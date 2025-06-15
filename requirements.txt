@@ -7,7 +7,6 @@ attrs==23.2.0
 bcrypt==4.0.1
 bitarray==2.9.2
 blinker==1.7.0
-certifi @ file:///private/tmp/python-certifi-20231118-5246-p3lgxk/certifi-2023.11.17
 cffi==1.16.0
 charset-normalizer==3.3.2
 click==8.1.7
