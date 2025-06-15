@@ -11,6 +11,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"]  # ← add this line
 )
 
 # 3. Utility Functions (like summarize_game_state)
