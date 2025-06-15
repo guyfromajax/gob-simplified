@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GOB MVP Simulator</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 24px;
+      background-color: #f9f9f9;
+    }
+    h1 {
+      font-size: 24px;
+    }
+    button {
+      margin-bottom: 20px;
+      padding: 10px 20px;
+      font-size: 16px;
+    }
+    table {
+      border-collapse: collapse;
+      margin-bottom: 24px;
+      width: 100%;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 8px;
+      text-align: center;
+    }
+    th {
+      background-color: #e9e9e9;
+    }
+    .team-header {
+      margin-top: 24px;
+    }
+    .sub-header {
+      margin-top: 12px;
+      font-size: 18px;
+    }
+    .scouting-table {
+      margin-top: 12px;
+      margin-bottom: 24px;
+    }
+    .scouting-table th {
+      background-color: #f0f0f0;
+    }
+  </style>
+</head>
+<body>
+  <h1>Geeked-Out Basketball Simulator</h1>
+  <button onclick="simulateGame()">Simulate Game</button>
+
+  <h2>Final Score</h2>
+  <div id="score"></div>
+
+  <h2>Points by Quarter</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Team</th>
+        <th>Q1</th>
+        <th>Q2</th>
+        <th>Q3</th>
+        <th>Q4</th>
+      </tr>
+    </thead>
+    <tbody id="quarterScores"></tbody>
+  </table>
+
+  <h2>Team Stats</h2>
+  <div class="sub-header">Lancaster</div>
+  <table>
+    <thead>
+      <tr><th>FGM</th><th>FGA</th><th>3PTA</th><th>3PTM</th><th>FTA</th><th>FTM</th><th>OREB</th><th>DREB</th><th>REB</th><th>AST</th></tr>
+    </thead>
+    <tbody id="teamStatsLancaster"></tbody>
+  </table>
+
+  <div class="sub-header">Bentley-Truman</div>
+  <table>
+    <thead>
+      <tr><th>FGM</th><th>FGA</th><th>3PTA</th><th>3PTM</th><th>FTA</th><th>FTM</th><th>OREB</th><th>DREB</th><th>REB</th><th>AST</th></tr>
+    </thead>
+    <tbody id="teamStatsBT"></tbody>
+  </table>
+
+  <h2>Scouting Reports</h2>
+  <div id="scoutingLancaster"></div>
+  <div id="scoutingBT"></div>
+
+  <h2 class="team-header">Box Score: Lancaster</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Player</th>
+        <th>PTS</th>
+        <th>REB</th>
+        <th>AST</th>
+        <th>FGA</th>
+        <th>FGM</th>
+      </tr>
+    </thead>
+    <tbody id="lancasterBox"></tbody>
+  </table>
+
+  <h2 class="team-header">Box Score: Bentley-Truman</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Player</th>
+        <th>PTS</th>
+        <th>REB</th>
+        <th>AST</th>
+        <th>FGA</th>
+        <th>FGM</th>
+      </tr>
+    </thead>
+    <tbody id="btBox"></tbody>
+  </table>
+
+  <script>
+    async function simulateGame() {
+      const res = await fetch("http://localhost:8000/simulate", {
+        method: "POST"
+      });
+      const data = await res.json();
+
+      document.getElementById("score").innerText = `Lancaster: ${data.final_score.Lancaster} | Bentley-Truman: ${data.final_score["Bentley-Truman"]}`;
+
+      const quarters = data.points_by_quarter;
+      const tbody = document.getElementById("quarterScores");
+      tbody.innerHTML = "";
+
+      for (let team in quarters) {
+        const row = document.createElement("tr");
+        row.innerHTML = `
+          <td>${team}</td>
+          <td>${quarters[team][0]}</td>
+          <td>${quarters[team][1]}</td>
+          <td>${quarters[team][2]}</td>
+          <td>${quarters[team][3]}</td>
+        `;
+        tbody.appendChild(row);
+      }
+
+      renderBoxScore(data.box_score.Lancaster, "lancasterBox");
+      renderBoxScore(data.box_score["Bentley-Truman"], "btBox");
+
+      renderTeamStats(data.box_score.Lancaster, "teamStatsLancaster");
+      renderTeamStats(data.box_score["Bentley-Truman"], "teamStatsBT");
+
+      renderScoutingReport(data.scouting.Lancaster, "Lancaster", "scoutingLancaster");
+      renderScoutingReport(data.scouting["Bentley-Truman"], "Bentley-Truman", "scoutingBT");
+    }
+
+    function renderBoxScore(boxData, tableId) {
+      const tbody = document.getElementById(tableId);
+      tbody.innerHTML = "";
+      for (let player in boxData) {
+        const stats = boxData[player];
+        const row = document.createElement("tr");
+        row.innerHTML = `
+          <td>${player}</td>
+          <td>${stats.PTS}</td>
+          <td>${stats.REB}</td>
+          <td>${stats.AST}</td>
+          <td>${stats.FGA}</td>
+          <td>${stats.FGM}</td>
+        `;
+        tbody.appendChild(row);
+      }
+    }
+
+    function renderTeamStats(boxData, tableId) {
+      const totals = {
+        FGM: 0, FGA: 0, "3PTA": 0, "3PTM": 0,
+        FTA: 0, FTM: 0, OREB: 0, DREB: 0, REB: 0, AST: 0
+      };
+      for (let player in boxData) {
+        for (let key in totals) {
+          totals[key] += boxData[player][key] || 0;
+        }
+      }
+      const row = document.createElement("tr");
+      row.innerHTML = Object.values(totals).map(v => `<td>${v}</td>`).join("");
+      document.getElementById(tableId).appendChild(row);
+    }
+
+    function renderScoutingReport(data, teamName, containerId) {
+      const container = document.getElementById(containerId);
+      container.innerHTML = `<h3>${teamName}</h3>`;
+
+      const table = document.createElement("table");
+      table.classList.add("scouting-table");
+
+      const header = document.createElement("tr");
+      header.innerHTML = "<th>Playcall</th><th>Used</th><th>Success</th>";
+      table.appendChild(header);
+
+      for (let play in data.offense.Playcalls) {
+        const row = document.createElement("tr");
+        row.innerHTML = `
+          <td>${play}</td>
+          <td>${data.offense.Playcalls[play].used}</td>
+          <td>${data.offense.Playcalls[play].success}</td>
+        `;
+        table.appendChild(row);
+      }
+
+      const fbRow = document.createElement("tr");
+      fbRow.innerHTML = `
+        <td>Fast Break</td>
+        <td>${data.offense.Fast_Break_Entries}</td>
+        <td>${data.offense.Fast_Break_Success}</td>
+      `;
+      table.appendChild(fbRow);
+
+      container.appendChild(table);
+    }
+  </script>
+</body>
+</html>
