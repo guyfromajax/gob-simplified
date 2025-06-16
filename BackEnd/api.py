@@ -2,9 +2,18 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from BackEnd.main import main
+from pymongo import MongoClient
+
 
 # 2. FastAPI App Setup
 app = FastAPI()
+#MongoDB Setup
+MONGO_URI = "mongodb+srv://jamiejosephdavies:Vu23fYitD0kR6IoH@mvp-cluster.dsp46ta.mongodb.net/?retryWrites=true&w=majority&appName=MVP-Cluster"
+
+client = MongoClient(MONGO_URI)
+db = client["gob"]
+games_collection = db["games"]
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
