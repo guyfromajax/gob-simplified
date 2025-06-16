@@ -40,5 +40,8 @@ def root():
 @app.post("/simulate")
 def simulate_game():
     game_state = main(return_game_state=True)
+    summary = summarize_game_state(game_state)
+
+    games_collection.insert_one(summary)  # ✅ Mongo write
     return summarize_game_state(game_state)
 
