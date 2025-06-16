@@ -8,7 +8,7 @@ from pymongo import MongoClient
 # 2. FastAPI App Setup
 app = FastAPI()
 #MongoDB Setup
-MONGO_URI = "mongodb+srv://jamiejosephdavies:Vu23fYitD0kR6IoH@mvp-cluster.dsp46ta.mongodb.net/?retryWrites=true&w=majority&appName=MVP-Cluster"
+MONGO_URI = "mongodb+srv://jamiejosephdavies:Vu23fYitD0kR6IoH@mvp-cluster.dsp46ta.mongodb.net/?retryWrites=true&w=majority"
 
 client = MongoClient(MONGO_URI)
 db = client["gob"]
