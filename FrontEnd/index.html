@@ -49,10 +49,21 @@
 </head>
 <body>
   <h1>Geeked-Out Basketball Simulator</h1>
+  <label for="modeSelect"><strong>Game Mode:</strong></label>
+  <select id="modeSelect">
+    <option value="single">Single Game</option>
+    <option value="bo3">Best of 3</option>
+  </select>
+
+  <br><br>
+
   <button onclick="simulateGame()">Simulate Game</button>
 
   <h2>Final Score</h2>
   <div id="score"></div>
+  <h2>Game Log</h2>
+  <div id="logContainer" style="background:#fff;border:1px solid #ccc;padding:12px;height:200px;overflow-y:scroll;font-family:monospace;font-size:14px;"></div>
+
 
   <h2>Points by Quarter</h2>
   <table>
@@ -119,105 +130,6 @@
     <tbody id="btBox"></tbody>
   </table>
 
-  <script>
-    async function simulateGame() {
-      const res = await fetch("http://localhost:8000/simulate", {
-        method: "POST"
-      });
-      const data = await res.json();
-
-      document.getElementById("score").innerText = `Lancaster: ${data.final_score.Lancaster} | Bentley-Truman: ${data.final_score["Bentley-Truman"]}`;
-
-      const quarters = data.points_by_quarter;
-      const tbody = document.getElementById("quarterScores");
-      tbody.innerHTML = "";
-
-      for (let team in quarters) {
-        const row = document.createElement("tr");
-        row.innerHTML = `
-          <td>${team}</td>
-          <td>${quarters[team][0]}</td>
-          <td>${quarters[team][1]}</td>
-          <td>${quarters[team][2]}</td>
-          <td>${quarters[team][3]}</td>
-        `;
-        tbody.appendChild(row);
-      }
-
-      renderBoxScore(data.box_score.Lancaster, "lancasterBox");
-      renderBoxScore(data.box_score["Bentley-Truman"], "btBox");
-
-      renderTeamStats(data.box_score.Lancaster, "teamStatsLancaster");
-      renderTeamStats(data.box_score["Bentley-Truman"], "teamStatsBT");
-
-      renderScoutingReport(data.scouting.Lancaster, "Lancaster", "scoutingLancaster");
-      renderScoutingReport(data.scouting["Bentley-Truman"], "Bentley-Truman", "scoutingBT");
-    }
-
-    function renderBoxScore(boxData, tableId) {
-      const tbody = document.getElementById(tableId);
-      tbody.innerHTML = "";
-      for (let player in boxData) {
-        const stats = boxData[player];
-        const row = document.createElement("tr");
-        row.innerHTML = `
-          <td>${player}</td>
-          <td>${stats.PTS}</td>
-          <td>${stats.REB}</td>
-          <td>${stats.AST}</td>
-          <td>${stats.FGA}</td>
-          <td>${stats.FGM}</td>
-        `;
-        tbody.appendChild(row);
-      }
-    }
-
-    function renderTeamStats(boxData, tableId) {
-      const totals = {
-        FGM: 0, FGA: 0, "3PTA": 0, "3PTM": 0,
-        FTA: 0, FTM: 0, OREB: 0, DREB: 0, REB: 0, AST: 0
-      };
-      for (let player in boxData) {
-        for (let key in totals) {
-          totals[key] += boxData[player][key] || 0;
-        }
-      }
-      const row = document.createElement("tr");
-      row.innerHTML = Object.values(totals).map(v => `<td>${v}</td>`).join("");
-      document.getElementById(tableId).appendChild(row);
-    }
-
-    function renderScoutingReport(data, teamName, containerId) {
-      const container = document.getElementById(containerId);
-      container.innerHTML = `<h3>${teamName}</h3>`;
-
-      const table = document.createElement("table");
-      table.classList.add("scouting-table");
-
-      const header = document.createElement("tr");
-      header.innerHTML = "<th>Playcall</th><th>Used</th><th>Success</th>";
-      table.appendChild(header);
-
-      for (let play in data.offense.Playcalls) {
-        const row = document.createElement("tr");
-        row.innerHTML = `
-          <td>${play}</td>
-          <td>${data.offense.Playcalls[play].used}</td>
-          <td>${data.offense.Playcalls[play].success}</td>
-        `;
-        table.appendChild(row);
-      }
-
-      const fbRow = document.createElement("tr");
-      fbRow.innerHTML = `
-        <td>Fast Break</td>
-        <td>${data.offense.Fast_Break_Entries}</td>
-        <td>${data.offense.Fast_Break_Success}</td>
-      `;
-      table.appendChild(fbRow);
-
-      container.appendChild(table);
-    }
-  </script>
+  <script src="app.js" defer></script>
 </body>
 </html>
