@@ -117,38 +117,53 @@ function renderTeamStats(boxData, tableId) {
   }
   
 
-  function renderScoutingReport(data, teamName, containerId) {
+function renderScoutingReport(data, teamName, containerId) {
     const container = document.getElementById(containerId);
     container.innerHTML = `<h3>${teamName}</h3>`;
-  
+
     const table = document.createElement("table");
     table.classList.add("scouting-table");
-  
+
     const header = document.createElement("tr");
     header.innerHTML = "<th>Playcall</th><th>Used</th><th>Success</th>";
     table.appendChild(header);
-  
+
     for (let play in data.offense.Playcalls) {
-      const row = document.createElement("tr");
-      row.innerHTML = `
+        const row = document.createElement("tr");
+        row.innerHTML = `
         <td>${play}</td>
         <td>${data.offense.Playcalls[play].used}</td>
         <td>${data.offense.Playcalls[play].success}</td>
-      `;
-      table.appendChild(row);
+        `;
+        table.appendChild(row);
     }
-  
+
     const fbRow = document.createElement("tr");
     fbRow.innerHTML = `
-      <td>Fast Break</td>
-      <td>${data.offense.Fast_Break_Entries}</td>
-      <td>${data.offense.Fast_Break_Success}</td>
+        <td>Fast Break</td>
+        <td>${data.offense.Fast_Break_Entries}</td>
+        <td>${data.offense.Fast_Break_Success}</td>
     `;
     table.appendChild(fbRow);
-  
+
     container.appendChild(table);
-  }
+    }
   
-  
+async function fetchPastGames() {
+    const res = await fetch("https://gob-simplified-production.up.railway.app/games");
+    const games = await res.json();
+
+    const container = document.getElementById("pastGamesContainer");
+    container.innerHTML = "";
+    games.forEach((game, i) => {
+        container.innerHTML += `<p><strong>Game ${i + 1}</strong>: ${game.final_score.Lancaster} - ${game.final_score["Bentley-Truman"]}</p>`;
+    });
+    }
+
+window.onload = () => {
+    fetchPastGames();
+    };
+      
+
   
   
