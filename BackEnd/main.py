@@ -1,10 +1,13 @@
 import random
 import json
+from BackEnd.api import app
+import uvicorn
+
 
 #PRE-GAME SETTINGS
 PRESET_ATTRIBUTES = {
     "Miller": {"SC": 81, "SH": 77, "ID": 21, "OD": 66, "PS": 86, "BH": 74, "RB": 48, "ST": 19, "AG": 70, "FT": 80, "ND": 72, "IQ": 82, "CH": 66, "EM": 51, "MO": 80},
-    "Kahn": {"SC": 37, "SH": 77, "ID": 20, "OD": 56, "PS": 50, "BH": 48, "RB": 48, "ST": 37, "AG": 20, "FT": 99, "ND": 89, "IQ": 66, "CH": 25, "EM": 80, "MO": 80},
+    "Khan": {"SC": 37, "SH": 77, "ID": 20, "OD": 56, "PS": 50, "BH": 48, "RB": 48, "ST": 37, "AG": 20, "FT": 99, "ND": 89, "IQ": 66, "CH": 25, "EM": 80, "MO": 80},
     "Struthers": {"SC": 90, "SH": 91, "ID": 90, "OD": 99, "PS": 69, "BH": 57, "RB": 67, "ST": 59, "AG": 61, "FT": 71, "ND": 37, "IQ": 90, "CH": 93, "EM": 48, "MO": 80},
     "Buckles": {"SC": 55, "SH": 5, "ID": 52, "OD": 17, "PS": 33, "BH": 13, "RB": 72, "ST": 58, "AG": 9, "FT": 55, "ND": 46, "IQ": 79, "CH": 77, "EM": 9, "MO": 80},
     "Henrich": {"SC": 80, "SH": 17, "ID": 69, "OD": 10, "PS": 18, "BH": 29, "RB": 80, "ST": 98, "AG": 37, "FT": 29, "ND": 27, "IQ": 18, "CH": 19, "EM": 66, "MO": 80},
@@ -1756,8 +1759,13 @@ def main(return_game_state=False):
     if return_game_state:
         return game_state
 
+# if __name__ == "__main__":
+#     game_state = main(return_game_state=False)
+
 if __name__ == "__main__":
-    game_state = main(return_game_state=False)
+    # This starts the FastAPI server when running locally or on Railway
+    uvicorn.run(app, host="0.0.0.0", port=8000)
+
 
 # if __name__ == "__main__":
     # aggregates = initialize_aggregates()
