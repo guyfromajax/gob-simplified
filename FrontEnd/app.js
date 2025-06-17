@@ -149,16 +149,6 @@ function renderScoutingReport(data, teamName, containerId) {
     container.appendChild(table);
     }
   
-async function fetchPastGames() {
-    const res = await fetch("https://gob-simplified-production.up.railway.app/games");
-    const games = await res.json();
-
-    const container = document.getElementById("pastGamesContainer");
-    container.innerHTML = "";
-    games.forEach((game, i) => {
-        container.innerHTML += `<p><strong>Game ${i + 1}</strong>: ${game.final_score.Lancaster} - ${game.final_score["Bentley-Truman"]}</p>`;
-    });
-    }
 
 async function loadPastGames() {
     console.log("Fetching past games...");
