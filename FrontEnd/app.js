@@ -160,9 +160,10 @@ async function fetchPastGames() {
     });
     }
 
-window.onload = () => {
-    fetchPastGames();
-    };
+if (window.location.pathname.includes("games.html")) {
+        loadPastGames();
+      }
+      
       
 
   
