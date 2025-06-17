@@ -160,8 +160,32 @@ async function fetchPastGames() {
     });
     }
 
+async function loadPastGames() {
+    console.log("Fetching past games...");
+    
+    try {
+        const response = await fetch("https://gob-simplified-production.up.railway.app/games");
+        console.log("Response:", response);
+    
+        const games = await response.json();
+        console.log("Games:", games);
+    
+        const container = document.getElementById("pastGamesContainer");
+        container.innerHTML = ""; // Clear loading text
+    
+        games.forEach((game, index) => {
+        const p = document.createElement("p");
+        p.innerText = `Game ${index + 1}: Lancaster ${game.final_score.Lancaster} - Bentley-Truman ${game.final_score["Bentley-Truman"]}`;
+        container.appendChild(p);
+        });
+    } catch (error) {
+        console.error("Failed to load past games:", error);
+    }
+    }
+      
+
 if (window.location.pathname.includes("games.html")) {
-        fetchPastGames();
+    loadPastGames();
       }
       
       
