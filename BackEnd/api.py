@@ -1,6 +1,7 @@
 # 1. Imports
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from BackEnd.main import main
 from pymongo import MongoClient
 import os
@@ -49,3 +50,13 @@ def simulate_game():
     games_collection.insert_one(summary)  # ✅ Mongo write
     return summarize_game_state(game_state)
 
+@app.get("/games")
+def get_games():
+    # Fetch the 10 most recent games (you can adjust this)
+    games = list(games_collection.find().sort("_id", -1).limit(10))
+
+    # Convert ObjectId to string for JSON serialization
+    for game in games:
+        game["_id"] = str(game["_id"])
+
+    return JSONResponse(content=games)
