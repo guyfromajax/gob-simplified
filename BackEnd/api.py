@@ -3,13 +3,16 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from BackEnd.main import main
 from pymongo import MongoClient
+import os
 
-#minor update
+
 
 # 2. FastAPI App Setup
 app = FastAPI()
 #MongoDB Setup
-MONGO_URI = "mongodb://jamiejosephdavies:Vu23fYitD0kR6IoH@mvp-cluster.dsp46ta.mongodb.net:27017/?retryWrites=true&w=majority"
+# MONGO_URI = "mongodb://jamiejosephdavies:Vu23fYitD0kR6IoH@mvp-cluster.dsp46ta.mongodb.net:27017/?retryWrites=true&w=majority"
+MONGO_URI = os.environ["MONGO_URI"]
+
 
 client = MongoClient(MONGO_URI)
 db = client["gob"]
