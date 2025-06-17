@@ -161,7 +161,7 @@ async function fetchPastGames() {
     }
 
 if (window.location.pathname.includes("games.html")) {
-        loadPastGames();
+        fetchPastGames();
       }
       
       
