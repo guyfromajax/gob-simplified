@@ -6,13 +6,6 @@ async function simulateGame() {
     console.log("Selected mode:", mode);
     console.log("Games to play:", gamesToPlay);
 
-    // if (mode === "bo3") {
-    //     const res = await fetch("https://gob-api.onrender.com/simulate", {
-    //         method: "POST"
-    //     });
-    //     const data = await res.json();
-    //     latestGameData = data;
-    // }
     let wins = { Lancaster: 0, "Bentley-Truman": 0 };
     let latestGameData = null;
   
@@ -29,7 +22,7 @@ async function simulateGame() {
       console.log(`Simulating game ${i + 1}...`);
       document.getElementById("logContainer").innerHTML += `<div>🟢 Game ${i + 1} starting...</div>`;
 
-      const res = await fetch("https://gob-api.onrender.com/simulate", {
+      const res = await fetch("https://gob-simplified-production.up.railway.app/simulate", {
         method: "POST"
       });
       const data = await res.json();
