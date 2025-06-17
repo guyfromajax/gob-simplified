@@ -5,6 +5,8 @@ from fastapi.responses import JSONResponse
 from pymongo import MongoClient
 import os
 import uuid
+from BackEnd.main import main
+
 
 # Mongo setup
 MONGO_URI = os.environ["MONGO_URI"]

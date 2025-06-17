@@ -1,6 +1,6 @@
 import random
 import json
-from BackEnd.api import app
+from api import app
 from pymongo import MongoClient
 import os
 
@@ -9,22 +9,7 @@ client = MongoClient(MONGO_URI)
 db = client["GOB"]
 players_collection = db["players"]
 
-
-
 #PRE-GAME SETTINGS
-# PRESET_ATTRIBUTES = {
-#     "Miller": {"SC": 81, "SH": 77, "ID": 21, "OD": 66, "PS": 86, "BH": 74, "RB": 48, "ST": 19, "AG": 70, "FT": 80, "ND": 72, "IQ": 82, "CH": 66, "EM": 51, "MO": 80},
-#     "Khan": {"SC": 37, "SH": 77, "ID": 20, "OD": 56, "PS": 50, "BH": 48, "RB": 48, "ST": 37, "AG": 20, "FT": 99, "ND": 89, "IQ": 66, "CH": 25, "EM": 80, "MO": 80},
-#     "Struthers": {"SC": 90, "SH": 91, "ID": 90, "OD": 99, "PS": 69, "BH": 57, "RB": 67, "ST": 59, "AG": 61, "FT": 71, "ND": 37, "IQ": 90, "CH": 93, "EM": 48, "MO": 80},
-#     "Buckles": {"SC": 55, "SH": 5, "ID": 52, "OD": 17, "PS": 33, "BH": 13, "RB": 72, "ST": 58, "AG": 9, "FT": 55, "ND": 46, "IQ": 79, "CH": 77, "EM": 9, "MO": 80},
-#     "Henrich": {"SC": 80, "SH": 17, "ID": 69, "OD": 10, "PS": 18, "BH": 29, "RB": 80, "ST": 98, "AG": 37, "FT": 29, "ND": 27, "IQ": 18, "CH": 19, "EM": 66, "MO": 80},
-#     "Fletcher": {"SC": 62, "SH": 41, "ID": 70, "OD": 88, "PS": 94, "BH": 77, "RB": 66, "ST": 44, "AG": 90, "FT": 60, "ND": 74, "IQ": 97, "CH": 88, "EM": 55, "MO": 80},
-#     "Athens": {"SC": 81, "SH": 91, "ID": 58, "OD": 71, "PS": 36, "BH": 69, "RB": 43, "ST": 43, "AG": 71, "FT": 93, "ND": 85, "IQ": 55, "CH": 49, "EM": 88, "MO": 80},
-#     "Rozier": {"SC": 62, "SH": 39, "ID": 68, "OD": 72, "PS": 28, "BH": 47, "RB": 68, "ST": 72, "AG": 20, "FT": 55, "ND": 23, "IQ": 42, "CH": 67, "EM": 90, "MO": 80},
-#     "Castleman": {"SC": 57, "SH": 12, "ID": 70, "OD": 12, "PS": 44, "BH": 7, "RB": 59, "ST": 83, "AG": 14, "FT": 38, "ND": 18, "IQ": 18, "CH": 19, "EM": 58, "MO": 80},
-#     "Prospect": {"SC": 98, "SH": 68, "ID": 99, "OD": 56, "PS": 50, "BH": 58, "RB": 100, "ST": 90, "AG": 64, "FT": 82, "ND": 94, "IQ": 92, "CH": 99, "EM": 35, "MO": 80}
-# }
-
 # 1. Get players from MongoDB for each team
 lancaster_roster = list(players_collection.find({"team": "Lancaster"}))
 bt_roster = list(players_collection.find({"team": "Bentley-Truman"}))
@@ -820,7 +805,7 @@ def resolve_shot(roles, defense, game_state):
         record_stat(game_state, opp_team, defense["primary_defender"], "DEF_S")
         #Build dict based on player proximity to the ball in the future
         base_block_prob = BLOCK_PROBABILITY.get(playcall, 0.0)
-        # Defensive player’s ID score (scaled 0–1)
+        # Defensive player's ID score (scaled 0–1)
         block_skill = defense_attrs["ID"] / 100  
         # Final block chance: scaled by skill
         final_block_chance = base_block_prob * (0.5 + block_skill)  # scales 50–150% of base
@@ -881,7 +866,7 @@ def resolve_shot(roles, defense, game_state):
             if attempt_putback:
                 text += (f"... he attempts the putback...")
 
-                # Basic putback shot calculation (we’ll refine later)
+                # Basic putback shot calculation (we'll refine later)
                 attrs = game_state["player_attributes"][team][rebounder]
                 shot_score = (
                     attrs["SC"] * 0.6 +
@@ -1473,16 +1458,17 @@ def main(return_game_state=False):
     game_state = {
         "offense_team": "Lancaster",
         "defense_team": "Bentley-Truman",
-        "players" = {
+        "players": {
             "Lancaster": lancaster_starters,
             "Bentley-Truman": bt_starters
-        }
+        },
         "score": {"Lancaster": 0, "Bentley-Truman": 0},
         "time_remaining": 480,
         "quarter": 1,
         "offensive_state": "HALF_COURT",
         "tempo": 2,
         "playcall": {"offense": "Base", "defense": "Man"},
+        "defense_playcall": "Man",  # Add this line
         "turn_number": 17,
         "team_fouls": {
             "Lancaster": 0,
@@ -1494,7 +1480,8 @@ def main(return_game_state=False):
         "bonsu_active": False,
         "box_score": {
             "Lancaster": {},
-            "Bentley-Truman": {}}
+            "Bentley-Truman": {}
+        }
     }
 
     game_state["scouting_data"] = {
@@ -1560,22 +1547,17 @@ def main(return_game_state=False):
 
     game_state["player_attributes"] = {}
 
+    # Build player_attributes from the full player objects already loaded from Mongo
     for team in game_state["players"]:
         game_state["player_attributes"][team] = {}
-        for pos, player in game_state["players"][team].items():
-            attr = {}
+        for pos, player_obj in game_state["players"][team].items():
+            attr = {k: v for k, v in player_obj.items() if k not in ["_id", "first_name", "last_name", "team"]}
+            for key in attr:
+                attr[f"anchor_{key}"] = attr[key]  # Save anchor values
+            game_state["player_attributes"][team][pos] = attr
 
-            preset = PRESET_ATTRIBUTES[player]
-            for key in ALL_ATTRS:
-                val = preset[key]
-                attr[f"anchor_{key}"] = val
-                attr[key] = val
-
-            attr["NG"] = 1.0  # Energy (separately capped at 1.0)
-
-            game_state["player_attributes"][team][player] = attr
             if not return_game_state:
-                print(game_state["player_attributes"][team][player])
+                print(game_state["player_attributes"][team][pos])  # Fix player to pos
 
     i = 1
     for q in range(1, 5):  # quarters 1 to 4
