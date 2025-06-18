@@ -1583,12 +1583,13 @@ def main(return_game_state=False):
         game_state["player_attributes"][team] = {}
         for pos, player_obj in game_state["players"][team].items():
             attr = {k: v for k, v in player_obj.items() if k not in ["_id", "first_name", "last_name", "team"]}
-            for key in attr:
-                attr[f"anchor_{key}"] = attr[key]  # Save anchor values
+            for key in list(attr):  # ✅ Safe copy of keys
+                attr[f"anchor_{key}"] = attr[key]
             game_state["player_attributes"][team][pos] = attr
 
             if not return_game_state:
                 print(game_state["player_attributes"][team][pos])  # Fix player to pos
+
 
     i = 1
     for q in range(1, 5):  # quarters 1 to 4
