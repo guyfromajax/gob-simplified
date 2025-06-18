@@ -63,6 +63,9 @@ def get_games():
 
 @app.post("/setup_teams")
 def setup_teams():
+    # Force remove any old teams & players before fresh insert
+    teams_collection.delete_many({})
+    players_collection.delete_many({})
 
     if teams_collection.count_documents({"name": "Lancaster"}) > 0:
         return {"message": "Teams already exist"}
