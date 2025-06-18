@@ -63,9 +63,10 @@ def get_games():
 
 @app.post("/setup_teams")
 def setup_teams():
-    # Force remove any old teams & players before fresh insert
+    # 🔄 TEMP FIX: clear the collection to avoid "already exist" block
     teams_collection.delete_many({})
     players_collection.delete_many({})
+    print("✅ Cleared teams and players collections.")
 
     if teams_collection.count_documents({"name": "Lancaster"}) > 0:
         return {"message": "Teams already exist"}
