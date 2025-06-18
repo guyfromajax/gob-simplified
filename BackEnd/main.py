@@ -4,7 +4,10 @@ import json
 from pymongo import MongoClient
 import os
 
-MONGO_URI = os.getenv("MONGO_URI")  # Make sure it's loaded in your env on Railway and local
+MONGO_URI = os.getenv("MONGO_URI")
+if not MONGO_URI:
+    raise RuntimeError("❌ MONGO_URI is not set in the environment.")
+
 client = MongoClient(MONGO_URI)
 db = client["GOB"]
 players_collection = db["players"]
@@ -1442,6 +1445,10 @@ def main(return_game_state=False):
     # Get team documents
     lancaster_team = teams_collection.find_one({"name": "Lancaster"})
     bt_team = teams_collection.find_one({"name": "Bentley-Truman"})
+    print("🔍 Checking live team names in /simulate:")
+    for t in teams_collection.find({}):
+        print("🧪", t.get("name"))
+
 
     print("🧠 Inserted teams:")
     for team in teams_collection.find({}):
