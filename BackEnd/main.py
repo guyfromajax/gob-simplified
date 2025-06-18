@@ -528,7 +528,7 @@ def determine_event_type(game_state, roles):
     #determine number of turnover RNGs based on defense team'saggression
     for pos, player_obj in game_state["players"][team].items():
         player_name = f"{player_obj['first_name']} {player_obj['last_name']}"
-        attr = game_state["player_attributes"][team][player_name]
+        attr = game_state["player_attributes"][team][pos]
         ng = attr["NG"]
         for key in MALLEABLE_ATTRS:
             anchor_val = attr[f"anchor_{key}"]
@@ -606,7 +606,7 @@ def recalculate_energy_scaled_attributes(game_state):
     for team in game_state["players"]:
         for pos, player_obj in game_state["players"][team].items():
             player_name = f"{player_obj['first_name']} {player_obj['last_name']}"
-            attr = game_state["player_attributes"][team][player_name]
+            attr = game_state["player_attributes"][team][pos]
             ng = attr["NG"]
             for key in MALLEABLE_ATTRS:
                 anchor_val = attr[f"anchor_{key}"]
@@ -1603,7 +1603,7 @@ def main(return_game_state=False):
         for team in game_state["players"]:
             for pos, player_obj in game_state["players"][team].items():
                 player_name = f"{player_obj['first_name']} {player_obj['last_name']}"
-                attr = game_state["player_attributes"][team][player_name]
+                attr = game_state["player_attributes"][team][pos]
                 attr["NG"] = min(1.0, round(attr["NG"] + recharge_amount, 3))
 
         if not return_game_state:
@@ -1636,7 +1636,7 @@ def main(return_game_state=False):
             for team in [game_state["offense_team"], game_state["defense_team"]]:
                 for pos, player_obj in game_state["players"][team].items():
                     player_name = f"{player_obj['first_name']} {player_obj['last_name']}"
-                    attr = game_state["player_attributes"][team][player_name]
+                    attr = game_state["player_attributes"][team][pos]
                     endurance = attr["ND"]
                     decay = max(0.001, base_decay - (endurance / 1000))  # Prevent negative decay
                     decay = max(0.001, decay * energy_rng_seed)  # Apply seeded RNG
@@ -1705,7 +1705,7 @@ def main(return_game_state=False):
             for team in [game_state["offense_team"], game_state["defense_team"]]:
                 for pos, player_obj in game_state["players"][team].items():
                     player_name = f"{player_obj['first_name']} {player_obj['last_name']}"
-                    attr = game_state["player_attributes"][team][player_name]
+                    attr = game_state["player_attributes"][team][pos]
                     endurance = attr["ND"]
                     decay = max(0.001, base_decay - (endurance / 1000))
                     decay = max(0.001, decay * energy_rng_seed)
