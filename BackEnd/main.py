@@ -1,6 +1,6 @@
 import random
 import json
-from BackEnd.api import app
+# from BackEnd.api import app
 from pymongo import MongoClient
 import os
 
@@ -1758,10 +1758,10 @@ def main(return_game_state=False):
 # if __name__ == "__main__":
 #     game_state = main(return_game_state=False)
 
-if __name__ == "__main__":
-    # This starts the FastAPI server when running locally or on Railway
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+# if __name__ == "__main__":
+#     # This starts the FastAPI server when running locally or on Railway
+#     import uvicorn
+#     uvicorn.run(app, host="0.0.0.0", port=8000)
 
 # if __name__ == "__main__":
 #     import uvicorn
