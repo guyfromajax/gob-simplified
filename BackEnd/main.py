@@ -1437,7 +1437,11 @@ def main(return_game_state=False):
     energy_rng_seed = 1.0  # Default for first turn
     # 1. Get players from MongoDB for each team
     lancaster_roster = list(players_collection.find({"team": "Lancaster"}))
+    print(f"🔍 Found {len(lancaster_roster)} players for Lancaster")
     bt_roster = list(players_collection.find({"team": "Bentley-Truman"}))
+    print(f"🔍 Found {len(bt_roster)} players for Bentley-Truman")
+    if len(lancaster_roster) < 5 or len(bt_roster) < 5:
+        raise ValueError("Not enough players found in database to simulate a game.")
     lancaster_starters = {
         "PG": lancaster_roster[0]["last_name"],
         "SG": lancaster_roster[1]["last_name"],
