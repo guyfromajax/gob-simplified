@@ -43,6 +43,10 @@ def root():
 
 @app.post("/simulate")
 def simulate_game():
+    print("🧪 Team docs in DB:")
+    for team in teams_collection.find({}):
+        print(team)
+
     game_state = main(return_game_state=True)
     summary = summarize_game_state(game_state)
 
