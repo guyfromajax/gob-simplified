@@ -1,6 +1,7 @@
 import random
 import json
-from BackEnd.api import teams_collection, players_collection 
+from BackEnd.db import players_collection, teams_collection
+
 # from pymongo import MongoClient
 # import os
 # from dotenv import load_dotenv

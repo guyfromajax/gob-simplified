@@ -2,19 +2,21 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from pymongo import MongoClient
-import os
+# from pymongo import MongoClient
+# import os
 import uuid
 from BackEnd.main import main
+from BackEnd.db import players_collection, teams_collection, games_collection
+
 
 
 # Mongo setup
-MONGO_URI = os.environ["MONGO_URI"]
-client = MongoClient(MONGO_URI)
-db = client["gob"]
-games_collection = db["games"]
-players_collection = db["players"]
-teams_collection = db["teams"]
+# MONGO_URI = os.environ["MONGO_URI"]
+# client = MongoClient(MONGO_URI)
+# db = client["gob"]
+# games_collection = db["games"]
+# players_collection = db["players"]
+# teams_collection = db["teams"]
 
 app = FastAPI()
 
