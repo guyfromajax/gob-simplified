@@ -1443,6 +1443,11 @@ def main(return_game_state=False):
     lancaster_team = teams_collection.find_one({"name": "Lancaster"})
     bt_team = teams_collection.find_one({"name": "Bentley-Truman"})
 
+    print("🧠 Inserted teams:")
+    for team in teams_collection.find({}):
+        print("📁", team.get("name"))
+
+
     if not lancaster_team or not bt_team:
         raise ValueError("One or both teams not found in the database.")
 
