@@ -8,6 +8,7 @@ MONGO_URI = os.getenv("MONGO_URI")  # Make sure it's loaded in your env on Railw
 client = MongoClient(MONGO_URI)
 db = client["GOB"]
 players_collection = db["players"]
+teams_collection = db["teams"]
 
 #PRE-GAME SETTINGS
 
@@ -518,8 +519,9 @@ def determine_event_type(game_state, roles):
     event_type = calculate_foul_turnover(game_state, positions, thresholds, roles)
    
     #determine number of turnover RNGs based on defense team'saggression
-    for pos, player in game_state["players"][team].items():
-        attr = game_state["player_attributes"][team][player]
+    for pos, player_obj in game_state["players"][team].items():
+        player_name = f"{player_obj['first_name']} {player_obj['last_name']}"
+        attr = game_state["player_attributes"][team][player_name]
         ng = attr["NG"]
         for key in MALLEABLE_ATTRS:
             anchor_val = attr[f"anchor_{key}"]
@@ -595,8 +597,9 @@ def generate_animation_packet(turn_result):
 
 def recalculate_energy_scaled_attributes(game_state):
     for team in game_state["players"]:
-        for pos, player in game_state["players"][team].items():
-            attr = game_state["player_attributes"][team][player]
+        for pos, player_obj in game_state["players"][team].items():
+            player_name = f"{player_obj['first_name']} {player_obj['last_name']}"
+            attr = game_state["player_attributes"][team][player_name]
             ng = attr["NG"]
             for key in MALLEABLE_ATTRS:
                 anchor_val = attr[f"anchor_{key}"]
@@ -1435,35 +1438,40 @@ def print_scouting_report(data):
 #MAIN
 def main(return_game_state=False):
     energy_rng_seed = 1.0  # Default for first turn
-    # 1. Get players from MongoDB for each team
-    lancaster_roster = list(players_collection.find({"team": "Lancaster"}))
-    print(f"🔍 Found {len(lancaster_roster)} players for Lancaster")
-    bt_roster = list(players_collection.find({"team": "Bentley-Truman"}))
-    print(f"🔍 Found {len(bt_roster)} players for Bentley-Truman")
-    if len(lancaster_roster) < 5 or len(bt_roster) < 5:
-        raise ValueError("Not enough players found in database to simulate a game.")
-    lancaster_starters = {
-        "PG": lancaster_roster[0]["last_name"],
-        "SG": lancaster_roster[1]["last_name"],
-        "SF": lancaster_roster[2]["last_name"],
-        "PF": lancaster_roster[3]["last_name"],
-        "C": lancaster_roster[4]["last_name"]
-    }
+    
+    # Get team documents
+    lancaster_team = teams_collection.find_one({"name": "Lancaster"})
+    bt_team = teams_collection.find_one({"name": "Bentley-Truman"})
 
-    bt_starters = {
-        "PG": bt_roster[0]["last_name"],
-        "SG": bt_roster[1]["last_name"],
-        "SF": bt_roster[2]["last_name"],
-        "PF": bt_roster[3]["last_name"],
-        "C": bt_roster[4]["last_name"]
-    }
+    # Pull 5 player documents from Mongo based on stored IDs
+    lancaster_roster = [
+        players_collection.find_one({"_id": pid})
+        for pid in lancaster_team["player_ids"][:5]
+    ]
+    bt_roster = [
+        players_collection.find_one({"_id": pid})
+        for pid in bt_team["player_ids"][:5]
+    ]
+
 
     game_state = {
         "offense_team": "Lancaster",
         "defense_team": "Bentley-Truman",
         "players": {
-            "Lancaster": lancaster_starters,
-            "Bentley-Truman": bt_starters
+            "Lancaster": {
+                "PG": lancaster_roster[0],
+                "SG": lancaster_roster[1],
+                "SF": lancaster_roster[2],
+                "PF": lancaster_roster[3],
+                "C":  lancaster_roster[4]
+            },
+            "Bentley-Truman": {
+                "PG": bt_roster[0],
+                "SG": bt_roster[1],
+                "SF": bt_roster[2],
+                "PF": bt_roster[3],
+                "C":  bt_roster[4]
+            }
         },
         "score": {"Lancaster": 0, "Bentley-Truman": 0},
         "time_remaining": 480,
@@ -1523,8 +1531,9 @@ def main(return_game_state=False):
 
     for team in game_state["players"]:
         game_state["box_score"][team] = {}
-        for pos, player in game_state["players"][team].items():
-            game_state["box_score"][team][player] = {
+        for pos, player_obj in game_state["players"][team].items():
+            player_name = f"{player_obj['first_name']} {player_obj['last_name']}"
+            game_state["box_score"][team][player_name] = {
                 "FGA": 0,
                 "FGM": 0,
                 "3PTA": 0,
@@ -1572,8 +1581,9 @@ def main(return_game_state=False):
         game_state["time_remaining"] = 480  # 8 minutes per quarter
         # Recharge NG at quarter break
         for team in game_state["players"]:
-            for pos, player in game_state["players"][team].items():
-                attr = game_state["player_attributes"][team][player]
+            for pos, player_obj in game_state["players"][team].items():
+                player_name = f"{player_obj['first_name']} {player_obj['last_name']}"
+                attr = game_state["player_attributes"][team][player_name]
                 attr["NG"] = min(1.0, round(attr["NG"] + recharge_amount, 3))
 
         if not return_game_state:
@@ -1604,8 +1614,9 @@ def main(return_game_state=False):
             fatigue_mod = 1.1 if game_state["defense_playcall"] == "Man" else 0.9
             def_team = game_state["defense_team"]
             for team in [game_state["offense_team"], game_state["defense_team"]]:
-                for pos, player in game_state["players"][team].items():
-                    attr = game_state["player_attributes"][team][player]
+                for pos, player_obj in game_state["players"][team].items():
+                    player_name = f"{player_obj['first_name']} {player_obj['last_name']}"
+                    attr = game_state["player_attributes"][team][player_name]
                     endurance = attr["ND"]
                     decay = max(0.001, base_decay - (endurance / 1000))  # Prevent negative decay
                     decay = max(0.001, decay * energy_rng_seed)  # Apply seeded RNG
@@ -1672,8 +1683,9 @@ def main(return_game_state=False):
                 energy_rng_seed = random.choices([0.9, 0.95, 1.0, 1.05, 1.1], weights=[1, 2, 5, 2, 1])[0]
             base_decay = 0.025
             for team in [game_state["offense_team"], game_state["defense_team"]]:
-                for pos, player in game_state["players"][team].items():
-                    attr = game_state["player_attributes"][team][player]
+                for pos, player_obj in game_state["players"][team].items():
+                    player_name = f"{player_obj['first_name']} {player_obj['last_name']}"
+                    attr = game_state["player_attributes"][team][player_name]
                     endurance = attr["ND"]
                     decay = max(0.001, base_decay - (endurance / 1000))
                     decay = max(0.001, decay * energy_rng_seed)
