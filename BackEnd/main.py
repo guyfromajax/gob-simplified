@@ -215,7 +215,6 @@ def resolve_strategy_calls(game_state):
 
 def resolve_turn(game_state):
     offense_team = game_state["offense_team"]
-    print(f"Entering resolve_turn()\nOFFENSE TEAM: {offense_team}\offensive_state: {game_state.get('offensive_state')}")
     # print(f"game_state: {game_state}")
     if game_state["offensive_state"] == "FREE_THROW":
         return resolve_free_throw(game_state)
