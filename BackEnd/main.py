@@ -10,24 +10,6 @@ db = client["GOB"]
 players_collection = db["players"]
 
 #PRE-GAME SETTINGS
-# 1. Get players from MongoDB for each team
-lancaster_roster = list(players_collection.find({"team": "Lancaster"}))
-bt_roster = list(players_collection.find({"team": "Bentley-Truman"}))
-lancaster_starters = {
-    "PG": lancaster_roster[0]["last_name"],
-    "SG": lancaster_roster[1]["last_name"],
-    "SF": lancaster_roster[2]["last_name"],
-    "PF": lancaster_roster[3]["last_name"],
-    "C": lancaster_roster[4]["last_name"]
-}
-
-bt_starters = {
-    "PG": bt_roster[0]["last_name"],
-    "SG": bt_roster[1]["last_name"],
-    "SF": bt_roster[2]["last_name"],
-    "PF": bt_roster[3]["last_name"],
-    "C": bt_roster[4]["last_name"]
-}
 
 ALL_ATTRS = [
     "SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "FT",  # malleable
@@ -1453,6 +1435,24 @@ def print_scouting_report(data):
 #MAIN
 def main(return_game_state=False):
     energy_rng_seed = 1.0  # Default for first turn
+    # 1. Get players from MongoDB for each team
+    lancaster_roster = list(players_collection.find({"team": "Lancaster"}))
+    bt_roster = list(players_collection.find({"team": "Bentley-Truman"}))
+    lancaster_starters = {
+        "PG": lancaster_roster[0]["last_name"],
+        "SG": lancaster_roster[1]["last_name"],
+        "SF": lancaster_roster[2]["last_name"],
+        "PF": lancaster_roster[3]["last_name"],
+        "C": lancaster_roster[4]["last_name"]
+    }
+
+    bt_starters = {
+        "PG": bt_roster[0]["last_name"],
+        "SG": bt_roster[1]["last_name"],
+        "SF": bt_roster[2]["last_name"],
+        "PF": bt_roster[3]["last_name"],
+        "C": bt_roster[4]["last_name"]
+    }
 
     game_state = {
         "offense_team": "Lancaster",
