@@ -1,20 +1,20 @@
 import random
 import json
-# from BackEnd.api import app
-from pymongo import MongoClient
-import os
-from dotenv import load_dotenv
-load_dotenv()
+from BackEnd.api import teams_collection, players_collection 
+# from pymongo import MongoClient
+# import os
+# from dotenv import load_dotenv
+# load_dotenv()
 
-MONGO_URI = os.getenv("MONGO_URI")
-if not MONGO_URI:
-    raise RuntimeError("❌ MONGO_URI is not set in the environment.")
-print(f"✅ Using MONGO_URI: {MONGO_URI}")
+# MONGO_URI = os.getenv("MONGO_URI")
+# if not MONGO_URI:
+#     raise RuntimeError("❌ MONGO_URI is not set in the environment.")
+# print(f"✅ Using MONGO_URI: {MONGO_URI}")
 
-client = MongoClient(MONGO_URI)
-db = client["GOB"]
-players_collection = db["players"]
-teams_collection = db["teams"]
+# client = MongoClient(MONGO_URI)
+# db = client["GOB"]
+# players_collection = db["players"]
+# teams_collection = db["teams"]
 
 #PRE-GAME SETTINGS
 
