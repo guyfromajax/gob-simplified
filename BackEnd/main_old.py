@@ -338,7 +338,7 @@ def resolve_free_throw(game_state):
     shooter = game_state["last_ball_handler"]
     offense = game_state["offense_team"]
     defense = game_state["defense_team"]
-    attrs = game_state["players"][offense][shooter]["attributes"]
+    attrs = game_state["player_attributes"][offense][shooter]
 
     # Use player's FT attribute
     ft_shot_score = ((attrs["FT"] * 0.8) + (attrs["CH"] * 0.2)) * random.randint(1, 6)
@@ -371,8 +371,8 @@ def resolve_free_throw(game_state):
             d_pos = choose_rebounder(rebounder_dict, "defense")
             o_rebounder = game_state["players"][offense][o_pos]
             d_rebounder = game_state["players"][defense][d_pos]
-            o_attr = game_state["players"][offense][o_rebounder]["attributes"]
-            d_attr = game_state["players"][defense][d_rebounder]["attributes"]
+            o_attr = game_state["player_attributes"][offense][o_rebounder]
+            d_attr = game_state["player_attributes"][defense][d_rebounder]
 
             o_score = calculate_rebound_score(o_attr)
             d_score = calculate_rebound_score(d_attr)
@@ -513,7 +513,7 @@ def determine_event_type(game_state, roles):
     #determine number of turnover RNGs based on defense team'saggression
     for pos, player_obj in game_state["players"][team].items():
         player_name = f"{player_obj['first_name']} {player_obj['last_name']}"
-        attr = game_state["players"][team][pos]["attributes"]
+        attr = game_state["player_attributes"][team][pos]
         ng = attr["NG"]
         for key in MALLEABLE_ATTRS:
             anchor_val = attr[f"anchor_{key}"]
@@ -591,7 +591,7 @@ def recalculate_energy_scaled_attributes(game_state):
     for team in game_state["players"]:
         for pos, player_obj in game_state["players"][team].items():
             player_name = f"{player_obj['first_name']} {player_obj['last_name']}"
-            attr = game_state["players"][team][pos]["attributes"]
+            attr = game_state["player_attributes"][team][pos]
             ng = attr["NG"]
             for key in MALLEABLE_ATTRS:
                 anchor_val = attr[f"anchor_{key}"]
@@ -607,7 +607,7 @@ def resolve_fast_break_shot(game_state, roles):
         passer = ""
     team = game_state["offense_team"]
     def_team = game_state["defense_team"]
-    attrs = game_state["players"][team][shooter]["attributes"]
+    attrs = game_state["player_attributes"][team][shooter]
     if shooter == passer:
         passer = ""
 
@@ -615,7 +615,7 @@ def resolve_fast_break_shot(game_state, roles):
 
     defender = random.choice(roles["defense"]) if roles["defense"] else ""
     if defender:
-        defense_attrs = game_state["players"][def_team][defender]["attributes"]
+        defense_attrs = game_state["player_attributes"][def_team][defender]
         defense_penalty = (defense_attrs["ID"] * 0.8 + defense_attrs["IQ"] * 0.1 + defense_attrs["CH"] * 0.1) * random.randint(1, 6)
         shot_score -= defense_penalty * 0.2
         record_stat(game_state, def_team, defender, "DEF_A")
@@ -676,7 +676,7 @@ def resolve_shot(roles, defense, game_state):
     passer = roles["passer"]
     team = game_state["offense_team"]
     opp_team = game_state["defense_team"]
-    attrs = game_state["players"][team][shooter]["attributes"]
+    attrs = game_state["player_attributes"][team][shooter]
     # Create a reverse lookup map from player name to position
     player_pos_map = {
         player: pos for pos, player in game_state["players"][team].items()
@@ -700,13 +700,13 @@ def resolve_shot(roles, defense, game_state):
     weights = PLAYCALL_ATTRIBUTE_WEIGHTS.get(playcall, {})
     shot_score = sum(attrs[attr] * (weight / 10) for attr, weight in weights.items()) * random.randint(1, 6)
     if passer:
-        passer_attrs = game_state["players"][team][passer]["attributes"]
+        passer_attrs = game_state["player_attributes"][team][passer]
         passer_score = (passer_attrs["PS"] * 0.8 + passer_attrs["IQ"] * 0.2) * random.randint(1, 6)
         shot_score += passer_score * 0.2
     else:
         dribble_score = (attrs["AG"] * 0.8 + attrs["IQ"] * 0.2) * random.randint(1, 6)
         shot_score += dribble_score * 0.2
-    defense_attrs = game_state["players"][opp_team][defense["primary_defender"]["attributes"]]
+    defense_attrs = game_state["player_attributes"][opp_team][defense["primary_defender"]]
     defense_penalty = (defense_attrs["OD"] * 0.8 + defense_attrs["IQ"] * 0.1 + defense_attrs["CH"] * 0.1) * random.randint(1, 6)
     if defense_call == "Zone":
         defense_penalty *= 0.9
@@ -729,7 +729,7 @@ def resolve_shot(roles, defense, game_state):
     # Screen bonus (if applicable)
     screener = roles.get("screener", "")
     if screener and screener != shooter:
-        screen_attrs = game_state["players"][team][screener]["attributes"]
+        screen_attrs = game_state["player_attributes"][team][screener]
         screen_score = calculate_screen_score(screen_attrs)
         shot_score += screen_score * 0.15
         print(f"screen by {screener} adds {round(screen_score * 0.15, 2)} to shot score")
@@ -745,7 +745,7 @@ def resolve_shot(roles, defense, game_state):
     total_gravity = 0
     for pos in gravity_contributors:
         player = game_state["players"][team][pos]
-        attrs = game_state["players"][team][player]["attributes"]
+        attrs = game_state["player_attributes"][team][player]
         total_gravity += calculate_gravity_score(attrs)
     gravity_boost = calculate_gravity_score(attrs) * 0.02  # Tunable
     shot_score += gravity_boost
@@ -801,8 +801,8 @@ def resolve_shot(roles, defense, game_state):
         o_rebounder = game_state["players"][team][o_pos]
         d_rebounder = game_state["players"][opp_team][d_pos]
 
-        o_attr = game_state["players"][team][o_rebounder]["attributes"]
-        d_attr = game_state["players"][opp_team][d_rebounder]["attributes"]
+        o_attr = game_state["player_attributes"][team][o_rebounder]
+        d_attr = game_state["player_attributes"][opp_team][d_rebounder]
 
         o_score = calculate_rebound_score(o_attr)
         d_score = calculate_rebound_score(d_attr)
@@ -843,7 +843,7 @@ def resolve_shot(roles, defense, game_state):
                 text += (f"... he attempts the putback...")
 
                 # Basic putback shot calculation (we'll refine later)
-                attrs = game_state["players"][team][rebounder]["attributes"]
+                attrs = game_state["player_attributes"][team][rebounder]
                 shot_score = (
                     attrs["SC"] * 0.6 +
                     attrs["CH"] * 0.2 +
@@ -852,7 +852,7 @@ def resolve_shot(roles, defense, game_state):
 
                 defender_pos = random.choice(["C", "C", "C", "C", "C", "PF", "PF", "PF", "SF", "SF", "SG", "PG"])
                 defender = game_state["players"][opp_team][defender_pos]
-                defense_attrs = game_state["players"][opp_team][defense["primary_defender"]["attributes"]]
+                defense_attrs = game_state["player_attributes"][opp_team][defense["primary_defender"]]
                 defense_penalty = (defense_attrs["ID"] * 0.8 + defense_attrs["IQ"] * 0.1 + defense_attrs["CH"] * 0.1) * random.randint(1, 6)
                 shot_score -= defense_penalty * 0.2
                 made = shot_score >= game_state["team_attributes"][team]["shot_threshold"]
@@ -1257,7 +1257,7 @@ def apply_help_defense_if_triggered(game_state, playcall, is_three, defense, sho
     ]
     help_pos = random.choice(possible_helpers)
     help_defender = game_state["players"][opp_team][help_pos]
-    help_attrs = game_state["players"][opp_team][help_defender]["attributes"]
+    help_attrs = game_state["player_attributes"][opp_team][help_defender]
 
     if help_playcall == "Attack":
         help_score = (
@@ -1289,8 +1289,8 @@ def determine_rebounder(game_state, team, opp_team):
     o_rebounder = game_state["players"][team][o_pos]
     d_rebounder = game_state["players"][opp_team][d_pos]
 
-    o_attr = game_state["players"][team][o_rebounder]["attributes"]
-    d_attr = game_state["players"][opp_team][d_rebounder]["attributes"]
+    o_attr = game_state["player_attributes"][team][o_rebounder]
+    d_attr = game_state["player_attributes"][opp_team][d_rebounder]
 
     o_score = calculate_rebound_score(o_attr)
     d_score = calculate_rebound_score(d_attr)
@@ -1344,7 +1344,7 @@ def resolve_offensive_rebound_loop(game_state, team, opp_team, rebounder):
 
         # attempt putback
         text_log += f"{rebounder} goes back up..."
-        attrs = game_state["players"][team][rebounder]["attributes"]
+        attrs = game_state["player_attributes"][team][rebounder]
         shot_score = (
             attrs["SC"] * 0.6 +
             attrs["CH"] * 0.2 +
@@ -1356,7 +1356,7 @@ def resolve_offensive_rebound_loop(game_state, team, opp_team, rebounder):
         # contested by random defender
         defender_pos = random.choice(["C", "C", "C", "PF", "PF", "SF", "SF", "SG", "PG"])
         defender = game_state["players"][opp_team][defender_pos]
-        defense_attrs = game_state["players"][opp_team][defender]["attributes"]
+        defense_attrs = game_state["player_attributes"][opp_team][defender]
         defense_penalty = (
             defense_attrs["ID"] * 0.8 + 
             defense_attrs["IQ"] * 0.1 + 
@@ -1570,10 +1570,10 @@ def main(return_game_state=False):
             attr = {k: v for k, v in player_obj.items() if k not in ["_id", "first_name", "last_name", "team"]}
             for key in list(attr):  # ✅ Safe copy of keys
                 attr[f"anchor_{key}"] = attr[key]
-            game_state["players"][team][pos]["attributes"] = attr
+            game_state["player_attributes"][team][pos] = attr
 
             if not return_game_state:
-                print(game_state["players"][team][pos]["attributes"])  # Fix player to pos
+                print(game_state["player_attributes"][team][pos])  # Fix player to pos
 
 
     i = 1
@@ -1588,7 +1588,7 @@ def main(return_game_state=False):
         for team in game_state["players"]:
             for pos, player_obj in game_state["players"][team].items():
                 player_name = f"{player_obj['first_name']} {player_obj['last_name']}"
-                attr = game_state["players"][team][pos]["attributes"]
+                attr = game_state["player_attributes"][team][pos]
                 attr["NG"] = min(1.0, round(attr["NG"] + recharge_amount, 3))
 
         if not return_game_state:
@@ -1621,7 +1621,7 @@ def main(return_game_state=False):
             for team in [game_state["offense_team"], game_state["defense_team"]]:
                 for pos, player_obj in game_state["players"][team].items():
                     player_name = f"{player_obj['first_name']} {player_obj['last_name']}"
-                    attr = game_state["players"][team][pos]["attributes"]
+                    attr = game_state["player_attributes"][team][pos]
                     endurance = attr["ND"]
                     decay = max(0.001, base_decay - (endurance / 1000))  # Prevent negative decay
                     decay = max(0.001, decay * energy_rng_seed)  # Apply seeded RNG
@@ -1690,7 +1690,7 @@ def main(return_game_state=False):
             for team in [game_state["offense_team"], game_state["defense_team"]]:
                 for pos, player_obj in game_state["players"][team].items():
                     player_name = f"{player_obj['first_name']} {player_obj['last_name']}"
-                    attr = game_state["players"][team][pos]["attributes"]
+                    attr = game_state["player_attributes"][team][pos]
                     endurance = attr["ND"]
                     decay = max(0.001, base_decay - (endurance / 1000))
                     decay = max(0.001, decay * energy_rng_seed)
@@ -1741,7 +1741,7 @@ def main(return_game_state=False):
     # Reset all player attributes to anchor values after the game
     for team in game_state["player_attributes"]:
         for player in game_state["player_attributes"][team]:
-            attr = game_state["players"][team][player]["attributes"]
+            attr = game_state["player_attributes"][team][player]
 
             for key in attr:
                 if key.startswith("anchor_"):
