@@ -700,6 +700,9 @@ def resolve_shot(roles, game_state):
     defender_pos = roles.get("defender", "")
     if defender_pos:
         defender = game_state["players"][def_team][defender_pos]
+
+    print(f"-------Inside resolve_shot---------")
+    print(f"shooter: {shooter_pos} | passer: {passer_pos} | screener: {screener_pos} | defender: {defender_pos}")
     
     attrs = game_state["players"][off_team][shooter_pos]["attributes"]
     
@@ -1278,7 +1281,7 @@ def apply_help_defense_if_triggered(game_state, playcall, is_three, defender_pos
     ]
     help_pos = random.choice(possible_helpers)
     help_defender = game_state["players"][def_team][help_pos]
-    help_attrs = game_state["players"][def_team][help_defender]["attributes"]
+    help_attrs = game_state["players"][def_team][help_pos]["attributes"]
 
     if help_playcall == "Attack":
         help_score = (
