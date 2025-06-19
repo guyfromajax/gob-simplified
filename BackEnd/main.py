@@ -626,7 +626,7 @@ def resolve_fast_break_shot(game_state, fb_roles):
     if shooter == passer:
         passer = ""
 
-    shot_score = (attrs["SC"] * 0.6 + attrs["CH"] * 0.2 + attrs["MO"] * 0.2) * random.randint(1, 6)
+    shot_score = (attrs["SC"] * 0.6 + attrs["CH"] * 0.2 + attrs["IQ"] * 0.2) * random.randint(1, 6)
 
     defender_pos = random.choice(fb_roles["defense"]) if fb_roles["defense"] else ""
     defender = game_state["players"][def_team][defender_pos]
@@ -869,7 +869,7 @@ def resolve_shot(roles, game_state):
                 shot_score = (
                     attrs["SC"] * 0.6 +
                     attrs["CH"] * 0.2 +
-                    attrs["MO"] * 0.2
+                    attrs["IQ"] * 0.2
                 ) * random.randint(1, 6)
 
                 defender_pos = random.choice(["C", "C", "C", "C", "C", "PF", "PF", "PF", "SF", "SF", "SG", "PG"])
@@ -1074,7 +1074,7 @@ def calculate_gravity_score(attrs):
     return (
         attrs["SH"] * 0.3 +
         attrs["SC"] * 0.3 +
-        attrs["MO"] * 0.4
+        attrs["IQ"] * 0.4
     )
 
 
@@ -1378,7 +1378,7 @@ def resolve_offensive_rebound_loop(game_state, off_team, def_team, rebounder):
         shot_score = (
             attrs["SC"] * 0.6 +
             attrs["CH"] * 0.2 +
-            attrs["MO"] * 0.2
+            attrs["IQ"] * 0.2
         ) * random.randint(1, 6)
         time_elapsed = random.randint(2, 5)
         total_time += time_elapsed
