@@ -955,7 +955,7 @@ def resolve_turnover(roles, game_state, turnover_type="DEAD BALL"):
 def resolve_foul(roles, game_state):
     off_team = game_state["offense_team"]
     def_team = game_state["defense_team"]
-    foul_team = game_state["foul_team"]
+    foul_team = off_team if game_state["foul_team"] == "OFFENSE" else def_team
     
     bh_pos = roles["ball_handler"]
     ball_handler = game_state["players"][off_team][bh_pos]
