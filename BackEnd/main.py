@@ -340,10 +340,10 @@ def resolve_fast_break(game_state):
 
 #FREE_THROW
 def resolve_free_throw(game_state):
-    shooter = game_state["last_ball_handler"] #this is a player object, not a position string
     off_team = game_state["offense_team"]
     def_team = game_state["defense_team"]
-    attrs = game_state["players"][off_team][shooter]["attributes"]
+    shooter = game_state["last_ball_handler"] #this is a player object, not a position string
+    attrs = shooter["attributes"]
 
     # Use player's FT attribute
     ft_shot_score = ((attrs["FT"] * 0.8) + (attrs["CH"] * 0.2)) * random.randint(1, 6)
@@ -622,7 +622,7 @@ def resolve_fast_break_shot(game_state, fb_roles):
         passer = ""
         passer_pos = ""
     
-    attrs = game_state["players"][off_team][shooter]["attributes"]
+    attrs = shooter["attributes"]
     if shooter == passer:
         passer = ""
 
@@ -631,7 +631,7 @@ def resolve_fast_break_shot(game_state, fb_roles):
     defender_pos = random.choice(fb_roles["defense"]) if fb_roles["defense"] else ""
     defender = game_state["players"][def_team][defender_pos]
     if defender:
-        defense_attrs = game_state["players"][def_team][defender_pos]["attributes"]
+        defense_attrs = defender["attributes"]
         defense_penalty = (defense_attrs["ID"] * 0.8 + defense_attrs["IQ"] * 0.1 + defense_attrs["CH"] * 0.1) * random.randint(1, 6)
         shot_score -= defense_penalty * 0.2
         record_stat(defender, "DEF_A") #confirmed, assuming fb_roles is an array of strings
@@ -704,7 +704,7 @@ def resolve_shot(roles, game_state):
     print(f"-------Inside resolve_shot---------")
     print(f"shooter: {shooter_pos} | passer: {passer_pos} | screener: {screener_pos} | defender: {defender_pos}")
     
-    attrs = game_state["players"][off_team][shooter_pos]["attributes"]
+    attrs = shooter["attributes"]
     
     playcall = game_state["current_playcall"]
     defense_call = game_state["defense_playcall"]
@@ -718,7 +718,7 @@ def resolve_shot(roles, game_state):
     weights = PLAYCALL_ATTRIBUTE_WEIGHTS.get(playcall, {})
     shot_score = sum(attrs[attr] * (weight / 10) for attr, weight in weights.items()) * random.randint(1, 6)
     if passer_pos:
-        passer_attrs = game_state["players"][off_team][passer_pos]["attributes"]
+        passer_attrs = passer["attributes"]
         passer_score = (passer_attrs["PS"] * 0.8 + passer_attrs["IQ"] * 0.2) * random.randint(1, 6)
         shot_score += passer_score * 0.2
     else:
@@ -765,7 +765,7 @@ def resolve_shot(roles, game_state):
     total_gravity = 0
     for pos in gravity_contributors:
         player = game_state["players"][off_team][pos]
-        attrs = game_state["players"][off_team][player]["attributes"]
+        attrs = player["attributes"]
         total_gravity += calculate_gravity_score(attrs)
     gravity_boost = total_gravity * 0.02  # Tunable
     shot_score += gravity_boost
@@ -865,7 +865,7 @@ def resolve_shot(roles, game_state):
                 text += (f"... he attempts the putback...")
 
                 # Basic putback shot calculation (we'll refine later)
-                attrs = game_state["players"][off_team][rebounder]["attributes"]
+                attrs = rebounder["attributes"]
                 shot_score = (
                     attrs["SC"] * 0.6 +
                     attrs["CH"] * 0.2 +
@@ -919,6 +919,12 @@ def resolve_shot(roles, game_state):
     }
 
 def resolve_turnover(roles, game_state, turnover_type="DEAD BALL"):
+
+    print(f"-------Inside resolve_turnover---------")
+    print(f"roles: {roles}")
+    print(f"game_state: {game_state}")
+    print(f"turnover_type: {turnover_type}")
+
     team = game_state["offense_team"]
     def_team = game_state["defense_team"]
     bh_pos = roles["ball_handler"]
@@ -1281,7 +1287,7 @@ def apply_help_defense_if_triggered(game_state, playcall, is_three, defender_pos
     ]
     help_pos = random.choice(possible_helpers)
     help_defender = game_state["players"][def_team][help_pos]
-    help_attrs = game_state["players"][def_team][help_pos]["attributes"]
+    help_attrs = help_defender["attributes"]
 
     if help_playcall == "Attack":
         help_score = (
@@ -1368,7 +1374,7 @@ def resolve_offensive_rebound_loop(game_state, off_team, def_team, rebounder):
 
         # attempt putback
         text_log += f"{rebounder} goes back up..."
-        attrs = game_state["players"][off_team][rebounder]["attributes"]
+        attrs = rebounder["attributes"]
         shot_score = (
             attrs["SC"] * 0.6 +
             attrs["CH"] * 0.2 +
@@ -1380,7 +1386,7 @@ def resolve_offensive_rebound_loop(game_state, off_team, def_team, rebounder):
         # contested by random defender
         defender_pos = random.choice(["C", "C", "C", "PF", "PF", "SF", "SF", "SG", "PG"])
         defender = game_state["players"][def_team][defender_pos]
-        defense_attrs = game_state["players"][def_team][defender]["attributes"]
+        defense_attrs = defender["attributes"]
         defense_penalty = (
             defense_attrs["ID"] * 0.8 + 
             defense_attrs["IQ"] * 0.1 + 
