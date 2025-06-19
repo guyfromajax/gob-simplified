@@ -767,7 +767,7 @@ def resolve_shot(roles, game_state):
         player = game_state["players"][off_team][pos]
         attrs = game_state["players"][off_team][player]["attributes"]
         total_gravity += calculate_gravity_score(attrs)
-    gravity_boost = calculate_gravity_score(attrs) * 0.02  # Tunable
+    gravity_boost = total_gravity * 0.02  # Tunable
     shot_score += gravity_boost
     print(f"Off-ball gravity boost: +{round(gravity_boost, 2)} from {gravity_contributors}")
 
