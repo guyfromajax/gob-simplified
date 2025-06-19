@@ -690,20 +690,13 @@ def resolve_fast_break_shot(game_state, roles):
 def resolve_shot(roles, defense, game_state):
 
     time_elapsed = 0
-    shooter = roles["shooter"]
-    passer = roles["passer"]
+    shooter_pos = roles["shooter"]
+    passer_pos = roles.get("passer", "")
+    screener_pos = roles.get("screener", "")
     off_team = game_state["offense_team"]
     def_team = game_state["defense_team"]
-    attrs = game_state["players"][off_team][shooter]["attributes"]
-    # Create a reverse lookup map from player name to position
-    player_pos_map = {
-        player: pos for pos, player in game_state["players"][off_team].items()
-    }
-
-    # Retrieve positions
-    shooter_pos = player_pos_map.get(roles["shooter"])
-    screener_pos = player_pos_map.get(roles["screener"], "")
-    passer_pos = player_pos_map.get(roles["passer"], "")
+    attrs = game_state["players"][off_team][shooter_pos]["attributes"]
+    
 
 
     playcall = game_state["current_playcall"]
@@ -717,8 +710,8 @@ def resolve_shot(roles, defense, game_state):
         playcall = "Attack"
     weights = PLAYCALL_ATTRIBUTE_WEIGHTS.get(playcall, {})
     shot_score = sum(attrs[attr] * (weight / 10) for attr, weight in weights.items()) * random.randint(1, 6)
-    if passer:
-        passer_attrs = game_state["players"][off_team][passer]["attributes"]
+    if passer_pos:
+        passer_attrs = game_state["players"][off_team][passer_pos]["attributes"]
         passer_score = (passer_attrs["PS"] * 0.8 + passer_attrs["IQ"] * 0.2) * random.randint(1, 6)
         shot_score += passer_score * 0.2
     else:
@@ -746,8 +739,8 @@ def resolve_shot(roles, defense, game_state):
 
     # Screen bonus (if applicable)
     screener = roles.get("screener", "")
-    if screener and screener != shooter:
-        screen_attrs = game_state["players"][off_team][screener]["attributes"]
+    if screener and screener != shooter_pos:
+        screen_attrs = game_state["players"][off_team][screener_pos]["attributes"]
         screen_score = calculate_screen_score(screen_attrs)
         shot_score += screen_score * 0.15
         print(f"screen by {screener} adds {round(screen_score * 0.15, 2)} to shot score")
@@ -770,32 +763,32 @@ def resolve_shot(roles, defense, game_state):
     print(f"Off-ball gravity boost: +{round(gravity_boost, 2)} from {gravity_contributors}")
 
     print(f"offense call: {playcall} // defense call: {defense_call}")
-    print(f"shooter: {shooter} | passer: {passer}")
+    print(f"shooter: {shooter_pos} | passer: {passer_pos}")
     print(f"shot score = {round(shot_score, 2)} | contested by {defense['primary_defender']} (defense score: {round(defense_penalty * 0.2, 2)})")
     made = shot_score >= shot_threshold
 
 
     # Track attempts
-    record_stat(game_state, off_team, shooter, "FGA")
+    record_stat(game_state, off_team, shooter_pos, "FGA")
     if is_three:
-        record_stat(game_state, off_team, shooter, "3PTA")
+        record_stat(game_state, off_team, shooter_pos, "3PTA")
 
     if made:
-        record_stat(game_state, off_team, shooter, "FGM")
-        if passer:
-            record_stat(game_state, off_team, passer, "AST")
+        record_stat(game_state, off_team, shooter_pos, "FGM")
+        if passer_pos:
+            record_stat(game_state, off_team, passer_pos, "AST")
         if is_three:
-            record_stat(game_state, off_team, shooter, "3PTM")
+            record_stat(game_state, off_team, shooter_pos, "3PTM")
         points = 3 if is_three else 2
         game_state["score"][off_team] += points
         quarter_index = game_state["quarter"] - 1
         game_state["points_by_quarter"][off_team][quarter_index] += points
-        text = f"{shooter} drains a 3!" if is_three else f"{shooter} makes the shot."
+        text = f"{shooter_pos} drains a 3!" if is_three else f"{shooter_pos} makes the shot."
         possession_flips = True
-        if screener:
-            record_stat(game_state, off_team, screener, "SCR_S")
+        if screener_pos:
+            record_stat(game_state, off_team, screener_pos, "SCR_S")
     else:
-        text = f"{shooter} misses the {'3' if is_three else 'shot'}."
+        text = f"{shooter_pos} misses the {'3' if is_three else 'shot'}."
         record_stat(game_state, def_team, defense["primary_defender"], "DEF_S")
         #Build dict based on player proximity to the ball in the future
         base_block_prob = BLOCK_PROBABILITY.get(playcall, 0.0)
@@ -903,14 +896,14 @@ def resolve_shot(roles, defense, game_state):
 
     return {
         "result_type": "MAKE" if made else "MISS",
-        "ball_handler": shooter,
-        "screener": roles["screener"],
-        "passer": passer,
+        "ball_handler": shooter_pos,
+        "screener": screener_pos,
+        "passer": passer_pos,
         "primary_defender": defense["primary_defender"],
         "text": text,
         "possession_flips": possession_flips,
-        "start_coords": {shooter: {"x": 72, "y": 25}},
-        "end_coords": {shooter: {"x": 82, "y": 23}},
+        "start_coords": {shooter_pos: {"x": 72, "y": 25}},
+        "end_coords": {shooter_pos: {"x": 82, "y": 23}},
         "time_elapsed": time_elapsed
     }
 
