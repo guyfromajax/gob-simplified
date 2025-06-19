@@ -72,7 +72,7 @@ def setup_teams():
     # 🔄 TEMP FIX: clear the collection to avoid "already exist" block
     teams_collection.delete_many({})
     players_collection.delete_many({})
-    print("✅ Cleared teams and players collections.")
+    print("✅ Cleared teams and players collections -- totally cleard.")
 
     if teams_collection.count_documents({"name": "Lancaster"}) > 0:
         return {"message": "Teams already exist"}
