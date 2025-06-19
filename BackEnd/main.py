@@ -288,8 +288,9 @@ def resolve_fast_break(game_state):
     roles["shooter"] = shooter
     # If shooter is not the ball handler, then ball handler is the passer
     roles["passer"] = roles["ball_handler"] if shooter != roles["ball_handler"] else ""
-    if roles["passer"] not in game_state["player_attributes"][offense_team] and roles["passer"] != "":
+    if roles["passer"] not in game_state["players"][offense_team] and roles["passer"] != "":
         print(f"⚠️ Invalid passer assignment: {roles['passer']} not in team {offense_team}")
+        print(f"players in offense team: {game_state['players'][offense_team]}")
     roles["screener"] = ""
 
     # Foul or turnover possibilities
@@ -444,22 +445,38 @@ def get_playcalls(game_state):
     }
 
 def assign_roles(game_state, playcall):
-    players = game_state["players"][game_state["offense_team"]]
-    attrs = game_state["player_attributes"][game_state["offense_team"]]
+    team = game_state["offense_team"]
+    players = game_state["players"][team]
 
-    shot_weights = get_shot_weights_for_playcall(attrs, playcall)
+    # Compute shot weights using attributes embedded in each player object
+    weights_dict = PLAYCALL_ATTRIBUTE_WEIGHTS.get("Attack" if playcall == "Set" else playcall, {})
+
+    shot_weights = {
+        pos: sum(
+            players[pos]["attributes"][attr] * weight
+            for attr, weight in weights_dict.items()
+        )
+        for pos in players
+    }
+
     shooter = weighted_random_from_dict(shot_weights)
 
+    # Compute screener weights (excluding the shooter)
     screen_weights = {
-        p: attrs[p]["ST"] * 6 + attrs[p]["AG"] * 2 + attrs[p]["IQ"] * 1 + attrs[p]["CH"] * 1
-        for p in players.values() if p != shooter
+        pos: (
+            players[pos]["attributes"]["ST"] * 6 +
+            players[pos]["attributes"]["AG"] * 2 +
+            players[pos]["attributes"]["IQ"] * 1 +
+            players[pos]["attributes"]["CH"] * 1
+        )
+        for pos in players if pos != shooter
     }
     screener = max(screen_weights, key=screen_weights.get)
 
-
+    # Pass chain and passer
     pass_chain = generate_pass_chain(game_state, shooter)
     passer_pos = pass_chain[-2] if len(pass_chain) >= 2 else ""
-    passer = players.get(passer_pos, "") if passer_pos != shooter else ""
+    passer = passer_pos if passer_pos != shooter else ""
 
     return {
         "shooter": shooter,
@@ -468,6 +485,7 @@ def assign_roles(game_state, playcall):
         "passer": passer,
         "pass_chain": pass_chain
     }
+
 
 
 def get_shot_weights_for_playcall(team_attrs, playcall_name):
@@ -1113,44 +1131,40 @@ def get_team_thresholds(game_state):
     }
 
 def calculate_foul_turnover(game_state, positions, thresholds, roles):
-    team = game_state["offense_team"]
-    opp_team = game_state["defense_team"]
-    attrs = game_state["player_attributes"]
-    roles["foul_player"] = None  # Always initialize to avoid KeyErrors
+    offense_team = game_state["offense_team"]
+    defense_team = game_state["defense_team"]
+    roles["foul_player"] = None
     ball_handler = roles["ball_handler"]
-    print(f"ball_handler: {ball_handler}")
     defense_call = game_state["defense_playcall"]
 
-    # Defensive foul calculation
-    d_foul_player = game_state["players"][opp_team][positions["d_foul"]]
-    d_attr = attrs[opp_team][d_foul_player]
+    # === Defensive Foul ===
     d_pos = positions["d_foul"]
+    d_foul_player = game_state["players"][defense_team][d_pos]
+    d_attr = d_foul_player["attributes"]
 
     iq = d_attr["IQ"] * 0.3
     ch = d_attr["CH"] * 0.3
     if d_pos in ["PG", "SG"]:
-        movement = (d_attr["OD"] * 0.2) + (d_attr["AG"] * 0.2)
+        movement = d_attr["OD"] * 0.2 + d_attr["AG"] * 0.2
     elif d_pos == "SF":
-        movement = (d_attr["OD"] * 0.1) + (d_attr["ID"] * 0.1) + (d_attr["AG"] * 0.1) + (d_attr["ST"] * 0.1)
+        movement = d_attr["OD"] * 0.1 + d_attr["ID"] * 0.1 + d_attr["AG"] * 0.1 + d_attr["ST"] * 0.1
     elif d_pos in ["PF", "C"]:
-        movement = (d_attr["ID"] * 0.2) + (d_attr["ST"] * 0.2)
+        movement = d_attr["ID"] * 0.2 + d_attr["ST"] * 0.2
     else:
         movement = 0
+
     d_foul_score = (iq + ch + movement) * random.randint(1, 6)
     if defense_call == "Zone":
         d_foul_score *= 1.1
     is_d_foul = d_foul_score < (thresholds["d_foul_threshold"] * 1.2)
-    # print(f"Defensive foul → {d_foul_player}: score={round(d_foul_score, 2)} vs threshold={thresholds['d_foul_threshold'] * 1.2} | flag={is_d_foul}")
 
-    # Offensive foul calculation
-    o_foul_player = game_state["players"][team][positions["o_foul"]]
-    o_attr = attrs[team][o_foul_player]
+    # === Offensive Foul ===
     o_pos = positions["o_foul"]
-    # Base weightings
+    o_foul_player = game_state["players"][offense_team][o_pos]
+    o_attr = o_foul_player["attributes"]
+
     iq = o_attr["IQ"] * 0.3
     ch = o_attr["CH"] * 0.3
-
-    # Adjust AG/ST weight based on position
     if o_pos in ["PG", "SG"]:
         movement = o_attr["AG"] * 0.4
     elif o_pos == "SF":
@@ -1158,15 +1172,16 @@ def calculate_foul_turnover(game_state, positions, thresholds, roles):
     elif o_pos in ["PF", "C"]:
         movement = o_attr["ST"] * 0.4
     else:
-        movement = 0  # fallback if somehow invalid position
+        movement = 0
 
     o_foul_score = (iq + ch + movement) * random.randint(1, 6)
     is_o_foul = o_foul_score < (thresholds["o_foul_threshold"] * 0.8)
-    # print(f"Offensive foul → {o_foul_player}: score={round(o_foul_score, 2)} vs threshold={thresholds['o_foul_threshold'] * 0.8} | flag={is_o_foul}")
 
-    # Turnover calculation
-    turnover_player = game_state["players"][team][positions["turnover"]]
-    t_attr = attrs[team][turnover_player]
+    # === Turnover ===
+    t_pos = positions["turnover"]
+    turnover_player = game_state["players"][offense_team][t_pos]
+    t_attr = turnover_player["attributes"]
+
     bh_score = (
         t_attr["BH"] * 0.5 +
         t_attr["AG"] * 0.2 +
@@ -1174,9 +1189,8 @@ def calculate_foul_turnover(game_state, positions, thresholds, roles):
         t_attr["CH"] * 0.1
     ) * random.randint(1, 6)
 
-    # Defensive pressure modifier
-    def_mod_player = game_state["players"][opp_team][positions["turnover"]]
-    def_mod_attr = attrs[opp_team][def_mod_player]
+    def_mod_player = game_state["players"][defense_team][t_pos]
+    def_mod_attr = def_mod_player["attributes"]
     pressure = (
         def_mod_attr["OD"] * 0.3 +
         def_mod_attr["AG"] * 0.3 +
@@ -1188,8 +1202,9 @@ def calculate_foul_turnover(game_state, positions, thresholds, roles):
 
     turnover_score = bh_score - pressure
     is_turnover = turnover_score < thresholds["turnover_threshold"]
-    print(f"Turnover → {turnover_player} vs {def_mod_player}: score={round(turnover_score, 2)} vs threshold={thresholds['turnover_threshold']} | flag={is_turnover}")
-    # Decision logic: priority order → turnover > d_foul > o_foul
+
+    print(f"Turnover → {turnover_player['first_name']} {turnover_player['last_name']} vs {def_mod_player['first_name']} {def_mod_player['last_name']}: score={round(turnover_score, 2)} vs threshold={thresholds['turnover_threshold']} | flag={is_turnover}")
+
     decisions = {
         "TURNOVER": (is_turnover, turnover_score),
         "D_FOUL": (is_d_foul, d_foul_score),
@@ -1198,13 +1213,11 @@ def calculate_foul_turnover(game_state, positions, thresholds, roles):
 
     active = [(k, v[1]) for k, v in decisions.items() if v[0]]
     if not active:
-        # print("Result: HCO (no foul or turnover)")
         print()
         return "SHOT"
 
-    # Choose lowest score among active flags, or fallback priority
     active.sort(key=lambda x: (x[1], ["TURNOVER", "D_FOUL", "O_FOUL"].index(x[0])))
-    # print(f"Result: {active[0][0]} (lowest score among triggers)\n")
+
     if active[0][0] == "TURNOVER":
         roles["turnover_player"] = turnover_player
         roles["turnover_defender"] = def_mod_player
@@ -1561,19 +1574,19 @@ def main(return_game_state=False):
                 "SCR_S": 0,
             }
 
-    game_state["player_attributes"] = {}
+    # game_state["player_attributes"] = {}
 
-    # Build player_attributes from the full player objects already loaded from Mongo
-    for team in game_state["players"]:
-        game_state["player_attributes"][team] = {}
-        for pos, player_obj in game_state["players"][team].items():
-            attr = {k: v for k, v in player_obj.items() if k not in ["_id", "first_name", "last_name", "team"]}
-            for key in list(attr):  # ✅ Safe copy of keys
-                attr[f"anchor_{key}"] = attr[key]
-            game_state["players"][team][pos]["attributes"] = attr
+    # # Build player_attributes from the full player objects already loaded from Mongo
+    # for team in game_state["players"]:
+    #     game_state["player_attributes"][team] = {}
+    #     for pos, player_obj in game_state["players"][team].items():
+    #         attr = {k: v for k, v in player_obj.items() if k not in ["_id", "first_name", "last_name", "team"]}
+    #         for key in list(attr):  # ✅ Safe copy of keys
+    #             attr[f"anchor_{key}"] = attr[key]
+    #         game_state["players"][team][pos]["attributes"] = attr
 
-            if not return_game_state:
-                print(game_state["players"][team][pos]["attributes"])  # Fix player to pos
+    #         if not return_game_state:
+    #             print(game_state["players"][team][pos]["attributes"])  # Fix player to pos
 
 
     i = 1
@@ -1739,17 +1752,17 @@ def main(return_game_state=False):
             print(f"{team}: Q1={q_points[0]}  Q2={q_points[1]}  Q3={q_points[2]}  Q4={q_points[3]}  Total={sum(q_points)}")
 
     # Reset all player attributes to anchor values after the game
-    for team in game_state["player_attributes"]:
-        for player in game_state["player_attributes"][team]:
-            attr = game_state["players"][team][player]["attributes"]
-
-            for key in attr:
+    for team in game_state["players"]:
+        for pos, player in game_state["players"][team].items():
+            attrs = player["attributes"]
+            for key in list(attrs):  # Always use list() in case we modify keys during iteration
                 if key.startswith("anchor_"):
                     base_attr = key.replace("anchor_", "")
-                    attr[base_attr] = attr[key]
+                    attrs[base_attr] = attrs[key]
 
             # Reset energy to full
-            attr["NG"] = 1.0
+            attrs["NG"] = 1.0
+
 
     if not return_game_state:
         print(f"\n=== Team Stats Summary ===")
