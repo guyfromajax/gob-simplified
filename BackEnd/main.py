@@ -1512,6 +1512,17 @@ def main(return_game_state=False):
         }
     }
 
+    # --- After assigning game_state["players"] ---
+    for team in game_state["players"]:
+        for pos, player_obj in game_state["players"][team].items():
+            player_obj["attributes"] = {
+                k: v for k, v in player_obj.items()
+                if k not in ["_id", "first_name", "last_name", "team"]
+            }
+            for k in list(player_obj["attributes"]):
+                player_obj["attributes"][f"anchor_{k}"] = player_obj["attributes"][k]
+
+    
     game_state["scouting_data"] = {
         team: {
             "offense": {
