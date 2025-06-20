@@ -729,10 +729,11 @@ def resolve_shot(roles, game_state):
 
 
     # help defense logic
-    shot_score, help_defender, help_penalty = apply_help_defense_if_triggered(
-        game_state, playcall, is_three, defender_pos, shot_score
-    )
-    if help_defender:
+    if defender:
+        shot_score, help_defender, help_penalty = apply_help_defense_if_triggered(
+            game_state, playcall, is_three, defender, shot_score
+        )
+        if help_defender:
         print(f"Help defense by {help_defender} → penalty applied: {round(help_penalty, 2)}")
 
     # Screen bonus (if applicable)
@@ -1232,7 +1233,7 @@ def calculate_foul_turnover(game_state, positions, thresholds, roles):
     print()
     return active[0][0]
 
-def apply_help_defense_if_triggered(game_state, playcall, is_three, defender_pos, shot_score):
+def apply_help_defense_if_triggered(game_state, playcall, is_three, defender, shot_score):
     """
     Determines if help defense is triggered and applies a penalty to the shot_score.
     Returns: updated_shot_score, help_defender (or None), help_defense_penalty
@@ -1265,6 +1266,11 @@ def apply_help_defense_if_triggered(game_state, playcall, is_three, defender_pos
 
     if random.random() >= base_help_chance:
         return shot_score, None, 0
+
+    defender_pos = next(
+        (pos for pos, obj in game_state["players"][def_team].items() if obj == defender),
+        None
+    )
 
     possible_helpers = [
         pos for pos in game_state["players"][def_team]
