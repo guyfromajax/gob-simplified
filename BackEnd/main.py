@@ -965,8 +965,7 @@ def resolve_foul(roles, game_state):
     bh_pos = roles["ball_handler"]
     ball_handler = game_state["players"][off_team][bh_pos]
     defender_pos = roles.get("defender", "")
-    foul_pos = roles["foul_player"]
-    foul_player = game_state["players"][foul_team][foul_pos]
+    foul_player = roles["foul_player"]
     
     shooter = roles["shooter"]
     tempo = game_state["strategy_calls"][off_team]["tempo_call"]
