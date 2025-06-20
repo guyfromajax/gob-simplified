@@ -494,11 +494,12 @@ def assign_roles(game_state, playcall):
     else:
         defender_pos = shooter_pos
 
+    passer = game_state["players"][off_team][passer_pos] if passer_pos else None
     return {
         "shooter": game_state["players"][off_team][shooter_pos],
         "screener": game_state["players"][off_team][screener_pos],
         "ball_handler": game_state["players"][off_team][shooter_pos],
-        "passer": game_state["players"][off_team][passer_pos],
+        "passer": passer,
         "pass_chain": pass_chain,
         "defender": game_state["players"][def_team][defender_pos]
     }
