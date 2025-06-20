@@ -234,7 +234,7 @@ def resolve_fast_break(game_state):
         game_state["last_rebound"] = "" 
         
         # Choose outlet passer (rebounder)
-        rebounder = game_state.get("last_rebounder", None)
+        rebounder = game_state.get("last_rebounder", None) #object
 
         bh_pos = random.choices(["PG", "SG", "SF"], weights=[75, 15, 10])[0]
         ball_handler = players[off_team][bh_pos]
@@ -296,7 +296,7 @@ def resolve_fast_break(game_state):
     # If shooter is not the ball handler, then ball handler is the passer
     fb_roles["passer"] = fb_roles["ball_handler"] if shooter != fb_roles["ball_handler"] else ""
     if fb_roles["passer"] not in game_state["players"][off_team] and fb_roles["passer"] != "":
-        print(f"⚠️ Invalid passer assignment: {roles['passer']} not in team {off_team}")
+        print(f"⚠️ Invalid passer assignment: {fb_roles['passer']} not in team {off_team}")
         print(f"players in offense team: {game_state['players'][off_team]}")
     fb_roles["screener"] = ""
 
@@ -481,7 +481,8 @@ def assign_roles(game_state, playcall):
     # Pass chain and passer
     pass_chain = generate_pass_chain(game_state, shooter_pos)
     passer_pos = pass_chain[-2] if len(pass_chain) >= 2 else ""
-    passer = passer_pos if passer_pos != shooter_pos else ""
+    if passer_pos == shooter_pos:
+        passer_pos = ""
 
     if game_state["defense_playcall"] == "Zone":
         defender_pos = random.choice(POSITION_LIST)
@@ -489,12 +490,12 @@ def assign_roles(game_state, playcall):
         defender_pos = shooter_pos
 
     return {
-        "shooter": shooter_pos,
-        "screener": screener_pos,
-        "ball_handler": shooter_pos,
-        "passer": passer,
+        "shooter": game_state["players"][off_team][shooter_pos],
+        "screener": game_state["players"][off_team][screener_pos],
+        "ball_handler": game_state["players"][off_team][shooter_pos],
+        "passer": game_state["players"][off_team][passer_pos],
         "pass_chain": pass_chain,
-        "defender": defender_pos,
+        "defender": game_state["players"][def_team][defender_pos]
     }
 
 
@@ -538,7 +539,7 @@ def resolve_half_court_offense(game_state):
     playcalls = get_playcalls(game_state)
     game_state["current_playcall"] = playcalls["offense"]
     game_state["defense_playcall"] = playcalls["defense"]
-    roles = assign_roles(game_state, playcalls["offense"])
+    roles = assign_roles(game_state, playcalls["offense"]) #shooter, screener, ball_handler, passer, pass_chain, defender
     # Track offensive playcall use
     off_team = game_state["offense_team"]
     off_playcall = playcalls["offense"]
@@ -615,18 +616,13 @@ def resolve_fast_break_shot(game_state, fb_roles):
     off_team = game_state["offense_team"]
     def_team = game_state["defense_team"]
     
-    shooter_pos = fb_roles["shooter"]
-    shooter = game_state["players"][off_team][shooter_pos]
-    passer_pos = fb_roles.get("passer", "")
-    passer = game_state["players"][off_team][passer_pos]
-    if shooter_pos == passer_pos:
-        passer = ""
-        passer_pos = ""
-    
-    attrs = shooter["attributes"]
+    shooter = fb_roles["shooter"]
+    passer = fb_roles.get("passer", "")
     if shooter == passer:
         passer = ""
-
+    
+    attrs = shooter["attributes"]
+    
     shot_score = (attrs["SC"] * 0.6 + attrs["CH"] * 0.2 + attrs["IQ"] * 0.2) * random.randint(1, 6)
 
     defender = random.choice(fb_roles["defense"]) if fb_roles["defense"] else None
@@ -690,18 +686,13 @@ def resolve_shot(roles, game_state):
     off_team = game_state["offense_team"]
     def_team = game_state["defense_team"]
     time_elapsed = 0
-    shooter_pos = roles["shooter"]
-    shooter = game_state["players"][off_team][shooter_pos]
-    passer_pos = roles.get("passer", "")
-    passer = game_state["players"][off_team][passer_pos]
-    screener_pos = roles.get("screener", "")
-    screener = game_state["players"][off_team][screener_pos]
-    defender_pos = roles.get("defender", "")
-    if defender_pos:
-        defender = game_state["players"][def_team][defender_pos]
+    shooter = roles["shooter"]
+    passer = roles.get("passer", "")
+    screener = roles.get("screener", "")
+    defender = roles.get("defender", "")
 
     print(f"-------Inside resolve_shot---------")
-    print(f"shooter: {shooter_pos} | passer: {passer_pos} | screener: {screener_pos} | defender: {defender_pos}")
+    print(f"shooter: {shooter['last_name']} | passer: {passer['last_name']} | screener: {screener['last_name']} | defender: {defender['last_name']}")
     
     attrs = shooter["attributes"]
     
@@ -716,14 +707,14 @@ def resolve_shot(roles, game_state):
         playcall = "Attack"
     weights = PLAYCALL_ATTRIBUTE_WEIGHTS.get(playcall, {})
     shot_score = sum(attrs[attr] * (weight / 10) for attr, weight in weights.items()) * random.randint(1, 6)
-    if passer_pos:
+    if passer:
         passer_attrs = passer["attributes"]
         passer_score = (passer_attrs["PS"] * 0.8 + passer_attrs["IQ"] * 0.2) * random.randint(1, 6)
         shot_score += passer_score * 0.2
     else:
         dribble_score = (attrs["AG"] * 0.8 + attrs["IQ"] * 0.2) * random.randint(1, 6)
         shot_score += dribble_score * 0.2
-    defense_attrs = game_state["players"][def_team][defender_pos]["attributes"]
+    defense_attrs = defender["attributes"]
     defense_penalty = (defense_attrs["OD"] * 0.8 + defense_attrs["IQ"] * 0.1 + defense_attrs["CH"] * 0.1) * random.randint(1, 6)
     if defense_call == "Zone":
         defense_penalty *= 0.9
@@ -745,10 +736,10 @@ def resolve_shot(roles, game_state):
         print(f"Help defense by {help_defender} → penalty applied: {round(help_penalty, 2)}")
 
     # Screen bonus (if applicable)
-    screener_pos = roles.get("screener", "")
-    if screener_pos and screener_pos != shooter_pos:
-        screener = game_state["players"][off_team][screener_pos]
-        screen_attrs = game_state["players"][off_team][screener_pos]["attributes"]
+    
+    if screener and screener != shooter:
+        
+        screen_attrs = screener["attributes"]
         screen_score = calculate_screen_score(screen_attrs)
         shot_score += screen_score * 0.15
         print(f"screen by {screener} adds {round(screen_score * 0.15, 2)} to shot score")
@@ -756,22 +747,22 @@ def resolve_shot(roles, game_state):
         #need to add shot defender's ability to work through the screen
 
     # Gravity contribution from off-ball players
-    gravity_contributors = [
-        pos for pos in game_state["players"][off_team]
-        if pos not in [shooter_pos, passer_pos, screener_pos]
-    ]
+    # gravity_contributors = [
+    #     pos for pos in game_state["players"][off_team]
+    #     if pos not in [shooter_pos, passer_pos, screener_pos]
+    # ]
 
-    total_gravity = 0
-    for pos in gravity_contributors:
-        player = game_state["players"][off_team][pos]
-        attrs = player["attributes"]
-        total_gravity += calculate_gravity_score(attrs)
-    gravity_boost = total_gravity * 0.02  # Tunable
-    shot_score += gravity_boost
-    print(f"Off-ball gravity boost: +{round(gravity_boost, 2)} from {gravity_contributors}")
+    # total_gravity = 0
+    # for pos in gravity_contributors:
+    #     player = game_state["players"][off_team][pos]
+    #     attrs = player["attributes"]
+    #     total_gravity += calculate_gravity_score(attrs)
+    # gravity_boost = total_gravity * 0.02  # Tunable
+    # shot_score += gravity_boost
+    # print(f"Off-ball gravity boost: +{round(gravity_boost, 2)} from {gravity_contributors}")
 
     print(f"offense call: {playcall} // defense call: {defense_call}")
-    print(f"shooter: {shooter_pos} | passer: {passer_pos}")
+    print(f"shooter: {shooter['last_name']} | passer: {passer['last_name']}")
     print(f"shot score = {round(shot_score, 2)} | (defense score: {round(defense_penalty * 0.2, 2)})")
     made = shot_score >= shot_threshold
 
@@ -783,7 +774,7 @@ def resolve_shot(roles, game_state):
 
     if made:
         record_stat(shooter, "FGM") #confirmed
-        if passer_pos:
+        if passer:
             record_stat(passer, "AST") #confirmed
         if is_three:
             record_stat(shooter, "3PTM") #confirmed
@@ -791,13 +782,12 @@ def resolve_shot(roles, game_state):
         game_state["score"][off_team] += points
         quarter_index = game_state["quarter"] - 1
         game_state["points_by_quarter"][off_team][quarter_index] += points
-        text = f"{shooter_pos} drains a 3!" if is_three else f"{shooter_pos} makes the shot."
+        text = f"{shooter['last_name']} drains a 3!" if is_three else f"{shooter['last_name']} makes the shot."
         possession_flips = True
-        if screener_pos:
-            screener = game_state["players"][off_team][screener_pos]
+        if screener:
             record_stat(screener, "SCR_S") #confirmed
     else:
-        text = f"{shooter_pos} misses the {'3' if is_three else 'shot'}."
+        text = f"{shooter['last_name']} misses the {'3' if is_three else 'shot'}."
         if defender:
             record_stat(defender, "DEF_S") #confirmed
         #Build dict based on player proximity to the ball in the future
@@ -808,7 +798,7 @@ def resolve_shot(roles, game_state):
         final_block_chance = base_block_prob * (0.5 + block_skill)  # scales 50–150% of base
         is_block = random.random() < final_block_chance
         if is_block:
-            text += f"{defender_pos} blocks the shot!"
+            text += f"{defender['last_name']} blocks the shot!"
             record_stat(defender, "BLK") #confirmed
             
 
@@ -873,7 +863,7 @@ def resolve_shot(roles, game_state):
 
                 defender_pos = random.choice(["C", "C", "C", "C", "C", "PF", "PF", "PF", "SF", "SF", "SG", "PG"])
                 defender = game_state["players"][def_team][defender_pos]
-                defense_attrs = game_state["players"][def_team][defender_pos]["attributes"]
+                defense_attrs = defender["attributes"]
                 defense_penalty = (defense_attrs["ID"] * 0.8 + defense_attrs["IQ"] * 0.1 + defense_attrs["CH"] * 0.1) * random.randint(1, 6)
                 shot_score -= defense_penalty * 0.2
                 made = shot_score >= game_state["team_attributes"][off_team]["shot_threshold"]
@@ -906,14 +896,14 @@ def resolve_shot(roles, game_state):
 
     return {
         "result_type": "MAKE" if made else "MISS",
-        "ball_handler": shooter_pos,
-        "screener": screener_pos,
-        "passer": passer_pos,
-        "defender": defender_pos,
+        "ball_handler": shooter,
+        "screener": screener,
+        "passer": passer,
+        "defender": defender,
         "text": text,
         "possession_flips": possession_flips,
-        "start_coords": {shooter_pos: {"x": 72, "y": 25}},
-        "end_coords": {shooter_pos: {"x": 82, "y": 23}},
+        "start_coords": {shooter: {"x": 72, "y": 25}},
+        "end_coords": {shooter: {"x": 82, "y": 23}},
         "time_elapsed": time_elapsed
     }
 
@@ -921,15 +911,11 @@ def resolve_turnover(roles, game_state, turnover_type="DEAD BALL"):
 
     print(f"-------Inside resolve_turnover---------")
     print(f"roles: {roles}")
-    print(f"game_state: {game_state}")
-    print(f"turnover_type: {turnover_type}")
 
     off_team = game_state["offense_team"]
     def_team = game_state["defense_team"]
-    bh_pos = roles["ball_handler"]
-    ball_handler = game_state["players"][off_team][bh_pos]
-    defender_pos = roles.get("defender", "")
-    defender = game_state["players"][def_team][defender_pos]
+    ball_handler = roles["ball_handler"]
+    defender = roles.get("defender", "")
     record_stat(ball_handler, "TO") #confirmed
 
     if turnover_type == "STEAL":
@@ -938,7 +924,7 @@ def resolve_turnover(roles, game_state, turnover_type="DEAD BALL"):
             game_state["offensive_state"] = "FAST_BREAK"
         else:
             game_state["offensive_state"] = "HCO"
-        game_state["last_stealer"] = defender_pos
+        game_state["last_stealer"] = defender
         game_state["last_rebound"] = ""
         text = f"{defender['last_name']} jumps the pass and takes it the other way!"
     else:
@@ -958,16 +944,18 @@ def resolve_turnover(roles, game_state, turnover_type="DEAD BALL"):
 
 
 def resolve_foul(roles, game_state):
+    print(f"-------Inside resolve_foul---------")
+    print(f"roles: {roles}")
     off_team = game_state["offense_team"]
     def_team = game_state["defense_team"]
     foul_team = off_team if game_state["foul_team"] == "OFFENSE" else def_team
     
-    bh_pos = roles["ball_handler"]
-    ball_handler = game_state["players"][off_team][bh_pos]
-    defender_pos = roles.get("defender", "")
+    ball_handler = roles["ball_handler"]
+    defender = roles.get("defender", "")
     foul_player = roles["foul_player"]
-    
     shooter = roles["shooter"]
+    screener = roles.get("screener", "")
+    passer = roles.get("passer", "")
     tempo = game_state["strategy_calls"][off_team]["tempo_call"]
     time_elapsed = get_time_elapsed(tempo)
 
@@ -1008,9 +996,9 @@ def resolve_foul(roles, game_state):
     return {
         "result_type": "FOUL",
         "ball_handler": ball_handler,
-        "screener": roles["screener"],
-        "passer": roles["passer"],
-        "defender": defender_pos,
+        "screener": screener,
+        "passer": passer,
+        "defender": defender,
         "foul_type": foul_type,
         "text": text,
         "possession_flips": False,
@@ -1148,8 +1136,7 @@ def calculate_foul_turnover(game_state, positions, thresholds, roles):
     off_team = game_state["offense_team"]
     def_team = game_state["defense_team"]
     roles["foul_player"] = None
-    bh_pos = roles["ball_handler"]
-    ball_handler = game_state["players"][off_team][bh_pos]
+    ball_handler = roles["ball_handler"]
     defense_call = game_state["defense_playcall"]
 
     # === Defensive Foul ===
@@ -1236,7 +1223,7 @@ def calculate_foul_turnover(game_state, positions, thresholds, roles):
     if active[0][0] == "TURNOVER":
         roles["turnover_player"] = turnover_player
         roles["turnover_defender"] = def_mod_player
-        roles["ball_handler"] = t_pos
+        roles["ball_handler"] = turnover_player
     elif active[0][0] == "D_FOUL":
         roles["foul_player"] = d_foul_player
     elif active[0][0] == "O_FOUL":
