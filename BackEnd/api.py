@@ -2,21 +2,12 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-# from pymongo import MongoClient
-# import os
+from BackEnd.constants import POSITION_LIST
 import uuid
-from BackEnd.main import main
+from BackEnd.main import run_simulation
 from BackEnd.db import players_collection, teams_collection, games_collection
+from BackEnd.utils.game_summary_builder import build_game_summary
 
-
-
-# Mongo setup
-# MONGO_URI = os.environ["MONGO_URI"]
-# client = MongoClient(MONGO_URI)
-# db = client["gob"]
-# games_collection = db["games"]
-# players_collection = db["players"]
-# teams_collection = db["teams"]
 
 app = FastAPI()
 
@@ -49,11 +40,35 @@ def simulate_game():
     for team in teams_collection.find({}):
         print(team)
 
-    game_state = main(return_game_state=True)
-    summary = summarize_game_state(game_state)
+    home_team = "Lancaster"
+    away_team = "Bentley-Truman"
 
-    games_collection.insert_one(summary)  # ✅ Mongo write
-    return summarize_game_state(game_state)
+    # Get teams
+    home_team_doc = teams_collection.find_one({"name": home_team})
+    away_team_doc = teams_collection.find_one({"name": away_team})
+
+    # Get top 5 players by ID (assumes player_ids list is present)
+    home_player_docs = [players_collection.find_one({"_id": pid}) for pid in home_team_doc["player_ids"][:5]]
+    away_player_docs = [players_collection.find_one({"_id": pid}) for pid in away_team_doc["player_ids"][:5]]
+
+    # Build positionally assigned dicts
+    home_players = {pos: player for pos, player in zip(POSITION_LIST, home_player_docs)}
+    away_players = {pos: player for pos, player in zip(POSITION_LIST, away_player_docs)}
+
+    # Dummy scouting_data for now
+    scouting_data = {
+        home_team: {"offense": {}, "defense": {}},
+        away_team: {"offense": {}, "defense": {}}
+    }
+
+    game_state = run_simulation(home_team, away_team, home_players, away_players, scouting_data, turns=1)
+
+    # 5. Summarize & persist
+    summary = summarize_game_state(game_state)
+    print(summary)
+    games_collection.insert_one(summary)
+    
+    return summary
 
 @app.get("/games")
 def get_games():
