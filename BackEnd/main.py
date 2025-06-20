@@ -734,7 +734,7 @@ def resolve_shot(roles, game_state):
             game_state, playcall, is_three, defender, shot_score
         )
         if help_defender:
-        print(f"Help defense by {help_defender} → penalty applied: {round(help_penalty, 2)}")
+            print(f"Help defense by {help_defender} → penalty applied: {round(help_penalty, 2)}")
 
     # Screen bonus (if applicable)
     
