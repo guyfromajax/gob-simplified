@@ -1,87 +1,21 @@
 import random
 import json
 from BackEnd.db import players_collection, teams_collection
+from BackEnd.models.player import Player
+from BackEnd.models.game_manager import GameManager
+from BackEnd.constants import (
+    ALL_ATTRS,
+    BOX_SCORE_KEYS,
+    PLAYCALL_ATTRIBUTE_WEIGHTS,
+    THREE_POINT_PROBABILITY,
+    BLOCK_PROBABILITY,
+    MALLEABLE_ATTRS,
+    STRATEGY_CALL_DICTS,
+    TEMPO_PASS_DICT,
+    TURNOVER_CALC_DICT,
+    POSITION_LIST,
+)
 
-#PRE-GAME SETTINGS
-
-ALL_ATTRS = [
-    "SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "FT",  # malleable
-    "ND", "IQ", "CH", "EM", "MO"  # static or macro-adjusted
-    ]
-
-BOX_SCORE_KEYS = [
-    "FGA", "FGM", "3PTA", "3PTM", "FTA", "FTM",
-    "OREB", "DREB", "REB", "AST", "STL", "BLK", "TO", "F", "MIN", "PTS",
-    "DEF_A", "DEF_S", "HELP_D", "SCR_A", "SCR_S"
-]
-
-
-PLAYCALL_ATTRIBUTE_WEIGHTS = {
-    "Base": {"SH": 2, "SC": 2, "AG": 2, "ST": 2, "IQ": 1, "CH": 1},
-    "Freelance": {"SH": 2, "SC": 2, "AG": 1, "ST": 1, "IQ": 3, "CH": 1},
-    "Inside": {"SC": 6, "ST": 2, "IQ": 1, "CH": 1},
-    "Attack": {"SC": 5, "AG": 2, "ST": 1, "IQ": 1, "CH": 1},
-    "Outside": {"SH": 8, "IQ": 1, "CH": 1},
-    "Set": "Same as Attack"
-}
-
-THREE_POINT_PROBABILITY = {
-    "Outside": 0.8,
-    "Base": 0.4,
-    "Freelance": 0.2
-    # All others default to 0.0
-}
-
-BLOCK_PROBABILITY = {
-    "Inside": 0.2,
-    "Attack": 0.1,
-    "Base": 0.1,
-    "Freelance": 0.1
-    # All others default to 0.0
-}
-
-MALLEABLE_ATTRS = ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "FT"]
-
-STRATEGY_CALL_DICTS = {
-    "defense": {
-        0: ["Man"],
-        1: ["Man", "Man", "Zone"],
-        2: ["Man", "Zone"],
-        3: ["Man", "Zone", "Zone"],
-        4: ["Zone"]},
-    "tempo": {
-        0: ["slow"],
-        1: ["slow", "normal"],
-        2: ["normal"],
-        3: ["normal", "fast"],
-        4: ["fast"],
-    },
-    "aggression": {
-        0: ["passive"],
-        1: ["passive", "normal"],
-        2: ["normal"],
-        3: ["normal", "aggressive"],
-        4: ["aggressive"],
-    },
-}
-
-TEMPO_PASS_DICT = {
-    "slow": random.randint(1,6),
-    "normal": random.randint(2,4),
-    "fast": random.randint(1,3)
-}
-
-TURNOVER_CALC_DICT = {
-    0: ["PG"],
-    1: ["PG", "SG"],
-    2: ["PG", "SG", "PG"],
-    3: ["PG", "SG", "SF", "PG"],
-    4: ["PG", "SG", "SF", "PF", "PG"],
-    5: ["PG", "SG", "SF", "PF", "C", "PG"],
-    6: ["PG", "SG", "SF", "PF", "C", "PG", "PG"]
-}
-
-POSITION_LIST = ["PG", "SG", "SF", "PF", "C"]
 
 def default_rebounder_dict():
     return {
@@ -343,7 +277,7 @@ def resolve_free_throw(game_state):
     off_team = game_state["offense_team"]
     def_team = game_state["defense_team"]
     shooter = game_state["last_ball_handler"] #this is a player object, not a position string
-    attrs = shooter["attributes"]
+    attrs = shooter.attributes
 
     # Use player's FT attribute
     ft_shot_score = ((attrs["FT"] * 0.8) + (attrs["CH"] * 0.2)) * random.randint(1, 6)
@@ -352,10 +286,10 @@ def resolve_free_throw(game_state):
     text = ""
 
     # Always record FTA
-    record_stat(shooter, "FTA") #confirmed
+    shooter.record_stat("FTA")
 
     if makes_shot:
-        record_stat(shooter, "FTM") #confirmed
+        shooter.record_stat("FTM")
         game_state["score"][off_team] += 1
         quarter_index = game_state["quarter"] - 1
         game_state["points_by_quarter"][off_team][quarter_index] += 1
@@ -376,8 +310,9 @@ def resolve_free_throw(game_state):
             d_pos = choose_rebounder(rebounder_dict, "defense")
             o_rebounder = game_state["players"][off_team][o_pos]
             d_rebounder = game_state["players"][def_team][d_pos]
-            o_attr = o_rebounder["attributes"]
-            d_attr = d_rebounder["attributes"]
+            o_attr = o_rebounder.attributes
+            d_attr = d_rebounder.attributes
+
 
             o_score = calculate_rebound_score(o_attr)
             d_score = calculate_rebound_score(d_attr)
@@ -396,7 +331,7 @@ def resolve_free_throw(game_state):
             rebounder = d_rebounder if rebound_team == def_team else o_rebounder
             stat = "DREB" if rebound_team == def_team else "OREB"
             game_state["last_rebound"] = stat  # stat is either "DREB" or "OREB"
-            record_stat(rebounder, stat) #confirmed
+            rebounder.record_stat(stat)
 
             if rebound_team == def_team:
                 possession_flips = True
@@ -463,7 +398,7 @@ def assign_roles(game_state, playcall):
 
     shot_weights = {
         pos: sum(
-            players[pos]["attributes"][attr] * weight
+            players[pos].attributes[attr] * weight
             for attr, weight in weights_dict.items()
         )
         for pos in players
@@ -474,13 +409,14 @@ def assign_roles(game_state, playcall):
     # Compute screener weights (excluding the shooter)
     screen_weights = {
         pos: (
-            players[pos]["attributes"]["ST"] * 6 +
-            players[pos]["attributes"]["AG"] * 2 +
-            players[pos]["attributes"]["IQ"] * 1 +
-            players[pos]["attributes"]["CH"] * 1
+            players[pos].attributes["ST"] * 6 +
+            players[pos].attributes["AG"] * 2 +
+            players[pos].attributes["IQ"] * 1 +
+            players[pos].attributes["CH"] * 1
         )
         for pos in players if pos != shooter_pos
     }
+
     screener_pos = max(screen_weights, key=screen_weights.get)
 
     # Pass chain and passer
@@ -532,7 +468,7 @@ def determine_event_type(game_state, roles):
    
     #determine number of turnover RNGs based on defense team'saggression
     for pos, player_obj in game_state["players"][off_team].items():
-        attr = player_obj["attributes"]
+        attr = player_obj.attributes
         ng = attr["NG"]
         for key in MALLEABLE_ATTRS:
             anchor_val = attr[f"anchor_{key}"]
@@ -608,8 +544,7 @@ def generate_animation_packet(turn_result):
 def recalculate_energy_scaled_attributes(game_state):
     for team in game_state["players"]:
         for pos, player_obj in game_state["players"][team].items():
-            player_name = f"{player_obj['first_name']} {player_obj['last_name']}"
-            attr = game_state["players"][team][pos]["attributes"]
+            attr = game_state["players"][team][pos].attributes
             ng = attr["NG"]
             for key in MALLEABLE_ATTRS:
                 anchor_val = attr[f"anchor_{key}"]
@@ -627,26 +562,26 @@ def resolve_fast_break_shot(game_state, fb_roles):
     if shooter == passer:
         passer = ""
     
-    attrs = shooter["attributes"]
+    attrs = shooter.attributes
     
     shot_score = (attrs["SC"] * 0.6 + attrs["CH"] * 0.2 + attrs["IQ"] * 0.2) * random.randint(1, 6)
 
     defender = random.choice(fb_roles["defense"]) if fb_roles["defense"] else None
     if defender:
-        defense_attrs = defender["attributes"]
+        defense_attrs = defender.attributes
         defense_penalty = (defense_attrs["ID"] * 0.8 + defense_attrs["IQ"] * 0.1 + defense_attrs["CH"] * 0.1) * random.randint(1, 6)
         shot_score -= defense_penalty * 0.2
-        record_stat(defender, "DEF_A") #confirmed, assuming fb_roles is an array of strings
+        defender.record_stat("DEF_A")
     else:
         defense_penalty = 0
 
     made = shot_score >= game_state["team_attributes"][off_team]["shot_threshold"]
-    record_stat(shooter, "FGA") #confirmed
+    shooter.record_stat("FGA")
 
     if made:
-        record_stat(shooter, "FGM") #confirmed
+        shooter.record_stat("FGM")
         if passer:
-            record_stat(passer, "AST") #confirmed
+            passer.record_stat("AST")
         text = f"{shooter} converts the fast break shot!"
         possession_flips = True
         game_state["offensive_state"] = "HCO"
@@ -657,10 +592,10 @@ def resolve_fast_break_shot(game_state, fb_roles):
         game_state["points_by_quarter"][off_team][quarter_index] += points
     else:
         if defender:
-            record_stat(defender, "DEF_S") #confirmed
+            defender.record_stat("DEF_S")
         rebounder = random.choice(fb_roles["defense"]) if fb_roles["defense"] else game_state["players"][def_team]["PG"]
         text = f"{shooter} misses the fast break shot -- {rebounder} grabs the rebound."
-        record_stat(rebounder, "DREB") #confirmed
+        rebounder.record_stat("DREB")
         possession_flips = True
         if random.random() < get_fast_break_chance(game_state):
             text += " -- entering a fast break!"
@@ -703,9 +638,9 @@ def resolve_shot(roles, game_state):
     defender = roles.get("defender", "")
 
     print(f"-------Inside resolve_shot---------")
-    print(f"shooter: {shooter['last_name']} | passer: {passer['last_name']} | screener: {screener['last_name']} | defender: {defender['last_name']}")
+    print(f"shooter: {shooter.name} | passer: {passer.name} | screener: {screener.name} | defender: {defender.name}")
     
-    attrs = shooter["attributes"]
+    attrs = shooter.attributes
     
     playcall = game_state["current_playcall"]
     defense_call = game_state["defense_playcall"]
@@ -719,19 +654,19 @@ def resolve_shot(roles, game_state):
     weights = PLAYCALL_ATTRIBUTE_WEIGHTS.get(playcall, {})
     shot_score = sum(attrs[attr] * (weight / 10) for attr, weight in weights.items()) * random.randint(1, 6)
     if passer:
-        passer_attrs = passer["attributes"]
+        passer_attrs = passer.attributes
         passer_score = (passer_attrs["PS"] * 0.8 + passer_attrs["IQ"] * 0.2) * random.randint(1, 6)
         shot_score += passer_score * 0.2
     else:
         dribble_score = (attrs["AG"] * 0.8 + attrs["IQ"] * 0.2) * random.randint(1, 6)
         shot_score += dribble_score * 0.2
-    defense_attrs = defender["attributes"]
+    defense_attrs = defender.attributes
     defense_penalty = (defense_attrs["OD"] * 0.8 + defense_attrs["IQ"] * 0.1 + defense_attrs["CH"] * 0.1) * random.randint(1, 6)
     if defense_call == "Zone":
         defense_penalty *= 0.9
     shot_score -= defense_penalty * 0.2  # Scaling factor to tune
     if defender:
-        record_stat(defender, "DEF_A") #confirmed
+        defender.record_stat("DEF_A")
     # Apply bonus/penalty based on defense type and shot type
     if (defense_call == "Zone" and is_three) or (defense_call == "Man" and not is_three):
         shot_score *= 0.9
@@ -751,11 +686,11 @@ def resolve_shot(roles, game_state):
     
     if screener and screener != shooter:
         
-        screen_attrs = screener["attributes"]
+        screen_attrs = screener.attributes
         screen_score = calculate_screen_score(screen_attrs)
         shot_score += screen_score * 0.15
         print(f"screen by {screener} adds {round(screen_score * 0.15, 2)} to shot score")
-        record_stat(screener, "SCR_A") #confirmed
+        screener.record_stat("SCR_A")
         #need to add shot defender's ability to work through the screen
 
     # Gravity contribution from off-ball players
@@ -767,41 +702,41 @@ def resolve_shot(roles, game_state):
     # total_gravity = 0
     # for pos in gravity_contributors:
     #     player = game_state["players"][off_team][pos]
-    #     attrs = player["attributes"]
+    #     attrs = player.attributes
     #     total_gravity += calculate_gravity_score(attrs)
     # gravity_boost = total_gravity * 0.02  # Tunable
     # shot_score += gravity_boost
     # print(f"Off-ball gravity boost: +{round(gravity_boost, 2)} from {gravity_contributors}")
 
     print(f"offense call: {playcall} // defense call: {defense_call}")
-    print(f"shooter: {shooter['last_name']} | passer: {passer['last_name']}")
+    print(f"shooter: {shooter.name} | passer: {passer.name}")
     print(f"shot score = {round(shot_score, 2)} | (defense score: {round(defense_penalty * 0.2, 2)})")
     made = shot_score >= shot_threshold
 
 
     # Track attempts
-    record_stat(shooter, "FGA") #confirmed
+    shooter.record_stat("FGA")
     if is_three:
-        record_stat(shooter, "3PTA") #confirmed
+        shooter.record_stat("3PTA")
 
     if made:
-        record_stat(shooter, "FGM") #confirmed
+        shooter.record_stat("FGM")
         if passer:
-            record_stat(passer, "AST") #confirmed
+            passer.record_stat("AST")
         if is_three:
-            record_stat(shooter, "3PTM") #confirmed
+            shooter.record_stat("3PTM")
         points = 3 if is_three else 2
         game_state["score"][off_team] += points
         quarter_index = game_state["quarter"] - 1
         game_state["points_by_quarter"][off_team][quarter_index] += points
-        text = f"{shooter['last_name']} drains a 3!" if is_three else f"{shooter['last_name']} makes the shot."
+        text = f"{shooter.name} drains a 3!" if is_three else f"{shooter.name} makes the shot."
         possession_flips = True
         if screener:
-            record_stat(screener, "SCR_S") #confirmed
+            screener.record_stat("SCR_S")
     else:
-        text = f"{shooter['last_name']} misses the {'3' if is_three else 'shot'}."
+        text = f"{shooter.name} misses the {'3' if is_three else 'shot'}."
         if defender:
-            record_stat(defender, "DEF_S") #confirmed
+            defender.record_stat("DEF_S")
         #Build dict based on player proximity to the ball in the future
         base_block_prob = BLOCK_PROBABILITY.get(playcall, 0.0)
         # Defensive player's ID score (scaled 0–1)
@@ -810,8 +745,8 @@ def resolve_shot(roles, game_state):
         final_block_chance = base_block_prob * (0.5 + block_skill)  # scales 50–150% of base
         is_block = random.random() < final_block_chance
         if is_block:
-            text += f"{defender['last_name']} blocks the shot!"
-            record_stat(defender, "BLK") #confirmed
+            text += f"{defender.name} blocks the shot!"
+            defender.record_stat("BLK")
             
 
         rebounder_dict = {
@@ -824,8 +759,8 @@ def resolve_shot(roles, game_state):
         o_rebounder = game_state["players"][off_team][o_pos]
         d_rebounder = game_state["players"][def_team][d_pos]
 
-        o_attr = o_rebounder["attributes"]
-        d_attr = d_rebounder["attributes"]
+        o_attr = o_rebounder.attributes
+        d_attr = d_rebounder.attributes
 
         o_score = calculate_rebound_score(o_attr)
         d_score = calculate_rebound_score(d_attr)
@@ -854,7 +789,7 @@ def resolve_shot(roles, game_state):
         rebounder = d_rebounder if rebound_team == def_team else o_rebounder
         stat = "DREB" if rebound_team == def_team else "OREB"
         game_state["last_rebound"] = stat  # stat is either "DREB" or "OREB"
-        record_stat(rebounder, stat) #confirmed
+        rebounder.record_stat(stat)
 
         text += f"...{rebounder} grabs the rebound."
         possession_flips = (rebound_team != off_team)
@@ -866,7 +801,7 @@ def resolve_shot(roles, game_state):
                 text += (f"... he attempts the putback...")
 
                 # Basic putback shot calculation (we'll refine later)
-                attrs = rebounder["attributes"]
+                attrs = rebounder.attributes
                 shot_score = (
                     attrs["SC"] * 0.6 +
                     attrs["CH"] * 0.2 +
@@ -875,15 +810,15 @@ def resolve_shot(roles, game_state):
 
                 defender_pos = random.choice(["C", "C", "C", "C", "C", "PF", "PF", "PF", "SF", "SF", "SG", "PG"])
                 defender = game_state["players"][def_team][defender_pos]
-                defense_attrs = defender["attributes"]
+                defense_attrs = defender.attributes
                 defense_penalty = (defense_attrs["ID"] * 0.8 + defense_attrs["IQ"] * 0.1 + defense_attrs["CH"] * 0.1) * random.randint(1, 6)
                 shot_score -= defense_penalty * 0.2
                 made = shot_score >= game_state["team_attributes"][off_team]["shot_threshold"]
 
                 # Track stats
-                record_stat(rebounder, "FGA") #confirmed
+                rebounder.record_stat("FGA")
                 if made:
-                    record_stat(rebounder, "FGM") #confirmed
+                    rebounder.record_stat("FGM")
                     points = 2
                     game_state["score"][off_team] += points
                     game_state["points_by_quarter"][off_team][game_state["quarter"] - 1] += points
@@ -933,17 +868,17 @@ def resolve_turnover(roles, game_state, turnover_type="DEAD BALL"):
     def_team = game_state["defense_team"]
     ball_handler = roles["ball_handler"]
     defender = roles.get("defender", "")
-    record_stat(ball_handler, "TO") #confirmed
+    ball_handler.record_stat("TO")
 
     if turnover_type == "STEAL":
-        record_stat(defender, "STL") #confirmed
+        defender.record_stat("STL")
         if random.random() < get_fast_break_chance(game_state):
             game_state["offensive_state"] = "FAST_BREAK"
         else:
             game_state["offensive_state"] = "HCO"
         game_state["last_stealer"] = defender
         game_state["last_rebound"] = ""
-        text = f"{defender['last_name']} jumps the pass and takes it the other way!"
+        text = f"{defender.name} jumps the pass and takes it the other way!"
     else:
         game_state["offensive_state"] = "HCO"
         text = f"{ball_handler} throws it out of bounds."
@@ -982,7 +917,7 @@ def resolve_foul(roles, game_state):
     time_elapsed = get_time_elapsed(tempo)
 
     # Track the foul
-    record_stat(foul_player, "F")
+    foul_player.record_stat("F")
     if foul_team == "DEFENSE":
         game_state["team_fouls"][def_team] += 1
         text = f"{foul_player} fouls {ball_handler}!"
@@ -1169,7 +1104,7 @@ def calculate_foul_turnover(game_state, positions, thresholds, roles):
     # === Defensive Foul ===
     d_pos = positions["d_foul"]
     d_foul_player = game_state["players"][def_team][d_pos]
-    d_attr = d_foul_player["attributes"]
+    d_attr = d_foul_player.attributes
 
     iq = d_attr["IQ"] * 0.3
     ch = d_attr["CH"] * 0.3
@@ -1190,7 +1125,7 @@ def calculate_foul_turnover(game_state, positions, thresholds, roles):
     # === Offensive Foul ===
     o_pos = positions["o_foul"]
     o_foul_player = game_state["players"][off_team][o_pos]
-    o_attr = o_foul_player["attributes"]
+    o_attr = o_foul_player.attributes
 
     iq = o_attr["IQ"] * 0.3
     ch = o_attr["CH"] * 0.3
@@ -1209,7 +1144,7 @@ def calculate_foul_turnover(game_state, positions, thresholds, roles):
     # === Turnover ===
     t_pos = positions["turnover"]
     turnover_player = game_state["players"][off_team][t_pos]
-    t_attr = turnover_player["attributes"]
+    t_attr = turnover_player.attributes
 
     bh_score = (
         t_attr["BH"] * 0.5 +
@@ -1219,7 +1154,7 @@ def calculate_foul_turnover(game_state, positions, thresholds, roles):
     ) * random.randint(1, 6)
 
     def_mod_player = game_state["players"][def_team][t_pos]
-    def_mod_attr = def_mod_player["attributes"]
+    def_mod_attr = def_mod_player.attributes
     pressure = (
         def_mod_attr["OD"] * 0.3 +
         def_mod_attr["AG"] * 0.3 +
@@ -1232,7 +1167,7 @@ def calculate_foul_turnover(game_state, positions, thresholds, roles):
     turnover_score = bh_score - pressure
     is_turnover = turnover_score < thresholds["turnover_threshold"]
 
-    print(f"Turnover → {turnover_player['first_name']} {turnover_player['last_name']} vs {def_mod_player['first_name']} {def_mod_player['last_name']}: score={round(turnover_score, 2)} vs threshold={thresholds['turnover_threshold']} | flag={is_turnover}")
+    print(f"Turnover → {turnover_player.name} vs {def_mod_player.name}: score={round(turnover_score, 2)} vs threshold={thresholds['turnover_threshold']} | flag={is_turnover}")
 
     decisions = {
         "TURNOVER": (is_turnover, turnover_score),
@@ -1304,7 +1239,7 @@ def apply_help_defense_if_triggered(game_state, playcall, is_three, defender, sh
     ]
     help_pos = random.choice(possible_helpers)
     help_defender = game_state["players"][def_team][help_pos]
-    help_attrs = help_defender["attributes"]
+    help_attrs = help_defender.attributes
 
     if help_playcall == "Attack":
         help_score = (
@@ -1336,8 +1271,8 @@ def determine_rebounder(game_state, off_team, def_team):
     o_rebounder = game_state["players"][off_team][o_pos]
     d_rebounder = game_state["players"][def_team][d_pos]
 
-    o_attr = o_rebounder["attributes"]
-    d_attr = d_rebounder["attributes"]
+    o_attr = o_rebounder.attributes
+    d_attr = d_rebounder.attributes
 
     o_score = calculate_rebound_score(o_attr)
     d_score = calculate_rebound_score(d_attr)
@@ -1391,7 +1326,7 @@ def resolve_offensive_rebound_loop(game_state, off_team, def_team, rebounder):
 
         # attempt putback
         text_log += f"{rebounder} goes back up..."
-        attrs = rebounder["attributes"]
+        attrs = rebounder.attributes
         shot_score = (
             attrs["SC"] * 0.6 +
             attrs["CH"] * 0.2 +
@@ -1403,7 +1338,7 @@ def resolve_offensive_rebound_loop(game_state, off_team, def_team, rebounder):
         # contested by random defender
         defender_pos = random.choice(["C", "C", "C", "PF", "PF", "SF", "SF", "SG", "PG"])
         defender = game_state["players"][def_team][defender_pos]
-        defense_attrs = defender["attributes"]
+        defense_attrs = defender.attributes
         defense_penalty = (
             defense_attrs["ID"] * 0.8 + 
             defense_attrs["IQ"] * 0.1 + 
@@ -1412,10 +1347,10 @@ def resolve_offensive_rebound_loop(game_state, off_team, def_team, rebounder):
         shot_score -= defense_penalty * 0.2
 
         made = shot_score >= game_state["team_attributes"][off_team]["shot_threshold"]
-        record_stat(rebounder, "FGA") #confirmed
+        rebounder.record_stat("FGA")
 
         if made:
-            record_stat(rebounder, "FGM") #confirmed
+            rebounder.record_stat("FGM")
             points = 2
             game_state["score"][off_team] += points
             game_state["points_by_quarter"][off_team][game_state["quarter"] - 1] += points
@@ -1428,7 +1363,7 @@ def resolve_offensive_rebound_loop(game_state, off_team, def_team, rebounder):
 
         # shot missed — determine rebound
         new_rebounder, new_team, new_stat = determine_rebounder(game_state, off_team, def_team)
-        record_stat(new_rebounder, new_stat) #confirmed
+        new_rebounder.record_stat(new_stat)
         text_log += f" but misses the shot. {new_rebounder} grabs the rebound."
 
         if new_team != off_team:
@@ -1462,13 +1397,11 @@ def build_box_score_from_player_stats(game_state):
 
     for team in game_state["players"]:
         box_score[team] = {}
-
         for pos, player in game_state["players"][team].items():
-            name = f"{player['first_name']} {player['last_name']}"
-            # Deep copy to avoid reference issues
-            box_score[team][name] = dict(player["stats"]["game"])
-    
+            name = player.get_name()
+            box_score[team][name] = dict(player.stats["game"])  # Deep copy
     return box_score
+
 
 def print_scouting_report(data):
     for team in data:
@@ -1487,333 +1420,314 @@ def print_scouting_report(data):
         for def_type, val in data[team]["defense"].items():
             print(f"{def_type.ljust(14)} — Used: {val['used']}, Success: {val['success']}")
 
+def run_simulation(home_team, away_team, home_players, away_players, scouting_data, turns=1):
+    gm = GameManager(home_team, away_team, home_players, away_players, scouting_data)
+
+    for _ in range(turns):
+        gm.simulate_turn()
+
+    return gm.to_dict()
+
+
 #MAIN
-def main(return_game_state=False):
-    energy_rng_seed = 1.0  # Default for first turn
+# def main(return_game_state=False):
+#     energy_rng_seed = 1.0  # Default for first turn
     
-    # Get team documents
-    lancaster_team = teams_collection.find_one({"name": "Lancaster"})
-    bt_team = teams_collection.find_one({"name": "Bentley-Truman"})
-    print("🔍 Checking live team names in /simulate:")
+#     # Get team documents
+#     lancaster_team = teams_collection.find_one({"name": "Lancaster"})
+#     bt_team = teams_collection.find_one({"name": "Bentley-Truman"})
+#     print("🔍 Checking live team names in /simulate:")
 
 
-    print("🧠 Inserted teams:")
-    for team in teams_collection.find({}):
-        print("📁", team.get("name"))
+#     print("🧠 Inserted teams:")
+#     for team in teams_collection.find({}):
+#         print("📁", team.get("name"))
 
 
-    if not lancaster_team or not bt_team:
-        raise ValueError("One or both teams not found in the database.")
+#     if not lancaster_team or not bt_team:
+#         raise ValueError("One or both teams not found in the database.")
 
-    # Pull 5 player documents from Mongo based on stored IDs
-    lancaster_roster = [
-        players_collection.find_one({"_id": pid})
-        for pid in lancaster_team["player_ids"][:5]
-    ]
-    bt_roster = [
-        players_collection.find_one({"_id": pid})
-        for pid in bt_team["player_ids"][:5]
-    ]
-    print(lancaster_roster)
-    print(bt_roster)
+#     # Pull 5 player documents from Mongo based on stored IDs
+#     lancaster_roster = [
+#         Player(players_collection.find_one({"_id": pid}))
+#         for pid in lancaster_team["player_ids"][:5]
+#     ]
+#     bt_roster = [
+#         Player(players_collection.find_one({"_id": pid}))
+#         for pid in bt_team["player_ids"][:5]
+#     ]
 
-
-    game_state = {
-        "offense_team": "Lancaster",
-        "defense_team": "Bentley-Truman",
-        "players": {
-            "Lancaster": {
-                "PG": lancaster_roster[0],
-                "SG": lancaster_roster[1],
-                "SF": lancaster_roster[2],
-                "PF": lancaster_roster[3],
-                "C":  lancaster_roster[4]
-            },
-            "Bentley-Truman": {
-                "PG": bt_roster[0],
-                "SG": bt_roster[1],
-                "SF": bt_roster[2],
-                "PF": bt_roster[3],
-                "C":  bt_roster[4]
-            }
-        },
-        "score": {"Lancaster": 0, "Bentley-Truman": 0},
-        "time_remaining": 480,
-        "quarter": 1,
-        "offensive_state": "HALF_COURT",
-        "tempo": 2,
-        "playcall": {"offense": "Base", "defense": "Man"},
-        "defense_playcall": "Man",  # Add this line
-        "turn_number": 17,
-        "team_fouls": {
-            "Lancaster": 0,
-            "Bentley-Truman": 0
-        },
-        "free_throws": 0,
-        "free_throws_remaining": 0,
-        "last_ball_handler": None,
-        "bonsu_active": False,
-        "box_score": {
-            "Lancaster": {},
-            "Bentley-Truman": {}
-        }
-    }
-
-    # --- After assigning game_state["players"] ---
-    for team in game_state["players"]:
-        for pos, player_obj in game_state["players"][team].items():
-            player_obj["attributes"] = {
-                k: v for k, v in player_obj.items()
-                if k not in ["_id", "first_name", "last_name", "team"]
-            }
-            for k in list(player_obj["attributes"]):
-                player_obj["attributes"][f"anchor_{k}"] = player_obj["attributes"][k]
-
-            player_obj["stats"] = {
-                "game": { stat: 0 for stat in BOX_SCORE_KEYS },
-                "season": { stat: 0 for stat in BOX_SCORE_KEYS },
-                "career": { stat: 0 for stat in BOX_SCORE_KEYS }
-            }
+#     print(lancaster_roster)
+#     print(bt_roster)
 
 
+#     game_state = {
+#         "offense_team": "Lancaster",
+#         "defense_team": "Bentley-Truman",
+#         "players": {
+#             "Lancaster": {
+#                 "PG": lancaster_roster[0],
+#                 "SG": lancaster_roster[1],
+#                 "SF": lancaster_roster[2],
+#                 "PF": lancaster_roster[3],
+#                 "C":  lancaster_roster[4]
+#             },
+#             "Bentley-Truman": {
+#                 "PG": bt_roster[0],
+#                 "SG": bt_roster[1],
+#                 "SF": bt_roster[2],
+#                 "PF": bt_roster[3],
+#                 "C":  bt_roster[4]
+#             }
+#         },
+#         "score": {"Lancaster": 0, "Bentley-Truman": 0},
+#         "time_remaining": 480,
+#         "quarter": 1,
+#         "offensive_state": "HALF_COURT",
+#         "tempo": 2,
+#         "playcall": {"offense": "Base", "defense": "Man"},
+#         "defense_playcall": "Man",  # Add this line
+#         "turn_number": 17,
+#         "team_fouls": {
+#             "Lancaster": 0,
+#             "Bentley-Truman": 0
+#         },
+#         "free_throws": 0,
+#         "free_throws_remaining": 0,
+#         "last_ball_handler": None,
+#         "bonsu_active": False,
+#         "box_score": {
+#             "Lancaster": {},
+#             "Bentley-Truman": {}
+#         }
+#     }
     
-    game_state["scouting_data"] = {
-        team: {
-            "offense": {
-                "Fast_Break_Entries": 0,
-                "Fast_Break_Success": 0,
-                "Playcalls": {call: {"used": 0, "success": 0} for call in ["Base", "Freelance", "Inside", "Attack", "Outside", "Set"]},
-            },
-            "defense": {
-                "Man": {"used": 0, "success": 0},
-                "Zone": {"used": 0, "success": 0},
-                "vs_Fast_Break": {"used": 0, "success": 0},
-            }
-        }
-        for team in game_state["players"]
-    }
+#     game_state["scouting_data"] = {
+#         team: {
+#             "offense": {
+#                 "Fast_Break_Entries": 0,
+#                 "Fast_Break_Success": 0,
+#                 "Playcalls": {call: {"used": 0, "success": 0} for call in ["Base", "Freelance", "Inside", "Attack", "Outside", "Set"]},
+#             },
+#             "defense": {
+#                 "Man": {"used": 0, "success": 0},
+#                 "Zone": {"used": 0, "success": 0},
+#                 "vs_Fast_Break": {"used": 0, "success": 0},
+#             }
+#         }
+#         for team in game_state["players"]
+#     }
     
-    game_state["playcall_weights"] = initialize_playcall_settings()
-    game_state["team_attributes"] = initialize_team_attributes()
-    game_state["strategy_settings"] = initialize_strategy_settings()
-    game_state["strategy_calls"] = initialize_strategy_calls()
+#     game_state["playcall_weights"] = initialize_playcall_settings()
+#     game_state["team_attributes"] = initialize_team_attributes()
+#     game_state["strategy_settings"] = initialize_strategy_settings()
+#     game_state["strategy_calls"] = initialize_strategy_calls()
 
-    game_state["playcall_tracker"] = {
-        team: {call: 0 for call in ["Base", "Freelance", "Inside", "Attack", "Outside", "Set"]}
-        for team in game_state["players"]
-    }
-    game_state["defense_playcall_tracker"] = {
-        team: {call: 0 for call in ["Man", "Zone"]}
-        for team in game_state["players"]
-    }
+#     game_state["playcall_tracker"] = {
+#         team: {call: 0 for call in ["Base", "Freelance", "Inside", "Attack", "Outside", "Set"]}
+#         for team in game_state["players"]
+#     }
+#     game_state["defense_playcall_tracker"] = {
+#         team: {call: 0 for call in ["Man", "Zone"]}
+#         for team in game_state["players"]
+#     }
 
-    game_state["points_by_quarter"] = {
-        team: [0, 0, 0, 0] for team in game_state["players"]
-    }
+#     game_state["points_by_quarter"] = {
+#         team: [0, 0, 0, 0] for team in game_state["players"]
+#     }
 
 
-    i = 1
-    for q in range(1, 5):  # quarters 1 to 4
-        game_state["quarter"] = q
-        recharge_amount = 0.3 if q == 3 else 0.2
-        # Reset fouls at start of quarter
-        for team in game_state["team_fouls"]:
-            game_state["team_fouls"][team] = 0
-        game_state["time_remaining"] = 480  # 8 minutes per quarter
-        # Recharge NG at quarter break
-        for team in game_state["players"]:
-            for pos, player_obj in game_state["players"][team].items():
-                player_name = f"{player_obj['first_name']} {player_obj['last_name']}"
-                attr = game_state["players"][team][pos]["attributes"]
-                attr["NG"] = min(1.0, round(attr["NG"] + recharge_amount, 3))
+#     i = 1
+#     for q in range(1, 5):  # quarters 1 to 4
+#         game_state["quarter"] = q
+#         recharge_amount = 0.3 if q == 3 else 0.2
+#         # Reset fouls at start of quarter
+#         for team in game_state["team_fouls"]:
+#             game_state["team_fouls"][team] = 0
+#         game_state["time_remaining"] = 480  # 8 minutes per quarter
+#         # Recharge NG at quarter break
+#         for team in game_state["players"]:
+#             for player in game_state["players"][team].values():
+#                 player.recharge_energy(recharge_amount)
 
-        if not return_game_state:
-            print(f"\n=== Start of Q{q} ===")
-        while game_state["time_remaining"] > 0:
-            if not return_game_state:
-                print(f"--- Turn {i} ---")
-            game_state["last_ball_handler"] = game_state["players"][game_state["offense_team"]]["PG"]
-            # game_state["last_ball_handler"] = "PG"
-            game_state["strategy_calls"] = resolve_strategy_calls(game_state)
-            # for team, calls in game_state["strategy_calls"].items():
-            #     print(f"{team} Tempo = {calls['tempo_call']}, Aggression = {calls['aggression_call']}")
-            turn_result = resolve_turn(game_state)
-            game_state["time_remaining"] = max(0, game_state["time_remaining"] - turn_result["time_elapsed"])
+
+#         if not return_game_state:
+#             print(f"\n=== Start of Q{q} ===")
+#         while game_state["time_remaining"] > 0:
+#             if not return_game_state:
+#                 print(f"--- Turn {i} ---")
+#             game_state["last_ball_handler"] = game_state["players"][game_state["offense_team"]]["PG"]
+#             # game_state["last_ball_handler"] = "PG"
+#             game_state["strategy_calls"] = resolve_strategy_calls(game_state)
+#             # for team, calls in game_state["strategy_calls"].items():
+#             #     print(f"{team} Tempo = {calls['tempo_call']}, Aggression = {calls['aggression_call']}")
+#             turn_result = resolve_turn(game_state)
+#             game_state["time_remaining"] = max(0, game_state["time_remaining"] - turn_result["time_elapsed"])
             
-            for player in game_state["players"][game_state["offense_team"]].values():
-                record_stat(player, "MIN", turn_result["time_elapsed"]) #confirmed
-            for player in game_state["players"][game_state["defense_team"]].values():
-                record_stat(player, "MIN", turn_result["time_elapsed"]) #confirmed
+#             for player in game_state["players"][game_state["offense_team"]].values():
+#                 player.record_stat("MIN", turn_result["time_elapsed"])
+#             for player in game_state["players"][game_state["defense_team"]].values():
+#                 player.record_stat("MIN", turn_result["time_elapsed"])
 
-            #Energy System
-            if i % 2 == 0 or i == 1:
-                energy_rng_seed = random.choices(
-                    [0.9, 0.95, 1.0, 1.05, 1.1],
-                    weights=[1, 2, 5, 2, 1]
-                )[0]
-            # print(f"Turn {i} | Energy RNG: {energy_rng_seed}")
-            base_decay = 0.025  # Base amount of NG lost per turn
-            fatigue_mod = 1.1 if game_state["defense_playcall"] == "Man" else 0.9
-            def_team = game_state["defense_team"]
-            for team in [game_state["offense_team"], game_state["defense_team"]]:
-                for pos, player_obj in game_state["players"][team].items():
-                    player_name = f"{player_obj['first_name']} {player_obj['last_name']}"
-                    attr = game_state["players"][team][pos]["attributes"]
-                    endurance = attr["ND"]
-                    decay = max(0.001, base_decay - (endurance / 1000))  # Prevent negative decay
-                    decay = max(0.001, decay * energy_rng_seed)  # Apply seeded RNG
-                     # ✅ Only apply to defenders
-                    if team == def_team:
-                        decay *= fatigue_mod
-                    attr["NG"] = max(0.1, round(attr["NG"] - decay, 3))  # Floor at 0.1
-            recalculate_energy_scaled_attributes(game_state)
+#             #Energy System
+#             if i % 2 == 0 or i == 1:
+#                 energy_rng_seed = random.choices(
+#                     [0.9, 0.95, 1.0, 1.05, 1.1],
+#                     weights=[1, 2, 5, 2, 1]
+#                 )[0]
+#             # print(f"Turn {i} | Energy RNG: {energy_rng_seed}")
+#             base_decay = 0.025  # Base amount of NG lost per turn
+#             fatigue_mod = 1.1 if game_state["defense_playcall"] == "Man" else 0.9
+#             def_team = game_state["defense_team"]
+#             for team in [game_state["offense_team"], game_state["defense_team"]]:
+#                 for pos, player_obj in game_state["players"][team].items():
+#                     attr = game_state["players"][team][pos].attributes
+#                     endurance = attr["ND"]
+#                     decay = max(0.001, base_decay - (endurance / 1000))  # Prevent negative decay
+#                     decay = max(0.001, decay * energy_rng_seed)  # Apply seeded RNG
+#                      # ✅ Only apply to defenders
+#                     if team == def_team:
+#                         decay *= fatigue_mod
+#                     player_obj.decay_energy(decay) # Floor at 0.1
+#             recalculate_energy_scaled_attributes(game_state)
 
-            minutes = game_state["time_remaining"] // 60
-            seconds = game_state["time_remaining"] % 60
-            clock_display = f"{minutes}:{seconds:02d}"
-            if not return_game_state:
-                print()
-                print(turn_result.get("text", "No description"))
-                print()
-                print(f"Score: {game_state['score']}")
-                print(f"Clock: {clock_display} // Q{game_state['quarter']}")
-                print(f"Team Fouls: {game_state['team_fouls']}")
-                # if turn_result.get("possession_flips"):
-                #     print("Possession changes.")
-                # else:
-                #     print("Possession retained.")
-                print()
-            if turn_result.get("possession_flips", False):
-                game_state["offense_team"], game_state["defense_team"] = (
-                    game_state["defense_team"],
-                    game_state["offense_team"]
-                )
-            i += 1
+#             minutes = game_state["time_remaining"] // 60
+#             seconds = game_state["time_remaining"] % 60
+#             clock_display = f"{minutes}:{seconds:02d}"
+#             if not return_game_state:
+#                 print()
+#                 print(turn_result.get("text", "No description"))
+#                 print()
+#                 print(f"Score: {game_state['score']}")
+#                 print(f"Clock: {clock_display} // Q{game_state['quarter']}")
+#                 print(f"Team Fouls: {game_state['team_fouls']}")
+#                 # if turn_result.get("possession_flips"):
+#                 #     print("Possession changes.")
+#                 # else:
+#                 #     print("Possession retained.")
+#                 print()
+#             if turn_result.get("possession_flips", False):
+#                 game_state["offense_team"], game_state["defense_team"] = (
+#                     game_state["defense_team"],
+#                     game_state["offense_team"]
+#                 )
+#             i += 1
 
-        if not return_game_state:
-            print(f"=== End of Q{q} ===")
+#         if not return_game_state:
+#             print(f"=== End of Q{q} ===")
     
-    for team in game_state["box_score"]:
-        for player in game_state["box_score"][team]:
-            raw_seconds = game_state["box_score"][team][player]["MIN"]
-            game_state["box_score"][team][player]["MIN"] = int(raw_seconds / 60)
+#     for team in game_state["box_score"]:
+#         for player in game_state["box_score"][team]:
+#             raw_seconds = game_state["box_score"][team][player]["MIN"]
+#             game_state["box_score"][team][player]["MIN"] = int(raw_seconds / 60)
 
-    # --- Overtime if tied after regulation ---
-    while game_state["score"]["Lancaster"] == game_state["score"]["Bentley-Truman"]:
-        game_state["quarter"] += 1
-        for team in game_state["points_by_quarter"]:
-            game_state["points_by_quarter"][team].append(0)
+#     # --- Overtime if tied after regulation ---
+#     while game_state["score"]["Lancaster"] == game_state["score"]["Bentley-Truman"]:
+#         game_state["quarter"] += 1
+#         for team in game_state["points_by_quarter"]:
+#             game_state["points_by_quarter"][team].append(0)
 
-        game_state["time_remaining"] = 240  # 4 minutes for OT
+#         game_state["time_remaining"] = 240  # 4 minutes for OT
 
-        if not return_game_state:
-            print(f"\n=== Start of Overtime Q{game_state['quarter']} ===")
+#         if not return_game_state:
+#             print(f"\n=== Start of Overtime Q{game_state['quarter']} ===")
 
-        while game_state["time_remaining"] > 0:
-            if not return_game_state:
-                print(f"--- Turn {i} (OT) ---")
-            turn_result = resolve_turn(game_state)
-            game_state["time_remaining"] = max(0, game_state["time_remaining"] - turn_result["time_elapsed"])
+#         while game_state["time_remaining"] > 0:
+#             if not return_game_state:
+#                 print(f"--- Turn {i} (OT) ---")
+#             turn_result = resolve_turn(game_state)
+#             game_state["time_remaining"] = max(0, game_state["time_remaining"] - turn_result["time_elapsed"])
 
-            for player in game_state["players"][game_state["offense_team"]].values():
-                record_stat(player, "MIN", turn_result["time_elapsed"]) #confirmed
-            for player in game_state["players"][game_state["defense_team"]].values():
-                record_stat(player, "MIN", turn_result["time_elapsed"]) #confirmed
+#             for player in game_state["players"][game_state["offense_team"]].values():
+#                 player.record_stat("MIN", turn_result["time_elapsed"])
+#             for player in game_state["players"][game_state["defense_team"]].values():
+#                 player.record_stat("MIN", turn_result["time_elapsed"])
 
-            # Energy and movement logic remains unchanged
-            if i % 2 == 0 or i == 1:
-                energy_rng_seed = random.choices([0.9, 0.95, 1.0, 1.05, 1.1], weights=[1, 2, 5, 2, 1])[0]
-            base_decay = 0.025
-            for team in [game_state["offense_team"], game_state["defense_team"]]:
-                for pos, player_obj in game_state["players"][team].items():
-                    player_name = f"{player_obj['first_name']} {player_obj['last_name']}"
-                    attr = game_state["players"][team][pos]["attributes"]
-                    endurance = attr["ND"]
-                    decay = max(0.001, base_decay - (endurance / 1000))
-                    decay = max(0.001, decay * energy_rng_seed)
-                    attr["NG"] = max(0.1, round(attr["NG"] - decay, 3))
-            recalculate_energy_scaled_attributes(game_state)
+#             # Energy and movement logic remains unchanged
+#             if i % 2 == 0 or i == 1:
+#                 energy_rng_seed = random.choices([0.9, 0.95, 1.0, 1.05, 1.1], weights=[1, 2, 5, 2, 1])[0]
+#             base_decay = 0.025
+#             for team in [game_state["offense_team"], game_state["defense_team"]]:
+#                 for pos, player_obj in game_state["players"][team].items():
+#                     attr = game_state["players"][team][pos].attributes
+#                     endurance = attr["ND"]
+#                     decay = max(0.001, base_decay - (endurance / 1000))
+#                     decay = max(0.001, decay * energy_rng_seed)
+#                     attr["NG"] = max(0.1, round(attr["NG"] - decay, 3))
+#             recalculate_energy_scaled_attributes(game_state)
 
-            minutes = game_state["time_remaining"] // 60
-            seconds = game_state["time_remaining"] % 60
-            clock_display = f"{minutes}:{seconds:02d}"
-            if not return_game_state:
-                print(turn_result.get("text", "No description"))
-                print(f"Clock: {clock_display}")
-                print(f"Quarter: Q{game_state['quarter']}")
-                print(f"Score: {game_state['score']}")
-                print(f"Team Fouls: {game_state['team_fouls']}")
-                print("Possession changes." if turn_result.get("possession_flips") else "Possession retained.")
-                print()
+#             minutes = game_state["time_remaining"] // 60
+#             seconds = game_state["time_remaining"] % 60
+#             clock_display = f"{minutes}:{seconds:02d}"
+#             if not return_game_state:
+#                 print(turn_result.get("text", "No description"))
+#                 print(f"Clock: {clock_display}")
+#                 print(f"Quarter: Q{game_state['quarter']}")
+#                 print(f"Score: {game_state['score']}")
+#                 print(f"Team Fouls: {game_state['team_fouls']}")
+#                 print("Possession changes." if turn_result.get("possession_flips") else "Possession retained.")
+#                 print()
 
-            if turn_result.get("possession_flips", False):
-                game_state["offense_team"], game_state["defense_team"] = (
-                    game_state["defense_team"],
-                    game_state["offense_team"]
-                )
-            i += 1
+#             if turn_result.get("possession_flips", False):
+#                 game_state["offense_team"], game_state["defense_team"] = (
+#                     game_state["defense_team"],
+#                     game_state["offense_team"]
+#                 )
+#             i += 1
 
-        if not return_game_state:
-            print(f"=== End of Overtime Q{game_state['quarter']} ===")
+#         if not return_game_state:
+#             print(f"=== End of Overtime Q{game_state['quarter']} ===")
 
     
-    if not return_game_state:
-        print(f"\n=== Box Score After {i} Turns ===")
-    for team in game_state["box_score"]:
-        team_score = game_state["score"][team]
-        if not return_game_state:
-            print(f"\n{team} {team_score}")
-        for player, stats in game_state["box_score"][team].items():
-            # Recalculate PTS if you're not auto-updating it in record_stat()
-            stats["PTS"] = (2 * stats["FGM"]) + stats["3PTM"] + stats["FTM"]
-            stats["REB"] = stats["OREB"] + stats["DREB"]
-            if not return_game_state:
-                print(f"{player}: {stats}")
+#     if not return_game_state:
+#         print(f"\n=== Box Score After {i} Turns ===")
+#     for team in game_state["box_score"]:
+#         team_score = game_state["score"][team]
+#         if not return_game_state:
+#             print(f"\n{team} {team_score}")
+#         for player, stats in game_state["box_score"][team].items():
+#             # Recalculate PTS if you're not auto-updating it in record_stat()
+#             stats["PTS"] = (2 * stats["FGM"]) + stats["3PTM"] + stats["FTM"]
+#             stats["REB"] = stats["OREB"] + stats["DREB"]
+#             if not return_game_state:
+#                 print(f"{player}: {stats}")
 
-    if not return_game_state:
-        print(f"\n=== Team Points by Quarter ===")
-        for team, q_points in game_state["points_by_quarter"].items():
-            print(f"{team}: Q1={q_points[0]}  Q2={q_points[1]}  Q3={q_points[2]}  Q4={q_points[3]}  Total={sum(q_points)}")
+#     if not return_game_state:
+#         print(f"\n=== Team Points by Quarter ===")
+#         for team, q_points in game_state["points_by_quarter"].items():
+#             print(f"{team}: Q1={q_points[0]}  Q2={q_points[1]}  Q3={q_points[2]}  Q4={q_points[3]}  Total={sum(q_points)}")
 
-    # Reset all player attributes to anchor values after the game
-    for team in game_state["players"]:
-        for pos, player in game_state["players"][team].items():
-            attrs = player["attributes"]
-            for key in list(attrs):  # Always use list() in case we modify keys during iteration
-                if key.startswith("anchor_"):
-                    base_attr = key.replace("anchor_", "")
-                    attrs[base_attr] = attrs[key]
+#     # Reset all player attributes to anchor values after the game
+#     for team in game_state["players"]:
+#         for pos, player in game_state["players"][team].items():
+#             player.reset_energy()
 
-            # Reset energy to full
-            attrs["NG"] = 1.0
+#     if not return_game_state:
+#         print(f"\n=== Team Stats Summary ===")
+#     team_stats = calculate_team_stats(game_state)
+#     stat_keys = ["FGM", "FGA", "3PTM", "3PTA", "FTM", "FTA", "OREB", "DREB", "REB", "AST", "STL", "BLK", "TO", "F", "PTS",
+#                     "DEF_A", "DEF_S", "HELP_D", "SCR_A", "SCR_S"]
 
+#     # Print header
+#     column_width = max(len(k) for k in stat_keys) + 2
+#     header = "TEAM".ljust(18) + "".join(k.rjust(column_width) for k in stat_keys)
+#     if not return_game_state:
+#         print(header)
+#         print("-" * len(header))
 
-    if not return_game_state:
-        print(f"\n=== Team Stats Summary ===")
-    team_stats = calculate_team_stats(game_state)
-    stat_keys = ["FGM", "FGA", "3PTM", "3PTA", "FTM", "FTA", "OREB", "DREB", "REB", "AST", "STL", "BLK", "TO", "F", "PTS",
-                    "DEF_A", "DEF_S", "HELP_D", "SCR_A", "SCR_S"]
+#         for team, stats in team_stats.items():
+#             row = team.ljust(18) + "".join(str(stats.get(k, 0)).rjust(column_width) for k in stat_keys)
+#             print(row)
 
-    # Print header
-    column_width = max(len(k) for k in stat_keys) + 2
-    header = "TEAM".ljust(18) + "".join(k.rjust(column_width) for k in stat_keys)
-    if not return_game_state:
-        print(header)
-        print("-" * len(header))
-
-        for team, stats in team_stats.items():
-            row = team.ljust(18) + "".join(str(stats.get(k, 0)).rjust(column_width) for k in stat_keys)
-            print(row)
-
-    # if not return_game_state:
-    #     print_scouting_report(game_state["scouting_data"])
+#     # if not return_game_state:
+#     #     print_scouting_report(game_state["scouting_data"])
 
 
 
-    if return_game_state:
-        return game_state
+#     if return_game_state:
+#         return game_state
 
-# if __name__ == "__main__":
+# # if __name__ == "__main__":
 #     game_state = main(return_game_state=False)
 
 # if __name__ == "__main__":
