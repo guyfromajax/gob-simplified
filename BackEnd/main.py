@@ -948,12 +948,17 @@ def resolve_turnover(roles, game_state, turnover_type="DEAD BALL"):
         text = f"{ball_handler} throws it out of bounds."
         game_state["offensive_state"] = "HCO"
 
+    bh_pos = next(
+        (pos for pos, obj in game_state["players"][off_team].items() if obj == ball_handler),
+        None
+    )
+    
     return {
         "result_type": turnover_type,
         "ball_handler": ball_handler,
         "text": text,
-        "start_coords": {ball_handler: {"x": 72, "y": 25}},
-        "end_coords": {ball_handler: {"x": 68, "y": 25}},
+        "start_coords": {bh_pos: {"x": 72, "y": 25}},
+        "end_coords": {bh_pos: {"x": 68, "y": 25}},
         "time_elapsed": random.randint(3, 8),
         "possession_flips": True  # Let the turn loop handle the flip
     }
@@ -1009,6 +1014,11 @@ def resolve_foul(roles, game_state):
         game_state["free_throws_remaining"] = 0
 
     #craft foul statement here and assign to game_state["text"]
+    bh_pos = next(
+        (pos for pos, obj in game_state["players"][off_team].items() if obj == ball_handler),
+        None
+    )
+    
     return {
         "result_type": "FOUL",
         "ball_handler": ball_handler,
@@ -1018,8 +1028,8 @@ def resolve_foul(roles, game_state):
         "foul_type": foul_type,
         "text": text,
         "possession_flips": False,
-        "start_coords": {ball_handler: {"x": 72, "y": 25}},
-        "end_coords": {ball_handler: {"x": 72, "y": 25}},
+        "start_coords": {bh_pos: {"x": 72, "y": 25}},
+        "end_coords": {bh_pos: {"x": 72, "y": 25}},
         "time_elapsed": time_elapsed
     }
 
