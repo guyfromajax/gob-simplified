@@ -924,10 +924,10 @@ def resolve_turnover(roles, game_state, turnover_type="DEAD BALL"):
     print(f"game_state: {game_state}")
     print(f"turnover_type: {turnover_type}")
 
-    team = game_state["offense_team"]
+    off_team = game_state["offense_team"]
     def_team = game_state["defense_team"]
     bh_pos = roles["ball_handler"]
-    ball_handler = game_state["players"][team][bh_pos]
+    ball_handler = game_state["players"][off_team][bh_pos]
     defender_pos = roles.get("defender", "")
     defender = game_state["players"][def_team][defender_pos]
     record_stat(ball_handler, "TO") #confirmed
@@ -1236,7 +1236,7 @@ def calculate_foul_turnover(game_state, positions, thresholds, roles):
     if active[0][0] == "TURNOVER":
         roles["turnover_player"] = turnover_player
         roles["turnover_defender"] = def_mod_player
-        roles["ball_handler"] = turnover_player
+        roles["ball_handler"] = t_pos
     elif active[0][0] == "D_FOUL":
         roles["foul_player"] = d_foul_player
     elif active[0][0] == "O_FOUL":
@@ -1614,6 +1614,7 @@ def main(return_game_state=False):
             if not return_game_state:
                 print(f"--- Turn {i} ---")
             game_state["last_ball_handler"] = game_state["players"][game_state["offense_team"]]["PG"]
+            # game_state["last_ball_handler"] = "PG"
             game_state["strategy_calls"] = resolve_strategy_calls(game_state)
             # for team, calls in game_state["strategy_calls"].items():
             #     print(f"{team} Tempo = {calls['tempo_call']}, Aggression = {calls['aggression_call']}")
