@@ -417,12 +417,17 @@ def resolve_free_throw(game_state):
             possession_flips = True
             game_state["offensive_state"] = "HCO"
 
+    shooter_pos = next(
+        (pos for pos, obj in game_state["players"][off_team].items() if obj == shooter),
+        None
+    )
+    
     return {
         "result_type": "FREE_THROW",
         "ball_handler": shooter,
         "text": text,
-        "start_coords": {shooter: {"x": 88, "y": 25}},
-        "end_coords": {shooter: {"x": 88, "y": 25}},
+        "start_coords": {shooter_pos: {"x": 88, "y": 25}},
+        "end_coords": {shooter_pos: {"x": 88, "y": 25}},
         "time_elapsed": 0,
         "possession_flips": possession_flips,
     }
@@ -667,6 +672,11 @@ def resolve_fast_break_shot(game_state, fb_roles):
 
     time_elapsed = random.randint(5, 15)
 
+    shooter_pos = next(
+        (pos for pos, obj in game_state["players"][off_team].items() if obj == shooter),
+        None
+    )
+    
     return {
         "result_type": "MAKE" if made else "MISS",
         "ball_handler": shooter,
@@ -675,8 +685,8 @@ def resolve_fast_break_shot(game_state, fb_roles):
         "defender": defender,
         "text": text,
         "possession_flips": possession_flips,
-        "start_coords": {shooter: {"x": 72, "y": 25}},
-        "end_coords": {shooter: {"x": 82, "y": 23}},
+        "start_coords": {shooter_pos: {"x": 72, "y": 25}},
+        "end_coords": {shooter_pos: {"x": 82, "y": 23}},
         "time_elapsed": time_elapsed
     }
 
@@ -895,6 +905,11 @@ def resolve_shot(roles, game_state):
     tempo = game_state["strategy_calls"][off_team]["tempo_call"]
     time_elapsed += get_time_elapsed(tempo)
 
+    shooter_pos = next(
+        (pos for pos, obj in game_state["players"][off_team].items() if obj == shooter),
+        None
+    )
+
     return {
         "result_type": "MAKE" if made else "MISS",
         "ball_handler": shooter,
@@ -903,8 +918,8 @@ def resolve_shot(roles, game_state):
         "defender": defender,
         "text": text,
         "possession_flips": possession_flips,
-        "start_coords": {shooter: {"x": 72, "y": 25}},
-        "end_coords": {shooter: {"x": 82, "y": 23}},
+        "start_coords": {shooter_pos: {"x": 72, "y": 25}},
+        "end_coords": {shooter_pos: {"x": 82, "y": 23}},
         "time_elapsed": time_elapsed
     }
 
