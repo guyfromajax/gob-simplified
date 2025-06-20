@@ -2,7 +2,7 @@ import random
 import json
 from BackEnd.db import players_collection, teams_collection
 from BackEnd.models.player import Player
-from models.game_manager import GameManager
+from BackEnd.models.game_manager import GameManager
 from BackEnd.constants import (
     ALL_ATTRS,
     BOX_SCORE_KEYS,
