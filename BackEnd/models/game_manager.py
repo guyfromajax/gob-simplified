@@ -1,4 +1,4 @@
-from models.player import Player
+from BackEnd.models.player import Player
 from constants import POSITION_LIST
 from copy import deepcopy
 from engine.turn_resolution import resolve_turn  # Update this path to your actual location
