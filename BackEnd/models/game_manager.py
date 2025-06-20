@@ -1,7 +1,7 @@
 from BackEnd.models.player import Player
 from BackEnd.constants import POSITION_LIST
 from copy import deepcopy
-from BackEnd.main import resolve_turn  # Update this path to your actual location
+from BackEnd.turn_logic import resolve_turn
 
 class GameManager:
     def __init__(self, home_team, away_team, home_players, away_players, scouting_data):
