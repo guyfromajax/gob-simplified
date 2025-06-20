@@ -376,8 +376,8 @@ def resolve_free_throw(game_state):
             d_pos = choose_rebounder(rebounder_dict, "defense")
             o_rebounder = game_state["players"][off_team][o_pos]
             d_rebounder = game_state["players"][def_team][d_pos]
-            o_attr = game_state["players"][off_team][o_rebounder]["attributes"]
-            d_attr = game_state["players"][def_team][d_rebounder]["attributes"]
+            o_attr = o_rebounder["attributes"]
+            d_attr = d_rebounder["attributes"]
 
             o_score = calculate_rebound_score(o_attr)
             d_score = calculate_rebound_score(d_attr)
@@ -450,6 +450,7 @@ def get_playcalls(game_state):
 
 def assign_roles(game_state, playcall):
     off_team = game_state["offense_team"]
+    def_team = game_state["defense_team"]
     players = game_state["players"][off_team]
 
     # Compute shot weights using attributes embedded in each player object
@@ -524,12 +525,12 @@ def determine_event_type(game_state, roles):
    
     #determine number of turnover RNGs based on defense team'saggression
     for pos, player_obj in game_state["players"][off_team].items():
-        player_name = f"{player_obj['first_name']} {player_obj['last_name']}"
-        attr = game_state["players"][off_team][pos]["attributes"]
+        attr = player_obj["attributes"]
         ng = attr["NG"]
         for key in MALLEABLE_ATTRS:
             anchor_val = attr[f"anchor_{key}"]
             attr[key] = int(anchor_val * ng)
+
 
     return event_type
 
@@ -628,8 +629,7 @@ def resolve_fast_break_shot(game_state, fb_roles):
 
     shot_score = (attrs["SC"] * 0.6 + attrs["CH"] * 0.2 + attrs["IQ"] * 0.2) * random.randint(1, 6)
 
-    defender_pos = random.choice(fb_roles["defense"]) if fb_roles["defense"] else ""
-    defender = game_state["players"][def_team][defender_pos]
+    defender = random.choice(fb_roles["defense"]) if fb_roles["defense"] else None
     if defender:
         defense_attrs = defender["attributes"]
         defense_penalty = (defense_attrs["ID"] * 0.8 + defense_attrs["IQ"] * 0.1 + defense_attrs["CH"] * 0.1) * random.randint(1, 6)
@@ -656,8 +656,7 @@ def resolve_fast_break_shot(game_state, fb_roles):
     else:
         if defender:
             record_stat(defender, "DEF_S") #confirmed
-        rebounder_pos = random.choice(fb_roles["defense"]) if fb_roles["defense"] else ["PG"]
-        rebounder = game_state["players"][def_team][rebounder_pos]
+        rebounder = random.choice(fb_roles["defense"]) if fb_roles["defense"] else game_state["players"][def_team]["PG"]
         text = f"{shooter} misses the fast break shot -- {rebounder} grabs the rebound."
         record_stat(rebounder, "DREB") #confirmed
         possession_flips = True
@@ -823,8 +822,8 @@ def resolve_shot(roles, game_state):
         o_rebounder = game_state["players"][off_team][o_pos]
         d_rebounder = game_state["players"][def_team][d_pos]
 
-        o_attr = game_state["players"][off_team][o_rebounder]["attributes"]
-        d_attr = game_state["players"][def_team][d_rebounder]["attributes"]
+        o_attr = o_rebounder["attributes"]
+        d_attr = d_rebounder["attributes"]
 
         o_score = calculate_rebound_score(o_attr)
         d_score = calculate_rebound_score(d_attr)
@@ -1319,8 +1318,8 @@ def determine_rebounder(game_state, off_team, def_team):
     o_rebounder = game_state["players"][off_team][o_pos]
     d_rebounder = game_state["players"][def_team][d_pos]
 
-    o_attr = game_state["players"][off_team][o_rebounder]["attributes"]
-    d_attr = game_state["players"][def_team][d_rebounder]["attributes"]
+    o_attr = o_rebounder["attributes"]
+    d_attr = d_rebounder["attributes"]
 
     o_score = calculate_rebound_score(o_attr)
     d_score = calculate_rebound_score(d_attr)
@@ -1439,6 +1438,19 @@ def calculate_team_stats(game_state):
         team_stats[team] = team_totals
 
     return team_stats
+
+def build_box_score_from_player_stats(game_state):
+    box_score = {}
+
+    for team in game_state["players"]:
+        box_score[team] = {}
+
+        for pos, player in game_state["players"][team].items():
+            name = f"{player['first_name']} {player['last_name']}"
+            # Deep copy to avoid reference issues
+            box_score[team][name] = dict(player["stats"]["game"])
+    
+    return box_score
 
 def print_scouting_report(data):
     for team in data:
@@ -1580,48 +1592,6 @@ def main(return_game_state=False):
     game_state["points_by_quarter"] = {
         team: [0, 0, 0, 0] for team in game_state["players"]
     }
-
-    for team in game_state["players"]:
-        game_state["box_score"][team] = {}
-        for pos, player_obj in game_state["players"][team].items():
-            player_name = f"{player_obj['first_name']} {player_obj['last_name']}"
-            game_state["box_score"][team][player_name] = {
-                "FGA": 0,
-                "FGM": 0,
-                "3PTA": 0,
-                "3PTM": 0,
-                "FTA": 0,
-                "FTM": 0,
-                "OREB": 0,
-                "DREB": 0,
-                "REB": 0,
-                "AST": 0,
-                "STL": 0,
-                "BLK": 0,
-                "TO": 0,
-                "F": 0,
-                "MIN": 0,
-                "PTS": 0,
-                "DEF_A": 0,
-                "DEF_S": 0,
-                "HELP_D": 0,
-                "SCR_A": 0,
-                "SCR_S": 0,
-            }
-
-    # game_state["player_attributes"] = {}
-
-    # # Build player_attributes from the full player objects already loaded from Mongo
-    # for team in game_state["players"]:
-    #     game_state["player_attributes"][team] = {}
-    #     for pos, player_obj in game_state["players"][team].items():
-    #         attr = {k: v for k, v in player_obj.items() if k not in ["_id", "first_name", "last_name", "team"]}
-    #         for key in list(attr):  # ✅ Safe copy of keys
-    #             attr[f"anchor_{key}"] = attr[key]
-    #         game_state["players"][team][pos]["attributes"] = attr
-
-    #         if not return_game_state:
-    #             print(game_state["players"][team][pos]["attributes"])  # Fix player to pos
 
 
     i = 1
