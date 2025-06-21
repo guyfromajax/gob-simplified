@@ -1,8 +1,8 @@
-from models.logger import Logger
-from models.rebound_manager import ReboundManager
-from models.playbook_manager import PlaybookManager
-from models.animation_manager import AnimationManager
-from constants import POSITION_LIST
+from BackEnd.models.logger import Logger
+from BackEnd.models.rebound_manager import ReboundManager
+from BackEnd.models.playbook_manager import PlaybookManager
+from BackEnd.models.animation_manager import AnimationManager
+from BackEnd.constants import POSITION_LIST, PLAYCALL_ATTRIBUTE_WEIGHTS
 import random
 
 class TurnManager:
@@ -51,5 +51,58 @@ class TurnManager:
         # Basic example: reduce time and switch possession if needed
         if result.get("possession_flips"):
             self.game.flip_possession()
+
+    def assign_roles(self, game_state, playcall):
+        off_team = game_state["offense_team"]
+        def_team = game_state["defense_team"]
+        players = game_state["players"][off_team]
+
+        # Compute shot weights using attributes embedded in each player object
+        weights_dict = PLAYCALL_ATTRIBUTE_WEIGHTS.get("Attack" if playcall == "Set" else playcall, {})
+
+        shot_weights = {
+            pos: sum(
+                players[pos].attributes[attr] * weight
+                for attr, weight in weights_dict.items()
+            )
+            for pos in players
+        }
+
+        shooter_pos = weighted_random_from_dict(shot_weights)
+
+        # Compute screener weights (excluding the shooter)
+        screen_weights = {
+            pos: (
+                players[pos].attributes["ST"] * 6 +
+                players[pos].attributes["AG"] * 2 +
+                players[pos].attributes["IQ"] * 1 +
+                players[pos].attributes["CH"] * 1
+            )
+            for pos in players if pos != shooter_pos
+        }
+
+        screener_pos = max(screen_weights, key=screen_weights.get)
+
+        # Pass chain and passer
+        pass_chain = generate_pass_chain(game_state, shooter_pos)
+        passer_pos = pass_chain[-2] if len(pass_chain) >= 2 else ""
+        if passer_pos == shooter_pos:
+            passer_pos = ""
+
+        if game_state["defense_playcall"] == "Zone":
+            defender_pos = random.choice(POSITION_LIST)
+        else:
+            defender_pos = shooter_pos
+
+        passer = game_state["players"][off_team][passer_pos] if passer_pos else None
+        return {
+            "shooter": game_state["players"][off_team][shooter_pos],
+            "screener": game_state["players"][off_team][screener_pos],
+            "ball_handler": game_state["players"][off_team][shooter_pos],
+            "passer": passer,
+            "pass_chain": pass_chain,
+            "defender": game_state["players"][def_team][defender_pos]
+        }
+
 
         # You can expand this with timeout logic, foul tracking, etc.
