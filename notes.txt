@@ -1,0 +1,12 @@
+
+Class Architecture
+graph TD
+    API -->|/simulate| GameManager
+    GameManager --> Team
+    GameManager --> TurnManager
+    GameManager --> BoxScore
+    TurnManager --> PlaybookManager
+    TurnManager --> Logger
+    TurnManager --> Team
+    TurnManager --> AnimationManager
+    Team --> Player
