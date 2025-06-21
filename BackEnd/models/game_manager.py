@@ -1,7 +1,7 @@
 from BackEnd.models.player import Player
+from BackEnd.models.turn_manager import TurnManager
 from BackEnd.constants import POSITION_LIST
 from copy import deepcopy
-from BackEnd.engine.phase_resolution import resolve_turn
 
 class GameManager:
     def __init__(self, home_team, away_team, home_players, away_players, scouting_data):
@@ -23,6 +23,8 @@ class GameManager:
         self.defense_team = away_team
 
         self.game_state = self._init_game_state()
+
+        self.turn_manager = TurnManager(self)
 
     def _init_game_state(self):
         return {
@@ -54,7 +56,7 @@ class GameManager:
         }
 
     def simulate_turn(self):
-        result = resolve_turn(self.game_state)
+        result = self.turn_manager.run_turn()
         self.turns.append(result)
         self._switch_possession()
         return result
