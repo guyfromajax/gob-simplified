@@ -1,4 +1,18 @@
+import random
 
+def resolve_turn(game_state):
+    off_team = game_state["offense_team"]
+    # print(f"game_state: {game_state}")
+    if game_state["offensive_state"] == "FREE_THROW":
+        return resolve_free_throw(game_state)
+
+    # Only allow fast break if last play ended with a defensive rebound or steal
+    # ✅ Fast break check — only if previous result was a rebound or steal
+    elif game_state["offensive_state"] == "FAST_BREAK":
+        game_state["offensive_state"] = ""
+        return resolve_fast_break(game_state)
+    
+    return resolve_half_court_offense(game_state)
 #FAST BREAK
 def resolve_fast_break(game_state):
     print("Entering resolve_fast_break()")
@@ -221,4 +235,118 @@ def resolve_free_throw(game_state):
         "time_elapsed": 0,
         "possession_flips": possession_flips,
     }
+
+def resolve_half_court_offense(game_state):
+    playcalls = get_playcalls(game_state)
+    game_state["current_playcall"] = playcalls["offense"]
+    game_state["defense_playcall"] = playcalls["defense"]
+    roles = assign_roles(game_state, playcalls["offense"]) #shooter, screener, ball_handler, passer, pass_chain, defender
+    # Track offensive playcall use
+    off_team = game_state["offense_team"]
+    off_playcall = playcalls["offense"]
+    game_state["scouting_data"][off_team]["offense"]["Playcalls"][off_playcall]["used"] += 1
+    def_team = game_state["defense_team"]
+    def_call = playcalls["defense"]
+    game_state["scouting_data"][def_team]["defense"][def_call]["used"] += 1
+
+    event_type = determine_event_type(game_state, roles)
+
+    if event_type == "O_FOUL":
+        event_type = "FOUL"
+        game_state["foul_team"] = "OFFENSE"
+    elif event_type == "D_FOUL":
+        event_type = "FOUL"
+        game_state["foul_team"] = "DEFENSE"
+
+    if event_type == "SHOT":
+        turn_result = resolve_shot(roles, game_state)
+    elif event_type == "TURNOVER":
+        turnover_type = random.choice(["STEAL", "DEAD BALL"])
+        turn_result = resolve_turnover(roles, game_state, turnover_type)
+    elif event_type == "FOUL":
+        #assign the player committing the foul here, which is assigned the calculate_foul_turnover function
+        turn_result = resolve_foul(roles, game_state)
+
+    # Define what counts as offensive success & defensive success
+    if turn_result["result_type"] == "MAKE" or (turn_result["result_type"] == "FOUL" and game_state.get("foul_team") == "DEFENSE"):
+        game_state["scouting_data"][off_team]["offense"]["Playcalls"][off_playcall]["success"] += 1
+    else:
+        game_state["scouting_data"][def_team]["defense"][def_call]["success"] += 1
+
+    # ✅ Add safety checks before returning
+    assert turn_result is not None, "turn_result is None"
+    assert "time_elapsed" in turn_result, "turn_result missing 'time_elapsed'"
+    # print(f"turn_result: {turn_result}")
+    return turn_result
+
+def resolve_foul(roles, game_state):
+    print(f"-------Inside resolve_foul---------")
+    print(f"roles: {roles}")
+    off_team = game_state["offense_team"]
+    def_team = game_state["defense_team"]
+    foul_team = off_team if game_state["foul_team"] == "OFFENSE" else def_team
+    
+    ball_handler = roles["ball_handler"]
+    defender = roles.get("defender", "")
+    foul_player = roles["foul_player"]
+    shooter = roles["shooter"]
+    screener = roles.get("screener", "")
+    passer = roles.get("passer", "")
+    tempo = game_state["strategy_calls"][off_team]["tempo_call"]
+    time_elapsed = get_time_elapsed(tempo)
+
+    # Track the foul
+    foul_player.record_stat("F")
+    if foul_team == "DEFENSE":
+        game_state["team_fouls"][def_team] += 1
+        text = f"{foul_player} fouls {ball_handler}!"
+    else:
+        game_state["team_fouls"][off_team] += 1
+        text = f"{foul_player} commits an offensive foul!"
+
+    foul_type = random.choice(["SHOOTING", "NON_SHOOTING"]) if foul_team == "DEFENSE" else "NON_SHOOTING" # Future logic: determine if this was shooting or not
+
+    if foul_type == "SHOOTING":
+        game_state["offensive_state"] = "FREE_THROW"
+        game_state["free_throws"] = 2  # Future: support 3 FT on 3PT attempt
+        game_state["free_throws_remaining"] = 2
+        game_state["last_ball_handler"] = ball_handler
+        ball_handler = shooter
+    elif game_state["team_fouls"][def_team] >= 10:
+        game_state["free_throws"] = 2
+        game_state["free_throws_remaining"] = 2
+        game_state["bonus_active"] = False
+        game_state["last_ball_handler"] = ball_handler
+    elif game_state["team_fouls"][def_team] >= 5:
+        game_state["offensive_state"] = "FREE_THROW"
+        game_state["free_throws"] = 2
+        game_state["free_throws_remaining"] = 2
+        game_state["bonus_active"] = False
+        game_state["last_ball_handler"] = ball_handler
+    else:
+        game_state["offensive_state"] = "HALF_COURT"
+        game_state["free_throws"] = 0
+        game_state["free_throws_remaining"] = 0
+
+    #craft foul statement here and assign to game_state["text"]
+    bh_pos = next(
+        (pos for pos, obj in game_state["players"][off_team].items() if obj == ball_handler),
+        None
+    )
+    
+    return {
+        "result_type": "FOUL",
+        "ball_handler": ball_handler,
+        "screener": screener,
+        "passer": passer,
+        "defender": defender,
+        "foul_type": foul_type,
+        "text": text,
+        "possession_flips": False,
+        "start_coords": {bh_pos: {"x": 72, "y": 25}},
+        "end_coords": {bh_pos: {"x": 72, "y": 25}},
+        "time_elapsed": time_elapsed
+    }
+
+
 
