@@ -9,6 +9,7 @@ class GameManager:
     def __init__(self, home_team, away_team, home_players, away_players):
         self.home_team = home_team
         self.away_team = away_team
+        self.scouting_data = self.initialize_scouting_data(home_team, away_team)
 
         self.players = {
             home_team: {pos: Player(p) for pos, p in home_players.items()},
@@ -100,7 +101,7 @@ class GameManager:
             "quarter": self.quarter,
             "clock": self.clock,
             "turns": self.turns,
-            "scouting_data": self.initialize_scouting_data(self.home_team, self.away_team),
+            "scouting_data": self.scouting_data,
             "strategy_calls": self.initialize_strategy_calls(self.home_team, self.away_team),
             "strategy_settings": self.initialize_strategy_settings(self.home_team, self.away_team),
             "team_attributes": self.initialize_team_attributes(self.home_team, self.away_team),
