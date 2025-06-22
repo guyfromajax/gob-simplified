@@ -2,6 +2,7 @@ from BackEnd.models.logger import Logger
 from BackEnd.models.rebound_manager import ReboundManager
 from BackEnd.models.playbook_manager import PlaybookManager
 from BackEnd.models.animation_manager import AnimationManager
+from BackEnd.utils.shared import weighted_random_from_dict
 from BackEnd.constants import POSITION_LIST, PLAYCALL_ATTRIBUTE_WEIGHTS
 import random
 
