@@ -3,6 +3,7 @@ from BackEnd.models.turn_manager import TurnManager
 from BackEnd.models.shot_manager import ShotManager
 from BackEnd.constants import POSITION_LIST
 from copy import deepcopy
+import random
 
 class GameManager:
     def __init__(self, home_team, away_team, home_players, away_players, scouting_data):
@@ -28,6 +29,26 @@ class GameManager:
         self.turn_manager = TurnManager(self)
         self.shot_manager = ShotManager(self.game_state)
 
+    @staticmethod
+    def initialize_team_attributes(home_team, away_team):
+        settings = {}
+        for team in [home_team, away_team]:
+            settings[team] = {
+                "shot_threshold": random.randint(150, 250),
+                "ft_shot_threshold": random.randint(150, 250),
+                "turnover_threshold": random.randint(-250, -150),
+                "foul_threshold": random.randint(40, 90),
+                "rebound_modifier": random.choice([0.8, 0.9, 1.0, 1.1, 1.2]),
+                "momentum_score": random.randint(0, 20),
+                "momentum_delta": random.choice([1, 2, 3, 4, 5]),
+                "offensive_efficiency": random.randint(1, 10),
+                "offensive_adjust": random.randint(1, 10),
+                "o_tendency_reads": random.randint(1, 10),
+                "d_tendency_reads": random.randint(1, 10),
+                "team_chemistry": random.randint(7, 25),
+            }
+        return settings
+    
     def _init_game_state(self):
         return {
             "players": self.players,
@@ -43,10 +64,7 @@ class GameManager:
                 self.home_team: {"tempo_call": "normal", "aggression_call": "normal"},
                 self.away_team: {"tempo_call": "normal", "aggression_call": "normal"}
             },
-            "team_attributes": {
-                self.home_team: {"momentum": 0, "fatigue": 0, "bonus": False},
-                self.away_team: {"momentum": 0, "fatigue": 0, "bonus": False}
-            },
+            "team_attributes": self.initialize_team_attributes(self.home_team, self.away_team),
             "offensive_state": {
                 "pass_count": 0,
                 "initial_possession_player": None
