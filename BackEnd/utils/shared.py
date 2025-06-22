@@ -209,3 +209,11 @@ def generate_pass_chain(game_state, shooter_pos):
 
     chain.append(shooter_pos)  # Shooter always last
     return chain
+
+def clean_mongo_ids(doc: dict) -> dict:
+    """
+    Converts MongoDB ObjectId fields to strings so FastAPI can serialize them.
+    """
+    if "_id" in doc and hasattr(doc["_id"], "__str__"):
+        doc["_id"] = str(doc["_id"])
+    return doc
