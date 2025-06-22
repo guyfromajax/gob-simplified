@@ -36,6 +36,7 @@ class AnimationManager:
 
         return path
 
+
     def build_animation_for_turn(self, start_coords_dict, end_coords_dict):
         """
         Build a dict of player animation steps keyed by position.
@@ -53,3 +54,8 @@ class AnimationManager:
                 animations[pos] = [start] * self.step_limit  # stationary hold
 
         return animations
+
+    def capture(self, result):
+        start_coords = result.get("start_coords", {})
+        end_coords = result.get("end_coords", {})
+        result["animations"] = self.build_animation_for_turn(start_coords, end_coords)
