@@ -11,7 +11,10 @@ class TurnManager:
         self.game = game_manager
         self.logger = Logger()
         self.rebound_manager = ReboundManager(self.game.game_state)
-        self.playbook_manager = PlaybookManager()
+        self.playbook_manager = PlaybookManager(
+            self.game.scouting_data, 
+            self.game.game_state["offense_team"]
+        )
         self.animator = AnimationManager()
 
     def run_turn(self):
