@@ -15,6 +15,17 @@ from BackEnd.constants import (
     TURNOVER_CALC_DICT,
     POSITION_LIST,
 )
+from BackEnd.utils.shared import (
+    calculate_screen_score,
+    choose_rebounder,
+    calculate_rebound_score,
+    get_fast_break_chance,
+    get_time_elapsed,
+    apply_help_defense_if_triggered,
+    resolve_offensive_rebound_loop,
+    weighted_random_from_dict,
+    generate_pass_chain,
+)
 
 def default_rebounder_dict():
     return {
@@ -233,28 +244,6 @@ def resolve_turnover(roles, game_state, turnover_type="DEAD BALL"):
         "time_elapsed": random.randint(3, 8),
         "possession_flips": True  # Let the turn loop handle the flip
     }
-
-def generate_pass_chain(game_state, shooter_pos):
-    positions = ["PG", "SG", "SF", "PF", "C"]
-    chain = ["PG"]  # Start with PG
-    last_added = "PG"
-
-    tempo = game_state["strategy_calls"][game_state["offense_team"]]["tempo_call"]
-    if tempo == "slow":
-        num_passes = 3
-    elif tempo == "fast":
-        num_passes = 1
-    else:
-        num_passes = 2
-
-    while len(chain) < num_passes:
-        candidate = random.choice(positions)
-        if candidate != last_added and candidate != shooter_pos:
-            chain.append(candidate)
-            last_added = candidate
-
-    chain.append(shooter_pos)  # Shooter always last
-    return chain
 
 def calculate_gravity_score(attrs):
     return (

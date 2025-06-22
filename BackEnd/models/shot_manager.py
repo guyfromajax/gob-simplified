@@ -10,7 +10,7 @@ class ShotManager:
     def resolve_shot(self, roles, defense_result):
 
         off_team = self.game_state["offense_team"]
-        def_team = self. game_state["defense_team"]
+        def_team = self.game_state["defense_team"]
         time_elapsed = 0
         shooter = roles["shooter"]
         passer = roles.get("passer", "")
