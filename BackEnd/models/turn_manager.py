@@ -65,10 +65,10 @@ class TurnManager:
         return shot_result
 
     def resolve_fast_break(self):
-        return self.game.resolve_fast_break_logic() 
+        return self.resolve_fast_break_logic() 
 
     def resolve_free_throw(self):
-        return self.game.resolve_free_throw_logic()
+        return self.resolve_free_throw_logic()
 
     def update_clock_and_possession(self, result):
         # Basic example: reduce time and switch possession if needed
