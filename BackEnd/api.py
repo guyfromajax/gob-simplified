@@ -7,6 +7,7 @@ import uuid
 from BackEnd.main import run_simulation
 from BackEnd.db import players_collection, teams_collection, games_collection
 from BackEnd.utils.game_summary_builder import build_game_summary
+from BackEnd.utils.shared import clean_mongo_ids
 
 
 app = FastAPI()
@@ -68,7 +69,7 @@ def simulate_game():
     print(summary)
     games_collection.insert_one(summary)
     
-    return summary
+    return clean_mongo_ids(summary)
 
 @app.get("/games")
 def get_games():
