@@ -62,13 +62,13 @@ def simulate_game():
         away_team: {"offense": {}, "defense": {}}
     }
 
-    game_state = run_simulation(home_team, away_team, home_players, away_players, scouting_data, turns=1)
+    game_state = run_simulation(home_team, away_team, home_players, away_players, scouting_data, turns=50)
 
     # 5. Summarize & persist
     summary = summarize_game_state(game_state)
     print(summary)
     games_collection.insert_one(summary)
-    
+
     return clean_mongo_ids(summary)
 
 @app.get("/games")
