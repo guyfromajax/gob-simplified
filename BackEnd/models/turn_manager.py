@@ -10,7 +10,7 @@ class TurnManager:
     def __init__(self, game_manager):
         self.game = game_manager
         self.logger = Logger()
-        self.rebound_manager = ReboundManager()
+        self.rebound_manager = ReboundManager(self.game.game_state)
         self.playbook_manager = PlaybookManager()
         self.animator = AnimationManager()
 
