@@ -28,8 +28,14 @@ class TurnManager:
         self.animator = AnimationManager()
 
     def run_turn(self):
+        # STEP 1: Read offensive state
         state = self.game.game_state["offensive_state"]
 
+        # STEP 2: Inject playcalls into game_state
+        self.game.game_state["current_playcall"] = self.playbook_manager.get_offensive_playcall()
+        self.game.game_state["defense_playcall"] = self.playbook_manager.get_defensive_playcall()
+
+        # STEP 3: Route based on state
         if state == "FREE_THROW":
             result = self.resolve_free_throw()
         elif state == "FAST_BREAK":
@@ -42,6 +48,7 @@ class TurnManager:
         self.animator.capture(result)
 
         return result
+
 
     def resolve_half_court_offense(self):
         # Determine shooter, screener, passer
