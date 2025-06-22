@@ -49,6 +49,28 @@ class GameManager:
             }
         return settings
     
+    @staticmethod
+    def initialize_strategy_calls(home_team, away_team):
+        calls = ["offense_playcall", "defense_playcall", "tempo_call", "aggression_call"]
+        settings = {
+            home_team: {call: "" for call in calls},
+            away_team: {call: "" for call in calls},
+        }
+        return settings
+
+    @staticmethod
+    def initialize_strategy_settings(home_team, away_team):
+        strategies = ["defense", "tempo", "aggression", "fast_break"]
+        settings = {}
+
+        for team in [home_team, away_team]:
+            team_settings = {s: random.randint(0, 4) for s in strategies}
+            team_settings["half_court_trap"] = 0
+            team_settings["full_court_press"] = 0
+            settings[team] = team_settings
+
+        return settings
+    
     def _init_game_state(self):
         return {
             "players": self.players,
@@ -60,10 +82,8 @@ class GameManager:
             "clock": self.clock,
             "turns": self.turns,
             "scouting_data": self.scouting_data,
-            "strategy_calls": {
-                self.home_team: {"tempo_call": "normal", "aggression_call": "normal"},
-                self.away_team: {"tempo_call": "normal", "aggression_call": "normal"}
-            },
+            "strategy_calls": self.initialize_strategy_calls(self.home_team, self.away_team),
+            "strategy_settings": self.initialize_strategy_settings(self.home_team, self.away_team),
             "team_attributes": self.initialize_team_attributes(self.home_team, self.away_team),
             "offensive_state": {
                 "pass_count": 0,
