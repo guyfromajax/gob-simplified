@@ -1,6 +1,6 @@
 import random
 from BackEnd.constants import THREE_POINT_PROBABILITY, PLAYCALL_ATTRIBUTE_WEIGHTS, BLOCK_PROBABILITY
-from BackEnd.main import apply_help_defense_if_triggered, get_fast_break_chance, get_time_elapsed, resolve_offensive_rebound_loop
+from BackEnd.utils.shared import apply_help_defense_if_triggered, get_fast_break_chance, get_time_elapsed, resolve_offensive_rebound_loop
 from BackEnd.main import calculate_screen_score, choose_rebounder, calculate_rebound_score
 
 class ShotManager:
