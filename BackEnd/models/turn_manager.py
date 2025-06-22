@@ -44,7 +44,7 @@ class TurnManager:
             result = self.resolve_half_court_offense()
 
         self.update_clock_and_possession(result)
-        self.logger.log_turn(result)
+        self.logger.log_turn_result(result)
         self.animator.capture(result)
 
         return result
