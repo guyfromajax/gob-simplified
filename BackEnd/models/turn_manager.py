@@ -53,7 +53,6 @@ class TurnManager:
     def resolve_half_court_offense(self):
         # Determine shooter, screener, passer
         roles = self.assign_roles(self.game)
-        defense_result = self.game.assess_defense(roles)
         shot_result = self.game.shot_manager.resolve_shot(roles, defense_result)
 
         if shot_result.get("missed"):
