@@ -35,9 +35,9 @@ class TurnManager:
 
     def resolve_half_court_offense(self):
         # Determine shooter, screener, passer
-        roles = self.playbook_manager.assign_roles(self.game)
+        roles = self.assign_roles(self.game)
         defense_result = self.game.assess_defense(roles)
-        shot_result = self.game.resolve_shot(roles, defense_result)
+        shot_result = self.game.shot_manager.resolve_shot(roles, defense_result)
 
         if shot_result.get("missed"):
             rebound_result = self.rebound_manager.handle_rebound(self.game, roles)
@@ -56,10 +56,10 @@ class TurnManager:
         if result.get("possession_flips"):
             self.game.flip_possession()
 
-    def assign_roles(self, game_state, playcall):
-        off_team = game_state["offense_team"]
-        def_team = game_state["defense_team"]
-        players = game_state["players"][off_team]
+    def assign_roles(self, playcall):
+        off_team = self.game.game_state["offense_team"]
+        def_team = self.game.game_state["defense_team"]
+        players = self.game.game_state["players"][off_team]
 
         # Compute shot weights using attributes embedded in each player object
         weights_dict = PLAYCALL_ATTRIBUTE_WEIGHTS.get("Attack" if playcall == "Set" else playcall, {})
@@ -88,24 +88,24 @@ class TurnManager:
         screener_pos = max(screen_weights, key=screen_weights.get)
 
         # Pass chain and passer
-        pass_chain = generate_pass_chain(game_state, shooter_pos)
+        pass_chain = generate_pass_chain(self.game.game_state, shooter_pos)
         passer_pos = pass_chain[-2] if len(pass_chain) >= 2 else ""
         if passer_pos == shooter_pos:
             passer_pos = ""
 
-        if game_state["defense_playcall"] == "Zone":
+        if self.game.game_state["defense_playcall"] == "Zone":
             defender_pos = random.choice(POSITION_LIST)
         else:
             defender_pos = shooter_pos
 
-        passer = game_state["players"][off_team][passer_pos] if passer_pos else None
+        passer = self.game.game_state["players"][off_team][passer_pos] if passer_pos else None
         return {
-            "shooter": game_state["players"][off_team][shooter_pos],
-            "screener": game_state["players"][off_team][screener_pos],
-            "ball_handler": game_state["players"][off_team][shooter_pos],
+            "shooter": self.game.game_state["players"][off_team][shooter_pos],
+            "screener": self.game.game_state["players"][off_team][screener_pos],
+            "ball_handler": self.game.game_state["players"][off_team][shooter_pos],
             "passer": passer,
             "pass_chain": pass_chain,
-            "defender": game_state["players"][def_team][defender_pos]
+            "defender": self.game.game_state["players"][def_team][defender_pos]
         }
 
 

@@ -1,5 +1,6 @@
 from BackEnd.models.player import Player
 from BackEnd.models.turn_manager import TurnManager
+from BackEnd.models.shot_manager import ShotManager
 from BackEnd.constants import POSITION_LIST
 from copy import deepcopy
 
@@ -25,6 +26,7 @@ class GameManager:
         self.game_state = self._init_game_state()
 
         self.turn_manager = TurnManager(self)
+        self.shot_manager = ShotManager(self.game_state)
 
     def _init_game_state(self):
         return {
