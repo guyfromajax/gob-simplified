@@ -56,13 +56,7 @@ def simulate_game():
     home_players = {pos: player for pos, player in zip(POSITION_LIST, home_player_docs)}
     away_players = {pos: player for pos, player in zip(POSITION_LIST, away_player_docs)}
 
-    # Dummy scouting_data for now
-    scouting_data = {
-        home_team: {"offense": {}, "defense": {}},
-        away_team: {"offense": {}, "defense": {}}
-    }
-
-    game_state = run_simulation(home_team, away_team, home_players, away_players, scouting_data, turns=50)
+    game_state = run_simulation(home_team, away_team, home_players, away_players, turns=50)
 
     # 5. Summarize & persist
     summary = summarize_game_state(game_state)

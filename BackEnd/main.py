@@ -473,8 +473,8 @@ def print_scouting_report(data):
         for def_type, val in data[team]["defense"].items():
             print(f"{def_type.ljust(14)} — Used: {val['used']}, Success: {val['success']}")
 
-def run_simulation(home_team, away_team, home_players, away_players, scouting_data, turns=1):
-    gm = GameManager(home_team, away_team, home_players, away_players, scouting_data)
+def run_simulation(home_team, away_team, home_players, away_players, turns=1):
+    gm = GameManager(home_team, away_team, home_players, away_players)
 
     for _ in range(turns):
         gm.simulate_turn()
