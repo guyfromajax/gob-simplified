@@ -6,13 +6,18 @@ import random
 import json
 from BackEnd.db import players_collection, teams_collection
 from BackEnd.models.player import Player
-from BackEnd.models.game_manager import GameManager
+# from BackEnd.models.game_manager import GameManager
 from BackEnd.constants import PLAYCALL_ATTRIBUTE_WEIGHTS, POSITION_LIST
 from BackEnd.utils.shared import weighted_random_from_dict, generate_pass_chain
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from BackEnd.models.game_manager import GameManager
+
+
 
 
 class TurnManager:
-    def __init__(self, game_manager):
+    def __init__(self, game_manager: "GameManager"):
         self.game = game_manager
         self.logger = Logger()
         self.rebound_manager = ReboundManager(self.game.game_state)
