@@ -1,7 +1,7 @@
 import random
 from BackEnd.constants import THREE_POINT_PROBABILITY, PLAYCALL_ATTRIBUTE_WEIGHTS, BLOCK_PROBABILITY
 from BackEnd.utils.shared import apply_help_defense_if_triggered, get_fast_break_chance, get_time_elapsed, resolve_offensive_rebound_loop
-from BackEnd.main import calculate_screen_score, choose_rebounder, calculate_rebound_score
+from BackEnd.utils.shared import calculate_screen_score, choose_rebounder, calculate_rebound_score
 
 class ShotManager:
     def __init__(self, game_state):
@@ -136,8 +136,8 @@ class ShotManager:
 
             o_pos = choose_rebounder(rebounder_dict, "offense")
             d_pos = choose_rebounder(rebounder_dict, "defense")
-            o_rebounder = game_state["players"][off_team][o_pos]
-            d_rebounder = game_state["players"][def_team][d_pos]
+            o_rebounder = self.game_state["players"][off_team][o_pos]
+            d_rebounder = self.game_state["players"][def_team][d_pos]
 
             o_attr = o_rebounder.attributes
             d_attr = d_rebounder.attributes
@@ -145,8 +145,8 @@ class ShotManager:
             o_score = calculate_rebound_score(o_attr)
             d_score = calculate_rebound_score(d_attr)
 
-            off_mod = game_state["team_attributes"][off_team]["rebound_modifier"]
-            def_mod = game_state["team_attributes"][def_team]["rebound_modifier"]
+            off_mod = self.game_state["team_attributes"][off_team]["rebound_modifier"]
+            def_mod = self.game_state["team_attributes"][def_team]["rebound_modifier"]
             bias = def_mod - off_mod
             def_prob = 0.75 + bias
             def_prob = min(0.95, max(0.55, def_prob))  # Clamp
@@ -168,7 +168,7 @@ class ShotManager:
             rebound_team = def_team if random.random() < d_weight else off_team
             rebounder = d_rebounder if rebound_team == def_team else o_rebounder
             stat = "DREB" if rebound_team == def_team else "OREB"
-            game_state["last_rebound"] = stat  # stat is either "DREB" or "OREB"
+            self.game_state["last_rebound"] = stat  # stat is either "DREB" or "OREB"
             rebounder.record_stat(stat)
 
             text += f"...{rebounder} grabs the rebound."

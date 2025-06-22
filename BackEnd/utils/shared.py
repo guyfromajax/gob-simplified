@@ -155,3 +155,35 @@ def resolve_offensive_rebound_loop(game_state, off_team, def_team, rebounder):
 
         # else: new offensive rebound, repeat loop
         rebounder = new_rebounder
+
+def calculate_screen_score(screen_attrs):
+    """
+    Calculates screen effectiveness score using weighted attributes:
+    ST (0.5), AG (0.2), IQ (0.2), CH (0.1) scaled by RNG 1–6
+    """
+    base_score = (
+        screen_attrs["ST"] * 0.5 +
+        screen_attrs["AG"] * 0.2 +
+        screen_attrs["IQ"] * 0.2 +
+        screen_attrs["CH"] * 0.1
+    )
+    return base_score * random.randint(1, 6)
+
+def choose_rebounder(rebounders, side):
+    players = list(rebounders[side].keys())
+    weights = list(rebounders[side].values())
+    return random.choices(players, weights=weights, k=1)[0]
+
+def calculate_rebound_score(player_attr):
+    """
+    Calculate rebound score based on attributes:
+    - RB (50%), ST (30%), IQ (10%), CH (10%)
+    - Scaled by a random multiplier between 1 and 6
+    """
+    base_score = (
+        player_attr["RB"] * 0.5 +
+        player_attr["ST"] * 0.3 +
+        player_attr["IQ"] * 0.1 +
+        player_attr["CH"] * 0.1
+    )
+    return base_score * random.randint(1, 6)
