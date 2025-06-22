@@ -53,7 +53,7 @@ class TurnManager:
     def resolve_half_court_offense(self):
         # Determine shooter, screener, passer
         roles = self.assign_roles(self.game)
-        shot_result = self.game.shot_manager.resolve_shot(roles, defense_result)
+        shot_result = self.game.shot_manager.resolve_shot(roles)
 
         if shot_result.get("missed"):
             rebound_result = self.rebound_manager.handle_rebound(self.game, roles)

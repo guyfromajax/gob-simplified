@@ -7,7 +7,7 @@ class ShotManager:
     def __init__(self, game_state):
         self.game_state = game_state
 
-    def resolve_shot(self, roles, defense_result):
+    def resolve_shot(self, roles):
 
         off_team = self.game_state["offense_team"]
         def_team = self.game_state["defense_team"]
