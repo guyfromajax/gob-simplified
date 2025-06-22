@@ -3,7 +3,6 @@ import json
 from BackEnd.db import players_collection, teams_collection
 from BackEnd.models.player import Player
 from BackEnd.models.game_manager import GameManager
-from BackEnd.turn_logic import resolve_turn
 from BackEnd.constants import (
     ALL_ATTRS,
     BOX_SCORE_KEYS,
