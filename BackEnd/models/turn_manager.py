@@ -18,7 +18,7 @@ class TurnManager:
         self.animator = AnimationManager()
 
     def run_turn(self):
-        state = self.game.offensive_state
+        state = self.game.game_state["offensive_state"]
 
         if state == "FREE_THROW":
             result = self.resolve_free_throw()
