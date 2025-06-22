@@ -1,6 +1,6 @@
 import random
 from BackEnd.constants import STRATEGY_CALL_DICTS
-from BackEnd.main import weighted_random_from_dict
+from BackEnd.utils.shared import weighted_random_from_dict
 
 class PlaybookManager:
     def __init__(self, scouting_data, team_name):
