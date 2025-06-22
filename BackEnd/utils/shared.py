@@ -187,3 +187,25 @@ def calculate_rebound_score(player_attr):
         player_attr["CH"] * 0.1
     )
     return base_score * random.randint(1, 6)
+
+def generate_pass_chain(game_state, shooter_pos):
+    positions = ["PG", "SG", "SF", "PF", "C"]
+    chain = ["PG"]  # Start with PG
+    last_added = "PG"
+
+    tempo = game_state["strategy_calls"][game_state["offense_team"]]["tempo_call"]
+    if tempo == "slow":
+        num_passes = 3
+    elif tempo == "fast":
+        num_passes = 1
+    else:
+        num_passes = 2
+
+    while len(chain) < num_passes:
+        candidate = random.choice(positions)
+        if candidate != last_added and candidate != shooter_pos:
+            chain.append(candidate)
+            last_added = candidate
+
+    chain.append(shooter_pos)  # Shooter always last
+    return chain

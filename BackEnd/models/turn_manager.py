@@ -2,9 +2,14 @@ from BackEnd.models.logger import Logger
 from BackEnd.models.rebound_manager import ReboundManager
 from BackEnd.models.playbook_manager import PlaybookManager
 from BackEnd.models.animation_manager import AnimationManager
-from BackEnd.utils.shared import weighted_random_from_dict
-from BackEnd.constants import POSITION_LIST, PLAYCALL_ATTRIBUTE_WEIGHTS
 import random
+import json
+from BackEnd.db import players_collection, teams_collection
+from BackEnd.models.player import Player
+from BackEnd.models.game_manager import GameManager
+from BackEnd.constants import PLAYCALL_ATTRIBUTE_WEIGHTS, POSITION_LIST
+from BackEnd.utils.shared import weighted_random_from_dict, generate_pass_chain
+
 
 class TurnManager:
     def __init__(self, game_manager):
