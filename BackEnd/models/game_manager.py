@@ -139,5 +139,18 @@ class GameManager:
 
     def to_dict(self):
         output = deepcopy(self.game_state)
-        output["box_score"] = self.get_box_score()
+        flat_box_score = []
+
+        for team in [self.home_team, self.away_team]:
+            for pos in POSITION_LIST:
+                player = self.players[team][pos]
+                flat_box_score.append({
+                    "team": team,
+                    "position": pos,
+                    "name": player.get_name(),
+                    "stats": player.stats["game"]
+                })
+
+        output["box_score"] = flat_box_score
         return output
+
