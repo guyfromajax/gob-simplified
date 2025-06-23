@@ -219,6 +219,13 @@ def clean_mongo_ids(doc: dict) -> dict:
     return doc
 
 def get_name_safe(p):
+
     if isinstance(p, dict):
         return p.get("name", "")
     return getattr(p, "name", "")
+
+def default_rebounder_dict():
+    return {
+        "offense": {"PG": 0.1, "SG": 0.1, "SF": 0.2, "PF": 0.3, "C": 0.3},
+        "defense": {"PG": 0.1, "SG": 0.1, "SF": 0.2, "PF": 0.3, "C": 0.3}
+    }
