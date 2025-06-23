@@ -56,7 +56,22 @@ class TurnManager:
         #need to check for a foul or turnover here
         # Determine shooter, screener, passer
         roles = self.assign_roles(self.game)
+        off_team = self.game.game_state["offense_team"]
+        def_team = self.game.game_state["defense_team"]
+        off_call = self.game.game_state["current_playcall"]
+        def_call = self.game.game_state["defense_playcall"]
+
+        # Track usage
+        self.game.scouting_data[off_team]["offense"]["Playcalls"][off_call]["used"] += 1
+        self.game.scouting_data[def_team]["defense"][def_call]["used"] += 1
+        
         shot_result = self.game.shot_manager.resolve_shot(roles)
+
+        if shot_result["result_type"] == "MAKE":
+            self.game.scouting_data[off_team]["offense"]["Playcalls"][off_call]["success"] += 1
+        elif shot_result["result_type"] in ["MISS", "TURNOVER"]:
+            self.game.scouting_data[def_team]["defense"][def_call]["success"] += 1
+
 
         if shot_result.get("missed"):
             rebound_result = self.rebound_manager.handle_rebound(self.game, roles)
