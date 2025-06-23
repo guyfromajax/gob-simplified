@@ -25,6 +25,7 @@ from BackEnd.utils.shared import (
     resolve_offensive_rebound_loop,
     weighted_random_from_dict,
     generate_pass_chain,
+    get_name_safe,
 )
 
 def default_rebounder_dict():
@@ -224,7 +225,7 @@ def resolve_turnover(roles, game_state, turnover_type="DEAD BALL"):
             game_state["offensive_state"] = "HCO"
         game_state["last_stealer"] = defender
         game_state["last_rebound"] = ""
-        text = f"{defender.name} jumps the pass and takes it the other way!"
+        text = f"{get_name_safe(defender)} jumps the pass and takes it the other way!"
     else:
         game_state["offensive_state"] = "HCO"
         text = f"{ball_handler} throws it out of bounds."
@@ -351,7 +352,7 @@ def calculate_foul_turnover(game_state, positions, thresholds, roles):
     turnover_score = bh_score - pressure
     is_turnover = turnover_score < thresholds["turnover_threshold"]
 
-    print(f"Turnover → {turnover_player.name} vs {def_mod_player.name}: score={round(turnover_score, 2)} vs threshold={thresholds['turnover_threshold']} | flag={is_turnover}")
+    print(f"Turnover → {get_name_safe(turnover_player)} vs {get_name_safe(def_mod_player)}: score={round(turnover_score, 2)} vs threshold={thresholds['turnover_threshold']} | flag={is_turnover}")
 
     decisions = {
         "TURNOVER": (is_turnover, turnover_score),

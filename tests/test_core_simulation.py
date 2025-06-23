@@ -4,7 +4,7 @@ from tests.test_utils import build_mock_game_state
 # Mock player class for use in tests
 class MockPlayer:
     def __init__(self, name, attributes):
-        self.name = name                # ← this defines `.name`
+        self.name = name               
         self.attributes = attributes
         self.stats = {"game": {}}
 
