@@ -80,7 +80,7 @@ class TurnManager:
         return shot_result
 
     def resolve_fast_break(self):
-        return resolve_fast_break_logic(self.game.game_state) 
+        return resolve_fast_break_logic(self.game) 
 
     def resolve_free_throw(self):
         return resolve_free_throw_logic(self.game.game_state)
