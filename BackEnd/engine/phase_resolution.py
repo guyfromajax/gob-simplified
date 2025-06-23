@@ -175,9 +175,8 @@ def resolve_fast_break_logic(game: "GameManager"):
         game_state["scouting_data"][def_team]["defense"]["vs_Fast_Break"]["success"] += 1
 
         from BackEnd.models.turn_manager import TurnManager
-        turn_manager = TurnManager(game_state)
 
-        return turn_manager.resolve_half_court_offense(game_state)
+        return TurnManager(game).resolve_half_court_offense(game_state)
     
     #get shooter and passer (if applicable)
     # Assign shooter and passer for shot, turnover, or foul scenarios
