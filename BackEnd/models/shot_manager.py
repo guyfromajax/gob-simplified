@@ -1,7 +1,7 @@
 import random
 from BackEnd.constants import THREE_POINT_PROBABILITY, PLAYCALL_ATTRIBUTE_WEIGHTS, BLOCK_PROBABILITY
 from BackEnd.utils.shared import apply_help_defense_if_triggered, get_fast_break_chance, get_time_elapsed, resolve_offensive_rebound_loop
-from BackEnd.utils.shared import calculate_screen_score, choose_rebounder, calculate_rebound_score
+from BackEnd.utils.shared import calculate_screen_score, choose_rebounder, calculate_rebound_score, get_name_safe
 
 class ShotManager:
     def __init__(self, game_state):
@@ -18,7 +18,7 @@ class ShotManager:
         defender = roles.get("defender", "")
 
         print(f"-------Inside resolve_shot---------")
-        print(f"shooter: {shooter.name} | passer: {passer.name} | screener: {screener.name} | defender: {defender.name}")
+        print(f"shooter: {get_name_safe(shooter)} | passer: {get_name_safe(passer)} | screener: {get_name_safe(screener)} | defender: {get_name_safe(defender)}")
         
         attrs = shooter.attributes
         

@@ -217,3 +217,8 @@ def clean_mongo_ids(doc: dict) -> dict:
     if "_id" in doc and hasattr(doc["_id"], "__str__"):
         doc["_id"] = str(doc["_id"])
     return doc
+
+def get_name_safe(p):
+    if isinstance(p, dict):
+        return p.get("name", "")
+    return getattr(p, "name", "")
