@@ -229,3 +229,38 @@ def default_rebounder_dict():
         "offense": {"PG": 0.1, "SG": 0.1, "SF": 0.2, "PF": 0.3, "C": 0.3},
         "defense": {"PG": 0.1, "SG": 0.1, "SF": 0.2, "PF": 0.3, "C": 0.3}
     }
+
+def determine_rebounder(game_state, off_team, def_team):
+    rebounder_dict = {
+        "offense": {"PG": 0.1, "SG": 0.1, "SF": 0.2, "PF": 0.3, "C": 0.3},
+        "defense": {"PG": 0.1, "SG": 0.1, "SF": 0.2, "PF": 0.3, "C": 0.3}
+    }
+
+    o_pos = choose_rebounder(rebounder_dict, "offense")
+    d_pos = choose_rebounder(rebounder_dict, "defense")
+    o_rebounder = game_state["players"][off_team][o_pos]
+    d_rebounder = game_state["players"][def_team][d_pos]
+
+    o_attr = o_rebounder.attributes
+    d_attr = d_rebounder.attributes
+
+    o_score = calculate_rebound_score(o_attr)
+    d_score = calculate_rebound_score(d_attr)
+
+    off_mod = game_state["team_attributes"][off_team]["rebound_modifier"]
+    def_mod = game_state["team_attributes"][def_team]["rebound_modifier"]
+    bias = def_mod - off_mod
+    def_prob = min(0.95, max(0.55, 0.75 + bias))
+
+    total_score = d_score + o_score
+    d_weight = (d_score / total_score) if total_score else 0.5
+    o_weight = 1 - d_weight
+    d_weight += (def_prob - 0.5)
+    d_weight = min(0.95, max(0.05, d_weight))
+    o_weight = 1 - d_weight
+
+    new_team = def_team if random.random() < d_weight else off_team
+    new_rebounder = d_rebounder if new_team == def_team else o_rebounder
+    new_stat = "DREB" if new_team == def_team else "OREB"
+
+    return new_rebounder, new_team, new_stat
