@@ -131,9 +131,13 @@ class GameManager:
     def get_box_score(self):
         return {
             team: {
-                pos: self.players[team][pos].stats["game"] for pos in POSITION_LIST
-            } for team in [self.home_team, self.away_team]
-        }
+                pos: {
+                    "name": player.name, **player.stats["game"]} 
+                    for pos, player in self.players[team].items()}
+            for team in [self.home_team, self.away_team]}
+
 
     def to_dict(self):
-        return deepcopy(self.game_state)
+        output = deepcopy(self.game_state)
+        output["box_score"] = self.get_box_score()
+        return output
