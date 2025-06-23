@@ -1,6 +1,8 @@
 import random
 from BackEnd.models.shot_manager import ShotManager
-from BackEnd.models.game_manager import GameManager
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from BackEnd.models.game_manager import GameManager
 
 from BackEnd.utils.shared import (
     get_name_safe, 
@@ -12,7 +14,6 @@ from BackEnd.utils.shared import (
     resolve_offensive_rebound_loop
 )
     
-
 def resolve_foul(roles, game_state):
     print(f"-------Inside resolve_foul---------")
     print(f"roles: {roles}")
@@ -82,7 +83,6 @@ def resolve_foul(roles, game_state):
         "time_elapsed": time_elapsed
     }
 
-
 # def resolve_turn(game_state):
 #     off_team = game_state["offense_team"]
 #     # print(f"game_state: {game_state}")
@@ -97,10 +97,9 @@ def resolve_foul(roles, game_state):
     
 #     return resolve_half_court_offense(game_state)
 # #FAST BREAK
-def resolve_fast_break_logic(game):
-    print("Entering resolve_fast_break()")
+def resolve_fast_break_logic(game: "GameManager"):
     from BackEnd.models.game_manager import GameManager
-    assert isinstance(game, GameManager), "Expected GameManager instance"
+    print("Entering resolve_fast_break()")
     game_state = game.game_state
     print(f"game_state rebound: {game_state.get('last_rebound')}")
 
