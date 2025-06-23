@@ -3,6 +3,7 @@ from BackEnd.constants import THREE_POINT_PROBABILITY, PLAYCALL_ATTRIBUTE_WEIGHT
 from BackEnd.utils.shared import apply_help_defense_if_triggered, get_fast_break_chance, get_time_elapsed, resolve_offensive_rebound_loop
 from BackEnd.utils.shared import calculate_screen_score, choose_rebounder, calculate_rebound_score, get_name_safe
 
+
 class ShotManager:
     def __init__(self, game_state):
         self.game_state = game_state
