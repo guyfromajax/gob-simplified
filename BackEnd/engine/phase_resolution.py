@@ -1,5 +1,7 @@
 import random
 from BackEnd.models.shot_manager import ShotManager
+from BackEnd.models.game_manager import GameManager
+
 from BackEnd.utils.shared import (
     get_name_safe, 
     get_time_elapsed, 
@@ -95,9 +97,10 @@ def resolve_foul(roles, game_state):
     
 #     return resolve_half_court_offense(game_state)
 # #FAST BREAK
-def resolve_fast_break_logic(game_state):
+def resolve_fast_break_logic(game: GameManager):
     print("Entering resolve_fast_break()")
     print(f"game_state rebound: {game_state.get('last_rebound')}")
+    game_state = game.game_state
     off_team = game_state["offense_team"]
     def_team = game_state["defense_team"]
     players = game_state["players"]
