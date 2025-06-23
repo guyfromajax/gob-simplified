@@ -107,11 +107,13 @@ class TurnManager:
         }
 
         screener_pos = max(screen_weights, key=screen_weights.get)
+        if screener_pos == shooter_pos:
+            screener_pos = ""
 
         # Pass chain and passer
         pass_chain = generate_pass_chain(self.game.game_state, shooter_pos)
         passer_pos = pass_chain[-2] if len(pass_chain) >= 2 else ""
-        if passer_pos == shooter_pos:
+        if passer_pos == shooter_pos or passer_pos == screener_pos:
             passer_pos = ""
 
         print("assign_roles game_state keys:", self.game.game_state.keys())
