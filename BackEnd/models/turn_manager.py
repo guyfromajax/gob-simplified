@@ -53,8 +53,8 @@ class TurnManager:
 
     def resolve_half_court_offense(self):
         
-        #need to check for a foul or turnover here
-        # Determine shooter, screener, passer
+        print("inside resolve_half_court_offense")
+        print(self.game.game_state)
         roles = self.assign_roles(self.game)
         off_team = self.game.game_state["offense_team"]
         def_team = self.game.game_state["defense_team"]
