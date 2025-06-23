@@ -1,4 +1,5 @@
 import random
+from BackEnd.models.shot_manager import ShotManager
 
 def resolve_foul(roles, game_state):
     print(f"-------Inside resolve_foul---------")
@@ -185,7 +186,9 @@ def resolve_fast_break_logic(game_state):
     print(f"Roles: {fb_roles}")
     
     if event_type == "SHOT":
-        turn_result = resolve_fast_break_shot(game_state, fb_roles)
+        shot_manager = ShotManager(game_state)
+        turn_result = shot_manager.resolve_fast_break_shot(fb_roles)
+
     elif event_type == "TURNOVER":
         turnover_type = random.choice(["STEAL", "DEAD BALL"])
         turn_result = resolve_turnover(fb_roles, game_state, turnover_type)
