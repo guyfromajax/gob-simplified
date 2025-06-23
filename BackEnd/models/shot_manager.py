@@ -89,7 +89,7 @@ class ShotManager:
         # print(f"Off-ball gravity boost: +{round(gravity_boost, 2)} from {gravity_contributors}")
 
         print(f"offense call: {playcall} // defense call: {defense_call}")
-        print(f"shooter: {shooter.name} | passer: {passer.name}")
+        print(f"shooter: {get_name_safe(shooter)} | passer: {get_name_safe(passer)}")
         print(f"shot score = {round(shot_score, 2)} | (defense score: {round(defense_penalty * 0.2, 2)})")
         made = shot_score >= shot_threshold
 
@@ -109,12 +109,12 @@ class ShotManager:
             self.game_state["score"][off_team] += points
             quarter_index = self.game_state["quarter"] - 1
             self.game_state["points_by_quarter"][off_team][quarter_index] += points
-            text = f"{shooter.name} drains a 3!" if is_three else f"{shooter.name} makes the shot."
+            text = f"{get_name_safe(shooter)} drains a 3!" if is_three else f"{get_name_safe(shooter)} makes the shot."
             possession_flips = True
             if screener:
                 screener.record_stat("SCR_S")
         else:
-            text = f"{shooter.name} misses the {'3' if is_three else 'shot'}."
+            text = f"{get_name_safe(shooter)} misses the {'3' if is_three else 'shot'}."
             if defender:
                 defender.record_stat("DEF_S")
             #Build dict based on player proximity to the ball in the future
@@ -125,7 +125,7 @@ class ShotManager:
             final_block_chance = base_block_prob * (0.5 + block_skill)  # scales 50–150% of base
             is_block = random.random() < final_block_chance
             if is_block:
-                text += f"{defender.name} blocks the shot!"
+                text += f"{get_name_safe(defender)} blocks the shot!"
                 defender.record_stat("BLK")
                 
 
