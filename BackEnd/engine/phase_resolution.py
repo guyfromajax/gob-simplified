@@ -9,6 +9,7 @@ from BackEnd.utils.shared import (
     default_rebounder_dict, 
     resolve_offensive_rebound_loop
 )
+    
 
 def resolve_foul(roles, game_state):
     print(f"-------Inside resolve_foul---------")
@@ -168,6 +169,7 @@ def resolve_fast_break_logic(game_state):
         print("HCO triggered")
         game_state["scouting_data"][def_team]["defense"]["vs_Fast_Break"]["success"] += 1
 
+        from BackEnd.models.turn_manager import TurnManager
         turn_manager = TurnManager(game_state)
 
         return turn_manager.resolve_half_court_offense(game_state)
