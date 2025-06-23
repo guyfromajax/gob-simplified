@@ -105,6 +105,8 @@ class GameManager:
             "strategy_calls": self.initialize_strategy_calls(self.home_team, self.away_team),
             "strategy_settings": self.initialize_strategy_settings(self.home_team, self.away_team),
             "team_attributes": self.initialize_team_attributes(self.home_team, self.away_team),
+            "current_playcall": "Base",
+            "defense_playcall": "Man",
             "offensive_state": {
                 "pass_count": 0,
                 "initial_possession_player": None

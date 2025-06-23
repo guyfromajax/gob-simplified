@@ -76,6 +76,8 @@ class TurnManager:
             self.game._switch_possession()
 
     def assign_roles(self, playcall):
+        print("inside assign_roles")
+        print(self.game.game_state.keys())
         off_team = self.game.game_state["offense_team"]
         def_team = self.game.game_state["defense_team"]
         players = self.game.game_state["players"][off_team]
@@ -111,6 +113,8 @@ class TurnManager:
         passer_pos = pass_chain[-2] if len(pass_chain) >= 2 else ""
         if passer_pos == shooter_pos:
             passer_pos = ""
+
+        print("assign_roles game_state keys:", self.game.game_state.keys())
 
         if self.game.game_state["defense_playcall"] == "Zone":
             defender_pos = random.choice(POSITION_LIST)
