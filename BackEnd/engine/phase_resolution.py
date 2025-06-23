@@ -1,5 +1,14 @@
 import random
 from BackEnd.models.shot_manager import ShotManager
+from BackEnd.utils.shared import (
+    get_name_safe, 
+    get_time_elapsed, 
+    get_fast_break_chance, 
+    calculate_rebound_score, 
+    choose_rebounder, 
+    default_rebounder_dict, 
+    resolve_offensive_rebound_loop
+)
 
 def resolve_foul(roles, game_state):
     print(f"-------Inside resolve_foul---------")
@@ -159,7 +168,9 @@ def resolve_fast_break_logic(game_state):
         print("HCO triggered")
         game_state["scouting_data"][def_team]["defense"]["vs_Fast_Break"]["success"] += 1
 
-        return resolve_half_court_offense(game_state)
+        turn_manager = TurnManager(game_state)
+
+        return turn_manager.resolve_half_court_offense(game_state)
     
     #get shooter and passer (if applicable)
     # Assign shooter and passer for shot, turnover, or foul scenarios
@@ -355,4 +366,42 @@ def resolve_free_throw_logic(game_state):
 #     # print(f"turn_result: {turn_result}")
 #     return turn_result
 
+def resolve_turnover_logic(roles, game_state, turnover_type="DEAD BALL"):
 
+        print(f"-------Inside resolve_turnover---------")
+        print(f"roles: {roles}")
+
+        off_team = game_state["offense_team"]
+        def_team = game_state["defense_team"]
+        ball_handler = roles["ball_handler"]
+        defender = roles.get("defender", "")
+        ball_handler.record_stat("TO")
+
+        if turnover_type == "STEAL":
+            defender.record_stat("STL")
+            if random.random() < get_fast_break_chance(game_state):
+                game_state["offensive_state"] = "FAST_BREAK"
+            else:
+                game_state["offensive_state"] = "HCO"
+            game_state["last_stealer"] = defender
+            game_state["last_rebound"] = ""
+            text = f"{get_name_safe(defender)} jumps the pass and takes it the other way!"
+        else:
+            game_state["offensive_state"] = "HCO"
+            text = f"{ball_handler} throws it out of bounds."
+            game_state["offensive_state"] = "HCO"
+
+        bh_pos = next(
+            (pos for pos, obj in game_state["players"][off_team].items() if obj == ball_handler),
+            None
+        )
+        
+        return {
+            "result_type": turnover_type,
+            "ball_handler": ball_handler,
+            "text": text,
+            "start_coords": {bh_pos: {"x": 72, "y": 25}},
+            "end_coords": {bh_pos: {"x": 68, "y": 25}},
+            "time_elapsed": random.randint(3, 8),
+            "possession_flips": True  # Let the turn loop handle the flip
+        }

@@ -26,13 +26,8 @@ from BackEnd.utils.shared import (
     weighted_random_from_dict,
     generate_pass_chain,
     get_name_safe,
+    default_rebounder_dict
 )
-
-def default_rebounder_dict():
-    return {
-        "offense": {"PG": 0.1, "SG": 0.1, "SF": 0.2, "PF": 0.3, "C": 0.3},
-        "defense": {"PG": 0.1, "SG": 0.1, "SF": 0.2, "PF": 0.3, "C": 0.3}
-    }
 
 def initialize_playcall_settings():
     playcalls = ["Base", "Freelance", "Inside", "Attack", "Outside", "Set"]
@@ -205,46 +200,6 @@ def recalculate_energy_scaled_attributes(game_state):
                 attr[key] = int(anchor_val * ng)
 
 #RESOLVE FUNCTIONS
-
-def resolve_turnover(roles, game_state, turnover_type="DEAD BALL"):
-
-    print(f"-------Inside resolve_turnover---------")
-    print(f"roles: {roles}")
-
-    off_team = game_state["offense_team"]
-    def_team = game_state["defense_team"]
-    ball_handler = roles["ball_handler"]
-    defender = roles.get("defender", "")
-    ball_handler.record_stat("TO")
-
-    if turnover_type == "STEAL":
-        defender.record_stat("STL")
-        if random.random() < get_fast_break_chance(game_state):
-            game_state["offensive_state"] = "FAST_BREAK"
-        else:
-            game_state["offensive_state"] = "HCO"
-        game_state["last_stealer"] = defender
-        game_state["last_rebound"] = ""
-        text = f"{get_name_safe(defender)} jumps the pass and takes it the other way!"
-    else:
-        game_state["offensive_state"] = "HCO"
-        text = f"{ball_handler} throws it out of bounds."
-        game_state["offensive_state"] = "HCO"
-
-    bh_pos = next(
-        (pos for pos, obj in game_state["players"][off_team].items() if obj == ball_handler),
-        None
-    )
-    
-    return {
-        "result_type": turnover_type,
-        "ball_handler": ball_handler,
-        "text": text,
-        "start_coords": {bh_pos: {"x": 72, "y": 25}},
-        "end_coords": {bh_pos: {"x": 68, "y": 25}},
-        "time_elapsed": random.randint(3, 8),
-        "possession_flips": True  # Let the turn loop handle the flip
-    }
 
 def calculate_gravity_score(attrs):
     return (

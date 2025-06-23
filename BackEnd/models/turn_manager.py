@@ -9,7 +9,7 @@ from BackEnd.models.player import Player
 # from BackEnd.models.game_manager import GameManager
 from BackEnd.constants import PLAYCALL_ATTRIBUTE_WEIGHTS, POSITION_LIST
 from BackEnd.utils.shared import weighted_random_from_dict, generate_pass_chain
-from BackEnd.engine.phase_resolution import resolve_fast_break_logic, resolve_free_throw_logic
+from BackEnd.engine.phase_resolution import resolve_fast_break_logic, resolve_free_throw_logic, resolve_turnover_logic
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from BackEnd.models.game_manager import GameManager
@@ -69,6 +69,9 @@ class TurnManager:
 
     def resolve_free_throw(self):
         return resolve_free_throw_logic(self.game.game_state)
+    
+    def resolve_turnover(self):
+        return resolve_turnover_logic(self.game.game_state)
 
     def update_clock_and_possession(self, result):
         # Basic example: reduce time and switch possession if needed
