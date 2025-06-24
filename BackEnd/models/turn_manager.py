@@ -50,7 +50,8 @@ class TurnManager:
 
         print("🔁 End of run_turn")
         print(f"next_turn offense: {self.game.game_state['offense_team']}")
-        print(f"next_turn score: {self.game.game_state['score']}")
+        print(f"{self.game.game_state['score']}")
+        print(f"{self.game.game_state['clock']}")
         return result
 
 
