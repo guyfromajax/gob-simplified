@@ -131,6 +131,8 @@ def resolve_fast_break_logic(game: "GameManager"):
         # Ensure outlet passer != ball handler
         if rebounder and rebounder != ball_handler:
             fb_roles["outlet_passer"] = rebounder
+        else:
+            fb_roles["outlet_passer"] = None
         fb_roles["ball_handler"] = ball_handler
         # Add other offensive players in play
         for pos in ["PG", "SG", "SF", "PF"]:
@@ -145,6 +147,8 @@ def resolve_fast_break_logic(game: "GameManager"):
 
     else:  # STEAL
         ball_handler = game_state.get("last_stealer")
+        if ball_handler is None:
+            ball_handler = game_state["players"][off_team]["PG"]
         fb_roles["ball_handler"] = ball_handler
 
         for pos in ["PG", "SG", "SF"]:
