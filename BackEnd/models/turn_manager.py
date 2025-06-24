@@ -48,6 +48,7 @@ class TurnManager:
         self.logger.log_turn_result(result)
         self.animator.capture(result)
 
+        print("🔁 End of run_turn")
         print(f"➡️ possession_flips: {result.get('possession_flips')} | current offense: {self.game.game_state['offense_team']}")
         return result
 

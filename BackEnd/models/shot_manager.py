@@ -173,6 +173,7 @@ class ShotManager:
             rebounder.record_stat(stat)
 
             text += f"...{rebounder} grabs the rebound."
+            print(f"{text}")
             possession_flips = (rebound_team != off_team)
             
             if stat == "OREB":
