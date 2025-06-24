@@ -135,7 +135,7 @@ class GameManager:
     def simulate_turn(self):
         result = self.turn_manager.run_turn()
         self.turns.append(result)
-        self._switch_possession()
+        # self._switch_possession()
         return result
 
     def _switch_possession(self):
