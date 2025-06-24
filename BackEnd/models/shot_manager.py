@@ -173,7 +173,6 @@ class ShotManager:
             rebounder.record_stat(stat)
 
             text += f"...{rebounder} grabs the rebound."
-            print(f"{text}")
             possession_flips = (rebound_team != off_team)
             
             if stat == "OREB":
@@ -228,6 +227,7 @@ class ShotManager:
             None
         )
 
+        print(f"{text}")
         return {
             "result_type": "MAKE" if made else "MISS",
             "ball_handler": shooter,
