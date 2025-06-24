@@ -38,6 +38,8 @@ BLOCK_PROBABILITY = {
 
 MALLEABLE_ATTRS = ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "FT"]
 
+PLAYCALLS = ["Base", "Freelance", "Inside", "Attack", "Outside", "Set"]
+
 STRATEGY_CALL_DICTS = {
     "defense": {
         0: ["Man"],

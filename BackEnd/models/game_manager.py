@@ -1,7 +1,7 @@
 from BackEnd.models.player import Player
 from BackEnd.models.turn_manager import TurnManager
 from BackEnd.models.shot_manager import ShotManager
-from BackEnd.constants import POSITION_LIST
+from BackEnd.constants import POSITION_LIST, PLAYCALLS
 from copy import deepcopy
 import random
 
@@ -10,6 +10,9 @@ class GameManager:
         self.home_team = home_team
         self.away_team = away_team
         self.scouting_data = self.initialize_scouting_data(home_team, away_team)
+        self.playcall_settings = self.initialize_playcall_settings(home_team, away_team)
+        self.strategy_settings = self.initialize_strategy_settings(home_team, away_team)
+        self.team_attributes = self.initialize_team_attributes(home_team, away_team)
 
         self.players = {
             home_team: {pos: Player(p) for pos, p in home_players.items()},
@@ -72,6 +75,14 @@ class GameManager:
         return settings
     
     @staticmethod
+    def initialize_playcall_settings(home_team, away_team):
+        playcalls = ["Base", "Freelance", "Inside", "Attack", "Outside", "Set"]
+        settings = {}
+        for team in [home_team, away_team]:
+            settings[team] = {call: random.randint(1, 4) for call in playcalls}
+        return settings
+    
+    @staticmethod
     def initialize_scouting_data(home_team, away_team):
         playcalls = ["Base", "Freelance", "Inside", "Attack", "Outside", "Set"]
 
@@ -103,8 +114,12 @@ class GameManager:
             "turns": self.turns,
             "scouting_data": self.scouting_data,
             "strategy_calls": self.initialize_strategy_calls(self.home_team, self.away_team),
-            "strategy_settings": self.initialize_strategy_settings(self.home_team, self.away_team),
-            "team_attributes": self.initialize_team_attributes(self.home_team, self.away_team),
+            "strategy_settings": self.strategy_settings,
+            "playcall_settings": self.playcall_settings,
+            "team_attributes": self.team_attributes,
+            "playcall_weights": self.playcall_settings,
+            "playcall_tracker": {self.home_team: {pc: 0 for pc in PLAYCALLS}, self.away_team: {pc: 0 for pc in PLAYCALLS}},
+            "defense_playcall_tracker": {self.home_team: {"Man": 0, "Zone": 0}, self.away_team: {"Man": 0, "Zone": 0}},
             "current_playcall": "Outside",
             "defense_playcall": "Zone",
             "offensive_state": {
