@@ -7,9 +7,14 @@ import json
 from BackEnd.db import players_collection, teams_collection
 from BackEnd.models.player import Player
 # from BackEnd.models.game_manager import GameManager
-from BackEnd.constants import PLAYCALL_ATTRIBUTE_WEIGHTS, POSITION_LIST, STRATEGY_CALL_DICTS
-from BackEnd.utils.shared import weighted_random_from_dict, generate_pass_chain
-from BackEnd.engine.phase_resolution import resolve_fast_break_logic, resolve_free_throw_logic, resolve_turnover_logic
+from BackEnd.constants import PLAYCALL_ATTRIBUTE_WEIGHTS, POSITION_LIST, STRATEGY_CALL_DICTS, TEMPO_PASS_DICT, MALLEABLE_ATTRS
+from BackEnd.utils.shared import weighted_random_from_dict, generate_pass_chain, get_team_thresholds, get_random_positions
+from BackEnd.engine.phase_resolution import (
+    resolve_fast_break_logic, 
+    resolve_free_throw_logic, 
+    resolve_turnover_logic, 
+    calculate_foul_turnover
+)
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from BackEnd.models.game_manager import GameManager
@@ -122,8 +127,6 @@ class TurnManager:
         if result.get("possession_flips"):
             self.game._switch_possession()
 
-
-
     def assign_roles(self, playcall):
         
         off_team = self.game.game_state["offense_team"]
@@ -178,6 +181,24 @@ class TurnManager:
             "pass_chain": pass_chain,
             "defender": self.game.game_state["players"][def_team][defender_pos]
         }
+    
+    def determine_event_type(self, roles):
+        game_state = self.game.game_state
+        # Base weights (can be tuned later)
+        off_team = game_state["offense_team"]
+        def_team = game_state["defense_team"]
+        thresholds = get_team_thresholds(game_state)
+        tempo_call = game_state["strategy_calls"][off_team]["tempo_call"]
+        pass_count = TEMPO_PASS_DICT[tempo_call]
+        positions = get_random_positions(pass_count)
+        event_type = calculate_foul_turnover(game_state, positions, thresholds, roles)
+    
+        #determine number of turnover RNGs based on defense team'saggression
+        for pos, player_obj in game_state["players"][off_team].items():
+            attr = player_obj.attributes
+            ng = attr["NG"]
+            for key in MALLEABLE_ATTRS:
+                anchor_val = attr[f"anchor_{key}"]
+                attr[key] = int(anchor_val * ng)
 
-
-        # You can expand this with timeout logic, foul tracking, etc.
+        return event_type
