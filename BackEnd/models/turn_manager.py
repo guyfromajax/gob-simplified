@@ -7,15 +7,12 @@ import json
 from BackEnd.db import players_collection, teams_collection
 from BackEnd.models.player import Player
 # from BackEnd.models.game_manager import GameManager
-from BackEnd.constants import PLAYCALL_ATTRIBUTE_WEIGHTS, POSITION_LIST
+from BackEnd.constants import PLAYCALL_ATTRIBUTE_WEIGHTS, POSITION_LIST, STRATEGY_CALL_DICTS
 from BackEnd.utils.shared import weighted_random_from_dict, generate_pass_chain
 from BackEnd.engine.phase_resolution import resolve_fast_break_logic, resolve_free_throw_logic, resolve_turnover_logic
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from BackEnd.models.game_manager import GameManager
-
-
-
 
 class TurnManager:
     def __init__(self, game_manager: "GameManager"):
@@ -29,14 +26,16 @@ class TurnManager:
         self.animator = AnimationManager()
 
     def run_turn(self):
-        # STEP 1: Read offensive state
+        # STEP 1: Set strategy calls (tempo + aggression)
+        self.set_strategy_calls()
+
+        # STEP 2: Set playcalls (offense + defense)
+        calls = self.set_playcalls()
+        self.game.game_state["current_playcall"] = calls["offense"]
+        self.game.game_state["defense_playcall"] = calls["defense"]
+
+        # STEP 3: Route based on offensive state
         state = self.game.game_state["offensive_state"]
-
-        # STEP 2: Inject playcalls into game_state
-        self.game.game_state["current_playcall"] = self.playbook_manager.get_offensive_playcall()
-        self.game.game_state["defense_playcall"] = self.playbook_manager.get_defensive_playcall()
-
-        # STEP 3: Route based on state
         if state == "FREE_THROW":
             result = self.resolve_free_throw()
         elif state == "FAST_BREAK":
@@ -44,6 +43,7 @@ class TurnManager:
         else:
             result = self.resolve_half_court_offense()
 
+        # STEP 4: Final updates (clock, logs, animation)
         self.update_clock_and_possession(result)
         self.logger.log_turn_result(result)
         self.animator.capture(result)
@@ -51,6 +51,41 @@ class TurnManager:
         return result
 
 
+    def set_playcalls(self):    
+        off_team = self.game.game_state["offense_team"]
+        def_team = self.game.game_state["defense_team"]
+
+        # OFFENSIVE PLAYCALL
+        off_weights = self.game.game_state["playcall_weights"][off_team]
+        chosen_playcall = weighted_random_from_dict(off_weights)
+
+        # DEFENSIVE PLAYCALL
+        def_setting = self.game.game_state["strategy_settings"][def_team]["defense"]
+        defense_options = STRATEGY_CALL_DICTS["defense"].get(def_setting, ["Man"])
+        chosen_defense = random.choice(defense_options)
+
+        # Track usage
+        self.game.game_state["playcall_tracker"][off_team][chosen_playcall] += 1
+        self.game.game_state["defense_playcall_tracker"][def_team][chosen_defense] += 1
+
+        return {
+            "offense": chosen_playcall,
+            "defense": chosen_defense
+        }
+
+    # Inside TurnManager class
+    def set_strategy_calls(self):
+        game_state = self.game.game_state
+        off_team = game_state["offense_team"]
+        def_team = game_state["defense_team"]
+
+        tempo_setting = game_state["strategy_settings"][off_team]["tempo"]
+        aggression_setting = game_state["strategy_settings"][def_team]["aggression"]
+
+        game_state["strategy_calls"][off_team]["tempo_call"] = random.choice(STRATEGY_CALL_DICTS["tempo"][tempo_setting])
+        game_state["strategy_calls"][def_team]["aggression_call"] = random.choice(STRATEGY_CALL_DICTS["aggression"][aggression_setting])
+
+    
     def resolve_half_court_offense(self):
         
         print("inside resolve_half_court_offense")
