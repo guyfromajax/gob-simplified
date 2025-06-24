@@ -49,7 +49,8 @@ class TurnManager:
         self.animator.capture(result)
 
         print("🔁 End of run_turn")
-        print(f"➡️ possession_flips: {result.get('possession_flips')} | current offense: {self.game.game_state['offense_team']}")
+        print(f"next_turn offense: {self.game.game_state['offense_team']}")
+        print(f"next_turn score: {self.game.game_state['score']}")
         return result
 
 
@@ -107,7 +108,6 @@ class TurnManager:
         # if result.get("possession_flips"):
         #     self.game._switch_possession()
         if bool(result.get("possession_flips")) is True:
-            print("🔁 Flipping possession...")
             self.game._switch_possession()
 
 
