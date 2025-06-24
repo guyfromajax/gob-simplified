@@ -1,6 +1,8 @@
 import random
-from BackEnd.models.shot_manager import ShotManager
 from typing import TYPE_CHECKING
+from BackEnd.models.shot_manager import ShotManager
+if TYPE_CHECKING:
+    from BackEnd.models.turn_manager import TurnManager
 if TYPE_CHECKING:
     from BackEnd.models.game_manager import GameManager
 
@@ -81,7 +83,6 @@ def resolve_foul(roles, game_state):
         "end_coords": {bh_pos: {"x": 72, "y": 25}},
         "time_elapsed": time_elapsed
     }
-
 
 # #FAST BREAK
 def resolve_fast_break_logic(game: "GameManager"):
@@ -314,51 +315,6 @@ def resolve_free_throw_logic(game_state):
         "possession_flips": possession_flips,
     }
 
-# def resolve_half_court_offense(game_state):
-#     # Assume you already have game_state, and team name is known
-#     pbm = PlaybookManager(game_state["scouting_data"], game_state["offense_team"])
-#     playcalls = pbm.get_playcalls(game_state)
-
-#     game_state["current_playcall"] = playcalls["offense"]
-#     game_state["defense_playcall"] = playcalls["defense"]
-#     roles = assign_roles(game_state, playcalls["offense"]) #shooter, screener, ball_handler, passer, pass_chain, defender
-#     # Track offensive playcall use
-#     off_team = game_state["offense_team"]
-#     off_playcall = playcalls["offense"]
-#     game_state["scouting_data"][off_team]["offense"]["Playcalls"][off_playcall]["used"] += 1
-#     def_team = game_state["defense_team"]
-#     def_call = playcalls["defense"]
-#     game_state["scouting_data"][def_team]["defense"][def_call]["used"] += 1
-
-#     event_type = determine_event_type(game_state, roles)
-
-#     if event_type == "O_FOUL":
-#         event_type = "FOUL"
-#         game_state["foul_team"] = "OFFENSE"
-#     elif event_type == "D_FOUL":
-#         event_type = "FOUL"
-#         game_state["foul_team"] = "DEFENSE"
-
-#     if event_type == "SHOT":
-#         turn_result = resolve_shot(roles, game_state)
-#     elif event_type == "TURNOVER":
-#         turnover_type = random.choice(["STEAL", "DEAD BALL"])
-#         turn_result = resolve_turnover(roles, game_state, turnover_type)
-#     elif event_type == "FOUL":
-#         #assign the player committing the foul here, which is assigned the calculate_foul_turnover function
-#         turn_result = resolve_foul(roles, game_state)
-
-#     # Define what counts as offensive success & defensive success
-#     if turn_result["result_type"] == "MAKE" or (turn_result["result_type"] == "FOUL" and game_state.get("foul_team") == "DEFENSE"):
-#         game_state["scouting_data"][off_team]["offense"]["Playcalls"][off_playcall]["success"] += 1
-#     else:
-#         game_state["scouting_data"][def_team]["defense"][def_call]["success"] += 1
-
-#     # ✅ Add safety checks before returning
-#     assert turn_result is not None, "turn_result is None"
-#     assert "time_elapsed" in turn_result, "turn_result missing 'time_elapsed'"
-#     # print(f"turn_result: {turn_result}")
-#     return turn_result
 
 def resolve_turnover_logic(roles, game_state, turnover_type="DEAD BALL"):
 
@@ -409,6 +365,21 @@ def resolve_half_court_offense_logic(game: "GameManager") -> dict:
     game.scouting_data[def_team]["defense"][def_call]["used"] += 1
 
     roles = game.turn_manager.assign_roles(game)
+    
+    # 🧠 Determine event type (SHOT / TURNOVER / O_FOUL / D_FOUL)
+    from BackEnd.models.turn_manager import TurnManager
+    event_type = game.turn_manager.determine_event_type(roles)
+    if event_type == "TURNOVER":
+        return resolve_turnover_logic(roles, game_state, turnover_type="DEAD BALL")
+
+    elif event_type == "O_FOUL":
+        game_state["foul_team"] = "OFFENSE"
+        return resolve_foul(roles, game_state)
+
+    elif event_type == "D_FOUL":
+        game_state["foul_team"] = "DEFENSE"
+        return resolve_foul(roles, game_state)
+    
     shot_result = game.shot_manager.resolve_shot(roles)
 
     # Track success
@@ -417,7 +388,107 @@ def resolve_half_court_offense_logic(game: "GameManager") -> dict:
     elif shot_result["result_type"] in ["MISS", "TURNOVER"]:
         game.scouting_data[def_team]["defense"][def_call]["success"] += 1
 
-    if shot_result.get("missed"):
+    if shot_result["result_type"] == "MISS":
         return game.turn_manager.rebound_manager.handle_rebound(game, roles)
 
     return shot_result
+
+def calculate_foul_turnover(game_state, positions, thresholds, roles):
+    off_team = game_state["offense_team"]
+    def_team = game_state["defense_team"]
+    roles["foul_player"] = None
+    ball_handler = roles["ball_handler"]
+    defense_call = game_state["defense_playcall"]
+
+    # === Defensive Foul ===
+    d_pos = positions["d_foul"]
+    d_foul_player = game_state["players"][def_team][d_pos]
+    d_attr = d_foul_player.attributes
+
+    iq = d_attr["IQ"] * 0.3
+    ch = d_attr["CH"] * 0.3
+    if d_pos in ["PG", "SG"]:
+        movement = d_attr["OD"] * 0.2 + d_attr["AG"] * 0.2
+    elif d_pos == "SF":
+        movement = d_attr["OD"] * 0.1 + d_attr["ID"] * 0.1 + d_attr["AG"] * 0.1 + d_attr["ST"] * 0.1
+    elif d_pos in ["PF", "C"]:
+        movement = d_attr["ID"] * 0.2 + d_attr["ST"] * 0.2
+    else:
+        movement = 0
+
+    d_foul_score = (iq + ch + movement) * random.randint(1, 6)
+    if defense_call == "Zone":
+        d_foul_score *= 1.1
+    is_d_foul = d_foul_score < (thresholds["d_foul_threshold"] * 1.2)
+
+    # === Offensive Foul ===
+    o_pos = positions["o_foul"]
+    o_foul_player = game_state["players"][off_team][o_pos]
+    o_attr = o_foul_player.attributes
+
+    iq = o_attr["IQ"] * 0.3
+    ch = o_attr["CH"] * 0.3
+    if o_pos in ["PG", "SG"]:
+        movement = o_attr["AG"] * 0.4
+    elif o_pos == "SF":
+        movement = o_attr["AG"] * 0.2 + o_attr["ST"] * 0.2
+    elif o_pos in ["PF", "C"]:
+        movement = o_attr["ST"] * 0.4
+    else:
+        movement = 0
+
+    o_foul_score = (iq + ch + movement) * random.randint(1, 6)
+    is_o_foul = o_foul_score < (thresholds["o_foul_threshold"] * 0.8)
+
+    # === Turnover ===
+    t_pos = positions["turnover"]
+    turnover_player = game_state["players"][off_team][t_pos]
+    t_attr = turnover_player.attributes
+
+    bh_score = (
+        t_attr["BH"] * 0.5 +
+        t_attr["AG"] * 0.2 +
+        t_attr["IQ"] * 0.2 +
+        t_attr["CH"] * 0.1
+    ) * random.randint(1, 6)
+
+    def_mod_player = game_state["players"][def_team][t_pos]
+    def_mod_attr = def_mod_player.attributes
+    pressure = (
+        def_mod_attr["OD"] * 0.3 +
+        def_mod_attr["AG"] * 0.3 +
+        def_mod_attr["IQ"] * 0.2 +
+        def_mod_attr["CH"] * 0.2
+    ) * random.randint(1, 6)
+    if defense_call == "Zone":
+        pressure *= 0.9
+
+    turnover_score = bh_score - pressure
+    is_turnover = turnover_score < thresholds["turnover_threshold"]
+
+    # print(f"Turnover → {get_name_safe(turnover_player)} vs {get_name_safe(def_mod_player)}: score={round(turnover_score, 2)} vs threshold={thresholds['turnover_threshold']} | flag={is_turnover}")
+
+    decisions = {
+        "TURNOVER": (is_turnover, turnover_score),
+        "D_FOUL": (is_d_foul, d_foul_score),
+        "O_FOUL": (is_o_foul, o_foul_score)
+    }
+
+    active = [(k, v[1]) for k, v in decisions.items() if v[0]]
+    if not active:
+        print()
+        return "SHOT"
+
+    active.sort(key=lambda x: (x[1], ["TURNOVER", "D_FOUL", "O_FOUL"].index(x[0])))
+
+    if active[0][0] == "TURNOVER":
+        roles["turnover_player"] = turnover_player
+        roles["turnover_defender"] = def_mod_player
+        roles["ball_handler"] = turnover_player
+    elif active[0][0] == "D_FOUL":
+        roles["foul_player"] = d_foul_player
+    elif active[0][0] == "O_FOUL":
+        roles["foul_player"] = o_foul_player
+
+    print()
+    return active[0][0]

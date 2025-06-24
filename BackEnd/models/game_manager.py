@@ -130,6 +130,10 @@ class GameManager:
             "box_score": {
                 self.home_team: {},
                 self.away_team: {}
+            },
+            "team_fouls": {
+                self.home_team: 0,
+                self.away_team: 0
             }
         }
 

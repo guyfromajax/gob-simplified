@@ -1,4 +1,5 @@
 import random
+from BackEnd.constants import TURNOVER_CALC_DICT, POSITION_LIST
 
 def weighted_random_from_dict(weight_dict):
     total = sum(weight_dict.values())
@@ -231,6 +232,7 @@ def default_rebounder_dict():
     }
 
 def determine_rebounder(game_state, off_team, def_team):
+
     rebounder_dict = {
         "offense": {"PG": 0.1, "SG": 0.1, "SF": 0.2, "PF": 0.3, "C": 0.3},
         "defense": {"PG": 0.1, "SG": 0.1, "SF": 0.2, "PF": 0.3, "C": 0.3}
@@ -264,3 +266,24 @@ def determine_rebounder(game_state, off_team, def_team):
     new_stat = "DREB" if new_team == def_team else "OREB"
 
     return new_rebounder, new_team, new_stat
+
+def get_team_thresholds(game_state):
+    off_team = game_state["offense_team"]
+    def_team = game_state["defense_team"]
+
+    off_attr = game_state["team_attributes"][off_team]
+    def_attr = game_state["team_attributes"][def_team]
+
+    return {
+        "turnover_threshold": off_attr.get("turnover_threshold", 10),
+        "d_foul_threshold": def_attr.get("foul_threshold", 10),
+        "o_foul_threshold": off_attr.get("foul_threshold", 10)
+    }
+
+def get_random_positions(pass_count):
+    return {
+        "turnover": random.choice(TURNOVER_CALC_DICT[pass_count]),
+        "o_foul": random.choice(POSITION_LIST),
+        "d_foul": random.choice(POSITION_LIST)
+    }
+
