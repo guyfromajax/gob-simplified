@@ -30,13 +30,6 @@ from BackEnd.utils.shared import (
     determine_rebounder,
 )
 
-def initialize_playcall_settings():
-    playcalls = ["Base", "Freelance", "Inside", "Attack", "Outside", "Set"]
-    settings = {}
-    for team in ["Lancaster", "Bentley-Truman"]:
-        settings[team] = {call: random.randint(1, 4) for call in playcalls}
-    return settings
-
 def initialize_team_attributes():
     settings = {}
     for team in ["Lancaster", "Bentley-Truman"]:
