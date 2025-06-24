@@ -301,7 +301,7 @@ def calculate_foul_turnover(game_state, positions, thresholds, roles):
     turnover_score = bh_score - pressure
     is_turnover = turnover_score < thresholds["turnover_threshold"]
 
-    print(f"Turnover → {get_name_safe(turnover_player)} vs {get_name_safe(def_mod_player)}: score={round(turnover_score, 2)} vs threshold={thresholds['turnover_threshold']} | flag={is_turnover}")
+    # print(f"Turnover → {get_name_safe(turnover_player)} vs {get_name_safe(def_mod_player)}: score={round(turnover_score, 2)} vs threshold={thresholds['turnover_threshold']} | flag={is_turnover}")
 
     decisions = {
         "TURNOVER": (is_turnover, turnover_score),

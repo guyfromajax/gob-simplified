@@ -18,8 +18,8 @@ class ShotManager:
         screener = roles.get("screener", "")
         defender = roles.get("defender", "")
 
-        print(f"-------Inside resolve_shot---------")
-        print(f"shooter: {get_name_safe(shooter)} | passer: {get_name_safe(passer)} | screener: {get_name_safe(screener)} | defender: {get_name_safe(defender)}")
+        # print(f"-------Inside resolve_shot---------")
+        # print(f"shooter: {get_name_safe(shooter)} | passer: {get_name_safe(passer)} | screener: {get_name_safe(screener)} | defender: {get_name_safe(defender)}")
         
         attrs = shooter.attributes
         
@@ -60,8 +60,8 @@ class ShotManager:
             shot_score, help_defender, help_penalty = apply_help_defense_if_triggered(
                 self.game_state, playcall, is_three, defender, shot_score
             )
-            if help_defender:
-                print(f"Help defense by {help_defender} → penalty applied: {round(help_penalty, 2)}")
+            # if help_defender:
+            #     print(f"Help defense by {help_defender} → penalty applied: {round(help_penalty, 2)}")
 
         # Screen bonus (if applicable)
         
@@ -70,7 +70,7 @@ class ShotManager:
             screen_attrs = screener.attributes
             screen_score = calculate_screen_score(screen_attrs)
             shot_score += screen_score * 0.15
-            print(f"screen by {screener} adds {round(screen_score * 0.15, 2)} to shot score")
+            # print(f"screen by {screener} adds {round(screen_score * 0.15, 2)} to shot score")
             screener.record_stat("SCR_A")
             #need to add shot defender's ability to work through the screen
 
@@ -89,9 +89,9 @@ class ShotManager:
         # shot_score += gravity_boost
         # print(f"Off-ball gravity boost: +{round(gravity_boost, 2)} from {gravity_contributors}")
 
-        print(f"offense call: {playcall} // defense call: {defense_call}")
-        print(f"shooter: {get_name_safe(shooter)} | passer: {get_name_safe(passer)}")
-        print(f"shot score = {round(shot_score, 2)} | (defense score: {round(defense_penalty * 0.2, 2)})")
+        # print(f"offense call: {playcall} // defense call: {defense_call}")
+        # print(f"shooter: {get_name_safe(shooter)} | passer: {get_name_safe(passer)}")
+        # print(f"shot score = {round(shot_score, 2)} | (defense score: {round(defense_penalty * 0.2, 2)})")
         made = shot_score >= shot_threshold
 
 

@@ -86,9 +86,9 @@ def resolve_foul(roles, game_state):
 # #FAST BREAK
 def resolve_fast_break_logic(game: "GameManager"):
     from BackEnd.models.game_manager import GameManager
-    print("Entering resolve_fast_break()")
+    # print("Entering resolve_fast_break()")
     game_state = game.game_state
-    print(f"game_state rebound: {game_state.get('last_rebound')}")
+    # print(f"game_state rebound: {game_state.get('last_rebound')}")
 
     off_team = game_state["offense_team"]
     def_team = game_state["defense_team"]
@@ -162,7 +162,7 @@ def resolve_fast_break_logic(game: "GameManager"):
 
     # If HCO triggered, skip fast break
     if event_type == "HCO":
-        print("HCO triggered")
+        # print("HCO triggered")
         game_state["scouting_data"][def_team]["defense"]["vs_Fast_Break"]["success"] += 1
 
         from BackEnd.models.turn_manager import TurnManager
@@ -176,10 +176,7 @@ def resolve_fast_break_logic(game: "GameManager"):
 
     fb_roles["shooter"] = shooter
     # If shooter is not the ball handler, then ball handler is the passer
-    fb_roles["passer"] = fb_roles["ball_handler"] if shooter != fb_roles["ball_handler"] else ""
-    if fb_roles["passer"] != None and fb_roles["passer"] not in game_state["players"][off_team].values():
-        print(f"⚠️ Invalid passer assignment: {fb_roles['passer']} not in team {off_team}")
-        print(f"players in offense team: {game_state['players'][off_team]}")
+    fb_roles["passer"] = fb_roles["ball_handler"] if shooter != fb_roles["ball_handler"] else None
     fb_roles["screener"] = None
 
     # Foul or turnover possibilities
@@ -190,8 +187,8 @@ def resolve_fast_break_logic(game: "GameManager"):
         event_type = "FOUL"
         game_state["foul_team"] = "DEFENSE"
 
-    print(f"Event type: {event_type}")
-    print(f"Roles: {fb_roles}")
+    # print(f"Event type: {event_type}")
+    # print(f"Roles: {fb_roles}")
     
     if event_type == "SHOT":
         shot_manager = ShotManager(game_state)
