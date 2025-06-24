@@ -22,7 +22,6 @@ class GameManager:
         self.score = {home_team: 0, away_team: 0}
         self.points_by_quarter = {home_team: [0, 0, 0, 0], away_team: [0, 0, 0, 0]}
         self.quarter = 1
-        self.clock = "8:00"
         self.turns = []
         self.offense_team = home_team
         self.defense_team = away_team
@@ -110,7 +109,9 @@ class GameManager:
             "score": self.score,
             "points_by_quarter": self.points_by_quarter,
             "quarter": self.quarter,
-            "clock": self.clock,
+            "time_remaining": 480,  # total seconds left in the quarter
+            "clock": "8:00",        # readable display version (for frontend)
+            "time_elapsed": 0,
             "turns": self.turns,
             "scouting_data": self.scouting_data,
             "strategy_calls": self.initialize_strategy_calls(self.home_team, self.away_team),

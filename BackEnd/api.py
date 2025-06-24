@@ -58,7 +58,7 @@ def simulate_game():
     home_players = {pos: player for pos, player in zip(POSITION_LIST, home_player_docs)}
     away_players = {pos: player for pos, player in zip(POSITION_LIST, away_player_docs)}
 
-    game_state = run_simulation(home_team, away_team, home_players, away_players, turns=50)
+    game_state = run_simulation(home_team, away_team, home_players, away_players)
 
     # 5. Summarize & persist
     summary = summarize_game_state(game_state)
