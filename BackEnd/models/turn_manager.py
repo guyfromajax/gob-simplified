@@ -103,8 +103,12 @@ class TurnManager:
 
     def update_clock_and_possession(self, result):
         # Basic example: reduce time and switch possession if needed
-        if result.get("possession_flips"):
+        # if result.get("possession_flips"):
+        #     self.game._switch_possession()
+        if bool(result.get("possession_flips")) is True:
+            print("🔁 Flipping possession...")
             self.game._switch_possession()
+
 
     def assign_roles(self, playcall):
         
