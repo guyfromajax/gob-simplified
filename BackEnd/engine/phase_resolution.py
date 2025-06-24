@@ -186,10 +186,10 @@ def resolve_fast_break_logic(game: "GameManager"):
     fb_roles["shooter"] = shooter
     # If shooter is not the ball handler, then ball handler is the passer
     fb_roles["passer"] = fb_roles["ball_handler"] if shooter != fb_roles["ball_handler"] else ""
-    if fb_roles["passer"] != "" and fb_roles["passer"] not in game_state["players"][off_team].values():
+    if fb_roles["passer"] != None and fb_roles["passer"] not in game_state["players"][off_team].values():
         print(f"⚠️ Invalid passer assignment: {fb_roles['passer']} not in team {off_team}")
         print(f"players in offense team: {game_state['players'][off_team]}")
-    fb_roles["screener"] = ""
+    fb_roles["screener"] = None
 
     # Foul or turnover possibilities
     if event_type == "O_FOUL":
