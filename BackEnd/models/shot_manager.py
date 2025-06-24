@@ -230,6 +230,7 @@ class ShotManager:
         return {
             "result_type": "MAKE" if made else "MISS",
             "ball_handler": shooter,
+            "shot_score": shot_score,
             "screener": screener,
             "passer": passer,
             "defender": defender,
@@ -247,7 +248,7 @@ class ShotManager:
         shooter = fb_roles["shooter"]
         passer = fb_roles.get("passer", "")
         if shooter == passer:
-            passer = ""
+            passer = None
         
         attrs = shooter.attributes
         
@@ -303,6 +304,8 @@ class ShotManager:
         return {
             "result_type": "MAKE" if made else "MISS",
             "ball_handler": shooter,
+            "shooter": shooter,
+            "shot_score": shot_score,
             "screener": None,
             "passer": passer,
             "defender": defender,
