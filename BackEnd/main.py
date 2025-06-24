@@ -382,10 +382,10 @@ def print_scouting_report(data):
         for def_type, val in data[team]["defense"].items():
             print(f"{def_type.ljust(14)} — Used: {val['used']}, Success: {val['success']}")
 
-def run_simulation(home_team, away_team, home_players, away_players, turns=1):
+def run_simulation(home_team, away_team, home_players, away_players):
     gm = GameManager(home_team, away_team, home_players, away_players)
 
-    for _ in range(turns):
+    while gm.game_state["time_remaining"] > 0:
         gm.simulate_turn()
 
     return gm.to_dict()

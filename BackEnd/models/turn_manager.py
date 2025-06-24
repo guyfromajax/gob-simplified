@@ -105,11 +105,23 @@ class TurnManager:
         return resolve_turnover_logic(self.game.game_state)
 
     def update_clock_and_possession(self, result):
-        # Basic example: reduce time and switch possession if needed
-        # if result.get("possession_flips"):
-        #     self.game._switch_possession()
-        if bool(result.get("possession_flips")) is True:
+        # 🕒 Reduce clock by time_elapsed
+        time_elapsed = result.get("time_elapsed", 0)
+        self.game.game_state["time_remaining"] -= time_elapsed
+
+        # Clamp to 0
+        if self.game.game_state["time_remaining"] < 0:
+            self.game.game_state["time_remaining"] = 0
+
+        # Convert to clock display (e.g., 400 → "6:40")
+        minutes = self.game.game_state["time_remaining"] // 60
+        seconds = self.game.game_state["time_remaining"] % 60
+        self.game.game_state["clock"] = f"{minutes}:{seconds:02d}"
+
+        # 🔁 Flip possession if flagged
+        if result.get("possession_flips"):
             self.game._switch_possession()
+
 
 
     def assign_roles(self, playcall):
