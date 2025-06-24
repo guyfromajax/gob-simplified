@@ -65,7 +65,11 @@ def test_playcalls_are_set(mock_game_manager):
     assert calls["offense"] in PLAYCALLS
     assert calls["defense"] in ["Man", "Zone"]
 
-
+def test_turn_result_has_possession_flips(mock_game_manager):
+    tm = TurnManager(mock_game_manager)
+    result = tm.run_turn()
+    assert "possession_flips" in result
+    assert isinstance(result["possession_flips"], bool)
 
 
  

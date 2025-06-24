@@ -139,9 +139,18 @@ class GameManager:
         return result
 
     def _switch_possession(self):
-        self.game_state["offense_team"], self.game_state["defense_team"] = (
-            self.game_state["defense_team"], self.game_state["offense_team"]
-        )
+        # Swap high-level attributes
+        self.offense_team, self.defense_team = self.defense_team, self.offense_team
+
+        # Sync game_state to match
+        self.game_state["offense_team"] = self.offense_team
+        self.game_state["defense_team"] = self.defense_team
+
+        # Reset possession-specific state if needed
+        # self.game_state["offensive_state"] = "HALF_COURT"
+        self.game_state["current_playcall"] = ""
+        self.game_state["defense_playcall"] = ""
+
 
     def get_box_score(self):
         return {
