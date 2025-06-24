@@ -37,9 +37,11 @@ def root():
 
 @app.post("/simulate")
 def simulate_game():
-    print("🧪 Team docs in DB:")
-    for team in teams_collection.find({}):
-        print(team)
+    # print("🧪 Team docs in DB:")
+    # for team in teams_collection.find({}):
+    #     print(team)
+    # print("Incoming game_state:", game_state.keys())
+
 
     home_team = "Lancaster"
     away_team = "Bentley-Truman"
@@ -82,7 +84,7 @@ def setup_teams():
     # 🔄 TEMP FIX: clear the collection to avoid "already exist" block
     teams_collection.delete_many({})
     players_collection.delete_many({})
-    print("✅ Cleared teams and players collections -- totally cleard.")
+    # print("✅ Cleared teams and players collections -- totally cleard.")
 
     if teams_collection.count_documents({"name": "Lancaster"}) > 0:
         return {"message": "Teams already exist"}

@@ -15,8 +15,7 @@ from BackEnd.utils.shared import (
 )
     
 def resolve_foul(roles, game_state):
-    print(f"-------Inside resolve_foul---------")
-    print(f"roles: {roles}")
+    
     off_team = game_state["offense_team"]
     def_team = game_state["defense_team"]
     foul_team = off_team if game_state["foul_team"] == "OFFENSE" else def_team
@@ -83,19 +82,7 @@ def resolve_foul(roles, game_state):
         "time_elapsed": time_elapsed
     }
 
-# def resolve_turn(game_state):
-#     off_team = game_state["offense_team"]
-#     # print(f"game_state: {game_state}")
-#     if game_state["offensive_state"] == "FREE_THROW":
-#         return resolve_free_throw(game_state)
 
-#     # Only allow fast break if last play ended with a defensive rebound or steal
-#     # ✅ Fast break check — only if previous result was a rebound or steal
-#     elif game_state["offensive_state"] == "FAST_BREAK":
-#         game_state["offensive_state"] = ""
-#         return resolve_fast_break(game_state)
-    
-#     return resolve_half_court_offense(game_state)
 # #FAST BREAK
 def resolve_fast_break_logic(game: "GameManager"):
     from BackEnd.models.game_manager import GameManager
@@ -377,9 +364,6 @@ def resolve_free_throw_logic(game_state):
 #     return turn_result
 
 def resolve_turnover_logic(roles, game_state, turnover_type="DEAD BALL"):
-
-    print(f"-------Inside resolve_turnover---------")
-    print(f"roles: {roles}")
 
     off_team = game_state["offense_team"]
     def_team = game_state["defense_team"]
