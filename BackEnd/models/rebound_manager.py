@@ -1,3 +1,5 @@
+import random
+
 class ReboundManager:
     def __init__(self, game_state):
         self.game_state = game_state
@@ -24,15 +26,15 @@ class ReboundManager:
             upto += weight
         return random.choice(list(weight_dict.keys()))  # fallback
 
-    def calculate_result(self):
+    def handle_rebound(self):
         o_pos = self.choose_rebounder("offense")
         d_pos = self.choose_rebounder("defense")
 
         o_player = self.players[self.off_team][o_pos]
         d_player = self.players[self.def_team][d_pos]
 
-        o_score = self._calc_score(o_player.attributes)
-        d_score = self._calc_score(d_player.attributes)
+        o_score = self._calc_rebound_score(o_player.attributes)
+        d_score = self._calc_rebound_score(d_player.attributes)
 
         off_mod = self.team_attrs[self.off_team]["rebound_modifier"]
         def_mod = self.team_attrs[self.def_team]["rebound_modifier"]
@@ -57,5 +59,5 @@ class ReboundManager:
             "rebound_stat": stat
         }
 
-    def _calc_score(self, attr):
+    def _calc_rebound_score(self, attr):
         return attr["RB"] * 0.5 + attr["ST"] * 0.3 + attr["AG"] * 0.2
