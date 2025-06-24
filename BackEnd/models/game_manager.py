@@ -139,8 +139,13 @@ class GameManager:
         return result
 
     def _switch_possession(self):
-        # Swap high-level attributes
+        print("Inside _switch_possession")
+        print(f"offense_team: {self.offense_team}")
+        print(f"defense_team: {self.defense_team}")
         self.offense_team, self.defense_team = self.defense_team, self.offense_team
+        print("after switch")
+        print(f"offense_team: {self.offense_team}")
+        print(f"defense_team: {self.defense_team}")
 
         # Sync game_state to match
         self.game_state["offense_team"] = self.offense_team
