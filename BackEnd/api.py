@@ -28,6 +28,7 @@ def summarize_game_state(game_state):
         "points_by_quarter": game_state["points_by_quarter"],
         "box_score": game_state["box_score"],
         "scouting": game_state["scouting_data"],
+        "team_totals": game_state.get("team_totals", {})
     }
 
 # 4. Routes
