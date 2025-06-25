@@ -364,7 +364,7 @@ def resolve_half_court_offense_logic(game: "GameManager") -> dict:
     game.scouting_data[off_team]["offense"]["Playcalls"][off_call]["used"] += 1
     game.scouting_data[def_team]["defense"][def_call]["used"] += 1
 
-    roles = game.turn_manager.assign_roles(game)
+    roles = game.turn_manager.assign_roles()
     
     # 🧠 Determine event type (SHOT / TURNOVER / O_FOUL / D_FOUL)
     from BackEnd.models.turn_manager import TurnManager

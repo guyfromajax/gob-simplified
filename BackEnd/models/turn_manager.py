@@ -133,11 +133,12 @@ class TurnManager:
         if result.get("possession_flips"):
             self.game._switch_possession()
 
-    def assign_roles(self, playcall):
+    def assign_roles(self):
         
         off_team = self.game.game_state["offense_team"]
         def_team = self.game.game_state["defense_team"]
         players = self.game.game_state["players"][off_team]
+        playcall = self.game.game_state["current_playcall"]
 
         # Compute shot weights using attributes embedded in each player object
         print(f"inside assign_roles playcall: {playcall}")
