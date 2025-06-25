@@ -8,7 +8,13 @@ from BackEnd.db import players_collection, teams_collection
 from BackEnd.models.player import Player
 # from BackEnd.models.game_manager import GameManager
 from BackEnd.constants import PLAYCALL_ATTRIBUTE_WEIGHTS, POSITION_LIST, STRATEGY_CALL_DICTS, TEMPO_PASS_DICT, MALLEABLE_ATTRS
-from BackEnd.utils.shared import weighted_random_from_dict, generate_pass_chain, get_team_thresholds, get_random_positions
+from BackEnd.utils.shared import (
+    weighted_random_from_dict, 
+    generate_pass_chain, 
+    get_team_thresholds, 
+    get_random_positions,
+    get_name_safe
+)
 from BackEnd.engine.phase_resolution import (
     resolve_fast_break_logic, 
     resolve_free_throw_logic, 
@@ -172,14 +178,25 @@ class TurnManager:
         else:
             defender_pos = shooter_pos
 
+        shooter = self.game.game_state["players"][off_team][shooter_pos]
+        screener = self.game.game_state["players"][off_team][screener_pos]
         passer = self.game.game_state["players"][off_team][passer_pos] if passer_pos else None
+        defender = self.game.game_state["players"][def_team][defender_pos]
+
+        print("end of assign_roles")
+        print(f"shooter: {get_name_safe(shooter)}")
+        print(f"screener: {get_name_safe(screener)}")
+        print(f"passer: {get_name_safe(passer)}")
+        print(f"defender: {get_name_safe(defender)}")
+
+        
         return {
-            "shooter": self.game.game_state["players"][off_team][shooter_pos],
-            "screener": self.game.game_state["players"][off_team][screener_pos],
-            "ball_handler": self.game.game_state["players"][off_team][shooter_pos],
+            "shooter": shooter,
+            "screener": screener,
+            "ball_handler": shooter,
             "passer": passer,
             "pass_chain": pass_chain,
-            "defender": self.game.game_state["players"][def_team][defender_pos]
+            "defender": defender
         }
     
     def determine_event_type(self, roles):
