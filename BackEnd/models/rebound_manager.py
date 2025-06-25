@@ -51,7 +51,6 @@ class ReboundManager:
         stat = "DREB" if rebound_team == self.def_team else "OREB"
 
         rebounder.record_stat(stat)
-        rebounder.record_stat("REB")
 
         # Store for possible fast break or putback
         self.game_state["last_rebounder"] = rebounder
