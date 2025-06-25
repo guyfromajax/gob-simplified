@@ -53,11 +53,21 @@ class ReboundManager:
         rebounder.record_stat(stat)
         rebounder.record_stat("REB")
 
+        # Store for possible fast break or putback
+        self.game_state["last_rebounder"] = rebounder
+        self.game_state["last_rebound"] = stat
+
+        # Return a valid turn_result
         return {
-            "rebound_team": rebound_team,
-            "rebounder": rebounder,
-            "rebound_stat": stat
+            "result_type": stat,
+            "ball_handler": rebounder,
+            "text": f"{rebounder} grabs the {stat}.",
+            "start_coords": {},  # optional
+            "end_coords": {},    # optional
+            "time_elapsed": random.randint(3, 6),
+            "possession_flips": rebound_team == self.def_team,
         }
+
 
     def _calc_rebound_score(self, attr):
         return attr["RB"] * 0.5 + attr["ST"] * 0.3 + attr["AG"] * 0.2
