@@ -31,6 +31,7 @@ class Player:
             s = self.stats["game"]
             s["PTS"] = (2 * s["FGM"]) + s["3PTM"] + s["FTM"]
         elif stat in {"OREB", "DREB"}:
+            s = self.stats["game"]
             s["REB"] = s["OREB"] + s["DREB"]
 
     def decay_energy(self, amount):
