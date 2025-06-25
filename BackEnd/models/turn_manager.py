@@ -140,7 +140,9 @@ class TurnManager:
         players = self.game.game_state["players"][off_team]
 
         # Compute shot weights using attributes embedded in each player object
+        print(f"inside assign_roles playcall: {playcall}")
         weights_dict = PLAYCALL_ATTRIBUTE_WEIGHTS.get("Attack" if playcall == "Set" else playcall, {})
+        print(f"inside assign_roles weights_dict: {weights_dict}")
 
         shot_weights = {
             pos: sum(
@@ -149,6 +151,7 @@ class TurnManager:
             )
             for pos in players
         }
+        print(f"inside assign_roles shot_weights: {shot_weights}")
 
         shooter_pos = weighted_random_from_dict(shot_weights)
         print(f"inside assign_roles shooter_pos: {shooter_pos}")
