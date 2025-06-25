@@ -170,7 +170,6 @@ class GameManager:
     def to_dict(self):
         output = deepcopy(self.game_state)
         flat_box_score = []
-        team_totals = {self.home_team: {}, self.away_team: {}}
 
         for team in [self.home_team, self.away_team]:
             for pos in POSITION_LIST:
@@ -182,11 +181,20 @@ class GameManager:
                     "stats": player.stats["game"]
                 })
 
-                for stat, value in player.stats["game"].items():
-                    if stat not in team_totals[team]:
-                        team_totals[team][stat] = 0
-                    team_totals[team][stat] += value
-
         output["box_score"] = flat_box_score
-        output["team_stats"] = team_totals
+        output["team_totals"] = self.compute_team_totals()  # ✅ This line adds it
+        
         return output
+    
+    def compute_team_totals(self):
+        team_totals = {}
+
+        for team, player_dict in self.players.items():
+            totals = {}
+            for player in player_dict.values():
+                for stat, value in player.stats["game"].items():
+                    totals[stat] = totals.get(stat, 0) + value
+            team_totals[team] = totals
+
+        return team_totals
+
