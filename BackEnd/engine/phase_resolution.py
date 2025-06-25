@@ -389,7 +389,8 @@ def resolve_half_court_offense_logic(game: "GameManager") -> dict:
         game.scouting_data[def_team]["defense"][def_call]["success"] += 1
 
     if shot_result["result_type"] == "MISS":
-        return game.turn_manager.rebound_manager.handle_rebound(game, roles)
+        return game.turn_manager.rebound_manager.handle_rebound()
+
 
     return shot_result
 
