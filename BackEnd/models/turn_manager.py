@@ -151,6 +151,7 @@ class TurnManager:
         }
 
         shooter_pos = weighted_random_from_dict(shot_weights)
+        print(f"inside assign_roles shooter_pos: {shooter_pos}")
 
         # Compute screener weights (excluding the shooter)
         screen_weights = {
