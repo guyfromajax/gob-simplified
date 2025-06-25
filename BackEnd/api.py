@@ -64,6 +64,7 @@ def simulate_game():
     summary = summarize_game_state(game_state)
     print(summary)
     games_collection.insert_one(summary)
+    print("✅ team_totals preview:", game_state.get("team_totals")) 
 
     return clean_mongo_ids(summary)
 
