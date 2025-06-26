@@ -126,12 +126,14 @@ class TurnManager:
         off_team = self.game.offense_team
         def_team = self.game.defense_team
         off_lineup = self.game.offense_team.lineup
+        def_lineup = self.game.defense_team.lineup
         playcall = self.game.game_state["current_playcall"]
 
         # Compute shot weights using attributes embedded in each player object
         print(f"inside assign_roles playcall: {playcall}")
         weights_dict = PLAYCALL_ATTRIBUTE_WEIGHTS.get("Attack" if playcall == "Set" else playcall, {})
         print(f"inside assign_roles weights_dict: {weights_dict}")
+        print(f"off_lineup: {off_lineup}")
         for pos, player in off_lineup.items():
             print(f"{pos}/{get_name_safe(player)}: {player.attributes}")
 
