@@ -45,6 +45,7 @@ class TeamManager:
             "defense": random.randint(0, 4),
             "tempo": random.randint(0, 4),
             "aggression": random.randint(0, 4),
+            "fast_break": random.randint(0, 4),
             "half_court_trap": 0,
             "full_court_press": 0,
         }
