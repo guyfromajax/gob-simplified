@@ -1,8 +1,10 @@
 import random
 import json
 from BackEnd.db import players_collection, teams_collection
+from BackEnd.utils.db_utils import build_lineup_from_mongo
 from BackEnd.models.player import Player
 from BackEnd.models.game_manager import GameManager
+from BackEnd.models.turn_manager import TurnManager
 from BackEnd.constants import (
     ALL_ATTRS,
     BOX_SCORE_KEYS,
@@ -243,6 +245,11 @@ def print_scouting_report(data):
 def run_simulation(home_team_name, away_team_name):
     gm = GameManager(home_team_name, away_team_name)
 
+    gm.home_team.lineup = build_lineup_from_mongo(home_team_name)
+    gm.away_team.lineup = build_lineup_from_mongo(away_team_name)
+
+    gm.turn_manager = TurnManager(gm)  # Rebuild now that lineups are present
+
     for pos, player in gm.offense_team.lineup.items():
         print(f"[DEBUG simulate_turn] {pos} - {player.get_name()} - {player.attributes}")
     print(f"time_remaining: {gm.game_state['time_remaining']}")
@@ -250,8 +257,9 @@ def run_simulation(home_team_name, away_team_name):
     while gm.game_state["time_remaining"] > 0:
         gm.simulate_turn()
 
-    gm.compute_team_totals()  # Ensure team stats are finalized
+    gm.compute_team_totals()
     return gm
+
 
 
 
