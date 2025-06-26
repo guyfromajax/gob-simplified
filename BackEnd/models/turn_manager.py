@@ -133,10 +133,7 @@ class TurnManager:
         print(f"inside assign_roles playcall: {playcall}")
         weights_dict = PLAYCALL_ATTRIBUTE_WEIGHTS.get("Attack" if playcall == "Set" else playcall, {})
         print(f"inside assign_roles weights_dict: {weights_dict}")
-        print(f"off_lineup: {off_lineup}")
-        for pos, player in off_lineup.items():
-            print(f"{pos}/{get_name_safe(player)}: {player.attributes}")
-
+        
         shot_weights = {
             pos: sum(
                 off_lineup[pos].attributes[attr] * weight
