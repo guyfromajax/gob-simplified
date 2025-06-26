@@ -10,7 +10,8 @@ from BackEnd.utils.game_summary_builder import build_game_summary
 from BackEnd.utils.shared import clean_mongo_ids
 from pydantic import BaseModel
 from fastapi import HTTPException
-
+import pprint
+from bson.json_util import dumps
 
 
 app = FastAPI()
@@ -51,6 +52,9 @@ def summarize_game_state(game):
 def root():
     return {"message": "GOB Simulation API is live"}
 
+from bson.json_util import dumps
+import pprint
+
 @app.post("/simulate")
 def simulate_game(request: SimulationRequest):
     home_team = request.home_team
@@ -67,9 +71,18 @@ def simulate_game(request: SimulationRequest):
     game = run_simulation(home_team, away_team)
 
     summary = summarize_game_state(game)
-    print(summary)
+
+    # ✅ Debug Summary Output
+    print("🧾 Game Summary (clean dict):")
+    pprint.pprint(summary)
+
+    print("🧪 Preview JSON-safe summary:")
+    print(dumps(summary))  # BSON-safe serialization
+
+    print("✅ team_totals preview:")
+    pprint.pprint(game.team_totals)
+
     games_collection.insert_one(summary)
-    print("✅ team_totals preview:", game.team_totals)
 
     return clean_mongo_ids(summary)
 
