@@ -1,15 +1,24 @@
 import random
 from BackEnd.constants import TURNOVER_CALC_DICT, POSITION_LIST
 
-def weighted_random_from_dict(weight_dict):
+def weighted_random_from_dict(weight_dict: dict) -> str:
+    if not weight_dict:
+        raise ValueError("weighted_random_from_dict received an empty dict")
+
     total = sum(weight_dict.values())
-    roll = random.uniform(0, total)
-    upto = 0
+    if total == 0:
+        raise ValueError("All weights are zero in weighted_random_from_dict")
+
+    rand_val = random.uniform(0, total)
+    cumulative = 0
     for key, weight in weight_dict.items():
-        if upto + weight >= roll:
+        cumulative += weight
+        if rand_val <= cumulative:
             return key
-        upto += weight
-    return random.choice(list(weight_dict.keys()))  # fallback
+
+    # fallback — should never hit if weights are valid
+    return random.choice(list(weight_dict.keys()))
+
 
 def apply_help_defense_if_triggered(game, playcall, is_three, defender, shot_score):
     """
