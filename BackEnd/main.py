@@ -253,7 +253,9 @@ def run_simulation(home_team_name, away_team_name):
     while gm.game_state["time_remaining"] > 0:
         gm.simulate_turn()
 
-    gm.compute_team_totals()
+    # This still works just fine:
+    print(gm.team_totals["Lancaster"]["PTS"])
+
     return gm
 
 
