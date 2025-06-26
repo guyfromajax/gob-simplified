@@ -19,6 +19,10 @@ class GameManager:
         self.defense_team = self.away_team
 
         self.game_state = self._init_game_state()
+        self.team_totals = {  # ✅ Initialize safely and predictably
+            home_team_name: {},
+            away_team_name: {}
+        }
 
         self.turn_manager = TurnManager(self)
         self.shot_manager = ShotManager(self)
@@ -79,8 +83,6 @@ class GameManager:
             for team in [self.home_team, self.away_team]
         }
 
-
-
     def to_dict(self):
         output = deepcopy(self.game_state)
         flat_box_score = []
@@ -121,6 +123,15 @@ class GameManager:
     @property
     def away_team_name(self):
         return self.away_team.name
+    
+    def compute_team_totals(self):
+        home_stats = self.home_team.get_team_game_stats()
+        away_stats = self.away_team.get_team_game_stats()
+        self.team_totals = {
+            self.home_team.name: home_stats,
+            self.away_team.name: away_stats
+    }
+
 
 
 
