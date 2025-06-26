@@ -130,7 +130,7 @@ class TeamManager:
             "F": 0,
         }
 
-        for player in self.players:
+        for player in self.lineup.values():
             stats = player.stats["game"]
             for key in team_stats:
                 team_stats[key] += stats.get(key, 0)
