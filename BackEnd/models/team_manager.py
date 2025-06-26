@@ -111,3 +111,30 @@ class TeamManager:
     def get_full_roster(self):
         return self.players
 
+    def get_team_game_stats(self):
+        team_stats = {
+            "PTS": 0,
+            "FGM": 0,
+            "FGA": 0,
+            "3PTM": 0,
+            "3PTA": 0,
+            "FTM": 0,
+            "FTA": 0,
+            "OREB": 0,
+            "DREB": 0,
+            "REB": 0,
+            "AST": 0,
+            "STL": 0,
+            "BLK": 0,
+            "TO": 0,
+            "F": 0,
+        }
+
+        for player in self.players:
+            stats = player.stats["game"]
+            for key in team_stats:
+                team_stats[key] += stats.get(key, 0)
+
+        team_stats["REB"] = team_stats["OREB"] + team_stats["DREB"]
+        return team_stats
+
