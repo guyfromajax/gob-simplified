@@ -70,9 +70,11 @@ def simulate_game(request: SimulationRequest):
 
     game = run_simulation(home_team, away_team)
 
-    summary = summarize_game_state(game)
+    print("✅ All turns completed. Finalizing...")
 
-    # ✅ Debug Summary Output
+    summary = summarize_game_state(game)
+    print("✅ Summary created.")
+
     print("🧾 Game Summary (clean dict):")
     pprint.pprint(summary)
 
@@ -83,8 +85,11 @@ def simulate_game(request: SimulationRequest):
     pprint.pprint(game.team_totals)
 
     games_collection.insert_one(summary)
+    print("✅ Inserted into MongoDB.")
 
+    print("✅ Returning cleaned summary.")
     return clean_mongo_ids(summary)
+
 
 @app.get("/games")
 def get_games():
