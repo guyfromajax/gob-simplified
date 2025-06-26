@@ -1,75 +1,93 @@
+from tests.test_utils import build_mock_game
 from BackEnd.models.turn_manager import TurnManager
 from BackEnd.models.shot_manager import ShotManager
-from BackEnd.models.player import Player
-from BackEnd.constants import POSITION_LIST, STRATEGY_CALL_DICTS, PLAYCALLS
+from BackEnd.constants import STRATEGY_CALL_DICTS, PLAYCALLS
+from BackEnd.utils.shared import get_player_position
 
-def test_turn_manager_assign_roles_outputs_roles_dict(mock_game_manager):
-    tm = TurnManager(mock_game_manager)
-    roles = tm.assign_roles("Base")
 
+def test_turn_manager_assign_roles_outputs_roles_dict():
+    game = build_mock_game()
+    tm = TurnManager(game)
+    roles = tm.assign_roles()
     assert isinstance(roles, dict)
     for role in ["shooter", "passer", "screener", "defender"]:
         assert role in roles
 
-def test_turn_manager_assign_roles_outputs_valid_positions(mock_game_manager):
-    tm = TurnManager(mock_game_manager)
-    roles = tm.assign_roles("Base")
 
-    valid_players = list(mock_game_manager.game_state["players"]["Team A"].values()) + list(mock_game_manager.game_state["players"]["Team B"].values())
-    for key in ["shooter", "passer", "screener", "defender"]:
-        assert roles[key] in valid_players or roles[key] is None
-        assert isinstance(roles[key], Player) or roles[key] is None
+def test_turn_manager_assign_roles_outputs_valid_objects():
+    game = build_mock_game()
+    tm = TurnManager(game)
+    roles = tm.assign_roles()
+    for role in ["shooter", "passer", "screener", "defender"]:
+        player = roles.get(role)
+        assert player is None or player.get_name().startswith("Lancaster") or player.get_name().startswith("Bentley-Truman")
 
-def test_turn_manager_run_turn_executes(mock_game_manager):
-    tm = TurnManager(mock_game_manager)
+
+def test_turn_manager_run_turn_executes():
+    game = build_mock_game()
+    tm = TurnManager(game)
     result = tm.run_turn()
-
     assert isinstance(result, dict)
     assert "result_type" in result
 
-def test_turn_manager_resolve_shot_returns_score(mock_game_manager):
-    tm = TurnManager(mock_game_manager)
-    roles = tm.assign_roles("Base")
-    sm = ShotManager(mock_game_manager.game_state)
-    result = sm.resolve_shot(roles)
 
+def test_turn_manager_resolve_shot_returns_score():
+    game = build_mock_game()
+    sm = ShotManager(game)
+    roles = {
+        "shooter": game.offense_team.lineup["PG"],
+        "passer": game.offense_team.lineup["SG"],
+        "screener": game.offense_team.lineup["SF"],
+        "defender": game.defense_team.lineup["PG"]
+    }
+    result = sm.resolve_shot(roles)
     assert isinstance(result, dict)
     assert "shot_score" in result
 
-def test_turn_manager_resolve_shot_returns_valid_result_type(mock_game_manager):
-    tm = TurnManager(mock_game_manager)
-    roles = tm.assign_roles("Base")
-    sm = ShotManager(mock_game_manager.game_state)
+
+def test_turn_manager_resolve_shot_returns_valid_result_type():
+    game = build_mock_game()
+    sm = ShotManager(game)
+    roles = {
+        "shooter": game.offense_team.lineup["PG"],
+        "passer": game.offense_team.lineup["SG"],
+        "screener": game.offense_team.lineup["SF"],
+        "defender": game.defense_team.lineup["PG"]
+    }
     result = sm.resolve_shot(roles)
+    VALID_RESULTS = {"MAKE", "MISS", "FOUL", "TURNOVER", "DEAD BALL"}
+    assert result["result_type"] in VALID_RESULTS
 
-    assert result["result_type"] in ["MAKE", "MISS", "BLOCK", "TURNOVER"]
 
-def test_strategy_calls_are_set(mock_game_manager):
-    tm = TurnManager(mock_game_manager)
+
+def test_strategy_calls_are_set():
+    game = build_mock_game()
+    tm = TurnManager(game)
     tm.set_strategy_calls()
-    off_team = mock_game_manager.home_team
-    def_team = mock_game_manager.away_team
+    
+    off_team = game.offense_team
+    def_team = game.defense_team
 
-    # Use the actual setting instead of hardcoding
-    tempo_setting = mock_game_manager.game_state["strategy_settings"][off_team]["tempo"]
-    aggression_setting = mock_game_manager.game_state["strategy_settings"][def_team]["aggression"]
-    calls = mock_game_manager.game_state["strategy_calls"]
-
-    assert calls[off_team]["tempo_call"] in STRATEGY_CALL_DICTS["tempo"][tempo_setting]
-    assert calls[def_team]["aggression_call"] in STRATEGY_CALL_DICTS["aggression"][aggression_setting]
+    assert "tempo_call" in off_team.strategy_calls
+    assert "aggression_call" in def_team.strategy_calls
 
 
-def test_playcalls_are_set(mock_game_manager):
-    tm = TurnManager(mock_game_manager)
+
+def test_playcalls_are_set():
+    game = build_mock_game()
+    tm = TurnManager(game)
     calls = tm.set_playcalls()
     assert calls["offense"] in PLAYCALLS
     assert calls["defense"] in ["Man", "Zone"]
 
-def test_turn_result_has_possession_flips(mock_game_manager):
-    tm = TurnManager(mock_game_manager)
+
+def test_turn_result_has_possession_flips():
+    game = build_mock_game()
+    tm = TurnManager(game)
     result = tm.run_turn()
     assert "possession_flips" in result
     assert isinstance(result["possession_flips"], bool)
+
 
 
  

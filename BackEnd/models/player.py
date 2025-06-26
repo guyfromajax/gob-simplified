@@ -10,6 +10,11 @@ class Player:
         self.team = data.get("team")
         self.attributes = self._extract_attributes(data)
         self.stats = self._init_stats()
+        self.metadata = {
+            "fouls": 0,
+            "minutes_played": 0,
+            "abilities": data.get("abilities", [])
+        }
 
     def _extract_attributes(self, data):
         attrs = {k: data.get(k, 0) for k in ALL_ATTRS}
@@ -56,4 +61,25 @@ class Player:
 
     def __repr__(self):
         return self.get_name()
+    
+    def reset_stats(self):
+        self.stats["game"] = {stat: 0 for stat in BOX_SCORE_KEYS}
+
+    def get_stat(self, stat, level="game"):
+        return self.stats.get(level, {}).get(stat, 0)
+    
+    def has_ability(self, ability_name):
+        return ability_name in self.metadata["abilities"]
+
+    def get_ability(self, ability_name):
+        return self.metadata["abilities"].get(ability_name)
+
+    def get_all_abilities(self):
+        return self.metadata["abilities"]
+
+    
+    
+
+
+
 

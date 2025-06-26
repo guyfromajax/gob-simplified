@@ -8,6 +8,9 @@ from BackEnd.main import run_simulation
 from BackEnd.db import players_collection, teams_collection, games_collection
 from BackEnd.utils.game_summary_builder import build_game_summary
 from BackEnd.utils.shared import clean_mongo_ids
+from pydantic import BaseModel
+from fastapi import HTTPException
+
 
 
 app = FastAPI()
@@ -21,15 +24,27 @@ app.add_middleware(
     expose_headers=["*"]  # ← add this line
 )
 
-# 3. Utility Functions (like summarize_game_state)
-def summarize_game_state(game_state):
+class SimulationRequest(BaseModel):
+    home_team: str
+    away_team: str
+
+
+def summarize_game_state(game):
     return {
-        "final_score": game_state["score"],
-        "points_by_quarter": game_state["points_by_quarter"],
-        "box_score": game_state["box_score"],
-        "scouting": game_state["scouting_data"],
-        "team_totals": game_state.get("team_totals", {})
+        "final_score": game.score,
+        "points_by_quarter": game.game_state["points_by_quarter"],
+        "box_score": game.game_state["box_score"],
+
+        "scouting": {
+            game.home_team.name: game.home_team.scouting_data,
+            game.away_team.name: game.away_team.scouting_data
+        },
+        "team_totals": {
+            game.home_team.name: game.home_team.stats,
+            game.away_team.name: game.away_team.stats
+        }
     }
+
 
 # 4. Routes
 @app.get("/")
@@ -37,35 +52,24 @@ def root():
     return {"message": "GOB Simulation API is live"}
 
 @app.post("/simulate")
-def simulate_game():
-    # print("🧪 Team docs in DB:")
-    # for team in teams_collection.find({}):
-    #     print(team)
-    # print("Incoming game_state:", game_state.keys())
+def simulate_game(request: SimulationRequest):
+    home_team = request.home_team
+    away_team = request.away_team
 
+    known_teams = [team["name"] for team in teams_collection.find({}, {"name": 1})]
 
-    home_team = "Lancaster"
-    away_team = "Bentley-Truman"
+    if home_team not in known_teams:
+        raise HTTPException(status_code=400, detail=f"Unknown home_team: '{home_team}'")
 
-    # Get teams
-    home_team_doc = teams_collection.find_one({"name": home_team})
-    away_team_doc = teams_collection.find_one({"name": away_team})
+    if away_team not in known_teams:
+        raise HTTPException(status_code=400, detail=f"Unknown away_team: '{away_team}'")
 
-    # Get top 5 players by ID (assumes player_ids list is present)
-    home_player_docs = [players_collection.find_one({"_id": pid}) for pid in home_team_doc["player_ids"][:5]]
-    away_player_docs = [players_collection.find_one({"_id": pid}) for pid in away_team_doc["player_ids"][:5]]
+    game = run_simulation(home_team, away_team)
 
-    # Build positionally assigned dicts
-    home_players = {pos: player for pos, player in zip(POSITION_LIST, home_player_docs)}
-    away_players = {pos: player for pos, player in zip(POSITION_LIST, away_player_docs)}
-
-    game_state = run_simulation(home_team, away_team, home_players, away_players)
-
-    # 5. Summarize & persist
-    summary = summarize_game_state(game_state)
+    summary = summarize_game_state(game)
     print(summary)
     games_collection.insert_one(summary)
-    print("✅ team_totals preview:", game_state.get("team_totals")) 
+    print("✅ team_totals preview:", game.team_totals)
 
     return clean_mongo_ids(summary)
 

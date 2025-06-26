@@ -1,34 +1,42 @@
+from tests.test_utils import build_mock_game
 from BackEnd.models.game_manager import GameManager
-from BackEnd.models.player import Player
-import pytest  # for exception testing or parameterized testing
-from copy import deepcopy  # for cloning mock input states
+
+
+def test_game_manager_simulate_turn_runs():
+    gm = build_mock_game()
+    print("DEBUG: type(gm) =", type(gm))
+    gm.simulate_turn()
 
 
 def test_game_manager_initializes_teams_correctly():
-    gm = GameManager("Team A", "Team B", {}, {})
-    assert gm.home_team == "Team A"
-    assert gm.away_team == "Team B"
+    gm = GameManager("Lancaster", "Bentley-Truman")
+    assert gm.home_team.name == "Lancaster"
+    assert gm.away_team.name == "Bentley-Truman"
 
-def test_game_manager_creates_player_objects():
-    mock_player_data = {"first_name": "John", "last_name": "Doe"}
-    home_players = {"PG": mock_player_data}
-    gm = GameManager("Team A", "Team B", home_players, {})
-    assert isinstance(gm.players["Team A"]["PG"], Player)
-    assert gm.players["Team A"]["PG"].get_name() == "John Doe"
+
+def test_game_manager_has_lineups():
+    gm = build_mock_game()
+    assert len(gm.home_team.lineup) == 5
+    assert len(gm.away_team.lineup) == 5
+    assert "PG" in gm.home_team.lineup
+    assert gm.home_team.lineup["PG"].get_name().startswith("Lancaster")
+
 
 def test_game_manager_box_score_structure():
-    mock_player_data = {"first_name": "John", "last_name": "Doe"}
-    home_players = {"PG": mock_player_data}
-    gm = GameManager("Team A", "Team B", home_players, {})
+    gm = build_mock_game()
+    player = gm.home_team.lineup["PG"]
+    player.record_stat("FGM", 1)
+    player.record_stat("3PTM", 1)
+    player.record_stat("FTM", 1)
+
     box_score = gm.get_box_score()
-    assert "Team A" in box_score
-    assert "PG" in box_score["Team A"]
-    assert isinstance(box_score["Team A"]["PG"], dict)
-    assert "PTS" in box_score["Team A"]["PG"]
+    stats = box_score["Lancaster"]["PG"]
+
+    assert "PTS" in stats
+    assert stats["PTS"] == 2 + 1 + 1
+
+
 
 def test_game_manager_simulate_turn_runs():
-    mock_player_data = {"first_name": "John", "last_name": "Doe"}
-    players = {pos: mock_player_data for pos in ["PG", "SG", "SF", "PF", "C"]}
-    gm = GameManager("Team A", "Team B", players, players)
+    gm = build_mock_game()
     gm.simulate_turn()  # Should not raise
-
