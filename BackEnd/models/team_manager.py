@@ -54,10 +54,18 @@ class TeamManager:
 
     def _init_team_attributes(self):
         return {
-            "rebound_modifier": 0.0,
-            "turnover_threshold": 10,
-            "foul_threshold": 10,
-            # Add others as needed
+            "shot_threshold": random.randint(150, 250),
+            "ft_shot_threshold": random.randint(150, 250),
+            "turnover_threshold": random.randint(-250, -150),
+            "foul_threshold": random.randint(40, 90),
+            "rebound_modifier": random.choice([0.8, 0.9, 1.0, 1.1, 1.2]),
+            "momentum_score": random.randint(0,20),
+            "momentum_delta": random.choice([1,2,3,4,5]),
+            "offensive_efficienty": random.randint(1,10),
+            "offensive_adjust": random.randint(1,10),
+            "o_tendency_reads": random.randint(1,10),
+            "d_tendency_reads": random.randint(1,10),
+            "team_chemistry": random.randint(7,25)
         }
 
     def _init_scouting_data(self):
