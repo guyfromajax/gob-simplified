@@ -243,6 +243,10 @@ def print_scouting_report(data):
 def run_simulation(home_team_name, away_team_name):
     gm = GameManager(home_team_name, away_team_name)
 
+    for pos, player in gm.offense_team.lineup.items():
+        print(f"[DEBUG simulate_turn] {pos} - {player.get_name()} - {player.attributes}")
+    print(f"time_remaining: {gm.game_state['time_remaining']}")
+
     while gm.game_state["time_remaining"] > 0:
         gm.simulate_turn()
 
