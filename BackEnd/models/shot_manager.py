@@ -128,6 +128,7 @@ class ShotManager:
             if screener:
                 screener.record_stat("SCR_S")
         else:
+            #apply determine_rebounder logic here
             text = f"{get_name_safe(shooter)} misses the {'3' if is_three else 'shot'}."
             if defender:
                 defender.record_stat("DEF_S")

@@ -149,7 +149,7 @@ def resolve_offensive_rebound_loop(game, rebounder):
 
         # shot missed — determine rebound
         new_rebounder, new_team, new_stat = determine_rebounder(game)
-        new_rebounder.record_stat(new_stat)
+        # new_rebounder.record_stat(new_stat)
         text_log += f" but misses the shot. {new_rebounder} grabs the rebound."
 
         if new_team != off_team:
