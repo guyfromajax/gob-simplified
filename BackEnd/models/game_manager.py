@@ -19,10 +19,6 @@ class GameManager:
         self.defense_team = self.away_team
 
         self.game_state = self._init_game_state()
-        self.team_totals = {  # ✅ Initialize safely and predictably
-            home_team_name: {},
-            away_team_name: {}
-        }
 
         self.turn_manager = TurnManager(self)
         self.shot_manager = ShotManager(self)
@@ -69,8 +65,6 @@ class GameManager:
         self.game_state["current_playcall"] = ""
         self.game_state["defense_playcall"] = ""
 
-
-
     def get_box_score(self):
         return {
             team.name: {
@@ -103,19 +97,6 @@ class GameManager:
 
         return output
 
-    
-    def compute_team_totals(self):
-        home_stats = self.home_team.get_team_game_stats()
-        away_stats = self.away_team.get_team_game_stats()
-
-        self.home_team.stats = home_stats
-        self.away_team.stats = away_stats
-
-        return {
-            self.home_team.name: home_stats,
-            self.away_team.name: away_stats
-        }
-
     @property
     def home_team_name(self):
         return self.home_team.name
@@ -124,13 +105,13 @@ class GameManager:
     def away_team_name(self):
         return self.away_team.name
     
-    def compute_team_totals(self):
-        home_stats = self.home_team.get_team_game_stats()
-        away_stats = self.away_team.get_team_game_stats()
-        self.team_totals = {
-            self.home_team.name: home_stats,
-            self.away_team.name: away_stats
-    }
+    @property
+    def team_totals(self):
+        return {
+            self.home_team.name: self.home_team.get_team_game_stats(),
+            self.away_team.name: self.away_team.get_team_game_stats()
+        }
+
 
 
 

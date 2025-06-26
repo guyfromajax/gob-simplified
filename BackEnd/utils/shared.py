@@ -311,3 +311,14 @@ def unpack_game_context(game):
         game.defense_team.lineup,
     )
 
+def summarize_game_state(game):
+    return {
+        "final_score": game.score,
+        "points_by_quarter": game.game_state["points_by_quarter"],
+        "box_score": game.get_box_score(),
+        "scouting": {
+            game.home_team.name: game.home_team.scouting_data,
+            game.away_team.name: game.away_team.scouting_data
+        },
+        "team_totals": game.team_totals
+    }

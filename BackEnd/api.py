@@ -7,7 +7,7 @@ import uuid
 from BackEnd.main import run_simulation
 from BackEnd.db import players_collection, teams_collection, games_collection
 from BackEnd.utils.game_summary_builder import build_game_summary
-from BackEnd.utils.shared import clean_mongo_ids
+from BackEnd.utils.shared import clean_mongo_ids, summarize_game_state
 from pydantic import BaseModel
 from fastapi import HTTPException
 import pprint
@@ -29,31 +29,11 @@ class SimulationRequest(BaseModel):
     home_team: str
     away_team: str
 
-
-def summarize_game_state(game):
-    return {
-        "final_score": game.score,
-        "points_by_quarter": game.game_state["points_by_quarter"],
-        "box_score": game.game_state["box_score"],
-
-        "scouting": {
-            game.home_team.name: game.home_team.scouting_data,
-            game.away_team.name: game.away_team.scouting_data
-        },
-        "team_totals": {
-            game.home_team.name: game.home_team.stats,
-            game.away_team.name: game.away_team.stats
-        }
-    }
-
-
 # 4. Routes
 @app.get("/")
 def root():
     return {"message": "GOB Simulation API is live"}
 
-from bson.json_util import dumps
-import pprint
 
 @app.post("/simulate")
 def simulate_game(request: SimulationRequest):
@@ -64,32 +44,19 @@ def simulate_game(request: SimulationRequest):
 
     if home_team not in known_teams:
         raise HTTPException(status_code=400, detail=f"Unknown home_team: '{home_team}'")
-
     if away_team not in known_teams:
         raise HTTPException(status_code=400, detail=f"Unknown away_team: '{away_team}'")
 
     game = run_simulation(home_team, away_team)
-
-    print("✅ All turns completed. Finalizing...")
-
     summary = summarize_game_state(game)
-    print("✅ Summary created.")
 
-    print("🧾 Game Summary (clean dict):")
-    pprint.pprint(summary)
-
-    print("🧪 Preview JSON-safe summary:")
-    print(dumps(summary))  # BSON-safe serialization
-
-    print("✅ team_totals preview:")
-    pprint.pprint(game.team_totals)
+    # ✅ Minimal debug visibility
+    print(f"✅ Game finished: {home_team} vs. {away_team}")
+    print(f"🏀 Final Score: {game.score}")
+    print(f"📊 Team Totals: {game.team_totals}")
 
     games_collection.insert_one(summary)
-    print("✅ Inserted into MongoDB.")
-
-    print("✅ Returning cleaned summary.")
     return clean_mongo_ids(summary)
-
 
 @app.get("/games")
 def get_games():
