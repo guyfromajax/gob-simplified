@@ -339,8 +339,6 @@ def resolve_turnover_logic(roles, game, turnover_type="DEAD BALL"):
     }
 
 def resolve_half_court_offense_logic(game: "GameManager") -> dict:
-    
-    print("🚨 DEBUG type of game in resolve_half_court_offense_logic:", type(game))
 
     game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
     off_call = game_state["current_playcall"]
