@@ -29,11 +29,8 @@ class TurnManager:
     def __init__(self, game_manager: "GameManager"):
         self.game = game_manager
         self.logger = Logger()
-        self.rebound_manager = ReboundManager(self.game.game_state)
-        self.playbook_manager = PlaybookManager(
-            self.game.scouting_data, 
-            self.game.game_state["offense_team"]
-        )
+        self.rebound_manager = ReboundManager(self.game)
+        self.playbook_manager = PlaybookManager(self.game.offense_team)
         self.animator = AnimationManager()
 
     def run_turn(self):
@@ -66,39 +63,30 @@ class TurnManager:
         return result
 
 
-    def set_playcalls(self):    
-        off_team = self.game.game_state["offense_team"]
-        def_team = self.game.game_state["defense_team"]
+    def set_playcalls(self):
 
-        # OFFENSIVE PLAYCALL
-        off_weights = self.game.game_state["playcall_weights"][off_team]
-        chosen_playcall = weighted_random_from_dict(off_weights)
-
-        # DEFENSIVE PLAYCALL
-        def_setting = self.game.game_state["strategy_settings"][def_team]["defense"]
-        defense_options = STRATEGY_CALL_DICTS["defense"].get(def_setting, ["Man"])
-        chosen_defense = random.choice(defense_options)
+        chosen_playcall = weighted_random_from_dict(self.game.offense_team.playcall_weights)
+        defense_setting = self.game.defense_team.strategy_settings["defense"]
+        chosen_defense = random.choice(STRATEGY_CALL_DICTS["defense"][defense_setting])
 
         # Track usage
-        self.game.game_state["playcall_tracker"][off_team][chosen_playcall] += 1
-        self.game.game_state["defense_playcall_tracker"][def_team][chosen_defense] += 1
+        self.game.offense_team.playcall_tracker[chosen_playcall] += 1
+        self.game.defense_team.defense_playcall_tracker[chosen_defense] += 1
 
         return {
             "offense": chosen_playcall,
             "defense": chosen_defense
         }
 
-    # Inside TurnManager class
+
     def set_strategy_calls(self):
-        game_state = self.game.game_state
-        off_team = game_state["offense_team"]
-        def_team = game_state["defense_team"]
 
-        tempo_setting = game_state["strategy_settings"][off_team]["tempo"]
-        aggression_setting = game_state["strategy_settings"][def_team]["aggression"]
+        tempo_setting = self.game.offense_team.strategy_settings["tempo"]
+        aggression_setting = self.game.defense_team.strategy_settings["aggression"]
 
-        game_state["strategy_calls"][off_team]["tempo_call"] = random.choice(STRATEGY_CALL_DICTS["tempo"][tempo_setting])
-        game_state["strategy_calls"][def_team]["aggression_call"] = random.choice(STRATEGY_CALL_DICTS["aggression"][aggression_setting])
+        self.game.offense_team.strategy_calls["tempo_call"] = random.choice(STRATEGY_CALL_DICTS["tempo"][tempo_setting])
+        self.game.defense_team.strategy_calls["aggression_call"] = random.choice(STRATEGY_CALL_DICTS["aggression"][aggression_setting])
+
 
     
     def resolve_half_court_offense(self):
@@ -131,13 +119,13 @@ class TurnManager:
 
         # 🔁 Flip possession if flagged
         if result.get("possession_flips"):
-            self.game._switch_possession()
+            self.game.switch_possession()
 
     def assign_roles(self):
         
-        off_team = self.game.game_state["offense_team"]
-        def_team = self.game.game_state["defense_team"]
-        players = self.game.game_state["players"][off_team]
+        off_team = self.game.offense_team
+        def_team = self.game.defense_team
+        off_lineup = self.game.offense_team.lineup
         playcall = self.game.game_state["current_playcall"]
 
         # Compute shot weights using attributes embedded in each player object
@@ -147,10 +135,10 @@ class TurnManager:
 
         shot_weights = {
             pos: sum(
-                players[pos].attributes[attr] * weight
+                off_lineup[pos].attributes[attr] * weight
                 for attr, weight in weights_dict.items()
             )
-            for pos in players
+            for pos in off_lineup
         }
         print(f"inside assign_roles shot_weights: {shot_weights}")
 
@@ -160,12 +148,12 @@ class TurnManager:
         # Compute screener weights (excluding the shooter)
         screen_weights = {
             pos: (
-                players[pos].attributes["ST"] * 6 +
-                players[pos].attributes["AG"] * 2 +
-                players[pos].attributes["IQ"] * 1 +
-                players[pos].attributes["CH"] * 1
+                off_lineup[pos].attributes["ST"] * 6 +
+                off_lineup[pos].attributes["AG"] * 2 +
+                off_lineup[pos].attributes["IQ"] * 1 +
+                off_lineup[pos].attributes["CH"] * 1
             )
-            for pos in players if pos != shooter_pos
+            for pos in off_lineup if pos != shooter_pos
         }
 
         screener_pos = max(screen_weights, key=screen_weights.get)
@@ -173,7 +161,8 @@ class TurnManager:
             screener_pos = ""
 
         # Pass chain and passer
-        pass_chain = generate_pass_chain(self.game.game_state, shooter_pos)
+        pass_chain = generate_pass_chain(self.game, shooter_pos)
+
         passer_pos = pass_chain[-2] if len(pass_chain) >= 2 else ""
         if passer_pos == shooter_pos or passer_pos == screener_pos:
             passer_pos = ""
@@ -183,10 +172,10 @@ class TurnManager:
         else:
             defender_pos = shooter_pos
 
-        shooter = self.game.game_state["players"][off_team][shooter_pos]
-        screener = self.game.game_state["players"][off_team][screener_pos]
-        passer = self.game.game_state["players"][off_team][passer_pos] if passer_pos else None
-        defender = self.game.game_state["players"][def_team][defender_pos]
+        shooter = self.game.offense_team.lineup[shooter_pos]
+        screener = self.game.offense_team.lineup[screener_pos]
+        passer = self.game.offense_team.lineup[passer_pos] if passer_pos else None
+        defender = self.game.defense_team.lineup[defender_pos]
 
         print("end of assign_roles")
         print(f"shooter: {get_name_safe(shooter)}")
@@ -207,16 +196,16 @@ class TurnManager:
     def determine_event_type(self, roles):
         game_state = self.game.game_state
         # Base weights (can be tuned later)
-        off_team = game_state["offense_team"]
-        def_team = game_state["defense_team"]
-        thresholds = get_team_thresholds(game_state)
-        tempo_call = game_state["strategy_calls"][off_team]["tempo_call"]
+        off_team = self.game.offense_team
+        def_team = self.game.defense_team
+        thresholds = get_team_thresholds(self.game)
+        tempo_call = self.game.offense_team.strategy_calls["tempo_call"]
         pass_count = TEMPO_PASS_DICT[tempo_call]
         positions = get_random_positions(pass_count)
-        event_type = calculate_foul_turnover(game_state, positions, thresholds, roles)
+        event_type = calculate_foul_turnover(self.game, positions, thresholds, roles)
     
         #determine number of turnover RNGs based on defense team'saggression
-        for pos, player_obj in game_state["players"][off_team].items():
+        for pos, player_obj in self.game.offense_team.lineup.items():
             attr = player_obj.attributes
             ng = attr["NG"]
             for key in MALLEABLE_ATTRS:

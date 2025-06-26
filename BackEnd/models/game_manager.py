@@ -1,126 +1,43 @@
 from BackEnd.models.player import Player
 from BackEnd.models.turn_manager import TurnManager
 from BackEnd.models.shot_manager import ShotManager
+from BackEnd.models.team_manager import TeamManager
+
 from BackEnd.constants import POSITION_LIST, PLAYCALLS
 from copy import deepcopy
 import random
 
 class GameManager:
-    def __init__(self, home_team, away_team, home_players, away_players):
-        self.home_team = home_team
-        self.away_team = away_team
-        self.scouting_data = self.initialize_scouting_data(home_team, away_team)
-        self.playcall_settings = self.initialize_playcall_settings(home_team, away_team)
-        self.strategy_settings = self.initialize_strategy_settings(home_team, away_team)
-        self.team_attributes = self.initialize_team_attributes(home_team, away_team)
+    def __init__(self, home_team_name, away_team_name):
+        self.home_team = TeamManager(home_team_name)
+        self.away_team = TeamManager(away_team_name)
 
-        self.players = {
-            home_team: {pos: Player(p) for pos, p in home_players.items()},
-            away_team: {pos: Player(p) for pos, p in away_players.items()}
-        }
-
-        self.score = {home_team: 0, away_team: 0}
-        self.points_by_quarter = {home_team: [0, 0, 0, 0], away_team: [0, 0, 0, 0]}
+        self.score = {home_team_name: 0, away_team_name: 0}
         self.quarter = 1
         self.turns = []
-        self.offense_team = home_team
-        self.defense_team = away_team
+        self.offense_team = self.home_team #vary based on opening tip
+        self.defense_team = self.away_team
 
         self.game_state = self._init_game_state()
 
         self.turn_manager = TurnManager(self)
-        self.shot_manager = ShotManager(self.game_state)
+        self.shot_manager = ShotManager(self)
 
-    @staticmethod
-    def initialize_team_attributes(home_team, away_team):
-        settings = {}
-        for team in [home_team, away_team]:
-            settings[team] = {
-                "shot_threshold": random.randint(150, 250),
-                "ft_shot_threshold": random.randint(150, 250),
-                "turnover_threshold": random.randint(-250, -150),
-                "foul_threshold": random.randint(40, 90),
-                "rebound_modifier": random.choice([0.8, 0.9, 1.0, 1.1, 1.2]),
-                "momentum_score": random.randint(0, 20),
-                "momentum_delta": random.choice([1, 2, 3, 4, 5]),
-                "offensive_efficiency": random.randint(1, 10),
-                "offensive_adjust": random.randint(1, 10),
-                "o_tendency_reads": random.randint(1, 10),
-                "d_tendency_reads": random.randint(1, 10),
-                "team_chemistry": random.randint(7, 25),
-            }
-        return settings
-    
-    @staticmethod
-    def initialize_strategy_calls(home_team, away_team):
-        calls = ["offense_playcall", "defense_playcall", "tempo_call", "aggression_call"]
-        settings = {
-            home_team: {call: "" for call in calls},
-            away_team: {call: "" for call in calls},
-        }
-        return settings
-
-    @staticmethod
-    def initialize_strategy_settings(home_team, away_team):
-        strategies = ["defense", "tempo", "aggression", "fast_break"]
-        settings = {}
-
-        for team in [home_team, away_team]:
-            team_settings = {s: random.randint(0, 4) for s in strategies}
-            team_settings["half_court_trap"] = 0
-            team_settings["full_court_press"] = 0
-            settings[team] = team_settings
-
-        return settings
-    
-    @staticmethod
-    def initialize_playcall_settings(home_team, away_team):
-        playcalls = ["Base", "Freelance", "Inside", "Attack", "Outside", "Set"]
-        settings = {}
-        for team in [home_team, away_team]:
-            settings[team] = {call: random.randint(1, 4) for call in playcalls}
-        return settings
-    
-    @staticmethod
-    def initialize_scouting_data(home_team, away_team):
-        playcalls = ["Base", "Freelance", "Inside", "Attack", "Outside", "Set"]
-
-        return {
-            team: {
-                "offense": {
-                    "Fast_Break_Entries": 0,
-                    "Fast_Break_Success": 0,
-                    "Playcalls": {call: {"used": 0, "success": 0} for call in playcalls},
-                },
-                "defense": {
-                    "Man": {"used": 0, "success": 0},
-                    "Zone": {"used": 0, "success": 0},
-                    "vs_Fast_Break": {"used": 0, "success": 0},
-                }
-            }
-            for team in [home_team, away_team]
-        }
     
     def _init_game_state(self):
         return {
-            "players": self.players,
-            "offense_team": self.offense_team,
-            "defense_team": self.defense_team,
+            "offense_team": self.offense_team.name,
+            "defense_team": self.defense_team.name,
             "score": self.score,
-            "points_by_quarter": self.points_by_quarter,
+            "points_by_quarter": {
+                self.home_team.name: self.home_team.points_by_quarter,
+                self.away_team.name: self.away_team.points_by_quarter
+            },
             "quarter": self.quarter,
-            "time_remaining": 480,  # total seconds left in the quarter
-            "clock": "8:00",        # readable display version (for frontend)
+            "time_remaining": 480,
+            "clock": "8:00",
             "time_elapsed": 0,
             "turns": self.turns,
-            "scouting_data": self.scouting_data,
-            "strategy_calls": self.initialize_strategy_calls(self.home_team, self.away_team),
-            "strategy_settings": self.strategy_settings,
-            "playcall_settings": self.playcall_settings,
-            "team_attributes": self.team_attributes,
-            "playcall_weights": self.playcall_settings,
-            "playcall_tracker": {self.home_team: {pc: 0 for pc in PLAYCALLS}, self.away_team: {pc: 0 for pc in PLAYCALLS}},
-            "defense_playcall_tracker": {self.home_team: {"Man": 0, "Zone": 0}, self.away_team: {"Man": 0, "Zone": 0}},
             "current_playcall": "Outside",
             "defense_playcall": "Zone",
             "offensive_state": {
@@ -128,43 +45,40 @@ class GameManager:
                 "initial_possession_player": None
             },
             "box_score": {
-                self.home_team: {},
-                self.away_team: {}
-            },
-            "team_fouls": {
-                self.home_team: 0,
-                self.away_team: 0
+                self.home_team.name: {},
+                self.away_team.name: {}
             }
         }
+
 
     def simulate_turn(self):
         print("Starting new turn")
         print(f"offense_team: {self.offense_team}")
         result = self.turn_manager.run_turn()
         self.turns.append(result)
-        # self._switch_possession()
         return result
 
-    def _switch_possession(self):
+    def switch_possession(self):
         self.offense_team, self.defense_team = self.defense_team, self.offense_team
-
-        # Sync game_state to match
-        self.game_state["offense_team"] = self.offense_team
-        self.game_state["defense_team"] = self.defense_team
-
-        # Reset possession-specific state if needed
-        # self.game_state["offensive_state"] = "HALF_COURT"
+        self.game_state["offense_team"] = self.offense_team.name
+        self.game_state["defense_team"] = self.defense_team.name
         self.game_state["current_playcall"] = ""
         self.game_state["defense_playcall"] = ""
 
 
+
     def get_box_score(self):
         return {
-            team: {
+            team.name: {
                 pos: {
-                    "name": player.name, **player.stats["game"]} 
-                    for pos, player in self.players[team].items()}
-            for team in [self.home_team, self.away_team]}
+                    "name": player.get_name(),
+                    **player.stats["game"]
+                }
+                for pos, player in team.lineup.items()
+            }
+            for team in [self.home_team, self.away_team]
+        }
+
 
 
     def to_dict(self):
@@ -172,29 +86,41 @@ class GameManager:
         flat_box_score = []
 
         for team in [self.home_team, self.away_team]:
-            for pos in POSITION_LIST:
-                player = self.players[team][pos]
+            for player in team.players:
                 flat_box_score.append({
-                    "team": team,
-                    "position": pos,
+                    "team": team.name,
                     "name": player.get_name(),
                     "stats": player.stats["game"]
                 })
 
         output["box_score"] = flat_box_score
-        output["team_totals"] = self.compute_team_totals()  # ✅ This line adds it
-        
+        output["team_totals"] = {
+            self.home_team.name: self.home_team.get_team_game_stats(),
+            self.away_team.name: self.away_team.get_team_game_stats()
+        }
+
         return output
+
     
     def compute_team_totals(self):
-        team_totals = {}
+        home_stats = self.home_team.get_team_game_stats()
+        away_stats = self.away_team.get_team_game_stats()
 
-        for team, player_dict in self.players.items():
-            totals = {}
-            for player in player_dict.values():
-                for stat, value in player.stats["game"].items():
-                    totals[stat] = totals.get(stat, 0) + value
-            team_totals[team] = totals
+        self.home_team.stats = home_stats
+        self.away_team.stats = away_stats
 
-        return team_totals
+        return {
+            self.home_team.name: home_stats,
+            self.away_team.name: away_stats
+        }
+
+    @property
+    def home_team_name(self):
+        return self.home_team.name
+
+    @property
+    def away_team_name(self):
+        return self.away_team.name
+
+
 

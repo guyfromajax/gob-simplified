@@ -1,15 +1,16 @@
 import random
+from BackEnd.utils.shared import calculate_rebound_score
 
 class ReboundManager:
-    def __init__(self, game_state):
-        self.game_state = game_state
-        self.off_team = game_state["offense_team"]
-        self.def_team = game_state["defense_team"]
-        self.players = game_state["players"]
-        self.team_attrs = game_state["team_attributes"]
+    def __init__(self, game):
+        self.game = game
+        self.off_team = game.offense_team
+        self.def_team = game.defense_team
+        self.off_lineup = self.off_team.lineup
+        self.def_lineup = self.def_team.lineup
 
     def choose_rebounder(self, side):
-        candidates = self.players[self.off_team if side == "offense" else self.def_team]
+        candidates = self.off_lineup if side == "offense" else self.def_lineup
         weights = {
             pos: (player.attributes["RB"] * 0.5 + player.attributes["ST"] * 0.3 + player.attributes["AG"] * 0.2)
             for pos, player in candidates.items()
@@ -17,27 +18,32 @@ class ReboundManager:
         return self._weighted_choice(weights)
 
     def _weighted_choice(self, weight_dict):
+        if not weight_dict:
+            # fallback to default positions or raise a clearer error
+            print("⚠️  Empty weight_dict passed to _weighted_choice")
+            return random.choice(["PG", "SG", "SF", "PF", "C"])
         total = sum(weight_dict.values())
-        rand = random.uniform(0, total)
+        r = random.uniform(0, total)
         upto = 0
-        for key, weight in weight_dict.items():
-            if upto + weight >= rand:
-                return key
-            upto += weight
-        return random.choice(list(weight_dict.keys()))  # fallback
+        for k, w in weight_dict.items():
+            if upto + w >= r:
+                return k
+            upto += w
+        return random.choice(list(weight_dict.keys()))  # final fallback
+
 
     def handle_rebound(self):
         o_pos = self.choose_rebounder("offense")
         d_pos = self.choose_rebounder("defense")
 
-        o_player = self.players[self.off_team][o_pos]
-        d_player = self.players[self.def_team][d_pos]
+        o_player = self.off_lineup[o_pos]
+        d_player = self.def_lineup[d_pos]
+        off_mod = self.off_team.team_attributes["rebound_modifier"]
+        def_mod = self.def_team.team_attributes["rebound_modifier"]
 
-        o_score = self._calc_rebound_score(o_player.attributes)
-        d_score = self._calc_rebound_score(d_player.attributes)
+        o_score = calculate_rebound_score(o_player)
+        d_score = calculate_rebound_score(d_player)
 
-        off_mod = self.team_attrs[self.off_team]["rebound_modifier"]
-        def_mod = self.team_attrs[self.def_team]["rebound_modifier"]
         bias = def_mod - off_mod
         def_prob = min(0.95, max(0.55, 0.75 + bias))
 
@@ -53,8 +59,8 @@ class ReboundManager:
         rebounder.record_stat(stat)
 
         # Store for possible fast break or putback
-        self.game_state["last_rebounder"] = rebounder
-        self.game_state["last_rebound"] = stat
+        self.game.game_state["last_rebounder"] = rebounder
+        self.game.game_state["last_rebound"] = stat
 
         # Return a valid turn_result
         return {
@@ -66,7 +72,3 @@ class ReboundManager:
             "time_elapsed": random.randint(3, 6),
             "possession_flips": rebound_team == self.def_team,
         }
-
-
-    def _calc_rebound_score(self, attr):
-        return attr["RB"] * 0.5 + attr["ST"] * 0.3 + attr["AG"] * 0.2

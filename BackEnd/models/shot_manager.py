@@ -1,17 +1,32 @@
 import random
 from BackEnd.constants import THREE_POINT_PROBABILITY, PLAYCALL_ATTRIBUTE_WEIGHTS, BLOCK_PROBABILITY
-from BackEnd.utils.shared import apply_help_defense_if_triggered, get_fast_break_chance, get_time_elapsed, resolve_offensive_rebound_loop
-from BackEnd.utils.shared import calculate_screen_score, choose_rebounder, calculate_rebound_score, get_name_safe
+from BackEnd.utils.shared import (
+    apply_help_defense_if_triggered, 
+    get_fast_break_chance, 
+    get_time_elapsed, 
+    resolve_offensive_rebound_loop,
+    get_player_position,
+    record_team_points,
+    calculate_screen_score,
+    choose_rebounder,
+    calculate_rebound_score,
+    get_name_safe
+)
 
 
 class ShotManager:
-    def __init__(self, game_state):
-        self.game_state = game_state
+    def __init__(self, game):
+        self.game = game
+        self.game_state = game.game_state  # still accessible
+
 
     def resolve_shot(self, roles):
 
-        off_team = self.game_state["offense_team"]
-        def_team = self.game_state["defense_team"]
+        off_team = self.game.offense_team
+        def_team = self.game.defense_team
+        off_lineup = off_team.lineup
+        def_lineup = def_team.lineup
+
         time_elapsed = 0
         shooter = roles["shooter"]
         passer = roles.get("passer", "")
@@ -26,7 +41,7 @@ class ShotManager:
         playcall = self.game_state["current_playcall"]
         defense_call = self.game_state["defense_playcall"]
         is_three = random.random() < THREE_POINT_PROBABILITY.get(playcall, 0.0)
-        shot_threshold = self.game_state["team_attributes"][off_team]["shot_threshold"]
+        shot_threshold = self.game.offense_team.team_attributes["shot_threshold"]
         if is_three:
             shot_threshold += 100
 
@@ -58,7 +73,7 @@ class ShotManager:
         # help defense logic
         if defender:
             shot_score, help_defender, help_penalty = apply_help_defense_if_triggered(
-                self.game_state, playcall, is_three, defender, shot_score
+                self.game, playcall, is_three, defender, shot_score
             )
             # if help_defender:
             #     print(f"Help defense by {help_defender} → penalty applied: {round(help_penalty, 2)}")
@@ -107,9 +122,7 @@ class ShotManager:
             if is_three:
                 shooter.record_stat("3PTM")
             points = 3 if is_three else 2
-            self.game_state["score"][off_team] += points
-            quarter_index = self.game_state["quarter"] - 1
-            self.game_state["points_by_quarter"][off_team][quarter_index] += points
+            record_team_points(self.game, off_team, points)
             text = f"{get_name_safe(shooter)} drains a 3!" if is_three else f"{get_name_safe(shooter)} makes the shot."
             possession_flips = True
             if screener:
@@ -137,17 +150,14 @@ class ShotManager:
 
             o_pos = choose_rebounder(rebounder_dict, "offense")
             d_pos = choose_rebounder(rebounder_dict, "defense")
-            o_rebounder = self.game_state["players"][off_team][o_pos]
-            d_rebounder = self.game_state["players"][def_team][d_pos]
+            o_rebounder = self.game.offense_team.lineup[o_pos]
+            d_rebounder = self.game.defense_team.lineup[d_pos]
 
-            o_attr = o_rebounder.attributes
-            d_attr = d_rebounder.attributes
+            o_score = calculate_rebound_score(o_rebounder)
+            d_score = calculate_rebound_score(d_rebounder)
 
-            o_score = calculate_rebound_score(o_attr)
-            d_score = calculate_rebound_score(d_attr)
-
-            off_mod = self.game_state["team_attributes"][off_team]["rebound_modifier"]
-            def_mod = self.game_state["team_attributes"][def_team]["rebound_modifier"]
+            off_mod = self.game.offense_team.team_attributes["rebound_modifier"]
+            def_mod = self.game.defense_team.team_attributes["rebound_modifier"]
             bias = def_mod - off_mod
             def_prob = 0.75 + bias
             def_prob = min(0.95, max(0.55, def_prob))  # Clamp
@@ -190,47 +200,44 @@ class ShotManager:
                     ) * random.randint(1, 6)
 
                     defender_pos = random.choice(["C", "C", "C", "C", "C", "PF", "PF", "PF", "SF", "SF", "SG", "PG"])
-                    defender = self.game_state["players"][def_team][defender_pos]
+                    defender = self.game.defense_team.lineup[defender_pos]
                     defense_attrs = defender.attributes
                     defense_penalty = (defense_attrs["ID"] * 0.8 + defense_attrs["IQ"] * 0.1 + defense_attrs["CH"] * 0.1) * random.randint(1, 6)
                     shot_score -= defense_penalty * 0.2
-                    made = shot_score >= self.game_state["team_attributes"][off_team]["shot_threshold"]
+                    made = shot_score >= off_team.team_attributes["shot_threshold"]
 
                     # Track stats
                     rebounder.record_stat("FGA")
                     if made:
                         rebounder.record_stat("FGM")
                         points = 2
-                        self.game_state["score"][off_team] += points
-                        self.game_state["points_by_quarter"][off_team][self.game_state["quarter"] - 1] += points
+                        record_team_points(self.game, off_team, points)
                         text += f" and he scores!"
                         possession_flips = True
                     else:
                         # Use dynamic logic for the missed putback
-                        putback_result = resolve_offensive_rebound_loop(self.game_state, off_team, def_team, rebounder)
+                        putback_result = resolve_offensive_rebound_loop(self.game, rebounder)
                         # Add result text and update turn metadata
                         text += f" and misses the putback. {putback_result['text']}"
                         possession_flips = putback_result["possession_flips"]
                         time_elapsed += putback_result["time_elapsed"]
             else:
                 self.game_state["last_rebounder"] = rebounder
-                if random.random() < get_fast_break_chance(self.game_state):
+                if random.random() < get_fast_break_chance(self.game):
                     self.game_state["offensive_state"] = "FAST_BREAK"
                 else:
                     self.game_state["offensive_state"] = "HCO"
         
-        tempo = self.game_state["strategy_calls"][off_team]["tempo_call"]
+        tempo = off_team.strategy_calls["tempo_call"]
         time_elapsed += get_time_elapsed(tempo)
 
-        shooter_pos = next(
-            (pos for pos, obj in self.game_state["players"][off_team].items() if obj == shooter),
-            None
-        )
+        shooter_pos = get_player_position(off_lineup, shooter)
 
         print(f"{text}")
         return {
             "result_type": "MAKE" if made else "MISS",
             "ball_handler": shooter,
+            "shooter": shooter,
             "shot_score": shot_score,
             "screener": screener,
             "passer": passer,
@@ -243,8 +250,10 @@ class ShotManager:
         }
     
     def resolve_fast_break_shot(self, fb_roles):
-        off_team = self.game_state["offense_team"]
-        def_team = self.game_state["defense_team"]
+        off_team = self.game.offense_team
+        def_team = self.game.defense_team
+        off_lineup = off_team.lineup
+        def_lineup = def_team.lineup
         
         shooter = fb_roles["shooter"]
         passer = fb_roles.get("passer", "")
@@ -264,7 +273,7 @@ class ShotManager:
         else:
             defense_penalty = 0
 
-        made = shot_score >= self.game_state["team_attributes"][off_team]["shot_threshold"]
+        made = shot_score >= off_team.team_attributes["shot_threshold"]
         shooter.record_stat("FGA")
 
         if made:
@@ -276,17 +285,15 @@ class ShotManager:
             self.game_state["offensive_state"] = "HCO"
             is_three = False
             points = 3 if is_three else 2
-            self.game_state["score"][off_team] += points
-            quarter_index = self.game_state["quarter"] - 1
-            self.game_state["points_by_quarter"][off_team][quarter_index] += points
+            record_team_points(self.game, off_team, points)
         else:
             if defender:
                 defender.record_stat("DEF_S")
-            rebounder = random.choice(fb_roles["defense"]) if fb_roles["defense"] else self.game_state["players"][def_team]["PG"]
+            rebounder = random.choice(fb_roles["defense"]) if fb_roles["defense"] else self.game.defense_team.lineup["PG"]
             text = f"{shooter} misses the fast break shot -- {rebounder} grabs the rebound."
             rebounder.record_stat("DREB")
             possession_flips = True
-            if random.random() < get_fast_break_chance(self.game_state):
+            if random.random() < get_fast_break_chance(self.game):
                 text += " -- entering a fast break!"
                 self.game_state["offensive_state"] = "FAST_BREAK"
             else:
@@ -297,10 +304,7 @@ class ShotManager:
 
         time_elapsed = random.randint(5, 15)
 
-        shooter_pos = next(
-            (pos for pos, obj in self.game_state["players"][off_team].items() if obj == shooter),
-            None
-        )
+        shooter_pos = get_player_position(off_lineup, shooter)
         
         return {
             "result_type": "MAKE" if made else "MISS",

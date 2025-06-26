@@ -142,27 +142,6 @@ def get_shot_weights_for_playcall(team_attrs, playcall_name):
 
     return shot_scores
 
-def determine_event_type(game_state, roles):
-    # Base weights (can be tuned later)
-    off_team = game_state["offense_team"]
-    def_team = game_state["defense_team"]
-    thresholds = get_team_thresholds(game_state)
-    tempo_call = game_state["strategy_calls"][off_team]["tempo_call"]
-    pass_count = TEMPO_PASS_DICT[tempo_call]
-    positions = get_random_positions(pass_count)
-    event_type = calculate_foul_turnover(game_state, positions, thresholds, roles)
-   
-    #determine number of turnover RNGs based on defense team'saggression
-    for pos, player_obj in game_state["players"][off_team].items():
-        attr = player_obj.attributes
-        ng = attr["NG"]
-        for key in MALLEABLE_ATTRS:
-            anchor_val = attr[f"anchor_{key}"]
-            attr[key] = int(anchor_val * ng)
-
-
-    return event_type
-
 #POST-TURN
 def generate_animation_packet(turn_result):
     """
@@ -206,127 +185,6 @@ def select_weighted_playcall(user_settings):
     playcall_names = list(user_settings.keys())
     weights = list(user_settings.values())
     return random.choices(playcall_names, weights=weights, k=1)[0]
-
-
-def get_random_positions(pass_count):
-    return {
-        "turnover": random.choice(TURNOVER_CALC_DICT[pass_count]),
-        "o_foul": random.choice(POSITION_LIST),
-        "d_foul": random.choice(POSITION_LIST)
-    }
-
-def get_team_thresholds(game_state):
-    off_team = game_state["offense_team"]
-    def_team = game_state["defense_team"]
-
-    off_attr = game_state["team_attributes"][off_team]
-    def_attr = game_state["team_attributes"][def_team]
-
-    return {
-        "turnover_threshold": off_attr.get("turnover_threshold", 10),
-        "d_foul_threshold": def_attr.get("foul_threshold", 10),
-        "o_foul_threshold": off_attr.get("foul_threshold", 10)
-    }
-
-def calculate_foul_turnover(game_state, positions, thresholds, roles):
-    off_team = game_state["offense_team"]
-    def_team = game_state["defense_team"]
-    roles["foul_player"] = None
-    ball_handler = roles["ball_handler"]
-    defense_call = game_state["defense_playcall"]
-
-    # === Defensive Foul ===
-    d_pos = positions["d_foul"]
-    d_foul_player = game_state["players"][def_team][d_pos]
-    d_attr = d_foul_player.attributes
-
-    iq = d_attr["IQ"] * 0.3
-    ch = d_attr["CH"] * 0.3
-    if d_pos in ["PG", "SG"]:
-        movement = d_attr["OD"] * 0.2 + d_attr["AG"] * 0.2
-    elif d_pos == "SF":
-        movement = d_attr["OD"] * 0.1 + d_attr["ID"] * 0.1 + d_attr["AG"] * 0.1 + d_attr["ST"] * 0.1
-    elif d_pos in ["PF", "C"]:
-        movement = d_attr["ID"] * 0.2 + d_attr["ST"] * 0.2
-    else:
-        movement = 0
-
-    d_foul_score = (iq + ch + movement) * random.randint(1, 6)
-    if defense_call == "Zone":
-        d_foul_score *= 1.1
-    is_d_foul = d_foul_score < (thresholds["d_foul_threshold"] * 1.2)
-
-    # === Offensive Foul ===
-    o_pos = positions["o_foul"]
-    o_foul_player = game_state["players"][off_team][o_pos]
-    o_attr = o_foul_player.attributes
-
-    iq = o_attr["IQ"] * 0.3
-    ch = o_attr["CH"] * 0.3
-    if o_pos in ["PG", "SG"]:
-        movement = o_attr["AG"] * 0.4
-    elif o_pos == "SF":
-        movement = o_attr["AG"] * 0.2 + o_attr["ST"] * 0.2
-    elif o_pos in ["PF", "C"]:
-        movement = o_attr["ST"] * 0.4
-    else:
-        movement = 0
-
-    o_foul_score = (iq + ch + movement) * random.randint(1, 6)
-    is_o_foul = o_foul_score < (thresholds["o_foul_threshold"] * 0.8)
-
-    # === Turnover ===
-    t_pos = positions["turnover"]
-    turnover_player = game_state["players"][off_team][t_pos]
-    t_attr = turnover_player.attributes
-
-    bh_score = (
-        t_attr["BH"] * 0.5 +
-        t_attr["AG"] * 0.2 +
-        t_attr["IQ"] * 0.2 +
-        t_attr["CH"] * 0.1
-    ) * random.randint(1, 6)
-
-    def_mod_player = game_state["players"][def_team][t_pos]
-    def_mod_attr = def_mod_player.attributes
-    pressure = (
-        def_mod_attr["OD"] * 0.3 +
-        def_mod_attr["AG"] * 0.3 +
-        def_mod_attr["IQ"] * 0.2 +
-        def_mod_attr["CH"] * 0.2
-    ) * random.randint(1, 6)
-    if defense_call == "Zone":
-        pressure *= 0.9
-
-    turnover_score = bh_score - pressure
-    is_turnover = turnover_score < thresholds["turnover_threshold"]
-
-    # print(f"Turnover → {get_name_safe(turnover_player)} vs {get_name_safe(def_mod_player)}: score={round(turnover_score, 2)} vs threshold={thresholds['turnover_threshold']} | flag={is_turnover}")
-
-    decisions = {
-        "TURNOVER": (is_turnover, turnover_score),
-        "D_FOUL": (is_d_foul, d_foul_score),
-        "O_FOUL": (is_o_foul, o_foul_score)
-    }
-
-    active = [(k, v[1]) for k, v in decisions.items() if v[0]]
-    if not active:
-        print()
-        return "SHOT"
-
-    active.sort(key=lambda x: (x[1], ["TURNOVER", "D_FOUL", "O_FOUL"].index(x[0])))
-
-    if active[0][0] == "TURNOVER":
-        roles["turnover_player"] = turnover_player
-        roles["turnover_defender"] = def_mod_player
-        roles["ball_handler"] = turnover_player
-    elif active[0][0] == "D_FOUL":
-        roles["foul_player"] = d_foul_player
-    elif active[0][0] == "O_FOUL":
-        roles["foul_player"] = o_foul_player
-
-    print()
-    return active[0][0]
 
 
 def calculate_rebound_score(player_attr):
@@ -382,13 +240,15 @@ def print_scouting_report(data):
         for def_type, val in data[team]["defense"].items():
             print(f"{def_type.ljust(14)} — Used: {val['used']}, Success: {val['success']}")
 
-def run_simulation(home_team, away_team, home_players, away_players):
-    gm = GameManager(home_team, away_team, home_players, away_players)
+def run_simulation(home_team_name, away_team_name):
+    gm = GameManager(home_team_name, away_team_name)
 
     while gm.game_state["time_remaining"] > 0:
         gm.simulate_turn()
 
-    return gm.to_dict()
+    gm.compute_team_totals()  # Ensure team stats are finalized
+    return gm
+
 
 
 #MAIN

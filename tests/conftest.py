@@ -4,10 +4,14 @@ from BackEnd.constants import POSITION_LIST
 
 @pytest.fixture
 def mock_game_manager():
-    mock_player_data = {
-        "first_name": "John",
-        "last_name": "Doe"
-    }
-    players = {pos: mock_player_data.copy() for pos in POSITION_LIST}
-    gm = GameManager("Team A", "Team B", players, players)
-    return gm  # <== return the full GameManager, not just gm.game_state
+    # Uses team names that must exist in your database
+    gm = GameManager("Lancaster", "Bentley-Truman")
+    return gm
+
+@pytest.fixture
+def simulated_game():
+    gm = GameManager("Lancaster", "Bentley-Truman")
+    gm.simulate_turn()
+    return gm
+
+

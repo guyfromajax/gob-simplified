@@ -11,7 +11,7 @@ def weighted_random_from_dict(weight_dict):
         upto += weight
     return random.choice(list(weight_dict.keys()))  # fallback
 
-def apply_help_defense_if_triggered(game_state, playcall, is_three, defender, shot_score):
+def apply_help_defense_if_triggered(game, playcall, is_three, defender, shot_score):
     """
     Determines if help defense is triggered and applies a penalty to the shot_score.
     Returns: updated_shot_score, help_defender (or None), help_defense_penalty
@@ -19,8 +19,7 @@ def apply_help_defense_if_triggered(game_state, playcall, is_three, defender, sh
     if is_three:
         return shot_score, None, 0
 
-    off_team = game_state["offense_team"]
-    def_team = game_state["defense_team"]
+    game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
 
     base_help_chance_by_playcall = {
         "Attack": 0.70,
@@ -35,7 +34,7 @@ def apply_help_defense_if_triggered(game_state, playcall, is_three, defender, sh
     base_help_chance = base_help_chance_by_playcall.get(help_playcall, 0)
 
     # Adjust for aggression
-    aggression = game_state["strategy_calls"][def_team]["aggression_call"]
+    aggression = def_team.strategy_calls["aggression_call"]
     if aggression == "passive":
         base_help_chance += 0.20
     elif aggression == "aggressive":
@@ -45,17 +44,11 @@ def apply_help_defense_if_triggered(game_state, playcall, is_three, defender, sh
     if random.random() >= base_help_chance:
         return shot_score, None, 0
 
-    defender_pos = next(
-        (pos for pos, obj in game_state["players"][def_team].items() if obj == defender),
-        None
-    )
+    defender_pos = get_player_position(def_lineup, defender)
 
-    possible_helpers = [
-        pos for pos in game_state["players"][def_team]
-        if pos != defender_pos
-    ]
+    possible_helpers = [pos for pos in def_lineup if pos != defender_pos]
     help_pos = random.choice(possible_helpers)
-    help_defender = game_state["players"][def_team][help_pos]
+    help_defender = def_lineup[help_pos]
     help_attrs = help_defender.attributes
 
     if help_playcall == "Attack":
@@ -76,9 +69,10 @@ def apply_help_defense_if_triggered(game_state, playcall, is_three, defender, sh
     penalty = help_score * 0.15
     return shot_score - penalty, help_defender, penalty
 
-def get_fast_break_chance(game_state):
-    team = game_state["defense_team"]
-    level = game_state["strategy_settings"][team]["fast_break"]
+def get_fast_break_chance(game):
+    game_state = game.game_state
+    def_team = game.defense_team
+    level = def_team.strategy_settings["fast_break"]
     return [0.0, 0.25, 0.5, 0.75, 1.0][level]
 
 def get_time_elapsed(tempo_call):
@@ -91,7 +85,9 @@ def get_time_elapsed(tempo_call):
     else:
         return int(max(5, min(35, random.gauss(12, 6))))  # Fallback
 
-def resolve_offensive_rebound_loop(game_state, off_team, def_team, rebounder):
+def resolve_offensive_rebound_loop(game, rebounder):
+    
+    game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
     total_time = 0
     text_log = ""
     
@@ -118,7 +114,7 @@ def resolve_offensive_rebound_loop(game_state, off_team, def_team, rebounder):
 
         # contested by random defender
         defender_pos = random.choice(["C", "C", "C", "PF", "PF", "SF", "SF", "SG", "PG"])
-        defender = game_state["players"][def_team][defender_pos]
+        defender = def_team.lineup[defender_pos]
         defense_attrs = defender.attributes
         defense_penalty = (
             defense_attrs["ID"] * 0.8 + 
@@ -127,23 +123,23 @@ def resolve_offensive_rebound_loop(game_state, off_team, def_team, rebounder):
         ) * random.randint(1, 6)
         shot_score -= defense_penalty * 0.2
 
-        made = shot_score >= game_state["team_attributes"][off_team]["shot_threshold"]
+        made = shot_score >= off_team.team_attributes["shot_threshold"]
         rebounder.record_stat("FGA")
 
         if made:
             rebounder.record_stat("FGM")
             points = 2
-            game_state["score"][off_team] += points
-            game_state["points_by_quarter"][off_team][game_state["quarter"] - 1] += points
+            record_team_points(game, off_team, points)
             text_log += f" and he scores!"
             return {
+                "shooter": rebounder,
                 "text": text_log,
                 "possession_flips": True,
                 "time_elapsed": total_time
             }
 
         # shot missed — determine rebound
-        new_rebounder, new_team, new_stat = determine_rebounder(game_state, off_team, def_team)
+        new_rebounder, new_team, new_stat = determine_rebounder(game)
         new_rebounder.record_stat(new_stat)
         text_log += f" but misses the shot. {new_rebounder} grabs the rebound."
 
@@ -175,26 +171,14 @@ def choose_rebounder(rebounders, side):
     weights = list(rebounders[side].values())
     return random.choices(players, weights=weights, k=1)[0]
 
-def calculate_rebound_score(player_attr):
-    """
-    Calculate rebound score based on attributes:
-    - RB (50%), ST (30%), IQ (10%), CH (10%)
-    - Scaled by a random multiplier between 1 and 6
-    """
-    base_score = (
-        player_attr["RB"] * 0.5 +
-        player_attr["ST"] * 0.3 +
-        player_attr["IQ"] * 0.1 +
-        player_attr["CH"] * 0.1
-    )
-    return base_score * random.randint(1, 6)
-
-def generate_pass_chain(game_state, shooter_pos):
+def generate_pass_chain(game, shooter_pos):
+    
+    game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
     positions = ["PG", "SG", "SF", "PF", "C"]
     chain = ["PG"]  # Start with PG
     last_added = "PG"
 
-    tempo = game_state["strategy_calls"][game_state["offense_team"]]["tempo_call"]
+    tempo = off_team.strategy_calls["tempo_call"]
     if tempo == "slow":
         num_passes = 3
     elif tempo == "fast":
@@ -231,8 +215,9 @@ def default_rebounder_dict():
         "defense": {"PG": 0.1, "SG": 0.1, "SF": 0.2, "PF": 0.3, "C": 0.3}
     }
 
-def determine_rebounder(game_state, off_team, def_team):
-
+def determine_rebounder(game):
+    
+    game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
     rebounder_dict = {
         "offense": {"PG": 0.1, "SG": 0.1, "SF": 0.2, "PF": 0.3, "C": 0.3},
         "defense": {"PG": 0.1, "SG": 0.1, "SF": 0.2, "PF": 0.3, "C": 0.3}
@@ -240,17 +225,14 @@ def determine_rebounder(game_state, off_team, def_team):
 
     o_pos = choose_rebounder(rebounder_dict, "offense")
     d_pos = choose_rebounder(rebounder_dict, "defense")
-    o_rebounder = game_state["players"][off_team][o_pos]
-    d_rebounder = game_state["players"][def_team][d_pos]
+    o_rebounder = off_lineup[o_pos]
+    d_rebounder = def_lineup[d_pos]
 
-    o_attr = o_rebounder.attributes
-    d_attr = d_rebounder.attributes
+    o_score = calculate_rebound_score(o_rebounder)
+    d_score = calculate_rebound_score(d_rebounder)
 
-    o_score = calculate_rebound_score(o_attr)
-    d_score = calculate_rebound_score(d_attr)
-
-    off_mod = game_state["team_attributes"][off_team]["rebound_modifier"]
-    def_mod = game_state["team_attributes"][def_team]["rebound_modifier"]
+    off_mod = off_team.team_attributes["rebound_modifier"]
+    def_mod = def_team.team_attributes["rebound_modifier"]
     bias = def_mod - off_mod
     def_prob = min(0.95, max(0.55, 0.75 + bias))
 
@@ -267,12 +249,12 @@ def determine_rebounder(game_state, off_team, def_team):
 
     return new_rebounder, new_team, new_stat
 
-def get_team_thresholds(game_state):
-    off_team = game_state["offense_team"]
-    def_team = game_state["defense_team"]
+def get_team_thresholds(game):
+    
+    game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
 
-    off_attr = game_state["team_attributes"][off_team]
-    def_attr = game_state["team_attributes"][def_team]
+    off_attr = off_team.team_attributes
+    def_attr = def_team.team_attributes
 
     return {
         "turnover_threshold": off_attr.get("turnover_threshold", 10),
@@ -286,4 +268,37 @@ def get_random_positions(pass_count):
         "o_foul": random.choice(POSITION_LIST),
         "d_foul": random.choice(POSITION_LIST)
     }
+
+def get_player_position(team_lineup, player_obj):
+    return next((pos for pos, p in team_lineup.items() if p == player_obj), None)
+
+def get_quarter_index_from_game(game):
+    return game.game_state["quarter"] - 1
+
+def calculate_rebound_score(player):
+    attr = player.attributes
+    return attr["RB"] * 0.5 + attr["ST"] * 0.3 + attr["AG"] * 0.2
+
+def record_team_points(game, team, points):
+    """
+    Updates total game score and per-quarter score for the given team.
+    
+    Parameters:
+    - game: GameManager object
+    - team: TeamManager object (e.g., game.offense_team)
+    - points: int, number of points to add
+    """
+    game.score[team.name] += points
+    quarter_index = game.game_state["quarter"] - 1
+    team.points_by_quarter[quarter_index] += points
+
+def unpack_game_context(game):
+    
+    return (
+        game.game_state,
+        game.offense_team,
+        game.defense_team,
+        game.offense_team.lineup,
+        game.defense_team.lineup,
+    )
 

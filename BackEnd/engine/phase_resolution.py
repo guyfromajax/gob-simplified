@@ -1,5 +1,10 @@
 import random
 from typing import TYPE_CHECKING
+from BackEnd.utils.shared import (
+    get_name_safe, 
+    get_player_position,
+    get_quarter_index_from_game
+)
 from BackEnd.models.shot_manager import ShotManager
 if TYPE_CHECKING:
     from BackEnd.models.turn_manager import TurnManager
@@ -13,13 +18,14 @@ from BackEnd.utils.shared import (
     calculate_rebound_score, 
     choose_rebounder, 
     default_rebounder_dict, 
-    resolve_offensive_rebound_loop
+    resolve_offensive_rebound_loop,
+    record_team_points,
+    unpack_game_context
 )
     
-def resolve_foul(roles, game_state):
+def resolve_foul(roles, game):
     
-    off_team = game_state["offense_team"]
-    def_team = game_state["defense_team"]
+    game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
     foul_team = off_team if game_state["foul_team"] == "OFFENSE" else def_team
     
     ball_handler = roles["ball_handler"]
@@ -28,17 +34,17 @@ def resolve_foul(roles, game_state):
     shooter = roles["shooter"]
     screener = roles.get("screener", "")
     passer = roles.get("passer", "")
-    tempo = game_state["strategy_calls"][off_team]["tempo_call"]
+    tempo = off_team.strategy_calls["tempo_call"]
     time_elapsed = get_time_elapsed(tempo)
 
     # Track the foul
     foul_player.record_stat("F")
     if foul_team == "DEFENSE":
-        game_state["team_fouls"][def_team] += 1
-        text = f"{foul_player} fouls {ball_handler}!"
+        def_team.team_fouls += 1
+        text = f"{get_name_safe(foul_player)} fouls {get_name_safe(ball_handler)}!"
     else:
-        game_state["team_fouls"][off_team] += 1
-        text = f"{foul_player} commits an offensive foul!"
+        off_team.team_fouls += 1
+        text = f"{get_name_safe(foul_player)} commits an offensive foul!"
 
     foul_type = random.choice(["SHOOTING", "NON_SHOOTING"]) if foul_team == "DEFENSE" else "NON_SHOOTING" # Future logic: determine if this was shooting or not
 
@@ -48,12 +54,12 @@ def resolve_foul(roles, game_state):
         game_state["free_throws_remaining"] = 2
         game_state["last_ball_handler"] = ball_handler
         ball_handler = shooter
-    elif game_state["team_fouls"][def_team] >= 10:
+    elif def_team.team_fouls >= 10:
         game_state["free_throws"] = 2
         game_state["free_throws_remaining"] = 2
         game_state["bonus_active"] = False
         game_state["last_ball_handler"] = ball_handler
-    elif game_state["team_fouls"][def_team] >= 5:
+    elif def_team.team_fouls >= 5:
         game_state["offensive_state"] = "FREE_THROW"
         game_state["free_throws"] = 2
         game_state["free_throws_remaining"] = 2
@@ -64,11 +70,7 @@ def resolve_foul(roles, game_state):
         game_state["free_throws"] = 0
         game_state["free_throws_remaining"] = 0
 
-    #craft foul statement here and assign to game_state["text"]
-    bh_pos = next(
-        (pos for pos, obj in game_state["players"][off_team].items() if obj == ball_handler),
-        None
-    )
+    bh_pos = get_player_position(off_team.lineup, ball_handler)
     
     return {
         "result_type": "FOUL",
@@ -88,14 +90,11 @@ def resolve_foul(roles, game_state):
 def resolve_fast_break_logic(game: "GameManager"):
     from BackEnd.models.game_manager import GameManager
     # print("Entering resolve_fast_break()")
-    game_state = game.game_state
-    # print(f"game_state rebound: {game_state.get('last_rebound')}")
-
-    off_team = game_state["offense_team"]
-    def_team = game_state["defense_team"]
-    players = game_state["players"]
-    game_state["scouting_data"][off_team]["offense"]["Fast_Break_Entries"] += 1
-    game_state["scouting_data"][def_team]["defense"]["vs_Fast_Break"]["used"] += 1
+    game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
+    off_scouting = off_team.scouting_data
+    def_scouting = def_team.scouting_data
+    off_scouting["offense"]["Fast_Break_Entries"] += 1
+    def_scouting["defense"]["vs_Fast_Break"]["used"] += 1
 
     fb_roles = {
         "offense": [],
@@ -114,7 +113,7 @@ def resolve_fast_break_logic(game: "GameManager"):
         rebounder = game_state.get("last_rebounder", None) #object
 
         bh_pos = random.choices(["PG", "SG", "SF"], weights=[75, 15, 10])[0]
-        ball_handler = players[off_team][bh_pos]
+        ball_handler = off_lineup[bh_pos]
 
         # Ensure outlet passer != ball handler
         if rebounder and rebounder != ball_handler:
@@ -124,29 +123,29 @@ def resolve_fast_break_logic(game: "GameManager"):
         fb_roles["ball_handler"] = ball_handler
         # Add other offensive players in play
         for pos in ["PG", "SG", "SF", "PF"]:
-            if players[off_team][pos] != ball_handler and players[off_team][pos] != rebounder:
+            if off_lineup[pos] != ball_handler and off_lineup[pos] != rebounder:
                 if random.random() < {"PG": 0.5, "SG": 0.5, "SF": 0.2, "PF": 0.05}.get(pos, 0):
-                    fb_roles["offense"].append(players[off_team][pos])
+                    fb_roles["offense"].append(off_lineup[pos])
 
         # Add defensive players
         for pos in ["PG", "SG", "SF", "PF"]:
             if random.random() < {"PG": 0.9, "SG": 0.8, "SF": 0.4, "PF": 0.1}.get(pos, 0):
-                fb_roles["defense"].append(players[def_team][pos])
+                fb_roles["defense"].append(def_lineup[pos])
 
     else:  # STEAL
         ball_handler = game_state.get("last_stealer")
         if ball_handler is None:
-            ball_handler = game_state["players"][off_team]["PG"]
+            ball_handler = off_lineup["PG"]
         fb_roles["ball_handler"] = ball_handler
 
         for pos in ["PG", "SG", "SF"]:
-            if players[off_team][pos] != ball_handler:
+            if off_lineup[pos] != ball_handler:
                 if random.random() < {"PG": 0.5, "SG": 0.4, "SF": 0.05}.get(pos, 0):
-                    fb_roles["offense"].append(players[off_team][pos])
+                    fb_roles["offense"].append(off_lineup[pos])
 
         for pos in ["PG", "SG", "SF"]:
             if random.random() < {"PG": 0.8, "SG": 0.5, "SF": 0.2}.get(pos, 0):
-                fb_roles["defense"].append(players[def_team][pos])
+                fb_roles["defense"].append(def_lineup[pos])
 
     # Determine event type
     o_count = len(fb_roles["offense"]) + 1  # include ball handler
@@ -163,13 +162,12 @@ def resolve_fast_break_logic(game: "GameManager"):
 
     # If HCO triggered, skip fast break
     if event_type == "HCO":
-        # print("HCO triggered")
-        game_state["scouting_data"][def_team]["defense"]["vs_Fast_Break"]["success"] += 1
+        def_scouting["defense"]["vs_Fast_Break"]["success"] += 1
+        game.game_state["offensive_state"] = "HCO"
 
         from BackEnd.models.turn_manager import TurnManager
+        return TurnManager(game).run_turn()
 
-        return TurnManager(game).resolve_half_court_offense()
-    
     #get shooter and passer (if applicable)
     # Assign shooter and passer for shot, turnover, or foul scenarios
     offense_in_play = [fb_roles["ball_handler"]] + fb_roles["offense"]
@@ -192,26 +190,26 @@ def resolve_fast_break_logic(game: "GameManager"):
     # print(f"Roles: {fb_roles}")
     
     if event_type == "SHOT":
-        shot_manager = ShotManager(game_state)
+        shot_manager = ShotManager(game)
         turn_result = shot_manager.resolve_fast_break_shot(fb_roles)
 
     elif event_type == "TURNOVER":
         turnover_type = random.choice(["STEAL", "DEAD BALL"])
-        turn_result = resolve_turnover(fb_roles, game_state, turnover_type)
+        turn_result = resolve_turnover_logic(fb_roles, game, turnover_type)
     elif event_type == "FOUL":
-        turn_result = resolve_foul(fb_roles, game_state)
+        turn_result = resolve_foul(fb_roles, game)
     
-    if turn_result["result_type"] == "MAKE":
-        game_state["scouting_data"][game_state["offense_team"]]["offense"]["Fast_Break_Success"] += 1
+    if turn_result["result_type"] == "MAKE": #def_scouting
+        off_scouting["offense"]["Fast_Break_Success"] += 1
 
     elif turn_result["result_type"] == "FOUL":
         if game_state.get("foul_team") == "DEFENSE":
-            game_state["scouting_data"][game_state["offense_team"]]["offense"]["Fast_Break_Success"] += 1
+            off_scouting["offense"]["Fast_Break_Success"] += 1
         elif game_state.get("foul_team") == "OFFENSE":
-            game_state["scouting_data"][game_state["defense_team"]]["defense"]["vs_Fast_Break"]["success"] += 1
+            def_scouting["defense"]["vs_Fast_Break"]["success"] += 1
 
     elif turn_result["result_type"] in ["MISS", "TURNOVER"]:
-        game_state["scouting_data"][game_state["defense_team"]]["defense"]["vs_Fast_Break"]["success"] += 1
+        def_scouting["defense"]["vs_Fast_Break"]["success"] += 1
 
 
     
@@ -221,15 +219,14 @@ def resolve_fast_break_logic(game: "GameManager"):
     return turn_result
 
 # #FREE_THROW
-def resolve_free_throw_logic(game_state):
-    off_team = game_state["offense_team"]
-    def_team = game_state["defense_team"]
+def resolve_free_throw_logic(game):
+    game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
     shooter = game_state["last_ball_handler"] #this is a player object, not a position string
     attrs = shooter.attributes
 
     # Use player's FT attribute
     ft_shot_score = ((attrs["FT"] * 0.8) + (attrs["CH"] * 0.2)) * random.randint(1, 6)
-    makes_shot = ft_shot_score >= game_state["team_attributes"][off_team]["ft_shot_threshold"]
+    makes_shot = ft_shot_score >= off_team.team_attributes["ft_shot_threshold"]
     possession_flips = False
     text = ""
 
@@ -238,10 +235,8 @@ def resolve_free_throw_logic(game_state):
 
     if makes_shot:
         shooter.record_stat("FTM")
-        game_state["score"][off_team] += 1
-        quarter_index = game_state["quarter"] - 1
-        game_state["points_by_quarter"][off_team][quarter_index] += 1
-        text = f"{shooter} hits the free throw!"
+        record_team_points(game, off_team, 1)
+        text = f"{get_name_safe(shooter)} hits the free throw!"
     else:
         text = f"{shooter} misses the free throw."
 
@@ -256,17 +251,14 @@ def resolve_free_throw_logic(game_state):
             rebounder_dict = default_rebounder_dict()
             o_pos = choose_rebounder(rebounder_dict, "offense")
             d_pos = choose_rebounder(rebounder_dict, "defense")
-            o_rebounder = game_state["players"][off_team][o_pos]
-            d_rebounder = game_state["players"][def_team][d_pos]
-            o_attr = o_rebounder.attributes
-            d_attr = d_rebounder.attributes
+            o_rebounder = off_lineup[o_pos]
+            d_rebounder = def_lineup[d_pos]
 
+            o_score = calculate_rebound_score(o_rebounder)
+            d_score = calculate_rebound_score(d_rebounder)
 
-            o_score = calculate_rebound_score(o_attr)
-            d_score = calculate_rebound_score(d_attr)
-
-            off_mod = game_state["team_attributes"][off_team]["rebound_modifier"]
-            def_mod = game_state["team_attributes"][def_team]["rebound_modifier"]
+            off_mod = off_team.team_attributes["rebound_modifier"]
+            def_mod = def_team.team_attributes["rebound_modifier"]
             bias = def_mod - off_mod
             def_prob = min(0.95, max(0.55, 0.75 + bias))
 
@@ -283,7 +275,7 @@ def resolve_free_throw_logic(game_state):
 
             if rebound_team == def_team:
                 possession_flips = True
-                if random.random() < get_fast_break_chance(game_state):
+                if random.random() < get_fast_break_chance(game):
                     game_state["offensive_state"] = "FAST_BREAK"
                 else:
                     game_state["offensive_state"] = "HCO"
@@ -293,17 +285,14 @@ def resolve_free_throw_logic(game_state):
             else:
                 # 🟡 Offensive rebound — enter putback loop!
                 putback_result = resolve_offensive_rebound_loop(
-                    game_state, off_team, def_team, rebounder
+                    game, rebounder
                 )
                 return putback_result
         else:
             possession_flips = True
             game_state["offensive_state"] = "HCO"
 
-    shooter_pos = next(
-        (pos for pos, obj in game_state["players"][off_team].items() if obj == shooter),
-        None
-    )
+    shooter_pos = get_player_position(off_lineup, shooter)
     
     return {
         "result_type": "FREE_THROW",
@@ -316,17 +305,16 @@ def resolve_free_throw_logic(game_state):
     }
 
 
-def resolve_turnover_logic(roles, game_state, turnover_type="DEAD BALL"):
-
-    off_team = game_state["offense_team"]
-    def_team = game_state["defense_team"]
+def resolve_turnover_logic(roles, game, turnover_type="DEAD BALL"):
+    
+    game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
     ball_handler = roles["ball_handler"]
     defender = roles.get("defender", "")
     ball_handler.record_stat("TO")
 
     if turnover_type == "STEAL":
         defender.record_stat("STL")
-        if random.random() < get_fast_break_chance(game_state):
+        if random.random() < get_fast_break_chance(game):
             game_state["offensive_state"] = "FAST_BREAK"
         else:
             game_state["offensive_state"] = "HCO"
@@ -338,10 +326,7 @@ def resolve_turnover_logic(roles, game_state, turnover_type="DEAD BALL"):
         text = f"{ball_handler} throws it out of bounds."
         game_state["offensive_state"] = "HCO"
 
-    bh_pos = next(
-        (pos for pos, obj in game_state["players"][off_team].items() if obj == ball_handler),
-        None
-    )
+    bh_pos = get_player_position(off_lineup, ball_handler)
     
     return {
         "result_type": turnover_type,
@@ -354,15 +339,18 @@ def resolve_turnover_logic(roles, game_state, turnover_type="DEAD BALL"):
     }
 
 def resolve_half_court_offense_logic(game: "GameManager") -> dict:
-    game_state = game.game_state
-    off_team = game_state["offense_team"]
-    def_team = game_state["defense_team"]
+    
+    print("🚨 DEBUG type of game in resolve_half_court_offense_logic:", type(game))
+
+    game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
     off_call = game_state["current_playcall"]
     def_call = game_state["defense_playcall"]
 
     # Track usage
-    game.scouting_data[off_team]["offense"]["Playcalls"][off_call]["used"] += 1
-    game.scouting_data[def_team]["defense"][def_call]["used"] += 1
+    off_scouting = off_team.scouting_data
+    def_scouting = def_team.scouting_data
+    off_scouting["offense"]["Playcalls"][off_call]["used"] += 1
+    def_scouting["defense"][def_call]["used"] += 1
 
     roles = game.turn_manager.assign_roles()
     
@@ -370,23 +358,23 @@ def resolve_half_court_offense_logic(game: "GameManager") -> dict:
     from BackEnd.models.turn_manager import TurnManager
     event_type = game.turn_manager.determine_event_type(roles)
     if event_type == "TURNOVER":
-        return resolve_turnover_logic(roles, game_state, turnover_type="DEAD BALL")
+        return resolve_turnover_logic(roles, game, turnover_type="DEAD BALL")
 
     elif event_type == "O_FOUL":
         game_state["foul_team"] = "OFFENSE"
-        return resolve_foul(roles, game_state)
+        return resolve_foul(roles, game)
 
     elif event_type == "D_FOUL":
         game_state["foul_team"] = "DEFENSE"
-        return resolve_foul(roles, game_state)
+        return resolve_foul(roles, game)
     
     shot_result = game.shot_manager.resolve_shot(roles)
 
     # Track success
     if shot_result["result_type"] == "MAKE":
-        game.scouting_data[off_team]["offense"]["Playcalls"][off_call]["success"] += 1
+        off_scouting["offense"]["Playcalls"][off_call]["success"] += 1
     elif shot_result["result_type"] in ["MISS", "TURNOVER"]:
-        game.scouting_data[def_team]["defense"][def_call]["success"] += 1
+        def_scouting["defense"][def_call]["success"] += 1
 
     if shot_result["result_type"] == "MISS":
         return game.turn_manager.rebound_manager.handle_rebound()
@@ -394,16 +382,15 @@ def resolve_half_court_offense_logic(game: "GameManager") -> dict:
 
     return shot_result
 
-def calculate_foul_turnover(game_state, positions, thresholds, roles):
-    off_team = game_state["offense_team"]
-    def_team = game_state["defense_team"]
+def calculate_foul_turnover(game, positions, thresholds, roles):
+    game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
     roles["foul_player"] = None
     ball_handler = roles["ball_handler"]
     defense_call = game_state["defense_playcall"]
 
     # === Defensive Foul ===
     d_pos = positions["d_foul"]
-    d_foul_player = game_state["players"][def_team][d_pos]
+    d_foul_player = def_team.lineup[d_pos]
     d_attr = d_foul_player.attributes
 
     iq = d_attr["IQ"] * 0.3
@@ -424,7 +411,7 @@ def calculate_foul_turnover(game_state, positions, thresholds, roles):
 
     # === Offensive Foul ===
     o_pos = positions["o_foul"]
-    o_foul_player = game_state["players"][off_team][o_pos]
+    o_foul_player = off_lineup[o_pos]
     o_attr = o_foul_player.attributes
 
     iq = o_attr["IQ"] * 0.3
@@ -443,7 +430,7 @@ def calculate_foul_turnover(game_state, positions, thresholds, roles):
 
     # === Turnover ===
     t_pos = positions["turnover"]
-    turnover_player = game_state["players"][off_team][t_pos]
+    turnover_player = off_lineup[t_pos]
     t_attr = turnover_player.attributes
 
     bh_score = (
@@ -453,7 +440,7 @@ def calculate_foul_turnover(game_state, positions, thresholds, roles):
         t_attr["CH"] * 0.1
     ) * random.randint(1, 6)
 
-    def_mod_player = game_state["players"][def_team][t_pos]
+    def_mod_player = def_lineup[t_pos]
     def_mod_attr = def_mod_player.attributes
     pressure = (
         def_mod_attr["OD"] * 0.3 +
