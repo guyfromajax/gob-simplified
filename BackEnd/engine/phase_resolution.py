@@ -227,6 +227,8 @@ def resolve_free_throw_logic(game):
 
     # FT outcome calculation
     ft_shot_score = ((attrs["FT"] * 0.8) + (attrs["CH"] * 0.2)) * random.randint(1, 6)
+    print(f"ft_shot_score: {ft_shot_score}")
+    print(f"off_team.team_attributes['ft_shot_threshold']: {off_team.team_attributes['ft_shot_threshold']}")
     makes_shot = ft_shot_score >= off_team.team_attributes["ft_shot_threshold"]
 
     shooter.record_stat("FTA")
