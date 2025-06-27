@@ -149,12 +149,12 @@ def resolve_offensive_rebound_loop(game, rebounder):
 
         # shot missed — determine rebound
         new_rebounder, new_team, new_stat = determine_rebounder(game)
-        # new_rebounder.record_stat(new_stat)
+        new_rebounder.record_stat(new_stat)
+        print(f"+1 rebound for {get_name_safe(new_rebounder)} / utils/shared - resolve_offensive_rebound_loop")
         text_log += f" but misses the shot. {new_rebounder} grabs the rebound."
 
         if new_team != off_team:
-            new_rebounder.record_stat(new_stat)
-            print(f"[REBOUND TRACKING] Offensive Rebound Loop - {new_rebounder.get_name()} recorded {new_stat}")
+            print(f"+1 rebound for {get_name_safe(new_rebounder)} / utils/shared - resolve_offensive_rebound_loop")
             return {
                 "text": text_log,
                 "possession_flips": True,
@@ -257,8 +257,8 @@ def determine_rebounder(game):
     new_team = def_team if random.random() < d_weight else off_team
     new_rebounder = d_rebounder if new_team == def_team else o_rebounder
     new_stat = "DREB" if new_team == def_team else "OREB"
-    new_rebounder.record_stat(new_stat)
-    print(f"+1 rebound for {get_name_safe(new_rebounder)} / utils/shared - determine_rebounder")
+    # new_rebounder.record_stat(new_stat)
+    # print(f"+1 rebound for {get_name_safe(new_rebounder)} / utils/shared - determine_rebounder")
 
     return new_rebounder, new_team, new_stat
 

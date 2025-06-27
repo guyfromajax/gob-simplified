@@ -181,8 +181,8 @@ class ShotManager:
             rebounder = d_rebounder if rebound_team == def_team else o_rebounder
             stat = "DREB" if rebound_team == def_team else "OREB"
             self.game_state["last_rebound"] = stat  # stat is either "DREB" or "OREB"
-            # rebounder.record_stat(stat)
-            # print(f"+1 rebound for {get_name_safe(rebounder)} / shot manager - resolve_shot")
+            rebounder.record_stat(stat)
+            print(f"+1 rebound for {get_name_safe(rebounder)} / shot manager - resolve_shot")
 
             text += f"...{rebounder} grabs the rebound."
             possession_flips = (rebound_team != off_team)
