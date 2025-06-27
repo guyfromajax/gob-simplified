@@ -25,6 +25,8 @@ class ShotManager:
     def __init__(self, game):
         self.game = game
         self.game_state = game.game_state  # still accessible
+        # Add defense score tracking
+        self.defense_scores = []
 
 
     def resolve_shot(self, roles):
@@ -219,6 +221,9 @@ class ShotManager:
             defense_attrs["IQ"] * 0.1 +
             defense_attrs["CH"] * 0.1
         ) * random.randint(1, 6)
+        
+        # Track defense score for statistics
+        self.defense_scores.append(defense_score)
 
         d_foul, foul_player = self.check_defensive_foul_on_shot(defender, defense_score)
 
@@ -310,8 +315,14 @@ class ShotManager:
         shot_score = (attrs["SC"] * 0.6 + attrs["CH"] * 0.2 + attrs["IQ"] * 0.2) * random.randint(1, 6)
 
         defender = random.choice(fb_roles["defense"]) if fb_roles["defense"] else None
-        defense_attrs = defender.attributes if defender else {"OD": 0, "IQ": 0, "CH": 0}
-        defense_score = (defense_attrs["ID"] * 0.8 + defense_attrs["IQ"] * 0.1 + defense_attrs["CH"] * 0.1) * random.randint(1, 6)
+        defense_attrs = defender.attributes if defender else {"ID": 0, "IQ": 0, "CH": 0}
+        defense_score = (
+            defense_attrs.get("ID", 0) * 0.8 +
+            defense_attrs.get("IQ", 0) * 0.1 +
+            defense_attrs.get("CH", 0) * 0.1
+        ) * random.randint(1, 6)
+        # Track defense score for statistics (fast break)
+        self.defense_scores.append(defense_score)
         shot_score -= defense_score * 0.2
         if defender:
             defender.record_stat("DEF_A")
@@ -366,3 +377,29 @@ class ShotManager:
             "end_coords": {shooter_pos: {"x": 82, "y": 23}},
             "time_elapsed": time_elapsed
         }
+
+    def print_defense_score_stats(self):
+        """Print defense score statistics for the game."""
+        if not self.defense_scores:
+            print("No defense scores recorded in this game.")
+            return
+            
+        import statistics
+        
+        count = len(self.defense_scores)
+        avg = statistics.mean(self.defense_scores)
+        median = statistics.median(self.defense_scores)
+        stdev = statistics.stdev(self.defense_scores) if count > 1 else 0
+        
+        print("\n" + "="*50)
+        print("DEFENSE SCORE STATISTICS")
+        print("="*50)
+        print(f"Total calculations: {count}")
+        print(f"Average: {avg:.2f}")
+        print(f"Median: {median:.2f}")
+        print(f"Standard Deviation: {stdev:.2f}")
+        print(f"1st Standard Deviation Range: {avg - stdev:.2f} to {avg + stdev:.2f}")
+        print(f"2nd Standard Deviation Range: {avg - 2*stdev:.2f} to {avg + 2*stdev:.2f}")
+        print(f"Min: {min(self.defense_scores):.2f}")
+        print(f"Max: {max(self.defense_scores):.2f}")
+        print("="*50)
