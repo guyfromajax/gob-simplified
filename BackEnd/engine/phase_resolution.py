@@ -39,8 +39,7 @@ def resolve_foul(roles, game):
 
     # Track the foul
     foul_player.record_stat("F")
-    print(f"foul_team: {foul_team}")
-    if foul_team == "DEFENSE":
+    if foul_team == def_team:
         def_team.team_fouls += 1
         text = f"{get_name_safe(foul_player)} fouls {get_name_safe(ball_handler)}!"
     else:
