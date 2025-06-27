@@ -314,15 +314,17 @@ def resolve_turnover_logic(roles, game, turnover_type="DEAD BALL"):
     ball_handler.record_stat("TO")
     turnover_type = random.choice(["STEAL", "DEAD BALL"])
 
-    if turnover_type == "STEAL":
+    if turnover_type == "STEAL" and defender:
         defender.record_stat("STL")
+        text = f"{get_name_safe(defender)} jumps the pass"
         if random.random() < get_fast_break_chance(game):
             game_state["offensive_state"] = "FAST_BREAK"
+            text += " and takes it the other way!"
         else:
             game_state["offensive_state"] = "HCO"
+            text += " and waits to set up the half-court offense."
         game_state["last_stealer"] = defender
         game_state["last_rebound"] = ""
-        text = f"{get_name_safe(defender)} jumps the pass and takes it the other way!"
     else:
         game_state["offensive_state"] = "HCO"
         description = random.choice([
