@@ -52,10 +52,15 @@ class GameManager:
 
 
     def simulate_turn(self):
-        print("Starting new turn")
-        print(f"offense_team: {self.offense_team}")
+        # print("Starting new turn")
+        # print(f"offense_team: {self.offense_team}")
         result = self.turn_manager.run_turn()
         self.turns.append(result)
+        
+        # Print the text from the turn result
+        if "text" in result:
+            print(result["text"])
+        
         return result
 
     def switch_possession(self):
