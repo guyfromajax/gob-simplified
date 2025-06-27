@@ -193,38 +193,44 @@ class ShotManager:
                 
                 if attempt_putback:
                     text += (f"... he attempts the putback...")
+                    putback_result = resolve_offensive_rebound_loop(self.game, rebounder)
+                    text += putback_result["text"]
+                    possession_flips = putback_result["possession_flips"]
+                    time_elapsed += putback_result["time_elapsed"]
 
-                    # Basic putback shot calculation (we'll refine later)
-                    attrs = rebounder.attributes
-                    shot_score = (
-                        attrs["SC"] * 0.6 +
-                        attrs["CH"] * 0.2 +
-                        attrs["IQ"] * 0.2
-                    ) * random.randint(1, 6)
+                    # # Basic putback shot calculation (we'll refine later)
+                    # attrs = rebounder.attributes
+                    # shot_score = (
+                    #     attrs["SC"] * 0.6 +
+                    #     attrs["CH"] * 0.2 +
+                    #     attrs["IQ"] * 0.2
+                    # ) * random.randint(1, 6)
 
-                    defender_pos = random.choice(["C", "C", "C", "C", "C", "PF", "PF", "PF", "SF", "SF", "SG", "PG"])
-                    defender = self.game.defense_team.lineup[defender_pos]
-                    defense_attrs = defender.attributes
-                    defense_penalty = (defense_attrs["ID"] * 0.8 + defense_attrs["IQ"] * 0.1 + defense_attrs["CH"] * 0.1) * random.randint(1, 6)
-                    shot_score -= defense_penalty * 0.2
-                    made = shot_score >= off_team.team_attributes["shot_threshold"]
+                    # defender_pos = random.choice(["C", "C", "C", "C", "C", "PF", "PF", "PF", "SF", "SF", "SG", "PG"])
+                    # defender = self.game.defense_team.lineup[defender_pos]
+                    # defense_attrs = defender.attributes
+                    # defense_penalty = (defense_attrs["ID"] * 0.8 + defense_attrs["IQ"] * 0.1 + defense_attrs["CH"] * 0.1) * random.randint(1, 6)
+                    # shot_score -= defense_penalty * 0.2
+                    # made = shot_score >= off_team.team_attributes["shot_threshold"]
 
-                    # Track stats
-                    rebounder.record_stat("FGA")
-                    print(f"{get_name_safe(rebounder)} attempts the o rebound shot in resolve_shot")
-                    if made:
-                        rebounder.record_stat("FGM")
-                        points = 2
-                        record_team_points(self.game, off_team, points)
-                        text += f" and he scores!"
-                        possession_flips = True
-                    else:
-                        # Use dynamic logic for the missed putback
-                        putback_result = resolve_offensive_rebound_loop(self.game, rebounder)
-                        # Add result text and update turn metadata
-                        text += f" and misses the putback. {putback_result['text']}"
-                        possession_flips = putback_result["possession_flips"]
-                        time_elapsed += putback_result["time_elapsed"]
+                    # # Track stats
+                    # rebounder.record_stat("FGA")
+                    # print(f"{get_name_safe(rebounder)} attempts the o rebound shot in resolve_shot")
+                    # if made:
+                    #     rebounder.record_stat("FGM")
+                    #     points = 2
+                    #     record_team_points(self.game, off_team, points)
+                    #     text += f" and he scores!"
+                    #     possession_flips = True
+                    # else:
+                    #     # Use dynamic logic for the missed putback
+                    #     putback_result = resolve_offensive_rebound_loop(self.game, rebounder)
+                    #     # Add result text and update turn metadata
+                    #     text += f" and misses the putback. {putback_result['text']}"
+                    #     possession_flips = putback_result["possession_flips"]
+                    #     time_elapsed += putback_result["time_elapsed"]
+                else:
+                    text += "...and he kicks it back out to reset the half-court offense"
             else:
                 self.game_state["last_rebounder"] = rebounder
                 if random.random() < get_fast_break_chance(self.game):
