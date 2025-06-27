@@ -134,6 +134,7 @@ def resolve_offensive_rebound_loop(game, rebounder):
 
         made = shot_score >= off_team.team_attributes["shot_threshold"]
         rebounder.record_stat("FGA")
+        print(f"{get_name_safe(rebounder)} attempts a shot")
 
         if made:
             rebounder.record_stat("FGM")
