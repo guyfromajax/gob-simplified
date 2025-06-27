@@ -240,7 +240,7 @@ class ShotManager:
             "result_type": "MAKE" if made else "MISS",
             "ball_handler": shooter,
             "shooter": shooter,
-            "shot_score": shot_score,
+            # "shot_score": shot_score,
             "screener": screener,
             "passer": passer,
             "defender": defender,

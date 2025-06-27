@@ -368,6 +368,20 @@ def resolve_half_court_offense_logic(game: "GameManager") -> dict:
         return resolve_foul(roles, game)
     
     shot_result = game.shot_manager.resolve_shot(roles)
+    # shot_result = {
+    #         "result_type": "MAKE" if made else "MISS",
+    #         "ball_handler": shooter,
+    #         "shooter": shooter,
+    #         "shot_score": shot_score,
+    #         "screener": screener,
+    #         "passer": passer,
+    #         "defender": defender,
+    #         "text": text,
+    #         "possession_flips": possession_flips,
+    #         "start_coords": {shooter_pos: {"x": 72, "y": 25}},
+    #         "end_coords": {shooter_pos: {"x": 82, "y": 23}},
+    #         "time_elapsed": time_elapsed
+    #     }
 
     # Track success
     if shot_result["result_type"] == "MAKE":
@@ -375,8 +389,8 @@ def resolve_half_court_offense_logic(game: "GameManager") -> dict:
     elif shot_result["result_type"] in ["MISS", "TURNOVER"]:
         def_scouting["defense"][def_call]["success"] += 1
 
-    if shot_result["result_type"] == "MISS":
-        return game.turn_manager.rebound_manager.handle_rebound()
+    # if shot_result["result_type"] == "MISS":
+    #     return game.turn_manager.rebound_manager.handle_rebound()
 
 
     return shot_result

@@ -58,8 +58,8 @@ class GameManager:
         self.turns.append(result)
         
         # Print the text from the turn result
-        if "text" in result:
-            print(result["text"])
+        # if "text" in result:
+        #     print(result["text"])
         
         return result
 
