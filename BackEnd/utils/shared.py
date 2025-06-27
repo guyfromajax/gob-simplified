@@ -126,7 +126,7 @@ def resolve_offensive_rebound_loop(game, rebounder):
 
         made = shot_score >= off_team.team_attributes["shot_threshold"]
         rebounder.record_stat("FGA")
-        print(f"{get_name_safe(rebounder)} attempts an offensive rebound shot")
+        # print(f"{get_name_safe(rebounder)} attempts an offensive rebound shot")
 
         if made:
             rebounder.record_stat("FGM")
@@ -142,7 +142,7 @@ def resolve_offensive_rebound_loop(game, rebounder):
         # shot missed — determine rebound
         new_rebounder, new_team, new_stat = determine_rebounder(game)
         new_rebounder.record_stat(new_stat)
-        print(f"+1 rebound for {get_name_safe(new_rebounder)} / utils/shared - resolve_offensive_rebound_loop")
+        # print(f"+1 rebound for {get_name_safe(new_rebounder)} / utils/shared - resolve_offensive_rebound_loop")
         text_log += f" but misses the shot. {new_rebounder} grabs the rebound."
 
         if new_team != off_team:
