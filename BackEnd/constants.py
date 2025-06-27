@@ -80,3 +80,12 @@ TURNOVER_CALC_DICT = {
 }
 
 POSITION_LIST = ["PG", "SG", "SF", "PF", "C"]
+
+# constants/strategy_factors.py
+AGGRESSION_FOUL_MULTIPLIER = {
+    0: 0.1,
+    1: 0.15,
+    2: 0.2,
+    3: 0.25,
+    4: 0.3,
+}

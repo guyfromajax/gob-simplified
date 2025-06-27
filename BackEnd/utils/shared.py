@@ -323,6 +323,7 @@ def unpack_game_context(game):
     )
 
 def summarize_game_state(game):
+
     return {
         "final_score": game.score,
         "points_by_quarter": game.game_state["points_by_quarter"],
@@ -333,3 +334,26 @@ def summarize_game_state(game):
         },
         "team_totals": game.team_totals
     }
+
+def check_defensive_foul(self, defender, is_three):
+    """
+    Returns True if a defensive foul is committed during a shot attempt.
+    """
+    if not defender:
+        return False  # No defender, no foul
+
+    attrs = defender.attributes
+    discipline = attrs.get("ND", 5)  # ND = "No Dumb Fouls"
+
+    # Base foul rate: higher on 3pt shots, but reduced by discipline
+    base_foul_chance = 0.06 if is_three else 0.045
+    foul_chance = max(0.01, base_foul_chance - (discipline * 0.0045))
+
+    return random.random() < foul_chance
+
+def calculate_gravity_score(attrs):
+    return (
+        attrs["SH"] * 0.3 +
+        attrs["SC"] * 0.3 +
+        attrs["IQ"] * 0.4
+    )
