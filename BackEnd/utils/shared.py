@@ -103,7 +103,6 @@ def resolve_offensive_rebound_loop(game, rebounder):
     while True:
 
         # attempt putback
-        text_log += f"{rebounder} goes back up..."
         attrs = rebounder.attributes
         shot_score = (
             attrs["SC"] * 0.6 +

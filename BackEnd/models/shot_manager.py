@@ -192,7 +192,7 @@ class ShotManager:
                 attempt_putback = random.random() < 0.65
                 
                 if attempt_putback:
-                    text += (f"... he attempts the putback...") #goes back up
+                    text += (f"... he attempts the putback...") 
                     putback_result = resolve_offensive_rebound_loop(self.game, rebounder)
                     text += putback_result["text"]
                     possession_flips = putback_result["possession_flips"]

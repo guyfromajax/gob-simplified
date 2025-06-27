@@ -33,7 +33,7 @@ class TurnManager:
         self.playbook_manager = PlaybookManager(self.game.offense_team)
         self.animator = AnimationManager()
 
-    def run_turn(self):
+    def run_micro_turn(self):
         # STEP 1: Set strategy calls (tempo + aggression)
         self.set_strategy_calls()
 
@@ -63,7 +63,7 @@ class TurnManager:
         self.animator.capture(result)
 
         print(f"{result['text']}")
-        print("🔁 End of run_turn")
+        print("🔁 End of run_micro_turn")
         print(f"{self.game.game_state['score']}")
         print(f"{self.game.game_state['clock']}")
         #print all team stats here after each turn
@@ -210,6 +210,7 @@ class TurnManager:
         event_type = calculate_foul_turnover(self.game, positions, thresholds, roles)
     
         #determine number of turnover RNGs based on defense team'saggression
+        
         for pos, player_obj in self.game.offense_team.lineup.items():
             attr = player_obj.attributes
             ng = attr["NG"]
