@@ -99,7 +99,7 @@ def resolve_offensive_rebound_loop(game, rebounder):
     game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
     total_time = 0
     text_log = ""
-    
+    turns = 0
     while True:
 
         # attempt putback
@@ -161,6 +161,16 @@ def resolve_offensive_rebound_loop(game, rebounder):
                 "possession_flips": False,
                 "time_elapsed": total_time
             }
+        
+        if turns > 4:
+            text_log += f"{get_name_safe(rebounder)} kicks it out."
+            return {
+                "text": text_log,
+                "possession_flips": False,
+                "time_elapsed": total_time
+            }
+        
+        turns += 1
 
 def calculate_screen_score(screen_attrs):
     """
