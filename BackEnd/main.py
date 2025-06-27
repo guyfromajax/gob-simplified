@@ -253,6 +253,9 @@ def run_simulation(home_team_name, away_team_name):
     while gm.game_state["time_remaining"] > 0:
         gm.simulate_macro_turn()
 
+    # Print function call counts
+    gm.print_function_counts()
+
     # This still works just fine:
     print(gm.team_totals["Lancaster"]["PTS"])
 
