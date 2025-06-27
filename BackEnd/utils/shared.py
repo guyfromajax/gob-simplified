@@ -101,14 +101,6 @@ def resolve_offensive_rebound_loop(game, rebounder):
     text_log = ""
     
     while True:
-        # 65% chance to shoot, else kick out
-        if random.random() > 0.65:
-            text_log += f"{rebounder} kicks it out."
-            return {
-                "text": text_log,
-                "possession_flips": False,
-                "time_elapsed": total_time
-            }
 
         # attempt putback
         text_log += f"{rebounder} goes back up..."
@@ -142,7 +134,6 @@ def resolve_offensive_rebound_loop(game, rebounder):
             record_team_points(game, off_team, points)
             text_log += f" and he scores!"
             return {
-                "shooter": rebounder,
                 "text": text_log,
                 "possession_flips": True,
                 "time_elapsed": total_time
@@ -163,6 +154,13 @@ def resolve_offensive_rebound_loop(game, rebounder):
 
         # else: new offensive rebound, repeat loop
         rebounder = new_rebounder
+        if random.random() > 0.65:
+            text_log += f"{get_name_safe(rebounder)} kicks it out."
+            return {
+                "text": text_log,
+                "possession_flips": False,
+                "time_elapsed": total_time
+            }
 
 def calculate_screen_score(screen_attrs):
     """
