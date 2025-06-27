@@ -141,7 +141,7 @@ class ShotManager:
             final_block_chance = base_block_prob * (0.5 + block_skill)  # scales 50–150% of base
             is_block = random.random() < final_block_chance
             if is_block:
-                text += f"{get_name_safe(defender)} blocks the shot!"
+                text += f"{get_name_safe(defender)} blocks the shot! Great Block!!!"
                 defender.record_stat("BLK")
                 
 
