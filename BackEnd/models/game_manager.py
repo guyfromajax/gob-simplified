@@ -3,7 +3,7 @@ from BackEnd.models.turn_manager import TurnManager
 from BackEnd.models.shot_manager import ShotManager
 from BackEnd.models.team_manager import TeamManager
 
-from BackEnd.constants import POSITION_LIST, PLAYCALLS
+from BackEnd.constants import POSITION_LIST, PLAYCALLS, BOX_SCORE_KEYS
 from copy import deepcopy
 import random
 
@@ -53,6 +53,9 @@ class GameManager:
         # print(f"offense_team: {self.offense_team}")
         result = self.turn_manager.run_turn()
         self.turns.append(result)
+        
+        # Update team stats after each turn
+        self.update_team_stats()
         
         # Print the text from the turn result
         # if "text" in result:
@@ -113,6 +116,22 @@ class GameManager:
             self.home_team.name: self.home_team.get_team_game_stats(),
             self.away_team.name: self.away_team.get_team_game_stats()
         }
+
+    def update_team_stats(self):
+        """Calculate and populate team stats by aggregating all player stats."""
+        # Initialize team stats dictionaries
+        self.home_team.stats = {stat: 0 for stat in BOX_SCORE_KEYS}
+        self.away_team.stats = {stat: 0 for stat in BOX_SCORE_KEYS}
+        
+        # Aggregate home team stats
+        for player in self.home_team.players:
+            for stat in BOX_SCORE_KEYS:
+                self.home_team.stats[stat] += player.stats["game"].get(stat, 0)
+        
+        # Aggregate away team stats
+        for player in self.away_team.players:
+            for stat in BOX_SCORE_KEYS:
+                self.away_team.stats[stat] += player.stats["game"].get(stat, 0)
 
 
 
