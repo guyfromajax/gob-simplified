@@ -182,7 +182,7 @@ class ShotManager:
             stat = "DREB" if rebound_team == def_team else "OREB"
             self.game_state["last_rebound"] = stat  # stat is either "DREB" or "OREB"
             rebounder.record_stat(stat)
-            print(f"+1 rebound for {get_name_safe(rebounder)}")
+            print(f"+1 rebound for {get_name_safe(rebounder)} / shot manager - resolve_shot")
 
             text += f"...{rebounder} grabs the rebound."
             possession_flips = (rebound_team != off_team)
@@ -294,7 +294,7 @@ class ShotManager:
             rebounder = random.choice(fb_roles["defense"]) if fb_roles["defense"] else self.game.defense_team.lineup["PG"]
             text = f"{shooter} misses the fast break shot -- {rebounder} grabs the rebound."
             rebounder.record_stat("DREB")
-            print(f"+1 rebound for {get_name_safe(rebounder)}")
+            print(f"+1 rebound for {get_name_safe(rebounder)} / shot manager - resolve_fast_break_shot")
             possession_flips = True
             if random.random() < get_fast_break_chance(self.game):
                 text += " -- entering a fast break!"
