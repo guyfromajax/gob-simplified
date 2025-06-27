@@ -63,11 +63,13 @@ class ReboundManager:
         self.game.game_state["last_rebounder"] = rebounder
         self.game.game_state["last_rebound"] = stat
 
+        print_variable = "defensive rebound" if stat == "DREB" else "offensive rebound"
+
         # Return a valid turn_result
         return {
             "result_type": stat,
             "ball_handler": rebounder,
-            "text": f"{rebounder} grabs the {stat}.",
+            "text": f"{rebounder} grabs the {print_variable}.",
             "start_coords": {},  # optional
             "end_coords": {},    # optional
             "time_elapsed": random.randint(3, 6),

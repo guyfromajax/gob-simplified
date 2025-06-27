@@ -44,7 +44,7 @@ class TurnManager:
 
         print("*****RUN TURN*****")
         print(f"offensive state: {self.game.game_state['offensive_state']}")
-        if self.game.game_state["offensive_state"] == "HCO":
+        if self.game.game_state["offensive_state"] in ["HCO", "HALF_COURT"]:
             print(f"{self.game.offense_team.name}: {self.game.game_state['current_playcall']}")
             print(f"{self.game.defense_team.name}: {self.game.game_state['defense_playcall']}")
 
@@ -62,6 +62,7 @@ class TurnManager:
         self.logger.log_turn_result(result)
         self.animator.capture(result)
 
+        print(f"{result['text']}")
         print("🔁 End of run_turn")
         print(f"{self.game.game_state['score']}")
         print(f"{self.game.game_state['clock']}")
