@@ -22,6 +22,10 @@ class GameManager:
 
         self.turn_manager = TurnManager(self)
         self.shot_manager = ShotManager(self)
+        
+        # Add counters for function calls
+        self.macro_turn_count = 0
+        self.micro_turn_count = 0
 
     
     def _init_game_state(self):
@@ -49,6 +53,9 @@ class GameManager:
 
 
     def simulate_macro_turn(self):
+        # Increment macro turn counter
+        self.macro_turn_count += 1
+        
         # print("Starting new turn")
         # print(f"offense_team: {self.offense_team}")
         result = self.turn_manager.run_micro_turn()
@@ -115,6 +122,14 @@ class GameManager:
             self.home_team.name: self.home_team.get_team_game_stats(),
             self.away_team.name: self.away_team.get_team_game_stats()
         }
+
+    def print_function_counts(self):
+        """Print the number of times each function was called."""
+        print(f"=== FUNCTION CALL COUNTS ===")
+        print(f"simulate_macro_turn() called: {self.macro_turn_count} times")
+        print(f"run_micro_turn() called: {self.micro_turn_count} times")
+        print(f"Total turns: {len(self.turns)}")
+        print(f"=============================")
 
     def update_team_stats(self):
         """Calculate and populate team stats by aggregating all player stats."""

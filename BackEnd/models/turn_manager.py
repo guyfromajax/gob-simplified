@@ -34,6 +34,9 @@ class TurnManager:
         self.animator = AnimationManager()
 
     def run_micro_turn(self):
+        # Increment micro turn counter
+        self.game.micro_turn_count += 1
+        
         # STEP 1: Set strategy calls (tempo + aggression)
         self.set_strategy_calls()
 
