@@ -428,43 +428,35 @@ def calculate_foul_turnover(game, positions, roles):
 
     # === Defensive Foul ===
     d_pos = positions["d_foul"]
-    d_foul_player = def_team.lineup[d_pos]
+    d_foul_player = def_lineup[d_pos]
     d_attr = d_foul_player.attributes
 
-    iq = d_attr["IQ"] * 0.3
-    ch = d_attr["CH"] * 0.3
-    if d_pos in ["PG", "SG"]:
-        movement = d_attr["OD"] * 0.2 + d_attr["AG"] * 0.2
-    elif d_pos == "SF":
-        movement = d_attr["OD"] * 0.1 + d_attr["ID"] * 0.1 + d_attr["AG"] * 0.1 + d_attr["ST"] * 0.1
-    elif d_pos in ["PF", "C"]:
-        movement = d_attr["ID"] * 0.2 + d_attr["ST"] * 0.2
-    else:
-        movement = 0
+    d_movement = (
+        d_attr["OD"] * 0.2 + d_attr["AG"] * 0.2 if d_pos in ["PG", "SG"] else
+        d_attr["OD"] * 0.1 + d_attr["ID"] * 0.1 + d_attr["AG"] * 0.1 + d_attr["ST"] * 0.1 if d_pos == "SF" else
+        d_attr["ID"] * 0.2 + d_attr["ST"] * 0.2 if d_pos in ["PF", "C"] else
+        0
+    )
 
-    d_foul_score = (iq + ch + movement) * random.randint(1, 6)
+    d_foul_score = (d_attr["IQ"] * 0.3 + d_attr["CH"] * 0.3 + d_movement) * random.randint(1, 6)
     if defense_call == "Zone":
         d_foul_score *= 1.1
-    is_d_foul = d_foul_score < (def_team.team_attributes["foul_threshold"] * 1.2)
+    is_d_foul = d_foul_score < def_team.team_attributes["foul_threshold"] * 1.2
 
     # === Offensive Foul ===
     o_pos = positions["o_foul"]
     o_foul_player = off_lineup[o_pos]
     o_attr = o_foul_player.attributes
 
-    iq = o_attr["IQ"] * 0.3
-    ch = o_attr["CH"] * 0.3
-    if o_pos in ["PG", "SG"]:
-        movement = o_attr["AG"] * 0.4
-    elif o_pos == "SF":
-        movement = o_attr["AG"] * 0.2 + o_attr["ST"] * 0.2
-    elif o_pos in ["PF", "C"]:
-        movement = o_attr["ST"] * 0.4
-    else:
-        movement = 0
+    o_movement = (
+        o_attr["AG"] * 0.4 if o_pos in ["PG", "SG"] else
+        o_attr["AG"] * 0.2 + o_attr["ST"] * 0.2 if o_pos == "SF" else
+        o_attr["ST"] * 0.4 if o_pos in ["PF", "C"] else
+        0
+    )
 
-    o_foul_score = (iq + ch + movement) * random.randint(1, 6)
-    is_o_foul = o_foul_score < (off_team.team_attributes["foul_threshold"] * 0.8)
+    o_foul_score = (o_attr["IQ"] * 0.3 + o_attr["CH"] * 0.3 + o_movement) * random.randint(1, 6)
+    is_o_foul = o_foul_score < off_team.team_attributes["foul_threshold"] * 0.8
 
     # === Turnover ===
     t_pos = positions["turnover"]
@@ -480,6 +472,7 @@ def calculate_foul_turnover(game, positions, roles):
 
     def_mod_player = def_lineup[t_pos]
     def_mod_attr = def_mod_player.attributes
+
     pressure = (
         def_mod_attr["OD"] * 0.3 +
         def_mod_attr["AG"] * 0.3 +
@@ -490,31 +483,30 @@ def calculate_foul_turnover(game, positions, roles):
         pressure *= 0.9
 
     turnover_score = bh_score - pressure
-    is_turnover = turnover_score < thresholds["turnover_threshold"]
+    is_turnover = turnover_score < off_team.team_attributes["turnover_threshold"]
 
-    # print(f"Turnover → {get_name_safe(turnover_player)} vs {get_name_safe(def_mod_player)}: score={round(turnover_score, 2)} vs threshold={thresholds['turnover_threshold']} | flag={is_turnover}")
-
+    # === Decide event type
     decisions = {
         "TURNOVER": (is_turnover, turnover_score),
         "D_FOUL": (is_d_foul, d_foul_score),
-        "O_FOUL": (is_o_foul, o_foul_score)
+        "O_FOUL": (is_o_foul, o_foul_score),
     }
 
     active = [(k, v[1]) for k, v in decisions.items() if v[0]]
     if not active:
-        print()
         return "SHOT"
 
+    # Prioritize by score, then priority: TURNOVER > D_FOUL > O_FOUL
     active.sort(key=lambda x: (x[1], ["TURNOVER", "D_FOUL", "O_FOUL"].index(x[0])))
 
-    if active[0][0] == "TURNOVER":
+    event_type = active[0][0]
+    if event_type == "TURNOVER":
         roles["turnover_player"] = turnover_player
         roles["turnover_defender"] = def_mod_player
         roles["ball_handler"] = turnover_player
-    elif active[0][0] == "D_FOUL":
+    elif event_type == "D_FOUL":
         roles["foul_player"] = d_foul_player
-    elif active[0][0] == "O_FOUL":
+    elif event_type == "O_FOUL":
         roles["foul_player"] = o_foul_player
 
-    print()
-    return active[0][0]
+    return event_type
