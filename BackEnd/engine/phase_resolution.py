@@ -23,7 +23,7 @@ from BackEnd.utils.shared import (
     unpack_game_context
 )
     
-def resolve_foul(roles, game):
+def resolve_non_shooting_foul(roles, game):
     
     game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
     foul_team = off_team if game_state["foul_team"] == "OFFENSE" else def_team
@@ -46,15 +46,18 @@ def resolve_foul(roles, game):
         off_team.team_fouls += 1
         text = f"{get_name_safe(foul_player)} commits an offensive foul!"
 
-    foul_type = random.choice(["SHOOTING", "NON_SHOOTING"]) if foul_team == "DEFENSE" else "NON_SHOOTING" # Future logic: determine if this was shooting or not
+    # foul_type = random.choice(["SHOOTING", "NON_SHOOTING"]) if foul_team == "DEFENSE" else "NON_SHOOTING" # Future logic: determine if this was shooting or not
+    # foul_type = "NON_SHOOTING"
 
-    if foul_type == "SHOOTING":
-        game_state["offensive_state"] = "FREE_THROW"
-        game_state["free_throws"] = 2  # Future: support 3 FT on 3PT attempt
-        game_state["free_throws_remaining"] = 2
-        game_state["last_ball_handler"] = ball_handler
-        ball_handler = shooter
-    elif def_team.team_fouls >= 10:
+    # if foul_type == "SHOOTING":
+    #     game_state["offensive_state"] = "FREE_THROW"
+    #     game_state["free_throws"] = 2  # Future: support 3 FT on 3PT attempt
+    #     game_state["free_throws_remaining"] = 2
+    #     game_state["last_ball_handler"] = ball_handler
+    #     ball_handler = shooter
+    print("Inside resolve_non_shooting_foul")
+    print(f"def_team.team_fouls: {def_team.team_fouls}")
+    if def_team.team_fouls >= 10:
         game_state["free_throws"] = 2
         game_state["free_throws_remaining"] = 2
         game_state["one_and_one"] = False
@@ -78,7 +81,6 @@ def resolve_foul(roles, game):
         "screener": screener,
         "passer": passer,
         "defender": defender,
-        "foul_type": foul_type,
         "text": text,
         "possession_flips": False,
         "start_coords": {bh_pos: {"x": 72, "y": 25}},
@@ -197,7 +199,7 @@ def resolve_fast_break_logic(game: "GameManager"):
         turnover_type = random.choice(["STEAL", "DEAD BALL"])
         turn_result = resolve_turnover_logic(fb_roles, game, turnover_type)
     elif event_type == "FOUL":
-        turn_result = resolve_foul(fb_roles, game)
+        turn_result = resolve_non_shooting_foul(fb_roles, game)
     
     if turn_result["result_type"] == "MAKE": #def_scouting
         off_scouting["offense"]["Fast_Break_Success"] += 1
@@ -384,11 +386,11 @@ def resolve_half_court_offense_logic(game: "GameManager") -> dict:
 
     elif event_type == "O_FOUL":
         game_state["foul_team"] = "OFFENSE"
-        return resolve_foul(roles, game)
+        return resolve_non_shooting_foul(roles, game)
 
     elif event_type == "D_FOUL":
         game_state["foul_team"] = "DEFENSE"
-        return resolve_foul(roles, game)
+        return resolve_non_shooting_foul(roles, game)
     
     shot_result = game.shot_manager.resolve_shot(roles)
     # shot_result = {
