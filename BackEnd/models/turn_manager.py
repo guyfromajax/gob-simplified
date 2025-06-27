@@ -110,10 +110,10 @@ class TurnManager:
         return resolve_fast_break_logic(self.game) 
 
     def resolve_free_throw(self):
-        return resolve_free_throw_logic(self.game.game_state)
+        return resolve_free_throw_logic(self.game)
     
     def resolve_turnover(self):
-        return resolve_turnover_logic(self.game.game_state)
+        return resolve_turnover_logic(self.game)
 
     def update_clock_and_possession(self, result):
         # 🕒 Reduce clock by time_elapsed
