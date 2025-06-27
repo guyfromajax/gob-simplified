@@ -174,14 +174,6 @@ def recalculate_energy_scaled_attributes(game_state):
                 anchor_val = attr[f"anchor_{key}"]
                 attr[key] = int(anchor_val * ng)
 
-#RESOLVE FUNCTIONS
-
-def calculate_gravity_score(attrs):
-    return (
-        attrs["SH"] * 0.3 +
-        attrs["SC"] * 0.3 +
-        attrs["IQ"] * 0.4
-    )
 
 def select_weighted_playcall(user_settings):
     playcall_names = list(user_settings.keys())
