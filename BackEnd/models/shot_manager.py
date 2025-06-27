@@ -112,7 +112,7 @@ class ShotManager:
 
         # Track attempts
         shooter.record_stat("FGA")
-        print(f"{get_name_safe(shooter)} attempts a shot -- 1 in shot manager")
+        # print(f"{get_name_safe(shooter)} attempts a shot -- 1 in shot manager")
         if is_three:
             shooter.record_stat("3PTA")
 
@@ -183,7 +183,7 @@ class ShotManager:
             stat = "DREB" if rebound_team == def_team else "OREB"
             self.game_state["last_rebound"] = stat  # stat is either "DREB" or "OREB"
             rebounder.record_stat(stat)
-            print(f"+1 rebound for {get_name_safe(rebounder)} / shot manager - resolve_shot")
+            # print(f"+1 rebound for {get_name_safe(rebounder)} / shot manager - resolve_shot")
 
             text += f"...{rebounder} grabs the rebound."
             possession_flips = (rebound_team != off_team)
@@ -192,43 +192,12 @@ class ShotManager:
                 attempt_putback = random.random() < 0.65
                 
                 if attempt_putback:
-                    text += (f"... he attempts the putback...")
+                    text += (f"... he attempts the putback...") #goes back up
                     putback_result = resolve_offensive_rebound_loop(self.game, rebounder)
                     text += putback_result["text"]
                     possession_flips = putback_result["possession_flips"]
                     time_elapsed += putback_result["time_elapsed"]
-
-                    # # Basic putback shot calculation (we'll refine later)
-                    # attrs = rebounder.attributes
-                    # shot_score = (
-                    #     attrs["SC"] * 0.6 +
-                    #     attrs["CH"] * 0.2 +
-                    #     attrs["IQ"] * 0.2
-                    # ) * random.randint(1, 6)
-
-                    # defender_pos = random.choice(["C", "C", "C", "C", "C", "PF", "PF", "PF", "SF", "SF", "SG", "PG"])
-                    # defender = self.game.defense_team.lineup[defender_pos]
-                    # defense_attrs = defender.attributes
-                    # defense_penalty = (defense_attrs["ID"] * 0.8 + defense_attrs["IQ"] * 0.1 + defense_attrs["CH"] * 0.1) * random.randint(1, 6)
-                    # shot_score -= defense_penalty * 0.2
-                    # made = shot_score >= off_team.team_attributes["shot_threshold"]
-
-                    # # Track stats
-                    # rebounder.record_stat("FGA")
-                    # print(f"{get_name_safe(rebounder)} attempts the o rebound shot in resolve_shot")
-                    # if made:
-                    #     rebounder.record_stat("FGM")
-                    #     points = 2
-                    #     record_team_points(self.game, off_team, points)
-                    #     text += f" and he scores!"
-                    #     possession_flips = True
-                    # else:
-                    #     # Use dynamic logic for the missed putback
-                    #     putback_result = resolve_offensive_rebound_loop(self.game, rebounder)
-                    #     # Add result text and update turn metadata
-                    #     text += f" and misses the putback. {putback_result['text']}"
-                    #     possession_flips = putback_result["possession_flips"]
-                    #     time_elapsed += putback_result["time_elapsed"]
+                    print(f"after attempting OREB putback, possession_flips: {possession_flips}")
                 else:
                     text += "...and he kicks it back out to reset the half-court offense"
             else:
@@ -243,7 +212,7 @@ class ShotManager:
 
         shooter_pos = get_player_position(off_lineup, shooter)
 
-        # print(f"{text}")
+        print(f"end of resolve_shot, possession_flips: {possession_flips}")
         return {
             "result_type": "MAKE" if made else "MISS",
             "ball_handler": shooter,
@@ -285,7 +254,7 @@ class ShotManager:
 
         made = shot_score >= off_team.team_attributes["shot_threshold"]
         shooter.record_stat("FGA")
-        print(f"{get_name_safe(shooter)} attempts a fast breakshot")
+        # print(f"{get_name_safe(shooter)} attempts a fast breakshot")
 
         if made:
             shooter.record_stat("FGM")
@@ -303,7 +272,7 @@ class ShotManager:
             rebounder = random.choice(fb_roles["defense"]) if fb_roles["defense"] else self.game.defense_team.lineup["PG"]
             text = f"{shooter} misses the fast break shot -- {rebounder} grabs the rebound."
             rebounder.record_stat("DREB")
-            print(f"+1 rebound for {get_name_safe(rebounder)} / shot manager - resolve_fast_break_shot")
+            # print(f"+1 rebound for {get_name_safe(rebounder)} / shot manager - resolve_fast_break_shot")
             possession_flips = True
             if random.random() < get_fast_break_chance(self.game):
                 text += " -- entering a fast break!"

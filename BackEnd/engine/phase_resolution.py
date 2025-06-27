@@ -272,7 +272,7 @@ def resolve_free_throw_logic(game):
             stat = "DREB" if rebound_team == def_team else "OREB"
             game_state["last_rebound"] = stat  # stat is either "DREB" or "OREB"
             rebounder.record_stat(stat)
-            print(f"+1 rebound for {get_name_safe(rebounder)} / phase resolution")
+            # print(f"+1 rebound for {get_name_safe(rebounder)} / phase resolution")
 
             if rebound_team == def_team:
                 possession_flips = True
