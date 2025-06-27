@@ -49,6 +49,11 @@ def simulate_game(request: SimulationRequest):
 
     game = run_simulation(home_team, away_team)
     summary = summarize_game_state(game)
+    
+
+    print("✅ Game summary prepared:")
+    print(summary)
+
 
     # ✅ Minimal debug visibility
     print(f"✅ Game finished: {home_team} vs. {away_team}")
