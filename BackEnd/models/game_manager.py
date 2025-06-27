@@ -15,6 +15,7 @@ class GameManager:
         self.score = {home_team_name: 0, away_team_name: 0}
         self.quarter = 1
         self.turns = []
+        
         self.offense_team = self.home_team #vary based on opening tip
         self.defense_team = self.away_team
 
@@ -52,7 +53,7 @@ class GameManager:
         }
 
 
-    def simulate_macro_turn(self):
+    def simulate_macro_turn(self): #run_simulation
         # Increment macro turn counter
         self.macro_turn_count += 1
         

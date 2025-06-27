@@ -40,11 +40,6 @@ class TurnManager:
         # STEP 1: Set strategy calls (tempo + aggression)
         self.set_strategy_calls()
 
-        # STEP 2: Set playcalls (offense + defense)
-        calls = self.set_playcalls()
-        self.game.game_state["current_playcall"] = calls["offense"]
-        self.game.game_state["defense_playcall"] = calls["defense"]
-
         print("*****RUN TURN*****")
         print(f"offensive state: {self.game.game_state['offensive_state']}")
         if self.game.game_state["offensive_state"] in ["HCO", "HALF_COURT"]:
@@ -58,17 +53,24 @@ class TurnManager:
         elif state == "FAST_BREAK":
             result = self.resolve_fast_break()
         else:
+            calls = self.set_playcalls()
+            self.game.game_state["current_playcall"] = calls["offense"]
+            self.game.game_state["defense_playcall"] = calls["defense"]
             result = self.resolve_half_court_offense()
+
+        print("Inside run_micro_turn // coming out of resolve offensive state functions")
+        print(f"result: {result}")
 
         # STEP 4: Final updates (clock, logs, animation)
         self.update_clock_and_possession(result)
         self.logger.log_turn_result(result)
         self.animator.capture(result)
 
+        print("🔁 End of run_micro_turn after housekeeping functions")
         print(f"{result['text']}")
-        print("🔁 End of run_micro_turn")
         print(f"{self.game.game_state['score']}")
         print(f"{self.game.game_state['clock']}")
+        print(f"game state: {self.game.game_state}")
         #print all team stats here after each turn
         # print(f"{self.game.offense_team.name} stats: {self.game.offense_team.stats}")
         # print(f"{self.game.defense_team.name} stats: {self.game.defense_team.stats}")
