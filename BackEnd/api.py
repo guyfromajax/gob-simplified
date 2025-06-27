@@ -51,8 +51,8 @@ def simulate_game(request: SimulationRequest):
     summary = summarize_game_state(game)
     
 
-    print("✅ Game summary prepared:")
-    print(summary)
+    # print("✅ Game summary prepared:")
+    # print(summary)
 
 
     # ✅ Minimal debug visibility
