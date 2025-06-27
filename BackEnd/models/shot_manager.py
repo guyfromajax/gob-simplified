@@ -112,6 +112,7 @@ class ShotManager:
 
         # Track attempts
         shooter.record_stat("FGA")
+        print(f"{get_name_safe(shooter)} attempts a shot")
         if is_three:
             shooter.record_stat("3PTA")
 
@@ -210,6 +211,7 @@ class ShotManager:
 
                     # Track stats
                     rebounder.record_stat("FGA")
+                    print(f"{get_name_safe(rebounder)} attempts a shot")
                     if made:
                         rebounder.record_stat("FGM")
                         points = 2
@@ -277,6 +279,7 @@ class ShotManager:
 
         made = shot_score >= off_team.team_attributes["shot_threshold"]
         shooter.record_stat("FGA")
+        print(f"{get_name_safe(shooter)} attempts a shot")
 
         if made:
             shooter.record_stat("FGM")
