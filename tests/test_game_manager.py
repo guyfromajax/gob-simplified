@@ -2,10 +2,10 @@ from tests.test_utils import build_mock_game
 from BackEnd.models.game_manager import GameManager
 
 
-def test_game_manager_simulate_turn_runs():
+def test_game_manager_simulate_macro_turn_runs():
     gm = build_mock_game()
     print("DEBUG: type(gm) =", type(gm))
-    gm.simulate_turn()
+    gm.simulate_macro_turn()
 
 
 def test_game_manager_initializes_teams_correctly():
@@ -37,6 +37,6 @@ def test_game_manager_box_score_structure():
 
 
 
-def test_game_manager_simulate_turn_runs():
+def test_game_manager_simulate_macro_turn_runs():
     gm = build_mock_game()
-    gm.simulate_turn()  # Should not raise
+    gm.simulate_macro_turn()  # Should not raise
