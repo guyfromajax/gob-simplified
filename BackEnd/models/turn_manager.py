@@ -42,6 +42,12 @@ class TurnManager:
         self.game.game_state["current_playcall"] = calls["offense"]
         self.game.game_state["defense_playcall"] = calls["defense"]
 
+        print("*****RUN TURN*****")
+        print(f"offensive state: {self.game.game_state['offensive_state']}")
+        if self.game.game_state["offensive_state"] == "HCO":
+            print(f"{self.game.offense_team.name}: {self.game.game_state['current_playcall']}")
+            print(f"{self.game.defense_team.name}: {self.game.game_state['defense_playcall']}")
+
         # STEP 3: Route based on offensive state
         state = self.game.game_state["offensive_state"]
         if state == "FREE_THROW":
@@ -172,7 +178,7 @@ class TurnManager:
         passer = self.game.offense_team.lineup[passer_pos] if passer_pos else None
         defender = self.game.defense_team.lineup[defender_pos]
 
-        print("end of assign_roles")
+        # print("end of assign_roles")
         # print(f"shooter: {get_name_safe(shooter)}")
         # print(f"screener: {get_name_safe(screener)}")
         # print(f"passer: {get_name_safe(passer)}")

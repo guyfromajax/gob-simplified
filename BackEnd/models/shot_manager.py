@@ -235,7 +235,7 @@ class ShotManager:
 
         shooter_pos = get_player_position(off_lineup, shooter)
 
-        print(f"{text}")
+        # print(f"{text}")
         return {
             "result_type": "MAKE" if made else "MISS",
             "ball_handler": shooter,
