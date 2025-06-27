@@ -173,10 +173,10 @@ class TurnManager:
         defender = self.game.defense_team.lineup[defender_pos]
 
         print("end of assign_roles")
-        print(f"shooter: {get_name_safe(shooter)}")
-        print(f"screener: {get_name_safe(screener)}")
-        print(f"passer: {get_name_safe(passer)}")
-        print(f"defender: {get_name_safe(defender)}")
+        # print(f"shooter: {get_name_safe(shooter)}")
+        # print(f"screener: {get_name_safe(screener)}")
+        # print(f"passer: {get_name_safe(passer)}")
+        # print(f"defender: {get_name_safe(defender)}")
 
         
         return {
