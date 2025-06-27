@@ -335,7 +335,7 @@ def resolve_turnover_logic(roles, game, turnover_type="DEAD BALL"):
         ])
         text = f"{ball_handler} {description}"
 
-
+    bh_pos = get_player_position(off_lineup, ball_handler)
     
     return {
         "result_type": turnover_type,
