@@ -57,13 +57,13 @@ def resolve_foul(roles, game):
     elif def_team.team_fouls >= 10:
         game_state["free_throws"] = 2
         game_state["free_throws_remaining"] = 2
-        game_state["bonus_active"] = False
+        game_state["one_and_one"] = False
         game_state["last_ball_handler"] = ball_handler
     elif def_team.team_fouls >= 5:
         game_state["offensive_state"] = "FREE_THROW"
         game_state["free_throws"] = 2
         game_state["free_throws_remaining"] = 2
-        game_state["bonus_active"] = False
+        game_state["one_and_one"] = True
         game_state["last_ball_handler"] = ball_handler
     else:
         game_state["offensive_state"] = "HCO"
@@ -218,36 +218,57 @@ def resolve_fast_break_logic(game: "GameManager"):
     assert "time_elapsed" in turn_result, "turn_result missing 'time_elapsed'"
     return turn_result
 
-# #FREE_THROW
 def resolve_free_throw_logic(game):
     game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
-    shooter = game_state["last_ball_handler"] #this is a player object, not a position string
+    shooter = game_state.get("shooter") or game_state.get("last_ball_handler")
     attrs = shooter.attributes
 
-    # Use player's FT attribute
+    # FT outcome calculation
     ft_shot_score = ((attrs["FT"] * 0.8) + (attrs["CH"] * 0.2)) * random.randint(1, 6)
     makes_shot = ft_shot_score >= off_team.team_attributes["ft_shot_threshold"]
-    possession_flips = False
-    text = ""
 
-    # Always record FTA
     shooter.record_stat("FTA")
+    text = f"{get_name_safe(shooter)} steps to the line... "
+    possession_flips = False
 
     if makes_shot:
         shooter.record_stat("FTM")
         record_team_points(game, off_team, 1)
-        text = f"{get_name_safe(shooter)} hits the free throw!"
+        text += "and hits the free throw!"
     else:
-        text = f"{shooter} misses the free throw."
+        text += "but misses the free throw."
 
+    # Handle 1-and-1 front-end logic
+    if game_state.get("one_and_one", False):
+        if game_state["free_throws_remaining"] == 1:
+            if makes_shot:
+                # Made front end → unlock second FT
+                game_state["free_throws_remaining"] = 1
+                game_state["one_and_one"] = False
+                return {
+                    "result_type": "FREE_THROW",
+                    "ball_handler": shooter,
+                    "text": text,
+                    "start_coords": {get_player_position(off_lineup, shooter): {"x": 88, "y": 25}},
+                    "end_coords": {get_player_position(off_lineup, shooter): {"x": 88, "y": 25}},
+                    "time_elapsed": 0,
+                    "possession_flips": False
+                }
+            else:
+                # Missed front end → dead ball, rebound
+                game_state["free_throws_remaining"] = 0
+                game_state["one_and_one"] = False
+                game_state["offensive_state"] = "HCO"
+
+    # Standard decrement for non-1-and-1 logic
     game_state["free_throws_remaining"] -= 1
 
-    # If no FTs remain, switch state and determine rebound if missed
+    # If no FTs remain, determine next state
     if game_state["free_throws_remaining"] <= 0:
         game_state["offensive_state"] = "HCO"
 
         if not makes_shot:
-            # Last FT missed → live rebound
+            # Rebound logic
             rebounder_dict = default_rebounder_dict()
             o_pos = choose_rebounder(rebounder_dict, "offense")
             d_pos = choose_rebounder(rebounder_dict, "defense")
@@ -270,38 +291,30 @@ def resolve_free_throw_logic(game):
             rebound_team = def_team if random.random() < d_weight else off_team
             rebounder = d_rebounder if rebound_team == def_team else o_rebounder
             stat = "DREB" if rebound_team == def_team else "OREB"
-            game_state["last_rebound"] = stat  # stat is either "DREB" or "OREB"
+            game_state["last_rebound"] = stat
+            game_state["last_rebounder"] = rebounder
             rebounder.record_stat(stat)
-            # print(f"+1 rebound for {get_name_safe(rebounder)} / phase resolution")
 
             if rebound_team == def_team:
                 possession_flips = True
+                text += f" {get_name_safe(rebounder)} grabs the defensive rebound."
                 if random.random() < get_fast_break_chance(game):
                     game_state["offensive_state"] = "FAST_BREAK"
-                else:
-                    game_state["offensive_state"] = "HCO"
-                game_state["last_rebounder"] = rebounder
-                game_state["last_rebound"] = stat
-                text += f" {rebounder} grabs the defensive rebound."
             else:
-                # 🟡 Offensive rebound — enter putback loop!
-                putback_result = resolve_offensive_rebound_loop(
-                    game, rebounder
-                )
-                return putback_result
+                # 🟡 Offensive rebound → putback loop
+                return resolve_offensive_rebound_loop(game, rebounder)
         else:
             possession_flips = True
-            game_state["offensive_state"] = "HCO"
 
     shooter_pos = get_player_position(off_lineup, shooter)
-    
+
     return {
         "result_type": "FREE_THROW",
         "ball_handler": shooter,
         "text": text,
         "start_coords": {shooter_pos: {"x": 88, "y": 25}},
         "end_coords": {shooter_pos: {"x": 88, "y": 25}},
-        "time_elapsed": 0,
+        "time_elapsed": 0,  # clock does not run
         "possession_flips": possession_flips,
     }
 

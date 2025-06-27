@@ -80,6 +80,7 @@ class ShotManager:
 
             if d_foul:
                 # AND-1 situation
+                self.game_state["shooter"] = shooter 
                 foul_player.record_stat("F")
                 self.game_state["foul_team"] = "DEFENSE"
                 self.game_state["offensive_state"] = "FREE_THROW"
@@ -99,6 +100,7 @@ class ShotManager:
 
             if d_foul:
                 # Shooting foul → free throws
+                self.game_state["shooter"] = shooter 
                 foul_player.record_stat("F")
                 self.game_state["foul_team"] = "DEFENSE"
                 self.game_state["offensive_state"] = "FREE_THROW"
