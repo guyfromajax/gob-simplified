@@ -150,6 +150,14 @@ class GameManager:
             for stat in BOX_SCORE_KEYS:
                 self.away_team.stats[stat] += player.stats["game"].get(stat, 0)
 
+    def print_game_statistics(self):
+        """Print all game statistics including defense score stats."""
+        # Print function call counts
+        self.print_function_counts()
+        
+        # Print defense score statistics
+        self.shot_manager.print_defense_score_stats()
+
 
 
 
