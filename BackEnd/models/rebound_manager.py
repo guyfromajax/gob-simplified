@@ -1,5 +1,5 @@
 import random
-from BackEnd.utils.shared import calculate_rebound_score
+from BackEnd.utils.shared import calculate_rebound_score, get_name_safe
 
 class ReboundManager:
     def __init__(self, game):
@@ -57,6 +57,7 @@ class ReboundManager:
         stat = "DREB" if rebound_team == self.def_team else "OREB"
 
         rebounder.record_stat(stat)
+        print(f"+1 rebound for {get_name_safe(rebounder)}")
 
         # Store for possible fast break or putback
         self.game.game_state["last_rebounder"] = rebounder
