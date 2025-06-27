@@ -166,7 +166,7 @@ def resolve_fast_break_logic(game: "GameManager"):
         game.game_state["offensive_state"] = "HCO"
 
         from BackEnd.models.turn_manager import TurnManager
-        return TurnManager(game).run_turn()
+        return TurnManager(game).run_micro_turn()
 
     #get shooter and passer (if applicable)
     # Assign shooter and passer for shot, turnover, or foul scenarios

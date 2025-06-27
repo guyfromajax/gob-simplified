@@ -23,10 +23,10 @@ def test_turn_manager_assign_roles_outputs_valid_objects():
         assert player is None or player.get_name().startswith("Lancaster") or player.get_name().startswith("Bentley-Truman")
 
 
-def test_turn_manager_run_turn_executes():
+def test_turn_manager_run_micro_turn_executes():
     game = build_mock_game()
     tm = TurnManager(game)
-    result = tm.run_turn()
+    result = tm.run_micro_turn()
     assert isinstance(result, dict)
     assert "result_type" in result
 
@@ -84,7 +84,7 @@ def test_playcalls_are_set():
 def test_turn_result_has_possession_flips():
     game = build_mock_game()
     tm = TurnManager(game)
-    result = tm.run_turn()
+    result = tm.run_micro_turn()
     assert "possession_flips" in result
     assert isinstance(result["possession_flips"], bool)
 

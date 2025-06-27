@@ -11,7 +11,7 @@ def mock_game_manager():
 @pytest.fixture
 def simulated_game():
     gm = GameManager("Lancaster", "Bentley-Truman")
-    gm.simulate_turn()
+    gm.simulate_macro_turn()
     return gm
 
 

@@ -13,7 +13,7 @@ def test_assign_roles_outputs_player_objects():
 
 def test_turn_returns_valid_result():
     game = build_mock_game()
-    result = game.simulate_turn()
+    result = game.simulate_macro_turn()
 
     VALID_RESULTS = {"MAKE", "MISS", "FOUL", "TURNOVER", "DEAD BALL"}
     assert result["result_type"] in VALID_RESULTS
