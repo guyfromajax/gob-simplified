@@ -40,10 +40,7 @@ class GameManager:
             "turns": self.turns,
             "current_playcall": "Outside",
             "defense_playcall": "Zone",
-            "offensive_state": {
-                "pass_count": 0,
-                "initial_possession_player": None
-            },
+            "offensive_state": "HCO",
             "box_score": {
                 self.home_team.name: {},
                 self.away_team.name: {}
