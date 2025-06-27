@@ -256,9 +256,6 @@ def run_simulation(home_team_name, away_team_name):
     # Print function call counts
     gm.print_function_counts()
 
-    # This still works just fine:
-    print(gm.team_totals["Lancaster"]["PTS"])
-
     return gm
 
 

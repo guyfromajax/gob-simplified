@@ -70,10 +70,8 @@ class TurnManager:
         print(f"{result['text']}")
         print(f"{self.game.game_state['score']}")
         print(f"{self.game.game_state['clock']}")
-        print(f"game state: {self.game.game_state}")
-        #print all team stats here after each turn
-        # print(f"{self.game.offense_team.name} stats: {self.game.offense_team.stats}")
-        # print(f"{self.game.defense_team.name} stats: {self.game.defense_team.stats}")
+        # print(f"game state: {self.game.game_state}")
+        
         return result
 
 
