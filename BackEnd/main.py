@@ -161,7 +161,7 @@ def generate_animation_packet(turn_result):
         },
         "text": turn_result["text"],
         "time_elapsed": turn_result["time_elapsed"],
-        "offensive_state": turn_result.get("new_offense_state", "HALF_COURT"),
+        "offensive_state": turn_result.get("new_offense_state", "HCO"),
         "foul_type": turn_result.get("foul_type", None),
     }
 
@@ -251,7 +251,7 @@ def run_simulation(home_team_name, away_team_name):
     gm.turn_manager = TurnManager(gm)  # Rebuild now that lineups are present
 
     while gm.game_state["time_remaining"] > 0:
-        gm.simulate_turn()
+        gm.simulate_macro_turn()
 
     # This still works just fine:
     print(gm.team_totals["Lancaster"]["PTS"])

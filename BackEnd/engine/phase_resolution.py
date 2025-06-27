@@ -66,7 +66,7 @@ def resolve_foul(roles, game):
         game_state["bonus_active"] = False
         game_state["last_ball_handler"] = ball_handler
     else:
-        game_state["offensive_state"] = "HALF_COURT"
+        game_state["offensive_state"] = "HCO"
         game_state["free_throws"] = 0
         game_state["free_throws_remaining"] = 0
 
@@ -244,7 +244,7 @@ def resolve_free_throw_logic(game):
 
     # If no FTs remain, switch state and determine rebound if missed
     if game_state["free_throws_remaining"] <= 0:
-        game_state["offensive_state"] = "HALF_COURT"
+        game_state["offensive_state"] = "HCO"
 
         if not makes_shot:
             # Last FT missed → live rebound
@@ -312,6 +312,7 @@ def resolve_turnover_logic(roles, game, turnover_type="DEAD BALL"):
     ball_handler = roles["ball_handler"]
     defender = roles.get("defender", "")
     ball_handler.record_stat("TO")
+    turnover_type = random.choice(["STEAL", "DEAD BALL"])
 
     if turnover_type == "STEAL":
         defender.record_stat("STL")
@@ -324,10 +325,17 @@ def resolve_turnover_logic(roles, game, turnover_type="DEAD BALL"):
         text = f"{get_name_safe(defender)} jumps the pass and takes it the other way!"
     else:
         game_state["offensive_state"] = "HCO"
-        text = f"{ball_handler} throws it out of bounds."
-        game_state["offensive_state"] = "HCO"
+        description = random.choice([
+            "throws it out of bounds",
+            "commits a travel.",
+            "commits a double dribble.",
+            "travels with the ball.",
+            "with an errant pass.",
+            "dribbles it off his foot and the ball goes out of bounds."
+        ])
+        text = f"{ball_handler} {description}"
 
-    bh_pos = get_player_position(off_lineup, ball_handler)
+
     
     return {
         "result_type": turnover_type,
