@@ -12,7 +12,7 @@ from BackEnd.utils.shared import (
     weighted_random_from_dict, 
     generate_pass_chain, 
     get_team_thresholds, 
-    get_random_positions,
+    get_foul_and_turnover_positions,
     get_name_safe
 )
 from BackEnd.engine.phase_resolution import (
@@ -206,11 +206,10 @@ class TurnManager:
         # Base weights (can be tuned later)
         off_team = self.game.offense_team
         def_team = self.game.defense_team
-        thresholds = get_team_thresholds(self.game)
         tempo_call = self.game.offense_team.strategy_calls["tempo_call"]
         pass_count = TEMPO_PASS_DICT[tempo_call]
-        positions = get_random_positions(pass_count)
-        event_type = calculate_foul_turnover(self.game, positions, thresholds, roles)
+        positions = get_foul_and_turnover_positions(pass_count)
+        event_type = calculate_foul_turnover(self.game, positions, roles)
     
         #determine number of turnover RNGs based on defense team'saggression
         

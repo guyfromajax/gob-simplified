@@ -420,7 +420,7 @@ def resolve_half_court_offense_logic(game: "GameManager") -> dict:
 
     return shot_result
 
-def calculate_foul_turnover(game, positions, thresholds, roles):
+def calculate_foul_turnover(game, positions, roles):
     game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
     roles["foul_player"] = None
     ball_handler = roles["ball_handler"]
@@ -445,7 +445,7 @@ def calculate_foul_turnover(game, positions, thresholds, roles):
     d_foul_score = (iq + ch + movement) * random.randint(1, 6)
     if defense_call == "Zone":
         d_foul_score *= 1.1
-    is_d_foul = d_foul_score < (thresholds["d_foul_threshold"] * 1.2)
+    is_d_foul = d_foul_score < (def_team.team_attributes["foul_threshold"] * 1.2)
 
     # === Offensive Foul ===
     o_pos = positions["o_foul"]
@@ -464,7 +464,7 @@ def calculate_foul_turnover(game, positions, thresholds, roles):
         movement = 0
 
     o_foul_score = (iq + ch + movement) * random.randint(1, 6)
-    is_o_foul = o_foul_score < (thresholds["o_foul_threshold"] * 0.8)
+    is_o_foul = o_foul_score < (off_team.team_attributes["foul_threshold"] * 0.8)
 
     # === Turnover ===
     t_pos = positions["turnover"]

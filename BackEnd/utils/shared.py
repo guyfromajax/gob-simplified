@@ -282,7 +282,7 @@ def get_team_thresholds(game):
         "o_foul_threshold": off_attr.get("foul_threshold", 10)
     }
 
-def get_random_positions(pass_count):
+def get_foul_and_turnover_positions(pass_count):
     return {
         "turnover": random.choice(TURNOVER_CALC_DICT[pass_count]),
         "o_foul": random.choice(POSITION_LIST),
