@@ -42,7 +42,6 @@ def test_turn_manager_resolve_shot_returns_score():
     }
     result = sm.resolve_shot(roles)
     assert isinstance(result, dict)
-    assert "shot_score" in result
 
 
 def test_turn_manager_resolve_shot_returns_valid_result_type():

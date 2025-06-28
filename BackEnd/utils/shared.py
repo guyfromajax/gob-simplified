@@ -332,7 +332,8 @@ def summarize_game_state(game):
             game.home_team.name: game.home_team.scouting_data,
             game.away_team.name: game.away_team.scouting_data
         },
-        "team_totals": game.team_totals
+        "team_totals": game.team_totals,
+        "turns": game.turns
     }
 
 def check_defensive_foul(self, defender, is_three):

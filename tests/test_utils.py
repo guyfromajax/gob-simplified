@@ -72,8 +72,19 @@ def build_mock_game():
 
     default_team_attrs = {
         "shot_threshold": 100,
-        "rebound_modifier": 1.0
+        "ft_shot_threshold": 100,
+        "turnover_threshold": -200,
+        "foul_threshold": 70,
+        "rebound_modifier": 1.0,
+        "momentum_score": 10,
+        "momentum_delta": 3,
+        "offensive_efficienty": 5,
+        "offensive_adjust": 5,
+        "o_tendency_reads": 5,
+        "d_tendency_reads": 5,
+        "team_chemistry": 15
     }
+
     game.home_team.team_attributes = default_team_attrs.copy()
     game.away_team.team_attributes = default_team_attrs.copy()
 
