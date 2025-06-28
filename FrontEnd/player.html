@@ -53,7 +53,9 @@
         console.log(player);
 
         document.getElementById("playerName").textContent = `${player.first_name} ${player.last_name}`;
-        document.getElementById("heightWeight").textContent = `${player.height}" • ${player.weight} lbs`;
+        const feet = Math.floor(player.height / 12);
+        const inches = player.height % 12;
+        document.getElementById("heightWeight").textContent = `${feet}'${inches}" • ${player.weight} lbs`;
         document.getElementById("reportText").textContent = player.scouting_report || "No report available";
 
         const attrs = player.attributes || {};
