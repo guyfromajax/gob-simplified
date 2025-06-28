@@ -5,7 +5,7 @@ from fastapi.responses import JSONResponse
 from BackEnd.constants import POSITION_LIST
 import uuid
 from BackEnd.main import run_simulation
-from BackEnd.db import players_collection, teams_collection, games_collection, teams_collection
+from BackEnd.db import players_collection, teams_collection, games_collection
 from BackEnd.utils.game_summary_builder import build_game_summary
 from BackEnd.utils.shared import clean_mongo_ids, summarize_game_state
 from pydantic import BaseModel
