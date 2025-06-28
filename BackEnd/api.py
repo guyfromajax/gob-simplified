@@ -63,7 +63,8 @@ def simulate_game(request: SimulationRequest):
     print(f"📊 Team Totals: {game.team_totals}")# show first few entries
 
     games_collection.insert_one(summary)
-    return clean_mongo_ids(summary)
+    # return clean_mongo_ids(summary)
+    return summary #return summary to frontend
 
 @app.get("/games")
 def get_games():
