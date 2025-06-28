@@ -15,6 +15,7 @@ class GameManager:
         self.score = {home_team_name: 0, away_team_name: 0}
         self.quarter = 1
         self.turns = []
+        self.text_log = []
         
         self.offense_team = self.home_team #vary based on opening tip
         self.defense_team = self.away_team
@@ -49,7 +50,19 @@ class GameManager:
             "box_score": {
                 self.home_team.name: {},
                 self.away_team.name: {}
-            }
+            },
+            "shooter": None,
+            "free_throws": 0,
+            "free_throws_remaining": 0,
+            "one_and_one": False,
+            "last_ball_handler": None,
+            "foul_team": None,
+            "foul_type": None,
+            "foul_player": None,
+            "last_ball_handler": None,
+            "last_rebounder": None,
+            "last_rebound": None,
+            "last_stealer": None
         }
 
 
@@ -61,6 +74,7 @@ class GameManager:
         # print(f"offense_team: {self.offense_team}")
         result = self.turn_manager.run_micro_turn()
         self.turns.append(result)
+        self.text_log.append(result["text"])
         
         # Update team stats after each turn
         self.update_team_stats()
