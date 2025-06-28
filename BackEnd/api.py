@@ -46,11 +46,14 @@ def test_route():
     print("✅ /test endpoint hit")
     return {"message": "test success"}
 
-
 @app.get("/ping")
 def ping():
     return {"message": "pong"}
 
+@app.get("/teams")
+def get_team_names():
+    teams = teams_collection.find({}, {"name": 1, "_id": 0})
+    return sorted([team["name"] for team in teams])
 
 
 @app.post("/simulate")
