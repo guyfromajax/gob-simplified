@@ -29,18 +29,18 @@ async function simulateGame() {
     const data = await response.json();
     console.log("📦 Full response from backend:", data);
     
-    const turns = data.turns || [];
+    const text_log = data.text_log || [];
     logContainer.innerHTML = ""; // clear previous
-    turns.forEach((turn, i) => {
+    text_log.forEach((turn, i) => {
       const text = turn.text || JSON.stringify(turn); // fallback in case text is missing
       logContainer.innerHTML += `Turn ${i + 1}: ${text}\n`;
     });
 
 
-    turns.forEach((turn, i) => {
-      const text = turn.text || `${turn.ball_handler} performs an action.`;
-      logContainer.innerHTML += `Turn ${i + 1}: ${text}\n`;
-    });
+    // text_log.forEach((turn, i) => {
+    //   const text = turn.text || `${turn.ball_handler} performs an action.`;
+    //   logContainer.innerHTML += `Turn ${i + 1}: ${text}\n`;
+    // });
 
     const score = data.final_score || {};
     scoreDisplay.textContent = `🏁 Final Score — ${team1}: ${score[team1] || 0} | ${team2}: ${score[team2] || 0}`;

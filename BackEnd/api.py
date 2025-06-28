@@ -1,17 +1,18 @@
 # 1. Imports
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from BackEnd.constants import POSITION_LIST
 import uuid
 from BackEnd.main import run_simulation
-from BackEnd.db import players_collection, teams_collection, games_collection
+from BackEnd.db import players_collection, teams_collection, games_collection, teams_collection
 from BackEnd.utils.game_summary_builder import build_game_summary
 from BackEnd.utils.shared import clean_mongo_ids, summarize_game_state
 from pydantic import BaseModel
 from fastapi import HTTPException
 import pprint
 from bson.json_util import dumps
+from bson import ObjectId
 
 
 app = FastAPI()
@@ -76,6 +77,35 @@ def simulate_game(request: SimulationRequest):
     # games_collection.insert_one(summary)
     # # return clean_mongo_ids(summary)
     # return summary #return summary to frontend
+
+@app.get("/roster/{team_name}")
+def get_team_roster(team_name: str):
+    team = teams_collection.find_one({"name": team_name})
+    if not team:
+        raise HTTPException(status_code=404, detail=f"Team '{team_name}' not found")
+
+    player_ids = team.get("player_ids", [])
+    if not player_ids:
+        raise HTTPException(status_code=404, detail=f"No players found for team '{team_name}'")
+
+    player_objects = list(players_collection.find({
+        "_id": {"$in": [ObjectId(pid) for pid in player_ids]}
+    }))
+
+    # List of attributes to display (excludes CH, EM)
+    display_attributes = ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "AG", "ST", "ND", "IQ", "FT", "NG"]
+
+    players = []
+    for p in player_objects:
+        players.append({
+            "name": f"{p.get('first_name', '')} {p.get('last_name', '')}".strip(),
+            "attributes": {attr: p.get(attr, "-") for attr in display_attributes}
+        })
+
+    return {
+        "team": team_name,
+        "players": players
+    }
 
 @app.get("/games")
 def get_games():
