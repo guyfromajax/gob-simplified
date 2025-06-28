@@ -62,6 +62,14 @@ def simulate_game(request: SimulationRequest):
     print(f"🏀 Final Score: {game.score}")
     print(f"📊 Team Totals: {game.team_totals}")# show first few entries
 
+    for turn in summary.get("turns", []):
+        for key, value in turn.items():
+            if hasattr(value, "name"):
+                turn[key] = value.name  # or str(value)
+            elif not isinstance(value, (str, int, float, dict, list, bool, type(None))):
+                turn[key] = str(value)
+
+
     games_collection.insert_one(summary)
     # return clean_mongo_ids(summary)
     return summary #return summary to frontend
