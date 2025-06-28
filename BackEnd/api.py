@@ -17,7 +17,11 @@ from fastapi.staticfiles import StaticFiles
 
 
 app = FastAPI()
-app.mount("/", StaticFiles(directory="FrontEnd", html=True), name="static")
+# app.mount("/", StaticFiles(directory="FrontEnd", html=True), name="static")
+app.mount("/static", StaticFiles(directory="FrontEnd", html=True), name="static")
+
+print("🚀 Loaded FastAPI app from api.py")
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -36,6 +40,17 @@ class SimulationRequest(BaseModel):
 @app.get("/")
 def root():
     return {"message": "GOB Simulation API is live"}
+
+@app.get("/test")
+def test_route():
+    print("✅ /test endpoint hit")
+    return {"message": "test success"}
+
+
+@app.get("/ping")
+def ping():
+    return {"message": "pong"}
+
 
 
 @app.post("/simulate")
@@ -80,10 +95,14 @@ def simulate_game(request: SimulationRequest):
     # # return clean_mongo_ids(summary)
     # return summary #return summary to frontend
 
+
 @app.get("/roster/{team_name}")
 def get_team_roster(team_name: str):
+    print(f"🔍 Endpoint hit: GET /roster/{team_name}")
+
     team = teams_collection.find_one({"name": team_name})
     if not team:
+        print(f"❌ No team found with name: '{team_name}'")
         raise HTTPException(status_code=404, detail=f"Team '{team_name}' not found")
 
     player_ids = team.get("player_ids", [])
@@ -94,21 +113,21 @@ def get_team_roster(team_name: str):
         "_id": {"$in": player_ids}
     }))
 
-
-    # List of attributes to display (excludes CH, EM)
     display_attributes = ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "AG", "ST", "ND", "IQ", "FT", "NG"]
 
     players = []
     for p in player_objects:
+        attributes = p.get("attributes", {})  # safely get nested attributes dict
         players.append({
             "name": f"{p.get('first_name', '')} {p.get('last_name', '')}".strip(),
-            "attributes": {attr: p.get(attr, "-") for attr in display_attributes}
+            "attributes": {attr: attributes.get(attr, "--") for attr in display_attributes}
         })
 
     return {
         "team": team_name,
         "players": players
     }
+
 
 @app.get("/games")
 def get_games():
@@ -267,3 +286,6 @@ def setup_teams():
     ])
 
     return {"message": "Teams and players created"}
+
+for route in app.routes:
+    print(f"🚀 Registered route: {route.path}")
