@@ -13,9 +13,11 @@ from fastapi import HTTPException
 import pprint
 from bson.json_util import dumps
 from bson import ObjectId
+from fastapi.staticfiles import StaticFiles
 
 
 app = FastAPI()
+app.mount("/", StaticFiles(directory="FrontEnd", html=True), name="static")
 
 app.add_middleware(
     CORSMiddleware,
