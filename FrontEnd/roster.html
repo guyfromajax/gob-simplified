@@ -12,11 +12,17 @@
 </head>
 <body>
 
-  <select id="teamSelect">
-    <option value="Lancaster">Lancaster</option>
-    <option value="Bentley-Truman">Bentley-Truman</option>
-  </select>
+    <select id="teamSelect"></select>
 
+  <script>
+    async function loadTeams() {
+      const res = await fetch(`${window.location.origin}/teams`);
+      const teams = await res.json();
+      const select = document.getElementById("teamSelect");
+      select.innerHTML = teams.map(name => `<option value="${name}">${name}</option>`).join("");
+    }
+  </script>
+      
   <button onclick="loadRoster()">View Roster</button>
 
   <div id="rosterContainer"></div>
@@ -29,5 +35,8 @@
 
 </body>
 </html>
+
+window.onload = loadTeams;
+
 
   
