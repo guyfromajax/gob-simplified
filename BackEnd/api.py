@@ -67,6 +67,13 @@ def simulate_game(request: SimulationRequest):
         raise HTTPException(status_code=400, detail=f"Unknown home_team: '{home_team}'")
     if away_team not in known_teams:
         raise HTTPException(status_code=400, detail=f"Unknown away_team: '{away_team}'")
+    
+    print("🔥 Simulate endpoint hit")
+    print(f"Home: {request.home_team}, Away: {request.away_team}")
+
+    # ✅ Add this line to print the full request body
+    print("🔍 Full request body:", request)
+
 
     game = run_simulation(home_team, away_team)
     print("Right before summarize_game_state")
