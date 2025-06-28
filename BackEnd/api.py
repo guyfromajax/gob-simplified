@@ -119,6 +119,18 @@ def get_games():
 
     return JSONResponse(content=games)
 
+@app.get("/player/{player_id}")
+def get_player(player_id: str):
+    try:
+        player = players_collection.find_one({"_id": player_id})
+        if not player:
+            raise HTTPException(status_code=404, detail="Player not found")
+        player["_id"] = str(player["_id"])  # ensure JSON serializable
+        return player
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 
 @app.post("/setup_teams")
 def setup_teams():
