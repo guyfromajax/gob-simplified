@@ -48,6 +48,8 @@ def simulate_game(request: SimulationRequest):
         raise HTTPException(status_code=400, detail=f"Unknown away_team: '{away_team}'")
 
     game = run_simulation(home_team, away_team)
+    print("Right before summarize_game_state")
+    print("🧪 Turns sample:", game.turns[:3])  
     summary = summarize_game_state(game)
     
 
@@ -58,7 +60,7 @@ def simulate_game(request: SimulationRequest):
     # ✅ Minimal debug visibility
     print(f"✅ Game finished: {home_team} vs. {away_team}")
     print(f"🏀 Final Score: {game.score}")
-    print(f"📊 Team Totals: {game.team_totals}")
+    print(f"📊 Team Totals: {game.team_totals}")# show first few entries
 
     games_collection.insert_one(summary)
     return clean_mongo_ids(summary)
