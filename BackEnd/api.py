@@ -69,10 +69,13 @@ def simulate_game(request: SimulationRequest):
     #         elif not isinstance(value, (str, int, float, dict, list, bool, type(None))):
     #             turn[key] = str(value)
 
-
     games_collection.insert_one(summary)
-    # return clean_mongo_ids(summary)
-    return summary #return summary to frontend
+    summary.pop("_id", None)  # ✅ remove Mongo's ObjectId
+    return summary
+    
+    # games_collection.insert_one(summary)
+    # # return clean_mongo_ids(summary)
+    # return summary #return summary to frontend
 
 @app.get("/games")
 def get_games():
