@@ -20,8 +20,12 @@
       const teams = await res.json();
       const select = document.getElementById("teamSelect");
       select.innerHTML = teams.map(name => `<option value="${name}">${name}</option>`).join("");
-    }
+
+      if (teams.length > 0) {
+        loadRoster();
+    }}
     window.onload = loadTeams;
+    
   </script>
       
   <button onclick="loadRoster()">View Roster</button>
