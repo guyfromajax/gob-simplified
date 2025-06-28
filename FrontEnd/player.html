@@ -57,7 +57,7 @@
         document.getElementById("reportText").textContent = player.scouting_report || "No report available";
 
         const attrs = player.attributes || {};
-        const headers = Object.keys(attrs);
+        const headers = Object.keys(attrs).filter(key => !key.startsWith("anchor_"));
         const headerRow = document.getElementById("attrHeaders");
         const valueRow = document.getElementById("attrValues");
 
