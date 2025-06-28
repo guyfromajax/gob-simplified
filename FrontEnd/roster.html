@@ -1,7 +1,30 @@
-<select id="teamSelect">
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Team Roster</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    table { border-collapse: collapse; width: 100%; margin-top: 20px; }
+    th, td { border: 1px solid #ccc; padding: 6px; text-align: center; }
+    th { background-color: #f0f0f0; }
+  </style>
+</head>
+<body>
+
+  <select id="teamSelect">
     <option value="Lancaster">Lancaster</option>
     <option value="Bentley-Truman">Bentley-Truman</option>
   </select>
+
   <button onclick="loadRoster()">View Roster</button>
+
   <div id="rosterContainer"></div>
+
+  <!-- ✅ This line is required -->
+  <script src="roster.js" defer></script>
+
+</body>
+</html>
+
   
