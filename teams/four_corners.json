@@ -1,0 +1,18 @@
+{
+    "name": "Four Corners",
+    "players": [
+      {"first_name": "Josiah", "last_name": "Wilson", "team": "Four Corners", "SC": 37, "SH": 80, "ID": 36, "OD": 88, "PS": 100, "BH": 115, "RB": 51, "AG": 92, "ST": 45, "ND": 90, "IQ": 97, "FT": 101, "NG": 1.0},
+      {"first_name": "Jay", "last_name": "Giancola", "team": "Four Corners", "SC": 71, "SH": 103, "ID": 35, "OD": 87, "PS": 85, "BH": 56, "RB": 32, "AG": 74, "ST": 38, "ND": 113, "IQ": 72, "FT": 115, "NG": 1.0},
+      {"first_name": "Charles", "last_name": "Black", "team": "Four Corners", "SC": 94, "SH": 67, "ID": 97, "OD": 73, "PS": 77, "BH": 56, "RB": 50, "AG": 85, "ST": 75, "ND": 28, "IQ": 55, "FT": 80, "NG": 1.0},
+      {"first_name": "Roberto", "last_name": "You", "team": "Four Corners", "SC": 94, "SH": 21, "ID": 91, "OD": 25, "PS": 44, "BH": 12, "RB": 93, "AG": 27, "ST": 100, "ND": 59, "IQ": 77, "FT": 25, "NG": 1.0},
+      {"first_name": "Jeffrey", "last_name": "Jackson", "team": "Four Corners", "SC": 70, "SH": 33, "ID": 92, "OD": 50, "PS": 61, "BH": 45, "RB": 88, "AG": 45, "ST": 66, "ND": 42, "IQ": 24, "FT": 90, "NG": 1.0},
+      {"first_name": "Leonard", "last_name": "Tibbits", "team": "Four Corners", "SC": 46, "SH": 41, "ID": 68, "OD": 64, "PS": 48, "BH": 50, "RB": 42, "AG": 46, "ST": 70, "ND": 63, "IQ": 41, "FT": 84, "NG": 1.0},
+      {"first_name": "Warren", "last_name": "Davis", "team": "Four Corners", "SC": 23, "SH": 44, "ID": 53, "OD": 92, "PS": 99, "BH": 58, "RB": 24, "AG": 81, "ST": 36, "ND": 34, "IQ": 34, "FT": 83, "NG": 1.0},
+      {"first_name": "Paul", "last_name": "Pavelka", "team": "Four Corners", "SC": 25, "SH": 35, "ID": 54, "OD": 16, "PS": 16, "BH": 61, "RB": 73, "AG": 65, "ST": 37, "ND": 59, "IQ": 87, "FT": 33, "NG": 1.0},
+      {"first_name": "Nolan", "last_name": "Fortress", "team": "Four Corners", "SC": 11, "SH": 86, "ID": 13, "OD": 25, "PS": 52, "BH": 11, "RB": 59, "AG": 7, "ST": 9, "ND": 9, "IQ": 30, "FT": 95, "NG": 1.0},
+      {"first_name": "Malcolm", "last_name": "Bleeker", "team": "Four Corners", "SC": 29, "SH": 51, "ID": 17, "OD": 27, "PS": 14, "BH": 31, "RB": 28, "AG": 85, "ST": 53, "ND": 65, "IQ": 10, "FT": 73, "NG": 1.0},
+      {"first_name": "Prince", "last_name": "Baez", "team": "Four Corners", "SC": 28, "SH": 35, "ID": 10, "OD": 11, "PS": 30, "BH": 43, "RB": 23, "AG": 13, "ST": 14, "ND": 31, "IQ": 22, "FT": 51, "NG": 1.0},
+      {"first_name": "Dan", "last_name": "Olson", "team": "Four Corners", "SC": 26, "SH": 35, "ID": 10, "OD": 28, "PS": 23, "BH": 22, "RB": 34, "AG": 35, "ST": 14, "ND": 14, "IQ": 23, "FT": 44, "NG": 1.0}
+    ]
+  }
+  

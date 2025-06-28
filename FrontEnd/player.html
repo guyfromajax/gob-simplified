@@ -1,0 +1,34 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Player Details</title>
+</head>
+<body>
+  <h1 id="playerName">Loading...</h1>
+  <div id="playerDetails"></div>
+
+  <script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const playerId = urlParams.get("id");
+
+    fetch(`https://gob-simplified-production.up.railway.app/player/${playerId}`)
+      .then(res => res.json())
+      .then(data => {
+        document.getElementById("playerName").innerText = `${data.first_name} ${data.last_name}`;
+        const detailDiv = document.getElementById("playerDetails");
+
+        const attrs = data.attributes;
+        for (const key in attrs) {
+          const val = key === "NG" ? parseFloat(attrs[key]).toFixed(2) : attrs[key];
+          const line = document.createElement("p");
+          line.textContent = `${key}: ${val}`;
+          detailDiv.appendChild(line);
+        }
+      })
+      .catch(err => {
+        document.getElementById("playerName").innerText = "Player not found.";
+      });
+  </script>
+</body>
+</html>
