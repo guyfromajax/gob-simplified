@@ -1,9 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>GOB Sim Viewer</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Geeked-Out Basketball – Sim Viewer</title>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -42,18 +42,10 @@
   <h1>Geeked-Out Basketball – Sim Viewer</h1>
 
   <label for="team1">Team 1:</label>
-  <select id="team1">
-    <option value="Lancaster">Lancaster</option>
-    <option value="Bentley-Truman">Bentley-Truman</option>
-    <!-- Add more teams as needed -->
-  </select>
+  <select id="team1"></select>
 
   <label for="team2">Team 2:</label>
-  <select id="team2">
-    <option value="Lancaster">Lancaster</option>
-    <option value="Bentley-Truman">Bentley-Truman</option>
-    <!-- Add more teams as needed -->
-  </select>
+  <select id="team2"></select>
 
   <button onclick="simulateGame()">Simulate Game</button>
   <a href="roster.html"><button>View Team Rosters</button></a>
@@ -62,6 +54,55 @@
 
   <div id="logContainer">Game log will appear here...</div>
 
-  <script src="app.js" defer></script>
+  <script>
+    async function loadTeams() {
+      const res = await fetch(`${window.location.origin}/teams`);
+      const teams = await res.json();
+
+      const select1 = document.getElementById("team1");
+      const select2 = document.getElementById("team2");
+
+      teams.forEach(name => {
+        select1.add(new Option(name, name));
+        select2.add(new Option(name, name));
+      });
+    }
+
+    async function simulateGame() {
+      const team1 = document.getElementById("team1").value;
+      const team2 = document.getElementById("team2").value;
+
+      if (team1 === team2) {
+        alert("Please select two different teams.");
+        return;
+      }
+
+      const res = await fetch(`${window.location.origin}/simulate`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ home_team: team1, away_team: team2 })
+      });
+
+      const data = await res.json();
+
+      // Handle summary + log
+      const logEl = document.getElementById("logContainer");
+      const scoreEl = document.getElementById("score");
+
+      if (data.turns) {
+        logEl.textContent = data.turns.map((t, i) => `Turn ${i + 1}: ${t.text || "(no text)"}`).join("\n");
+      } else {
+        logEl.textContent = "No turns received.";
+      }
+
+      const s = data.score || {};
+      scoreEl.textContent = `🏁 Final Score — ${team1}: ${s[team1] ?? 0} | ${team2}: ${s[team2] ?? 0}`;
+    }
+
+    window.onload = loadTeams;
+  </script>
 </body>
 </html>
+
