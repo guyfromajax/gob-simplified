@@ -1,34 +1,77 @@
-
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Player Details</title>
+  <meta charset="UTF-8" />
+  <title>Player Profile</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    .container { max-width: 800px; margin: auto; }
+    .header { display: flex; align-items: center; justify-content: space-between; }
+    .attributes, .scouting-report { margin-top: 20px; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border: 1px solid #ccc; padding: 6px; text-align: center; }
+    th { background-color: #f0f0f0; }
+  </style>
 </head>
 <body>
-  <h1 id="playerName">Loading...</h1>
-  <div id="playerDetails"></div>
+  <div class="container">
+    <div class="header">
+      <div>
+        <h1 id="playerName">Loading...</h1>
+        <p id="heightWeight"></p>
+      </div>
+      <!-- Placeholder for image in future -->
+    </div>
+
+    <div class="attributes">
+      <h3>Attributes</h3>
+      <table>
+        <thead>
+          <tr id="attrHeaders"></tr>
+        </thead>
+        <tbody>
+          <tr id="attrValues"></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="scouting-report">
+      <h3>Scouting Report</h3>
+      <p id="reportText"></p>
+    </div>
+  </div>
 
   <script>
-    const urlParams = new URLSearchParams(window.location.search);
-    const playerId = urlParams.get("id");
+    async function loadPlayer() {
+      const params = new URLSearchParams(window.location.search);
+      const playerId = params.get("id");
+      const backendURL = window.location.origin;
 
-    fetch(`https://gob-simplified-production.up.railway.app/player/${playerId}`)
-      .then(res => res.json())
-      .then(data => {
-        document.getElementById("playerName").innerText = `${data.first_name} ${data.last_name}`;
-        const detailDiv = document.getElementById("playerDetails");
+      try {
+        const res = await fetch(`${backendURL}/player/${playerId}`);
+        const player = await res.json();
 
-        const attrs = data.attributes;
-        for (const key in attrs) {
-          const val = key === "NG" ? parseFloat(attrs[key]).toFixed(2) : attrs[key];
-          const line = document.createElement("p");
-          line.textContent = `${key}: ${val}`;
-          detailDiv.appendChild(line);
-        }
-      })
-      .catch(err => {
-        document.getElementById("playerName").innerText = "Player not found.";
-      });
+        document.getElementById("playerName").textContent = `${player.first_name} ${player.last_name}`;
+        document.getElementById("heightWeight").textContent = `${player.height}" • ${player.weight} lbs`;
+        document.getElementById("reportText").textContent = player.scouting_report || "No report available";
+
+        const attrs = player.attributes || {};
+        const headers = Object.keys(attrs);
+        const headerRow = document.getElementById("attrHeaders");
+        const valueRow = document.getElementById("attrValues");
+
+        headers.forEach(attr => {
+          headerRow.innerHTML += `<th>${attr}</th>`;
+          valueRow.innerHTML += `<td>${attrs[attr]}</td>`;
+        });
+      } catch (err) {
+        document.body.innerHTML = "<h2>❌ Failed to load player data.</h2>";
+        console.error(err);
+      }
+    }
+
+    window.onload = loadPlayer;
   </script>
 </body>
 </html>
+
