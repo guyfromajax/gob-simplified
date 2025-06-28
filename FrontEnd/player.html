@@ -50,6 +50,7 @@
       try {
         const res = await fetch(`${backendURL}/player/${playerId}`);
         const player = await res.json();
+        console.log(player);
 
         document.getElementById("playerName").textContent = `${player.first_name} ${player.last_name}`;
         document.getElementById("heightWeight").textContent = `${player.height}" • ${player.weight} lbs`;
