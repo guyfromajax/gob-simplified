@@ -122,6 +122,7 @@ def get_team_roster(team_name: str):
     for p in player_objects:
         attributes = p.get("attributes", {})  # safely get nested attributes dict
         players.append({
+            "_id": str(p["_id"]),  # ✅ Add this line
             "name": f"{p.get('first_name', '')} {p.get('last_name', '')}".strip(),
             "attributes": {attr: attributes.get(attr, "--") for attr in display_attributes}
         })
