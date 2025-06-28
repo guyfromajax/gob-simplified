@@ -89,8 +89,9 @@ def get_team_roster(team_name: str):
         raise HTTPException(status_code=404, detail=f"No players found for team '{team_name}'")
 
     player_objects = list(players_collection.find({
-        "_id": {"$in": [ObjectId(pid) for pid in player_ids]}
+        "_id": {"$in": player_ids}
     }))
+
 
     # List of attributes to display (excludes CH, EM)
     display_attributes = ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "AG", "ST", "ND", "IQ", "FT", "NG"]
