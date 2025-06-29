@@ -87,7 +87,7 @@
       });
 
       const simData = await res.json();
-      const players = simData.players || [];
+      players = simData.players || [];
       console.log("✅ Sim data loaded:", simData);
       console.log("🎯 First turn animations:", simData.turns[0]?.animations);
       console.log("🏀 home_team_id:", simData.home_team_id);
@@ -122,7 +122,8 @@
         });
 
         const maxDuration = Math.max(...animationQueue.map(a => a.duration || 600), 600);
-
+        const stateStart = performance.now();
+        
         function animateTurnFrame() {
           const now = performance.now();
           ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -145,8 +146,6 @@
             requestAnimationFrame(animateTurnFrame);
           }
         }
-
-        const stateStart = performance.now();
         animateTurnFrame();
 
         setTimeout(() => {
