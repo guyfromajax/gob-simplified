@@ -292,6 +292,15 @@ def get_foul_and_turnover_positions(pass_count):
 def get_player_position(team_lineup, player_obj):
     return next((pos for pos, p in team_lineup.items() if p == player_obj), None)
 
+def get_player_by_pos(pos, offense_lineup, defense_lineup):
+    if pos in offense_lineup:
+        return offense_lineup[pos]
+    elif pos in defense_lineup:
+        return defense_lineup[pos]
+    else:
+        return None
+
+
 def get_quarter_index_from_game(game):
     return game.game_state["quarter"] - 1
 
