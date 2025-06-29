@@ -1,17 +1,26 @@
 
 body {
-    font-family: sans-serif;
-    padding: 1em;
-    max-width: 800px;
-    margin: auto;
+    margin: 0;
+    overflow: hidden;
+    background-color: #222;
   }
   
-  #logContainer {
-    margin-top: 2em;
-    border: 1px solid #ccc;
-    padding: 1em;
-    max-height: 500px;
-    overflow-y: scroll;
-    background: #f9f9f9;
+  canvas {
+    display: block;
+    background-color: transparent;
+  }
+  
+  #court {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 0;
+  }
+  
+  #gameLayer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 1;
   }
   
