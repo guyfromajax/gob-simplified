@@ -10,12 +10,15 @@ class Player:
         self.name = f"{self.first_name} {self.last_name}"
         self.team = data.get("team")
         self.attributes = self._extract_attributes(data)
+        # self.jersey = data["jersey"]
+        # self.year = data["year"]
         self.stats = self._init_stats()
         self.metadata = {
             "fouls": 0,
             "minutes_played": 0,
             "abilities": data.get("abilities", [])
         }
+        self.coords = {"x": 0, "y": 0}
 
     def _extract_attributes(self, data):
         attr_data = data.get("attributes", {})
