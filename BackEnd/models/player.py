@@ -17,7 +17,8 @@ class Player:
         }
 
     def _extract_attributes(self, data):
-        attrs = {k: data.get(k, 0) for k in ALL_ATTRS}
+        attr_data = data.get("attributes", {})
+        attrs = {k: attr_data.get(k, 0) for k in ALL_ATTRS}
         for k in list(attrs):
             attrs[f"anchor_{k}"] = attrs[k]
         attrs["NG"] = 1.0
