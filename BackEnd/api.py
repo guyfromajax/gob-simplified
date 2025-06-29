@@ -18,7 +18,9 @@ from fastapi.staticfiles import StaticFiles
 
 app = FastAPI()
 # app.mount("/", StaticFiles(directory="FrontEnd", html=True), name="static")
-app.mount("/static", StaticFiles(directory="FrontEnd", html=True), name="static")
+# app.mount("/static", StaticFiles(directory="FrontEnd", html=True), name="static")
+app.mount("/static", StaticFiles(directory="FrontEnd/static"), name="static")
+
 
 print("🚀 Loaded FastAPI app from api.py")
 

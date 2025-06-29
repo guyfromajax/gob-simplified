@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GOB Court Animation Test</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+    }
+    canvas {
+      display: block;
+      background-color: #222;
+    }
+    #court {
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 0;
+    }
+    #gameLayer {
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 1;
+    }
+  </style>
+</head>
+<body>
+  <img id="court" src="/static/courts/lancaster.jpg" width="1229" height="768" />
+  <canvas id="gameLayer" width="1229" height="768"></canvas>
+
+  <script>
+    const canvas = document.getElementById('gameLayer');
+    const ctx = canvas.getContext('2d');
+
+    // Grid to pixel conversion
+    function gridToPixels(x, y) {
+      const pixelX = (x / 100) * 1229;
+      const pixelY = ((50 - y) / 50) * 768; // y=0 is bottom, y=50 is top
+      return { x: pixelX, y: pixelY };
+    }
+
+    const players = [
+      { id: "PG", team: "home", jersey: 1, pos: "PG", x: 10, y: 25 },
+      { id: "SG", team: "home", jersey: 2, pos: "SG", x: 15, y: 30 },
+      { id: "SF", team: "home", jersey: 3, pos: "SF", x: 20, y: 20 },
+      { id: "PF", team: "home", jersey: 4, pos: "PF", x: 25, y: 35 },
+      { id: "C",  team: "home", jersey: 5, pos: "C",  x: 30, y: 25 },
+      { id: "PG", team: "away", jersey: 6, pos: "PG", x: 90, y: 25 },
+      { id: "SG", team: "away", jersey: 7, pos: "SG", x: 85, y: 30 },
+      { id: "SF", team: "away", jersey: 8, pos: "SF", x: 80, y: 20 },
+      { id: "PF", team: "away", jersey: 9, pos: "PF", x: 75, y: 35 },
+      { id: "C",  team: "away", jersey: 10,pos: "C",  x: 70, y: 25 }
+    ];
+
+    const animationQueue = [
+      {
+        playerId: "PG",
+        start: { x: 10, y: 25 },
+        end: { x: 35, y: 25 },
+        duration: 2000,
+        hasBall: true
+      },
+      {
+        playerId: "SG",
+        start: { x: 15, y: 30 },
+        end: { x: 20, y: 40 },
+        duration: 2000,
+        hasBall: false
+      }
+    ];
+
+    const playerStates = {};
+    animationQueue.forEach(anim => {
+      playerStates[anim.playerId] = {
+        ...anim,
+        startTime: performance.now()
+      };
+    });
+
+    function drawPlayer(player, overrideCoords = null) {
+      const { x, y } = overrideCoords || gridToPixels(player.x, player.y);
+      const radius = 20;
+
+      ctx.beginPath();
+      ctx.arc(x, y, radius, 0, Math.PI * 2);
+      ctx.fillStyle = player.team === 'home' ? '#0077cc' : '#ffffff';
+      ctx.strokeStyle = player.team === 'home' ? '#ffcc00' : '#0077cc';
+      ctx.lineWidth = 3;
+      ctx.fill();
+      ctx.stroke();
+
+      // Position label
+      ctx.fillStyle = player.team === 'home' ? '#ffcc00' : '#0077cc';
+      ctx.font = '12px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText(player.pos, x, y + 4);
+
+      // Jersey number
+      ctx.font = 'bold 12px Arial';
+      const numberY = player.team === 'home' ? y - radius - 5 : y + radius + 15;
+      ctx.fillText(player.jersey, x, numberY);
+
+      // Ball icon (if ball handler)
+      if (playerStates[player.id]?.hasBall) {
+        ctx.beginPath();
+        ctx.arc(x, y, 6, 0, Math.PI * 2);
+        ctx.fillStyle = 'orange';
+        ctx.fill();
+      }
+    }
+
+    function animate() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const now = performance.now();
+
+      players.forEach(player => {
+        const state = playerStates[player.id];
+        if (state) {
+          const progress = Math.min(1, (now - state.startTime) / state.duration);
+          const startPix = gridToPixels(state.start.x, state.start.y);
+          const endPix = gridToPixels(state.end.x, state.end.y);
+          const currentX = startPix.x + (endPix.x - startPix.x) * progress;
+          const currentY = startPix.y + (endPix.y - startPix.y) * progress;
+          drawPlayer(player, { x: currentX, y: currentY });
+        } else {
+          drawPlayer(player);
+        }
+      });
+
+      requestAnimationFrame(animate);
+    }
+
+    animate();
+  </script>
+</body>
+</html>
