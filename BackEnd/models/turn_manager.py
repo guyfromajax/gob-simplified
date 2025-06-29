@@ -75,6 +75,11 @@ class TurnManager:
         print(f"{self.game.game_state['clock']}")
         print(f"animations: {animations}")
         # print(f"game state: {self.game.game_state}")
+        if "ball_handler" in result and hasattr(result["ball_handler"], "player_id"):
+            result["ball_handler_id"] = result["ball_handler"].player_id
+        else:
+            result["ball_handler_id"] = None
+
         
         result["turn_count"] = self.game.micro_turn_count
         result["possession_team_id"] = self.game.offense_team.team_id
@@ -151,14 +156,14 @@ class TurnManager:
         off_lineup = self.game.offense_team.lineup
         def_lineup = self.game.defense_team.lineup
         playcall = self.game.game_state["current_playcall"]
-        print(f"playcall: {playcall}")
+        # print(f"playcall: {playcall}")
 
         # Compute shot weights using attributes embedded in each player object
         weights_dict = PLAYCALL_ATTRIBUTE_WEIGHTS.get("Attack" if playcall == "Set" else playcall, {})
-        print(f"weights_dict: {weights_dict}")
+        # print(f"weights_dict: {weights_dict}")
 
-        for pos, player in off_lineup.items():
-            print(f"{pos}: {player.attributes}")
+        # for pos, player in off_lineup.items():
+        #     print(f"{pos}: {player.attributes}")
         
         shot_weights = {
             pos: sum(
@@ -167,7 +172,7 @@ class TurnManager:
             )
             for pos in off_lineup
         }
-        print(f"shot_weights: {shot_weights}")
+        # print(f"shot_weights: {shot_weights}")
         shooter_pos = weighted_random_from_dict(shot_weights)
 
         # Compute screener weights (excluding the shooter)
