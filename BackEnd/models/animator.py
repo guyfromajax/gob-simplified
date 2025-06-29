@@ -1,3 +1,6 @@
+from BackEnd.utils.shared import get_player_by_pos
+
+
 class Animator:
     def __init__(self, game):
         self.game = game
@@ -10,7 +13,11 @@ class Animator:
         end_dict = result.get("end_coords", {})
 
         for pos, start in start_dict.items():
-            player = self.game.get_player_by_pos(pos)  # or lookup via offense/defense team
+            player = get_player_by_pos(pos, self.game.offense_team.lineup, self.game.defense_team.lineup)
+            if player is None:
+                print(f"⚠️ No player found for position: {pos}")
+                continue
+
 
             if not player:
                 continue

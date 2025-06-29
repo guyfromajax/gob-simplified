@@ -80,6 +80,9 @@ class TurnManager:
         result["possession_team_id"] = self.game.offense_team.team_id
         print(f"possesion team id: {self.game.offense_team.team_id}")
 
+        print(f"offense lineup: {self.game.offense_team.lineup}")
+        print(f"defense lineup: {self.game.defense_team.lineup}")
+
         return result
 
 
