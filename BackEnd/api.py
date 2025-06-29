@@ -87,6 +87,7 @@ def simulate_game(request: SimulationRequest):
     summary["home_team_name"] = game.home_team.name
     summary["away_team_name"] = game.away_team.name
     summary["score"] = game.score
+    summary["home_team_id"] = game.home_team.team_id
     
     return summary
 
