@@ -18,7 +18,6 @@ class Player:
 
     def _extract_attributes(self, data):
         attr_data = data.get("attributes", {})
-        print("🎯 Extracting attributes from:", attr_data)  # Add this
         attrs = {k: attr_data.get(k, 0) for k in ALL_ATTRS}
         
         for k in list(attrs):
@@ -94,6 +93,9 @@ class Player:
 
     def get_all_abilities(self):
         return self.metadata["abilities"]
+    
+    def set_coords(self, x, y):
+        self.coords = {"x": x, "y": y}
 
     
     

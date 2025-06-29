@@ -55,54 +55,107 @@
   <div id="logContainer">Game log will appear here...</div>
 
   <script>
-    async function loadTeams() {
-      const res = await fetch(`${window.location.origin}/teams`);
-      const teams = await res.json();
-
-      const select1 = document.getElementById("team1");
-      const select2 = document.getElementById("team2");
-
-      teams.forEach(name => {
-        select1.add(new Option(name, name));
-        select2.add(new Option(name, name));
-      });
+    const canvas = document.getElementById('gameLayer');
+    const ctx = canvas.getContext('2d');
+  
+    function gridToPixels(x, y) {
+      const pixelX = (x / 100) * 1229;
+      const pixelY = ((50 - y) / 50) * 768;
+      return { x: pixelX, y: pixelY };
     }
-
-    async function simulateGame() {
-      const team1 = document.getElementById("team1").value;
-      const team2 = document.getElementById("team2").value;
-
-      if (team1 === team2) {
-        alert("Please select two different teams.");
-        return;
-      }
-
+  
+    // Fetch sim data, set court image, and initialize animation
+    async function loadSimAndStart() {
       const res = await fetch(`${window.location.origin}/simulate`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ home_team: team1, away_team: team2 })
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ home_team: "Four Corners", away_team: "Bentley-Truman" })
       });
-
-      const data = await res.json();
-
-      // Handle summary + log
-      const logEl = document.getElementById("logContainer");
-      const scoreEl = document.getElementById("score");
-
-      if (data.turns) {
-        logEl.textContent = data.turns.map((t, i) => `Turn ${i + 1}: ${t.text || "(no text)"}`).join("\n");
-      } else {
-        logEl.textContent = "No turns received.";
+  
+      const simData = await res.json();
+      const homeTeamId = simData.home_team_id.toLowerCase(); // e.g., "four_corners"
+      document.getElementById("court").src = `/static/images/courts/${homeTeamId}.jpg`;
+  
+      // Setup animation from first turn (you can expand this later)
+      const animationQueue = simData.turns[0]?.animations || [];
+  
+      const playerStates = {};
+      animationQueue.forEach(anim => {
+        playerStates[anim.playerId] = {
+          ...anim,
+          startTime: performance.now()
+        };
+      });
+  
+      const players = [
+        { id: "PG", team: "home", jersey: 1, pos: "PG", x: 10, y: 25 },
+        { id: "SG", team: "home", jersey: 2, pos: "SG", x: 15, y: 30 },
+        { id: "SF", team: "home", jersey: 3, pos: "SF", x: 20, y: 20 },
+        { id: "PF", team: "home", jersey: 4, pos: "PF", x: 25, y: 35 },
+        { id: "C",  team: "home", jersey: 5, pos: "C",  x: 30, y: 25 },
+        { id: "PG", team: "away", jersey: 6, pos: "PG", x: 90, y: 25 },
+        { id: "SG", team: "away", jersey: 7, pos: "SG", x: 85, y: 30 },
+        { id: "SF", team: "away", jersey: 8, pos: "SF", x: 80, y: 20 },
+        { id: "PF", team: "away", jersey: 9, pos: "PF", x: 75, y: 35 },
+        { id: "C",  team: "away", jersey: 10,pos: "C",  x: 70, y: 25 }
+      ];
+  
+      function drawPlayer(player, overrideCoords = null) {
+        const { x, y } = overrideCoords || gridToPixels(player.x, player.y);
+        const radius = 20;
+  
+        ctx.beginPath();
+        ctx.arc(x, y, radius, 0, Math.PI * 2);
+        ctx.fillStyle = player.team === 'home' ? '#0077cc' : '#ffffff';
+        ctx.strokeStyle = player.team === 'home' ? '#ffcc00' : '#0077cc';
+        ctx.lineWidth = 3;
+        ctx.fill();
+        ctx.stroke();
+  
+        ctx.fillStyle = player.team === 'home' ? '#ffcc00' : '#0077cc';
+        ctx.font = '12px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText(player.pos, x, y + 4);
+  
+        ctx.font = 'bold 12px Arial';
+        const numberY = player.team === 'home' ? y - radius - 5 : y + radius + 15;
+        ctx.fillText(player.jersey, x, numberY);
+  
+        if (playerStates[player.id]?.hasBall) {
+          ctx.beginPath();
+          ctx.arc(x, y, 6, 0, Math.PI * 2);
+          ctx.fillStyle = 'orange';
+          ctx.fill();
+        }
       }
-
-      const s = data.score || {};
-      scoreEl.textContent = `🏁 Final Score — ${team1}: ${s[team1] ?? 0} | ${team2}: ${s[team2] ?? 0}`;
+  
+      function animate() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        const now = performance.now();
+  
+        players.forEach(player => {
+          const state = playerStates[player.id];
+          if (state) {
+            const progress = Math.min(1, (now - state.startTime) / state.duration);
+            const startPix = gridToPixels(state.start.x, state.start.y);
+            const endPix = gridToPixels(state.end.x, state.end.y);
+            const currentX = startPix.x + (endPix.x - startPix.x) * progress;
+            const currentY = startPix.y + (endPix.y - startPix.y) * progress;
+            drawPlayer(player, { x: currentX, y: currentY });
+          } else {
+            drawPlayer(player);
+          }
+        });
+  
+        requestAnimationFrame(animate);
+      }
+  
+      animate();
     }
-
-    window.onload = loadTeams;
+  
+    loadSimAndStart();
   </script>
+  
 </body>
 </html>
 

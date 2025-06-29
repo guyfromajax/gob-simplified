@@ -65,13 +65,21 @@ class TurnManager:
         self.update_clock_and_possession(result)
         self.logger.log_turn_result(result)
         self.animator.capture(result)
+        animations = self.animator.get_latest_animation_packet()  # see below
+        result["animations"] = animations
+
 
         print("🔁 End of run_micro_turn after housekeeping functions")
         print(f"{result['text']}")
         print(f"{self.game.game_state['score']}")
         print(f"{self.game.game_state['clock']}")
+        print(f"animations: {animations}")
         # print(f"game state: {self.game.game_state}")
         
+        result["turn_count"] = self.game.micro_turn_count
+        result["possession_team_id"] = self.game.offense_team.team_id
+        print(f"possesion team id: {self.game.offense_team.team_id}")
+
         return result
 
 
