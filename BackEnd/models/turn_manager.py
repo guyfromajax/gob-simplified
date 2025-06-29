@@ -1,7 +1,7 @@
 from BackEnd.models.logger import Logger
 from BackEnd.models.rebound_manager import ReboundManager
 from BackEnd.models.playbook_manager import PlaybookManager
-from BackEnd.models.animation_manager import AnimationManager
+from BackEnd.models.animator import Animator
 import random
 import json
 from BackEnd.db import players_collection, teams_collection
@@ -31,7 +31,7 @@ class TurnManager:
         self.logger = Logger()
         self.rebound_manager = ReboundManager(self.game)
         self.playbook_manager = PlaybookManager(self.game.offense_team)
-        self.animator = AnimationManager()
+        self.animator = Animator(self.game)
 
     def run_micro_turn(self):
         # Increment micro turn counter
