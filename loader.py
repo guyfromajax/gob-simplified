@@ -27,6 +27,7 @@ for filename in os.listdir(directory):
     player_ids = []
 
     for raw_player in team_data["players"]:
+        print(f"raw_player: {raw_player}")
         player_obj = Player(raw_player)
         player_id = str(uuid4())
         player_data = {
@@ -38,6 +39,9 @@ for filename in os.listdir(directory):
             "stats": player_obj.stats,
             "metadata": player_obj.metadata
         }
+        # player_id = str(uuid4())
+        # raw_player["_id"] = player_id
+        # raw_player["team"] = team_name
         player_ids.append(player_id)
         player_docs.append(player_data)
 
