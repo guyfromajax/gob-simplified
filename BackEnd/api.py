@@ -91,24 +91,26 @@ def simulate_game(request: SimulationRequest):
     summary["home_team_id"] = game.home_team.team_id
     
     for pos, player in game.home_team.lineup.items():
+        coords = player.coords if hasattr(player, "coords") and player.coords else {"x": 0, "y": 0}
         summary["players"].append({
             "playerId": player.player_id,
             "team": "home",  # for animation styling
             "team_id": game.home_team.team_id,  # for logos/colors later
             "pos": pos,
             "jersey": player.attributes.get("jersey", 1),
-            "x": player.coords.get("x", 0),
-            "y": player.coords.get("y", 0)
+            "x": coords.get("x", 0),
+            "y": coords.get("y", 0)
         })
     for pos, player in game.away_team.lineup.items():
+        coords = player.coords if hasattr(player, "coords") and player.coords else {"x": 0, "y": 0}
         summary["players"].append({
             "playerId": player.player_id,
             "team": "away",
             "team_id": game.away_team.team_id,
             "pos": pos,
             "jersey": player.attributes.get("jersey", 6),  # adjust if needed
-            "x": player.coords.get("x", 0),
-            "y": player.coords.get("y", 0)
+            "x": coords.get("x", 0),
+            "y": coords.get("y", 0)
         })
 
     
