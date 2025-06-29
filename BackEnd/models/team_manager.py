@@ -1,5 +1,5 @@
 import random
-from BackEnd.db import players_collection
+from BackEnd.db import players_collection, teams_collection
 from BackEnd.models.player import Player
 from BackEnd.constants import PLAYCALLS
 
@@ -9,6 +9,11 @@ class TeamManager:
         self.is_home_team = is_home_team
         self.players = self._load_roster()
         self.lineup = self._load_lineup()
+        
+        team_doc = teams_collection.find_one({"name": name})
+        if not team_doc:
+            print(f"⚠️ No team document found for team: {name}")
+        self.team_id = team_doc.get("team_id") if team_doc else None
 
         self.points = 0
         self.points_by_quarter = [0, 0, 0, 0]
