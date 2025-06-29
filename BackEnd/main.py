@@ -237,6 +237,9 @@ def print_scouting_report(data):
 def run_simulation(home_team_name, away_team_name):
     gm = GameManager(home_team_name, away_team_name)
 
+    print("Inside run_simulation")
+    print(f"Home team: {home_team_name}, Away team: {away_team_name}")
+
     gm.home_team.lineup = build_lineup_from_mongo(home_team_name)
     gm.away_team.lineup = build_lineup_from_mongo(away_team_name)
 
