@@ -14,6 +14,7 @@ import pprint
 from bson.json_util import dumps
 from bson import ObjectId
 from fastapi.staticfiles import StaticFiles
+from BackEnd.models.animator import Animator    
 
 
 app = FastAPI()
@@ -72,10 +73,6 @@ def simulate_game(request: SimulationRequest):
     print("Right before summarize_game_state")
     print("🧪 Turns sample:", game.turns[:3])  
     summary = summarize_game_state(game)
-    
-
-    # print("✅ Game summary prepared:")
-    # print(summary)
 
     # ✅ Minimal debug visibility
     print(f"✅ Game finished: {home_team} vs. {away_team}")
