@@ -59,7 +59,6 @@ class TurnManager:
             result = self.resolve_half_court_offense()
 
         print("Inside run_micro_turn // coming out of resolve offensive state functions")
-        print(f"result: {result}")
 
         # STEP 4: Final updates (clock, logs, animation)
         self.update_clock_and_possession(result)
@@ -87,6 +86,8 @@ class TurnManager:
 
         print(f"offense lineup: {self.game.offense_team.lineup}")
         print(f"defense lineup: {self.game.defense_team.lineup}")
+
+        print(f"result: {result}")
 
         return result
 
