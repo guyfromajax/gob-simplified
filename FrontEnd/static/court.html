@@ -45,8 +45,6 @@
       return { x: pixelX, y: pixelY };
     }
 
-    const players = simData.players || [];
-
     function drawPlayer(player, overrideCoords = null) {
       const { x, y } = overrideCoords || gridToPixels(player.x, player.y);
       const radius = 20;
@@ -77,7 +75,7 @@
     }
 
     let playerStates = {}; // needs to be scoped outside for use in drawPlayer
-
+    let players = [];
     async function loadSimAndStart() {
       const res = await fetch(`${window.location.origin}/simulate`, {
         method: "POST",
@@ -89,6 +87,7 @@
       });
 
       const simData = await res.json();
+      const players = simData.players || [];
       console.log("✅ Sim data loaded:", simData);
       console.log("🎯 First turn animations:", simData.turns[0]?.animations);
       console.log("🏀 home_team_id:", simData.home_team_id);
