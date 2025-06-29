@@ -52,14 +52,17 @@
       });
   
       const simData = await res.json();
+      console.log("✅ Sim data loaded:", simData);
+      console.log("🎯 First turn animations:", simData.turns[0]?.animations);
       console.log("🏀 home_team_id:", simData.home_team_id);
       const teamId = simData.home_team_id.toLowerCase();
       const courtPath = `/static/images/courts/${teamId}.jpg`;
       console.log("📸 Loading court image:", courtPath);
       document.getElementById("court").src = courtPath;
-  
+
       const animationQueue = simData.turns[0]?.animations || [];
-  
+      console.log("🎯 Animation queue:", animationQueue);
+
       const playerStates = {};
       animationQueue.forEach(anim => {
         playerStates[anim.playerId] = {
