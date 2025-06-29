@@ -89,6 +89,7 @@ def simulate_game(request: SimulationRequest):
     summary["away_team_name"] = game.away_team.name
     summary["score"] = game.score
     summary["home_team_id"] = game.home_team.team_id
+    summary["players"] = []
     
     for pos, player in game.home_team.lineup.items():
         coords = player.coords if hasattr(player, "coords") and player.coords else {"x": 0, "y": 0}
