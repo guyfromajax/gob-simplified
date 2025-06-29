@@ -84,26 +84,21 @@ def simulate_game(request: SimulationRequest):
     # print("✅ Game summary prepared:")
     # print(summary)
 
-
     # ✅ Minimal debug visibility
     print(f"✅ Game finished: {home_team} vs. {away_team}")
     print(f"🏀 Final Score: {game.score}")
     print(f"📊 Team Totals: {game.team_totals}")# show first few entries
 
-    # for turn in summary.get("turns", []):
-    #     for key, value in turn.items():
-    #         if hasattr(value, "name"):
-    #             turn[key] = value.name  # or str(value)
-    #         elif not isinstance(value, (str, int, float, dict, list, bool, type(None))):
-    #             turn[key] = str(value)
-
     games_collection.insert_one(summary)
     summary.pop("_id", None)  # ✅ remove Mongo's ObjectId
-    return summary
+
+    # ✅ Attach turn log and other details to return payload
+    summary["turns"] = game.turns
+    summary["home_team_name"] = game.home_team.name
+    summary["away_team_name"] = game.away_team.name
+    summary["score"] = game.score
     
-    # games_collection.insert_one(summary)
-    # # return clean_mongo_ids(summary)
-    # return summary #return summary to frontend
+    return summary
 
 
 @app.get("/roster/{team_name}")
