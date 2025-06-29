@@ -144,7 +144,7 @@ class TurnManager:
 
         # Compute shot weights using attributes embedded in each player object
         weights_dict = PLAYCALL_ATTRIBUTE_WEIGHTS.get("Attack" if playcall == "Set" else playcall, {})
-        print(f"weights_dict: {weights_dict}")``
+        print(f"weights_dict: {weights_dict}")
         
         shot_weights = {
             pos: sum(
