@@ -140,9 +140,11 @@ class TurnManager:
         off_lineup = self.game.offense_team.lineup
         def_lineup = self.game.defense_team.lineup
         playcall = self.game.game_state["current_playcall"]
+        print(f"playcall: {playcall}")
 
         # Compute shot weights using attributes embedded in each player object
         weights_dict = PLAYCALL_ATTRIBUTE_WEIGHTS.get("Attack" if playcall == "Set" else playcall, {})
+        print(f"weights_dict: {weights_dict}")``
         
         shot_weights = {
             pos: sum(
@@ -151,6 +153,7 @@ class TurnManager:
             )
             for pos in off_lineup
         }
+        print(f"shot_weights: {shot_weights}")
         shooter_pos = weighted_random_from_dict(shot_weights)
 
         # Compute screener weights (excluding the shooter)
