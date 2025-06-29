@@ -18,10 +18,14 @@ class Player:
 
     def _extract_attributes(self, data):
         attr_data = data.get("attributes", {})
+        print("🎯 Extracting attributes from:", attr_data)  # Add this
         attrs = {k: attr_data.get(k, 0) for k in ALL_ATTRS}
+        
         for k in list(attrs):
             attrs[f"anchor_{k}"] = attrs[k]
-        attrs["NG"] = 1.0
+
+        attrs["NG"] = attr_data.get("NG", 1.0)
+
         return attrs
 
     def _init_stats(self):
@@ -40,17 +44,30 @@ class Player:
             s = self.stats["game"]
             s["REB"] = s["OREB"] + s["DREB"]
 
-    def decay_energy(self, amount):
-        self.attributes["NG"] = max(0.1, round(self.attributes["NG"] - amount, 3))
-        self._rescale_attributes()
+    # def decay_energy(self, amount):
+    #     self.attributes["NG"] = max(0.1, round(self.attributes["NG"] - amount, 3))
+    #     self._rescale_attributes()
+
+    def decay_energy(self, intensity):
+        self.attributes["NG"] = max(0.1, self.attributes["NG"] - intensity)
+        for attr in ALL_ATTRS:
+            base = self.attributes.get(f"anchor_{attr}", 0)
+            self.attributes[attr] = int(base * self.attributes["NG"])
+
 
     def recharge_energy(self, amount):
         self.attributes["NG"] = min(1.0, round(self.attributes["NG"] + amount, 3))
         self._rescale_attributes()
 
+    # def reset_energy(self):
+    #     self.attributes["NG"] = 1.0
+    #     self._rescale_attributes()
+
     def reset_energy(self):
         self.attributes["NG"] = 1.0
-        self._rescale_attributes()
+        for attr in ALL_ATTRS:
+            self.attributes[attr] = self.attributes.get(f"anchor_{attr}", 0)
+
 
     def _rescale_attributes(self):
         ng = self.attributes["NG"]

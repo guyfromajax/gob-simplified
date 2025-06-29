@@ -17,6 +17,8 @@ def build_lineup_from_mongo(team_name: str) -> dict:
 
     for i, pos in enumerate(POSITION_LIST):
         player_doc = players[i]
+        print(f"\n📥 Loading player {player_doc.get('first_name')} {player_doc.get('last_name')} at {pos}")
+        print("🔎 Raw 'attributes' field from Mongo:", player_doc.get("attributes", {}))
         lineup[pos] = Player(player_doc)
 
     return lineup

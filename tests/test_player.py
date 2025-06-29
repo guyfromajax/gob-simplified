@@ -55,3 +55,50 @@ def test_reset_energy_restores_attributes():
     p.reset_energy()
     for attr in ALL_ATTRS:
         assert p.attributes[attr] == mock_data[attr]
+
+# tests/test_player.py
+
+def test_player_initialization_from_nested_attributes():
+    mock_doc = {
+        "first_name": "Test",
+        "last_name": "Player",
+        "team": "Lancaster",
+        "attributes": {
+            "SC": 5,
+            "SH": 4,
+            "ID": 3,
+            "OD": 2,
+            "PS": 1,
+            "BH": 6,
+            "RB": 5,
+            "ST": 4,
+            "AG": 3,
+            "FT": 2,
+            "ND": 1,
+            "IQ": 7,
+            "CH": 8,
+            "EM": 9,
+            "MO": 10,
+            "NG": 1.2
+        }
+    }
+
+    player = Player(mock_doc)
+
+    assert player.SC == 5
+    assert player.SH == 4
+    assert player.ID == 3
+    assert player.OD == 2
+    assert player.PS == 1
+    assert player.BH == 6
+    assert player.RB == 5
+    assert player.ST == 4
+    assert player.AG == 3
+    assert player.FT == 2
+    assert player.ND == 1
+    assert player.IQ == 7
+    assert player.CH == 8
+    assert player.EM == 9
+    assert player.MO == 10
+    assert abs(player.NG - 1.2) < 0.001
+
