@@ -25,13 +25,14 @@ class Animator:
             end = end_dict.get(pos, start)
 
             packet.append({
-                "playerId": player["playerId"],
+                "playerId": player.player_id,
                 "start": start,
                 "end": end,
                 "event": result["result_type"].lower(),
-                "hasBall": player["playerId"] == result.get("ball_handler_id"),
-                "duration": 600  # adjust later if needed
+                "hasBall": player.player_id == result.get("ball_handler_id"),
+                "duration": 600
             })
+
 
         self.latest_packet = packet
 
