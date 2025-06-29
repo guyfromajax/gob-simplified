@@ -45,18 +45,7 @@
       return { x: pixelX, y: pixelY };
     }
 
-    const players = [
-      { id: "PG", team: "home", jersey: 1, pos: "PG", x: 10, y: 25 },
-      { id: "SG", team: "home", jersey: 2, pos: "SG", x: 15, y: 30 },
-      { id: "SF", team: "home", jersey: 3, pos: "SF", x: 20, y: 20 },
-      { id: "PF", team: "home", jersey: 4, pos: "PF", x: 25, y: 35 },
-      { id: "C",  team: "home", jersey: 5, pos: "C",  x: 30, y: 25 },
-      { id: "PG", team: "away", jersey: 6, pos: "PG", x: 90, y: 25 },
-      { id: "SG", team: "away", jersey: 7, pos: "SG", x: 85, y: 30 },
-      { id: "SF", team: "away", jersey: 8, pos: "SF", x: 80, y: 20 },
-      { id: "PF", team: "away", jersey: 9, pos: "PF", x: 75, y: 35 },
-      { id: "C",  team: "away", jersey: 10,pos: "C",  x: 70, y: 25 }
-    ];
+    const players = simData.players || [];
 
     function drawPlayer(player, overrideCoords = null) {
       const { x, y } = overrideCoords || gridToPixels(player.x, player.y);

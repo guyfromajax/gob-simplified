@@ -83,11 +83,34 @@ def simulate_game(request: SimulationRequest):
     summary.pop("_id", None)  # ✅ remove Mongo's ObjectId
 
     # ✅ Attach turn log and other details to return payload
+    
     summary["turns"] = game.turns
     summary["home_team_name"] = game.home_team.name
     summary["away_team_name"] = game.away_team.name
     summary["score"] = game.score
     summary["home_team_id"] = game.home_team.team_id
+    
+    for pos, player in game.home_team.lineup.items():
+        summary["players"].append({
+            "playerId": player.player_id,
+            "team": "home",  # for animation styling
+            "team_id": game.home_team.team_id,  # for logos/colors later
+            "pos": pos,
+            "jersey": player.attributes.get("jersey", 1),
+            "x": player.coords.get("x", 0),
+            "y": player.coords.get("y", 0)
+        })
+    for pos, player in game.away_team.lineup.items():
+        summary["players"].append({
+            "playerId": player.player_id,
+            "team": "away",
+            "team_id": game.away_team.team_id,
+            "pos": pos,
+            "jersey": player.attributes.get("jersey", 6),  # adjust if needed
+            "x": player.coords.get("x", 0),
+            "y": player.coords.get("y", 0)
+        })
+
     
     return summary
 
