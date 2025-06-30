@@ -91,6 +91,20 @@
 
         const simData = await res.json();
         console.log("✅ Sim data loaded:", simData);
+
+        // Dynamically load court image based on home_team_id
+        const courtImg = document.getElementById("court");
+        if (simData.home_team_id) {
+          const teamId = simData.home_team_id.toLowerCase();
+          courtImg.src = `/static/images/courts/${teamId}.jpg`;
+
+          // Optional fallback in case the image doesn't exist
+          courtImg.onerror = () => {
+            console.warn(`⚠️ Court image not found for ${teamId}, using fallback.`);
+            courtImg.src = "/static/images/courts/default.jpg";
+          };
+        }
+
         players = simData.players || [];
         console.log("🔍 Players loaded:", players);
         playTurns(simData.turns);
