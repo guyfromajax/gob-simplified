@@ -77,33 +77,24 @@
     let playerStates = {}; // needs to be scoped outside for use in drawPlayer
     let players = [];
     async function loadSimAndStart() {
-    const res = await fetch(`${window.location.origin}/simulate`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        home_team: "Four Corners",
-        away_team: "Bentley-Truman"
-      })
-    });
+      try {
+        const res = await fetch("/simulate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            home_team: "Four Corners",
+            away_team: "Bentley-Truman"
+          })
+        });
 
-    if (!res.ok) {
-      const errorText = await res.text();
-      console.error("❌ Simulation failed:", errorText);
-      return;
-    }
+        if (!res.ok) throw new Error(`Simulation failed: ${res.statusText}`);
 
-      const simData = await res.json();
-      players = simData.players || [];
-      console.log("🎽 Players loaded:", players);
-      console.log("✅ Sim data loaded:", simData);
-      console.log("🎯 First turn animations:", simData.turns[0]?.animations);
-      console.log("🏀 home_team_id:", simData.home_team_id);
-      const teamId = simData.home_team_id.toLowerCase();
-      const courtPath = `/static/images/courts/${teamId}.jpg`;
-      console.log("📸 Loading court image:", courtPath);
-      document.getElementById("court").src = courtPath;
-
-      playTurns(simData.turns);
+        const simData = await res.json();
+        console.log("✅ Sim data loaded:", simData);
+        playTurns(simData.turns);
+      } catch (err) {
+        console.error("❌ Simulation failed:", err);
+      }
     }
 
     function playTurns(turns) {
