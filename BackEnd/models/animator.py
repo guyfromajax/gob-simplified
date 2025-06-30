@@ -8,16 +8,16 @@ class Animator:
 
     def capture(self, result):
         packet = []
-
         all_players = {**self.game.home_team.lineup, **self.game.away_team.lineup}
 
-        for pos, player in all_players.items():
+        spread = [
+            {"x": 10, "y": 10}, {"x": 20, "y": 20}, {"x": 30, "y": 30}, {"x": 40, "y": 40}, {"x": 50, "y": 50},
+            {"x": 60, "y": 40}, {"x": 70, "y": 30}, {"x": 80, "y": 20}, {"x": 90, "y": 10}, {"x": 25, "y": 25},
+        ]
+
+        for i, (pos, player) in enumerate(all_players.items()):
             start = getattr(player, "coords", {"x": 25, "y": 50})
-
-            # TEMP: insert dummy movement for testing
-            end = {"x": start["x"] + random.randint(5, 15), "y": start["y"] + random.randint(5, 15)}
-
-            # Update player coords for continuity
+            end = {"x": spread[i]["x"], "y": spread[i]["y"]}
             player.set_coords(end["x"], end["y"])
 
             packet.append({
@@ -29,8 +29,8 @@ class Animator:
                 "duration": 600
             })
 
-
         self.latest_packet = packet
+
 
 
     def get_latest_animation_packet(self):
