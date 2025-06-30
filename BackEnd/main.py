@@ -245,7 +245,7 @@ def run_simulation(home_team_name, away_team_name):
         gm.simulate_macro_turn()
 
     # Print all game statistics including defense score stats
-    gm.print_game_statistics()
+    # gm.print_game_statistics()
 
     print(f"*********gm:\n{gm}")
     return gm
