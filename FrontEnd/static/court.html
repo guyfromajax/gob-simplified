@@ -88,6 +88,7 @@
 
       const simData = await res.json();
       players = simData.players || [];
+      console.log("🎽 Players loaded:", players);
       console.log("✅ Sim data loaded:", simData);
       console.log("🎯 First turn animations:", simData.turns[0]?.animations);
       console.log("🏀 home_team_id:", simData.home_team_id);
@@ -123,7 +124,7 @@
 
         const maxDuration = Math.max(...animationQueue.map(a => a.duration || 600), 600);
         const stateStart = performance.now();
-        
+
         function animateTurnFrame() {
           const now = performance.now();
           ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -136,8 +137,10 @@
               const endPix = gridToPixels(state.end.x, state.end.y);
               const currentX = startPix.x + (endPix.x - startPix.x) * progress;
               const currentY = startPix.y + (endPix.y - startPix.y) * progress;
+              console.log(`Animating ${player.name}:`, state);
               drawPlayer(player, { x: currentX, y: currentY });
             } else {
+              console.log(`🚫 No state found for player: ${player.pos} (${player.player_id})`);
               drawPlayer(player);
             }
           });
