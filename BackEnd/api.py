@@ -82,13 +82,7 @@ def simulate_game(request: SimulationRequest):
     games_collection.insert_one(summary)
     summary.pop("_id", None)  # ✅ remove Mongo's ObjectId
 
-    # ✅ Attach turn log and other details to return payload
-    # summary["turns"] = game.turns
-    # summary["home_team_name"] = game.home_team.name
-    # summary["away_team_name"] = game.away_team.name
-    # summary["score"] = game.score
-    # summary["home_team_id"] = game.home_team.team_id
-    # summary["players"] = []
+    print("Inside simulate_game()\nReturning summary keys:", summary.keys())
     
     return summary
 
