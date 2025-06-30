@@ -251,6 +251,7 @@ def run_simulation(home_team_name, away_team_name):
     # Print all game statistics including defense score stats
     gm.print_game_statistics()
 
+    print(f"*********gm:\n{gm}")
     return gm
 
 

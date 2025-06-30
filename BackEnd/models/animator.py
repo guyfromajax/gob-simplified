@@ -12,29 +12,27 @@ class Animator:
         start_dict = result.get("start_coords", {})
         end_dict = result.get("end_coords", {})
 
-        for pos, start in start_dict.items():
-            player = get_player_by_pos(pos, self.game.offense_team.lineup, self.game.defense_team.lineup)
-            if player is None:
-                print(f"⚠️ No player found for position: {pos}")
-                continue
+        all_players = {**self.game.home_team.lineup, **self.game.away_team.lineup}
 
-
-            if not player:
-                continue
-
+        for pos, player in all_players.items():
+            # Fallback to player.coords if not in start_coords
+            start = start_dict.get(pos, getattr(player, "coords", {"x": 0, "y": 0}))
             end = end_dict.get(pos, start)
+
+            # Update the player's internal coords for continuity
+            player.set_coords(end["x"], end["y"])
 
             packet.append({
                 "playerId": player.player_id,
                 "start": start,
                 "end": end,
-                "event": result["result_type"].lower(),
+                "event": result.get("result_type", "idle").lower(),
                 "hasBall": player.player_id == result.get("ball_handler_id"),
                 "duration": 600
             })
 
-
         self.latest_packet = packet
+
 
     def get_latest_animation_packet(self):
         return self.latest_packet
