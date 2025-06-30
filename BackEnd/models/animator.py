@@ -1,5 +1,5 @@
 from BackEnd.utils.shared import get_player_by_pos
-
+import random
 
 class Animator:
     def __init__(self, game):
@@ -9,17 +9,15 @@ class Animator:
     def capture(self, result):
         packet = []
 
-        start_dict = result.get("start_coords", {})
-        end_dict = result.get("end_coords", {})
-
         all_players = {**self.game.home_team.lineup, **self.game.away_team.lineup}
 
         for pos, player in all_players.items():
-            # Fallback to player.coords if not in start_coords
-            start = start_dict.get(pos, getattr(player, "coords", {"x": 0, "y": 0}))
-            end = end_dict.get(pos, start)
+            start = getattr(player, "coords", {"x": 25, "y": 50})
 
-            # Update the player's internal coords for continuity
+            # TEMP: insert dummy movement for testing
+            end = {"x": start["x"] + random.randint(5, 15), "y": start["y"] + random.randint(5, 15)}
+
+            # Update player coords for continuity
             player.set_coords(end["x"], end["y"])
 
             packet.append({
@@ -30,6 +28,7 @@ class Animator:
                 "hasBall": player.player_id == result.get("ball_handler_id"),
                 "duration": 600
             })
+
 
         self.latest_packet = packet
 

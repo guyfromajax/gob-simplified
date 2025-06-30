@@ -185,8 +185,6 @@ class ShotManager:
             "defender": defender,
             "text": text,
             "possession_flips": possession_flips,
-            "start_coords": {shooter_pos: {"x": 72, "y": 25}},
-            "end_coords": {shooter_pos: {"x": 82, "y": 23}},
             "time_elapsed": time_elapsed
         }
 
@@ -375,8 +373,6 @@ class ShotManager:
             "defender": defender,
             "text": text,
             "possession_flips": possession_flips,
-            "start_coords": {shooter_pos: {"x": 72, "y": 25}},
-            "end_coords": {shooter_pos: {"x": 82, "y": 23}},
             "time_elapsed": time_elapsed
         }
 

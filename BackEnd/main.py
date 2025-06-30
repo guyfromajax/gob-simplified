@@ -155,10 +155,6 @@ def generate_animation_packet(turn_result):
     - Game state deltas
     """
     return {
-        "coords": {
-            "start": turn_result["start_coords"],
-            "end": turn_result["end_coords"]
-        },
         "text": turn_result["text"],
         "time_elapsed": turn_result["time_elapsed"],
         "offensive_state": turn_result.get("new_offense_state", "HCO"),
