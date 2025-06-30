@@ -34,7 +34,9 @@ for filename in os.listdir(directory):
                 "team": player_obj.team,
                 "attributes": player_obj.attributes,
                 "stats": player_obj.stats,
-                "metadata": player_obj.metadata
+                "metadata": player_obj.metadata,
+                "jersey": player_obj.jersey,
+                "year": player_obj.year
             }
             player_docs.append(player_doc)
             print(f"✅ Migrated: {player_obj.name} ({player_obj.team})")

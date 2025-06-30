@@ -332,6 +332,29 @@ def unpack_game_context(game):
     )
 
 def summarize_game_state(game):
+    players = []
+    for pos, player in game.home_team.lineup.items():
+        coords = player.coords if hasattr(player, "coords") and player.coords else {"x": 0, "y": 0}
+        players.append({
+            "playerId": player.player_id,
+            "team": "home",  # for animation styling
+            "team_id": game.home_team.team_id,  # for logos/colors later
+            "pos": pos,
+            "jersey": player.attributes.get("jersey", 1),
+            "x": coords.get("x", 0),
+            "y": coords.get("y", 0)
+        })
+    for pos, player in game.away_team.lineup.items():
+        coords = player.coords if hasattr(player, "coords") and player.coords else {"x": 0, "y": 0}
+        players.append({
+            "playerId": player.player_id,
+            "team": "away",
+            "team_id": game.away_team.team_id,
+            "pos": pos,
+            "jersey": player.attributes.get("jersey", 6),  # adjust if needed
+            "x": coords.get("x", 0),
+            "y": coords.get("y", 0)
+        })
 
     return {
         "final_score": game.score,
@@ -342,7 +365,13 @@ def summarize_game_state(game):
             game.away_team.name: game.away_team.scouting_data
         },
         "team_totals": game.team_totals,
-        "text_log": game.text_log
+        "text_log": game.text_log,
+        "turns": game.turns,
+        "home_team_name": game.home_team.name,
+        "away_team_name": game.away_team.name,
+        "score": game.score,
+        "home_team_id": game.home_team.team_id,
+        "players": players
     }
 
 def check_defensive_foul(self, defender, is_three):
