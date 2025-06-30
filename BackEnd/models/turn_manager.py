@@ -75,11 +75,17 @@ class TurnManager:
         print(f"animations: {animations}")
         # print(f"game state: {self.game.game_state}")
         # Clean up any class objects in result to make Mongo safe
+        # Clean up any class objects in result to make Mongo safe
         for key in ["ball_handler", "shooter", "screener", "passer", "defender"]:
-            if key in result and hasattr(result[key], "name"):
-                result[key] = result[key].name
-            elif key in result:
-                result[key] = str(result[key])
+            if key in result:
+                val = result[key]
+                if hasattr(val, "name"):
+                    result[key] = val.name
+                elif hasattr(val, "player_id"):  # fallback to player_id
+                    result[key] = val.player_id
+                else:
+                    result[key] = str(val)  # final fallback (safe for non-class data)
+
         result["turn_count"] = self.game.micro_turn_count
         result["possession_team_id"] = self.game.offense_team.team_id
         print(f"possesion team id: {self.game.offense_team.team_id}")
