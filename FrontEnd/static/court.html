@@ -77,14 +77,20 @@
     let playerStates = {}; // needs to be scoped outside for use in drawPlayer
     let players = [];
     async function loadSimAndStart() {
-      const res = await fetch(`${window.location.origin}/simulate`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          home_team: "Four Corners",
-          away_team: "Bentley-Truman"
-        })
-      });
+    const res = await fetch(`${window.location.origin}/simulate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        home_team: "Four Corners",
+        away_team: "Bentley-Truman"
+      })
+    });
+
+    if (!res.ok) {
+      const errorText = await res.text();
+      console.error("❌ Simulation failed:", errorText);
+      return;
+    }
 
       const simData = await res.json();
       players = simData.players || [];
