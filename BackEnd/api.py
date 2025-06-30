@@ -75,9 +75,9 @@ def simulate_game(request: SimulationRequest):
     summary = summarize_game_state(game)
 
     # ✅ Minimal debug visibility
-    print(f"✅ Game finished: {home_team} vs. {away_team}")
-    print(f"🏀 Final Score: {game.score}")
-    print(f"📊 Team Totals: {game.team_totals}")# show first few entries
+    # print(f"✅ Game finished: {home_team} vs. {away_team}")
+    # print(f"🏀 Final Score: {game.score}")
+    # print(f"📊 Team Totals: {game.team_totals}")# show first few entries
 
     print("\n🔎 DEBUGGING SUMMARY BEFORE INSERT")
     pprint.pprint(summary)
