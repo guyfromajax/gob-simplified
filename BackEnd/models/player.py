@@ -13,7 +13,7 @@ class Player:
         self.team = data.get("team")
         self.attributes = self._extract_attributes(data)
         self.jersey = data["jersey"]
-        # self.year = data["year"]
+        self.year = data["year"]
         self.stats = self._init_stats()
         self.metadata = {
             "fouls": 0,
