@@ -15,7 +15,7 @@ from bson.json_util import dumps
 from bson import ObjectId
 from fastapi.staticfiles import StaticFiles
 from BackEnd.models.animator import Animator    
-
+import traceback
 
 app = FastAPI()
 # app.mount("/", StaticFiles(directory="FrontEnd", html=True), name="static")
@@ -80,13 +80,15 @@ def simulate_game(request: SimulationRequest):
     print(f"📊 Team Totals: {game.team_totals}")# show first few entries
 
     print("\n🔎 DEBUGGING SUMMARY BEFORE INSERT")
-    pprint(summary)
+    pprint.pprint(summary)
 
     try:
+        print("🔍 About to insert summary into Mongo...")
         games_collection.insert_one(summary)
         summary.pop("_id", None)
     except Exception as e:
         print("🚨 Mongo insert failed:", e)
+        traceback.print_exc()
     
     print("Inside simulate_game()\nReturning summary keys:", summary.keys())
     
