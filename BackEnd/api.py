@@ -82,10 +82,9 @@ def simulate_game(request: SimulationRequest):
     print("\n🔎 DEBUGGING SUMMARY BEFORE INSERT")
     pprint(summary)
 
-
     try:
         games_collection.insert_one(summary)
-        summary.pop("_id", None)  # ✅ remove Mongo's ObjectId
+        summary.pop("_id", None)
     except Exception as e:
         print("🚨 Mongo insert failed:", e)
     
