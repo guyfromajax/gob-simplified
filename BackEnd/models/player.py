@@ -1,16 +1,18 @@
 # BackEnd/models/player.py
 
 from BackEnd.constants import ALL_ATTRS, BOX_SCORE_KEYS, MALLEABLE_ATTRS
+import uuid
+
 
 class Player:
     def __init__(self, data):
-        self.player_id = str(data["_id"])
+        self.player_id = str(data.get("_id", uuid.uuid4()))
         self.first_name = data["first_name"]
         self.last_name = data["last_name"]
         self.name = f"{self.first_name} {self.last_name}"
         self.team = data.get("team")
         self.attributes = self._extract_attributes(data)
-        # self.jersey = data["jersey"]
+        self.jersey = data["jersey"]
         # self.year = data["year"]
         self.stats = self._init_stats()
         self.metadata = {
