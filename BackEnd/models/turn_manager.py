@@ -59,6 +59,8 @@ class TurnManager:
             result = self.resolve_half_court_offense()
 
         print("Inside run_micro_turn // coming out of resolve offensive state functions")
+        print(f"offense team id: {self.game.offense_team.team_id}")
+        print(f"defense team id: {self.game.defense_team.team_id}")
 
         # STEP 4: Final updates (clock, logs, animation)
         self.update_clock_and_possession(result)
@@ -66,13 +68,14 @@ class TurnManager:
         self.animator.capture(result)
         animations = self.animator.get_latest_animation_packet()  # see below
         result["animations"] = animations
+        result["possession_team_id"] = self.game.offense_team.team_id
 
 
-        print("🔁 End of run_micro_turn after housekeeping functions")
-        print(f"{result['text']}")
-        print(f"{self.game.game_state['score']}")
-        print(f"{self.game.game_state['clock']}")
-        print(f"animations: {animations}")
+        # print("🔁 End of run_micro_turn after housekeeping functions")
+        # print(f"{result['text']}")
+        # print(f"{self.game.game_state['score']}")
+        # print(f"{self.game.game_state['clock']}")
+        # print(f"animations: {animations}")
         # print(f"game state: {self.game.game_state}")
         # Clean up any class objects in result to make Mongo safe
         # Clean up any class objects in result to make Mongo safe
@@ -91,10 +94,10 @@ class TurnManager:
 
         result["turn_count"] = self.game.micro_turn_count
         result["possession_team_id"] = self.game.offense_team.team_id
-        print(f"possesion team id: {self.game.offense_team.team_id}")
+        # print(f"possesion team id: {self.game.offense_team.team_id}")
 
-        print(f"offense lineup: {self.game.offense_team.lineup}")
-        print(f"defense lineup: {self.game.defense_team.lineup}")
+        # print(f"offense lineup: {self.game.offense_team.lineup}")
+        # print(f"defense lineup: {self.game.defense_team.lineup}")
 
         print(f"result: {result}")
 
