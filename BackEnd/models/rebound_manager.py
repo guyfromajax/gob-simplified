@@ -70,8 +70,6 @@ class ReboundManager:
             "result_type": stat,
             "ball_handler": rebounder,
             "text": f"{rebounder} grabs the {print_variable}.",
-            "start_coords": {},  # optional
-            "end_coords": {},    # optional
             "time_elapsed": random.randint(3, 6),
             "possession_flips": rebound_team == self.def_team,
         }

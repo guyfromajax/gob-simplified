@@ -83,8 +83,6 @@ def resolve_non_shooting_foul(roles, game):
         "defender": defender,
         "text": text,
         "possession_flips": False,
-        "start_coords": {bh_pos: {"x": 72, "y": 25}},
-        "end_coords": {bh_pos: {"x": 72, "y": 25}},
         "time_elapsed": time_elapsed
     }
 
@@ -253,8 +251,6 @@ def resolve_free_throw_logic(game):
                     "result_type": "FREE_THROW",
                     "ball_handler": shooter,
                     "text": text,
-                    "start_coords": {get_player_position(off_lineup, shooter): {"x": 88, "y": 25}},
-                    "end_coords": {get_player_position(off_lineup, shooter): {"x": 88, "y": 25}},
                     "time_elapsed": 0,
                     "possession_flips": False
                 }
@@ -316,8 +312,6 @@ def resolve_free_throw_logic(game):
         "result_type": "FREE_THROW",
         "ball_handler": shooter,
         "text": text,
-        "start_coords": {shooter_pos: {"x": 88, "y": 25}},
-        "end_coords": {shooter_pos: {"x": 88, "y": 25}},
         "time_elapsed": 0,  # clock does not run
         "possession_flips": possession_flips,
     }
@@ -360,8 +354,6 @@ def resolve_turnover_logic(roles, game, turnover_type="DEAD BALL"):
         "result_type": turnover_type,
         "ball_handler": ball_handler,
         "text": text,
-        "start_coords": {bh_pos: {"x": 72, "y": 25}},
-        "end_coords": {bh_pos: {"x": 68, "y": 25}},
         "time_elapsed": random.randint(3, 8),
         "possession_flips": True  # Let the turn loop handle the flip
     }
@@ -405,8 +397,6 @@ def resolve_half_court_offense_logic(game: "GameManager") -> dict:
     #         "defender": defender,
     #         "text": text,
     #         "possession_flips": possession_flips,
-    #         "start_coords": {shooter_pos: {"x": 72, "y": 25}},
-    #         "end_coords": {shooter_pos: {"x": 82, "y": 23}},
     #         "time_elapsed": time_elapsed
     #     }
 
