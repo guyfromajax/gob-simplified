@@ -66,18 +66,22 @@ def simulate_game(request: SimulationRequest):
     print(f"Home: {request.home_team}, Away: {request.away_team}")
 
     # ✅ Add this line to print the full request body
-    print("🔍 Full request body:", request)
+    # print("🔍 Full request body:", request)
 
 
     game = run_simulation(home_team, away_team)
-    print("Right before summarize_game_state")
-    print("🧪 Turns sample:", game.turns[:3])  
+    # print("Right before summarize_game_state")
+    # print("🧪 Turns sample:", game.turns[:3])  
     summary = summarize_game_state(game)
 
     # ✅ Minimal debug visibility
     print(f"✅ Game finished: {home_team} vs. {away_team}")
     print(f"🏀 Final Score: {game.score}")
     print(f"📊 Team Totals: {game.team_totals}")# show first few entries
+
+    print("\n🔎 DEBUGGING SUMMARY BEFORE INSERT")
+    pprint(summary)
+
 
     games_collection.insert_one(summary)
     summary.pop("_id", None)  # ✅ remove Mongo's ObjectId
