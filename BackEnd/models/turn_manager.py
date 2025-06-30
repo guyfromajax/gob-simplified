@@ -74,10 +74,12 @@ class TurnManager:
         print(f"{self.game.game_state['clock']}")
         print(f"animations: {animations}")
         # print(f"game state: {self.game.game_state}")
-        # 🔥 REMOVE the full Player object from result dict to make it Mongo-safe
-        if "ball_handler" in result:
-            result["ball_handler"] = result["ball_handler"].name if hasattr(result["ball_handler"], "name") else str(result["ball_handler"])
-        
+        # Clean up any class objects in result to make Mongo safe
+        for key in ["ball_handler", "shooter", "screener", "passer", "defender"]:
+            if key in result and hasattr(result[key], "name"):
+                result[key] = result[key].name
+            elif key in result:
+                result[key] = str(result[key])
         result["turn_count"] = self.game.micro_turn_count
         result["possession_team_id"] = self.game.offense_team.team_id
         print(f"possesion team id: {self.game.offense_team.team_id}")
