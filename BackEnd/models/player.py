@@ -20,7 +20,7 @@ class Player:
             "minutes_played": 0,
             "abilities": data.get("abilities", [])
         }
-        self.coords = {"x": 0, "y": 0}
+        self.coords = {"x": 25, "y": 50}
 
     def _extract_attributes(self, data):
         attr_data = data.get("attributes", {})
