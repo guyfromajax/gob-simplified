@@ -76,6 +76,9 @@ class TurnManager:
         # print(f"game state: {self.game.game_state}")
         # Clean up any class objects in result to make Mongo safe
         # Clean up any class objects in result to make Mongo safe
+        for key in ["ball_handler", "shooter", "passer", "screener", "defender"]:
+            if key in result:
+                result[key] = get_name_safe(result[key])
         for key in ["ball_handler", "shooter", "screener", "passer", "defender"]:
             if key in result:
                 val = result[key]
