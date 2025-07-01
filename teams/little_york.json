@@ -1,6 +1,8 @@
 
 {
     "name": "Little York",
+    "primary_color": "#65308e",
+    "secondary_color": "#f6af38",
     "players": [
       {
         "first_name": "Derrick",

@@ -1,6 +1,8 @@
 
 {
     "name": "Xavien",
+    "primary_color": "#016837",
+    "secondary_color": "#999999",
     "players": [
       {
         "first_name": "Lucky",

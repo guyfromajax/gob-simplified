@@ -1,6 +1,8 @@
 
 {
     "name": "Lancaster",
+    "primary_color": "#d24a1b",
+    "secondary_color": "#ccc",
     "players": [
       {
         "first_name": "Ervin",

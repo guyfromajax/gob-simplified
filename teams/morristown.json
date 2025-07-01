@@ -1,5 +1,7 @@
 {
     "name": "Morristown",
+    "primary_color": "#ec1d28",
+    "secondary_color": "#ccc",
     "players": [
       {
         "first_name": "Mose",
