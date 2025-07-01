@@ -44,44 +44,44 @@
       const pixelY = ((50 - y) / 50) * 768;
       return { x: pixelX, y: pixelY };
     }
-
-    function drawPlayer(player, overrideCoords = null) {
-  const { x, y } = overrideCoords || gridToPixels(player.x, player.y);
-  const radius = 20;
+    function drawPlayer(player, overrideCoords = null, homeColors = {}, awayColors = {}) {
+      const { x, y } = overrideCoords || gridToPixels(player.x, player.y);
+      const radius = 20;
 
       const isHome = player.team === 'home';
-        const fillColor = isHome ? homeColors.primary_color : "#ffffff";
-        const borderColor = isHome ? homeColors.secondary_color : awayColors.primary_color;
-        const textColor = isHome ? homeColors.secondary_color : awayColors.primary_color;
+      const fillColor = isHome ? homeColors.primary_color : "#ffffff";
+      const borderColor = isHome ? homeColors.secondary_color : awayColors.primary_color;
+      const textColor = isHome ? homeColors.secondary_color : awayColors.primary_color;
 
-        // Player circle
+      // Player circle
+      ctx.beginPath();
+      ctx.arc(x, y, radius, 0, Math.PI * 2);
+      ctx.fillStyle = fillColor;
+      ctx.strokeStyle = borderColor;
+      ctx.lineWidth = 3;
+      ctx.fill();
+      ctx.stroke();
+
+      // Position abbreviation
+      ctx.fillStyle = textColor;
+      ctx.font = '12px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText(player.pos, x, y + 4);
+
+      // Jersey number
+      ctx.font = 'bold 12px Arial';
+      const numberY = isHome ? y - radius - 5 : y + radius + 15;
+      ctx.fillText(player.jersey, x, numberY);
+
+      // Ball indicator
+      if (playerStates[player.playerId]?.hasBall) {
         ctx.beginPath();
-        ctx.arc(x, y, radius, 0, Math.PI * 2);
-        ctx.fillStyle = fillColor;
-        ctx.strokeStyle = borderColor;
-        ctx.lineWidth = 3;
+        ctx.arc(x, y, 6, 0, Math.PI * 2);
+        ctx.fillStyle = 'orange';
         ctx.fill();
-        ctx.stroke();
-
-        // Position abbreviation
-        ctx.fillStyle = textColor;
-        ctx.font = '12px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillText(player.pos, x, y + 4);
-
-        // Jersey number (above for home, below for away)
-        ctx.font = 'bold 12px Arial';
-        const numberY = isHome ? y - radius - 5 : y + radius + 15;
-        ctx.fillText(player.jersey, x, numberY);
-
-        // Ball indicator
-        if (playerStates[player.playerId]?.hasBall) {
-          ctx.beginPath();
-          ctx.arc(x, y, 6, 0, Math.PI * 2);
-          ctx.fillStyle = 'orange';
-          ctx.fill();
-        }
       }
+    }
+
 
 
     let playerStates = {}; // needs to be scoped outside for use in drawPlayer
@@ -168,7 +168,7 @@
               console.log(" → State:", state);
               console.log(" → Interpolated position:", { x: currentX, y: currentY });
 
-              drawPlayer(player, { x: currentX, y: currentY });
+              drawPlayer(player, null, homeColors, awayColors);
             } else {
               console.log(`🚫 No state found for player: ${player.pos} (${player.playerId})`);
               drawPlayer(player);
