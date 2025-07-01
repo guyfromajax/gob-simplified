@@ -14,6 +14,8 @@ class TeamManager:
         if not team_doc:
             print(f"⚠️ No team document found for team: {name}")
         self.team_id = team_doc.get("team_id") if team_doc else None
+        self.primary_color = team_doc.get("primary_color", "#000000") if team_doc else "#000000"
+        self.secondary_color = team_doc.get("secondary_color", "#ffffff") if team_doc else "#ffffff"
 
         self.points = 0
         self.points_by_quarter = [0, 0, 0, 0]
