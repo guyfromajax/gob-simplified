@@ -1,6 +1,8 @@
 
 {
     "name": "Bentley-Truman",
+    "primary_color": "#4066b2",
+    "secondary_color": "#9b9b9b",
     "players": [
       {
         "first_name": "Xenon",

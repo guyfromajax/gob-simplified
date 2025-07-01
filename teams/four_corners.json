@@ -1,5 +1,7 @@
 {
     "name": "Four Corners",
+    "primary_color": "#c0976a",
+    "secondary_color": "#00954b",
     "players": [
       {"first_name": "Josiah", "last_name": "Wilson", "team": "Four Corners", "jersey": 1, "year": "sophomore", "SC": 37, "SH": 80, "ID": 36, "OD": 88, "PS": 100, "BH": 115, "RB": 51, "AG": 92, "ST": 45, "ND": 90, "IQ": 97, "FT": 101, "NG": 1.0},
       {"first_name": "Jay", "last_name": "Giancola", "team": "Four Corners", "jersey": 21, "year": "junior", "SC": 71, "SH": 103, "ID": 35, "OD": 87, "PS": 85, "BH": 56, "RB": 32, "AG": 74, "ST": 38, "ND": 113, "IQ": 72, "FT": 115, "NG": 1.0},

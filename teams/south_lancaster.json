@@ -1,6 +1,8 @@
 
 {
     "name": "South Lancaster",
+    "primary_color": "#7c2b24",
+    "secondary_color": "#e39649",
     "players": [
       {
         "first_name": "Ferdinand",
