@@ -332,15 +332,6 @@ def unpack_game_context(game):
     )
 
 def summarize_game_state(game):
-    home_colors = {
-        "primary_color": game.home_team.attributes.get("primary_color", "#000000"),
-        "secondary_color": game.home_team.attributes.get("secondary_color", "#ffffff")
-    }
-    away_colors = {
-        "primary_color": game.away_team.attributes.get("primary_color", "#000000"),
-        "secondary_color": game.away_team.attributes.get("secondary_color", "#ffffff")
-    }
-
     
     players = []
     for team_key, team_obj in [("home", game.home_team), ("away", game.away_team)]:
@@ -352,7 +343,8 @@ def summarize_game_state(game):
                 "team_id": team_obj.team_id,
                 "pos": pos,
                 "jersey": player.jersey,
-                # "jersey": player.attributes.get("jersey", 1 if team_key == "home" else 6),
+                "primary_color": team_obj.attributes.get("primary_color", "#000000"),
+                "secondary_color": team_obj.attributes.get("secondary_color", "#ffffff"),
                 "x": coords.get("x", 0),
                 "y": coords.get("y", 0)
             })
@@ -370,8 +362,6 @@ def summarize_game_state(game):
         "turns": game.turns,
         "home_team_name": game.home_team.name,
         "away_team_name": game.away_team.name,
-        "home_team_colors": home_colors,
-        "away_team_colors": away_colors,
         "score": game.score,
         "home_team_id": game.home_team.team_id,
         "players": players
