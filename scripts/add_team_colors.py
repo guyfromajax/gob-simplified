@@ -1,9 +1,4 @@
-from pymongo import MongoClient
-
-# Connect to your MongoDB instance
-client = MongoClient("your_mongodb_connection_string")
-db = client["your_database_name"]
-teams_collection = db["teams_collection"]
+from BackEnd.db import teams_collection
 
 # Define your team color mappings
 team_colors = {
@@ -41,10 +36,10 @@ team_colors = {
     }
 }
 
-# Loop through and update each team
+# Loop through and update each team in Mongo
 for team_id, colors in team_colors.items():
     result = teams_collection.update_one(
         {"team_id": team_id},
         {"$set": colors}
     )
-    print(f"Updated {team_id} → matched: {result.matched_count}, modified: {result.modified_count}")
+    print(f"✅ Updated {team_id} → matched: {result.matched_count}, modified: {result.modified_count}")
