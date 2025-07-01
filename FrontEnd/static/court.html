@@ -85,7 +85,7 @@
 
 
 
-    let playerStates = {}; // needs to be scoped outside for use in drawPlayer
+    let playerStates = {}; 
     let players = [];
     let homeColors = {};
     let awayColors = {};
@@ -107,6 +107,8 @@
         console.log("✅ Sim data loaded:", simData);
         homeColors = simData.home_team_colors;
         awayColors = simData.away_team_colors;
+        console.log("🏠 Home colors:", homeColors);
+        console.log("🛫 Away colors:", awayColors);
 
         // Dynamically load court image based on home_team_id
         const courtImg = document.getElementById("court");
@@ -175,7 +177,7 @@
               drawPlayer(player, { x: currentX, y: currentY }, homeColors, awayColors);
             } else {
               console.log(`🚫 No state found for player: ${player.pos} (${player.playerId})`);
-              drawPlayer(player);
+              drawPlayer(player, null, homeColors, awayColors);
             }
           });
 
