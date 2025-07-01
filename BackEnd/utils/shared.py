@@ -343,8 +343,8 @@ def summarize_game_state(game):
                 "team_id": team_obj.team_id,
                 "pos": pos,
                 "jersey": player.jersey,
-                "primary_color": team_obj.attributes.get("primary_color", "#000000"),
-                "secondary_color": team_obj.attributes.get("secondary_color", "#ffffff"),
+                "primary_color": getattr(team_obj, "primary_color", "#000000"),
+                "secondary_color": getattr(team_obj, "secondary_color", "#ffffff"),
                 "x": coords.get("x", 0),
                 "y": coords.get("y", 0)
             })
