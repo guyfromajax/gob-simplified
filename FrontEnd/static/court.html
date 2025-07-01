@@ -46,33 +46,43 @@
     }
 
     function drawPlayer(player, overrideCoords = null) {
-      const { x, y } = overrideCoords || gridToPixels(player.x, player.y);
-      const radius = 20;
+  const { x, y } = overrideCoords || gridToPixels(player.x, player.y);
+  const radius = 20;
 
-      ctx.beginPath();
-      ctx.arc(x, y, radius, 0, Math.PI * 2);
-      ctx.fillStyle = player.team === 'home' ? '#0077cc' : '#ffffff';
-      ctx.strokeStyle = player.team === 'home' ? '#ffcc00' : '#0077cc';
-      ctx.lineWidth = 3;
-      ctx.fill();
-      ctx.stroke();
+      const isHome = player.team === 'home';
+        const fillColor = isHome ? homeColors.primary_color : "#ffffff";
+        const borderColor = isHome ? homeColors.secondary_color : awayColors.primary_color;
+        const textColor = isHome ? homeColors.secondary_color : awayColors.primary_color;
 
-      ctx.fillStyle = player.team === 'home' ? '#ffcc00' : '#0077cc';
-      ctx.font = '12px Arial';
-      ctx.textAlign = 'center';
-      ctx.fillText(player.pos, x, y + 4);
-
-      ctx.font = 'bold 12px Arial';
-      const numberY = player.team === 'home' ? y - radius - 5 : y + radius + 15;
-      ctx.fillText(player.jersey, x, numberY);
-
-      if (playerStates[player.playerId]?.hasBall) {
+        // Player circle
         ctx.beginPath();
-        ctx.arc(x, y, 6, 0, Math.PI * 2);
-        ctx.fillStyle = 'orange';
+        ctx.arc(x, y, radius, 0, Math.PI * 2);
+        ctx.fillStyle = fillColor;
+        ctx.strokeStyle = borderColor;
+        ctx.lineWidth = 3;
         ctx.fill();
+        ctx.stroke();
+
+        // Position abbreviation
+        ctx.fillStyle = textColor;
+        ctx.font = '12px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText(player.pos, x, y + 4);
+
+        // Jersey number (above for home, below for away)
+        ctx.font = 'bold 12px Arial';
+        const numberY = isHome ? y - radius - 5 : y + radius + 15;
+        ctx.fillText(player.jersey, x, numberY);
+
+        // Ball indicator
+        if (playerStates[player.playerId]?.hasBall) {
+          ctx.beginPath();
+          ctx.arc(x, y, 6, 0, Math.PI * 2);
+          ctx.fillStyle = 'orange';
+          ctx.fill();
+        }
       }
-    }
+
 
     let playerStates = {}; // needs to be scoped outside for use in drawPlayer
     let players = [];
@@ -91,6 +101,8 @@
 
         const simData = await res.json();
         console.log("✅ Sim data loaded:", simData);
+        let homeColors = simData.home_team_colors;
+        let awayColors = simData.away_team_colors;
 
         // Dynamically load court image based on home_team_id
         const courtImg = document.getElementById("court");
