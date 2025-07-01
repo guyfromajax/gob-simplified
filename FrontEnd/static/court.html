@@ -52,6 +52,7 @@
       const fillColor = isHome ? homeColors.primary_color : "#ffffff";
       const borderColor = isHome ? homeColors.secondary_color : awayColors.primary_color;
       const textColor = isHome ? homeColors.secondary_color : awayColors.primary_color;
+      console.log(`🖌️ Drawing ${player.pos} with fill: ${fillColor}, stroke: ${borderColor}`);
 
       // Player circle
       ctx.beginPath();
@@ -171,7 +172,7 @@
               console.log(" → State:", state);
               console.log(" → Interpolated position:", { x: currentX, y: currentY });
 
-              drawPlayer(player, null, homeColors, awayColors);
+              drawPlayer(player, { x: currentX, y: currentY }, homeColors, awayColors);
             } else {
               console.log(`🚫 No state found for player: ${player.pos} (${player.playerId})`);
               drawPlayer(player);
