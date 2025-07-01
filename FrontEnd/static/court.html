@@ -66,7 +66,7 @@
       const numberY = player.team === 'home' ? y - radius - 5 : y + radius + 15;
       ctx.fillText(player.jersey, x, numberY);
 
-      if (playerStates[player.player_id]?.hasBall) {
+      if (playerStates[player.playerId]?.hasBall) {
         ctx.beginPath();
         ctx.arc(x, y, 6, 0, Math.PI * 2);
         ctx.fillStyle = 'orange';
@@ -143,7 +143,7 @@
           ctx.clearRect(0, 0, canvas.width, canvas.height);
 
           players.forEach(player => {
-            const state = playerStates[player.player_id];
+            const state = playerStates[player.playerId];
             if (state) {
               const progress = Math.min(1, (now - state.startTime) / state.duration);
               const startPix = gridToPixels(state.start.x, state.start.y);
@@ -152,13 +152,13 @@
               const currentY = startPix.y + (endPix.y - startPix.y) * progress;
               
               console.log(`Animating ${player.name}:`, state);
-              console.log(`Animating player ${player.player_id}`);
+              console.log(`Animating player ${player.playerId}`);
               console.log(" → State:", state);
               console.log(" → Interpolated position:", { x: currentX, y: currentY });
 
               drawPlayer(player, { x: currentX, y: currentY });
             } else {
-              console.log(`🚫 No state found for player: ${player.pos} (${player.player_id})`);
+              console.log(`🚫 No state found for player: ${player.pos} (${player.playerId})`);
               drawPlayer(player);
             }
           });
