@@ -349,6 +349,10 @@ def summarize_game_state(game):
                 "x": coords.get("x", 0),
                 "y": coords.get("y", 0)
             })
+    print(f"Home team primary color: {game.home_team.primary_color}")
+    print(f"Home team secondary color: {game.home_team.secondary_color}")
+    print(f"Away team primary color: {game.away_team.primary_color}")
+    print(f"Away team secondary color: {game.away_team.secondary_color}")
 
     return {
         "final_score": game.score,
@@ -364,13 +368,21 @@ def summarize_game_state(game):
         "home_team_name": game.home_team.name,
         "away_team_name": game.away_team.name,
         "home_team_colors": {
-            "primary_color": getattr(game.home_team, "primary_color", "#0077cc"),
-            "secondary_color": getattr(game.home_team, "secondary_color", "#ffcc00")
+            "primary_color": game.home_team.primary_color,
+            "secondary_color": game.home_team.secondary_color
         },
         "away_team_colors": {
-            "primary_color": getattr(game.away_team, "primary_color", "#ffffff"),
-            "secondary_color": getattr(game.away_team, "secondary_color", "#0077cc")
+            "primary_color": game.away_team.primary_color,
+            "secondary_color": game.away_team.secondary_color
         },
+        # "home_team_colors": {
+        #     "primary_color": getattr(game.home_team, "primary_color", "#0077cc"),
+        #     "secondary_color": getattr(game.home_team, "secondary_color", "#ffcc00")
+        # },
+        # "away_team_colors": {
+        #     "primary_color": getattr(game.away_team, "primary_color", "#ffffff"),
+        #     "secondary_color": getattr(game.away_team, "secondary_color", "#0077cc")
+        # },
         "score": game.score,
         "home_team_id": game.home_team.team_id,
         "players": players
