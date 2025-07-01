@@ -86,6 +86,9 @@
 
     let playerStates = {}; // needs to be scoped outside for use in drawPlayer
     let players = [];
+    let homeColors = {};
+    let awayColors = {};
+
     async function loadSimAndStart() {
       try {
         const res = await fetch("/simulate", {
@@ -101,8 +104,8 @@
 
         const simData = await res.json();
         console.log("✅ Sim data loaded:", simData);
-        let homeColors = simData.home_team_colors;
-        let awayColors = simData.away_team_colors;
+        homeColors = simData.home_team_colors;
+        awayColors = simData.away_team_colors;
 
         // Dynamically load court image based on home_team_id
         const courtImg = document.getElementById("court");
