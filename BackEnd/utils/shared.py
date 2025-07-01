@@ -333,28 +333,19 @@ def unpack_game_context(game):
 
 def summarize_game_state(game):
     players = []
-    for pos, player in game.home_team.lineup.items():
-        coords = player.coords if hasattr(player, "coords") and player.coords else {"x": 0, "y": 0}
-        players.append({
-            "playerId": player.player_id,
-            "team": "home",  # for animation styling
-            "team_id": game.home_team.team_id,  # for logos/colors later
-            "pos": pos,
-            "jersey": player.attributes.get("jersey", 1),
-            "x": coords.get("x", 0),
-            "y": coords.get("y", 0)
-        })
-    for pos, player in game.away_team.lineup.items():
-        coords = player.coords if hasattr(player, "coords") and player.coords else {"x": 0, "y": 0}
-        players.append({
-            "playerId": player.player_id,
-            "team": "away",
-            "team_id": game.away_team.team_id,
-            "pos": pos,
-            "jersey": player.attributes.get("jersey", 6),  # adjust if needed
-            "x": coords.get("x", 0),
-            "y": coords.get("y", 0)
-        })
+    for team_key, team_obj in [("home", game.home_team), ("away", game.away_team)]:
+        for pos, player in team_obj.lineup.items():
+            coords = getattr(player, "coords", None) or {"x": 0, "y": 0}
+            players.append({
+                "playerId": player.player_id,
+                "team": team_key,
+                "team_id": team_obj.team_id,
+                "pos": pos,
+                "jersey": player.jersey,
+                # "jersey": player.attributes.get("jersey", 1 if team_key == "home" else 6),
+                "x": coords.get("x", 0),
+                "y": coords.get("y", 0)
+            })
 
     return {
         "final_score": game.score,
