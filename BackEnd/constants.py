@@ -119,7 +119,7 @@ ACTIONS = {
     "POST": "post_up",
     "CUT": "cut",
     "SCREEN": "screen",
-    "OPEN": "get_open",
+    "GET_OPEN": "get_open",
     "RECEIVE": "receive",
     "SHOOT": "shoot",
     "DRIFT": "drift",
