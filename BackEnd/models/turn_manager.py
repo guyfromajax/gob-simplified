@@ -76,12 +76,16 @@ class TurnManager:
         self.logger.log_turn_result(result)
         # If animations weren’t assigned yet (e.g. fast break, free throw), use fallback
         if "animations" not in result:
-            from BackEnd.models.animator import Animator
-            animator = Animator(self.game)
-            result["animations"] = animator.capture_halfcourt_animation(
-                roles=result.get("roles", {}),  # fallback logic
-                event_step=result.get("event_step")
-            )
+            roles = result.get("roles")
+            if roles:
+                from BackEnd.models.animator import Animator
+                animator = Animator(self.game)
+                result["animations"] = animator.capture_halfcourt_animation(
+                    roles=roles,
+                    event_step=result.get("event_step")
+                )
+            else:
+                result["animations"] = []  # No animation possible (e.g., free throw or turnover with no roles)
 
 
         result["possession_team_id"] = self.game.offense_team.team_id
