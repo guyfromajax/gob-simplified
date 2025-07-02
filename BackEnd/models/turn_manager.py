@@ -170,7 +170,7 @@ class TurnManager:
         if result.get("possession_flips"):
             self.game.switch_possession()
 
-    def assign_roles(self):
+    def assign_roles(self, off_call="INSIDE", def_call="MAN"):
         game = self.game
         game_state = game.game_state
         off_team = game.offense_team
