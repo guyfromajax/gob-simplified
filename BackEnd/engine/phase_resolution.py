@@ -365,6 +365,11 @@ def resolve_half_court_offense_logic(game):
     off_call = game_state["current_playcall"]
     def_call = game_state["defense_playcall"]
     roles = game.turn_manager.assign_roles(off_call, def_call)
+    print("inside resolve_half_court_offense_logic")
+    print("[DEBUG] roles:", roles.keys())
+    print("[DEBUG] event_step:", roles.get("event_step"))
+    print("[DEBUG] steps:", roles.get("steps"))
+    print("[DEBUG] shooter:", roles.get("shooter"))
 
     # 2. Event Determination
     event_type = game.turn_manager.determine_event_type(roles)
