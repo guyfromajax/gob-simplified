@@ -2,7 +2,7 @@ from BackEnd.db import teams_collection
 
 # Define your team color mappings
 team_colors = {
-    "BENTLEY_TRUMAN": {
+    "BENTLEY-TRUMAN": {
         "primary_color": "#4066b2",
         "secondary_color": "#9b9b9b"
     },

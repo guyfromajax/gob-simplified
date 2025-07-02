@@ -245,14 +245,21 @@ class TurnManager:
         pass_count = TEMPO_PASS_DICT[tempo_call]
         positions = get_foul_and_turnover_positions(pass_count)
         event_type = calculate_foul_turnover(self.game, positions, roles)
+
+        for player in self.game.offense_team.lineup.values():
+            player.decay_energy(player.get_fatigue_decay_amount())
+
+        for player in self.game.defense_team.lineup.values():
+            player.decay_energy(player.get_fatigue_decay_amount())
+
     
         #determine number of turnover RNGs based on defense team'saggression
         
-        for pos, player_obj in self.game.offense_team.lineup.items():
-            attr = player_obj.attributes
-            ng = attr["NG"]
-            for key in MALLEABLE_ATTRS:
-                anchor_val = attr[f"anchor_{key}"]
-                attr[key] = int(anchor_val * ng)
+        # for pos, player_obj in self.game.offense_team.lineup.items():
+        #     attr = player_obj.attributes
+        #     ng = attr["NG"]
+        #     for key in MALLEABLE_ATTRS:
+        #         anchor_val = attr[f"anchor_{key}"]
+        #         attr[key] = int(anchor_val * ng)
 
         return event_type

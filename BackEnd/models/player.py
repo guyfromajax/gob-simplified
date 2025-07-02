@@ -49,15 +49,19 @@ class Player:
             s = self.stats["game"]
             s["REB"] = s["OREB"] + s["DREB"]
 
+    def get_fatigue_decay_amount(self):
+        nd = self.attributes.get("ND", 50)  # Default to 50 if not set
+
+        if nd >= 85:
+            return 0.0
+        elif nd >= 60:
+            return 0.01
+        else:
+            return 0.02
+    
     def decay_energy(self, amount):
         self.attributes["NG"] = max(0.1, round(self.attributes["NG"] - amount, 3))
         self._rescale_attributes()
-
-    # def decay_energy(self, intensity):
-    #     self.attributes["NG"] = max(0.1, self.attributes["NG"] - intensity)
-    #     for attr in ALL_ATTRS:
-    #         base = self.attributes.get(f"anchor_{attr}", 0)
-    #         self.attributes[attr] = int(base * self.attributes["NG"])
 
 
     def recharge_energy(self, amount):
@@ -67,11 +71,6 @@ class Player:
     def reset_energy(self):
         self.attributes["NG"] = 1.0
         self._rescale_attributes()
-
-    # def reset_energy(self):
-    #     self.attributes["NG"] = 1.0
-    #     for attr in ALL_ATTRS:
-    #         self.attributes[attr] = self.attributes.get(f"anchor_{attr}", 0)
 
 
     def _rescale_attributes(self):
