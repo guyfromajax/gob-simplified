@@ -11,7 +11,7 @@ class Animator:
 
         # Predefined spread of destination points
         spread = [
-            {"x": 64, "y": 25}, {"x": 68, "y": 36}, {"x": 68, "y": 14}, {"x": 73, "y": 41}, {"x": 73, "y": 9},
+            {"x": 64, "y": 25}, {"x": 68, "y": 36}, {"x": 68, "y": 14}, {"x": 73, "y": 40}, {"x": 73, "y": 10},
             {"x": 80, "y": 43}, {"x": 80, "y": 7}, {"x": 88, "y": 44}, {"x": 88, "y": 6}, {"x": 74, "y": 32},
         ]
         #  "top_of_the_key": {"x": 64, "y": random.randint(25,26)},
