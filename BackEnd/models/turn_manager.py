@@ -21,7 +21,8 @@ from BackEnd.utils.shared import (
     generate_pass_chain, 
     get_team_thresholds, 
     get_foul_and_turnover_positions,
-    get_name_safe
+    get_name_safe,
+    get_player_position
 )
 from BackEnd.engine.phase_resolution import (
     resolve_fast_break_logic, 
@@ -345,7 +346,7 @@ class TurnManager:
                 attr["CH"] * 0.1
             ) * random.randint(1, 6)
 
-            def_pos = player.position
+            def_pos = get_player_position(off_lineup, player)
             defender = def_lineup.get(def_pos) if defense_call != "Zone" else random.choice(list(def_lineup.values()))
             def_attr = defender.attributes
             pressure = (
