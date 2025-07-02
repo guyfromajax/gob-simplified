@@ -6,8 +6,16 @@ import random
 import json
 from BackEnd.db import players_collection, teams_collection
 from BackEnd.models.player import Player
-# from BackEnd.models.game_manager import GameManager
-from BackEnd.constants import PLAYCALL_ATTRIBUTE_WEIGHTS, POSITION_LIST, STRATEGY_CALL_DICTS, TEMPO_PASS_DICT, MALLEABLE_ATTRS
+from collections import defaultdict
+from BackEnd.playcall_skeletons.inside_skeletons import INSIDE_SCENES
+from BackEnd.constants import ACTIONS
+from BackEnd.constants import (
+    PLAYCALL_ATTRIBUTE_WEIGHTS, 
+    POSITION_LIST, 
+    STRATEGY_CALL_DICTS, 
+    TEMPO_PASS_DICT,
+    MALLEABLE_ATTRS
+)
 from BackEnd.utils.shared import (
     weighted_random_from_dict, 
     generate_pass_chain, 
@@ -163,103 +171,236 @@ class TurnManager:
             self.game.switch_possession()
 
     def assign_roles(self):
-        
-        off_team = self.game.offense_team
-        def_team = self.game.defense_team
-        off_lineup = self.game.offense_team.lineup
-        def_lineup = self.game.defense_team.lineup
-        playcall = self.game.game_state["current_playcall"]
-        # print(f"playcall: {playcall}")
+        game = self.game
+        game_state = game.game_state
+        off_team = game.offense_team
+        def_team = game.defense_team
+        off_lineup = off_team.lineup
+        def_lineup = def_team.lineup
+        tempo_call = off_team.strategy_calls["tempo_call"]
 
-        # Compute shot weights using attributes embedded in each player object
-        weights_dict = PLAYCALL_ATTRIBUTE_WEIGHTS.get("Attack" if playcall == "Set" else playcall, {})
-        # print(f"weights_dict: {weights_dict}")
+        # --- Step 1: Pick scene and step count
+        scene = random.choice(INSIDE_SCENES)
+        tempo_to_steps = {"slow": 6, "normal": 4, "fast": 3}
+        max_steps = tempo_to_steps.get(tempo_call.lower(), 4)
+        steps = scene["steps"][:max_steps]
 
-        # for pos, player in off_lineup.items():
-        #     print(f"{pos}: {player.attributes}")
-        
-        shot_weights = {
-            pos: sum(
-                off_lineup[pos].attributes[attr] * weight
-                for attr, weight in weights_dict.items()
-            )
-            for pos in off_lineup
-        }
-        # print(f"shot_weights: {shot_weights}")
-        shooter_pos = weighted_random_from_dict(shot_weights)
+        # --- Step 2: Initialize outputs
+        action_timeline = defaultdict(list)
+        touch_counts = defaultdict(int)
 
-        # Compute screener weights (excluding the shooter)
-        screen_weights = {
-            pos: (
-                off_lineup[pos].attributes["ST"] * 6 +
-                off_lineup[pos].attributes["AG"] * 2 +
-                off_lineup[pos].attributes["IQ"] * 1 +
-                off_lineup[pos].attributes["CH"] * 1
-            )
-            for pos in off_lineup if pos != shooter_pos
-        }
+        # --- Step 3: Build action timeline + touch counts
+        for step_index, step in enumerate(steps):
+            pos_actions = step["pos_actions"]
+            events = step.get("events", [])
 
-        screener_pos = max(screen_weights, key=screen_weights.get)
-        if screener_pos == shooter_pos:
-            screener_pos = ""
+            for pos, action_info in pos_actions.items():
+                player = off_lineup[pos]
+                action = action_info["action"]
+                action_timeline[player].append((step["timestamp"], action, action_info.get("spot")))
 
-        # Pass chain and passer
-        pass_chain = generate_pass_chain(self.game, shooter_pos)
+                # Count touch if action involves ball
+                if action in [ACTIONS["HANDLE"], ACTIONS["PASS"], ACTIONS["RECEIVE"], ACTIONS["SHOOT"]]:
+                    touch_counts[player] += 1
+
+            for event in events:
+                if event["type"] == "pass":
+                    passer = off_lineup[event["from"]]
+                    receiver = off_lineup[event["to"]]
+                    touch_counts[passer] += 1
+                    touch_counts[receiver] += 1
+                elif event["type"] == "shot":
+                    shooter = off_lineup[event["by"]]
+                    touch_counts[shooter] += 1
+
+        # --- Step 4: Determine primary roles
+        shooter_pos = scene["primary_shooter"]
+        screener_pos = scene["screener"]
+        pass_chain = scene["pass_sequence"]
 
         passer_pos = pass_chain[-2] if len(pass_chain) >= 2 else ""
-        if passer_pos == shooter_pos or passer_pos == screener_pos:
+        if passer_pos in [shooter_pos, screener_pos]:
             passer_pos = ""
 
-        if self.game.game_state["defense_playcall"] == "Zone":
-            defender_pos = random.choice(POSITION_LIST)
+        if game_state["defense_playcall"] == "Zone":
+            defender_pos = random.choice(list(def_lineup))
         else:
             defender_pos = shooter_pos
 
-        shooter = self.game.offense_team.lineup[shooter_pos]
-        screener = self.game.offense_team.lineup[screener_pos]
-        passer = self.game.offense_team.lineup[passer_pos] if passer_pos else None
-        defender = self.game.defense_team.lineup[defender_pos]
+        # --- Step 5: Lookup player objects
+        shooter = off_lineup[shooter_pos]
+        screener = off_lineup[screener_pos]
+        passer = off_lineup.get(passer_pos)
+        defender = def_lineup[defender_pos]
 
-        # print("end of assign_roles")
-        # print(f"shooter: {get_name_safe(shooter)}")
-        # print(f"screener: {get_name_safe(screener)}")
-        # print(f"passer: {get_name_safe(passer)}")
-        # print(f"defender: {get_name_safe(defender)}")
-
-        
         return {
             "shooter": shooter,
             "screener": screener,
             "ball_handler": shooter,
             "passer": passer,
             "pass_chain": pass_chain,
-            "defender": defender
+            "defender": defender,
+            "steps": steps,
+            "action_timeline": action_timeline,
+            "touch_counts": touch_counts
         }
     
-    def determine_event_type(self, roles):
-        game_state = self.game.game_state
-        # Base weights (can be tuned later)
-        off_team = self.game.offense_team
-        def_team = self.game.defense_team
-        tempo_call = self.game.offense_team.strategy_calls["tempo_call"]
-        pass_count = TEMPO_PASS_DICT[tempo_call]
-        positions = get_foul_and_turnover_positions(pass_count)
-        event_type = calculate_foul_turnover(self.game, positions, roles)
-
-        for player in self.game.offense_team.lineup.values():
-            player.decay_energy(player.get_fatigue_decay_amount())
-
-        for player in self.game.defense_team.lineup.values():
-            player.decay_energy(player.get_fatigue_decay_amount())
-
-    
-        #determine number of turnover RNGs based on defense team'saggression
+    # def assign_roles(self):
         
-        # for pos, player_obj in self.game.offense_team.lineup.items():
-        #     attr = player_obj.attributes
-        #     ng = attr["NG"]
-        #     for key in MALLEABLE_ATTRS:
-        #         anchor_val = attr[f"anchor_{key}"]
-        #         attr[key] = int(anchor_val * ng)
+    #     off_team = self.game.offense_team
+    #     def_team = self.game.defense_team
+    #     off_lineup = self.game.offense_team.lineup
+    #     def_lineup = self.game.defense_team.lineup
+    #     playcall = self.game.game_state["current_playcall"]
+    #     # print(f"playcall: {playcall}")
 
-        return event_type
+    #     # Compute shot weights using attributes embedded in each player object
+    #     weights_dict = PLAYCALL_ATTRIBUTE_WEIGHTS.get("Attack" if playcall == "Set" else playcall, {})
+    #     # print(f"weights_dict: {weights_dict}")
+
+    #     # for pos, player in off_lineup.items():
+    #     #     print(f"{pos}: {player.attributes}")
+        
+    #     shot_weights = {
+    #         pos: sum(
+    #             off_lineup[pos].attributes[attr] * weight
+    #             for attr, weight in weights_dict.items()
+    #         )
+    #         for pos in off_lineup
+    #     }
+    #     # print(f"shot_weights: {shot_weights}")
+    #     shooter_pos = weighted_random_from_dict(shot_weights)
+
+    #     # Compute screener weights (excluding the shooter)
+    #     screen_weights = {
+    #         pos: (
+    #             off_lineup[pos].attributes["ST"] * 6 +
+    #             off_lineup[pos].attributes["AG"] * 2 +
+    #             off_lineup[pos].attributes["IQ"] * 1 +
+    #             off_lineup[pos].attributes["CH"] * 1
+    #         )
+    #         for pos in off_lineup if pos != shooter_pos
+    #     }
+
+    #     screener_pos = max(screen_weights, key=screen_weights.get)
+    #     if screener_pos == shooter_pos:
+    #         screener_pos = ""
+
+    #     # Pass chain and passer
+    #     pass_chain = generate_pass_chain(self.game, shooter_pos)
+
+    #     passer_pos = pass_chain[-2] if len(pass_chain) >= 2 else ""
+    #     if passer_pos == shooter_pos or passer_pos == screener_pos:
+    #         passer_pos = ""
+
+    #     if self.game.game_state["defense_playcall"] == "Zone":
+    #         defender_pos = random.choice(POSITION_LIST)
+    #     else:
+    #         defender_pos = shooter_pos
+
+    #     shooter = self.game.offense_team.lineup[shooter_pos]
+    #     screener = self.game.offense_team.lineup[screener_pos]
+    #     passer = self.game.offense_team.lineup[passer_pos] if passer_pos else None
+    #     defender = self.game.defense_team.lineup[defender_pos]
+
+        
+    #     return {
+    #         "shooter": shooter,
+    #         "screener": screener,
+    #         "ball_handler": shooter,
+    #         "passer": passer,
+    #         "pass_chain": pass_chain,
+    #         "defender": defender
+    #     }
+    
+    def determine_event_type(self, roles):
+        game = self.game
+        game_state = game.game_state
+        off_team = game.offense_team
+        def_team = game.defense_team
+        def_lineup = def_team.lineup
+        off_lineup = off_team.lineup
+        defense_call = game_state["defense_playcall"]
+        action_timeline = roles["action_timeline"]
+        touch_counts = roles["touch_counts"]
+        steps = roles["steps"]
+
+        # Step 1: Decay energy for all players
+        for player in off_lineup.values():
+            player.decay_energy(player.get_fatigue_decay_amount())
+        for player in def_lineup.values():
+            player.decay_energy(player.get_fatigue_decay_amount())
+
+        # Step 2: Calculate score for each potential turnover candidate
+        turnover_risks = []
+        for player, touches in touch_counts.items():
+            if touches == 0:
+                continue
+
+            attr = player.attributes
+            bh_score = (
+                attr["BH"] * 0.5 +
+                attr["AG"] * 0.2 +
+                attr["IQ"] * 0.2 +
+                attr["CH"] * 0.1
+            ) * random.randint(1, 6)
+
+            def_pos = player.position
+            defender = def_lineup.get(def_pos) if defense_call != "Zone" else random.choice(list(def_lineup.values()))
+            def_attr = defender.attributes
+            pressure = (
+                def_attr["OD"] * 0.3 +
+                def_attr["AG"] * 0.3 +
+                def_attr["IQ"] * 0.2 +
+                def_attr["CH"] * 0.2
+            ) * random.randint(1, 6)
+            if defense_call == "Zone":
+                pressure *= 0.9
+
+            score = bh_score - pressure - (touches * 2)
+            turnover_risks.append((score, player, defender))
+
+        # Step 3: Calculate foul risks
+        foul_risks = []
+        for step_index, step in enumerate(steps):
+            for pos, action_data in step["pos_actions"].items():
+                action = action_data["action"]
+                if action not in ["screen", "post_up", "handle_ball"]:
+                    continue  # Only consider foul-prone actions
+
+                offender = off_lineup[pos]
+                defender = def_lineup[pos] if defense_call != "Zone" else random.choice(list(def_lineup.values()))
+                o_attr = offender.attributes
+                d_attr = defender.attributes
+
+                d_score = (d_attr["IQ"] * 0.3 + d_attr["CH"] * 0.3 + d_attr["AG"] * 0.2 + d_attr["OD"] * 0.2) * random.randint(1, 6)
+                o_score = (o_attr["IQ"] * 0.3 + o_attr["CH"] * 0.3 + o_attr["AG"] * 0.2 + o_attr["ST"] * 0.2) * random.randint(1, 6)
+
+                # Slightly bias toward foul when high activity + tempo
+                foul_margin = o_score - d_score
+                if foul_margin < off_team.team_attributes["foul_threshold"] * 0.7:
+                    foul_risks.append(("O_FOUL", step_index, offender, defender))
+                elif d_score < def_team.team_attributes["foul_threshold"] * 1.3:
+                    foul_risks.append(("D_FOUL", step_index, offender, defender))
+
+        # Step 4: Decide event
+        turnover_risks.sort(key=lambda x: x[0])
+        foul_risks.sort(key=lambda x: x[1])  # prioritize earlier fouls
+
+        if turnover_risks and turnover_risks[0][0] < off_team.team_attributes["turnover_threshold"]:
+            _, player, defender = turnover_risks[0]
+            roles["event_step"] = None  # You could optionally track when
+            roles["turnover_player"] = player
+            roles["turnover_defender"] = defender
+            roles["ball_handler"] = player
+            return "TURNOVER"
+
+        elif foul_risks:
+            foul_type, step_index, offender, defender = foul_risks[0]
+            roles["event_step"] = step_index
+            roles["foul_player"] = defender if foul_type == "D_FOUL" else offender
+            return foul_type
+
+        # No event = clean possession
+        return "SHOT"
+

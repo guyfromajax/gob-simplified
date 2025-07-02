@@ -358,59 +358,99 @@ def resolve_turnover_logic(roles, game, turnover_type="DEAD BALL"):
         "possession_flips": True  # Let the turn loop handle the flip
     }
 
-def resolve_half_court_offense_logic(game: "GameManager") -> dict:
-
+def resolve_half_court_offense_logic(game):
     game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
+
+    # 1. Tactical Setup
     off_call = game_state["current_playcall"]
     def_call = game_state["defense_playcall"]
+    roles = game.turn_manager.assign_roles(off_call, def_call)
 
-    # Track usage
-    off_scouting = off_team.scouting_data
-    def_scouting = def_team.scouting_data
-    off_scouting["offense"]["Playcalls"][off_call]["used"] += 1
-    def_scouting["defense"][def_call]["used"] += 1
-
-    roles = game.turn_manager.assign_roles()
-    
-    # 🧠 Determine event type (SHOT / TURNOVER / O_FOUL / D_FOUL)
-    from BackEnd.models.turn_manager import TurnManager
+    # 2. Event Determination
     event_type = game.turn_manager.determine_event_type(roles)
-    if event_type == "TURNOVER":
-        return resolve_turnover_logic(roles, game, turnover_type="DEAD BALL")
 
-    elif event_type == "O_FOUL":
-        game_state["foul_team"] = "OFFENSE"
-        return resolve_non_shooting_foul(roles, game)
+    event_type = "SHOT"
 
-    elif event_type == "D_FOUL":
-        game_state["foul_team"] = "DEFENSE"
-        return resolve_non_shooting_foul(roles, game)
-    
+    if event_type != "SHOT":
+            #need to add animations to each of these
+            if event_type == "TURNOVER":
+                return resolve_turnover_logic(roles, game, turnover_type="DEAD BALL")
+
+            elif event_type == "O_FOUL":
+                game_state["foul_team"] = "OFFENSE"
+                return resolve_non_shooting_foul(roles, game)
+
+            elif event_type == "D_FOUL":
+                game_state["foul_team"] = "DEFENSE"
+                return resolve_non_shooting_foul(roles, game)
+        # result = resolve_non_shooting_foul_or_turnover(game, event_type, roles)
+        # result["animations"] = game.animator.capture_halfcourt_animation(result, roles)
+        # return result
+
+    # 3. Shot Result
     shot_result = game.shot_manager.resolve_shot(roles)
-    # shot_result = {
-    #         "result_type": "MAKE" if made else "MISS",
-    #         "ball_handler": shooter,
-    #         "shooter": shooter,
-    #         "shot_score": shot_score,
-    #         "screener": screener,
-    #         "passer": passer,
-    #         "defender": defender,
-    #         "text": text,
-    #         "possession_flips": possession_flips,
-    #         "time_elapsed": time_elapsed
-    #     }
+    shot_result["animations"] = game.animator.capture_halfcourt_animation(roles)
 
-    # Track success
+    # 4. scouting report update
     if shot_result["result_type"] == "MAKE":
-        off_scouting["offense"]["Playcalls"][off_call]["success"] += 1
+        off_team.scouting_data["offense"]["Playcalls"][off_call]["success"] += 1
     elif shot_result["result_type"] in ["MISS", "TURNOVER"]:
-        def_scouting["defense"][def_call]["success"] += 1
-
-    # if shot_result["result_type"] == "MISS":
-    #     return game.turn_manager.rebound_manager.handle_rebound()
-
+        def_team.scouting_data["defense"][def_call]["success"] += 1
 
     return shot_result
+
+
+# def resolve_half_court_offense_logic(game: "GameManager") -> dict:
+
+#     game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
+#     off_call = game_state["current_playcall"]
+#     def_call = game_state["defense_playcall"]
+
+#     # Track usage
+#     off_scouting = off_team.scouting_data
+#     def_scouting = def_team.scouting_data
+#     off_scouting["offense"]["Playcalls"][off_call]["used"] += 1
+#     def_scouting["defense"][def_call]["used"] += 1
+
+#     roles = game.turn_manager.assign_roles()
+    
+#     # 🧠 Determine event type (SHOT / TURNOVER / O_FOUL / D_FOUL)
+#     from BackEnd.models.turn_manager import TurnManager
+#     event_type = game.turn_manager.determine_event_type(roles)
+#     if event_type == "TURNOVER":
+#         return resolve_turnover_logic(roles, game, turnover_type="DEAD BALL")
+
+#     elif event_type == "O_FOUL":
+#         game_state["foul_team"] = "OFFENSE"
+#         return resolve_non_shooting_foul(roles, game)
+
+#     elif event_type == "D_FOUL":
+#         game_state["foul_team"] = "DEFENSE"
+#         return resolve_non_shooting_foul(roles, game)
+    
+#     shot_result = game.shot_manager.resolve_shot(roles)
+#     # shot_result = {
+#     #         "result_type": "MAKE" if made else "MISS",
+#     #         "ball_handler": shooter,
+#     #         "shooter": shooter,
+#     #         "shot_score": shot_score,
+#     #         "screener": screener,
+#     #         "passer": passer,
+#     #         "defender": defender,
+#     #         "text": text,
+#     #         "possession_flips": possession_flips,
+#     #         "time_elapsed": time_elapsed
+#     #     }
+
+#     # Track success
+#     if shot_result["result_type"] == "MAKE":
+#         off_scouting["offense"]["Playcalls"][off_call]["success"] += 1
+#     elif shot_result["result_type"] in ["MISS", "TURNOVER"]:
+#         def_scouting["defense"][def_call]["success"] += 1
+
+
+#     return shot_result
+
 
 def calculate_foul_turnover(game, positions, roles):
     game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
