@@ -66,10 +66,13 @@ class Animator:
                 action_type = "GUARD_BALL"
             else:
                 off_player = off_lineup[pos]
-                end_coords = next((
-                    step[2] for step in action_timeline.get(off_player, [])
+                last_spot = next((
+                    step[2] for step in reversed(action_timeline.get(off_player, []))
                     if step[2] is not None
-                ), {"x": 64, "y": 25})
+                ), "top_of_the_key")
+
+                end_coords = HCO_STRING_SPOTS.get(last_spot, {"x": 64, "y": 25})
+
                 def_coords = assign_non_bh_defender_coords(end_coords, ball_handler_end_coords, aggression_call)
                 action_type = "GUARD_OFFBALL"
 
