@@ -53,7 +53,7 @@ class Animator:
             timeline.sort(key=lambda tup: tup[0])
             first_spot = timeline[0][2]
             last_spot = timeline[-1][2]
-            start_coords = HCO_STRING_SPOTS.get(first_spot, {"x": 64, "y": 25})
+            start_coords = player.coords  # This reflects where they ended last turn
             end_coords = HCO_STRING_SPOTS.get(last_spot, start_coords)
             if is_away_offense:
                 start_coords = get_away_player_coords(start_coords)
