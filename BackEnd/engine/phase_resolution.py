@@ -10,6 +10,7 @@ if TYPE_CHECKING:
     from BackEnd.models.turn_manager import TurnManager
 if TYPE_CHECKING:
     from BackEnd.models.game_manager import GameManager
+from BackEnd.models.animator import Animator
 
 from BackEnd.utils.shared import (
     get_name_safe, 
@@ -394,7 +395,9 @@ def resolve_half_court_offense_logic(game):
 
     # 3. Shot Result
     shot_result = game.shot_manager.resolve_shot(roles)
-    shot_result["animations"] = game.animator.capture_halfcourt_animation(roles)
+    animator = Animator(game)
+    shot_result["animations"] = animator.capture_halfcourt_animation(roles)
+
 
     # 4. scouting report update
     if shot_result["result_type"] == "MAKE":
