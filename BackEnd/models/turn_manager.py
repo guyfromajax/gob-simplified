@@ -74,20 +74,18 @@ class TurnManager:
         # STEP 4: Final updates (clock, logs, animation)
         self.update_clock_and_possession(result)
         self.logger.log_turn_result(result)
-        self.animator.capture(result)
-        animations = self.animator.get_latest_animation_packet()  # see below
-        result["animations"] = animations
+        # If animations weren’t assigned yet (e.g. fast break, free throw), use fallback
+        if "animations" not in result:
+            from BackEnd.models.animator import Animator
+            animator = Animator(self.game)
+            result["animations"] = animator.capture_halfcourt_animation(
+                roles=result.get("roles", {}),  # fallback logic
+                event_step=result.get("event_step")
+            )
+
+
         result["possession_team_id"] = self.game.offense_team.team_id
 
-
-        # print("🔁 End of run_micro_turn after housekeeping functions")
-        # print(f"{result['text']}")
-        # print(f"{self.game.game_state['score']}")
-        # print(f"{self.game.game_state['clock']}")
-        # print(f"animations: {animations}")
-        # print(f"game state: {self.game.game_state}")
-        # Clean up any class objects in result to make Mongo safe
-        # Clean up any class objects in result to make Mongo safe
         for key in ["ball_handler", "shooter", "passer", "screener", "defender"]:
             if key in result:
                 result[key] = get_name_safe(result[key])
@@ -103,10 +101,6 @@ class TurnManager:
 
         result["turn_count"] = self.game.micro_turn_count
         result["possession_team_id"] = self.game.offense_team.team_id
-        # print(f"possesion team id: {self.game.offense_team.team_id}")
-
-        # print(f"offense lineup: {self.game.offense_team.lineup}")
-        # print(f"defense lineup: {self.game.defense_team.lineup}")
 
         print(f"result: {result}")
 
