@@ -12,17 +12,17 @@ class Animator:
         # Predefined spread of destination points
         spread = [
             {"x": 64, "y": 25}, {"x": 68, "y": 36}, {"x": 68, "y": 14}, {"x": 73, "y": 40}, {"x": 73, "y": 10},
-            {"x": 80, "y": 43}, {"x": 80, "y": 7}, {"x": 88, "y": 44}, {"x": 88, "y": 6}, {"x": 74, "y": 32},
+            {"x": 80, "y": 43}, {"x": 80, "y": 7}, {"x": 90, "y": 44}, {"x": 90, "y": 6}, {"x": 74, "y": 32},
         ]
-        #  "top_of_the_key": {"x": 64, "y": random.randint(25,26)},
-        # "upper midWing": {"x": 68, "y": 37}, 
+        #  "top_of_the_key": {"x": 64, "y": 25},
+        # "upper midWing": {"x": 68, "y": 36}, 
         # "lower midWing": {"x": 68, "y": 14},
-        # "upper wing": {"x": 73, "y": 42}, 
-        # "lower wing": {"x": 73, "y": 9},
-        # "upper midCorner": {"x": 80, "y": 46}, 
-        # "lower midCorner": {"x": 80, "y": 5},
-        # "upper corner": {"x": 88, "y": 47}, 
-        # "lower corner": {"x": 88, "y": 4},
+        # "upper wing": {"x": 73, "y": 40}, 
+        # "lower wing": {"x": 73, "y": 10},
+        # "upper midCorner": {"x": 80, "y": 43}, 
+        # "lower midCorner": {"x": 80, "y": 7},
+        # "upper corner": {"x": 88, "y": 44}, 
+        # "lower corner": {"x": 88, "y": 6},
         # "upper highPost": {"x": 74, "y": 32}, 
 
         i = 0  # Index to assign spread coords
