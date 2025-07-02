@@ -11,19 +11,20 @@ class Animator:
 
         # Predefined spread of destination points
         spread = [
-            {"x": 64, "y": 25}, {"x": 68, "y": 36}, {"x": 68, "y": 14}, {"x": 73, "y": 40}, {"x": 73, "y": 10},
-            {"x": 81, "y": 43}, {"x": 81, "y": 7}, {"x": 90, "y": 44}, {"x": 90, "y": 6}, {"x": 74, "y": 32},
+            {"x": 74, "y": 19}, {"x": 80, "y": 32}, {"x": 80, "y": 19}, {"x": 86, "y": 32}, {"x": 86, "y": 19},
+            {"x": 74, "y": 26}, {"x": 74, "y": 25}, {"x": 80, "y": 26}, {"x": 80, "y": 25}, {"x": 74, "y": 43},
         ]
-        #  "top_of_the_key": {"x": 64, "y": 25},
-        # "upper midWing": {"x": 68, "y": 36}, 
-        # "lower midWing": {"x": 68, "y": 14},
-        # "upper wing": {"x": 73, "y": 40}, 
-        # "lower wing": {"x": 73, "y": 10},
-        # "upper midCorner": {"x": 80, "y": 43}, 
-        # "lower midCorner": {"x": 80, "y": 7},
-        # "upper corner": {"x": 88, "y": 44}, 
-        # "lower corner": {"x": 88, "y": 6},
-        # "upper highPost": {"x": 74, "y": 32}, 
+
+        # "lower highPost": {"x": 74, "y": 19},
+        # "upper midPost": {"x": 80, "y": 32}, 
+        # "lower midPost": {"x": 80, "y": 19},
+        # "upper lowPost": {"x": 86, "y": 32}, 
+        # "lower lowPost": {"x": 86, "y": 19}, 
+        # "upper topLane": {"x": 74, "y": 26}, 
+        # "lower topLane": {"x": 74, "y": 25},
+        # "upper midLane": {"x": 80, "y": 26}, 
+        # "lower midLane": {"x": 80, "y": 25}, #finished through here
+        # "upper apex": {"x": 74, "y": 43}, 
 
         i = 0  # Index to assign spread coords
 
