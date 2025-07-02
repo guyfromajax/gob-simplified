@@ -61,6 +61,11 @@ class Animator:
             })
 
         for pos, defender in def_lineup.items():
+            start = {
+                "x": def_coords["x"] + random.choice([-2, -1, 0, 1, 2]),
+                "y": def_coords["y"] + random.choice([-1, 0, 1])
+            }
+
             if pos == bh_pos:
                 def_coords = assign_ball_handler_defender_coords(ball_handler_end_coords, aggression_call)
                 action_type = "GUARD_BALL"
@@ -78,7 +83,7 @@ class Animator:
 
             animations.append({
                 "playerId": defender.player_id,
-                "start": def_coords,
+                "start": start,
                 "end": def_coords,
                 "actions": [{"timestamp": 0, "type": action_type}],
                 "hasBall": False,
