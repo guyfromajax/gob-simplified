@@ -98,6 +98,11 @@ class Animator:
                 "y": def_coords["y"] + random.choice([-1, 0, 1])
             }
 
+            # ✅ Flip if away team has the ball
+            if is_away_offense:
+                def_coords = get_away_player_coords(def_coords)
+                start = get_away_player_coords(start)
+
             animations.append({
                 "playerId": defender.player_id,
                 "start": start,
