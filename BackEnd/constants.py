@@ -123,6 +123,7 @@ ACTIONS = {
     "RECEIVE": "receive",
     "SHOOT": "shoot",
     "DRIFT": "drift",
-    "STAY": "stationary"
+    "STAY": "stationary",
+    "PASS": "pass"
 }
 
