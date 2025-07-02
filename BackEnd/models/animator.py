@@ -1,7 +1,8 @@
 from BackEnd.utils.shared import get_player_by_pos, get_player_position
 from BackEnd.utils.shared_defense import (
     assign_ball_handler_defender_coords,
-    assign_non_bh_defender_coords
+    assign_non_bh_defender_coords,
+    get_away_player_coords
 )
 from collections import defaultdict
 from BackEnd.constants import HCO_STRING_SPOTS, ACTIONS
@@ -18,6 +19,12 @@ class Animator:
         off_lineup = offense_team.lineup
         def_lineup = defense_team.lineup
         aggression_call = defense_team.strategy_calls.get("aggression_call", "normal")
+        is_away_offense = offense_team.team_id == self.game.away_team.team_id
+        print("Inside capture_halfcourt_animation")
+        print(f"offense_team_id: {offense_team.team_id}")
+        print(f"away_team_id: {self.game.away_team.team_id}")
+        print(f"is_away_offense: {is_away_offense}")
+
 
         steps = roles["steps"]
         action_timeline = roles["action_timeline"]
@@ -45,6 +52,9 @@ class Animator:
             last_spot = timeline[-1][2]
             start_coords = HCO_STRING_SPOTS.get(first_spot, {"x": 64, "y": 25})
             end_coords = HCO_STRING_SPOTS.get(last_spot, start_coords)
+            if is_away_offense:
+                start_coords = get_away_player_coords(start_coords)
+                end_coords = get_away_player_coords(end_coords)
 
             if pos == bh_pos:
                 ball_handler_end_coords = end_coords  # capture for defensive positioning
