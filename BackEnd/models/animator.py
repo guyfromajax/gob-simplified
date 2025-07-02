@@ -11,20 +11,20 @@ class Animator:
 
         # Predefined spread of destination points
         spread = [
-            {"x": 74, "y": 19}, {"x": 80, "y": 32}, {"x": 80, "y": 19}, {"x": 86, "y": 32}, {"x": 86, "y": 19},
-            {"x": 74, "y": 26}, {"x": 74, "y": 25}, {"x": 80, "y": 26}, {"x": 80, "y": 25}, {"x": 74, "y": 36},
+            {"x": 80, "y": 40}, {"x": 80, "y": 11}, {"x": 89, "y": 40}, {"x": 89, "y": 11}, {"x": 80, "y": 36},
+            {"x": 80, "y": 15}, {"x": 89, "y": 36}, {"x": 89, "y": 15}, {"x": 88, "y": 40}, {"x": 88, "y": 11},
         ]
 
-        # "lower highPost": {"x": 74, "y": 19},
-        # "upper midPost": {"x": 80, "y": 32}, 
-        # "lower midPost": {"x": 80, "y": 19},
-        # "upper lowPost": {"x": 86, "y": 32}, 
-        # "lower lowPost": {"x": 86, "y": 19}, 
-        # "upper topLane": {"x": 74, "y": 26}, 
-        # "lower topLane": {"x": 74, "y": 25},
-        # "upper midLane": {"x": 80, "y": 26}, 
-        # "lower midLane": {"x": 80, "y": 25}, #finished through here
-        # "upper apex": {"x": 74, "y": 43}, 
+        # "upper longAllen": {"x": 80, "y": 40}, 
+        # "lower longAllen": {"x": 80, "y": 11},
+        # "upper shortAllen": {"x": 89, "y": 40}, 
+        # "lower shortAllen": {"x": 89, "y": 11},
+        # "upper longBird": {"x": 80, "y": 36}, 
+        # "lower longBird": {"x": 80, "y": 15},
+        # "upper shortBird": {"x": 89, "y": 36}, 
+        # "lower shortBird": {"x": 89, "y": 15},
+        # "upper longBaseline": {"x": 88, "y": 40}, 
+        # "lower longBaseline": {"x": 88, "y": 11},
 
         i = 0  # Index to assign spread coords
 
