@@ -4,7 +4,7 @@ from BackEnd.utils.shared_defense import (
     assign_non_bh_defender_coords
 )
 from collections import defaultdict
-from BackEnd.constants import HCO_STRING_SPOTS
+from BackEnd.constants import HCO_STRING_SPOTS, ACTIONS
 import random
 
 class Animator:
@@ -61,27 +61,25 @@ class Animator:
             })
 
         for pos, defender in def_lineup.items():
-            start = {
-                "x": def_coords["x"] + random.choice([-2, -1, 0, 1, 2]),
-                "y": def_coords["y"] + random.choice([-1, 0, 1])
-            }
+            def_coords = None  # ✅ Safe default
+            action_type = ACTIONS["GUARD_OFFBALL"]
 
             if pos == bh_pos:
                 def_coords = assign_ball_handler_defender_coords(ball_handler_end_coords, aggression_call)
-                action_type = "GUARD_BALL"
-            else:
+                action_type = ACTIONS["GUARD_BALL"]
+            elif pos in off_lineup:
                 off_player = off_lineup[pos]
-                last_spot = next((
-                    step[2] for step in reversed(action_timeline.get(off_player, []))
-                    if step[2] is not None
-                ), "top_of_the_key")
+                last_spot = next(
+                    (step[2] for step in reversed(action_timeline.get(off_player, [])) if step[2]),
+                    "key"
+                )
+                o_coords = HCO_STRING_SPOTS.get(last_spot, HCO_STRING_SPOTS["key"])
+                def_coords = assign_non_bh_defender_coords(o_coords, ball_handler_end_coords, aggression_call)
+            else:
+                print(f"[WARN] No offensive match for defender {pos}, skipping.")
+                continue  # skip player if we can't map them
 
-                end_coords = HCO_STRING_SPOTS.get(last_spot, {"x": 64, "y": 25})
-
-                def_coords = assign_non_bh_defender_coords(end_coords, ball_handler_end_coords, aggression_call)
-                action_type = "GUARD_OFFBALL"
-
-            # ✅ Now def_coords is always defined
+            # ✅ Only continue if def_coords is safe
             start = {
                 "x": def_coords["x"] + random.choice([-2, -1, 0, 1, 2]),
                 "y": def_coords["y"] + random.choice([-1, 0, 1])
@@ -95,6 +93,7 @@ class Animator:
                 "hasBall": False,
                 "duration": steps[-1]["timestamp"] if steps else 800
             })
+
 
         self.latest_packet = animations
         print(f"[DEBUG] Generated {len(animations)} animations")
