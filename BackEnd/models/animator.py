@@ -1,8 +1,11 @@
-from BackEnd.utils.shared import get_player_by_pos, get_player_position
+from BackEnd.utils.shared import (
+    get_player_by_pos, 
+    get_player_position,
+    get_away_player_coords
+)
 from BackEnd.utils.shared_defense import (
     assign_ball_handler_defender_coords,
-    assign_non_bh_defender_coords,
-    get_away_player_coords
+    assign_non_bh_defender_coords
 )
 from collections import defaultdict
 from BackEnd.constants import HCO_STRING_SPOTS, ACTIONS
