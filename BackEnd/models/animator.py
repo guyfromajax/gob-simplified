@@ -81,6 +81,12 @@ class Animator:
                 def_coords = assign_non_bh_defender_coords(end_coords, ball_handler_end_coords, aggression_call)
                 action_type = "GUARD_OFFBALL"
 
+            # ✅ Now def_coords is always defined
+            start = {
+                "x": def_coords["x"] + random.choice([-2, -1, 0, 1, 2]),
+                "y": def_coords["y"] + random.choice([-1, 0, 1])
+            }
+
             animations.append({
                 "playerId": defender.player_id,
                 "start": start,
