@@ -78,9 +78,13 @@ class Animator:
             action_type = ACTIONS["GUARD_OFFBALL"]
 
             if pos == bh_pos:
+                print(f"[DEF MATCH] Defender: {pos}, matched to off_lineup: {pos in off_lineup}")
+                print(f"[DEF INFO] is_ball_handler: {pos == bh_pos}")
                 def_coords = assign_ball_handler_defender_coords(ball_handler_end_coords, aggression_call)
                 action_type = ACTIONS["GUARD_BALL"]
             elif pos in off_lineup:
+                print(f"[DEF MATCH] Defender: {pos}, matched to off_lineup: {pos in off_lineup}")
+                print(f"[DEF INFO] is_ball_handler: {pos == bh_pos}")
                 off_player = off_lineup[pos]
                 last_spot = next(
                     (step[2] for step in reversed(action_timeline.get(off_player, [])) if step[2]),
