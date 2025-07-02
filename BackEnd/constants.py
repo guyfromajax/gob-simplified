@@ -124,6 +124,7 @@ ACTIONS = {
     "SHOOT": "shoot",
     "DRIFT": "drift",
     "STAY": "stationary",
-    "PASS": "pass"
+    "PASS": "pass",
+    "REBOUND": "rebound"
 }
 
