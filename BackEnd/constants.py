@@ -89,3 +89,40 @@ AGGRESSION_FOUL_MULTIPLIER = {
     3: 1.1,
     4: 1.2,
 }
+
+HCO_STRING_SPOTS = {
+    "key": {"x": 64, "y": 25},
+    "upper midWing": {"x": 68, "y": 36}, 
+    "lower midWing": {"x": 68, "y": 14},
+    "upper wing": {"x": 73, "y": 40}, 
+    "lower wing": {"x": 73, "y": 10},
+    "upper midCorner": {"x": 81, "y": 43}, 
+    "lower midCorner": {"x": 81, "y": 7},
+    "upper corner": {"x": 88, "y": 44}, 
+    "lower corner": {"x": 88, "y": 6},
+    "upper highPost": {"x": 74, "y": 32}, 
+    "lower highPost": {"x": 74, "y": 19},
+    "upper midPost": {"x": 80, "y": 32}, 
+    "lower midPost": {"x": 80, "y": 19},
+    "upper lowPost": {"x": 86, "y": 32}, 
+    "lower lowPost": {"x": 86, "y": 19}, 
+    "topLane": {"x": 74, "y": 25},
+    "midLane": {"x": 80, "y": 25}, 
+    "upper apex": {"x": 80, "y": 36}, 
+    "lower apex": {"x": 80, "y": 15},
+    "upper midBaseline": {"x": 89, "y": 36}, 
+    "lower midBaseline": {"x": 89, "y": 15},
+}
+
+ACTIONS = {
+    "HANDLE": "handle_ball",
+    "POST": "post_up",
+    "CUT": "cut",
+    "SCREEN": "screen",
+    "OPEN": "get_open",
+    "RECEIVE": "receive",
+    "SHOOT": "shoot",
+    "DRIFT": "drift",
+    "STAY": "stationary"
+}
+
