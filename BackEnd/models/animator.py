@@ -93,10 +93,7 @@ class Animator:
                 continue  # skip player if we can't map them
 
             # ✅ Only continue if def_coords is safe
-            start = {
-                "x": def_coords["x"] + random.choice([-2, -1, 0, 1, 2]),
-                "y": def_coords["y"] + random.choice([-1, 0, 1])
-            }
+            start = defender.coords
 
             # ✅ Flip if away team has the ball
             if is_away_offense and pos != bh_pos:
