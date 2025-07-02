@@ -22,7 +22,8 @@ from BackEnd.utils.shared import (
     get_team_thresholds, 
     get_foul_and_turnover_positions,
     get_name_safe,
-    get_player_position
+    get_player_position,
+    update_player_coords_from_animations
 )
 from BackEnd.engine.phase_resolution import (
     resolve_fast_break_logic, 
@@ -105,6 +106,7 @@ class TurnManager:
 
         result["turn_count"] = self.game.micro_turn_count
         result["possession_team_id"] = self.game.offense_team.team_id
+        update_player_coords_from_animations(self.game, result["animations"])
 
         print(f"result: {result}")
 
