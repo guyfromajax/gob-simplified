@@ -1,4 +1,8 @@
-from BackEnd.utils.shared import get_player_by_pos
+from BackEnd.utils.shared import get_player_by_pos, get_player_position
+from BackEnd.utils.shared_defense import (
+    assign_ball_handler_defender_coords,
+    assign_non_bh_defender_coords
+)
 from collections import defaultdict
 from BackEnd.constants import HCO_STRING_SPOTS
 import random
@@ -10,17 +14,28 @@ class Animator:
 
     def capture_halfcourt_animation(self, roles, event_step=None):
         offense_team = self.game.offense_team
-        lineup = offense_team.lineup
+        defense_team = self.game.defense_team
+        off_lineup = offense_team.lineup
+        def_lineup = defense_team.lineup
+        aggression_call = defense_team.strategy_calls.get("aggression_call", "normal")
+
         steps = roles["steps"]
         action_timeline = roles["action_timeline"]
         shooter = roles["shooter"]
+        ball_handler = roles["ball_handler"]
 
         if event_step is not None:
             steps = steps[:event_step + 1]
 
         animations = []
 
-        for pos, player in lineup.items():
+        # ----------------
+        # 🔵 OFFENSIVE ANIMATION
+        # ----------------
+        bh_pos = get_player_position(off_lineup, ball_handler)
+        ball_handler_end_coords = None
+
+        for pos, player in off_lineup.items():
             timeline = action_timeline.get(player, [])
             if not timeline:
                 continue
@@ -31,10 +46,10 @@ class Animator:
             start_coords = HCO_STRING_SPOTS.get(first_spot, {"x": 64, "y": 25})
             end_coords = HCO_STRING_SPOTS.get(last_spot, start_coords)
 
-            actions = [
-                {"timestamp": t, "type": action}
-                for t, action, _ in timeline
-            ]
+            if pos == bh_pos:
+                ball_handler_end_coords = end_coords  # capture for defensive positioning
+
+            actions = [{"timestamp": t, "type": action} for t, action, _ in timeline]
 
             animations.append({
                 "playerId": player.player_id,
@@ -45,41 +60,32 @@ class Animator:
                 "duration": timeline[-1][0]
             })
 
+        for pos, defender in def_lineup.items():
+            if pos == bh_pos:
+                def_coords = assign_ball_handler_defender_coords(ball_handler_end_coords, aggression_call)
+                action_type = "GUARD_BALL"
+            else:
+                off_player = off_lineup[pos]
+                end_coords = next((
+                    step[2] for step in action_timeline.get(off_player, [])
+                    if step[2] is not None
+                ), {"x": 64, "y": 25})
+                def_coords = assign_non_bh_defender_coords(end_coords, ball_handler_end_coords, aggression_call)
+                action_type = "GUARD_OFFBALL"
+
+            animations.append({
+                "playerId": defender.player_id,
+                "start": def_coords,
+                "end": def_coords,
+                "actions": [{"timestamp": 0, "type": action_type}],
+                "hasBall": False,
+                "duration": steps[-1]["timestamp"] if steps else 800
+            })
+
         self.latest_packet = animations
         print(f"[DEBUG] Generated {len(animations)} animations")
 
         return animations
-    
-    def capture(self, result):
-        packet = []
-
-        # Predefined spread of destination points
-        spread = [
-            {"x": 80, "y": 40}, {"x": 80, "y": 11}, {"x": 89, "y": 40}, {"x": 89, "y": 11}, {"x": 80, "y": 36},
-            {"x": 80, "y": 15}, {"x": 89, "y": 36}, {"x": 89, "y": 15}, {"x": 88, "y": 40}, {"x": 88, "y": 11},
-        ]
-
-        i = 0  # Index to assign spread coords
-
-        for team in [self.game.home_team, self.game.away_team]:
-            for pos, player in team.lineup.items():
-                start = getattr(player, "coords", {"x": 25, "y": 50})
-                end = spread[i % len(spread)]  # cycle through spread points
-
-                player.set_coords(end["x"], end["y"])
-
-                packet.append({
-                    "playerId": player.player_id,
-                    "start": start,
-                    "end": end,
-                    "event": result.get("result_type", "idle").lower(),
-                    "hasBall": player.player_id == result.get("ball_handler_id"),
-                    "duration": 600
-                })
-
-                i += 1
-
-        self.latest_packet = packet
 
     def get_latest_animation_packet(self):
         return self.latest_packet

@@ -125,6 +125,9 @@ ACTIONS = {
     "DRIFT": "drift",
     "STAY": "stationary",
     "PASS": "pass",
-    "REBOUND": "rebound"
+    "REBOUND": "rebound",
+    # 🛡️ Defensive actions
+    "GUARD_BALL": "guard_ball",
+    "GUARD_OFFBALL": "guard_offball"
 }
 
