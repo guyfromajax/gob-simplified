@@ -410,3 +410,66 @@ def calculate_gravity_score(attrs):
         attrs["SC"] * 0.3 +
         attrs["IQ"] * 0.4
     )
+
+# def get_hco_execution_coords(self, offenseTeam, stringSpot):
+#     """
+#     Returns the coordinates for a player based on the stringSpot value and the offense team.
+#     """
+
+#     stringSpotDict = {
+#         "top_of_the_key": {"x": 64, "y": random.randint(25,26)},
+#         "upper midWing": {"x": 68, "y": 37}, 
+#         "lower midWing": {"x": 68, "y": 14},
+#         "upper wing": {"x": 73, "y": 42}, 
+#         "lower wing": {"x": 73, "y": 9},
+#         "upper midCorner": {"x": 80, "y": 46}, 
+#         "lower midCorner": {"x": 80, "y": 5},
+#         "upper corner": {"x": 88, "y": 47}, 
+#         "lower corner": {"x": 88, "y": 4},
+#         "upper highPost": {"x": 74, "y": 32}, 
+#         "lower highPost": {"x": 74, "y": 19},
+#         "upper midPost": {"x": 80, "y": 32}, 
+#         "lower midPost": {"x": 80, "y": 19},
+#         "upper lowPost": {"x": 86, "y": 32}, 
+#         "lower lowPost": {"x": 86, "y": 19}, 
+#         "upper topLane": {"x": 74, "y": 26}, 
+#         "lower topLane": {"x": 74, "y": 25},
+#         "upper midLane": {"x": 80, "y": 26}, 
+#         "lower midLane": {"x": 80, "y": 25}, #finished through here
+#         "upper apex": {"x": 74, "y": 43}, 
+#         "lower apex": {"x": 74, "y": 8},
+#         "upper longAllen": {"x": 80, "y": 40}, 
+#         "lower longAllen": {"x": 80, "y": 11},
+#         "upper shortAllen": {"x": 89, "y": 40}, 
+#         "lower shortAllen": {"x": 89, "y": 11},
+#         "upper longBird": {"x": 80, "y": 36}, 
+#         "lower longBird": {"x": 80, "y": 15},
+#         "upper shortBird": {"x": 89, "y": 36}, 
+#         "lower shortBird": {"x": 89, "y": 15},
+#         "upper longBaseline": {"x": 88, "y": 40}, 
+#         "lower longBaseline": {"x": 88, "y": 11},
+#         "upper shortBaseline": {"x": 88, "y": 36}, 
+#         "lower shortBaseline": {"x": 88, "y": 15},
+#     }
+
+#     playerCoords = stringSpotDict[stringSpot]
+    
+#     if offenseTeam == "awayTeam":
+#         playerCoords = self.getAwayPlayerCoords(playerCoords)
+
+#     return playerCoords
+
+# def getAwayPlayerCoords(self, playerCoords):
+        
+#         """
+#         Gets individual player coordinates if the away team has the ball.
+#         """
+
+#         ySpot = playerCoords["y"]    
+#         coordsX = playerCoords["x"]
+#         baseValue = coordsX - 51
+#         xSpot = coordsX - (1 + (baseValue * 2))   
+#         playerCoords = {"x": xSpot, "y": ySpot} 
+        
+#         return playerCoords
+
