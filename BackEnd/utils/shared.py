@@ -411,14 +411,6 @@ def calculate_gravity_score(attrs):
         attrs["IQ"] * 0.4
     )
 
-def get_hco_away_coords(offenseTeam, stringSpot):
-    playerCoords = HCO_STRING_SPOTS[stringSpot]
-    
-    if offenseTeam == "awayTeam":
-        playerCoords = getAwayPlayerCoords(playerCoords)
-
-    return playerCoords
-
 def get_away_player_coords(playerCoords):
         
         """
@@ -432,4 +424,13 @@ def get_away_player_coords(playerCoords):
         playerCoords = {"x": xSpot, "y": ySpot} 
         
         return playerCoords
+
+def update_player_coords_from_animations(game, animations):
+    for anim in animations:
+        pid = anim["playerId"]
+        for team in [game.home_team, game.away_team]:
+            for player in team.lineup.values():
+                if player.player_id == pid:
+                    player.coords = anim["end"]
+
 

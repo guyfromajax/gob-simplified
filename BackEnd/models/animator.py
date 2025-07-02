@@ -1,7 +1,8 @@
 from BackEnd.utils.shared import (
     get_player_by_pos, 
     get_player_position,
-    get_away_player_coords
+    get_away_player_coords,
+    update_player_coords_from_animations
 )
 from BackEnd.utils.shared_defense import (
     assign_ball_handler_defender_coords,
@@ -110,6 +111,7 @@ class Animator:
 
         self.latest_packet = animations
         print(f"[DEBUG] Generated {len(animations)} animations")
+        update_player_coords_from_animations(self.game, result["animations"])
 
         return animations
 
