@@ -317,13 +317,6 @@
                           
             // const coordA = HCO_STRING_SPOTS[currStep.spot] || player.start || { x: 64, y: 25 };
             // const coordB = HCO_STRING_SPOTS[nextStep.spot] || player.end || coordA;
-            
-            if (!HCO_STRING_SPOTS[spotA]) {
-              console.warn(`⚠️ Unknown spotA: '${spotA}'`);
-            }
-            if (!HCO_STRING_SPOTS[spotB]) {
-              console.warn(`⚠️ Unknown spotB: '${spotB}'`);
-            }
 
             const rawX = coordA.x + (coordB.x - coordA.x) * progress;
             const rawY = coordA.y + (coordB.y - coordA.y) * progress;
