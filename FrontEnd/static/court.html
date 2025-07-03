@@ -319,8 +319,8 @@
               return { x: 0, y: 0 };                        // fallback
             }
 
-            const coordA = resolveCoords(currStep.spot);
-            const coordB = resolveCoords(nextStep.spot);
+            const coordA = resolveCoords(currStep);
+            const coordB = resolveCoords(nextStep);
                           
             // const coordA = HCO_STRING_SPOTS[currStep.spot] || player.start || { x: 64, y: 25 };
             // const coordB = HCO_STRING_SPOTS[nextStep.spot] || player.end || coordA;
