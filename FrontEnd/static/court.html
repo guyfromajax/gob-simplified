@@ -134,12 +134,25 @@
 
         if (!res.ok) throw new Error(`Simulation failed: ${res.statusText}`);
 
-        const simData = await res.json();
+        const simData = await res.json(); // getting all sim data here
         console.log("✅ Sim data loaded:", simData);
         homeColors = simData.home_team_colors;
         awayColors = simData.away_team_colors;
         console.log("🏠 Home colors:", homeColors);
         console.log("🛫 Away colors:", awayColors);
+        teamInfo = {
+          home: {
+            player_ids: simData.players.filter(p => p.team === 'home').map(p => p.playerId),
+            primary_color: simData.home_team_colors.primary_color,
+            secondary_color: simData.home_team_colors.secondary_color
+          },
+          away: {
+            player_ids: simData.players.filter(p => p.team === 'away').map(p => p.playerId),
+            primary_color: simData.away_team_colors.primary_color,
+            secondary_color: simData.away_team_colors.secondary_color
+          }
+        };
+
 
         // Dynamically load court image based on home_team_id
         const courtImg = document.getElementById("court");
