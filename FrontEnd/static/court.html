@@ -122,7 +122,7 @@
       ctx.textAlign = 'center';
       ctx.textBaseline = textAlign === "top" ? "top" : "bottom";
       const pos = playerPositions[player.playerId] || "";
-      ctx.fillText(playerPositions[player.playerId] || "", x, y + (textAlign === "top" ? -radius - 5 : radius + 5));
+      ctx.fillText(playerPositions[player.playerId] || "HH", x, y + (textAlign === "top" ? -radius - 5 : radius + 5));
       // ctx.fillText(player.pos || "", x, y + (textAlign === "top" ? -radius - 5 : radius + 5));
       ctx.font = 'bold 12px Arial';
       ctx.fillText(player.jersey || "", x, y + (textAlign === "top" ? -radius - 20 : radius + 20));
