@@ -302,18 +302,18 @@
               ? 1
               : (elapsed / speedFactor - currStep.timestamp) / (nextStep.timestamp - currStep.timestamp);
 
-            function resolveSpotCoords(spot) {
-              if (typeof spot === 'string') {
-                const coords = HCO_STRING_SPOTS[spot];
-                if (!coords) console.warn("⚠️ Unknown spot:", spot);
-                return coords || { x: 0, y: 0 };
+              function resolveCoords(step) {
+                if (step.coords) return step.coords;         // ✅ new system: raw coords
+                if (step.spot && typeof step.spot === 'string') {
+                  const coords = HCO_STRING_SPOTS[step.spot];
+                  if (!coords) console.warn("⚠️ Unknown spot:", step.spot);
+                  return coords || { x: 0, y: 0 };
+                }
+                return { x: 0, y: 0 };                        // fallback
               }
-              // Already a coordinate object
-              return spot;
-            }
 
-            const coordA = resolveSpotCoords(currStep.spot);
-            const coordB = resolveSpotCoords(nextStep.spot);
+            const coordA = resolveCoords(currStep.spot);
+            const coordB = resolveCoords(nextStep.spot);
                           
             // const coordA = HCO_STRING_SPOTS[currStep.spot] || player.start || { x: 64, y: 25 };
             // const coordB = HCO_STRING_SPOTS[nextStep.spot] || player.end || coordA;
@@ -334,7 +334,7 @@
               ctx.clearRect(0, 0, canvas.width, canvas.height);
               currentTurn.forEach(player => {
                 const lastStep = player.movement[player.movement.length - 1];
-                const coord = HCO_STRING_SPOTS[lastStep.spot] || { x: 64, y: 25 };
+                const coord = lastStep.coords || HCO_STRING_SPOTS[lastStep.spot] || { x: 64, y: 25 };
                 const pixelCoords = gridToPixels(coord.x, coord.y);
                 drawPlayer(player, pixelCoords);
               });
