@@ -128,6 +128,11 @@
       // ctx.fillText(player.pos || "", x, y + (textAlign === "top" ? -radius - 5 : radius + 5));
       ctx.font = 'bold 16px Arial';
       ctx.fillText(player.jersey || "", x, y + (textAlign === "top" ? -radius - 20 : radius + 20));
+
+      if (!coords || coords.x === undefined || coords.y === undefined) {
+        console.error(`❌ Missing or invalid coords for player ${player.playerId}`, coords);
+      }
+
     }
 
     let playerStates = {}; 
@@ -304,6 +309,14 @@
             const coordB = HCO_STRING_SPOTS[nextStep.spot] || player.end || coordA;
 
             console.log(`Animating ${player.playerId} from ${currStep.spot} to ${nextStep.spot}`, coordA, coordB);
+            console.log(`🔎 Spot '${currStep.spot}' =>`, HCO_STRING_SPOTS[currStep.spot]);
+            console.log(`🔎 Spot '${nextStep.spot}' =>`, HCO_STRING_SPOTS[nextStep.spot]);
+
+            if (!HCO_STRING_SPOTS[currStep.spot] || !HCO_STRING_SPOTS[nextStep.spot]) {
+              console.error(`❌ Missing spot for player ${player.playerId}`, currStep.spot, nextStep.spot);
+              return;
+            }
+
 
 
             const x = coordA.x + (coordB.x - coordA.x) * progress;
