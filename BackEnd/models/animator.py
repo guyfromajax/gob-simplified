@@ -63,12 +63,14 @@ class Animator:
                 ball_handler_end_coords = end_coords  # capture for defensive positioning
 
             actions = [{"timestamp": t, "type": action} for t, action, _ in timeline]
+            movement = [{"timestamp": t, "spot": spot} for t, _, spot in timeline]
 
             animations.append({
                 "playerId": player.player_id,
                 "start": start_coords,
                 "end": end_coords,
                 "actions": actions,
+                "movement": movement,
                 "hasBall": player == shooter,
                 "duration": timeline[-1][0]
             })
