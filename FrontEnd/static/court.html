@@ -118,13 +118,17 @@
       ctx.stroke();
 
       ctx.fillStyle = text;
-      ctx.font = '12px Arial';
+      ctx.font = 'bold 16px Arial';
       ctx.textAlign = 'center';
-      ctx.textBaseline = textAlign === "top" ? "top" : "bottom";
+      ctx.textBaseline = "middle"
       const posLabel = playerPositions[player.playerId] || "HH";
-      ctx.fillText(posLabel, x, y + (textAlign === "top" ? -radius - 5 : radius + 5));  
+      ctx.shadowColor = 'rgba(0,0,0,0.4)';
+      ctx.shadowBlur = 3;
+      ctx.fillText(posLabel, x, y);
+      ctx.shadowBlur = 0;  // reset after
+      // ctx.fillText(posLabel, x, y + (textAlign === "top" ? -radius - 5 : radius + 5));  
       // ctx.fillText(player.pos || "", x, y + (textAlign === "top" ? -radius - 5 : radius + 5));
-      ctx.font = 'bold 12px Arial';
+      ctx.font = 'bold 16px Arial';
       ctx.fillText(player.jersey || "", x, y + (textAlign === "top" ? -radius - 20 : radius + 20));
     }
 
