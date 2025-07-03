@@ -297,6 +297,7 @@
 
             console.log(`🏀 ${player.playerId} movement:`, movement);
             const currStep = movement[stepIndex];
+            console.log(`🏀 ${player.playerId} currStep:`, currStep);
             const nextStep = movement[stepIndex + 1] || currStep;
 
             const speedFactor = 5; // 🔧 increase to slow down, decrease to speed up
@@ -304,15 +305,15 @@
               ? 1
               : (elapsed / speedFactor - currStep.timestamp) / (nextStep.timestamp - currStep.timestamp);
 
-              function resolveCoords(step) {
-                if (step.coords) return step.coords;         // ✅ new system: raw coords
-                if (step.spot && typeof step.spot === 'string') {
-                  const coords = HCO_STRING_SPOTS[step.spot];
-                  if (!coords) console.warn("⚠️ Unknown spot:", step.spot);
-                  return coords || { x: 0, y: 0 };
-                }
-                return { x: 0, y: 0 };                        // fallback
+            function resolveCoords(step) {
+              if (step.coords) return step.coords;         // ✅ new system: raw coords
+              if (step.spot && typeof step.spot === 'string') {
+                const coords = HCO_STRING_SPOTS[step.spot];
+                if (!coords) console.warn("⚠️ Unknown spot:", step.spot);
+                return coords || { x: 0, y: 0 };
               }
+              return { x: 0, y: 0 };                        // fallback
+            }
 
             const coordA = resolveCoords(currStep.spot);
             const coordB = resolveCoords(nextStep.spot);
