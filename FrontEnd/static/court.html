@@ -298,19 +298,25 @@
             const nextStep = movement[stepIndex + 1] || currStep;
 
             const speedFactor = 5; // 🔧 increase to slow down, decrease to speed up
-
             const progress = nextStep.timestamp === currStep.timestamp
               ? 1
               : (elapsed / speedFactor - currStep.timestamp) / (nextStep.timestamp - currStep.timestamp);
 
-            const rawSpotA = currStep.spot || "";
-            const rawSpotB = nextStep.spot || "";
+              function resolveSpotCoords(spot) {
+                if (typeof spot === 'string') {
+                  const coords = HCO_STRING_SPOTS[spot];
+                  if (!coords) console.warn("⚠️ Unknown spot:", spot);
+                  return coords || { x: 0, y: 0 };
+                }
+                // Already a coordinate object
+                return spot;
+              }
 
-            // Normalize to match dictionary keys exactly
-            const spotA = rawSpotA.trim();
-            const spotB = rawSpotB.trim();
-            const coordA = HCO_STRING_SPOTS[currStep.spot] || player.start || { x: 64, y: 25 };
-            const coordB = HCO_STRING_SPOTS[nextStep.spot] || player.end || coordA;
+              const coordA = resolveSpotCoords(currStep.spot);
+              const coordB = resolveSpotCoords(nextStep.spot);
+                          
+              // const coordA = HCO_STRING_SPOTS[currStep.spot] || player.start || { x: 64, y: 25 };
+            // const coordB = HCO_STRING_SPOTS[nextStep.spot] || player.end || coordA;
             
             if (!HCO_STRING_SPOTS[spotA]) {
               console.warn(`⚠️ Unknown spotA: '${spotA}'`);
