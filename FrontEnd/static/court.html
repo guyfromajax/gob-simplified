@@ -305,6 +305,8 @@
             const coordA = HCO_STRING_SPOTS[currStep.spot] || player.start || { x: 64, y: 25 };
             const coordB = HCO_STRING_SPOTS[nextStep.spot] || player.end || coordA;
 
+            console.log(`Animating ${player.playerId} from ${currStep.spot} to ${nextStep.spot}`, coordA, coordB);
+
 
             const x = coordA.x + (coordB.x - coordA.x) * progress;
             const y = coordA.y + (coordB.y - coordA.y) * progress;
