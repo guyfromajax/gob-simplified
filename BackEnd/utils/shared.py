@@ -433,4 +433,15 @@ def update_player_coords_from_animations(game, animations):
                 if player.player_id == pid:
                     player.coords = anim["end"]
 
+def serialize_lineup(lineup_dict):
+    return {
+        pos: {
+            "player_id": player.player_id,
+            "team": player.team,
+            "jersey": player.jersey,
+        }
+        for pos, player in lineup_dict.items()
+    }
+
+
 

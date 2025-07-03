@@ -23,7 +23,8 @@ from BackEnd.utils.shared import (
     get_foul_and_turnover_positions,
     get_name_safe,
     get_player_position,
-    update_player_coords_from_animations
+    update_player_coords_from_animations,
+    serialize_lineup
 )
 from BackEnd.engine.phase_resolution import (
     resolve_fast_break_logic, 
@@ -108,8 +109,8 @@ class TurnManager:
         result["possession_team_id"] = self.game.offense_team.team_id
         update_player_coords_from_animations(self.game, result["animations"])
 
-        result["home_lineup"] = self.game.home_team.lineup
-        result["away_lineup"] = self.game.away_team.lineup
+        result["home_lineup"] = serialize_lineup(self.game.home_team.lineup)
+        result["away_lineup"] = serialize_lineup(self.game.away_team.lineup)
 
         print(f"result: {result}")
 
