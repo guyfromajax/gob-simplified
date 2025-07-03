@@ -101,9 +101,6 @@
       const pixelY = ((50 - y) / 50) * 768;
       return { x: pixelX, y: pixelY };
     }
-    const rawX = coordA.x + (coordB.x - coordA.x) * progress;
-    const rawY = coordA.y + (coordB.y - coordA.y) * progress;
-    const pixelCoords = gridToPixels(rawX, rawY);
     
     function drawPlayer(player, pixelCoords) {
       if (!window.teamInfo || !teamInfo.home || !teamInfo.away) return;
@@ -337,13 +334,15 @@
               console.error(`❌ Missing spot for player ${player.playerId}`, currStep.spot, nextStep.spot);
               return;
             }
+            // const x = coordA.x + (coordB.x - coordA.x) * progress;
+            // const y = coordA.y + (coordB.y - coordA.y) * progress;
 
+            const rawX = coordA.x + (coordB.x - coordA.x) * progress;
+            const rawY = coordA.y + (coordB.y - coordA.y) * progress;
 
+            const pixelCoords = gridToPixels(rawX, rawY);
+            drawPlayer(player, pixelCoords);
 
-            const x = coordA.x + (coordB.x - coordA.x) * progress;
-            const y = coordA.y + (coordB.y - coordA.y) * progress;
-
-            drawPlayer(player, { x, y });
           });
 
           if (elapsed < getMaxTurnDuration(currentTurn)) {
