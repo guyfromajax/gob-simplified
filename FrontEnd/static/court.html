@@ -93,6 +93,7 @@
       if (!window.teamInfo || !teamInfo.home || !teamInfo.away) return;
 
       const { fill, stroke, text, textAlign } = getPlayerColors(player.playerId, teamInfo.home, teamInfo.away);
+      console.log(`Draw ${player.pos || "??"} with fill: ${fill}, text: ${text}, stroke: ${stroke}`);
 
       const radius = 20;
       const x = coords.x;
@@ -214,7 +215,13 @@
 
           currentTurn.forEach(player => {
             const movement = player.movement;
-            if (!movement || movement.length < 2) return;
+            if (!movement || movement.length < 2) {
+              drawPlayer(player, player.start || { x: 64, y: 25 });
+              return;
+            }
+
+            console.log(`Player ${player.pos} movement:`, player.movement);
+            // if (!movement || movement.length < 2) return;
 
             let stepIndex = 0;
             while (
@@ -231,8 +238,10 @@
               ? 1
               : (elapsed - currStep.timestamp) / (nextStep.timestamp - currStep.timestamp);
 
-            const coordA = HCO_STRING_SPOTS[currStep.spot];
-            const coordB = HCO_STRING_SPOTS[nextStep.spot];
+            console.log(`🏀 ${player.playerId} moving from ${currStep.spot} to ${nextStep.spot}`);
+            const coordA = HCO_STRING_SPOTS[currStep.spot] || player.start || { x: 64, y: 25 };
+            const coordB = HCO_STRING_SPOTS[nextStep.spot] || player.end || coordA;
+
 
             const x = coordA.x + (coordB.x - coordA.x) * progress;
             const y = coordA.y + (coordB.y - coordA.y) * progress;
