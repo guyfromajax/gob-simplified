@@ -169,7 +169,6 @@
         for (const [pos, playerId] of Object.entries(homeLineup)) {
           if (playerId) {
             playerPositions[playerId] = pos;
-            console.log(`Mapped home team ${playerId} to ${pos}`);
           }
         }
 
@@ -177,13 +176,12 @@
         for (const [pos, playerId] of Object.entries(awayLineup)) {
           if (playerId) {
             playerPositions[playerId] = pos;
-            console.log(`Mapped away team ${playerId} to ${pos}`);
           }
         }
-        console.log("📌 playerPositions:", playerPositions);
 
         
         simData.turns.forEach(turn => {
+          console.log("▶️ Playing turn", turn);
           turn.animations = turn.animations.map(anim => {
             const fullPlayer = simData.players.find(p => p.playerId === anim.playerId);
             return {
@@ -195,8 +193,6 @@
 
         homeColors = simData.home_team_colors;
         awayColors = simData.away_team_colors;
-        console.log("🏠 Home colors:", homeColors);
-        console.log("🛫 Away colors:", awayColors);
         teamInfo = {
           home: {
             player_ids: simData.players.filter(p => p.team === 'home').map(p => p.playerId),
@@ -225,7 +221,7 @@
         }
 
         players = simData.players || [];
-        console.log("🔍 Players loaded:", players);
+        // console.log("🔍 Players loaded:", players);
         playTurns(simData.turns);
       } catch (err) {
         console.error("❌ Simulation failed:", err);
@@ -287,7 +283,7 @@
               return;
             }
 
-            console.log(`Player ${player.pos} movement:`, player.movement);
+            // console.log(`Player ${player.pos} movement:`, player.movement);
             // if (!movement || movement.length < 2) return;
 
             let stepIndex = 0;
@@ -317,25 +313,13 @@
             const spotB = rawSpotB.trim();
             const coordA = HCO_STRING_SPOTS[currStep.spot] || player.start || { x: 64, y: 25 };
             const coordB = HCO_STRING_SPOTS[nextStep.spot] || player.end || coordA;
-            console.log(`🧭 Step: '${spotA}' → '${spotB}' | From:`, coordA, "To:", coordB);
-
-            console.log(`Animating ${player.playerId} from ${currStep.spot} to ${nextStep.spot}`, coordA, coordB);
-            console.log(`🔎 Spot '${currStep.spot}' =>`, HCO_STRING_SPOTS[currStep.spot]);
-            console.log(`🔎 Spot '${nextStep.spot}' =>`, HCO_STRING_SPOTS[nextStep.spot]);
+            
             if (!HCO_STRING_SPOTS[spotA]) {
               console.warn(`⚠️ Unknown spotA: '${spotA}'`);
             }
             if (!HCO_STRING_SPOTS[spotB]) {
               console.warn(`⚠️ Unknown spotB: '${spotB}'`);
             }
-
-
-            if (!HCO_STRING_SPOTS[currStep.spot] || !HCO_STRING_SPOTS[nextStep.spot]) {
-              console.error(`❌ Missing spot for player ${player.playerId}`, currStep.spot, nextStep.spot);
-              return;
-            }
-            // const x = coordA.x + (coordB.x - coordA.x) * progress;
-            // const y = coordA.y + (coordB.y - coordA.y) * progress;
 
             const rawX = coordA.x + (coordB.x - coordA.x) * progress;
             const rawY = coordA.y + (coordB.y - coordA.y) * progress;
