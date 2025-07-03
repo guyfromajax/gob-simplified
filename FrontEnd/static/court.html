@@ -183,9 +183,12 @@
         });
 
         const maxDuration = Math.max(...animationQueue.map(a => a.duration || 600), 600);
-        const stateStart = performance.now();
 
-        function animateTurnFrame(currentTime) {
+        // ✅ Fix: Set currentTurn for animation use
+        currentTurn = animationQueue;
+        animationStartTime = performance.now();
+
+        requestAnimationFrame(function animateTurnFrame(currentTime) {
           const elapsed = currentTime - animationStartTime;
 
           ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -194,7 +197,6 @@
             const movement = player.movement;
             if (!movement || movement.length < 2) return;
 
-            // Find current step pair
             let stepIndex = 0;
             while (
               stepIndex < movement.length - 1 &&
@@ -221,13 +223,8 @@
 
           if (elapsed < getMaxTurnDuration(currentTurn)) {
             requestAnimationFrame(animateTurnFrame);
-          } else {
-            // optional: fire onTurnComplete() or load next turn
           }
-        }
-
-        console.log("🎬 Animation queue:", animationQueue);
-        animateTurnFrame();
+        });
 
         setTimeout(() => {
           currentTurnIndex++;
