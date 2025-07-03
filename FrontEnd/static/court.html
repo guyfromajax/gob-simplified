@@ -102,8 +102,6 @@
       if (!window.teamInfo || !teamInfo.home || !teamInfo.away) return;
 
       const { fill, stroke, text, textAlign } = getPlayerColors(player.playerId, teamInfo.home, teamInfo.away);
-      console.log(`Draw ${player.pos || "??"} with fill: ${fill}, text: ${text}, stroke: ${stroke}`);
-      console.log("Draw", player.playerId, "pos:", player.pos, "jersey:", player.jersey);
 
       const radius = 20;
       const x = coords.x;
