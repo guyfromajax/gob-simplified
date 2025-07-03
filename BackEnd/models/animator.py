@@ -132,7 +132,7 @@ class Animator:
                 "start": start,
                 "end": def_coords,
                 "actions": [{"timestamp": 0, "type": action_type}],
-                "movement": movement
+                "movement": movement,
                 "hasBall": False,
                 "duration": steps[-1]["timestamp"] if steps else 800
             })
