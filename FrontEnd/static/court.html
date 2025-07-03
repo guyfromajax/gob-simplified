@@ -155,14 +155,15 @@
         const homeLineup = firstTurn.home_lineup || {};
         const awayLineup = firstTurn.away_lineup || {};
 
-        for (const [pos, player] of Object.entries(homeLineup)) {
-          if (player && player.playerId) {
-            playerPositions[player.playerId] = pos;
+        for (const [pos, playerId] of Object.entries(homeLineup)) {
+          if (playerId) {
+            playerPositions[playerId] = pos;
           }
         }
-        for (const [pos, player] of Object.entries(awayLineup)) {
-          if (player && player.playerId) {
-            playerPositions[player.playerId] = pos;
+
+        for (const [pos, playerId] of Object.entries(awayLineup)) {
+          if (playerId) {
+            playerPositions[playerId] = pos;
           }
         }
         console.log("📌 playerPositions:", playerPositions);
