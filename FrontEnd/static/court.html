@@ -122,7 +122,7 @@
       ctx.textAlign = 'center';
       ctx.textBaseline = textAlign === "top" ? "top" : "bottom";
       const pos = playerPositions[player.playerId] || "";
-      ctx.fillText(pos, x, y + (textAlign === "top" ? -radius - 5 : radius + 5));
+      ctx.fillText(playerPositions[player.playerId] || "", x, y + (textAlign === "top" ? -radius - 5 : radius + 5));
       // ctx.fillText(player.pos || "", x, y + (textAlign === "top" ? -radius - 5 : radius + 5));
       ctx.font = 'bold 12px Arial';
       ctx.fillText(player.jersey || "", x, y + (textAlign === "top" ? -radius - 20 : radius + 20));
@@ -132,6 +132,7 @@
     let players = [];
     let homeColors = {};
     let awayColors = {};
+    let playerPositions = {};
 
     async function loadSimAndStart() {
       try {
@@ -149,17 +150,21 @@
 
         const simData = await res.json(); // getting all sim data here
         console.log("✅ Sim data loaded:", simData);
-        const playerPositions = {};
+        // inside loadSimAndStart(), after simData is loaded
+        const firstTurn = simData.turns[0];
+        const homeLineup = firstTurn.home_lineup;
+        const awayLineup = firstTurn.away_lineup;
 
-        ['home', 'away'].forEach(side => {
-          const lineup = simData[`${side}_lineup`]; // Must be passed in simData
-          if (!lineup) return;
-
-          Object.entries(lineup).forEach(([pos, player]) => {
-            if (player?.playerId) {
-              playerPositions[player.playerId] = pos;
-            }
-          });
+        // Map playerId -> position
+        Object.entries(homeLineup).forEach(([pos, playerObj]) => {
+          if (playerObj?.playerId) {
+            playerPositions[playerObj.playerId] = pos;
+          }
+        });
+        Object.entries(awayLineup).forEach(([pos, playerObj]) => {
+          if (playerObj?.playerId) {
+            playerPositions[playerObj.playerId] = pos;
+          }
         });
         
         simData.turns.forEach(turn => {
