@@ -94,6 +94,7 @@
 
       const { fill, stroke, text, textAlign } = getPlayerColors(player.playerId, teamInfo.home, teamInfo.away);
       console.log(`Draw ${player.pos || "??"} with fill: ${fill}, text: ${text}, stroke: ${stroke}`);
+      console.log("Draw", player.playerId, "pos:", player.pos, "jersey:", player.jersey);
 
       const radius = 20;
       const x = coords.x;
@@ -239,6 +240,9 @@
               : (elapsed - currStep.timestamp) / (nextStep.timestamp - currStep.timestamp);
 
             console.log(`🏀 ${player.playerId} moving from ${currStep.spot} to ${nextStep.spot}`);
+            console.log(`Spot: "${currStep.spot}" →`, HCO_STRING_SPOTS[currStep.spot]);
+            console.log(`Next spot: "${nextStep.spot}" →`, HCO_STRING_SPOTS[nextStep.spot]);
+
             const coordA = HCO_STRING_SPOTS[currStep.spot] || player.start || { x: 64, y: 25 };
             const coordB = HCO_STRING_SPOTS[nextStep.spot] || player.end || coordA;
 
