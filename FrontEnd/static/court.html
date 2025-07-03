@@ -306,7 +306,11 @@
               : (elapsed / speedFactor - currStep.timestamp) / (nextStep.timestamp - currStep.timestamp);
 
             function resolveCoords(step) {
-              if (step.coords) return step.coords;         // ✅ new system: raw coords
+              if (!step) {
+                console.warn("⚠️ resolveCoords called with undefined step.");
+                return { x: 0, y: 0 };
+              }
+                          if (step.coords) return step.coords;         // ✅ new system: raw coords
               if (step.spot && typeof step.spot === 'string') {
                 const coords = HCO_STRING_SPOTS[step.spot];
                 if (!coords) console.warn("⚠️ Unknown spot:", step.spot);
