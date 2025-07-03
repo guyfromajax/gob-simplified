@@ -303,15 +303,6 @@
               ? 1
               : (elapsed / speedFactor - currStep.timestamp) / (nextStep.timestamp - currStep.timestamp);
 
-            
-            // const progress = nextStep.timestamp === currStep.timestamp
-            //   ? 1
-            //   : (elapsed - currStep.timestamp) / (nextStep.timestamp - currStep.timestamp);
-
-            // console.log(`🏀 ${player.playerId} moving from ${currStep.spot} to ${nextStep.spot}`);
-            // console.log(`Spot: "${currStep.spot}" →`, HCO_STRING_SPOTS[currStep.spot]);
-            // console.log(`Next spot: "${nextStep.spot}" →`, HCO_STRING_SPOTS[nextStep.spot]);
-
             const rawSpotA = currStep.spot || "";
             const rawSpotB = nextStep.spot || "";
 
@@ -338,6 +329,23 @@
 
           if (elapsed < getMaxTurnDuration(currentTurn)) {
             requestAnimationFrame(animateTurnFrame);
+            // After animation finishes, persist last frame
+            if (elapsed >= getMaxTurnDuration(currentTurn)) {
+              // Re-draw all players in their end positions
+              ctx.clearRect(0, 0, canvas.width, canvas.height);
+              currentTurn.forEach(player => {
+                const lastStep = player.movement[player.movement.length - 1];
+                const coord = HCO_STRING_SPOTS[lastStep.spot] || { x: 64, y: 25 };
+                const pixelCoords = gridToPixels(coord.x, coord.y);
+                drawPlayer(player, pixelCoords);
+              });
+
+              // Delay before next turn
+              setTimeout(() => {
+                currentTurnIndex++;
+                playNextTurn();
+              }, 300); // 🔧 slight pause
+            }
           }
         });
 
