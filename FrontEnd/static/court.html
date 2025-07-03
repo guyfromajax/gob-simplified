@@ -57,6 +57,27 @@
       // Add more spots as needed
     };
 
+    function getPlayerColors(playerId, homeTeam, awayTeam) {
+      const isHome = homeTeam.player_ids.includes(playerId);
+      const team = isHome ? homeTeam : awayTeam;
+
+      if (isHome) {
+        return {
+          fill: team.primary_color,
+          stroke: team.secondary_color,
+          text: team.secondary_color,
+          textAlign: "top"
+        };
+      } else {
+        return {
+          fill: "#ffffff",
+          stroke: team.primary_color,
+          text: team.primary_color,
+          textAlign: "bottom"
+        };
+      }
+    }
+
 
     function startAnimation(turn) {
       animationStartTime = performance.now();
@@ -68,46 +89,31 @@
       const pixelY = ((50 - y) / 50) * 768;
       return { x: pixelX, y: pixelY };
     }
-    function drawPlayer(player, overrideCoords = null, homeColors = {}, awayColors = {}) {
-      const { x, y } = overrideCoords || gridToPixels(player.x, player.y);
+    function drawPlayer(player, coords) {
+      if (!window.teamInfo || !teamInfo.home || !teamInfo.away) return;
+
+      const { fill, stroke, text, textAlign } = getPlayerColors(player.playerId, teamInfo.home, teamInfo.away);
+
       const radius = 20;
+      const x = coords.x;
+      const y = coords.y;
 
-      const isHome = player.team === 'home';
-      const fillColor = isHome ? homeColors.primary_color : "#ffffff";
-      const borderColor = isHome ? homeColors.secondary_color : awayColors.primary_color;
-      const textColor = isHome ? homeColors.secondary_color : awayColors.primary_color;
-      console.log(`🖌️ Drawing ${player.pos} with fill: ${fillColor}, stroke: ${borderColor}`);
-
-      // Player circle
       ctx.beginPath();
       ctx.arc(x, y, radius, 0, Math.PI * 2);
-      ctx.fillStyle = fillColor;
-      ctx.strokeStyle = borderColor;
+      ctx.fillStyle = fill;
+      ctx.strokeStyle = stroke;
       ctx.lineWidth = 3;
       ctx.fill();
       ctx.stroke();
 
-      // Position abbreviation
-      ctx.fillStyle = textColor;
+      ctx.fillStyle = text;
       ctx.font = '12px Arial';
       ctx.textAlign = 'center';
-      ctx.fillText(player.pos, x, y + 4);
-
-      // Jersey number
+      ctx.textBaseline = textAlign === "top" ? "top" : "bottom";
+      ctx.fillText(player.pos || "", x, y + (textAlign === "top" ? -radius - 5 : radius + 5));
       ctx.font = 'bold 12px Arial';
-      const numberY = isHome ? y - radius - 5 : y + radius + 15;
-      ctx.fillText(player.jersey, x, numberY);
-
-      // Ball indicator
-      if (playerStates[player.playerId]?.hasBall) {
-        ctx.beginPath();
-        ctx.arc(x, y, 6, 0, Math.PI * 2);
-        ctx.fillStyle = 'orange';
-        ctx.fill();
-      }
+      ctx.fillText(player.jersey || "", x, y + (textAlign === "top" ? -radius - 20 : radius + 20));
     }
-
-
 
     let playerStates = {}; 
     let players = [];
