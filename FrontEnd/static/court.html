@@ -302,20 +302,20 @@
               ? 1
               : (elapsed / speedFactor - currStep.timestamp) / (nextStep.timestamp - currStep.timestamp);
 
-              function resolveSpotCoords(spot) {
-                if (typeof spot === 'string') {
-                  const coords = HCO_STRING_SPOTS[spot];
-                  if (!coords) console.warn("⚠️ Unknown spot:", spot);
-                  return coords || { x: 0, y: 0 };
-                }
-                // Already a coordinate object
-                return spot;
+            function resolveSpotCoords(spot) {
+              if (typeof spot === 'string') {
+                const coords = HCO_STRING_SPOTS[spot];
+                if (!coords) console.warn("⚠️ Unknown spot:", spot);
+                return coords || { x: 0, y: 0 };
               }
+              // Already a coordinate object
+              return spot;
+            }
 
-              const coordA = resolveSpotCoords(currStep.spot);
-              const coordB = resolveSpotCoords(nextStep.spot);
+            const coordA = resolveSpotCoords(currStep.spot);
+            const coordB = resolveSpotCoords(nextStep.spot);
                           
-              // const coordA = HCO_STRING_SPOTS[currStep.spot] || player.start || { x: 64, y: 25 };
+            // const coordA = HCO_STRING_SPOTS[currStep.spot] || player.start || { x: 64, y: 25 };
             // const coordB = HCO_STRING_SPOTS[nextStep.spot] || player.end || coordA;
             
             if (!HCO_STRING_SPOTS[spotA]) {
