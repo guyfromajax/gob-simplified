@@ -10,7 +10,7 @@ INSIDE_SCENE_1 = {
         {
             "timestamp": 0,
             "pos_actions": {
-                "PG": {"action": ACTIONS["HANDLE"], "spot": "top_of_the_key"},
+                "PG": {"action": ACTIONS["HANDLE"], "spot": "key"},
                 "SG": {"action": ACTIONS["DRIFT"], "spot": "upper wing"},
                 "SF": {"action": ACTIONS["CUT"], "spot": "lower midBaseline"},
                 "PF": {"action": ACTIONS["POST"], "spot": "upper highPost"},
@@ -21,7 +21,7 @@ INSIDE_SCENE_1 = {
         {
             "timestamp": 250,
             "pos_actions": {
-                "PG": {"action": ACTIONS["PASS"], "spot": "top_of_the_key"},
+                "PG": {"action": ACTIONS["PASS"], "spot": "key"},
                 "SG": {"action": ACTIONS["STAY"], "spot": "upper wing"},
                 "SF": {"action": ACTIONS["GET_OPEN"], "spot": "lower corner"},
                 "PF": {"action": ACTIONS["RECEIVE"], "spot": "upper highPost"},
