@@ -297,7 +297,7 @@
             const currStep = movement[stepIndex];
             const nextStep = movement[stepIndex + 1] || currStep;
 
-            const speedFactor = 3; // 🔧 increase to slow down, decrease to speed up
+            const speedFactor = 5; // 🔧 increase to slow down, decrease to speed up
 
             const progress = nextStep.timestamp === currStep.timestamp
               ? 1
@@ -340,11 +340,11 @@
                 drawPlayer(player, pixelCoords);
               });
 
-              // Delay before next turn
-              setTimeout(() => {
-                currentTurnIndex++;
-                playNextTurn();
-              }, 300); // 🔧 slight pause
+              // // Delay before next turn
+              // setTimeout(() => {
+              //   currentTurnIndex++;
+              //   playNextTurn();
+              // }, 300); // 🔧 slight pause
             }
           }
         });
