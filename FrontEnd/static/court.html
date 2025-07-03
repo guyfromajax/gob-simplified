@@ -297,9 +297,16 @@
             const currStep = movement[stepIndex];
             const nextStep = movement[stepIndex + 1] || currStep;
 
+            const speedFactor = 3; // 🔧 increase to slow down, decrease to speed up
+
             const progress = nextStep.timestamp === currStep.timestamp
               ? 1
-              : (elapsed - currStep.timestamp) / (nextStep.timestamp - currStep.timestamp);
+              : (elapsed / speedFactor - currStep.timestamp) / (nextStep.timestamp - currStep.timestamp);
+
+            
+            // const progress = nextStep.timestamp === currStep.timestamp
+            //   ? 1
+            //   : (elapsed - currStep.timestamp) / (nextStep.timestamp - currStep.timestamp);
 
             // console.log(`🏀 ${player.playerId} moving from ${currStep.spot} to ${nextStep.spot}`);
             // console.log(`Spot: "${currStep.spot}" →`, HCO_STRING_SPOTS[currStep.spot]);
