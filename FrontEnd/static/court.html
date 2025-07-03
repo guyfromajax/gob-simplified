@@ -38,7 +38,10 @@
   <script>
     const canvas = document.getElementById('gameLayer');
     const ctx = canvas.getContext('2d');
-    
+
+    const GRID_WIDTH = 100;
+    const GRID_HEIGHT = 50;
+
     let animationStartTime = null;
     let currentTurn = null; // array of 10 player animation objects
 
@@ -98,7 +101,11 @@
       const pixelY = ((50 - y) / 50) * 768;
       return { x: pixelX, y: pixelY };
     }
-    function drawPlayer(player, coords) {
+    const rawX = coordA.x + (coordB.x - coordA.x) * progress;
+    const rawY = coordA.y + (coordB.y - coordA.y) * progress;
+    const pixelCoords = gridToPixels(rawX, rawY);
+    
+    function drawPlayer(player, pixelCoords) {
       if (!window.teamInfo || !teamInfo.home || !teamInfo.away) return;
 
       const { fill, stroke, text, textAlign } = getPlayerColors(player.playerId, teamInfo.home, teamInfo.away);
