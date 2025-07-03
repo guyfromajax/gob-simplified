@@ -108,6 +108,9 @@ class TurnManager:
         result["possession_team_id"] = self.game.offense_team.team_id
         update_player_coords_from_animations(self.game, result["animations"])
 
+        result["home_lineup"] = self.game.home_team.lineup
+        result["away_lineup"] = self.game.away_team.lineup
+
         print(f"result: {result}")
 
         return result
