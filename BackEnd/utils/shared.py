@@ -435,13 +435,8 @@ def update_player_coords_from_animations(game, animations):
 
 def serialize_lineup(lineup_dict):
     return {
-        pos: {
-            "player_id": player.player_id,
-            "team": player.team,
-            "jersey": player.jersey,
-        }
+        pos: player.player_id if hasattr(player, 'player_id') else player
         for pos, player in lineup_dict.items()
     }
-
 
 
