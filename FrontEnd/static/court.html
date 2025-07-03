@@ -108,8 +108,8 @@
       const { fill, stroke, text, textAlign } = getPlayerColors(player.playerId, teamInfo.home, teamInfo.away);
 
       const radius = 20;
-      const x = coords.x;
-      const y = coords.y;
+      const x = pixelCoords.x;
+      const y = pixelCoords.y;
 
       ctx.beginPath();
       ctx.arc(x, y, radius, 0, Math.PI * 2);
@@ -133,8 +133,8 @@
       ctx.font = 'bold 16px Arial';
       ctx.fillText(player.jersey || "", x, y + (textAlign === "top" ? -radius - 20 : radius + 20));
 
-      if (!coords || coords.x === undefined || coords.y === undefined) {
-        console.error(`❌ Missing or invalid coords for player ${player.playerId}`, coords);
+      if (!pixelCoords || pixelCoords.x === undefined || pixelCoords.y === undefined) {
+        console.error(`❌ Missing or invalid coords for player ${player.playerId}`, pixelCoords);
       }
 
     }
