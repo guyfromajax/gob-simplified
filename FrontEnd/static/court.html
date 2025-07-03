@@ -121,7 +121,9 @@
       ctx.font = '12px Arial';
       ctx.textAlign = 'center';
       ctx.textBaseline = textAlign === "top" ? "top" : "bottom";
-      ctx.fillText(player.pos || "", x, y + (textAlign === "top" ? -radius - 5 : radius + 5));
+      const pos = playerPositions[player.playerId] || "";
+      ctx.fillText(pos, x, y + (textAlign === "top" ? -radius - 5 : radius + 5));
+      // ctx.fillText(player.pos || "", x, y + (textAlign === "top" ? -radius - 5 : radius + 5));
       ctx.font = 'bold 12px Arial';
       ctx.fillText(player.jersey || "", x, y + (textAlign === "top" ? -radius - 20 : radius + 20));
     }
@@ -224,6 +226,17 @@
 
         const turn = turns[currentTurnIndex];
         const animationQueue = turn.animations || [];
+        const playerPositions = {};
+
+        // Extract from home lineup
+        Object.entries(turn.home_lineup || {}).forEach(([pos, playerId]) => {
+          playerPositions[playerId] = pos;
+        });
+
+        // Extract from away lineup
+        Object.entries(turn.away_lineup || {}).forEach(([pos, playerId]) => {
+          playerPositions[playerId] = pos;
+        });
 
         console.log(`▶️ Playing turn ${currentTurnIndex + 1}/${turns.length}`, turn);
 
