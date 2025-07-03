@@ -63,7 +63,13 @@ class Animator:
                 ball_handler_end_coords = end_coords  # capture for defensive positioning
 
             actions = [{"timestamp": t, "type": action} for t, action, _ in timeline]
-            movement = [{"timestamp": t, "spot": spot} for t, _, spot in timeline]
+            # movement = [{"timestamp": t, "spot": spot} for t, _, spot in timeline]
+            movement = []
+            for t, _, spot in timeline:
+                coord = HCO_STRING_SPOTS.get(spot, HCO_STRING_SPOTS["key"])
+                if is_away_offense:
+                    coord = get_away_player_coords(coord)
+                movement.append({"timestamp": t, "coords": coord})
 
             animations.append({
                 "playerId": player.player_id,
@@ -102,11 +108,31 @@ class Animator:
                 def_coords = get_away_player_coords(def_coords)
                 start = get_away_player_coords(start)
 
+            movement = []
+            if pos == bh_pos:
+                for step in steps:
+                    t = step["timestamp"]
+                    bh_coords = step.get("coords", ball_handler_end_coords)
+                    d_coords = assign_ball_handler_defender_coords(bh_coords, aggression_call)
+                    if is_away_offense:
+                        d_coords = get_away_player_coords(d_coords)
+                    movement.append({"timestamp": t, "coords": d_coords})
+            elif pos in off_lineup:
+                off_player = off_lineup[pos]
+                timeline = action_timeline.get(off_player, [])
+                for t, _, spot in timeline:
+                    o_coords = HCO_STRING_SPOTS.get(spot, HCO_STRING_SPOTS["key"])
+                    d_coords = assign_non_bh_defender_coords(o_coords, ball_handler_end_coords, aggression_call)
+                    if is_away_offense:
+                        d_coords = get_away_player_coords(d_coords)
+                    movement.append({"timestamp": t, "coords": d_coords})
+
             animations.append({
                 "playerId": defender.player_id,
                 "start": start,
                 "end": def_coords,
                 "actions": [{"timestamp": 0, "type": action_type}],
+                "movement": movement
                 "hasBall": False,
                 "duration": steps[-1]["timestamp"] if steps else 800
             })
