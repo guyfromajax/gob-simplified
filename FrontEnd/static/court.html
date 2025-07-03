@@ -158,12 +158,15 @@
         for (const [pos, playerId] of Object.entries(homeLineup)) {
           if (playerId) {
             playerPositions[playerId] = pos;
+            console.log(`Mapped home team ${playerId} to ${pos}`);
           }
         }
+
 
         for (const [pos, playerId] of Object.entries(awayLineup)) {
           if (playerId) {
             playerPositions[playerId] = pos;
+            console.log(`Mapped away team ${playerId} to ${pos}`);
           }
         }
         console.log("📌 playerPositions:", playerPositions);
