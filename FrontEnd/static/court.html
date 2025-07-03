@@ -279,7 +279,8 @@
           currentTurn.forEach(player => {
             const movement = player.movement;
             if (!movement || movement.length < 2) {
-              drawPlayer(player, player.start || { x: 64, y: 25 });
+              const fallbackCoords = movement?.[0]?.coords || player.start || { x: 64, y: 25 };
+              drawPlayer(player, fallbackCoords);
               return;
             }
 
@@ -294,6 +295,7 @@
               stepIndex++;
             }
 
+            console.log(`🏀 ${player.playerId} movement:`, movement);
             const currStep = movement[stepIndex];
             const nextStep = movement[stepIndex + 1] || currStep;
 
