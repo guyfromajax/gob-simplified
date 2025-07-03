@@ -121,8 +121,8 @@
       ctx.font = '12px Arial';
       ctx.textAlign = 'center';
       ctx.textBaseline = textAlign === "top" ? "top" : "bottom";
-      const pos = playerPositions[player.playerId] || "";
-      ctx.fillText(playerPositions[player.playerId] || "HH", x, y + (textAlign === "top" ? -radius - 5 : radius + 5));
+      const posLabel = playerPositions[player.playerId] || "HH";
+      ctx.fillText(posLabel, x, y + (textAlign === "top" ? -radius - 5 : radius + 5));  
       // ctx.fillText(player.pos || "", x, y + (textAlign === "top" ? -radius - 5 : radius + 5));
       ctx.font = 'bold 12px Arial';
       ctx.fillText(player.jersey || "", x, y + (textAlign === "top" ? -radius - 20 : radius + 20));
@@ -150,22 +150,23 @@
 
         const simData = await res.json(); // getting all sim data here
         console.log("✅ Sim data loaded:", simData);
-        // inside loadSimAndStart(), after simData is loaded
-        const firstTurn = simData.turns[0];
-        const homeLineup = firstTurn.home_lineup;
-        const awayLineup = firstTurn.away_lineup;
+        // Build playerId -> position map from first turn's lineups
+        const firstTurn = simData.turns[0] || {};
+        const homeLineup = firstTurn.home_lineup || {};
+        const awayLineup = firstTurn.away_lineup || {};
 
-        // Map playerId -> position
-        Object.entries(homeLineup).forEach(([pos, playerObj]) => {
-          if (playerObj?.playerId) {
-            playerPositions[playerObj.playerId] = pos;
+        for (const [pos, player] of Object.entries(homeLineup)) {
+          if (player && player.playerId) {
+            playerPositions[player.playerId] = pos;
           }
-        });
-        Object.entries(awayLineup).forEach(([pos, playerObj]) => {
-          if (playerObj?.playerId) {
-            playerPositions[playerObj.playerId] = pos;
+        }
+        for (const [pos, player] of Object.entries(awayLineup)) {
+          if (player && player.playerId) {
+            playerPositions[player.playerId] = pos;
           }
-        });
+        }
+        console.log("📌 playerPositions:", playerPositions);
+
         
         simData.turns.forEach(turn => {
           turn.animations = turn.animations.map(anim => {
