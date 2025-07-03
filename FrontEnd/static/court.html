@@ -138,6 +138,16 @@
 
         const simData = await res.json(); // getting all sim data here
         console.log("✅ Sim data loaded:", simData);
+        simData.turns.forEach(turn => {
+          turn.animations = turn.animations.map(anim => {
+            const fullPlayer = simData.players.find(p => p.playerId === anim.playerId);
+            return {
+              ...anim,
+              ...fullPlayer
+            };
+          });
+        });
+
         homeColors = simData.home_team_colors;
         awayColors = simData.away_team_colors;
         console.log("🏠 Home colors:", homeColors);
