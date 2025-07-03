@@ -301,16 +301,30 @@
               ? 1
               : (elapsed - currStep.timestamp) / (nextStep.timestamp - currStep.timestamp);
 
-            console.log(`🏀 ${player.playerId} moving from ${currStep.spot} to ${nextStep.spot}`);
-            console.log(`Spot: "${currStep.spot}" →`, HCO_STRING_SPOTS[currStep.spot]);
-            console.log(`Next spot: "${nextStep.spot}" →`, HCO_STRING_SPOTS[nextStep.spot]);
+            // console.log(`🏀 ${player.playerId} moving from ${currStep.spot} to ${nextStep.spot}`);
+            // console.log(`Spot: "${currStep.spot}" →`, HCO_STRING_SPOTS[currStep.spot]);
+            // console.log(`Next spot: "${nextStep.spot}" →`, HCO_STRING_SPOTS[nextStep.spot]);
 
+            const rawSpotA = currStep.spot || "";
+            const rawSpotB = nextStep.spot || "";
+
+            // Normalize to match dictionary keys exactly
+            const spotA = rawSpotA.trim();
+            const spotB = rawSpotB.trim();
             const coordA = HCO_STRING_SPOTS[currStep.spot] || player.start || { x: 64, y: 25 };
             const coordB = HCO_STRING_SPOTS[nextStep.spot] || player.end || coordA;
+            console.log(`🧭 Step: '${spotA}' → '${spotB}' | From:`, coordA, "To:", coordB);
 
             console.log(`Animating ${player.playerId} from ${currStep.spot} to ${nextStep.spot}`, coordA, coordB);
             console.log(`🔎 Spot '${currStep.spot}' =>`, HCO_STRING_SPOTS[currStep.spot]);
             console.log(`🔎 Spot '${nextStep.spot}' =>`, HCO_STRING_SPOTS[nextStep.spot]);
+            if (!HCO_STRING_SPOTS[spotA]) {
+              console.warn(`⚠️ Unknown spotA: '${spotA}'`);
+            }
+            if (!HCO_STRING_SPOTS[spotB]) {
+              console.warn(`⚠️ Unknown spotB: '${spotB}'`);
+            }
+
 
             if (!HCO_STRING_SPOTS[currStep.spot] || !HCO_STRING_SPOTS[nextStep.spot]) {
               console.error(`❌ Missing spot for player ${player.playerId}`, currStep.spot, nextStep.spot);
