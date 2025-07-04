@@ -64,7 +64,7 @@ class Animator:
 
             actions = [{"timestamp": t, "type": action} for t, action, _ in timeline]
             # movement = [{"timestamp": t, "spot": spot} for t, _, spot in timeline]
-            movement = []
+            movement = [{"timestamp": 0, "coords": start_coords}]
             for t, _, spot in timeline:
                 coord = HCO_STRING_SPOTS.get(spot, HCO_STRING_SPOTS["key"])
                 if is_away_offense:
@@ -112,7 +112,7 @@ class Animator:
                 def_coords = get_away_player_coords(def_coords)
                 start = get_away_player_coords(start)
 
-            movement = []
+            movement = [{"timestamp": 0, "coords": start}]
             if pos == bh_pos:
                 for step in steps:
                     t = step["timestamp"]
