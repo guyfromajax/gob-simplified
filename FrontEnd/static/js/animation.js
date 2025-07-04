@@ -3,16 +3,18 @@ export function easeInOutQuad(t) {
 }
 
 export class AnimationEngine {
-  constructor(ctx, gridToPixels, drawPlayer) {
+  constructor(ctx, gridToPixels, drawPlayer, speedMultiplier = 1.0) {
     this.ctx = ctx;
     this.gridToPixels = gridToPixels;
     this.drawPlayer = drawPlayer;
+    this.speedMultiplier = speedMultiplier;
     this.turnIndex = 0;
     this.turns = [];
     this.activePlayers = [];
     this.startTime = 0;
     this.currentPositions = {}; // playerId -> {x, y}
   }
+  
 
   setTeams(teamInfo, players) {
     this.teamInfo = teamInfo;
@@ -37,7 +39,7 @@ export class AnimationEngine {
   }
 
   animateFrame(currentTime) {
-    const elapsed = currentTime - this.startTime;
+    const elapsed = (currentTime - this.startTime) * this.speedMultiplier;
     const ctx = this.ctx;
     ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 

@@ -124,7 +124,7 @@
 
     }
 
-    const engine = new AnimationEngine(ctx, gridToPixels, drawPlayer);
+    const engine = new AnimationEngine(ctx, gridToPixels, drawPlayer, 0.5); // lower # = slower animation
 
     async function loadSimAndStart() {
       const res = await fetch('/simulate', {
@@ -181,3 +181,5 @@
   </script>
 </body>
 </html>
+
+
