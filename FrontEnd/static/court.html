@@ -35,39 +35,44 @@
   <img id="court" width="1229" height="768" />
   <canvas id="gameLayer" width="1229" height="768"></canvas>
 
-  <script>
+  <script type="module">
+    import { AnimationEngine } from './js/animation.js';
+
     const canvas = document.getElementById('gameLayer');
     const ctx = canvas.getContext('2d');
 
-    const GRID_WIDTH = 100;
-    const GRID_HEIGHT = 50;
-
-    let animationStartTime = null;
-    let currentTurn = null; // array of 10 player animation objects
-
     const HCO_STRING_SPOTS = {
-        "key": {"x": 64, "y": 25},
-        "upper midWing": {"x": 68, "y": 36}, 
-        "lower midWing": {"x": 68, "y": 14},
-        "upper wing": {"x": 73, "y": 40}, 
-        "lower wing": {"x": 73, "y": 10},
-        "upper midCorner": {"x": 81, "y": 43}, 
-        "lower midCorner": {"x": 81, "y": 7},
-        "upper corner": {"x": 88, "y": 44}, 
-        "lower corner": {"x": 88, "y": 6},
-        "upper highPost": {"x": 74, "y": 32}, 
-        "lower highPost": {"x": 74, "y": 19},
-        "upper midPost": {"x": 80, "y": 32}, 
-        "lower midPost": {"x": 80, "y": 19},
-        "upper lowPost": {"x": 86, "y": 32}, 
-        "lower lowPost": {"x": 86, "y": 19}, 
-        "topLane": {"x": 74, "y": 25},
-        "midLane": {"x": 80, "y": 25}, 
-        "upper apex": {"x": 80, "y": 36}, 
-        "lower apex": {"x": 80, "y": 15},
-        "upper midBaseline": {"x": 89, "y": 36}, 
-        "lower midBaseline": {"x": 89, "y": 15},
+      "key": {"x": 64, "y": 25},
+      "upper midWing": {"x": 68, "y": 36},
+      "lower midWing": {"x": 68, "y": 14},
+      "upper wing": {"x": 73, "y": 40},
+      "lower wing": {"x": 73, "y": 10},
+      "upper midCorner": {"x": 81, "y": 43},
+      "lower midCorner": {"x": 81, "y": 7},
+      "upper corner": {"x": 88, "y": 44},
+      "lower corner": {"x": 88, "y": 6},
+      "upper highPost": {"x": 74, "y": 32},
+      "lower highPost": {"x": 74, "y": 19},
+      "upper midPost": {"x": 80, "y": 32},
+      "lower midPost": {"x": 80, "y": 19},
+      "upper lowPost": {"x": 86, "y": 32},
+      "lower lowPost": {"x": 86, "y": 19},
+      "topLane": {"x": 74, "y": 25},
+      "midLane": {"x": 80, "y": 25},
+      "upper apex": {"x": 80, "y": 36},
+      "lower apex": {"x": 80, "y": 15},
+      "upper midBaseline": {"x": 89, "y": 36},
+      "lower midBaseline": {"x": 89, "y": 15}
+    };
+
+    function gridToPixels(x, y) {
+      const pixelX = (x / 100) * 1229;
+      const pixelY = ((50 - y) / 50) * 768;
+      return { x: pixelX, y: pixelY };
     }
+
+    let teamInfo = {};
+    const playerPositions = {};
 
     function getPlayerColors(playerId, homeTeam, awayTeam) {
       const isHome = homeTeam.player_ids.includes(playerId);
@@ -77,35 +82,19 @@
         return {
           fill: team.primary_color,
           stroke: team.secondary_color,
-          text: team.secondary_color,
-          textAlign: "top"
-        };
-      } else {
-        return {
-          fill: "#ffffff",
-          stroke: team.primary_color,
-          text: team.primary_color,
-          textAlign: "bottom"
+          text: team.secondary_color
         };
       }
+      return {
+        fill: '#ffffff',
+        stroke: team.primary_color,
+        text: team.primary_color
+      };
     }
 
-
-    function startAnimation(turn) {
-      animationStartTime = performance.now();
-      currentTurn = turn;
-    }
-
-    function gridToPixels(x, y) {
-      const pixelX = (x / 100) * 1229;
-      const pixelY = ((50 - y) / 50) * 768;
-      return { x: pixelX, y: pixelY };
-    }
-    
     function drawPlayer(player, pixelCoords) {
-      if (!window.teamInfo || !teamInfo.home || !teamInfo.away) return;
-
-      const { fill, stroke, text, textAlign } = getPlayerColors(player.playerId, teamInfo.home, teamInfo.away);
+      if (!teamInfo.home || !teamInfo.away) return;
+      const { fill, stroke, text } = getPlayerColors(player.playerId, teamInfo.home, teamInfo.away);
 
       const radius = 20;
       const x = pixelCoords.x;
@@ -122,247 +111,63 @@
       ctx.fillStyle = text;
       ctx.font = 'bold 16px Arial';
       ctx.textAlign = 'center';
-      ctx.textBaseline = "middle"
-      const posLabel = playerPositions[player.playerId] || "HH";
-      ctx.shadowColor = 'rgba(0,0,0,0.4)';
-      ctx.shadowBlur = 3;
+      ctx.textBaseline = 'middle';
+      const posLabel = playerPositions[player.playerId] || '';
       ctx.fillText(posLabel, x, y);
-      ctx.shadowBlur = 0;  // reset after
-      // ctx.fillText(posLabel, x, y + (textAlign === "top" ? -radius - 5 : radius + 5));  
-      // ctx.fillText(player.pos || "", x, y + (textAlign === "top" ? -radius - 5 : radius + 5));
-      ctx.font = 'bold 16px Arial';
-      ctx.fillText(player.jersey || "", x, y + (textAlign === "top" ? -radius - 20 : radius + 20));
-
-      if (!pixelCoords || pixelCoords.x === undefined || pixelCoords.y === undefined) {
-        console.error(`❌ Missing or invalid coords for player ${player.playerId}`, pixelCoords);
-      }
-
+      ctx.fillText(player.jersey || '', x, y + 20);
     }
 
-    let playerStates = {}; 
-    let players = [];
-    let homeColors = {};
-    let awayColors = {};
-    let playerPositions = {};
+    const engine = new AnimationEngine(ctx, gridToPixels, drawPlayer);
 
     async function loadSimAndStart() {
-      try {
-        const res = await fetch("/simulate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            home_team: "Four Corners",
-            away_team: "Bentley-Truman"
-          })
-        });
-        console.log("🚀 loadSimAndStart() is running -- CONFIRMEE!!!!");
-        console.log("Forcing a change for the new branch")
+      const res = await fetch('/simulate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ home_team: 'Four Corners', away_team: 'Bentley-Truman' })
+      });
+      if (!res.ok) throw new Error(`Simulation failed: ${res.statusText}`);
 
-        if (!res.ok) throw new Error(`Simulation failed: ${res.statusText}`);
+      const simData = await res.json();
 
-        const simData = await res.json(); // getting all sim data here
-        console.log("✅ Sim data loaded:", simData);
-        // Build playerId -> position map from first turn's lineups
-        const firstTurn = simData.turns[0] || {};
-        const homeLineup = firstTurn.home_lineup || {};
-        const awayLineup = firstTurn.away_lineup || {};
-
-        for (const [pos, playerId] of Object.entries(homeLineup)) {
-          if (playerId) {
-            playerPositions[playerId] = pos;
-          }
-        }
-
-
-        for (const [pos, playerId] of Object.entries(awayLineup)) {
-          if (playerId) {
-            playerPositions[playerId] = pos;
-          }
-        }
-
-        
-        simData.turns.forEach(turn => {
-          console.log("▶️ Playing turn", turn);
-          turn.animations = turn.animations.map(anim => {
-            const fullPlayer = simData.players.find(p => p.playerId === anim.playerId);
-            return {
-              ...anim,
-              ...fullPlayer
-            };
-          });
-        });
-
-        homeColors = simData.home_team_colors;
-        awayColors = simData.away_team_colors;
-        teamInfo = {
-          home: {
-            player_ids: simData.players.filter(p => p.team === 'home').map(p => p.playerId),
-            primary_color: simData.home_team_colors.primary_color,
-            secondary_color: simData.home_team_colors.secondary_color
-          },
-          away: {
-            player_ids: simData.players.filter(p => p.team === 'away').map(p => p.playerId),
-            primary_color: simData.away_team_colors.primary_color,
-            secondary_color: simData.away_team_colors.secondary_color
-          }
-        };
-
-
-        // Dynamically load court image based on home_team_id
-        const courtImg = document.getElementById("court");
-        if (simData.home_team_id) {
-          const teamId = simData.home_team_id.toLowerCase();
-          courtImg.src = `/static/images/courts/${teamId}.jpg`;
-
-          // Optional fallback in case the image doesn't exist
-          courtImg.onerror = () => {
-            console.warn(`⚠️ Court image not found for ${teamId}, using fallback.`);
-            courtImg.src = "/static/images/courts/default.jpg";
-          };
-        }
-
-        players = simData.players || [];
-        // console.log("🔍 Players loaded:", players);
-        playTurns(simData.turns);
-      } catch (err) {
-        console.error("❌ Simulation failed:", err);
+      const firstTurn = simData.turns[0] || {};
+      const homeLineup = firstTurn.home_lineup || {};
+      const awayLineup = firstTurn.away_lineup || {};
+      for (const [pos, playerId] of Object.entries(homeLineup)) {
+        if (playerId) playerPositions[playerId] = pos;
       }
-    }
-    function getMaxTurnDuration(turn) {
-      return Math.max(...turn.map(p => p.movement?.at(-1)?.timestamp || 0));
-    }
-
-
-    function playTurns(turns) {
-      let currentTurnIndex = 0;
-
-      function playNextTurn() {
-        if (currentTurnIndex >= turns.length) {
-          console.log("✅ All turns finished!");
-          return;
-        }
-
-        const turn = turns[currentTurnIndex];
-        const animationQueue = turn.animations || [];
-        const playerPositions = {};
-
-        // Extract from home lineup
-        Object.entries(turn.home_lineup || {}).forEach(([pos, playerId]) => {
-          playerPositions[playerId] = pos;
-        });
-
-        // Extract from away lineup
-        Object.entries(turn.away_lineup || {}).forEach(([pos, playerId]) => {
-          playerPositions[playerId] = pos;
-        });
-
-        console.log(`▶️ Playing turn ${currentTurnIndex + 1}/${turns.length}`, turn);
-
-        playerStates = {};
-        animationQueue.forEach(anim => {
-          playerStates[anim.playerId] = {
-            ...anim,
-            startTime: performance.now()
-          };
-        });
-
-        const maxDuration = Math.max(...animationQueue.map(a => a.duration || 600), 600);
-
-        // ✅ Fix: Set currentTurn for animation use
-        currentTurn = animationQueue;
-        animationStartTime = performance.now();
-
-        requestAnimationFrame(function animateTurnFrame(currentTime) {
-          const elapsed = currentTime - animationStartTime;
-
-          ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-          currentTurn.forEach(player => {
-            const movement = player.movement;
-            if (!movement || movement.length < 2) {
-              const fallbackCoords = movement?.[0]?.coords || player.start || { x: 64, y: 25 };
-              drawPlayer(player, fallbackCoords);
-              return;
-            }
-
-            // console.log(`Player ${player.pos} movement:`, player.movement);
-            // if (!movement || movement.length < 2) return;
-
-            let stepIndex = 0;
-            while (
-              stepIndex < movement.length - 1 &&
-              elapsed >= movement[stepIndex + 1].timestamp
-            ) {
-              stepIndex++;
-            }
-
-            console.log(`🏀 ${player.playerId} movement:`, movement);
-            const currStep = movement[stepIndex];
-            console.log(`🏀 ${player.playerId} currStep:`, currStep);
-            const nextStep = movement[stepIndex + 1] || currStep;
-
-            const speedFactor = 5; // 🔧 increase to slow down, decrease to speed up
-            const progress = nextStep.timestamp === currStep.timestamp
-              ? 1
-              : (elapsed / speedFactor - currStep.timestamp) / (nextStep.timestamp - currStep.timestamp);
-
-            function resolveCoords(step) {
-              if (!step) {
-                console.warn("⚠️ resolveCoords called with undefined step.");
-                return { x: 0, y: 0 };
-              }
-                          if (step.coords) return step.coords;         // ✅ new system: raw coords
-              if (step.spot && typeof step.spot === 'string') {
-                const coords = HCO_STRING_SPOTS[step.spot];
-                if (!coords) console.warn("⚠️ Unknown spot:", step.spot);
-                return coords || { x: 0, y: 0 };
-              }
-              return { x: 0, y: 0 };                        // fallback
-            }
-
-            const coordA = resolveCoords(currStep);
-            const coordB = resolveCoords(nextStep);
-                          
-            // const coordA = HCO_STRING_SPOTS[currStep.spot] || player.start || { x: 64, y: 25 };
-            // const coordB = HCO_STRING_SPOTS[nextStep.spot] || player.end || coordA;
-
-            const rawX = coordA.x + (coordB.x - coordA.x) * progress;
-            const rawY = coordA.y + (coordB.y - coordA.y) * progress;
-
-            const pixelCoords = gridToPixels(rawX, rawY);
-            drawPlayer(player, pixelCoords);
-
-          });
-
-          if (elapsed < getMaxTurnDuration(currentTurn)) {
-            requestAnimationFrame(animateTurnFrame);
-            // After animation finishes, persist last frame
-            if (elapsed >= getMaxTurnDuration(currentTurn)) {
-              // Re-draw all players in their end positions
-              ctx.clearRect(0, 0, canvas.width, canvas.height);
-              currentTurn.forEach(player => {
-                const lastStep = player.movement[player.movement.length - 1];
-                const coord = lastStep.coords || HCO_STRING_SPOTS[lastStep.spot] || { x: 64, y: 25 };
-                const pixelCoords = gridToPixels(coord.x, coord.y);
-                drawPlayer(player, pixelCoords);
-              });
-
-              // // Delay before next turn
-              // setTimeout(() => {
-              //   currentTurnIndex++;
-              //   playNextTurn();
-              // }, 300); // 🔧 slight pause
-            }
-          }
-        });
-
-        setTimeout(() => {
-          currentTurnIndex++;
-          playNextTurn();
-        }, maxDuration + 100);
+      for (const [pos, playerId] of Object.entries(awayLineup)) {
+        if (playerId) playerPositions[playerId] = pos;
       }
 
-      playNextTurn();
+      simData.turns.forEach(turn => {
+        turn.animations = turn.animations.map(anim => {
+          const fullPlayer = simData.players.find(p => p.playerId === anim.playerId);
+          return { ...anim, ...fullPlayer };
+        });
+      });
+
+      teamInfo = {
+        home: {
+          player_ids: simData.players.filter(p => p.team === 'home').map(p => p.playerId),
+          primary_color: simData.home_team_colors.primary_color,
+          secondary_color: simData.home_team_colors.secondary_color
+        },
+        away: {
+          player_ids: simData.players.filter(p => p.team === 'away').map(p => p.playerId),
+          primary_color: simData.away_team_colors.primary_color,
+          secondary_color: simData.away_team_colors.secondary_color
+        }
+      };
+
+      const courtImg = document.getElementById('court');
+      if (simData.home_team_id) {
+        const teamId = simData.home_team_id.toLowerCase();
+        courtImg.src = `/static/images/courts/${teamId}.jpg`;
+        courtImg.onerror = () => { courtImg.src = '/static/images/courts/default.jpg'; };
+      }
+
+      engine.setTeams(teamInfo, simData.players || []);
+      engine.start(simData.turns);
     }
 
     loadSimAndStart();
