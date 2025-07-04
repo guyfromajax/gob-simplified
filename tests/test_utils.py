@@ -78,7 +78,7 @@ def build_mock_game():
         "rebound_modifier": 1.0,
         "momentum_score": 10,
         "momentum_delta": 3,
-        "offensive_efficienty": 5,
+        "offensive_efficiency": 5,
         "offensive_adjust": 5,
         "o_tendency_reads": 5,
         "d_tendency_reads": 5,

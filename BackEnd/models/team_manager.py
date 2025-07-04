@@ -69,7 +69,7 @@ class TeamManager:
             "rebound_modifier": random.choice([0.8, 0.9, 1.0, 1.1, 1.2]),
             "momentum_score": random.randint(0,20),
             "momentum_delta": random.choice([1,2,3,4,5]),
-            "offensive_efficienty": random.randint(1,10),
+            "offensive_efficiency": random.randint(1,10),
             "offensive_adjust": random.randint(1,10),
             "o_tendency_reads": random.randint(1,10),
             "d_tendency_reads": random.randint(1,10),

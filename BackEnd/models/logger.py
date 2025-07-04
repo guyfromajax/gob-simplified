@@ -18,10 +18,6 @@ class Logger:
     def get_turn_logs(self):
         return self.turn_results
 
-    def reset(self):
-        self.events.clear()
-        self.turn_results.clear()
-
     def log_summary(self, summary_dict: dict):
         self.summary_data = summary_dict
 
