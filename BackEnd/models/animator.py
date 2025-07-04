@@ -4,7 +4,7 @@ from BackEnd.utils.shared import (
     get_away_player_coords,
 )
 from BackEnd.utils.shared_defense import (
-    assign_ball_handler_defender_coords,
+    assign_bh_defender_coords,
     assign_non_bh_defender_coords
 )
 from collections import defaultdict
@@ -86,7 +86,7 @@ class Animator:
             action_type = ACTIONS["GUARD_OFFBALL"]
 
             if pos == bh_pos:
-                def_coords = assign_ball_handler_defender_coords(ball_handler_end_coords, aggression_call)
+                def_coords = assign_bh_defender_coords(ball_handler_end_coords, aggression_call, is_away_offense)
                 action_type = ACTIONS["GUARD_BALL"]
             elif pos in off_lineup:
                 off_player = off_lineup[pos]
@@ -95,7 +95,7 @@ class Animator:
                     "key"
                 )
                 o_coords = HCO_STRING_SPOTS.get(last_spot, HCO_STRING_SPOTS["key"])
-                def_coords = assign_non_bh_defender_coords(o_coords, ball_handler_end_coords, aggression_call)
+                def_coords = def_coords = assign_non_bh_defender_coords(o_coords, ball_handler_end_coords, aggression_call, is_away_offense)
             else:
                 print(f"[WARN] No offensive match for defender {pos}, skipping.")
                 continue  # skip player if we can't map them
@@ -113,7 +113,7 @@ class Animator:
                 for step in steps:
                     t = step["timestamp"]
                     bh_coords = step.get("coords", ball_handler_end_coords)
-                    d_coords = assign_ball_handler_defender_coords(bh_coords, aggression_call)
+                    d_coords = assign_bh_defender_coords(bh_coords, aggression_call, is_away_offense)
                     if is_away_offense:
                         d_coords = get_away_player_coords(d_coords)
                     movement.append({"timestamp": t, "coords": d_coords})
@@ -122,7 +122,7 @@ class Animator:
                 timeline = action_timeline.get(off_player, [])
                 for t, _, spot in timeline:
                     o_coords = HCO_STRING_SPOTS.get(spot, HCO_STRING_SPOTS["key"])
-                    d_coords = assign_non_bh_defender_coords(o_coords, ball_handler_end_coords, aggression_call)
+                    d_coords = def_coords = assign_non_bh_defender_coords(o_coords, ball_handler_end_coords, aggression_call, is_away_offense)
                     if is_away_offense:
                         d_coords = get_away_player_coords(d_coords)
                     movement.append({"timestamp": t, "coords": d_coords})
