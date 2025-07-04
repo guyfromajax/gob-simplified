@@ -11,11 +11,19 @@ def assign_bh_defender_coords(ball_coords, aggression_level: str, is_away_offens
 
     x = ball_coords["x"]
     y = ball_coords["y"]
+
+    # Convert ball handler coords back to home orientation so the spacing logic
+    # is consistent regardless of which team has possession.
+    if is_away_offense:
+        flipped = get_away_player_coords(ball_coords)
+        x, y = flipped["x"], flipped["y"]
+
     direction = -1 if is_away_offense else 1  # direction toward basket
 
     # Edge case: ball on baseline
     if y <= 4 or y >= 46:
-        y_def = y + (d_spacing * direction if y < 25 else -d_spacing * direction)
+        # Vertical positioning doesn't depend on court orientation
+        y_def = y + (d_spacing if y < 25 else -d_spacing)
         x_def = x
 
     # Edge case: top of key
@@ -64,7 +72,8 @@ def assign_non_bh_defender_coords(o_coords, ball_coords, aggression_level, is_aw
     elif oy <= 6 or oy >= 44:
         return {
             "x": ox - random.randint(1, 3),
-            "y": oy + (d_spacing * direction if oy < 25 else -d_spacing * direction)
+            # Vertical offset shouldn't flip when court orientation changes
+            "y": oy + (d_spacing if oy < 25 else -d_spacing)
         }
 
     # Edge case: defending someone near the top or wings and ball is on the key
