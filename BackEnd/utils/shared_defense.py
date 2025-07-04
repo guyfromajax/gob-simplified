@@ -1,4 +1,5 @@
 import random
+from BackEnd.utils.shared import get_away_player_coords
 
 def assign_bh_defender_coords(ball_coords, aggression_level: str, is_away_offense: bool) -> dict:
     """
@@ -44,6 +45,13 @@ def assign_non_bh_defender_coords(o_coords, ball_coords, aggression_level, is_aw
 
     ox, oy = o_coords["x"], o_coords["y"]
     bx, by = ball_coords["x"], ball_coords["y"]
+
+    # When the away team has the ball the offensive coordinates are flipped
+    # horizontally. Convert the ball handler's coordinates back to the home
+    # orientation so the logic below can remain consistent.
+    if is_away_offense:
+        flipped = get_away_player_coords(ball_coords)
+        bx, by = flipped["x"], flipped["y"]
 
     # Edge case: defending someone on the block or in the lane (score threat)
     if 74 <= ox <= 88 and 15 <= oy <= 33:
