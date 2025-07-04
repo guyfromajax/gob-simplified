@@ -23,10 +23,6 @@ class Animator:
         def_lineup = defense_team.lineup
         aggression_call = defense_team.strategy_calls.get("aggression_call", "normal")
         is_away_offense = offense_team.team_id == self.game.away_team.team_id
-        print("Inside capture_halfcourt_animation")
-        print(f"offense_team_id: {offense_team.team_id}")
-        print(f"away_team_id: {self.game.away_team.team_id}")
-        print(f"is_away_offense: {is_away_offense}")
 
 
         steps = roles["steps"]
