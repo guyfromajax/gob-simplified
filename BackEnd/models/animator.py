@@ -98,9 +98,13 @@ class Animator:
 
             # ✅ Only continue if def_coords is safe
             start = defender.coords
+            if pos == bh_pos and steps:
+                bh_start = steps[0].get("coords", ball_handler_end_coords)
+                start = assign_bh_defender_coords(bh_start, aggression_call, is_away_offense)
 
-            # ✅ Flip if away team has the ball
-            if is_away_offense and pos != bh_pos:
+            # ✅ Flip if away team has the ball so all coordinates are in the
+            # same orientation as the offense
+            if is_away_offense:
                 def_coords = get_away_player_coords(def_coords)
                 start = get_away_player_coords(start)
 
