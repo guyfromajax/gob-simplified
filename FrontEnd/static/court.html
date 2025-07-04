@@ -74,27 +74,13 @@
     let teamInfo = {};
     const playerPositions = {};
 
-    function getPlayerColors(playerId, homeTeam, awayTeam) {
-      const isHome = homeTeam.player_ids.includes(playerId);
-      const team = isHome ? homeTeam : awayTeam;
-
-      if (isHome) {
-        return {
-          fill: team.primary_color,
-          stroke: team.secondary_color,
-          text: team.secondary_color
-        };
-      }
-      return {
-        fill: '#ffffff',
-        stroke: team.primary_color,
-        text: team.primary_color
-      };
-    }
-
     function drawPlayer(player, pixelCoords) {
       if (!teamInfo.home || !teamInfo.away) return;
-      const { fill, stroke, text } = getPlayerColors(player.playerId, teamInfo.home, teamInfo.away);
+
+      const isHome = teamInfo.home.player_ids.includes(player.playerId);
+      const fill = isHome ? teamInfo.home.primary_color : '#ffffff';
+      const stroke = isHome ? teamInfo.home.secondary_color : teamInfo.away.primary_color;
+      const text = isHome ? teamInfo.home.secondary_color : teamInfo.away.primary_color;
 
       const radius = 20;
       const x = pixelCoords.x;
@@ -117,11 +103,9 @@
       ctx.fillText(posLabel, x, y);
 
       // Jersey number (below or above the circle)
-      ctx.font = 'bold 16px Arial';  // smaller font for jersey
-      const isHome = teamInfo.home.player_ids.includes(player.playerId);
+      ctx.font = 'bold 16px Arial';
       const jerseyOffset = isHome ? -radius - 24 : radius + 24;
       ctx.fillText(player.jersey || '', x, y + jerseyOffset);
-
     }
 
     const engine = new AnimationEngine(ctx, gridToPixels, drawPlayer, 0.3); // lower # = slower animation
@@ -136,31 +120,38 @@
 
       const simData = await res.json();
 
-      const firstTurn = simData.turns[0] || {};
-      const homeLineup = firstTurn.home_lineup || {};
-      const awayLineup = firstTurn.away_lineup || {};
-      for (const [pos, playerId] of Object.entries(homeLineup)) {
-        if (playerId) playerPositions[playerId] = pos;
+      const homeLineup = simData.home_lineup || (simData.turns[0]?.home_lineup || {});
+      const awayLineup = simData.away_lineup || (simData.turns[0]?.away_lineup || {});
+
+      const allPlayers = [];
+      for (const [pos, p] of Object.entries(homeLineup)) {
+        if (!p) continue;
+        const id = p._id || p.playerId || p.player_id;
+        playerPositions[id] = pos;
+        allPlayers.push({ ...p, playerId: id, team: 'home' });
       }
-      for (const [pos, playerId] of Object.entries(awayLineup)) {
-        if (playerId) playerPositions[playerId] = pos;
+      for (const [pos, p] of Object.entries(awayLineup)) {
+        if (!p) continue;
+        const id = p._id || p.playerId || p.player_id;
+        playerPositions[id] = pos;
+        allPlayers.push({ ...p, playerId: id, team: 'away' });
       }
 
       simData.turns.forEach(turn => {
         turn.animations = turn.animations.map(anim => {
-          const fullPlayer = simData.players.find(p => p.playerId === anim.playerId);
+          const fullPlayer = allPlayers.find(p => p.playerId === anim.playerId);
           return { ...anim, ...fullPlayer };
         });
       });
 
       teamInfo = {
         home: {
-          player_ids: simData.players.filter(p => p.team === 'home').map(p => p.playerId),
+          player_ids: allPlayers.filter(p => p.team === 'home').map(p => p.playerId),
           primary_color: simData.home_team_colors.primary_color,
           secondary_color: simData.home_team_colors.secondary_color
         },
         away: {
-          player_ids: simData.players.filter(p => p.team === 'away').map(p => p.playerId),
+          player_ids: allPlayers.filter(p => p.team === 'away').map(p => p.playerId),
           primary_color: simData.away_team_colors.primary_color,
           secondary_color: simData.away_team_colors.secondary_color
         }
@@ -173,7 +164,7 @@
         courtImg.onerror = () => { courtImg.src = '/static/images/courts/default.jpg'; };
       }
 
-      engine.setTeams(teamInfo, simData.players || []);
+      engine.setTeams(teamInfo, allPlayers);
       engine.start(simData.turns);
     }
 
