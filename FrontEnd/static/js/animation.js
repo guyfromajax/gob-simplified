@@ -86,6 +86,12 @@ export class AnimationEngine {
           const pixel = this.gridToPixels(pos.x, pos.y);
           this.ballCoords = { ...pixel };
         }   
+        if (this.ballCoords) {
+          console.log("Ball coords:", this.ballCoords);
+        } else {
+          console.log("No ball coords");
+        }        
+        
       });   
       if (this.ballCoords && this.ballImage?.complete) {
         const ballSize = 16;
