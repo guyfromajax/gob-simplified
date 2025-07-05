@@ -79,8 +79,8 @@ class GameManager:
         # Update team stats after each turn
         self.update_team_stats()
         
-        print("End of simulate_macro_turn")
-        print(f"result: {result}")
+        # print("End of simulate_macro_turn")
+        # print(f"result: {result}")
         
         return result
 
