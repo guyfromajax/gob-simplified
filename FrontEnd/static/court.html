@@ -168,7 +168,7 @@
           continue;
         }
         playerPositions[idStr] = pos;
-        allPlayers.push({ ...fullPlayer, playerId: idStr, team: 'home' });
+        allPlayers.push({ ...fullPlayer, playerId: idStr, team: 'home', pos });
       }
 
       for (const [pos, id] of Object.entries(awayLineup)) {
@@ -182,7 +182,7 @@
           continue;
         }
         playerPositions[idStr] = pos;
-        allPlayers.push({ ...fullPlayer, playerId: idStr, team: 'away' });
+        allPlayers.push({ ...fullPlayer, playerId: idStr, team: 'away', pos });
       }
 
       // console.log("allPlayers:", allPlayers);
@@ -209,8 +209,8 @@
         )?.[0];
 
         if (fromPos && toPos) {
-          const fromPlayer = enrichedAnimations.find(p => playerPositions[p.playerId] === fromPos);
-          const toPlayer = enrichedAnimations.find(p => playerPositions[p.playerId] === toPos);
+          const fromPlayer = enrichedAnimations.find(p => p.pos === fromPos);
+          const toPlayer = enrichedAnimations.find(p => p.pos === toPos);
 
           if (fromPlayer && toPlayer) {
             fromPlayer.passTo = toPlayer.playerId;
@@ -225,7 +225,7 @@
         )?.[0];
 
         if (shooterPos) {
-          const shooter = enrichedAnimations.find(p => playerPositions[p.playerId] === shooterPos);
+          const shooter = enrichedAnimations.find(p => p.pos === shooterPos);
           if (shooter) shooter.hasBall = true;
         }
 
