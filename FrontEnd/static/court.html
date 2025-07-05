@@ -191,14 +191,28 @@
       simData.turns.forEach((turn, turnIndex) => {
         const posActions = turn.pos_actions || {};
         
-        // Enrich animations with player data and default hasBall
+        // Determine who should have the ball in this turn
+        let ballHandlerId = null;
+        for (const anim of turn.animations) {
+          const hasBallAction = anim.actions?.some(a =>
+            a.type === "HANDLE" || a.type === "RECEIVE"
+          );
+          if (hasBallAction) {
+            ballHandlerId = anim.playerId;
+            break;
+          }
+        }
+
         const enrichedAnimations = turn.animations.map(anim => {
           const fullPlayer = allPlayers.find(p =>
             (p.playerId || p._id || p.player_id || "").toString() === anim.playerId
           );
-          if (!fullPlayer.pos) console.warn("⚠️ Missing position for:", fullPlayer);
-          return { ...anim, ...fullPlayer, hasBall: false };
+          if (!fullPlayer?.pos) console.warn("⚠️ Missing position for:", fullPlayer);
+
+          const isBallHandler = anim.playerId === ballHandlerId;
+          return { ...anim, ...fullPlayer, hasBall: isBallHandler };
         });
+
         console.log(
             "Turn", turnIndex,
             enrichedAnimations.map(p => ({
