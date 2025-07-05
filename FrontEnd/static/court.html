@@ -140,19 +140,33 @@
       console.log("away lineup:", awayLineup);
 
       const allPlayers = [];
-      for (const [pos, p] of Object.entries(homeLineup)) {
-        if (!p) continue;
-        const id = (p._id || p.playerId || p.player_id || "").toString();
-        playerPositions[id] = pos;
-        p.playerId = id; // ensure player object has a consistent .playerId
-        allPlayers.push({ ...p, playerId: id, team: 'home' });
+
+      for (const [pos, id] of Object.entries(homeLineup)) {
+        const idStr = (id || "").toString();
+        const fullPlayer = simData.players.find(pl => {
+          const plId = (pl._id || pl.playerId || pl.player_id || "").toString();
+          return plId === idStr;
+        });
+        if (!fullPlayer) {
+          console.warn(`⚠️ Could not find player details for ID ${idStr}`);
+          continue;
+        }
+        playerPositions[idStr] = pos;
+        allPlayers.push({ ...fullPlayer, playerId: idStr, team: 'home' });
       }
-      for (const [pos, p] of Object.entries(awayLineup)) {
-        if (!p) continue;
-        const id = (p._id || p.playerId || p.player_id || "").toString();
-        playerPositions[id] = pos;
-        p.playerId = id; // ensure player object has a consistent .playerId
-        allPlayers.push({ ...p, playerId: id, team: 'away' });
+
+      for (const [pos, id] of Object.entries(awayLineup)) {
+        const idStr = (id || "").toString();
+        const fullPlayer = simData.players.find(pl => {
+          const plId = (pl._id || pl.playerId || pl.player_id || "").toString();
+          return plId === idStr;
+        });
+        if (!fullPlayer) {
+          console.warn(`⚠️ Could not find player details for ID ${idStr}`);
+          continue;
+        }
+        playerPositions[idStr] = pos;
+        allPlayers.push({ ...fullPlayer, playerId: idStr, team: 'away' });
       }
 
       simData.turns.forEach(turn => {
