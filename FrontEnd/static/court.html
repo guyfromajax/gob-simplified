@@ -195,7 +195,7 @@
         let ballHandlerId = null;
         for (const anim of turn.animations) {
           const hasBallAction = anim.actions?.some(a =>
-            a.type === "HANDLE" || a.type === "RECEIVE"
+            a.type === "handle_ball" || a.type === "receive"
           );
           if (hasBallAction) {
             ballHandlerId = anim.playerId;
