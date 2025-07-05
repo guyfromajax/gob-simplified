@@ -196,7 +196,10 @@
           const fullPlayer = allPlayers.find(p =>
             (p.playerId || p._id || p.player_id || "").toString() === anim.playerId
           );
-          console.log(
+          if (!fullPlayer.pos) console.warn("⚠️ Missing position for:", fullPlayer);
+          return { ...anim, ...fullPlayer, hasBall: false };
+        });
+        console.log(
             "Turn", turnIndex,
             enrichedAnimations.map(p => ({
               pos: p.pos,
@@ -204,9 +207,6 @@
               hasBall: p.hasBall
             }))
           );
-          if (!fullPlayer.pos) console.warn("⚠️ Missing position for:", fullPlayer);
-          return { ...anim, ...fullPlayer, hasBall: false };
-        });
 
         // Infer passes based on PASS + RECEIVE actions in same turn
         const fromPos = Object.entries(posActions).find(
