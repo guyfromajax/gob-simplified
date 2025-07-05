@@ -76,9 +76,9 @@
 
     function drawPlayer(player, pixelCoords) {
       if (!teamInfo.home || !teamInfo.away) return;
-      console.log("Drawing player:", player);
-      console.log("home team ids:", teamInfo.home.player_ids);
-      console.log("away team ids:", teamInfo.away.player_ids);
+      // console.log("Drawing player:", player);
+      // console.log("home team ids:", teamInfo.home.player_ids);
+      // console.log("away team ids:", teamInfo.away.player_ids);
 
       const isHome = teamInfo.home.player_ids.includes(player.playerId);
       const isAway = teamInfo.away.player_ids.includes(player.playerId);
@@ -136,8 +136,8 @@
       const homeLineup = simData.home_lineup || (simData.turns[0]?.home_lineup || {});
       const awayLineup = simData.away_lineup || (simData.turns[0]?.away_lineup || {});
 
-      console.log("home lineup:", homeLineup);
-      console.log("away lineup:", awayLineup);
+      // console.log("home lineup:", homeLineup);
+      // console.log("away lineup:", awayLineup);
 
       const allPlayers = [];
 
@@ -168,6 +168,9 @@
         playerPositions[idStr] = pos;
         allPlayers.push({ ...fullPlayer, playerId: idStr, team: 'away' });
       }
+
+      console.log("allPlayers:", allPlayers);
+      console.log("playerPositions:", playerPositions);
 
       simData.turns.forEach(turn => {
         turn.animations = turn.animations.map(anim => {
