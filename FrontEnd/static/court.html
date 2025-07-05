@@ -76,8 +76,14 @@
 
     function drawPlayer(player, pixelCoords) {
       if (!teamInfo.home || !teamInfo.away) return;
+      console.log("Drawing player:", player);
 
       const isHome = teamInfo.home.player_ids.includes(player.playerId);
+      const isAway = teamInfo.away.player_ids.includes(player.playerId);
+      if (!isHome && !isAway) {
+        console.warn("⚠️ Could not determine team for player:", player);
+      }
+
       const fill = isHome ? teamInfo.home.primary_color : '#ffffff';
       const stroke = isHome ? teamInfo.home.secondary_color : teamInfo.away.primary_color;
       const text = isHome ? teamInfo.home.secondary_color : teamInfo.away.primary_color;
@@ -93,6 +99,11 @@
       ctx.lineWidth = 3;
       ctx.fill();
       ctx.stroke();
+
+      if (!player.jersey || !playerPositions[player.playerId]) {
+        console.warn("⚠️ Missing jersey or position for:", player);
+      }
+
 
       // Position label (inside the circle)
       ctx.fillStyle = text;
@@ -126,13 +137,13 @@
       const allPlayers = [];
       for (const [pos, p] of Object.entries(homeLineup)) {
         if (!p) continue;
-        const id = p._id || p.playerId || p.player_id;
+        const id = (p._id || p.playerId || p.player_id || "").toString();
         playerPositions[id] = pos;
         allPlayers.push({ ...p, playerId: id, team: 'home' });
       }
       for (const [pos, p] of Object.entries(awayLineup)) {
         if (!p) continue;
-        const id = p._id || p.playerId || p.player_id;
+        const id = (p._id || p.playerId || p.player_id || "").toString();
         playerPositions[id] = pos;
         allPlayers.push({ ...p, playerId: id, team: 'away' });
       }
