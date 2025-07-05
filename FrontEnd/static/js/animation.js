@@ -95,7 +95,8 @@ export class AnimationEngine {
 
       // ✅ Draw ball after players
       if (this.ballCoords && this.ballImage?.complete) {
-        const ballSize = 16;
+        const pulse = 1 + 0.1 * Math.sin(currentTime / 100);  // range ~0.9 to 1.1
+        const ballSize = 16 * pulse;
         ctx.drawImage(
           this.ballImage,
           this.ballCoords.x - ballSize / 2,
@@ -125,7 +126,8 @@ export class AnimationEngine {
         
       });   
       if (this.ballCoords && this.ballImage?.complete) {
-        const ballSize = 16;
+        const pulse = 1 + 0.1 * Math.sin(currentTime / 100);  // range ~0.9 to 1.1
+        const ballSize = 16 * pulse;
         ctx.drawImage(
           this.ballImage,
           this.ballCoords.x - ballSize / 2,
