@@ -77,6 +77,8 @@
     function drawPlayer(player, pixelCoords) {
       if (!teamInfo.home || !teamInfo.away) return;
       console.log("Drawing player:", player);
+      console.log("home team ids:", teamInfo.home.player_ids);
+      console.log("away team ids:", teamInfo.away.player_ids);
 
       const isHome = teamInfo.home.player_ids.includes(player.playerId);
       const isAway = teamInfo.away.player_ids.includes(player.playerId);
