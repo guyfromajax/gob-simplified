@@ -112,7 +112,7 @@ class TurnManager:
         result["home_lineup"] = serialize_lineup(self.game.home_team.lineup)
         result["away_lineup"] = serialize_lineup(self.game.away_team.lineup)
 
-        print(f"result: {result}")
+        # print(f"result: {result}")
 
         return result
 
