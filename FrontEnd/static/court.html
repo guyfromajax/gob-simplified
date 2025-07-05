@@ -188,39 +188,46 @@
       // console.log("allPlayers:", allPlayers);
       // console.log("playerPositions:", playerPositions);
 
+      let lastBallHandlerId = null;
+
       simData.turns.forEach((turn, turnIndex) => {
         const posActions = turn.pos_actions || {};
-        
-        // Determine who should have the ball in this turn
-        let ballHandlerId = null;
-        for (const anim of turn.animations) {
-          const hasBallAction = anim.actions?.some(a =>
-            a.type === "handle_ball" || a.type === "receive"
+
+        // First, look at events in this turn to track a pass
+        const events = turn.events || [];
+        const passEvent = events.find(e => e.type === "pass");
+        const receiveEvent = events.find(e => e.type === "receive");
+        const shotEvent = events.find(e => e.type === "shot");
+
+        if (passEvent) {
+          lastBallHandlerId = allPlayers.find(p => p.pos === passEvent.to)?.playerId || null;
+        } else {
+          // fallback to whoever is handling/receiving
+          const handler = turn.animations.find(anim =>
+            anim.actions?.some(a => ["handle_ball", "receive"].includes(a.type))
           );
-          if (hasBallAction) {
-            ballHandlerId = anim.playerId;
-            break;
-          }
+          if (handler) lastBallHandlerId = handler.playerId;
         }
 
+        // build enrichedAnimations for this turn
         const enrichedAnimations = turn.animations.map(anim => {
           const fullPlayer = allPlayers.find(p =>
             (p.playerId || p._id || p.player_id || "").toString() === anim.playerId
           );
-          if (!fullPlayer?.pos) console.warn("⚠️ Missing position for:", fullPlayer);
-
-          const isBallHandler = anim.playerId === ballHandlerId;
-          return { ...anim, ...fullPlayer, hasBall: isBallHandler };
+          return {
+            ...anim,
+            ...fullPlayer,
+            hasBall: anim.playerId === lastBallHandlerId
+          };
         });
 
-        console.log(
-            "Turn", turnIndex,
-            enrichedAnimations.map(p => ({
-              pos: p.pos,
-              jersey: p.jersey,
-              hasBall: p.hasBall
-            }))
-          );
+        console.log("Turn", turnIndex, enrichedAnimations.map(p => ({
+          pos: p.pos, jersey: p.jersey, hasBall: p.hasBall
+        })));
+
+        turn.animations = enrichedAnimations;
+      });
+
 
         // Infer passes based on PASS + RECEIVE actions in same turn
         const fromPos = Object.entries(posActions).find(
