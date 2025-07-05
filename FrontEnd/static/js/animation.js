@@ -68,6 +68,7 @@ export class AnimationEngine {
       const pixel = this.gridToPixels(x, y);
       if (p.hasBall) {
         this.ballCoords = { ...pixel };
+        console.log("🎯 Ball attached to", p.pos, p.jersey, this.ballCoords);
       }
       this.drawPlayer({ ...p }, pixel);
     });
