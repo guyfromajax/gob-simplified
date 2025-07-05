@@ -144,18 +144,22 @@
         if (!p) continue;
         const id = (p._id || p.playerId || p.player_id || "").toString();
         playerPositions[id] = pos;
+        p.playerId = id; // ensure player object has a consistent .playerId
         allPlayers.push({ ...p, playerId: id, team: 'home' });
       }
       for (const [pos, p] of Object.entries(awayLineup)) {
         if (!p) continue;
         const id = (p._id || p.playerId || p.player_id || "").toString();
         playerPositions[id] = pos;
+        p.playerId = id; // ensure player object has a consistent .playerId
         allPlayers.push({ ...p, playerId: id, team: 'away' });
       }
 
       simData.turns.forEach(turn => {
         turn.animations = turn.animations.map(anim => {
-          const fullPlayer = allPlayers.find(p => p.playerId === anim.playerId);
+          const fullPlayer = allPlayers.find(p =>
+            (p.playerId || p._id || p.player_id || "").toString() === anim.playerId
+          );
           return { ...anim, ...fullPlayer };
         });
       });
