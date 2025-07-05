@@ -103,6 +103,8 @@
           })
         });
         if (!res.ok) throw new Error('Simulation failed');
+        sessionStorage.setItem("homeTeam", userSel.value);
+        sessionStorage.setItem("awayTeam", oppSel.value);
         window.location.href = '/static/court.html';
       } catch (err) {
         console.error(err);
