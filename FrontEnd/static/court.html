@@ -124,14 +124,22 @@
     const engine = new AnimationEngine(ctx, gridToPixels, drawPlayer, 0.3); // lower # = slower animation
 
     async function loadSimAndStart() {
+      const homeTeam = sessionStorage.getItem("homeTeam") || "Four Corners";
+      const awayTeam = sessionStorage.getItem("awayTeam") || "Bentley-Truman";
+
       const res = await fetch('/simulate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ home_team: 'Four Corners', away_team: 'Bentley-Truman' })
+        body: JSON.stringify({
+          home_team: homeTeam,
+          away_team: awayTeam
+        })
       });
+      
       if (!res.ok) throw new Error(`Simulation failed: ${res.statusText}`);
 
       const simData = await res.json();
+      console.log("***simData:", simData);
 
       const homeLineup = simData.home_lineup || (simData.turns[0]?.home_lineup || {});
       const awayLineup = simData.away_lineup || (simData.turns[0]?.away_lineup || {});
@@ -169,8 +177,8 @@
         allPlayers.push({ ...fullPlayer, playerId: idStr, team: 'away' });
       }
 
-      console.log("allPlayers:", allPlayers);
-      console.log("playerPositions:", playerPositions);
+      // console.log("allPlayers:", allPlayers);
+      // console.log("playerPositions:", playerPositions);
 
       simData.turns.forEach(turn => {
         turn.animations = turn.animations.map(anim => {
