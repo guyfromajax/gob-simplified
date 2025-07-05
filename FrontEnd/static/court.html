@@ -136,6 +136,9 @@
       const homeLineup = simData.home_lineup || (simData.turns[0]?.home_lineup || {});
       const awayLineup = simData.away_lineup || (simData.turns[0]?.away_lineup || {});
 
+      console.log("home lineup:", homeLineup);
+      console.log("away lineup:", awayLineup);
+
       const allPlayers = [];
       for (const [pos, p] of Object.entries(homeLineup)) {
         if (!p) continue;
