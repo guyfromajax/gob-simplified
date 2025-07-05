@@ -12,7 +12,9 @@ export class AnimationEngine {
     this.turns = [];
     this.activePlayers = [];
     this.startTime = 0;
-    this.currentPositions = {}; // playerId -> {x, y}
+    this.currentPositions = {};
+    this.ballCoords = null;
+    this.ballImage = null;
   }
   
 
@@ -64,6 +66,9 @@ export class AnimationEngine {
       const y = a.coords.y + (b.coords.y - a.coords.y) * t;
       this.currentPositions[p.playerId] = { x, y };
       const pixel = this.gridToPixels(x, y);
+      if (p.hasBall) {
+        this.ballCoords = { ...pixel };
+      }
       this.drawPlayer({ ...p }, pixel);
     });
 
@@ -77,9 +82,28 @@ export class AnimationEngine {
         const pos = last ? last.coords : this.currentPositions[p.playerId];
         this.currentPositions[p.playerId] = pos;
         this.drawPlayer({ ...p }, this.gridToPixels(pos.x, pos.y));
-      });
+        if (p.hasBall) {
+          const pixel = this.gridToPixels(pos.x, pos.y);
+          this.ballCoords = { ...pixel };
+        }   
+      });   
+      if (this.ballCoords && this.ballImage?.complete) {
+        const ballSize = 16;
+        ctx.drawImage(
+          this.ballImage,
+          this.ballCoords.x - ballSize / 2,
+          this.ballCoords.y - ballSize / 2,
+          ballSize,
+          ballSize
+        );
+      }
+      
       this.turnIndex++;
       this.playNextTurn();
     }
   }
+
+  setBallImage(img) {
+    this.ballImage = img;
+  } 
 }

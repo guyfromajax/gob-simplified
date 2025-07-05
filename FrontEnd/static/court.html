@@ -40,6 +40,11 @@
 
     const canvas = document.getElementById('gameLayer');
     const ctx = canvas.getContext('2d');
+    const ballImage = new Image();
+    ballImage.src = '/static/images/ball.png';
+    let ballCoords = null;
+
+
 
     const HCO_STRING_SPOTS = {
       "key": {"x": 64, "y": 25},
@@ -123,6 +128,11 @@
 
     const engine = new AnimationEngine(ctx, gridToPixels, drawPlayer, 0.3); // lower # = slower animation
 
+    const ballImage = new Image();
+    ballImage.src = '/static/images/ball.png';
+    engine.setBallImage(ballImage);
+
+    
     async function loadSimAndStart() {
       const homeTeam = sessionStorage.getItem("homeTeam") || "Four Corners";
       const awayTeam = sessionStorage.getItem("awayTeam") || "Bentley-Truman";
