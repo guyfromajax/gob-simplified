@@ -89,6 +89,9 @@
       const fill = isHome ? teamInfo.home.primary_color : '#ffffff';
       const stroke = isHome ? teamInfo.home.secondary_color : teamInfo.away.primary_color;
       const text = isHome ? teamInfo.home.secondary_color : teamInfo.away.primary_color;
+      const jerseyColor = isHome
+        ? teamInfo.home.primary_color
+        : teamInfo.away.primary_color;
 
       const radius = 20;
       const x = pixelCoords.x;
@@ -102,10 +105,6 @@
       ctx.fill();
       ctx.stroke();
 
-      if (!player.jersey || !playerPositions[player.playerId]) {
-        console.warn("⚠️ Missing jersey or position for:", player);
-      }
-
 
       // Position label (inside the circle)
       ctx.fillStyle = text;
@@ -116,6 +115,7 @@
       ctx.fillText(posLabel, x, y);
 
       // Jersey number (below or above the circle)
+      ctx.fillStyle = jerseyColor;
       ctx.font = 'bold 16px Arial';
       const jerseyOffset = isHome ? -radius - 24 : radius + 24;
       ctx.fillText(player.jersey || '', x, y + jerseyOffset);

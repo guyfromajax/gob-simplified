@@ -38,10 +38,6 @@ def build_lineup_from_mongo(team_name: str) -> dict:
         rated.sort(key=lambda tup: tup[1], reverse=True)
 
         top_candidates = rated[:3] if len(rated) >= 3 else rated
-        print(f"Top candidates for {pos}: {top_candidates[0][0].first_name} {top_candidates[0][0].last_name }")
-        print(f"Top candidates for {pos}: {top_candidates[1][0].first_name} {top_candidates[1][0].last_name }")
-        print(f"Top candidates for {pos}: {top_candidates[2][0].first_name} {top_candidates[2][0].last_name }")
-
         chosen_player = random.choice(top_candidates)[0]
 
         lineup[pos] = chosen_player
