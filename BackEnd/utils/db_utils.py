@@ -41,6 +41,7 @@ def build_lineup_from_mongo(team_name: str) -> dict:
         chosen_player = random.choice(top_candidates)[0]
 
         lineup[pos] = chosen_player
+        print(f"Chose {chosen_player.first_name} {chosen_player.last_name} for {pos}")
         available_players.remove(chosen_player)
 
     return lineup
