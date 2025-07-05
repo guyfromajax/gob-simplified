@@ -188,13 +188,67 @@
       // console.log("allPlayers:", allPlayers);
       // console.log("playerPositions:", playerPositions);
 
-      simData.turns.forEach(turn => {
-        turn.animations = turn.animations.map(anim => {
+      simData.turns.forEach((turn, turnIndex) => {
+        const posActions = turn.pos_actions || {};
+        
+        // Enrich animations with player data and default hasBall
+        const enrichedAnimations = turn.animations.map(anim => {
           const fullPlayer = allPlayers.find(p =>
             (p.playerId || p._id || p.player_id || "").toString() === anim.playerId
           );
-          return { ...anim, ...fullPlayer };
+          return { ...anim, ...fullPlayer, hasBall: false };
         });
+
+        // Infer passes based on PASS + RECEIVE actions in same turn
+        const fromPos = Object.entries(posActions).find(
+          ([_, a]) => a.action === "PASS"
+        )?.[0];
+
+        const toPos = Object.entries(posActions).find(
+          ([_, a]) => a.action === "RECEIVE"
+        )?.[0];
+
+        if (fromPos && toPos) {
+          const fromPlayer = enrichedAnimations.find(p => playerPositions[p.playerId] === fromPos);
+          const toPlayer = enrichedAnimations.find(p => playerPositions[p.playerId] === toPos);
+
+          if (fromPlayer && toPlayer) {
+            fromPlayer.passTo = toPlayer.playerId;
+            fromPlayer.hasBall = true;
+            toPlayer.receivesBall = true;
+          }
+        }
+
+        // Handle shooter (hasBall)
+        const shooterPos = Object.entries(posActions).find(
+          ([_, a]) => a.action === "SHOOT"
+        )?.[0];
+
+        if (shooterPos) {
+          const shooter = enrichedAnimations.find(p => playerPositions[p.playerId] === shooterPos);
+          if (shooter) shooter.hasBall = true;
+        }
+
+        // Save to turn
+        turn.animations = enrichedAnimations;
+
+        // Give receiver the ball in the next turn
+        const nextTurn = simData.turns[turnIndex + 1];
+        if (nextTurn) {
+          nextTurn.animations = nextTurn.animations.map(anim => {
+            const fullPlayer = allPlayers.find(p =>
+              (p.playerId || p._id || p.player_id || "").toString() === anim.playerId
+            );
+            const isReceiver = enrichedAnimations.some(
+              prev => prev.passTo === (fullPlayer?.playerId || "")
+            );
+            return {
+              ...anim,
+              ...fullPlayer,
+              hasBall: isReceiver
+            };
+          });
+        }
       });
 
       teamInfo = {
