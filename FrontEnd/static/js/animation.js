@@ -87,7 +87,7 @@ export class AnimationEngine {
 
       if (p.hasBallAtStep?.[i] && !isBallInFlight) {
         this.ballCoords = { ...pixel };
-        console.log("🎯 Ball attached to", p.pos, p.jersey, "at step", i, this.ballCoords);
+        // console.log("🎯 Ball attached to", p.pos, p.jersey, "at step", i, this.ballCoords);
       }
       
       this.drawPlayer({ ...p }, pixel);
@@ -172,7 +172,7 @@ export class AnimationEngine {
        
         if (p.hasBallAtStep?.[i] && !isBallInFlight) {
           this.ballCoords = { ...pixel };
-          console.log("🎯 Ball attached to", p.pos, p.jersey, "at step", i, this.ballCoords);
+          // console.log("🎯 Ball attached to", p.pos, p.jersey, "at step", i, this.ballCoords);
         }
         this.drawPlayer({ ...p }, pixel);
       });
@@ -232,7 +232,7 @@ export class AnimationEngine {
 
         if (p.hasBallAtStep?.[i] && !isBallInFlight) {
           this.ballCoords = { ...pixel };
-          console.log("🎯 Ball attached to", p.pos, p.jersey, "at step", i, this.ballCoords);
+          // console.log("🎯 Ball attached to", p.pos, p.jersey, "at step", i, this.ballCoords);
         }        
         if (!p.hasBall && turn.ballTrack && p.playerId === turn.ballTrack.movement?.at(-1)?.playerId) {
           const pixel = this.gridToPixels(pos.x, pos.y);
