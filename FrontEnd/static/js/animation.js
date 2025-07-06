@@ -50,7 +50,7 @@ export class AnimationEngine {
 
   animateFrame(currentTime) {
     const elapsed = (currentTime - this.startTime) * this.speedMultiplier;
-    const turn = this.turns[this.turnIndex];
+    // const turn = this.turns[this.turnIndex];
     const ctx = this.ctx;
     ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 
