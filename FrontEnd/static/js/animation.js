@@ -42,6 +42,7 @@ export class AnimationEngine {
 
   animateFrame(currentTime) {
     const elapsed = (currentTime - this.startTime) * this.speedMultiplier;
+    const turn = this.turns[this.turnIndex];
     const ctx = this.ctx;
     ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 
@@ -57,6 +58,11 @@ export class AnimationEngine {
         i++;
       }
       const a = movement[i];
+      if (!movement || movement.length === 0) {
+        console.warn("⚠️ #1 No movement for", p.playerId, p.pos);
+        return;
+      }
+      
       const b = movement[i + 1] || a;
       const tRaw = b.timestamp === a.timestamp
         ? 1
@@ -68,6 +74,7 @@ export class AnimationEngine {
       const pixel = this.gridToPixels(x, y);
       if (p.hasBall) {
         this.ballCoords = { ...pixel };
+        console.log("📍 #1 Ball coords updated to:", this.ballCoords);
         console.log("🎯 Ball attached to", p.pos, p.jersey, this.ballCoords);
       }
       this.drawPlayer({ ...p }, pixel);
@@ -81,6 +88,11 @@ export class AnimationEngine {
         let i = 0;
         while (i < movement.length - 1 && elapsed >= movement[i + 1].timestamp) i++;
         const a = movement[i];
+        if (!movement || movement.length === 0) {
+          console.warn("⚠️ #2 No movement for", p.playerId, p.pos);
+          return;
+        }
+        
         const b = movement[i + 1] || a;
         const tRaw = b.timestamp === a.timestamp
           ? 1
@@ -91,6 +103,7 @@ export class AnimationEngine {
         this.currentPositions[p.playerId] = { x, y };
         const pixel = this.gridToPixels(x, y);
         if (p.hasBall) this.ballCoords = { ...pixel };
+        console.log("📍 #2 Ball coords updated to:", this.ballCoords);
         this.drawPlayer({ ...p }, pixel);
       });
 
@@ -102,6 +115,11 @@ export class AnimationEngine {
           let i = 0;
           while (i < movement.length - 1 && elapsed >= movement[i + 1].timestamp) i++;
           const a = movement[i];
+          if (!movement || movement.length === 0) {
+            console.warn("⚠️ #3 No movement for", p.playerId, p.pos);
+            return;
+          }
+          
           const b = movement[i + 1] || a;
           const tRaw = b.timestamp === a.timestamp
             ? 1
@@ -111,6 +129,7 @@ export class AnimationEngine {
           const y = a.coords.y + (b.coords.y - a.coords.y) * t;
           const pixel = this.gridToPixels(x, y);
           this.ballCoords = { ...pixel };
+          console.log("📍 #3 Ball coords updated to:", this.ballCoords);
         }
       }
 
@@ -139,10 +158,12 @@ export class AnimationEngine {
         if (p.hasBall) {
           const pixel = this.gridToPixels(pos.x, pos.y);
           this.ballCoords = { ...pixel };
+          console.log("📍 #4 Ball coords updated to:", this.ballCoords);
         }   
         if (!p.hasBall && turn.ballTrack && p.playerId === turn.ballTrack.movement?.at(-1)?.playerId) {
           const pixel = this.gridToPixels(pos.x, pos.y);
           this.ballCoords = { ...pixel };
+          console.log("📍 #5 Ball coords updated to:", this.ballCoords);
         }        
         if (this.ballCoords) {
           console.log("Ball coords:", this.ballCoords);
@@ -156,6 +177,7 @@ export class AnimationEngine {
         if (lastCoords) {
           const pixel = this.gridToPixels(lastCoords.x, lastCoords.y);
           this.ballCoords = { ...pixel };
+          console.log("📍 #6 Ball coords updated to:", this.ballCoords);
         }
       }      
       if (this.ballCoords && this.ballImage?.complete) {

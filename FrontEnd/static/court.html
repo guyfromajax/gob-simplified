@@ -42,6 +42,7 @@
     const ctx = canvas.getContext('2d');
     const ballImage = new Image();
     ballImage.src = '/static/images/ball.png';
+    ballImage.onload = () => console.log("🏀 Ball image loaded");
     let ballCoords = null;
 
 
@@ -235,6 +236,9 @@
           const fullPlayer = allPlayers.find(p =>
             (p.playerId || p._id || p.player_id || "") === anim.playerId
           );
+          if (!anim.movement || anim.movement.length === 0) {
+            console.warn("⚠️ No movement steps for", anim.playerId, anim.pos);
+          }
           return {
             ...anim,
             ...fullPlayer,
@@ -258,6 +262,7 @@
               ]
             };
             turn.ballTrack = ballTrack;
+            console.log("📦 Injected ballTrack for turn:", turnIndex, ballTrack);
           }
         }
 
