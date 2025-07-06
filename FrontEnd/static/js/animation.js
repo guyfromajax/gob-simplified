@@ -72,6 +72,7 @@ export class AnimationEngine {
       const y = a.coords.y + (b.coords.y - a.coords.y) * t;
       this.currentPositions[p.playerId] = { x, y };
       const pixel = this.gridToPixels(x, y);
+      if (p.hasBall) console.log("🏀 Ball is with", p.playerId, p.pos);
       if (p.hasBall) {
         this.ballCoords = { ...pixel };
         console.log("📍 #1 Ball coords updated to:", this.ballCoords);
