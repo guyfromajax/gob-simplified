@@ -279,8 +279,8 @@
 
 
         // Detect and flag pass logic
-        const fromPos = Object.entries(posActions).find(([_, a]) => a.action === "PASS")?.[0];
-        const toPos = Object.entries(posActions).find(([_, a]) => a.action === "RECEIVE")?.[0];
+        const fromPos = Object.entries(posActions).find(([_, a]) => a.action === "pass")?.[0];
+        const toPos = Object.entries(posActions).find(([_, a]) => a.action === "receive")?.[0];
 
         if (fromPos && toPos) {
           const fromPlayer = enrichedAnimations.find(p => p.pos === fromPos);
