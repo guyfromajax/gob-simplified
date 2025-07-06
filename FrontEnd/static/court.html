@@ -282,6 +282,7 @@
         const fromPos = Object.entries(posActions).find(([_, a]) => a.action === "pass")?.[0];
         const toPos = Object.entries(posActions).find(([_, a]) => a.action === "receive")?.[0];
 
+        console.log("🔍 fromPos:", fromPos, "toPos:", toPos);
         if (fromPos && toPos) {
           const fromPlayer = enrichedAnimations.find(p => p.pos === fromPos);
           const toPlayer = enrichedAnimations.find(p => p.pos === toPos);
