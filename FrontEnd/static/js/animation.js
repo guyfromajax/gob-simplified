@@ -122,7 +122,7 @@ export class AnimationEngine {
           const y = a.coords.y + (b.coords.y - a.coords.y) * t;
           const pixel = this.gridToPixels(x, y);
           this.ballCoords = { ...pixel };
-          console.log("📍 #3 Ball coords updated to:", this.ballCoords);
+          // console.log("📍 #3 Ball coords updated to:", this.ballCoords);
 
           if (this.ballImage?.complete) {
             const pulse = 1 + 0.3 * Math.sin(currentTime / 100);
@@ -213,7 +213,7 @@ export class AnimationEngine {
           } else {
             console.warn("🚫 Skipping draw — ballImage not ready or undefined");
           }
-          console.log("📍 #6 Ball coords updated to:", this.ballCoords);
+          // console.log("📍 #6 Ball coords updated to:", this.ballCoords);
         }
       } 
       this.activePlayers.forEach(p => {
@@ -237,13 +237,13 @@ export class AnimationEngine {
         if (!p.hasBall && turn.ballTrack && p.playerId === turn.ballTrack.movement?.at(-1)?.playerId) {
           const pixel = this.gridToPixels(pos.x, pos.y);
           this.ballCoords = { ...pixel };
-          console.log("📍 #5 Ball coords updated to:", this.ballCoords);
+          // console.log("📍 #5 Ball coords updated to:", this.ballCoords);
         }        
-        if (this.ballCoords) {
-          console.log("Ball coords:", this.ballCoords);
-        } else {
-          console.log("No ball coords");
-        }        
+        // if (this.ballCoords) {
+        //   console.log("Ball coords:", this.ballCoords);
+        // } else {
+        //   console.log("No ball coords");
+        // }        
         
       });        
       if (this.ballCoords && this.ballImage?.complete) {
