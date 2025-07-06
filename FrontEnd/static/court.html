@@ -246,7 +246,16 @@
               a => Math.abs(a.timestamp - step.timestamp) <= 50 &&
                   ["handle_ball", "receive"].includes(a.type)
             );
-            hasBallAtStep.push(!!matchingAction);
+            const ballArrivesAt = turn.ballTrack?.movement?.[1]?.timestamp;
+            const stepTime = step.timestamp;
+
+            const isReceiveAction = matchingAction && matchingAction.type === "receive";
+            const isTooEarly = ballArrivesAt && stepTime < ballArrivesAt;
+            if (isReceiveAction && isTooEarly) {
+              console.log(`⏳ Delaying possession: ${anim.playerId} at step ${i}`);
+            }
+
+            hasBallAtStep.push(isReceiveAction && !isTooEarly);
           });
 
 
