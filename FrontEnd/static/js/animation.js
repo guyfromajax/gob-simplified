@@ -160,6 +160,7 @@ export class AnimationEngine {
         const pos = last ? last.coords : this.currentPositions[p.playerId];
         this.currentPositions[p.playerId] = pos;
         this.drawPlayer({ ...p }, this.gridToPixels(pos.x, pos.y));
+        const i = getStepIndexForElapsed(p.movement, elapsed);
         if (p.hasBallAtStep?.[i]) {
           this.ballCoords = { ...pixel };
           console.log("🎯 Ball attached to", p.pos, p.jersey, "at step", i, this.ballCoords);
