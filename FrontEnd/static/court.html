@@ -277,11 +277,13 @@
           const fromPlayer = enrichedAnimations.find(p => p.pos === fromPos);
           const toPlayer = enrichedAnimations.find(p => p.pos === toPos);
           if (fromPlayer && toPlayer) {
+            const passStart = fromPlayer.movement.at(-1)?.timestamp || turn.timestamp;
+            const passEnd = toPlayer.movement[0]?.timestamp || (passStart + 300);
             const ballTrack = {
-              playerId: "BALL", // synthetic
+              playerId: "BALL",
               movement: [
-                { timestamp: turn.timestamp, coords: fromPlayer.movement.at(-1).coords },
-                { timestamp: turn.timestamp + 250, coords: toPlayer.movement[0].coords }
+                { timestamp: passStart, coords: fromPlayer.movement.at(-1).coords },
+                { timestamp: passEnd, coords: toPlayer.movement[0].coords }
               ]
             };
             turn.ballTrack = ballTrack;
