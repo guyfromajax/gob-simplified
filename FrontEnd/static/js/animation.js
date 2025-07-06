@@ -123,6 +123,18 @@ export class AnimationEngine {
           const pixel = this.gridToPixels(x, y);
           this.ballCoords = { ...pixel };
           console.log("📍 #3 Ball coords updated to:", this.ballCoords);
+
+          if (this.ballImage?.complete) {
+            const pulse = 1 + 0.3 * Math.sin(currentTime / 100);
+            const ballSize = 16 * pulse;
+            ctx.drawImage(
+              this.ballImage,
+              this.ballCoords.x - ballSize / 2,
+              this.ballCoords.y - ballSize / 2,
+              ballSize,
+              ballSize
+            );
+          }
         }
       }
       // Ongoing animation: draw players and set ballCoords
