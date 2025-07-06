@@ -73,7 +73,7 @@ export class AnimationEngine {
         ? 1
         : (elapsed - a.timestamp) / (b.timestamp - a.timestamp);
       const t = Math.min(1, Math.max(0, easeInOutQuad(tRaw)));
-      console.log(`🔍 Ball t: ${t}, a.x: ${a.coords.x}, b.x: ${b.coords.x}`);
+      // console.log(`🔍 Ball t: ${t}, a.x: ${a.coords.x}, b.x: ${b.coords.x}`);
       const x = a.coords.x + (b.coords.x - a.coords.x) * t;
       const y = a.coords.y + (b.coords.y - a.coords.y) * t;
       this.currentPositions[p.playerId] = { x, y };
@@ -82,7 +82,7 @@ export class AnimationEngine {
       const ballTrackEnd = turn.ballTrack?.movement?.[1]?.timestamp;
       const isBallInFlight = !!ballTrackEnd && elapsed < ballTrackEnd;
 
-      console.log(`isBallInFlight: ${isBallInFlight}, elapsed: ${elapsed}, threshold: ${ballTrackEnd}`);
+      // console.log(`isBallInFlight: ${isBallInFlight}, elapsed: ${elapsed}, threshold: ${ballTrackEnd}`);
 
 
       if (p.hasBallAtStep?.[i] && !isBallInFlight) {
@@ -116,7 +116,7 @@ export class AnimationEngine {
             ? 1
             : (elapsed - a.timestamp) / (b.timestamp - a.timestamp);
           const t = Math.min(1, Math.max(0, easeInOutQuad(tRaw)));
-          console.log(`🔍 Ball t: ${t}, a.x: ${a.coords.x}, b.x: ${b.coords.x}`);
+          // console.log(`🔍 Ball t: ${t}, a.x: ${a.coords.x}, b.x: ${b.coords.x}`);
 
           const x = a.coords.x + (b.coords.x - a.coords.x) * t;
           const y = a.coords.y + (b.coords.y - a.coords.y) * t;
@@ -156,7 +156,7 @@ export class AnimationEngine {
           ? 1
           : (elapsed - a.timestamp) / (b.timestamp - a.timestamp);
         const t = Math.min(1, Math.max(0, easeInOutQuad(tRaw)));
-        console.log(`🔍 Ball t: ${t}, a.x: ${a.coords.x}, b.x: ${b.coords.x}`);
+        // console.log(`🔍 Ball t: ${t}, a.x: ${a.coords.x}, b.x: ${b.coords.x}`);
 
         const x = a.coords.x + (b.coords.x - a.coords.x) * t;
         const y = a.coords.y + (b.coords.y - a.coords.y) * t;
@@ -166,7 +166,7 @@ export class AnimationEngine {
         const ballTrackEnd = turn.ballTrack?.movement?.[1]?.timestamp;
         const isBallInFlight = !!ballTrackEnd && elapsed < ballTrackEnd;
 
-        console.log(`isBallInFlight: ${isBallInFlight}, elapsed: ${elapsed}, threshold: ${ballTrackEnd}`);
+        // console.log(`isBallInFlight: ${isBallInFlight}, elapsed: ${elapsed}, threshold: ${ballTrackEnd}`);
 
         
        
@@ -228,7 +228,7 @@ export class AnimationEngine {
         const ballTrackEnd = turn.ballTrack?.movement?.[1]?.timestamp;
         const isBallInFlight = !!ballTrackEnd && elapsed < ballTrackEnd;
 
-        console.log(`isBallInFlight: ${isBallInFlight}, elapsed: ${elapsed}, threshold: ${ballTrackEnd}`);
+        // console.log(`isBallInFlight: ${isBallInFlight}, elapsed: ${elapsed}, threshold: ${ballTrackEnd}`);
 
         if (p.hasBallAtStep?.[i] && !isBallInFlight) {
           this.ballCoords = { ...pixel };
