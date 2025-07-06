@@ -131,9 +131,11 @@ export class AnimationEngine {
           movement[1]?.timestamp
         ];
         console.log(`🕒 BallFlight: ${startTime} → ${endTime}, elapsed: ${elapsed}`);
-        console.log(
-          `🕒 #1 Ball flight from ${movement[0].timestamp} to ${movement[1].timestamp}, elapsed: ${elapsed}`
-        );
+        if (movement[0] && movement[1]) {
+          console.log(
+            `🕒 #1 Ball flight from ${movement[0].timestamp} to ${movement[1].timestamp}, elapsed: ${elapsed}`
+          );
+        }        
         console.log(`📍 Ball interpolated position: x=${x}, y=${y}`);
 
         
