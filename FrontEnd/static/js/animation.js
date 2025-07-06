@@ -158,8 +158,10 @@ export class AnimationEngine {
       this.activePlayers.forEach(p => {
         const last = p.movement.at(-1);
         const pos = last ? last.coords : this.currentPositions[p.playerId];
+        const pixel = this.gridToPixels(pos.x, pos.y);
         this.currentPositions[p.playerId] = pos;
         this.drawPlayer({ ...p }, this.gridToPixels(pos.x, pos.y));
+        const movement = p.movement || [];
         const i = getStepIndexForElapsed(movement, elapsed);
         if (p.hasBallAtStep?.[i]) {
           this.ballCoords = { ...pixel };
