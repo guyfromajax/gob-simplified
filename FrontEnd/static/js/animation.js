@@ -77,8 +77,11 @@ export class AnimationEngine {
       const y = a.coords.y + (b.coords.y - a.coords.y) * t;
       this.currentPositions[p.playerId] = { x, y };
       const pixel = this.gridToPixels(x, y);
-      const isBallInFlight = !!turn.ballTrack && elapsed < turn.ballTrack.movement?.[1]?.timestamp;
-      console.log(`isBallInFlight: ${isBallInFlight}, elapsed: ${elapsed}, threshold: ${turn.ballTrack.movement[1]?.timestamp}`);
+
+      const ballTrackEnd = turn.ballTrack?.movement?.[1]?.timestamp;
+      const isBallInFlight = !!ballTrackEnd && elapsed < ballTrackEnd;
+      console.log(`isBallInFlight: ${isBallInFlight}, elapsed: ${elapsed}, threshold: ${ballTrackEnd}`);
+
       if (p.hasBallAtStep?.[i] && !isBallInFlight) {
         this.ballCoords = { ...pixel };
         console.log("🎯 Ball attached to", p.pos, p.jersey, "at step", i, this.ballCoords);
