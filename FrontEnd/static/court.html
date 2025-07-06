@@ -127,9 +127,10 @@
       const jerseyOffset = isHome ? -radius - 24 : radius + 24;
       ctx.fillText(player.jersey || '', x, y + jerseyOffset);
 
-      if (player.hasBall) {
+      if (player.hasBallAtStep?.[player.currentStepIndex]) {
         ballCoords = { ...pixelCoords };
       }
+
 
     }
 
@@ -293,11 +294,10 @@
         if (shooterPos) {
           const shooter = enrichedAnimations.find(p => p.pos === shooterPos);
           if (shooter) {
-            shooter.hasBall = true;
-            lastBallHandlerId = shooter.playerId; // update tracker
+            shooter.wasFinalBallHandler = true;
+            lastBallHandlerId = shooter.playerId; // optional, still useful
           }
         }
-
         // Store updated animation
         turn.animations = enrichedAnimations;
       });
