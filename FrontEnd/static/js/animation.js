@@ -165,6 +165,7 @@ export class AnimationEngine {
     } else {
       // ensure final positions are drawn once more
       ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+      const movement = p.movement || [];
       if (turn.ballTrack) {
         const lastCoords = turn.ballTrack.movement.at(-1)?.coords;
         if (lastCoords) {
