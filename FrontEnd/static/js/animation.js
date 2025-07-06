@@ -118,13 +118,8 @@ export class AnimationEngine {
       if (turn.ballTrack) {
         const movement = turn.ballTrack.movement || [];
         if (movement.length >= 2) {
-          const i = getStepIndexForElapsed(p.movement, elapsed);
+          const i = getStepIndexForElapsed(movement, elapsed);
           const a = movement[i];
-          if (!movement || movement.length === 0) {
-            console.warn("⚠️ #3 No movement for", p.playerId, p.pos);
-            return;
-          }
-          
           const b = movement[i + 1] || a;
           const tRaw = b.timestamp === a.timestamp
             ? 1
