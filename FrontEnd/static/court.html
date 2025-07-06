@@ -200,21 +200,16 @@
 
       simData.turns.forEach((turn, turnIndex) => {
         const posActions = turn.pos_actions || {};
-        const events = turn.events || [];
 
         // Look for a pass or a handle/receive action
-        const passEvent = events.find(e => e.type === "pass");
         const handler = turn.animations.find(anim =>
           anim.actions?.some(a => ["handle_ball", "receive"].includes(a.type))
         );
 
-        // Update lastBallHandlerId based on events or fallback
-        if (passEvent) {
-          const receivingPlayer = allPlayers.find(p => p.pos === passEvent.to);
-          lastBallHandlerId = receivingPlayer?.playerId || null;
-        } else if (handler) {
+        if (handler) {
           lastBallHandlerId = handler.playerId;
         }
+
 
         // Enrich animations
         const enrichedAnimations = turn.animations.map(anim => {
