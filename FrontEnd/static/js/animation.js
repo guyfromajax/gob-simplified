@@ -104,7 +104,7 @@ export class AnimationEngine {
         this.currentPositions[p.playerId] = { x, y };
         const pixel = this.gridToPixels(x, y);
         if (p.hasBall) this.ballCoords = { ...pixel };
-        console.log("📍 #2 Ball coords updated to:", this.ballCoords);
+        // console.log("📍 #2 Ball coords updated to:", this.ballCoords);
         this.drawPlayer({ ...p }, pixel);
       });
 
