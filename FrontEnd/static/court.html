@@ -250,9 +250,14 @@
           const fromPlayer = enrichedAnimations.find(p => p.pos === fromPos);
           const toPlayer = enrichedAnimations.find(p => p.pos === toPos);
           if (fromPlayer && toPlayer) {
-            fromPlayer.passTo = toPlayer.playerId;
-            fromPlayer.hasBall = true;
-            toPlayer.receivesBall = true;
+            const ballTrack = {
+              playerId: "BALL", // synthetic
+              movement: [
+                { timestamp: turn.timestamp, coords: fromPlayer.movement.at(-1).coords },
+                { timestamp: turn.timestamp + 250, coords: toPlayer.movement[0].coords }
+              ]
+            };
+            turn.ballTrack = ballTrack;
           }
         }
 

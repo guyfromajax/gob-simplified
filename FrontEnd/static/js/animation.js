@@ -94,6 +94,27 @@ export class AnimationEngine {
         this.drawPlayer({ ...p }, pixel);
       });
 
+      // 🏀 Animate the ball independently during a pass
+      const turn = this.turns[this.turnIndex];
+      if (turn.ballTrack) {
+        const movement = turn.ballTrack.movement || [];
+        if (movement.length >= 2) {
+          let i = 0;
+          while (i < movement.length - 1 && elapsed >= movement[i + 1].timestamp) i++;
+          const a = movement[i];
+          const b = movement[i + 1] || a;
+          const tRaw = b.timestamp === a.timestamp
+            ? 1
+            : (elapsed - a.timestamp) / (b.timestamp - a.timestamp);
+          const t = Math.min(1, Math.max(0, easeInOutQuad(tRaw)));
+          const x = a.coords.x + (b.coords.x - a.coords.x) * t;
+          const y = a.coords.y + (b.coords.y - a.coords.y) * t;
+          const pixel = this.gridToPixels(x, y);
+          this.ballCoords = { ...pixel };
+        }
+      }
+
+
       // ✅ Draw ball after players
       if (this.ballCoords && this.ballImage?.complete) {
         const pulse = 1 + 0.3 * Math.sin(currentTime / 100);  // range ~0.9 to 1.1
@@ -119,6 +140,10 @@ export class AnimationEngine {
           const pixel = this.gridToPixels(pos.x, pos.y);
           this.ballCoords = { ...pixel };
         }   
+        if (!p.hasBall && turn.ballTrack && p.playerId === turn.ballTrack.movement?.at(-1)?.playerId) {
+          const pixel = this.gridToPixels(pos.x, pos.y);
+          this.ballCoords = { ...pixel };
+        }        
         if (this.ballCoords) {
           console.log("Ball coords:", this.ballCoords);
         } else {
@@ -126,6 +151,13 @@ export class AnimationEngine {
         }        
         
       });   
+      if (turn.ballTrack) {
+        const lastCoords = turn.ballTrack.movement.at(-1)?.coords;
+        if (lastCoords) {
+          const pixel = this.gridToPixels(lastCoords.x, lastCoords.y);
+          this.ballCoords = { ...pixel };
+        }
+      }      
       if (this.ballCoords && this.ballImage?.complete) {
         const pulse = 1 + 0.3 * Math.sin(currentTime / 100);  // range ~0.9 to 1.1
         const ballSize = 16 * pulse;
