@@ -83,7 +83,7 @@ export class AnimationEngine {
 
     if (elapsed < maxDuration) {
       // Ongoing animation: draw players and set ballCoords
-      this.activePlayers.forEach(p => {
+      this.activePlayers.forEach(p => { // #2 instance
         const movement = p.movement || [];
         if (movement.length === 0) return;
         let i = 0;
@@ -103,7 +103,12 @@ export class AnimationEngine {
         const y = a.coords.y + (b.coords.y - a.coords.y) * t;
         this.currentPositions[p.playerId] = { x, y };
         const pixel = this.gridToPixels(x, y);
-        if (p.hasBall) this.ballCoords = { ...pixel };
+        if (p.hasBallAtStep?.[i]) {
+          this.ballCoords = { ...pixel };
+          console.log("🎯 Ball attached to", p.pos, p.jersey, "at step", i, this.ballCoords);
+        }
+        
+        // if (p.hasBall) this.ballCoords = { ...pixel };
         // console.log("📍 #2 Ball coords updated to:", this.ballCoords);
         this.drawPlayer({ ...p }, pixel);
       });

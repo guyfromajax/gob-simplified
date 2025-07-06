@@ -238,6 +238,16 @@
           const fullPlayer = allPlayers.find(p =>
             (p.playerId || p._id || p.player_id || "") === anim.playerId
           );
+          
+          const hasBallAtStep = [];
+          (anim.movement || []).forEach((step, i) => {
+            const matchingAction = (anim.actions || []).find(
+              a => Math.abs(a.timestamp - step.timestamp) <= 50 &&
+                  ["handle_ball", "receive"].includes(a.type)
+            );
+            hasBallAtStep.push(!!matchingAction);
+          });
+
 
           const isHandler = anim.playerId === stepBallHandlerId;
 
@@ -253,7 +263,7 @@
           return {
             ...fullPlayer,
             ...anim,
-            hasBall: isHandler
+            hasBallAtStep
           };
         });
 
