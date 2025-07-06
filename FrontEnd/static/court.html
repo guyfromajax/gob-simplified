@@ -150,6 +150,13 @@
       const simData = await res.json();
       console.log("***simData:", simData);
 
+      const courtImg = document.getElementById('court');
+      if (simData.home_team_id) {
+        const teamId = simData.home_team_id.toLowerCase();
+        courtImg.src = `/static/images/courts/${teamId}.jpg`;
+        courtImg.onerror = () => { courtImg.src = '/static/images/courts/default.jpg'; };
+      }
+
       const homeLineup = simData.home_lineup || (simData.turns[0]?.home_lineup || {});
       const awayLineup = simData.away_lineup || (simData.turns[0]?.away_lineup || {});
 
@@ -282,13 +289,6 @@
         }
       };
     }
-
-      const courtImg = document.getElementById('court');
-      if (simData.home_team_id) {
-        const teamId = simData.home_team_id.toLowerCase();
-        courtImg.src = `/static/images/courts/${teamId}.jpg`;
-        courtImg.onerror = () => { courtImg.src = '/static/images/courts/default.jpg'; };
-      }
 
       engine.setTeams(teamInfo, allPlayers);
       engine.start(simData.turns);
