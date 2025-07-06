@@ -73,6 +73,7 @@ export class AnimationEngine {
         ? 1
         : (elapsed - a.timestamp) / (b.timestamp - a.timestamp);
       const t = Math.min(1, Math.max(0, easeInOutQuad(tRaw)));
+      console.log(`🔍 Ball t: ${t}, a.x: ${a.coords.x}, b.x: ${b.coords.x}`);
       const x = a.coords.x + (b.coords.x - a.coords.x) * t;
       const y = a.coords.y + (b.coords.y - a.coords.y) * t;
       this.currentPositions[p.playerId] = { x, y };
@@ -93,6 +94,37 @@ export class AnimationEngine {
     });
 
     if (elapsed < maxDuration) {
+      if (turn.ballTrack) {
+        const movement = turn.ballTrack.movement || [];
+        const [startTime, endTime] = [
+          movement[0]?.timestamp,
+          movement[1]?.timestamp
+        ];
+        console.log(`🕒 BallFlight: ${startTime} → ${endTime}, elapsed: ${elapsed}`);
+        if (movement[0] && movement[1]) {
+          console.log(
+            `🕒 #1 Ball flight from ${movement[0].timestamp} to ${movement[1].timestamp}, elapsed: ${elapsed}`
+          );
+        }        
+        console.log(`📍 Ball interpolated position: x=${x}, y=${y}`);
+        
+        if (movement.length >= 2) {
+          const i = getStepIndexForElapsed(movement, elapsed);
+          const a = movement[i];
+          const b = movement[i + 1] || a;
+          const tRaw = b.timestamp === a.timestamp
+            ? 1
+            : (elapsed - a.timestamp) / (b.timestamp - a.timestamp);
+          const t = Math.min(1, Math.max(0, easeInOutQuad(tRaw)));
+          console.log(`🔍 Ball t: ${t}, a.x: ${a.coords.x}, b.x: ${b.coords.x}`);
+
+          const x = a.coords.x + (b.coords.x - a.coords.x) * t;
+          const y = a.coords.y + (b.coords.y - a.coords.y) * t;
+          const pixel = this.gridToPixels(x, y);
+          this.ballCoords = { ...pixel };
+          console.log("📍 #3 Ball coords updated to:", this.ballCoords);
+        }
+      }
       // Ongoing animation: draw players and set ballCoords
       this.activePlayers.forEach(p => { // #2 instance
         const movement = p.movement || [];
@@ -109,6 +141,8 @@ export class AnimationEngine {
           ? 1
           : (elapsed - a.timestamp) / (b.timestamp - a.timestamp);
         const t = Math.min(1, Math.max(0, easeInOutQuad(tRaw)));
+        console.log(`🔍 Ball t: ${t}, a.x: ${a.coords.x}, b.x: ${b.coords.x}`);
+
         const x = a.coords.x + (b.coords.x - a.coords.x) * t;
         const y = a.coords.y + (b.coords.y - a.coords.y) * t;
         this.currentPositions[p.playerId] = { x, y };
@@ -128,51 +162,18 @@ export class AnimationEngine {
         this.drawPlayer({ ...p }, pixel);
       });
 
-      // 🏀 Animate the ball independently during a pass
-      // const turn = this.turns[this.turnIndex];
-      if (turn.ballTrack) {
-        const movement = turn.ballTrack.movement || [];
-        const [startTime, endTime] = [
-          movement[0]?.timestamp,
-          movement[1]?.timestamp
-        ];
-        console.log(`🕒 BallFlight: ${startTime} → ${endTime}, elapsed: ${elapsed}`);
-        if (movement[0] && movement[1]) {
-          console.log(
-            `🕒 #1 Ball flight from ${movement[0].timestamp} to ${movement[1].timestamp}, elapsed: ${elapsed}`
-          );
-        }        
-        console.log(`📍 Ball interpolated position: x=${x}, y=${y}`);
-
-        
-        if (movement.length >= 2) {
-          const i = getStepIndexForElapsed(movement, elapsed);
-          const a = movement[i];
-          const b = movement[i + 1] || a;
-          const tRaw = b.timestamp === a.timestamp
-            ? 1
-            : (elapsed - a.timestamp) / (b.timestamp - a.timestamp);
-          const t = Math.min(1, Math.max(0, easeInOutQuad(tRaw)));
-          const x = a.coords.x + (b.coords.x - a.coords.x) * t;
-          const y = a.coords.y + (b.coords.y - a.coords.y) * t;
-          const pixel = this.gridToPixels(x, y);
-          this.ballCoords = { ...pixel };
-          console.log("📍 #3 Ball coords updated to:", this.ballCoords);
-        }
-      }
-
 
       // ✅ Draw ball after players
       if (this.ballCoords && this.ballImage?.complete) {
         const pulse = 1 + 0.3 * Math.sin(currentTime / 100);  // range ~0.9 to 1.1
         const ballSize = 16 * pulse;
-        ctx.drawImage(
-          this.ballImage,
-          this.ballCoords.x - ballSize / 2,
-          this.ballCoords.y - ballSize / 2,
-          ballSize,
-          ballSize
-        );
+        // ctx.drawImage(
+        //   this.ballImage,
+        //   this.ballCoords.x - ballSize / 2,
+        //   this.ballCoords.y - ballSize / 2,
+        //   ballSize,
+        //   ballSize
+        // );
       }
       requestAnimationFrame(this.animateFrame.bind(this));
     } else {
@@ -183,6 +184,17 @@ export class AnimationEngine {
         if (lastCoords) {
           const pixel = this.gridToPixels(lastCoords.x, lastCoords.y);
           this.ballCoords = { ...pixel };
+          if (this.ballImage?.complete) {
+            const pulse = 1 + 0.3 * Math.sin(currentTime / 100);  // subtle scale effect
+            const ballSize = 16 * pulse;
+            ctx.drawImage(
+              this.ballImage,
+              this.ballCoords.x - ballSize / 2,
+              this.ballCoords.y - ballSize / 2,
+              ballSize,
+              ballSize
+            );
+          }
           console.log("📍 #6 Ball coords updated to:", this.ballCoords);
         }
       } 
@@ -219,13 +231,13 @@ export class AnimationEngine {
       if (this.ballCoords && this.ballImage?.complete) {
         const pulse = 1 + 0.3 * Math.sin(currentTime / 100);  // range ~0.9 to 1.1
         const ballSize = 16 * pulse;
-        ctx.drawImage(
-          this.ballImage,
-          this.ballCoords.x - ballSize / 2,
-          this.ballCoords.y - ballSize / 2,
-          ballSize,
-          ballSize
-        );
+        // ctx.drawImage(
+        //   this.ballImage,
+        //   this.ballCoords.x - ballSize / 2,
+        //   this.ballCoords.y - ballSize / 2,
+        //   ballSize,
+        //   ballSize
+        // );
       }
       
       this.turnIndex++;
