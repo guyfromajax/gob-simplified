@@ -119,6 +119,12 @@ export class AnimationEngine {
       // const turn = this.turns[this.turnIndex];
       if (turn.ballTrack) {
         const movement = turn.ballTrack.movement || [];
+        console.log(
+          `🕒 #1 Ball flight from ${movement[0].timestamp} to ${movement[1].timestamp}, elapsed: ${elapsed}`
+        );
+        console.log(`📍 Ball interpolated position: x=${x}, y=${y}`);
+
+        
         if (movement.length >= 2) {
           const i = getStepIndexForElapsed(movement, elapsed);
           const a = movement[i];
