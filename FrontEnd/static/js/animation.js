@@ -2,6 +2,14 @@ export function easeInOutQuad(t) {
   return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
 }
 
+function getStepIndexForElapsed(movement, elapsed) {
+  if (!movement || movement.length === 0) return 0;
+  let i = 0;
+  while (i < movement.length - 1 && elapsed >= movement[i + 1].timestamp) i++;
+  return i;
+}
+
+
 export class AnimationEngine {
   constructor(ctx, gridToPixels, drawPlayer, speedMultiplier = 1.0) {
     this.ctx = ctx;
@@ -53,10 +61,7 @@ export class AnimationEngine {
     this.activePlayers.forEach(p => {
       const movement = p.movement || [];
       if (movement.length === 0) return;
-      let i = 0;
-      while (i < movement.length - 1 && elapsed >= movement[i + 1].timestamp) {
-        i++;
-      }
+      const i = getStepIndexForElapsed(p.movement, elapsed);
       const a = movement[i];
       if (!movement || movement.length === 0) {
         console.warn("⚠️ #1 No movement for", p.playerId, p.pos);
@@ -85,8 +90,7 @@ export class AnimationEngine {
       this.activePlayers.forEach(p => { // #2 instance
         const movement = p.movement || [];
         if (movement.length === 0) return;
-        let i = 0;
-        while (i < movement.length - 1 && elapsed >= movement[i + 1].timestamp) i++;
+        const i = getStepIndexForElapsed(p.movement, elapsed);
         const a = movement[i];
         if (!movement || movement.length === 0) {
           console.warn("⚠️ #2 No movement for", p.playerId, p.pos);
@@ -114,8 +118,7 @@ export class AnimationEngine {
       if (turn.ballTrack) {
         const movement = turn.ballTrack.movement || [];
         if (movement.length >= 2) {
-          let i = 0;
-          while (i < movement.length - 1 && elapsed >= movement[i + 1].timestamp) i++;
+          const i = getStepIndexForElapsed(p.movement, elapsed);
           const a = movement[i];
           if (!movement || movement.length === 0) {
             console.warn("⚠️ #3 No movement for", p.playerId, p.pos);
