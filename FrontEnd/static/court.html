@@ -201,25 +201,31 @@
       simData.turns.forEach((turn, turnIndex) => {
         const posActions = turn.pos_actions || {};
 
-        // Look for a handle/receive action that lines up with this step's timestamp
-        const stepTime = turn.timestamp ?? 0;
-        const handler = turn.animations.find(anim => {
-          const actions = anim.actions || [];
-          let nearest = null;
-          for (const a of actions) {
-            if (a.timestamp <= stepTime && (!nearest || a.timestamp > nearest.timestamp)) {
-              nearest = a;
-            }
-          }
-          return nearest && ["handle_ball", "receive"].includes(nearest.type);
-        });
+        const stepTime = turn.timestamp;
 
-        if (handler) {
-          lastBallHandlerId = handler.playerId;
+        // ✅ Step 1: Try to find the player whose action at this step includes "handle_ball" or "receive"
+        let stepBallHandlerId = null;
+
+        for (const anim of turn.animations) {
+          const actionAtStep = anim.actions?.find(
+            a => a.timestamp === stepTime && ["handle_ball", "receive"].includes(a.type)
+          );
+          if (actionAtStep) {
+            stepBallHandlerId = anim.playerId;
+            break; // only one player should handle the ball per step
+          }
         }
 
+        // ✅ Step 2: Fallback to previous handler if no one has ball at this step
+        if (!stepBallHandlerId && lastBallHandlerId) {
+          stepBallHandlerId = lastBallHandlerId;
+        }
 
-        // Enrich animations
+        // ✅ Step 3: Track for future fallback
+        if (stepBallHandlerId) {
+          lastBallHandlerId = stepBallHandlerId;
+        }
+
         const enrichedAnimations = turn.animations.map(anim => {
           const fullPlayer = allPlayers.find(p =>
             (p.playerId || p._id || p.player_id || "") === anim.playerId
@@ -227,9 +233,10 @@
           return {
             ...anim,
             ...fullPlayer,
-            hasBall: anim.playerId === lastBallHandlerId
+            hasBall: anim.playerId === stepBallHandlerId
           };
         });
+
 
         // Detect and flag pass logic
         const fromPos = Object.entries(posActions).find(([_, a]) => a.action === "PASS")?.[0];
