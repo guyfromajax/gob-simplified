@@ -205,13 +205,13 @@ export class AnimationEngine {
             const pulse = 1 + 0.3 * Math.sin(currentTime / 100);  // subtle scale effect
             const ballSize = 16 * pulse;
             console.log("✅ Drawing ball with coords:", this.ballCoords);
-            ctx.drawImage(
-              this.ballImage,
-              this.ballCoords.x - ballSize / 2,
-              this.ballCoords.y - ballSize / 2,
-              ballSize,
-              ballSize
-            );
+            // ctx.drawImage(
+            //   this.ballImage,
+            //   this.ballCoords.x - ballSize / 2,
+            //   this.ballCoords.y - ballSize / 2,
+            //   ballSize,
+            //   ballSize
+            // );
           } else {
             console.warn("🚫 Skipping draw — ballImage not ready or undefined");
           }
