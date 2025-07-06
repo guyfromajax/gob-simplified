@@ -125,6 +125,11 @@
       ctx.font = 'bold 16px Arial';
       const jerseyOffset = isHome ? -radius - 24 : radius + 24;
       ctx.fillText(player.jersey || '', x, y + jerseyOffset);
+
+      if (player.hasBall) {
+        ballCoords = { ...pixelCoords };
+      }
+
     }
 
     const engine = new AnimationEngine(ctx, gridToPixels, drawPlayer, 0.3); // lower # = slower animation
@@ -236,7 +241,6 @@
             hasBall: anim.playerId === stepBallHandlerId
           };
         });
-
 
         // Detect and flag pass logic
         const fromPos = Object.entries(posActions).find(([_, a]) => a.action === "PASS")?.[0];
