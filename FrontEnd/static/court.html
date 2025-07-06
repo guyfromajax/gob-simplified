@@ -214,7 +214,7 @@
 
         for (const anim of turn.animations) {
           const actionAtStep = anim.actions?.find(
-            a => a.timestamp === stepTime && ["handle_ball", "receive"].includes(a.type)
+            a => Math.abs(a.timestamp - stepTime) <= 50 && ["handle_ball", "receive"].includes(a.type)
           );
           if (actionAtStep) {
             stepBallHandlerId = anim.playerId;
@@ -231,6 +231,7 @@
         if (stepBallHandlerId) {
           lastBallHandlerId = stepBallHandlerId;
         }
+        console.log(`⛹️ Step ${turnIndex} ball handler:`, stepBallHandlerId);
 
         const enrichedAnimations = turn.animations.map(anim => {
           const fullPlayer = allPlayers.find(p =>
