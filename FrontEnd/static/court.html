@@ -233,6 +233,7 @@
         }
         console.log(`⛹️ Step ${turnIndex} ball handler:`, stepBallHandlerId);
 
+        console.log(`🔎 Turn ${turnIndex} animation sample:`, turn.animations?.[0]);
         const enrichedAnimations = turn.animations.map(anim => {
           const fullPlayer = allPlayers.find(p =>
             (p.playerId || p._id || p.player_id || "") === anim.playerId
