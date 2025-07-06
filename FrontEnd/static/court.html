@@ -237,15 +237,25 @@
           const fullPlayer = allPlayers.find(p =>
             (p.playerId || p._id || p.player_id || "") === anim.playerId
           );
+
+          const isHandler = anim.playerId === stepBallHandlerId;
+
           if (!anim.movement || anim.movement.length === 0) {
-            console.warn("⚠️ No movement steps for", anim.playerId, anim.pos);
+            console.warn(`⚠️ No movement steps for ${anim.playerId} (${playerPositions[anim.playerId]})`);
           }
+
+          if (isHandler) {
+            console.log(`✅ Ball handler assigned: ${anim.playerId} (${playerPositions[anim.playerId]})`);
+            console.log("➡️ Movement steps:", anim.movement);
+          }
+
           return {
-            ...anim,
             ...fullPlayer,
-            hasBall: anim.playerId === stepBallHandlerId
+            ...anim,
+            hasBall: isHandler
           };
         });
+
 
         // Detect and flag pass logic
         const fromPos = Object.entries(posActions).find(([_, a]) => a.action === "PASS")?.[0];
