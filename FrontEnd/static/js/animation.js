@@ -54,9 +54,11 @@ export class AnimationEngine {
     const ctx = this.ctx;
     ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 
-    const maxDuration = Math.max(
+    const playerEnd = Math.max(
       ...this.activePlayers.map(p => p.movement?.at(-1)?.timestamp || 0)
     );
+    const ballEnd = turn.ballTrack?.movement?.[1]?.timestamp || 0;
+    const maxDuration = Math.max(playerEnd, ballEnd);
 
     this.activePlayers.forEach(p => {
       const movement = p.movement || [];
@@ -249,13 +251,13 @@ export class AnimationEngine {
       if (this.ballCoords && this.ballImage?.complete) {
         const pulse = 1 + 0.3 * Math.sin(currentTime / 100);  // range ~0.9 to 1.1
         const ballSize = 16 * pulse;
-        ctx.drawImage(
-          this.ballImage,
-          this.ballCoords.x - ballSize / 2,
-          this.ballCoords.y - ballSize / 2,
-          ballSize,
-          ballSize
-        );
+        // ctx.drawImage(
+        //   this.ballImage,
+        //   this.ballCoords.x - ballSize / 2,
+        //   this.ballCoords.y - ballSize / 2,
+        //   ballSize,
+        //   ballSize
+        // );
       }
       
       this.turnIndex++;
