@@ -201,10 +201,18 @@
       simData.turns.forEach((turn, turnIndex) => {
         const posActions = turn.pos_actions || {};
 
-        // Look for a pass or a handle/receive action
-        const handler = turn.animations.find(anim =>
-          anim.actions?.some(a => ["handle_ball", "receive"].includes(a.type))
-        );
+        // Look for a handle/receive action that lines up with this step's timestamp
+        const stepTime = turn.timestamp ?? 0;
+        const handler = turn.animations.find(anim => {
+          const actions = anim.actions || [];
+          let nearest = null;
+          for (const a of actions) {
+            if (a.timestamp <= stepTime && (!nearest || a.timestamp > nearest.timestamp)) {
+              nearest = a;
+            }
+          }
+          return nearest && ["handle_ball", "receive"].includes(nearest.type);
+        });
 
         if (handler) {
           lastBallHandlerId = handler.playerId;
