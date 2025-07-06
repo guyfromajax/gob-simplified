@@ -80,7 +80,9 @@ export class AnimationEngine {
 
       const ballTrackEnd = turn.ballTrack?.movement?.[1]?.timestamp;
       const isBallInFlight = !!ballTrackEnd && elapsed < ballTrackEnd;
+
       console.log(`isBallInFlight: ${isBallInFlight}, elapsed: ${elapsed}, threshold: ${ballTrackEnd}`);
+
 
       if (p.hasBallAtStep?.[i] && !isBallInFlight) {
         this.ballCoords = { ...pixel };
