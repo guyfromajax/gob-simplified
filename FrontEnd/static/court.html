@@ -192,24 +192,21 @@
 
       simData.turns.forEach((turn, turnIndex) => {
         const posActions = turn.pos_actions || {};
-
-        // First, look at events in this turn to track a pass
         const events = turn.events || [];
-        const passEvent = events.find(e => e.type === "pass");
-        const receiveEvent = events.find(e => e.type === "receive");
-        const shotEvent = events.find(e => e.type === "shot");
 
+        // 🔁 Determine current ball handler
+        const passEvent = events.find(e => e.type === "pass");
+        const handler = turn.animations.find(anim =>
+          anim.actions?.some(a => ["handle_ball", "receive"].includes(a.type))
+        );
+        let lastBallHandlerId = null;
         if (passEvent) {
           lastBallHandlerId = allPlayers.find(p => p.pos === passEvent.to)?.playerId || null;
-        } else {
-          // fallback to whoever is handling/receiving
-          const handler = turn.animations.find(anim =>
-            anim.actions?.some(a => ["handle_ball", "receive"].includes(a.type))
-          );
-          if (handler) lastBallHandlerId = handler.playerId;
+        } else if (handler) {
+          lastBallHandlerId = handler.playerId;
         }
 
-        // build enrichedAnimations for this turn
+        // 🎥 Enrich animations
         const enrichedAnimations = turn.animations.map(anim => {
           const fullPlayer = allPlayers.find(p =>
             (p.playerId || p._id || p.player_id || "").toString() === anim.playerId
@@ -221,15 +218,7 @@
           };
         });
 
-        console.log("Turn", turnIndex, enrichedAnimations.map(p => ({
-          pos: p.pos, jersey: p.jersey, hasBall: p.hasBall
-        })));
-
-        turn.animations = enrichedAnimations;
-      });
-
-
-        // Infer passes based on PASS + RECEIVE actions in same turn
+        // 🧠 Infer pass
         const fromPos = Object.entries(posActions).find(
           ([_, a]) => a.action === "PASS"
         )?.[0];
@@ -241,7 +230,6 @@
         if (fromPos && toPos) {
           const fromPlayer = enrichedAnimations.find(p => p.pos === fromPos);
           const toPlayer = enrichedAnimations.find(p => p.pos === toPos);
-
           if (fromPlayer && toPlayer) {
             fromPlayer.passTo = toPlayer.playerId;
             fromPlayer.hasBall = true;
@@ -249,20 +237,19 @@
           }
         }
 
-        // Handle shooter (hasBall)
+        // 🏀 Shot handler
         const shooterPos = Object.entries(posActions).find(
           ([_, a]) => a.action === "SHOOT"
         )?.[0];
-
         if (shooterPos) {
           const shooter = enrichedAnimations.find(p => p.pos === shooterPos);
           if (shooter) shooter.hasBall = true;
         }
 
-        // Save to turn
+        // 💾 Store
         turn.animations = enrichedAnimations;
 
-        // Give receiver the ball in the next turn
+        // ✅ Properly scoped inside the loop
         const nextTurn = simData.turns[turnIndex + 1];
         if (nextTurn) {
           nextTurn.animations = nextTurn.animations.map(anim => {
@@ -279,7 +266,8 @@
             };
           });
         }
-      };
+      });
+    }
 
       teamInfo = {
         home: {
