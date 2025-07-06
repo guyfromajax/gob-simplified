@@ -50,7 +50,7 @@ export class AnimationEngine {
 
   animateFrame(currentTime) {
     const elapsed = (currentTime - this.startTime) * this.speedMultiplier;
-    // const turn = this.turns[this.turnIndex];
+    const turn = this.turns[this.turnIndex];
     const ctx = this.ctx;
     ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 
@@ -116,7 +116,7 @@ export class AnimationEngine {
       });
 
       // 🏀 Animate the ball independently during a pass
-      const turn = this.turns[this.turnIndex];
+      // const turn = this.turns[this.turnIndex];
       if (turn.ballTrack) {
         const movement = turn.ballTrack.movement || [];
         if (movement.length >= 2) {
