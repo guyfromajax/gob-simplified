@@ -221,6 +221,7 @@
           const actionAtStep = anim.actions?.find(
             a => Math.abs(a.timestamp - stepTime) <= 50 && ["handle_ball", "receive"].includes(a.type)
           );
+          console.log(`Checking action timestamp ${a.timestamp} vs turn timestamp ${turn.timestamp}`);
           if (actionAtStep) {
             stepBallHandlerId = anim.playerId;
             break; // only one player should handle the ball per step
