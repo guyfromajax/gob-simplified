@@ -88,6 +88,7 @@ export class AnimationEngine {
 
 
       if (p.hasBallAtStep?.[i] && !isBallInFlight) {
+        console.warn("⚠️ H3C: [Player attach] ballCoords overridden by player:", p.pos);
         this.ballCoords = { ...pixel };
         // console.log("🎯 Ball attached to", p.pos, p.jersey, "at step", i, this.ballCoords);
       }
@@ -118,6 +119,7 @@ export class AnimationEngine {
           const tRaw = b.timestamp === a.timestamp
             ? 1
             : (elapsed - a.timestamp) / (b.timestamp - a.timestamp);
+          console.log("🧪 H1 DEBUG → elapsed:", elapsed, "a.ts:", a.timestamp, "b.ts:", b.timestamp, "tRaw:", tRaw, "i:", i);
           const t = Math.min(1, Math.max(0, easeInOutQuad(tRaw)));
           // console.log(`🔍 Ball t: ${t}, a.x: ${a.coords.x}, b.x: ${b.coords.x}`);
 
@@ -174,6 +176,7 @@ export class AnimationEngine {
         
        
         if (p.hasBallAtStep?.[i] && !isBallInFlight) {
+          console.warn("⚠️ H3A: [Player attach] ballCoords overridden by player:", p.pos);
           this.ballCoords = { ...pixel };
           // console.log("🎯 Ball attached to", p.pos, p.jersey, "at step", i, this.ballCoords);
         }
@@ -234,6 +237,7 @@ export class AnimationEngine {
         // console.log(`isBallInFlight: ${isBallInFlight}, elapsed: ${elapsed}, threshold: ${ballTrackEnd}`);
 
         if (p.hasBallAtStep?.[i] && !isBallInFlight) {
+          console.warn("⚠️ H3B: [Final attach] ballCoords overridden by player:", p.pos);
           this.ballCoords = { ...pixel };
           // console.log("🎯 Ball attached to", p.pos, p.jersey, "at step", i, this.ballCoords);
         }        
