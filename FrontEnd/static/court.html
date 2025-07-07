@@ -134,7 +134,7 @@
     const engine = new AnimationEngine(ctx, gridToPixels, drawPlayer, 0.3); // lower # = slower animation
     engine.setBallImage(ballImage);
 
-    async function loadSimAndStart() {
+    async function loadSimAndStart() { //turns
       const homeTeam = sessionStorage.getItem("homeTeam") || "Four Corners";
       const awayTeam = sessionStorage.getItem("awayTeam") || "Bentley-Truman";
 
@@ -195,6 +195,8 @@
 
       let lastBallHandlerId = null;
 
+      console.log("Right before simData.turns.forEach")
+      console.log("🔍 simData.turns:", simData.turns);
       simData.turns.forEach((turn, turnIndex) => {
         console.log(`🌀 Turn ${turnIndex} timestamp:`, turn.timestamp);
         
@@ -282,29 +284,41 @@
           Object.entries(offenseLineup || {}).map(([pos, id]) => [id, pos])
         );
 
-        console.log(`🔍 Turn ${turnIndex} @ ${turn.timestamp}`);
-        enrichedAnimations.forEach(p => {
-          console.log(`🧠 ${p.pos} actions:`, p.actions);
-        });
+        let fromPlayerId = null;
+        let toPlayerId = null;
+        let passTimestamp = null;
 
-        const fromPlayerId = enrichedAnimations.find(p =>
-          p.actions?.some(a => {
-            console.log(`🟡 Checking for PASS: ${p.playerId} ${a.type} @ ${a.timestamp} vs turn ${turn.timestamp}`);
-            return Math.abs(a.timestamp - turn.timestamp) <= 50 && a.type === "pass";
-          })
-        )?.playerId;
+        // Step 1: Find pass timestamp and fromPlayerId
+        for (const p of enrichedAnimations) {
+          const passAction = p.actions?.find(a => a.type === "pass");
+          if (passAction) {
+            fromPlayerId = p.playerId;
+            passTimestamp = passAction.timestamp;
+            break; // stop after first pass found
+          }
+        }
 
-        const toPlayerId = enrichedAnimations.find(p =>
-          p.actions?.some(a => {
-            console.log(`🔵 Checking for RECEIVE: ${p.playerId} ${a.type} @ ${a.timestamp} vs turn ${turn.timestamp}`);
-            return Math.abs(a.timestamp - turn.timestamp) <= 50 && a.type === "receive";
-          })
-        )?.playerId;
+        // Step 2: Find toPlayerId from receive at same timestamp
+        if (passTimestamp !== null) {
+          for (const p of enrichedAnimations) {
+            if (p.playerId === fromPlayerId) continue;
+            const receiveAction = p.actions?.find(
+              a => a.type === "receive" && a.timestamp === passTimestamp
+            );
+            if (receiveAction) {
+              toPlayerId = p.playerId;
+              break;
+            }
+          }
+        }
 
         const fromPos = playerIdToPos[fromPlayerId];
         const toPos = playerIdToPos[toPlayerId];
 
-        console.log("🔍 fromPos:", fromPos, "toPos:", toPos);
+        console.log("🎯 stepTime:", stepTime);
+        console.log("📤 Passer:", fromPlayerId, fromPos);
+        console.log("📥 Receiver:", toPlayerId, toPos);
+
         if (fromPos && toPos) {
           const fromPlayer = enrichedAnimations.find(p => p.pos === fromPos);
           const toPlayer = enrichedAnimations.find(p => p.pos === toPos);
