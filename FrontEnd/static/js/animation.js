@@ -88,16 +88,14 @@ export class AnimationEngine {
       this.currentPositions[p.playerId] = { x, y };
       const pixel = this.gridToPixels(x, y);
 
-      const isBallInFlight = isBallInFlightWindow(elapsed, turn.ballTrack);
+      const isBallHandlerNow = p.hasBallAtStep?.[i] === true;
+      const ballFlightActive = isBallInFlightWindow(elapsed, turn.ballTrack);
+      const shouldAttachBall = isBallHandlerNow && !ballFlightActive;
 
-
-
-      if (p.hasBallAtStep?.[i] && (!turn.ballTrack || elapsed < turn.ballTrack.movement?.[0]?.timestamp)) {
-        console.warn("⚠️ H3C: [Player attach] ballCoords overridden by player:", p.pos);
+      if (shouldAttachBall) {
+        console.warn("⚠️ [Player attach] ballCoords overridden by player:", p.pos);
         this.ballCoords = { ...pixel };
-        // console.log("🎯 Ball attached to", p.pos, p.jersey, "at step", i, this.ballCoords);
       }
-      
       this.drawPlayer({ ...p }, pixel);
       // console.log("🎯 Ball coords inside animateFrame:", this.ballCoords);
     });
@@ -173,15 +171,15 @@ export class AnimationEngine {
         this.currentPositions[p.playerId] = { x, y };
         const pixel = this.gridToPixels(x, y);
         
-        const isBallInFlight = isBallInFlightWindow(elapsed, turn.ballTrack);
+        const isBallHandlerNow = p.hasBallAtStep?.[i] === true;
+        const ballFlightActive = isBallInFlightWindow(elapsed, turn.ballTrack);
+        const shouldAttachBall = isBallHandlerNow && !ballFlightActive;
 
-        
-       
-        if (p.hasBallAtStep?.[i] && (!turn.ballTrack || elapsed < turn.ballTrack.movement?.[0]?.timestamp)) {
-          console.warn("⚠️ H3A: [Player attach] ballCoords overridden by player:", p.pos);
+        if (shouldAttachBall) {
+          console.warn("⚠️ [Player attach] ballCoords overridden by player:", p.pos);
           this.ballCoords = { ...pixel };
-          // console.log("🎯 Ball attached to", p.pos, p.jersey, "at step", i, this.ballCoords);
         }
+
         this.drawPlayer({ ...p }, pixel);
       });
 
@@ -233,13 +231,15 @@ export class AnimationEngine {
         const movement = p.movement || [];
         const i = getStepIndexForElapsed(movement, elapsed);
         
-        const isBallInFlight = isBallInFlightWindow(elapsed, turn.ballTrack);
+        const isBallHandlerNow = p.hasBallAtStep?.[i] === true;
+        const ballFlightActive = isBallInFlightWindow(elapsed, turn.ballTrack);
+        const shouldAttachBall = isBallHandlerNow && !ballFlightActive;
 
-        if (p.hasBallAtStep?.[i] && (!turn.ballTrack || elapsed < turn.ballTrack.movement?.[0]?.timestamp)) {
-          console.warn("⚠️ H3B: [Final attach] ballCoords overridden by player:", p.pos);
+        if (shouldAttachBall) {
+          console.warn("⚠️ [Player attach] ballCoords overridden by player:", p.pos);
           this.ballCoords = { ...pixel };
-          // console.log("🎯 Ball attached to", p.pos, p.jersey, "at step", i, this.ballCoords);
-        }        
+        }
+   
         if (!p.hasBall && turn.ballTrack && p.playerId === turn.ballTrack.movement?.at(-1)?.playerId) {
           const pixel = this.gridToPixels(pos.x, pos.y);
           this.ballCoords = { ...pixel };
