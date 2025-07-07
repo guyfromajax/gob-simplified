@@ -324,8 +324,9 @@
         }
 
         // Handle shooter override
-        const shooterPos = Object.entries(posActions).find(([_, a]) => a.action === "SHOOT")?.[0];
+        const shooterPos = Object.entries(posActions).find(([_, a]) => a.action === "shoot")?.[0];
         if (shooterPos) {
+          console.log("🔍 shooterPos:", shooterPos);
           const shooter = enrichedAnimations.find(p => p.pos === shooterPos);
           if (shooter) {
             shooter.wasFinalBallHandler = true;
