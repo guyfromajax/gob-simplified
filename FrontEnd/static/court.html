@@ -293,6 +293,8 @@
           : simData.away_lineup;
 
         const playerIdToPos = Object.fromEntries(
+          console.log("Inside playerIdToPos"),
+          console.log("🔍 offenseLineup:", offenseLineup),
           Object.entries(offenseLineup || {}).map(([pos, id]) => [id, pos])
         );
 
