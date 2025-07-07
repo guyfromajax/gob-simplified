@@ -93,7 +93,7 @@ export class AnimationEngine {
       }
       
       this.drawPlayer({ ...p }, pixel);
-      console.log("🎯 Ball coords inside animateFrame:", this.ballCoords);
+      // console.log("🎯 Ball coords inside animateFrame:", this.ballCoords);
     });
 
     if (elapsed < maxDuration) {
