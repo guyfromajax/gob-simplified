@@ -112,6 +112,7 @@ class TurnManager:
         result["home_lineup"] = serialize_lineup(self.game.home_team.lineup)
         result["away_lineup"] = serialize_lineup(self.game.away_team.lineup)
 
+        print(f"inside run_micro_turn result: {result}")
         result["turns"] = []
         for step in result["steps"]:
             turn = {
