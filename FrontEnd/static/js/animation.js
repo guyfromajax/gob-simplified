@@ -93,6 +93,7 @@ export class AnimationEngine {
       }
       
       this.drawPlayer({ ...p }, pixel);
+      console.log("🎯 Ball coords inside animateFrame:", this.ballCoords);
     });
 
     if (elapsed < maxDuration) {
@@ -184,13 +185,13 @@ export class AnimationEngine {
       if (this.ballCoords && this.ballImage?.complete) {
         const pulse = 1 + 0.3 * Math.sin(currentTime / 100);  // range ~0.9 to 1.1
         const ballSize = 16 * pulse;
-        // ctx.drawImage(
-        //   this.ballImage,
-        //   this.ballCoords.x - ballSize / 2,
-        //   this.ballCoords.y - ballSize / 2,
-        //   ballSize,
-        //   ballSize
-        // );
+        ctx.drawImage(
+          this.ballImage,
+          this.ballCoords.x - ballSize / 2,
+          this.ballCoords.y - ballSize / 2,
+          ballSize,
+          ballSize
+        );
       }
       requestAnimationFrame(this.animateFrame.bind(this));
     } else {
@@ -205,13 +206,13 @@ export class AnimationEngine {
             const pulse = 1 + 0.3 * Math.sin(currentTime / 100);  // subtle scale effect
             const ballSize = 16 * pulse;
             console.log("✅ Drawing ball with coords:", this.ballCoords);
-            // ctx.drawImage(
-            //   this.ballImage,
-            //   this.ballCoords.x - ballSize / 2,
-            //   this.ballCoords.y - ballSize / 2,
-            //   ballSize,
-            //   ballSize
-            // );
+            ctx.drawImage(
+              this.ballImage,
+              this.ballCoords.x - ballSize / 2,
+              this.ballCoords.y - ballSize / 2,
+              ballSize,
+              ballSize
+            );
           } else {
             console.warn("🚫 Skipping draw — ballImage not ready or undefined");
           }
@@ -251,13 +252,13 @@ export class AnimationEngine {
       if (this.ballCoords && this.ballImage?.complete) {
         const pulse = 1 + 0.3 * Math.sin(currentTime / 100);  // range ~0.9 to 1.1
         const ballSize = 16 * pulse;
-        // ctx.drawImage(
-        //   this.ballImage,
-        //   this.ballCoords.x - ballSize / 2,
-        //   this.ballCoords.y - ballSize / 2,
-        //   ballSize,
-        //   ballSize
-        // );
+        ctx.drawImage(
+          this.ballImage,
+          this.ballCoords.x - ballSize / 2,
+          this.ballCoords.y - ballSize / 2,
+          ballSize,
+          ballSize
+        );
       }
       
       this.turnIndex++;
