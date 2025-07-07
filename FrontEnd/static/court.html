@@ -293,11 +293,6 @@
           : turn.away_lineup;
 
           console.log("🧩 Raw offenseLineup:", offenseLineup);
-          console.log("🔍 offenseLineup structure check:");
-          Object.entries(offenseLineup || {}).forEach(([pos, player]) => {
-            const id = player?.id;
-            console.log(`   ${pos}: id =`, id, "| type =", typeof id);
-          });
 
           const playerIdToPos = Object.fromEntries(
             Object.entries(offenseLineup || {}).map(([pos, playerId]) => [playerId, pos])
