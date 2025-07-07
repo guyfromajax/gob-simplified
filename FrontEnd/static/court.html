@@ -283,8 +283,19 @@
 
 
         // Detect and flag pass logic
-        const fromPos = Object.entries(posActions).find(([_, a]) => a.action === "pass")?.[0];
-        const toPos = Object.entries(posActions).find(([_, a]) => a.action === "receive")?.[0];
+        console.log(`🔍 Turn ${turnIndex} @ ${turn.timestamp}`);
+        enrichedAnimations.forEach(p => {
+          console.log(`🧠 ${p.pos} actions:`, p.actions);
+        });
+
+        const fromPos = enrichedAnimations.find(p =>
+          p.actions?.some(a => Math.abs(a.timestamp - turn.timestamp) <= 50 && a.type === "pass")
+        )?.pos;
+
+        const toPos = enrichedAnimations.find(p =>
+          p.actions?.some(a => Math.abs(a.timestamp - turn.timestamp) <= 50 && a.type === "receive")
+        )?.pos;
+
 
         console.log("🔍 fromPos:", fromPos, "toPos:", toPos);
         if (fromPos && toPos) {
