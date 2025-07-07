@@ -292,11 +292,16 @@
           ? simData.home_lineup
           : simData.away_lineup;
 
-        const playerIdToPos = Object.fromEntries(
-          console.log("Inside playerIdToPos"),
-          console.log("🔍 offenseLineup:", offenseLineup),
-          Object.entries(offenseLineup || {}).map(([pos, id]) => [id, pos])
-        );
+          console.log("🔍 offenseLineup structure check:");
+          Object.entries(offenseLineup || {}).forEach(([pos, player]) => {
+            const id = player?.id;
+            console.log(`   ${pos}: id =`, id, "| type =", typeof id);
+          });
+
+          const playerIdToPos = Object.fromEntries(
+            Object.entries(offenseLineup || {}).map(([pos, player]) => [player?.id, pos])
+          );
+
 
         let fromPlayerId = null;
         let toPlayerId = null;
