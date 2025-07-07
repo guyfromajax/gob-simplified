@@ -282,11 +282,15 @@
         });
 
 
-        // Detect and flag pass logic
+        const offenseTeamId = simData.possession_team_id;
+        const offenseLineup = offenseTeamId === simData.home_team_id
+          ? simData.home_lineup
+          : simData.away_lineup;
+
         const playerIdToPos = Object.fromEntries(
-          Object.entries(simData.home_lineup).concat(Object.entries(simData.away_lineup))
-            .map(([pos, id]) => [id, pos])
+          Object.entries(offenseLineup || {}).map(([pos, id]) => [id, pos])
         );
+
         console.log(`🔍 Turn ${turnIndex} @ ${turn.timestamp}`);
         enrichedAnimations.forEach(p => {
           console.log(`🧠 ${p.pos} actions:`, p.actions);
@@ -308,18 +312,22 @@
           const fromPlayer = enrichedAnimations.find(p => p.pos === fromPos);
           const toPlayer = enrichedAnimations.find(p => p.pos === toPos);
           if (fromPlayer && toPlayer) {
-            const passStart = fromPlayer.movement.at(-1)?.timestamp || turn.timestamp;
-            const passEnd = toPlayer.movement[0]?.timestamp || (passStart + 300);
-            const ballTrack = {
-              playerId: "BALL",
-              movement: [
-                { timestamp: passStart, coords: fromPlayer.movement.at(-1).coords },
-                { timestamp: passEnd, coords: toPlayer.movement[0].coords }
-              ]
-            };
-            turn.ballTrack = ballTrack;
-            console.log("📦 Injected ballTrack for turn:", turnIndex, ballTrack);
-            console.log("💨 Ball flight from", ballTrack.movement[0], "to", ballTrack.movement[1]);
+            const fromMove = fromPlayer.movement?.at(-1);
+            const toMove = toPlayer.movement?.[0];
+            if (fromMove && toMove) {
+              const passStart = fromMove.timestamp;
+              const passEnd = toMove.timestamp;
+              const ballTrack = {
+                playerId: "BALL",
+                movement: [
+                  { timestamp: passStart, coords: fromMove.coords },
+                  { timestamp: passEnd, coords: toMove.coords }
+                ]
+              };
+              turn.ballTrack = ballTrack;
+              console.log("📦 Injected ballTrack for turn:", turnIndex, ballTrack);
+              console.log("💨 Ball flight from", ballTrack.movement[0], "to", ballTrack.movement[1]);
+            }
           }
         }
 
