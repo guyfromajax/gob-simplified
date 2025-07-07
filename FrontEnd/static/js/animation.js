@@ -60,6 +60,13 @@ export class AnimationEngine {
     const ballEnd = turn.ballTrack?.movement?.[1]?.timestamp || 0;
     const maxDuration = Math.max(playerEnd, ballEnd);
 
+    function isBallInFlightWindow(elapsed, ballTrack) {
+      if (!ballTrack || !ballTrack.movement || ballTrack.movement.length < 2) return false;
+      const start = ballTrack.movement[0].timestamp;
+      const end = ballTrack.movement.at(-1).timestamp;
+      return elapsed >= start && elapsed <= end;
+    }
+
     this.activePlayers.forEach(p => {
       const movement = p.movement || [];
       if (movement.length === 0) return;
@@ -81,10 +88,8 @@ export class AnimationEngine {
       this.currentPositions[p.playerId] = { x, y };
       const pixel = this.gridToPixels(x, y);
 
-      const ballTrackEnd = turn.ballTrack?.movement?.[1]?.timestamp;
-      const isBallInFlight = !!ballTrackEnd && elapsed < ballTrackEnd;
+      const isBallInFlight = isBallInFlightWindow(elapsed, turn.ballTrack);
 
-      // console.log(`isBallInFlight: ${isBallInFlight}, elapsed: ${elapsed}, threshold: ${ballTrackEnd}`);
 
 
       if (p.hasBallAtStep?.[i] && (!turn.ballTrack || elapsed < turn.ballTrack.movement?.[0]?.timestamp)) {
@@ -110,7 +115,6 @@ export class AnimationEngine {
             `🕒 #1 Ball flight from ${movement[0].timestamp} to ${movement[1].timestamp}, elapsed: ${elapsed}`
           );
         }        
-        console.log(`📍 Ball interpolated position: x=${x}, y=${y}`);
         
         if (movement.length >= 2) {
           const i = getStepIndexForElapsed(movement, elapsed);
@@ -125,6 +129,7 @@ export class AnimationEngine {
 
           const x = a.coords.x + (b.coords.x - a.coords.x) * t;
           const y = a.coords.y + (b.coords.y - a.coords.y) * t;
+          console.log(`📍 Ball interpolated position: x=${x}, y=${y}`);
           const pixel = this.gridToPixels(x, y);
           this.ballCoords = { ...pixel };
           // console.log("📍 #3 Ball coords updated to:", this.ballCoords);
@@ -168,10 +173,7 @@ export class AnimationEngine {
         this.currentPositions[p.playerId] = { x, y };
         const pixel = this.gridToPixels(x, y);
         
-        const ballTrackEnd = turn.ballTrack?.movement?.[1]?.timestamp;
-        const isBallInFlight = !!ballTrackEnd && elapsed < ballTrackEnd;
-
-        // console.log(`isBallInFlight: ${isBallInFlight}, elapsed: ${elapsed}, threshold: ${ballTrackEnd}`);
+        const isBallInFlight = isBallInFlightWindow(elapsed, turn.ballTrack);
 
         
        
@@ -231,10 +233,7 @@ export class AnimationEngine {
         const movement = p.movement || [];
         const i = getStepIndexForElapsed(movement, elapsed);
         
-        const ballTrackEnd = turn.ballTrack?.movement?.[1]?.timestamp;
-        const isBallInFlight = !!ballTrackEnd && elapsed < ballTrackEnd;
-
-        // console.log(`isBallInFlight: ${isBallInFlight}, elapsed: ${elapsed}, threshold: ${ballTrackEnd}`);
+        const isBallInFlight = isBallInFlightWindow(elapsed, turn.ballTrack);
 
         if (p.hasBallAtStep?.[i] && (!turn.ballTrack || elapsed < turn.ballTrack.movement?.[0]?.timestamp)) {
           console.warn("⚠️ H3B: [Final attach] ballCoords overridden by player:", p.pos);
