@@ -221,7 +221,6 @@
           const actionAtStep = anim.actions?.find(
             a => Math.abs(a.timestamp - stepTime) <= 50 && ["handle_ball", "receive"].includes(a.type)
           );
-          console.log(`Checking action timestamp ${a.timestamp} vs turn timestamp ${turn.timestamp}`);
           if (actionAtStep) {
             stepBallHandlerId = anim.playerId;
             break; // only one player should handle the ball per step
@@ -298,11 +297,17 @@
         });
 
         const fromPlayerId = enrichedAnimations.find(p =>
-          p.actions?.some(a => Math.abs(a.timestamp - turn.timestamp) <= 50 && a.type === "pass")
+          p.actions?.some(a => {
+            console.log(`🟡 Checking for PASS: ${p.playerId} ${a.type} @ ${a.timestamp} vs turn ${turn.timestamp}`);
+            return Math.abs(a.timestamp - turn.timestamp) <= 50 && a.type === "pass";
+          })
         )?.playerId;
 
         const toPlayerId = enrichedAnimations.find(p =>
-          p.actions?.some(a => Math.abs(a.timestamp - turn.timestamp) <= 50 && a.type === "receive")
+          p.actions?.some(a => {
+            console.log(`🔵 Checking for RECEIVE: ${p.playerId} ${a.type} @ ${a.timestamp} vs turn ${turn.timestamp}`);
+            return Math.abs(a.timestamp - turn.timestamp) <= 50 && a.type === "receive";
+          })
         )?.playerId;
 
         const fromPos = playerIdToPos[fromPlayerId];
