@@ -206,6 +206,9 @@
       let lastBallHandlerId = null;
 
       simData.turns.forEach((turn, turnIndex) => {
+        if (!turn.ballTrack) {
+          console.warn(`⚠️ No ballTrack on turn ${turnIndex}`);
+        }
         const posActions = turn.pos_actions || {};
 
         const stepTime = turn.timestamp;
@@ -232,9 +235,9 @@
         if (stepBallHandlerId) {
           lastBallHandlerId = stepBallHandlerId;
         }
-        console.log(`⛹️ Step ${turnIndex} ball handler:`, stepBallHandlerId);
+        // console.log(`⛹️ Step ${turnIndex} ball handler:`, stepBallHandlerId);
 
-        console.log(`🔎 Turn ${turnIndex} animation sample:`, turn.animations?.[0]);
+        // console.log(`🔎 Turn ${turnIndex} animation sample:`, turn.animations?.[0]);
         const enrichedAnimations = turn.animations.map(anim => {
           const fullPlayer = allPlayers.find(p =>
             (p.playerId || p._id || p.player_id || "") === anim.playerId
