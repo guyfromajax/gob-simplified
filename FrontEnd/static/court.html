@@ -332,8 +332,11 @@
         console.log("📥 Receiver:", toPlayerId, toPos);
 
         if (fromPos && toPos) {
-          const fromPlayer = enrichedAnimations.find(p => p.pos === fromPos);
-          const toPlayer = enrichedAnimations.find(p => p.pos === toPos);
+          // const fromPlayer = enrichedAnimations.find(p => p.pos === fromPos);
+          // const toPlayer = enrichedAnimations.find(p => p.pos === toPos);
+          const fromPlayer = enrichedAnimations.find(p => p.playerId === fromPlayerId);
+          const toPlayer = enrichedAnimations.find(p => p.playerId === toPlayerId);
+
           if (fromPlayer && toPlayer) {
             const fromMove = fromPlayer.movement?.at(-1);
             const toMove = toPlayer.movement?.[0];
