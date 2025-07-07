@@ -292,6 +292,7 @@
           ? simData.home_lineup
           : simData.away_lineup;
 
+          console.log("🧩 Raw offenseLineup:", offenseLineup);
           console.log("🔍 offenseLineup structure check:");
           Object.entries(offenseLineup || {}).forEach(([pos, player]) => {
             const id = player?.id;
@@ -299,7 +300,7 @@
           });
 
           const playerIdToPos = Object.fromEntries(
-            Object.entries(offenseLineup || {}).map(([pos, player]) => [player?.id, pos])
+            Object.entries(offenseLineup || {}).map(([pos, playerId]) => [playerId, pos])
           );
 
 
