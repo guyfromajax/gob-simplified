@@ -198,7 +198,7 @@
       console.log("Right before simData.turns.forEach")
       console.log("🔍 simData.turns:", simData.turns);
       simData.turns.forEach((turn, turnIndex) => {
-        console.log(`🌀 Turn ${turnIndex} timestamp:`, turn.timestamp);
+        console.log(`🌀 Turn ${turnIndex}`);
         
         if (!turn.ballTrack) {
           console.warn(`⚠️ No ballTrack on turn ${turnIndex}`);
@@ -370,6 +370,14 @@
       };
 
       engine.setTeams(teamInfo, allPlayers);
+      simData.turns.forEach(turn => {
+        const stepTime = turn.timestamp ?? 0; // or recompute from max action timestamp if needed
+        for (const player of turn.animations) {
+          const stepIndex = player.movement?.findIndex(m => m.timestamp === stepTime);
+          player.currentStepIndex = stepIndex >= 0 ? stepIndex : 0;
+        }
+      });
+
       engine.start(simData.turns);
     
     }
