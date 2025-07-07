@@ -130,15 +130,10 @@
       if (player.hasBallAtStep?.[player.currentStepIndex]) {
         ballCoords = { ...pixelCoords };
       }
-
-
     }
-
     const engine = new AnimationEngine(ctx, gridToPixels, drawPlayer, 0.3); // lower # = slower animation
-
     engine.setBallImage(ballImage);
 
-    
     async function loadSimAndStart() {
       const homeTeam = sessionStorage.getItem("homeTeam") || "Four Corners";
       const awayTeam = sessionStorage.getItem("awayTeam") || "Bentley-Truman";
@@ -166,11 +161,6 @@
 
       const homeLineup = simData.home_lineup || (simData.turns[0]?.home_lineup || {});
       const awayLineup = simData.away_lineup || (simData.turns[0]?.away_lineup || {});
-
-      // console.log("home lineup:", homeLineup);
-      // console.log("away lineup:", awayLineup);
-
-      // const allPlayers = [];
 
       for (const [pos, id] of Object.entries(homeLineup)) {
         const idStr = (id || "").toString();
@@ -206,6 +196,8 @@
       let lastBallHandlerId = null;
 
       simData.turns.forEach((turn, turnIndex) => {
+        console.log(`🌀 Turn ${turnIndex} timestamp:`, turn.timestamp);
+        
         if (!turn.ballTrack) {
           console.warn(`⚠️ No ballTrack on turn ${turnIndex}`);
         }
@@ -280,7 +272,6 @@
             hasBallAtStep
           };
         });
-
 
         const offenseTeamId = simData.possession_team_id;
         const offenseLineup = offenseTeamId === simData.home_team_id
