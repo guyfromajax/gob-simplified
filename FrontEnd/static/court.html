@@ -287,10 +287,10 @@
           };
         });
 
-        const offenseTeamId = simData.possession_team_id;
+        const offenseTeamId = turn.possession_team_id;
         const offenseLineup = offenseTeamId === simData.home_team_id
-          ? simData.home_lineup
-          : simData.away_lineup;
+          ? turn.home_lineup
+          : turn.away_lineup;
 
           console.log("🧩 Raw offenseLineup:", offenseLineup);
           console.log("🔍 offenseLineup structure check:");
