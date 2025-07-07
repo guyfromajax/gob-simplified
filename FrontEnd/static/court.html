@@ -45,6 +45,21 @@
     ballImage.onload = () => console.log("🏀 Ball image loaded");
     let ballCoords = null;
 
+    function generateBallTrack(start, end, durationMs, steps = 20) {
+      const movement = [];
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        const timestamp = durationMs * t;
+        const coords = {
+          x: start.x + (end.x - start.x) * t,
+          y: start.y + (end.y - start.y) * t,
+        };
+        movement.push({ timestamp, coords });
+      }
+      return movement;
+    }
+
+
 
 
     const HCO_STRING_SPOTS = {
@@ -328,13 +343,12 @@
             if (fromMove && toMove) {
               const passStart = fromMove.timestamp;
               const passEnd = toMove.timestamp;
+              const duration = passEnd - passStart;
               const ballTrack = {
                 playerId: "BALL",
-                movement: [
-                  { timestamp: passStart, coords: fromMove.coords },
-                  { timestamp: passEnd, coords: toMove.coords }
-                ]
+                movement: generateBallTrack(fromMove.coords, toMove.coords, duration)
               };
+
               turn.ballTrack = ballTrack;
               console.log("📦 Injected ballTrack for turn:", turnIndex, ballTrack);
               console.log("💨 Ball flight from", ballTrack.movement[0], "to", ballTrack.movement[1]);
