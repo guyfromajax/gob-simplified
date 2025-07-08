@@ -305,14 +305,17 @@
               const passStep = p.movement?.find(m => m.action === "pass" && m.timestamp === timestamp);
               if (passStep) fromPlayer = { ...p, step: passStep };
 
-              const receiveStep = p.movement?.find(m => m.action === "receive" && m.timestamp === timestamp);
+              const receiveStep = p.movement?.find(m =>
+                m.action === "receive" && m.timestamp > timestamp && m.timestamp <= timestamp + 600
+              );
+
               if (receiveStep) toPlayer = { ...p, step: receiveStep };
             }
 
             if (fromPlayer && toPlayer) {
               const start = fromPlayer.step.timestamp;
               const end = toPlayer.step.timestamp;
-              const duration = end - start;
+              const duration = Math.max(end - start, 400);
               console.log("💨 Ball track duration (ms):", duration);
 
               const ballTrack = {
