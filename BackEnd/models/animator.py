@@ -43,6 +43,8 @@ class Animator:
 
         for pos, player in off_lineup.items():
             timeline = action_timeline.get(player, [])
+            print("Inside capture_halfcourt_animation")
+            print(f"[DEBUG] timeline: {timeline}")
             if not timeline:
                 continue
 
@@ -68,7 +70,7 @@ class Animator:
                 movement.append({
                     "timestamp": t,
                     "coords": coord,
-                    "action": ACTIONS[action]  # e.g., "pass", "screen", "shoot", "cut"
+                    "action": action # e.g., "pass", "screen", "shoot", "cut"
                 })
 
             animations.append({
