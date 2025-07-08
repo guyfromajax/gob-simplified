@@ -1,0 +1,11 @@
+# Keep your container lean
+__pycache__/
+.venv/
+.env
+node_modules/
+.git/
+*.db
+*.csv
+*.mp4
+*.zip
+.DS_Store
