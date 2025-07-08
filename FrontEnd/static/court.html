@@ -251,7 +251,6 @@
             (p.playerId || p._id || p.player_id || "") === anim.playerId
           );
           
-          const hasBallAtStep = [];
           const hasBallAtStep = (anim.movement || []).map((step) => {
             const isHandler = step.action === "handle_ball";
             const isReceiver = step.action === "receive";
