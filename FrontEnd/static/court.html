@@ -224,9 +224,15 @@
         let stepBallHandlerId = null;
 
         for (const anim of turn.animations) {
-          const actionAtStep = anim.actions?.find(
-            a => Math.abs(a.timestamp - stepTime) <= 50 && ["handle_ball", "receive"].includes(a.type)
+          const stepIndex = anim.movement?.findIndex(
+            m => Math.abs(m.timestamp - stepTime) <= 50 &&
+                ["handle_ball", "receive"].includes(m.action)
           );
+          if (stepIndex !== -1) {
+            stepBallHandlerId = anim.playerId;
+            break;
+          }
+
           if (actionAtStep) {
             stepBallHandlerId = anim.playerId;
             break; // only one player should handle the ball per step
@@ -252,10 +258,15 @@
           
           const hasBallAtStep = [];
           (anim.movement || []).forEach((step, i) => {
-            const matchingAction = (anim.actions || []).find(
-              a => Math.abs(a.timestamp - step.timestamp) <= 50 &&
-                  ["handle_ball", "receive"].includes(a.type)
-            );
+            const hasBallAtStep = (anim.movement || []).map((step) => {
+            const isHandler = step.action === "handle_ball";
+            const isReceiver = step.action === "receive";
+            const isTooEarly = turn.ballTrack?.movement?.[1]?.timestamp &&
+                              step.timestamp < turn.ballTrack.movement[1].timestamp;
+
+            return isHandler || (isReceiver && !isTooEarly);
+          });
+
             const ballArrivesAt = turn.ballTrack?.movement?.[1]?.timestamp;
             const stepTime = step.timestamp;
 
@@ -267,7 +278,6 @@
 
             hasBallAtStep.push(shouldHaveBall);
           });
-
 
           const isHandler = anim.playerId === stepBallHandlerId;
 
@@ -305,7 +315,7 @@
 
         // Step 1: Find pass timestamp and fromPlayerId
         for (const p of enrichedAnimations) {
-          const passAction = p.actions?.find(a => a.type === "pass");
+          const passAction = p.movement?.find(step => step.action === "pass")
           if (passAction) {
             fromPlayerId = p.playerId;
             passTimestamp = passAction.timestamp;
@@ -313,19 +323,22 @@
           }
         }
 
-        // Step 2: Find toPlayerId from receive at same timestamp
+        // Step 2: Find toPlayerId from receive at same timestamp 
         if (passTimestamp !== null) {
           for (const p of enrichedAnimations) {
             if (p.playerId === fromPlayerId) continue;
-            const receiveAction = p.actions?.find(
-              a => a.type === "receive" && a.timestamp === passTimestamp
+
+            const receiveStep = p.movement?.find(
+              step => step.action === "receive" && step.timestamp === passTimestamp
             );
-            if (receiveAction) {
+
+            if (receiveStep) {
               toPlayerId = p.playerId;
               break;
             }
           }
         }
+
 
         const fromPos = playerIdToPos[fromPlayerId];
         const toPos = playerIdToPos[toPlayerId];
@@ -335,23 +348,23 @@
         console.log("📥 Receiver:", toPlayerId, toPos);
 
         if (fromPos && toPos) {
-          // const fromPlayer = enrichedAnimations.find(p => p.pos === fromPos);
-          // const toPlayer = enrichedAnimations.find(p => p.pos === toPos);
           const fromPlayer = enrichedAnimations.find(p => p.playerId === fromPlayerId);
           const toPlayer = enrichedAnimations.find(p => p.playerId === toPlayerId);
 
           if (fromPlayer && toPlayer) {
-            const fromMove = fromPlayer.movement?.at(-1);
-            const toMove = toPlayer.movement?.[0];
-            if (fromMove && toMove) {
-              const passStart = fromMove.timestamp;
-              const passEnd = toMove.timestamp;
+            const passStep = fromPlayer.movement.find(m => m.action === "pass");
+            const receiveStep = toPlayer.movement.find(
+              m => m.action === "receive" && m.timestamp === passStep?.timestamp
+            );
+
+            if (passStep && receiveStep) {
+              const passStart = passStep.timestamp;
+              const passEnd = receiveStep.timestamp;
               const duration = passEnd - passStart;
               const ballTrack = {
                 playerId: "BALL",
-                movement: generateBallTrack(fromMove.coords, toMove.coords, duration, passStart)
+                movement: generateBallTrack(passStep.coords, receiveStep.coords, duration, passStart)
               };
-
 
               turn.ballTrack = ballTrack;
               console.log("📦 Injected ballTrack for turn:", turnIndex, ballTrack);
@@ -359,6 +372,7 @@
             }
           }
         }
+
 
         // Handle shooter override
         const shooterPos = Object.entries(posActions).find(([_, a]) => a.action === "shoot")?.[0];
