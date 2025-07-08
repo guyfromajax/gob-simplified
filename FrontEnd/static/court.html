@@ -289,71 +289,48 @@
             Object.entries(offenseLineup || {}).map(([pos, playerId]) => [playerId, pos])
           );
 
+          turn.ballTracksByTimestamp = {}; // New map of timestamp → ballTrack
 
-        let fromPlayerId = null;
-        let toPlayerId = null;
-        let passTimestamp = null;
+          // Collect all unique timestamps for the turn
+          const allTimestamps = [...new Set(
+            enrichedAnimations.flatMap(p => p.movement?.map(m => m.timestamp) || [])
+          )].sort((a, b) => a - b);
 
-        // Step 1: Find pass timestamp and fromPlayerId
-        for (const p of enrichedAnimations) {
-          const passAction = p.movement?.find(step => step.action === "pass")
-          if (passAction) {
-            fromPlayerId = p.playerId;
-            passTimestamp = passAction.timestamp;
-            break; // stop after first pass found
-          }
-        }
+          // For each timestamp in the turn
+          for (const timestamp of allTimestamps) {
+            let fromPlayer = null;
+            let toPlayer = null;
 
-        // Step 2: Find toPlayerId from receive at same timestamp 
-        if (passTimestamp !== null) {
-          for (const p of enrichedAnimations) {
-            if (p.playerId === fromPlayerId) continue;
+            for (const p of enrichedAnimations) {
+              const passStep = p.movement?.find(m => m.action === "pass" && m.timestamp === timestamp);
+              if (passStep) fromPlayer = { ...p, step: passStep };
 
-            const receiveStep = p.movement?.find(
-              step => step.action === "receive" && step.timestamp === passTimestamp
-            );
-
-            if (receiveStep) {
-              toPlayerId = p.playerId;
-              break;
+              const receiveStep = p.movement?.find(m => m.action === "receive" && m.timestamp === timestamp);
+              if (receiveStep) toPlayer = { ...p, step: receiveStep };
             }
-          }
-        }
 
+            if (fromPlayer && toPlayer) {
+              const start = fromPlayer.step.timestamp;
+              const end = toPlayer.step.timestamp;
+              const duration = end - start;
 
-        const fromPos = playerIdToPos[fromPlayerId];
-        const toPos = playerIdToPos[toPlayerId];
-
-        console.log("🎯 stepTime:", stepTime);
-        console.log("📤 Passer:", fromPlayerId, fromPos);
-        console.log("📥 Receiver:", toPlayerId, toPos);
-
-        if (fromPos && toPos) {
-          const fromPlayer = enrichedAnimations.find(p => p.playerId === fromPlayerId);
-          const toPlayer = enrichedAnimations.find(p => p.playerId === toPlayerId);
-
-          if (fromPlayer && toPlayer) {
-            const passStep = fromPlayer.movement.find(m => m.action === "pass");
-            const receiveStep = toPlayer.movement.find(
-              m => m.action === "receive" && m.timestamp === passStep?.timestamp
-            );
-
-            if (passStep && receiveStep) {
-              const passStart = passStep.timestamp;
-              const passEnd = receiveStep.timestamp;
-              const duration = passEnd - passStart;
               const ballTrack = {
                 playerId: "BALL",
-                movement: generateBallTrack(passStep.coords, receiveStep.coords, duration, passStart)
+                movement: generateBallTrack(fromPlayer.step.coords, toPlayer.step.coords, duration, start)
               };
 
-              turn.ballTrack = ballTrack;
-              console.log("📦 Injected ballTrack for turn:", turnIndex, ballTrack);
-              console.log("💨 Ball flight from", ballTrack.movement[0], "to", ballTrack.movement[1]);
+              turn.ballTracksByTimestamp[start] = ballTrack;
+
+              console.log("📦 Step-level ballTrack:", {
+                turn: turnIndex,
+                timestamp: start,
+                from: fromPlayer.playerId,
+                to: toPlayer.playerId,
+                ballTrack
+              });
             }
           }
-        }
-
+  
 
         // Handle shooter override
         const shooterPos = Object.entries(posActions).find(([_, a]) => a.action === "shoot")?.[0];

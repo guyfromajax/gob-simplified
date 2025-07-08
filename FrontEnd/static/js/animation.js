@@ -50,6 +50,13 @@ export class AnimationEngine {
 
   animateFrame(currentTime) {
     const elapsed = (currentTime - this.startTime) * this.speedMultiplier;
+    let activeBallTrack = null;
+    if (turn.ballTracksByTimestamp) {
+      activeBallTrack = Object.values(turn.ballTracksByTimestamp).find(bt =>
+        isBallInFlightWindow(elapsed, bt)
+      );
+    }
+
     const turn = this.turns[this.turnIndex];
     const ctx = this.ctx;
     ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
@@ -57,7 +64,7 @@ export class AnimationEngine {
     const playerEnd = Math.max(
       ...this.activePlayers.map(p => p.movement?.at(-1)?.timestamp || 0)
     );
-    const ballEnd = turn.ballTrack?.movement?.[1]?.timestamp || 0;
+    const ballEnd = activeBallTrack?.movement?.[1]?.timestamp || 0;
     const maxDuration = Math.max(playerEnd, ballEnd);
 
     function isBallInFlightWindow(elapsed, ballTrack) {
@@ -89,7 +96,7 @@ export class AnimationEngine {
       const pixel = this.gridToPixels(x, y);
 
       const isBallHandlerNow = p.hasBallAtStep?.[i] === true;
-      const ballFlightActive = isBallInFlightWindow(elapsed, turn.ballTrack);
+      const ballFlightActive = isBallInFlightWindow(elapsed, activeBallTrack);
       const shouldAttachBall = isBallHandlerNow && !ballFlightActive;
 
       if (shouldAttachBall) {
@@ -101,8 +108,8 @@ export class AnimationEngine {
     });
 
     if (elapsed < maxDuration) {
-      if (turn.ballTrack) {
-        const movement = turn.ballTrack.movement || [];
+      if (activeBallTrack) {
+        const movement = activeBallTrack?.movement || [];
         const [startTime, endTime] = [
           movement[0]?.timestamp,
           movement[1]?.timestamp
@@ -172,7 +179,7 @@ export class AnimationEngine {
         const pixel = this.gridToPixels(x, y);
         
         const isBallHandlerNow = p.hasBallAtStep?.[i] === true;
-        const ballFlightActive = isBallInFlightWindow(elapsed, turn.ballTrack);
+        const ballFlightActive = isBallInFlightWindow(elapsed, activeBallTrack);
         const shouldAttachBall = isBallHandlerNow && !ballFlightActive;
 
         if (shouldAttachBall) {
@@ -200,8 +207,8 @@ export class AnimationEngine {
     } else {
       // ensure final positions are drawn once more
       ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-      if (turn.ballTrack) {
-        const lastCoords = turn.ballTrack.movement.at(-1)?.coords;
+      if (activeBallTrack) {
+        const lastCoords = activeBallTrack?.movement.at(-1)?.coords;
         if (lastCoords) {
           const pixel = this.gridToPixels(lastCoords.x, lastCoords.y);
           this.ballCoords = { ...pixel };
@@ -232,7 +239,7 @@ export class AnimationEngine {
         const i = getStepIndexForElapsed(movement, elapsed);
         
         const isBallHandlerNow = p.hasBallAtStep?.[i] === true;
-        const ballFlightActive = isBallInFlightWindow(elapsed, turn.ballTrack);
+        const ballFlightActive = isBallInFlightWindow(elapsed, activeBallTrack);
         const shouldAttachBall = isBallHandlerNow && !ballFlightActive;
 
         if (shouldAttachBall) {
@@ -240,7 +247,7 @@ export class AnimationEngine {
           this.ballCoords = { ...pixel };
         }
    
-        if (!p.hasBall && turn.ballTrack && p.playerId === turn.ballTrack.movement?.at(-1)?.playerId) {
+        if (!p.hasBall && activeBallTrack && p.playerId === activeBallTrack?.movement?.at(-1)?.playerId) {
           const pixel = this.gridToPixels(pos.x, pos.y);
           this.ballCoords = { ...pixel };
           // console.log("📍 #5 Ball coords updated to:", this.ballCoords);
