@@ -252,26 +252,13 @@
           );
           
           const hasBallAtStep = [];
-          (anim.movement || []).forEach((step, i) => {
-            const hasBallAtStep = (anim.movement || []).map((step) => {
+          const hasBallAtStep = (anim.movement || []).map((step) => {
             const isHandler = step.action === "handle_ball";
             const isReceiver = step.action === "receive";
             const isTooEarly = turn.ballTrack?.movement?.[1]?.timestamp &&
                               step.timestamp < turn.ballTrack.movement[1].timestamp;
 
             return isHandler || (isReceiver && !isTooEarly);
-          });
-
-            const ballArrivesAt = turn.ballTrack?.movement?.[1]?.timestamp;
-            const stepTime = step.timestamp;
-
-            const actionType = matchingAction?.type;
-            const isTooEarly = ballArrivesAt && stepTime < ballArrivesAt;
-
-            const shouldHaveBall =
-              actionType === "handle_ball" || (actionType === "receive" && !isTooEarly);
-
-            hasBallAtStep.push(shouldHaveBall);
           });
 
           const isHandler = anim.playerId === stepBallHandlerId;
