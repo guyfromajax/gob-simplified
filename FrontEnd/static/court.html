@@ -232,11 +232,6 @@
             stepBallHandlerId = anim.playerId;
             break;
           }
-
-          if (actionAtStep) {
-            stepBallHandlerId = anim.playerId;
-            break; // only one player should handle the ball per step
-          }
         }
 
         // ✅ Step 2: Fallback to previous handler if no one has ball at this step
