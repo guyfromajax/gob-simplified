@@ -27,6 +27,7 @@ class Animator:
 
         steps = roles["steps"]
         action_timeline = roles["action_timeline"]
+        print(f"[DEBUG] action_timeline: {action_timeline}")
         shooter = roles["shooter"]
         ball_handler = roles["ball_handler"]
 
@@ -44,7 +45,7 @@ class Animator:
         for pos, player in off_lineup.items():
             timeline = action_timeline.get(player, [])
             print("Inside capture_halfcourt_animation")
-            print(f"[DEBUG] timeline: {timeline}")
+            print(f"[DEBUG] timeline for {pos}: {timeline}")
             if not timeline:
                 continue
 
