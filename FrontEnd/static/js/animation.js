@@ -50,6 +50,7 @@ export class AnimationEngine {
 
   animateFrame(currentTime) {
     const elapsed = (currentTime - this.startTime) * this.speedMultiplier;
+    const turn = this.turns[this.turnIndex];
     let activeBallTrack = null;
     if (turn.ballTracksByTimestamp) {
       activeBallTrack = Object.values(turn.ballTracksByTimestamp).find(bt =>
@@ -57,7 +58,6 @@ export class AnimationEngine {
       );
     }
 
-    const turn = this.turns[this.turnIndex];
     const ctx = this.ctx;
     ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 
