@@ -28,7 +28,7 @@ export function createTestScene(Phaser) {
         startingCoords: { x: 30, y: 25 },
         movement: [
           { timestamp: 0, coords: { x: 30, y: 25 }, action: "handle_ball" },
-          { timestamp: 1000, coords: { x: 50, y: 25 }, action: "pass" }
+          { timestamp: 1000, coords: { x: 50, y: 50 }, action: "pass" }
         ],
         hasBallAtStep: [true, false] // For passer
 
