@@ -39,8 +39,8 @@ export function createTestScene(Phaser) {
         jersey: "2",
         startingCoords: { x: 60, y: 25 },
         movement: [
-          { timestamp: 1000, coords: { x: 60, y: 25 }, action: "receive" },
-          { timestamp: 2000, coords: { x: 70, y: 30 }, action: "shoot" }
+          { timestamp: 1000, coords: { x: 60, y: 10 }, action: "receive" },
+          { timestamp: 2000, coords: { x: 70, y: 40 }, action: "shoot" }
         ],
         hasBallAtStep: [false, true] // For receiver
       }
