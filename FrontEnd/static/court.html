@@ -19,20 +19,7 @@
 <body>
   <div id="phaser-container"></div>
 
-  <script type="module">
-    import { TestScene } from '/static/js/phaser/testScene.js';
-    // 👉 Change this to GameScene once you integrate real turns
+  <script type="module" src="/static/js/bootGame.js"></script> <!-- ✅ NEW -->
 
-    const config = {
-      type: Phaser.AUTO,
-      width: 1229,
-      height: 768,
-      backgroundColor: "#1e1e1e",
-      parent: "phaser-container",
-      scene: [TestScene], // 👈 Replace with GameScene later
-    };
-
-    new Phaser.Game(config);
-  </script>
 </body>
 </html>
