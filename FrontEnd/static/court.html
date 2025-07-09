@@ -304,10 +304,10 @@
             const fromPlayer = enrichedAnimations.find(p => p.playerId === fromPlayerId);
             const toPlayer = enrichedAnimations.find(p => p.playerId === toPlayerId);
 
-            const passStep = fromPlayer?.movement.find(m => m.action === "pass");
-            const receiveStep = toPlayer?.movement.find(m =>
-              m.action === "receive" && m.timestamp > passStep.timestamp
-            );
+            const timestamp = turn.timestamp;
+
+            const passStep = fromPlayer?.movement.find(m => m.action === "pass" && m.timestamp === timestamp);
+            const receiveStep = toPlayer?.movement.find(m => m.action === "receive" && m.timestamp > timestamp);
 
             if (passStep && receiveStep) {
               const start = passStep.timestamp;
@@ -320,11 +320,11 @@
               };
 
               turn.ballTracksByTimestamp[start] = ballTrack;
-              console.log("📦 Sequenced BallTrack:", { from: fromPos, to: toPos, duration });
+              console.log("📦 Sequenced BallTrack:", { turn: turnIndex, timestamp, from: fromPlayerId, to: toPlayerId, duration });
             }
           }
 
-
+          
         // Handle shooter override
         const shooterPos = Object.entries(posActions).find(([_, a]) => a.action === "shoot")?.[0];
         if (shooterPos) {
