@@ -11,7 +11,7 @@ export function animateMovementSequence({ scene, sprite, movement, onAction }) {
 
     // 🔍 Log movement and coordinates
     console.log("🔁 Tweening sprite:", sprite.name || sprite.playerId || "unknown");
-    console.log("  → From:", prev.coords, "To:", curr.coords, "Duration:", duration);
+    console.log("  → From:", JSON.stringify(prev.coords), "To:", JSON.stringify(curr.coords), "Duration:", duration);
 
     const { x: targetX, y: targetY } = gridToPixels(
       curr.coords.x,
