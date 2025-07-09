@@ -3,6 +3,7 @@ import { animateMovementSequence } from "./animateMovementSequence.js";
 export async function playTurnAnimation({ scene, playerSprites, turnData, onAction }) {
   const promises = [];
 
+  console.log("✅ playTurnAnimation received:", { scene, playerSprites, turnData });
   for (const anim of turnData.animations) {
     const sprite = playerSprites[anim.playerId];
     const movement = anim.movement;
