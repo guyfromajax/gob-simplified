@@ -100,11 +100,11 @@ export class AnimationEngine {
       const shouldAttachBall = isBallHandlerNow && !ballFlightActive;
 
       if (shouldAttachBall) {
-        console.warn("⚠️ [Player attach] ballCoords overridden by player:", p.pos);
+        // console.warn("⚠️ [Player attach] ballCoords overridden by player:", p.pos);
         this.ballCoords = { ...pixel };
       }
       this.drawPlayer({ ...p }, pixel);
-      // console.log("🎯 Ball coords inside animateFrame:", this.ballCoords);
+      
     });
 
     if (elapsed < maxDuration) {
@@ -137,7 +137,6 @@ export class AnimationEngine {
           console.log(`📍 Ball interpolated position: x=${x}, y=${y}`);
           const pixel = this.gridToPixels(x, y);
           this.ballCoords = { ...pixel };
-          // console.log("📍 #3 Ball coords updated to:", this.ballCoords);
 
           if (this.ballImage?.complete) {
             const pulse = 1 + 0.3 * Math.sin(currentTime / 100);
@@ -183,7 +182,7 @@ export class AnimationEngine {
         const shouldAttachBall = isBallHandlerNow && !ballFlightActive;
 
         if (shouldAttachBall) {
-          console.warn("⚠️ [Player attach] ballCoords overridden by player:", p.pos);
+          // console.warn("⚠️ [Player attach] ballCoords overridden by player:", p.pos);
           this.ballCoords = { ...pixel };
         }
 
@@ -243,20 +242,14 @@ export class AnimationEngine {
         const shouldAttachBall = isBallHandlerNow && !ballFlightActive;
 
         if (shouldAttachBall) {
-          console.warn("⚠️ [Player attach] ballCoords overridden by player:", p.pos);
+          // console.warn("⚠️ [Player attach] ballCoords overridden by player:", p.pos);
           this.ballCoords = { ...pixel };
         }
    
         if (!p.hasBall && activeBallTrack && p.playerId === activeBallTrack?.movement?.at(-1)?.playerId) {
           const pixel = this.gridToPixels(pos.x, pos.y);
           this.ballCoords = { ...pixel };
-          // console.log("📍 #5 Ball coords updated to:", this.ballCoords);
-        }        
-        // if (this.ballCoords) {
-        //   console.log("Ball coords:", this.ballCoords);
-        // } else {
-        //   console.log("No ball coords");
-        // }        
+        }             
         
       });        
       if (this.ballCoords && this.ballImage?.complete) {
