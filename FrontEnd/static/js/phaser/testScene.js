@@ -3,6 +3,8 @@ import { loadPhaserPlayers } from './setup/loadPhaserPlayers.js';
 import { playTurnAnimation } from './animation/playTurnAnimation.js';
 import { onAction } from './animation/onAction.js';
 import { passBall, lockBallToPlayer } from './animation/ballManager.js';
+import { gridToPixels } from './utils/gridToPixels.js';
+
 
 export function createTestScene(Phaser) {
   return class TestScene extends Phaser.Scene {
