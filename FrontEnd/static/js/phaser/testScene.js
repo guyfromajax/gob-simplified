@@ -64,13 +64,7 @@ export function createTestScene(Phaser) {
 
     this.playerSprites = loadPhaserPlayers(this, allPlayers, teamInfo, Phaser);
 
-    console.log("Player sprites loaded:", Object.keys(this.playerSprites));
-    console.log("SG sprite (should be p2):", this.playerSprites["p2"]);
-    const sgStart = gridToPixels(60, 25, this.game.config.width, this.game.config.height);
     this.add.circle(sgStart.x, sgStart.y, 6, 0xff0000).setDepth(5);
-
-    const sgDest = gridToPixels(70, 50, this.game.config.width, this.game.config.height);
-    this.add.circle(sgDest.x, sgDest.y, 6, 0x00ff00).setDepth(5); // 🟢 green dot
 
     // Create ball sprite as a white circle
     this.ballSprite = this.add.circle(0, 0, 8, 0xffffff);
