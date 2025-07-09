@@ -27,7 +27,7 @@ export function createTestScene(Phaser) {
         playerId,
         pos: "PG",
         jersey: "1",
-        startingCoords: { x: 30, y: 25 },
+        startingCoords: { x: 10, y: 10 },
         movement: [
           { timestamp: 0, coords: { x: 10, y: 10 }, action: "handle_ball" },
           { timestamp: 1000, coords: { x: 50, y: 25 }, action: "pass" }
@@ -39,7 +39,7 @@ export function createTestScene(Phaser) {
         playerId: receiverId,
         pos: "SG",
         jersey: "2",
-        startingCoords: { x: 60, y: 25 },
+        startingCoords: { x: 30, y: 25 },
         movement: [
           { timestamp: 1000, coords: { x: 30, y: 25 }, action: "receive" },
           { timestamp: 4000, coords: { x: 70, y: 40 }, action: "shoot" } // ⏱ 4 seconds
