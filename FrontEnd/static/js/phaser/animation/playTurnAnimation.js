@@ -7,6 +7,8 @@ export async function playTurnAnimation({ scene, playerSprites, turnData, onActi
     const sprite = playerSprites[anim.playerId];
     const movement = anim.movement;
 
+    console.log("playerSprites:", this.playerSprites);
+
     if (!sprite || !movement) continue;
 
     const promise = new Promise((resolve) => {
