@@ -294,6 +294,10 @@
             Object.entries(offenseLineup || {}).map(([pos, id]) => [pos, id])
           );
 
+          const allTimestamps = [...new Set(
+              enrichedAnimations.flatMap(p => p.movement?.map(m => m.timestamp) || [])
+            )].sort((a, b) => a - b);
+
           // Loop through pairs in the pass sequence
           for (let i = 0; i < passSequence.length - 1; i++) {
             const fromPos = passSequence[i];
@@ -304,18 +308,7 @@
             const fromPlayer = enrichedAnimations.find(p => p.playerId === fromPlayerId);
             const toPlayer = enrichedAnimations.find(p => p.playerId === toPlayerId);
 
-            // Instead of matching just turn.timestamp, check across all timestamps in the turn
-            const allTimestamps = [...new Set(
-              enrichedAnimations.flatMap(p => p.movement?.map(m => m.timestamp) || [])
-            )].sort((a, b) => a - b);
-
             for (const timestamp of allTimestamps) {
-              const passStep = fromPlayer?.movement.find(m => m.action === "pass" && m.timestamp === timestamp);
-              const receiveStep = toPlayer?.movement.find(m =>
-                m.action === "receive" && m.timestamp >= timestamp
-              );
-
-              for (const timestamp of allTimestamps) {
               const passStep = fromPlayer?.movement.find(m => m.action === "pass" && m.timestamp === timestamp);
               const receiveStep = toPlayer?.movement.find(m =>
                 m.action === "receive" && m.timestamp >= timestamp
@@ -341,14 +334,11 @@
                   duration
                 });
 
-                break; // ✅ stop scanning timestamps after first valid match for this pair
+                break; // ✅ Stop scanning timestamps after first valid match for this pair
               }
-            }
-
             }
           }
 
-          
         // Handle shooter override
         const shooterPos = Object.entries(posActions).find(([_, a]) => a.action === "shoot")?.[0];
         if (shooterPos) {
