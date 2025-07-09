@@ -1,4 +1,4 @@
-import Phaser from 'https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.esm.js';
+import * as Phaser from 'https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.esm.js';
 import { loadPhaserPlayers } from './setup/loadPhaserPlayers.js';
 import { playTurnAnimation } from './animation/playTurnAnimation.js';
 import { onAction } from './animation/onAction.js';
@@ -28,7 +28,9 @@ export class TestScene extends Phaser.Scene {
         movement: [
           { timestamp: 0, coords: { x: 30, y: 25 }, action: "handle_ball" },
           { timestamp: 1000, coords: { x: 50, y: 25 }, action: "pass" }
-        ]
+        ],
+        hasBallAtStep: [true, false] // For passer
+
       },
       {
         playerId: receiverId,
@@ -38,7 +40,8 @@ export class TestScene extends Phaser.Scene {
         movement: [
           { timestamp: 1000, coords: { x: 60, y: 25 }, action: "receive" },
           { timestamp: 2000, coords: { x: 70, y: 30 }, action: "shoot" }
-        ]
+        ],
+        hasBallAtStep: [false, true] // For receiver
       }
     ];
 
