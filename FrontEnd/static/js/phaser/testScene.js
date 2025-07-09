@@ -42,7 +42,7 @@ export function createTestScene(Phaser) {
         startingCoords: { x: 60, y: 25 },
         movement: [
           { timestamp: 1000, coords: { x: 60, y: 25 }, action: "receive" },
-          { timestamp: 2000, coords: { x: 70, y: 50 }, action: "shoot" }
+          { timestamp: 4000, coords: { x: 70, y: 50 }, action: "shoot" } // ⏱ 4 seconds
         ],
         hasBallAtStep: [false, true] // For receiver
       }
@@ -67,12 +67,16 @@ export function createTestScene(Phaser) {
     sgSprite.setVisible(true);
     sgSprite.setPosition(100, 100); // temporarily override for visibility
     sgSprite.setDepth(5);
+    console.log("SG movement:", allPlayers[1].movement);
+
 
     console.log("Player sprites loaded:", Object.keys(this.playerSprites));
     console.log("SG sprite (should be p2):", this.playerSprites["p2"]);
     const sgStart = gridToPixels(60, 25, this.game.config.width, this.game.config.height);
     this.add.circle(sgStart.x, sgStart.y, 6, 0xff0000).setDepth(5);
 
+    const sgDest = gridToPixels(70, 50, this.game.config.width, this.game.config.height);
+    this.add.circle(sgDest.x, sgDest.y, 6, 0x00ff00).setDepth(5); // 🟢 green dot
 
     // Create ball sprite as a white circle
     this.ballSprite = this.add.circle(0, 0, 8, 0xffffff);
