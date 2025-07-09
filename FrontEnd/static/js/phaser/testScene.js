@@ -1,7 +1,8 @@
-import { loadPhaserPlayers } from "./setup/loadPhaserPlayers.js";
-import { playTurnAnimation } from "./animation/playTurnAnimation.js";
-import { onAction } from "./animation/onAction.js";
-import { lockBallToPlayer, passBall } from "./animation/ballManager.js";
+import Phaser from 'https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.esm.js';
+import { loadPhaserPlayers } from './setup/loadPhaserPlayers.js';
+import { playTurnAnimation } from './animation/playTurnAnimation.js';
+import { onAction } from './animation/onAction.js';
+import { passBall, lockBallToPlayer } from './animation/ballManager.js';
 
 export class TestScene extends Phaser.Scene {
   constructor() {
@@ -9,10 +10,11 @@ export class TestScene extends Phaser.Scene {
   }
 
   preload() {
-    // No assets yet — everything is generated with shapes
+    console.log("✅ TestScene preloaded");
   }
 
   create() {
+    console.log("TestScene created")
     // Mock player data
     const playerId = "p1";
     const receiverId = "p2";
@@ -64,7 +66,6 @@ export class TestScene extends Phaser.Scene {
     const receiveStep = allPlayers[1].movement[0];
 
     lockBallToPlayer(this.ballSprite, this.playerSprites[playerId]);
-    console.log("TestScene created")
 
     playTurnAnimation({
       scene: this,
