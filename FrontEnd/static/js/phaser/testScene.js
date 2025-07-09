@@ -63,6 +63,11 @@ export function createTestScene(Phaser) {
   
 
     this.playerSprites = loadPhaserPlayers(this, allPlayers, teamInfo, Phaser);
+    const sgSprite = this.playerSprites["p2"];
+    sgSprite.setVisible(true);
+    sgSprite.setPosition(100, 100); // temporarily override for visibility
+    sgSprite.setDepth(5);
+
     console.log("Player sprites loaded:", Object.keys(this.playerSprites));
     console.log("SG sprite (should be p2):", this.playerSprites["p2"]);
     const sgStart = gridToPixels(60, 25, this.game.config.width, this.game.config.height);

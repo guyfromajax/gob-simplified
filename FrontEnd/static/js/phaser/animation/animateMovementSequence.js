@@ -9,12 +9,18 @@ export function animateMovementSequence({ scene, sprite, movement, onAction }) {
 
     const duration = curr.timestamp - prev.timestamp;
 
+    // 🔍 Log movement and coordinates
+    console.log("🔁 Tweening sprite:", sprite.name || sprite.playerId || "unknown");
+    console.log("  → From:", prev.coords, "To:", curr.coords, "Duration:", duration);
+
     const { x: targetX, y: targetY } = gridToPixels(
       curr.coords.x,
       curr.coords.y,
       scene.game.config.width,
       scene.game.config.height
     );
+
+    console.log("  → Target pixels:", { targetX, targetY });
 
     scene.tweens.add({
       targets: sprite,
@@ -28,5 +34,6 @@ export function animateMovementSequence({ scene, sprite, movement, onAction }) {
     });
   }
 }
+
 
   
