@@ -64,6 +64,7 @@ export class TestScene extends Phaser.Scene {
     const receiveStep = allPlayers[1].movement[0];
 
     lockBallToPlayer(this.ballSprite, this.playerSprites[playerId]);
+    console.log("TestScene created")
 
     playTurnAnimation({
       scene: this,
