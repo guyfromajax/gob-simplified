@@ -1,5 +1,5 @@
 import * as Phaser from 'https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.esm.js';
-import { createTestScene } from './phaser/testScene.js';
+import { createTestScene } from './testScene.js'; // ✅ correct path
 
 const TestScene = createTestScene(Phaser); // inject Phaser into your scene
 
