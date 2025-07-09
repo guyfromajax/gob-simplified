@@ -3,6 +3,7 @@ export function createPhaserPlayer({
     player,
     teamInfo,
     position,
+    Phaser, 
     spriteKey = "playerCircle",
   }) {
     const { x, y } = player.startingCoords || { x: 50, y: 25 }; // fallback

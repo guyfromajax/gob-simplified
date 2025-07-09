@@ -8,7 +8,7 @@ import { createPhaserPlayer } from "./createPhaserPlayer.js";
  * @param {Object} teamInfo - { home: { colors }, away: { colors } }
  * @returns {Object} Map of playerId -> Phaser container
  */
-export function loadPhaserPlayers(scene, allPlayers, teamInfo) {
+export function loadPhaserPlayers(scene, allPlayers, teamInfo, Phaser) {
   const playerSprites = {};
 
   for (const player of allPlayers) {
@@ -18,7 +18,8 @@ export function loadPhaserPlayers(scene, allPlayers, teamInfo) {
       scene,
       player,
       teamInfo: teamColors,
-      position: player.pos
+      position: player.pos,
+      Phaser
     });
     playerSprites[player.playerId] = sprite;
   }

@@ -60,7 +60,7 @@ export function createTestScene(Phaser) {
     };
   
 
-    this.playerSprites = loadPhaserPlayers(this, allPlayers, teamInfo);
+    this.playerSprites = loadPhaserPlayers(this, allPlayers, teamInfo, Phaser);
 
     // Create ball sprite as a white circle
     this.ballSprite = this.add.circle(0, 0, 8, 0xffffff);
