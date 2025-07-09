@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GOB Court Animation Test</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      background-color: #222;
+    }
+
+    canvas {
+      display: block;
+      background-color: transparent;
+    }
+
+    #court {
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 0;
+    }
+
+    #gameLayer {
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 1;
+    }
+  </style>
+</head>
+<body>
+  <img id="court" width="1229" height="768" />
+  <canvas id="gameLayer" width="1229" height="768"></canvas>
+
+  <script type="module">
+    import { AnimationEngine } from './js/animation.js';
+
+    const canvas = document.getElementById('gameLayer');
+    const ctx = canvas.getContext('2d');
+    const ballImage = new Image();
+    ballImage.src = '/static/images/ball.png';
+    ballImage.onload = () => console.log("🏀 Ball image loaded");
+    let ballCoords = null;
+
+    function generateBallTrack(start, end, durationMs, startTimestamp, steps = 20) {
+      const movement = [];
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        const timestamp = startTimestamp + durationMs * t; // ✅ anchor to real time
+        const coords = {
+          x: start.x + (end.x - start.x) * t,
+          y: start.y + (end.y - start.y) * t,
+        };
+        movement.push({ timestamp, coords });
+      }
+      return movement;
+    }
+
+    const HCO_STRING_SPOTS = {
+      "key": {"x": 64, "y": 25},
+      "upper midWing": {"x": 68, "y": 36},
+      "lower midWing": {"x": 68, "y": 14},
+      "upper wing": {"x": 73, "y": 40},
+      "lower wing": {"x": 73, "y": 10},
+      "upper midCorner": {"x": 81, "y": 43},
+      "lower midCorner": {"x": 81, "y": 7},
+      "upper corner": {"x": 88, "y": 44},
+      "lower corner": {"x": 88, "y": 6},
+      "upper highPost": {"x": 74, "y": 32},
+      "lower highPost": {"x": 74, "y": 19},
+      "upper midPost": {"x": 80, "y": 32},
+      "lower midPost": {"x": 80, "y": 19},
+      "upper lowPost": {"x": 86, "y": 32},
+      "lower lowPost": {"x": 86, "y": 19},
+      "topLane": {"x": 74, "y": 25},
+      "midLane": {"x": 80, "y": 25},
+      "upper apex": {"x": 80, "y": 36},
+      "lower apex": {"x": 80, "y": 15},
+      "upper midBaseline": {"x": 89, "y": 36},
+      "lower midBaseline": {"x": 89, "y": 15}
+    };
+
+    function gridToPixels(x, y) {
+      const pixelX = (x / 100) * 1229;
+      const pixelY = ((50 - y) / 50) * 768;
+      return { x: pixelX, y: pixelY };
+    }
+
+    let teamInfo = {};
+    const playerPositions = {};
+    let allPlayers = [];
+
+    function drawPlayer(player, pixelCoords) {
+      if (!teamInfo.home || !teamInfo.away) return;
+      // console.log("Drawing player:", player);
+      // console.log("home team ids:", teamInfo.home.player_ids);
+      // console.log("away team ids:", teamInfo.away.player_ids);
+
+      const isHome = teamInfo.home.player_ids.includes(player.playerId);
+      const isAway = teamInfo.away.player_ids.includes(player.playerId);
+      if (!isHome && !isAway) {
+        console.warn("⚠️ Could not determine team for player:", player);
+      }
+
+      const fill = isHome ? teamInfo.home.primary_color : '#ffffff';
+      const stroke = isHome ? teamInfo.home.secondary_color : teamInfo.away.primary_color;
+      const text = isHome ? teamInfo.home.secondary_color : teamInfo.away.primary_color;
+      const jerseyColor = isHome
+        ? teamInfo.home.primary_color
+        : teamInfo.away.primary_color;
+
+      const radius = 20;
+      const x = pixelCoords.x;
+      const y = pixelCoords.y;
+
+      ctx.beginPath();
+      ctx.arc(x, y, radius, 0, Math.PI * 2);
+      ctx.fillStyle = fill;
+      ctx.strokeStyle = stroke;
+      ctx.lineWidth = 3;
+      ctx.fill();
+      ctx.stroke();
+
+
+      // Position label (inside the circle)
+      ctx.fillStyle = text;
+      ctx.font = 'bold 16px Arial';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      const posLabel = playerPositions[player.playerId] || '';
+      ctx.fillText(posLabel, x, y);
+
+      // Jersey number (below or above the circle)
+      ctx.fillStyle = jerseyColor;
+      ctx.font = 'bold 16px Arial';
+      const jerseyOffset = isHome ? -radius - 24 : radius + 24;
+      ctx.fillText(player.jersey || '', x, y + jerseyOffset);
+
+      if (player.hasBallAtStep?.[player.currentStepIndex]) {
+        ballCoords = { ...pixelCoords };
+      }
+    }
+    const engine = new AnimationEngine(ctx, gridToPixels, drawPlayer, 0.3); // lower # = slower animation
+    engine.setBallImage(ballImage);
+
+    async function loadSimAndStart() { //turns
+      const homeTeam = sessionStorage.getItem("homeTeam") || "Four Corners";
+      const awayTeam = sessionStorage.getItem("awayTeam") || "Bentley-Truman";
+
+      const res = await fetch('/simulate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          home_team: homeTeam,
+          away_team: awayTeam
+        })
+      });
+      
+      if (!res.ok) throw new Error(`Simulation failed: ${res.statusText}`);
+
+      const simData = await res.json();
+      console.log("***simData:", simData);
+
+      const courtImg = document.getElementById('court');
+      if (simData.home_team_id) {
+        const teamId = simData.home_team_id.toLowerCase();
+        courtImg.src = `/static/images/courts/${teamId}.jpg`;
+        courtImg.onerror = () => { courtImg.src = '/static/images/courts/default.jpg'; };
+      }
+
+      const homeLineup = simData.home_lineup || (simData.turns[0]?.home_lineup || {});
+      const awayLineup = simData.away_lineup || (simData.turns[0]?.away_lineup || {});
+
+      for (const [pos, id] of Object.entries(homeLineup)) {
+        const idStr = (id || "").toString();
+        const fullPlayer = simData.players.find(pl => {
+          const plId = (pl._id || pl.playerId || pl.player_id || "").toString();
+          return plId === idStr;
+        });
+        if (!fullPlayer) {
+          console.warn(`⚠️ Could not find player details for ID ${idStr}`);
+          continue;
+        }
+        playerPositions[idStr] = pos;
+        allPlayers.push({ ...fullPlayer, playerId: idStr, team: 'home', pos });
+      }
+
+      for (const [pos, id] of Object.entries(awayLineup)) {
+        const idStr = (id || "").toString();
+        const fullPlayer = simData.players.find(pl => {
+          const plId = (pl._id || pl.playerId || pl.player_id || "").toString();
+          return plId === idStr;
+        });
+        if (!fullPlayer) {
+          console.warn(`⚠️ Could not find player details for ID ${idStr}`);
+          continue;
+        }
+        playerPositions[idStr] = pos;
+        allPlayers.push({ ...fullPlayer, playerId: idStr, team: 'away', pos });
+      }
+
+      // console.log("allPlayers:", allPlayers);
+      // console.log("playerPositions:", playerPositions);
+
+      let lastBallHandlerId = null;
+
+      console.log("Right before simData.turns.forEach")
+      console.log("🔍 simData.turns:", simData.turns);
+      simData.turns.forEach((turn, turnIndex) => {
+        console.log(`🌀 Turn ${turnIndex}`);
+        
+        if (!turn.ballTrack) {
+          console.warn(`⚠️ No ballTrack on turn ${turnIndex}`);
+        }
+        const posActions = turn.pos_actions || {};
+        console.log("🔍 turn posActions:", turnIndex, posActions);
+
+        const stepTime = turn.timestamp;
+
+        // ✅ Step 1: Try to find the player whose action at this step includes "handle_ball" or "receive"
+        let stepBallHandlerId = null;
+
+        for (const anim of turn.animations) {
+          const stepIndex = anim.movement?.findIndex(
+            m => Math.abs(m.timestamp - stepTime) <= 50 &&
+                ["handle_ball", "receive"].includes(m.action)
+          );
+          if (stepIndex !== -1) {
+            stepBallHandlerId = anim.playerId;
+            break;
+          }
+        }
+
+        // ✅ Step 2: Fallback to previous handler if no one has ball at this step
+        if (!stepBallHandlerId && lastBallHandlerId) {
+          stepBallHandlerId = lastBallHandlerId;
+        }
+
+        // ✅ Step 3: Track for future fallback
+        if (stepBallHandlerId) {
+          lastBallHandlerId = stepBallHandlerId;
+        }
+        // console.log(`⛹️ Step ${turnIndex} ball handler:`, stepBallHandlerId);
+
+        // console.log(`🔎 Turn ${turnIndex} animation sample:`, turn.animations?.[0]);
+        const enrichedAnimations = turn.animations.map(anim => {
+          const fullPlayer = allPlayers.find(p =>
+            (p.playerId || p._id || p.player_id || "") === anim.playerId
+          );
+          
+          const hasBallAtStep = (anim.movement || []).map((step) => {
+            const isHandler = step.action === "handle_ball";
+            const isReceiver = step.action === "receive";
+            const isTooEarly = turn.ballTrack?.movement?.[1]?.timestamp &&
+                              step.timestamp < turn.ballTrack.movement[1].timestamp;
+
+            return isHandler || (isReceiver && !isTooEarly);
+          });
+
+          const isHandler = anim.playerId === stepBallHandlerId;
+
+          if (!anim.movement || anim.movement.length === 0) {
+            console.warn(`⚠️ No movement steps for ${anim.playerId} (${playerPositions[anim.playerId]})`);
+          }
+
+          if (isHandler) {
+            console.log(`✅ Ball handler assigned: ${anim.playerId} (${playerPositions[anim.playerId]})`);
+            console.log("➡️ Movement steps:", anim.movement);
+          }
+
+          return {
+            ...fullPlayer,
+            ...anim,
+            hasBallAtStep
+          };
+        });
+
+        const offenseTeamId = turn.possession_team_id;
+        const offenseLineup = offenseTeamId === simData.home_team_id
+          ? turn.home_lineup
+          : turn.away_lineup;
+
+          const playerIdToPos = Object.fromEntries(
+            Object.entries(offenseLineup || {}).map(([pos, playerId]) => [playerId, pos])
+          );
+
+          turn.ballTracksByTimestamp = {}; // still define this per turn
+
+          const passSequence = turn.pass_sequence || ["PG", "PF", "C"];
+          const playerByPos = Object.fromEntries(
+            Object.entries(offenseLineup || {}).map(([pos, id]) => [pos, id])
+          );
+
+          const allTimestamps = [...new Set(
+              enrichedAnimations.flatMap(p => p.movement?.map(m => m.timestamp) || [])
+            )].sort((a, b) => a - b);
+
+          // Loop through pairs in the pass sequence
+          for (let i = 0; i < passSequence.length - 1; i++) {
+            const fromPos = passSequence[i];
+            const toPos = passSequence[i + 1];
+            const fromPlayerId = playerByPos[fromPos];
+            const toPlayerId = playerByPos[toPos];
+
+            const fromPlayer = enrichedAnimations.find(p => p.playerId === fromPlayerId);
+            const toPlayer = enrichedAnimations.find(p => p.playerId === toPlayerId);
+
+            for (const timestamp of allTimestamps) {
+              const passStep = fromPlayer?.movement.find(m => m.action === "pass" && m.timestamp === timestamp);
+              const receiveStep = toPlayer?.movement.find(m =>
+                m.action === "receive" && m.timestamp >= timestamp
+              );
+
+              if (passStep && receiveStep) {
+                const start = passStep.timestamp;
+                const end = receiveStep.timestamp;
+                const duration = Math.min(Math.max(end - start, 300), 600);
+
+                const ballTrack = {
+                  playerId: "BALL",
+                  movement: generateBallTrack(passStep.coords, receiveStep.coords, duration, start)
+                };
+
+                turn.ballTracksByTimestamp[start] = ballTrack;
+
+                console.log("📦 Sequenced BallTrack:", {
+                  turn: turnIndex,
+                  timestamp,
+                  from: fromPlayerId,
+                  to: toPlayerId,
+                  duration
+                });
+
+                break; // ✅ Stop scanning timestamps after first valid match for this pair
+              }
+            }
+          }
+
+        // Handle shooter override
+        const shooterPos = Object.entries(posActions).find(([_, a]) => a.action === "shoot")?.[0];
+        if (shooterPos) {
+          console.log("🔍 shooterPos:", shooterPos);
+          const shooter = enrichedAnimations.find(p => p.pos === shooterPos);
+          if (shooter) {
+            shooter.wasFinalBallHandler = true;
+            lastBallHandlerId = shooter.playerId; // optional, still useful
+          }
+        }
+        // Store updated animation
+        turn.animations = enrichedAnimations;
+      });
+
+      teamInfo = {
+        home: {
+          player_ids: allPlayers.filter(p => p.team === 'home').map(p => p.playerId),
+          primary_color: simData.home_team_colors.primary_color,
+          secondary_color: simData.home_team_colors.secondary_color
+        },
+        away: {
+          player_ids: allPlayers.filter(p => p.team === 'away').map(p => p.playerId),
+          primary_color: simData.away_team_colors.primary_color,
+          secondary_color: simData.away_team_colors.secondary_color
+        }
+      };
+
+      engine.setTeams(teamInfo, allPlayers);
+      simData.turns.forEach(turn => {
+        const stepTime = turn.timestamp ?? 0; // or recompute from max action timestamp if needed
+        for (const player of turn.animations) {
+          const stepIndex = player.movement?.findIndex(m => m.timestamp === stepTime);
+          player.currentStepIndex = stepIndex >= 0 ? stepIndex : 0;
+        }
+      });
+
+      engine.start(simData.turns);
+    
+    }
+
+    loadSimAndStart();
+  </script>
+</body>
+</html>
+
+
