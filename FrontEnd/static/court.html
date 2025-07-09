@@ -283,8 +283,6 @@
           ? turn.home_lineup
           : turn.away_lineup;
 
-          console.log("🧩 Raw offenseLineup:", offenseLineup);
-
           const playerIdToPos = Object.fromEntries(
             Object.entries(offenseLineup || {}).map(([pos, playerId]) => [playerId, pos])
           );
