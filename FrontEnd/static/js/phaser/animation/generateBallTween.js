@@ -1,3 +1,5 @@
+import { gridToPixels } from '../utils/gridToPixels.js';
+
 export function generateBallTween({
     scene,
     ballSprite,
@@ -10,19 +12,17 @@ export function generateBallTween({
   
     const duration = endTimestamp - startTimestamp;
   
-    const startX = (startCoords.x / 100) * scene.game.config.width;
-    const startY = ((50 - startCoords.y) / 50) * scene.game.config.height;
-    const endX = (endCoords.x / 100) * scene.game.config.width;
-    const endY = ((50 - endCoords.y) / 50) * scene.game.config.height;
+    const startPixels = gridToPixels(startCoords.x, startCoords.y, scene.game.config.width, scene.game.config.height);
+    const endPixels = gridToPixels(endCoords.x, endCoords.y, scene.game.config.width, scene.game.config.height);
   
     // Set starting position first
-    ballSprite.setPosition(startX, startY);
+    ballSprite.setPosition(startPixels.x, startPixels.y);
     ballSprite.setVisible(true);
   
     scene.tweens.add({
       targets: ballSprite,
-      x: endX,
-      y: endY,
+      x: endPixels.x,
+      y: endPixels.y,
       duration,
       ease: "Sine.easeInOut",
       onComplete: () => {
