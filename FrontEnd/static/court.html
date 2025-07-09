@@ -304,23 +304,47 @@
             const fromPlayer = enrichedAnimations.find(p => p.playerId === fromPlayerId);
             const toPlayer = enrichedAnimations.find(p => p.playerId === toPlayerId);
 
-            const timestamp = turn.timestamp;
+            // Instead of matching just turn.timestamp, check across all timestamps in the turn
+            const allTimestamps = [...new Set(
+              enrichedAnimations.flatMap(p => p.movement?.map(m => m.timestamp) || [])
+            )].sort((a, b) => a - b);
 
-            const passStep = fromPlayer?.movement.find(m => m.action === "pass" && m.timestamp === timestamp);
-            const receiveStep = toPlayer?.movement.find(m => m.action === "receive" && m.timestamp > timestamp);
+            for (const timestamp of allTimestamps) {
+              const passStep = fromPlayer?.movement.find(m => m.action === "pass" && m.timestamp === timestamp);
+              const receiveStep = toPlayer?.movement.find(m =>
+                m.action === "receive" && m.timestamp >= timestamp
+              );
 
-            if (passStep && receiveStep) {
-              const start = passStep.timestamp;
-              const end = receiveStep.timestamp;
-              const duration = Math.min(Math.max(end - start, 300), 600);
+              for (const timestamp of allTimestamps) {
+              const passStep = fromPlayer?.movement.find(m => m.action === "pass" && m.timestamp === timestamp);
+              const receiveStep = toPlayer?.movement.find(m =>
+                m.action === "receive" && m.timestamp >= timestamp
+              );
 
-              const ballTrack = {
-                playerId: "BALL",
-                movement: generateBallTrack(passStep.coords, receiveStep.coords, duration, start)
-              };
+              if (passStep && receiveStep) {
+                const start = passStep.timestamp;
+                const end = receiveStep.timestamp;
+                const duration = Math.min(Math.max(end - start, 300), 600);
 
-              turn.ballTracksByTimestamp[start] = ballTrack;
-              console.log("📦 Sequenced BallTrack:", { turn: turnIndex, timestamp, from: fromPlayerId, to: toPlayerId, duration });
+                const ballTrack = {
+                  playerId: "BALL",
+                  movement: generateBallTrack(passStep.coords, receiveStep.coords, duration, start)
+                };
+
+                turn.ballTracksByTimestamp[start] = ballTrack;
+
+                console.log("📦 Sequenced BallTrack:", {
+                  turn: turnIndex,
+                  timestamp,
+                  from: fromPlayerId,
+                  to: toPlayerId,
+                  duration
+                });
+
+                break; // ✅ stop scanning timestamps after first valid match for this pair
+              }
+            }
+
             }
           }
 
