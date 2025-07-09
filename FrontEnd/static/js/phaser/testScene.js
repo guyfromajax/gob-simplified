@@ -79,6 +79,12 @@ export function createTestScene(Phaser) {
 
     lockBallToPlayer(this.ballSprite, this.playerSprites[playerId]);
 
+    if (!this.playerSprites) {
+      console.error("❌ playerSprites is undefined!");
+      return;
+    }
+    
+    console.log("playTurnAnimation function:", playTurnAnimation);
     playTurnAnimation({
       scene: this,
       playerSprites: this.playerSprites,
