@@ -8,7 +8,7 @@ export async function playTurnAnimation({ scene, playerSprites, turnData, onActi
     const sprite = playerSprites[anim.playerId];
     const movement = anim.movement;
 
-    console.log("playerSprites:", this.playerSprites);
+    console.log("playerSprites:", playerSprites);
 
     if (!sprite || !movement) continue;
 
@@ -35,7 +35,7 @@ export async function playTurnAnimation({ scene, playerSprites, turnData, onActi
   await Promise.all(promises);
 }
 
-import { onAction } from "./onAction.js";
+// import { onAction } from "./onAction.js";
 
 // Pass it into animateMovementSequence()
 // animateMovementSequence({
