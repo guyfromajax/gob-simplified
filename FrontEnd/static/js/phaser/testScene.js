@@ -1,13 +1,14 @@
-import * as Phaser from 'https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.esm.js';
+
 import { loadPhaserPlayers } from './setup/loadPhaserPlayers.js';
 import { playTurnAnimation } from './animation/playTurnAnimation.js';
 import { onAction } from './animation/onAction.js';
 import { passBall, lockBallToPlayer } from './animation/ballManager.js';
 
-export class TestScene extends Phaser.Scene {
-  constructor() {
-    super("TestScene");
-  }
+export function createTestScene(Phaser) {
+  return class TestScene extends Phaser.Scene {
+    constructor() {
+      super("TestScene");
+    }
 
   preload() {
     console.log("✅ TestScene preloaded");
@@ -57,6 +58,7 @@ export class TestScene extends Phaser.Scene {
         secondary_color: "#FFFFFF"
       }
     };
+  
 
     this.playerSprites = loadPhaserPlayers(this, allPlayers, teamInfo);
 
@@ -92,7 +94,11 @@ export class TestScene extends Phaser.Scene {
       }
     });
   }
+  }
 }
+
+export default createTestScene;
+
 
 // import { TestScene } from "./phaser/TestScene.js";
 
