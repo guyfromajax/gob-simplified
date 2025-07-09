@@ -1,5 +1,7 @@
 import * as Phaser from 'https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.esm.js';
-import { TestScene } from './phaser/testScene.js';
+import { createTestScene } from './phaser/testScene.js';
+
+const TestScene = createTestScene(Phaser); // inject Phaser into your scene
 
 const config = {
   type: Phaser.AUTO,
@@ -11,3 +13,4 @@ const config = {
 };
 
 new Phaser.Game(config);
+
