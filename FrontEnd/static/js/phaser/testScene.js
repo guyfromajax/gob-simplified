@@ -29,8 +29,8 @@ export function createTestScene(Phaser) {
         jersey: "1",
         startingCoords: { x: 30, y: 25 },
         movement: [
-          { timestamp: 0, coords: { x: 30, y: 25 }, action: "handle_ball" },
-          { timestamp: 1000, coords: { x: 50, y: 50 }, action: "pass" }
+          { timestamp: 0, coords: { x: 10, y: 10 }, action: "handle_ball" },
+          { timestamp: 1000, coords: { x: 50, y: 25 }, action: "pass" }
         ],
         hasBallAtStep: [true, false] // For passer
 
@@ -41,8 +41,8 @@ export function createTestScene(Phaser) {
         jersey: "2",
         startingCoords: { x: 60, y: 25 },
         movement: [
-          { timestamp: 1000, coords: { x: 60, y: 25 }, action: "receive" },
-          { timestamp: 4000, coords: { x: 70, y: 50 }, action: "shoot" } // ⏱ 4 seconds
+          { timestamp: 1000, coords: { x: 30, y: 25 }, action: "receive" },
+          { timestamp: 4000, coords: { x: 70, y: 40 }, action: "shoot" } // ⏱ 4 seconds
         ],
         hasBallAtStep: [false, true] // For receiver
       }
@@ -63,12 +63,6 @@ export function createTestScene(Phaser) {
   
 
     this.playerSprites = loadPhaserPlayers(this, allPlayers, teamInfo, Phaser);
-    const sgSprite = this.playerSprites["p2"];
-    sgSprite.setVisible(true);
-    sgSprite.setPosition(100, 100); // temporarily override for visibility
-    sgSprite.setDepth(5);
-    console.log("SG movement:", allPlayers[1].movement);
-
 
     console.log("Player sprites loaded:", Object.keys(this.playerSprites));
     console.log("SG sprite (should be p2):", this.playerSprites["p2"]);
