@@ -14,7 +14,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   const pgAnimation = turnData.animations.find(a => a.playerId === pgId);
   console.log("🧠 PG hasBallAtStep:", pgAnimation?.hasBallAtStep);
 
-
+  console.log("🎬 Full animations array for turn:", turnData.animations);
   for (const anim of turnData.animations) {
     console.log("👥 Players with animations:", turnData.animations.map(a => a.playerId));
     console.log("👤 PG ID:", playerSprites["PG"]?.playerId); // or however you're mapping positions
