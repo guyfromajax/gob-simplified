@@ -80,10 +80,10 @@ export async function animateGameTurns({
           scene.add.circle(ballSprite.x, ballSprite.y, 10, 0xff0000).setDepth(9999);
         }
 
-        if (action === "shoot" || sprite.playerId === shooterId) {
-          console.log("🏀 Shot triggered. Hiding ball.");
-          ballSprite.setVisible(false);
-        }
+        // if (action === "shoot" || sprite.playerId === shooterId) {
+        //   console.log("🏀 Shot triggered. Hiding ball.");
+        //   ballSprite.setVisible(false);
+        // }
       }
     });
   }
