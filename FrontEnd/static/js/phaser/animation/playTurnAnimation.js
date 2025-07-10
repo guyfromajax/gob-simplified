@@ -1,7 +1,7 @@
 import { animateMovementSequence } from "./animateMovementSequence.js";
 import { updateBallOwnership } from "./ballManager.js";
 
-export async function playTurnAnimation({ scene, playerSprites, turnData, onAction }) {
+export async function playTurnAnimation({ scene, playerSprites, turnData, ballSprite, onAction }) {
   const promises = [];
 
   console.log("✅ playTurnAnimation received:", { scene, playerSprites, turnData });
@@ -18,11 +18,13 @@ export async function playTurnAnimation({ scene, playerSprites, turnData, onActi
         scene,
         sprite,
         movement,
+        hasBallAtStep: anim.hasBallAtStep,
+        ballSprite,
         onAction: (action, sprite, timestamp) => {
           if (onAction) onAction(action, sprite, timestamp);
         },
       });
-
+           
       // estimate final timestamp duration for setTimeout fallback
       const totalDuration =
         movement.at(-1).timestamp - movement[0].timestamp;
@@ -35,30 +37,30 @@ export async function playTurnAnimation({ scene, playerSprites, turnData, onActi
 
   await Promise.all(promises);
   // Get latest timestamp across all players in this turn
-  const latestTimestamp = Math.max(
-    ...turnData.animations.flatMap(anim => anim.movement.map(m => m.timestamp))
-  );
+  // const latestTimestamp = Math.max(
+  //   ...turnData.animations.flatMap(anim => anim.movement.map(m => m.timestamp))
+  // );
 
-  const startTime = scene.time.now;
+  // const startTime = scene.time.now;
 
-  const timer = scene.time.addEvent({
-    delay: 33, // ~30 FPS
-    callback: () => {
-      const currentTimestamp = scene.time.now - startTime;
+  // const timer = scene.time.addEvent({
+  //   delay: 33, // ~30 FPS
+  //   callback: () => {
+  //     const currentTimestamp = scene.time.now - startTime;
 
-      updateBallOwnership(
-        scene.ballSprite,
-        turnData.animations,
-        playerSprites,
-        currentTimestamp
-      );
+  //     updateBallOwnership(
+  //       scene.ballSprite,
+  //       turnData.animations,
+  //       playerSprites,
+  //       currentTimestamp
+  //     );
 
-      if (currentTimestamp >= latestTimestamp + 200) {
-        timer.remove(); // stop after final step
-      }
-    },
-    loop: true,
-  });
+  //     if (currentTimestamp >= latestTimestamp + 200) {
+  //       timer.remove(); // stop after final step
+  //     }
+  //   },
+  //   loop: true,
+  // });
 }
 
 // import { onAction } from "./onAction.js";
