@@ -10,6 +10,7 @@ export function createGameScene(Phaser) {
 
     async preload() {
       console.log("✅ GameScene preloaded");
+      this.load.image("ball", "/static/images/ball.png");
     }
 
     async create() {
@@ -75,7 +76,7 @@ export function createGameScene(Phaser) {
         }
       }, Phaser);
 
-      this.ballSprite = this.add.circle(0, 0, 8, 0xffffff).setVisible(false).setDepth(10);
+      this.ballSprite = this.add.image(0, 0, "ball").setVisible(false).setDepth(10).setScale(0.04);
 
       await animateGameTurns({
         scene: this,
