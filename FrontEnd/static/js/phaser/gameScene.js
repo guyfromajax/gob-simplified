@@ -10,7 +10,7 @@ export function createGameScene(Phaser) {
 
     async preload() {
       console.log("✅ GameScene preloaded");
-      this.load.image("ball", "/static/images/ball.png");
+      this.load.image("ball", "images/ball.png");
     }
 
     async create() {
