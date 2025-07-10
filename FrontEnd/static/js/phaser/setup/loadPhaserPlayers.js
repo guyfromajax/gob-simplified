@@ -26,6 +26,7 @@ export function loadPhaserPlayers(scene, allPlayers, teamInfo, Phaser) {
     });
     playerSprites[player.playerId] = sprite;
   }
+  console.log("👾 playerSprites keys:", Object.keys(playerSprites));
 
   return playerSprites;
 }
