@@ -1,6 +1,6 @@
 import { animateMovementSequence } from "./animateMovementSequence.js";
 import { updateBallOwnership } from "./ballManager.js";
-import { getPlayerIdByPosition } from "./utils/playerUtils.js"; 
+import { getPlayerIdByPosition } from "../utils/playerUtils.js"; 
 
 export async function playTurnAnimation({ scene, playerSprites, turnData, ballSprite, onAction }) {
   const promises = [];
