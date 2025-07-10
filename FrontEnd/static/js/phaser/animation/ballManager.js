@@ -1,14 +1,18 @@
 import { generateBallTween } from "./generateBallTween.js";
 
 export function lockBallToPlayer(ballSprite, playerSprite) {
-  if (!ballSprite || !playerSprite) return;
+  if (!ballSprite || !playerSprite) {
+    console.warn("⚠️ lockBallToPlayer skipped: missing sprite");
+    return;
+  }
 
-  // Use x/y from the container directly (playerSprite is a Phaser container)
+  console.log("🔒 lockBallToPlayer invoked for:", playerSprite.name || playerSprite);
+
   const { x, y } = playerSprite;
-
   ballSprite.setPosition(x, y);
   ballSprite.setVisible(true);
 }
+
 
 
 /**
