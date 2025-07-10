@@ -16,6 +16,11 @@ export function animateMovementSequence({ scene, sprite, movement, onAction, bal
   if (!movement || movement.length < 2) return;
 
   if (hasBallAtStep?.[0]) {
+    console.log("🔐 Ball starts with:", sprite.name);
+    lockBallToPlayer(ballSprite, sprite);
+  }
+  
+  if (hasBallAtStep?.[0]) {
     lockBallToPlayer(ballSprite, sprite);
   }
   console.log("🎯 Sprite:", sprite.name, "| hasBallAtStep:", hasBallAtStep);
