@@ -39,23 +39,26 @@ export async function playTurnAnimation({ scene, playerSprites, turnData, onActi
     ...turnData.animations.flatMap(anim => anim.movement.map(m => m.timestamp))
   );
 
-  // Track elapsed time for this turn
-  let currentTimestamp = 0;
-  const tickInterval = 33; // approx 30 FPS
+  const startTime = scene.time.now;
+
   const timer = scene.time.addEvent({
-    delay: tickInterval,
+    delay: 33, // ~30 FPS
     callback: () => {
-      currentTimestamp += tickInterval;
+      const currentTimestamp = scene.time.now - startTime;
 
-      updateBallOwnership(scene.ballSprite, turnData.animations, playerSprites, currentTimestamp);
+      updateBallOwnership(
+        scene.ballSprite,
+        turnData.animations,
+        playerSprites,
+        currentTimestamp
+      );
 
-      if (currentTimestamp >= latestTimestamp + 100) {
-        timer.remove(); // stop this timer
+      if (currentTimestamp >= latestTimestamp + 200) {
+        timer.remove(); // stop after final step
       }
     },
     loop: true,
   });
-
 }
 
 // import { onAction } from "./onAction.js";
