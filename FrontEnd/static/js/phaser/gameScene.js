@@ -78,9 +78,10 @@ export function createGameScene(Phaser) {
 
       this.ballSprite = this.add.image(0, 0, "ball").setVisible(false).setDepth(10).setScale(0.04);
       console.log("✅ ballSprite created", this.ballSprite);
-      this.ballSprite.setPosition(614, 384); // roughly midcourt
       this.ballSprite.setVisible(true);
-      this.ballSprite.setDepth(999); // on top of everything
+      this.ballSprite.setPosition(600, 300); // middle of screen
+      this.ballSprite.setTint(0xff0000);
+
       if (!this.textures.exists("ball")) {
         console.error("❌ Ball texture not found in texture manager.");
       }
