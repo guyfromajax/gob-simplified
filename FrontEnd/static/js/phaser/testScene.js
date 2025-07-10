@@ -64,8 +64,6 @@ export function createTestScene(Phaser) {
 
     this.playerSprites = loadPhaserPlayers(this, allPlayers, teamInfo, Phaser);
 
-    this.add.circle(sgStart.x, sgStart.y, 6, 0xff0000).setDepth(5);
-
     // Create ball sprite as a white circle
     this.ballSprite = this.add.circle(0, 0, 8, 0xffffff);
     this.ballSprite.setVisible(false);
