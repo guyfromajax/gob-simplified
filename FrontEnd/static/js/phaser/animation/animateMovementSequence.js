@@ -15,6 +15,12 @@ import { lockBallToPlayer } from "./ballManager.js";
 export function animateMovementSequence({ scene, sprite, movement, onAction, ballSprite, hasBallAtStep }) {
   if (!movement || movement.length < 2) return;
 
+  if (hasBallAtStep?.[0]) {
+    lockBallToPlayer(ballSprite, sprite);
+  }
+  console.log("🎯 Sprite:", sprite.name, "| hasBallAtStep:", hasBallAtStep);
+
+  
   for (let i = 1; i < movement.length; i++) {
     const prev = movement[i - 1];
     const curr = movement[i];
@@ -44,6 +50,11 @@ export function animateMovementSequence({ scene, sprite, movement, onAction, bal
       onStart: () => {
         if (onAction) onAction(curr.action, sprite, curr.timestamp);
       },
+      onUpdate: () => {
+        if (hasBallAtStep?.[i]) {
+          lockBallToPlayer(ballSprite, sprite);
+        }
+      },
       onComplete: () => {
         // If this was the final step where player had the ball, leave ball locked
         if (hasBallAtStep?.[i]) {
@@ -53,10 +64,6 @@ export function animateMovementSequence({ scene, sprite, movement, onAction, bal
     });
   }
 }
-
-
-
-
 
 
 
