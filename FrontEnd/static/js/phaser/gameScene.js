@@ -79,7 +79,7 @@ export function createGameScene(Phaser) {
       this.ballSprite = this.add.image(0, 0, "ball").setVisible(true).setDepth(1000).setScale(1);
       this.tweens.add({
         targets: this.ballSprite,
-        scale: { from: 2, to: 2.5 }, // adjust these as needed
+        scale: { from: 1, to: 1.3 }, // adjust these as needed
         duration: 400, // duration of one pulse
         yoyo: true,    // scale back down
         repeat: -1,    // repeat forever
