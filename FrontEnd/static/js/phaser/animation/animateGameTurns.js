@@ -47,7 +47,6 @@ export async function animateGameTurns({
         if (action === "handle_ball" && anim?.hasBallAtStep?.length) {
           console.log("🔒 Locking ball to ball handler:", playerId);
           lockBallToPlayer(ballSprite, sprite);
-          scene.add.circle(ballSprite.x, ballSprite.y, 10, 0xff0000).setDepth(9999);
         }
 
         if (action === "pass") {
@@ -77,7 +76,6 @@ export async function animateGameTurns({
         if (action === "receive") {
           console.log("📥 Ball received by:", playerId);
           lockBallToPlayer(ballSprite, sprite);
-          scene.add.circle(ballSprite.x, ballSprite.y, 10, 0xff0000).setDepth(9999);
         }
 
         // if (action === "shoot" || sprite.playerId === shooterId) {
