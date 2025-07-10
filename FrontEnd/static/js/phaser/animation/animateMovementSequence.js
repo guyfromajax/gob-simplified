@@ -23,7 +23,7 @@ export function animateMovementSequence({ scene, sprite, movement, onAction, bal
   if (hasBallAtStep?.[0]) {
     lockBallToPlayer(ballSprite, sprite);
   }
-  console.log("🎯 Sprite:", sprite.name, "| hasBallAtStep:", hasBallAtStep);
+  console.log("🎯 Sprite TEST:", sprite.name, "| hasBallAtStep:", hasBallAtStep);
 
   
   for (let i = 1; i < movement.length; i++) {
