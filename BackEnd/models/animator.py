@@ -49,6 +49,13 @@ class Animator:
             if not timeline:
                 continue
 
+            hasBallAtStep = []
+            for step in timeline:
+                if step in ["handle_ball", "receive", "shoot"]:
+                    hasBallAtStep.append(True)
+                else:
+                    hasBallAtStep.append(False)
+
             timeline.sort(key=lambda tup: tup[0])
             first_spot = timeline[0][2]
             last_spot = timeline[-1][2]
@@ -79,12 +86,17 @@ class Animator:
                 "start": start_coords,
                 "end": end_coords,
                 "movement": movement,
+                "hasBallAtStep": hasBallAtStep,
                 "duration": timeline[-1][0]
             })
 
         for pos, defender in def_lineup.items():
             def_coords = None
             action_type = ACTIONS["GUARD_OFFBALL"]
+
+            hasBallAtStep = []
+            for step in steps:
+                hasBallAtStep.append(False)
 
             if pos == bh_pos:
                 def_coords = assign_bh_defender_coords(ball_handler_end_coords, aggression_call, is_away_offense)
