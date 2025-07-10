@@ -13,23 +13,25 @@ export function createPhaserPlayer({ scene, player, teamInfo, position, Phaser }
   circle.setStrokeStyle(3, Phaser.Display.Color.HexStringToColor(stroke).color);
   circle.setDepth(1);
 
-  const label = scene.add.text(0, -24, position, {
-    font: "16px Arial",
+  const label = scene.add.text(px, py, position, {
+    font: "bold 14px Arial",
     color: stroke,
     align: "center"
   });
   label.setOrigin(0.5);
   label.setDepth(2);
+  
 
   const jerseyOffset = teamInfo.isHome ? -28 : 28;
 
-  const jersey = scene.add.text(px, py + jerseyOffset, jerseyText, {
-    font: "16px Arial",
+  const jersey = scene.add.text(px, py + (player.team === "home" ? -30 : 28), jerseyText, {
+    font: "bold 16px Arial",
     color: fill,
     align: "center"
   });
   jersey.setOrigin(0.5);
   jersey.setDepth(2);
+  
 
   // Add to container with origin (0,0) at center of circle
   const container = scene.add.container(px, py, [circle, label, jersey]);

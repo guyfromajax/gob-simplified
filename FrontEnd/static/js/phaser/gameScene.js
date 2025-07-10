@@ -43,11 +43,19 @@ export function createGameScene(Phaser) {
       this.load.image(courtKey, courtPath);
       this.load.once("complete", () => {
       if (this.textures.exists(courtKey)) {
-          this.add.image(0, 0, courtKey).setOrigin(0).setDepth(0);
+        this.add.image(0, 0, courtKey)
+        .setOrigin(0)
+        .setDisplaySize(this.game.config.width, this.game.config.height)
+        .setDepth(0);
+      
       } else {
           this.load.image(courtKey, fallbackPath);
           this.load.once("complete", () => {
-          this.add.image(0, 0, courtKey).setOrigin(0).setDepth(0);
+            this.add.image(0, 0, courtKey)
+            .setOrigin(0)
+            .setDisplaySize(this.game.config.width, this.game.config.height)
+            .setDepth(0);
+          
           });
         this.load.start();
       }
