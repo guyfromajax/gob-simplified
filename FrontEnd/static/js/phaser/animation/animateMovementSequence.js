@@ -14,11 +14,23 @@ import { lockBallToPlayer } from "./ballManager.js";
  * @returns {Promise} resolves when all tweens finish
  */
 export function animateMovementSequence({ scene, sprite, movement, onAction, ballSprite, hasBallAtStep }) {
+  console.log("🧪 Running animateMovementSequence for:", sprite?.name || anim?.playerId);
+  console.log("🎯 Step 0 possession check → hasBallAtStep[0]:", hasBallAtStep?.[0]);
+  console.log("🎯 Sprite exists:", !!sprite);
+  console.log("🎯 Sprite position (start):", sprite?.x, sprite?.y);
+
   return new Promise((resolve) => {
     if (!movement || movement.length < 2) return resolve();
 
     let stepIndex = 1;
 
+    if (hasBallAtStep?.[0] && sprite && ballSprite) {
+      console.log("🔒 Locking ball to starting player:", sprite.name);
+      lockBallToPlayer(ballSprite, sprite);
+    } else {
+      console.warn("⚠️ Could not lock ball to starting player.");
+    }
+    
     const animateNextStep = () => {
       if (stepIndex >= movement.length) {
         return resolve(); // done
