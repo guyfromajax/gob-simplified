@@ -10,8 +10,8 @@ export function animateMovementSequence({ scene, sprite, movement, onAction }) {
     const duration = (curr.timestamp - prev.timestamp) * 3;
 
     // 🔍 Log movement and coordinates
-    console.log("🔁 Tweening sprite:", sprite.name || sprite.playerId || "unknown");
-    console.log("  → From:", JSON.stringify(prev.coords), "To:", JSON.stringify(curr.coords), "Duration:", duration);
+    // console.log("🔁 Tweening sprite:", sprite.name || sprite.playerId || "unknown");
+    // console.log("  → From:", JSON.stringify(prev.coords), "To:", JSON.stringify(curr.coords), "Duration:", duration);
 
     const { x: targetX, y: targetY } = gridToPixels(
       curr.coords.x,
