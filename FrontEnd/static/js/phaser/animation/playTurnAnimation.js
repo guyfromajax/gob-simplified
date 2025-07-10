@@ -1,4 +1,5 @@
 import { animateMovementSequence } from "./animateMovementSequence.js";
+import { updateBallOwnership } from "./ballManager.js";
 
 export async function playTurnAnimation({ scene, playerSprites, turnData, onAction }) {
   const promises = [];
@@ -33,6 +34,28 @@ export async function playTurnAnimation({ scene, playerSprites, turnData, onActi
   }
 
   await Promise.all(promises);
+  // Get latest timestamp across all players in this turn
+  const latestTimestamp = Math.max(
+    ...turnData.animations.flatMap(anim => anim.movement.map(m => m.timestamp))
+  );
+
+  // Track elapsed time for this turn
+  let currentTimestamp = 0;
+  const tickInterval = 33; // approx 30 FPS
+  const timer = scene.time.addEvent({
+    delay: tickInterval,
+    callback: () => {
+      currentTimestamp += tickInterval;
+
+      updateBallOwnership(scene.ballSprite, turnData.animations, playerSprites, currentTimestamp);
+
+      if (currentTimestamp >= latestTimestamp + 100) {
+        timer.remove(); // stop this timer
+      }
+    },
+    loop: true,
+  });
+
 }
 
 // import { onAction } from "./onAction.js";
