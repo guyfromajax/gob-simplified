@@ -86,6 +86,7 @@ export function createGameScene(Phaser) {
       });
 
       console.log("✅ GameScene animation complete");
+      this.ballSprite.setVisible(true).setPosition(600, 300);
     }
   };
 }
