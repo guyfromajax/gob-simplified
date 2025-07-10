@@ -7,7 +7,7 @@ export function animateMovementSequence({ scene, sprite, movement, onAction }) {
     const prev = movement[i - 1];
     const curr = movement[i];
 
-    const duration = curr.timestamp - prev.timestamp;
+    const duration = (curr.timestamp - prev.timestamp) * 3;
 
     // 🔍 Log movement and coordinates
     console.log("🔁 Tweening sprite:", sprite.name || sprite.playerId || "unknown");

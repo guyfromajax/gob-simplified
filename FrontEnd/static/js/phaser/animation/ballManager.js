@@ -4,12 +4,11 @@ import { generateBallTween } from "./generateBallTween.js";
  * Attach the ball sprite to a given player container.
  */
 export function lockBallToPlayer(ballSprite, playerSprite) {
-  if (!ballSprite || !playerSprite) return;
+  const { x, y } = playerSprite.getCenter();
+  ballSprite.setPosition(x, y);
   ballSprite.setVisible(true);
-  ballSprite.setDepth(10); // on top
-  ballSprite.x = playerSprite.x;
-  ballSprite.y = playerSprite.y;
 }
+
 
 /**
  * Animate the ball flying from one point to another.
