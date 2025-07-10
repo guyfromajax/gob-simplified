@@ -6,7 +6,7 @@ export async function playTurnAnimation({ scene, playerSprites, turnData, ballSp
   const promises = [];
 
   console.log("✅ playTurnAnimation received:", { scene, playerSprites, turnData });
-  const pgId = getPlayerIdByPosition("PG", simData.players, "home");
+  const pgId = getPlayerIdByPosition("PG", scene.simData.players, "home");
   console.log("👤 PG ID:", pgId);
 
   const pgAnimation = turnData.animations.find(a => a.playerId === pgId);
