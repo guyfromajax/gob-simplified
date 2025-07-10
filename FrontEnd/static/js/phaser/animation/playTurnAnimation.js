@@ -1,16 +1,17 @@
 import { animateMovementSequence } from "./animateMovementSequence.js";
 import { updateBallOwnership } from "./ballManager.js";
-import { getPlayerIdByPosition } from "../utils/playerUtils.js"; 
+import { getPlayerIdByPosition } from "../utils/playerUtils.js";
 
 export async function playTurnAnimation({ scene, playerSprites, turnData, ballSprite, onAction }) {
   const promises = [];
 
   console.log("✅ playTurnAnimation received:", { scene, playerSprites, turnData });
-  const pgId = getPlayerIdByPosition("PG", scene.simData?.players || []);
+  const pgId = getPlayerIdByPosition("PG", simData.players, "home");
   console.log("👤 PG ID:", pgId);
 
   const pgAnimation = turnData.animations.find(a => a.playerId === pgId);
   console.log("🧠 PG hasBallAtStep:", pgAnimation?.hasBallAtStep);
+
 
   for (const anim of turnData.animations) {
     console.log("👥 Players with animations:", turnData.animations.map(a => a.playerId));
