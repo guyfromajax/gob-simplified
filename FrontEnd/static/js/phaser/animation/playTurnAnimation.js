@@ -6,6 +6,8 @@ export async function playTurnAnimation({ scene, playerSprites, turnData, ballSp
 
   console.log("✅ playTurnAnimation received:", { scene, playerSprites, turnData });
   for (const anim of turnData.animations) {
+    console.log("👥 Players with animations:", turnData.animations.map(a => a.playerId));
+    console.log("👤 PG ID:", playerSprites["PG"]?.playerId); // or however you're mapping positions
     const sprite = playerSprites[anim.playerId];
     const movement = anim.movement;
 
@@ -36,31 +38,6 @@ export async function playTurnAnimation({ scene, playerSprites, turnData, ballSp
   }
 
   await Promise.all(promises);
-  // Get latest timestamp across all players in this turn
-  // const latestTimestamp = Math.max(
-  //   ...turnData.animations.flatMap(anim => anim.movement.map(m => m.timestamp))
-  // );
-
-  // const startTime = scene.time.now;
-
-  // const timer = scene.time.addEvent({
-  //   delay: 33, // ~30 FPS
-  //   callback: () => {
-  //     const currentTimestamp = scene.time.now - startTime;
-
-  //     updateBallOwnership(
-  //       scene.ballSprite,
-  //       turnData.animations,
-  //       playerSprites,
-  //       currentTimestamp
-  //     );
-
-  //     if (currentTimestamp >= latestTimestamp + 200) {
-  //       timer.remove(); // stop after final step
-  //     }
-  //   },
-  //   loop: true,
-  // });
 }
 
 // import { onAction } from "./onAction.js";
