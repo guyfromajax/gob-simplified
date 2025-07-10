@@ -77,15 +77,14 @@ export function createGameScene(Phaser) {
       }, Phaser);
 
       this.ballSprite = this.add.image(0, 0, "ball").setVisible(true).setDepth(1000).setScale(1);
-      console.log("✅ ballSprite created", this.ballSprite);
-
-      if (!this.textures.exists("ball")) {
-        console.error("❌ Ball texture not found in texture manager.");
-      }
-      
-
-
-
+      this.tweens.add({
+        targets: this.ballSprite,
+        scale: { from: 0.18, to: 0.24 }, // adjust these as needed
+        duration: 400, // duration of one pulse
+        yoyo: true,    // scale back down
+        repeat: -1,    // repeat forever
+        ease: 'Sine.easeInOut'
+      });
 
       await animateGameTurns({
         scene: this,
