@@ -76,7 +76,7 @@ export function createGameScene(Phaser) {
         }
       }, Phaser);
 
-      this.ballSprite = this.add.image(0, 0, "ball").setVisible(false).setDepth(10).setScale(0.04);
+      this.ballSprite = this.add.image(0, 0, "ball").setVisible(true).setDepth(10).setScale(0.04);
       console.log("✅ ballSprite created", this.ballSprite);
       this.ballSprite.setVisible(true);
       this.ballSprite.setPosition(600, 300); // middle of screen

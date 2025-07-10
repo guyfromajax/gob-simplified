@@ -16,6 +16,7 @@ export async function animateGameTurns({
 
   for (let i = 0; i < turns.length; i++) {
     const turn = turns[i];
+    console.log(`🔁 Turn ${i + 1}`, turn);
 
     const ballHandlerName = turn.ball_handler || "";
     const shooterName = turn.shooter || "";
@@ -33,6 +34,7 @@ export async function animateGameTurns({
       playerSprites,
       turnData: turn,
       onAction: (action, sprite, timestamp) => {
+        console.log(`🎬 Action "${action}" fired at ${timestamp}ms for sprite:`, sprite);
         onAction(action, sprite, timestamp);
 
         const playerId = Object.keys(playerSprites).find(
@@ -43,6 +45,7 @@ export async function animateGameTurns({
         const movement = anim?.movement || [];
 
         if (action === "handle_ball" && anim?.hasBallAtStep?.length) {
+          console.log("🔒 Locking ball to ball handler:", playerId);
           lockBallToPlayer(ballSprite, sprite);
         }
 
@@ -58,6 +61,7 @@ export async function animateGameTurns({
           );
 
           if (passStep && receiveStep) {
+            console.log("📤 Pass triggered");
             passBall({
               scene,
               ballSprite,
@@ -70,10 +74,12 @@ export async function animateGameTurns({
         }
 
         if (action === "receive") {
+          console.log("📥 Ball received by:", playerId);
           lockBallToPlayer(ballSprite, sprite);
         }
 
         if (action === "shoot" || sprite.playerId === shooterId) {
+          console.log("🏀 Shot triggered. Hiding ball.");
           ballSprite.setVisible(false);
         }
       }
