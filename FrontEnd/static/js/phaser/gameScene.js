@@ -77,6 +77,10 @@ export function createGameScene(Phaser) {
       }, Phaser);
 
       this.ballSprite = this.add.image(0, 0, "ball").setVisible(false).setDepth(10).setScale(0.04);
+      this.ballSprite.setPosition(600, 384); // middle of screen
+      this.ballSprite.setVisible(true);
+      this.ballSprite.setDepth(999); // above everything
+
 
       await animateGameTurns({
         scene: this,
@@ -86,7 +90,6 @@ export function createGameScene(Phaser) {
       });
 
       console.log("✅ GameScene animation complete");
-      this.ballSprite.setVisible(true).setPosition(600, 300);
     }
   };
 }
