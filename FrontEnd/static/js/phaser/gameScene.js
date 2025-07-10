@@ -33,29 +33,26 @@ export function createGameScene(Phaser) {
       console.log("📦 simData received:", simData);
       console.log("📦 First turn:", simData.turns?.[0]);
 
-      // 🏀 Load court image dynamically by home team
-      const teamId = simData.home_team_id.toLowerCase();
+      // 🏀 Load court background image based on home team ID
+      const teamId = simData.home_team_id.toLowerCase(); // ensures lowercase for snake-case file names
       const courtKey = "court-bg";
       const courtPath = `/static/images/courts/${teamId}.jpg`;
-      const fallbackCourt = "/static/images/courts/default.jpg";
+      const fallbackPath = "/static/images/courts/default.jpg";
 
-      try {
-        const img = new Image();
-        img.src = courtPath;
-        img.onload = () => {
-          this.textures.addBase64(courtKey, img.src);
+      // Load with fallback
+      this.load.image(courtKey, courtPath);
+      this.load.once("complete", () => {
+      if (this.textures.exists(courtKey)) {
           this.add.image(0, 0, courtKey).setOrigin(0).setDepth(0);
-        };
-        img.onerror = () => {
-          this.load.image(courtKey, fallbackCourt);
+      } else {
+          this.load.image(courtKey, fallbackPath);
           this.load.once("complete", () => {
-            this.add.image(0, 0, courtKey).setOrigin(0).setDepth(0);
+          this.add.image(0, 0, courtKey).setOrigin(0).setDepth(0);
           });
-          this.load.start();
-        };
-      } catch (e) {
-        console.warn("⚠️ Failed to load court image:", e);
+        this.load.start();
       }
+      });
+      this.load.start();
 
       this.playerSprites = loadPhaserPlayers(this, simData.players, {
         home: {

@@ -21,7 +21,9 @@ export function createPhaserPlayer({ scene, player, teamInfo, position, Phaser }
   label.setOrigin(0.5);
   label.setDepth(2);
 
-  const jersey = scene.add.text(0, 28, jerseyText, {
+  const jerseyOffset = teamInfo.isHome ? -28 : 28;
+
+  const jersey = scene.add.text(px, py + jerseyOffset, jerseyText, {
     font: "16px Arial",
     color: fill,
     align: "center"

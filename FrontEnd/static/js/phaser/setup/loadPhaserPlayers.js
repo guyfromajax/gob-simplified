@@ -17,7 +17,10 @@ export function loadPhaserPlayers(scene, allPlayers, teamInfo, Phaser) {
     const sprite = createPhaserPlayer({
       scene,
       player,
-      teamInfo: teamColors,
+      teamInfo: {
+        ...teamColors,
+        isHome
+      },
       position: player.pos,
       Phaser
     });
