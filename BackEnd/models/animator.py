@@ -49,12 +49,7 @@ class Animator:
             if not timeline:
                 continue
 
-            hasBallAtStep = []
-            for step in timeline:
-                if step in ["handle_ball", "receive", "shoot"]:
-                    hasBallAtStep.append(True)
-                else:
-                    hasBallAtStep.append(False)
+            hasBallAtStep = [action in {"handle_ball", "receive", "shoot"} for (_, action, _) in timeline]
 
             timeline.sort(key=lambda tup: tup[0])
             first_spot = timeline[0][2]
@@ -94,9 +89,7 @@ class Animator:
             def_coords = None
             action_type = ACTIONS["GUARD_OFFBALL"]
 
-            hasBallAtStep = []
-            for step in steps:
-                hasBallAtStep.append(False)
+            hasBallAtStep = [action in {"handle_ball", "receive", "shoot"} for (_, action, _) in timeline]
 
             if pos == bh_pos:
                 def_coords = assign_bh_defender_coords(ball_handler_end_coords, aggression_call, is_away_offense)
@@ -155,6 +148,7 @@ class Animator:
                 "start": start,
                 "end": def_coords,
                 "movement": movement,
+                "hasBallAtStep": hasBallAtStep,
                 "duration": steps[-1]["timestamp"] if steps else 800
             })
 
