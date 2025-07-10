@@ -1,10 +1,11 @@
 import { generateBallTween } from "./generateBallTween.js";
 
-/**
- * Attach the ball sprite to a given player container.
- */
 export function lockBallToPlayer(ballSprite, playerSprite) {
-  const { x, y } = playerSprite.getCenter();
+  if (!ballSprite || !playerSprite) return;
+
+  // Use x/y from the container directly (playerSprite is a Phaser container)
+  const { x, y } = playerSprite;
+
   ballSprite.setPosition(x, y);
   ballSprite.setVisible(true);
 }
