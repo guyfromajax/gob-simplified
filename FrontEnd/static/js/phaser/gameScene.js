@@ -76,7 +76,7 @@ export function createGameScene(Phaser) {
         }
       }, Phaser);
 
-      this.ballSprite = this.add.image(0, 0, "ball").setVisible(true).setDepth(1000).setScale(0.2);
+      this.ballSprite = this.add.image(0, 0, "ball").setVisible(true).setDepth(1000).setScale(1);
       console.log("✅ ballSprite created", this.ballSprite);
       this.ballSprite.setTint(0x00ff00); // Force the ball image to turn green
       this.ballSprite.setVisible(true);
