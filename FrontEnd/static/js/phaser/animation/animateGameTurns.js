@@ -18,7 +18,6 @@ export async function animateGameTurns({
     const turn = turns[i];
     console.log(`🔁 Turn ${i + 1}`, turn);
 
-    const ballHandlerName = turn.ball_handler || "";
     const shooterName = turn.shooter || "";
     const animations = turn.animations || [];
 
@@ -26,11 +25,11 @@ export async function animateGameTurns({
       allPlayers.map(p => [p.name, p.playerId])
     );
 
-    const ballHandlerId = playerMap[ballHandlerName];
     const shooterId = playerMap[shooterName];
 
     await playTurnAnimation({
       scene,
+      simData,
       playerSprites,
       turnData: turn,
       onAction: (action, sprite, timestamp) => {
