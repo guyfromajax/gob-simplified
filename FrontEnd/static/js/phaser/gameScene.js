@@ -10,7 +10,7 @@ export function createGameScene(Phaser) {
 
     async preload() {
       console.log("✅ GameScene preloaded");
-      this.load.image("ball", "images/ball.png");
+      this.load.image("ball", "/static/images/ball.png");
     }
 
     async create() {
@@ -78,6 +78,7 @@ export function createGameScene(Phaser) {
 
       this.ballSprite = this.add.image(0, 0, "ball").setVisible(true).setDepth(1000).setScale(0.2);
       console.log("✅ ballSprite created", this.ballSprite);
+      this.ballSprite.setTint(0x00ff00); // Force the ball image to turn green
       this.ballSprite.setVisible(true);
       this.ballSprite.setPosition(600, 300); // middle of screen
       this.ballSprite.setTint(0xff0000);
