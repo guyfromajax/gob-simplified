@@ -5,10 +5,10 @@ import { getPlayerIdByPosition } from "../utils/playerUtils.js";
 export async function playTurnAnimation({ scene, simData, playerSprites, turnData, ballSprite, onAction }) {
   const promises = [];
   console.log("🔍 inside playTurnAnimation")
-  console.log("🔍 scene.simData:", scene.simData);
+  console.log("🔍 simData:", simData);
 
   console.log("✅ playTurnAnimation received:", { scene, playerSprites, turnData });
-  const pgId = getPlayerIdByPosition("PG", scene.simData.players, "home");
+  const pgId = getPlayerIdByPosition("PG", simData.players, "home");
   console.log("👤 PG ID:", pgId);
 
   const pgAnimation = turnData.animations.find(a => a.playerId === pgId);
