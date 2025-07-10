@@ -43,6 +43,40 @@ export function hideBall(ballSprite) {
   if (ballSprite) ballSprite.setVisible(false);
 }
 
+/**
+ * Checks which player has the ball at the current animation step
+ * and locks the ball to that player's sprite.
+ *
+ * @param {Phaser.GameObjects.Image} ballSprite - The Phaser ball image
+ * @param {Array} animations - Array of player animation objects for the current turn
+ * @param {Object} playerSprites - Map of playerId → Phaser sprite
+ * @param {number} currentTimestamp - The current animation timestamp (ms)
+ */
+export function updateBallOwnership(ballSprite, animations, playerSprites, currentTimestamp) {
+  for (const anim of animations) {
+    const { playerId, hasBallAtStep, movement } = anim;
+    if (!hasBallAtStep || !movement || !movement.length) continue;
+
+    // Find current step index based on timestamp
+    let stepIndex = 0;
+    while (
+      stepIndex < movement.length - 1 &&
+      currentTimestamp >= movement[stepIndex + 1].timestamp
+    ) {
+      stepIndex++;
+    }
+
+    if (hasBallAtStep[stepIndex]) {
+      const playerSprite = playerSprites[playerId];
+      if (playerSprite) {
+        lockBallToPlayer(ballSprite, playerSprite);
+      }
+      break; // Only one player can have the ball
+    }
+  }
+}
+
+
 // import { lockBallToPlayer, passBall } from "./ballManager.js";
 
 // // Lock to player
