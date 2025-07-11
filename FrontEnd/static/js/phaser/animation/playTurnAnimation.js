@@ -26,8 +26,22 @@ async function runSetupTween({ scene, ballSprite, animations, playerSprites }) {
   const stepIndex = 0;
   const promises = [];
 
-  // 🧠 Find ball owner BEFORE tween loop
-  let ballOwnerSprite = null;
+   // Find ball owner before starting tweens
+   let ballOwnerSprite = null;
+   for (const anim of animations) {
+     if (anim.hasBallAtStep?.[stepIndex]) {
+       ballOwnerSprite = playerSprites[anim.playerId];
+       break;
+     }
+   }
+ 
+   // Ensure the ball is positioned on the correct sprite immediately
+   if (ballOwnerSprite && ballSprite?.setPosition) {
+     ballSprite.setPosition(ballOwnerSprite.x, ballOwnerSprite.y);
+     ballSprite.setVisible(true);
+   } else if (ballSprite) {
+     ballSprite.setVisible(false);
+   }
 
   for (const anim of animations) {
     if (anim.hasBallAtStep?.[stepIndex]) {
