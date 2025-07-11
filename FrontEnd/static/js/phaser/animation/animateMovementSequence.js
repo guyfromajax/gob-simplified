@@ -13,11 +13,11 @@ import { lockBallToPlayer } from "./ballManager.js";
  * @param {Array} hasBallAtStep - Boolean array mapping possession per step
  * @returns {Promise} resolves when all tweens finish
  */
-export function animateMovementSequence({ scene, sprite, movement, onAction, ballSprite, hasBallAtStep }) {
-  console.log("🧪 Running animateMovementSequence for sprite:", sprite?.name || sprite?.playerId || "[unknown]");
+export function animateMovementSequence({ scene, sprite, movement, onAction, ballSprite, hasBallAtStep, position }) {
+
+  console.log(`🧪 animateMovementSequence → Position: ${position}`);
   console.log("🎯 Step 0 possession check → hasBallAtStep[0]:", hasBallAtStep?.[0]);
   console.log("🎯 Sprite exists:", !!sprite);
-  console.log("🎯 Sprite position (start):", sprite?.x, sprite?.y);
 
   return new Promise((resolve) => {
     if (!movement || movement.length < 2) return resolve();

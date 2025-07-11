@@ -21,12 +21,14 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
       continue;
     }
 
+    const positionName = simData.players.find(p => p.playerId === anim.playerId)?.pos || "[unknown]";
     const promise = animateMovementSequence({
       scene,
       sprite,
       movement: anim.movement,
       hasBallAtStep: anim.hasBallAtStep,
       ballSprite,
+      position: positionName,
       onAction: (action, sprite, timestamp) => {
         if (onAction) onAction(action, sprite, timestamp);
       }
