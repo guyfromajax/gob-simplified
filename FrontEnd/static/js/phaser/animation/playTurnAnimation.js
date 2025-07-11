@@ -72,10 +72,10 @@ async function runSetupTween({ scene, ballSprite, animations, playerSprites, off
         duration: 2000,
         ease: "Linear",
         onUpdate: () => {
-          if (sprite === ballOwnerSprite && ballSprite?.setPosition) {
+          if (sprite === ballOwnerSprite && ballSprite?.setPosition && sprite.x !== undefined && sprite.y !== undefined) {
             ballSprite.setPosition(sprite.x, sprite.y);
             ballSprite.setVisible(true);
-          }
+          }          
         },
         onComplete: resolve
       });
