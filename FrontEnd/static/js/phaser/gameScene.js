@@ -77,6 +77,15 @@ export function createGameScene(Phaser) {
       }, Phaser);
 
       this.ballSprite = this.add.image(0, 0, "ball").setVisible(true).setDepth(1000).setScale(1);
+      // Give Phaser a tick to fully register the sprite
+      this.time.delayedCall(0, async () => {
+        await animateGameTurns({
+        scene: this,
+        simData,
+        playerSprites: this.playerSprites,
+        ballSprite: this.ballSprite
+        });
+      });
       this.tweens.add({
         targets: this.ballSprite,
         scale: { from: 1, to: 1.3 }, // adjust these as needed
