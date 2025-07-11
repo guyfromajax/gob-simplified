@@ -27,6 +27,14 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
     ...turnData.animations.map(anim => anim.movement.length)
   );
 
+  // 🟠 Position the ball at step 0 before any animation begins
+  updateBallOwnership({
+    ballSprite,
+    animations: turnData.animations,
+    playerSprites,
+    stepIndex: 0
+  });
+
   for (let stepIndex = 1; stepIndex < maxSteps; stepIndex++) {
     // 🔁 Update ball lock once per step
     updateBallOwnership({
