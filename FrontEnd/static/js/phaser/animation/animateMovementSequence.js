@@ -13,29 +13,23 @@ import { lockBallToPlayer } from "./ballManager.js";
  * @param {Array} hasBallAtStep - Boolean array mapping possession per step
  * @returns {Promise} resolves when all tweens finish
  */
-export function animateMovementSequence({ scene, sprite, movement, onAction, ballSprite, hasBallAtStep, position }) {
-
-  console.log(`🧪 animateMovementSequence → Position: ${position}`);
-  console.log("🎯 Step 0 possession check → hasBallAtStep[0]:", hasBallAtStep?.[0]);
-  console.log("🎯 Sprite exists:", !!sprite);
-
+export function animateMovementSequence({ 
+  scene, 
+  sprite, 
+  movement, 
+  onAction, 
+  ballSprite, 
+  hasBallAtStep, 
+  position, 
+  currentBallOwnerRef // <-- a mutable ref passed from playTurnAnimation
+}) {
   return new Promise((resolve) => {
     if (!movement || movement.length < 2) return resolve();
 
     let stepIndex = 1;
 
-    console.log("🎯 ballSprite ready:", !!ballSprite, "| sprite:", sprite?.name || "[unknown]");
-    if (hasBallAtStep?.[0] && sprite && ballSprite && ballSprite.setPosition) {
-      console.log("🔒 Locking ball to starting player:", position);
-      lockBallToPlayer(ballSprite, sprite);
-    } else {
-      console.warn("⚠️ Could not lock ball to starting player — check ballSprite and sprite validity");
-    }    
-    
     const animateNextStep = () => {
-      if (stepIndex >= movement.length) {
-        return resolve(); // done
-      }
+      if (stepIndex >= movement.length) return resolve();
 
       const prev = movement[stepIndex - 1];
       const curr = movement[stepIndex];
@@ -50,9 +44,11 @@ export function animateMovementSequence({ scene, sprite, movement, onAction, bal
 
       const targets = [sprite];
 
-      if (hasBallAtStep?.[stepIndex]) {
-        lockBallToPlayer(ballSprite, sprite); // lock immediately
-        targets.push(ballSprite);             // tween ball with player
+      const ownsBallThisStep = hasBallAtStep?.[stepIndex];
+
+      if (ownsBallThisStep) {
+        currentBallOwnerRef.value = sprite;
+        ballSprite.setVisible(true);
       }
 
       scene.tweens.add({
@@ -65,23 +61,22 @@ export function animateMovementSequence({ scene, sprite, movement, onAction, bal
           if (onAction) onAction(curr.action, sprite, curr.timestamp);
         },
         onUpdate: () => {
-          if (hasBallAtStep?.[stepIndex]) {
-            lockBallToPlayer(ballSprite, sprite);
+          if (currentBallOwnerRef.value === sprite) {
+            ballSprite.setPosition(sprite.x, sprite.y);
           }
         },
         onComplete: () => {
-          if (hasBallAtStep?.[stepIndex]) {
-            lockBallToPlayer(ballSprite, sprite); // final lock after move
-          }
           stepIndex++;
           animateNextStep();
         }
       });
     };
 
-    // Initial check for starting possession
+    // Handle step 0 before any tween begins
     if (hasBallAtStep?.[0]) {
-      lockBallToPlayer(ballSprite, sprite);
+      currentBallOwnerRef.value = sprite;
+      ballSprite.setPosition(sprite.x, sprite.y);
+      ballSprite.setVisible(true);
     }
 
     animateNextStep();
