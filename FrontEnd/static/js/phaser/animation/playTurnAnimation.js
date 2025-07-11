@@ -27,7 +27,11 @@ async function runSetupTween({ scene, ballSprite, animations, playerSprites, off
   const stepIndex = 0;
   const promises = [];
   console.log("🟡 runSetupTween → ballSprite defined?", !!ballSprite);
-  console.log("🟡 runSetupTween → offenseTeamId:", offenseTeamId);
+  console.log("🔍 Checking sprite team match →", {
+    playerId: anim.playerId,
+    spriteTeam: sprite?.team,
+    offenseTeamId
+  });
 
   // ✅ Find ball owner from offensive team before tweening
   let ballOwnerSprite = null;
