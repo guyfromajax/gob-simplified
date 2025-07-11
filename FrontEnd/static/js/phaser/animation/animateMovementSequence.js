@@ -24,12 +24,13 @@ export function animateMovementSequence({ scene, sprite, movement, onAction, bal
 
     let stepIndex = 1;
 
-    if (hasBallAtStep?.[0] && sprite && ballSprite) {
-      console.log("🔒 Locking ball to starting player:", sprite.name);
+    console.log("🎯 ballSprite ready:", !!ballSprite, "| sprite:", sprite?.name || "[unknown]");
+    if (hasBallAtStep?.[0] && sprite && ballSprite && ballSprite.setPosition) {
+      console.log("🔒 Locking ball to starting player:", position);
       lockBallToPlayer(ballSprite, sprite);
     } else {
-      console.warn("⚠️ Could not lock ball to starting player.");
-    }
+      console.warn("⚠️ Could not lock ball to starting player — check ballSprite and sprite validity");
+    }    
     
     const animateNextStep = () => {
       if (stepIndex >= movement.length) {
