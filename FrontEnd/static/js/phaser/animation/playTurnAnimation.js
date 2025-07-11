@@ -57,7 +57,7 @@ async function runSetupTween({ scene, ballSprite, animations, playerSprites }) {
         targets: [sprite],
         x,
         y,
-        duration: 500,
+        duration: 2000,
         ease: "Linear",
         onUpdate: () => {
           if (sprite === ballOwnerSprite && ballSprite?.setPosition) {
