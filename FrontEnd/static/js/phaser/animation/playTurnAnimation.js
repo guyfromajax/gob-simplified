@@ -13,9 +13,64 @@ function updateBallOwnership({ ballSprite, animations, playerSprites, stepIndex 
     if (hasBall && sprite && ballSprite?.setPosition) {
       ballSprite.setPosition(sprite.x, sprite.y);
       ballSprite.setVisible(true);
-      break; // Only one player should have the ball
+      break;
     }
   }
+}
+
+/**
+ * Smoothly move all players to their step 0 positions before possession begins.
+ * Locks the ball to the player with hasBallAtStep[0] during this setup tween.
+ */
+async function runSetupTween({ scene, ballSprite, animations, playerSprites }) {
+  const stepIndex = 0;
+  const promises = [];
+
+  let ballOwnerSprite = null;
+
+  for (const anim of animations) {
+    const sprite = playerSprites[anim.playerId];
+    const firstStep = anim.movement?.[0];
+    const hasBall = anim.hasBallAtStep?.[0];
+
+    if (!sprite || !firstStep) continue;
+
+    const { x, y } = gridToPixels(
+      firstStep.coords.x,
+      firstStep.coords.y,
+      scene.game.config.width,
+      scene.game.config.height
+    );
+
+    if (hasBall) ballOwnerSprite = sprite;
+
+    promises.push(new Promise((resolve) => {
+      scene.tweens.add({
+        targets: [sprite],
+        x,
+        y,
+        duration: 500,
+        ease: "Linear",
+        onUpdate: () => {
+          if (sprite === ballOwnerSprite && ballSprite?.setPosition) {
+            ballSprite.setPosition(sprite.x, sprite.y);
+            ballSprite.setVisible(true);
+          }
+        },
+        onComplete: resolve
+      });
+    }));
+  }
+
+  await Promise.all(promises);
+
+  // Snap ball to final location after setup tween completes
+  updateBallOwnership({
+    ballSprite,
+    animations,
+    playerSprites,
+    stepIndex: 0
+  });
 }
 
 /**
@@ -27,33 +82,15 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
     ...turnData.animations.map(anim => anim.movement.length)
   );
 
-  // 🟠 Build player sprites at step 0 before any animation begins
-  // for (const anim of turnData.animations) {
-  //   const sprite = playerSprites[anim.playerId];
-  //   const first = anim.movement[0];
-  
-  //   if (sprite && first) {
-  //     const { x, y } = gridToPixels(
-  //       first.coords.x,
-  //       first.coords.y,
-  //       scene.game.config.width,
-  //       scene.game.config.height
-  //     );
-  //     sprite.setPosition(x, y);
-  //   }
-  // }
-
-  // 🟠 Position the ball at step 0 before any animation begins
-  updateBallOwnership({
+  // 🔶 Pre-possession: Move players to their step 0 positions
+  await runSetupTween({
+    scene,
     ballSprite,
     animations: turnData.animations,
-    playerSprites,
-    stepIndex: 0
+    playerSprites
   });
-  
 
   for (let stepIndex = 1; stepIndex < maxSteps; stepIndex++) {
-    // 🔁 Update ball lock once per step
     updateBallOwnership({
       ballSprite,
       animations: turnData.animations,
