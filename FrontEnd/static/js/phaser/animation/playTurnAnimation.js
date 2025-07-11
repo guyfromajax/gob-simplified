@@ -5,12 +5,13 @@ import { gridToPixels } from "../utils/gridToPixels.js";
  * Centralized ball ownership logic
  * Assigns the ball to the correct player for the current stepIndex
  */
-function updateBallOwnership({ ballSprite, animations, playerSprites, stepIndex }) {
+function updateBallOwnership({ ballSprite, animations, playerSprites, stepIndex, offenseTeamId }) {
   for (const anim of animations) {
     const sprite = playerSprites[anim.playerId];
     const hasBall = anim.hasBallAtStep?.[stepIndex];
+    const team = sprite?.team; // assumes sprite.team was set on creation
 
-    if (hasBall && sprite && ballSprite?.setPosition) {
+    if (hasBall && sprite && team === offenseTeamId && ballSprite?.setPosition) {
       ballSprite.setPosition(sprite.x, sprite.y);
       ballSprite.setVisible(true);
       break;
@@ -22,38 +23,32 @@ function updateBallOwnership({ ballSprite, animations, playerSprites, stepIndex 
  * Smoothly move all players to their step 0 positions before possession begins.
  * Locks the ball to the player with hasBallAtStep[0] during this setup tween.
  */
-async function runSetupTween({ scene, ballSprite, animations, playerSprites }) {
+async function runSetupTween({ scene, ballSprite, animations, playerSprites, offenseTeamId }) {
   const stepIndex = 0;
   const promises = [];
 
-   // Find ball owner before starting tweens
-   let ballOwnerSprite = null;
-   for (const anim of animations) {
-     if (anim.hasBallAtStep?.[stepIndex]) {
-       ballOwnerSprite = playerSprites[anim.playerId];
-       break;
-     }
-   }
- 
-   // Ensure the ball is positioned on the correct sprite immediately
-   if (ballOwnerSprite && ballSprite?.setPosition) {
-     ballSprite.setPosition(ballOwnerSprite.x, ballOwnerSprite.y);
-     ballSprite.setVisible(true);
-   } else if (ballSprite) {
-     ballSprite.setVisible(false);
-   }
-
+  // ✅ Find ball owner from offensive team before tweening
+  let ballOwnerSprite = null;
   for (const anim of animations) {
-    if (anim.hasBallAtStep?.[stepIndex]) {
-      ballOwnerSprite = playerSprites[anim.playerId];
+    const sprite = playerSprites[anim.playerId];
+    const hasBall = anim.hasBallAtStep?.[stepIndex];
+    if (hasBall && sprite?.team === offenseTeamId) {
+      ballOwnerSprite = sprite;
       break;
     }
+  }
+
+  // ✅ Pre-place the ball at correct start location
+  if (ballOwnerSprite && ballSprite?.setPosition) {
+    ballSprite.setPosition(ballOwnerSprite.x, ballOwnerSprite.y);
+    ballSprite.setVisible(true);
+  } else if (ballSprite) {
+    ballSprite.setVisible(false);
   }
 
   for (const anim of animations) {
     const sprite = playerSprites[anim.playerId];
     const firstStep = anim.movement?.[0];
-    const hasBall = anim.hasBallAtStep?.[0];
 
     if (!sprite || !firstStep) continue;
 
@@ -63,8 +58,6 @@ async function runSetupTween({ scene, ballSprite, animations, playerSprites }) {
       scene.game.config.width,
       scene.game.config.height
     );
-
-    if (hasBall) ballOwnerSprite = sprite;
 
     promises.push(new Promise((resolve) => {
       scene.tweens.add({
@@ -84,15 +77,10 @@ async function runSetupTween({ scene, ballSprite, animations, playerSprites }) {
     }));
   }
 
-  await Promise.all(promises);
-
-  // Snap ball to final location after setup tween completes
-  updateBallOwnership({
-    ballSprite,
-    animations,
-    playerSprites,
-    stepIndex: 0
-  });
+  // Final snap just in case
+  if (ballOwnerSprite && ballSprite?.setPosition) {
+    ballSprite.setPosition(ballOwnerSprite.x, ballOwnerSprite.y);
+  }
 }
 
 /**
@@ -109,7 +97,8 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
     scene,
     ballSprite,
     animations: turnData.animations,
-    playerSprites
+    playerSprites,
+    offenseTeamId: turnData.possession_team_id
   });
 
   for (let stepIndex = 1; stepIndex < maxSteps; stepIndex++) {
@@ -117,7 +106,8 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
       ballSprite,
       animations: turnData.animations,
       playerSprites,
-      stepIndex
+      stepIndex,
+      offenseTeamId: turnData.possession_team_id
     });
 
     const promises = [];
