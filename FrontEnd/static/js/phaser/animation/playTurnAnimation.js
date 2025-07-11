@@ -61,7 +61,7 @@ async function runSetupTween({ scene, ballSprite, animations, playerSprites, off
         targets: sprite,
         x,
         y,
-        duration: 800,
+        duration: 2000,
         ease: "Linear",
         onComplete: resolve
       });
