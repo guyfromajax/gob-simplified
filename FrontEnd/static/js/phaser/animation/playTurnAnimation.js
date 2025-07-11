@@ -28,20 +28,20 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   );
 
   // 🟠 Build player sprites at step 0 before any animation begins
-  for (const anim of turnData.animations) {
-    const sprite = playerSprites[anim.playerId];
-    const first = anim.movement[0];
+  // for (const anim of turnData.animations) {
+  //   const sprite = playerSprites[anim.playerId];
+  //   const first = anim.movement[0];
   
-    if (sprite && first) {
-      const { x, y } = gridToPixels(
-        first.coords.x,
-        first.coords.y,
-        scene.game.config.width,
-        scene.game.config.height
-      );
-      sprite.setPosition(x, y);
-    }
-  }
+  //   if (sprite && first) {
+  //     const { x, y } = gridToPixels(
+  //       first.coords.x,
+  //       first.coords.y,
+  //       scene.game.config.width,
+  //       scene.game.config.height
+  //     );
+  //     sprite.setPosition(x, y);
+  //   }
+  // }
 
   // 🟠 Position the ball at step 0 before any animation begins
   updateBallOwnership({
