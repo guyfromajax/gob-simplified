@@ -28,7 +28,6 @@ async function runSetupTween({ scene, ballSprite, animations, playerSprites, off
   const promises = [];
   console.log("🟡 runSetupTween → ballSprite defined?", !!ballSprite);
   console.log("🔍 Checking sprite team match →", {
-    playerId: anim.playerId,
     spriteTeam: sprite?.team,
     offenseTeamId
   });
