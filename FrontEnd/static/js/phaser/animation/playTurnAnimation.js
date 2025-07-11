@@ -27,8 +27,9 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
       simData.players.find(p => p.playerId === anim.playerId)?.pos || "[unknown]";
 
       if (!ballSprite) {
-        console.error("🚫 ballSprite not passed to animateMovementSequence");
-      }      
+        console.warn("🚫 ballSprite not passed to animateMovementSequence");
+        continue;
+      }       
     
       const promise = animateMovementSequence({
       scene,
