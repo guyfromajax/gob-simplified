@@ -26,7 +26,15 @@ async function runSetupTween({ scene, ballSprite, animations, playerSprites }) {
   const stepIndex = 0;
   const promises = [];
 
+  // 🧠 Find ball owner BEFORE tween loop
   let ballOwnerSprite = null;
+
+  for (const anim of animations) {
+    if (anim.hasBallAtStep?.[stepIndex]) {
+      ballOwnerSprite = playerSprites[anim.playerId];
+      break;
+    }
+  }
 
   for (const anim of animations) {
     const sprite = playerSprites[anim.playerId];
