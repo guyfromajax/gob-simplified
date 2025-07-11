@@ -1,51 +1,63 @@
-import { animateMovementSequence } from "./animateMovementSequence.js";
+import { animateStep } from "./animateStep.js";
+import { gridToPixels } from "../utils/gridToPixels.js";
 
 /**
- * Plays a single possession (turn) by animating all players in parallel.
- * Resolves only after all animations finish.
- *
- * @param {object} scene - Phaser scene
- * @param {object} simData - Full simData including players
- * @param {object} playerSprites - Map of playerId → sprite
- * @param {object} turnData - One turn from simData.turns
- * @param {Phaser.GameObjects.Sprite} ballSprite - The shared ball sprite
- * @param {Function} onAction - Action callback (pass, shoot, etc.)
+ * Centralized ball ownership logic
+ * Assigns the ball to the correct player for the current stepIndex
+ */
+function updateBallOwnership({ ballSprite, animations, playerSprites, stepIndex }) {
+  for (const anim of animations) {
+    const sprite = playerSprites[anim.playerId];
+    const hasBall = anim.hasBallAtStep?.[stepIndex];
+
+    if (hasBall && sprite && ballSprite?.setPosition) {
+      ballSprite.setPosition(sprite.x, sprite.y);
+      ballSprite.setVisible(true);
+      break; // Only one player should have the ball
+    }
+  }
+}
+
+/**
+ * Step-synchronized possession animation.
+ * Each stepIndex is animated across all players, then the next step begins.
  */
 export async function playTurnAnimation({ scene, simData, playerSprites, turnData, ballSprite, onAction }) {
-  const promises = [];
-  const currentBallOwnerRef = { value: null }; // ✅ shared mutable ref for frame-accurate ball tracking
+  const maxSteps = Math.max(
+    ...turnData.animations.map(anim => anim.movement.length)
+  );
 
-  for (const anim of turnData.animations) {
-    const sprite = playerSprites[anim.playerId];
-
-    if (!sprite || !anim.movement || !anim.hasBallAtStep) {
-      console.warn("⚠️ Skipping animation for missing sprite or data:", anim.playerId);
-      continue;
-    }
-
-    const positionName =
-      simData.players.find(p => p.playerId === anim.playerId)?.pos || "[unknown]";
-
-      if (!ballSprite) {
-        console.warn("🚫 ballSprite not passed to animateMovementSequence");
-        continue;
-      }       
-    
-      const promise = animateMovementSequence({
-      scene,
-      sprite,
-      movement: anim.movement,
-      hasBallAtStep: anim.hasBallAtStep,
+  for (let stepIndex = 1; stepIndex < maxSteps; stepIndex++) {
+    // 🔁 Update ball lock once per step
+    updateBallOwnership({
       ballSprite,
-      position: positionName,
-      currentBallOwnerRef,
-      onAction: (action, sprite, timestamp) => {
-        if (onAction) onAction(action, sprite, timestamp);
-      }
+      animations: turnData.animations,
+      playerSprites,
+      stepIndex
     });
 
-    promises.push(promise);
-  }
+    const promises = [];
 
-  await Promise.all(promises);
+    for (const anim of turnData.animations) {
+      const sprite = playerSprites[anim.playerId];
+      const movement = anim.movement;
+
+      if (!sprite || stepIndex >= movement.length) continue;
+
+      const prev = movement[stepIndex - 1];
+      const curr = movement[stepIndex];
+      const duration = (curr.timestamp - prev.timestamp) * 3;
+
+      const promise = animateStep({
+        scene,
+        sprite,
+        step: curr,
+        duration
+      });
+
+      promises.push(promise);
+    }
+
+    await Promise.all(promises);
+  }
 }
