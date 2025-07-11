@@ -5,7 +5,7 @@ import { passBall, lockBallToPlayer } from "./ballManager.js";
 /**
  * Animate all turns from simData.turns using real backend structure.
  */
-export async function animateGameTurns({
+export async function animateGameTurns({ //hasBallAtStep
   scene,
   simData,
   playerSprites,
@@ -86,28 +86,3 @@ export async function animateGameTurns({
   }
 }
 
-// import { animateGameTurns } from "./animation/animateGameTurns.js";
-// import { loadPhaserPlayers } from "./setup/loadPhaserPlayers.js";
-
-// // After fetching simData and creating ball sprite...
-// this.playerSprites = loadPhaserPlayers(this, simData.players, {
-//   home: {
-//     player_ids: simData.players.filter(p => p.team === "home").map(p => p.playerId),
-//     primary_color: simData.home_team_colors.primary_color,
-//     secondary_color: simData.home_team_colors.secondary_color
-//   },
-//   away: {
-//     player_ids: simData.players.filter(p => p.team === "away").map(p => p.playerId),
-//     primary_color: simData.away_team_colors.primary_color,
-//     secondary_color: simData.away_team_colors.secondary_color
-//   }
-// });
-
-// this.ballSprite = this.add.circle(0, 0, 8, 0xffffff).setVisible(false);
-
-// animateGameTurns({
-//   scene: this,
-//   simData,
-//   playerSprites: this.playerSprites,
-//   ballSprite: this.ballSprite
-// });
