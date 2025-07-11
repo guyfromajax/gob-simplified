@@ -13,15 +13,19 @@ import { animateMovementSequence } from "./animateMovementSequence.js";
  */
 export async function playTurnAnimation({ scene, simData, playerSprites, turnData, ballSprite, onAction }) {
   const promises = [];
+  const currentBallOwnerRef = { value: null }; // ✅ shared mutable ref for frame-accurate ball tracking
 
   for (const anim of turnData.animations) {
     const sprite = playerSprites[anim.playerId];
+
     if (!sprite || !anim.movement || !anim.hasBallAtStep) {
       console.warn("⚠️ Skipping animation for missing sprite or data:", anim.playerId);
       continue;
     }
 
-    const positionName = simData.players.find(p => p.playerId === anim.playerId)?.pos || "[unknown]";
+    const positionName =
+      simData.players.find(p => p.playerId === anim.playerId)?.pos || "[unknown]";
+
     const promise = animateMovementSequence({
       scene,
       sprite,
@@ -29,6 +33,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
       hasBallAtStep: anim.hasBallAtStep,
       ballSprite,
       position: positionName,
+      currentBallOwnerRef,
       onAction: (action, sprite, timestamp) => {
         if (onAction) onAction(action, sprite, timestamp);
       }
