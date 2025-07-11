@@ -48,9 +48,13 @@ export function animateMovementSequence({
 
       if (ownsBallThisStep) {
         currentBallOwnerRef.value = sprite;
-        ballSprite.setVisible(true);
-      }
-
+        if (ballSprite && ballSprite.setVisible) {
+          ballSprite.setVisible(true);
+        } else {
+          console.warn("⚠️ ballSprite is not ready when trying to setVisible");
+        }
+      }      
+      
       scene.tweens.add({
         targets,
         x: targetX,
@@ -75,10 +79,13 @@ export function animateMovementSequence({
     // Handle step 0 before any tween begins
     if (hasBallAtStep?.[0]) {
       currentBallOwnerRef.value = sprite;
-      ballSprite.setPosition(sprite.x, sprite.y);
-      ballSprite.setVisible(true);
-    }
-
+      if (ballSprite?.setPosition && ballSprite?.setVisible) {
+        ballSprite.setPosition(sprite.x, sprite.y);
+        ballSprite.setVisible(true);
+      } else {
+        console.warn("⚠️ ballSprite not ready at step 0 lock.");
+      }
+    }    
     animateNextStep();
   });
 }
