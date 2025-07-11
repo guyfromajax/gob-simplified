@@ -23,38 +23,30 @@ function updateBallOwnership({ ballSprite, animations, playerSprites, stepIndex,
  * Smoothly move all players to their step 0 positions before possession begins.
  * Locks the ball to the player with hasBallAtStep[0] during this setup tween.
  */
+
 async function runSetupTween({ scene, ballSprite, animations, playerSprites, offenseTeamId }) {
   const stepIndex = 0;
   const promises = [];
-  console.log("🟡 runSetupTween → ballSprite defined?", !!ballSprite);
 
-  // ✅ Find ball owner from offensive team before tweening
+  // Find the ball owner
   let ballOwnerSprite = null;
   for (const anim of animations) {
     const sprite = playerSprites[anim.playerId];
     const hasBall = anim.hasBallAtStep?.[stepIndex];
-    console.log("🔍 Checking sprite team match →", {
-      spriteTeam: sprite?.team_id,
-      offenseTeamId
-    });
     if (hasBall && sprite?.team_id === offenseTeamId) {
       ballOwnerSprite = sprite;
       break;
     }
   }
 
-  // ✅ Pre-place the ball at correct start location
   if (ballOwnerSprite && ballSprite?.setPosition) {
     ballSprite.setPosition(ballOwnerSprite.x, ballOwnerSprite.y);
     ballSprite.setVisible(true);
-  } else if (ballSprite) {
-    ballSprite.setVisible(false);
   }
 
   for (const anim of animations) {
     const sprite = playerSprites[anim.playerId];
     const firstStep = anim.movement?.[0];
-
     if (!sprite || !firstStep) continue;
 
     const { x, y } = gridToPixels(
@@ -66,27 +58,84 @@ async function runSetupTween({ scene, ballSprite, animations, playerSprites, off
 
     promises.push(new Promise((resolve) => {
       scene.tweens.add({
-        targets: [sprite],
+        targets: sprite,
         x,
         y,
-        duration: 2000,
+        duration: 800,
         ease: "Linear",
-        onUpdate: () => {
-          if (sprite === ballOwnerSprite && ballSprite?.setPosition && sprite.x !== undefined && sprite.y !== undefined) {
-            ballSprite.setPosition(sprite.x, sprite.y);
-            ballSprite.setVisible(true);
-          }          
-        },
         onComplete: resolve
       });
     }));
   }
 
-  // Final snap just in case
-  if (ballOwnerSprite && ballSprite?.setPosition) {
-    ballSprite.setPosition(ballOwnerSprite.x, ballOwnerSprite.y);
-  }
+  await Promise.all(promises);
 }
+
+// Previous verions as of July 11, 2025
+// async function runSetupTween({ scene, ballSprite, animations, playerSprites, offenseTeamId }) {
+//   const stepIndex = 0;
+//   const promises = [];
+//   console.log("🟡 runSetupTween → ballSprite defined?", !!ballSprite);
+
+//   // ✅ Find ball owner from offensive team before tweening
+//   let ballOwnerSprite = null;
+//   for (const anim of animations) {
+//     const sprite = playerSprites[anim.playerId];
+//     const hasBall = anim.hasBallAtStep?.[stepIndex];
+//     console.log("🔍 Checking sprite team match →", {
+//       spriteTeam: sprite?.team_id,
+//       offenseTeamId
+//     });
+//     if (hasBall && sprite?.team_id === offenseTeamId) {
+//       ballOwnerSprite = sprite;
+//       break;
+//     }
+//   }
+
+//   // ✅ Pre-place the ball at correct start location
+//   if (ballOwnerSprite && ballSprite?.setPosition) {
+//     ballSprite.setPosition(ballOwnerSprite.x, ballOwnerSprite.y);
+//     ballSprite.setVisible(true);
+//   } else if (ballSprite) {
+//     ballSprite.setVisible(false);
+//   }
+
+//   for (const anim of animations) {
+//     const sprite = playerSprites[anim.playerId];
+//     const firstStep = anim.movement?.[0];
+
+//     if (!sprite || !firstStep) continue;
+
+//     const { x, y } = gridToPixels(
+//       firstStep.coords.x,
+//       firstStep.coords.y,
+//       scene.game.config.width,
+//       scene.game.config.height
+//     );
+
+//     promises.push(new Promise((resolve) => {
+//       scene.tweens.add({
+//         targets: [sprite],
+//         x,
+//         y,
+//         duration: 2000,
+//         ease: "Linear",
+//         onUpdate: () => {
+//           if (sprite === ballOwnerSprite && ballSprite?.setPosition) {
+//             ballSprite.setPosition(sprite.x, sprite.y);
+//             ballSprite.setVisible(true);
+//           }
+//         },
+//         onComplete: resolve
+//       });
+//     }));
+//   }
+
+//   // Final snap just in case
+//   if (ballOwnerSprite && ballSprite?.setPosition) {
+//     ballSprite.setPosition(ballOwnerSprite.x, ballOwnerSprite.y);
+//   }
+// }
 
 /**
  * Step-synchronized possession animation.
