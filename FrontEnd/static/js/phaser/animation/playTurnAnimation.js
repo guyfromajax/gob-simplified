@@ -34,10 +34,10 @@ async function runSetupTween({ scene, ballSprite, animations, playerSprites, off
     const sprite = playerSprites[anim.playerId];
     const hasBall = anim.hasBallAtStep?.[stepIndex];
     console.log("🔍 Checking sprite team match →", {
-      spriteTeam: sprite?.team,
+      spriteTeam: sprite?.team_id,
       offenseTeamId
     });
-    if (hasBall && sprite?.team === offenseTeamId) {
+    if (hasBall && sprite?.team_id === offenseTeamId) {
       ballOwnerSprite = sprite;
       break;
     }
