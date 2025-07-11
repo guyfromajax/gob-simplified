@@ -10,7 +10,7 @@ import { gridToPixels } from "../utils/gridToPixels.js";
  * @param {number} duration - Milliseconds for tween duration
  * @returns {Promise} resolves when tween completes
  */
-export function animateStep({ scene, sprite, step, duration }) {
+export function animateStep({ scene, sprite, step, duration, ballSprite, currentBallOwnerRef }) {
   return new Promise((resolve) => {
     const { x: targetX, y: targetY } = gridToPixels(
       step.coords.x,
@@ -25,6 +25,14 @@ export function animateStep({ scene, sprite, step, duration }) {
       y: targetY,
       duration,
       ease: "Linear",
+      onUpdate: () => {
+        if (
+          currentBallOwnerRef?.value === sprite &&
+          ballSprite?.setPosition
+        ) {
+          ballSprite.setPosition(sprite.x, sprite.y);
+        }
+      },
       onComplete: resolve
     });
   });
