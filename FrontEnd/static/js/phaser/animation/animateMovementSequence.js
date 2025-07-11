@@ -1,5 +1,4 @@
 import { gridToPixels } from "../utils/gridToPixels.js";
-import { lockBallToPlayer } from "./ballManager.js";
 
 /**
  * Animates a player's movement over time using chained tweens.
@@ -11,7 +10,9 @@ import { lockBallToPlayer } from "./ballManager.js";
  * @param {Function} onAction - Callback for animation events
  * @param {Phaser.GameObjects.Sprite} ballSprite - Ball sprite to attach when possessed
  * @param {Array} hasBallAtStep - Boolean array mapping possession per step
- * @returns {Promise} resolves when all tweens finish
+ * @param {string} position - Position label (e.g. PG, SG)
+ * @param {object} currentBallOwnerRef - A shared ref passed from playTurnAnimation
+ * @returns {Promise}
  */
 export function animateMovementSequence({ 
   scene, 
@@ -21,7 +22,7 @@ export function animateMovementSequence({
   ballSprite, 
   hasBallAtStep, 
   position, 
-  currentBallOwnerRef // <-- a mutable ref passed from playTurnAnimation
+  currentBallOwnerRef 
 }) {
   return new Promise((resolve) => {
     if (!movement || movement.length < 2) return resolve();
@@ -42,21 +43,18 @@ export function animateMovementSequence({
         scene.game.config.height
       );
 
-      const targets = [sprite];
+      const ownsBallThisStep = hasBallAtStep?.[stepIndex] === true;
 
-      const ownsBallThisStep = hasBallAtStep?.[stepIndex];
-
+      // If this player owns the ball this step, set them as the current owner
       if (ownsBallThisStep) {
         currentBallOwnerRef.value = sprite;
         if (ballSprite?.setVisible) {
           ballSprite.setVisible(true);
-        } else {
-          console.warn("⚠️ ballSprite is not ready when trying to setVisible");
         }
-      }          
-      
+      }
+
       scene.tweens.add({
-        targets,
+        targets: [sprite],
         x: targetX,
         y: targetY,
         duration,
@@ -65,6 +63,7 @@ export function animateMovementSequence({
           if (onAction) onAction(curr.action, sprite, curr.timestamp);
         },
         onUpdate: () => {
+          // Only the current owner gets to update the ball
           if (currentBallOwnerRef.value === sprite && ballSprite?.setPosition) {
             ballSprite.setPosition(sprite.x, sprite.y);
           }
@@ -85,7 +84,8 @@ export function animateMovementSequence({
       } else {
         console.warn("⚠️ ballSprite not ready at step 0 lock.");
       }
-    }       
+    }
+
     animateNextStep();
   });
 }
