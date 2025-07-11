@@ -14,6 +14,7 @@ export function loadPhaserPlayers(scene, allPlayers, teamInfo, Phaser) {
   for (const player of allPlayers) {
     const isHome = teamInfo.home.player_ids.includes(player.playerId);
     const teamColors = isHome ? teamInfo.home : teamInfo.away;
+    
     const sprite = createPhaserPlayer({
       scene,
       player,
@@ -24,6 +25,10 @@ export function loadPhaserPlayers(scene, allPlayers, teamInfo, Phaser) {
       position: player.pos,
       Phaser
     });
+    // ✅ Attach team metadata for later logic
+    sprite.team_id = player.team_id; // e.g., "MORRISTOWN"
+    sprite.team = player.team;       // e.g., "home" or "away"
+    
     playerSprites[player.playerId] = sprite;
   }
   // console.log("👾 playerSprites keys:", Object.keys(playerSprites));
