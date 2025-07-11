@@ -31,17 +31,17 @@ INSIDE_SCENE_1 = {
     "screener": "PF",
     "pass_sequence": ["PG", "PF", "C"],
     "steps": [
-        {
-            "timestamp": 0,
-            "pos_actions": {
-                "PG": {"action": ACTIONS["HANDLE"], "spot": "key"},
-                "SG": {"action": ACTIONS["DRIFT"], "spot": "upper wing"},
-                "SF": {"action": ACTIONS["CUT"], "spot": "lower wing"},
-                "PF": {"action": ACTIONS["POST"], "spot": "upper highPost"},
-                "C": {"action": ACTIONS["POST"], "spot": "lower lowPost"}
-            },
-            "events": []
-        },
+        # {
+        #     "timestamp": 0,
+        #     "pos_actions": {
+        #         "PG": {"action": ACTIONS["HANDLE"], "spot": "key"},
+        #         "SG": {"action": ACTIONS["DRIFT"], "spot": "upper wing"},
+        #         "SF": {"action": ACTIONS["CUT"], "spot": "lower wing"},
+        #         "PF": {"action": ACTIONS["POST"], "spot": "upper highPost"},
+        #         "C": {"action": ACTIONS["POST"], "spot": "lower lowPost"}
+        #     },
+        #     "events": []
+        # },
         {
             "timestamp": 300,
             "pos_actions": {
