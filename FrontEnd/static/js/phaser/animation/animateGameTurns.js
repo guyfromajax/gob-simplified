@@ -32,6 +32,7 @@ export async function animateGameTurns({ //hasBallAtStep
       simData,
       playerSprites,
       turnData: turn,
+      ballSprite,
       onAction: (action, sprite, timestamp) => {
         console.log(`🎬 Action "${action}" fired at ${timestamp}ms for sprite:`, sprite);
         onAction(action, sprite, timestamp);
