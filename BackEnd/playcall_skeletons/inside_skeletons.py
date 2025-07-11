@@ -32,7 +32,7 @@ INSIDE_SCENE_1 = {
     "pass_sequence": ["PG", "PF", "C"],
     "steps": [
         {
-            "timestamp": 500,
+            "timestamp": 1000,
             "pos_actions": {
                 "PG": {"action": ACTIONS["HANDLE"], "spot": "key"},
                 "SG": {"action": ACTIONS["DRIFT"], "spot": "upper wing"},
@@ -43,7 +43,7 @@ INSIDE_SCENE_1 = {
             "events": []
         },
         {
-            "timestamp": 1000,
+            "timestamp": 1500,
             "pos_actions": {
                 "PG": {"action": ACTIONS["PASS"], "spot": "key"},
                 "SG": {"action": ACTIONS["STAY"], "spot": "upper wing"},
@@ -54,7 +54,7 @@ INSIDE_SCENE_1 = {
             "events": [{"type": "pass", "from": "PG", "to": "PF"}]
         },
         {
-            "timestamp": 1500,
+            "timestamp": 2000,
             "pos_actions": {
                 "PG": {"action": ACTIONS["DRIFT"], "spot": "lower wing"},
                 "SG": {"action": ACTIONS["SCREEN"], "spot": "key"},
@@ -65,7 +65,7 @@ INSIDE_SCENE_1 = {
             "events": []
         },
         {
-            "timestamp": 2000,
+            "timestamp": 2500,
             "pos_actions": {
                 "PG": {"action": ACTIONS["STAY"], "spot": "lower corner"},
                 "SG": {"action": ACTIONS["STAY"], "spot": "lower wing"},
@@ -76,7 +76,7 @@ INSIDE_SCENE_1 = {
             "events": [{"type": "pass", "from": "PF", "to": "C"}]
         },
         {
-            "timestamp": 2500,
+            "timestamp": 3000,
             "pos_actions": {
                 "PG": {"action": ACTIONS["STAY"], "spot": "upper corner"},
                 "SG": {"action": ACTIONS["STAY"], "spot": "lower corner"},
@@ -87,7 +87,7 @@ INSIDE_SCENE_1 = {
             "events": []
         },
         {
-            "timestamp": 3000,
+            "timestamp": 3500,
             "pos_actions": {
                 "PG": {"action": ACTIONS["STAY"], "spot": "upper wing"},
                 "SG": {"action": ACTIONS["STAY"], "spot": "lower wing"},
