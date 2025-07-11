@@ -42,67 +42,58 @@ export function createGameScene(Phaser) {
 
       // Load with fallback
       this.load.image(courtKey, courtPath);
-      this.load.once("complete", () => {
-      if (this.textures.exists(courtKey)) {
-        this.add.image(0, 0, courtKey)
-        .setOrigin(0)
-        .setDisplaySize(this.game.config.width, this.game.config.height)
-        .setDepth(0);
       
-      } else {
-          this.load.image(courtKey, fallbackPath);
-          this.load.once("complete", () => {
+      // Ensure animation only runs after everything is loaded and created
+      this.load.once("complete", async () => {
+        if (this.textures.exists(courtKey)) {
+        this.add.image(0, 0, courtKey)
+            .setOrigin(0)
+            .setDisplaySize(this.game.config.width, this.game.config.height)
+            .setDepth(0);
+        } else {
+        this.load.image(courtKey, fallbackPath);
+        this.load.once("complete", () => {
             this.add.image(0, 0, courtKey)
             .setOrigin(0)
             .setDisplaySize(this.game.config.width, this.game.config.height)
             .setDepth(0);
-          
-          });
+        });
         this.load.start();
-      }
-      });
-      this.load.start();
-
-      this.playerSprites = loadPhaserPlayers(this, simData.players, {
+        }
+    
+        this.playerSprites = loadPhaserPlayers(this, simData.players, {
         home: {
-          player_ids: simData.players.filter(p => p.team === "home").map(p => p.playerId),
-          primary_color: simData.home_team_colors.primary_color,
-          secondary_color: simData.home_team_colors.secondary_color
+            player_ids: simData.players.filter(p => p.team === "home").map(p => p.playerId),
+            primary_color: simData.home_team_colors.primary_color,
+            secondary_color: simData.home_team_colors.secondary_color
         },
         away: {
-          player_ids: simData.players.filter(p => p.team === "away").map(p => p.playerId),
-          primary_color: simData.away_team_colors.primary_color,
-          secondary_color: simData.away_team_colors.secondary_color
+            player_ids: simData.players.filter(p => p.team === "away").map(p => p.playerId),
+            primary_color: simData.away_team_colors.primary_color,
+            secondary_color: simData.away_team_colors.secondary_color
         }
-      }, Phaser);
-
-      this.ballSprite = this.add.image(0, 0, "ball").setVisible(true).setDepth(1000).setScale(1);
-      // Give Phaser a tick to fully register the sprite
-      this.time.delayedCall(0, async () => {
+        }, Phaser);
+    
+        this.ballSprite = this.add.image(0, 0, "ball").setVisible(true).setDepth(1000).setScale(1);
+    
+        this.tweens.add({
+        targets: this.ballSprite,
+        scale: { from: 1, to: 1.3 },
+        duration: 400,
+        yoyo: true,
+        repeat: -1,
+        ease: 'Sine.easeInOut'
+        });
+    
         await animateGameTurns({
         scene: this,
         simData,
         playerSprites: this.playerSprites,
         ballSprite: this.ballSprite
         });
-      });
-      this.tweens.add({
-        targets: this.ballSprite,
-        scale: { from: 1, to: 1.3 }, // adjust these as needed
-        duration: 400, // duration of one pulse
-        yoyo: true,    // scale back down
-        repeat: -1,    // repeat forever
-        ease: 'Sine.easeInOut'
-      });
-
-      await animateGameTurns({
-        scene: this,
-        simData,
-        playerSprites: this.playerSprites,
-        ballSprite: this.ballSprite
-      });
-
-      console.log("✅ GameScene animation complete");
+    
+        console.log("✅ GameScene animation complete");
+    });
     }
   };
 }
