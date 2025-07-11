@@ -4,40 +4,49 @@ export function createPhaserPlayer({ scene, player, teamInfo, position, Phaser }
   const { x, y } = player.startingCoords || { x: 50, y: 25 };
   const { x: px, y: py } = gridToPixels(x, y, scene.game.config.width, scene.game.config.height);
 
-  const fill = teamInfo.primary_color || "#ffffff";
-  const stroke = teamInfo.secondary_color || "#000000";
-  const jerseyText = player.jersey || "";
+  const isHome = player.team === "home"; // ✅ Determine team side
 
-  // Create circle
-  const circle = scene.add.circle(0, 0, 20, Phaser.Display.Color.HexStringToColor(fill).color);
-  circle.setStrokeStyle(3, Phaser.Display.Color.HexStringToColor(stroke).color);
+  // ✅ Style logic per GDD
+  const fillColor = isHome
+    ? Phaser.Display.Color.HexStringToColor(teamInfo.primary_color).color
+    : 0xffffff;
+
+  const borderColor = isHome
+    ? Phaser.Display.Color.HexStringToColor(teamInfo.secondary_color).color
+    : Phaser.Display.Color.HexStringToColor(teamInfo.primary_color).color;
+
+  const textColor = isHome
+    ? teamInfo.secondary_color
+    : teamInfo.primary_color;
+
+  // ✅ Create player circle
+  const circle = scene.add.circle(0, 0, 20, fillColor);
+  circle.setStrokeStyle(3, borderColor);
   circle.setDepth(1);
 
-  // Position abbreviation (e.g. "PG") — centered inside circle
+  // ✅ Position abbreviation — centered inside
   const label = scene.add.text(0, 0, position, {
     font: "bold 16px Arial",
-    color: stroke,
+    color: textColor,
     align: "center"
   });
   label.setOrigin(0.5);
   label.setDepth(2);
 
-  // Jersey number — above or below depending on team
-  const isHome = player.team === "home";
-  const jerseyOffset = isHome ? -30 : 28;
-  const jersey = scene.add.text(0, jerseyOffset, jerseyText, {
-    font: "bold 16px Arial",
-    color: fill,
+  // ✅ Jersey number — above if home, below if away
+  const jerseyOffset = isHome ? -28 : 28;
+  const jersey = scene.add.text(0, jerseyOffset, player.jersey || "", {
+    font: "bold 14px Arial",
+    color: textColor,
     align: "center"
   });
   jersey.setOrigin(0.5);
   jersey.setDepth(2);
 
-  // Group all into a container
+  // ✅ Container to group all elements
   const container = scene.add.container(px, py, [circle, label, jersey]);
   container.setDepth(1);
 
   return container;
 }
-
   
