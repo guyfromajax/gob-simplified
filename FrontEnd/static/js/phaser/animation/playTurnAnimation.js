@@ -26,6 +26,8 @@ function updateBallOwnership({ ballSprite, animations, playerSprites, stepIndex,
 async function runSetupTween({ scene, ballSprite, animations, playerSprites, offenseTeamId }) {
   const stepIndex = 0;
   const promises = [];
+  console.log("🟡 runSetupTween → ballSprite defined?", !!ballSprite);
+  console.log("🟡 runSetupTween → offenseTeamId:", offenseTeamId);
 
   // ✅ Find ball owner from offensive team before tweening
   let ballOwnerSprite = null;
