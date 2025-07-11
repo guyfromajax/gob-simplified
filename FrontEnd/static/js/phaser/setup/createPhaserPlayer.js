@@ -46,7 +46,8 @@ export function createPhaserPlayer({ scene, player, teamInfo, position, Phaser }
   // ✅ Container to group all elements
   const container = scene.add.container(px, py, [circle, label, jersey]);
   container.setDepth(1);
-  container.team = player.team; // attach team to sprite container
+  const team_identifier = teamInfo.team_id;
+  container.team = team_identifier; // attach team to sprite container
 
 
   return container;
