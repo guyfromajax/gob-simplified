@@ -42,6 +42,21 @@ class Animator:
         bh_pos = get_player_position(off_lineup, ball_handler)
         ball_handler_end_coords = None
 
+        # Determine which offensive player has the ball at each step
+        ball_actions = {"handle_ball", "receive", "shoot"}
+        ball_owner_by_step = []
+        for step in steps:
+            owner = None
+            for pos_key, action_info in step["pos_actions"].items():
+                if action_info["action"] in ball_actions:
+                    owner = off_lineup[pos_key]
+                    break
+            ball_owner_by_step.append(owner)
+
+        for idx, owner in enumerate(ball_owner_by_step):
+            if owner is None:
+                print(f"[WARN] No ball owner detected for step {idx}")
+
         for pos, player in off_lineup.items():
             timeline = action_timeline.get(player, [])
             print("Inside capture_halfcourt_animation")
@@ -49,7 +64,7 @@ class Animator:
             if not timeline:
                 continue
 
-            hasBallAtStep = [action in {"handle_ball", "receive", "shoot"} for (_, action, _) in timeline]
+            hasBallAtStep = [ball_owner_by_step[i] is player for i in range(len(timeline))]
 
             timeline.sort(key=lambda tup: tup[0])
             first_spot = timeline[0][2]
@@ -89,7 +104,7 @@ class Animator:
             def_coords = None
             action_type = ACTIONS["GUARD_OFFBALL"]
 
-            hasBallAtStep = [action in {"handle_ball", "receive", "shoot"} for (_, action, _) in timeline]
+            hasBallAtStep = [False for _ in ball_owner_by_step]
 
             if pos == bh_pos:
                 def_coords = assign_bh_defender_coords(ball_handler_end_coords, aggression_call, is_away_offense)
