@@ -1,0 +1,95 @@
+const logoGrid = document.getElementById('logo-grid');
+const awayBox = document.getElementById('away-box');
+const homeBox = document.getElementById('home-box');
+const awayCheck = document.getElementById('away-check');
+const homeCheck = document.getElementById('home-check');
+const playBtn = document.getElementById('play-btn');
+const clickSound = new Audio('./sounds/mixkit-click.wav');
+const addSound = new Audio('./sounds/handgun.mp3');
+
+const teams = [
+  'Bentley-Truman',
+  'Four Corners',
+  'Lancaster',
+  'Little York',
+  'Morristown',
+  'Ocean City',
+  'South Lancaster',
+  'Xavien'
+];
+
+function createLogoButtons() {
+  teams.forEach(name => {
+    const btn = document.createElement('button');
+    btn.className = 'logo-btn';
+    btn.title = 'click or drag to add';
+    const img = document.createElement('img');
+    img.src = `./images/homepage-logos/${name}.png`;
+    img.alt = name;
+    img.draggable = true;
+    img.addEventListener('dragstart', e => {
+      e.dataTransfer.setData('text/plain', name);
+    });
+    btn.appendChild(img);
+    btn.addEventListener('click', () => {
+      addSound.play();
+      addToFirstAvailable(name);
+    });
+    logoGrid.appendChild(btn);
+  });
+}
+
+function addToFirstAvailable(team) {
+  if (!awayBox.dataset.team) {
+    setLogo(awayBox, team);
+  } else if (!homeBox.dataset.team) {
+    setLogo(homeBox, team);
+  }
+}
+
+function setLogo(box, team) {
+  box.innerHTML = '';
+  const img = document.createElement('img');
+  img.src = `./images/homepage-logos/${team}.png`;
+  img.alt = team;
+  box.appendChild(img);
+  box.dataset.team = team;
+  updatePlayBtn();
+}
+
+function handleDrop(event, target) {
+  event.preventDefault();
+  const team = event.dataTransfer.getData('text/plain');
+  if (team) {
+    const box = target === 'home' ? homeBox : awayBox;
+    setLogo(box, team);
+  }
+}
+
+function toggleMyTeam(which) {
+  if (which === 'home') {
+    if (homeCheck.checked) awayCheck.checked = false;
+  } else {
+    if (awayCheck.checked) homeCheck.checked = false;
+  }
+}
+
+function updatePlayBtn() {
+  if (homeBox.dataset.team && awayBox.dataset.team) {
+    playBtn.disabled = false;
+    playBtn.style.opacity = '1';
+  } else {
+    playBtn.disabled = true;
+    playBtn.style.opacity = '0.5';
+  }
+}
+
+playBtn.addEventListener('click', () => {
+  if (playBtn.disabled) return;
+  clickSound.play();
+  const home = encodeURIComponent(homeBox.dataset.team);
+  const away = encodeURIComponent(awayBox.dataset.team);
+  window.location.href = `court.html?home=${home}&away=${away}`;
+});
+
+createLogoButtons();
