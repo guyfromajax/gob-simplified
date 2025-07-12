@@ -188,6 +188,14 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   });
 
   // ✅ NEW: Lock ball ownership to correct player at step 
+  console.log("🟡 inside playTurnAnimation → ");
+  //print turnData here in the console logs
+  console.log("turnData", turnData);
+  // console.log("turnData.animations", turnData.animations);
+  // console.log("turnData.possession_team_id", turnData.possession_team_id);
+  // console.log("turnData.animations[0].hasBallAtStep", turnData.animations[0].hasBallAtStep);
+  // console.log("turnData.animations[0].playerId", turnData.animations[0].playerId);
+  // console.log("turnData.animations[0].movement", turnData.animations[0].movement);
   updateBallOwnership({
     ballSprite,
     animations: turnData.animations,
