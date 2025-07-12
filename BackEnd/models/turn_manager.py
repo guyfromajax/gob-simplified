@@ -104,10 +104,6 @@ class TurnManager:
                     result[key] = val.player_id
                 else:
                     result[key] = str(val)  # final fallback (safe for non-class data)
-                if key == "ball_handler":
-                    print(f"ball_handler: {result[key]}")
-                else:
-                    print("No ball handler key")
 
         result["turn_count"] = self.game.micro_turn_count
         # result["possession_team_id"] = self.game.offense_team.team_id
