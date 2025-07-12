@@ -89,7 +89,7 @@ class Animator:
             def_coords = None
             action_type = ACTIONS["GUARD_OFFBALL"]
 
-            hasBallAtStep = [action in {"handle_ball", "receive", "shoot"} for (_, action, _) in timeline]
+            hasBallAtStep = [False for (_, action, _) in timeline]
 
             if pos == bh_pos:
                 def_coords = assign_bh_defender_coords(ball_handler_end_coords, aggression_call, is_away_offense)
