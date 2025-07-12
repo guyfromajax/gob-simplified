@@ -26,6 +26,7 @@ function updateBallOwnership({ ballSprite, animations, playerSprites, stepIndex,
       ballSprite.setPosition(sprite.x, sprite.y);
       ballSprite.setVisible(true);
       if (currentBallOwnerRef) currentBallOwnerRef.value = sprite;
+      break;
 
       console.log("🟡 also inside updateBallOwnership → Ball assigned at step", stepIndex, {
         playerId: anim.playerId,
@@ -36,7 +37,6 @@ function updateBallOwnership({ ballSprite, animations, playerSprites, stepIndex,
     } else {
       console.log("🟡 all four conditions are not met at step", stepIndex);
     }
-      break;
     }
   }
 

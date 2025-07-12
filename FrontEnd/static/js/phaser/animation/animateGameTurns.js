@@ -54,11 +54,11 @@ export async function animateGameTurns({ //hasBallAtStep
           if (!passStep) return;
 
           const receiverAnim = animations.find(a =>
-            a.movement?.some(m => m.action === "receive" && m.timestamp >= passStep.timestamp)
+            a.movement?.some(m => m.action === "receive" && m.timestamp === passStep.timestamp)
           );
           const receiveStep = receiverAnim?.movement.find(
-            m => m.action === "receive" && m.timestamp >= passStep.timestamp
-          );
+            m => m.action === "receive" && m.timestamp === passStep.timestamp
+          );          
 
           if (passStep && receiveStep) {
             console.log("📤 Pass triggered");
