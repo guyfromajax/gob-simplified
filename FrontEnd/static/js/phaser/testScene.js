@@ -72,7 +72,7 @@ export function createTestScene(Phaser) {
     const passStep = allPlayers[0].movement[1];
     const receiveStep = allPlayers[1].movement[0];
 
-    lockBallToPlayer(this.ballSprite, this.playerSprites[playerId]);
+    lockBallToPlayer(this, this.ballSprite, this.playerSprites[playerId]);
 
     if (!this.playerSprites) {
       console.error("❌ playerSprites is undefined!");

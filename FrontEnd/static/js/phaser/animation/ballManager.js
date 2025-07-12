@@ -1,12 +1,19 @@
 import { generateBallTween } from "./generateBallTween.js";
 
-export function lockBallToPlayer(ballSprite, playerSprite) {
+export function lockBallToPlayer(scene, ballSprite, playerSprite) {
   if (!ballSprite || !playerSprite) {
     console.warn("⚠️ lockBallToPlayer skipped: missing sprite");
     return;
   }
 
-  console.log("🔒 lockBallToPlayer invoked for:", playerSprite.name || playerSprite);
+  console.log(
+    "🔒 lockBallToPlayer invoked for:",
+    playerSprite.name || playerSprite
+  );
+
+  if (scene?.tweens) {
+    scene.tweens.killTweensOf(ballSprite);
+  }
 
   const { x, y } = playerSprite;
   ballSprite.setPosition(x, y);
@@ -52,7 +59,7 @@ export function hideBall(ballSprite) {
  * @param {Object} playerSprites - Map of playerId → Phaser sprite
  * @param {number} currentTimestamp - The current animation timestamp (ms)
  */
-export function updateBallOwnership(ballSprite, animations, playerSprites, currentTimestamp) {
+export function updateBallOwnership(scene, ballSprite, animations, playerSprites, currentTimestamp) {
   for (const anim of animations) {
     const { playerId, hasBallAtStep, movement } = anim;
     if (!hasBallAtStep || !movement || !movement.length) continue;
@@ -69,7 +76,7 @@ export function updateBallOwnership(ballSprite, animations, playerSprites, curre
     if (hasBallAtStep[stepIndex]) {
       const playerSprite = playerSprites[playerId];
       if (playerSprite) {
-        lockBallToPlayer(ballSprite, playerSprite);
+        lockBallToPlayer(scene, ballSprite, playerSprite);
       }
       break; // Only one player can have the ball
     }
