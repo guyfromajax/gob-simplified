@@ -40,7 +40,15 @@ function createLogoButtons() {
 }
 
 function addToFirstAvailable(team) {
-  if (!awayBox.dataset.team) {
+  const bothEmpty = !awayBox.dataset.team && !homeBox.dataset.team;
+  if (bothEmpty) {
+    // Place in the slot marked as "My Team" first
+    if (homeCheck.checked) {
+      setLogo(homeBox, team);
+    } else {
+      setLogo(awayBox, team);
+    }
+  } else if (!awayBox.dataset.team) {
     setLogo(awayBox, team);
   } else if (!homeBox.dataset.team) {
     setLogo(homeBox, team);
@@ -63,6 +71,7 @@ function handleDrop(event, target) {
   if (team) {
     const box = target === 'home' ? homeBox : awayBox;
     setLogo(box, team);
+    addSound.play();
   }
 }
 
