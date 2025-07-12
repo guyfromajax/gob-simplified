@@ -56,7 +56,7 @@ async function runSetupTween({ scene, animations, playerSprites }) {
         targets: [sprite],
         x,
         y,
-        duration: 2000,
+        duration: 1000,
         ease: "Linear",
         onUpdate: () => {
           // 🧼 No more ball logic here
