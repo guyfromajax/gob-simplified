@@ -17,12 +17,12 @@ function updateBallOwnership({ ballSprite, animations, playerSprites, stepIndex,
       if (currentBallOwnerRef) currentBallOwnerRef.value = sprite;
 
       // ✅ Log the actual assignment
-      console.log("Ball assigned at step", stepIndex, {
-        playerId: anim.playerId,
-        hasBall,
-        team,
-        offenseTeamId
-      });
+      // console.log("Ball assigned at step", stepIndex, {
+      //   playerId: anim.playerId,
+      //   hasBall,
+      //   team,
+      //   offenseTeamId
+      // });
 
       break;
     }
