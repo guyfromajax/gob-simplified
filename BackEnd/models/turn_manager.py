@@ -72,7 +72,6 @@ class TurnManager:
         print("Inside run_micro_turn // coming out of resolve offensive state functions")
         print(f"offense team id: {self.game.offense_team.team_id}")
         print(f"defense team id: {self.game.defense_team.team_id}")
-        print(f"ball handler: {result['ball_handler']}")
 
         # STEP 4: Final updates (clock, logs, animation)
         self.update_clock_and_possession(result)
@@ -105,6 +104,10 @@ class TurnManager:
                     result[key] = val.player_id
                 else:
                     result[key] = str(val)  # final fallback (safe for non-class data)
+                if key == "ball_handler":
+                    print(f"ball_handler: {result[key]}")
+                else:
+                    print("No ball handler key")
 
         result["turn_count"] = self.game.micro_turn_count
         # result["possession_team_id"] = self.game.offense_team.team_id
@@ -113,7 +116,7 @@ class TurnManager:
         result["home_lineup"] = serialize_lineup(self.game.home_team.lineup)
         result["away_lineup"] = serialize_lineup(self.game.away_team.lineup)
 
-        print(f"inside run_micro_turn result: {result}")
+        # print(f"inside run_micro_turn result: {result}")
         # print(f"result: {result}")
         return result
 
