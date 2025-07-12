@@ -73,6 +73,9 @@ class TurnManager:
         print(f"offense team id: {self.game.offense_team.team_id}")
         print(f"defense team id: {self.game.defense_team.team_id}")
 
+        # Record possession team before any potential flip
+        result["starting_possession_team_id"] = self.game.offense_team.team_id
+
         # STEP 4: Final updates (clock, logs, animation)
         self.update_clock_and_possession(result)
         self.logger.log_turn_result(result)
