@@ -13,6 +13,13 @@ function updateBallOwnership({ ballSprite, animations, playerSprites, stepIndex,
     const hasBall = anim.hasBallAtStep?.[stepIndex];
     const team = sprite?.team_id;
 
+    console.log("hasBall", hasBall);
+    console.log("sprite", sprite);
+    console.log("team = sprite.team_id", team);
+    console.log("offenseTeamId", offenseTeamId);
+    console.log("ballSprite", ballSprite);
+    console.log("currentBallOwnerRef", currentBallOwnerRef);
+
     if (hasBall && sprite && team === offenseTeamId && ballSprite?.setPosition) {
       console.log("All four conditions are met")
       ballSprite.setPosition(sprite.x, sprite.y);
@@ -28,8 +35,6 @@ function updateBallOwnership({ ballSprite, animations, playerSprites, stepIndex,
     } else {
       console.log("🟡 all four conditions are not met at step", stepIndex);
     }
-      
-
       break;
     }
   }
