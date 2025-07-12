@@ -1,5 +1,6 @@
 import { animateStep } from "./animateStep.js";
 import { gridToPixels } from "../utils/gridToPixels.js";
+import { lockBallToPlayer } from "./ballManager.js";
 
 /**
  * Centralized ball ownership logic
@@ -35,7 +36,7 @@ function updateBallOwnership({ ballSprite, animations, playerSprites, stepIndex,
  * Locks the ball to the player with hasBallAtStep[0] during this setup tween.
  */
 
-async function runSetupTween({ scene, animations, playerSprites }) {
+async function runSetupTween({ scene, ballSprite, animations, playerSprites, currentBallOwnerRef }) {
   const stepIndex = 0;
   const promises = [];
 
@@ -59,7 +60,10 @@ async function runSetupTween({ scene, animations, playerSprites }) {
         duration: 1000,
         ease: "Linear",
         onUpdate: () => {
-          // 🧼 No more ball logic here
+          if (currentBallOwnerRef?.value === sprite && ballSprite?.setPosition) {
+            ballSprite.setPosition(sprite.x, sprite.y);
+            ballSprite.setVisible(true);
+          }
         },
         onComplete: resolve
       });
@@ -146,14 +150,32 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
     ...turnData.animations.map(anim => anim.movement.length)
   );
 
+  if (ballSprite && scene?.tweens) {
+    scene.tweens.killTweensOf(ballSprite);
+    ballSprite.setVisible(false);
+  }
+
+  // Determine which player owns the ball at step 0
+  let step0OwnerSprite = null;
+  for (const anim of turnData.animations) {
+    if (anim.hasBallAtStep?.[0]) {
+      step0OwnerSprite = playerSprites[anim.playerId];
+      break;
+    }
+  }
+
+  if (step0OwnerSprite) {
+    lockBallToPlayer(ballSprite, step0OwnerSprite);
+    currentBallOwnerRef.value = step0OwnerSprite;
+  }
+
   // 🔶 Pre-possession: Move players to their step 0 positions
   await runSetupTween({
     scene,
-    // ballSprite,
+    ballSprite,
     animations: turnData.animations,
     playerSprites,
-    // offenseTeamId: turnData.possession_team_id,
-    // currentBallOwnerRef
+    currentBallOwnerRef
   });
 
   // ✅ NEW: Lock ball ownership to correct player at step 0
