@@ -7,28 +7,32 @@ import { lockBallToPlayer } from "./ballManager.js";
  * Assigns the ball to the correct player for the current stepIndex
  */
 function updateBallOwnership({ ballSprite, animations, playerSprites, stepIndex, offenseTeamId, currentBallOwnerRef }) {
+  console.log("🟡 inside updateBallOwnership → stepIndex:", stepIndex);
   for (const anim of animations) {
     const sprite = playerSprites[anim.playerId];
     const hasBall = anim.hasBallAtStep?.[stepIndex];
     const team = sprite?.team_id;
 
     if (hasBall && sprite && team === offenseTeamId && ballSprite?.setPosition) {
+      console.log("All four conditions are met")
       ballSprite.setPosition(sprite.x, sprite.y);
       ballSprite.setVisible(true);
       if (currentBallOwnerRef) currentBallOwnerRef.value = sprite;
 
-      // ✅ Log the actual assignment
-      // console.log("Ball assigned at step", stepIndex, {
-      //   playerId: anim.playerId,
-      //   hasBall,
-      //   team,
-      //   offenseTeamId
-      // });
+      console.log("🟡 also inside updateBallOwnership → Ball assigned at step", stepIndex, {
+        playerId: anim.playerId,
+        hasBall,
+        team: sprite?.team_id,
+        offenseTeamId
+      });
+    } else {
+      console.log("🟡 all four conditions are not met at step", stepIndex);
+    }
+      
 
       break;
     }
   }
-}
 
 
 /**
@@ -178,7 +182,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
     currentBallOwnerRef
   });
 
-  // ✅ NEW: Lock ball ownership to correct player at step 0
+  // ✅ NEW: Lock ball ownership to correct player at step 
   updateBallOwnership({
     ballSprite,
     animations: turnData.animations,

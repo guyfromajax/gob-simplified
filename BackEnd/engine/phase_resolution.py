@@ -225,8 +225,8 @@ def resolve_free_throw_logic(game):
 
     # FT outcome calculation
     ft_shot_score = ((attrs["FT"] * 0.8) + (attrs["CH"] * 0.2)) * random.randint(1, 6)
-    print(f"ft_shot_score: {ft_shot_score}")
-    print(f"off_team.team_attributes['ft_shot_threshold']: {off_team.team_attributes['ft_shot_threshold']}")
+    # print(f"ft_shot_score: {ft_shot_score}")
+    # print(f"off_team.team_attributes['ft_shot_threshold']: {off_team.team_attributes['ft_shot_threshold']}")
     makes_shot = ft_shot_score >= off_team.team_attributes["ft_shot_threshold"]
 
     shooter.record_stat("FTA")
@@ -374,23 +374,21 @@ def resolve_half_court_offense_logic(game):
     # 2. Event Determination
     event_type = game.turn_manager.determine_event_type(roles)
 
+    print(f"event_type: {event_type}")
     event_type = "SHOT"
 
     if event_type != "SHOT":
-            #need to add animations to each of these
-            if event_type == "TURNOVER":
-                return resolve_turnover_logic(roles, game, turnover_type="DEAD BALL")
+        #need to add animations to each of these
+        if event_type == "TURNOVER":
+            return resolve_turnover_logic(roles, game, turnover_type="DEAD BALL")
 
-            elif event_type == "O_FOUL":
-                game_state["foul_team"] = "OFFENSE"
-                return resolve_non_shooting_foul(roles, game)
+        elif event_type == "O_FOUL":
+            game_state["foul_team"] = "OFFENSE"
+            return resolve_non_shooting_foul(roles, game)
 
-            elif event_type == "D_FOUL":
-                game_state["foul_team"] = "DEFENSE"
-                return resolve_non_shooting_foul(roles, game)
-        # result = resolve_non_shooting_foul_or_turnover(game, event_type, roles)
-        # result["animations"] = game.animator.capture_halfcourt_animation(result, roles)
-        # return result
+        elif event_type == "D_FOUL":
+            game_state["foul_team"] = "DEFENSE"
+            return resolve_non_shooting_foul(roles, game)
 
     # 3. Shot Result
     shot_result = game.shot_manager.resolve_shot(roles)
