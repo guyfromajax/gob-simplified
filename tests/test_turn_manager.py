@@ -88,5 +88,14 @@ def test_turn_result_has_possession_flips():
     assert isinstance(result["possession_flips"], bool)
 
 
+def test_turn_result_includes_possession_ids():
+    game = build_mock_game()
+    tm = TurnManager(game)
+    starting_id = game.offense_team.team_id
+    result = tm.run_micro_turn()
+    assert result["starting_possession_team_id"] == starting_id
+    assert result["possession_team_id"] == game.offense_team.team_id
+
+
 
  
