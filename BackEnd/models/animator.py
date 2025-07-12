@@ -117,7 +117,15 @@ class Animator:
             hasBallAtStep = [False for _ in ball_owner_by_step]
 
             if pos == bh_pos:
-                def_coords = assign_bh_defender_coords(ball_handler_end_coords, aggression_call, is_away_offense)
+                bh_timeline = action_timeline.get(ball_handler, [])
+                bh_first_spot = bh_timeline[0][2] if bh_timeline else None
+                bh_last_spot = bh_timeline[-1][2] if bh_timeline else None
+                first_coords = HCO_STRING_SPOTS.get(bh_first_spot, ball_handler_end_coords)
+                final_coords = HCO_STRING_SPOTS.get(bh_last_spot, ball_handler_end_coords)
+                if is_away_offense:
+                    first_coords = get_away_player_coords(first_coords)
+                    final_coords = get_away_player_coords(final_coords)
+                def_coords = assign_bh_defender_coords(final_coords, aggression_call, is_away_offense)
                 action_type = ACTIONS["GUARD_BALL"]
             elif pos in off_lineup:
                 off_player = off_lineup[pos]
@@ -132,9 +140,8 @@ class Animator:
                 continue
 
             start = defender.coords
-            if pos == bh_pos and steps:
-                bh_start = steps[0].get("coords", ball_handler_end_coords)
-                start = assign_bh_defender_coords(bh_start, aggression_call, is_away_offense)
+            if pos == bh_pos:
+                start = assign_bh_defender_coords(first_coords, aggression_call, is_away_offense)
 
             if is_away_offense:
                 def_coords = get_away_player_coords(def_coords)
@@ -143,9 +150,10 @@ class Animator:
             movement = []
 
             if pos == bh_pos:
-                for step in steps:
-                    t = step["timestamp"]
-                    bh_coords = step.get("coords", ball_handler_end_coords)
+                for t, _, spot in bh_timeline:
+                    bh_coords = HCO_STRING_SPOTS.get(spot, HCO_STRING_SPOTS["key"])
+                    if is_away_offense:
+                        bh_coords = get_away_player_coords(bh_coords)
                     d_coords = assign_bh_defender_coords(bh_coords, aggression_call, is_away_offense)
                     if is_away_offense:
                         d_coords = get_away_player_coords(d_coords)
