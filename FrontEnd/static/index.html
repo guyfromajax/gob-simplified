@@ -1,31 +1,36 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>GOB Homepage</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;700&display=swap" rel="stylesheet">
   <style>
     body {
-      font-family: Arial, sans-serif;
+      font-family: 'Inter', sans-serif;
       background: #f2f2f2;
       margin: 0;
       padding: 20px;
     }
-
-    #team-slots {
-      display: flex;
-      gap: 20px;
-      justify-content: space-between;
+    #page-title {
+      font-family: 'Bebas Neue', cursive;
+      font-size: 48px;
+      font-weight: bold;
+      text-align: center;
       margin-bottom: 20px;
     }
-
+    #team-slots {
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      gap: 40px;
+      margin-bottom: 20px;
+    }
     .slot {
-      flex: 1;
       display: flex;
       flex-direction: column;
       align-items: center;
     }
-
     .box {
       width: 150px;
       height: 150px;
@@ -37,32 +42,6 @@
       background: #fff;
     }
     .box img { max-width: 100%; max-height: 100%; }
-
-    .box img {
-      max-width: 100%;
-      max-height: 100%;
-    }
-
-    .logo-grid {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 10px;
-      max-width: 600px;
-      margin: 0 auto 20px;
-    }
-
-    .logo-btn {
-      border: none;
-      background: none;
-      cursor: pointer;
-    }
-    .logo-btn img { width: 100%; height: auto; }
-
-    .logo-btn img {
-      width: 100%;
-      height: auto;
-    }
-
     #play-btn {
       position: relative;
       border: none;
@@ -70,78 +49,51 @@
       cursor: pointer;
     }
     #play-btn img { width: 200px; display: block; }
-
-    #play-btn img {
-      width: 200px;
-      display: block;
-    }
-
     #play-btn span {
       position: absolute;
       top: 50%;
       left: 50%;
       transform: translate(-50%, -50%);
       color: #fff;
+      font-family: 'Bebas Neue', cursive;
+      font-size: 24px;
       font-weight: bold;
       pointer-events: none;
     }
+    .logo-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      width: calc(100% - 40px);
+      margin: 0 20px;
+    }
+    .logo-btn {
+      border: none;
+      background: none;
+      cursor: pointer;
+    }
+    .logo-btn img { width: 100%; height: auto; }
   </style>
 </head>
 <body>
+  <h1 id="page-title">Game Time!</h1>
   <div id="team-slots">
     <div class="slot" id="away-slot">
       <div>Away</div>
       <div class="box" id="away-box" ondragover="event.preventDefault()" ondrop="handleDrop(event, 'away')"></div>
       <label><input type="checkbox" id="away-check" onchange="toggleMyTeam('away')"> My Team</label>
-      <div class="box" id="away-box"></div>
-      <label>
-        <input type="checkbox" id="away-check"> My Team
-      </label>
     </div>
+    <button id="play-btn" disabled style="opacity:0.5">
+      <img src="./images/buttons/orange_button_live.png" alt="Play Now">
+      <span>Play Now</span>
+    </button>
     <div class="slot" id="home-slot">
       <div>Home</div>
       <div class="box" id="home-box" ondragover="event.preventDefault()" ondrop="handleDrop(event, 'home')"></div>
       <label><input type="checkbox" id="home-check" onchange="toggleMyTeam('home')" checked> My Team</label>
-      <div class="box" id="home-box"></div>
-      <label>
-        <input type="checkbox" id="home-check" checked> My Team
-      </label>
     </div>
   </div>
-
   <div class="logo-grid" id="logo-grid"></div>
-  <div class="logo-grid" id="logo-grid">
-    <button class="logo-btn" data-team="Bentley-Truman" title="click or drag to add">
-      <img src="./images/homepage-logos/Bentley-Truman.png" alt="Bentley-Truman logo">
-    </button>
-    <button class="logo-btn" data-team="Four Corners" title="click or drag to add">
-      <img src="./images/homepage-logos/Four Corners.png" alt="Four Corners logo">
-    </button>
-    <button class="logo-btn" data-team="Lancaster" title="click or drag to add">
-      <img src="./images/homepage-logos/Lancaster.png" alt="Lancaster logo">
-    </button>
-    <button class="logo-btn" data-team="Little York" title="click or drag to add">
-      <img src="./images/homepage-logos/Little York.png" alt="Little York logo">
-    </button>
-    <button class="logo-btn" data-team="Morristown" title="click or drag to add">
-      <img src="./images/homepage-logos/Morristown.png" alt="Morristown logo">
-    </button>
-    <button class="logo-btn" data-team="Ocean City" title="click or drag to add">
-      <img src="./images/homepage-logos/Ocean City.png" alt="Ocean City logo">
-    </button>
-    <button class="logo-btn" data-team="South Lancaster" title="click or drag to add">
-      <img src="./images/homepage-logos/South Lancaster.png" alt="South Lancaster logo">
-    </button>
-    <button class="logo-btn" data-team="Xavien" title="click or drag to add">
-      <img src="./images/homepage-logos/Xavien.png" alt="Xavien logo">
-    </button>
-  </div>
-
-  <button id="play-btn" disabled style="opacity:0.5">
-    <img src="./images/buttons/orange_button_live.png" alt="Play Now">
-    <span>Play Now</span>
-  </button>
-
-  <script src="./js/homepage.js"></script>
+  <script src="./homepage.js"></script>
 </body>
 </html>
