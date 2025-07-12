@@ -46,7 +46,7 @@ export async function animateGameTurns({ //hasBallAtStep
 
         if (action === "handle_ball" && anim?.hasBallAtStep?.length) {
           console.log("🔒 Locking ball to ball handler:", playerId);
-          lockBallToPlayer(ballSprite, sprite);
+          lockBallToPlayer(scene, ballSprite, sprite);
         }
 
         if (action === "pass") {
@@ -75,7 +75,7 @@ export async function animateGameTurns({ //hasBallAtStep
 
         if (action === "receive") {
           console.log("📥 Ball received by:", playerId);
-          lockBallToPlayer(ballSprite, sprite);
+          lockBallToPlayer(scene, ballSprite, sprite);
         }
 
         // if (action === "shoot" || sprite.playerId === shooterId) {
