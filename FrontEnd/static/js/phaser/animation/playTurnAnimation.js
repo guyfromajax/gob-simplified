@@ -20,7 +20,8 @@ function updateBallOwnership({ ballSprite, animations, playerSprites, stepIndex,
     console.log("ballSprite", ballSprite);
     console.log("currentBallOwnerRef", currentBallOwnerRef);
 
-    if (hasBall && sprite && team === offenseTeamId && ballSprite?.setPosition) {
+    // if (hasBall && sprite && team === offenseTeamId && ballSprite?.setPosition) {
+    if (hasBall && ballSprite?.setPosition) {
       console.log("All four conditions are met")
       ballSprite.setPosition(sprite.x, sprite.y);
       ballSprite.setVisible(true);
