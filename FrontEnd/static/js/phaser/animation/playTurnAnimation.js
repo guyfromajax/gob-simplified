@@ -166,6 +166,15 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
     offenseTeamId: turnData.possession_team_id
   });
 
+  // ✅ NEW: Lock ball ownership to correct player at step 0
+  updateBallOwnership({
+    ballSprite,
+    animations: turnData.animations,
+    playerSprites,
+    stepIndex: 0,
+    offenseTeamId: turnData.possession_team_id
+  });
+
   for (let stepIndex = 1; stepIndex < maxSteps; stepIndex++) {
     updateBallOwnership({
       ballSprite,
