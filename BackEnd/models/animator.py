@@ -51,6 +51,16 @@ class Animator:
                 if action_info["action"] in ball_actions:
                     owner = off_lineup[pos_key]
                     break
+            if owner is None:
+                for event in step.get("events", []):
+                    if event.get("type") == "pass":
+                        owner = off_lineup.get(event.get("to"))
+                        if owner:
+                            break
+                    elif event.get("type") == "shot":
+                        owner = off_lineup.get(event.get("by"))
+                        if owner:
+                            break
             ball_owner_by_step.append(owner)
 
         for idx, owner in enumerate(ball_owner_by_step):
