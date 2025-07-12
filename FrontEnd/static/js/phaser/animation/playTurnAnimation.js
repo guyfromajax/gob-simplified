@@ -9,46 +9,39 @@ function updateBallOwnership({ ballSprite, animations, playerSprites, stepIndex,
   for (const anim of animations) {
     const sprite = playerSprites[anim.playerId];
     const hasBall = anim.hasBallAtStep?.[stepIndex];
-    const team = sprite?.team_id; // assumes sprite.team was set on creation
+    const team = sprite?.team_id;
 
     if (hasBall && sprite && team === offenseTeamId && ballSprite?.setPosition) {
       ballSprite.setPosition(sprite.x, sprite.y);
       ballSprite.setVisible(true);
       if (currentBallOwnerRef) currentBallOwnerRef.value = sprite;
+
+      // ✅ Log the actual assignment
+      console.log("Ball assigned at step", stepIndex, {
+        playerId: anim.playerId,
+        hasBall,
+        team,
+        offenseTeamId
+      });
+
       break;
     }
   }
 }
+
 
 /**
  * Smoothly move all players to their step 0 positions before possession begins.
  * Locks the ball to the player with hasBallAtStep[0] during this setup tween.
  */
 
-async function runSetupTween({ scene, ballSprite, animations, playerSprites, offenseTeamId, currentBallOwnerRef }) {
+async function runSetupTween({ scene, animations, playerSprites }) {
   const stepIndex = 0;
-  const promises = []; //onUpdate
-
-  // Find the ball owner
-  let ballOwnerSprite = null;
-  for (const anim of animations) {
-    const sprite = playerSprites[anim.playerId];
-    const hasBall = anim.hasBallAtStep?.[stepIndex];
-    if (hasBall && sprite?.team_id === offenseTeamId) {
-      ballOwnerSprite = sprite;
-      break;
-    }
-  }
-
-  if (ballOwnerSprite && ballSprite?.setPosition) {
-    ballSprite.setPosition(ballOwnerSprite.x, ballOwnerSprite.y);
-    ballSprite.setVisible(true);
-    if (currentBallOwnerRef) currentBallOwnerRef.value = ballOwnerSprite;
-  }
+  const promises = [];
 
   for (const anim of animations) {
     const sprite = playerSprites[anim.playerId];
-    const firstStep = anim.movement?.[0];
+    const firstStep = anim.movement?.[stepIndex];
     if (!sprite || !firstStep) continue;
 
     const { x, y } = gridToPixels(
@@ -66,24 +59,16 @@ async function runSetupTween({ scene, ballSprite, animations, playerSprites, off
         duration: 2000,
         ease: "Linear",
         onUpdate: () => {
-          if (sprite === ballOwnerSprite && ballSprite?.setPosition) {
-            ballSprite.setPosition(sprite.x, sprite.y);
-            ballSprite.setVisible(true);
-          }
+          // 🧼 No more ball logic here
         },
         onComplete: resolve
       });
     }));
   }
 
-  // Final snap just in case
-  if (ballOwnerSprite && ballSprite?.setPosition) {
-    ballSprite.setPosition(ballOwnerSprite.x, ballOwnerSprite.y);
-    if (currentBallOwnerRef) currentBallOwnerRef.value = ballOwnerSprite;
-  }
-
   await Promise.all(promises);
 }
+
 
 // Previous verions as of July 11, 2025
 // async function runSetupTween({ scene, ballSprite, animations, playerSprites, offenseTeamId }) {
@@ -164,11 +149,11 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   // 🔶 Pre-possession: Move players to their step 0 positions
   await runSetupTween({
     scene,
-    ballSprite,
+    // ballSprite,
     animations: turnData.animations,
     playerSprites,
-    offenseTeamId: turnData.possession_team_id,
-    currentBallOwnerRef
+    // offenseTeamId: turnData.possession_team_id,
+    // currentBallOwnerRef
   });
 
   // ✅ NEW: Lock ball ownership to correct player at step 0
@@ -177,7 +162,8 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
     animations: turnData.animations,
     playerSprites,
     stepIndex: 0,
-    offenseTeamId: turnData.possession_team_id
+    offenseTeamId: turnData.possession_team_id,
+    currentBallOwnerRef
   });
 
   for (let stepIndex = 1; stepIndex < maxSteps; stepIndex++) {
