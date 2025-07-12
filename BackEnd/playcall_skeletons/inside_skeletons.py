@@ -32,6 +32,17 @@ INSIDE_SCENE_1 = {
     "pass_sequence": ["PG", "PF", "C"],
     "steps": [
         {
+            "timestamp": 0,
+            "pos_actions": {
+                "PG": {"action": ACTIONS["HANDLE"], "spot": "key"},
+                "SG": {"action": ACTIONS["DRIFT"], "spot": "upper wing"},
+                "SF": {"action": ACTIONS["CUT"], "spot": "lower wing"},
+                "PF": {"action": ACTIONS["POST"], "spot": "upper highPost"},
+                "C": {"action": ACTIONS["POST"], "spot": "lower lowPost"}
+            },
+            "events": []
+        },
+        {
             "timestamp": 300,
             "pos_actions": {
                 "PG": {"action": ACTIONS["HANDLE"], "spot": "key"},
@@ -45,17 +56,6 @@ INSIDE_SCENE_1 = {
         {
             "timestamp": 600,
             "pos_actions": {
-                "PG": {"action": ACTIONS["HANDLE"], "spot": "key"},
-                "SG": {"action": ACTIONS["DRIFT"], "spot": "upper wing"},
-                "SF": {"action": ACTIONS["CUT"], "spot": "lower wing"},
-                "PF": {"action": ACTIONS["POST"], "spot": "upper highPost"},
-                "C": {"action": ACTIONS["POST"], "spot": "lower lowPost"}
-            },
-            "events": []
-        },
-        {
-            "timestamp": 900,
-            "pos_actions": {
                 "PG": {"action": ACTIONS["PASS"], "spot": "key"},
                 "SG": {"action": ACTIONS["STAY"], "spot": "upper wing"},
                 "SF": {"action": ACTIONS["GET_OPEN"], "spot": "lower corner"},
@@ -65,7 +65,7 @@ INSIDE_SCENE_1 = {
             "events": [{"type": "pass", "from": "PG", "to": "PF"}]
         },
         {
-            "timestamp": 1200,
+            "timestamp": 900,
             "pos_actions": {
                 "PG": {"action": ACTIONS["DRIFT"], "spot": "lower wing"},
                 "SG": {"action": ACTIONS["SCREEN"], "spot": "key"},
@@ -76,7 +76,7 @@ INSIDE_SCENE_1 = {
             "events": []
         },
         {
-            "timestamp": 1500,
+            "timestamp": 1200,
             "pos_actions": {
                 "PG": {"action": ACTIONS["STAY"], "spot": "lower corner"},
                 "SG": {"action": ACTIONS["STAY"], "spot": "lower wing"},
@@ -87,7 +87,7 @@ INSIDE_SCENE_1 = {
             "events": [{"type": "pass", "from": "PF", "to": "C"}]
         },
         {
-            "timestamp": 1800,
+            "timestamp": 1500,
             "pos_actions": {
                 "PG": {"action": ACTIONS["STAY"], "spot": "upper corner"},
                 "SG": {"action": ACTIONS["STAY"], "spot": "lower corner"},
@@ -98,7 +98,7 @@ INSIDE_SCENE_1 = {
             "events": []
         },
         {
-            "timestamp": 2100,
+            "timestamp": 1800,
             "pos_actions": {
                 "PG": {"action": ACTIONS["STAY"], "spot": "upper wing"},
                 "SG": {"action": ACTIONS["STAY"], "spot": "lower wing"},
