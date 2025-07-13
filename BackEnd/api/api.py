@@ -88,8 +88,10 @@ def simulate_game(request: SimulationRequest):
 
     try:
         print("🔍 About to insert summary into Mongo...")
-        games_collection.insert_one(summary)
-        summary.pop("_id", None)
+        inserted_id = games_collection.insert_one(summary).inserted_id
+        summary["_id"] = str(inserted_id)
+        # games_collection.insert_one(summary)
+        # summary.pop("_id", None)
     except Exception as e:
         print("🚨 Mongo insert failed:", e)
         traceback.print_exc()

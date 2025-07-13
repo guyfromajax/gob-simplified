@@ -5,12 +5,14 @@ from BackEnd.tournament.tournament_manager import TournamentManager
 from BackEnd.main import run_simulation
 from BackEnd.utils.shared import summarize_game_state
 from bson import ObjectId
-
+from pydantic import BaseModel
 
 router = APIRouter()
 
-class TournamentRequest(BaseModel):
-    user_team_id: str
+class TournamentResultRequest(BaseModel):
+    tournament_id: str
+    game_id: str
+    winner: str
 
 class SimulateRequest(BaseModel):
     tournament_id: str
@@ -68,3 +70,30 @@ def simulate_round(request: SimulateRequest):
     if updated:
         updated["_id"] = str(updated["_id"])
     return updated
+
+@app.post("/tournament/save-result")
+def save_result(request: TournamentResultRequest):
+    from bson import ObjectId
+
+    tournament_id = ObjectId(request.tournament_id)
+    tournament = tournaments_collection.find_one({"_id": tournament_id})
+
+    if not tournament:
+        raise HTTPException(status_code=404, detail="Tournament not found")
+
+    # find and update the user’s game in the current round
+    round_key = f"round{tournament['current_round']}"
+    for i, match in enumerate(tournament["bracket"][round_key]):
+        if match["game_id"] is None and request.winner in [match["home_team"], match["away_team"]]:
+            tournament["bracket"][round_key][i]["game_id"] = request.game_id
+            tournament["bracket"][round_key][i]["winner"] = request.winner
+            break
+
+    tournaments_collection.update_one(
+        {"_id": tournament_id},
+        {"$set": {
+            f"bracket.{round_key}": tournament["bracket"][round_key]
+        }}
+    )
+
+    return {"status": "success"}
