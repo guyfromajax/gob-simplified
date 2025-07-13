@@ -15,7 +15,7 @@ from bson.json_util import dumps
 from bson import ObjectId
 from fastapi.staticfiles import StaticFiles
 from BackEnd.models.animator import Animator   
-from BackEnd.api.tournament_routes import router as tournament_router
+from .tournament_routes import router as tournament_router
 import traceback
 
 app = FastAPI()
