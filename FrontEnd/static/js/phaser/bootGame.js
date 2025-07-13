@@ -47,10 +47,12 @@ async function initTournamentGame() {
       ...GameScene,
       data: {
         rosters: { homeRoster, awayRoster },
-        tournamentId
+        tournamentId,
+        homeTeam,
+        awayTeam
       }
     }
-  });  
+  });
 }
 
 initTournamentGame();  // ✅ This stays last
