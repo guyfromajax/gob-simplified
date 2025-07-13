@@ -28,9 +28,8 @@ def test_create_tournament_generates_seeded_bracket(mock_collection):
     assert tournament["_id"] == "mock_id"
     mock_collection.insert_one.assert_called_once()
 
-    # ensure players mapping was created for all teams
-    assert isinstance(tournament.get("players"), dict)
-    assert set(tournament["players"].keys()) == set(all_teams)
+    # tournament should not contain embedded rosters
+    assert "players" not in tournament
 
 def test_save_game_result_and_advance_round(mock_collection):
     manager = TournamentManager(
