@@ -10,21 +10,15 @@ from bson import ObjectId
 
 def _load_from_db(team_name: str) -> Tuple[Dict | None, List[Dict]]:
     try:
+        # Find the team document by name
         team_doc = teams_collection.find_one({"name": team_name})
         print(f"🔍 Team doc: {team_doc}")
         if not team_doc:
             print(f"❌ No team found: {team_name}")
             return None, []
 
-        player_ids = team_doc.get("player_ids", [])
-        print(f"🔍 Player IDs: {player_ids}")
-        if not player_ids:
-            print(f"⚠️ No player_ids found in team doc for {team_name}")
-            return team_doc, []
-
-        # ✅ Directly use UUID strings to query players
-        print(f"🔍 Players collection: {players_collection}")
-        players = list(players_collection.find({"_id": {"$in": player_ids}}))
+        # Query players by team name directly in the players collection
+        players = list(players_collection.find({"team": team_name}))
         print(f"✅ Loaded {len(players)} players for {team_name} from DB")
         print(f"🔍 Players: {players}")
 
@@ -34,10 +28,6 @@ def _load_from_db(team_name: str) -> Tuple[Dict | None, List[Dict]]:
         print(f"⚠️ MongoDB roster lookup failed for {team_name}: {e}")
         return None, []
 
-
-    except PyMongoError as e:
-        print(f"⚠️ MongoDB roster lookup failed for {team_name}: {e}")
-        return None, []
 
 
 def _team_file_path(team_name: str) -> Path:
