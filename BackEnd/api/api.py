@@ -23,6 +23,7 @@ from fastapi.staticfiles import StaticFiles
 from BackEnd.models.animator import Animator   
 from .tournament_routes import router as tournament_router
 import traceback
+from unidecode import unidecode
 
 app = FastAPI()
 app.include_router(tournament_router)
@@ -109,16 +110,23 @@ def simulate_game(request: SimulationRequest):
 
 @app.get("/roster/{team_name}")
 def get_team_roster(team_name: str, tournament_id: str | None = None):
-    """Return a team's roster.
-
-    ``tournament_id`` is ignored but accepted for backward compatibility.
-    The roster is always loaded using :func:`load_roster`.
-    """
     print(f"🔍 Endpoint hit: GET /roster/{team_name}")
     if tournament_id:
         print(f"🔍 Tournament ID provided but ignored: {tournament_id}")
 
-    team_doc, player_objects = load_roster(team_name)
+    # Normalize team name to match DB
+    normalized_name = unidecode(team_name.strip().replace("-", " ")).lower()
+
+    all_teams = [t["name"] for t in teams_collection.find({}, {"name": 1})]
+    match = next((t for t in all_teams if unidecode(t.lower().replace("-", " ")) == normalized_name), None)
+
+    if not match:
+        print(f"❌ No team found matching: {normalized_name}")
+        raise HTTPException(status_code=404, detail=f"No players found for team '{team_name}'")
+
+    team_doc, player_objects = load_roster(match)
+    ...
+
 
     if not player_objects:
         print(f"❌ No players found for {team_name}")
