@@ -14,13 +14,16 @@ import pprint
 from bson.json_util import dumps
 from bson import ObjectId
 from fastapi.staticfiles import StaticFiles
-from BackEnd.models.animator import Animator    
+from BackEnd.models.animator import Animator   
+from BackEnd.api.tournament_routes import router as tournament_router
 import traceback
 
 app = FastAPI()
+app.include_router(tournament_router)
 # app.mount("/", StaticFiles(directory="FrontEnd", html=True), name="static")
 # app.mount("/static", StaticFiles(directory="FrontEnd", html=True), name="static")
 app.mount("/static", StaticFiles(directory="FrontEnd/static"), name="static")
+
 
 
 print("🚀 Loaded FastAPI app from api.py")
