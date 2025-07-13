@@ -116,6 +116,8 @@ def get_team_roster(team_name: str, tournament_id: str | None = None):
     ``teams_collection``/JSON files using ``load_roster``.
     """
     print(f"🔍 Endpoint hit: GET /roster/{team_name}")
+    if tournament_id:
+        print(f"🔍 Tournament ID: {tournament_id}")
 
     team_doc = None
     player_objects = []
