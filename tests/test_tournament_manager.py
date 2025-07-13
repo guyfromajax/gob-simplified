@@ -3,16 +3,20 @@ from unittest.mock import MagicMock
 from BackEnd.tournament.tournament_manager import TournamentManager
 
 @pytest.fixture
-def mock_db():
-    db = MagicMock()
-    db.tournaments.insert_one.return_value.inserted_id = "mock_id"
-    return db
+def mock_collection():
+    collection = MagicMock()
+    collection.insert_one.return_value.inserted_id = "mock_id"
+    return collection
 
-def test_create_tournament_generates_seeded_bracket(mock_db):
+def test_create_tournament_generates_seeded_bracket(mock_collection):
     user_team = "Xavien"
     all_teams = ["Xavien", "Morristown", "Lancaster", "Little York", "Ocean City", "South Lancaster", "Bentley-Truman", "Four Corners"]
 
-    manager = TournamentManager(mock_db, user_team, all_teams)
+    manager = TournamentManager(
+        user_team_id=user_team,
+        tournaments_collection=mock_collection,
+        team_ids=all_teams,
+    )
     tournament = manager.create_tournament()
 
     assert tournament["user_team_id"] == user_team
@@ -22,10 +26,14 @@ def test_create_tournament_generates_seeded_bracket(mock_db):
                          [m["away_team"] for m in tournament["bracket"]["round1"]])
     assert set(all_teams) == all_teams_used
     assert tournament["_id"] == "mock_id"
-    mock_db.tournaments.insert_one.assert_called_once()
+    mock_collection.insert_one.assert_called_once()
 
-def test_save_game_result_and_advance_round(mock_db):
-    manager = TournamentManager(mock_db, "Xavien", ["A", "B", "C", "D", "E", "F", "G", "H"])
+def test_save_game_result_and_advance_round(mock_collection):
+    manager = TournamentManager(
+        user_team_id="Xavien",
+        tournaments_collection=mock_collection,
+        team_ids=["A", "B", "C", "D", "E", "F", "G", "H"],
+    )
     manager.create_tournament()
 
     # simulate round 1 results
