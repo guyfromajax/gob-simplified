@@ -40,40 +40,46 @@ def start_tournament(request: StartTournamentRequest):
 @router.post("/simulate-tournament-round")
 def simulate_round(request: SimulateRequest):
     try:
-        oid = ObjectId(request.tournament_id)
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid tournament_id")
+        try:
+            oid = ObjectId(request.tournament_id)
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid tournament_id")
 
-    try:
-        tournament_object_id = ObjectId(request.tournament_id)
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid tournament_id format")
+        try:
+            tournament_object_id = ObjectId(request.tournament_id)
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid tournament_id format")
 
-    tournament_doc = tournaments_collection.find_one({"_id": tournament_object_id})
-    if not tournament_doc:
-        raise HTTPException(status_code=404, detail="Tournament not found")
+        tournament_doc = tournaments_collection.find_one({"_id": tournament_object_id})
+        if not tournament_doc:
+            raise HTTPException(status_code=404, detail="Tournament not found")
 
-    manager = TournamentManager(tournaments_collection=tournaments_collection)
-    manager.tournament = tournament_doc
-    manager.tournament_id = tournament_doc["_id"]
+        manager = TournamentManager(tournaments_collection=tournaments_collection)
+        manager.tournament = tournament_doc
+        manager.tournament_id = tournament_doc["_id"]
 
-    round_name = f"round{tournament_doc['current_round']}"
-    matchups = tournament_doc["bracket"].get(round_name, [])
+        round_name = f"round{tournament_doc['current_round']}"
+        matchups = tournament_doc["bracket"].get(round_name, [])
 
-    for i, matchup in enumerate(matchups):
-        if tournament_doc["user_team_id"] in [matchup["home_team"], matchup["away_team"]]:
-            continue  # Skip user match
-        game = run_simulation(matchup["home_team"], matchup["away_team"])
-        summary = summarize_game_state(game)
-        game_id = games_collection.insert_one(summary).inserted_id
-        winner = matchup["home_team"] if summary["score"][matchup["home_team"]] > summary["score"][matchup["away_team"]] else matchup["away_team"]
-        manager.save_game_result(round_name, i, str(game_id), winner)
+        for i, matchup in enumerate(matchups):
+            if tournament_doc["user_team_id"] in [matchup["home_team"], matchup["away_team"]]:
+                continue  # Skip user match
+            game = run_simulation(matchup["home_team"], matchup["away_team"])
+            summary = summarize_game_state(game)
+            game_id = games_collection.insert_one(summary).inserted_id
+            winner = matchup["home_team"] if summary["score"][matchup["home_team"]] > summary["score"][matchup["away_team"]] else matchup["away_team"]
+            manager.save_game_result(round_name, i, str(game_id), winner)
 
-    manager.advance_round()
-    updated = tournaments_collection.find_one({"_id": oid})
-    if updated:
-        updated["_id"] = str(updated["_id"])
-    return updated
+        manager.advance_round()
+        updated = tournaments_collection.find_one({"_id": oid})
+        if updated:
+            updated["_id"] = str(updated["_id"])
+        return updated
+
+    except Exception as e:
+        print("🚨 Error in simulate_round:", str(e))
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 @router.post("/tournament/save-result")
 def save_result(request: TournamentResultRequest):
