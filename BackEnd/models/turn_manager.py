@@ -43,6 +43,15 @@ class TurnManager:
         self.rebound_manager = ReboundManager(self.game)
         self.playbook_manager = PlaybookManager(self.game.offense_team)
         self.animator = Animator(self.game)
+        self._ensure_lineup_fields()
+
+    def _ensure_lineup_fields(self):
+        for team in [self.game.home_team, self.game.away_team]:
+            for player in team.lineup.values():
+                if not hasattr(player, "player_id"):
+                    setattr(player, "player_id", str(id(player)))
+                if not hasattr(player, "coords"):
+                    setattr(player, "coords", {"x": 25, "y": 50})
 
     def run_micro_turn(self):
         # Increment micro turn counter
@@ -335,9 +344,11 @@ class TurnManager:
 
         # Step 1: Decay energy for all players
         for player in off_lineup.values():
-            player.decay_energy(player.get_fatigue_decay_amount())
+            if hasattr(player, "decay_energy") and hasattr(player, "get_fatigue_decay_amount"):
+                player.decay_energy(player.get_fatigue_decay_amount())
         for player in def_lineup.values():
-            player.decay_energy(player.get_fatigue_decay_amount())
+            if hasattr(player, "decay_energy") and hasattr(player, "get_fatigue_decay_amount"):
+                player.decay_energy(player.get_fatigue_decay_amount())
 
         # Step 2: Calculate score for each potential turnover candidate
         turnover_risks = []

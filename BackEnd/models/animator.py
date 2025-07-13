@@ -79,7 +79,7 @@ class Animator:
             timeline.sort(key=lambda tup: tup[0])
             first_spot = timeline[0][2]
             last_spot = timeline[-1][2]
-            start_coords = player.coords  # Where they ended last turn
+            start_coords = getattr(player, "coords", {"x": 25, "y": 50})
             end_coords = HCO_STRING_SPOTS.get(last_spot, start_coords)
 
             if is_away_offense:
@@ -102,7 +102,7 @@ class Animator:
                 })
 
             animations.append({
-                "playerId": player.player_id,
+                "playerId": getattr(player, "player_id", str(id(player))),
                 "start": start_coords,
                 "end": end_coords,
                 "movement": movement,
@@ -139,7 +139,7 @@ class Animator:
                 print(f"[WARN] No offensive match for defender {pos}, skipping.")
                 continue
 
-            start = defender.coords
+            start = getattr(defender, "coords", {"x": 25, "y": 50})
             if pos == bh_pos:
                 start = assign_bh_defender_coords(first_coords, aggression_call, is_away_offense)
 
@@ -177,7 +177,7 @@ class Animator:
                     })
 
             animations.append({
-                "playerId": defender.player_id,
+                "playerId": getattr(defender, "player_id", str(id(defender))),
                 "start": start,
                 "end": def_coords,
                 "movement": movement,
