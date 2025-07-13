@@ -12,3 +12,5 @@ db = client["gob"]
 players_collection = db["players"]
 teams_collection = db["teams"]
 games_collection = db["games"]
+tournaments_collection = db["tournaments"]
+
