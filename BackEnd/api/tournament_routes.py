@@ -3,7 +3,6 @@ from pydantic import BaseModel
 from BackEnd.db import tournaments_collection, teams_collection, games_collection
 from BackEnd.tournament.tournament_manager import TournamentManager
 from BackEnd.main import run_simulation
-from BackEnd.utils.game_summary_builder import build_game_summary
 from BackEnd.utils.shared import summarize_game_state
 
 router = APIRouter()
@@ -22,13 +21,22 @@ def start_tournament(request: TournamentRequest):
     if request.user_team_id not in all_team_ids:
         raise HTTPException(status_code=400, detail="Invalid user_team_id")
 
-    manager = TournamentManager(tournaments_collection=tournaments_collection)
+    manager = TournamentManager(
+        user_team_id=request.user_team_id,
+        tournaments_collection=tournaments_collection,
+    )
     tournament = manager.create_tournament()
+    tournament["_id"] = str(tournament["_id"])
     return tournament
 
 @router.post("/simulate-tournament-round")
 def simulate_round(request: SimulateRequest):
-    tournament_doc = tournaments_collection.find_one({"_id": request.tournament_id})
+    try:
+        oid = ObjectId(request.tournament_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid tournament_id")
+
+    tournament_doc = tournaments_collection.find_one({"_id": oid})
     if not tournament_doc:
         raise HTTPException(status_code=404, detail="Tournament not found")
 
@@ -49,4 +57,7 @@ def simulate_round(request: SimulateRequest):
         manager.save_game_result(round_name, i, str(game_id), winner)
 
     manager.advance_round()
-    return tournaments_collection.find_one({"_id": request.tournament_id})
+    updated = tournaments_collection.find_one({"_id": oid})
+    if updated:
+        updated["_id"] = str(updated["_id"])
+    return updated
