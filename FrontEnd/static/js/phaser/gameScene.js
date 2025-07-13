@@ -11,8 +11,15 @@ export function createGameScene(Phaser) {
     init(data) {
         this.rosters = data.rosters;
         this.tournamentId = data.tournamentId;
-      
-        console.log("🧠 Game initialized with:", this.rosters, this.tournamentId);
+        this.homeTeam = data.homeTeam;
+        this.awayTeam = data.awayTeam;
+
+        console.log("🧠 Game initialized with:", {
+          rosters: this.rosters,
+          tournamentId: this.tournamentId,
+          homeTeam: this.homeTeam,
+          awayTeam: this.awayTeam,
+        });
       }
       
 
@@ -24,8 +31,10 @@ export function createGameScene(Phaser) {
     async create() {
       console.log("🎬 GameScene created");
 
-      const homeTeam = this.rosters.homeRoster.team_name;
-      const awayTeam = this.rosters.awayRoster.team_name;
+      const homeTeam = this.homeTeam || this.rosters.homeRoster.team || this.rosters.homeRoster.team_name;
+      const awayTeam = this.awayTeam || this.rosters.awayRoster.team || this.rosters.awayRoster.team_name;
+
+      console.log("📨 Sending /simulate request for:", homeTeam, "vs", awayTeam);
 
       const res = await fetch('/simulate', {
       method: 'POST',
@@ -41,6 +50,9 @@ export function createGameScene(Phaser) {
 
       const simData = await res.json();
       console.log("📦 simData received:", simData);
+      console.log(
+        `✅ Simulated matchup: ${simData.home_team} vs ${simData.away_team}`
+      );
       console.log("📦 First turn:", simData.turns?.[0]);
 
       // 🏀 Load court background image based on home team ID
