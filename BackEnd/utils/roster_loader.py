@@ -11,28 +11,28 @@ from bson import ObjectId
 def _load_from_db(team_name: str) -> Tuple[Dict | None, List[Dict]]:
     try:
         team_doc = teams_collection.find_one({"name": team_name})
+        print(f"🔍 Team doc: {team_doc}")
         if not team_doc:
             print(f"❌ No team found: {team_name}")
             return None, []
-        
+
         player_ids = team_doc.get("player_ids", [])
+        print(f"🔍 Player IDs: {player_ids}")
         if not player_ids:
             print(f"⚠️ No player_ids found in team doc for {team_name}")
             return team_doc, []
 
-        lookup_ids = []
-        for pid in player_ids:
-            if isinstance(pid, ObjectId):
-                lookup_ids.append(pid)
-            elif ObjectId.is_valid(pid):
-                lookup_ids.append(ObjectId(pid))
-            else:
-                lookup_ids.append(pid)
-
-        players = list(players_collection.find({"_id": {"$in": lookup_ids}}))
+        # ✅ Directly use UUID strings to query players
+        players = list(players_collection.find({"_id": {"$in": player_ids}}))
         print(f"✅ Loaded {len(players)} players for {team_name} from DB")
+        print(f"🔍 Players: {players}")
 
         return team_doc, players
+
+    except PyMongoError as e:
+        print(f"⚠️ MongoDB roster lookup failed for {team_name}: {e}")
+        return None, []
+
 
     except PyMongoError as e:
         print(f"⚠️ MongoDB roster lookup failed for {team_name}: {e}")
