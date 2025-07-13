@@ -16,19 +16,20 @@ console.log("🏀 Tournament launch params:", {
 const GameScene = createGameScene(Phaser);  // ✅ Moved this up
 
 async function fetchTeamRoster(teamName) {
-  const res = await fetch(`/roster/${encodeURIComponent(teamName)}`);
-  if (!res.ok) {
-    throw new Error(`Failed to load roster for ${teamName}`);
+    const res = await fetch(`/roster/${encodeURIComponent(teamName)}?tournament_id=${tournamentId}`);
+    if (!res.ok) {
+      throw new Error(`Failed to load roster for ${teamName}`);
+    }
+    return res.json();
   }
-  return res.json();
-}
+  
 
 async function initTournamentGame() {
   if (!homeTeam || !awayTeam) {
     console.error("Missing team data in URL");
     return;
   }
-
+  
   const [homeRoster, awayRoster] = await Promise.all([
     fetchTeamRoster(homeTeam),
     fetchTeamRoster(awayTeam)
