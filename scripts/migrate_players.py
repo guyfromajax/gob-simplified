@@ -27,8 +27,10 @@ for filename in os.listdir(directory):
             }
         try:
             player_obj = Player(raw_player)
+            uuid_str = str(uuid4())
             player_doc = {
-                "_id": str(uuid4()),
+                "_id": uuid_str,
+                "player_id": uuid_str,
                 "first_name": player_obj.first_name,
                 "last_name": player_obj.last_name,
                 "team": player_obj.team,
