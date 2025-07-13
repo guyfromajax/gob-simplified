@@ -5,9 +5,13 @@ from BackEnd.tournament.tournament_manager import TournamentManager
 from BackEnd.main import run_simulation
 from BackEnd.utils.shared import summarize_game_state
 from bson import ObjectId
-from pydantic import BaseModel
 
 router = APIRouter()
+
+
+class StartTournamentRequest(BaseModel):
+    """Payload for creating a new tournament."""
+    user_team_id: str
 
 class TournamentResultRequest(BaseModel):
     tournament_id: str
@@ -71,7 +75,7 @@ def simulate_round(request: SimulateRequest):
         updated["_id"] = str(updated["_id"])
     return updated
 
-@app.post("/tournament/save-result")
+@router.post("/tournament/save-result")
 def save_result(request: TournamentResultRequest):
     from bson import ObjectId
 
