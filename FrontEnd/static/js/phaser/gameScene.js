@@ -31,10 +31,13 @@ export function createGameScene(Phaser) {
     async create() {
       console.log("🎬 GameScene created");
 
-      const homeTeam = this.homeTeam || this.rosters.homeRoster.team || this.rosters.homeRoster.team_name;
-      const awayTeam = this.awayTeam || this.rosters.awayRoster.team || this.rosters.awayRoster.team_name;
+    //   const homeTeam = this.homeTeam || this.rosters.homeRoster.team || this.rosters.homeRoster.team_name;
+    //   const awayTeam = this.awayTeam || this.rosters.awayRoster.team || this.rosters.awayRoster.team_name;
 
-      console.log("📨 Sending /simulate request for:", homeTeam, "vs", awayTeam);
+      const homeTeam = this.rosters.homeRoster.team_name;
+      const awayTeam = this.rosters.awayRoster.team_name;
+
+    console.log("📨 Sending /simulate request for:", homeTeam, "vs", awayTeam);
 
       const res = await fetch('/simulate', {
       method: 'POST',
