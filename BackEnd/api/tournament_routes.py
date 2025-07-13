@@ -22,7 +22,7 @@ def start_tournament(request: TournamentRequest):
     if request.user_team_id not in all_team_ids:
         raise HTTPException(status_code=400, detail="Invalid user_team_id")
 
-    manager = TournamentManager(db={"tournaments": tournaments_collection}, user_team_id=request.user_team_id, all_team_ids=all_team_ids)
+    manager = TournamentManager(tournaments_collection=tournaments_collection)
     tournament = manager.create_tournament()
     return tournament
 
@@ -32,7 +32,7 @@ def simulate_round(request: SimulateRequest):
     if not tournament_doc:
         raise HTTPException(status_code=404, detail="Tournament not found")
 
-    manager = TournamentManager(db={"tournaments": tournaments_collection}, user_team_id=tournament_doc["user_team_id"], all_team_ids=[])
+    manager = TournamentManager(tournaments_collection=tournaments_collection)
     manager.tournament = tournament_doc
     manager.tournament_id = tournament_doc["_id"]
 

@@ -4,14 +4,14 @@ from bson import ObjectId
 import random
 
 class TournamentManager:
-    def __init__(self, db, user_team_id, all_team_ids):
-        self.db = db
+    def __init__(self, user_team_id=None, tournaments_collection=None):
         self.user_team_id = user_team_id
-        self.team_ids = all_team_ids
+        self.tournaments_collection = tournaments_collection
         self.tournament_id = None
         self.tournament = None
 
     def create_tournament(self):
+        self.tournament_id = self.tournaments_collection.insert_one(tournament_doc).inserted_id
         teams = self.team_ids[:]
         random.shuffle(teams)
         seeds = {team_id: i + 1 for i, team_id in enumerate(teams)}
