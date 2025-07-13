@@ -66,7 +66,7 @@ class TournamentManager:
         }
         self.tournament_id = self.tournaments_collection.insert_one(tournament_doc).inserted_id
         self.tournament = tournament_doc
-        self.tournament["_id"] = self.tournament_id
+        self.tournament["_id"] = str(self.tournament_id)  
         return self.tournament
 
     def _generate_first_round(self, seeds):
