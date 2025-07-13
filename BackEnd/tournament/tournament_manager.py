@@ -1,13 +1,19 @@
-from pymongo import MongoClient
 from datetime import datetime
-from bson import ObjectId
 import random
+from bson import ObjectId
+
+from BackEnd.db import tournaments_collection as default_tournaments_collection
 
 class TournamentManager:
-    def __init__(self, user_team_id=None, tournaments_collection=None):
+    """Manage tournament creation and progression."""
+
+    def __init__(self, user_team_id: str | None = None, *,
+                 tournaments_collection=None, team_ids=None) -> None:
         self.user_team_id = user_team_id
-        self.tournaments_collection = tournaments_collection
-        self.team_ids = [
+        self.tournaments_collection = (
+            tournaments_collection or default_tournaments_collection
+        )
+        self.team_ids = team_ids or [
             "Bentley-Truman",
             "Four Corners",
             "Lancaster",
@@ -15,10 +21,10 @@ class TournamentManager:
             "Morristown",
             "Ocean City",
             "South Lancaster",
-            "Xavien"
+            "Xavien",
         ]
-        self.tournament_id = None
-        self.tournament = None
+        self.tournament_id: ObjectId | None = None
+        self.tournament: dict | None = None
 
     def create_tournament(self):
         teams = self.team_ids[:]
@@ -44,7 +50,6 @@ class TournamentManager:
             "completed": False
         }
         self.tournament_id = self.tournaments_collection.insert_one(tournament_doc).inserted_id
-        # self.tournament_id = self.db.tournaments.insert_one(tournament_doc).inserted_id
         self.tournament = tournament_doc
         self.tournament["_id"] = self.tournament_id
         return self.tournament
@@ -62,10 +67,14 @@ class TournamentManager:
     def save_game_result(self, round_name, matchup_index, game_id, winner_id):
         self.tournament["bracket"][round_name][matchup_index]["game_id"] = game_id
         self.tournament["bracket"][round_name][matchup_index]["winner"] = winner_id
-        self.db.tournaments.update_one(
+        self.tournaments_collection.update_one(
             {"_id": self.tournament_id},
-            {"$set": {f"bracket.{round_name}.{matchup_index}.game_id": game_id,
-                      f"bracket.{round_name}.{matchup_index}.winner": winner_id}}
+            {
+                "$set": {
+                    f"bracket.{round_name}.{matchup_index}.game_id": game_id,
+                    f"bracket.{round_name}.{matchup_index}.winner": winner_id,
+                }
+            },
         )
 
     def advance_round(self):
@@ -88,11 +97,13 @@ class TournamentManager:
         elif current_round == 3:
             self.tournament["completed"] = True
 
-        self.db.tournaments.update_one(
+        self.tournaments_collection.update_one(
             {"_id": self.tournament_id},
-            {"$set": {
-                "bracket": self.tournament["bracket"],
-                "current_round": self.tournament["current_round"],
-                "completed": self.tournament["completed"]
-            }}
+            {
+                "$set": {
+                    "bracket": self.tournament["bracket"],
+                    "current_round": self.tournament["current_round"],
+                    "completed": self.tournament["completed"],
+                }
+            },
         )
