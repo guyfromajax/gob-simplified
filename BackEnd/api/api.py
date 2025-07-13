@@ -5,7 +5,12 @@ from fastapi.responses import JSONResponse
 from BackEnd.constants import POSITION_LIST
 import uuid
 from BackEnd.main import run_simulation
-from BackEnd.db import players_collection, teams_collection, games_collection
+from BackEnd.db import (
+    players_collection,
+    teams_collection,
+    games_collection,
+    tournaments_collection,
+)
 from BackEnd.utils.roster_loader import load_roster
 from BackEnd.utils.game_summary_builder import build_game_summary
 from BackEnd.utils.shared import clean_mongo_ids, summarize_game_state
@@ -103,13 +108,60 @@ def simulate_game(request: SimulationRequest):
 
 
 @app.get("/roster/{team_name}")
-def get_team_roster(team_name: str):
+def get_team_roster(team_name: str, tournament_id: str | None = None):
+    """Return a team's roster.
+
+    If ``tournament_id`` is provided, the roster is looked up within that
+    tournament document. Otherwise the roster is loaded from the global
+    ``teams_collection``/JSON files using ``load_roster``.
+    """
     print(f"🔍 Endpoint hit: GET /roster/{team_name}")
 
-    team_doc, player_objects = load_roster(team_name)
-    if not player_objects:
-        print(f"❌ No players found for {team_name}")
-        raise HTTPException(status_code=404, detail=f"No players found for team '{team_name}'")
+    team_doc = None
+    player_objects = []
+
+    if tournament_id:
+        # Tournament context lookup
+        try:
+            oid = ObjectId(tournament_id)
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid tournament_id")
+
+        tournament = tournaments_collection.find_one({"_id": oid})
+        if not tournament:
+            raise HTTPException(status_code=404, detail="Tournament not found")
+
+        players_data = tournament.get("players", {})
+        team_data = None
+
+        if isinstance(players_data, dict):
+            # players stored as mapping of team_name -> roster or team object
+            team_data = players_data.get(team_name)
+        elif isinstance(players_data, list):
+            # players stored as list of team docs
+            for entry in players_data:
+                name = entry.get("team") or entry.get("team_name") or entry.get("name")
+                if name == team_name:
+                    team_data = entry
+                    break
+
+        if team_data:
+            if isinstance(team_data, dict) and "players" in team_data:
+                player_objects = team_data.get("players", [])
+                team_doc = team_data
+            elif isinstance(team_data, list):
+                player_objects = team_data
+                team_doc = {"name": team_name}
+
+        if not player_objects:
+            raise HTTPException(status_code=404, detail="Team not found in tournament")
+    else:
+        # Standard single game lookup
+        team_doc, player_objects = load_roster(team_name)
+
+        if not player_objects:
+            print(f"❌ No players found for {team_name}")
+            raise HTTPException(status_code=404, detail=f"No players found for team '{team_name}'")
 
     team = team_doc or {"name": team_name}
 
