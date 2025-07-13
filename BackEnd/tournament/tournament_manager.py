@@ -7,6 +7,16 @@ class TournamentManager:
     def __init__(self, user_team_id=None, tournaments_collection=None):
         self.user_team_id = user_team_id
         self.tournaments_collection = tournaments_collection
+        self.team_ids = [
+            "Bentley-Truman",
+            "Four Corners",
+            "Lancaster",
+            "Little York",
+            "Morristown",
+            "Ocean City",
+            "South Lancaster",
+            "Xavien"
+        ]
         self.tournament_id = None
         self.tournament = None
 
