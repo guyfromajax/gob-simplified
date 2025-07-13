@@ -10,12 +10,26 @@ def _load_from_db(team_name: str) -> Tuple[Dict | None, List[Dict]]:
     try:
         team_doc = teams_collection.find_one({"name": team_name})
         if not team_doc:
+            print(f"❌ No team found: {team_name}")
             return None, []
+        
         player_ids = team_doc.get("player_ids", [])
         if not player_ids:
+            print(f"⚠️ No player_ids found in team doc for {team_name}")
             return team_doc, []
-        players = list(players_collection.find({"_id": {"$in": player_ids}}))
+
+        valid_ids = []
+        for pid in player_ids:
+            try:
+                valid_ids.append(ObjectId(pid))
+            except Exception as e:
+                print(f"⚠️ Invalid player_id: {pid} — {e}")
+
+        players = list(players_collection.find({"_id": {"$in": valid_ids}}))
+        print(f"✅ Loaded {len(players)} players for {team_name} from DB")
+
         return team_doc, players
+
     except PyMongoError as e:
         print(f"⚠️ MongoDB roster lookup failed for {team_name}: {e}")
         return None, []
