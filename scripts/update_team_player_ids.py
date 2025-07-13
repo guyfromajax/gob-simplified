@@ -1,3 +1,5 @@
+from BackEnd.db import teams_collection, players_collection
+
 for team_doc in teams_collection.find({}):
     team_name = team_doc["name"]
     players = players_collection.find({"team": team_name})
