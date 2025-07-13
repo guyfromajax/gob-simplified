@@ -20,14 +20,16 @@ def _load_from_db(team_name: str) -> Tuple[Dict | None, List[Dict]]:
             print(f"⚠️ No player_ids found in team doc for {team_name}")
             return team_doc, []
 
-        valid_ids = []
+        lookup_ids = []
         for pid in player_ids:
-            try:
-                valid_ids.append(ObjectId(pid))
-            except Exception as e:
-                print(f"⚠️ Invalid player_id: {pid} — {e}")
+            if isinstance(pid, ObjectId):
+                lookup_ids.append(pid)
+            elif ObjectId.is_valid(pid):
+                lookup_ids.append(ObjectId(pid))
+            else:
+                lookup_ids.append(pid)
 
-        players = list(players_collection.find({"_id": {"$in": valid_ids}}))
+        players = list(players_collection.find({"_id": {"$in": lookup_ids}}))
         print(f"✅ Loaded {len(players)} players for {team_name} from DB")
 
         return team_doc, players
