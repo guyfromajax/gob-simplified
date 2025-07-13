@@ -4,6 +4,8 @@ from BackEnd.db import tournaments_collection, teams_collection, games_collectio
 from BackEnd.tournament.tournament_manager import TournamentManager
 from BackEnd.main import run_simulation
 from BackEnd.utils.shared import summarize_game_state
+from bson import ObjectId
+
 
 router = APIRouter()
 
@@ -36,7 +38,12 @@ def simulate_round(request: SimulateRequest):
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid tournament_id")
 
-    tournament_doc = tournaments_collection.find_one({"_id": oid})
+    try:
+        tournament_object_id = ObjectId(request.tournament_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid tournament_id format")
+
+    tournament_doc = tournaments_collection.find_one({"_id": tournament_object_id})
     if not tournament_doc:
         raise HTTPException(status_code=404, detail="Tournament not found")
 
