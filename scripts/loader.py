@@ -29,9 +29,10 @@ for filename in os.listdir(directory):
     for raw_player in team_data["players"]:
         print(f"raw_player: {raw_player}")
         player_obj = Player(raw_player)
-        player_id = str(uuid4())
+        uuid_str = str(uuid4())
         player_data = {
-            "_id": player_id,
+            "_id": uuid_str,
+            "player_id": uuid_str,
             "first_name": player_obj.first_name,
             "last_name": player_obj.last_name,
             "team": player_obj.team,
@@ -42,7 +43,7 @@ for filename in os.listdir(directory):
         # player_id = str(uuid4())
         # raw_player["_id"] = player_id
         # raw_player["team"] = team_name
-        player_ids.append(player_id)
+        player_ids.append(uuid_str)
         player_docs.append(player_data)
 
     # Insert team with player_ids
