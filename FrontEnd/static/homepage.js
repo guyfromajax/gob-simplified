@@ -7,6 +7,17 @@ const playBtn = document.getElementById('play-btn');
 const clickSound = new Audio('./sounds/mixkit-click.wav');
 const addSound = new Audio('./sounds/handgun.mp3');
 
+const teamCodeMap = {
+  "Bentley-Truman": "bt",
+  "Four Corners": "fc",
+  "Lancaster": "lan",
+  "Little York": "ly",
+  "Morristown": "mor",
+  "Ocean City": "oc",
+  "South Lancaster": "sl",
+  "Xavien": "xav"
+};
+
 const teams = [
   'Bentley-Truman',
   'Four Corners',
@@ -58,7 +69,16 @@ function addToFirstAvailable(team) {
 function setLogo(box, team) {
   box.innerHTML = '';
   const img = document.createElement('img');
-  img.src = `./images/homepage-logos/${team}.png`;
+  const code = teamCodeMap[team];
+  if (code) {
+    img.src = `./images/square-logos/${code}_square.png`;
+    img.onerror = () => {
+      img.onerror = null;
+      img.src = `./images/homepage-logos/${team}.png`;
+    };
+  } else {
+    img.src = `./images/homepage-logos/${team}.png`;
+  }
   img.alt = team;
   box.appendChild(img);
   box.dataset.team = team;
