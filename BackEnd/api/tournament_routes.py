@@ -18,7 +18,7 @@ class SimulateRequest(BaseModel):
     tournament_id: str
 
 @router.post("/start-tournament")
-def start_tournament(request: TournamentRequest):
+def start_tournament(request: StartTournamentRequest):
     team_docs = list(teams_collection.find({}, {"name": 1}))
     all_team_ids = [team["name"] for team in team_docs]
 
