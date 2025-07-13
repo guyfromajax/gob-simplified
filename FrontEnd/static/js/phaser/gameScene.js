@@ -24,8 +24,8 @@ export function createGameScene(Phaser) {
     async create() {
       console.log("🎬 GameScene created");
 
-      const homeTeam = this.rosters?.homeRoster?.team_name;
-      const awayTeam = this.rosters?.awayRoster?.team_name;
+      const homeTeam = this.rosters.homeRoster.team_name;
+      const awayTeam = this.rosters.awayRoster.team_name;
 
       const res = await fetch('/simulate', {
       method: 'POST',
