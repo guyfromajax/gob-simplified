@@ -96,9 +96,29 @@ function updatePlayBtn() {
 playBtn.addEventListener('click', () => {
   if (playBtn.disabled) return;
   clickSound.play();
-  const home = encodeURIComponent(homeBox.dataset.team);
-  const away = encodeURIComponent(awayBox.dataset.team);
-  window.location.href = `court.html?home=${home}&away=${away}`;
+
+  const homeTeam = homeBox.dataset.team;
+  const awayTeam = awayBox.dataset.team;
+
+  // Persist selection for other pages that still rely on sessionStorage
+  sessionStorage.setItem('homeTeam', homeTeam);
+  sessionStorage.setItem('awayTeam', awayTeam);
+  if (homeCheck.checked || awayCheck.checked) {
+    sessionStorage.setItem('myTeam', homeCheck.checked ? 'home' : 'away');
+  } else {
+    sessionStorage.removeItem('myTeam');
+  }
+
+  const params = new URLSearchParams({
+    home: homeTeam,
+    away: awayTeam
+  });
+
+  if (homeCheck.checked || awayCheck.checked) {
+    params.set('my_team', homeCheck.checked ? 'home' : 'away');
+  }
+
+  window.location.href = `court.html?${params.toString()}`;
 });
 
 createLogoButtons();
