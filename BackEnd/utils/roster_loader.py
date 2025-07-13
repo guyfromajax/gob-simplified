@@ -23,6 +23,7 @@ def _load_from_db(team_name: str) -> Tuple[Dict | None, List[Dict]]:
             return team_doc, []
 
         # ✅ Directly use UUID strings to query players
+        print(f"🔍 Players collection: {players_collection}")
         players = list(players_collection.find({"_id": {"$in": player_ids}}))
         print(f"✅ Loaded {len(players)} players for {team_name} from DB")
         print(f"🔍 Players: {players}")
