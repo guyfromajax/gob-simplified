@@ -10,9 +10,8 @@ class TournamentManager:
     def __init__(self, user_team_id: str | None = None, *,
                  tournaments_collection=None, team_ids=None) -> None:
         self.user_team_id = user_team_id
-        self.tournaments_collection = (
-            tournaments_collection or default_tournaments_collection
-        )
+        self.tournaments_collection = default_tournaments_collection if tournaments_collection is None else tournaments_collection
+
         self.team_ids = team_ids or [
             "Bentley-Truman",
             "Four Corners",
