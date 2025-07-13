@@ -6,6 +6,7 @@ from BackEnd.constants import POSITION_LIST
 import uuid
 from BackEnd.main import run_simulation
 from BackEnd.db import players_collection, teams_collection, games_collection
+from BackEnd.utils.roster_loader import load_roster
 from BackEnd.utils.game_summary_builder import build_game_summary
 from BackEnd.utils.shared import clean_mongo_ids, summarize_game_state
 from pydantic import BaseModel
@@ -105,18 +106,13 @@ def simulate_game(request: SimulationRequest):
 def get_team_roster(team_name: str):
     print(f"🔍 Endpoint hit: GET /roster/{team_name}")
 
-    team = teams_collection.find_one({"name": team_name})
-    if not team:
-        print(f"❌ No team found with name: '{team_name}'")
-        raise HTTPException(status_code=404, detail=f"Team '{team_name}' not found")
-
-    player_ids = team.get("player_ids", [])
-    if not player_ids:
+    team_doc, player_objects = load_roster(team_name)
+    if not player_objects:
+        print(f"❌ No players found for {team_name}")
         raise HTTPException(status_code=404, detail=f"No players found for team '{team_name}'")
 
-    player_objects = list(players_collection.find({
-        "_id": {"$in": player_ids}
-    }))
+    team = team_doc or {"name": team_name}
+
 
     display_attributes = ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "AG", "ST", "ND", "IQ", "FT", "NG"]
 
@@ -130,7 +126,8 @@ def get_team_roster(team_name: str):
         })
 
     return {
-        "team": team_name,
+        "team": team.get("name", team_name),
+        "team_name": team.get("name", team_name),
         "players": players
     }
 

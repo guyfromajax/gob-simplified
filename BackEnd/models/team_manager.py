@@ -1,5 +1,6 @@
 import random
 from BackEnd.db import players_collection, teams_collection
+from BackEnd.utils.roster_loader import load_roster
 from BackEnd.models.player import Player
 from BackEnd.constants import PLAYCALLS
 
@@ -33,8 +34,8 @@ class TeamManager:
         self.team_attributes = self._init_team_attributes()
 
     def _load_roster(self):
-        roster_cursor = players_collection.find({"team": self.name})
-        return [Player(p) for p in roster_cursor]
+        _, players = load_roster(self.name)
+        return [Player(p) for p in players]
 
     def _load_lineup(self):
         # If you’re still defining self.players before this
