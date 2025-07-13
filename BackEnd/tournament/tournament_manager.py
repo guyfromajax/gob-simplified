@@ -3,7 +3,6 @@ import random
 from bson import ObjectId
 
 from BackEnd.db import tournaments_collection as default_tournaments_collection
-from BackEnd.utils.roster_loader import load_roster
 
 class TournamentManager:
     """Manage tournament creation and progression."""
@@ -32,19 +31,6 @@ class TournamentManager:
         seeds = {team_id: i + 1 for i, team_id in enumerate(teams)}
         round1 = self._generate_first_round(seeds)
 
-        # Build roster mapping for all teams in the bracket
-        tournament_teams = {
-            team
-            for matchup in round1
-            for team in (matchup["home_team"], matchup["away_team"])
-        }
-        players_map = {}
-        for team_name in tournament_teams:
-            team_doc, players = load_roster(team_name)
-            team_entry = team_doc.copy() if team_doc else {"name": team_name}
-            team_entry["players"] = players
-            players_map[team_name] = team_entry
-
         tournament_doc = {
             "user_team_id": self.user_team_id,
             "created_at": datetime.utcnow(),
@@ -61,7 +47,6 @@ class TournamentManager:
                 "top_10_blocks": [],
                 "top_10_steals": []
             },
-            "players": players_map,
             "completed": False
         }
         self.tournament_id = self.tournaments_collection.insert_one(tournament_doc).inserted_id

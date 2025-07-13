@@ -30,11 +30,15 @@ def test_roster_single_game_mode():
 
 def test_roster_with_tournament_id():
     tournaments_collection.delete_many({})
-    tid = tournaments_collection.insert_one({
-        "players": {
-            "Lancaster": {"players": [make_player(1, "Lancaster"), make_player(2, "Lancaster")]},
-        }
-    }).inserted_id
+    # create minimal tournament doc; roster data is no longer stored
+    tid = tournaments_collection.insert_one({"user_team_id": "Lancaster"}).inserted_id
+
+    # roster should load correctly even when tournament_id is provided
+    players_collection.delete_many({})
+    teams_collection.delete_many({})
+    sample_players = [make_player(i, "Lancaster") for i in range(2)]
+    players_collection.insert_many(sample_players)
+    teams_collection.insert_one({"name": "Lancaster", "player_ids": [p["_id"] for p in sample_players]})
 
     resp = client.get(f"/roster/Lancaster?tournament_id={tid}")
     assert resp.status_code == 200
@@ -42,6 +46,6 @@ def test_roster_with_tournament_id():
     assert data["team_name"] == "Lancaster"
     assert len(data["players"]) == 2
 
-    # invalid team within tournament
+    # invalid team even when tournament_id provided
     resp = client.get(f"/roster/UnknownTeam?tournament_id={tid}")
     assert resp.status_code == 404
