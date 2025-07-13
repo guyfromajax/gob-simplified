@@ -8,6 +8,14 @@ export function createGameScene(Phaser) {
       super("GameScene");
     }
 
+    init(data) {
+        this.rosters = data.rosters;
+        this.tournamentId = data.tournamentId;
+      
+        console.log("🧠 Game initialized with:", this.rosters, this.tournamentId);
+      }
+      
+
     async preload() {
       console.log("✅ GameScene preloaded");
       this.load.image("ball", "/static/images/ball.png");
@@ -95,6 +103,34 @@ export function createGameScene(Phaser) {
         });
     
         console.log("✅ GameScene animation complete");
+
+        // Extract score and winner
+        const homeScore = simData.score?.[simData.home_team] || 0;
+        const awayScore = simData.score?.[simData.away_team] || 0;
+        const winner = homeScore > awayScore ? simData.home_team : simData.away_team;
+
+        // POST to /tournament/save-result
+        if (this.tournamentId) {
+        try {
+            const res = await fetch("/tournament/save-result", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                tournament_id: this.tournamentId,
+                game_id: simData._id,  // make sure _id is included in your /simulate response
+                winner: winner
+            })
+            });
+
+            if (!res.ok) {
+            console.error("❌ Failed to save tournament result:", await res.text());
+            } else {
+            console.log("✅ Tournament result saved.");
+            }
+        } catch (err) {
+            console.error("🚨 Error during tournament result save:", err);
+        }
+        }
     });
     }
   };
