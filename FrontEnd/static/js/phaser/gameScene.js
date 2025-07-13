@@ -24,14 +24,15 @@ export function createGameScene(Phaser) {
     async create() {
       console.log("🎬 GameScene created");
 
-      const homeTeam = sessionStorage.getItem("homeTeam") || "Four Corners";
-      const awayTeam = sessionStorage.getItem("awayTeam") || "Bentley-Truman";
+      const homeTeam = this.rosters?.homeRoster?.team_name;
+      const awayTeam = this.rosters?.awayRoster?.team_name;
 
       const res = await fetch('/simulate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ home_team: homeTeam, away_team: awayTeam })
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ home_team: homeTeam, away_team: awayTeam })
       });
+
 
       if (!res.ok) {
         console.error("❌ Failed to fetch sim data:", res.statusText);

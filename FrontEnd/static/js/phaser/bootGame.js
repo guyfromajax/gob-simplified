@@ -42,10 +42,15 @@ async function initTournamentGame() {
     height: 768,
     backgroundColor: "#1e1e1e",
     parent: "phaser-container",
-    scene: [GameScene],
-    rosters: { homeRoster, awayRoster },
-    tournamentId
-  });
+    scene: {
+      key: 'GameScene',
+      ...GameScene,
+      data: {
+        rosters: { homeRoster, awayRoster },
+        tournamentId
+      }
+    }
+  });  
 }
 
 initTournamentGame();  // ✅ This stays last
