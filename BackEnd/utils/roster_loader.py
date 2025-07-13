@@ -4,6 +4,8 @@ from typing import Tuple, List, Dict
 
 from BackEnd.db import players_collection, teams_collection
 from pymongo.errors import PyMongoError
+from bson import ObjectId
+
 
 
 def _load_from_db(team_name: str) -> Tuple[Dict | None, List[Dict]]:
