@@ -1,3 +1,8 @@
+import sys
+import os
+# Add the project root to sys.path so Python can find BackEnd
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 from BackEnd.db import teams_collection, players_collection
 
 for team_doc in teams_collection.find({}):
