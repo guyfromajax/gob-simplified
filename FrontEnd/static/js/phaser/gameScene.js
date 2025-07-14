@@ -26,8 +26,10 @@ export function createGameScene(Phaser) {
     async preload() {
       console.log("✅ GameScene preloaded");
       this.load.image("ball", "/static/images/ball.png");
-      const teamId = this.homeTeam.toLowerCase();
+      const normalizeTeamName = (name) => name.toLowerCase().replace(/[\s\-]/g, '_');
+      const teamId = normalizeTeamName(this.homeTeam);
       this.load.image("court-bg", `/static/images/courts/${teamId}.jpg`);
+
     }
 
     async create() {
