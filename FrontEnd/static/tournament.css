@@ -16,6 +16,58 @@ h1, h2, h3 {
   padding: 20px;
 }
 
+#top-left {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.team-logo {
+  width: 100px;
+  height: auto;
+  margin-bottom: 10px;
+}
+
+.left-info {
+  display: flex;
+  width: 100%;
+  justify-content: space-between;
+  font-weight: bold;
+}
+
+#top-center {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.chemistry-bar {
+  width: 100%;
+  height: 20px;
+  border-radius: 10px;
+  background: linear-gradient(to right, #003366, #4a90e2, #ffd580, #ff6600);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  margin-bottom: 10px;
+}
+
+.team-stats {
+  line-height: 1.4;
+}
+
+.coach-info {
+  text-align: center;
+}
+
+.coach-info img {
+  width: 80px;
+  height: auto;
+  margin-bottom: 5px;
+}
+
 #tournament-tabs {
   padding: 20px;
 }
