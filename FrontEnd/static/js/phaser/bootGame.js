@@ -43,6 +43,8 @@ async function initTournamentGame() {
     height: 768,
     backgroundColor: "#1e1e1e",
     parent: "phaser-container",
+    // Disable audio to avoid AudioContext warnings in automated testing
+    audio: { noAudio: true },
     scene: {
       key: 'GameScene',
       ...GameScene,
