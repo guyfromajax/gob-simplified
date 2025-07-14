@@ -26,6 +26,8 @@ export function createGameScene(Phaser) {
     async preload() {
       console.log("✅ GameScene preloaded");
       this.load.image("ball", "/static/images/ball.png");
+      const teamId = this.homeTeam.toLowerCase();
+      this.load.image("court-bg", `/static/images/courts/${teamId}.jpg`);
     }
 
     async create() {
@@ -58,33 +60,9 @@ export function createGameScene(Phaser) {
       );
       console.log("📦 First turn:", simData.turns?.[0]);
 
-      // 🏀 Load court background image based on home team ID
-      const teamId = simData.home_team_id.toLowerCase(); // ensures lowercase for snake-case file names
       const courtKey = "court-bg";
-      const courtPath = `/static/images/courts/${teamId}.jpg`;
-      const fallbackPath = "/static/images/courts/default.jpg";
 
-      // Load with fallback
-      this.load.image(courtKey, courtPath);
-
-      // Ensure animation only runs after everything is loaded and created
-      this.load.once("complete", async () => {
-        if (this.textures.exists(courtKey)) {
-        this.add.image(0, 0, courtKey)
-            .setOrigin(0)
-            .setDisplaySize(this.game.config.width, this.game.config.height)
-            .setDepth(0);
-        } else {
-        this.load.image(courtKey, fallbackPath);
-        this.load.once("complete", () => {
-            this.add.image(0, 0, courtKey)
-            .setOrigin(0)
-            .setDisplaySize(this.game.config.width, this.game.config.height)
-            .setDepth(0);
-        });
-        this.load.start();
-        }
-    
+      const startAnimation = async () => {
         this.playerSprites = loadPhaserPlayers(this, simData.players, {
         home: {
             player_ids: simData.players.filter(p => p.team === "home").map(p => p.playerId),
@@ -97,9 +75,9 @@ export function createGameScene(Phaser) {
             secondary_color: simData.away_team_colors.secondary_color
         }
         }, Phaser);
-    
+
         this.ballSprite = this.add.image(0, 0, "ball").setVisible(true).setDepth(1000).setScale(1);
-    
+
         this.tweens.add({
         targets: this.ballSprite,
         scale: { from: 1, to: 1.3 },
@@ -108,14 +86,14 @@ export function createGameScene(Phaser) {
         repeat: -1,
         ease: 'Sine.easeInOut'
         });
-    
+
         await animateGameTurns({
         scene: this,
         simData,
         playerSprites: this.playerSprites,
         ballSprite: this.ballSprite
         });
-    
+
         console.log("✅ GameScene animation complete");
 
         // Extract score and winner
@@ -145,8 +123,24 @@ export function createGameScene(Phaser) {
             console.error("🚨 Error during tournament result save:", err);
         }
         }
-    });
-      this.load.start()
+      };
+
+      if (this.textures.exists(courtKey)) {
+        this.add.image(0, 0, courtKey)
+            .setOrigin(0)
+            .setDisplaySize(this.game.config.width, this.game.config.height)
+            .setDepth(0);
+        startAnimation();
+      } else {
+        this.load.once("complete", () => {
+            this.add.image(0, 0, courtKey)
+            .setOrigin(0)
+            .setDisplaySize(this.game.config.width, this.game.config.height)
+            .setDepth(0);
+            startAnimation();
+        });
+        this.load.start();
+      }
     }
   };
 }
