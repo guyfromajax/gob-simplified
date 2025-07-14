@@ -37,7 +37,7 @@ async function initTournamentGame() {
 
   console.log("✅ Loaded rosters:", { homeRoster, awayRoster });
 
-  new Phaser.Game({
+  const game = new Phaser.Game({
     type: Phaser.AUTO,
     width: 1229,
     height: 768,
@@ -45,16 +45,14 @@ async function initTournamentGame() {
     parent: "phaser-container",
     // Disable audio to avoid AudioContext warnings in automated testing
     audio: { noAudio: true },
-    scene: {
-      key: 'GameScene',
-      ...GameScene,
-      data: {
-        rosters: { homeRoster, awayRoster },
-        tournamentId,
-        homeTeam,
-        awayTeam
-      }
-    }
+    scene: GameScene
+  });
+
+  game.scene.start('GameScene', {
+    rosters: { homeRoster, awayRoster },
+    tournamentId,
+    homeTeam,
+    awayTeam
   });
 }
 
