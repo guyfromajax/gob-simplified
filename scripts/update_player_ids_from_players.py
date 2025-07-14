@@ -1,3 +1,9 @@
+import os
+import sys
+
+# Add the project root to sys.path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 from BackEnd.db import teams_collection, players_collection
 
 for team in teams_collection.find({}):
@@ -9,3 +15,4 @@ for team in teams_collection.find({}):
         {"$set": {"player_ids": player_ids}}
     )
     print(f"✅ Updated {name} with {len(player_ids)} player_ids")
+
