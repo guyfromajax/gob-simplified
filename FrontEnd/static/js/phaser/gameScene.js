@@ -67,8 +67,6 @@ export function createGameScene(Phaser) {
       // Load with fallback
       this.load.image(courtKey, courtPath);
 
-      this.load.start()
-      
       // Ensure animation only runs after everything is loaded and created
       this.load.once("complete", async () => {
         if (this.textures.exists(courtKey)) {
@@ -148,6 +146,7 @@ export function createGameScene(Phaser) {
         }
         }
     });
+      this.load.start()
     }
   };
 }
