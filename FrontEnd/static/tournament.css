@@ -24,6 +24,7 @@ h1, h2, h3, h4, h5, h6 {
   grid-template-columns: 2fr 2fr 1fr 1fr;
   gap: 10px;
   padding: 20px;
+  margin-bottom: 20px;
 }
 
 #top-left {
@@ -117,6 +118,9 @@ h1, h2, h3, h4, h5, h6 {
 
 .tab-content {
   display: none;
+  min-height: 200px;             /* Ensures space is reserved even when empty */
+  background: #ffffff;           /* Adds contrast in case parent bg is also white */
+  padding: 10px 0;               /* Optional: gives spacing buffer */
 }
 
 .tab-content.active {
@@ -228,6 +232,7 @@ h1, h2, h3, h4, h5, h6 {
 
 /* --- Team Tab Tables --- */
 .scroll-x {
+  display: block;
   overflow-x: auto;
   white-space: nowrap;
   width: 100%;
