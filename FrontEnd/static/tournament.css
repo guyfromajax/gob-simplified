@@ -4,6 +4,11 @@ body {
   padding: 0;
 }
 
+:root {
+  --matchup-height: 160px;
+  --matchup-gap: 40px;
+}
+
 h1, h2, h3 {
   font-family: 'Bebas Neue', cursive;
 }
@@ -122,13 +127,28 @@ h1, h2, h3 {
   align-items: center;
 }
 
+.round.semifinals .matchup-wrapper:first-child,
+.round.final .matchup-wrapper:first-child {
+  margin-top: calc(var(--matchup-height) / 2 + var(--matchup-gap) / 2);
+}
+
+.matchup-wrapper {
+  height: var(--matchup-height);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.round .matchup-wrapper:not(:last-child) {
+  margin-bottom: var(--matchup-gap);
+}
+
 .matchup {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   padding: 10px;
-  margin-bottom: 40px;
   position: relative;
   border: 2px solid transparent;
 }
