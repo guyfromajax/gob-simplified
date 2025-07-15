@@ -5,8 +5,8 @@ body {
 }
 
 :root {
-  --matchup-height: 160px;
-  --matchup-gap: 40px;
+  --matchup-height: 100px;
+  --matchup-gap: 20px;
 }
 
 h1, h2, h3 {
@@ -127,9 +127,19 @@ h1, h2, h3 {
   align-items: center;
 }
 
-.round.semifinals .matchup-wrapper:first-child,
-.round.final .matchup-wrapper {
-  margin-top: calc(var(--matchup-height) + var(--matchup-gap));
+.round.semifinals .matchup-wrapper:first-child {
+  margin-top: calc((var(--matchup-height) + var(--matchup-gap)) / 2);
+}
+
+.round.final {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  height: 100%;
+}
+
+.round.final .spacer {
+  flex: 1;
 }
 
 .matchup-wrapper {
@@ -154,7 +164,7 @@ h1, h2, h3 {
 }
 
 .matchup img {
-  width: 80px;
+  width: 160px;
   height: auto;
   margin: 4px 0;
 }
