@@ -9,6 +9,8 @@
 </head>
 <body>
 
+  <div id="tournament-container">
+
   <div id="tournament-top">
     <div id="top-left">
       <img src="images/homepage-logos/Bentley-Truman.png" alt="Bentley-Truman Logo" class="team-logo">
@@ -47,6 +49,7 @@
       <button data-tab="leaders-tab">Leaders</button>
     </div>
     <div id="bracket-tab" class="tab-content active">
+      <div class="scroll-x">
       <div id="bracket" class="bracket">
         <div class="round quarterfinals">
           <div class="matchup-wrapper">
@@ -390,6 +393,8 @@
       </div>
     </div>
   </div>
+
+  </div> <!-- end tournament-container -->
 
   <script>
     const tabButtons = document.querySelectorAll('.tab-buttons button');
