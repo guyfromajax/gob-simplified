@@ -131,6 +131,10 @@ h1, h2, h3 {
   margin-top: calc((var(--matchup-height) + var(--matchup-gap)) / 2);
 }
 
+.round.semifinals .matchup-wrapper:nth-child(2) {
+  margin-top: calc(var(--matchup-height) + var(--matchup-gap));
+}
+
 .round.final {
   display: flex;
   flex-direction: column;
@@ -164,8 +168,9 @@ h1, h2, h3 {
 }
 
 .matchup img {
-  width: 160px;
+  width: 128px;
   height: auto;
+  object-fit: contain;
   margin: 4px 0;
 }
 
