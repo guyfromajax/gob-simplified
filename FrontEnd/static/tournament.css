@@ -128,8 +128,8 @@ h1, h2, h3 {
 }
 
 .round.semifinals .matchup-wrapper:first-child,
-.round.final .matchup-wrapper:first-child {
-  margin-top: calc(var(--matchup-height) / 2 + var(--matchup-gap) / 2);
+.round.final .matchup-wrapper {
+  margin-top: calc(var(--matchup-height) + var(--matchup-gap));
 }
 
 .matchup-wrapper {
