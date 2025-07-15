@@ -9,8 +9,13 @@ body {
   --matchup-gap: 20px;
 }
 
-h1, h2, h3 {
+h1, h2, h3, h4, h5, h6 {
   font-family: 'Bebas Neue', cursive;
+}
+
+#tournament-container {
+  max-width: 1200px;
+  margin: 0 auto;
 }
 
 #tournament-top {
@@ -102,6 +107,10 @@ h1, h2, h3 {
   cursor: pointer;
 }
 
+.tab-buttons button:hover {
+  background-color: #f0f0f0;
+}
+
 .tab-buttons button.active {
   border-bottom: 2px solid #333;
 }
@@ -119,6 +128,7 @@ h1, h2, h3 {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 20px;
+  min-width: 900px;
 }
 
 .round {
@@ -220,6 +230,7 @@ h1, h2, h3 {
 .scroll-x {
   overflow-x: auto;
   white-space: nowrap;
+  width: 100%;
 }
 
 table.roster-table,
@@ -263,4 +274,20 @@ table.stats-table tbody tr:nth-child(odd) {
 
 table.leaders-table tbody tr:nth-child(odd) {
   background-color: #f9f9f9;
+}
+
+@media (max-width: 768px) {
+  :root {
+    --matchup-height: 80px;
+    --matchup-gap: 10px;
+  }
+
+  #tournament-top {
+    grid-template-columns: 1fr;
+    text-align: center;
+  }
+
+  .coach-info img {
+    width: 60px;
+  }
 }
