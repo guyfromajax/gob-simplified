@@ -97,10 +97,86 @@ h1, h2, h3 {
   cursor: pointer;
 }
 
+.tab-buttons button.active {
+  border-bottom: 2px solid #333;
+}
+
 .tab-content {
   display: none;
 }
 
 .tab-content.active {
   display: block;
+}
+
+/* --- Bracket Layout --- */
+.bracket {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+
+.round {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.matchup {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 10px;
+  margin-bottom: 40px;
+  position: relative;
+  border: 2px solid transparent;
+}
+
+.matchup img {
+  width: 80px;
+  height: auto;
+  margin: 4px 0;
+}
+
+/* Connector line to next round */
+.round:not(.final) .matchup::after {
+  content: "";
+  position: absolute;
+  right: -20px;
+  top: 50%;
+  width: 20px;
+  height: 2px;
+  background: #999;
+}
+
+/* --- Bracket State Styles --- */
+.winner {
+  outline: 3px solid #00e676;
+}
+
+@keyframes pulse-yellow {
+  0% { outline-color: #ffeb3b; }
+  50% { outline-color: #fff176; }
+  100% { outline-color: #ffeb3b; }
+}
+
+.upcoming {
+  animation: pulse-yellow 1s infinite;
+  outline: 3px solid #ffeb3b;
+}
+
+@keyframes pulse-green {
+  0% { outline-color: #00e676; }
+  50% { outline-color: #69f0ae; }
+  100% { outline-color: #00e676; }
+}
+
+.champion.won {
+  animation: pulse-green 1s infinite;
+  outline: 3px solid #00e676;
+}
+
+.champion {
+  outline: 3px solid #00e676;
 }
