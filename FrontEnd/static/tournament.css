@@ -25,6 +25,8 @@ h1, h2, h3, h4, h5, h6 {
   gap: 10px;
   padding: 20px;
   margin-bottom: 20px;
+  position: relative;
+  z-index: 1;
 }
 
 #top-left {
@@ -118,9 +120,10 @@ h1, h2, h3, h4, h5, h6 {
 
 .tab-content {
   display: none;
-  min-height: 200px;             /* Ensures space is reserved even when empty */
-  background: #ffffff;           /* Adds contrast in case parent bg is also white */
-  padding: 10px 0;               /* Optional: gives spacing buffer */
+  min-height: 300px;
+  padding: 10px 0;
+  background-color: white;
+  overflow: hidden;
 }
 
 .tab-content.active {
