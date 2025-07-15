@@ -1,6 +1,13 @@
 // Placeholder data for Tournament Mode
 const userTeamId = "BENTLEY-TRUMAN";
 
+// Map team names to actual logo filenames when they do not
+// follow the standard <Team>-Horizontal.svg format
+const logoMap = {
+  "Ocean": "Ocean-Horizontal (1).svg",
+  "Xavien": "Xavien-Horizontal (1).svg"
+};
+
 const bracketData = [
   { round: 1, matchups: [
       { teamA: "Bently", teamB: "Corners", winner: "Bently" },
@@ -51,13 +58,19 @@ function renderBracket() {
       const matchup = document.createElement("div");
       matchup.className = "matchup";
       if (m.champion) matchup.classList.add("champion");
-      if (m.winner) matchup.classList.add("winner");
-      if (m.upcoming) matchup.classList.add("upcoming");
 
       const imgA = document.createElement("img");
-      imgA.src = `images/bracket-logos/${m.teamA}-Horizontal.svg`;
+      imgA.src = `images/bracket-logos/${logoMap[m.teamA] || `${m.teamA}-Horizontal.svg`}`;
       const imgB = document.createElement("img");
-      imgB.src = `images/bracket-logos/${m.teamB}-Horizontal.svg`;
+      imgB.src = `images/bracket-logos/${logoMap[m.teamB] || `${m.teamB}-Horizontal.svg`}`;
+
+      if (m.winner === m.teamA) imgA.classList.add("winner");
+      if (m.winner === m.teamB) imgB.classList.add("winner");
+      if (m.upcoming) {
+        imgA.classList.add("upcoming");
+        imgB.classList.add("upcoming");
+      }
+
       matchup.appendChild(imgA);
       matchup.appendChild(imgB);
       wrap.appendChild(matchup);
@@ -127,4 +140,14 @@ document.addEventListener("DOMContentLoaded", () => {
   renderRoster();
   renderStats();
   renderLeaderboards();
+
+  const tbody = document.querySelector('#team-tab table.roster-table tbody');
+  const testRow = `
+    <tr>
+      <td>Test Player</td>
+      <td>80</td><td>75</td><td>70</td><td>72</td><td>68</td>
+      <td>74</td><td>65</td><td>60</td><td>78</td><td>70</td>
+      <td>85</td><td>76</td>
+    </tr>`;
+  tbody.innerHTML += testRow;
 });
