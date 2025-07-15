@@ -200,3 +200,32 @@ h1, h2, h3 {
 .champion {
   outline: 3px solid #00e676;
 }
+
+/* --- Team Tab Tables --- */
+.scroll-x {
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+table.roster-table,
+table.stats-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: 'Inter', sans-serif;
+  min-width: 800px;
+}
+
+table.roster-table th,
+table.roster-table td,
+table.stats-table th,
+table.stats-table td {
+  border: 1px solid #ccc;
+  padding: 4px 6px;
+  text-align: center;
+  font-size: 14px;
+}
+
+table.roster-table tbody tr:nth-child(odd),
+table.stats-table tbody tr:nth-child(odd) {
+  background-color: #f9f9f9;
+}
