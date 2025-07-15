@@ -230,6 +230,14 @@ table.stats-table {
   min-width: 800px;
 }
 
+/* Leaderboard tables share the same base styling */
+table.leaders-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: 'Inter', sans-serif;
+  min-width: 600px;
+}
+
 table.roster-table th,
 table.roster-table td,
 table.stats-table th,
@@ -240,7 +248,19 @@ table.stats-table td {
   font-size: 14px;
 }
 
+table.leaders-table th,
+table.leaders-table td {
+  border: 1px solid #ccc;
+  padding: 4px 6px;
+  text-align: center;
+  font-size: 14px;
+}
+
 table.roster-table tbody tr:nth-child(odd),
 table.stats-table tbody tr:nth-child(odd) {
+  background-color: #f9f9f9;
+}
+
+table.leaders-table tbody tr:nth-child(odd) {
   background-color: #f9f9f9;
 }
