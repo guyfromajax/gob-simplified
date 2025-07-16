@@ -1,39 +1,20 @@
-// Placeholder data for Tournament Mode
 const userTeamId = "BENTLEY-TRUMAN";
 
-// Map team names to actual logo filenames when they do not
-// follow the standard <Team>-Horizontal.svg format
+// Map full team names to bracket logo filenames
 const logoMap = {
-  "Ocean": "Ocean-Horizontal (1).svg",
-  "Xavien": "Xavien-Horizontal (1).svg"
+  "Bentley-Truman": "Bently-Horizontal.svg",
+  "Four Corners": "Corners-Horizontal.svg",
+  "Lancaster": "Lancaster-Horizontal.svg",
+  "Little York": "York-Horizontal.svg",
+  "Morristown": "Morristown-Horizontal.svg",
+  "Ocean City": "Ocean-Horizontal (1).svg",
+  "South Lancaster": "South-Horizontal.svg",
+  "Xavien": "Xavien-Horizontal (1).svg",
 };
 
-const bracketData = [
-  { round: 1, matchups: [
-      { teamA: "Bently", teamB: "Corners", winner: "Bently" },
-      { teamA: "Lancaster", teamB: "Morristown", winner: "Lancaster" },
-      { teamA: "Ocean", teamB: "South", upcoming: true },
-      { teamA: "Xavien", teamB: "York" }
-  ]},
-  { round: 2, matchups: [
-      { teamA: "Bently", teamB: "Lancaster" },
-      { teamA: "South", teamB: "York" }
-  ]},
-  { round: 3, matchups: [
-      { teamA: "Bently", teamB: "South", champion: true }
-  ]}
-];
-
-const roster = Array.from({ length: 12 }, (_, i) => ({
-  name: `Player ${i+1}`,
-  SC: 70 + (i % 5), SH: 72 + (i % 5), ID: 68 + (i % 5), OD: 69 + (i % 5),
-  PS: 70 + (i % 5), BH: 71 + (i % 5), RB: 65 + (i % 5), ST: 60 + (i % 5),
-  AG: 75 + (i % 5), ND: 70 + (i % 5), IQ: 80 + (i % 5), FT: 75 + (i % 5)
-}));
-
-const stats = roster.map(p => ({ name: p.name, PTS: 0, FGM: 0, FGA: 0,
-  TPM: 0, TPA: 0, FTM: 0, FTA: 0, REB: 0, AST: 0, STL: 0, BLK: 0,
-  F: 0, MIN: 0, TO: 0 }));
+let tournament = null;
+let roster = [];
+let stats = [];
 
 const leaderBoards = [
   { title: "Points", key: "PTS" },
@@ -46,46 +27,45 @@ const leaderBoards = [
 
 console.log("✅ tournament.js loaded");
 
+function getLogo(teamName) {
+  return `images/bracket-logos/${logoMap[teamName] || `${teamName}-Horizontal.svg`}`;
+}
+
 function renderBracket() {
+  if (!tournament) return;
   const bracket = document.getElementById("bracket");
   bracket.innerHTML = "";
-  bracketData.forEach(round => {
-    const roundDiv = document.createElement("div");
-    roundDiv.className = round.round === 1 ? "round quarterfinals" :
-      round.round === 2 ? "round semifinals" : "round final";
 
-    round.matchups.forEach(m => {
-      const wrap = document.createElement("div");
-      wrap.className = "matchup-wrapper";
-      const matchup = document.createElement("div");
-      matchup.className = "matchup";
-      if (m.champion) matchup.classList.add("champion");
+  const round1 = tournament.bracket?.round1 || [];
+  const roundDiv = document.createElement("div");
+  roundDiv.className = "round quarterfinals";
 
-      const imgA = document.createElement("img");
-      imgA.src = `images/bracket-logos/${logoMap[m.teamA] || `${m.teamA}-Horizontal.svg`}`;
-      const imgB = document.createElement("img");
-      imgB.src = `images/bracket-logos/${logoMap[m.teamB] || `${m.teamB}-Horizontal.svg`}`;
+  round1.forEach(m => {
+    const wrap = document.createElement("div");
+    wrap.className = "matchup-wrapper";
+    const matchup = document.createElement("div");
+    matchup.className = "matchup";
 
-      if (m.winner === m.teamA) imgA.classList.add("winner");
-      if (m.winner === m.teamB) imgB.classList.add("winner");
-      if (m.upcoming) {
-        imgA.classList.add("upcoming");
-        imgB.classList.add("upcoming");
-      }
+    const imgA = document.createElement("img");
+    imgA.src = getLogo(m.home_team);
+    imgA.classList.add("upcoming");
 
-      matchup.appendChild(imgA);
-      matchup.appendChild(imgB);
-      wrap.appendChild(matchup);
-      roundDiv.appendChild(wrap);
-    });
-    bracket.appendChild(roundDiv);
+    const imgB = document.createElement("img");
+    imgB.src = getLogo(m.away_team);
+    imgB.classList.add("upcoming");
+
+    matchup.appendChild(imgA);
+    matchup.appendChild(imgB);
+    wrap.appendChild(matchup);
+    roundDiv.appendChild(wrap);
   });
+
+  bracket.appendChild(roundDiv);
 }
 
 function renderRoster() {
   const tbody = document.getElementById("roster-body");
   console.log("Inside renderRoster");
-  console.log(tbody);
   tbody.innerHTML = "";
   roster.forEach(p => {
     const tr = document.createElement("tr");
@@ -101,7 +81,6 @@ function renderRoster() {
 function renderStats() {
   const tbody = document.getElementById("stats-body");
   console.log("Inside renderStats");
-  console.log(tbody);
   tbody.innerHTML = "";
   stats.forEach(s => {
     const tr = document.createElement("tr");
@@ -141,19 +120,38 @@ function renderLeaderboards() {
   });
 }
 
-document.addEventListener("DOMContentLoaded", () => {
+async function loadTournament() {
+  try {
+    const res = await fetch(`/tournament/active`);
+    tournament = await res.json();
+    console.log("Bracket data arrives", tournament);
+  } catch (err) {
+    console.error("Failed to load tournament", err);
+  }
+}
+
+async function loadRoster() {
+  try {
+    const res = await fetch(`/teams/${userTeamId}/players`);
+    const data = await res.json();
+    console.log("Team player data loads", data);
+    roster = data.players.map(p => Object.assign({ name: p.name }, p.attributes));
+    stats = roster.map(p => ({
+      name: p.name,
+      PTS: 0, FGM: 0, FGA: 0, TPM: 0, TPA: 0,
+      FTM: 0, FTA: 0, REB: 0, AST: 0,
+      STL: 0, BLK: 0, F: 0, MIN: 0, TO: 0,
+    }));
+  } catch (err) {
+    console.error("Failed to load roster", err);
+  }
+}
+
+document.addEventListener("DOMContentLoaded", async () => {
+  await loadTournament();
+  await loadRoster();
   renderBracket();
   renderRoster();
   renderStats();
   renderLeaderboards();
-
-  const tbody = document.querySelector('#team-tab table.roster-table tbody');
-  const testRow = `
-    <tr>
-      <td>Test Player</td>
-      <td>80</td><td>75</td><td>70</td><td>72</td><td>68</td>
-      <td>74</td><td>65</td><td>60</td><td>78</td><td>70</td>
-      <td>85</td><td>76</td>
-    </tr>`;
-  tbody.innerHTML += testRow;
 });
