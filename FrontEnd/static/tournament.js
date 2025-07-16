@@ -37,6 +37,8 @@ const leaderBoards = [
   { title: "Blocks", key: "BLK" }
 ];
 
+console.log("✅ tournament.js loaded");
+
 function renderBracket() {
   const bracket = document.getElementById("bracket");
   bracket.innerHTML = "";
@@ -69,6 +71,8 @@ function renderBracket() {
 
 function renderRoster() {
   const tbody = document.getElementById("roster-body");
+  console.log("Inside renderRoster");
+  console.log(tbody);
   tbody.innerHTML = "";
   roster.forEach(p => {
     const tr = document.createElement("tr");
@@ -83,6 +87,8 @@ function renderRoster() {
 
 function renderStats() {
   const tbody = document.getElementById("stats-body");
+  console.log("Inside renderStats");
+  console.log(tbody);
   tbody.innerHTML = "";
   stats.forEach(s => {
     const tr = document.createElement("tr");
