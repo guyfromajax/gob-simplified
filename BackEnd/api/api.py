@@ -24,6 +24,7 @@ from BackEnd.models.animator import Animator
 from .tournament_routes import router as tournament_router
 import traceback
 from unidecode import unidecode
+from typing import Optional
 
 app = FastAPI()
 app.include_router(tournament_router)
@@ -178,3 +179,38 @@ def get_player(player_id: str):
 
 # for route in app.routes:
 #     print(f"🚀 Registered route: {route.path}")
+
+
+@app.get("/teams/{team_id}/players")
+def get_team_players(team_id: str):
+    """Return roster data for a given team."""
+    team_doc, players = load_roster(team_id)
+    if not players:
+        raise HTTPException(status_code=404, detail=f"No players found for team '{team_id}'")
+
+    display_attributes = ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "AG", "ST", "ND", "IQ", "FT", "NG"]
+    players_data = []
+    for p in players:
+        attributes = p.get("attributes", {})
+        players_data.append({
+            "_id": str(p.get("_id")),
+            "name": f"{p.get('first_name', '')} {p.get('last_name', '')}".strip(),
+            "attributes": {attr: attributes.get(attr, "--") for attr in display_attributes},
+        })
+
+    return {
+        "team": team_doc.get("name", team_id) if team_doc else team_id,
+        "players": players_data,
+    }
+
+
+@app.get("/tournament/active")
+def get_active_tournament(user_team_id: Optional[str] = "BENTLEY-TRUMAN"):
+    """Fetch the most recently created active tournament or create one."""
+    doc = tournaments_collection.find_one({"completed": False}, sort=[("created_at", -1)])
+    if not doc:
+        manager = TournamentManager(user_team_id=user_team_id, tournaments_collection=tournaments_collection)
+        doc = manager.create_tournament()
+    else:
+        doc["_id"] = str(doc["_id"])
+    return doc
