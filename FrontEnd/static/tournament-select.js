@@ -31,7 +31,7 @@ async function selectTeam(team) {
     const tournament = await res.json();
     localStorage.setItem("activeTournament", JSON.stringify(tournament));
     localStorage.setItem("userTeamId", team);
-    window.location.href = "/static/tournament.html";
+    window.location.href = "./tournament.html";
   } catch (err) {
     console.error(err);
     alert("Unable to start tournament");
