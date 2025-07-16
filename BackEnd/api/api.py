@@ -29,6 +29,7 @@ from typing import Optional
 app = FastAPI()
 app.include_router(tournament_router)
 
+
 # app.mount("/", StaticFiles(directory="FrontEnd", html=True), name="static")
 # app.mount("/static", StaticFiles(directory="FrontEnd", html=True), name="static")
 app.mount("/static", StaticFiles(directory="FrontEnd/static"), name="static")
