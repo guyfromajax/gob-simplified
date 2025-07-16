@@ -39,6 +39,11 @@ h1, h2, h3, h4, h5, h6 {
   width: 100px;
   height: auto;
   margin-bottom: 10px;
+  border: 2px solid black;
+}
+
+.team-logo.user-team {
+  border: 3px solid yellow;
 }
 
 .left-info {
