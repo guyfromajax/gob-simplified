@@ -31,14 +31,32 @@ function getLogo(teamName) {
   return `images/bracket-logos/${logoMap[teamName] || `${teamName}-Horizontal.svg`}`;
 }
 
+function addTbdRound(bracketEl, count, cls) {
+  const div = document.createElement("div");
+  div.className = `round ${cls}`;
+  for (let i = 0; i < count; i++) {
+    const wrap = document.createElement("div");
+    wrap.className = "matchup-wrapper";
+    const matchup = document.createElement("div");
+    matchup.className = "matchup";
+    const placeholder = document.createElement("div");
+    placeholder.className = "placeholder";
+    placeholder.textContent = "TBD";
+    matchup.appendChild(placeholder);
+    wrap.appendChild(matchup);
+    div.appendChild(wrap);
+  }
+  bracketEl.appendChild(div);
+}
+
 function renderBracket() {
   if (!tournament) return;
   const bracket = document.getElementById("bracket");
   bracket.innerHTML = "";
 
   const round1 = tournament.bracket?.round1 || [];
-  const roundDiv = document.createElement("div");
-  roundDiv.className = "round quarterfinals";
+  const r1Div = document.createElement("div");
+  r1Div.className = "round quarterfinals";
 
   round1.forEach(m => {
     const wrap = document.createElement("div");
@@ -57,10 +75,14 @@ function renderBracket() {
     matchup.appendChild(imgA);
     matchup.appendChild(imgB);
     wrap.appendChild(matchup);
-    roundDiv.appendChild(wrap);
+    r1Div.appendChild(wrap);
   });
 
-  bracket.appendChild(roundDiv);
+  bracket.appendChild(r1Div);
+
+  const round2Count = Math.ceil(round1.length / 2);
+  addTbdRound(bracket, round2Count, "semifinals");
+  addTbdRound(bracket, 1, "final");
 }
 
 function renderRoster() {
