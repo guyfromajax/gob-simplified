@@ -233,6 +233,18 @@ h1, h2, h3, h4, h5, h6 {
   outline: 3px solid #00e676;
 }
 
+/* Placeholder for TBD rounds */
+.placeholder {
+  width: 128px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #f0f0f0;
+  font-weight: bold;
+  border: 1px dashed #999;
+}
+
 /* --- Team Tab Tables --- */
 .scroll-x {
   display: block;
