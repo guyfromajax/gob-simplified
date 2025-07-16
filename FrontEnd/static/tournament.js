@@ -1,4 +1,29 @@
-const userTeamId = "BENTLEY-TRUMAN";
+let tournament = JSON.parse(localStorage.getItem("activeTournament")) || null;
+const userTeamId = (localStorage.getItem("userTeamId") || "").toUpperCase();
+
+const teamAbbreviations = {
+  "BENTLEY-TRUMAN": "BT",
+  "FOUR CORNERS": "FC",
+  "LANCASTER": "Lan",
+  "LITTLE YORK": "LY",
+  "MORRISTOWN": "Mor",
+  "OCEAN CITY": "OC",
+  "SOUTH LANCASTER": "SL",
+  "XAVIEN": "Xav",
+};
+
+function formatTeamName(name) {
+  if (!name) return "";
+  return name
+    .toLowerCase()
+    .split(" ")
+    .map(w => w.split("-").map(s => s.charAt(0).toUpperCase() + s.slice(1)).join("-"))
+    .join(" ");
+}
+
+function isUserTeam(teamName) {
+  return teamName.toUpperCase() === userTeamId;
+}
 
 // Map full team names to bracket logo filenames
 const logoMap = {
@@ -12,7 +37,9 @@ const logoMap = {
   "Xavien": "Xavien-Horizontal (1).svg",
 };
 
-let tournament = null;
+// tournament is preloaded from localStorage above; will be
+// overwritten if fetched again.
+// let tournament = null; (replaced)
 let roster = [];
 let stats = [];
 
@@ -66,11 +93,13 @@ function renderBracket() {
 
     const imgA = document.createElement("img");
     imgA.src = getLogo(m.home_team);
-    imgA.classList.add("upcoming");
+    imgA.classList.add("team-logo");
+    if (isUserTeam(m.home_team)) imgA.classList.add("user-team");
 
     const imgB = document.createElement("img");
     imgB.src = getLogo(m.away_team);
-    imgB.classList.add("upcoming");
+    imgB.classList.add("team-logo");
+    if (isUserTeam(m.away_team)) imgB.classList.add("user-team");
 
     matchup.appendChild(imgA);
     matchup.appendChild(imgB);
@@ -142,9 +171,23 @@ function renderLeaderboards() {
   });
 }
 
+function initTopAssets() {
+  const formattedTeamName = formatTeamName(userTeamId);
+  const logoEl = document.getElementById("user-team-logo");
+  if (logoEl) {
+    logoEl.src = `images/homepage-logos/${formattedTeamName}.png`;
+  }
+  const abbr = teamAbbreviations[userTeamId] || "";
+  const sammy = document.getElementById("coach-sammy");
+  const mary = document.getElementById("coach-mary");
+  if (sammy) sammy.src = `images/coaches/${abbr}/Sammy-${abbr}.png`;
+  if (mary) mary.src = `images/coaches/${abbr}/Mary-${abbr}.png`;
+}
+
 async function loadTournament() {
+  if (tournament) return;
   try {
-    const res = await fetch(`/tournament/active`);
+    const res = await fetch(`/tournament/active?user_team_id=${encodeURIComponent(userTeamId)}`);
     tournament = await res.json();
     console.log("Bracket data arrives", tournament);
   } catch (err) {
@@ -154,7 +197,7 @@ async function loadTournament() {
 
 async function loadRoster() {
   try {
-    const res = await fetch(`/teams/${userTeamId}/players`);
+    const res = await fetch(`/teams/${encodeURIComponent(formatTeamName(userTeamId))}/players`);
     const data = await res.json();
     console.log("Team player data loads", data);
     roster = data.players.map(p => Object.assign({ name: p.name }, p.attributes));
@@ -170,6 +213,7 @@ async function loadRoster() {
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
+  initTopAssets();
   await loadTournament();
   await loadRoster();
   renderBracket();
