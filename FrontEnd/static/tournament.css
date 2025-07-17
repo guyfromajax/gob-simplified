@@ -145,9 +145,9 @@ h1, h2, h3, h4, h5, h6 {
 /* --- Bracket Layout --- */
 .bracket {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 20px;
-  min-width: 900px;
+  min-width: 1100px;
 }
 
 /* extra spacing so the top-most logo isn't clipped and all matchups fit */
@@ -217,13 +217,24 @@ h1, h2, h3, h4, h5, h6 {
 
 /* Connector line to next round */
 .round:not(.final) .matchup::after {
-  content: "";
-  position: absolute;
-  right: -20px;
-  top: 50%;
-  width: 20px;
-  height: 2px;
-  background: #999;
+  display: none;
+}
+
+.team-entry {
+  display: flex;
+  align-items: center;
+}
+
+.seed-label {
+  font-weight: bold;
+}
+
+.seed-left {
+  margin-right: 6px;
+}
+
+.seed-right {
+  margin-left: 6px;
 }
 
 /* --- Bracket State Styles --- */
