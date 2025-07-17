@@ -177,10 +177,10 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .round.final {
+  min-height: 600px;  /* Matches other columns */
   display: flex;
   flex-direction: column;
   justify-content: center;
-  height: 100%;
 }
 
 .round.final .spacer {

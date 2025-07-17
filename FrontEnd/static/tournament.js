@@ -142,9 +142,17 @@ function renderBracket() {
 
   const leftR1 = document.createElement("div");
   leftR1.className = "round round-1 quarterfinals";
-  [round1[0], round1[1]].forEach(m => {
-    leftR1.appendChild(createMatchup(m, "left"));
-  });
+
+  leftR1.appendChild(createMatchup(round1[0], "left"));
+
+  // ✨ Insert vertical spacer between matchups
+  const leftSpacer = document.createElement("div");
+  leftSpacer.style.height = "40px";
+  leftSpacer.className = "bracket-spacer";
+  leftR1.appendChild(leftSpacer);
+
+  leftR1.appendChild(createMatchup(round1[1], "left"));
+
 
   const leftSemi = document.createElement("div");
   leftSemi.className = "round round-2 semifinals";
@@ -160,9 +168,16 @@ function renderBracket() {
 
   const rightR1 = document.createElement("div");
   rightR1.className = "round round-5 quarterfinals";
-  [round1[2], round1[3]].forEach(m => {
-    rightR1.appendChild(createMatchup(m, "right"));
-  });
+
+  rightR1.appendChild(createMatchup(round1[2], "right"));
+
+  const rightSpacer = document.createElement("div");
+  rightSpacer.style.height = "40px";
+  rightSpacer.className = "bracket-spacer";
+  rightR1.appendChild(rightSpacer);
+
+  rightR1.appendChild(createMatchup(round1[3], "right"));
+
 
 
   bracket.appendChild(leftR1);
