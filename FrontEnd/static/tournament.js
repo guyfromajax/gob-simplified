@@ -141,28 +141,29 @@ function renderBracket() {
   }
 
   const leftR1 = document.createElement("div");
-  leftR1.className = "round quarterfinals";
+  leftR1.className = "round round-1 quarterfinals";
   [round1[0], round1[1]].forEach(m => {
     leftR1.appendChild(createMatchup(m, "left"));
   });
 
   const leftSemi = document.createElement("div");
-  leftSemi.className = "round semifinals";
+  leftSemi.className = "round round-2 semifinals";
   leftSemi.appendChild(createPlaceholder());
 
   const final = document.createElement("div");
-  final.className = "round final";
+  final.className = "round round-3 final";
   final.appendChild(createPlaceholder());
 
   const rightSemi = document.createElement("div");
-  rightSemi.className = "round semifinals";
+  rightSemi.className = "round round-4 semifinals";
   rightSemi.appendChild(createPlaceholder());
 
   const rightR1 = document.createElement("div");
-  rightR1.className = "round quarterfinals";
+  rightR1.className = "round round-5 quarterfinals";
   [round1[2], round1[3]].forEach(m => {
     rightR1.appendChild(createMatchup(m, "right"));
   });
+
 
   bracket.appendChild(leftR1);
   bracket.appendChild(leftSemi);
