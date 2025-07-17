@@ -150,10 +150,18 @@ h1, h2, h3, h4, h5, h6 {
   min-width: 1100px;
 }
 
+/* ensure each round occupies its own grid column */
+.bracket .round:nth-child(1) { grid-column: 1; }
+.bracket .round:nth-child(2) { grid-column: 2; }
+.bracket .round:nth-child(3) { grid-column: 3; }
+.bracket .round:nth-child(4) { grid-column: 4; }
+.bracket .round:nth-child(5) { grid-column: 5; }
+
 /* extra spacing so the top-most logo isn't clipped and all matchups fit */
 #bracket {
-  padding-top: 16px;
-  min-height: 520px;
+  padding-top: 32px;
+  padding-bottom: 32px;
+  min-height: 600px;
 }
 
 .round {
@@ -162,12 +170,8 @@ h1, h2, h3, h4, h5, h6 {
   align-items: center;
 }
 
-.round.semifinals .matchup-wrapper:first-child {
-  margin-top: calc((var(--matchup-height) + var(--matchup-gap)) / 2);
-}
-
-.round.semifinals .matchup-wrapper:nth-child(2) {
-  margin-top: calc(var(--matchup-height) + var(--matchup-gap));
+.round.semifinals .matchup-wrapper {
+  margin-top: calc(var(--matchup-height) / 2 + var(--matchup-gap) / 2);
 }
 
 .round.final {
