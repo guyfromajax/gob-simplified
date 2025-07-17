@@ -142,15 +142,15 @@ h1, h2, h3, h4, h5, h6 {
   display: block;
 }
 
-/* --- Bracket Layout --- */
 .bracket {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   align-content: stretch;
   grid-template-rows: 1fr;
   gap: 20px;
+  align-items: stretch;            /* ✅ Force columns to fill the tallest column */
   min-width: 1100px;
-  height: 640px; /* New: match total visual height of columns with 2 matchups + spacing */
+  min-height: 640px;               /* ✅ Sets height for entire bracket */
 }
 
 .round-1 { grid-column: 1; }
@@ -187,18 +187,29 @@ h1, h2, h3, h4, h5, h6 {
   justify-content: center;
 }
 
-.round.round-2,
+/* .round.round-2,
 .round.round-3,
 .round.round-4 {
   display: flex;
   flex-direction: column;
   justify-content: center;
   height: 100%;
-}
+} */
 
 .round.final .spacer {
   flex: 1;
 }
+
+.round.round-2,
+.round.round-3,
+.round.round-4 {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-self: stretch;     /* ✅ Let the .round fill grid row vertically */
+  height: 100%;            /* ✅ Full height inside grid column */
+}
+
 
 .matchup-wrapper {
   height: var(--matchup-height);
