@@ -168,7 +168,7 @@ h1, h2, h3, h4, h5, h6 {
   display: flex;
   flex-direction: column;
   align-items: center;
-  outline: 1px dashed red; /* ✅ DEBUG ONLY */
+  /* outline: 1px dashed red; ✅ DEBUG ONLY */
 }
 
 
@@ -182,6 +182,16 @@ h1, h2, h3, h4, h5, h6 {
   flex-direction: column;
   justify-content: center;
 }
+
+.round.round-2,
+.round.round-3,
+.round.round-4 {
+  min-height: 600px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
 
 .round.final .spacer {
   flex: 1;

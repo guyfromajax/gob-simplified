@@ -55,7 +55,8 @@ const leaderBoards = [
 console.log("✅ tournament.js loaded");
 
 function getLogo(teamName) {
-  return `images/bracket-logos/${logoMap[teamName] || `${teamName}-Horizontal.svg`}`;
+  const formatted = formatTeamName(teamName);
+  return `images/homepage-logos/${formatted}.png`;
 }
 
 function addTbdRound(bracketEl, count, cls) {
