@@ -93,12 +93,12 @@ function renderBracket() {
 
     const imgA = document.createElement("img");
     imgA.src = getLogo(m.home_team);
-    imgA.classList.add("team-logo");
+    imgA.classList.add("team-logo", "bracket-logo");
     if (isUserTeam(m.home_team)) imgA.classList.add("user-team");
 
     const imgB = document.createElement("img");
     imgB.src = getLogo(m.away_team);
-    imgB.classList.add("team-logo");
+    imgB.classList.add("team-logo", "bracket-logo");
     if (isUserTeam(m.away_team)) imgB.classList.add("user-team");
 
     matchup.appendChild(imgA);
