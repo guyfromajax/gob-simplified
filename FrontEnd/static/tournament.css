@@ -46,6 +46,13 @@ h1, h2, h3, h4, h5, h6 {
   border: 3px solid yellow;
 }
 
+/* Remove border from the logo displayed in the top-left user info box */
+#user-team-logo {
+  border: none;
+  box-shadow: none;
+  background: none;
+}
+
 .left-info {
   display: flex;
   width: 100%;
@@ -143,6 +150,12 @@ h1, h2, h3, h4, h5, h6 {
   min-width: 900px;
 }
 
+/* extra spacing so the top-most logo isn't clipped and all matchups fit */
+#bracket {
+  padding-top: 16px;
+  min-height: 520px;
+}
+
 .round {
   display: flex;
   flex-direction: column;
@@ -194,6 +207,12 @@ h1, h2, h3, h4, h5, h6 {
   height: auto;
   object-fit: contain;
   margin: 4px 0;
+}
+
+/* Consistent sizing for team logos in the bracket */
+.bracket-logo {
+  height: 48px;
+  width: auto;
 }
 
 /* Connector line to next round */
