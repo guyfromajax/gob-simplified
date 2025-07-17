@@ -82,36 +82,93 @@ function renderBracket() {
   bracket.innerHTML = "";
 
   const round1 = tournament.bracket?.round1 || [];
-  const r1Div = document.createElement("div");
-  r1Div.className = "round quarterfinals";
 
-  round1.forEach(m => {
+  const seedMap = {};
+  if (round1.length === 4) {
+    seedMap[round1[0].home_team] = 1;
+    seedMap[round1[0].away_team] = 8;
+    seedMap[round1[1].home_team] = 4;
+    seedMap[round1[1].away_team] = 5;
+    seedMap[round1[2].home_team] = 2;
+    seedMap[round1[2].away_team] = 7;
+    seedMap[round1[3].home_team] = 3;
+    seedMap[round1[3].away_team] = 6;
+  }
+
+  function createTeamEntry(team, side) {
+    const div = document.createElement("div");
+    div.className = "team-entry";
+    const label = document.createElement("span");
+    label.className = `seed-label ${side === "left" ? "seed-left" : "seed-right"}`;
+    label.textContent = `#${seedMap[team]}`;
+    const img = document.createElement("img");
+    img.src = getLogo(team);
+    img.classList.add("team-logo", "bracket-logo");
+    if (isUserTeam(team)) img.classList.add("user-team");
+    if (side === "left") {
+      div.appendChild(label);
+      div.appendChild(img);
+    } else {
+      div.appendChild(img);
+      div.appendChild(label);
+    }
+    return div;
+  }
+
+  function createMatchup(m, side) {
     const wrap = document.createElement("div");
     wrap.className = "matchup-wrapper";
     const matchup = document.createElement("div");
     matchup.className = "matchup";
 
-    const imgA = document.createElement("img");
-    imgA.src = getLogo(m.home_team);
-    imgA.classList.add("team-logo", "bracket-logo");
-    if (isUserTeam(m.home_team)) imgA.classList.add("user-team");
-
-    const imgB = document.createElement("img");
-    imgB.src = getLogo(m.away_team);
-    imgB.classList.add("team-logo", "bracket-logo");
-    if (isUserTeam(m.away_team)) imgB.classList.add("user-team");
-
-    matchup.appendChild(imgA);
-    matchup.appendChild(imgB);
+    matchup.appendChild(createTeamEntry(m.home_team, side));
+    matchup.appendChild(createTeamEntry(m.away_team, side));
     wrap.appendChild(matchup);
-    r1Div.appendChild(wrap);
+    return wrap;
+  }
+
+  function createPlaceholder() {
+    const wrap = document.createElement("div");
+    wrap.className = "matchup-wrapper";
+    const matchup = document.createElement("div");
+    matchup.className = "matchup";
+    const placeholder = document.createElement("div");
+    placeholder.className = "placeholder";
+    placeholder.textContent = "TBD";
+    matchup.appendChild(placeholder);
+    wrap.appendChild(matchup);
+    return wrap;
+  }
+
+  const leftR1 = document.createElement("div");
+  leftR1.className = "round quarterfinals";
+  [round1[0], round1[1]].forEach(m => {
+    leftR1.appendChild(createMatchup(m, "left"));
   });
 
-  bracket.appendChild(r1Div);
+  const leftSemi = document.createElement("div");
+  leftSemi.className = "round semifinals";
+  leftSemi.appendChild(createPlaceholder());
 
-  const round2Count = Math.ceil(round1.length / 2);
-  addTbdRound(bracket, round2Count, "semifinals");
-  addTbdRound(bracket, 1, "final");
+  const final = document.createElement("div");
+  final.className = "round final";
+  final.appendChild(createPlaceholder());
+
+  const rightSemi = document.createElement("div");
+  rightSemi.className = "round semifinals";
+  rightSemi.appendChild(createPlaceholder());
+
+  const rightR1 = document.createElement("div");
+  rightR1.className = "round quarterfinals";
+  [round1[2], round1[3]].forEach(m => {
+    rightR1.appendChild(createMatchup(m, "right"));
+  });
+
+  bracket.appendChild(leftR1);
+  bracket.appendChild(leftSemi);
+  bracket.appendChild(final);
+  bracket.appendChild(rightSemi);
+  bracket.appendChild(rightR1);
 }
 
 function renderRoster() {
