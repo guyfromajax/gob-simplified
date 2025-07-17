@@ -186,10 +186,7 @@ h1, h2, h3, h4, h5, h6 {
 .round.round-2,
 .round.round-3,
 .round.round-4 {
-  min-height: 600px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
+  padding-top: 140px; /* tweak this to match first round visual spacing */
 }
 /* added a comment */
 
