@@ -145,12 +145,10 @@ h1, h2, h3, h4, h5, h6 {
 .bracket {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
-  align-content: stretch;
-  grid-template-rows: 1fr;
+  grid-template-rows: 1fr;           /* ✅ Define a single row */
   gap: 20px;
-  align-items: stretch;            /* ✅ Force columns to fill the tallest column */
   min-width: 1100px;
-  min-height: 640px;               /* ✅ Sets height for entire bracket */
+  min-height: 640px;
 }
 
 .round-1 { grid-column: 1; }
@@ -171,8 +169,8 @@ h1, h2, h3, h4, h5, h6 {
   display: flex;
   flex-direction: column;
   align-items: center;
-  height: 100%;
-  /* outline: 1px dashed red; ✅ DEBUG ONLY */
+  justify-content: center;
+  grid-row: 1 / -1;                  /* ✅ Force each .round to span the full grid row */
 }
 
 
@@ -187,28 +185,19 @@ h1, h2, h3, h4, h5, h6 {
   justify-content: center;
 }
 
+.round.final .spacer {
+  flex: 1;
+}
+
 /* .round.round-2,
 .round.round-3,
 .round.round-4 {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  height: 100%;
-} */
-
-.round.final .spacer {
-  flex: 1;
-}
-
-.round.round-2,
-.round.round-3,
-.round.round-4 {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
   align-self: stretch;     /* ✅ Let the .round fill grid row vertically */
-  height: 100%;            /* ✅ Full height inside grid column */
-}
+  /* height: 100%;            /* ✅ Full height inside grid column */
+/* } */ */ */
 
 
 .matchup-wrapper {
