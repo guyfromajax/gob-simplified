@@ -23,6 +23,7 @@ from fastapi.staticfiles import StaticFiles
 from BackEnd.models.animator import Animator   
 from .tournament_routes import router as tournament_router
 from .training_routes import router as training_router
+from .franchise_routes import router as franchise_router
 import traceback
 from unidecode import unidecode
 from typing import Optional
@@ -30,6 +31,7 @@ from typing import Optional
 app = FastAPI()
 app.include_router(tournament_router)
 app.include_router(training_router)
+app.include_router(franchise_router)
 
 
 # app.mount("/", StaticFiles(directory="FrontEnd", html=True), name="static")
