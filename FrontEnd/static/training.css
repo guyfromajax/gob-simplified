@@ -70,3 +70,46 @@ body.dark-mode .category {
   background: #333;
   border-color: #555;
 }
+
+.main-button {
+  font-family: 'Bebas Neue', cursive;
+  font-size: 24px;
+  background: #ff9800;
+  color: #fff;
+  border: none;
+  padding: 12px 30px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: transform 0.1s;
+}
+
+.main-button:hover:not([disabled]) {
+  transform: scale(1.05);
+}
+
+.main-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+#results-list {
+  list-style: none;
+  padding: 0;
+  max-width: 600px;
+  margin: 20px auto;
+}
+
+#results-list li {
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 8px 12px;
+  margin-bottom: 8px;
+  font-family: 'Bebas Neue', cursive;
+  color: #ff5722;
+}
+
+body.dark-mode #results-list li {
+  background: #333;
+  border-color: #555;
+}
