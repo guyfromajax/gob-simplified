@@ -30,6 +30,8 @@ class TrainingManager:
 
     def load_team_and_players(self):
         self.team_doc = teams_collection.find_one({"name": self.team_name})
+        print(self.team_doc)
+        print(self.team_nam)
         if not self.team_doc:
             raise ValueError(f"❌ No team found with name {self.team_name}")
 
