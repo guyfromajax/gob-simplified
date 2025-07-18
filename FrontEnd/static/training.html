@@ -201,6 +201,7 @@
   }
 
   function showResults(data) {
+    console.log('Training response:', data);
     document.getElementById('training-grid').style.display = 'none';
     document.getElementById('points-remaining').style.display = 'none';
     document.getElementById('training-header').style.display = 'none';
@@ -216,27 +217,29 @@
 
     const traitOrder = ['SH','SC','ID','OD','PS','BH','RB','AG','ST','ND','IQ','FT'];
 
-    if (data.player_logs) {
+    if (data && typeof data.player_logs === 'object') {
       Object.entries(data.player_logs).forEach(([name, traits]) => {
-        const section = document.createElement('div');
-        section.className = 'player-section';
+        const row = document.createElement('p');
+        const bold = document.createElement('strong');
+        bold.textContent = name + ': ';
+        row.appendChild(bold);
 
-        const header = document.createElement('h2');
-        header.textContent = name;
-        section.appendChild(header);
-
-        const line = document.createElement('pre');
         const parts = traitOrder.map(attr => {
-          const val = traits.hasOwnProperty(attr) ? traits[attr] : 0;
+          const val = Object.hasOwn(traits, attr) ? traits[attr] : 0;
           const sign = val > 0 ? '+' : '';
           return `${attr} ${sign}${val}`;
         });
-        line.textContent = parts.join(', ');
-        section.appendChild(line);
 
-        resultsDiv.appendChild(section);
+        row.appendChild(document.createTextNode(parts.join(', ')));
+        resultsDiv.appendChild(row);
       });
-    } else if (Array.isArray(data)) {
+    } else {
+      const err = document.createElement('p');
+      err.textContent = 'Unable to display player training results.';
+      resultsDiv.appendChild(err);
+    }
+
+    if (Array.isArray(data)) {
       const ul = document.createElement('ul');
       ul.id = 'results-list';
       data.forEach(line => {
@@ -256,22 +259,21 @@
       resultsDiv.appendChild(ul);
     }
 
-    if (data.team_log) {
-      const teamDiv = document.createElement('div');
-      teamDiv.id = 'team-attributes';
-
-      const teamHeader = document.createElement('h2');
-      teamHeader.textContent = 'Team Attributes';
-      teamDiv.appendChild(teamHeader);
+    if (data && typeof data.team_log === 'object') {
+      const header = document.createElement('h2');
+      header.textContent = 'Team Attributes';
+      resultsDiv.appendChild(header);
 
       Object.entries(data.team_log).forEach(([attr, delta]) => {
-        const row = document.createElement('pre');
+        const row = document.createElement('p');
         const sign = delta > 0 ? '+' : '';
         row.textContent = `${attr} ${sign}${delta}`;
-        teamDiv.appendChild(row);
+        resultsDiv.appendChild(row);
       });
-
-      resultsDiv.appendChild(teamDiv);
+    } else {
+      const err = document.createElement('p');
+      err.textContent = 'Team attribute data unavailable.';
+      resultsDiv.appendChild(err);
     }
 
     const btnWrap = document.createElement('div');
