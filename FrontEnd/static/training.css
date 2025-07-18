@@ -113,3 +113,54 @@ body.dark-mode #results-list li {
   background: #333;
   border-color: #555;
 }
+
+.player-section {
+  margin-bottom: 20px;
+  border-bottom: 1px solid #ddd;
+  padding-bottom: 10px;
+}
+
+.player-section:last-child {
+  border-bottom: none;
+}
+
+.player-section h2 {
+  font-family: 'Bebas Neue', cursive;
+  margin: 0 0 5px;
+}
+
+.player-section pre {
+  font-family: 'Courier New', monospace;
+  background: #f5f5f5;
+  padding: 4px 8px;
+  border-radius: 4px;
+  display: inline-block;
+  margin: 0;
+}
+
+body.dark-mode .player-section {
+  border-color: #555;
+}
+
+body.dark-mode .player-section pre {
+  background: #333;
+  color: #eee;
+}
+
+#team-attributes {
+  margin-top: 30px;
+}
+
+#team-attributes pre {
+  font-family: 'Courier New', monospace;
+  background: #f5f5f5;
+  padding: 4px 8px;
+  border-radius: 4px;
+  display: inline-block;
+  margin: 0 0 5px 0;
+}
+
+body.dark-mode #team-attributes pre {
+  background: #333;
+  color: #eee;
+}

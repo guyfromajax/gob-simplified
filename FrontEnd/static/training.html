@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="./training.css">
 </head>
 <body>
-  <h1>Training Allocation</h1>
+  <h1 id="training-header">Training Allocation</h1>
   <div id="points-remaining">Points Remaining: <span id="remaining">24</span></div>
 
   <div id="training-grid">
@@ -192,7 +192,7 @@
         body: JSON.stringify(payload)
       });
       const data = await res.json();
-      showResults(data.log || []);
+      showResults(data);
     } catch (err) {
       console.error('Failed to run training', err);
       runBtn.textContent = 'Run Training';
@@ -200,25 +200,80 @@
     }
   }
 
-  function showResults(log) {
+  function showResults(data) {
     document.getElementById('training-grid').style.display = 'none';
     document.getElementById('points-remaining').style.display = 'none';
+    document.getElementById('training-header').style.display = 'none';
     runBtn.style.display = 'none';
     document.getElementById('toggle-mode').style.display = 'none';
 
     const resultsDiv = document.getElementById('results');
+    resultsDiv.innerHTML = '';
     resultsDiv.style.display = 'block';
     const title = document.createElement('h1');
     title.textContent = 'Training Results';
     resultsDiv.appendChild(title);
-    const ul = document.createElement('ul');
-    ul.id = 'results-list';
-    log.forEach(line => {
-      const li = document.createElement('li');
-      li.textContent = line;
-      ul.appendChild(li);
-    });
-    resultsDiv.appendChild(ul);
+
+    const traitOrder = ['SH','SC','ID','OD','PS','BH','RB','AG','ST','ND','IQ','FT'];
+
+    if (data.player_logs) {
+      Object.entries(data.player_logs).forEach(([name, traits]) => {
+        const section = document.createElement('div');
+        section.className = 'player-section';
+
+        const header = document.createElement('h2');
+        header.textContent = name;
+        section.appendChild(header);
+
+        const line = document.createElement('pre');
+        const parts = traitOrder.map(attr => {
+          const val = traits.hasOwnProperty(attr) ? traits[attr] : 0;
+          const sign = val > 0 ? '+' : '';
+          return `${attr} ${sign}${val}`;
+        });
+        line.textContent = parts.join(', ');
+        section.appendChild(line);
+
+        resultsDiv.appendChild(section);
+      });
+    } else if (Array.isArray(data)) {
+      const ul = document.createElement('ul');
+      ul.id = 'results-list';
+      data.forEach(line => {
+        const li = document.createElement('li');
+        li.textContent = line;
+        ul.appendChild(li);
+      });
+      resultsDiv.appendChild(ul);
+    } else if (Array.isArray(data.log)) {
+      const ul = document.createElement('ul');
+      ul.id = 'results-list';
+      data.log.forEach(line => {
+        const li = document.createElement('li');
+        li.textContent = line;
+        ul.appendChild(li);
+      });
+      resultsDiv.appendChild(ul);
+    }
+
+    if (data.team_log) {
+      const teamDiv = document.createElement('div');
+      teamDiv.id = 'team-attributes';
+
+      const teamHeader = document.createElement('h2');
+      teamHeader.textContent = 'Team Attributes';
+      teamDiv.appendChild(teamHeader);
+
+      Object.entries(data.team_log).forEach(([attr, delta]) => {
+        const row = document.createElement('pre');
+        const sign = delta > 0 ? '+' : '';
+        row.textContent = `${attr} ${sign}${delta}`;
+        teamDiv.appendChild(row);
+      });
+
+      resultsDiv.appendChild(teamDiv);
+    }
+
     const btnWrap = document.createElement('div');
     btnWrap.style.textAlign = 'center';
     btnWrap.style.marginTop = '20px';
