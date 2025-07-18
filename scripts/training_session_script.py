@@ -1,4 +1,8 @@
-from models.training_manager import TrainingManager, TrainingCategory
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+
+from BackEnd.models.training_manager import TrainingManager, TrainingCategory
 from datetime import datetime
 
 # Step 1: Initialize manager and load data
