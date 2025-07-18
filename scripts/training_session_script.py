@@ -17,7 +17,7 @@ session.assign_points(TrainingCategory.OFFENSIVE_DRILLS.value, {"inside": 2, "ou
 session.assign_points(TrainingCategory.DEFENSIVE_DRILLS.value, {"inside": 1, "outside": 2})
 session.assign_points(TrainingCategory.TECHNICAL_DRILLS.value, {"PS": 2, "BH": 2, "RB": 1})
 session.assign_points(TrainingCategory.WEIGHT_ROOM.value, {"ST": 1, "AG": 1})
-session.assign_points(TrainingCategory.CONDITIONING.value, 3)
+session.assign_points(TrainingCategory.CONDITIONING.value, 2)
 session.assign_points(TrainingCategory.FREE_THROWS.value, 2)
 session.assign_points(TrainingCategory.TEAM_BUILDING.value, 3)
 session.assign_points(TrainingCategory.BREAKS.value, 4)  # ← allows zeroing to be avoided
