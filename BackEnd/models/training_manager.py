@@ -44,7 +44,7 @@ class TrainingManager:
         date = date or datetime.now().strftime("%Y-%m-%d")
         return TrainingSession(session_type=session_type, date=date, team_id=str(self.team_doc["_id"]))
 
-    def run_and_save_session(self, training_session: TrainingSession):
+    def run_and_save_session(self, training_session: "TrainingSession"):
         updates = training_session.apply_training(self.players, self.team_doc)
         save_training_results(
             player_updates=updates,
