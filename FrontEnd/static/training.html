@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GOB Training</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./training.css">
+</head>
+<body>
+  <h1>Training Allocation</h1>
+  <div id="points-remaining">Points Remaining: <span id="remaining">24</span></div>
+
+  <div id="training-grid">
+    <div class="category">
+      <div class="category-name">Offensive Drills</div>
+      <label>Inside
+        <input type="range" min="0" max="5" step="1" value="0" class="slider" id="offensive-inside">
+        <span class="value">0</span>
+      </label>
+      <label>Outside
+        <input type="range" min="0" max="5" step="1" value="0" class="slider" id="offensive-outside">
+        <span class="value">0</span>
+      </label>
+    </div>
+    <div class="category">
+      <div class="category-name">Defensive Drills</div>
+      <label>Inside
+        <input type="range" min="0" max="5" step="1" value="0" class="slider" id="defensive-inside">
+        <span class="value">0</span>
+      </label>
+      <label>Outside
+        <input type="range" min="0" max="5" step="1" value="0" class="slider" id="defensive-outside">
+        <span class="value">0</span>
+      </label>
+    </div>
+    <div class="category">
+      <div class="category-name">Technical Drills</div>
+      <label>Passing
+        <input type="range" min="0" max="5" step="1" value="0" class="slider" id="technical-passing">
+        <span class="value">0</span>
+      </label>
+      <label>Ball Handling
+        <input type="range" min="0" max="5" step="1" value="0" class="slider" id="technical-ball">
+        <span class="value">0</span>
+      </label>
+      <label>Rebounding
+        <input type="range" min="0" max="5" step="1" value="0" class="slider" id="technical-rebound">
+        <span class="value">0</span>
+      </label>
+    </div>
+    <div class="category">
+      <div class="category-name">Weight Room</div>
+      <label>Strength
+        <input type="range" min="0" max="5" step="1" value="0" class="slider" id="weight-strength">
+        <span class="value">0</span>
+      </label>
+      <label>Agility
+        <input type="range" min="0" max="5" step="1" value="0" class="slider" id="weight-agility">
+        <span class="value">0</span>
+      </label>
+    </div>
+    <div class="category">
+      <div class="category-name">Conditioning</div>
+      <label>Conditioning
+        <input type="range" min="0" max="5" step="1" value="0" class="slider" id="conditioning">
+        <span class="value">0</span>
+      </label>
+    </div>
+    <div class="category">
+      <div class="category-name">Team Building</div>
+      <label>Team Building
+        <input type="range" min="0" max="5" step="1" value="0" class="slider" id="team-building">
+        <span class="value">0</span>
+      </label>
+    </div>
+    <div class="category">
+      <div class="category-name">Free Throws</div>
+      <label>Free Throws
+        <input type="range" min="0" max="5" step="1" value="0" class="slider" id="free-throws">
+        <span class="value">0</span>
+      </label>
+    </div>
+    <div class="category">
+      <div class="category-name">Film Study</div>
+      <label>Film Study
+        <input type="range" min="0" max="5" step="1" value="0" class="slider" id="film-study">
+        <span class="value">0</span>
+      </label>
+    </div>
+    <div class="category">
+      <div class="category-name">Scrimmages</div>
+      <label>Scrimmages
+        <input type="range" min="0" max="5" step="1" value="0" class="slider" id="scrimmages">
+        <span class="value">0</span>
+      </label>
+    </div>
+    <div class="category">
+      <div class="category-name">Breaks</div>
+      <label>Breaks
+        <input type="range" min="0" max="5" step="1" value="0" class="slider" id="breaks">
+        <span class="value">0</span>
+      </label>
+    </div>
+  </div>
+
+  <div style="text-align:center; margin-top:20px;">
+    <button id="toggle-mode">Toggle Dark Mode</button>
+  </div>
+
+  <script>
+  const totalPoints = 24;
+  const remainingEl = document.getElementById('remaining');
+  const sliders = document.querySelectorAll('.slider');
+
+  function updateRemaining() {
+    let used = 0;
+    sliders.forEach(s => used += parseInt(s.value));
+    const remaining = totalPoints - used;
+    remainingEl.textContent = remaining;
+    return remaining;
+  }
+
+  sliders.forEach(slider => {
+    slider.dataset.prev = slider.value;
+    slider.addEventListener('input', function(e) {
+      let total = 0;
+      sliders.forEach(s => total += parseInt(s.value));
+      if (total > totalPoints) {
+        this.value = this.dataset.prev;
+        total = Array.from(sliders).reduce((acc,s)=> acc + parseInt(s.value),0);
+      }
+      this.dataset.prev = this.value;
+      this.parentElement.querySelector('.value').textContent = this.value;
+      updateRemaining();
+    });
+  });
+
+  updateRemaining();
+
+  document.getElementById('toggle-mode').addEventListener('click', () => {
+    document.body.classList.toggle('dark-mode');
+  });
+  </script>
+</body>
+</html>
