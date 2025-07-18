@@ -24,6 +24,7 @@ if client:
     teams_collection = db["teams"]
     games_collection = db["games"]
     tournaments_collection = db["tournaments"]
+    training_log_collection = db["training_sessions"]
 else:
     import mongomock
     client = mongomock.MongoClient()
@@ -32,4 +33,6 @@ else:
     teams_collection = db["teams"]
     games_collection = db["games"]
     tournaments_collection = db["tournaments"]
+    training_log_collection = db["training_sessions"]
+
 
