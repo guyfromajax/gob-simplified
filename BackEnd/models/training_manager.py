@@ -20,6 +20,42 @@ class TrainingCategory(Enum):
     SCRIMMAGE = "scrimmage"
     BREAKS = "breaks"
 
+class TrainingManager:
+    def __init__(self, team_name: str):
+        self.team_name = team_name
+        self.team_doc = None
+        self.players = []
+
+    def load_team_and_players(self):
+        self.team_doc = teams_collection.find_one({"name": self.team_name})
+        if not self.team_doc:
+            raise ValueError(f"❌ No team found with name {self.team_name}")
+
+        player_ids = self.team_doc.get("player_ids", [])
+        self.players = list(players_collection.find({"_id": {"$in": [ObjectId(pid) for pid in player_ids]}}))
+
+        if not self.players:
+            raise ValueError(f"❌ No players found for team {self.team_name}")
+        return self
+
+    def create_training_session(self, session_type: str = "in-season", date: str = None):
+        if not self.team_doc:
+            raise RuntimeError("⚠️ Must load team before creating training session.")
+        date = date or datetime.now().strftime("%Y-%m-%d")
+        return TrainingSession(session_type=session_type, date=date, team_id=str(self.team_doc["_id"]))
+
+    def run_and_save_session(self, training_session: TrainingSession):
+        updates = training_session.apply_training(self.players, self.team_doc)
+        save_training_results(
+            player_updates=updates,
+            players_collection=players_collection,
+            team_doc=self.team_doc,
+            teams_collection=teams_collection,
+            training_session=training_session,
+            training_log_collection=training_log_collection
+        )
+        return training_session.log
+
 
 class Allocation:
     def __init__(self, total_points: int, subtypes: Dict[str, int] = None):
@@ -31,7 +67,6 @@ class Allocation:
             "total_points": self.total_points,
             "subtypes": self.subtypes
         }
-
 
 class TrainingSession:
     def __init__(self, session_type: str, date: str, team_id: str):
@@ -196,4 +231,60 @@ def save_training_results(
     if training_log_collection:
         training_log_collection.insert_one(training_session.to_dict())
 
+# class TrainingManager:
+#     def __init__(self, team_name: str):
+#         self.team_name = team_name
+#         self.team_doc = None
+#         self.players = []
+
+#     def load_team_and_players(self):
+#         self.team_doc = teams_collection.find_one({"name": self.team_name})
+#         if not self.team_doc:
+#             raise ValueError(f"❌ No team found with name {self.team_name}")
+
+#         player_ids = self.team_doc.get("player_ids", [])
+#         self.players = list(players_collection.find({"_id": {"$in": [ObjectId(pid) for pid in player_ids]}}))
+
+#         if not self.players:
+#             raise ValueError(f"❌ No players found for team {self.team_name}")
+#         return self
+
+#     def create_training_session(self, session_type: str = "in-season", date: str = None):
+#         if not self.team_doc:
+#             raise RuntimeError("⚠️ Must load team before creating training session.")
+
+#         date = date or datetime.now().strftime("%Y-%m-%d")
+#         session = TrainingSession(session_type=session_type, date=date, team_id=str(self.team_doc["_id"]))
+#         return session
+
+#     def run_and_save_session(self, training_session: TrainingSession):
+#         updates = training_session.apply_training(self.players, self.team_doc)
+#         save_training_results(
+#             player_updates=updates,
+#             players_collection=players_collection,
+#             team_doc=self.team_doc,
+#             teams_collection=teams_collection,
+#             training_session=training_session,
+#             training_log_collection=training_log_collection
+#         )
+#         return training_session.log
+
+
+# 🧪 Example Usage
+# You could use this in your test or simulation pipeline:
+
+# python
+# Copy
+# Edit
+# manager = TrainingManager("Four Corners").load_team_and_players()
+
+# session = manager.create_training_session(session_type="preseason")
+# session.assign_points("offensive_drills", {"inside": 2, "outside": 1})
+# session.assign_points("conditioning", 3)
+# session.assign_points("breaks", 1)
+
+# log = manager.run_and_save_session(session)
+
+# for entry in log:
+#     print(entry)
 
