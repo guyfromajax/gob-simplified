@@ -105,19 +105,27 @@
   </div>
 
   <div style="text-align:center; margin-top:20px;">
+    <button id="run-training" class="main-button" disabled>Run Training</button>
+  </div>
+
+  <div style="text-align:center; margin-top:20px;">
     <button id="toggle-mode">Toggle Dark Mode</button>
   </div>
+
+  <div id="results" style="display:none;"></div>
 
   <script>
   const totalPoints = 24;
   const remainingEl = document.getElementById('remaining');
   const sliders = document.querySelectorAll('.slider');
+  const runBtn = document.getElementById('run-training');
 
   function updateRemaining() {
     let used = 0;
     sliders.forEach(s => used += parseInt(s.value));
     const remaining = totalPoints - used;
     remainingEl.textContent = remaining;
+    runBtn.disabled = remaining !== 0;
     return remaining;
   }
 
@@ -141,6 +149,84 @@
   document.getElementById('toggle-mode').addEventListener('click', () => {
     document.body.classList.toggle('dark-mode');
   });
+
+  async function runTraining() {
+    const allocations = {
+      offensive_drills: {
+        inside: parseInt(document.getElementById('offensive-inside').value),
+        outside: parseInt(document.getElementById('offensive-outside').value)
+      },
+      defensive_drills: {
+        inside: parseInt(document.getElementById('defensive-inside').value),
+        outside: parseInt(document.getElementById('defensive-outside').value)
+      },
+      technical_drills: {
+        PS: parseInt(document.getElementById('technical-passing').value),
+        BH: parseInt(document.getElementById('technical-ball').value),
+        RB: parseInt(document.getElementById('technical-rebound').value)
+      },
+      weight_room: {
+        ST: parseInt(document.getElementById('weight-strength').value),
+        AG: parseInt(document.getElementById('weight-agility').value)
+      },
+      conditioning: parseInt(document.getElementById('conditioning').value),
+      team_building: parseInt(document.getElementById('team-building').value),
+      free_throws: parseInt(document.getElementById('free-throws').value),
+      film_study: parseInt(document.getElementById('film-study').value),
+      scrimmage: parseInt(document.getElementById('scrimmages').value),
+      breaks: parseInt(document.getElementById('breaks').value)
+    };
+
+    const payload = {
+      team_name: 'Four Corners',
+      session_type: 'preseason',
+      allocations
+    };
+
+    try {
+      runBtn.disabled = true;
+      runBtn.textContent = 'Running...';
+      const res = await fetch('/api/run_training', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      showResults(data.log || []);
+    } catch (err) {
+      console.error('Failed to run training', err);
+      runBtn.textContent = 'Run Training';
+      runBtn.disabled = false;
+    }
+  }
+
+  function showResults(log) {
+    document.getElementById('training-grid').style.display = 'none';
+    document.getElementById('points-remaining').style.display = 'none';
+    runBtn.style.display = 'none';
+    document.getElementById('toggle-mode').style.display = 'none';
+
+    const resultsDiv = document.getElementById('results');
+    resultsDiv.style.display = 'block';
+    const title = document.createElement('h1');
+    title.textContent = 'Training Results';
+    resultsDiv.appendChild(title);
+    const ul = document.createElement('ul');
+    ul.id = 'results-list';
+    log.forEach(line => {
+      const li = document.createElement('li');
+      li.textContent = line;
+      ul.appendChild(li);
+    });
+    resultsDiv.appendChild(ul);
+    const btnWrap = document.createElement('div');
+    btnWrap.style.textAlign = 'center';
+    btnWrap.style.marginTop = '20px';
+    btnWrap.innerHTML = '<button id="locker-btn" class="main-button">Go To Locker Room</button>';
+    resultsDiv.appendChild(btnWrap);
+  }
+
+  runBtn.addEventListener('click', runTraining);
   </script>
 </body>
 </html>
