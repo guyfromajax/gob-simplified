@@ -9,7 +9,95 @@
 </head>
 <body>
   <div id="franchise-container">
-    <h1>Franchise Command Center</h1>
+    <div id="tournament-top">
+      <div id="top-left">
+        <img id="team-logo" src="" alt="Team Logo" class="team-logo">
+        <div class="left-info">
+          <span class="username">Username</span>
+          <span class="seed">Seed: --</span>
+        </div>
+      </div>
+      <div id="top-center">
+        <div class="chemistry-label">Team Chemistry</div>
+        <div class="chemistry-bar">0 / 25</div>
+        <div class="team-stats">
+          <div id="stat-offense">Offense: --</div>
+          <div id="stat-athleticism">Athleticism: --</div>
+          <div id="stat-prestige">Prestige: --</div>
+          <div id="stat-defense">Defense: --</div>
+          <div id="stat-intangibles">Intangibles: --</div>
+          <div id="stat-rank">Nat'l Rank: --</div>
+        </div>
+      </div>
+      <div id="top-right-coach1" class="coach-info">
+        <img id="coach-sammy" src="" alt="Coach" class="coach-img">
+        <div class="coach-bonus">+SH / +SC</div>
+      </div>
+      <div id="top-right-coach2" class="coach-info">
+        <img id="coach-mary" src="" alt="Fans" class="coach-img">
+        <div class="coach-bonus">+ Home Crowd</div>
+      </div>
+      <div style="position:absolute; top:20px; right:20px;">
+        <button id="play-now" style="background:#ff6600;color:#fff;border:none;padding:10px 16px;font-family:'Bebas Neue',cursive;font-size:20px;cursor:pointer;">Play Now</button>
+      </div>
+    </div>
+
+    <div id="tournament-tabs">
+      <div class="tab-buttons">
+        <button data-tab="standings-tab" class="active">Standings</button>
+        <button data-tab="leaders-tab">Leaders</button>
+        <button data-tab="teamstats-tab">Team Stats</button>
+        <button data-tab="recruits-tab">Recruits</button>
+      </div>
+      <div id="standings-tab" class="tab-content active">
+        <div class="scroll-x">
+          <table class="leaders-table">
+            <thead>
+              <tr><th>Rank</th><th>Team</th><th>Record</th></tr>
+            </thead>
+            <tbody id="standings-body"></tbody>
+          </table>
+        </div>
+      </div>
+      <div id="leaders-tab" class="tab-content">
+        <div id="leaders-container"></div>
+      </div>
+      <div id="teamstats-tab" class="tab-content">
+        <div class="scroll-x">
+          <table class="stats-table">
+            <thead>
+              <tr><th>Team</th><th>PTS</th><th>REB</th><th>AST</th><th>STL</th><th>BLK</th></tr>
+            </thead>
+            <tbody id="teamstats-body"></tbody>
+          </table>
+        </div>
+      </div>
+      <div id="recruits-tab" class="tab-content">
+        <div class="scroll-x">
+          <table class="roster-table">
+            <thead>
+              <tr><th>Name</th><th>SC</th><th>SH</th><th>ID</th><th>OD</th><th>PS</th><th>BH</th><th>RB</th><th>AG</th><th>ST</th><th>ND</th><th>IQ</th><th>FT</th></tr>
+            </thead>
+            <tbody id="recruits-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
   </div>
+
+  <script src="./franchise-command-center.js"></script>
+  <script>
+    const tabButtons = document.querySelectorAll('.tab-buttons button');
+    const tabContents = document.querySelectorAll('.tab-content');
+    tabButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        tabButtons.forEach(b => b.classList.remove('active'));
+        tabContents.forEach(c => c.classList.remove('active'));
+        btn.classList.add('active');
+        const target = document.getElementById(btn.dataset.tab);
+        if (target) target.classList.add('active');
+      });
+    });
+  </script>
 </body>
 </html>
