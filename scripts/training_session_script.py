@@ -1,4 +1,4 @@
-from BackEnd.models.training_manager import TrainingManager, TrainingCategory
+from models.training_manager import TrainingManager, TrainingCategory
 from datetime import datetime
 
 # Step 1: Initialize manager and load data
