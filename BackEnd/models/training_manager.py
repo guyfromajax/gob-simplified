@@ -231,7 +231,7 @@ def save_training_results(
     # --- Player Updates ---
     for player_id, updates in player_updates.items():
         update_fields = {f"attributes.{k}": v for k, v in updates.items()}
-        players_collection.update_one({"_id": ObjectId(player_id)}, {"$set": update_fields})
+        players_collection.update_one({"_id": player_id}, {"$set": update_fields})
 
     # --- Team Updates ---
     TEAM_FIELDS = [
