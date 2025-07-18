@@ -3,29 +3,21 @@ from datetime import datetime
 
 class FranchiseManager:
     def __init__(self, db):
-        self.db = db  # MongoDB connection or collection wrapper
+        self.db = db
         self.teams = self.load_teams()
         self.week = 1
+        self.schedule_manager = ScheduleManager(self.teams)
+        self.recruit_manager = RecruitManager(self.db)
         self.schedule = []
 
     def load_teams(self):
         return list(self.db.teams.find())
 
     def initialize_season(self):
-        self.schedule = self.generate_schedule()
+        self.schedule = self.schedule_manager.generate_schedule()
         self.week = 1
         self.reset_stats()
         self.save_season_state()
-
-    def generate_schedule(self):
-        teams = [team["_id"] for team in self.teams]
-        matchups = []
-        for i in range(len(teams)):
-            for j in range(i + 1, len(teams)):
-                matchups.append((teams[i], teams[j]))
-                matchups.append((teams[j], teams[i]))
-        random.shuffle(matchups)
-        return [matchups[i:i+4] for i in range(0, 56, 4)]  # 14 weeks * 4 games
 
     def reset_stats(self):
         for team in self.teams:
@@ -42,7 +34,6 @@ class FranchiseManager:
         self.save_season_state()
 
     def simulate_game(self, team1_id, team2_id):
-        # Stub for now - would use existing game simulation engine
         team1_score = random.randint(50, 90)
         team2_score = random.randint(50, 90)
         winner = team1_id if team1_score > team2_score else team2_id
@@ -72,30 +63,7 @@ class FranchiseManager:
         return {"Freshman": "Sophomore", "Sophomore": "Junior", "Junior": "Senior"}.get(year, year)
 
     def generate_recruits(self):
-        first_names = ["Jalen", "Marcus", "Tyrese", "Zion", "Cade"]
-        last_names = ["Walker", "Jackson", "Robinson", "Wright", "Anderson"]
-        for _ in range(40):
-            name = f"{random.choice(first_names)} {random.choice(last_names)}"
-            attributes = {
-                "SC": random.randint(1, 5),
-                "SH": random.randint(1, 5),
-                "ID": random.randint(1, 5),
-                "OD": random.randint(1, 5),
-                "PS": random.randint(1, 5),
-                "BH": random.randint(1, 5),
-                "RB": random.randint(1, 5),
-                "AG": random.randint(1, 5),
-                "ST": random.randint(1, 5),
-                "ND": random.randint(1, 5),
-                "IQ": random.randint(1, 5),
-                "FT": random.randint(1, 5),
-            }
-            self.db.recruits.insert_one({
-                "name": name,
-                "attributes": attributes,
-                "year": "Freshman",
-                "created_at": datetime.utcnow()
-            })
+        self.recruit_manager.generate_recruits()
 
     def save_season_state(self):
         self.db.franchise_state.update_one(
@@ -110,3 +78,52 @@ class FranchiseManager:
     # /franchise/schedule → use self.schedule
     # /franchise/stats → aggregate from self.db.players (season_stats)
     # /franchise/recruits → use self.db.recruits.find()
+
+class ScheduleManager:
+    def __init__(self, teams):
+        self.teams = [team["_id"] for team in teams]
+
+    def generate_schedule(self):
+        matchups = []
+        for i in range(len(self.teams)):
+            for j in range(i + 1, len(self.teams)):
+                matchups.append((self.teams[i], self.teams[j]))
+                matchups.append((self.teams[j], self.teams[i]))
+        random.shuffle(matchups)
+        return [matchups[i:i+4] for i in range(0, 56, 4)]  # 14 weeks * 4 games
+
+class RecruitManager:
+    def __init__(self, db):
+        self.db = db
+        self.first_names = ["Jalen", "Marcus", "Tyrese", "Zion", "Cade"]
+        self.last_names = ["Walker", "Jackson", "Robinson", "Wright", "Anderson"]
+
+    def generate_recruits(self, count=40):
+        recruits = []
+        for _ in range(count):
+            name = f"{random.choice(self.first_names)} {random.choice(self.last_names)}"
+            attributes = {
+                "SC": random.randint(1, 30),
+                "SH": random.randint(1, 30),
+                "ID": random.randint(1, 30),
+                "OD": random.randint(1, 30),
+                "PS": random.randint(1, 30),
+                "BH": random.randint(1, 30),
+                "RB": random.randint(1, 30),
+                "AG": random.randint(1, 30),
+                "ST": random.randint(1, 30),
+                "ND": random.randint(1, 30),
+                "IQ": random.randint(1, 30),
+                "FT": random.randint(1, 30),
+            }
+            recruit = {
+                "name": name,
+                "attributes": attributes,
+                "year": "Freshman",
+                "created_at": datetime.utcnow()
+            }
+            recruits.append(recruit)
+
+        if recruits:
+            self.db.recruits.delete_many({})  # Optional: clear previous recruits
+            self.db.recruits.insert_many(recruits)
