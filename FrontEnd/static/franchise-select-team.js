@@ -14,7 +14,7 @@ function createButtons() {
   teams.forEach(team => {
     const btn = document.createElement("button");
     btn.className = "team-button";
-    btn.innerHTML = `<img src="./images/homepage-logos/${team}.png" alt="${team} logo"><span>${team}</span>`;
+    btn.innerHTML = `<img src="/static/images/homepage-logos/${team}.png" alt="${team} logo"><span>${team}</span>`;
     btn.addEventListener("click", () => selectTeam(team));
     container.appendChild(btn);
   });
