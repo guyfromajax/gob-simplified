@@ -81,6 +81,18 @@ class TrainingSession:
         self.allocations = {}  # category: Allocation object
         self.log = []
 
+    def assign_points(self, category: str, allocation: Dict[str, int] or int):
+        total = sum(allocation.values()) if isinstance(allocation, dict) else allocation
+        if total > self.practice_points:
+            raise ValueError("❌ Not enough practice points remaining.")
+
+        if category in self.allocations:
+            raise ValueError(f"⚠️ Points already assigned for {category}.")
+
+        self.allocations[category] = Allocation(total, allocation if isinstance(allocation, dict) else None)
+        self.practice_points -= total
+
+    
     def apply_training(self, players: List[dict], team: dict) -> List[dict]:
         player_updates = {player["_id"]: {} for player in players}
         all_players_by_id = {player["_id"]: player for player in players}
