@@ -108,7 +108,7 @@ class TrainingSession:
             # TEAM trait changes
             if category in ["team_building", "film_study", "scrimmage"]:
                 trait = self._get_team_trait_from_category(category)
-                change = self._get_trait_change(allocation.total_points, team_level=True)
+                change = self._get_trait_change(allocation.total_points, team_level=True, trait_name=trait)
                 team[trait] = team.get(trait, 0) + change
                 self.log.append(f"Team {trait} changed by {change}")
                 continue
@@ -139,8 +139,7 @@ class TrainingSession:
         # Return updated documents
         return player_updates
 
-    def _get_trait_change(self, points: int, team_level=False) -> int:
-        # Probabilities per point level
+    def _get_trait_change(self, points: int, team_level=False, trait_name: str = None) -> int:
         lookup = {
             0: [(0, 0.25), (-1, 0.50), (-2, 0.20), (-3, 0.05)],
             1: [(2, 0.10), (1, 0.50), (0, 0.20), (-1, 0.15), (-2, 0.05)],
@@ -148,6 +147,7 @@ class TrainingSession:
             3: [(5, 0.025), (4, 0.075), (3, 0.35), (2, 0.35), (1, 0.125), (0, 0.05), (-1, 0.025)],
             4: [(5, 0.05), (4, 0.125), (3, 0.325), (2, 0.325), (1, 0.125), (0, 0.025), (-1, 0.025)],
         }
+
         if points >= 5:
             dist = [(5, 0.075), (4, 0.125), (3, 0.325), (2, 0.30), (1, 0.15), (0, 0.0125), (-1, 0.0125)]
         else:
@@ -155,7 +155,18 @@ class TrainingSession:
 
         outcomes, probs = zip(*dist)
         result = random.choices(outcomes, probs)[0]
-        return result * 10 if team_level else result
+
+        # Apply multiplier only if it's a team attribute that's not "team_chemistry"
+        TEAM_TRAITS_WITH_MULTIPLIER = [
+            "shot_threshold", "turnover_threshold", "foul_threshold",
+            "rebound_modifier", "offensive_efficiency", "offensive_adjust",
+            "o_tendency_reads", "d_tendency_reads"
+        ]
+
+        if team_level and trait_name in TEAM_TRAITS_WITH_MULTIPLIER:
+            return result * 10
+        return result
+
 
     def _handle_break_effects(self, break_points: int, updates: Dict, players_by_id: Dict):
         roll_map = {
