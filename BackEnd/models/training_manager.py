@@ -5,6 +5,8 @@ from bson import ObjectId
 from pymongo.collection import Collection
 from BackEnd.db import players_collection, teams_collection, training_log_collection  # adjust if needed
 from datetime import datetime
+from bson.errors import InvalidId
+
 
 
 
@@ -31,8 +33,15 @@ class TrainingManager:
         if not self.team_doc:
             raise ValueError(f"❌ No team found with name {self.team_name}")
 
-        player_ids = self.team_doc.get("player_ids", [])
-        self.players = list(players_collection.find({"_id": {"$in": [ObjectId(pid) for pid in player_ids]}}))
+        valid_object_ids = []
+        for pid in self.team_doc.get("player_ids", []):
+            try:
+                valid_object_ids.append(ObjectId(pid))
+            except InvalidId:
+                print(f"⚠️ Skipping invalid player ID: {pid}")
+
+        self.players = list(players_collection.find({"_id": {"$in": valid_object_ids}}))
+
 
         if not self.players:
             raise ValueError(f"❌ No players found for team {self.team_name}")
