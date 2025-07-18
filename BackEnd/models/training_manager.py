@@ -1,11 +1,9 @@
 from enum import Enum
 from typing import List, Dict
 import random
-from bson import ObjectId
 from pymongo.collection import Collection
 from BackEnd.db import players_collection, teams_collection, training_log_collection  # adjust if needed
 from datetime import datetime
-from bson.errors import InvalidId
 
 
 
@@ -30,8 +28,6 @@ class TrainingManager:
 
     def load_team_and_players(self):
         self.team_doc = teams_collection.find_one({"name": self.team_name})
-        # print(self.team_name)
-        print(self.team_doc)
         if not self.team_doc:
             raise ValueError(f"❌ No team found with name {self.team_name}")
 
@@ -91,6 +87,16 @@ class TrainingSession:
 
         self.allocations[category] = Allocation(total, allocation if isinstance(allocation, dict) else None)
         self.practice_points -= total
+
+    def to_dict(self) -> dict:
+        """Serialize the session for database logging."""
+        return {
+            "session_type": self.session_type,
+            "date": self.date,
+            "team_id": self.team_id,
+            "allocations": {cat: alloc.to_dict() for cat, alloc in self.allocations.items()},
+            "log": self.log,
+        }
 
     
     def apply_training(self, players: List[dict], team: dict) -> List[dict]:
@@ -244,7 +250,7 @@ def save_training_results(
         teams_collection.update_one({"_id": team_doc["_id"]}, {"$set": team_fields})
 
     # --- Optional Training Log ---
-    if training_log_collection:
+    if training_log_collection is not None:
         training_log_collection.insert_one(training_session.to_dict())
 
 # class TrainingManager:
