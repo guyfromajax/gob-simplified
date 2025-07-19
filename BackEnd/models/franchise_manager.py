@@ -15,6 +15,8 @@ class FranchiseManager:
         return list(self.db.teams.find())
 
     def initialize_season(self):
+        # Clear any previous season game data to ensure a fresh start
+        self.db.games.delete_many({})
         self.schedule = self.schedule_manager.generate_schedule()
         self.week = 1
         self.reset_stats()
