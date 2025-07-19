@@ -367,6 +367,24 @@ table.leaders-table tbody tr:nth-child(odd) {
   background-color: #f9f9f9;
 }
 
+.schedule-container {
+  max-height: 400px;
+  overflow-y: auto;
+  margin-top: 10px;
+}
+
+.schedule-week {
+  margin-bottom: 8px;
+}
+
+.schedule-week h4 {
+  margin: 4px 0;
+}
+
+.schedule-game {
+  padding-left: 10px;
+}
+
 @media (max-width: 768px) {
   :root {
     --matchup-height: 80px;
