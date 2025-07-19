@@ -9,14 +9,34 @@ async function fetchJSON(url) {
   }
 }
 
+const teamMap = {
+  "Four Corners": "FC",
+  "Bentley-Truman": "BT",
+  "Lancaster": "Lan",
+  "Little York": "LY",
+  "Morristown": "Mor",
+  "Ocean City": "OC",
+  "South Lancaster": "SL",
+  "Xavien": "Xav",
+};
+
 function populateTop(data) {
   if (!data) return;
   document.querySelector('.username').textContent = data.username || 'User';
   document.querySelector('.seed').textContent = `Seed: ${data.seed || '--'}`;
   document.getElementById('team-logo').src = `/static/images/homepage-logos/${data.team}.png`;
-  const folder = (data.team || '').toLowerCase().replace(/\s+/g, '-');
-  document.getElementById('coach-sammy').src = `/static/images/coaches/${folder}/sammy.png`;
-  document.getElementById('coach-mary').src = `/static/images/coaches/${folder}/mary.png`;
+
+  const abbr = teamMap[data.team];
+  const sammyEl = document.getElementById('coach-sammy');
+  const maryEl = document.getElementById('coach-mary');
+  if (abbr) {
+    if (sammyEl) sammyEl.src = `/static/images/coaches/${abbr}/Sammy-${abbr}.png`;
+    if (maryEl) maryEl.src = `/static/images/coaches/${abbr}/Mary-${abbr}.png`;
+  } else {
+    if (sammyEl) sammyEl.removeAttribute('src');
+    if (maryEl) maryEl.removeAttribute('src');
+  }
+
   document.querySelector('.chemistry-bar').textContent = `${data.team_chemistry || 0} / 25`;
   document.getElementById('stat-offense').textContent = `Offense: ${data.offense || '--'}`;
   document.getElementById('stat-defense').textContent = `Defense: ${data.defense || '--'}`;
