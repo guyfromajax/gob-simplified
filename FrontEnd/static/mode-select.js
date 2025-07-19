@@ -15,7 +15,11 @@ if (tournamentBtn) {
 }
 
 if (franchiseBtn) {
+  // franchiseBtn.addEventListener('click', () => {
+  //   window.location.href = './franchise-select-team.html';
+  // });
   franchiseBtn.addEventListener('click', () => {
-    window.location.href = './franchise-select-team.html';
+    window.location.href = '/franchise/start';
   });
+  
 }
