@@ -13,7 +13,9 @@ function populateTop(data) {
   if (!data) return;
   document.querySelector('.username').textContent = data.username || 'User';
   document.querySelector('.seed').textContent = `Seed: ${data.seed || '--'}`;
-  document.getElementById('team-logo').src = `images/homepage-logos/${data.team}.png`;
+  document.getElementById('team-logo').src = `/static/images/homepage-logos/${data.team}.png`;
+  document.getElementById('coach-sammy').src = '/static/images/coach.png';
+  document.getElementById('coach-mary').src = '/static/images/fan.png';
   document.querySelector('.chemistry-bar').textContent = `${data.team_chemistry || 0} / 25`;
   document.getElementById('stat-offense').textContent = `Offense: ${data.offense || '--'}`;
   document.getElementById('stat-defense').textContent = `Defense: ${data.defense || '--'}`;
