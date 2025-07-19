@@ -178,9 +178,23 @@ async function init() {
   renderRecruits(await fetchJSON('/franchise/recruits'));
 }
 
-document.getElementById('play-now').addEventListener('click', async () => {
-  await fetch('/franchise/play-next-game', { method: 'POST' });
-  window.location.href = '/animation';
+const playNowBtn = document.getElementById('play-now');
+playNowBtn.addEventListener('click', async () => {
+  const originalText = playNowBtn.textContent;
+  playNowBtn.disabled = true;
+  playNowBtn.textContent = 'Loading...';
+  try {
+    const res = await fetch('/franchise/play-next-game', { method: 'POST' });
+    if (!res.ok) throw new Error('Simulation failed');
+    const { home, away } = await res.json();
+    if (!home || !away) throw new Error('Matchup not found');
+    window.location.href = `/court.html?home=${encodeURIComponent(home)}&away=${encodeURIComponent(away)}`;
+  } catch (err) {
+    console.error(err);
+    alert('Unable to play next game');
+    playNowBtn.disabled = false;
+    playNowBtn.textContent = originalText;
+  }
 });
 
 window.addEventListener('DOMContentLoaded', init);
