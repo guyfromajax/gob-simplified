@@ -294,4 +294,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   renderRoster();
   renderStats();
   renderLeaderboards();
+
+  const playBtn = document.getElementById('play-now');
+  if (playBtn) {
+    playBtn.addEventListener('click', () => {
+      console.log('Play Now clicked (tournament)');
+    });
+  }
 });
