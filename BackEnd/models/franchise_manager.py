@@ -85,21 +85,35 @@ class ScheduleManager:
         self.teams = [team["_id"] for team in teams]
 
     def generate_schedule(self):
-        matchups = []
+        # Create all home/away permutations (not just combinations)
+        all_matchups = list(permutations(self.teams, 2))  # 56 total matchups (8 teams x 7 opponents)
+        random.shuffle(all_matchups)
 
-        # Generate all unique team pairings
-        team_pairs = combinations(self.teams, 2)  # 28 total pairings
+        schedule = []
+        used_matchups = set()
 
-        # For each pair, create both home/away matchups
-        for team1, team2 in team_pairs:
-            matchups.append((team1, team2))  # team1 is home
-            matchups.append((team2, team1))  # team2 is home
+        while len(schedule) < 14:  # 14 weeks
+            week = []
+            teams_scheduled = set()
 
-        # Shuffle matchups to randomize order (but still valid schedule)
-        random.shuffle(matchups)
+            for matchup in all_matchups:
+                away, home = matchup
+                if matchup in used_matchups:
+                    continue
+                if away in teams_scheduled or home in teams_scheduled:
+                    continue
 
-        # Group into 14 weeks (4 games per week)
-        schedule = [matchups[i:i+4] for i in range(0, 56, 4)]
+                week.append((away, home))
+                teams_scheduled.update([away, home])
+                used_matchups.add(matchup)
+
+                if len(week) == 4:  # 4 games = 8 teams = full week
+                    break
+
+            if len(week) < 4:
+                raise ValueError("Unable to build a full schedule. Check for scheduling conflicts.")
+
+            schedule.append(week)
 
         return schedule
 

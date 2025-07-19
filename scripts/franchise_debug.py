@@ -31,13 +31,14 @@ def debug_franchise_init():
     print("📅 Schedule Preview (team names):")
     for week_num, games in enumerate(manager.schedule, start=1):
         print(f"Week {week_num}:")
-        for game in games:
-            team1 = id_to_name.get(str(game[0]), str(game[0]))
-            team2 = id_to_name.get(str(game[1]), str(game[1]))
-            print(f"  {team1} vs {team2}")
+        for away_id, home_id in games:
+            away = id_to_name.get(str(away_id), str(away_id))
+            home = id_to_name.get(str(home_id), str(home_id))
+            print(f"  {away} at {home}")
 
-    print("\n🎓 Recruit Sample:")
-    recruits = list(db.recruits.find().limit(5))
+
+        print("\n🎓 Recruit Sample:")
+        recruits = list(db.recruits.find().limit(5))
     pprint.pprint(recruits)
 
 if __name__ == "__main__":
