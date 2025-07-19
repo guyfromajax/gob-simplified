@@ -10,12 +10,16 @@ router = APIRouter()
 
 STATIC_DIR = Path(__file__).resolve().parents[2] / "FrontEnd" / "static"
 
+# @router.get("/franchise/start")
+# def franchise_start():
+#     state = franchise_state_collection.find_one({"_id": "state"}) or {}
+#     if not state.get("team"):
+#         return RedirectResponse(url="/franchise/select-team")
+#     return RedirectResponse(url="/franchise/command-center")
 @router.get("/franchise/start")
 def franchise_start():
-    state = franchise_state_collection.find_one({"_id": "state"}) or {}
-    if not state.get("team"):
-        return RedirectResponse(url="/franchise/select-team")
-    return RedirectResponse(url="/franchise/command-center")
+    return RedirectResponse(url="/franchise/select-team")
+
 
 @router.get("/franchise/select-team")
 def get_select_team_page():
