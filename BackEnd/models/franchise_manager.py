@@ -23,7 +23,10 @@ class FranchiseManager:
     def reset_stats(self):
         for team in self.teams:
             self.db.players.update_many({"team_id": team["_id"]}, {"$set": {"season_stats": {}}})
-            self.db.teams.update_one({"_id": team["_id"]}, {"$set": {"season_stats": {}, "record": {"W": 0, "L": 0}}})
+            self.db.teams.update_one(
+                {"_id": team["_id"]},
+                {"$set": {"season_stats": {}, "record": {"W": 0, "L": 0}, "PF": 0, "PA": 0}}
+            )
 
     def run_week(self):
         if self.week > 14:
@@ -42,6 +45,14 @@ class FranchiseManager:
 
         self.db.teams.update_one({"_id": winner}, {"$inc": {"record.W": 1}})
         self.db.teams.update_one({"_id": loser}, {"$inc": {"record.L": 1}})
+        self.db.teams.update_one(
+            {"_id": team1_id},
+            {"$inc": {"PF": team1_score, "PA": team2_score}}
+        )
+        self.db.teams.update_one(
+            {"_id": team2_id},
+            {"$inc": {"PF": team2_score, "PA": team1_score}}
+        )
         self.db.games.insert_one({
             "team1_id": team1_id,
             "team2_id": team2_id,
