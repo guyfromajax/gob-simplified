@@ -10,6 +10,11 @@ router = APIRouter()
 
 STATIC_DIR = Path(__file__).resolve().parents[2] / "FrontEnd" / "static"
 
+@router.get("/court.html")
+def serve_court_html():
+    """Return the court page so query params work in production."""
+    return FileResponse(STATIC_DIR / "court.html")
+
 # @router.get("/franchise/start")
 # def franchise_start():
 #     state = franchise_state_collection.find_one({"_id": "state"}) or {}
