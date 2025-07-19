@@ -1,5 +1,6 @@
 import random
 from datetime import datetime
+from itertools import combinations, permutations
 
 class FranchiseManager:
     def __init__(self, db):
@@ -85,12 +86,22 @@ class ScheduleManager:
 
     def generate_schedule(self):
         matchups = []
-        for i in range(len(self.teams)):
-            for j in range(i + 1, len(self.teams)):
-                matchups.append((self.teams[i], self.teams[j]))
-                matchups.append((self.teams[j], self.teams[i]))
+
+        # Generate all unique team pairings
+        team_pairs = combinations(self.teams, 2)  # 28 total pairings
+
+        # For each pair, create both home/away matchups
+        for team1, team2 in team_pairs:
+            matchups.append((team1, team2))  # team1 is home
+            matchups.append((team2, team1))  # team2 is home
+
+        # Shuffle matchups to randomize order (but still valid schedule)
         random.shuffle(matchups)
-        return [matchups[i:i+4] for i in range(0, 56, 4)]  # 14 weeks * 4 games
+
+        # Group into 14 weeks (4 games per week)
+        schedule = [matchups[i:i+4] for i in range(0, 56, 4)]
+
+        return schedule
 
 class RecruitManager:
     def __init__(self, db):
