@@ -12,8 +12,8 @@ STATIC_DIR = Path(__file__).resolve().parents[2] / "FrontEnd" / "static"
 
 @router.get("/franchise/start")
 def franchise_start():
-    state = franchise_state_collection.find_one({"_id": "state"})
-    if state is None:
+    state = franchise_state_collection.find_one({"_id": "state"}) or {}
+    if not state.get("team"):
         return RedirectResponse(url="/franchise/select-team")
     return RedirectResponse(url="/franchise/command-center")
 
@@ -59,8 +59,8 @@ def command_center_data():
     team_doc = db.teams.find_one({"name": team_name}) or {}
     return {
         "team": team_name,
-        "username": "Coach",
-        "seed": 1,
+        "username": state.get("username", "Coach"),
+        "seed": state.get("seed", 1),
         "team_chemistry": team_doc.get("team_chemistry", 0),
         "offense": team_doc.get("offense", "-"),
         "defense": team_doc.get("defense", "-"),
