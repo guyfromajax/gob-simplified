@@ -14,8 +14,9 @@ function populateTop(data) {
   document.querySelector('.username').textContent = data.username || 'User';
   document.querySelector('.seed').textContent = `Seed: ${data.seed || '--'}`;
   document.getElementById('team-logo').src = `/static/images/homepage-logos/${data.team}.png`;
-  document.getElementById('coach-sammy').src = '/static/images/coach.png';
-  document.getElementById('coach-mary').src = '/static/images/fan.png';
+  const folder = (data.team || '').toLowerCase().replace(/\s+/g, '-');
+  document.getElementById('coach-sammy').src = `/static/images/coaches/${folder}/sammy.png`;
+  document.getElementById('coach-mary').src = `/static/images/coaches/${folder}/mary.png`;
   document.querySelector('.chemistry-bar').textContent = `${data.team_chemistry || 0} / 25`;
   document.getElementById('stat-offense').textContent = `Offense: ${data.offense || '--'}`;
   document.getElementById('stat-defense').textContent = `Defense: ${data.defense || '--'}`;
@@ -89,8 +90,32 @@ function renderRecruits(data) {
   });
 }
 
+function renderTeam(data) {
+  if (!data) return;
+  const tbody = document.getElementById('team-body');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+  const headers = ["SC","SH","ID","OD","PS","BH","RB","AG","ST","ND","IQ","FT","NG"];
+  (data.players || []).forEach(p => {
+    const tr = document.createElement('tr');
+    let html = `<td>${p.name}</td>`;
+    headers.forEach(h => {
+      let val = p.attributes ? p.attributes[h] : null;
+      if (h === 'NG') val = (val ?? 0).toFixed(2);
+      else val = Math.round(val ?? 0);
+      html += `<td>${val}</td>`;
+    });
+    tr.innerHTML = html;
+    tbody.appendChild(tr);
+  });
+}
+
 async function init() {
-  populateTop(await fetchJSON('/franchise/command-center/data'));
+  const topData = await fetchJSON('/franchise/command-center/data');
+  populateTop(topData);
+  if (topData && topData.team) {
+    renderTeam(await fetchJSON(`/roster/${encodeURIComponent(topData.team)}`));
+  }
   renderStandings(await fetchJSON('/franchise/standings'));
   renderLeaders(await fetchJSON('/franchise/leaders'));
   renderTeamStats(await fetchJSON('/franchise/team-stats'));

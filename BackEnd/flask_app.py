@@ -11,8 +11,8 @@ app = Flask(__name__, static_folder=str(STATIC_DIR))
 
 @app.route('/franchise/start')
 def franchise_start():
-    state = franchise_state_collection.find_one({"_id": "state"})
-    if state is None:
+    state = franchise_state_collection.find_one({"_id": "state"}) or {}
+    if not state.get("team"):
         return redirect('/franchise/select-team')
     return redirect('/franchise/command-center')
 

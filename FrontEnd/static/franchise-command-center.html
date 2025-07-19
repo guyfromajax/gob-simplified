@@ -45,6 +45,7 @@
     <div id="tournament-tabs">
       <div class="tab-buttons">
         <button data-tab="standings-tab" class="active">Standings</button>
+        <button data-tab="team-tab">Team</button>
         <button data-tab="leaders-tab">Leaders</button>
         <button data-tab="teamstats-tab">Team Stats</button>
         <button data-tab="recruits-tab">Recruits</button>
@@ -56,6 +57,16 @@
               <tr><th>Rank</th><th>Team</th><th>Record</th></tr>
             </thead>
             <tbody id="standings-body"></tbody>
+          </table>
+        </div>
+      </div>
+      <div id="team-tab" class="tab-content">
+        <div class="scroll-x">
+          <table class="roster-table">
+            <thead>
+              <tr><th>Name</th><th>SC</th><th>SH</th><th>ID</th><th>OD</th><th>PS</th><th>BH</th><th>RB</th><th>AG</th><th>ST</th><th>ND</th><th>IQ</th><th>FT</th></tr>
+            </thead>
+            <tbody id="team-body"></tbody>
           </table>
         </div>
       </div>
