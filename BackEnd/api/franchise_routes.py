@@ -77,11 +77,82 @@ def command_center_data():
 
 @router.get("/franchise/standings")
 def standings():
-    teams = list(db.teams.find({}, {"name": 1, "record": 1}))
+    state = franchise_state_collection.find_one({"_id": "state"}) or {}
+    schedule = state.get("schedule", [])
+    week = state.get("week", 1)
+
+    next_games = schedule[week - 1] if week - 1 < len(schedule) else []
+    id_to_name = {t["_id"]: t["name"] for t in db.teams.find({}, {"name": 1})}
+
+    matchup_map = {}
+    for away_id, home_id in next_games:
+        home_name = id_to_name.get(home_id, "")
+        away_name = id_to_name.get(away_id, "")
+        matchup_map[away_id] = f"at {home_name}"
+        matchup_map[home_id] = f"vs {away_name}"
+
+    teams = list(db.teams.find({}, {"name": 1, "record": 1, "PF": 1, "PA": 1}))
+
+    output = []
     for t in teams:
-        t["record"] = t.get("record", {"W": 0, "L": 0})
-    teams.sort(key=lambda x: x["record"].get("W", 0), reverse=True)
-    return {"standings": teams}
+        rec = t.get("record", {"W": 0, "L": 0})
+        wins = rec.get("W", 0)
+        losses = rec.get("L", 0)
+        games_played = wins + losses
+        pct = round(wins / games_played, 3) if games_played else 0.0
+        pf = t.get("PF", 0)
+        pa = t.get("PA", 0)
+        differential = pf - pa
+        output.append({
+            "team_id": str(t["_id"]),
+            "name": t.get("name", ""),
+            "W": wins,
+            "L": losses,
+            "pct": pct,
+            "PF": pf,
+            "PA": pa,
+            "differential": differential,
+            "next": matchup_map.get(t["_id"], "")
+        })
+
+    output.sort(key=lambda x: (x["W"], x["differential"]), reverse=True)
+    return {"standings": output}
+
+
+@router.get("/franchise/schedule")
+def season_schedule():
+    state = franchise_state_collection.find_one({"_id": "state"}) or {}
+    schedule = state.get("schedule", [])
+
+    weeks = []
+    for idx, games in enumerate(schedule, start=1):
+        week_games = []
+        for away_id, home_id in games:
+            game_doc = db.games.find_one({"week": idx, "team1_id": away_id, "team2_id": home_id}) or \
+                       db.games.find_one({"week": idx, "team1_id": home_id, "team2_id": away_id})
+            if game_doc:
+                status = "complete"
+                if game_doc["team1_id"] == away_id:
+                    away_score = game_doc.get("team1_score")
+                    home_score = game_doc.get("team2_score")
+                else:
+                    away_score = game_doc.get("team2_score")
+                    home_score = game_doc.get("team1_score")
+            else:
+                status = "scheduled"
+                away_score = None
+                home_score = None
+            week_games.append({
+                "week": idx,
+                "away_team_id": str(away_id),
+                "home_team_id": str(home_id),
+                "away_score": away_score,
+                "home_score": home_score,
+                "status": status
+            })
+        weeks.append(week_games)
+
+    return {"schedule": weeks}
 
 
 @router.get("/franchise/leaders")

@@ -53,14 +53,17 @@
         <button data-tab="recruits-tab">Recruits</button>
       </div>
       <div id="standings-tab" class="tab-content active">
+        <h3>Team Standings</h3>
         <div class="scroll-x">
-          <table class="leaders-table">
+          <table class="leaders-table" id="standings-table">
             <thead>
-              <tr><th>Rank</th><th>Team</th><th>Record</th></tr>
+              <tr><th>Team</th><th>W</th><th>L</th><th>%</th><th>PF</th><th>PA</th><th>Next</th></tr>
             </thead>
             <tbody id="standings-body"></tbody>
           </table>
         </div>
+        <h3>Season Schedule</h3>
+        <div id="schedule-container" class="schedule-container"></div>
       </div>
       <div id="team-tab" class="tab-content">
         <div class="scroll-x">
