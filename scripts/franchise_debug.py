@@ -1,3 +1,17 @@
+"""Debugging utilities for the franchise manager.
+
+This script can be executed directly via ``python scripts/franchise_debug.py``.
+To ensure imports work correctly when run this way we add the project root to
+``sys.path``.
+"""
+
+from pathlib import Path
+import sys
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 from BackEnd.db import db
 from BackEnd.models.franchise_manager import FranchiseManager
 import pprint
