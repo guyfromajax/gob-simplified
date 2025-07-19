@@ -18,18 +18,23 @@ import pprint
 
 def debug_franchise_init():
     manager = FranchiseManager(db)
-    
+
     print("✅ Initializing season...")
     manager.initialize_season()
 
     print("✅ Generating recruits...")
     manager.generate_recruits()
 
-    print("📅 Schedule Preview (14 weeks):")
+    # 🔍 Build ID-to-name map for readable output
+    id_to_name = {str(team["_id"]): team["name"] for team in db.teams.find()}
+
+    print("📅 Schedule Preview (team names):")
     for week_num, games in enumerate(manager.schedule, start=1):
         print(f"Week {week_num}:")
         for game in games:
-            print(f"  {game[0]} vs {game[1]}")
+            team1 = id_to_name.get(str(game[0]), str(game[0]))
+            team2 = id_to_name.get(str(game[1]), str(game[1]))
+            print(f"  {team1} vs {team2}")
 
     print("\n🎓 Recruit Sample:")
     recruits = list(db.recruits.find().limit(5))
