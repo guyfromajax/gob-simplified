@@ -16,6 +16,6 @@ if (tournamentBtn) {
 
 if (franchiseBtn) {
   franchiseBtn.addEventListener('click', () => {
-    window.location.href = '/franchise/start';
+    window.location.href = './franchise-select-team.html';
   });
 }
