@@ -20,6 +20,8 @@ const teamMap = {
   "Xavien": "Xav",
 };
 
+const teamIdNameMap = {};
+
 function populateTop(data) {
   if (!data) return;
   document.querySelector('.username').textContent = data.username || 'User';
@@ -50,10 +52,10 @@ function renderStandings(data) {
   if (!data) return;
   const tbody = document.getElementById('standings-body');
   tbody.innerHTML = '';
-  data.standings.forEach((t, i) => {
+  (data.standings || []).forEach(t => {
+    teamIdNameMap[t.team_id] = t.name;
     const tr = document.createElement('tr');
-    const rec = t.record || {W:0,L:0};
-    tr.innerHTML = `<td>${i + 1}</td><td>${t.name}</td><td>${rec.W}-${rec.L}</td>`;
+    tr.innerHTML = `<td>${t.name}</td><td>${t.W}</td><td>${t.L}</td><td>${t.pct.toFixed(3)}</td><td>${t.PF}</td><td>${t.PA}</td><td>${t.next}</td>`;
     tbody.appendChild(tr);
   });
 }
@@ -130,6 +132,39 @@ function renderTeam(data) {
   });
 }
 
+function renderSchedule(data) {
+  if (!data) return;
+  const container = document.getElementById('schedule-container');
+  if (!container) return;
+  container.innerHTML = '';
+  (data.schedule || []).forEach((weekGames, idx) => {
+    const weekDiv = document.createElement('div');
+    weekDiv.className = 'schedule-week';
+    const h4 = document.createElement('h4');
+    h4.textContent = `Week ${idx + 1}`;
+    weekDiv.appendChild(h4);
+    weekGames.forEach(g => {
+      const gameDiv = document.createElement('div');
+      gameDiv.className = 'schedule-game';
+      const away = teamIdNameMap[g.away_team_id] || g.away_team_id;
+      const home = teamIdNameMap[g.home_team_id] || g.home_team_id;
+      let text = '';
+      if (g.status === 'complete') {
+        let awayStr = `${away} (${g.away_score})`;
+        let homeStr = `${home} (${g.home_score})`;
+        if (g.away_score > g.home_score) awayStr = `<strong>${awayStr}</strong>`;
+        if (g.home_score > g.away_score) homeStr = `<strong>${homeStr}</strong>`;
+        text = `${awayStr} at ${homeStr}`;
+      } else {
+        text = `${away} at ${home}`;
+      }
+      gameDiv.innerHTML = text;
+      weekDiv.appendChild(gameDiv);
+    });
+    container.appendChild(weekDiv);
+  });
+}
+
 async function init() {
   const topData = await fetchJSON('/franchise/command-center/data');
   populateTop(topData);
@@ -137,6 +172,7 @@ async function init() {
     renderTeam(await fetchJSON(`/roster/${encodeURIComponent(topData.team)}`));
   }
   renderStandings(await fetchJSON('/franchise/standings'));
+  renderSchedule(await fetchJSON('/franchise/schedule'));
   renderLeaders(await fetchJSON('/franchise/leaders'));
   renderTeamStats(await fetchJSON('/franchise/team-stats'));
   renderRecruits(await fetchJSON('/franchise/recruits'));
