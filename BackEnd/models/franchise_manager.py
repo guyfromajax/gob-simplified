@@ -85,35 +85,31 @@ class ScheduleManager:
         self.teams = [team["_id"] for team in teams]
 
     def generate_schedule(self):
-        # Create all home/away permutations (not just combinations)
-        all_matchups = list(permutations(self.teams, 2))  # 56 total matchups (8 teams x 7 opponents)
-        random.shuffle(all_matchups)
+        if len(self.teams) != 8:
+            raise ValueError("This round-robin generator expects exactly 8 teams.")
+
+        teams = list(self.teams)
+        random.shuffle(teams)  # Randomize starting order
 
         schedule = []
-        used_matchups = set()
 
-        while len(schedule) < 14:  # 14 weeks
+        for round_index in range(len(teams) - 1):
             week = []
-            teams_scheduled = set()
-
-            for matchup in all_matchups:
-                away, home = matchup
-                if matchup in used_matchups:
-                    continue
-                if away in teams_scheduled or home in teams_scheduled:
-                    continue
-
-                week.append((away, home))
-                teams_scheduled.update([away, home])
-                used_matchups.add(matchup)
-
-                if len(week) == 4:  # 4 games = 8 teams = full week
-                    break
-
-            if len(week) < 4:
-                raise ValueError("Unable to build a full schedule. Check for scheduling conflicts.")
-
+            for i in range(len(teams) // 2):
+                home = teams[i]
+                away = teams[-i - 1]
+                # Alternate home/away each round
+                if round_index % 2 == 0:
+                    week.append((away, home))  # away at home
+                else:
+                    week.append((home, away))  # away at home
             schedule.append(week)
+            # Rotate the teams (keep the first fixed)
+            teams = [teams[0]] + [teams[-1]] + teams[1:-1]
+
+        # Second half of season: reverse home/away of first 7 weeks
+        mirrored_schedule = [(home, away) for week in schedule for (away, home) in week]
+        schedule += [mirrored_schedule[i:i+4] for i in range(0, len(mirrored_schedule), 4)]
 
         return schedule
 
