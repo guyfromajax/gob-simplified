@@ -52,8 +52,28 @@ def play_next_game():
     manager = FranchiseManager(db)
     manager.schedule = state.get("schedule", [])
     manager.week = state.get("week", 1)
+
+    user_team_name = state.get("team")
+    user_team_doc = db.teams.find_one({"name": user_team_name})
+    user_team_id = user_team_doc.get("_id") if user_team_doc else None
+
+    matchup = None
+    if manager.week - 1 < len(manager.schedule):
+        for away_id, home_id in manager.schedule[manager.week - 1]:
+            if away_id == user_team_id or home_id == user_team_id:
+                away_doc = db.teams.find_one({"_id": away_id}, {"name": 1})
+                home_doc = db.teams.find_one({"_id": home_id}, {"name": 1})
+                matchup = {
+                    "home": home_doc.get("name", ""),
+                    "away": away_doc.get("name", "")
+                }
+                break
+
     manager.run_week()
-    return {"status": "ok"}
+
+    if not matchup:
+        raise HTTPException(status_code=404, detail="User matchup not found")
+    return matchup
 
 
 @router.get("/franchise/command-center/data")
