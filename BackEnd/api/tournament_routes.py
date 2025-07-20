@@ -39,42 +39,65 @@ def start_tournament(request: StartTournamentRequest):
 
 @router.post("/simulate-tournament-round")
 def simulate_round(request: SimulateRequest):
+    """Simulate all non-user games for the current round and return the user's
+    matchup. If the user game has already been played, a flag is returned."""
+
     try:
         try:
-            oid = ObjectId(request.tournament_id)
+            tournament_id = ObjectId(request.tournament_id)
         except Exception:
             raise HTTPException(status_code=400, detail="Invalid tournament_id")
 
-        try:
-            tournament_object_id = ObjectId(request.tournament_id)
-        except Exception:
-            raise HTTPException(status_code=400, detail="Invalid tournament_id format")
-
-        tournament_doc = tournaments_collection.find_one({"_id": tournament_object_id})
+        tournament_doc = tournaments_collection.find_one({"_id": tournament_id})
         if not tournament_doc:
             raise HTTPException(status_code=404, detail="Tournament not found")
 
         manager = TournamentManager(tournaments_collection=tournaments_collection)
         manager.tournament = tournament_doc
-        manager.tournament_id = tournament_doc["_id"]
+        manager.tournament_id = tournament_id
 
         round_name = f"round{tournament_doc['current_round']}"
         matchups = tournament_doc["bracket"].get(round_name, [])
 
+        user_team_id = tournament_doc.get("user_team_id")
+        user_matchup = None
+        already_played = False
+
         for i, matchup in enumerate(matchups):
-            if tournament_doc["user_team_id"] in [matchup["home_team"], matchup["away_team"]]:
-                continue  # Skip user match
+            if user_team_id in [matchup["home_team"], matchup["away_team"]]:
+                user_matchup = {"home": matchup["home_team"], "away": matchup["away_team"]}
+                if matchup.get("game_id"):
+                    already_played = True
+                continue  # skip sim for user game
+
+            # Skip games already simulated
+            if matchup.get("game_id"):
+                continue
+
             game = run_simulation(matchup["home_team"], matchup["away_team"])
             summary = summarize_game_state(game)
             game_id = games_collection.insert_one(summary).inserted_id
-            winner = matchup["home_team"] if summary["score"][matchup["home_team"]] > summary["score"][matchup["away_team"]] else matchup["away_team"]
+            winner = (
+                matchup["home_team"]
+                if summary["score"][matchup["home_team"]] > summary["score"][matchup["away_team"]]
+                else matchup["away_team"]
+            )
             manager.save_game_result(round_name, i, str(game_id), winner)
 
-        manager.advance_round()
-        updated = tournaments_collection.find_one({"_id": oid})
-        if updated:
-            updated["_id"] = str(updated["_id"])
-        return updated
+        # Reload tournament to check if round is complete
+        updated_doc = tournaments_collection.find_one({"_id": tournament_id})
+        if updated_doc:
+            all_done = all(m.get("winner") for m in updated_doc["bracket"].get(round_name, []))
+            if all_done:
+                manager.tournament = updated_doc
+                manager.advance_round()
+
+        if already_played:
+            return {"already_played": True}
+        if user_matchup:
+            return user_matchup
+
+        return {"error": "User matchup not found"}
 
     except Exception as e:
         print("🚨 Error in simulate_round:", str(e))
