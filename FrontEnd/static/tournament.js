@@ -297,8 +297,32 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   const playBtn = document.getElementById('play-now');
   if (playBtn) {
-    playBtn.addEventListener('click', () => {
-      console.log('Play Now clicked (tournament)');
+    playBtn.addEventListener('click', async () => {
+      if (!tournament || !tournament._id) {
+        alert('Tournament not loaded');
+        return;
+      }
+      playBtn.disabled = true;
+      try {
+        const res = await fetch('/simulate-tournament-round', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tournament_id: tournament._id })
+        });
+        if (!res.ok) throw new Error('Request failed');
+        const data = await res.json();
+        if (data.already_played) {
+          alert('This round has already been played.');
+          return;
+        }
+        const { home, away } = data;
+        if (!home || !away) throw new Error('Matchup not found');
+        window.location.href = `/court.html?tournament_id=${encodeURIComponent(tournament._id)}&home=${encodeURIComponent(home)}&away=${encodeURIComponent(away)}`;
+      } catch (err) {
+        console.error('Failed to start game', err);
+        alert('Unable to start game');
+        playBtn.disabled = false;
+      }
     });
   }
 });
