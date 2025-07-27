@@ -1,5 +1,5 @@
 let tournament = JSON.parse(localStorage.getItem("activeTournament")) || null;
-const userTeamId = (localStorage.getItem("userTeamId") || "").toUpperCase();
+let userTeamId = (localStorage.getItem("userTeamId") || "").toUpperCase();
 
 const teamAbbreviations = {
   "BENTLEY-TRUMAN": "BT",
@@ -245,13 +245,14 @@ function renderLeaderboards() {
   });
 }
 
-function initTopAssets() {
-  const formattedTeamName = formatTeamName(userTeamId);
+function initTopAssets(teamName) {
+  const teamKey = (teamName || userTeamId || "").toUpperCase();
+  const formattedTeamName = formatTeamName(teamKey);
   const logoEl = document.getElementById("user-team-logo");
   if (logoEl) {
     logoEl.src = `images/homepage-logos/${formattedTeamName}.png`;
   }
-  const abbr = teamAbbreviations[userTeamId] || "";
+  const abbr = teamAbbreviations[teamKey] || "";
   const sammyEl = document.getElementById("coach-sammy");
   const dukeEl = document.getElementById("coach-duke");
   if (sammyEl) sammyEl.src = `/static/images/coaches/${abbr}/Sammy-${abbr}.png`;
@@ -287,8 +288,12 @@ async function loadRoster() {
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
-  initTopAssets();
   await loadTournament();
+  if (!userTeamId && tournament && tournament.user_team_id) {
+    userTeamId = tournament.user_team_id.toUpperCase();
+    localStorage.setItem("userTeamId", tournament.user_team_id);
+  }
+  initTopAssets(userTeamId);
   await loadRoster();
   renderBracket();
   renderRoster();
