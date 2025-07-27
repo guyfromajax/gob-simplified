@@ -33,15 +33,11 @@ app.include_router(tournament_router)
 app.include_router(training_router)
 app.include_router(franchise_router)
 
-
 # app.mount("/", StaticFiles(directory="FrontEnd", html=True), name="static")
 # app.mount("/static", StaticFiles(directory="FrontEnd", html=True), name="static")
 app.mount("/static", StaticFiles(directory="FrontEnd/static"), name="static")
 
-
-
 print("🚀 Loaded FastAPI app from api.py")
-
 
 app.add_middleware(
     CORSMiddleware,
