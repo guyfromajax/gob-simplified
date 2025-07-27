@@ -1,15 +1,16 @@
 let tournament = JSON.parse(localStorage.getItem("activeTournament")) || null;
-let userTeamId = (localStorage.getItem("userTeamId") || "").toUpperCase();
+let userTeamId = localStorage.getItem("userTeamId") || "";
 
-const teamAbbreviations = {
-  "BENTLEY-TRUMAN": "BT",
-  "FOUR CORNERS": "FC",
-  "LANCASTER": "Lan",
-  "LITTLE YORK": "LY",
-  "MORRISTOWN": "Mor",
-  "OCEAN CITY": "OC",
-  "SOUTH LANCASTER": "SL",
-  "XAVIEN": "Xav",
+// Match franchise command center mapping
+const teamMap = {
+  "Four Corners": "FC",
+  "Bentley-Truman": "BT",
+  "Lancaster": "Lan",
+  "Little York": "LY",
+  "Morristown": "Mor",
+  "Ocean City": "OC",
+  "South Lancaster": "SL",
+  "Xavien": "Xav",
 };
 
 function formatTeamName(name) {
@@ -22,7 +23,7 @@ function formatTeamName(name) {
 }
 
 function isUserTeam(teamName) {
-  return teamName.toUpperCase() === userTeamId;
+  return teamName === userTeamId;
 }
 
 // Map full team names to bracket logo filenames
@@ -56,7 +57,7 @@ console.log("✅ tournament.js loaded");
 
 function getLogo(teamName) {
   const formatted = formatTeamName(teamName);
-  return `images/homepage-logos/${formatted}.png`;
+  return `/static/images/homepage-logos/${formatted}.png`;
 }
 
 function addTbdRound(bracketEl, count, cls) {
@@ -246,17 +247,21 @@ function renderLeaderboards() {
 }
 
 function initTopAssets(teamName) {
-  const teamKey = (teamName || userTeamId || "").toUpperCase();
-  const formattedTeamName = formatTeamName(teamKey);
+  const formattedName = formatTeamName(teamName || userTeamId || "");
   const logoEl = document.getElementById("user-team-logo");
   if (logoEl) {
-    logoEl.src = `images/homepage-logos/${formattedTeamName}.png`;
+    logoEl.src = `/static/images/homepage-logos/${formattedName}.png`;
   }
-  const abbr = teamAbbreviations[teamKey] || "";
+  const abbr = teamMap[formattedName] || "";
   const sammyEl = document.getElementById("coach-sammy");
   const dukeEl = document.getElementById("coach-duke");
-  if (sammyEl) sammyEl.src = `/static/images/coaches/${abbr}/Sammy-${abbr}.png`;
-  if (dukeEl) dukeEl.src = `/static/images/coaches/${abbr}/Duke-${abbr}.png`;
+  if (abbr) {
+    if (sammyEl) sammyEl.src = `/static/images/coaches/${abbr}/Sammy-${abbr}.png`;
+    if (dukeEl) dukeEl.src = `/static/images/coaches/${abbr}/Duke-${abbr}.png`;
+  } else {
+    if (sammyEl) sammyEl.removeAttribute('src');
+    if (dukeEl) dukeEl.removeAttribute('src');
+  }
 }
 
 async function loadTournament() {
@@ -290,7 +295,7 @@ async function loadRoster() {
 document.addEventListener("DOMContentLoaded", async () => {
   await loadTournament();
   if (!userTeamId && tournament && tournament.user_team_id) {
-    userTeamId = tournament.user_team_id.toUpperCase();
+    userTeamId = tournament.user_team_id;
     localStorage.setItem("userTeamId", tournament.user_team_id);
   }
   initTopAssets(userTeamId);
