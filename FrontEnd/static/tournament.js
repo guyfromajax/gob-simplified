@@ -253,9 +253,9 @@ function initTopAssets() {
   }
   const abbr = teamAbbreviations[userTeamId] || "";
   const sammy = document.getElementById("coach-sammy");
-  const mary = document.getElementById("coach-mary");
+  const duke = document.getElementById("coach-duke");
   if (sammy) sammy.src = `images/coaches/${abbr}/Sammy-${abbr}.png`;
-  if (mary) mary.src = `images/coaches/${abbr}/Mary-${abbr}.png`;
+  if (duke) duke.src = `images/coaches/${abbr}/Duke-${abbr}.png`;
 }
 
 async function loadTournament() {
