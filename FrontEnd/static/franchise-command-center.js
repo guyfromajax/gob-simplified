@@ -30,13 +30,13 @@ function populateTop(data) {
 
   const abbr = teamMap[data.team];
   const sammyEl = document.getElementById('coach-sammy');
-  const maryEl = document.getElementById('coach-duke');
+  const dukeEl = document.getElementById('coach-duke');
   if (abbr) {
     if (sammyEl) sammyEl.src = `/static/images/coaches/${abbr}/Sammy-${abbr}.png`;
-    if (maryEl) maryEl.src = `/static/images/coaches/${abbr}/Duke-${abbr}.png`;
+    if (dukeEl) dukeEl.src = `/static/images/coaches/${abbr}/Duke-${abbr}.png`;
   } else {
     if (sammyEl) sammyEl.removeAttribute('src');
-    if (maryEl) maryEl.removeAttribute('src');
+    if (dukeEl) dukeEl.removeAttribute('src');
   }
 
   document.querySelector('.chemistry-bar').textContent = `${data.team_chemistry || 0} / 25`;

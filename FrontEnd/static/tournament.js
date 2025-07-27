@@ -252,10 +252,10 @@ function initTopAssets() {
     logoEl.src = `images/homepage-logos/${formattedTeamName}.png`;
   }
   const abbr = teamAbbreviations[userTeamId] || "";
-  const sammy = document.getElementById("coach-sammy");
-  const duke = document.getElementById("coach-duke");
-  if (sammy) sammy.src = `images/coaches/${abbr}/Sammy-${abbr}.png`;
-  if (duke) duke.src = `images/coaches/${abbr}/Duke-${abbr}.png`;
+  const sammyEl = document.getElementById("coach-sammy");
+  const dukeEl = document.getElementById("coach-duke");
+  if (sammyEl) sammyEl.src = `/static/images/coaches/${abbr}/Sammy-${abbr}.png`;
+  if (dukeEl) dukeEl.src = `/static/images/coaches/${abbr}/Duke-${abbr}.png`;
 }
 
 async function loadTournament() {
