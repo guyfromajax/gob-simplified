@@ -21,5 +21,13 @@ if (franchiseBtn) {
   franchiseBtn.addEventListener('click', () => {
     window.location.href = '/franchise/start';
   });
-  
+
 }
+
+const teamButtons = document.querySelectorAll('.team-button');
+teamButtons.forEach(btn => {
+  btn.addEventListener('click', () => {
+    const team = btn.dataset.team;
+    window.location.href = `/team-roster/${encodeURIComponent(team)}`;
+  });
+});
