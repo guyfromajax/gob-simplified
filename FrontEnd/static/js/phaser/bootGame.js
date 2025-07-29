@@ -39,12 +39,11 @@ function showPopup(score) {
   const container = document.getElementById('phaser-container');
   const popup = document.createElement('div');
   popup.className = 'result-popup';
-  const backUrl = getBackUrl();
   popup.innerHTML = `
     <div class="popup-content">
       <h2>Final Score</h2>
       <p>${score.homeTeam} ${score.homeScore} - ${score.awayScore} ${score.awayTeam}</p>
-      <a href="${window.location.origin + backUrl + window.location.search}" class="back-button">Back To Locker Room</a>
+      <a href="${window.location.origin + getBackUrl() + window.location.search}" class="back-button">Back To Locker Room</a>
     </div>
   `;
   container.appendChild(popup);
