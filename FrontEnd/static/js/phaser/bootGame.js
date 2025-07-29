@@ -17,11 +17,6 @@ const GameScene = createGameScene(Phaser);
 let game;
 let gamePromise;
 
-function getBackUrl() {
-  if (tournamentId) return '/tournament';
-  if (franchise) return '/franchise/command-center';
-  return '/mode-select';
-}
 
 async function fetchTeamRoster(teamName) {
   const res = await fetch(`/roster/${encodeURIComponent(teamName)}?tournament_id=${tournamentId}`);
@@ -39,11 +34,21 @@ function showPopup(score) {
   const container = document.getElementById('phaser-container');
   const popup = document.createElement('div');
   popup.className = 'result-popup';
+
+  let backUrl;
+  if (tournamentId) {
+    backUrl = 'https://gob-simplified-production.up.railway.app/static/tournament.html';
+  } else if (franchise) {
+    backUrl = 'https://gob-simplified-production.up.railway.app/franchise/command-center';
+  } else {
+    backUrl = 'https://gob-simplified-production.up.railway.app/static/mode-select.html';
+  }
+
   popup.innerHTML = `
     <div class="popup-content">
       <h2>Final Score</h2>
       <p>${score.homeTeam} ${score.homeScore} - ${score.awayScore} ${score.awayTeam}</p>
-      <a href="${window.location.origin + getBackUrl() + window.location.search}" class="back-button">Back To Locker Room</a>
+      <a href="${backUrl}" class="back-button">Back To Locker Room</a>
     </div>
   `;
   container.appendChild(popup);
