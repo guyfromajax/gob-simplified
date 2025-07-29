@@ -14,6 +14,8 @@ console.log('🏀 Tournament launch params:', {
 });
 
 const GameScene = createGameScene(Phaser);
+let game;
+let gamePromise;
 
 function getBackUrl() {
   if (tournamentId) return '/tournament';
@@ -30,38 +32,7 @@ async function fetchTeamRoster(teamName) {
 }
 
 async function startGameAnimation() {
-  if (!homeTeam || !awayTeam) {
-    console.error('Missing team data in URL');
-    return null;
-  }
-
-  const [homeRoster, awayRoster] = await Promise.all([
-    fetchTeamRoster(homeTeam),
-    fetchTeamRoster(awayTeam),
-  ]);
-
-  const game = new Phaser.Game({
-    type: Phaser.AUTO,
-    width: 1229,
-    height: 768,
-    backgroundColor: '#1e1e1e',
-    parent: 'phaser-container',
-    audio: { noAudio: true },
-    scene: GameScene,
-  });
-
-  return new Promise((resolve) => {
-    const gs = game.scene.getScene('GameScene');
-    gs.events.once('gameComplete', (finalScore) => {
-      resolve(finalScore);
-    });
-    game.scene.start('GameScene', {
-      rosters: { homeRoster, awayRoster },
-      tournamentId,
-      homeTeam,
-      awayTeam,
-    });
-  });
+  return gamePromise;
 }
 
 function showPopup(score) {
@@ -73,7 +44,7 @@ function showPopup(score) {
     <div class="popup-content">
       <h2>Final Score</h2>
       <p>${score.homeTeam} ${score.homeScore} - ${score.awayScore} ${score.awayTeam}</p>
-      <a href="${backUrl}" class="back-button">Back To Locker Room</a>
+      <a href="${window.location.origin + backUrl + window.location.search}" class="back-button">Back To Locker Room</a>
     </div>
   `;
   container.appendChild(popup);
@@ -82,6 +53,43 @@ function showPopup(score) {
 async function playGame() {
   playBtn.style.display = 'none';
   resultsBtn.style.display = 'none';
+
+  if (!homeTeam || !awayTeam) {
+    console.error('Missing team data in URL');
+    return;
+  }
+
+  const [homeRoster, awayRoster] = await Promise.all([
+    fetchTeamRoster(homeTeam),
+    fetchTeamRoster(awayTeam),
+  ]);
+
+  if (!game) {
+    game = new Phaser.Game({
+      type: Phaser.AUTO,
+      width: 1229,
+      height: 768,
+      backgroundColor: '#1e1e1e',
+      parent: 'phaser-container',
+      audio: { noAudio: true },
+      scene: GameScene,
+    });
+  }
+
+  const gs = game.scene.getScene('GameScene');
+  gamePromise = new Promise((resolve) => {
+    gs.events.once('gameComplete', (finalScore) => {
+      resolve(finalScore);
+    });
+  });
+
+  gs.scene.restart({
+    rosters: { homeRoster, awayRoster },
+    tournamentId,
+    homeTeam,
+    awayTeam,
+  });
+
   const score = await startGameAnimation();
   if (score) {
     showPopup(score);
