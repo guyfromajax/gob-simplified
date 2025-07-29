@@ -116,7 +116,7 @@ export function createGameScene(Phaser) {
             })
             });
 
-            if (!res.ok) {
+        if (!res.ok) {
             console.error("❌ Failed to save tournament result:", await res.text());
             } else {
             console.log("✅ Tournament result saved.");
@@ -125,6 +125,16 @@ export function createGameScene(Phaser) {
             console.error("🚨 Error during tournament result save:", err);
         }
         }
+
+        // Expose final score and signal completion
+        this.finalScore = {
+            homeTeam: simData.home_team,
+            awayTeam: simData.away_team,
+            homeScore,
+            awayScore,
+            winner
+        };
+        this.events.emit('gameComplete', this.finalScore);
       };
 
       if (this.textures.exists(courtKey)) {
