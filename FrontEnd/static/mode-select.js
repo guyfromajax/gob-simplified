@@ -24,10 +24,12 @@ if (franchiseBtn) {
 
 }
 
-const teamButtons = document.querySelectorAll('.team-button');
-teamButtons.forEach(btn => {
-  btn.addEventListener('click', () => {
-    const team = btn.dataset.team;
-    window.location.href = `/team-roster/${encodeURIComponent(team)}`;
+document.addEventListener('DOMContentLoaded', () => {
+  const teamButtons = document.querySelectorAll('.team-button');
+  teamButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const team = btn.dataset.team;
+      window.location.href = `/team-roster/${encodeURIComponent(team)}`;
+    });
   });
 });
