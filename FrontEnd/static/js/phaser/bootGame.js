@@ -26,7 +26,43 @@ async function fetchTeamRoster(teamName) {
   return res.json();
 }
 
-async function startGameAnimation() {
+async function startGameAnimation({ homeRoster, awayRoster }) {
+  if (!game) {
+    game = new Phaser.Game({
+      type: Phaser.AUTO,
+      width: 1229,
+      height: 768,
+      backgroundColor: '#1e1e1e',
+      parent: 'phaser-container',
+      audio: { noAudio: true },
+      scene: [], // prevent auto-start
+    });
+    game.scene.add('GameScene', GameScene);
+  }
+
+  const gs = game.scene.getScene('GameScene');
+  gamePromise = new Promise((resolve) => {
+    gs.events.once('gameComplete', (finalScore) => {
+      resolve(finalScore);
+    });
+  });
+
+  if (gs.scene.isActive()) {
+    gs.scene.restart({
+      rosters: { homeRoster, awayRoster },
+      tournamentId,
+      homeTeam,
+      awayTeam,
+    });
+  } else {
+    gs.scene.start({
+      rosters: { homeRoster, awayRoster },
+      tournamentId,
+      homeTeam,
+      awayTeam,
+    });
+  }
+
   return gamePromise;
 }
 
@@ -68,33 +104,7 @@ async function playGame() {
     fetchTeamRoster(awayTeam),
   ]);
 
-  if (!game) {
-    game = new Phaser.Game({
-      type: Phaser.AUTO,
-      width: 1229,
-      height: 768,
-      backgroundColor: '#1e1e1e',
-      parent: 'phaser-container',
-      audio: { noAudio: true },
-      scene: GameScene,
-    });
-  }
-
-  const gs = game.scene.getScene('GameScene');
-  gamePromise = new Promise((resolve) => {
-    gs.events.once('gameComplete', (finalScore) => {
-      resolve(finalScore);
-    });
-  });
-
-  gs.scene.restart({
-    rosters: { homeRoster, awayRoster },
-    tournamentId,
-    homeTeam,
-    awayTeam,
-  });
-
-  const score = await startGameAnimation();
+  const score = await startGameAnimation({ homeRoster, awayRoster });
   if (score) {
     showPopup(score);
   }
