@@ -5,15 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Ocean City Roster</title>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/mode-select.css">
   <style>
     body { font-family: 'Inter', sans-serif; background:#f5f5f5; margin:0; padding:20px; }
-    #back { position:absolute; top:10px; left:10px; }
-    #back a { text-decoration:none; background:#ff9800; color:#fff; padding:6px 12px; border-radius:4px; font-weight:bold; }
     h1 { font-family:'Bebas Neue', cursive; text-align:center; margin-top:40px; }
   </style>
 </head>
 <body>
-  <div id="back"><a href="/mode-select">Back</a></div>
+  <button class="back-button" onclick="window.history.back()">Back</button>
   <h1>In Development</h1>
 </body>
 </html>
