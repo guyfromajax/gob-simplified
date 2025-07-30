@@ -1,7 +1,9 @@
 # 1. Imports
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, HTMLResponse
+from fastapi.templating import Jinja2Templates
+from fastapi import Request
 from BackEnd.constants import POSITION_LIST
 import uuid
 from BackEnd.main import run_simulation
@@ -32,6 +34,8 @@ app = FastAPI()
 app.include_router(tournament_router)
 app.include_router(training_router)
 app.include_router(franchise_router)
+
+templates = Jinja2Templates(directory="FrontEnd/static")
 
 # app.mount("/", StaticFiles(directory="FrontEnd", html=True), name="static")
 # app.mount("/static", StaticFiles(directory="FrontEnd", html=True), name="static")
@@ -203,6 +207,36 @@ def get_team_players(team_id: str):
         "team": team_doc.get("name", team_id) if team_doc else team_id,
         "players": players_data,
     }
+
+
+@app.get("/team-roster/{team}", response_class=HTMLResponse)
+def team_roster_page(request: Request, team: str):
+    """Render an HTML roster page for a given team."""
+    players_cursor = players_collection.find({"team": team})
+    players = []
+    for p in players_cursor:
+        players.append({
+            "name": f"{p.get('first_name', '')} {p.get('last_name', '')}".strip(),
+            "year": p.get("year", "--"),
+            "height": p.get("height", "--"),
+            "weight": p.get("weight", "--"),
+            "SC": p.get("SC", "--"),
+            "SH": p.get("SH", "--"),
+            "ID": p.get("ID", "--"),
+            "OD": p.get("OD", "--"),
+            "PS": p.get("PS", "--"),
+            "BH": p.get("BH", "--"),
+            "RB": p.get("RB", "--"),
+            "AG": p.get("AG", "--"),
+            "ST": p.get("ST", "--"),
+            "ND": p.get("ND", "--"),
+            "IQ": p.get("IQ", "--"),
+            "FT": p.get("FT", "--"),
+            "NG": p.get("NG", "--"),
+        })
+
+    template_name = f"team-roster/team-roster-{team.replace(' ', '-')}.html"
+    return templates.TemplateResponse(template_name, {"request": request, "team": team, "players": players})
 
 
 @app.get("/tournament/active")
