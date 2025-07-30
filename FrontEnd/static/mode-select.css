@@ -82,3 +82,12 @@ body {
     grid-template-columns: repeat(2, 1fr);
   }
 }
+
+.back-button {
+  background: #ff9800;
+  color: #fff;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
