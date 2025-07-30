@@ -5,6 +5,9 @@ requests
 pymongo>=4.6.1
 pymongo[srv]==4.6.1
 Unidecode
+Jinja2
+mongomock
+httpx
 
 
 
