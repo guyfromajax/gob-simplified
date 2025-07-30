@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Little York Team Roster</title>
+  <title>{{ team }} Team Roster</title>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/tournament.css">
   <style>
@@ -15,7 +15,7 @@
 </head>
 <body>
   <div id="back"><a href="/mode-select">Back</a></div>
-  <h1>Little York Roster</h1>
+  <h1>{{ team }} Roster</h1>
   <div class="scroll-x">
     <table class="roster-table">
       <thead>
@@ -40,11 +40,27 @@
         </tr>
       </thead>
       <tbody>
-        <tr><td>Player1</td><td>Junior</td><td>6'2"</td><td>180</td><td>75</td><td>80</td><td>70</td><td>65</td><td>72</td><td>74</td><td>68</td><td>76</td><td>71</td><td>69</td><td>77</td><td>85</td><td>1</td></tr>
-        <tr><td>Player2</td><td>Senior</td><td>6'4"</td><td>190</td><td>78</td><td>77</td><td>73</td><td>68</td><td>70</td><td>72</td><td>70</td><td>74</td><td>72</td><td>70</td><td>75</td><td>82</td><td>2</td></tr>
-        <tr><td>Player3</td><td>Sophomore</td><td>6'1"</td><td>175</td><td>72</td><td>74</td><td>68</td><td>67</td><td>71</td><td>73</td><td>65</td><td>75</td><td>69</td><td>68</td><td>74</td><td>80</td><td>3</td></tr>
-        <tr><td>Player4</td><td>Freshman</td><td>6'3"</td><td>185</td><td>70</td><td>72</td><td>69</td><td>66</td><td>68</td><td>70</td><td>72</td><td>73</td><td>70</td><td>67</td><td>72</td><td>78</td><td>4</td></tr>
-        <tr><td>Player5</td><td>Junior</td><td>6'5"</td><td>200</td><td>76</td><td>79</td><td>71</td><td>69</td><td>73</td><td>75</td><td>74</td><td>78</td><td>73</td><td>71</td><td>78</td><td>83</td><td>5</td></tr>
+      {% for p in players %}
+        <tr>
+          <td>{{ p.name }}</td>
+          <td>{{ p.year }}</td>
+          <td>{{ p.height }}</td>
+          <td>{{ p.weight }}</td>
+          <td>{{ p.SC }}</td>
+          <td>{{ p.SH }}</td>
+          <td>{{ p.ID }}</td>
+          <td>{{ p.OD }}</td>
+          <td>{{ p.PS }}</td>
+          <td>{{ p.BH }}</td>
+          <td>{{ p.RB }}</td>
+          <td>{{ p.AG }}</td>
+          <td>{{ p.ST }}</td>
+          <td>{{ p.ND }}</td>
+          <td>{{ p.IQ }}</td>
+          <td>{{ p.FT }}</td>
+          <td>{{ p.NG }}</td>
+        </tr>
+      {% endfor %}
       </tbody>
     </table>
   </div>
