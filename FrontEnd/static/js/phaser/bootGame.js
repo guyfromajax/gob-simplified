@@ -40,29 +40,25 @@ async function startGameAnimation({ homeRoster, awayRoster }) {
     game.scene.add('GameScene', GameScene);
   }
 
+  const sceneData = {
+    rosters: { homeRoster, awayRoster },
+    tournamentId,
+    homeTeam,
+    awayTeam,
+  };
+
+  if (game.scene.isActive('GameScene')) {
+    game.scene.restart('GameScene', sceneData);
+  } else {
+    game.scene.start('GameScene', sceneData);
+  }
+
   const gs = game.scene.getScene('GameScene');
-  console.log("gs =", gs);
   gamePromise = new Promise((resolve) => {
     gs.events.once('gameComplete', (finalScore) => {
       resolve(finalScore);
     });
   });
-
-  if (gs.scene.isActive()) {
-    gs.scene.restart({
-      rosters: { homeRoster, awayRoster },
-      tournamentId,
-      homeTeam,
-      awayTeam,
-    });
-  } else {
-    gs.scene.start('GameScene', {
-      rosters: { homeRoster, awayRoster },
-      tournamentId,
-      homeTeam,
-      awayTeam,
-    });
-  }
 
   return gamePromise;
 }
