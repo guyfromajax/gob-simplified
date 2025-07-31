@@ -41,6 +41,7 @@ async function startGameAnimation({ homeRoster, awayRoster }) {
   }
 
   const gs = game.scene.getScene('GameScene');
+  console.log("gs =", gs);
   gamePromise = new Promise((resolve) => {
     gs.events.once('gameComplete', (finalScore) => {
       resolve(finalScore);
