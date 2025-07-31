@@ -55,7 +55,7 @@ async function startGameAnimation({ homeRoster, awayRoster }) {
       awayTeam,
     });
   } else {
-    gs.scene.start({
+    gs.scene.start('GameScene', {
       rosters: { homeRoster, awayRoster },
       tournamentId,
       homeTeam,
