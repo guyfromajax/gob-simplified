@@ -134,7 +134,9 @@ export function createGameScene(Phaser) {
             awayScore,
             winner
         };
-        this.events.emit('gameComplete', this.finalScore);
+        // Emit on the global game event emitter so external code can reliably
+        // listen for completion even across scene restarts
+        this.game.events.emit('gameComplete', this.finalScore);
       };
 
       if (this.textures.exists(courtKey)) {
