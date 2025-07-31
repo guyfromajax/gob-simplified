@@ -41,9 +41,9 @@ export function createGameScene(Phaser) {
       const homeTeam = this.rosters.homeRoster.team_name;
       const awayTeam = this.rosters.awayRoster.team_name;
 
-    console.log("📨 Sending /simulate request for:", homeTeam, "vs", awayTeam);
+    console.log("📨 Sending /api/simulate request for:", homeTeam, "vs", awayTeam);
 
-      const res = await fetch('/simulate', {
+      const res = await fetch('/api/simulate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ home_team: homeTeam, away_team: awayTeam })
