@@ -53,10 +53,10 @@ async function startGameAnimation({ homeRoster, awayRoster }) {
     game.scene.start('GameScene', sceneData);
   }
 
-  const gs = game.scene.getScene('GameScene');
-
   gamePromise = new Promise((resolve) => {
-    gs.events.once('gameComplete', (finalScore) => {
+    // Listen on the global event emitter so we don't lose the listener when
+    // GameScene is restarted or recreated
+    game.events.once('gameComplete', (finalScore) => {
       resolve(finalScore);
     });
   });
