@@ -47,6 +47,12 @@ async function startGameAnimation({ homeRoster, awayRoster }) {
     awayTeam,
   };
 
+  if (game.scene.isActive('GameScene')) {
+    game.scene.restart('GameScene', sceneData);
+  } else {
+    game.scene.start('GameScene', sceneData);
+  }
+
   const gs = game.scene.getScene('GameScene');
 
   gamePromise = new Promise((resolve) => {
@@ -54,12 +60,6 @@ async function startGameAnimation({ homeRoster, awayRoster }) {
       resolve(finalScore);
     });
   });
-
-  if (game.scene.isActive('GameScene')) {
-    game.scene.restart('GameScene', sceneData);
-  } else {
-    game.scene.start('GameScene', sceneData);
-  }
 
   return gamePromise;
 }
