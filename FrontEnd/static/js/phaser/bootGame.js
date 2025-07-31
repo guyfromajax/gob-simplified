@@ -95,7 +95,7 @@ async function playGame() {
   resultsBtn.style.display = 'none';
 
   if (!homeTeam || !awayTeam) {
-    console.error('Missing team data in URL');
+    alert('Please select teams before playing.');
     return;
   }
 
