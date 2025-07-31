@@ -73,7 +73,7 @@ function showPopup(score) {
   if (tournamentId) {
     backUrl = 'https://gob-simplified-production.up.railway.app/static/tournament.html';
   } else if (franchise) {
-    backUrl = 'https://gob-simplified-production.up.railway.app/franchise/command-center';
+    backUrl = 'https://gob-simplified-production.up.railway.app/franchise-command-center.html';
   } else {
     backUrl = 'https://gob-simplified-production.up.railway.app/static/mode-select.html';
   }
