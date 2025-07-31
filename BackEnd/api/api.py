@@ -67,6 +67,7 @@ def get_team_names():
     return sorted([team["name"] for team in teams])
 
 
+@app.post("/api/simulate")
 @app.post("/simulate")
 def simulate_game(request: SimulationRequest):
     home_team = request.home_team
