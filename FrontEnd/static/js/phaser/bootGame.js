@@ -2,6 +2,7 @@ import * as Phaser from 'https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.
 import { createGameScene } from './gameScene.js';
 
 const urlParams = new URLSearchParams(window.location.search);
+console.log("urlParams =", urlParams);
 const tournamentId = urlParams.get('tournament_id');
 const franchise = urlParams.get('franchise');
 const homeTeam = urlParams.get('home');
@@ -73,7 +74,7 @@ function showPopup(score) {
   if (tournamentId) {
     backUrl = 'https://gob-simplified-production.up.railway.app/static/tournament.html';
   } else if (franchise) {
-    backUrl = 'https://gob-simplified-production.up.railway.app/franchise-command-center.html';
+    backUrl = 'https://gob-simplified-production.up.railway.app/franchise/command-center';
   } else {
     backUrl = 'https://gob-simplified-production.up.railway.app/static/mode-select.html';
   }
