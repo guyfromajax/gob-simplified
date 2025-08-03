@@ -216,24 +216,15 @@ def team_roster_page(request: Request, team: str):
     players_cursor = players_collection.find({"team": team})
     players = []
     for p in players_cursor:
+        attrs = p.get("attributes", {})
+        display_attributes = ["SC", "SH", "ID", "OD", "PS", "BH", "RB",
+                              "AG", "ST", "ND", "IQ", "FT", "NG"]
         players.append({
             "name": f"{p.get('first_name', '')} {p.get('last_name', '')}".strip(),
             "year": p.get("year", "--"),
             "height": p.get("height", "--"),
             "weight": p.get("weight", "--"),
-            "SC": p.get("SC", "--"),
-            "SH": p.get("SH", "--"),
-            "ID": p.get("ID", "--"),
-            "OD": p.get("OD", "--"),
-            "PS": p.get("PS", "--"),
-            "BH": p.get("BH", "--"),
-            "RB": p.get("RB", "--"),
-            "AG": p.get("AG", "--"),
-            "ST": p.get("ST", "--"),
-            "ND": p.get("ND", "--"),
-            "IQ": p.get("IQ", "--"),
-            "FT": p.get("FT", "--"),
-            "NG": p.get("NG", "--"),
+            "attributes": {attr: attrs.get(attr, "--") for attr in display_attributes},
         })
 
     template_name = f"team-roster/team-roster-{team.replace(' ', '-')}.html"
