@@ -9,6 +9,8 @@ async function fetchJSON(url) {
   }
 }
 
+let franchiseId = null;
+
 const teamMap = {
   "Four Corners": "FC",
   "Bentley-Truman": "BT",
@@ -184,7 +186,11 @@ playNowBtn.addEventListener('click', async () => {
   playNowBtn.disabled = true;
   playNowBtn.textContent = 'Loading...';
   try {
-    const res = await fetch('/franchise/play-next-game', { method: 'POST' });
+    const res = await fetch('/franchise/play-next-game', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ franchise_id: franchiseId })
+    });
     if (!res.ok) throw new Error('Simulation failed');
     const { home, away } = await res.json();
     if (!home || !away) throw new Error('Matchup not found');
@@ -197,4 +203,7 @@ playNowBtn.addEventListener('click', async () => {
   }
 });
 
-window.addEventListener('DOMContentLoaded', init);
+window.addEventListener('DOMContentLoaded', () => {
+  franchiseId = localStorage.getItem('franchiseId');
+  init();
+});

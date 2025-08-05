@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse, RedirectResponse
 from pydantic import BaseModel
 from pathlib import Path
+from bson import ObjectId
 
 from BackEnd.db import db, franchise_state_collection
 from BackEnd.models.franchise_manager import FranchiseManager
@@ -33,6 +34,9 @@ def get_select_team_page():
 class TeamSelection(BaseModel):
     team_name: str
 
+class PlayGameRequest(BaseModel):
+    franchise_id: str
+
 @router.post("/franchise/select-team")
 def select_team(selection: TeamSelection):
     franchise_state_collection.delete_many({})
@@ -52,11 +56,16 @@ def get_animation_page():
 
 
 @router.post("/franchise/play-next-game")
-def play_next_game():
+def play_next_game(req: PlayGameRequest):
     state = franchise_state_collection.find_one({"_id": "state"}) or {}
+    franchise_doc = db.franchises.find_one({"_id": ObjectId(req.franchise_id)})
+    if not franchise_doc:
+        raise HTTPException(status_code=404, detail="Franchise not found")
+
     manager = FranchiseManager(db)
-    manager.schedule = state.get("schedule", [])
-    manager.week = state.get("week", 1)
+    manager.schedule = franchise_doc.get("schedule", [])
+    manager.week = franchise_doc.get("week", 1)
+    manager.franchise_id = franchise_doc.get("_id")
 
     user_team_name = state.get("team")
     user_team_doc = db.teams.find_one({"name": user_team_name})
