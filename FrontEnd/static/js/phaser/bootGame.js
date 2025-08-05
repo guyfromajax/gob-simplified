@@ -4,7 +4,7 @@ import { createGameScene } from './gameScene.js';
 const urlParams = new URLSearchParams(window.location.search);
 console.log("urlParams =", urlParams);
 const tournamentId = urlParams.get('tournament_id');
-const franchise = urlParams.get('franchise');
+const franchiseId = urlParams.get('franchise_id');
 const homeTeam = urlParams.get('home');
 const awayTeam = urlParams.get('away');
 
@@ -73,7 +73,7 @@ function showPopup(score) {
   let backUrl;
   if (tournamentId) {
     backUrl = 'https://gob-simplified-production.up.railway.app/static/tournament.html';
-  } else if (franchise) {
+  } else if (franchiseId) {
     backUrl = 'https://gob-simplified-production.up.railway.app/franchise/command-center';
   } else {
     backUrl = 'https://gob-simplified-production.up.railway.app/static/mode-select.html';
