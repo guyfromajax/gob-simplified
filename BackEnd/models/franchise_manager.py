@@ -10,6 +10,7 @@ class FranchiseManager:
         self.schedule_manager = ScheduleManager(self.teams)
         self.recruit_manager = RecruitManager(self.db)
         self.schedule = []
+        self.franchise_id = None
 
     def load_teams(self):
         return list(self.db.teams.find())
@@ -80,11 +81,15 @@ class FranchiseManager:
         self.recruit_manager.generate_recruits()
 
     def save_season_state(self):
-        self.db.franchise_state.update_one(
-            {"_id": "state"},
-            {"$set": {"week": self.week, "schedule": self.schedule}},
-            upsert=True
-        )
+        state = {"week": self.week, "schedule": self.schedule}
+        if self.franchise_id:
+            self.db.franchises.update_one(
+                {"_id": self.franchise_id},
+                {"$set": state}
+            )
+        else:
+            result = self.db.franchises.insert_one(state)
+            self.franchise_id = result.inserted_id
 
     # --- UI Integration Recommendations ---
     # /franchise/standings → use team records from self.db.teams
