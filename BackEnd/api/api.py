@@ -89,8 +89,18 @@ def simulate_game(request: SimulationRequest):
 
     game = run_simulation(home_team, away_team)
     # print("Right before summarize_game_state")
-    # print("🧪 Turns sample:", game.turns[:3])  
+    # print("🧪 Turns sample:", game.turns[:3])
     summary = summarize_game_state(game)
+
+    # Ensure team objects exist for the frontend
+    summary["homeTeam"] = summary.get("homeTeam") or {
+        "name": summary.get("home_team", home_team),
+        "score": summary.get("score", {}).get(home_team, 0),
+    }
+    summary["awayTeam"] = summary.get("awayTeam") or {
+        "name": summary.get("away_team", away_team),
+        "score": summary.get("score", {}).get(away_team, 0),
+    }
 
     # ✅ Minimal debug visibility
     # print(f"✅ Game finished: {home_team} vs. {away_team}")
