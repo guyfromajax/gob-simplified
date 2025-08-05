@@ -103,8 +103,8 @@ export function createGameScene(Phaser) {
         // Extract score and winner
         const homeTeamObj = simData.homeTeam || { name: simData.home_team };
         const awayTeamObj = simData.awayTeam || { name: simData.away_team };
-        const homeScore = homeTeamObj.score ?? simData.score?.[homeTeamObj.name] || 0;
-        const awayScore = awayTeamObj.score ?? simData.score?.[awayTeamObj.name] || 0;
+        const homeScore = (homeTeamObj.score ?? simData.score?.[homeTeamObj.name]) || 0;
+        const awayScore = (awayTeamObj.score ?? simData.score?.[awayTeamObj.name]) || 0;
         const winner = homeScore > awayScore ? homeTeamObj.name : awayTeamObj.name;
 
         // POST to /tournament/save-result
