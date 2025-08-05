@@ -39,7 +39,7 @@ def select_team(selection: TeamSelection):
     franchise_state_collection.insert_one({"_id": "state", "team": selection.team_name})
     manager = FranchiseManager(db)
     manager.initialize_season()
-    return {"status": "ok"}
+    return {"status": "ok", "franchise_id": str(manager.franchise_id)}
 
 @router.get("/franchise/command-center")
 def command_center():
