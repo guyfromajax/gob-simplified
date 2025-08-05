@@ -57,8 +57,10 @@ export function createGameScene(Phaser) {
 
       const simData = await res.json();
       console.log("📦 simData received:", simData);
+      const logHome = simData.homeTeam?.name || simData.home_team;
+      const logAway = simData.awayTeam?.name || simData.away_team;
       console.log(
-        `✅ Simulated matchup: ${simData.home_team} vs ${simData.away_team}`
+        `✅ Simulated matchup: ${logHome} vs ${logAway}`
       );
       console.log("📦 First turn:", simData.turns?.[0]);
 
@@ -99,9 +101,11 @@ export function createGameScene(Phaser) {
         console.log("✅ GameScene animation complete");
 
         // Extract score and winner
-        const homeScore = simData.score?.[simData.home_team] || 0;
-        const awayScore = simData.score?.[simData.away_team] || 0;
-        const winner = homeScore > awayScore ? simData.home_team : simData.away_team;
+        const homeTeamObj = simData.homeTeam || { name: simData.home_team };
+        const awayTeamObj = simData.awayTeam || { name: simData.away_team };
+        const homeScore = homeTeamObj.score ?? simData.score?.[homeTeamObj.name] || 0;
+        const awayScore = awayTeamObj.score ?? simData.score?.[awayTeamObj.name] || 0;
+        const winner = homeScore > awayScore ? homeTeamObj.name : awayTeamObj.name;
 
         // POST to /tournament/save-result
         if (this.tournamentId) {
@@ -128,11 +132,13 @@ export function createGameScene(Phaser) {
 
         // Expose final score and signal completion
         this.finalScore = {
-            homeTeam: simData.home_team,
-            awayTeam: simData.away_team,
+            homeTeam: homeTeamObj.name,
+            awayTeam: awayTeamObj.name,
             homeScore,
             awayScore,
-            winner
+            winner,
+            homeTeamData: homeTeamObj,
+            awayTeamData: awayTeamObj,
         };
         // Emit on the global game event emitter so external code can reliably
         // listen for completion even across scene restarts

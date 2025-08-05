@@ -115,11 +115,15 @@ async function showResults() {
   try {
     const res = await fetch(`/game/result?tournament_id=${tournamentId}`);
     const data = await res.json();
+    const homeObj = data.homeTeam || { name: data.home_team };
+    const awayObj = data.awayTeam || { name: data.away_team };
     const score = {
-      homeTeam: data.home_team || homeTeam,
-      awayTeam: data.away_team || awayTeam,
-      homeScore: data.score?.[data.home_team] ?? 0,
-      awayScore: data.score?.[data.away_team] ?? 0,
+      homeTeam: homeObj.name || homeTeam,
+      awayTeam: awayObj.name || awayTeam,
+      homeScore: homeObj.score ?? data.score?.[homeObj.name] ?? 0,
+      awayScore: awayObj.score ?? data.score?.[awayObj.name] ?? 0,
+      homeTeamData: homeObj,
+      awayTeamData: awayObj,
     };
     showPopup(score);
   } catch (err) {

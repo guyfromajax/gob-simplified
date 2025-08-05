@@ -354,38 +354,52 @@ def summarize_game_state(game):
     print(f"Away team primary color: {game.away_team.primary_color}")
     print(f"Away team secondary color: {game.away_team.secondary_color}")
 
+    home_team_obj = {
+        "name": game.home_team.name,
+        "team_id": game.home_team.team_id,
+        "score": game.score.get(game.home_team.name, 0),
+        "colors": {
+            "primary_color": game.home_team.primary_color,
+            "secondary_color": game.home_team.secondary_color,
+        },
+    }
+
+    away_team_obj = {
+        "name": game.away_team.name,
+        "team_id": game.away_team.team_id,
+        "score": game.score.get(game.away_team.name, 0),
+        "colors": {
+            "primary_color": game.away_team.primary_color,
+            "secondary_color": game.away_team.secondary_color,
+        },
+    }
+
     return {
         "final_score": game.score,
         "points_by_quarter": game.game_state["points_by_quarter"],
         "box_score": game.get_box_score(),
         "scouting": {
             game.home_team.name: game.home_team.scouting_data,
-            game.away_team.name: game.away_team.scouting_data
+            game.away_team.name: game.away_team.scouting_data,
         },
         "team_totals": game.team_totals,
         "text_log": game.text_log,
         "turns": game.turns,
-        "home_team_name": game.home_team.name,
-        "away_team_name": game.away_team.name,
+        "home_team": game.home_team.name,
+        "away_team": game.away_team.name,
         "home_team_colors": {
             "primary_color": game.home_team.primary_color,
-            "secondary_color": game.home_team.secondary_color
+            "secondary_color": game.home_team.secondary_color,
         },
         "away_team_colors": {
             "primary_color": game.away_team.primary_color,
-            "secondary_color": game.away_team.secondary_color
+            "secondary_color": game.away_team.secondary_color,
         },
-        # "home_team_colors": {
-        #     "primary_color": getattr(game.home_team, "primary_color", "#0077cc"),
-        #     "secondary_color": getattr(game.home_team, "secondary_color", "#ffcc00")
-        # },
-        # "away_team_colors": {
-        #     "primary_color": getattr(game.away_team, "primary_color", "#ffffff"),
-        #     "secondary_color": getattr(game.away_team, "secondary_color", "#0077cc")
-        # },
         "score": game.score,
         "home_team_id": game.home_team.team_id,
-        "players": players
+        "players": players,
+        "homeTeam": home_team_obj,
+        "awayTeam": away_team_obj,
     }
 
 def check_defensive_foul(self, defender, is_three):
