@@ -112,11 +112,15 @@ def command_center_data():
 
 
 @router.get("/franchise/standings")
-def standings():
-    state = franchise_state_collection.find_one({"_id": "state"}) or {}
-    schedule = state.get("schedule", [])
-    week = state.get("week", 1)
+def standings(franchise_id: str):
+    franchise_doc = db.franchises.find_one({"_id": ObjectId(franchise_id)})
+    found = franchise_doc is not None
+    logger.info("standings franchise_id=%s found=%s", franchise_id, found)
+    if not franchise_doc:
+        raise HTTPException(status_code=404, detail="Franchise not found")
 
+    schedule = franchise_doc.get("schedule", [])
+    week = franchise_doc.get("week", 1)
     next_games = schedule[week - 1] if week - 1 < len(schedule) else []
     id_to_name = {t["_id"]: t["name"] for t in db.teams.find({}, {"name": 1})}
 
@@ -152,6 +156,7 @@ def standings():
         })
 
     output.sort(key=lambda x: (x["W"], x["differential"]), reverse=True)
+    logger.info("standings returning franchise_id=%s found=%s", franchise_id, found)
     return {"standings": output}
 
 
