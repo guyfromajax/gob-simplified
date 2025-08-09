@@ -27,7 +27,6 @@ const teamIdNameMap = {};
 function populateTop(data) {
   if (!data) return;
   document.querySelector('.username').textContent = data.username || 'User';
-  document.querySelector('.seed').textContent = `Seed: ${data.seed || '--'}`;
   document.getElementById('team-logo').src = `/static/images/homepage-logos/${data.team}.png`;
 
   const abbr = teamMap[data.team];
