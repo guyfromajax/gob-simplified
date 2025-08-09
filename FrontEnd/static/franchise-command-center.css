@@ -1,0 +1,26 @@
+#franchise-container #top-left {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 200px;
+}
+
+#franchise-container #top-left .team-logo {
+  height: 70%;
+  width: auto;
+  margin-bottom: 10px;
+  object-fit: contain;
+}
+
+#franchise-container #top-left .left-info {
+  width: 100%;
+  display: flex;
+  justify-content: flex-start;
+  font-weight: bold;
+}
+
+@media (max-width: 600px) {
+  #franchise-container #top-left {
+    height: 150px;
+  }
+}
