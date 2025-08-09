@@ -3,11 +3,13 @@ from fastapi.responses import FileResponse, RedirectResponse
 from pydantic import BaseModel
 from pathlib import Path
 from bson import ObjectId
+import logging
 
 from BackEnd.db import db, franchise_state_collection
 from BackEnd.models.franchise_manager import FranchiseManager
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 STATIC_DIR = Path(__file__).resolve().parents[2] / "FrontEnd" / "static"
 
@@ -154,9 +156,13 @@ def standings():
 
 
 @router.get("/franchise/schedule")
-def season_schedule():
-    state = franchise_state_collection.find_one({"_id": "state"}) or {}
-    schedule = state.get("schedule", [])
+def season_schedule(franchise_id: str):
+    franchise_doc = db.franchises.find_one({"_id": ObjectId(franchise_id)})
+    found = franchise_doc is not None
+    logger.info("season_schedule franchise_id=%s found=%s", franchise_id, found)
+    if not franchise_doc:
+        raise HTTPException(status_code=404, detail="Franchise not found")
+    schedule = franchise_doc.get("schedule", [])
 
     weeks = []
     for idx, games in enumerate(schedule, start=1):
@@ -186,6 +192,7 @@ def season_schedule():
             })
         weeks.append(week_games)
 
+    logger.info("season_schedule returning franchise_id=%s found=%s", franchise_id, found)
     return {"schedule": weeks}
 
 
