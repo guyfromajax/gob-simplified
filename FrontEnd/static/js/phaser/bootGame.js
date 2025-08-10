@@ -1,17 +1,34 @@
 import * as Phaser from 'https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.esm.js';
 import { createGameScene } from './gameScene.js';
 
+function getMode({ tournamentId, franchiseId }) {
+  if (tournamentId) return 'tournament';
+  if (franchiseId) return 'franchise';
+  return 'standalone';
+}
+
+function buildQuery(params = {}) {
+  const search = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value) search.append(key, value);
+  });
+  const str = search.toString();
+  return str ? `?${str}` : '';
+}
+
 const urlParams = new URLSearchParams(window.location.search);
-console.log("urlParams =", urlParams);
 const tournamentId = urlParams.get('tournament_id');
 const franchiseId = urlParams.get('franchise_id');
 const homeTeam = urlParams.get('home');
 const awayTeam = urlParams.get('away');
+const mode = getMode({ tournamentId, franchiseId });
 
-console.log('🏀 Tournament launch params:', {
+console.log('🏀 Launch params:', {
   tournamentId,
+  franchiseId,
   homeTeam,
   awayTeam,
+  mode,
 });
 
 const GameScene = createGameScene(Phaser);
@@ -20,7 +37,11 @@ let gamePromise;
 
 
 async function fetchTeamRoster(teamName) {
-  const res = await fetch(`/roster/${encodeURIComponent(teamName)}?tournament_id=${tournamentId}`);
+  const query = buildQuery({
+    tournament_id: mode === 'tournament' ? tournamentId : null,
+    franchise_id: mode === 'franchise' ? franchiseId : null,
+  });
+  const res = await fetch(`/roster/${encodeURIComponent(teamName)}${query}`);
   if (!res.ok) {
     throw new Error(`Failed to load roster for ${teamName}`);
   }
@@ -44,6 +65,7 @@ async function startGameAnimation({ homeRoster, awayRoster }) {
   const sceneData = {
     rosters: { homeRoster, awayRoster },
     tournamentId,
+    franchiseId,
     homeTeam,
     awayTeam,
   };
@@ -71,13 +93,18 @@ function showPopup(score) {
   popup.className = 'result-popup';
 
   let backUrl;
-  if (tournamentId) {
-    backUrl = 'https://gob-simplified-production.up.railway.app/static/tournament.html';
-  } else if (franchiseId) {
-    backUrl = 'https://gob-simplified-production.up.railway.app/franchise/command-center';
-  } else {
-    backUrl = 'https://gob-simplified-production.up.railway.app/static/mode-select.html';
+  switch (mode) {
+    case 'tournament':
+      backUrl = '/static/tournament.html';
+      break;
+    case 'franchise':
+      backUrl = '/franchise/command-center' + buildQuery({ franchise_id: franchiseId });
+      break;
+    default:
+      backUrl = '/static/mode-select.html';
   }
+
+  console.log('showPopup back navigation', { tournamentId, franchiseId, mode, backUrl });
 
   popup.innerHTML = `
     <div class="popup-content">
@@ -113,7 +140,11 @@ async function showResults() {
   playBtn.style.display = 'none';
   resultsBtn.style.display = 'none';
   try {
-    const res = await fetch(`/game/result?tournament_id=${tournamentId}`);
+    const query = buildQuery({
+      tournament_id: mode === 'tournament' ? tournamentId : null,
+      franchise_id: mode === 'franchise' ? franchiseId : null,
+    });
+    const res = await fetch(`/game/result${query}`);
     const data = await res.json();
     const homeObj = data.homeTeam || { name: data.home_team };
     const awayObj = data.awayTeam || { name: data.away_team };
