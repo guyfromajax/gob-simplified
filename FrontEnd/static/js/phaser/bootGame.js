@@ -41,6 +41,7 @@ console.log("🏀 Tournament launch params:", {
 
 const GameScene = createGameScene(Phaser);
 let game;
+let isSimulating = false;
 
 
 async function fetchTeamRoster(teamName) {
@@ -123,12 +124,26 @@ function showPopup(score) {
 }
 
 async function handleButtonClick(animate) {
-  const [homeRoster, awayRoster] = await Promise.all([
-    fetchTeamRoster(homeTeam),
-    fetchTeamRoster(awayTeam),
-  ]);
-  const finalScore = await startGame({ homeRoster, awayRoster, animate });
-  showPopup(finalScore);
+  if (isSimulating) return;
+  isSimulating = true;
+  const playBtn = document.querySelector('.play-button');
+  const resultsBtn = document.querySelector('.results-button');
+  if (playBtn) playBtn.style.display = 'none';
+  if (resultsBtn) resultsBtn.style.display = 'none';
+
+  try {
+    const [homeRoster, awayRoster] = await Promise.all([
+      fetchTeamRoster(homeTeam),
+      fetchTeamRoster(awayTeam),
+    ]);
+    const finalScore = await startGame({ homeRoster, awayRoster, animate });
+    showPopup(finalScore);
+  } catch (err) {
+    console.error('Error starting game:', err);
+    isSimulating = false;
+    if (playBtn) playBtn.style.display = '';
+    if (resultsBtn) resultsBtn.style.display = '';
+  }
 }
 
 function initGame() {
