@@ -11,12 +11,14 @@ export function createGameScene(Phaser) {
     init(data) {
         this.rosters = data.rosters;
         this.tournamentId = data.tournamentId;
+        this.franchiseId = data.franchiseId;
         this.homeTeam = data.homeTeam;
         this.awayTeam = data.awayTeam;
 
         console.log("🧠 Game initialized with:", {
           rosters: this.rosters,
           tournamentId: this.tournamentId,
+          franchiseId: this.franchiseId,
           homeTeam: this.homeTeam,
           awayTeam: this.awayTeam,
         });
@@ -127,6 +129,29 @@ export function createGameScene(Phaser) {
             }
         } catch (err) {
             console.error("🚨 Error during tournament result save:", err);
+        }
+        }
+
+        // POST to /franchise/save-result
+        if (this.franchiseId) {
+        try {
+            const res = await fetch("/franchise/save-result", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                franchise_id: this.franchiseId,
+                game_id: simData._id,
+                winner: winner
+            })
+            });
+
+        if (!res.ok) {
+            console.error("❌ Failed to save franchise result:", await res.text());
+            } else {
+            console.log("✅ Franchise result saved.");
+            }
+        } catch (err) {
+            console.error("🚨 Error during franchise result save:", err);
         }
         }
 
