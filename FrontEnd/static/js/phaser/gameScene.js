@@ -15,6 +15,7 @@ export function createGameScene(Phaser) {
         this.franchiseId = data.franchiseId;
         this.homeTeam = data.homeTeam;
         this.awayTeam = data.awayTeam;
+        this.animate = data.animate;
         this.mode = data.mode;
 
         console.log("🧠 Game initialized with:", {
