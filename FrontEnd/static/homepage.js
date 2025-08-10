@@ -113,7 +113,7 @@ function updatePlayBtn() {
   }
 }
 
-playBtn.addEventListener('click', () => {
+playBtn.addEventListener('click', async () => {
   if (playBtn.disabled) return;
   clickSound.play();
 
@@ -129,17 +129,35 @@ playBtn.addEventListener('click', () => {
     sessionStorage.removeItem('myTeam');
   }
 
-  const params = new URLSearchParams({
-    home: homeTeam,
-    away: awayTeam,
-    mode: 'single'
-  });
-
-  if (homeCheck.checked || awayCheck.checked) {
-    params.set('my_team', homeCheck.checked ? 'home' : 'away');
+  // Ensure an error container exists near the play button
+  let errorDiv = document.getElementById('play-error');
+  if (!errorDiv) {
+    errorDiv = document.createElement('div');
+    errorDiv.id = 'play-error';
+    errorDiv.style.color = 'red';
+    playBtn.insertAdjacentElement('afterend', errorDiv);
   }
+  errorDiv.textContent = '';
 
-  window.location.href = `court.html?${params.toString()}`;
+  try {
+    const res = await fetch('/simulate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ home_team: homeTeam, away_team: awayTeam })
+    });
+
+    if (!res.ok) {
+      throw new Error(`Request failed: ${res.status}`);
+    }
+
+    const data = await res.json();
+    sessionStorage.setItem('simData', JSON.stringify(data));
+
+    window.location.href = 'court.html';
+  } catch (err) {
+    console.error('Failed to simulate game', err);
+    errorDiv.textContent = 'Failed to simulate game. Please try again.';
+  }
 });
 
 createLogoButtons();

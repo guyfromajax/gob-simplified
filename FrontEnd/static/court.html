@@ -1,26 +1,65 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <link rel="icon" type="image/x-icon" href="./images/favicon.ico" />
   <meta charset="UTF-8" />
-  <title>GOB Court</title>
+  <link rel="icon" type="image/x-icon" href="./images/favicon.ico" />
+  <title>Game Result</title>
   <style>
     body {
-      margin: 0;
-      overflow: hidden;
-      background-color: #111;
+      font-family: Arial, sans-serif;
+      background: #111;
+      color: #eee;
+      padding: 20px;
     }
-
-    #phaser-container {
-      width: 100%;
-      height: 100vh;
+    pre {
+      white-space: pre-wrap;
+      background: #222;
+      padding: 10px;
     }
   </style>
 </head>
 <body>
-  <div id="phaser-container"></div>
+  <h1 id="matchup"></h1>
+  <div id="my-team"></div>
+  <h2 id="score"></h2>
+  <pre id="log"></pre>
 
-  <script type="module" src="./js/phaser/bootGame.js"></script>
+  <script>
+    const raw = sessionStorage.getItem('simData');
+    const homeTeam = sessionStorage.getItem('homeTeam');
+    const awayTeam = sessionStorage.getItem('awayTeam');
+    const myTeam = sessionStorage.getItem('myTeam');
 
+    if (raw) {
+      const data = JSON.parse(raw);
+      const home = homeTeam || data.home_team;
+      const away = awayTeam || data.away_team;
+
+      document.getElementById('matchup').textContent = `${home} vs ${away}`;
+
+      const homeScore = data.score?.[home] ?? 0;
+      const awayScore = data.score?.[away] ?? 0;
+      document.getElementById('score').textContent = `${home} ${homeScore} - ${awayScore} ${away}`;
+
+      if (myTeam) {
+        const mine = myTeam === 'home' ? home : away;
+        document.getElementById('my-team').textContent = `My Team: ${mine}`;
+      }
+
+      const logEl = document.getElementById('log');
+      if (Array.isArray(data.events)) {
+        logEl.textContent = data.events.join('\n');
+      } else if (Array.isArray(data.turns)) {
+        logEl.textContent = data.turns.map(t => JSON.stringify(t)).join('\n');
+      } else if (Array.isArray(data.log)) {
+        logEl.textContent = data.log.join('\n');
+      } else {
+        logEl.textContent = JSON.stringify(data, null, 2);
+      }
+    } else {
+      document.getElementById('matchup').textContent = 'No simulation data found.';
+    }
+  </script>
 </body>
 </html>
+
