@@ -2,6 +2,7 @@ import random
 from datetime import datetime
 from itertools import combinations, permutations
 # at top of BackEnd/franchise_manager.py
+from importlib import resources
 from pathlib import Path
 import json
 
@@ -139,12 +140,6 @@ class RecruitManager:
     def __init__(self, db, names_file: Path | None = None):
         self.db = db
 
-        # Default to BackEnd/data/names/franchise_names.json
-        default_path = Path(__file__).resolve().parents[1] / "data" / "names" / "franchise_names.json"
-        names_path = Path(names_file) if names_file else default_path
-
-        print(f"Inside RecruitManager, names_path: {names_path}")
-
         # Fallbacks (used if file missing or malformed)
         fallback_first = ["Jalen", "Marcus", "Tyrese", "Zion", "Cade"]
         fallback_last  = ["Walker", "Jackson", "Robinson", "Wright", "Anderson"]
@@ -152,15 +147,19 @@ class RecruitManager:
         self.first_names, self.last_names = fallback_first, fallback_last
 
         try:
-            if names_path.exists():
-                with names_path.open() as f:
+            if names_file is not None:
+                with Path(names_file).open() as f:
                     payload = json.load(f)
-                # Expect keys: "first_names", "last_names"
-                fn = payload.get("first_names") or []
-                ln = payload.get("last_names") or []
-                if isinstance(fn, list) and isinstance(ln, list) and fn and ln:
-                    self.first_names = fn
-                    self.last_names = ln
+            else:
+                resource_path = resources.files("BackEnd").joinpath("data", "names", "franchise_names.json")
+                with resource_path.open("r") as f:
+                    payload = json.load(f)
+            # Expect keys: "first_names", "last_names"
+            fn = payload.get("first_names") or []
+            ln = payload.get("last_names") or []
+            if isinstance(fn, list) and isinstance(ln, list) and fn and ln:
+                self.first_names = fn
+                self.last_names = ln
         except Exception:
             # Swallow and keep fallbacks; optionally log if you have a logger
             pass
