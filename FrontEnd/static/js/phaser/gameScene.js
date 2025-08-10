@@ -13,12 +13,14 @@ export function createGameScene(Phaser) {
         this.tournamentId = data.tournamentId;
         this.homeTeam = data.homeTeam;
         this.awayTeam = data.awayTeam;
+        this.mode = data.mode;
 
         console.log("🧠 Game initialized with:", {
           rosters: this.rosters,
           tournamentId: this.tournamentId,
           homeTeam: this.homeTeam,
           awayTeam: this.awayTeam,
+          mode: this.mode,
         });
       }
       
@@ -124,6 +126,14 @@ export function createGameScene(Phaser) {
         } catch (err) {
             console.error("🚨 Error during tournament result save:", err);
         }
+        }
+
+        // Show final score and navigate
+        alert(`Final Score — ${homeTeam} ${homeScore} | ${awayTeam} ${awayScore}`);
+        if (this.mode === 'single') {
+          window.location.href = 'index.html';
+        } else if (!this.tournamentId) {
+          window.location.href = '/franchise/command-center';
         }
       };
 
