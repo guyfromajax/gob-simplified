@@ -17,10 +17,19 @@ function buildQuery(params = {}) {
 }
 
 const urlParams = new URLSearchParams(window.location.search);
-const tournamentId = urlParams.get("tournament_id");
-const homeTeam = urlParams.get("home");
-const awayTeam = urlParams.get("away");
-const mode = urlParams.get("mode");
+const tournamentId = urlParams.get('tournament_id');
+const homeTeam = urlParams.get('home');
+const awayTeam = urlParams.get('away');
+const queryFranchiseId = urlParams.get('franchise_id');
+const storedFranchiseId =
+  typeof localStorage !== 'undefined'
+    ? localStorage.getItem('franchise_id') || localStorage.getItem('franchiseId')
+    : null;
+const franchiseId = queryFranchiseId || storedFranchiseId;
+if (queryFranchiseId && typeof localStorage !== 'undefined') {
+  localStorage.setItem('franchise_id', queryFranchiseId);
+}
+const mode = urlParams.get('mode') || getMode({ tournamentId, franchiseId });
 
 console.log("🏀 Tournament launch params:", {
   tournamentId,
@@ -32,8 +41,6 @@ console.log("🏀 Tournament launch params:", {
 
 const GameScene = createGameScene(Phaser);
 let game;
-let gamePromise;
-let isSimulating = false;
 
 
 async function fetchTeamRoster(teamName) {
@@ -77,15 +84,13 @@ async function startGame({ homeRoster, awayRoster, animate = true }) {
     game.scene.start('GameScene', sceneData);
   }
 
-  gamePromise = new Promise((resolve) => {
+  return new Promise((resolve) => {
     // Listen on the global event emitter so we don't lose the listener when
     // GameScene is restarted or recreated
     game.events.once('gameComplete', (finalScore) => {
       resolve(finalScore);
     });
   });
-
-  return gamePromise;
 }
 
 function showPopup(score) {
@@ -117,49 +122,26 @@ function showPopup(score) {
   container.appendChild(popup);
 }
 
-async function playGame() {
-  if (isSimulating) return;
-  isSimulating = true;
-  playBtn.style.display = 'none';
-  resultsBtn.style.display = 'none';
-
-  if (!homeTeam || !awayTeam) {
-    alert('Please select teams before playing.');
-    isSimulating = false;
-    return;
-  }
-
+async function handleButtonClick(animate) {
   const [homeRoster, awayRoster] = await Promise.all([
     fetchTeamRoster(homeTeam),
     fetchTeamRoster(awayTeam),
   ]);
-
-  console.log("✅ Loaded rosters:", { homeRoster, awayRoster });
-
-  const game = new Phaser.Game({
-    type: Phaser.AUTO,
-    width: 1229,
-    height: 768,
-    backgroundColor: "#1e1e1e",
-    parent: "phaser-container",
-    // Disable audio to avoid AudioContext warnings in automated testing
-    audio: { noAudio: true },
-    scene: GameScene
-  });
-
-  game.scene.start('GameScene', {
-    rosters: { homeRoster, awayRoster },
-    tournamentId,
-    homeTeam,
-    awayTeam,
-    mode
-  });
+  const finalScore = await startGame({ homeRoster, awayRoster, animate });
+  showPopup(finalScore);
 }
 
-initTournamentGame();  // ✅ This stays last
+function initGame() {
+  const playBtn = document.querySelector('.play-button');
+  const resultsBtn = document.querySelector('.results-button');
+  if (playBtn) {
+    playBtn.addEventListener('click', () => handleButtonClick(true));
+  }
+  if (resultsBtn) {
+    resultsBtn.addEventListener('click', () => handleButtonClick(false));
+  }
+}
 
+initGame();
 
 // new Phaser.Game(config);
-
-
-
