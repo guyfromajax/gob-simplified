@@ -13,15 +13,6 @@ const teamMap = {
   "Xavien": "Xav",
 };
 
-function formatTeamName(name) {
-  if (!name) return "";
-  return name
-    .toLowerCase()
-    .split(" ")
-    .map(w => w.split("-").map(s => s.charAt(0).toUpperCase() + s.slice(1)).join("-"))
-    .join(" ");
-}
-
 function isUserTeam(teamName) {
   return teamName === userTeamId;
 }
