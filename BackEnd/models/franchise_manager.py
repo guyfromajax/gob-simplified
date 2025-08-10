@@ -5,6 +5,10 @@ from itertools import combinations, permutations
 from importlib import resources
 from pathlib import Path
 import json
+import logging
+
+
+logger = logging.getLogger(__name__)
 
 
 class FranchiseManager:
@@ -147,22 +151,27 @@ class RecruitManager:
         self.first_names, self.last_names = fallback_first, fallback_last
 
         try:
-            if names_file is not None:
-                with Path(names_file).open() as f:
-                    payload = json.load(f)
-            else:
-                resource_path = resources.files("BackEnd").joinpath("data", "names", "franchise_names.json")
-                with resource_path.open("r") as f:
-                    payload = json.load(f)
+            resource_path = Path(names_file) if names_file is not None else resources.files("BackEnd").joinpath(
+                "data", "names", "franchise_names.json"
+            )
+            with resource_path.open("r") as f:
+                payload = json.load(f)
             # Expect keys: "first_names", "last_names"
             fn = payload.get("first_names") or []
             ln = payload.get("last_names") or []
             if isinstance(fn, list) and isinstance(ln, list) and fn and ln:
                 self.first_names = fn
                 self.last_names = ln
-        except Exception:
-            # Swallow and keep fallbacks; optionally log if you have a logger
-            pass
+            else:
+                logger.warning(
+                    "Recruit names file %s missing required data; using fallback names", resource_path
+                )
+        except Exception as exc:
+            logger.warning(
+                "Error loading recruit names from %s: %s. Using fallback names.",
+                locals().get("resource_path", names_file),
+                exc,
+            )
 
 
     def generate_recruits(self, count=40):
