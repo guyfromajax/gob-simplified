@@ -6,11 +6,13 @@ const urlParams = new URLSearchParams(window.location.search);
 const tournamentId = urlParams.get("tournament_id");
 const homeTeam = urlParams.get("home");
 const awayTeam = urlParams.get("away");
+const mode = urlParams.get("mode");
 
 console.log("🏀 Tournament launch params:", {
   tournamentId,
   homeTeam,
-  awayTeam
+  awayTeam,
+  mode
 });
 
 const GameScene = createGameScene(Phaser);  // ✅ Moved this up
@@ -52,7 +54,8 @@ async function initTournamentGame() {
     rosters: { homeRoster, awayRoster },
     tournamentId,
     homeTeam,
-    awayTeam
+    awayTeam,
+    mode
   });
 }
 
