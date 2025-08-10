@@ -19,8 +19,8 @@ def _load_from_db(team_name: str) -> Tuple[Dict | None, List[Dict]]:
 
         # Query players by team name directly in the players collection
         players = list(players_collection.find({"team": team_name}))
-        print(f"✅ Loaded {len(players)} players for {team_name} from DB")
-        print(f"🔍 Players: {players}")
+        # print(f"✅ Loaded {len(players)} players for {team_name} from DB")
+        # print(f"🔍 Players: {players}")
 
         return team_doc, players
 
