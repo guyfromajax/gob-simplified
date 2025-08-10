@@ -131,7 +131,8 @@ playBtn.addEventListener('click', () => {
 
   const params = new URLSearchParams({
     home: homeTeam,
-    away: awayTeam
+    away: awayTeam,
+    mode: 'single'
   });
 
   if (homeCheck.checked || awayCheck.checked) {
