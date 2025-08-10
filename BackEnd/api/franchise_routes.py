@@ -39,6 +39,12 @@ class TeamSelection(BaseModel):
 class PlayGameRequest(BaseModel):
     franchise_id: str
 
+
+class FranchiseResultRequest(BaseModel):
+    franchise_id: str
+    game_id: str
+    winner: str
+
 @router.post("/franchise/select-team")
 def select_team(selection: TeamSelection):
     franchise_state_collection.delete_many({})
@@ -90,6 +96,78 @@ def play_next_game(req: PlayGameRequest):
     if not matchup:
         raise HTTPException(status_code=404, detail="User matchup not found")
     return matchup
+
+
+@router.post("/franchise/save-result")
+def save_result(req: FranchiseResultRequest):
+    try:
+        franchise_id = ObjectId(req.franchise_id)
+        game_id = ObjectId(req.game_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid ID format")
+
+    franchise_doc = db.franchises.find_one({"_id": franchise_id})
+    if not franchise_doc:
+        raise HTTPException(status_code=404, detail="Franchise not found")
+
+    game_doc = db.games.find_one({"_id": game_id})
+    if not game_doc:
+        raise HTTPException(status_code=404, detail="Game not found")
+
+    home = game_doc.get("homeTeam", {}) or {}
+    away = game_doc.get("awayTeam", {}) or {}
+    home_name = home.get("name") or game_doc.get("home_team")
+    away_name = away.get("name") or game_doc.get("away_team")
+    home_id = home.get("team_id") or game_doc.get("home_team_id")
+    away_id = away.get("team_id") or game_doc.get("away_team_id")
+    score_map = game_doc.get("score") or game_doc.get("final_score") or {}
+    home_score = home.get("score", score_map.get(home_name, 0))
+    away_score = away.get("score", score_map.get(away_name, 0))
+
+    if req.winner == home_name:
+        winner_id, loser_id = home_id, away_id
+        winner_score, loser_score = home_score, away_score
+    else:
+        winner_id, loser_id = away_id, home_id
+        winner_score, loser_score = away_score, home_score
+
+    db.teams.update_one(
+        {"_id": winner_id}, {"$inc": {"record.W": 1, "PF": winner_score, "PA": loser_score}}
+    )
+    db.teams.update_one(
+        {"_id": loser_id}, {"$inc": {"record.L": 1, "PF": loser_score, "PA": winner_score}}
+    )
+
+    week = franchise_doc.get("week", 1) - 1
+    if week < 1:
+        week = 1
+
+    db.games.delete_many(
+        {
+            "week": week,
+            "$or": [
+                {"team1_id": away_id, "team2_id": home_id},
+                {"team1_id": home_id, "team2_id": away_id},
+            ],
+            "_id": {"$ne": game_id},
+        }
+    )
+
+    db.games.update_one(
+        {"_id": game_id},
+        {
+            "$set": {
+                "team1_id": away_id,
+                "team2_id": home_id,
+                "team1_score": away_score,
+                "team2_score": home_score,
+                "week": week,
+            }
+        },
+        upsert=True,
+    )
+
+    return {"status": "success"}
 
 
 @router.get("/franchise/command-center/data")
