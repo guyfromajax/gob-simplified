@@ -18,7 +18,10 @@ function buildQuery(params = {}) {
 
 const urlParams = new URLSearchParams(window.location.search);
 const tournamentId = urlParams.get('tournament_id');
-const franchiseId = urlParams.get('franchise_id');
+let franchiseId = urlParams.get('franchise_id');
+if (!franchiseId) {
+  franchiseId = localStorage.getItem('franchiseId');
+}
 const homeTeam = urlParams.get('home');
 const awayTeam = urlParams.get('away');
 const mode = getMode({ tournamentId, franchiseId });
