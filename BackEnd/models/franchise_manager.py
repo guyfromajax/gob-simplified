@@ -151,11 +151,20 @@ class RecruitManager:
         self.first_names, self.last_names = fallback_first, fallback_last
 
         try:
-            resource_path = Path(names_file) if names_file is not None else resources.files("BackEnd").joinpath(
-                "data", "names", "franchise_names.json"
-            )
-            with resource_path.open("r") as f:
+            if names_file is not None:
+                resource_path = Path(names_file)
+            else:
+                try:
+                    resource_path = resources.files("BackEnd").joinpath(
+                        "data", "names", "franchise_names.json"
+                    )
+                except Exception:
+                    # Fallback to filesystem path relative to this file
+                    resource_path = Path(__file__).resolve().parent.parent / "data" / "names" / "franchise_names.json"
+
+            with resource_path.open("r", encoding="utf-8") as f:
                 payload = json.load(f)
+
             # Expect keys: "first_names", "last_names"
             fn = payload.get("first_names") or []
             ln = payload.get("last_names") or []
