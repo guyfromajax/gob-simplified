@@ -34,6 +34,7 @@ console.log('🏀 Launch params:', {
 const GameScene = createGameScene(Phaser);
 let game;
 let gamePromise;
+let isSimulating = false;
 
 
 async function fetchTeamRoster(teamName) {
@@ -48,7 +49,7 @@ async function fetchTeamRoster(teamName) {
   return res.json();
 }
 
-async function startGameAnimation({ homeRoster, awayRoster }) {
+async function startGame({ homeRoster, awayRoster, animate = true }) {
   if (!game) {
     game = new Phaser.Game({
       type: Phaser.AUTO,
@@ -68,6 +69,7 @@ async function startGameAnimation({ homeRoster, awayRoster }) {
     franchiseId,
     homeTeam,
     awayTeam,
+    animate,
   };
 
   if (game.scene.isActive('GameScene')) {
@@ -117,11 +119,14 @@ function showPopup(score) {
 }
 
 async function playGame() {
+  if (isSimulating) return;
+  isSimulating = true;
   playBtn.style.display = 'none';
   resultsBtn.style.display = 'none';
 
   if (!homeTeam || !awayTeam) {
     alert('Please select teams before playing.');
+    isSimulating = false;
     return;
   }
 
@@ -130,35 +135,32 @@ async function playGame() {
     fetchTeamRoster(awayTeam),
   ]);
 
-  const score = await startGameAnimation({ homeRoster, awayRoster });
+  const score = await startGame({ homeRoster, awayRoster, animate: true });
   if (score) {
     showPopup(score);
   }
 }
 
 async function showResults() {
+  if (isSimulating) return;
+  isSimulating = true;
   playBtn.style.display = 'none';
   resultsBtn.style.display = 'none';
-  try {
-    const query = buildQuery({
-      tournament_id: mode === 'tournament' ? tournamentId : null,
-      franchise_id: mode === 'franchise' ? franchiseId : null,
-    });
-    const res = await fetch(`/game/result${query}`);
-    const data = await res.json();
-    const homeObj = data.homeTeam || { name: data.home_team };
-    const awayObj = data.awayTeam || { name: data.away_team };
-    const score = {
-      homeTeam: homeObj.name || homeTeam,
-      awayTeam: awayObj.name || awayTeam,
-      homeScore: homeObj.score ?? data.score?.[homeObj.name] ?? 0,
-      awayScore: awayObj.score ?? data.score?.[awayObj.name] ?? 0,
-      homeTeamData: homeObj,
-      awayTeamData: awayObj,
-    };
+
+  if (!homeTeam || !awayTeam) {
+    alert('Please select teams before playing.');
+    isSimulating = false;
+    return;
+  }
+
+  const [homeRoster, awayRoster] = await Promise.all([
+    fetchTeamRoster(homeTeam),
+    fetchTeamRoster(awayTeam),
+  ]);
+
+  const score = await startGame({ homeRoster, awayRoster, animate: false });
+  if (score) {
     showPopup(score);
-  } catch (err) {
-    console.error('Failed to fetch results', err);
   }
 }
 
