@@ -92,15 +92,22 @@ def simulate_game(request: SimulationRequest):
     # print("🧪 Turns sample:", game.turns[:3])
     summary = summarize_game_state(game)
 
-    # Ensure team objects exist for the frontend
+    # Build a consolidated score map from available sources
+    score_map = summary.get("final_score") or summary.get("score") or {}
+
+    # Ensure team objects exist for the frontend and populate scores
     summary["homeTeam"] = summary.get("homeTeam") or {
         "name": summary.get("home_team", home_team),
-        "score": summary.get("score", {}).get(home_team, 0),
     }
+    summary["homeTeam"]["score"] = score_map.get(summary["homeTeam"]["name"], 0)
+
     summary["awayTeam"] = summary.get("awayTeam") or {
         "name": summary.get("away_team", away_team),
-        "score": summary.get("score", {}).get(away_team, 0),
     }
+    summary["awayTeam"]["score"] = score_map.get(summary["awayTeam"]["name"], 0)
+
+    # Expose the score map under a consistent key
+    summary["score"] = score_map
 
     # ✅ Minimal debug visibility
     # print(f"✅ Game finished: {home_team} vs. {away_team}")
