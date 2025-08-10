@@ -2,8 +2,9 @@ export async function finalizeGame({ simData, tournamentId, franchiseId, game })
   // Extract score and winner
   const homeTeamObj = simData.homeTeam || { name: simData.home_team };
   const awayTeamObj = simData.awayTeam || { name: simData.away_team };
-  const homeScore = (homeTeamObj.score ?? simData.score?.[homeTeamObj.name]) || 0;
-  const awayScore = (awayTeamObj.score ?? simData.score?.[awayTeamObj.name]) || 0;
+  const scoreMap = simData.final_score || simData.score || {};
+  const homeScore = homeTeamObj.score ?? scoreMap[homeTeamObj.name] ?? 0;
+  const awayScore = awayTeamObj.score ?? scoreMap[awayTeamObj.name] ?? 0;
   const winner = homeScore > awayScore ? homeTeamObj.name : awayTeamObj.name;
 
   // POST to /tournament/save-result if needed
