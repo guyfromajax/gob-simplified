@@ -243,6 +243,7 @@ def run_simulation(home_team_name, away_team_name):
 
     while gm.game_state["time_remaining"] > 0:
         gm.simulate_macro_turn()
+        print(f"🏀 {gm.home_team.name}: {gm.game_state['score'][gm.home_team.name]} | {gm.away_team.name}: {gm.game_state['score'][gm.away_team.name]}")
 
     # Print all game statistics including defense score stats
     # gm.print_game_statistics()
