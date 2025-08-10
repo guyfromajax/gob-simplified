@@ -1,6 +1,10 @@
 import random
 from datetime import datetime
 from itertools import combinations, permutations
+# at top of BackEnd/franchise_manager.py
+from pathlib import Path
+import json
+
 
 class FranchiseManager:
     def __init__(self, db):
@@ -132,10 +136,33 @@ class ScheduleManager:
         return schedule
 
 class RecruitManager:
-    def __init__(self, db):
+    def __init__(self, db, names_file: Path | None = None):
         self.db = db
-        self.first_names = ["Jalen", "Marcus", "Tyrese", "Zion", "Cade"]
-        self.last_names = ["Walker", "Jackson", "Robinson", "Wright", "Anderson"]
+
+        # Default to BackEnd/data/names/franchise_names.json
+        default_path = Path(__file__).resolve().parents[1] / "data" / "names" / "franchise_names.json"
+        names_path = Path(names_file) if names_file else default_path
+
+        # Fallbacks (used if file missing or malformed)
+        fallback_first = ["Jalen", "Marcus", "Tyrese", "Zion", "Cade"]
+        fallback_last  = ["Walker", "Jackson", "Robinson", "Wright", "Anderson"]
+
+        self.first_names, self.last_names = fallback_first, fallback_last
+
+        try:
+            if names_path.exists():
+                with names_path.open() as f:
+                    payload = json.load(f)
+                # Expect keys: "first_names", "last_names"
+                fn = payload.get("first_names") or []
+                ln = payload.get("last_names") or []
+                if isinstance(fn, list) and isinstance(ln, list) and fn and ln:
+                    self.first_names = fn
+                    self.last_names = ln
+        except Exception:
+            # Swallow and keep fallbacks; optionally log if you have a logger
+            pass
+
 
     def generate_recruits(self, count=40):
         recruits = []
