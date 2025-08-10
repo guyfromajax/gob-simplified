@@ -193,11 +193,18 @@ async function init() {
 }
 
 const playNowBtn = document.getElementById('play-now');
+playNowBtn.disabled = true;
 playNowBtn.addEventListener('click', async () => {
   console.log('Play Now click search:', window.location.search);
   const originalText = playNowBtn.textContent;
   playNowBtn.disabled = true;
   playNowBtn.textContent = 'Loading...';
+  if (!franchiseId) {
+    alert('Franchise not loaded');
+    playNowBtn.disabled = false;
+    playNowBtn.textContent = originalText;
+    return;
+  }
   try {
     const res = await fetch('/franchise/play-next-game', {
       method: 'POST',
@@ -220,5 +227,8 @@ playNowBtn.addEventListener('click', async () => {
 
 window.addEventListener('DOMContentLoaded', () => {
   franchiseId = localStorage.getItem('franchiseId');
+  if (franchiseId) {
+    playNowBtn.disabled = false;
+  }
   init();
 });
