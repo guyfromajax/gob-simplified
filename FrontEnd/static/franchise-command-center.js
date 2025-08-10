@@ -27,14 +27,23 @@ const teamIdNameMap = {};
 function populateTop(data) {
   if (!data) return;
   document.querySelector('.username').textContent = data.username || 'User';
-  document.getElementById('team-logo').src = `/static/images/homepage-logos/${data.team}.png`;
+  const formattedTeam = formatTeamName(data.team);
+  const logoSrc = `/static/images/homepage-logos/${formattedTeam}.png`;
+  document.getElementById('team-logo').src = logoSrc;
+  console.log('Team logo URL:', logoSrc);
 
-  const abbr = teamMap[data.team];
+  const abbr = teamMap[formattedTeam];
   const sammyEl = document.getElementById('coach-sammy');
   const dukeEl = document.getElementById('coach-duke');
   if (abbr) {
-    if (sammyEl) sammyEl.src = `/static/images/coaches/${abbr}/Sammy-${abbr}.png`;
-    if (dukeEl) dukeEl.src = `/static/images/coaches/${abbr}/Duke-${abbr}.png`;
+    if (sammyEl) {
+      sammyEl.src = `/static/images/coaches/${abbr}/Sammy-${abbr}.png`;
+      console.log('Coach Sammy URL:', sammyEl.src);
+    }
+    if (dukeEl) {
+      dukeEl.src = `/static/images/coaches/${abbr}/Duke-${abbr}.png`;
+      console.log('Coach Duke URL:', dukeEl.src);
+    }
   } else {
     if (sammyEl) sammyEl.removeAttribute('src');
     if (dukeEl) dukeEl.removeAttribute('src');
