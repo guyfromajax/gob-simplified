@@ -194,6 +194,7 @@ async function init() {
 
 const playNowBtn = document.getElementById('play-now');
 playNowBtn.addEventListener('click', async () => {
+  console.log('Play Now click search:', window.location.search);
   const originalText = playNowBtn.textContent;
   playNowBtn.disabled = true;
   playNowBtn.textContent = 'Loading...';
@@ -206,7 +207,9 @@ playNowBtn.addEventListener('click', async () => {
     if (!res.ok) throw new Error('Simulation failed');
     const { home, away } = await res.json();
     if (!home || !away) throw new Error('Matchup not found');
-    window.location.href = `/court.html?home=${encodeURIComponent(home)}&away=${encodeURIComponent(away)}`;
+    const url = `/court.html?franchise_id=${encodeURIComponent(franchiseId)}&home=${encodeURIComponent(home)}&away=${encodeURIComponent(away)}`;
+    console.log('Navigating to', url);
+    window.location.href = url;
   } catch (err) {
     console.error(err);
     alert('Unable to play next game');
