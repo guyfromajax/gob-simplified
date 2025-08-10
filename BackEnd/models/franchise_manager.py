@@ -143,6 +143,8 @@ class RecruitManager:
         default_path = Path(__file__).resolve().parents[1] / "data" / "names" / "franchise_names.json"
         names_path = Path(names_file) if names_file else default_path
 
+        print(f"Inside RecruitManager, names_path: {names_path}")
+
         # Fallbacks (used if file missing or malformed)
         fallback_first = ["Jalen", "Marcus", "Tyrese", "Zion", "Cade"]
         fallback_last  = ["Walker", "Jackson", "Robinson", "Wright", "Anderson"]
