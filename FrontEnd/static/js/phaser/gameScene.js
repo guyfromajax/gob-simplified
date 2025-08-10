@@ -15,7 +15,7 @@ export function createGameScene(Phaser) {
         this.franchiseId = data.franchiseId;
         this.homeTeam = data.homeTeam;
         this.awayTeam = data.awayTeam;
-        this.animate = data.animate !== false;
+        this.mode = data.mode;
 
         console.log("🧠 Game initialized with:", {
           rosters: this.rosters,
@@ -23,7 +23,7 @@ export function createGameScene(Phaser) {
           franchiseId: this.franchiseId,
           homeTeam: this.homeTeam,
           awayTeam: this.awayTeam,
-          animate: this.animate,
+          mode: this.mode,
         });
       }
       
@@ -118,8 +118,42 @@ export function createGameScene(Phaser) {
 
           console.log("✅ GameScene animation complete");
 
-          await finalize();
-        };
+        // Extract score and winner
+        const homeScore = simData.score?.[simData.home_team] || 0;
+        const awayScore = simData.score?.[simData.away_team] || 0;
+        const winner = homeScore > awayScore ? simData.home_team : simData.away_team;
+
+        // POST to /tournament/save-result
+        if (this.tournamentId) {
+        try {
+            const res = await fetch("/tournament/save-result", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                tournament_id: this.tournamentId,
+                game_id: simData._id,  // make sure _id is included in your /simulate response
+                winner: winner
+            })
+            });
+
+            if (!res.ok) {
+            console.error("❌ Failed to save tournament result:", await res.text());
+            } else {
+            console.log("✅ Tournament result saved.");
+            }
+        } catch (err) {
+            console.error("🚨 Error during tournament result save:", err);
+        }
+        }
+
+        // Show final score and navigate
+        alert(`Final Score — ${homeTeam} ${homeScore} | ${awayTeam} ${awayScore}`);
+        if (this.mode === 'single') {
+          window.location.href = 'index.html';
+        } else if (!this.tournamentId) {
+          window.location.href = '/franchise/command-center';
+        }
+      };
 
         if (this.textures.exists(courtKey)) {
           this.add.image(0, 0, courtKey)

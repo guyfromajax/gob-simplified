@@ -17,21 +17,17 @@ function buildQuery(params = {}) {
 }
 
 const urlParams = new URLSearchParams(window.location.search);
-const tournamentId = urlParams.get('tournament_id');
-let franchiseId = urlParams.get('franchise_id');
-if (!franchiseId) {
-  franchiseId = localStorage.getItem('franchiseId');
-}
-const homeTeam = urlParams.get('home');
-const awayTeam = urlParams.get('away');
-const mode = getMode({ tournamentId, franchiseId });
+const tournamentId = urlParams.get("tournament_id");
+const homeTeam = urlParams.get("home");
+const awayTeam = urlParams.get("away");
+const mode = urlParams.get("mode");
 
-console.log('🏀 Launch params:', {
+console.log("🏀 Tournament launch params:", {
   tournamentId,
   franchiseId,
   homeTeam,
   awayTeam,
-  mode,
+  mode
 });
 
 const GameScene = createGameScene(Phaser);
@@ -138,39 +134,29 @@ async function playGame() {
     fetchTeamRoster(awayTeam),
   ]);
 
-  const score = await startGame({ homeRoster, awayRoster, animate: true });
-  if (score) {
-    showPopup(score);
-  }
+  console.log("✅ Loaded rosters:", { homeRoster, awayRoster });
+
+  const game = new Phaser.Game({
+    type: Phaser.AUTO,
+    width: 1229,
+    height: 768,
+    backgroundColor: "#1e1e1e",
+    parent: "phaser-container",
+    // Disable audio to avoid AudioContext warnings in automated testing
+    audio: { noAudio: true },
+    scene: GameScene
+  });
+
+  game.scene.start('GameScene', {
+    rosters: { homeRoster, awayRoster },
+    tournamentId,
+    homeTeam,
+    awayTeam,
+    mode
+  });
 }
 
-async function showResults() {
-  if (isSimulating) return;
-  isSimulating = true;
-  playBtn.style.display = 'none';
-  resultsBtn.style.display = 'none';
-
-  if (!homeTeam || !awayTeam) {
-    alert('Please select teams before playing.');
-    isSimulating = false;
-    return;
-  }
-
-  const [homeRoster, awayRoster] = await Promise.all([
-    fetchTeamRoster(homeTeam),
-    fetchTeamRoster(awayTeam),
-  ]);
-
-  const score = await startGame({ homeRoster, awayRoster, animate: false });
-  if (score) {
-    showPopup(score);
-  }
-}
-
-const playBtn = document.querySelector('.play-button');
-const resultsBtn = document.querySelector('.results-button');
-if (playBtn) playBtn.addEventListener('click', playGame);
-if (resultsBtn) resultsBtn.addEventListener('click', showResults);
+initTournamentGame();  // ✅ This stays last
 
 
 // new Phaser.Game(config);
