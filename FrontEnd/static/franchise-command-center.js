@@ -130,8 +130,9 @@ function renderTeam(data) {
   tbody.innerHTML = '';
   let players = (data.players || []).map(p => {
     const best = getBestPosition(p.position_ratings || {});
+    const fullName = `${p.first_name || ''} ${p.last_name || ''}`.trim() || p.name || '';
     return {
-      name: p.name,
+      name: fullName,
       pos: best.pos,
       year: yearMap[p.year?.toLowerCase()] || p.year || '--',
       height: formatHeight(p.height),
