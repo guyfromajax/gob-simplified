@@ -120,7 +120,7 @@ def main():
     ap.add_argument("--mongo", default="mongodb://localhost:27017", help="Mongo URI")
     ap.add_argument("--db", default="gob", help="Database name")
     ap.add_argument("--collection", default="players", help="Players collection name")
-    ap.add_argument("--teams-dir", default="BackEnd/teams", help="Path to teams JSON directory")
+    ap.add_argument("--teams-dir", default="teams", help="Path to teams JSON directory")
     ap.add_argument("--dry-run", action="store_true", help="Do not write; just print planned changes")
     args = ap.parse_args()
 
