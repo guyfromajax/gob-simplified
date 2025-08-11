@@ -140,78 +140,57 @@ class ScheduleManager:
 
         return schedule
 
+# --- Drop-in replacement for RecruitManager (path-robust + same JSON schema) ---
 class RecruitManager:
     def __init__(self, db, names_file: Path | None = None):
         self.db = db
 
-        # Fallbacks (used if file missing or malformed)
-        fallback_first = ["Jalen", "Marcus", "Tyrese", "Zion", "Cade"]
-        fallback_last  = ["Walker", "Jackson", "Robinson", "Wright", "Anderson"]
+        # Defaults only if file truly missing/malformed
+        self.first_names = ["Jalen", "Marcus", "Tyrese", "Zion", "Cade"]
+        self.last_names  = ["Walker", "Jackson", "Robinson", "Wright", "Anderson"]
 
-        self.first_names, self.last_names = fallback_first, fallback_last
+        payload = None
 
+        # 1) Try local path relative to this file: BackEnd/data/names/franchise_names.json
         try:
-            if names_file is not None:
-                with Path(names_file).open("r", encoding="utf-8") as f:
-                    payload = json.load(f)
-            else:
-                print("DEBUG sys.path:", sys.path)
+            default_path = (Path(__file__).resolve()
+                            .parents[1] / "data" / "names" / "franchise_names.json")
+            path = Path(names_file) if names_file else default_path
+            with path.open("r", encoding="utf-8") as f:
+                payload = json.load(f)
+        except Exception:
+            payload = None
+
+        # 2) Fallback: importlib.resources (works when BackEnd is on sys.path)
+        if payload is None:
+            try:
                 pkg = resources.files("BackEnd.data.names")
-                print("DEBUG package files:", list(pkg.iterdir()))
-                try:
-                    with resources.open_text(
-                        "BackEnd.data.names", "franchise_names.json", encoding="utf-8"
-                    ) as f:
-                        payload = json.load(f)
-                except Exception as exc:
-                    print("DEBUG failed to load franchise_names.json:", exc)
-                    raise
+                with resources.open_text("BackEnd.data.names", "franchise_names.json", encoding="utf-8") as f:
+                    payload = json.load(f)
+            except Exception:
+                payload = None
 
-            # Expect keys: "first_names", "last_names"
-            fn = payload.get("first_names") or []
-            ln = payload.get("last_names") or []
-            if isinstance(fn, list) and isinstance(ln, list) and fn and ln:
-                self.first_names = fn
-                self.last_names = ln
+        # 3) If we got data, validate keys and apply
+        if isinstance(payload, dict):
+            fn = payload.get("first_names")
+            ln = payload.get("last_names")
+            if isinstance(fn, list) and fn and isinstance(ln, list) and ln:
+                self.first_names, self.last_names = fn, ln
             else:
-                logger.warning(
-                    "Recruit names file %s missing required data; using fallback names",
-                    names_file or "package resource",
-                )
-        except Exception as exc:
-            logger.warning(
-                "Error loading recruit names from %s: %s. Using fallback names.",
-                names_file or "package resource",
-                exc,
-            )
-
+                logger.warning("Names JSON missing non-empty 'first_names'/'last_names'; using fallback lists.")
+        else:
+            logger.warning("Could not load franchise_names.json from disk or package; using fallback lists.")
 
     def generate_recruits(self, count=40):
         recruits = []
         for _ in range(count):
             name = f"{random.choice(self.first_names)} {random.choice(self.last_names)}"
-            attributes = {
-                "SC": random.randint(1, 30),
-                "SH": random.randint(1, 30),
-                "ID": random.randint(1, 30),
-                "OD": random.randint(1, 30),
-                "PS": random.randint(1, 30),
-                "BH": random.randint(1, 30),
-                "RB": random.randint(1, 30),
-                "AG": random.randint(1, 30),
-                "ST": random.randint(1, 30),
-                "ND": random.randint(1, 30),
-                "IQ": random.randint(1, 30),
-                "FT": random.randint(1, 30),
-            }
-            recruit = {
-                "name": name,
-                "attributes": attributes,
-                "year": "Freshman",
-                "created_at": datetime.utcnow()
-            }
-            recruits.append(recruit)
+            attributes = {k: random.randint(1, 30) for k in
+                          ["SC","SH","ID","OD","PS","BH","RB","AG","ST","ND","IQ","FT"]}
+            recruits.append({"name": name, "attributes": attributes,
+                             "year": "Freshman", "created_at": datetime.utcnow()})
 
         if recruits:
-            self.db.recruits.delete_many({})  # Optional: clear previous recruits
+            self.db.recruits.delete_many({})
             self.db.recruits.insert_many(recruits)
+
