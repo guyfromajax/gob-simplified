@@ -152,23 +152,25 @@ class RecruitManager:
         payload = None
 
         # 1) Try local path relative to this file: BackEnd/data/names/franchise_names.json
+        default_path = (Path(__file__).resolve().parents[1]
+                        / "data" / "names" / "franchise_names.json")
+        path = Path(names_file).expanduser() if names_file else default_path
         try:
-            default_path = (Path(__file__).resolve()
-                            .parents[1] / "data" / "names" / "franchise_names.json")
-            path = Path(names_file) if names_file else default_path
             with path.open("r", encoding="utf-8") as f:
                 payload = json.load(f)
-        except Exception:
-            payload = None
+            logger.info("Recruit names loaded from %s", path)
+        except Exception as exc:
+            logger.warning("Failed to load recruit names from %s: %s", path, exc)
 
         # 2) Fallback: importlib.resources (works when BackEnd is on sys.path)
         if payload is None:
             try:
-                pkg = resources.files("BackEnd.data.names")
-                with resources.open_text("BackEnd.data.names", "franchise_names.json", encoding="utf-8") as f:
+                with resources.open_text("BackEnd.data.names",
+                                        "franchise_names.json", encoding="utf-8") as f:
                     payload = json.load(f)
-            except Exception:
-                payload = None
+                logger.info("Recruit names loaded from package BackEnd.data.names")
+            except Exception as exc:
+                logger.warning("Could not load recruit names via package resources: %s", exc)
 
         # 3) If we got data, validate keys and apply
         if isinstance(payload, dict):
