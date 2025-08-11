@@ -43,7 +43,7 @@
         <tr>
           <td>{{ p.name }}</td>
           <td>{{ p.year }}</td>
-          <td>{{ p.height }}</td>
+          <td{% if p.height_raw is not none %} data-sort-value="{{ p.height_raw }}"{% endif %}>{{ p.height }}</td>
           <td>{{ p.weight }}</td>
           <td>{{ p.attributes.SC }}</td>
           <td>{{ p.attributes.SH }}</td>
