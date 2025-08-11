@@ -252,3 +252,98 @@ def tournament_state(tournament_id: str):
         raise HTTPException(status_code=404, detail="Tournament not found")
     doc["_id"] = str(doc["_id"])
     return doc
+
+
+@router.post("/tournament/sim-remaining")
+def sim_remaining(request: SimulateRequest):
+    """Simulate all remaining games until the bracket is complete.
+
+    The endpoint is idempotent; already simulated games are skipped and existing
+    results are preserved.  The updated tournament document is returned."""
+
+    try:
+        tid = ObjectId(request.tournament_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid tournament_id")
+
+    tournament = tournaments_collection.find_one({"_id": tid})
+    if not tournament:
+        raise HTTPException(status_code=404, detail="Tournament not found")
+
+    manager = TournamentManager(tournaments_collection=tournaments_collection)
+    manager.tournament_id = tid
+
+    def _log_result(result_doc):
+        exists = tournaments_collection.find_one(
+            {
+                "_id": tid,
+                "results": {
+                    "$elemMatch": {
+                        "round": result_doc["round"],
+                        "match_index": result_doc["match_index"],
+                    }
+                },
+            }
+        )
+        if not exists:
+            tournaments_collection.update_one(
+                {"_id": tid}, {"$push": {"results": result_doc}}
+            )
+
+    while True:
+        tournament = tournaments_collection.find_one({"_id": tid})
+        if not tournament or tournament.get("completed"):
+            break
+
+        round_num = tournament.get("current_round", 1)
+        round_key = "final" if round_num == 3 else f"round{round_num}"
+        matchups = tournament.get("bracket", {}).get(round_key, [])
+        manager.tournament = tournament
+
+        for i, match in enumerate(matchups):
+            if match.get("game_id"):
+                exists = tournaments_collection.find_one(
+                    {
+                        "_id": tid,
+                        "results": {
+                            "$elemMatch": {"round": round_num, "match_index": i}
+                        },
+                    }
+                )
+                if not exists:
+                    summary = games_collection.find_one({"_id": ObjectId(match["game_id"])}) or {}
+                    result_doc = {
+                        "home_team": match["home_team"],
+                        "away_team": match["away_team"],
+                        "score": summary.get("score", {}),
+                        "winner": match.get("winner"),
+                        "round": round_num,
+                        "match_index": i,
+                    }
+                    _log_result(result_doc)
+                continue
+
+            game = run_simulation(match["home_team"], match["away_team"])
+            summary = summarize_game_state(game)
+            game_id = games_collection.insert_one(summary).inserted_id
+            home = match["home_team"]
+            away = match["away_team"]
+            winner = home if summary["score"][home] > summary["score"][away] else away
+            manager.save_game_result(round_key, i, str(game_id), winner, summary.get("score"))
+            result_doc = {
+                "home_team": home,
+                "away_team": away,
+                "score": summary.get("score", {}),
+                "winner": winner,
+                "round": round_num,
+                "match_index": i,
+            }
+            _log_result(result_doc)
+
+        update_bracket_from_results(tid, tournaments_collection=tournaments_collection)
+
+    final_doc = tournaments_collection.find_one({"_id": tid})
+    if not final_doc:
+        raise HTTPException(status_code=404, detail="Tournament not found")
+    final_doc["_id"] = str(final_doc["_id"])
+    return final_doc
