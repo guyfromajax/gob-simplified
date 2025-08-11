@@ -1,6 +1,11 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from BackEnd.db import tournaments_collection, teams_collection, games_collection
+from BackEnd.db import (
+    tournaments_collection,
+    teams_collection,
+    games_collection,
+    players_collection,
+)
 from BackEnd.tournament.tournament_manager import TournamentManager
 from BackEnd.tournament.bracket_logic import update_bracket_from_results
 from BackEnd.main import run_simulation
@@ -22,6 +27,86 @@ class TournamentResultRequest(BaseModel):
 
 class SimulateRequest(BaseModel):
     tournament_id: str
+
+
+@router.get("/tournament/leaders")
+def get_tournament_leaders(tournament_id: str):
+    """Return top 10 leaders for key stats within a tournament."""
+    try:
+        tid = ObjectId(tournament_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid tournament_id")
+
+    tourney = tournaments_collection.find_one({"_id": tid})
+    if not tourney:
+        raise HTTPException(status_code=404, detail="Tournament not found")
+
+    teams: set[str] = set()
+    for round_matches in tourney.get("bracket", {}).values():
+        for match in round_matches:
+            teams.add(match.get("home_team"))
+            teams.add(match.get("away_team"))
+    teams.discard(None)
+
+    players = list(players_collection.find({"team": {"$in": list(teams)}}))
+
+    categories = [
+        ("PTS", "MIN"),
+        ("TPM", "TPA"),
+        ("REB", "MIN"),
+        ("AST", "MIN"),
+        ("STL", "MIN"),
+        ("BLK", "MIN"),
+    ]
+
+    def stat_val(stats: dict, key: str) -> float:
+        if key in stats:
+            return stats.get(key, 0)
+        if key == "TPM":
+            return stats.get("3PTM", 0)
+        if key == "TPA":
+            return stats.get("3PTA", 0)
+        return stats.get(key, 0)
+
+    result: dict[str, list] = {}
+    for stat, tie_key in categories:
+        entries = []
+        for p in players:
+            season = p.get("stats", {}).get("season", {})
+            value = stat_val(season, stat)
+            tie_val = stat_val(season, tie_key) if tie_key else 0
+            entries.append(
+                {
+                    "player_id": str(p.get("_id")),
+                    "first_name": p.get("first_name", ""),
+                    "last_name": p.get("last_name", ""),
+                    "team_name": p.get("team", ""),
+                    "value": value,
+                    "_tie": tie_val,
+                }
+            )
+        entries.sort(
+            key=lambda x: (
+                -x["value"],
+                -x["_tie"],
+                f"{x['first_name']} {x['last_name']}",
+            )
+        )
+        top = []
+        for idx, e in enumerate(entries[:10], start=1):
+            top.append(
+                {
+                    "rank": idx,
+                    "player_id": e["player_id"],
+                    "first_name": e["first_name"],
+                    "last_name": e["last_name"],
+                    "team_name": e["team_name"],
+                    "value": e["value"],
+                }
+            )
+        result[stat] = top
+
+    return result
 
 @router.post("/start-tournament")
 def start_tournament(request: StartTournamentRequest):
