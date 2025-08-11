@@ -48,18 +48,35 @@ document.addEventListener('DOMContentLoaded', () => {
     btn.addEventListener('click', () => {
       window.location.href = `/team-roster/${encodeURIComponent(team)}`;
     });
+  });
 
-    const slug = team.toLowerCase().replace(/[\s-]/g, '_');
-    fetch(`/teams/${slug}.json`)
-      .then(resp => resp.json())
-      .then(data => {
-        const color = data.secondary_color || '#ccc';
+  const fallbackColor = '#ccc';
+  fetch('/teams')
+    .then(resp => resp.json())
+    .then(teamData => {
+      const colorMap = {};
+      teamData.forEach(t => {
+        colorMap[t.name] = t.secondary_color;
+      });
+
+      teamButtons.forEach(btn => {
+        const team = btn.dataset.team;
+        const taglineEl = btn.querySelector('.team-tagline');
+        const color = colorMap[team] || fallbackColor;
+        const taglineColor = colorMap[team] ? '#fff' : '#000';
         btn.style.borderColor = color;
         btn.style.backgroundColor = color;
-      })
-      .catch(() => {
-        btn.style.borderColor = '#ccc';
-        btn.style.backgroundColor = '#ccc';
+        if (taglineEl) taglineEl.style.color = taglineColor;
+        console.log(`Tile ${team} bgColor: ${color}`);
       });
-  });
+    })
+    .catch(() => {
+      teamButtons.forEach(btn => {
+        const taglineEl = btn.querySelector('.team-tagline');
+        btn.style.borderColor = fallbackColor;
+        btn.style.backgroundColor = fallbackColor;
+        if (taglineEl) taglineEl.style.color = '#000';
+        console.log(`Tile ${btn.dataset.team} bgColor: ${fallbackColor} (fallback)`);
+      });
+    });
 });
