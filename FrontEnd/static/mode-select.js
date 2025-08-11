@@ -55,9 +55,11 @@ document.addEventListener('DOMContentLoaded', () => {
       .then(data => {
         const color = data.secondary_color || '#ccc';
         btn.style.borderColor = color;
+        btn.style.backgroundColor = color;
       })
       .catch(() => {
         btn.style.borderColor = '#ccc';
+        btn.style.backgroundColor = '#ccc';
       });
   });
 });
