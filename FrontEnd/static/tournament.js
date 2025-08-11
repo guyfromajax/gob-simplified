@@ -32,6 +32,7 @@ const logoMap = {
 // tournament is preloaded from localStorage above; always refreshed from API.
 let roster = [];
 let stats = [];
+const ATTR_HEADERS = ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "AG", "ST", "ND", "IQ", "FT"];
 
 const leaderBoards = [
   { title: "Points", key: "PTS" },
@@ -187,11 +188,13 @@ function renderRoster() {
   tbody.innerHTML = "";
   roster.forEach(p => {
     const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${p.name}</td>
-      <td>${p.SC}</td><td>${p.SH}</td><td>${p.ID}</td><td>${p.OD}</td>
-      <td>${p.PS}</td><td>${p.BH}</td><td>${p.RB}</td><td>${p.ST}</td>
-      <td>${p.AG}</td><td>${p.ND}</td><td>${p.IQ}</td><td>${p.FT}</td>`;
+    let html = `<td>${p.name}</td><td>${p.pos}</td><td>${p.year}</td><td>${p.height}</td><td>${p.weight}</td>`;
+    ATTR_HEADERS.forEach(h => {
+      const val = p.attributes ? p.attributes[h] : undefined;
+      html += `<td>${val ?? '--'}</td>`;
+    });
+    html += `<td>${p.rt ?? '-'}</td>`;
+    tr.innerHTML = html;
     tbody.appendChild(tr);
   });
 }
@@ -303,7 +306,19 @@ async function loadRoster() {
     const res = await fetch(`/teams/${encodeURIComponent(formatTeamName(userTeamId))}/players`);
     const data = await res.json();
     console.log("Team player data loads", data);
-    roster = data.players.map(p => Object.assign({ name: p.name }, p.attributes));
+    roster = (data.players || []).map(p => {
+      const best = getBestPosition(p.position_ratings || {});
+      return {
+        name: p.name,
+        pos: best.pos,
+        year: yearMap[p.year?.toLowerCase()] || p.year || '--',
+        height: formatHeight(p.height),
+        weight: p.weight ?? '--',
+        attributes: p.attributes || {},
+        rt: best.rating,
+      };
+    });
+    roster.sort((a, b) => (b.rt ?? -1) - (a.rt ?? -1));
     stats = roster.map(p => ({
       name: p.name,
       PTS: 0, FGM: 0, FGA: 0, TPM: 0, TPA: 0,

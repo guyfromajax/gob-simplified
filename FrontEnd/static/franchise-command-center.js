@@ -10,6 +10,7 @@ async function fetchJSON(url) {
 }
 
 let franchiseId = null;
+const ATTR_HEADERS = ["SC","SH","ID","OD","PS","BH","RB","AG","ST","ND","IQ","FT"];
 
 const teamMap = {
   "Four Corners": "FC",
@@ -127,16 +128,27 @@ function renderTeam(data) {
   const tbody = document.getElementById('team-body');
   if (!tbody) return;
   tbody.innerHTML = '';
-  const headers = ["SC","SH","ID","OD","PS","BH","RB","AG","ST","ND","IQ","FT","NG"];
-  (data.players || []).forEach(p => {
+  let players = (data.players || []).map(p => {
+    const best = getBestPosition(p.position_ratings || {});
+    return {
+      name: p.name,
+      pos: best.pos,
+      year: yearMap[p.year?.toLowerCase()] || p.year || '--',
+      height: formatHeight(p.height),
+      weight: p.weight ?? '--',
+      attributes: p.attributes || {},
+      rt: best.rating,
+    };
+  });
+  players.sort((a, b) => (b.rt ?? -1) - (a.rt ?? -1));
+  players.forEach(p => {
     const tr = document.createElement('tr');
-    let html = `<td>${p.name}</td>`;
-    headers.forEach(h => {
-      let val = p.attributes ? p.attributes[h] : null;
-      if (h === 'NG') val = (val ?? 0).toFixed(2);
-      else val = Math.round(val ?? 0);
-      html += `<td>${val}</td>`;
+    let html = `<td>${p.name}</td><td>${p.pos}</td><td>${p.year}</td><td>${p.height}</td><td>${p.weight}</td>`;
+    ATTR_HEADERS.forEach(h => {
+      const val = p.attributes ? p.attributes[h] : undefined;
+      html += `<td>${val ?? '--'}</td>`;
     });
+    html += `<td>${p.rt ?? '-'}</td>`;
     tr.innerHTML = html;
     tbody.appendChild(tr);
   });
