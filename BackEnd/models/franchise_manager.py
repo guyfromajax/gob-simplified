@@ -5,6 +5,7 @@ from importlib import resources
 from pathlib import Path
 import json
 import logging
+import sys
 
 
 logger = logging.getLogger(__name__)
@@ -154,10 +155,17 @@ class RecruitManager:
                 with Path(names_file).open("r", encoding="utf-8") as f:
                     payload = json.load(f)
             else:
-                with resources.open_text(
-                    "BackEnd.data.names", "franchise_names.json", encoding="utf-8"
-                ) as f:
-                    payload = json.load(f)
+                print("DEBUG sys.path:", sys.path)
+                pkg = resources.files("BackEnd.data.names")
+                print("DEBUG package files:", list(pkg.iterdir()))
+                try:
+                    with resources.open_text(
+                        "BackEnd.data.names", "franchise_names.json", encoding="utf-8"
+                    ) as f:
+                        payload = json.load(f)
+                except Exception as exc:
+                    print("DEBUG failed to load franchise_names.json:", exc)
+                    raise
 
             # Expect keys: "first_names", "last_names"
             fn = payload.get("first_names") or []
