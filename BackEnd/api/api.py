@@ -165,9 +165,15 @@ def get_team_roster(team_name: str, tournament_id: str | None = None):
     for p in player_objects:
         attributes = p.get("attributes", {})  # safely get nested attributes dict
         players.append({
-            "_id": str(p["_id"]),  # ✅ Add this line
+            "_id": str(p.get("_id")),
+            "first_name": p.get("first_name", ""),
+            "last_name": p.get("last_name", ""),
             "name": f"{p.get('first_name', '')} {p.get('last_name', '')}".strip(),
-            "attributes": {attr: attributes.get(attr, "--") for attr in display_attributes}
+            "year": p.get("year"),
+            "height": p.get("height"),
+            "weight": p.get("weight"),
+            "position_ratings": p.get("position_ratings", {}),
+            "attributes": {attr: attributes.get(attr, "--") for attr in display_attributes},
         })
 
     return {
@@ -217,7 +223,13 @@ def get_team_players(team_id: str):
         attributes = p.get("attributes", {})
         players_data.append({
             "_id": str(p.get("_id")),
+            "first_name": p.get("first_name", ""),
+            "last_name": p.get("last_name", ""),
             "name": f"{p.get('first_name', '')} {p.get('last_name', '')}".strip(),
+            "year": p.get("year"),
+            "height": p.get("height"),
+            "weight": p.get("weight"),
+            "position_ratings": p.get("position_ratings", {}),
             "attributes": {attr: attributes.get(attr, "--") for attr in display_attributes},
         })
 
