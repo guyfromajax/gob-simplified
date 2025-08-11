@@ -195,10 +195,8 @@ async function init() {
     renderTeam(await fetchJSON(`/roster/${encodeURIComponent(topData.team)}`));
   }
   const standingsData = await fetchJSON(`/franchise/standings?franchise_id=${franchiseId}`);
-  console.log("standings keys", Object.keys(standingsData || {}));
   renderStandings(standingsData);
   const scheduleData = await fetchJSON(`/franchise/schedule?franchise_id=${franchiseId}`);
-  console.log("schedule keys", Object.keys(scheduleData || {}));
   renderSchedule(scheduleData);
   renderLeaders(await fetchJSON('/franchise/leaders'));
   renderTeamStats(await fetchJSON('/franchise/team-stats'));
