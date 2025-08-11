@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from BackEnd.db import tournaments_collection, teams_collection, games_collection
 from BackEnd.tournament.tournament_manager import TournamentManager
+from BackEnd.tournament.bracket_logic import update_bracket_from_results
 from BackEnd.main import run_simulation
 from BackEnd.utils.shared import summarize_game_state
 from bson import ObjectId
@@ -207,10 +208,8 @@ def save_result(request: TournamentResultRequest):
         }
         _log_result(result_doc)
 
-    # Reload and advance round
-    updated_doc = tournaments_collection.find_one({"_id": tournament_id})
-    if updated_doc:
-        manager.tournament = updated_doc
-        manager.advance_round()
+    # Use saved results to advance the bracket to the next round.  This relies
+    # solely on the stored results and is safe to re-run (idempotent).
+    update_bracket_from_results(tournament_id, tournaments_collection=tournaments_collection)
 
     return {"status": "success"}
