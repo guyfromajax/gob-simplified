@@ -84,27 +84,43 @@ export function createGameScene(Phaser) {
       const clockEl = document.getElementById('game-clock');
       const quarterEl = document.getElementById('quarter');
 
+      // Live scoreboard state
+      const liveScore = { [homeTeam]: 0, [awayTeam]: 0 };
+      let liveHomeFouls = 0;
+      let liveAwayFouls = 0;
+      let liveClock = '8:00';
+      let liveQuarter = 1;
+
       const updateScoreboard = (turn = {}) => {
-        const score = turn.score || {};
-        if (homeScoreEl && score[homeTeam] != null) homeScoreEl.textContent = score[homeTeam];
-        if (awayScoreEl && score[awayTeam] != null) awayScoreEl.textContent = score[awayTeam];
+        // Update score from authoritative state or incrementally from event
+        if (turn.score) {
+          if (typeof turn.score[homeTeam] === 'number') liveScore[homeTeam] = turn.score[homeTeam];
+          if (typeof turn.score[awayTeam] === 'number') liveScore[awayTeam] = turn.score[awayTeam];
+        } else {
+          const scoringTeam = turn.scoring_team || turn.team || turn.offense_team;
+          if (turn.result === 'made_3') liveScore[scoringTeam] = (liveScore[scoringTeam] || 0) + 3;
+          else if (turn.result === 'made_2') liveScore[scoringTeam] = (liveScore[scoringTeam] || 0) + 2;
+          else if (turn.result === 'made_ft') liveScore[scoringTeam] = (liveScore[scoringTeam] || 0) + 1;
+        }
 
         const homeF = turn.homeFouls ?? turn.home_team_fouls ?? turn.fouls?.home;
         const awayF = turn.awayFouls ?? turn.away_team_fouls ?? turn.fouls?.away;
-        if (homeFoulsEl && homeF != null) homeFoulsEl.textContent = `F: ${homeF}`;
-        if (awayFoulsEl && awayF != null) awayFoulsEl.textContent = `F: ${awayF}`;
+        if (typeof homeF === 'number') liveHomeFouls = homeF;
+        if (typeof awayF === 'number') liveAwayFouls = awayF;
 
-        if (clockEl && (turn.clock || turn.game_clock)) clockEl.textContent = turn.clock || turn.game_clock;
-        if (quarterEl && turn.quarter != null) quarterEl.textContent = `Q:${turn.quarter}`;
+        if (turn.clock || turn.game_clock) liveClock = turn.clock || turn.game_clock;
+        if (turn.quarter != null) liveQuarter = turn.quarter;
+
+        if (homeScoreEl) homeScoreEl.textContent = liveScore[homeTeam];
+        if (awayScoreEl) awayScoreEl.textContent = liveScore[awayTeam];
+        if (homeFoulsEl) homeFoulsEl.textContent = `F: ${liveHomeFouls}`;
+        if (awayFoulsEl) awayFoulsEl.textContent = `F: ${liveAwayFouls}`;
+        if (clockEl) clockEl.textContent = liveClock;
+        if (quarterEl) quarterEl.textContent = `Q:${liveQuarter}`;
       };
 
-      updateScoreboard({
-        score: simData.score || {},
-        homeFouls: simData.homeTeam?.fouls || 0,
-        awayFouls: simData.awayTeam?.fouls || 0,
-        clock: simData.clock || '8:00',
-        quarter: simData.quarter || 1
-      });
+      // Initialize scoreboard at tip-off
+      updateScoreboard();
 
       const finalize = async () => {
         const finalScore = await finalizeGame({
