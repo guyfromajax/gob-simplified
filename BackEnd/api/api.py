@@ -232,6 +232,13 @@ def team_roster_page(request: Request, team: str):
     """Render an HTML roster page for a given team."""
     players_cursor = players_collection.find({"team": team})
     players = []
+    order = ["PG", "SG", "SF", "PF", "C"]
+    year_map = {
+        "senior": "SR",
+        "junior": "JR",
+        "sophomore": "SO",
+        "freshman": "FR",
+    }
     for p in players_cursor:
         attrs = p.get("attributes", {})
         raw_height = p.get("height")
@@ -239,19 +246,55 @@ def team_roster_page(request: Request, team: str):
             height_raw = int(float(raw_height))
         except (TypeError, ValueError):
             height_raw = None
-        display_attributes = ["SC", "SH", "ID", "OD", "PS", "BH", "RB",
-                              "AG", "ST", "ND", "IQ", "FT", "NG"]
-        players.append({
-            "name": f"{p.get('first_name', '')} {p.get('last_name', '')}".strip(),
-            "year": p.get("year", "--"),
-            "height": format_height(raw_height),
-            "height_raw": height_raw,
-            "weight": p.get("weight", "--"),
-            "attributes": {attr: attrs.get(attr, "--") for attr in display_attributes},
-        })
+        display_attributes = [
+            "SC",
+            "SH",
+            "ID",
+            "OD",
+            "PS",
+            "BH",
+            "RB",
+            "AG",
+            "ST",
+            "ND",
+            "IQ",
+            "FT",
+        ]
+
+        pos_ratings = p.get("position_ratings") or {}
+        pos = "-"
+        rt_val: int | None = None
+        for o in order:
+            rating = pos_ratings.get(o)
+            if rating is None:
+                continue
+            if rt_val is None or rating > rt_val:
+                pos, rt_val = o, rating
+        rt = int(rt_val) if rt_val is not None else "-"
+
+        year_raw = p.get("year", "--")
+        year_abbr = year_map.get(str(year_raw).lower(), year_raw or "--")
+
+        players.append(
+            {
+                "name": f"{p.get('first_name', '')} {p.get('last_name', '')}".strip(),
+                "pos": pos,
+                "year": year_abbr,
+                "height": format_height(raw_height),
+                "height_raw": height_raw,
+                "weight": p.get("weight", "--"),
+                "attributes": {attr: attrs.get(attr, "--") for attr in display_attributes},
+                "rt": rt,
+                "rt_value": rt_val if rt_val is not None else -1,
+            }
+        )
+
+    players.sort(key=lambda x: x.get("rt_value", -1), reverse=True)
 
     template_name = f"team-roster/team-roster-{team.replace(' ', '-')}.html"
-    return templates.TemplateResponse(template_name, {"request": request, "team": team, "players": players})
+    return templates.TemplateResponse(
+        template_name, {"request": request, "team": team, "players": players}
+    )
 
 
 @app.get("/tournament/active")
