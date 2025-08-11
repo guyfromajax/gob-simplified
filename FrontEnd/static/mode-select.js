@@ -56,18 +56,23 @@ document.addEventListener('DOMContentLoaded', () => {
     .then(teamData => {
       const colorMap = {};
       teamData.forEach(t => {
-        colorMap[t.name] = t.secondary_color;
+        colorMap[t.name] = {
+          primary: t.primary_color,
+          secondary: t.secondary_color
+        };
       });
 
       teamButtons.forEach(btn => {
         const team = btn.dataset.team;
         const taglineEl = btn.querySelector('.team-tagline');
-        const color = colorMap[team] || fallbackColor;
-        const taglineColor = colorMap[team] ? '#fff' : '#000';
-        btn.style.borderColor = color;
-        btn.style.backgroundColor = color;
+        const colors = colorMap[team] || {};
+        const bgColor = colors.primary || fallbackColor;
+        const borderColor = colors.secondary || fallbackColor;
+        const taglineColor = colors.primary ? '#fff' : '#000';
+        btn.style.backgroundColor = bgColor;
+        btn.style.borderColor = borderColor;
         if (taglineEl) taglineEl.style.color = taglineColor;
-        console.log(`Tile ${team} bgColor: ${color}`);
+        console.log(`Tile ${team} bgColor: ${bgColor} borderColor: ${borderColor}`);
       });
     })
     .catch(() => {
