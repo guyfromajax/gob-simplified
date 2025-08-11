@@ -72,6 +72,40 @@ export function createGameScene(Phaser) {
       );
       console.log("📦 First turn:", simData.turns?.[0]);
 
+      const homeLogoEl = document.getElementById('home-logo');
+      const awayLogoEl = document.getElementById('away-logo');
+      if (homeLogoEl) homeLogoEl.src = `/static/images/homepage-logos/${encodeURIComponent(homeTeam)}.png`;
+      if (awayLogoEl) awayLogoEl.src = `/static/images/homepage-logos/${encodeURIComponent(awayTeam)}.png`;
+
+      const homeScoreEl = document.getElementById('home-score');
+      const awayScoreEl = document.getElementById('away-score');
+      const homeFoulsEl = document.getElementById('home-fouls');
+      const awayFoulsEl = document.getElementById('away-fouls');
+      const clockEl = document.getElementById('game-clock');
+      const quarterEl = document.getElementById('quarter');
+
+      const updateScoreboard = (turn = {}) => {
+        const score = turn.score || {};
+        if (homeScoreEl && score[homeTeam] != null) homeScoreEl.textContent = score[homeTeam];
+        if (awayScoreEl && score[awayTeam] != null) awayScoreEl.textContent = score[awayTeam];
+
+        const homeF = turn.homeFouls ?? turn.home_team_fouls ?? turn.fouls?.home;
+        const awayF = turn.awayFouls ?? turn.away_team_fouls ?? turn.fouls?.away;
+        if (homeFoulsEl && homeF != null) homeFoulsEl.textContent = `F: ${homeF}`;
+        if (awayFoulsEl && awayF != null) awayFoulsEl.textContent = `F: ${awayF}`;
+
+        if (clockEl && (turn.clock || turn.game_clock)) clockEl.textContent = turn.clock || turn.game_clock;
+        if (quarterEl && turn.quarter != null) quarterEl.textContent = `Q:${turn.quarter}`;
+      };
+
+      updateScoreboard({
+        score: simData.score || {},
+        homeFouls: simData.homeTeam?.fouls || 0,
+        awayFouls: simData.awayTeam?.fouls || 0,
+        clock: simData.clock || '8:00',
+        quarter: simData.quarter || 1
+      });
+
       const finalize = async () => {
         const finalScore = await finalizeGame({
           simData,
@@ -114,7 +148,8 @@ export function createGameScene(Phaser) {
             scene: this,
             simData,
             playerSprites: this.playerSprites,
-            ballSprite: this.ballSprite
+            ballSprite: this.ballSprite,
+            onUpdate: updateScoreboard
           });
 
           console.log("✅ GameScene animation complete");
