@@ -29,9 +29,7 @@ const logoMap = {
   "Xavien": "Xavien-Horizontal (1).svg",
 };
 
-// tournament is preloaded from localStorage above; will be
-// overwritten if fetched again.
-// let tournament = null; (replaced)
+// tournament is preloaded from localStorage above; always refreshed from API.
 let roster = [];
 let stats = [];
 
@@ -51,23 +49,6 @@ function getLogo(teamName) {
   return `/static/images/homepage-logos/${formatted}.png`;
 }
 
-function addTbdRound(bracketEl, count, cls) {
-  const div = document.createElement("div");
-  div.className = `round ${cls}`;
-  for (let i = 0; i < count; i++) {
-    const wrap = document.createElement("div");
-    wrap.className = "matchup-wrapper";
-    const matchup = document.createElement("div");
-    matchup.className = "matchup";
-    const placeholder = document.createElement("div");
-    placeholder.className = "placeholder";
-    placeholder.textContent = "TBD";
-    matchup.appendChild(placeholder);
-    wrap.appendChild(matchup);
-    div.appendChild(wrap);
-  }
-  bracketEl.appendChild(div);
-}
 
 function renderBracket() {
   if (!tournament) return;
@@ -75,6 +56,9 @@ function renderBracket() {
   bracket.innerHTML = "";
 
   const round1 = tournament.bracket?.round1 || [];
+  const round2 = tournament.bracket?.round2 || [];
+  const finalRound = tournament.bracket?.final || [];
+  const results = tournament.results || [];
 
   const seedMap = {};
   if (round1.length === 4) {
@@ -88,34 +72,54 @@ function renderBracket() {
     seedMap[round1[3].away_team] = 6;
   }
 
-  function createTeamEntry(team, side) {
+  function getResult(round, index) {
+    return results.find(r => r.round === round && r.match_index === index) || null;
+  }
+
+  function createTeamEntry(team, side, score, isWinner) {
     const div = document.createElement("div");
     div.className = "team-entry";
+    if (isWinner) div.classList.add("winner");
     const label = document.createElement("span");
     label.className = `seed-label ${side === "left" ? "seed-left" : "seed-right"}`;
-    label.textContent = `#${seedMap[team]}`;
+    label.textContent = seedMap[team] ? `#${seedMap[team]}` : "";
     const img = document.createElement("img");
     img.src = getLogo(team);
     img.classList.add("team-logo", "bracket-logo");
     if (isUserTeam(team)) img.classList.add("user-team");
+    const scoreSpan = document.createElement("span");
+    scoreSpan.className = "score";
+    scoreSpan.textContent = score !== undefined && score !== null ? score : "";
     if (side === "left") {
       div.appendChild(label);
       div.appendChild(img);
+      div.appendChild(scoreSpan);
     } else {
+      div.appendChild(scoreSpan);
       div.appendChild(img);
       div.appendChild(label);
     }
     return div;
   }
 
-  function createMatchup(m, side) {
+  function createMatchup(m, side, round, index) {
     const wrap = document.createElement("div");
     wrap.className = "matchup-wrapper";
     const matchup = document.createElement("div");
     matchup.className = "matchup";
 
-    matchup.appendChild(createTeamEntry(m.home_team, side));
-    matchup.appendChild(createTeamEntry(m.away_team, side));
+    const res = getResult(round, index) || {};
+    const homeScore = res.score ? res.score[m.home_team] : null;
+    const awayScore = res.score ? res.score[m.away_team] : null;
+    const winner = res.winner;
+
+    if (side === "center") {
+      matchup.appendChild(createTeamEntry(m.home_team, "left", homeScore, winner === m.home_team));
+      matchup.appendChild(createTeamEntry(m.away_team, "right", awayScore, winner === m.away_team));
+    } else {
+      matchup.appendChild(createTeamEntry(m.home_team, side, homeScore, winner === m.home_team));
+      matchup.appendChild(createTeamEntry(m.away_team, side, awayScore, winner === m.away_team));
+    }
     wrap.appendChild(matchup);
     return wrap;
   }
@@ -135,43 +139,40 @@ function renderBracket() {
 
   const leftR1 = document.createElement("div");
   leftR1.className = "round round-1 quarterfinals";
+  if (round1[0]) leftR1.appendChild(createMatchup(round1[0], "left", 1, 0));
 
-  leftR1.appendChild(createMatchup(round1[0], "left"));
-
-  // ✨ Insert vertical spacer between matchups
   const leftSpacer = document.createElement("div");
   leftSpacer.style.height = "40px";
   leftSpacer.className = "bracket-spacer";
   leftR1.appendChild(leftSpacer);
 
-  leftR1.appendChild(createMatchup(round1[1], "left"));
-
+  if (round1[1]) leftR1.appendChild(createMatchup(round1[1], "left", 1, 1));
 
   const leftSemi = document.createElement("div");
   leftSemi.className = "round round-2 semifinals";
-  leftSemi.appendChild(createPlaceholder());
+  if (round2[0]) leftSemi.appendChild(createMatchup(round2[0], "left", 2, 0));
+  else leftSemi.appendChild(createPlaceholder());
 
   const final = document.createElement("div");
   final.className = "round round-3 final";
-  final.appendChild(createPlaceholder());
+  if (finalRound[0]) final.appendChild(createMatchup(finalRound[0], "center", 3, 0));
+  else final.appendChild(createPlaceholder());
 
   const rightSemi = document.createElement("div");
   rightSemi.className = "round round-4 semifinals";
-  rightSemi.appendChild(createPlaceholder());
+  if (round2[1]) rightSemi.appendChild(createMatchup(round2[1], "right", 2, 1));
+  else rightSemi.appendChild(createPlaceholder());
 
   const rightR1 = document.createElement("div");
   rightR1.className = "round round-5 quarterfinals";
-
-  rightR1.appendChild(createMatchup(round1[2], "right"));
+  if (round1[2]) rightR1.appendChild(createMatchup(round1[2], "right", 1, 2));
 
   const rightSpacer = document.createElement("div");
   rightSpacer.style.height = "40px";
   rightSpacer.className = "bracket-spacer";
   rightR1.appendChild(rightSpacer);
 
-  rightR1.appendChild(createMatchup(round1[3], "right"));
-
-
+  if (round1[3]) rightR1.appendChild(createMatchup(round1[3], "right", 1, 3));
 
   bracket.appendChild(leftR1);
   bracket.appendChild(leftSemi);
@@ -237,6 +238,32 @@ function renderLeaderboards() {
   });
 }
 
+function updateCTA() {
+  const playBtn = document.getElementById('play-now');
+  const container = document.querySelector('.play-now-container');
+  if (!container || !playBtn || !tournament) return;
+
+  const roundKey = tournament.current_round === 3 ? 'final' : `round${tournament.current_round}`;
+  const matchups = tournament.bracket?.[roundKey] || [];
+  const userMatch = matchups.find(m => m.home_team === userTeamId || m.away_team === userTeamId);
+
+  const eliminatedMsg = document.getElementById('eliminated-msg');
+  if (userMatch) {
+    const opponent = userMatch.home_team === userTeamId ? userMatch.away_team : userMatch.home_team;
+    playBtn.style.display = 'inline-block';
+    playBtn.textContent = `Play Next Game vs ${opponent}`;
+    if (eliminatedMsg) eliminatedMsg.remove();
+  } else {
+    playBtn.style.display = 'none';
+    if (!eliminatedMsg) {
+      const msg = document.createElement('div');
+      msg.id = 'eliminated-msg';
+      msg.textContent = 'Eliminated';
+      container.appendChild(msg);
+    }
+  }
+}
+
 function initTopAssets(teamName) {
   const formattedName = formatTeamName(teamName || userTeamId || "");
   const logoEl = document.getElementById("user-team-logo");
@@ -256,10 +283,10 @@ function initTopAssets(teamName) {
 }
 
 async function loadTournament() {
-  if (tournament) return;
   try {
     const res = await fetch(`/tournament/active?user_team_id=${encodeURIComponent(userTeamId)}`);
     tournament = await res.json();
+    localStorage.setItem("activeTournament", JSON.stringify(tournament));
     console.log("Bracket data arrives", tournament);
   } catch (err) {
     console.error("Failed to load tournament", err);
@@ -295,6 +322,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   renderRoster();
   renderStats();
   renderLeaderboards();
+  updateCTA();
 
   const playBtn = document.getElementById('play-now');
   if (playBtn) {

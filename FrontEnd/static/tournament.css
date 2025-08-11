@@ -116,6 +116,12 @@ h1, h2, h3, h4, h5, h6 {
   cursor: pointer;
 }
 
+#eliminated-msg {
+  font-family: 'Bebas Neue', cursive;
+  font-size: 20px;
+  color: #333;
+}
+
 .coach-info img {
   width: 80px;
   height: auto;
@@ -238,6 +244,21 @@ h1, h2, h3, h4, h5, h6 {
   padding: 10px;
   position: relative;
   border: 2px solid transparent;
+}
+
+.team-entry {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.team-entry .score {
+  font-family: 'Bebas Neue', cursive;
+  font-size: 20px;
+}
+
+.team-entry.winner .score {
+  font-weight: bold;
 }
 
 .matchup img {
