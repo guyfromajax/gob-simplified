@@ -225,12 +225,12 @@ playNowBtn.addEventListener('click', async () => {
       body: JSON.stringify({ franchise_id: franchiseId })
     });
     if (!res.ok) throw new Error('Simulation failed');
-    const { home, away, week } = await res.json();
+    const { home, away, week, home_id, away_id } = await res.json();
     if (!home || !away) throw new Error('Matchup not found');
     try {
       localStorage.setItem('franchise_week', week);
     } catch {}
-    const url = `/court.html?franchise_id=${encodeURIComponent(franchiseId)}&week=${week}&home=${encodeURIComponent(home)}&away=${encodeURIComponent(away)}`;
+    const url = `/court.html?franchise_id=${encodeURIComponent(franchiseId)}&week=${week}&home=${encodeURIComponent(home)}&away=${encodeURIComponent(away)}&home_id=${encodeURIComponent(home_id)}&away_id=${encodeURIComponent(away_id)}`;
     console.log('Navigating to', url);
     window.location.href = url;
   } catch (err) {
