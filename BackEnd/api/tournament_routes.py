@@ -5,6 +5,7 @@ from BackEnd.tournament.tournament_manager import TournamentManager
 from BackEnd.tournament.bracket_logic import update_bracket_from_results
 from BackEnd.main import run_simulation
 from BackEnd.utils.shared import summarize_game_state
+from BackEnd.utils.stat_updater import apply_stats_from_summary
 from bson import ObjectId
 
 router = APIRouter()
@@ -87,6 +88,7 @@ def simulate_round(request: SimulateRequest):
                 else matchup["away_team"]
             )
             manager.save_game_result(round_name, i, str(game_id), winner)
+            apply_stats_from_summary(summary, str(game_id), request.tournament_id)
 
         # Reload tournament to check if round is complete
         updated_doc = tournaments_collection.find_one({"_id": tournament_id})
@@ -174,6 +176,7 @@ def save_result(request: TournamentResultRequest):
             away_team = match["away_team"]
             summary = games_collection.find_one({"_id": ObjectId(request.game_id)}) or {}
             manager.save_game_result(round_key, i, request.game_id, request.winner, summary.get("score"))
+            apply_stats_from_summary(summary, request.game_id, request.tournament_id)
             user_result = {
                 "home_team": home_team,
                 "away_team": away_team,
@@ -195,6 +198,7 @@ def save_result(request: TournamentResultRequest):
         if match.get("game_id"):
             summary = games_collection.find_one({"_id": ObjectId(match["game_id"])} ) or {}
             manager.save_game_result(round_key, i, match["game_id"], match["winner"], summary.get("score"))
+            apply_stats_from_summary(summary, match["game_id"], request.tournament_id)
             result_doc = {
                 "home_team": match["home_team"],
                 "away_team": match["away_team"],
@@ -211,6 +215,7 @@ def save_result(request: TournamentResultRequest):
             summary = summarize_game_state(game)
             insert_result = games_collection.insert_one(summary)
             game_id = insert_result.inserted_id
+            apply_stats_from_summary(summary, str(game_id), request.tournament_id)
             print(f"✅ Game document inserted for round {round_num} match {i}")
         except Exception as e:
             print(
@@ -312,6 +317,7 @@ def sim_remaining(request: SimulateRequest):
                 )
                 if not exists:
                     summary = games_collection.find_one({"_id": ObjectId(match["game_id"])}) or {}
+                    apply_stats_from_summary(summary, match["game_id"], request.tournament_id)
                     result_doc = {
                         "home_team": match["home_team"],
                         "away_team": match["away_team"],
@@ -326,6 +332,7 @@ def sim_remaining(request: SimulateRequest):
             game = run_simulation(match["home_team"], match["away_team"])
             summary = summarize_game_state(game)
             game_id = games_collection.insert_one(summary).inserted_id
+            apply_stats_from_summary(summary, str(game_id), request.tournament_id)
             home = match["home_team"]
             away = match["away_team"]
             winner = home if summary["score"][home] > summary["score"][away] else away
