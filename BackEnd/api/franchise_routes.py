@@ -4,6 +4,7 @@ from pydantic import BaseModel
 from pathlib import Path
 from bson import ObjectId
 import logging
+import random
 
 from BackEnd.db import db, franchise_state_collection
 from BackEnd.models.franchise_manager import FranchiseManager
@@ -44,6 +45,69 @@ class FranchiseResultRequest(BaseModel):
     franchise_id: str
     game_id: str
     winner: str
+
+
+class GameResult(BaseModel):
+    team1_id: str
+    team2_id: str
+    team1_score: int
+    team2_score: int
+
+
+class CompleteWeekRequest(BaseModel):
+    franchise_id: str
+    week: int
+    result: GameResult
+
+
+def _apply_team_result(team1_id, team2_id, team1_score, team2_score, sign=1):
+    db.teams.update_one({"_id": team1_id}, {"$inc": {"PF": sign * team1_score, "PA": sign * team2_score, "record.W": 0, "record.L": 0}})
+    db.teams.update_one({"_id": team2_id}, {"$inc": {"PF": sign * team2_score, "PA": sign * team1_score, "record.W": 0, "record.L": 0}})
+    if team1_score > team2_score:
+        db.teams.update_one({"_id": team1_id}, {"$inc": {"record.W": sign}})
+        db.teams.update_one({"_id": team2_id}, {"$inc": {"record.L": sign}})
+    elif team2_score > team1_score:
+        db.teams.update_one({"_id": team2_id}, {"$inc": {"record.W": sign}})
+        db.teams.update_one({"_id": team1_id}, {"$inc": {"record.L": sign}})
+
+
+def _save_game_result(team1_id, team2_id, team1_score, team2_score, week):
+    existing = db.games.find_one({
+        "week": week,
+        "$or": [
+            {"team1_id": team1_id, "team2_id": team2_id},
+            {"team1_id": team2_id, "team2_id": team1_id},
+        ],
+    })
+
+    if existing:
+        _apply_team_result(existing["team1_id"], existing["team2_id"], existing["team1_score"], existing["team2_score"], sign=-1)
+        filter_doc = {"_id": existing["_id"]}
+    else:
+        filter_doc = {"week": week, "team1_id": team1_id, "team2_id": team2_id}
+
+    _apply_team_result(team1_id, team2_id, team1_score, team2_score, sign=1)
+
+    db.games.update_one(
+        filter_doc,
+        {
+            "$set": {
+                "team1_id": team1_id,
+                "team2_id": team2_id,
+                "team1_score": team1_score,
+                "team2_score": team2_score,
+                "week": week,
+            }
+        },
+        upsert=True,
+    )
+
+    return {
+        "team1_id": str(team1_id),
+        "team2_id": str(team2_id),
+        "team1_score": team1_score,
+        "team2_score": team2_score,
+    }
 
 @router.post("/franchise/select-team")
 def select_team(selection: TeamSelection):
@@ -87,11 +151,10 @@ def play_next_game(req: PlayGameRequest):
                 home_doc = db.teams.find_one({"_id": home_id}, {"name": 1})
                 matchup = {
                     "home": home_doc.get("name", ""),
-                    "away": away_doc.get("name", "")
+                    "away": away_doc.get("name", ""),
+                    "week": manager.week,
                 }
                 break
-
-    manager.run_week()
 
     if not matchup:
         raise HTTPException(status_code=404, detail="User matchup not found")
@@ -168,6 +231,69 @@ def save_result(req: FranchiseResultRequest):
     )
 
     return {"status": "success"}
+
+
+@router.post("/franchise/complete-week")
+def complete_week(req: CompleteWeekRequest):
+    try:
+        franchise_id = ObjectId(req.franchise_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid ID format")
+
+    franchise_doc = db.franchises.find_one({"_id": franchise_id})
+    if not franchise_doc:
+        raise HTTPException(status_code=404, detail="Franchise not found")
+
+    schedule = franchise_doc.get("schedule", [])
+    if req.week < 1 or req.week > len(schedule):
+        raise HTTPException(status_code=400, detail="Invalid week")
+
+    week_games = schedule[req.week - 1]
+    results = []
+
+    user = req.result
+    results.append(_save_game_result(user.team1_id, user.team2_id, user.team1_score, user.team2_score, req.week))
+
+    for away_id, home_id in week_games:
+        if {str(away_id), str(home_id)} == {user.team1_id, user.team2_id}:
+            continue
+        existing = db.games.find_one({
+            "week": req.week,
+            "$or": [
+                {"team1_id": away_id, "team2_id": home_id},
+                {"team1_id": home_id, "team2_id": away_id},
+            ],
+        })
+        if existing:
+            results.append({
+                "team1_id": str(existing["team1_id"]),
+                "team2_id": str(existing["team2_id"]),
+                "team1_score": existing["team1_score"],
+                "team2_score": existing["team2_score"],
+            })
+            continue
+        team1_score = random.randint(50, 90)
+        team2_score = random.randint(50, 90)
+        results.append(_save_game_result(away_id, home_id, team1_score, team2_score, req.week))
+
+    existing_results = franchise_doc.get("results", {})
+    existing_results[str(req.week)] = results
+    db.franchises.update_one(
+        {"_id": franchise_id},
+        {"$set": {"results": existing_results, "week": req.week + 1}},
+    )
+
+    id_to_name = {str(t["_id"]): t.get("name", "") for t in db.teams.find({}, {"name": 1})}
+    scoreboard = []
+    for r in results:
+        scoreboard.append({
+            "team1": id_to_name.get(r["team1_id"], r["team1_id"]),
+            "team2": id_to_name.get(r["team2_id"], r["team2_id"]),
+            "team1_score": r["team1_score"],
+            "team2_score": r["team2_score"],
+        })
+
+    return {"week": req.week, "results": scoreboard}
 
 
 @router.get("/franchise/command-center/data")

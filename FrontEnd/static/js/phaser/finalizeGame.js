@@ -6,6 +6,8 @@ export async function finalizeGame({ simData, tournamentId, franchiseId, game })
   const homeScore = homeTeamObj.score ?? scoreMap[homeTeamObj.name] ?? 0;
   const awayScore = awayTeamObj.score ?? scoreMap[awayTeamObj.name] ?? 0;
   const winner = homeScore > awayScore ? homeTeamObj.name : awayTeamObj.name;
+  const params = new URLSearchParams(window.location.search);
+  const week = Number(params.get('week'));
 
   // POST to /tournament/save-result if needed
   if (tournamentId) {
@@ -29,25 +31,34 @@ export async function finalizeGame({ simData, tournamentId, franchiseId, game })
     }
   }
 
-  // POST to /franchise/save-result if needed
-  if (franchiseId) {
+  // POST to /franchise/complete-week if needed
+  if (franchiseId && week) {
     try {
-      const res = await fetch("/franchise/save-result", {
+      const team1Id =
+        awayTeamObj.team_id || awayTeamObj.teamId || simData.away_team_id || simData.awayTeamId;
+      const team2Id =
+        homeTeamObj.team_id || homeTeamObj.teamId || simData.home_team_id || simData.homeTeamId;
+      const res = await fetch("/franchise/complete-week", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           franchise_id: franchiseId,
-          game_id: simData._id,
-          winner: winner,
+          week: week,
+          result: {
+            team1_id: team1Id,
+            team2_id: team2Id,
+            team1_score: awayScore,
+            team2_score: homeScore,
+          },
         }),
       });
       if (!res.ok) {
-        console.error("❌ Failed to save franchise result:", await res.text());
+        console.error("❌ Failed to complete franchise week:", await res.text());
       } else {
-        console.log("✅ Franchise result saved.");
+        console.log("✅ Franchise week completed.");
       }
     } catch (err) {
-      console.error("🚨 Error during franchise result save:", err);
+      console.error("🚨 Error during franchise week completion:", err);
     }
   }
 
