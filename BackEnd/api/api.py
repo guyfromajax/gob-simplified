@@ -243,6 +243,7 @@ def get_team_players(team_id: str):
             "weight": p.get("weight"),
             "position_ratings": p.get("position_ratings", {}),
             "attributes": {attr: attributes.get(attr, "--") for attr in display_attributes},
+            "stats": p.get("stats", {}).get("season", {}),
         })
 
     return {
