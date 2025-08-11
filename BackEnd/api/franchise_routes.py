@@ -60,6 +60,18 @@ class CompleteWeekRequest(BaseModel):
     result: GameResult
 
 
+def _normalize_team_id(team_id: str):
+    try:
+        return ObjectId(team_id)
+    except Exception:
+        doc = db.teams.find_one(
+            {"$or": [{"_id": team_id}, {"name": team_id}, {"code": team_id}]}
+        )
+        if not doc:
+            raise HTTPException(status_code=400, detail=f"Unknown team id {team_id}")
+        return doc["_id"]
+
+
 def _apply_team_result(team1_id, team2_id, team1_score, team2_score, sign=1):
     db.teams.update_one({"_id": team1_id}, {"$inc": {"PF": sign * team1_score, "PA": sign * team2_score, "record.W": 0, "record.L": 0}})
     db.teams.update_one({"_id": team2_id}, {"$inc": {"PF": sign * team2_score, "PA": sign * team1_score, "record.W": 0, "record.L": 0}})
@@ -152,6 +164,8 @@ def play_next_game(req: PlayGameRequest):
                 matchup = {
                     "home": home_doc.get("name", ""),
                     "away": away_doc.get("name", ""),
+                    "home_id": str(home_id),
+                    "away_id": str(away_id),
                     "week": manager.week,
                 }
                 break
@@ -252,10 +266,12 @@ def complete_week(req: CompleteWeekRequest):
     results = []
 
     user = req.result
-    results.append(_save_game_result(user.team1_id, user.team2_id, user.team1_score, user.team2_score, req.week))
+    team1_id = _normalize_team_id(user.team1_id)
+    team2_id = _normalize_team_id(user.team2_id)
+    results.append(_save_game_result(team1_id, team2_id, user.team1_score, user.team2_score, req.week))
 
     for away_id, home_id in week_games:
-        if {str(away_id), str(home_id)} == {user.team1_id, user.team2_id}:
+        if {str(away_id), str(home_id)} == {str(team1_id), str(team2_id)}:
             continue
         existing = db.games.find_one({
             "week": req.week,
