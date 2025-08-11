@@ -20,6 +20,7 @@
       <thead>
         <tr>
           <th>Name</th>
+          <th>POS</th>
           <th>Year</th>
           <th>Height</th>
           <th>Weight</th>
@@ -35,13 +36,14 @@
           <th>ND</th>
           <th>IQ</th>
           <th>FT</th>
-          <th>NG</th>
+          <th>RT</th>
         </tr>
       </thead>
       <tbody>
       {% for p in players %}
         <tr>
           <td>{{ p.name }}</td>
+          <td>{{ p.pos }}</td>
           <td>{{ p.year }}</td>
           <td{% if p.height_raw is not none %} data-sort-value="{{ p.height_raw }}"{% endif %}>{{ p.height }}</td>
           <td>{{ p.weight }}</td>
@@ -57,7 +59,7 @@
           <td>{{ p.attributes.ND }}</td>
           <td>{{ p.attributes.IQ }}</td>
           <td>{{ p.attributes.FT }}</td>
-          <td>{{ p.attributes.NG }}</td>
+          <td>{{ p.rt }}</td>
         </tr>
       {% endfor %}
       </tbody>
