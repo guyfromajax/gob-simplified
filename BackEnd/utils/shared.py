@@ -1,6 +1,22 @@
 import random
 from BackEnd.constants import TURNOVER_CALC_DICT, POSITION_LIST, HCO_STRING_SPOTS
 
+
+def format_height(value) -> str:
+    """Convert total inches to a feet'inches" string.
+
+    Accepts numbers or numeric strings; invalid or missing values yield
+    an empty string.
+    """
+    if value in (None, ""):
+        return ""
+    try:
+        inches = int(float(value))
+    except (TypeError, ValueError):
+        return ""
+    feet, inches = divmod(inches, 12)
+    return f"{feet}'{inches}\""
+
 def weighted_random_from_dict(weight_dict: dict) -> str:
     if not weight_dict:
         raise ValueError("weighted_random_from_dict received an empty dict")
