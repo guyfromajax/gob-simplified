@@ -1,7 +1,6 @@
 import random
 from datetime import datetime
 from itertools import combinations, permutations
-# at top of BackEnd/franchise_manager.py
 from importlib import resources
 from pathlib import Path
 import json
@@ -152,18 +151,13 @@ class RecruitManager:
 
         try:
             if names_file is not None:
-                resource_path = Path(names_file)
+                with Path(names_file).open("r", encoding="utf-8") as f:
+                    payload = json.load(f)
             else:
-                try:
-                    resource_path = resources.files("BackEnd").joinpath(
-                        "data", "names", "franchise_names.json"
-                    )
-                except Exception:
-                    # Fallback to filesystem path relative to this file
-                    resource_path = Path(__file__).resolve().parent.parent / "data" / "names" / "franchise_names.json"
-
-            with resource_path.open("r", encoding="utf-8") as f:
-                payload = json.load(f)
+                with resources.open_text(
+                    "BackEnd.data.names", "franchise_names.json", encoding="utf-8"
+                ) as f:
+                    payload = json.load(f)
 
             # Expect keys: "first_names", "last_names"
             fn = payload.get("first_names") or []
@@ -173,12 +167,13 @@ class RecruitManager:
                 self.last_names = ln
             else:
                 logger.warning(
-                    "Recruit names file %s missing required data; using fallback names", resource_path
+                    "Recruit names file %s missing required data; using fallback names",
+                    names_file or "package resource",
                 )
         except Exception as exc:
             logger.warning(
                 "Error loading recruit names from %s: %s. Using fallback names.",
-                locals().get("resource_path", names_file),
+                names_file or "package resource",
                 exc,
             )
 
