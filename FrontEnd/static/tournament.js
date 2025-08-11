@@ -244,8 +244,20 @@ function renderLeaderboards() {
 function updateCTA() {
   const playBtn = document.getElementById('play-now');
   const simBtn = document.getElementById('sim-remaining');
+  const exitBtn = document.getElementById('exit-tournament');
   const container = document.querySelector('.play-now-container');
-  if (!container || !playBtn || !simBtn || !tournament) return;
+  if (!container || !playBtn || !simBtn || !exitBtn || !tournament) return;
+
+  if (tournament.completed) {
+    playBtn.style.display = 'none';
+    simBtn.style.display = 'none';
+    container.style.display = 'none';
+    exitBtn.style.display = 'inline-block';
+    return;
+  }
+
+  exitBtn.style.display = 'none';
+  container.style.display = 'block';
 
   const roundKey = tournament.current_round === 3 ? 'final' : `round${tournament.current_round}`;
   const matchups = tournament.bracket?.[roundKey] || [];
@@ -258,11 +270,7 @@ function updateCTA() {
     simBtn.style.display = 'none';
   } else {
     playBtn.style.display = 'none';
-    if (tournament.completed) {
-      simBtn.style.display = 'none';
-    } else {
-      simBtn.style.display = 'inline-block';
-    }
+    simBtn.style.display = 'inline-block';
   }
 }
 
@@ -401,6 +409,13 @@ document.addEventListener("DOMContentLoaded", async () => {
         alert('Unable to simulate remaining games');
         simBtn.disabled = false;
       }
+    });
+  }
+
+  const exitBtn = document.getElementById('exit-tournament');
+  if (exitBtn) {
+    exitBtn.addEventListener('click', () => {
+      window.location.href = '/static/mode-select.html';
     });
   }
 });
