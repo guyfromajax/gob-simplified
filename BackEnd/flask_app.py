@@ -1,8 +1,8 @@
-from flask import Flask, request, redirect, send_from_directory
+from flask import Flask, request, redirect, send_from_directory, jsonify
 from pathlib import Path
 
 from BackEnd.db import db, franchise_state_collection
-from BackEnd.models.franchise_manager import FranchiseManager
+from BackEnd.models.franchise_manager import FranchiseManager, RecruitManager
 
 BASE_DIR = Path(__file__).resolve().parents[1]
 STATIC_DIR = BASE_DIR / "FrontEnd" / "static"
@@ -46,6 +46,13 @@ def franchise_play_next_game():
     manager.week = state.get('week', 1)
     manager.run_week()
     return redirect('/animation')
+
+
+@app.route('/franchise/debug/names')
+def franchise_debug_names():
+    manager = RecruitManager(db)
+    data = manager.diagnostics or {"detail": "NAMES_DIAG not enabled"}
+    return jsonify(data)
 
 @app.route('/animation')
 def animation_page():
