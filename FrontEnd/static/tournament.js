@@ -43,6 +43,8 @@ const leaderBoards = [
   { title: "Blocks", key: "BLK" }
 ];
 
+let leaderData = {};
+
 console.log("✅ tournament.js loaded");
 
 function getLogo(teamName) {
@@ -229,9 +231,15 @@ function renderLeaderboards() {
     table.className = "leaders-table";
     table.innerHTML = `<thead><tr><th>Rank</th><th>Player</th><th>Team</th><th>Value</th></tr></thead>`;
     const body = document.createElement("tbody");
-    for (let i=1;i<=10;i++) {
+    const rows = (leaderData[board.key] || []);
+    for (let i = 0; i < 10; i++) {
+      const entry = rows[i];
       const tr = document.createElement("tr");
-      tr.innerHTML = `<td>${i}</td><td>Player ${i}</td><td>Team ${String.fromCharCode(64+i)}</td><td>${(20-i).toFixed(1)}</td>`;
+      if (entry) {
+        tr.innerHTML = `<td>${entry.rank}</td><td>${entry.first_name} ${entry.last_name}</td><td>${entry.team_name}</td><td>${entry.value}</td>`;
+      } else {
+        tr.innerHTML = `<td>${i + 1}</td><td>—</td><td>—</td><td>—</td>`;
+      }
       body.appendChild(tr);
     }
     table.appendChild(body);
@@ -240,6 +248,20 @@ function renderLeaderboards() {
     container.appendChild(section);
   });
 }
+
+async function refreshLeaders() {
+  if (!tournament || !tournament._id) return;
+  try {
+    const res = await fetch(`/tournament/leaders?tournament_id=${encodeURIComponent(tournament._id)}`);
+    leaderData = await res.json();
+  } catch (err) {
+    console.error("Failed to load leaders", err);
+    leaderData = {};
+  }
+  renderLeaderboards();
+}
+
+window.refreshLeaders = refreshLeaders;
 
 function updateCTA() {
   const playBtn = document.getElementById('play-now');
@@ -351,7 +373,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   renderBracket();
   renderRoster();
   renderStats();
-  renderLeaderboards();
+  await refreshLeaders();
   updateCTA();
 
   const playBtn = document.getElementById('play-now');
@@ -374,6 +396,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           alert('This round has already been played.');
           return;
         }
+        await refreshLeaders();
         const { home, away } = data;
         if (!home || !away) throw new Error('Matchup not found');
         window.location.href = `/court.html?tournament_id=${encodeURIComponent(tournament._id)}&home=${encodeURIComponent(home)}&away=${encodeURIComponent(away)}`;
@@ -404,6 +427,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         tournament = data;
         localStorage.setItem('activeTournament', JSON.stringify(tournament));
         renderBracket();
+        await refreshLeaders();
         updateCTA();
       } catch (err) {
         console.error('Failed to simulate remaining games', err);
