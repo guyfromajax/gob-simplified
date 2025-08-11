@@ -41,9 +41,14 @@ def test_save_game_result_and_advance_round(mock_collection):
 
     # simulate round 1 results
     for i in range(4):
-        manager.save_game_result("round1", i, f"game{i}", f"Winner{i}")
+        match = manager.tournament["bracket"]["round1"][i]
+        home = match["home_team"]
+        away = match["away_team"]
+        score = {home: i + 1, away: i}
+        manager.save_game_result("round1", i, f"game{i}", f"Winner{i}", score)
         assert manager.tournament["bracket"]["round1"][i]["game_id"] == f"game{i}"
         assert manager.tournament["bracket"]["round1"][i]["winner"] == f"Winner{i}"
+        assert manager.tournament["bracket"]["round1"][i]["score"] == score
 
     manager.advance_round()
     assert manager.tournament["current_round"] == 2
