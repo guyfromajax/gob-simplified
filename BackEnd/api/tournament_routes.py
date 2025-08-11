@@ -134,6 +134,19 @@ def save_result(request: TournamentResultRequest):
     manager.tournament_id = tournament_id
 
     def _log_result(result_doc):
+        exists = tournaments_collection.find_one(
+            {
+                "_id": tournament_id,
+                "results": {
+                    "$elemMatch": {
+                        "round": result_doc["round"],
+                        "match_index": result_doc["match_index"],
+                    }
+                },
+            }
+        )
+        if exists:
+            return
         try:
             update_result = tournaments_collection.update_one(
                 {"_id": tournament_id}, {"$push": {"results": result_doc}}
@@ -155,30 +168,42 @@ def save_result(request: TournamentResultRequest):
     user_match_index = None
     home_team = away_team = None
     for i, match in enumerate(tournament["bracket"][round_key]):
-        if match["game_id"] is None and request.winner in [match["home_team"], match["away_team"]]:
+        if request.winner in [match["home_team"], match["away_team"]]:
             user_match_index = i
             home_team = match["home_team"]
             away_team = match["away_team"]
-            manager.save_game_result(round_key, i, request.game_id, request.winner)
+            summary = games_collection.find_one({"_id": ObjectId(request.game_id)}) or {}
+            manager.save_game_result(round_key, i, request.game_id, request.winner, summary.get("score"))
+            user_result = {
+                "home_team": home_team,
+                "away_team": away_team,
+                "score": summary.get("score", {}),
+                "winner": request.winner,
+                "round": round_num,
+                "match_index": i,
+            }
+            _log_result(user_result)
             break
 
     if user_match_index is None:
         raise HTTPException(status_code=400, detail="User matchup not found")
 
-    summary = games_collection.find_one({"_id": ObjectId(request.game_id)}) or {}
-    user_result = {
-        "home_team": home_team,
-        "away_team": away_team,
-        "score": summary.get("score", {}),
-        "winner": request.winner,
-        "round": round_num,
-        "match_index": user_match_index,
-    }
-    _log_result(user_result)
-
-    # Simulate remaining games
+    # Ensure all match results are recorded
     for i, match in enumerate(manager.tournament["bracket"][round_key]):
+        if i == user_match_index:
+            continue
         if match.get("game_id"):
+            summary = games_collection.find_one({"_id": ObjectId(match["game_id"])} ) or {}
+            manager.save_game_result(round_key, i, match["game_id"], match["winner"], summary.get("score"))
+            result_doc = {
+                "home_team": match["home_team"],
+                "away_team": match["away_team"],
+                "score": summary.get("score", {}),
+                "winner": match["winner"],
+                "round": round_num,
+                "match_index": i,
+            }
+            _log_result(result_doc)
             continue
 
         try:
@@ -196,7 +221,7 @@ def save_result(request: TournamentResultRequest):
         home = match["home_team"]
         away = match["away_team"]
         winner = home if summary["score"][home] > summary["score"][away] else away
-        manager.save_game_result(round_key, i, str(game_id), winner)
+        manager.save_game_result(round_key, i, str(game_id), winner, summary.get("score"))
 
         result_doc = {
             "home_team": home,
@@ -213,3 +238,17 @@ def save_result(request: TournamentResultRequest):
     update_bracket_from_results(tournament_id, tournaments_collection=tournaments_collection)
 
     return {"status": "success"}
+
+
+@router.get("/tournament/state/{tournament_id}")
+def tournament_state(tournament_id: str):
+    """Return the current bracket state for a tournament."""
+    try:
+        tid = ObjectId(tournament_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid tournament_id")
+    doc = tournaments_collection.find_one({"_id": tid})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Tournament not found")
+    doc["_id"] = str(doc["_id"])
+    return doc
