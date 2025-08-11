@@ -61,6 +61,16 @@ def update_bracket_from_results(
     results.sort(key=lambda r: r["match_index"])
     winners = [r["winner"] for r in results]
 
+    # Final round complete – mark tournament finished
+    if current_round >= 3:
+        champion = winners[0] if winners else None
+        tournaments_collection.update_one(
+            {"_id": tid}, {"$set": {"completed": True, "champion": champion}}
+        )
+        tournament["completed"] = True
+        tournament["champion"] = champion
+        return tournament
+
     next_round_num = current_round + 1
     next_key = "final" if next_round_num == 3 else f"round{next_round_num}"
 
@@ -76,6 +86,7 @@ def update_bracket_from_results(
                 "away_team": winners[i + 1],
                 "game_id": None,
                 "winner": None,
+                "score": {},
             }
         )
 
