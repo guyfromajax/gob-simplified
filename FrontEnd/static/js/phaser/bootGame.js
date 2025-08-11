@@ -29,6 +29,10 @@ const franchiseId = queryFranchiseId || storedFranchiseId;
 if (queryFranchiseId && typeof localStorage !== 'undefined') {
   localStorage.setItem('franchise_id', queryFranchiseId);
 }
+const weekParam = parseInt(urlParams.get('week'), 10);
+if (weekParam && !Number.isNaN(weekParam) && typeof localStorage !== 'undefined') {
+  localStorage.setItem('franchise_week', weekParam);
+}
 const mode = urlParams.get('mode') || getMode({ tournamentId, franchiseId });
 
 console.log("🏀 Tournament launch params:", {
