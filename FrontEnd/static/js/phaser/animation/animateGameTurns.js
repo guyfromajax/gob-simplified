@@ -9,7 +9,8 @@ export async function animateGameTurns({ //hasBallAtStep
   scene,
   simData,
   playerSprites,
-  ballSprite
+  ballSprite,
+  onUpdate
 }) {
   const turns = simData.turns || [];
   const allPlayers = simData.players || [];
@@ -84,6 +85,14 @@ export async function animateGameTurns({ //hasBallAtStep
         // }
       }
     });
+
+    if (onUpdate) {
+      try {
+        onUpdate(turn);
+      } catch (err) {
+        console.error('Scoreboard update failed:', err);
+      }
+    }
   }
 }
 
