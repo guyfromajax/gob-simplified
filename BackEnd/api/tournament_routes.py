@@ -77,6 +77,9 @@ def simulate_round(request: SimulateRequest):
             game = run_simulation(matchup["home_team"], matchup["away_team"])
             summary = summarize_game_state(game)
             game_id = games_collection.insert_one(summary).inserted_id
+            #add a print statement here to show team name and score for each team after the game is simulated
+            print(f"Home team: {matchup['home_team']} - Score: {summary['score'][matchup['home_team']]}")
+            print(f"Away team: {matchup['away_team']} - Score: {summary['score'][matchup['away_team']]}")
             winner = (
                 matchup["home_team"]
                 if summary["score"][matchup["home_team"]] > summary["score"][matchup["away_team"]]
