@@ -1,5 +1,6 @@
 import * as Phaser from 'https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.esm.js';
 import { createGameScene } from './gameScene.js';
+import { setCourtOffsets } from './utils/gridToPixels.js';
 
 function getMode({ tournamentId, franchiseId }) {
   if (tournamentId) return 'tournament';
@@ -46,6 +47,18 @@ console.log("🏀 Tournament launch params:", {
 const GameScene = createGameScene(Phaser);
 let game;
 let isSimulating = false;
+
+function updateOffsets() {
+  if (typeof document === 'undefined') return;
+  const container = document.getElementById('phaser-container');
+  if (!container || !container.getBoundingClientRect) return;
+  const rect = container.getBoundingClientRect();
+  setCourtOffsets(rect.left, rect.top);
+}
+
+if (typeof window !== 'undefined' && window.addEventListener) {
+  window.addEventListener('resize', updateOffsets);
+}
 
 
 async function fetchTeamRoster(teamName) {
@@ -162,5 +175,6 @@ function initGame() {
 }
 
 initGame();
+updateOffsets();
 
 // new Phaser.Game(config);

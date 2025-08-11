@@ -1,5 +1,13 @@
-export function gridToPixels(x, y, width = 1229, height = 768) {
-    const pixelX = (x / 100) * width;
-    const pixelY = ((50 - y) / 50) * height;
-    return { x: pixelX, y: pixelY };
-  }  
+let offsetX = 0;
+let offsetY = 0;
+
+export function setCourtOffsets(x = 0, y = 0) {
+  offsetX = x;
+  offsetY = y;
+}
+
+export function gridToPixels(x, y, width = 1229, height = 768, applyOffset = false) {
+  const pixelX = (x / 100) * width + (applyOffset ? offsetX : 0);
+  const pixelY = ((50 - y) / 50) * height + (applyOffset ? offsetY : 0);
+  return { x: pixelX, y: pixelY };
+}  
