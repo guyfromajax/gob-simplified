@@ -6,16 +6,16 @@ export async function finalizeGame({ simData, tournamentId, franchiseId, game })
   const homeScore = homeTeamObj.score ?? scoreMap[homeTeamObj.name] ?? 0;
   const awayScore = awayTeamObj.score ?? scoreMap[awayTeamObj.name] ?? 0;
   const winner = homeScore > awayScore ? homeTeamObj.name : awayTeamObj.name;
-  let week = null;
-  if (typeof localStorage !== 'undefined') {
-    week = Number(localStorage.getItem('franchise_week'));
+  let week = parseInt(new URLSearchParams(window.location.search).get('week'), 10);
+  if (!week || Number.isNaN(week)) {
+    if (typeof localStorage !== 'undefined') {
+      week = parseInt(localStorage.getItem('franchise_week'), 10);
+    }
   }
-  if (!week) {
-    const params = new URLSearchParams(window.location.search);
-    week = Number(params.get('week'));
-  }
-  if (!week && simData && simData.week) {
-    week = Number(simData.week);
+  if (!week || Number.isNaN(week)) {
+    if (simData && simData.week) {
+      week = parseInt(simData.week, 10);
+    }
   }
 
   // POST to /tournament/save-result if needed
@@ -41,7 +41,7 @@ export async function finalizeGame({ simData, tournamentId, franchiseId, game })
   }
 
   // POST to /franchise/complete-week if needed
-  if (franchiseId && week) {
+  if (franchiseId && Number.isInteger(week) && week >= 1) {
     try {
       const team1Id =
         awayTeamObj.team_id || awayTeamObj.teamId || simData.away_team_id || simData.awayTeamId;
