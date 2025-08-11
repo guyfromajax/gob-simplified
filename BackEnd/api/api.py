@@ -15,7 +15,7 @@ from BackEnd.db import (
 )
 from BackEnd.utils.roster_loader import load_roster
 from BackEnd.utils.game_summary_builder import build_game_summary
-from BackEnd.utils.shared import clean_mongo_ids, summarize_game_state
+from BackEnd.utils.shared import clean_mongo_ids, summarize_game_state, format_height
 from pydantic import BaseModel
 from fastapi import HTTPException
 import pprint
@@ -234,12 +234,18 @@ def team_roster_page(request: Request, team: str):
     players = []
     for p in players_cursor:
         attrs = p.get("attributes", {})
+        raw_height = p.get("height")
+        try:
+            height_raw = int(float(raw_height))
+        except (TypeError, ValueError):
+            height_raw = None
         display_attributes = ["SC", "SH", "ID", "OD", "PS", "BH", "RB",
                               "AG", "ST", "ND", "IQ", "FT", "NG"]
         players.append({
             "name": f"{p.get('first_name', '')} {p.get('last_name', '')}".strip(),
             "year": p.get("year", "--"),
-            "height": p.get("height", "--"),
+            "height": format_height(raw_height),
+            "height_raw": height_raw,
             "weight": p.get("weight", "--"),
             "attributes": {attr: attrs.get(attr, "--") for attr in display_attributes},
         })
