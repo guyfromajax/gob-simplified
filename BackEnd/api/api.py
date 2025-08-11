@@ -63,8 +63,11 @@ def root():
 
 @app.get("/teams")
 def get_team_names():
-    teams = teams_collection.find({}, {"name": 1, "_id": 0})
-    return sorted([team["name"] for team in teams])
+    teams = teams_collection.find({}, {"name": 1, "secondary_color": 1, "_id": 0})
+    return sorted([
+        {"name": team.get("name"), "secondary_color": team.get("secondary_color")}
+        for team in teams
+    ], key=lambda t: t["name"])
 
 
 @app.post("/api/simulate")
