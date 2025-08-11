@@ -62,19 +62,32 @@ class TournamentManager:
             (sorted_teams[1][0], sorted_teams[6][0]),
             (sorted_teams[2][0], sorted_teams[5][0])
         ]
-        return [{"home_team": home, "away_team": away, "game_id": None, "winner": None} for home, away in matchups]
+        return [
+            {
+                "home_team": home,
+                "away_team": away,
+                "game_id": None,
+                "winner": None,
+                "score": {},
+            }
+            for home, away in matchups
+        ]
 
-    def save_game_result(self, round_name, matchup_index, game_id, winner_id):
-        self.tournament["bracket"][round_name][matchup_index]["game_id"] = game_id
-        self.tournament["bracket"][round_name][matchup_index]["winner"] = winner_id
+    def save_game_result(self, round_name, matchup_index, game_id, winner_id, score=None):
+        match = self.tournament["bracket"][round_name][matchup_index]
+        match["game_id"] = game_id
+        match["winner"] = winner_id
+        if score is not None:
+            match["score"] = score
+        update_fields = {
+            f"bracket.{round_name}.{matchup_index}.game_id": game_id,
+            f"bracket.{round_name}.{matchup_index}.winner": winner_id,
+        }
+        if score is not None:
+            update_fields[f"bracket.{round_name}.{matchup_index}.score"] = score
         self.tournaments_collection.update_one(
             {"_id": self.tournament_id},
-            {
-                "$set": {
-                    f"bracket.{round_name}.{matchup_index}.game_id": game_id,
-                    f"bracket.{round_name}.{matchup_index}.winner": winner_id,
-                }
-            },
+            {"$set": update_fields},
         )
 
     def advance_round(self):
@@ -82,15 +95,33 @@ class TournamentManager:
         if current_round == 1:
             r1_winners = [m["winner"] for m in self.tournament["bracket"]["round1"]]
             r2 = [
-                {"home_team": r1_winners[0], "away_team": r1_winners[1], "game_id": None, "winner": None},
-                {"home_team": r1_winners[2], "away_team": r1_winners[3], "game_id": None, "winner": None}
+                {
+                    "home_team": r1_winners[0],
+                    "away_team": r1_winners[1],
+                    "game_id": None,
+                    "winner": None,
+                    "score": {},
+                },
+                {
+                    "home_team": r1_winners[2],
+                    "away_team": r1_winners[3],
+                    "game_id": None,
+                    "winner": None,
+                    "score": {},
+                },
             ]
             self.tournament["bracket"]["round2"] = r2
             self.tournament["current_round"] = 2
         elif current_round == 2:
             r2_winners = [m["winner"] for m in self.tournament["bracket"]["round2"]]
             final = [
-                {"home_team": r2_winners[0], "away_team": r2_winners[1], "game_id": None, "winner": None}
+                {
+                    "home_team": r2_winners[0],
+                    "away_team": r2_winners[1],
+                    "game_id": None,
+                    "winner": None,
+                    "score": {},
+                }
             ]
             self.tournament["bracket"]["final"] = final
             self.tournament["current_round"] = 3

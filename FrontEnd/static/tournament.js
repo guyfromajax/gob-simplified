@@ -284,7 +284,13 @@ function initTopAssets(teamName) {
 
 async function loadTournament() {
   try {
-    const res = await fetch(`/tournament/active?user_team_id=${encodeURIComponent(userTeamId)}`);
+    let url;
+    if (tournament && tournament._id) {
+      url = `/tournament/state/${encodeURIComponent(tournament._id)}`;
+    } else {
+      url = `/tournament/active?user_team_id=${encodeURIComponent(userTeamId)}`;
+    }
+    const res = await fetch(url);
     tournament = await res.json();
     localStorage.setItem("activeTournament", JSON.stringify(tournament));
     console.log("Bracket data arrives", tournament);
