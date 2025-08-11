@@ -6,7 +6,10 @@ export async function finalizeGame({ simData, tournamentId, franchiseId, game })
   const homeScore = homeTeamObj.score ?? scoreMap[homeTeamObj.name] ?? 0;
   const awayScore = awayTeamObj.score ?? scoreMap[awayTeamObj.name] ?? 0;
   const winner = homeScore > awayScore ? homeTeamObj.name : awayTeamObj.name;
-  let week = parseInt(new URLSearchParams(window.location.search).get('week'), 10);
+  const params = new URLSearchParams(window.location.search);
+  let week = parseInt(params.get('week'), 10);
+  const homeIdParam = params.get('home_id');
+  const awayIdParam = params.get('away_id');
   if (!week || Number.isNaN(week)) {
     if (typeof localStorage !== 'undefined') {
       week = parseInt(localStorage.getItem('franchise_week'), 10);
@@ -44,9 +47,21 @@ export async function finalizeGame({ simData, tournamentId, franchiseId, game })
   if (franchiseId && Number.isInteger(week) && week >= 1) {
     try {
       const team1Id =
-        awayTeamObj.team_id || awayTeamObj.teamId || simData.away_team_id || simData.awayTeamId;
+        awayIdParam ||
+        awayTeamObj.team_id ||
+        awayTeamObj.teamId ||
+        simData.away_team_id ||
+        simData.awayTeamId ||
+        awayTeamObj.name ||
+        simData.away_team;
       const team2Id =
-        homeTeamObj.team_id || homeTeamObj.teamId || simData.home_team_id || simData.homeTeamId;
+        homeIdParam ||
+        homeTeamObj.team_id ||
+        homeTeamObj.teamId ||
+        simData.home_team_id ||
+        simData.homeTeamId ||
+        homeTeamObj.name ||
+        simData.home_team;
       console.log(
         `📡 Saving franchise game: franchiseId=${franchiseId}, week=${week}, away=${awayTeamObj.name}, home=${homeTeamObj.name}`
       );
