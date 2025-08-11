@@ -26,6 +26,15 @@ if (franchiseBtn) {
 
 document.addEventListener('DOMContentLoaded', () => {
   const teamButtons = document.querySelectorAll('.team-button');
+  const modeContainer = document.querySelector('.mode-container');
+  const teamGrid = document.getElementById('team-grid');
+  const syncTeamGridWidth = () => {
+    if (modeContainer && teamGrid) {
+      teamGrid.style.width = `${modeContainer.offsetWidth}px`;
+    }
+  };
+  window.addEventListener('resize', syncTeamGridWidth);
+  syncTeamGridWidth();
   const taglines = {
     'Bentley-Truman': 'Top-Shelf Talent',
     'Lancaster': 'Muscle & Defense',
