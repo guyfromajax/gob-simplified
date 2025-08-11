@@ -325,15 +325,16 @@ async function loadRoster() {
         weight: p.weight ?? '--',
         attributes: p.attributes || {},
         rt: best.rating,
+        rawStats: p.stats || {},
       };
     });
     roster.sort((a, b) => (b.rt ?? -1) - (a.rt ?? -1));
-    stats = roster.map(p => ({
-      name: p.name,
-      PTS: 0, FGM: 0, FGA: 0, TPM: 0, TPA: 0,
-      FTM: 0, FTA: 0, REB: 0, AST: 0,
-      STL: 0, BLK: 0, F: 0, MIN: 0, TO: 0,
-    }));
+    const statKeys = ["PTS","FGM","FGA","TPM","TPA","FTM","FTA","REB","AST","STL","BLK","F","MIN","TO"];
+    stats = roster.map(p => {
+      const row = { name: p.name };
+      statKeys.forEach(k => row[k] = p.rawStats[k] || 0);
+      return row;
+    });
   } catch (err) {
     console.error("Failed to load roster", err);
   }
