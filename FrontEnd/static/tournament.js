@@ -240,26 +240,25 @@ function renderLeaderboards() {
 
 function updateCTA() {
   const playBtn = document.getElementById('play-now');
+  const simBtn = document.getElementById('sim-remaining');
   const container = document.querySelector('.play-now-container');
-  if (!container || !playBtn || !tournament) return;
+  if (!container || !playBtn || !simBtn || !tournament) return;
 
   const roundKey = tournament.current_round === 3 ? 'final' : `round${tournament.current_round}`;
   const matchups = tournament.bracket?.[roundKey] || [];
   const userMatch = matchups.find(m => m.home_team === userTeamId || m.away_team === userTeamId);
 
-  const eliminatedMsg = document.getElementById('eliminated-msg');
   if (userMatch) {
     const opponent = userMatch.home_team === userTeamId ? userMatch.away_team : userMatch.home_team;
     playBtn.style.display = 'inline-block';
     playBtn.textContent = `Play Next Game vs ${opponent}`;
-    if (eliminatedMsg) eliminatedMsg.remove();
+    simBtn.style.display = 'none';
   } else {
     playBtn.style.display = 'none';
-    if (!eliminatedMsg) {
-      const msg = document.createElement('div');
-      msg.id = 'eliminated-msg';
-      msg.textContent = 'Eliminated';
-      container.appendChild(msg);
+    if (tournament.completed) {
+      simBtn.style.display = 'none';
+    } else {
+      simBtn.style.display = 'inline-block';
     }
   }
 }
@@ -357,6 +356,34 @@ document.addEventListener("DOMContentLoaded", async () => {
         console.error('Failed to start game', err);
         alert('Unable to start game');
         playBtn.disabled = false;
+      }
+    });
+  }
+
+  const simBtn = document.getElementById('sim-remaining');
+  if (simBtn) {
+    simBtn.addEventListener('click', async () => {
+      if (!tournament || !tournament._id) {
+        alert('Tournament not loaded');
+        return;
+      }
+      simBtn.disabled = true;
+      try {
+        const res = await fetch('/tournament/sim-remaining', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tournament_id: tournament._id })
+        });
+        if (!res.ok) throw new Error('Request failed');
+        const data = await res.json();
+        tournament = data;
+        localStorage.setItem('activeTournament', JSON.stringify(tournament));
+        renderBracket();
+        updateCTA();
+      } catch (err) {
+        console.error('Failed to simulate remaining games', err);
+        alert('Unable to simulate remaining games');
+        simBtn.disabled = false;
       }
     });
   }
