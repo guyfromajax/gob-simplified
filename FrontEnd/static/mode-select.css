@@ -12,11 +12,18 @@ body {
   margin-bottom: 20px;
 }
 
+.mode-wrapper {
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 auto;
+}
+
 .mode-container {
   display: flex;
   justify-content: center;
   gap: 20px;
   flex-wrap: wrap;
+  width: 100%;
 }
 
 .mode-card {
@@ -61,8 +68,7 @@ body {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 15px;
-  max-width: 800px;
-  margin: 0 auto;
+  width: 100%;
 }
 
 .team-button {
@@ -73,17 +79,18 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
+  aspect-ratio: 1;
 }
 
 .team-button img {
+  flex: 1;
   width: 100%;
-  height: auto;
   object-fit: contain;
 }
 
 .team-tagline {
   margin-top: 8px;
-  font-size: 14px;
+  font-size: clamp(12px, 1.1vw, 22px);
   text-align: center;
   font-family: 'Bebas Neue', sans-serif;
   font-weight: 700;
