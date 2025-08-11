@@ -5,6 +5,7 @@ from pathlib import Path
 from bson import ObjectId
 import logging
 import random
+from BackEnd.main import run_simulation
 
 from BackEnd.db import db, franchise_state_collection
 from BackEnd.models.franchise_manager import FranchiseManager
@@ -268,7 +269,13 @@ def complete_week(req: CompleteWeekRequest):
     user = req.result
     team1_id = _normalize_team_id(user.team1_id)
     team2_id = _normalize_team_id(user.team2_id)
-    results.append(_save_game_result(team1_id, team2_id, user.team1_score, user.team2_score, req.week))
+    user_res = _save_game_result(team1_id, team2_id, user.team1_score, user.team2_score, req.week)
+    results.append({
+        "away_id": user_res["team1_id"],
+        "home_id": user_res["team2_id"],
+        "away_score": user_res["team1_score"],
+        "home_score": user_res["team2_score"],
+    })
 
     for away_id, home_id in week_games:
         if {str(away_id), str(home_id)} == {str(team1_id), str(team2_id)}:
@@ -282,15 +289,31 @@ def complete_week(req: CompleteWeekRequest):
         })
         if existing:
             results.append({
-                "team1_id": str(existing["team1_id"]),
-                "team2_id": str(existing["team2_id"]),
-                "team1_score": existing["team1_score"],
-                "team2_score": existing["team2_score"],
+                "away_id": str(existing["team1_id"]),
+                "home_id": str(existing["team2_id"]),
+                "away_score": existing["team1_score"],
+                "home_score": existing["team2_score"],
             })
             continue
-        team1_score = random.randint(50, 90)
-        team2_score = random.randint(50, 90)
-        results.append(_save_game_result(away_id, home_id, team1_score, team2_score, req.week))
+
+        away_doc = db.teams.find_one({"_id": away_id}, {"name": 1}) or {}
+        home_doc = db.teams.find_one({"_id": home_id}, {"name": 1}) or {}
+        home_name = home_doc.get("name", "")
+        away_name = away_doc.get("name", "")
+        try:
+            gm = run_simulation(home_name, away_name)
+            away_score = gm.score.get(away_name, 0)
+            home_score = gm.score.get(home_name, 0)
+        except Exception:
+            away_score = random.randint(50, 90)
+            home_score = random.randint(50, 90)
+        sim_res = _save_game_result(away_id, home_id, away_score, home_score, req.week)
+        results.append({
+            "away_id": sim_res["team1_id"],
+            "home_id": sim_res["team2_id"],
+            "away_score": sim_res["team1_score"],
+            "home_score": sim_res["team2_score"],
+        })
 
     existing_results = franchise_doc.get("results", {})
     existing_results[str(req.week)] = results
@@ -303,10 +326,10 @@ def complete_week(req: CompleteWeekRequest):
     scoreboard = []
     for r in results:
         scoreboard.append({
-            "team1": id_to_name.get(r["team1_id"], r["team1_id"]),
-            "team2": id_to_name.get(r["team2_id"], r["team2_id"]),
-            "team1_score": r["team1_score"],
-            "team2_score": r["team2_score"],
+            "team1": id_to_name.get(r["away_id"], r["away_id"]),
+            "team2": id_to_name.get(r["home_id"], r["home_id"]),
+            "team1_score": r["away_score"],
+            "team2_score": r["home_score"],
         })
 
     return {"week": req.week, "results": scoreboard}
@@ -390,23 +413,34 @@ def season_schedule(franchise_id: str):
     schedule = franchise_doc.get("schedule", [])
 
     weeks = []
+    results_by_week = franchise_doc.get("results", {})
     for idx, games in enumerate(schedule, start=1):
         week_games = []
+        week_results = {
+            (r["away_id"], r["home_id"]): (r["away_score"], r["home_score"])
+            for r in results_by_week.get(str(idx), [])
+        }
         for away_id, home_id in games:
-            game_doc = db.games.find_one({"week": idx, "team1_id": away_id, "team2_id": home_id}) or \
-                       db.games.find_one({"week": idx, "team1_id": home_id, "team2_id": away_id})
-            if game_doc:
+            res = week_results.get((str(away_id), str(home_id))) or \
+                  week_results.get((str(home_id), str(away_id)))
+            if res:
+                away_score, home_score = res
                 status = "complete"
-                if game_doc["team1_id"] == away_id:
-                    away_score = game_doc.get("team1_score")
-                    home_score = game_doc.get("team2_score")
-                else:
-                    away_score = game_doc.get("team2_score")
-                    home_score = game_doc.get("team1_score")
             else:
-                status = "scheduled"
-                away_score = None
-                home_score = None
+                game_doc = db.games.find_one({"week": idx, "team1_id": away_id, "team2_id": home_id}) or \
+                           db.games.find_one({"week": idx, "team1_id": home_id, "team2_id": away_id})
+                if game_doc:
+                    status = "complete"
+                    if game_doc["team1_id"] == away_id:
+                        away_score = game_doc.get("team1_score")
+                        home_score = game_doc.get("team2_score")
+                    else:
+                        away_score = game_doc.get("team2_score")
+                        home_score = game_doc.get("team1_score")
+                else:
+                    status = "scheduled"
+                    away_score = None
+                    home_score = None
             week_games.append({
                 "week": idx,
                 "away_team_id": str(away_id),
