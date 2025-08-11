@@ -214,6 +214,9 @@ playNowBtn.addEventListener('click', async () => {
     if (!res.ok) throw new Error('Simulation failed');
     const { home, away, week } = await res.json();
     if (!home || !away) throw new Error('Matchup not found');
+    try {
+      localStorage.setItem('franchise_week', week);
+    } catch {}
     const url = `/court.html?franchise_id=${encodeURIComponent(franchiseId)}&week=${week}&home=${encodeURIComponent(home)}&away=${encodeURIComponent(away)}`;
     console.log('Navigating to', url);
     window.location.href = url;

@@ -6,8 +6,17 @@ export async function finalizeGame({ simData, tournamentId, franchiseId, game })
   const homeScore = homeTeamObj.score ?? scoreMap[homeTeamObj.name] ?? 0;
   const awayScore = awayTeamObj.score ?? scoreMap[awayTeamObj.name] ?? 0;
   const winner = homeScore > awayScore ? homeTeamObj.name : awayTeamObj.name;
-  const params = new URLSearchParams(window.location.search);
-  const week = Number(params.get('week'));
+  let week = null;
+  if (typeof localStorage !== 'undefined') {
+    week = Number(localStorage.getItem('franchise_week'));
+  }
+  if (!week) {
+    const params = new URLSearchParams(window.location.search);
+    week = Number(params.get('week'));
+  }
+  if (!week && simData && simData.week) {
+    week = Number(simData.week);
+  }
 
   // POST to /tournament/save-result if needed
   if (tournamentId) {
@@ -38,6 +47,9 @@ export async function finalizeGame({ simData, tournamentId, franchiseId, game })
         awayTeamObj.team_id || awayTeamObj.teamId || simData.away_team_id || simData.awayTeamId;
       const team2Id =
         homeTeamObj.team_id || homeTeamObj.teamId || simData.home_team_id || simData.homeTeamId;
+      console.log(
+        `📡 Saving franchise game: franchiseId=${franchiseId}, week=${week}, away=${awayTeamObj.name}, home=${homeTeamObj.name}`
+      );
       const res = await fetch("/franchise/complete-week", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
