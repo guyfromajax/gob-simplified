@@ -139,7 +139,7 @@ playBtn.addEventListener('click', () => {
     params.set('my_team', homeCheck.checked ? 'home' : 'away');
   }
 
-  window.location.href = `court.html?${params.toString()}`;
+  window.location.href = `/static/set-lineup.html?${params.toString()}`;
 });
 
 createLogoButtons();

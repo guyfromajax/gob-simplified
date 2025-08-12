@@ -55,6 +55,8 @@ app.add_middleware(
 class SimulationRequest(BaseModel):
     home_team: str
     away_team: str
+    home_lineup: dict[str, str] | None = None
+    away_lineup: dict[str, str] | None = None
 
 # 4. Routes
 @app.get("/")
@@ -99,7 +101,7 @@ def simulate_game(request: SimulationRequest):
     # print("🔍 Full request body:", request)
 
 
-    game = run_simulation(home_team, away_team)
+    game = run_simulation(home_team, away_team, request.home_lineup, request.away_lineup)
     # print("Right before summarize_game_state")
     # print("🧪 Turns sample:", game.turns[:3])
     summary = summarize_game_state(game)

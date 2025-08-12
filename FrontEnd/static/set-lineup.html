@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Set Lineup</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/tournament.css" />
+  <link rel="stylesheet" href="/static/set-lineup.css" />
+</head>
+<body>
+  <h1 style="font-family: 'Bebas Neue', sans-serif;">SET LINEUP</h1>
+  <div id="lineup-container">
+    <ul id="slots">
+      <li class="slot" data-pos="PG">PG<button class="remove" hidden>✕</button></li>
+      <li class="slot" data-pos="SG">SG<button class="remove" hidden>✕</button></li>
+      <li class="slot" data-pos="SF">SF<button class="remove" hidden>✕</button></li>
+      <li class="slot" data-pos="PF">PF<button class="remove" hidden>✕</button></li>
+      <li class="slot" data-pos="C">C<button class="remove" hidden>✕</button></li>
+    </ul>
+    <button id="play-now" class="play-button disabled">PLAY NOW</button>
+  </div>
+
+  <div id="roster-table-container">
+    <table class="roster-table">
+      <thead>
+        <tr>
+          <th>Player Name</th>
+          <th>HT</th>
+          <th>WT</th>
+          <th>SC</th>
+          <th>SH</th>
+          <th>ID</th>
+          <th>OD</th>
+          <th>PS</th>
+          <th>BH</th>
+          <th>RB</th>
+          <th>ST</th>
+          <th>AG</th>
+          <th>ND</th>
+          <th>IQ</th>
+          <th>FT</th>
+          <th>NG</th>
+          <th class="rt">RT</th>
+        </tr>
+      </thead>
+      <tbody id="roster-body"></tbody>
+    </table>
+  </div>
+
+  <div id="toast" hidden></div>
+  <script src="/static/common.js"></script>
+  <script src="/static/set-lineup.js"></script>
+</body>
+</html>

@@ -1,6 +1,7 @@
 
 import random
 from typing import List, Dict
+from bson import ObjectId
 from BackEnd.db import players_collection
 from BackEnd.models.player import Player
 
@@ -44,5 +45,17 @@ def build_lineup_from_mongo(team_name: str) -> dict:
         print(f"Chose {chosen_player.first_name} {chosen_player.last_name} for {pos}")
         available_players.remove(chosen_player)
 
+    return lineup
+
+
+def build_lineup_from_ids(lineup_ids: Dict[str, str]) -> Dict[str, Player]:
+    lineup: Dict[str, Player] = {}
+    for pos, pid in lineup_ids.items():
+        try:
+            doc = players_collection.find_one({"_id": ObjectId(pid)})
+        except Exception:
+            doc = players_collection.find_one({"_id": pid})
+        if doc:
+            lineup[pos] = Player(doc)
     return lineup
 
