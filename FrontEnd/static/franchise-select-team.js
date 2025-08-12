@@ -36,6 +36,7 @@ async function selectTeam(team) {
     if (!res.ok) throw new Error("Failed to start franchise");
     const data = await res.json();
     localStorage.setItem("franchiseId", data.franchise_id);
+    localStorage.setItem("franchise_user_team", team);
     window.location.href = "/franchise/command-center";
   } catch (err) {
     console.error(err);

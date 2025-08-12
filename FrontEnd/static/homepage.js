@@ -136,7 +136,10 @@ playBtn.addEventListener('click', () => {
   });
 
   if (homeCheck.checked || awayCheck.checked) {
-    params.set('my_team', homeCheck.checked ? 'home' : 'away');
+    const mySide = homeCheck.checked ? 'home' : 'away';
+    params.set('my_team', mySide);
+    const userTeam = mySide === 'home' ? homeTeam : awayTeam;
+    params.set('user_team_id', userTeam);
   }
 
   window.location.href = `/static/set-lineup.html?${params.toString()}`;

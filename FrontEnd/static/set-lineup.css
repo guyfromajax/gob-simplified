@@ -3,6 +3,16 @@ body {
   margin: 20px;
 }
 
+#team-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+#team-logo {
+  height: 50px;
+}
+
 #lineup-container {
   display: flex;
   gap: 20px;

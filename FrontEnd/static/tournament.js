@@ -399,7 +399,11 @@ document.addEventListener("DOMContentLoaded", async () => {
         await refreshLeaders();
         const { home, away } = data;
         if (!home || !away) throw new Error('Matchup not found');
-        window.location.href = `/static/set-lineup.html?tournament_id=${encodeURIComponent(tournament._id)}&home=${encodeURIComponent(home)}&away=${encodeURIComponent(away)}`;
+        const mySide = home === userTeamId ? 'home' : (away === userTeamId ? 'away' : '');
+        let url = `/static/set-lineup.html?tournament_id=${encodeURIComponent(tournament._id)}&home=${encodeURIComponent(home)}&away=${encodeURIComponent(away)}`;
+        if (userTeamId) url += `&user_team_id=${encodeURIComponent(userTeamId)}`;
+        if (mySide) url += `&my_team=${mySide}`;
+        window.location.href = url;
       } catch (err) {
         console.error('Failed to start game', err);
         alert('Unable to start game');
