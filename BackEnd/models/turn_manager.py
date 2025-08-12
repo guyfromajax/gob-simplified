@@ -126,6 +126,16 @@ class TurnManager:
 
         result["score"] = dict(self.game.score)
 
+        # Sync and expose fouls/clock/quarter for live scoreboard updates
+        self.game.game_state["team_fouls"] = {
+            self.game.home_team.name: self.game.home_team.team_fouls,
+            self.game.away_team.name: self.game.away_team.team_fouls,
+        }
+        result["homeFouls"] = self.game.home_team.team_fouls
+        result["awayFouls"] = self.game.away_team.team_fouls
+        result["clock"] = self.game.game_state["clock"]
+        result["quarter"] = self.game.game_state["quarter"]
+
         # print(f"inside run_micro_turn result: {result}")
         # print(f"result: {result}")
         return result
