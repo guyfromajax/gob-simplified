@@ -176,7 +176,7 @@ class ShotManager:
         shooter_pos = get_player_position(off_lineup, shooter)
         print(f"end of resolve_shot, possession_flips: {possession_flips}")
 
-        return {
+        result = {
             "result_type": "MAKE" if made else "MISS",
             "ball_handler": shooter,
             "shooter": shooter,
@@ -187,6 +187,12 @@ class ShotManager:
             "possession_flips": possession_flips,
             "time_elapsed": time_elapsed
         }
+
+        if made:
+            result["points"] = points
+            result["scoring_team"] = off_team.name
+
+        return result
 
     
     def calculate_shot_score(self, shooter, passer, screener, defender, playcall, defense_call, is_three):
