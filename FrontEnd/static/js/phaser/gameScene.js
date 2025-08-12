@@ -94,15 +94,9 @@ export function createGameScene(Phaser) {
         const prevHome = liveScore[homeTeam];
         const prevAway = liveScore[awayTeam];
 
-        // Update score from authoritative state or incrementally from event
         if (turn.score) {
           if (typeof turn.score[homeTeam] === 'number') liveScore[homeTeam] = turn.score[homeTeam];
           if (typeof turn.score[awayTeam] === 'number') liveScore[awayTeam] = turn.score[awayTeam];
-        } else {
-          const scoringTeam = turn.scoring_team || turn.team || turn.offense_team;
-          if (turn.result === 'made_3') liveScore[scoringTeam] = (liveScore[scoringTeam] || 0) + 3;
-          else if (turn.result === 'made_2') liveScore[scoringTeam] = (liveScore[scoringTeam] || 0) + 2;
-          else if (turn.result === 'made_ft') liveScore[scoringTeam] = (liveScore[scoringTeam] || 0) + 1;
         }
 
         const homeF = turn.homeFouls ?? turn.home_team_fouls ?? turn.fouls?.home;

@@ -307,14 +307,19 @@ def resolve_free_throw_logic(game):
             possession_flips = True
 
     shooter_pos = get_player_position(off_lineup, shooter)
-
-    return {
+    result = {
         "result_type": "FREE_THROW",
         "ball_handler": shooter,
         "text": text,
         "time_elapsed": 0,  # clock does not run
         "possession_flips": possession_flips,
     }
+
+    if makes_shot:
+        result["points"] = 1
+        result["scoring_team"] = off_team.name
+
+    return result
 
 
 def resolve_turnover_logic(roles, game, turnover_type="DEAD BALL"):

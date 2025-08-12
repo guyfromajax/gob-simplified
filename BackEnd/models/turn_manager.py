@@ -124,6 +124,8 @@ class TurnManager:
         result["home_lineup"] = serialize_lineup(self.game.home_team.lineup)
         result["away_lineup"] = serialize_lineup(self.game.away_team.lineup)
 
+        result["score"] = dict(self.game.score)
+
         # print(f"inside run_micro_turn result: {result}")
         # print(f"result: {result}")
         return result
