@@ -29,7 +29,7 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 0 20px;
+      padding: 0 32px;
       box-sizing: border-box;
       z-index: 1000;
     }
@@ -38,7 +38,6 @@
       display: flex;
       align-items: center;
       height: 100%;
-      flex: 1;
       gap: 10px;
     }
 
@@ -60,8 +59,8 @@
     }
 
     #scoreboard img.team-logo {
+      width: 100%;
       height: 100%;
-      width: auto;
       object-fit: contain;
       display: block;
     }
@@ -69,7 +68,7 @@
     #scoreboard .score {
       font-size: 48px;
       line-height: 1;
-      flex: 1;
+      flex: 0 0 60px;
       text-align: center;
     }
 
@@ -87,6 +86,7 @@
       align-items: center;
       justify-content: center;
       height: 100%;
+      margin: 0 40px;
     }
 
     #scoreboard .center .clock {
