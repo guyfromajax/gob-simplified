@@ -47,6 +47,10 @@ class GameManager:
             "current_playcall": "Outside",
             "defense_playcall": "Zone",
             "offensive_state": "HCO",
+            "team_fouls": {
+                self.home_team.name: 0,
+                self.away_team.name: 0,
+            },
             "box_score": {
                 self.home_team.name: {},
                 self.away_team.name: {}
