@@ -10,6 +10,7 @@ async function fetchJSON(url) {
 }
 
 let franchiseId = null;
+const userTeamName = localStorage.getItem('franchise_user_team') || '';
 const ATTR_HEADERS = ["SC","SH","ID","OD","PS","BH","RB","AG","ST","ND","IQ","FT"];
 
 const teamMap = {
@@ -228,7 +229,10 @@ playNowBtn.addEventListener('click', async () => {
     try {
       localStorage.setItem('franchise_week', week);
     } catch {}
-    const url = `/static/set-lineup.html?franchise_id=${encodeURIComponent(franchiseId)}&week=${week}&home=${encodeURIComponent(home)}&away=${encodeURIComponent(away)}&home_id=${encodeURIComponent(home_id)}&away_id=${encodeURIComponent(away_id)}`;
+    const mySide = userTeamName === home ? 'home' : (userTeamName === away ? 'away' : '');
+    let url = `/static/set-lineup.html?franchise_id=${encodeURIComponent(franchiseId)}&week=${week}&home=${encodeURIComponent(home)}&away=${encodeURIComponent(away)}&home_id=${encodeURIComponent(home_id)}&away_id=${encodeURIComponent(away_id)}`;
+    if (userTeamName) url += `&user_team_id=${encodeURIComponent(userTeamName)}`;
+    if (mySide) url += `&my_team=${mySide}`;
     console.log('Navigating to', url);
     window.location.href = url;
   } catch (err) {

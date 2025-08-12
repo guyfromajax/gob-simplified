@@ -1,8 +1,11 @@
 const urlParams = new URLSearchParams(window.location.search);
 const homeTeam = urlParams.get('home');
 const awayTeam = urlParams.get('away');
-const myTeamSide = urlParams.get('my_team') || 'home';
-const teamName = myTeamSide === 'away' ? awayTeam : homeTeam;
+const homeId = urlParams.get('home_id');
+const awayId = urlParams.get('away_id');
+let myTeamSide = urlParams.get('my_team');
+const userTeamIdParam = urlParams.get('user_team_id');
+let teamName = '';
 
 let roster = [];
 const lineup = {};
@@ -116,7 +119,47 @@ function setupSlots() {
   });
 }
 
+function resolveTeam() {
+  if (myTeamSide === 'home' || myTeamSide === 'away') {
+    teamName = myTeamSide === 'away' ? awayTeam : homeTeam;
+    return !!teamName;
+  }
+  const storedId = userTeamIdParam || localStorage.getItem('userTeamId') || localStorage.getItem('franchise_user_team');
+  if (storedId) {
+    if (storedId === homeId || storedId === homeTeam) {
+      myTeamSide = 'home';
+      teamName = homeTeam;
+      return true;
+    }
+    if (storedId === awayId || storedId === awayTeam) {
+      myTeamSide = 'away';
+      teamName = awayTeam;
+      return true;
+    }
+  }
+  return false;
+}
+
+function setHeader() {
+  const title = document.getElementById('team-title');
+  if (title) title.textContent = `Set Your Lineup — ${teamName}`;
+  const logo = document.getElementById('team-logo');
+  if (logo) {
+    logo.src = `/static/images/homepage-logos/${teamName}.png`;
+    logo.alt = `${teamName} logo`;
+    logo.hidden = false;
+    logo.onerror = () => { logo.hidden = true; };
+  }
+}
+
 async function init() {
+  if (!resolveTeam()) {
+    alert("Can't determine your team for this game. Please return and relaunch.");
+    const btn = document.getElementById('play-now');
+    if (btn) btn.classList.add('disabled');
+    return;
+  }
+  setHeader();
   await loadRoster();
   setupSlots();
   const btn = document.getElementById('play-now');
@@ -124,6 +167,9 @@ async function init() {
     btn.addEventListener('click', () => {
       if (btn.classList.contains('disabled')) return;
       const params = new URLSearchParams(window.location.search);
+      ['home','away'].forEach(side => {
+        ['pg','sg','sf','pf','c'].forEach(pos => params.delete(`${side}_${pos}`));
+      });
       ['PG','SG','SF','PF','C'].forEach(pos => {
         const id = lineup[pos];
         if (id) params.set(`${myTeamSide}_${pos.toLowerCase()}`, id);
