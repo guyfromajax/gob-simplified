@@ -18,6 +18,8 @@ export function createGameScene(Phaser) {
         this.awayTeam = data.awayTeam;
         this.animate = data.animate;
         this.mode = data.mode;
+        this.homeLineup = data.homeLineup || {};
+        this.awayLineup = data.awayLineup || {};
 
         console.log("🧠 Game initialized with:", {
           rosters: this.rosters,
@@ -52,10 +54,13 @@ export function createGameScene(Phaser) {
 
     console.log("📨 Sending /api/simulate request for:", homeTeam, "vs", awayTeam);
 
+      const payload = { home_team: homeTeam, away_team: awayTeam };
+      if (Object.keys(this.homeLineup).length) payload.home_lineup = this.homeLineup;
+      if (Object.keys(this.awayLineup).length) payload.away_lineup = this.awayLineup;
       const res = await fetch('/api/simulate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ home_team: homeTeam, away_team: awayTeam })
+      body: JSON.stringify(payload)
       });
 
 

@@ -228,7 +228,7 @@ playNowBtn.addEventListener('click', async () => {
     try {
       localStorage.setItem('franchise_week', week);
     } catch {}
-    const url = `/court.html?franchise_id=${encodeURIComponent(franchiseId)}&week=${week}&home=${encodeURIComponent(home)}&away=${encodeURIComponent(away)}&home_id=${encodeURIComponent(home_id)}&away_id=${encodeURIComponent(away_id)}`;
+    const url = `/static/set-lineup.html?franchise_id=${encodeURIComponent(franchiseId)}&week=${week}&home=${encodeURIComponent(home)}&away=${encodeURIComponent(away)}&home_id=${encodeURIComponent(home_id)}&away_id=${encodeURIComponent(away_id)}`;
     console.log('Navigating to', url);
     window.location.href = url;
   } catch (err) {
