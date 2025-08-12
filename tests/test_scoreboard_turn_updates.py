@@ -54,3 +54,31 @@ def test_scoring_turn_includes_metadata_and_score():
     assert result["score"][game.home_team.name] == 2
     assert result.get("points") == 2
     assert result.get("scoring_team") == game.home_team.name
+
+
+def test_turn_payload_includes_clock_quarter_fouls():
+    game = build_mock_game()
+    tm = game.turn_manager
+
+    def fake_turn_with_foul():
+        # Record a defensive foul on the away team
+        game.defense_team.record_team_foul()
+        return {
+            "result_type": "FOUL",
+            "ball_handler": game.offense_team.lineup["PG"],
+            "shooter": game.offense_team.lineup["PG"],
+            "screener": game.offense_team.lineup["SG"],
+            "passer": game.offense_team.lineup["SG"],
+            "defender": game.defense_team.lineup["PG"],
+            "text": "foul",
+            "possession_flips": False,
+            "time_elapsed": 30,
+        }
+
+    tm.resolve_half_court_offense = types.MethodType(lambda self: fake_turn_with_foul(), tm)
+    result = tm.run_micro_turn()
+
+    assert result["clock"] == "7:30"
+    assert result["quarter"] == 1
+    assert result["homeFouls"] == 0
+    assert result["awayFouls"] == 1
