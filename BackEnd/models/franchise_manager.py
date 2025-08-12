@@ -8,6 +8,8 @@ import logging
 import os
 import sys
 
+from BackEnd.main import run_simulation
+
 
 logger = logging.getLogger(__name__)
 
@@ -50,29 +52,74 @@ class FranchiseManager:
         self.week += 1
         self.save_season_state()
 
-    def simulate_game(self, team1_id, team2_id):
-        team1_score = random.randint(50, 90)
-        team2_score = random.randint(50, 90)
-        winner = team1_id if team1_score > team2_score else team2_id
-        loser = team2_id if winner == team1_id else team1_id
-
-        self.db.teams.update_one({"_id": winner}, {"$inc": {"record.W": 1}})
-        self.db.teams.update_one({"_id": loser}, {"$inc": {"record.L": 1}})
+    def _apply_team_result(self, team1_id, team2_id, team1_score, team2_score, sign=1):
         self.db.teams.update_one(
             {"_id": team1_id},
-            {"$inc": {"PF": team1_score, "PA": team2_score}}
+            {"$inc": {"PF": sign * team1_score, "PA": sign * team2_score, "record.W": 0, "record.L": 0}},
         )
         self.db.teams.update_one(
             {"_id": team2_id},
-            {"$inc": {"PF": team2_score, "PA": team1_score}}
+            {"$inc": {"PF": sign * team2_score, "PA": sign * team1_score, "record.W": 0, "record.L": 0}},
         )
-        self.db.games.insert_one({
-            "team1_id": team1_id,
-            "team2_id": team2_id,
-            "team1_score": team1_score,
-            "team2_score": team2_score,
-            "week": self.week
-        })
+        if team1_score > team2_score:
+            self.db.teams.update_one({"_id": team1_id}, {"$inc": {"record.W": sign}})
+            self.db.teams.update_one({"_id": team2_id}, {"$inc": {"record.L": sign}})
+        elif team2_score > team1_score:
+            self.db.teams.update_one({"_id": team2_id}, {"$inc": {"record.W": sign}})
+            self.db.teams.update_one({"_id": team1_id}, {"$inc": {"record.L": sign}})
+
+    def _save_game_result(self, team1_id, team2_id, team1_score, team2_score):
+        existing = self.db.games.find_one(
+            {
+                "week": self.week,
+                "$or": [
+                    {"team1_id": team1_id, "team2_id": team2_id},
+                    {"team1_id": team2_id, "team2_id": team1_id},
+                ],
+            }
+        )
+        if existing:
+            self._apply_team_result(
+                existing["team1_id"],
+                existing["team2_id"],
+                existing["team1_score"],
+                existing["team2_score"],
+                sign=-1,
+            )
+            filter_doc = {"_id": existing["_id"]}
+        else:
+            filter_doc = {"week": self.week, "team1_id": team1_id, "team2_id": team2_id}
+
+        self._apply_team_result(team1_id, team2_id, team1_score, team2_score, sign=1)
+        self.db.games.update_one(
+            filter_doc,
+            {
+                "$set": {
+                    "team1_id": team1_id,
+                    "team2_id": team2_id,
+                    "team1_score": team1_score,
+                    "team2_score": team2_score,
+                    "week": self.week,
+                }
+            },
+            upsert=True,
+        )
+
+    def simulate_game(self, team1_id, team2_id):
+        away_doc = self.db.teams.find_one({"_id": team1_id}, {"name": 1}) or {}
+        home_doc = self.db.teams.find_one({"_id": team2_id}, {"name": 1}) or {}
+        home_name = home_doc.get("name", "")
+        away_name = away_doc.get("name", "")
+
+        try:
+            gm = run_simulation(home_name, away_name)
+            team1_score = gm.score.get(away_name, 0)
+            team2_score = gm.score.get(home_name, 0)
+        except Exception:
+            team1_score = random.randint(50, 90)
+            team2_score = random.randint(50, 90)
+
+        self._save_game_result(team1_id, team2_id, team1_score, team2_score)
 
     def age_players(self):
         for team in self.teams:
