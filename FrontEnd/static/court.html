@@ -41,6 +41,7 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
+      height: 100%;
     }
 
     #scoreboard .team {
@@ -48,10 +49,19 @@
       gap: 10px;
     }
 
+    #scoreboard .logo-container {
+      height: 100%;
+      width: var(--scoreboard-height);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
     #scoreboard img.team-logo {
-      height: 60px;
-      width: 60px;
+      height: 100%;
+      width: auto;
       object-fit: contain;
+      display: block;
     }
 
     #scoreboard .score {
@@ -127,7 +137,9 @@
 <body>
   <div id="scoreboard">
     <div class="team home">
-      <img id="home-logo" class="team-logo" alt="home logo" />
+      <div class="logo-container">
+        <img id="home-logo" class="team-logo" alt="home logo" />
+      </div>
       <div id="home-score" class="score">0</div>
     </div>
     <div class="tol home">
@@ -144,7 +156,9 @@
     </div>
     <div class="team away">
       <div id="away-score" class="score">0</div>
-      <img id="away-logo" class="team-logo" alt="away logo" />
+      <div class="logo-container">
+        <img id="away-logo" class="team-logo" alt="away logo" />
+      </div>
     </div>
   </div>
   <div id="phaser-container">
