@@ -1,7 +1,7 @@
 import random
 import json
 from BackEnd.db import players_collection, teams_collection
-from BackEnd.utils.db_utils import build_lineup_from_mongo
+from BackEnd.utils.db_utils import build_lineup_from_mongo, build_lineup_from_ids
 from BackEnd.models.player import Player
 from BackEnd.models.game_manager import GameManager
 from BackEnd.models.turn_manager import TurnManager
@@ -231,14 +231,21 @@ def print_scouting_report(data):
         for def_type, val in data[team]["defense"].items():
             print(f"{def_type.ljust(14)} — Used: {val['used']}, Success: {val['success']}")
 
-def run_simulation(home_team_name, away_team_name):
+def run_simulation(home_team_name, away_team_name, home_lineup_ids=None, away_lineup_ids=None):
     gm = GameManager(home_team_name, away_team_name)
 
     print("Inside run_simulation")
     print(f"Home team: {home_team_name}, Away team: {away_team_name}")
 
-    gm.home_team.lineup = build_lineup_from_mongo(home_team_name)
-    gm.away_team.lineup = build_lineup_from_mongo(away_team_name)
+    if home_lineup_ids:
+        gm.home_team.lineup = build_lineup_from_ids(home_lineup_ids)
+    else:
+        gm.home_team.lineup = build_lineup_from_mongo(home_team_name)
+
+    if away_lineup_ids:
+        gm.away_team.lineup = build_lineup_from_ids(away_lineup_ids)
+    else:
+        gm.away_team.lineup = build_lineup_from_mongo(away_team_name)
 
     gm.turn_manager = TurnManager(gm)  # Rebuild now that lineups are present
     for q in range(1, 5):
