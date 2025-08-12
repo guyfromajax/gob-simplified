@@ -91,7 +91,7 @@ body {
 
 .team-tagline {
   margin-top: 8px;
-  font-size: clamp(12px, 1.1vw, 22px);
+  font-size: clamp(12px, 1.1vw, 66px);
   text-align: center;
   font-family: 'Bebas Neue', sans-serif;
   font-weight: 700;
