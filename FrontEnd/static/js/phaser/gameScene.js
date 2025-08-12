@@ -2,6 +2,7 @@ import { animateGameTurns } from './animation/animateGameTurns.js';
 import { loadPhaserPlayers } from './setup/loadPhaserPlayers.js';
 import { gridToPixels } from './utils/gridToPixels.js';
 import { finalizeGame } from './finalizeGame.js';
+import { emit } from './utils/eventBus.js';
 
 export function createGameScene(Phaser) {
   return class GameScene extends Phaser.Scene {
@@ -77,8 +78,6 @@ export function createGameScene(Phaser) {
       if (homeLogoEl) homeLogoEl.src = `/static/images/homepage-logos/${encodeURIComponent(homeTeam)}.png`;
       if (awayLogoEl) awayLogoEl.src = `/static/images/homepage-logos/${encodeURIComponent(awayTeam)}.png`;
 
-      const homeScoreEl = document.getElementById('home-score');
-      const awayScoreEl = document.getElementById('away-score');
       const homeFoulsEl = document.getElementById('home-fouls');
       const awayFoulsEl = document.getElementById('away-fouls');
       const clockEl = document.getElementById('game-clock');
@@ -92,6 +91,9 @@ export function createGameScene(Phaser) {
       let liveQuarter = 1;
 
       const updateScoreboard = (turn = {}) => {
+        const prevHome = liveScore[homeTeam];
+        const prevAway = liveScore[awayTeam];
+
         // Update score from authoritative state or incrementally from event
         if (turn.score) {
           if (typeof turn.score[homeTeam] === 'number') liveScore[homeTeam] = turn.score[homeTeam];
@@ -111,12 +113,17 @@ export function createGameScene(Phaser) {
         if (turn.clock || turn.game_clock) liveClock = turn.clock || turn.game_clock;
         if (turn.quarter != null) liveQuarter = turn.quarter;
 
-        if (homeScoreEl) homeScoreEl.textContent = liveScore[homeTeam];
-        if (awayScoreEl) awayScoreEl.textContent = liveScore[awayTeam];
         if (homeFoulsEl) homeFoulsEl.textContent = `F: ${liveHomeFouls}`;
         if (awayFoulsEl) awayFoulsEl.textContent = `F: ${liveAwayFouls}`;
         if (clockEl) clockEl.textContent = liveClock;
         if (quarterEl) quarterEl.textContent = `Q:${liveQuarter}`;
+
+        if (liveScore[homeTeam] !== prevHome || liveScore[awayTeam] !== prevAway) {
+          emit('score:update', {
+            home: liveScore[homeTeam],
+            away: liveScore[awayTeam],
+          });
+        }
       };
 
       // Initialize scoreboard at tip-off

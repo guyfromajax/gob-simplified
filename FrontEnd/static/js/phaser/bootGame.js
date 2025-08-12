@@ -1,6 +1,21 @@
 import * as Phaser from 'https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.esm.js';
 import { createGameScene } from './gameScene.js';
 import { setCourtOffsets } from './utils/gridToPixels.js';
+import { on, emit } from './utils/eventBus.js';
+
+function updateScoreboardScores({ home, away }) {
+  const homeScoreEl = document.getElementById('home-score');
+  const awayScoreEl = document.getElementById('away-score');
+  if (homeScoreEl) homeScoreEl.textContent = home;
+  if (awayScoreEl) awayScoreEl.textContent = away;
+}
+
+if (typeof on === 'function' && typeof emit === 'function') {
+  on('score:update', updateScoreboardScores);
+  emit('score:update', { home: 0, away: 0 });
+} else {
+  updateScoreboardScores({ home: 0, away: 0 });
+}
 
 function getMode({ tournamentId, franchiseId }) {
   if (tournamentId) return 'tournament';
