@@ -34,19 +34,21 @@
       z-index: 1000;
     }
 
-    #scoreboard .team,
-    #scoreboard .tol,
-    #scoreboard .center {
+    #scoreboard .side {
       display: flex;
-      flex-direction: column;
       align-items: center;
-      justify-content: center;
       height: 100%;
+      flex: 1;
+      gap: 10px;
     }
 
-    #scoreboard .team {
-      flex-direction: row;
-      gap: 10px;
+    #scoreboard .side.home {
+      justify-content: flex-start;
+    }
+
+    #scoreboard .side.away {
+      justify-content: flex-start;
+      flex-direction: row-reverse;
     }
 
     #scoreboard .logo-container {
@@ -67,10 +69,24 @@
     #scoreboard .score {
       font-size: 48px;
       line-height: 1;
+      flex: 1;
+      text-align: center;
     }
 
     #scoreboard .tol {
       font-size: 24px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #scoreboard .center {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
     }
 
     #scoreboard .center .clock {
@@ -136,28 +152,28 @@
 </head>
 <body>
   <div id="scoreboard">
-    <div class="team home">
+    <div class="side home">
       <div class="logo-container">
         <img id="home-logo" class="team-logo" alt="home logo" />
       </div>
       <div id="home-score" class="score">0</div>
-    </div>
-    <div class="tol home">
-      <div>TOL 3</div>
-      <div id="home-fouls">F: 0</div>
+      <div class="tol home">
+        <div>TOL: 3</div>
+        <div id="home-fouls">F: 0</div>
+      </div>
     </div>
     <div class="center">
       <div id="game-clock" class="clock">8:00</div>
       <div id="quarter" class="quarter">Q:1</div>
     </div>
-    <div class="tol away">
-      <div>TOL 3</div>
-      <div id="away-fouls">F: 0</div>
-    </div>
-    <div class="team away">
-      <div id="away-score" class="score">0</div>
+    <div class="side away">
       <div class="logo-container">
         <img id="away-logo" class="team-logo" alt="away logo" />
+      </div>
+      <div id="away-score" class="score">0</div>
+      <div class="tol away">
+        <div>TOL: 3</div>
+        <div id="away-fouls">F: 0</div>
       </div>
     </div>
   </div>
