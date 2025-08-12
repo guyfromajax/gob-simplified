@@ -51,6 +51,15 @@ if (weekParam && !Number.isNaN(weekParam) && typeof localStorage !== 'undefined'
 }
 const mode = urlParams.get('mode') || getMode({ tournamentId, franchiseId });
 
+const homeLineup = {};
+const awayLineup = {};
+['pg', 'sg', 'sf', 'pf', 'c'].forEach(pos => {
+  const h = urlParams.get(`home_${pos}`);
+  const a = urlParams.get(`away_${pos}`);
+  if (h) homeLineup[pos.toUpperCase()] = h;
+  if (a) awayLineup[pos.toUpperCase()] = a;
+});
+
 console.log("🏀 Tournament launch params:", {
   tournamentId,
   franchiseId,
@@ -109,6 +118,8 @@ async function startGame({ homeRoster, awayRoster, animate = true }) {
     homeTeam,
     awayTeam,
     animate,
+    homeLineup,
+    awayLineup,
   };
 
   if (game.scene.isActive('GameScene')) {
