@@ -50,9 +50,9 @@ if (weekParam && !Number.isNaN(weekParam) && typeof localStorage !== 'undefined'
   localStorage.setItem('franchise_week', weekParam);
 }
 const mode = urlParams.get('mode') || getMode({ tournamentId, franchiseId });
-const gameId = urlParams.get('game_id');
-const quarter = parseInt(urlParams.get('quarter'), 10) || 1;
-const periodLabel = urlParams.get('period') || `Q${quarter}`;
+let gameId = urlParams.get('game_id');
+let quarter = parseInt(urlParams.get('quarter'), 10) || 1;
+let periodLabel = urlParams.get('period') || `Q${quarter}`;
 
 const homeLineup = {};
 const awayLineup = {};
@@ -75,6 +75,19 @@ console.log("🏀 Tournament launch params:", {
 const GameScene = createGameScene(Phaser);
 let game;
 let isSimulating = false;
+
+function showStatus(msg) {
+  let el = document.getElementById('sim-status');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'sim-status';
+    el.style.color = '#fff';
+    el.style.fontFamily = 'Bebas Neue, sans-serif';
+    const container = document.getElementById('phaser-container');
+    if (container) container.appendChild(el);
+  }
+  el.textContent = msg;
+}
 
 function updateOffsets() {
   if (typeof document === 'undefined') return;
@@ -178,8 +191,10 @@ async function handleButtonClick(animate) {
   isSimulating = true;
   const playBtn = document.querySelector('.play-button');
   const resultsBtn = document.querySelector('.results-button');
+  const sim4Btn = document.querySelector('.sim-to-fourth-button');
   if (playBtn) playBtn.style.display = 'none';
   if (resultsBtn) resultsBtn.style.display = 'none';
+  if (sim4Btn) sim4Btn.style.display = 'none';
 
   try {
     const [homeRoster, awayRoster] = await Promise.all([
@@ -190,20 +205,96 @@ async function handleButtonClick(animate) {
     showPopup(finalScore);
   } catch (err) {
     console.error('Error starting game:', err);
+  } finally {
+    if (isSimulating) {
+      isSimulating = false;
+      if (playBtn) playBtn.style.display = '';
+      if (resultsBtn) resultsBtn.style.display = '';
+      if (sim4Btn && quarter < 4) sim4Btn.style.display = '';
+    }
+  }
+}
+
+async function handleSimToFourth() {
+  if (isSimulating || quarter >= 4) return;
+  isSimulating = true;
+  const playBtn = document.querySelector('.play-button');
+  const resultsBtn = document.querySelector('.results-button');
+  const sim4Btn = document.querySelector('.sim-to-fourth-button');
+  [playBtn, resultsBtn, sim4Btn].forEach(btn => { if (btn) btn.disabled = true; });
+
+  try {
+    let currentQ = quarter;
+    let gId = gameId;
+    let lastSummary;
+    while (currentQ <= 3) {
+      showStatus(`Simulating Q${currentQ}...`);
+      const payload = {
+        home_team: homeTeam,
+        away_team: awayTeam,
+        quarter: currentQ,
+        game_id: gId,
+      };
+      if (currentQ === quarter) {
+        if (Object.keys(homeLineup).length) payload.home_lineup = homeLineup;
+        if (Object.keys(awayLineup).length) payload.away_lineup = awayLineup;
+      }
+      const res = await fetch('/api/simulate-quarter', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error('Simulation failed');
+      lastSummary = await res.json();
+      gId = lastSummary.game_id;
+      currentQ += 1;
+    }
+
+    gameId = gId;
+    quarter = 4;
+    periodLabel = 'Q4';
+    const params = new URLSearchParams(window.location.search);
+    params.set('game_id', gameId);
+    params.set('quarter', 4);
+    params.set('period', 'Q4');
+    ['home_pg','home_sg','home_sf','home_pf','home_c','away_pg','away_sg','away_sf','away_pf','away_c']
+      .forEach(p => params.delete(p));
+    window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`);
+    updateScoreboardScores({
+      home: lastSummary.score[homeTeam] || 0,
+      away: lastSummary.score[awayTeam] || 0,
+    });
+    const qEl = document.getElementById('quarter');
+    if (qEl) qEl.textContent = 'Q:4';
+    showStatus('Simulating Q1…Q2…Q3 complete. Ready for Q4.');
+  } catch (err) {
+    console.error('Error simming to 4th quarter:', err);
+    showStatus('Simulation failed. Please try again.');
+  } finally {
     isSimulating = false;
-    if (playBtn) playBtn.style.display = '';
-    if (resultsBtn) resultsBtn.style.display = '';
+    if (playBtn) playBtn.disabled = false;
+    if (resultsBtn) resultsBtn.disabled = false;
+    if (sim4Btn) sim4Btn.disabled = true;
   }
 }
 
 function initGame() {
   const playBtn = document.querySelector('.play-button');
   const resultsBtn = document.querySelector('.results-button');
+  const sim4Btn = document.querySelector('.sim-to-fourth-button');
   if (playBtn) {
     playBtn.addEventListener('click', () => handleButtonClick(true));
   }
   if (resultsBtn) {
     resultsBtn.addEventListener('click', () => handleButtonClick(false));
+  }
+  if (sim4Btn) {
+    if (quarter >= 4) {
+      sim4Btn.disabled = true;
+      sim4Btn.title = 'Already in 4th quarter';
+    } else {
+      sim4Btn.addEventListener('click', handleSimToFourth);
+    }
   }
 }
 
