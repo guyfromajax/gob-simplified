@@ -64,3 +64,33 @@ def test_update_bracket_uses_saved_results(monkeypatch):
     again = tournaments_collection.find_one({"_id": tid})
     assert again["current_round"] == 2
     assert again["bracket"]["round2"] == updated["bracket"]["round2"]
+
+
+def test_update_bracket_uses_matchups_when_results_empty():
+    tournaments_collection.delete_many({})
+    games_collection.delete_many({})
+
+    manager = TournamentManager(
+        user_team_id="A",
+        tournaments_collection=tournaments_collection,
+        team_ids=["A", "B", "C", "D", "E", "F", "G", "H"],
+    )
+    tournament = manager.create_tournament()
+    tid = ObjectId(tournament["_id"])
+
+    # Populate winners directly in the bracket without any saved results
+    for idx, match in enumerate(tournament["bracket"]["round1"]):
+        manager.save_game_result("round1", idx, ObjectId(), match["home_team"])
+
+    tournaments_collection.update_one({"_id": tid}, {"$set": {"results": []}})
+
+    updated = update_bracket_from_results(str(tid))
+    assert updated is not None
+    assert updated["current_round"] == 2
+    assert len(updated["bracket"]["round2"]) == 2
+
+    winners = [m["winner"] for m in updated["bracket"]["round1"]]
+    assert updated["bracket"]["round2"][0]["home_team"] == winners[0]
+    assert updated["bracket"]["round2"][0]["away_team"] == winners[1]
+    assert updated["bracket"]["round2"][1]["home_team"] == winners[2]
+    assert updated["bracket"]["round2"][1]["away_team"] == winners[3]
