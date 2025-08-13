@@ -16,7 +16,9 @@ export async function animateGameTurns({ //hasBallAtStep
   const allPlayers = simData.players || [];
 
   for (let i = 0; i < turns.length; i++) {
+    scene.currentTurn = i;
     const turn = turns[i];
+    if (scene.skipToEnd) break;
     console.log(`🔁 Turn ${i + 1}`, turn);
 
     const shooterName = turn.shooter || "";
@@ -92,6 +94,16 @@ export async function animateGameTurns({ //hasBallAtStep
       } catch (err) {
         console.error('Scoreboard update failed:', err);
       }
+    }
+    if (scene.skipToEnd) {
+      for (let j = i + 1; j < turns.length; j++) {
+        try {
+          if (onUpdate) onUpdate(turns[j]);
+        } catch (err) {
+          console.error('Scoreboard update failed:', err);
+        }
+      }
+      break;
     }
   }
 }
