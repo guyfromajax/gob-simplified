@@ -4,7 +4,6 @@ from BackEnd.db import (
     tournaments_collection,
     teams_collection,
     games_collection,
-    players_collection,
 )
 from BackEnd.tournament.tournament_manager import TournamentManager
 from BackEnd.tournament.bracket_logic import update_bracket_from_results
@@ -48,7 +47,20 @@ def get_tournament_leaders(tournament_id: str):
             teams.add(match.get("away_team"))
     teams.discard(None)
 
-    players = list(players_collection.find({"team": {"$in": list(teams)}}))
+    # Use stats stored in the tournament document; ignore players from other teams.
+    players = []
+    for pid, pdata in tourney.get("player_stats", {}).items():
+        if pdata.get("team") not in teams:
+            continue
+        players.append(
+            {
+                "player_id": str(pid),
+                "first_name": pdata.get("first_name", ""),
+                "last_name": pdata.get("last_name", ""),
+                "team_name": pdata.get("team", ""),
+                "stats": pdata.get("stats", {}),
+            }
+        )
 
     categories = [
         ("PTS", "MIN"),
@@ -72,15 +84,15 @@ def get_tournament_leaders(tournament_id: str):
     for stat, tie_key in categories:
         entries = []
         for p in players:
-            season = p.get("stats", {}).get("season", {})
+            season = p.get("stats", {})
             value = stat_val(season, stat)
             tie_val = stat_val(season, tie_key) if tie_key else 0
             entries.append(
                 {
-                    "player_id": str(p.get("_id")),
+                    "player_id": p.get("player_id"),
                     "first_name": p.get("first_name", ""),
                     "last_name": p.get("last_name", ""),
-                    "team_name": p.get("team", ""),
+                    "team_name": p.get("team_name", ""),
                     "value": value,
                     "_tie": tie_val,
                 }
