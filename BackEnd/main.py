@@ -34,6 +34,28 @@ from BackEnd.utils.shared import (
 from BackEnd.utils.energy_system import recharge_lineups
 
 
+def _initialize_game_stats(gm: GameManager) -> None:
+    """Reset per-game stats for all players if not already done.
+
+    This is invoked once at the start of a game before Q1 begins.  It
+    iterates both rosters, clears each player's ``stats['game']`` bucket and
+    records a flag in ``gm.game_state`` so subsequent quarters do not reset
+    the numbers again.
+    """
+
+    if gm.game_state.get("game_stats_initialized"):
+        return
+
+    affected: list[str] = []
+    for team in (gm.home_team, gm.away_team):
+        for player in team.get_all_players():
+            player.reset_stats()
+            affected.append(player.player_id)
+
+    gm.game_state["game_stats_initialized"] = True
+    print(f"[DEV] Initialized game stats for players: {affected}")
+
+
 def simulate_quarter(gm: GameManager, home_lineup_ids=None, away_lineup_ids=None):
     """Simulate a single quarter on an existing ``GameManager``.
 
@@ -42,6 +64,9 @@ def simulate_quarter(gm: GameManager, home_lineup_ids=None, away_lineup_ids=None
     (or auto-generated if still empty). This function mutates ``gm`` in place
     and advances ``gm.quarter`` when finished.
     """
+
+    # Zero per-game stats exactly once per game before the opening tip.
+    _initialize_game_stats(gm)
 
     # Apply lineups if provided or build them if not already set
     if home_lineup_ids:
