@@ -50,8 +50,13 @@ def build_lineup_from_mongo(team_name: str) -> dict:
 
 def assign_lineup_from_ids(team: TeamManager, lineup_ids: Dict[str, str]) -> Dict[str, Player]:
     for pos, pid in lineup_ids.items():
+        existing = team.lineup.get(pos)
+        if existing and existing.player_id == pid:
+            continue
+
         player = team.get_player_by_id(pid)
         if player and team.lineup.get(pos) is not player:
             team.lineup[pos] = player
+
     return team.lineup
 
