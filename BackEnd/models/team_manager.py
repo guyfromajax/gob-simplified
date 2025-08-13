@@ -1,5 +1,5 @@
 import random
-from BackEnd.db import players_collection, teams_collection
+from BackEnd.db import teams_collection
 from BackEnd.utils.roster_loader import load_roster
 from BackEnd.models.player import Player
 from BackEnd.constants import PLAYCALLS
@@ -35,15 +35,18 @@ class TeamManager:
 
     def _load_roster(self):
         _, players = load_roster(self.name)
-        return [Player(p) for p in players]
+        roster = {}
+        for pdata in players:
+            player = Player(pdata)
+            roster[player.player_id] = player
+        return roster
 
     def _load_lineup(self):
         # If you’re still defining self.players before this
         return {}  # default to empty dict — lineup will be set later
 
-
-    def get_player(self, position):
-        return self.players.get(position)
+    def get_player_by_id(self, player_id):
+        return self.players.get(player_id)
 
     def get_all_players(self):
         return self.players.values()
