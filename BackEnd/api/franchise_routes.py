@@ -463,14 +463,14 @@ def leaders():
     for cat in categories:
         sorted_players = sorted(
             players,
-            key=lambda p: p.get("season_stats", {}).get(cat, 0),
+            key=lambda p: p.get("stats", {}).get("season", {}).get(cat, 0),
             reverse=True
         )[:10]
         result[cat] = [
             {
                 "name": f"{p.get('first_name', '')} {p.get('last_name', '')}".strip(),
                 "team": p.get("team"),
-                "value": p.get("season_stats", {}).get(cat, 0)
+                "value": p.get("stats", {}).get("season", {}).get(cat, 0)
             }
             for p in sorted_players
         ]
@@ -485,7 +485,7 @@ def team_stats():
         players = list(db.players.find({"team": t["name"]}))
         totals = {}
         for p in players:
-            for stat, val in p.get("season_stats", {}).items():
+            for stat, val in p.get("stats", {}).get("season", {}).items():
                 totals[stat] = totals.get(stat, 0) + val
         output.append({"team": t["name"], "stats": totals})
     return {"teams": output}
