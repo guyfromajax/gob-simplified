@@ -6,9 +6,11 @@ import { lockBallToPlayer } from "./ballManager.js";
  * Centralized ball ownership logic
  * Assigns the ball to the correct player for the current stepIndex
  */
-function updateBallOwnership({ ballSprite, animations, playerSprites, stepIndex, offenseTeamId, currentBallOwnerRef }) {
+function updateBallOwnership({ scene, ballSprite, animations, playerSprites, stepIndex, offenseTeamId, currentBallOwnerRef }) {
+  if (scene?.skipToEnd) return;
   console.log("🟡 inside updateBallOwnership → stepIndex:", stepIndex);
   for (const anim of animations) {
+    if (scene.skipToEnd) break;
     const sprite = playerSprites[anim.playerId];
     const hasBall = anim.hasBallAtStep?.[stepIndex];
     const team = sprite?.team_id;
@@ -47,10 +49,12 @@ function updateBallOwnership({ ballSprite, animations, playerSprites, stepIndex,
  */
 
 async function runSetupTween({ scene, ballSprite, animations, playerSprites, currentBallOwnerRef }) {
+  if (scene.skipToEnd) return;
   const stepIndex = 0;
   const promises = [];
 
   for (const anim of animations) {
+    if (scene.skipToEnd) break;
     const sprite = playerSprites[anim.playerId];
     const firstStep = anim.movement?.[stepIndex];
     if (!sprite || !firstStep) continue;
@@ -172,6 +176,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   // Determine which player owns the ball at step 0
   let step0OwnerSprite = null;
   for (const anim of turnData.animations) {
+    if (scene.skipToEnd) break;
     if (anim.hasBallAtStep?.[0]) {
       step0OwnerSprite = playerSprites[anim.playerId];
       break;
@@ -206,6 +211,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   // console.log("turnData.animations[0].playerId", turnData.animations[0].playerId);
   // console.log("turnData.animations[0].movement", turnData.animations[0].movement);
   updateBallOwnership({
+    scene,
     ballSprite,
     animations: turnData.animations,
     playerSprites,
@@ -218,6 +224,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
     if (scene.skipToEnd) break;
 
     updateBallOwnership({
+      scene,
       ballSprite,
       animations: turnData.animations,
       playerSprites,
@@ -229,6 +236,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
     const promises = [];
 
     for (const anim of turnData.animations) {
+      if (scene.skipToEnd) break;
       const sprite = playerSprites[anim.playerId];
       const movement = anim.movement;
 
