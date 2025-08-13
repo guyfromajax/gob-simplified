@@ -88,6 +88,107 @@ export function createGameScene(Phaser) {
       const clockEl = document.getElementById('game-clock');
       const quarterEl = document.getElementById('quarter');
 
+      const positions = ["PG","SG","SF","PF","C"];
+      this.nameToId = Object.fromEntries(simData.players.map(p => [p.name, p.playerId]));
+      this.playerInfo = Object.fromEntries(simData.players.map(p => [p.playerId, { name: p.name, team: p.team, pos: p.pos }]));
+      this.playerStats = {};
+      simData.players.forEach(p => {
+        this.playerStats[p.playerId] = { PTS: 0, REB: 0, AST: 0 };
+      });
+      this.rowRefs = { home: {}, away: {} };
+      this.currentLineup = { home: {}, away: {} };
+
+      const homeBody = document.getElementById('home-stats-body');
+      const awayBody = document.getElementById('away-stats-body');
+
+      const initTeamTable = (teamKey, bodyEl) => {
+        positions.forEach(pos => {
+          const player = simData.players.find(p => p.team === teamKey && p.pos === pos);
+          const playerId = player?.playerId;
+          const tr = document.createElement('tr');
+          const nameTd = document.createElement('td');
+          const ptsTd = document.createElement('td');
+          const rebTd = document.createElement('td');
+          const astTd = document.createElement('td');
+          nameTd.textContent = player?.name || '';
+          ptsTd.textContent = '0';
+          rebTd.textContent = '0';
+          astTd.textContent = '0';
+          tr.append(nameTd, ptsTd, rebTd, astTd);
+          bodyEl.appendChild(tr);
+          this.rowRefs[teamKey][pos] = { nameCell: nameTd, ptsCell: ptsTd, rebCell: rebTd, astCell: astTd };
+          if (playerId) {
+            this.playerStats[playerId].cells = { pts: ptsTd, reb: rebTd, ast: astTd };
+            this.currentLineup[teamKey][pos] = playerId;
+          }
+        });
+      };
+
+      initTeamTable('home', homeBody);
+      initTeamTable('away', awayBody);
+
+      const updateLineup = (teamKey, lineup) => {
+        if (!lineup) return;
+        positions.forEach(pos => {
+          const playerId = lineup[pos];
+          if (!playerId) return;
+          this.currentLineup[teamKey][pos] = playerId;
+          const info = this.playerInfo[playerId];
+          const row = this.rowRefs[teamKey][pos];
+          if (info && row) {
+            row.nameCell.textContent = info.name;
+            const stats = this.playerStats[playerId] || { PTS: 0, REB: 0, AST: 0 };
+            this.playerStats[playerId] = stats;
+            row.ptsCell.textContent = stats.PTS;
+            row.rebCell.textContent = stats.REB;
+            row.astCell.textContent = stats.AST;
+            stats.cells = { pts: row.ptsCell, reb: row.rebCell, ast: row.astCell };
+          }
+        });
+      };
+
+      const applyPlayerStats = (turn = {}) => {
+        if (turn.home_lineup) updateLineup('home', turn.home_lineup);
+        if (turn.away_lineup) updateLineup('away', turn.away_lineup);
+
+        if (turn.points && turn.shooter) {
+          const shooterId = this.nameToId[turn.shooter];
+          if (shooterId) {
+            const ps = this.playerStats[shooterId];
+            ps.PTS += turn.points;
+            if (ps.cells?.pts) ps.cells.pts.textContent = ps.PTS;
+          }
+          if (turn.passer) {
+            const passerId = this.nameToId[turn.passer];
+            if (passerId) {
+              const ps = this.playerStats[passerId];
+              ps.AST += 1;
+              if (ps.cells?.ast) ps.cells.ast.textContent = ps.AST;
+            }
+          }
+        }
+
+        if ((turn.result_type === 'DREB' || turn.result_type === 'OREB') && turn.ball_handler) {
+          const rebId = this.nameToId[turn.ball_handler];
+          if (rebId) {
+            const ps = this.playerStats[rebId];
+            ps.REB += 1;
+            if (ps.cells?.reb) ps.cells.reb.textContent = ps.REB;
+          }
+        } else if (turn.text) {
+          const m = turn.text.match(/([A-Za-z\-\'\.\s]+) grabs the rebound/);
+          if (m) {
+            const name = m[1].trim();
+            const rebId = this.nameToId[name];
+            if (rebId) {
+              const ps = this.playerStats[rebId];
+              ps.REB += 1;
+              if (ps.cells?.reb) ps.cells.reb.textContent = ps.REB;
+            }
+          }
+        }
+      };
+
       // Live scoreboard state
       const liveScore = { [homeTeam]: 0, [awayTeam]: 0 };
       let liveHomeFouls = 0;
@@ -117,6 +218,8 @@ export function createGameScene(Phaser) {
         if (clockEl) clockEl.textContent = liveClock;
         if (quarterEl) quarterEl.textContent = `Q:${liveQuarter}`;
 
+        applyPlayerStats(turn);
+
         if (liveScore[homeTeam] !== prevHome || liveScore[awayTeam] !== prevAway) {
           emit('score:update', {
             home: liveScore[homeTeam],
@@ -127,6 +230,29 @@ export function createGameScene(Phaser) {
 
       // Initialize scoreboard at tip-off
       updateScoreboard();
+
+      const pauseBtn = document.getElementById('pause-btn');
+      const skipBtn = document.getElementById('skip-btn');
+      this.isPaused = false;
+      this.skipToEnd = false;
+      if (pauseBtn) {
+        pauseBtn.addEventListener('click', () => {
+          this.isPaused = !this.isPaused;
+          if (this.isPaused) {
+            this.tweens.pauseAll();
+            pauseBtn.textContent = 'Resume';
+          } else {
+            this.tweens.resumeAll();
+            pauseBtn.textContent = 'Pause';
+          }
+        });
+      }
+      if (skipBtn) {
+        skipBtn.addEventListener('click', () => {
+          this.skipToEnd = true;
+          this.tweens.killAll();
+        });
+      }
 
       const finalize = async () => {
         const finalScore = await finalizeGame({

@@ -99,11 +99,65 @@
       line-height: 1;
     }
 
-    #phaser-container {
+    #main-container {
+      display: flex;
       width: 100%;
       height: calc(100vh - var(--scoreboard-height));
       margin-top: var(--scoreboard-height);
+    }
+
+    #phaser-container {
+      flex: 1;
       position: relative;
+    }
+
+    #stats-sidebar {
+      width: 260px;
+      background: #222;
+      color: #fff;
+      box-sizing: border-box;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .stats-box {
+      width: 100%;
+    }
+
+    .stats-box table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 16px;
+    }
+
+    .stats-box th,
+    .stats-box td {
+      text-align: center;
+      padding: 2px;
+    }
+
+    .controls {
+      margin-top: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    #pause-btn,
+    #skip-btn {
+      background-color: #ff6200;
+      color: #fff;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-family: 'Bebas Neue', sans-serif;
+    }
+
+    #skip-btn {
+      background-color: #007bff;
     }
 
     .play-button,
@@ -177,9 +231,35 @@
       </div>
     </div>
   </div>
-  <div id="phaser-container">
-    <button class="play-button">Play Game</button>
-    <button class="results-button">See Results</button>
+  <div id="main-container">
+    <div id="phaser-container">
+      <button class="play-button">Play Game</button>
+      <button class="results-button">See Results</button>
+    </div>
+    <div id="stats-sidebar">
+      <div class="stats-box" id="home-stats-box">
+        <table>
+          <thead>
+            <tr><th colspan="4">Home Team</th></tr>
+            <tr><th>Name</th><th>PTS</th><th>REB</th><th>AST</th></tr>
+          </thead>
+          <tbody id="home-stats-body"></tbody>
+        </table>
+      </div>
+      <div class="stats-box" id="away-stats-box">
+        <table>
+          <thead>
+            <tr><th colspan="4">Away Team</th></tr>
+            <tr><th>Name</th><th>PTS</th><th>REB</th><th>AST</th></tr>
+          </thead>
+          <tbody id="away-stats-body"></tbody>
+        </table>
+      </div>
+      <div class="controls">
+        <button id="pause-btn">Pause</button>
+        <button id="skip-btn">Skip To End</button>
+      </div>
+    </div>
   </div>
 
   <!-- <script type="module" src="./js/phaser/bootGame.js"></script> -->
