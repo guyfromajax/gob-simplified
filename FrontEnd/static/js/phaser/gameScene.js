@@ -120,6 +120,14 @@ export function createGameScene(Phaser) {
             console.error("❌ Failed to save tournament result:", await res.text());
             } else {
             console.log("✅ Tournament result saved.");
+            try {
+                const activeRes = await fetch(`/tournament/active?user_team_id=${encodeURIComponent(localStorage.getItem("userTeamId") || "")}`);
+                const updatedTournament = await activeRes.json();
+                localStorage.setItem("activeTournament", JSON.stringify(updatedTournament));
+                console.log("🔄 Tournament cache refreshed");
+            } catch (err) {
+                console.error("Failed to refresh tournament", err);
+            }
             }
         } catch (err) {
             console.error("🚨 Error during tournament result save:", err);

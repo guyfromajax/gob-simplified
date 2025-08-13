@@ -259,10 +259,10 @@ function initTopAssets() {
 }
 
 async function loadTournament() {
-  if (tournament) return;
   try {
     const res = await fetch(`/tournament/active?user_team_id=${encodeURIComponent(userTeamId)}`);
     tournament = await res.json();
+    localStorage.setItem("activeTournament", JSON.stringify(tournament));
     console.log("Bracket data arrives", tournament);
   } catch (err) {
     console.error("Failed to load tournament", err);
