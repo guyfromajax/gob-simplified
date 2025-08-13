@@ -54,12 +54,16 @@ def update_bracket_from_results(
 
     # Gather all results for the current round and order them by match index
     results = [r for r in tournament.get("results", []) if r.get("round") == current_round]
-    if len(results) < len(matchups):
-        # Round not complete – nothing to advance
-        return tournament
+    winners = []
 
-    results.sort(key=lambda r: r["match_index"])
-    winners = [r["winner"] for r in results]
+    if results and len(results) == len(matchups):
+        results.sort(key=lambda r: r["match_index"])
+        winners = [r["winner"] for r in results]
+    else:
+        winners = [m.get("winner") for m in matchups if m.get("winner") is not None]
+        if len(winners) != len(matchups):
+            # Round not complete – nothing to advance
+            return tournament
 
     # Final round complete – mark tournament finished
     if current_round >= 3:
