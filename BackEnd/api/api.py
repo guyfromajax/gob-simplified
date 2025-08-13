@@ -17,6 +17,7 @@ from BackEnd.db import (
 from BackEnd.utils.roster_loader import load_roster
 from BackEnd.utils.game_summary_builder import build_game_summary
 from BackEnd.utils.shared import clean_mongo_ids, summarize_game_state, format_height
+from BackEnd.utils import stat_updater
 from pydantic import BaseModel
 from fastapi import HTTPException
 import pprint
@@ -213,6 +214,11 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest):
             "next_lineup_needed": not is_final,
         }
     )
+
+    if is_final and game_id:
+        # Scrimmage simulations should not generate aggregate stats.
+        # Finalizing with ``mode="scrimmage"`` is a no-op but documents intent.
+        stat_updater.finalize_game(game_id, mode="scrimmage")
 
     return summary
 

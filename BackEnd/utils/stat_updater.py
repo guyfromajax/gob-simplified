@@ -85,7 +85,16 @@ def finalize_game(
     tournament_id: str | None = None,
     franchise_id: str | None = None,
 ) -> None:
-    """Persist finished game stats into tournament or franchise documents."""
+    """Persist finished game stats into aggregate documents for supported modes.
+
+    Scrimmage games (or calls with ``mode`` omitted) should not write any
+    aggregate data.  They rely solely on :func:`update_game_stats` for per-turn
+    box score updates.  Passing ``mode="scrimmage"`` therefore causes an early
+    return so future modes don't unintentionally create aggregates.
+    """
+    if mode in (None, "scrimmage"):
+        # Explicitly skip aggregation for scrimmages and unspecified modes.
+        return
     if mode == "tournament" and tournament_id:
         try:
             tid = ObjectId(tournament_id)
