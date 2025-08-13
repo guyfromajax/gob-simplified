@@ -101,6 +101,13 @@ export function createGameScene(Phaser) {
       const homeBody = document.getElementById('home-stats-body');
       const awayBody = document.getElementById('away-stats-body');
 
+      const formatName = (name) => {
+        if (!name) return '';
+        const parts = name.trim().split(/\s+/);
+        if (parts.length === 1) return parts[0];
+        return `${parts[0][0]}. ${parts[parts.length - 1]}`;
+      };
+
       const initTeamTable = (teamKey, bodyEl) => {
         positions.forEach(pos => {
           const player = simData.players.find(p => p.team === teamKey && p.pos === pos);
@@ -110,7 +117,7 @@ export function createGameScene(Phaser) {
           const ptsTd = document.createElement('td');
           const rebTd = document.createElement('td');
           const astTd = document.createElement('td');
-          nameTd.textContent = player?.name || '';
+          nameTd.textContent = formatName(player?.name) || '';
           ptsTd.textContent = '0';
           rebTd.textContent = '0';
           astTd.textContent = '0';
@@ -136,7 +143,7 @@ export function createGameScene(Phaser) {
           const info = this.playerInfo[playerId];
           const row = this.rowRefs[teamKey][pos];
           if (info && row) {
-            row.nameCell.textContent = info.name;
+            row.nameCell.textContent = formatName(info.name);
             const stats = this.playerStats[playerId] || { PTS: 0, REB: 0, AST: 0 };
             this.playerStats[playerId] = stats;
             row.ptsCell.textContent = stats.PTS;
@@ -250,6 +257,9 @@ export function createGameScene(Phaser) {
       if (skipBtn) {
         skipBtn.addEventListener('click', () => {
           this.skipToEnd = true;
+          this.isPaused = false;
+          if (pauseBtn) pauseBtn.textContent = 'Pause';
+          this.tweens.resumeAll();
           this.tweens.killAll();
         });
       }
