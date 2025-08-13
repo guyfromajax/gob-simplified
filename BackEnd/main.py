@@ -232,22 +232,33 @@ def print_scouting_report(data):
 
 def run_simulation(home_team_name, away_team_name):
     gm = GameManager(home_team_name, away_team_name)
-
-    print("Inside run_simulation")
-    print(f"Home team: {home_team_name}, Away team: {away_team_name}")
-
     gm.home_team.lineup = build_lineup_from_mongo(home_team_name)
     gm.away_team.lineup = build_lineup_from_mongo(away_team_name)
 
     gm.turn_manager = TurnManager(gm)  # Rebuild now that lineups are present
 
-    while gm.game_state["time_remaining"] > 0:
-        gm.simulate_macro_turn()
+    while True:
+        # Play out the current period
+        while gm.game_state["time_remaining"] > 0:
+            gm.simulate_macro_turn()
 
-    # Print all game statistics including defense score stats
-    # gm.print_game_statistics()
+        # Exit if regulation or OT ends with a winner
+        home_score = gm.score[gm.home_team_name]
+        away_score = gm.score[gm.away_team_name]
+        if gm.quarter >= 4 and home_score != away_score:
+            break
 
-    print(f"*********gm:\n{gm}")
+        # Advance to next quarter or OT
+        gm.quarter += 1
+        gm.game_state["quarter"] = gm.quarter
+        gm.home_team.team_fouls = 0
+        gm.away_team.team_fouls = 0
+        gm.game_state["time_remaining"] = 480 if gm.quarter <= 4 else 240
+        gm.game_state["clock"] = "8:00" if gm.quarter <= 4 else "4:00"
+        for team in [gm.home_team, gm.away_team]:
+            for player in team.lineup.values():
+                player.recharge_energy(0.2)
+
     return gm
 
 
