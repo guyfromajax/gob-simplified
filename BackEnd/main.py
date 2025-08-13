@@ -33,6 +33,58 @@ from BackEnd.utils.shared import (
 )
 from BackEnd.utils.energy_system import recharge_lineups
 
+
+def simulate_quarter(gm: GameManager, home_lineup_ids=None, away_lineup_ids=None):
+    """Simulate a single quarter on an existing ``GameManager``.
+
+    Lineups may be optionally supplied as dictionaries mapping positions to
+    player ids. When omitted the current lineup on the ``GameManager`` is used
+    (or auto-generated if still empty). This function mutates ``gm`` in place
+    and advances ``gm.quarter`` when finished.
+    """
+
+    # Apply lineups if provided or build them if not already set
+    if home_lineup_ids:
+        gm.home_team.lineup = build_lineup_from_ids(home_lineup_ids)
+    elif not gm.home_team.lineup:
+        gm.home_team.lineup = build_lineup_from_mongo(gm.home_team.name)
+
+    if away_lineup_ids:
+        gm.away_team.lineup = build_lineup_from_ids(away_lineup_ids)
+    elif not gm.away_team.lineup:
+        gm.away_team.lineup = build_lineup_from_mongo(gm.away_team.name)
+
+    # Ensure the turn manager is aware of any lineup changes
+    gm.turn_manager = TurnManager(gm)
+
+    q = gm.quarter
+    gm.game_state["quarter"] = q
+
+    period_label = f"Q{q}" if q <= 4 else f"OT{q - 4}"
+    gm.game_state["period_label"] = period_label
+
+    # Reset clock and fouls for the upcoming quarter
+    gm.game_state["time_remaining"] = 480 if q <= 4 else 240
+    gm.game_state["clock"] = "8:00" if q <= 4 else "4:00"
+    gm.home_team.team_fouls = 0
+    gm.away_team.team_fouls = 0
+    gm.game_state["team_fouls"] = {gm.home_team.name: 0, gm.away_team.name: 0}
+
+    # Recharge energy slightly between quarters
+    recharge_amount = 0.3 if q == 3 else 0.2
+    recharge_lineups(gm, recharge_amount)
+
+    while gm.game_state["time_remaining"] > 0:
+        gm.simulate_macro_turn()
+        gm.game_state["team_fouls"] = {
+            gm.home_team.name: gm.home_team.team_fouls,
+            gm.away_team.name: gm.away_team.team_fouls,
+        }
+
+    gm.quarter += 1
+
+    return gm
+
 def initialize_team_attributes():
     settings = {}
     for team in ["Lancaster", "Bentley-Truman"]:
@@ -232,76 +284,34 @@ def print_scouting_report(data):
             print(f"{def_type.ljust(14)} — Used: {val['used']}, Success: {val['success']}")
 
 def run_simulation(home_team_name, away_team_name, home_lineup_ids=None, away_lineup_ids=None):
+    """Run a full game simulation.
+
+    This now acts as a thin wrapper around :func:`simulate_quarter`, looping
+    until the game is complete. Existing callers therefore continue to work
+    without modification while enabling quarter-by-quarter control elsewhere.
+    """
+
     gm = GameManager(home_team_name, away_team_name)
 
     print("Inside run_simulation")
     print(f"Home team: {home_team_name}, Away team: {away_team_name}")
 
-    if home_lineup_ids:
-        gm.home_team.lineup = build_lineup_from_ids(home_lineup_ids)
-    else:
-        gm.home_team.lineup = build_lineup_from_mongo(home_team_name)
-
-    if away_lineup_ids:
-        gm.away_team.lineup = build_lineup_from_ids(away_lineup_ids)
-    else:
-        gm.away_team.lineup = build_lineup_from_mongo(away_team_name)
-
-    gm.turn_manager = TurnManager(gm)  # Rebuild now that lineups are present
-
-    q = 1
+    gm.quarter = 1
     while True:
-        gm.quarter = q
-        gm.game_state["quarter"] = q
+        simulate_quarter(gm, home_lineup_ids if gm.quarter == 1 else None,
+                         away_lineup_ids if gm.quarter == 1 else None)
 
-        # Label current period
-        period_label = f"Q{q}" if q <= 4 else f"OT{q - 4}"
-        gm.game_state["period_label"] = period_label
+        current_q = gm.quarter - 1  # simulate_quarter increments after play
 
-        # Reset clock and fouls
-        gm.game_state["time_remaining"] = 480 if q <= 4 else 240
-        gm.game_state["clock"] = "8:00" if q <= 4 else "4:00"
-        gm.home_team.team_fouls = 0
-        gm.away_team.team_fouls = 0
-        gm.game_state["team_fouls"] = {gm.home_team.name: 0, gm.away_team.name: 0}
-
-        # Recharge energy at period start
-        recharge_amount = 0.3 if q == 3 else 0.2
-        recharge_lineups(gm, recharge_amount)
-
-        print(f"=== Start of {period_label} ===")
-        while gm.game_state["time_remaining"] > 0:
-            gm.simulate_macro_turn()
-            gm.game_state["team_fouls"] = {
-                gm.home_team.name: gm.home_team.team_fouls,
-                gm.away_team.name: gm.away_team.team_fouls,
-            }
-            clock = gm.game_state["clock"]
-            h, a = gm.home_team.name, gm.away_team.name
-            h_pts = gm.game_state["score"][h]
-            a_pts = gm.game_state["score"][a]
-            print(f"Clock: {clock} // {period_label}")
-            print(f"🏀 {h}: {h_pts} | {a}: {a_pts}")
-            print(f"Team Fouls: {gm.game_state['team_fouls']}")
-        print(f"=== End of {period_label} ===")
-
-        # Check for game end after regulation or OT
-        if q >= 4:
+        if current_q >= 4:
             h_pts = gm.game_state["score"][gm.home_team.name]
             a_pts = gm.game_state["score"][gm.away_team.name]
             if h_pts != a_pts:
-                break  # Game over
-            # Prepare for another overtime
+                gm.quarter = current_q
+                gm.game_state["quarter"] = current_q
+                break
             gm.home_team.points_by_quarter.append(0)
             gm.away_team.points_by_quarter.append(0)
-        elif q < 4:
-            # Continue to next regulation quarter
-            pass
-
-        q += 1
-
-    # Print all game statistics including defense score stats
-    # gm.print_game_statistics()
 
     print(f"*********gm:\n{gm}")
     return gm
