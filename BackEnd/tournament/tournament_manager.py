@@ -2,7 +2,11 @@ from datetime import datetime
 import random
 from bson import ObjectId
 
-from BackEnd.db import tournaments_collection as default_tournaments_collection
+from BackEnd.db import (
+    tournaments_collection as default_tournaments_collection,
+    players_collection,
+)
+from BackEnd.constants import BOX_SCORE_KEYS
 
 class TournamentManager:
     """Manage tournament creation and progression."""
@@ -31,6 +35,21 @@ class TournamentManager:
         seeds = {team_id: i + 1 for i, team_id in enumerate(teams)}
         round1 = self._generate_first_round(seeds)
 
+        zero_stats = {key: 0 for key in BOX_SCORE_KEYS}
+        player_stats: dict[str, dict] = {}
+        players = players_collection.find(
+            {"team": {"$in": teams}},
+            {"first_name": 1, "last_name": 1, "team": 1},
+        )
+        for p in players:
+            pid = str(p.get("_id"))
+            player_stats[pid] = {
+                "first_name": p.get("first_name", ""),
+                "last_name": p.get("last_name", ""),
+                "team": p.get("team", ""),
+                "season": zero_stats.copy(),
+            }
+
         tournament_doc = {
             "user_team_id": self.user_team_id,
             "created_at": datetime.utcnow(),
@@ -47,6 +66,8 @@ class TournamentManager:
                 "top_10_blocks": [],
                 "top_10_steals": []
             },
+            "player_stats": player_stats,
+            "applied_games": [],
             "completed": False
         }
         self.tournament_id = self.tournaments_collection.insert_one(tournament_doc).inserted_id
