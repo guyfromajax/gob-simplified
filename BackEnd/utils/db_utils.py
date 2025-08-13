@@ -1,9 +1,9 @@
 
 import random
 from typing import List, Dict
-from bson import ObjectId
 from BackEnd.db import players_collection
 from BackEnd.models.player import Player
+from BackEnd.models.team_manager import TeamManager
 
 # Trait groups per position
 POSITION_TRAITS = {
@@ -48,14 +48,10 @@ def build_lineup_from_mongo(team_name: str) -> dict:
     return lineup
 
 
-def build_lineup_from_ids(lineup_ids: Dict[str, str]) -> Dict[str, Player]:
-    lineup: Dict[str, Player] = {}
+def assign_lineup_from_ids(team: TeamManager, lineup_ids: Dict[str, str]) -> Dict[str, Player]:
     for pos, pid in lineup_ids.items():
-        try:
-            doc = players_collection.find_one({"_id": ObjectId(pid)})
-        except Exception:
-            doc = players_collection.find_one({"_id": pid})
-        if doc:
-            lineup[pos] = Player(doc)
-    return lineup
+        player = team.get_player_by_id(pid)
+        if player and team.lineup.get(pos) is not player:
+            team.lineup[pos] = player
+    return team.lineup
 
