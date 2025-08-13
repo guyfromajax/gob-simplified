@@ -141,7 +141,8 @@ class TeamManager:
             "F": 0,
         }
 
-        for player in self.lineup.values():
+        # Include all players (not just current lineup) to capture bench contributions
+        for player in self.players.values():
             stats = player.stats["game"]
             for key in team_stats:
                 team_stats[key] += stats.get(key, 0)
