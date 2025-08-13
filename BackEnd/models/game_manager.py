@@ -151,22 +151,10 @@ class GameManager:
         print(f"=============================")
 
     def update_team_stats(self):
-        """Calculate and populate team stats by aggregating all player stats."""
-        from BackEnd.constants import BOX_SCORE_KEYS
-        
-        # Initialize team stats dictionaries
-        self.home_team.stats = {stat: 0 for stat in BOX_SCORE_KEYS}
-        self.away_team.stats = {stat: 0 for stat in BOX_SCORE_KEYS}
-        
-        # Aggregate home team stats from lineup players
-        for player in self.home_team.lineup.values():
-            for stat in BOX_SCORE_KEYS:
-                self.home_team.stats[stat] += player.stats["game"].get(stat, 0)
-        
-        # Aggregate away team stats from lineup players
-        for player in self.away_team.lineup.values():
-            for stat in BOX_SCORE_KEYS:
-                self.away_team.stats[stat] += player.stats["game"].get(stat, 0)
+        """Update team totals based on all rostered players."""
+        # Delegate aggregation to each team, which sums over all players
+        self.home_team.update_team_stats()
+        self.away_team.update_team_stats()
 
     def print_game_statistics(self):
         """Print all game statistics including defense score stats."""
