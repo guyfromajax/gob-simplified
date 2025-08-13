@@ -4,7 +4,9 @@ from BackEnd.db import (
     tournaments_collection,
     teams_collection,
     games_collection,
+    players_collection,
 )
+from BackEnd.constants import BOX_SCORE_KEYS
 from BackEnd.tournament.tournament_manager import TournamentManager
 from BackEnd.tournament.bracket_logic import update_bracket_from_results
 from BackEnd.main import run_simulation
@@ -123,14 +125,30 @@ def get_tournament_leaders(tournament_id: str):
 @router.post("/start-tournament")
 def start_tournament(request: StartTournamentRequest):
     team_docs = list(teams_collection.find({}, {"name": 1}))
-    all_team_ids = [team["name"] for team in team_docs]
+    team_ids = [team["name"] for team in team_docs]
 
-    if request.user_team_id not in all_team_ids:
+    if request.user_team_id not in team_ids:
         raise HTTPException(status_code=400, detail="Invalid user_team_id")
+
+    # Reset all player stats for teams in this tournament
+    zero_stats = {key: 0 for key in BOX_SCORE_KEYS}
+    for tid in team_ids:
+        players_collection.update_many(
+            {"team": tid},
+            {
+                "$set": {
+                    "stats.game": zero_stats,
+                    "stats.season": zero_stats,
+                    "stats.career": zero_stats,
+                    "stats.applied_games": [],
+                }
+            },
+        )
 
     manager = TournamentManager(
         user_team_id=request.user_team_id,
         tournaments_collection=tournaments_collection,
+        team_ids=team_ids,
     )
     tournament = manager.create_tournament()
     tournament["_id"] = str(tournament["_id"])
