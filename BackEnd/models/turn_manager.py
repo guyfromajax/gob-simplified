@@ -135,6 +135,7 @@ class TurnManager:
         result["awayFouls"] = self.game.away_team.team_fouls
         result["clock"] = self.game.game_state["clock"]
         result["quarter"] = self.game.game_state["quarter"]
+        result["period_label"] = self.game.game_state.get("period_label")
 
         # print(f"inside run_micro_turn result: {result}")
         # print(f"result: {result}")

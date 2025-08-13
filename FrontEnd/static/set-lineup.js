@@ -5,6 +5,7 @@ const homeId = urlParams.get('home_id');
 const awayId = urlParams.get('away_id');
 let myTeamSide = urlParams.get('my_team');
 const userTeamIdParam = urlParams.get('user_team_id');
+const periodLabel = urlParams.get('period');
 let teamName = '';
 
 let roster = [];
@@ -142,7 +143,10 @@ function resolveTeam() {
 
 function setHeader() {
   const title = document.getElementById('team-title');
-  if (title) title.textContent = `Set Your Lineup — ${teamName}`;
+  if (title) {
+    const periodText = periodLabel ? ` — ${periodLabel}` : '';
+    title.textContent = `Set Your Lineup — ${teamName}${periodText}`;
+  }
   const logo = document.getElementById('team-logo');
   if (logo) {
     logo.src = `/static/images/homepage-logos/${teamName}.png`;
