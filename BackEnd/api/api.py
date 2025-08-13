@@ -6,7 +6,8 @@ from fastapi.templating import Jinja2Templates
 from fastapi import Request
 from BackEnd.constants import POSITION_LIST
 import uuid
-from BackEnd.main import run_simulation
+from BackEnd.main import run_simulation, simulate_quarter
+from BackEnd.models.game_manager import GameManager
 from BackEnd.db import (
     players_collection,
     teams_collection,
@@ -57,6 +58,18 @@ class SimulationRequest(BaseModel):
     away_team: str
     home_lineup: dict[str, str] | None = None
     away_lineup: dict[str, str] | None = None
+
+
+class QuarterSimulationRequest(BaseModel):
+    game_id: str | None = None
+    home_team: str
+    away_team: str
+    quarter: int = 1
+    home_lineup: dict[str, str] | None = None
+    away_lineup: dict[str, str] | None = None
+
+
+ongoing_games: dict[str, GameManager] = {}
 
 # 4. Routes
 @app.get("/")
@@ -142,7 +155,40 @@ def simulate_game(request: SimulationRequest):
         traceback.print_exc()
     
     print("Inside simulate_game()\nReturning summary keys:", summary.keys())
-    
+
+    return summary
+
+
+@app.post("/api/simulate-quarter")
+def simulate_quarter_endpoint(request: QuarterSimulationRequest):
+    game_id = request.game_id
+    if game_id and game_id in ongoing_games:
+        gm = ongoing_games[game_id]
+    else:
+        gm = GameManager(request.home_team, request.away_team)
+        game_id = str(uuid.uuid4())
+        ongoing_games[game_id] = gm
+
+    gm.quarter = request.quarter
+
+    simulate_quarter(
+        gm,
+        request.home_lineup,
+        request.away_lineup,
+    )
+
+    summary = summarize_game_state(gm)
+    is_final = (
+        gm.quarter > 4
+        and summary["score"][gm.home_team.name] != summary["score"][gm.away_team.name]
+    )
+    summary.update({
+        "game_id": game_id,
+        "quarter": request.quarter,
+        "is_final": is_final,
+        "next_lineup_needed": not is_final,
+    })
+
     return summary
 
 
