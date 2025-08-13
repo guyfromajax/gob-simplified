@@ -7,6 +7,8 @@ from BackEnd.constants import POSITION_LIST, PLAYCALLS, BOX_SCORE_KEYS
 from copy import deepcopy
 import random
 
+from BackEnd.utils.stat_updater import update_game_stats
+
 class GameManager:
     def __init__(self, home_team_name, away_team_name):
         self.home_team = TeamManager(home_team_name)
@@ -24,10 +26,13 @@ class GameManager:
 
         self.turn_manager = TurnManager(self)
         self.shot_manager = ShotManager(self)
-        
+
         # Add counters for function calls
         self.macro_turn_count = 0
         self.micro_turn_count = 0
+
+        # optional database identifier for live games
+        self.game_id: str | None = None
 
     
     def _init_game_state(self):
@@ -79,13 +84,18 @@ class GameManager:
         result = self.turn_manager.run_micro_turn()
         self.turns.append(result)
         self.text_log.append(result["text"])
-        
+
         # Update team stats after each turn
         self.update_team_stats()
-        
+
+        # Persist incremental stats for active games
+        deltas = result.get("deltas")
+        if self.game_id and deltas:
+            update_game_stats(self.game_id, deltas, dict(self.score))
+
         # print("End of simulate_macro_turn")
         # print(f"result: {result}")
-        
+
         return result
 
     def switch_possession(self):
