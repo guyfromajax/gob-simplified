@@ -356,6 +356,7 @@ def summarize_game_state(game):
             coords = getattr(player, "coords", None) or {"x": 0, "y": 0}
             players.append({
                 "playerId": player.player_id,
+                "name": getattr(player, "name", None) or f"{getattr(player, 'first_name', '')} {getattr(player, 'last_name', '')}".strip(),
                 "team": team_key,
                 "team_id": team_obj.team_id,
                 "pos": pos,
