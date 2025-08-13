@@ -163,6 +163,33 @@ export function createGameScene(Phaser) {
         });
       };
 
+      const hydrateBoxScore = () => {
+        const box = simData.box_score || {};
+        ['home', 'away'].forEach(teamKey => {
+          const teamName = teamKey === 'home' ? homeTeam : awayTeam;
+          const teamBox = box[teamName] || {};
+          const lineup = {};
+          positions.forEach(pos => {
+            const statBlock = teamBox[pos];
+            if (!statBlock) return;
+            const playerId = this.nameToId[statBlock.name];
+            if (!playerId) return;
+            const pts = statBlock.PTS ?? 0;
+            const reb = statBlock.REB ?? ((statBlock.OREB || 0) + (statBlock.DREB || 0));
+            const ast = statBlock.AST ?? 0;
+            const ps = this.playerStats[playerId] || { PTS: 0, REB: 0, AST: 0 };
+            ps.PTS = pts;
+            ps.REB = reb;
+            ps.AST = ast;
+            this.playerStats[playerId] = ps;
+            lineup[pos] = playerId;
+          });
+          updateLineup(teamKey, lineup);
+        });
+      };
+
+      hydrateBoxScore();
+
       const applyPlayerStats = (turn = {}) => {
         if (turn.home_lineup) updateLineup('home', turn.home_lineup);
         if (turn.away_lineup) updateLineup('away', turn.away_lineup);
