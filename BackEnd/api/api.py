@@ -169,7 +169,29 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest):
         game_id = str(uuid.uuid4())
         ongoing_games[game_id] = gm
 
-    gm.quarter = request.quarter
+    # If the requested quarter has already been simulated, return the existing state
+    if request.quarter < gm.quarter:
+        summary = summarize_game_state(gm)
+        is_final = (
+            gm.quarter > 4
+            and summary["score"][gm.home_team.name] != summary["score"][gm.away_team.name]
+        )
+        summary.update(
+            {
+                "game_id": game_id,
+                "quarter": gm.quarter - 1,
+                "is_final": is_final,
+                "next_lineup_needed": not is_final,
+            }
+        )
+        return summary
+
+    # Prevent skipping ahead or repeating quarters unintentionally
+    if request.quarter != gm.quarter:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Quarter mismatch. Expected {gm.quarter}, got {request.quarter}",
+        )
 
     simulate_quarter(
         gm,
@@ -182,12 +204,14 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest):
         gm.quarter > 4
         and summary["score"][gm.home_team.name] != summary["score"][gm.away_team.name]
     )
-    summary.update({
-        "game_id": game_id,
-        "quarter": request.quarter,
-        "is_final": is_final,
-        "next_lineup_needed": not is_final,
-    })
+    summary.update(
+        {
+            "game_id": game_id,
+            "quarter": request.quarter,
+            "is_final": is_final,
+            "next_lineup_needed": not is_final,
+        }
+    )
 
     return summary
 
