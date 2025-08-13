@@ -1,6 +1,8 @@
 from typing import Any, Dict
 
-from BackEnd.db import players_collection
+from bson import ObjectId
+
+from BackEnd.db import players_collection, tournaments_collection
 
 
 def apply_stats_from_summary(summary: Dict[str, Any], game_id: str, tournament_id: str | None = None) -> None:
@@ -47,3 +49,30 @@ def apply_stats_from_summary(summary: Dict[str, Any], game_id: str, tournament_i
             {"_id": pid, "stats.applied_games": {"$ne": token}},
             update_doc,
         )
+
+        # Persist the latest season stats to the tournament document if applicable.
+        if tournament_id:
+            try:
+                tid = ObjectId(tournament_id)
+            except Exception:
+                tid = None
+            if tid:
+                player_doc = players_collection.find_one(
+                    {"_id": pid},
+                    {"first_name": 1, "last_name": 1, "team": 1, "stats.season": 1},
+                )
+                if not player_doc:
+                    continue
+                season_stats = (
+                    player_doc.get("stats", {}).get("season", {}) if isinstance(player_doc, dict) else {}
+                )
+                player_entry = {
+                    "first_name": player_doc.get("first_name", ""),
+                    "last_name": player_doc.get("last_name", ""),
+                    "team": player_doc.get("team", ""),
+                    "stats": season_stats,
+                }
+                tournaments_collection.update_one(
+                    {"_id": tid},
+                    {"$set": {f"player_stats.{pid}": player_entry}},
+                )
