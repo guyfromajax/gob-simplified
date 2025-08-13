@@ -289,7 +289,9 @@ def save_result(request: TournamentResultRequest):
             user_match_index = i
             home_team = match["home_team"]
             away_team = match["away_team"]
-            summary = games_collection.find_one({"_id": ObjectId(request.game_id)}) or {}
+            summary = {}
+            if ObjectId.is_valid(request.game_id):
+                summary = games_collection.find_one({"_id": ObjectId(request.game_id)}) or {}
             manager.save_game_result(round_key, i, request.game_id, request.winner, summary.get("score"))
             apply_stats_from_summary(summary, request.game_id, request.tournament_id)
             user_result = {
@@ -311,7 +313,9 @@ def save_result(request: TournamentResultRequest):
         if i == user_match_index:
             continue
         if match.get("game_id"):
-            summary = games_collection.find_one({"_id": ObjectId(match["game_id"])} ) or {}
+            summary = {}
+            if ObjectId.is_valid(match["game_id"]):
+                summary = games_collection.find_one({"_id": ObjectId(match["game_id"])} ) or {}
             manager.save_game_result(round_key, i, match["game_id"], match["winner"], summary.get("score"))
             apply_stats_from_summary(summary, match["game_id"], request.tournament_id)
             result_doc = {
