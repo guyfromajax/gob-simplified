@@ -78,5 +78,5 @@ def test_apply_stats_saved_to_tournament():
     tourney = tournaments_collection.find_one({"_id": tid})
     assert tourney is not None
     pstats = tourney.get("player_stats", {})
-    assert pstats["p1"]["stats"]["PTS"] == 7
-    assert pstats["p2"]["stats"]["AST"] == 5
+    assert pstats["p1"]["season"]["PTS"] == 7
+    assert pstats["p2"]["season"]["AST"] == 5

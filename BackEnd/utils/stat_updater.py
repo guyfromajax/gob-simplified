@@ -70,13 +70,64 @@ def apply_stats_from_summary(summary: Dict[str, Any], game_id: str, tournament_i
                     "first_name": player_doc.get("first_name", ""),
                     "last_name": player_doc.get("last_name", ""),
                     "team": player_doc.get("team", ""),
-                    "stats": season_stats,
+                    "season": season_stats,
                 }
                 tournaments_collection.update_one(
                     {"_id": tid},
                     {"$set": {f"player_stats.{pid}": player_entry}},
                 )
 
+
+def finalize_game(game_id: str, *, mode: str | None = None, tournament_id: str | None = None) -> None:
+    """Persist finished game stats into a tournament document.
+
+    When ``mode`` is "tournament" and ``tournament_id`` is provided, the
+    function reads the stored game summary and increments each player's season
+    totals within the tournament document.  To ensure idempotency, a game is
+    applied only once per tournament via the ``applied_games`` array.
+    """
+    if mode != "tournament" or not tournament_id:
+        return
+
+    try:
+        tid = ObjectId(tournament_id)
+    except Exception:
+        return
+
+    tourney = tournaments_collection.find_one({"_id": tid}, {"applied_games": 1})
+    if not tourney or game_id in tourney.get("applied_games", []):
+        return
+
+    try:
+        gid = ObjectId(game_id)
+    except Exception:
+        return
+
+    game = games_collection.find_one({"_id": gid}) or {}
+    players = game.get("players", [])
+    box_score = game.get("box_score", {})
+    team_map = {"home": game.get("home_team"), "away": game.get("away_team")}
+
+    inc_doc: Dict[str, Any] = {}
+    for p in players:
+        pid = p.get("playerId")
+        team_side = p.get("team")
+        pos = p.get("pos")
+        team_name = team_map.get(team_side)
+        if not pid or not team_name:
+            continue
+        stat_block = box_score.get(team_name, {}).get(pos, p.get("stats", {}))
+        for stat, val in stat_block.items():
+            if stat == "name" or not isinstance(val, (int, float)):
+                continue
+            key = f"player_stats.{pid}.season.{stat}"
+            inc_doc[key] = inc_doc.get(key, 0) + val
+
+    update: Dict[str, Any] = {"$addToSet": {"applied_games": game_id}}
+    if inc_doc:
+        update["$inc"] = inc_doc
+
+    tournaments_collection.update_one({"_id": tid}, update)
 
 def update_game_stats(game_id: str | None, deltas: Dict[str, Any], score: Dict[str, Any]) -> None:
     """Apply per-turn stat deltas to the ongoing game's document."""
