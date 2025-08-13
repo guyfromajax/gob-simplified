@@ -8,6 +8,8 @@ import random
 from BackEnd.main import run_simulation
 
 from BackEnd.db import db, franchise_state_collection
+from BackEnd.utils.shared import summarize_game_state
+from BackEnd.utils import stat_updater
 from BackEnd.models.franchise_manager import FranchiseManager
 
 router = APIRouter()
@@ -244,6 +246,9 @@ def save_result(req: FranchiseResultRequest):
         },
         upsert=True,
     )
+    stat_updater.finalize_game(
+        req.game_id, mode="franchise", franchise_id=req.franchise_id
+    )
 
     return {"status": "success"}
 
@@ -304,6 +309,13 @@ def complete_week(req: CompleteWeekRequest):
             gm = run_simulation(home_name, away_name)
             away_score = gm.score.get(away_name, 0)
             home_score = gm.score.get(home_name, 0)
+            summary = summarize_game_state(gm)
+            token = f"{req.week}-{away_id}-{home_id}"
+            summary["_id"] = token
+            db.games.update_one({"_id": token}, {"$set": summary}, upsert=True)
+            stat_updater.finalize_game(
+                token, mode="franchise", franchise_id=req.franchise_id
+            )
         except Exception:
             away_score = random.randint(50, 90)
             home_score = random.randint(50, 90)
