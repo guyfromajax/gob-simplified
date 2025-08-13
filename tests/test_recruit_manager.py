@@ -4,7 +4,8 @@ from importlib import resources
 from BackEnd.models.franchise_manager import RecruitManager
 
 
-def test_recruit_manager_loads_default_names():
+def test_recruit_manager_loads_default_names(monkeypatch):
+    monkeypatch.delenv("FRANCHISE_NAMES_FILE", raising=False)
     rm = RecruitManager(db=None)
     resource_path = resources.files("BackEnd").joinpath("data", "names", "franchise_names.json")
     with resource_path.open("r") as f:
