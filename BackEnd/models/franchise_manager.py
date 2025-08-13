@@ -8,7 +8,8 @@ import os
 
 from BackEnd.main import run_simulation
 from BackEnd.utils.shared import summarize_game_state
-from BackEnd.utils.stat_updater import apply_stats_from_summary
+from BackEnd.utils import stat_updater
+from BackEnd.constants import BOX_SCORE_KEYS
 
 
 logger = logging.getLogger(__name__)
@@ -82,7 +83,35 @@ class FranchiseManager:
         self.schedule = self.schedule_manager.generate_schedule()
         self.week = 1
         self.reset_stats()
-        self.save_season_state()
+
+        zero_stats = {k: 0 for k in BOX_SCORE_KEYS}
+        existing = {}
+        if self.franchise_id:
+            existing = (
+                self.db.franchises.find_one(
+                    {"_id": self.franchise_id}, {"player_stats": 1}
+                )
+                or {}
+            )
+        prev_stats = existing.get("player_stats", {})
+        player_stats: dict[str, dict] = {}
+        players = self.db.players.find(
+            {}, {"first_name": 1, "last_name": 1, "team": 1}
+        )
+        for p in players:
+            pid = str(p.get("_id"))
+            career = prev_stats.get(pid, {}).get("career", zero_stats.copy())
+            player_stats[pid] = {
+                "first_name": p.get("first_name", ""),
+                "last_name": p.get("last_name", ""),
+                "team": p.get("team", ""),
+                "season": zero_stats.copy(),
+                "career": career,
+            }
+
+        self.save_season_state(
+            extra_state={"player_stats": player_stats, "applied_games": []}
+        )
 
     def reset_stats(self):
         for team in self.teams:
@@ -118,6 +147,7 @@ class FranchiseManager:
         for team1_id, team2_id in games:
             self.simulate_game(team1_id, team2_id)
         self.week += 1
+
         self.save_season_state()
 
     def _apply_team_result(self, team1_id, team2_id, team1_score, team2_score, sign=1):
@@ -185,7 +215,18 @@ class FranchiseManager:
             team2_score = gm.score.get(home_name, 0)
             summary = summarize_game_state(gm)
             game_token = f"{self.week}-{team1_id}-{team2_id}"
-            apply_stats_from_summary(summary, game_token)
+            summary["_id"] = game_token
+            self.db.games.update_one(
+                {"_id": game_token}, {"$set": summary}, upsert=True
+            )
+            if self.franchise_id:
+                stat_updater.finalize_game(
+                    game_token,
+                    mode="franchise",
+                    franchise_id=str(self.franchise_id),
+                )
+            else:
+                stat_updater.apply_stats_from_summary(summary, game_token)
         except Exception:
             team1_score = random.randint(50, 90)
             team2_score = random.randint(50, 90)
@@ -208,13 +249,12 @@ class FranchiseManager:
     def generate_recruits(self):
         self.recruit_manager.generate_recruits()
 
-    def save_season_state(self):
+    def save_season_state(self, extra_state: dict | None = None):
         state = {"week": self.week, "schedule": self.schedule}
+        if extra_state:
+            state.update(extra_state)
         if self.franchise_id:
-            self.db.franchises.update_one(
-                {"_id": self.franchise_id},
-                {"$set": state}
-            )
+            self.db.franchises.update_one({"_id": self.franchise_id}, {"$set": state})
         else:
             result = self.db.franchises.insert_one(state)
             self.franchise_id = result.inserted_id
