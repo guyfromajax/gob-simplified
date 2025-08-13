@@ -29,7 +29,7 @@ export async function finalizeGame({ simData, tournamentId, franchiseId, game })
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           tournament_id: tournamentId,
-          game_id: simData._id,
+          game_id: simData.game_id || simData._id,
           winner: winner,
         }),
       });
