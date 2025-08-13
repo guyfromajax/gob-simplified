@@ -1,6 +1,6 @@
 import random
 import json
-from BackEnd.db import players_collection, teams_collection
+from BackEnd.db import players_collection, teams_collection, games_collection
 from BackEnd.utils.db_utils import build_lineup_from_mongo, assign_lineup_from_ids
 from BackEnd.models.player import Player
 from BackEnd.models.game_manager import GameManager
@@ -34,13 +34,14 @@ from BackEnd.utils.shared import (
 from BackEnd.utils.energy_system import recharge_lineups
 
 
-def _initialize_game_stats(gm: GameManager) -> None:
-    """Reset per-game stats for all players if not already done.
+def _initialize_game_stats(gm: GameManager, game_id: str | None = None) -> None:
+    """Reset per-game stats for all players and persist initial state.
 
-    This is invoked once at the start of a game before Q1 begins.  It
-    iterates both rosters, clears each player's ``stats['game']`` bucket and
-    records a flag in ``gm.game_state`` so subsequent quarters do not reset
-    the numbers again.
+    This is invoked once at the start of a game before Q1 begins. It clears
+    each player's ``stats['game']`` bucket and records a flag in
+    ``gm.game_state`` so subsequent quarters do not reset the numbers again.
+    When ``game_id`` is provided the initial player payload is written to the
+    ``games`` collection.
     """
 
     if gm.game_state.get("game_stats_initialized"):
@@ -53,10 +54,36 @@ def _initialize_game_stats(gm: GameManager) -> None:
             affected.append(player.player_id)
 
     gm.game_state["game_stats_initialized"] = True
+
+    if game_id:
+        players_payload = []
+        for label, team in (("home", gm.home_team), ("away", gm.away_team)):
+            for pos, player in team.lineup.items():
+                players_payload.append(
+                    {
+                        "playerId": player.player_id,
+                        "team": label,
+                        "team_id": team.team_id,
+                        "pos": pos,
+                        "stats": {k: 0 for k in BOX_SCORE_KEYS},
+                    }
+                )
+
+        games_collection.update_one(
+            {"_id": game_id},
+            {"$set": {"players": players_payload, "game_stats_initialized": True}},
+            upsert=True,
+        )
+
     print(f"[DEV] Initialized game stats for players: {affected}")
 
 
-def simulate_quarter(gm: GameManager, home_lineup_ids=None, away_lineup_ids=None):
+def simulate_quarter(
+    gm: GameManager,
+    home_lineup_ids=None,
+    away_lineup_ids=None,
+    game_id: str | None = None,
+):
     """Simulate a single quarter on an existing ``GameManager``.
 
     Lineups may be optionally supplied as dictionaries mapping positions to
@@ -64,9 +91,6 @@ def simulate_quarter(gm: GameManager, home_lineup_ids=None, away_lineup_ids=None
     (or auto-generated if still empty). This function mutates ``gm`` in place
     and advances ``gm.quarter`` when finished.
     """
-
-    # Zero per-game stats exactly once per game before the opening tip.
-    _initialize_game_stats(gm)
 
     # Apply lineups if provided or build them if not already set
     if home_lineup_ids:
@@ -78,6 +102,10 @@ def simulate_quarter(gm: GameManager, home_lineup_ids=None, away_lineup_ids=None
         gm.away_team.lineup = assign_lineup_from_ids(gm.away_team, away_lineup_ids)
     elif not gm.away_team.lineup:
         gm.away_team.lineup = build_lineup_from_mongo(gm.away_team.name)
+
+    # Zero per-game stats exactly once per game before the opening tip.
+    if gm.quarter == 1:
+        _initialize_game_stats(gm, game_id)
 
     # Ensure the turn manager is aware of any lineup changes
     gm.turn_manager = TurnManager(gm)
