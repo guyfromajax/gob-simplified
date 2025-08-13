@@ -101,50 +101,28 @@ def finalize_game(
         except Exception:
             return
 
-        tourney = tournaments_collection.find_one({"_id": tid}, {"applied_games": 1})
-        if not tourney or game_id in tourney.get("applied_games", []):
+        result = tournaments_collection.update_one(
+            {"_id": tid, "applied_games": {"$ne": game_id}},
+            {"$addToSet": {"applied_games": game_id}},
+        )
+
+        if result.modified_count == 0:
             return
 
         try:
             gid = ObjectId(game_id)
         except Exception:
-            return
+            gid = game_id
 
         game = games_collection.find_one({"_id": gid}) or {}
-        players = game.get("players", [])
-        box_score = game.get("box_score", {})
-        team_map = {"home": game.get("home_team"), "away": game.get("away_team")}
+        apply_stats_from_summary(game, game_id, tournament_id)
 
-        inc_doc: Dict[str, Any] = {}
-        for p in players:
-            pid = p.get("playerId")
-            team_side = p.get("team")
-            pos = p.get("pos")
-            team_name = team_map.get(team_side)
-            if not pid or not team_name:
-                continue
-            stat_block = box_score.get(team_name, {}).get(pos, p.get("stats", {}))
-            for stat, val in stat_block.items():
-                if stat == "name" or not isinstance(val, (int, float)):
-                    continue
-                key = f"player_stats.{pid}.season.{stat}"
-                inc_doc[key] = inc_doc.get(key, 0) + val
-
-        update: Dict[str, Any] = {"$addToSet": {"applied_games": game_id}}
-        if inc_doc:
-            update["$inc"] = inc_doc
-
-        tournaments_collection.update_one({"_id": tid}, update)
         return
 
     if mode == "franchise" and franchise_id:
         try:
             fid = ObjectId(franchise_id)
         except Exception:
-            return
-
-        franchise = db.franchises.find_one({"_id": fid}, {"applied_games": 1})
-        if not franchise or game_id in franchise.get("applied_games", []):
             return
 
         game = games_collection.find_one({"_id": game_id})
@@ -155,8 +133,6 @@ def finalize_game(
                 game = None
         if not game:
             return
-
-        apply_stats_from_summary(game, game_id)
 
         players = game.get("players", [])
         box_score = game.get("box_score", {})
@@ -185,7 +161,15 @@ def finalize_game(
         if inc_doc:
             update["$inc"] = inc_doc
 
-        db.franchises.update_one({"_id": fid}, update)
+        result = db.franchises.update_one(
+            {"_id": fid, "applied_games": {"$ne": game_id}},
+            update,
+        )
+        if result.modified_count == 0:
+            return
+
+        apply_stats_from_summary(game, game_id)
+
         return
 
     return
