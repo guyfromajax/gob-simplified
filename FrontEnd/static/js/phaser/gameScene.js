@@ -242,6 +242,8 @@ export function createGameScene(Phaser) {
       const skipBtn = document.getElementById('skip-btn');
       this.isPaused = false;
       this.skipToEnd = false;
+      this.isSkipping = false;
+      this.finalized = false;
       if (pauseBtn) {
         pauseBtn.addEventListener('click', () => {
           this.isPaused = !this.isPaused;
@@ -255,16 +257,21 @@ export function createGameScene(Phaser) {
         });
       }
       if (skipBtn) {
-        skipBtn.addEventListener('click', () => {
+        skipBtn.addEventListener('click', async () => {
+          if (this.isSkipping) return;
           this.skipToEnd = true;
+          this.isSkipping = true;
           this.isPaused = false;
+          skipBtn.disabled = true;
           if (pauseBtn) pauseBtn.textContent = 'Pause';
           this.tweens.resumeAll();
-          this.tweens.killAll();
+          this.tweens.getAllTweens().forEach(t => t.stop());
+          await finalize();
         });
       }
 
       const finalize = async () => {
+        if (this.finalized) return this.finalScore;
         const finalScore = await finalizeGame({
           simData,
           tournamentId: this.tournamentId,
@@ -272,6 +279,8 @@ export function createGameScene(Phaser) {
           game: this.game,
         });
         this.finalScore = finalScore;
+        this.finalized = true;
+        return finalScore;
       };
 
       if (this.animate) {
