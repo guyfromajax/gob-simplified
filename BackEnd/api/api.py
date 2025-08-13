@@ -197,6 +197,7 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest):
         gm,
         request.home_lineup,
         request.away_lineup,
+        game_id,
     )
 
     summary = summarize_game_state(gm)
