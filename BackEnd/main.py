@@ -1,7 +1,7 @@
 import random
 import json
 from BackEnd.db import players_collection, teams_collection
-from BackEnd.utils.db_utils import build_lineup_from_mongo, build_lineup_from_ids
+from BackEnd.utils.db_utils import build_lineup_from_mongo, assign_lineup_from_ids
 from BackEnd.models.player import Player
 from BackEnd.models.game_manager import GameManager
 from BackEnd.models.turn_manager import TurnManager
@@ -45,12 +45,12 @@ def simulate_quarter(gm: GameManager, home_lineup_ids=None, away_lineup_ids=None
 
     # Apply lineups if provided or build them if not already set
     if home_lineup_ids:
-        gm.home_team.lineup = build_lineup_from_ids(home_lineup_ids)
+        gm.home_team.lineup = assign_lineup_from_ids(gm.home_team, home_lineup_ids)
     elif not gm.home_team.lineup:
         gm.home_team.lineup = build_lineup_from_mongo(gm.home_team.name)
 
     if away_lineup_ids:
-        gm.away_team.lineup = build_lineup_from_ids(away_lineup_ids)
+        gm.away_team.lineup = assign_lineup_from_ids(gm.away_team, away_lineup_ids)
     elif not gm.away_team.lineup:
         gm.away_team.lineup = build_lineup_from_mongo(gm.away_team.name)
 
