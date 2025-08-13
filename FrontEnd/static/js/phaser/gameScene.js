@@ -205,13 +205,16 @@ export function createGameScene(Phaser) {
         }
       };
 
-      // Live scoreboard state
-      const liveScore = { [homeTeam]: 0, [awayTeam]: 0 };
-      let liveHomeFouls = 0;
-      let liveAwayFouls = 0;
-      let liveClock = '8:00';
-      let liveQuarter = 1;
-      let livePeriodLabel = this.periodLabel || 'Q1';
+      // Live scoreboard state seeded from persisted game data
+      const liveScore = {
+        [homeTeam]: simData.score?.[homeTeam] ?? 0,
+        [awayTeam]: simData.score?.[awayTeam] ?? 0,
+      };
+      let liveHomeFouls = simData.fouls?.home ?? 0;
+      let liveAwayFouls = simData.fouls?.away ?? 0;
+      let liveClock = simData.clock || '8:00';
+      let liveQuarter = this.quarter;
+      let livePeriodLabel = simData.period_label || `Q${this.quarter}`;
 
       const updateScoreboard = (turn = {}) => {
         const prevHome = liveScore[homeTeam];
@@ -250,8 +253,15 @@ export function createGameScene(Phaser) {
         }
       };
 
-      // Initialize scoreboard at tip-off
-      updateScoreboard();
+      // Show cumulative state immediately
+      updateScoreboard({
+        score: liveScore,
+        homeFouls: liveHomeFouls,
+        awayFouls: liveAwayFouls,
+        clock: liveClock,
+        quarter: liveQuarter,
+        period_label: livePeriodLabel,
+      });
 
       const pauseBtn = document.getElementById('pause-btn');
       const skipBtn = document.getElementById('skip-btn');
@@ -326,9 +336,13 @@ export function createGameScene(Phaser) {
             ease: 'Sine.easeInOut'
           });
 
+          const quarterTurns = (simData.turns || []).filter(
+            t => t.quarter === this.quarter
+          );
+
           await animateGameTurns({
             scene: this,
-            simData,
+            simData: { ...simData, turns: quarterTurns },
             playerSprites: this.playerSprites,
             ballSprite: this.ballSprite,
             onUpdate: updateScoreboard
