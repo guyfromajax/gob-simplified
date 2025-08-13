@@ -268,13 +268,15 @@ function updateCTA() {
   const simBtn = document.getElementById('sim-remaining');
   const exitBtn = document.getElementById('exit-tournament');
   const container = document.querySelector('.play-now-container');
-  if (!container || !playBtn || !simBtn || !exitBtn || !tournament) return;
+  const opponentEl = document.getElementById('play-now-opponent');
+  if (!container || !playBtn || !simBtn || !exitBtn || !tournament || !opponentEl) return;
 
   if (tournament.completed) {
     playBtn.style.display = 'none';
     simBtn.style.display = 'none';
     container.style.display = 'none';
     exitBtn.style.display = 'inline-block';
+    opponentEl.textContent = '';
     return;
   }
 
@@ -287,11 +289,12 @@ function updateCTA() {
 
   if (userMatch) {
     const opponent = userMatch.home_team === userTeamId ? userMatch.away_team : userMatch.home_team;
-    playBtn.style.display = 'inline-block';
-    playBtn.textContent = `Play Next Game vs ${opponent}`;
+    playBtn.style.display = 'inline-flex';
+    opponentEl.textContent = `vs ${opponent}`;
     simBtn.style.display = 'none';
   } else {
     playBtn.style.display = 'none';
+    opponentEl.textContent = '';
     simBtn.style.display = 'inline-block';
   }
 }
