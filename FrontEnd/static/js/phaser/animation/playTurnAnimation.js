@@ -63,7 +63,7 @@ async function runSetupTween({ scene, ballSprite, animations, playerSprites, cur
     );
 
     promises.push(new Promise((resolve) => {
-      scene.tweens.add({
+      const tween = scene.tweens.add({
         targets: [sprite],
         x,
         y,
@@ -75,8 +75,12 @@ async function runSetupTween({ scene, ballSprite, animations, playerSprites, cur
             ballSprite.setVisible(true);
           }
         },
-        onComplete: resolve
+        onComplete: resolve,
+        onStop: resolve
       });
+      if (scene.skipToEnd) {
+        tween.stop();
+      }
     }));
   }
 
@@ -188,6 +192,10 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
     currentBallOwnerRef
   });
 
+  if (scene.skipToEnd) {
+    return;
+  }
+
   // ✅ NEW: Lock ball ownership to correct player at step 
   console.log("🟡 inside playTurnAnimation → ");
   //print turnData here in the console logs
@@ -207,6 +215,8 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   });
 
   for (let stepIndex = 1; stepIndex < maxSteps; stepIndex++) {
+    if (scene.skipToEnd) break;
+
     updateBallOwnership({
       ballSprite,
       animations: turnData.animations,

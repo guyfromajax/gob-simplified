@@ -19,7 +19,7 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
       scene.game.config.height
     );
 
-    scene.tweens.add({
+    const tween = scene.tweens.add({
       targets: [sprite],
       x: targetX,
       y: targetY,
@@ -30,8 +30,13 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
           ballSprite.setPosition(sprite.x, sprite.y);
         }
       },
-      onComplete: resolve
+      onComplete: resolve,
+      onStop: resolve
     });
+
+    if (scene.skipToEnd) {
+      tween.stop();
+    }
   });
 }
 
