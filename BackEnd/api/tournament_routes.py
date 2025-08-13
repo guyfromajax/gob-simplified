@@ -295,7 +295,11 @@ def save_result(request: TournamentResultRequest):
             if ObjectId.is_valid(request.game_id):
                 summary = games_collection.find_one({"_id": ObjectId(request.game_id)}) or {}
             manager.save_game_result(round_key, i, request.game_id, request.winner, summary.get("score"))
-            stat_updater.apply_stats_from_summary(summary, request.game_id, request.tournament_id)
+            stat_updater.finalize_game(
+                request.game_id,
+                mode="tournament",
+                tournament_id=request.tournament_id,
+            )
             user_result = {
                 "home_team": home_team,
                 "away_team": away_team,
@@ -319,7 +323,11 @@ def save_result(request: TournamentResultRequest):
             if ObjectId.is_valid(match["game_id"]):
                 summary = games_collection.find_one({"_id": ObjectId(match["game_id"])} ) or {}
             manager.save_game_result(round_key, i, match["game_id"], match["winner"], summary.get("score"))
-            stat_updater.apply_stats_from_summary(summary, match["game_id"], request.tournament_id)
+            stat_updater.finalize_game(
+                match["game_id"],
+                mode="tournament",
+                tournament_id=request.tournament_id,
+            )
             result_doc = {
                 "home_team": match["home_team"],
                 "away_team": match["away_team"],
@@ -336,7 +344,11 @@ def save_result(request: TournamentResultRequest):
             summary = summarize_game_state(game)
             insert_result = games_collection.insert_one(summary)
             game_id = insert_result.inserted_id
-            stat_updater.apply_stats_from_summary(summary, str(game_id), request.tournament_id)
+            stat_updater.finalize_game(
+                str(game_id),
+                mode="tournament",
+                tournament_id=request.tournament_id,
+            )
             print(f"✅ Game document inserted for round {round_num} match {i}")
         except Exception as e:
             print(
@@ -438,7 +450,11 @@ def sim_remaining(request: SimulateRequest):
                 )
                 if not exists:
                     summary = games_collection.find_one({"_id": ObjectId(match["game_id"])}) or {}
-                    stat_updater.apply_stats_from_summary(summary, match["game_id"], request.tournament_id)
+                    stat_updater.finalize_game(
+                        match["game_id"],
+                        mode="tournament",
+                        tournament_id=request.tournament_id,
+                    )
                     result_doc = {
                         "home_team": match["home_team"],
                         "away_team": match["away_team"],
@@ -453,7 +469,11 @@ def sim_remaining(request: SimulateRequest):
             game = run_simulation(match["home_team"], match["away_team"])
             summary = summarize_game_state(game)
             game_id = games_collection.insert_one(summary).inserted_id
-            stat_updater.apply_stats_from_summary(summary, str(game_id), request.tournament_id)
+            stat_updater.finalize_game(
+                str(game_id),
+                mode="tournament",
+                tournament_id=request.tournament_id,
+            )
             home = match["home_team"]
             away = match["away_team"]
             winner = home if summary["score"][home] > summary["score"][away] else away
