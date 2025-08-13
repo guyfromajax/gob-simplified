@@ -107,8 +107,7 @@ def simulate_quarter(
         gm.away_team.lineup = build_lineup_from_mongo(gm.away_team.name)
 
     # Zero per-game stats exactly once per game before the opening tip.
-    if gm.quarter == 1:
-        _initialize_game_stats(gm, game_id)
+    _initialize_game_stats(gm, game_id)
 
     # Ensure the turn manager is aware of any lineup changes
     gm.turn_manager = TurnManager(gm)
