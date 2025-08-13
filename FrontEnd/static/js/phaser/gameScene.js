@@ -20,6 +20,7 @@ export function createGameScene(Phaser) {
         this.mode = data.mode;
         this.homeLineup = data.homeLineup || {};
         this.awayLineup = data.awayLineup || {};
+        this.periodLabel = data.periodLabel;
 
         console.log("🧠 Game initialized with:", {
           rosters: this.rosters,
@@ -28,6 +29,7 @@ export function createGameScene(Phaser) {
           homeTeam: this.homeTeam,
           awayTeam: this.awayTeam,
           mode: this.mode,
+          periodLabel: this.periodLabel,
         });
       }
       
@@ -202,6 +204,7 @@ export function createGameScene(Phaser) {
       let liveAwayFouls = 0;
       let liveClock = '8:00';
       let liveQuarter = 1;
+      let livePeriodLabel = this.periodLabel || 'Q1';
 
       const updateScoreboard = (turn = {}) => {
         const prevHome = liveScore[homeTeam];
@@ -219,11 +222,16 @@ export function createGameScene(Phaser) {
 
         if (turn.clock || turn.game_clock) liveClock = turn.clock || turn.game_clock;
         if (turn.quarter != null) liveQuarter = turn.quarter;
+        if (turn.period_label) {
+          livePeriodLabel = turn.period_label;
+        } else if (turn.quarter != null) {
+          livePeriodLabel = turn.quarter > 4 ? `OT${turn.quarter - 4}` : `Q${turn.quarter}`;
+        }
 
         if (homeFoulsEl) homeFoulsEl.textContent = `F: ${liveHomeFouls}`;
         if (awayFoulsEl) awayFoulsEl.textContent = `F: ${liveAwayFouls}`;
         if (clockEl) clockEl.textContent = liveClock;
-        if (quarterEl) quarterEl.textContent = `Q:${liveQuarter}`;
+        if (quarterEl) quarterEl.textContent = livePeriodLabel;
 
         applyPlayerStats(turn);
 
