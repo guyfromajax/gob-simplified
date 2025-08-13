@@ -7,6 +7,8 @@ import logging
 import os
 
 from BackEnd.main import run_simulation
+from BackEnd.utils.shared import summarize_game_state
+from BackEnd.utils.stat_updater import apply_stats_from_summary
 
 
 logger = logging.getLogger(__name__)
@@ -84,10 +86,29 @@ class FranchiseManager:
 
     def reset_stats(self):
         for team in self.teams:
-            self.db.players.update_many({"team_id": team["_id"]}, {"$set": {"season_stats": {}}})
+            self.db.players.update_many(
+                {"team_id": team["_id"]},
+                {
+                    "$set": {
+                        "stats.game": {},
+                        "stats.season": {},
+                        "stats.career": {},
+                        "stats.applied_games": [],
+                    },
+                    "$unset": {"season_stats": ""},
+                },
+            )
             self.db.teams.update_one(
                 {"_id": team["_id"]},
-                {"$set": {"season_stats": {}, "record": {"W": 0, "L": 0}, "PF": 0, "PA": 0}}
+                {
+                    "$set": {
+                        "stats.season": {},
+                        "record": {"W": 0, "L": 0},
+                        "PF": 0,
+                        "PA": 0,
+                    },
+                    "$unset": {"season_stats": ""},
+                },
             )
 
     def run_week(self):
@@ -162,6 +183,9 @@ class FranchiseManager:
             gm = run_simulation(home_name, away_name)
             team1_score = gm.score.get(away_name, 0)
             team2_score = gm.score.get(home_name, 0)
+            summary = summarize_game_state(gm)
+            game_token = f"{self.week}-{team1_id}-{team2_id}"
+            apply_stats_from_summary(summary, game_token)
         except Exception:
             team1_score = random.randint(50, 90)
             team2_score = random.randint(50, 90)
@@ -199,7 +223,7 @@ class FranchiseManager:
     # /franchise/standings → use team records from self.db.teams
     # /franchise/roster → use self.db.players.find({"team_id": team_id})
     # /franchise/schedule → use self.schedule
-    # /franchise/stats → aggregate from self.db.players (season_stats)
+    # /franchise/stats → aggregate from self.db.players (stats.season)
     # /franchise/recruits → use self.db.recruits.find()
 
 class ScheduleManager:
