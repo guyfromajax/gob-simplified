@@ -50,6 +50,7 @@ if (weekParam && !Number.isNaN(weekParam) && typeof localStorage !== 'undefined'
   localStorage.setItem('franchise_week', weekParam);
 }
 const mode = urlParams.get('mode') || getMode({ tournamentId, franchiseId });
+const periodLabel = urlParams.get('period');
 
 const homeLineup = {};
 const awayLineup = {};
@@ -65,7 +66,8 @@ console.log("🏀 Tournament launch params:", {
   franchiseId,
   homeTeam,
   awayTeam,
-  mode
+  mode,
+  periodLabel,
 });
 
 const GameScene = createGameScene(Phaser);
@@ -120,6 +122,7 @@ async function startGame({ homeRoster, awayRoster, animate = true }) {
     animate,
     homeLineup,
     awayLineup,
+    periodLabel,
   };
 
   if (game.scene.isActive('GameScene')) {

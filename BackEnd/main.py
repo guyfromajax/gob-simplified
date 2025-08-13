@@ -248,22 +248,28 @@ def run_simulation(home_team_name, away_team_name, home_lineup_ids=None, away_li
         gm.away_team.lineup = build_lineup_from_mongo(away_team_name)
 
     gm.turn_manager = TurnManager(gm)  # Rebuild now that lineups are present
-    for q in range(1, 5):
+
+    q = 1
+    while True:
         gm.quarter = q
         gm.game_state["quarter"] = q
 
+        # Label current period
+        period_label = f"Q{q}" if q <= 4 else f"OT{q - 4}"
+        gm.game_state["period_label"] = period_label
+
         # Reset clock and fouls
-        gm.game_state["time_remaining"] = 480
-        gm.game_state["clock"] = "8:00"
+        gm.game_state["time_remaining"] = 480 if q <= 4 else 240
+        gm.game_state["clock"] = "8:00" if q <= 4 else "4:00"
         gm.home_team.team_fouls = 0
         gm.away_team.team_fouls = 0
         gm.game_state["team_fouls"] = {gm.home_team.name: 0, gm.away_team.name: 0}
 
-        # Recharge energy at quarter start
+        # Recharge energy at period start
         recharge_amount = 0.3 if q == 3 else 0.2
         recharge_lineups(gm, recharge_amount)
 
-        print(f"=== Start of Q{q} ===")
+        print(f"=== Start of {period_label} ===")
         while gm.game_state["time_remaining"] > 0:
             gm.simulate_macro_turn()
             gm.game_state["team_fouls"] = {
@@ -274,10 +280,25 @@ def run_simulation(home_team_name, away_team_name, home_lineup_ids=None, away_li
             h, a = gm.home_team.name, gm.away_team.name
             h_pts = gm.game_state["score"][h]
             a_pts = gm.game_state["score"][a]
-            print(f"Clock: {clock} // Q{q}")
+            print(f"Clock: {clock} // {period_label}")
             print(f"🏀 {h}: {h_pts} | {a}: {a_pts}")
             print(f"Team Fouls: {gm.game_state['team_fouls']}")
-        print(f"=== End of Q{q} ===")
+        print(f"=== End of {period_label} ===")
+
+        # Check for game end after regulation or OT
+        if q >= 4:
+            h_pts = gm.game_state["score"][gm.home_team.name]
+            a_pts = gm.game_state["score"][gm.away_team.name]
+            if h_pts != a_pts:
+                break  # Game over
+            # Prepare for another overtime
+            gm.home_team.points_by_quarter.append(0)
+            gm.away_team.points_by_quarter.append(0)
+        elif q < 4:
+            # Continue to next regulation quarter
+            pass
+
+        q += 1
 
     # Print all game statistics including defense score stats
     # gm.print_game_statistics()
