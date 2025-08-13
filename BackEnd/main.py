@@ -92,6 +92,9 @@ def simulate_quarter(
     and advances ``gm.quarter`` when finished.
     """
 
+    if game_id is not None:
+        gm.game_id = game_id
+
     # Apply lineups if provided or build them if not already set
     if home_lineup_ids:
         gm.home_team.lineup = assign_lineup_from_ids(gm.home_team, home_lineup_ids)

@@ -2,7 +2,7 @@ from typing import Any, Dict
 
 from bson import ObjectId
 
-from BackEnd.db import players_collection, tournaments_collection
+from BackEnd.db import players_collection, tournaments_collection, games_collection
 
 
 def apply_stats_from_summary(summary: Dict[str, Any], game_id: str, tournament_id: str | None = None) -> None:
@@ -76,3 +76,25 @@ def apply_stats_from_summary(summary: Dict[str, Any], game_id: str, tournament_i
                     {"_id": tid},
                     {"$set": {f"player_stats.{pid}": player_entry}},
                 )
+
+
+def update_game_stats(game_id: str | None, deltas: Dict[str, Any], score: Dict[str, Any]) -> None:
+    """Apply per-turn stat deltas to the ongoing game's document."""
+    if not game_id or not deltas:
+        return
+    for pid, pdata in deltas.items():
+        stats = pdata.get("stats", {})
+        if not stats:
+            continue
+        inc_doc = {f"players.$.stats.{stat}": amt for stat, amt in stats.items()}
+        set_doc: Dict[str, Any] = {}
+        team_name = pdata.get("team")
+        if team_name and team_name in score:
+            set_doc[f"score.{team_name}"] = score[team_name]
+        update_doc: Dict[str, Any] = {"$inc": inc_doc}
+        if set_doc:
+            update_doc["$set"] = set_doc
+        games_collection.update_one(
+            {"_id": game_id, "players.playerId": pid},
+            update_doc,
+        )
