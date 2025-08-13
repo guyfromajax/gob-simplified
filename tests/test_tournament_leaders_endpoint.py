@@ -28,7 +28,7 @@ def test_leaders_return_top_players_and_exclude_others():
                         "team": "A",
                         "first_name": "Ann",
                         "last_name": "Alpha",
-                        "stats": {
+                        "season": {
                             "PTS": 20,
                             "TPM": 5,
                             "TPA": 10,
@@ -43,7 +43,7 @@ def test_leaders_return_top_players_and_exclude_others():
                         "team": "B",
                         "first_name": "Bob",
                         "last_name": "Beta",
-                        "stats": {
+                        "season": {
                             "PTS": 15,
                             "TPM": 5,
                             "TPA": 8,
@@ -58,7 +58,7 @@ def test_leaders_return_top_players_and_exclude_others():
                         "team": "X",  # should be excluded
                         "first_name": "X",
                         "last_name": "Excluded",
-                        "stats": {
+                        "season": {
                             "PTS": 100,
                             "TPM": 20,
                             "TPA": 30,
