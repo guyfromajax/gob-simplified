@@ -1,17 +1,64 @@
 import random
 from datetime import datetime
 from itertools import combinations, permutations
-from importlib import resources
 from pathlib import Path
 import json
 import logging
 import os
-import sys
 
 from BackEnd.main import run_simulation
 
 
 logger = logging.getLogger(__name__)
+
+
+# Helper ---------------------------------------------------------------------
+def load_franchise_names() -> tuple[list[str], list[str]]:
+    """Load recruit name lists from ``franchise_names.json``.
+
+    The path is resolved from the ``FRANCHISE_NAMES_FILE`` environment
+    variable, falling back to ``BackEnd/data/names/franchise_names.json``
+    relative to this file. ``BackEnd.data.names`` must be importable so the
+    JSON resource is packaged and available at runtime.
+
+    Logs the absolute path checked (and whether it exists) along with counts of
+    loaded first and last names.
+
+    Returns:
+        Tuple of ``(first_names, last_names)``.
+
+    Raises:
+        FileNotFoundError: if the file does not exist.
+        ValueError: if the JSON is malformed or missing required keys.
+    """
+
+    env_path = os.environ.get("FRANCHISE_NAMES_FILE")
+    default_path = Path(__file__).resolve().parents[1] / "data" / "names" / "franchise_names.json"
+    path = Path(env_path).expanduser() if env_path else default_path
+    abs_path = path.resolve()
+    exists = abs_path.is_file()
+    logger.info("Loading franchise names from %s (exists=%s)", abs_path, exists)
+    if not exists:
+        msg = f"franchise names file not found: {abs_path}"
+        logger.warning(msg)
+        raise FileNotFoundError(msg)
+
+    try:
+        with abs_path.open("r", encoding="utf-8") as f:
+            payload = json.load(f)
+    except Exception as exc:  # pragma: no cover - json errors
+        logger.warning("Failed to parse franchise names JSON %s: %s", abs_path, exc)
+        raise ValueError(f"invalid franchise names JSON: {exc}") from exc
+
+    fn = payload.get("first_names")
+    ln = payload.get("last_names")
+    if not isinstance(fn, list) or not isinstance(ln, list) or not fn or not ln:
+        msg = "Names JSON malformed: expected non-empty 'first_names' and 'last_names' lists"
+        logger.warning(msg)
+        raise ValueError(msg)
+
+    logger.info("Loaded %d first names and %d last names", len(fn), len(ln))
+    return fn, ln
 
 
 class FranchiseManager:
@@ -188,87 +235,22 @@ class ScheduleManager:
 
         return schedule
 
-# --- Drop-in replacement for RecruitManager (path-robust + same JSON schema) ---
 class RecruitManager:
-    def __init__(self, db, names_file: Path | None = None):
+    """Manage recruit generation using optional external name data."""
+
+    def __init__(self, db):
         self.db = db
 
         # Defaults only if file truly missing/malformed
         self.first_names = ["Jalen", "Marcus", "Tyrese", "Zion", "Cade"]
-        self.last_names  = ["Walker", "Jackson", "Robinson", "Wright", "Anderson"]
+        self.last_names = ["Walker", "Jackson", "Robinson", "Wright", "Anderson"]
 
         self.diagnostics = None
-        diag_enabled = os.environ.get("NAMES_DIAG") == "1"
-        if diag_enabled:
-            self.diagnostics = {
-                "file": __file__,
-                "cwd": os.getcwd(),
-                "sys_path": sys.path[:5],
-            }
 
-        payload = None
-
-        # 1) Try local path relative to this file: BackEnd/data/names/franchise_names.json
-        default_path = (Path(__file__).resolve().parents[1]
-                        / "data" / "names" / "franchise_names.json")
-        path = Path(names_file).expanduser() if names_file else default_path
-        if diag_enabled and self.diagnostics is not None:
-            self.diagnostics.update({
-                "expected_path": str(path.resolve()),
-                "expected_path_exists": path.exists(),
-            })
         try:
-            with path.open("r", encoding="utf-8") as f:
-                payload = json.load(f)
-            logger.info("Recruit names loaded from %s", path)
-            if diag_enabled and self.diagnostics is not None:
-                self.diagnostics["code_path"] = "filesystem"
+            self.first_names, self.last_names = load_franchise_names()
         except Exception as exc:
-            logger.warning("Failed to load recruit names from %s: %s", path, exc)
-            if diag_enabled and self.diagnostics is not None:
-                self.diagnostics["filesystem_error"] = str(exc)
-
-        # 2) Fallback: importlib.resources (works when BackEnd is on sys.path)
-        if payload is None:
-            try:
-                pkg = "BackEnd.data.names"
-                if diag_enabled and self.diagnostics is not None:
-                    try:
-                        self.diagnostics["resources_files"] = str(resources.files(pkg))
-                    except Exception as exc:  # pragma: no cover - diagnostic only
-                        self.diagnostics["resources_files"] = f"<error: {exc}>"
-                with resources.open_text(pkg,
-                                        "franchise_names.json", encoding="utf-8") as f:
-                    payload = json.load(f)
-                logger.info("Recruit names loaded from package BackEnd.data.names")
-                if diag_enabled and self.diagnostics is not None:
-                    self.diagnostics["code_path"] = "importlib.resources"
-            except Exception as exc:
-                logger.warning("Could not load recruit names via package resources: %s", exc)
-                if diag_enabled and self.diagnostics is not None:
-                    self.diagnostics["resource_error"] = str(exc)
-
-        # 3) If we got data, validate keys and apply
-        if isinstance(payload, dict):
-            fn = payload.get("first_names")
-            ln = payload.get("last_names")
-            if isinstance(fn, list) and fn and isinstance(ln, list) and ln:
-                self.first_names, self.last_names = fn, ln
-            else:
-                logger.warning("Names JSON missing non-empty 'first_names'/'last_names'; using fallback lists.")
-            if diag_enabled and self.diagnostics is not None:
-                self.diagnostics.update({
-                    "first_names_count": len(fn) if isinstance(fn, list) else 0,
-                    "last_names_count": len(ln) if isinstance(ln, list) else 0,
-                })
-        else:
-            logger.warning("Could not load franchise_names.json from disk or package; using fallback lists.")
-            if diag_enabled and self.diagnostics is not None:
-                self.diagnostics["parsed"] = False
-
-        if diag_enabled and self.diagnostics is not None and "parsed" not in self.diagnostics:
-            self.diagnostics["parsed"] = True
-            logger.info("NAMES_DIAG: %s", self.diagnostics)
+            logger.warning("Using fallback recruit names: %s", exc)
 
     def generate_recruits(self, count=40):
         recruits = []
