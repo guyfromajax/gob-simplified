@@ -56,7 +56,13 @@ class TurnManager:
     def run_micro_turn(self):
         # Increment micro turn counter
         self.game.micro_turn_count += 1
-        
+
+        # Snapshot player stats to compute deltas after the turn
+        pre_stats = {}
+        for team in (self.game.home_team, self.game.away_team):
+            for player in team.get_all_players():
+                pre_stats[player.player_id] = player.stats["game"].copy()
+
         # STEP 1: Set strategy calls (tempo + aggression)
         self.set_strategy_calls()
 
@@ -125,6 +131,20 @@ class TurnManager:
         result["away_lineup"] = serialize_lineup(self.game.away_team.lineup)
 
         result["score"] = dict(self.game.score)
+
+        # Compute stat deltas for each player
+        deltas = {}
+        for team in (self.game.home_team, self.game.away_team):
+            for player in team.get_all_players():
+                prev = pre_stats.get(player.player_id, {})
+                diff = {
+                    stat: player.stats["game"].get(stat, 0) - prev.get(stat, 0)
+                    for stat in player.stats["game"]
+                    if player.stats["game"].get(stat, 0) - prev.get(stat, 0)
+                }
+                if diff:
+                    deltas[player.player_id] = {"team": team.name, "stats": diff}
+        result["deltas"] = deltas
 
         # Sync and expose fouls/clock/quarter for live scoreboard updates
         self.game.game_state["team_fouls"] = {
