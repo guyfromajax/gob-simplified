@@ -11,6 +11,7 @@ import { gridToPixels } from "../utils/gridToPixels.js";
  * @returns {Promise} resolves when tween completes
  */
 export function animateStep({ scene, sprite, step, duration, ballSprite, currentBallOwnerRef }) {
+  if (scene.skipToEnd) return Promise.resolve();
   return new Promise((resolve) => {
     const { x: targetX, y: targetY } = gridToPixels(
       step.coords.x,
