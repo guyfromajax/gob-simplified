@@ -50,7 +50,9 @@ if (weekParam && !Number.isNaN(weekParam) && typeof localStorage !== 'undefined'
   localStorage.setItem('franchise_week', weekParam);
 }
 const mode = urlParams.get('mode') || getMode({ tournamentId, franchiseId });
-const periodLabel = urlParams.get('period');
+const gameId = urlParams.get('game_id');
+const quarter = parseInt(urlParams.get('quarter'), 10) || 1;
+const periodLabel = urlParams.get('period') || `Q${quarter}`;
 
 const homeLineup = {};
 const awayLineup = {};
@@ -123,6 +125,8 @@ async function startGame({ homeRoster, awayRoster, animate = true }) {
     homeLineup,
     awayLineup,
     periodLabel,
+    gameId,
+    quarter,
   };
 
   if (game.scene.isActive('GameScene')) {

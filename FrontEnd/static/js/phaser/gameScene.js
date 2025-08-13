@@ -21,6 +21,8 @@ export function createGameScene(Phaser) {
         this.homeLineup = data.homeLineup || {};
         this.awayLineup = data.awayLineup || {};
         this.periodLabel = data.periodLabel;
+        this.gameId = data.gameId;
+        this.quarter = data.quarter || 1;
 
         console.log("🧠 Game initialized with:", {
           rosters: this.rosters,
@@ -57,9 +59,12 @@ export function createGameScene(Phaser) {
     console.log("📨 Sending /api/simulate request for:", homeTeam, "vs", awayTeam);
 
       const payload = { home_team: homeTeam, away_team: awayTeam };
+      if (this.gameId) payload.game_id = this.gameId;
+      payload.quarter = this.quarter;
       if (Object.keys(this.homeLineup).length) payload.home_lineup = this.homeLineup;
       if (Object.keys(this.awayLineup).length) payload.away_lineup = this.awayLineup;
-      const res = await fetch('/api/simulate', {
+      const url = this.gameId || this.quarter > 1 ? '/api/simulate-quarter' : '/api/simulate-quarter';
+      const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
@@ -75,6 +80,8 @@ export function createGameScene(Phaser) {
       console.log("📦 simData received:", simData);
       const logHome = simData.homeTeam?.name || simData.home_team;
       const logAway = simData.awayTeam?.name || simData.away_team;
+      this.gameId = simData.game_id || this.gameId;
+      this.isFinal = simData.is_final;
       console.log(
         `✅ Simulated matchup: ${logHome} vs ${logAway}`
       );
@@ -328,7 +335,17 @@ export function createGameScene(Phaser) {
           });
 
           console.log("✅ GameScene animation complete");
-          await finalize();
+          if (this.isFinal) {
+            await finalize();
+          } else {
+            const nextQ = this.quarter + 1;
+            const params = new URLSearchParams(window.location.search);
+            params.set('game_id', this.gameId);
+            params.set('quarter', nextQ);
+            params.set('period', `Q${nextQ}`);
+            window.location.href = `/static/set-lineup.html?${params.toString()}`;
+            return;
+          }
         };
 
         if (this.textures.exists(courtKey)) {
@@ -348,7 +365,16 @@ export function createGameScene(Phaser) {
           this.load.start();
         }
       } else {
-        await finalize();
+        if (this.isFinal) {
+          await finalize();
+        } else {
+          const nextQ = this.quarter + 1;
+          const params = new URLSearchParams(window.location.search);
+          params.set('game_id', this.gameId);
+          params.set('quarter', nextQ);
+          params.set('period', `Q${nextQ}`);
+          window.location.href = `/static/set-lineup.html?${params.toString()}`;
+        }
       }
     }
   };
