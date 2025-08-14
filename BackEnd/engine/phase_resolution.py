@@ -335,6 +335,7 @@ def resolve_turnover_logic(roles, game, turnover_type="DEAD BALL"):
     defender = roles.get("defender", "")
     ball_handler.record_stat("TO")
     turnover_type = random.choice(["STEAL", "DEAD BALL"])
+    game_state["last_turnover_player"] = ball_handler
 
     if turnover_type == "STEAL" and defender:
         defender.record_stat("STL")
@@ -358,6 +359,7 @@ def resolve_turnover_logic(roles, game, turnover_type="DEAD BALL"):
             "dribbles it off his foot and the ball goes out of bounds."
         ])
         text = f"{ball_handler} {description}"
+        game_state["last_stealer"] = None
 
     bh_pos = get_player_position(off_lineup, ball_handler)
     
