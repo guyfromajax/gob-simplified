@@ -232,11 +232,13 @@ class TurnManager:
         # --- Step 1: Pick scene and step count
         scene = random.choice(INSIDE_SCENES)
         tempo_to_steps = {"slow": 7, "normal": 5, "fast": 4}
-        max_steps = min(
-            len(scene["steps"]),
-            tempo_to_steps.get(tempo_call.lower(), len(scene["steps"]))
-        )
-        steps = scene["steps"][:max_steps]
+        requested = tempo_to_steps.get(tempo_call.lower(), len(scene["steps"]))
+
+        # Always include the final shot step
+        if requested >= len(scene["steps"]):
+            steps = scene["steps"]
+        else:
+            steps = scene["steps"][:requested - 1] + [scene["steps"][-1]]
 
         # --- Step 2: Initialize outputs
         action_timeline = defaultdict(list)
