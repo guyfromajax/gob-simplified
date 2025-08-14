@@ -16,11 +16,14 @@ class GameManager:
         self.quarter = 1
         self.turns = []
         self.text_log = []
-        
+
         self.offense_team = self.home_team #vary based on opening tip
         self.defense_team = self.away_team
 
         self.game_state = self._init_game_state()
+
+        # Flag to prevent mid-game reinitialization of player stats
+        self.game_state["game_stats_initialized"] = False
 
         self.turn_manager = TurnManager(self)
         self.shot_manager = ShotManager(self)
@@ -64,6 +67,18 @@ class GameManager:
             "last_rebound": None,
             "last_stealer": None
         }
+
+
+    def initialize_player_stats(self):
+        """Zero out player game stats once at game start."""
+        if self.game_state.get("game_stats_initialized"):
+            return
+
+        for team in [self.home_team, self.away_team]:
+            for player in team.lineup.values():
+                player.reset_stats()
+
+        self.game_state["game_stats_initialized"] = True
 
 
     def simulate_macro_turn(self): #run_simulation

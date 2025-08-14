@@ -31,6 +31,12 @@ class MockPlayer:
     def get_name(self):
         return self.name
 
+    def reset_stats(self):
+        self.stats["game"] = {}
+
+    def recharge_energy(self, amount):
+        pass
+
 
 def build_mock_game():
     home_team = "Lancaster"

@@ -235,6 +235,9 @@ def run_simulation(home_team_name, away_team_name):
     gm.home_team.lineup = build_lineup_from_mongo(home_team_name)
     gm.away_team.lineup = build_lineup_from_mongo(away_team_name)
 
+    # Ensure player game stats are initialized only once
+    gm.initialize_player_stats()
+
     gm.turn_manager = TurnManager(gm)  # Rebuild now that lineups are present
 
     while True:
