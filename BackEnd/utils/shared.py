@@ -151,7 +151,9 @@ def resolve_offensive_rebound_loop(game, rebounder):
             return {
                 "text": text_log,
                 "possession_flips": True,
-                "time_elapsed": total_time
+                "time_elapsed": total_time,
+                "points": points,
+                "shooter": rebounder,
             }
 
         # shot missed — determine rebound
