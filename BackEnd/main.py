@@ -99,12 +99,13 @@ def simulate_quarter(
     if home_lineup_ids:
         gm.home_team.lineup = assign_lineup_from_ids(gm.home_team, home_lineup_ids)
     elif not gm.home_team.lineup:
-        gm.home_team.lineup = build_lineup_from_mongo(gm.home_team.name)
+        # Reuse existing player objects so per-game stats persist mid-game.
+        gm.home_team.lineup = build_lineup_from_mongo(gm.home_team)
 
     if away_lineup_ids:
         gm.away_team.lineup = assign_lineup_from_ids(gm.away_team, away_lineup_ids)
     elif not gm.away_team.lineup:
-        gm.away_team.lineup = build_lineup_from_mongo(gm.away_team.name)
+        gm.away_team.lineup = build_lineup_from_mongo(gm.away_team)
 
     # Zero per-game stats exactly once per game before the opening tip.
     _initialize_game_stats(gm, game_id)
