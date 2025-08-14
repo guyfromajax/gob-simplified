@@ -6,8 +6,8 @@ import { gridToPixels } from "../utils/gridToPixels.js";
 const SHOT_DEBUG = false;
 
 // Hoop locations in grid coordinates for each team
-const HOME_RIM_COORDS = { x: 94, y: 25 };
-const AWAY_RIM_COORDS = { x: 6, y: 25 };
+const HOME_RIM_COORDS = { x: 91, y: 25 };
+const AWAY_RIM_COORDS = { x: 9, y: 25 };
 
 export function lockBallToPlayer(scene, ballSprite, playerSprite) {
   if (!ballSprite || !playerSprite) {
