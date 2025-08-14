@@ -120,9 +120,36 @@ export function shootBall({
           ease: "Sine.easeIn",
           onComplete: () => {
             if (result === "MAKE") {
-              ballSprite.setVisible(false);
+              // Slight pause before hiding to trigger existing make flow
+              scene.time.delayedCall(250, () => {
+                ballSprite.setVisible(false);
+                resolve();
+              });
+            } else if (result === "MISS") {
+              // Bounce the ball off the rim
+              const bounceGridX = isHomeTeam
+                ? rimCoords.x - 6
+                : rimCoords.x + 6;
+              const bounceGridY =
+                rimCoords.y + Phaser.Math.Between(-6, 6);
+              const bounce = gridToPixels(
+                bounceGridX,
+                bounceGridY,
+                scene.game.config.width,
+                scene.game.config.height
+              );
+
+              scene.tweens.add({
+                targets: ballSprite,
+                x: bounce.x,
+                y: bounce.y,
+                duration: duration / 3,
+                ease: "Sine.easeOut",
+                onComplete: resolve
+              });
+            } else {
+              resolve();
             }
-            resolve();
           }
         });
       }
