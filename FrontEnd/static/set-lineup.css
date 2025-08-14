@@ -73,6 +73,12 @@ body {
   overflow-x: auto;
 }
 
+.pos-note {
+  font-style: italic;
+  font-size: 0.9em;
+  margin-top: 4px;
+}
+
 .roster-table td.ht,
 .roster-table td.wt {
   font-size: 0.75em;
