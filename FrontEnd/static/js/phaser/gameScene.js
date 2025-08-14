@@ -164,11 +164,12 @@ export function createGameScene(Phaser) {
       };
 
       const hydrateBoxScore = () => {
-        // Use the cumulative stats block so numbers persist between quarters.
-        const box = simData.final_box_score || simData.box_score || {};
+        // Use the baseline stats captured at the start of the quarter so the
+        // table initially reflects pre-tip totals.
+        const box = simData.start_box_score || {};
         // Preserve the final (cumulative) box score separately for any
         // consumers that need the completed stats (e.g. post-game summaries).
-        this.finalBoxScore = box;
+        this.finalBoxScore = simData.final_box_score || simData.box_score || {};
         ['home', 'away'].forEach(teamKey => {
           const teamName = teamKey === 'home' ? homeTeam : awayTeam;
           const teamBox = box[teamName] || {};
