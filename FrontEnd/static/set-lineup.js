@@ -44,9 +44,18 @@ function renderRoster() {
       e.dataTransfer.setData('text/plain', p._id);
     });
 
-    const rt = Math.max(...Object.values(p.position_ratings || {}));
+    const posRatings = p.position_ratings || {};
+    let bestPos = '--';
+    let rt = '--';
+    const entries = Object.entries(posRatings);
+    if (entries.length) {
+      const [pos, rating] = entries.reduce((a, b) => b[1] > a[1] ? b : a);
+      bestPos = pos;
+      rt = rating;
+    }
     const cells = [
       p.name,
+      bestPos,
       formatHeight(p.height),
       p.weight ?? '--',
       p.attributes.SC, p.attributes.SH, p.attributes.ID, p.attributes.OD,
@@ -54,7 +63,7 @@ function renderRoster() {
       p.attributes.AG, p.attributes.ND, p.attributes.IQ, p.attributes.FT,
       p.attributes.NG, rt
     ];
-    const classes = ['','ht','wt','','','','','','','','','','','','','', 'rt'];
+    const classes = ['', '', 'ht', 'wt', '', '', '', '', '', '', '', '', '', '', '', '', '', 'rt'];
     cells.forEach((val, idx) => {
       const td = document.createElement('td');
       td.textContent = val ?? '--';
