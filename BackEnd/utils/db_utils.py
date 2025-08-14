@@ -1,6 +1,7 @@
 
 import random
-from typing import List, Dict
+from typing import List, Dict, Union
+
 from BackEnd.db import players_collection
 from BackEnd.models.player import Player
 from BackEnd.models.team_manager import TeamManager
@@ -20,9 +21,23 @@ def get_player_rating(player, traits: List[str]) -> float:
         total += player.attributes.get(trait, 0)
     return total / len(traits)
 
-def build_lineup_from_mongo(team_name: str) -> dict:
-    players_cursor = players_collection.find({"team": team_name})
-    players = [Player(p) for p in players_cursor]
+def build_lineup_from_mongo(team: Union[str, TeamManager]) -> Dict[str, Player]:
+    """Build a starting lineup using existing player objects when available.
+
+    ``team`` may be either a team name or an actual :class:`TeamManager`
+    instance.  When a ``TeamManager`` is supplied the players from its roster
+    are reused so their in-memory ``stats['game']`` containers are preserved.
+    Passing a string falls back to the original behaviour of constructing new
+    :class:`Player` objects from the database.
+    """
+
+    if isinstance(team, TeamManager):
+        team_name = team.name
+        players = list(team.get_all_players())
+    else:
+        team_name = team
+        players_cursor = players_collection.find({"team": team_name})
+        players = [Player(p) for p in players_cursor]
 
     if len(players) < 5:
         raise ValueError(f"Team '{team_name}' has fewer than 5 players.")

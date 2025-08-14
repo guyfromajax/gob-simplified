@@ -1,7 +1,6 @@
 import BackEnd.main as main
 from BackEnd.models.game_manager import GameManager
 from BackEnd.models.player import Player
-from BackEnd.utils.roster_loader import load_roster
 
 
 def fake_simulate_macro_turn(self):
@@ -9,10 +8,25 @@ def fake_simulate_macro_turn(self):
     self.game_state["time_remaining"] = 0
 
 
-def fake_build_lineup(team_name):
-    _, players = load_roster(team_name)
+def fake_build_lineup(team):
+    """Return a simple deterministic lineup for tests.
+
+    Constructs new :class:`Player` objects each call without relying on any
+    database state, allowing the simulation to proceed with minimal data.
+    """
+    name = team.name if hasattr(team, "name") else str(team)
     positions = ["PG", "SG", "SF", "PF", "C"]
-    return {pos: Player(p) for pos, p in zip(positions, players[:5])}
+    lineup = {}
+    for i, pos in enumerate(positions):
+        pdata = {
+            "_id": f"{name}_{i}",
+            "first_name": f"{name}{i}",
+            "last_name": pos,
+            "team": name,
+            "attributes": {},
+        }
+        lineup[pos] = Player(pdata)
+    return lineup
 
 
 def test_simulate_quarter_advances_game(monkeypatch):
