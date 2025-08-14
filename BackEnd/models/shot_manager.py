@@ -372,8 +372,8 @@ class ShotManager:
         time_elapsed = random.randint(5, 15)
 
         shooter_pos = get_player_position(off_lineup, shooter)
-        
-        return {
+
+        result = {
             "result_type": "MAKE" if made else "MISS",
             "ball_handler": shooter,
             "shooter": shooter,
@@ -385,6 +385,12 @@ class ShotManager:
             "possession_flips": possession_flips,
             "time_elapsed": time_elapsed
         }
+
+        if made:
+            result["points"] = points
+            result["scoring_team"] = off_team.name
+
+        return result
 
     def print_defense_score_stats(self):
         """Print defense score statistics for the game."""
