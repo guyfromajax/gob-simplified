@@ -72,8 +72,6 @@ export function shootBall({
   isHomeTeam
 }) {
   if (!scene || !ballSprite) return Promise.resolve();
-
-  const duration = 600; // fallback duration in ms
   const start = gridToPixels(
     fromCoords.x,
     fromCoords.y,
@@ -91,6 +89,11 @@ export function shootBall({
     x: (start.x + rim.x) / 2,
     y: Math.min(start.y, rim.y) - 40
   };
+
+  // Scale the flight duration based on shot distance for more natural pacing
+  const baseDuration = 1000; // minimum duration in ms
+  const shotDistance = Phaser.Math.Distance.Between(start.x, start.y, rim.x, rim.y);
+  const duration = Math.max(baseDuration, shotDistance * 5); // 5ms per pixel
 
   ballSprite.setPosition(start.x, start.y);
   ballSprite.setVisible(true);
