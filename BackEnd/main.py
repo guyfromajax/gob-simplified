@@ -47,6 +47,20 @@ def _initialize_game_stats(gm: GameManager, game_id: str | None = None) -> None:
     if gm.game_state.get("game_stats_initialized"):
         return
 
+    if game_id:
+        doc = games_collection.find_one({"_id": game_id})
+        if doc and doc.get("game_stats_initialized"):
+            stats_map = {
+                p.get("playerId"): p.get("stats", {}) for p in doc.get("players", [])
+            }
+            for team in (gm.home_team, gm.away_team):
+                for player in team.get_all_players():
+                    stats = stats_map.get(player.player_id)
+                    if stats:
+                        player.stats["game"].update(stats)
+            gm.game_state["game_stats_initialized"] = True
+            return
+
     affected: list[str] = []
     for team in (gm.home_team, gm.away_team):
         for player in team.get_all_players():
