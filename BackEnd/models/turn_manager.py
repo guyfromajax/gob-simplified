@@ -231,8 +231,11 @@ class TurnManager:
 
         # --- Step 1: Pick scene and step count
         scene = random.choice(INSIDE_SCENES)
-        tempo_to_steps = {"slow": 6, "normal": 4, "fast": 3}
-        max_steps = tempo_to_steps.get(tempo_call.lower(), 4)
+        tempo_to_steps = {"slow": 7, "normal": 5, "fast": 4}
+        max_steps = min(
+            len(scene["steps"]),
+            tempo_to_steps.get(tempo_call.lower(), len(scene["steps"]))
+        )
         steps = scene["steps"][:max_steps]
 
         # --- Step 2: Initialize outputs

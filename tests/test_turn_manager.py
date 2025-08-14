@@ -1,7 +1,7 @@
 from tests.test_utils import build_mock_game
 from BackEnd.models.turn_manager import TurnManager
 from BackEnd.models.shot_manager import ShotManager
-from BackEnd.constants import STRATEGY_CALL_DICTS, PLAYCALLS
+from BackEnd.constants import STRATEGY_CALL_DICTS, PLAYCALLS, ACTIONS
 from BackEnd.utils.shared import get_player_position
 
 
@@ -21,6 +21,27 @@ def test_turn_manager_assign_roles_outputs_valid_objects():
     for role in ["shooter", "passer", "screener", "defender"]:
         player = roles.get(role)
         assert player is None or player.get_name().startswith("Lancaster") or player.get_name().startswith("Bentley-Truman")
+
+
+def test_assign_roles_includes_shoot_action():
+    game = build_mock_game()
+    game.offense_team.strategy_calls["tempo_call"] = "slow"
+    tm = TurnManager(game)
+    roles = tm.assign_roles()
+
+    step_actions = [
+        info["action"]
+        for step in roles["steps"]
+        for info in step["pos_actions"].values()
+    ]
+    assert ACTIONS["SHOOT"] in step_actions
+
+    timeline_actions = [
+        action
+        for actions in roles["action_timeline"].values()
+        for _, action, _ in actions
+    ]
+    assert ACTIONS["SHOOT"] in timeline_actions
 
 
 def test_turn_manager_run_micro_turn_executes():
