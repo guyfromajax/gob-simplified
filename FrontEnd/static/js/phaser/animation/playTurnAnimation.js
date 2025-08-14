@@ -184,7 +184,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   }
 
   if (step0OwnerSprite) {
-    lockBallToPlayer(ballSprite, step0OwnerSprite);
+    lockBallToPlayer(scene, ballSprite, step0OwnerSprite);
     currentBallOwnerRef.value = step0OwnerSprite;
   }
 
