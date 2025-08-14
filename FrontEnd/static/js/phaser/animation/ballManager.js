@@ -4,8 +4,9 @@ import { gridToPixels } from "../utils/gridToPixels.js";
 // Debug flag for logging shot details
 const SHOT_DEBUG = false;
 
-// Half-court rim location in grid coordinates
-const RIM_COORDS = { x: 94, y: 25 };
+// Hoop locations in grid coordinates for each team
+const HOME_RIM_COORDS = { x: 94, y: 25 };
+const AWAY_RIM_COORDS = { x: 6, y: 25 };
 
 export function lockBallToPlayer(scene, ballSprite, playerSprite) {
   if (!ballSprite || !playerSprite) {
@@ -67,7 +68,8 @@ export function shootBall({
   fromCoords,
   startTimestamp,
   result,
-  shooterPos
+  shooterPos,
+  isHomeTeam
 }) {
   if (!scene || !ballSprite) return Promise.resolve();
 
@@ -78,9 +80,10 @@ export function shootBall({
     scene.game.config.width,
     scene.game.config.height
   );
+  const rimCoords = isHomeTeam ? HOME_RIM_COORDS : AWAY_RIM_COORDS;
   const rim = gridToPixels(
-    RIM_COORDS.x,
-    RIM_COORDS.y,
+    rimCoords.x,
+    rimCoords.y,
     scene.game.config.width,
     scene.game.config.height
   );
