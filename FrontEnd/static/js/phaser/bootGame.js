@@ -2,6 +2,7 @@ import * as Phaser from 'https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.
 import { createGameScene } from './gameScene.js';
 import { setCourtOffsets } from './utils/gridToPixels.js';
 import { on, emit } from './utils/eventBus.js';
+import { finalizeGame } from './finalizeGame.js';
 
 function updateScoreboardScores({ home, away }) {
   const homeScoreEl = document.getElementById('home-score');
@@ -190,10 +191,10 @@ async function handleButtonClick(animate) {
   if (isSimulating) return;
   isSimulating = true;
   const playBtn = document.querySelector('.play-button');
-  const resultsBtn = document.querySelector('.results-button');
+  const simFullBtn = document.querySelector('.sim-full-game-button');
   const sim4Btn = document.querySelector('.sim-to-fourth-button');
   if (playBtn) playBtn.style.display = 'none';
-  if (resultsBtn) resultsBtn.style.display = 'none';
+  if (simFullBtn) simFullBtn.style.display = 'none';
   if (sim4Btn) sim4Btn.style.display = 'none';
 
   try {
@@ -209,7 +210,7 @@ async function handleButtonClick(animate) {
     if (isSimulating) {
       isSimulating = false;
       if (playBtn) playBtn.style.display = '';
-      if (resultsBtn) resultsBtn.style.display = '';
+      if (simFullBtn) simFullBtn.style.display = '';
       if (sim4Btn && quarter < 4) sim4Btn.style.display = '';
     }
   }
@@ -219,9 +220,9 @@ async function handleSimToFourth() {
   if (isSimulating || quarter >= 4) return;
   isSimulating = true;
   const playBtn = document.querySelector('.play-button');
-  const resultsBtn = document.querySelector('.results-button');
+  const simFullBtn = document.querySelector('.sim-full-game-button');
   const sim4Btn = document.querySelector('.sim-to-fourth-button');
-  [playBtn, resultsBtn, sim4Btn].forEach(btn => { if (btn) btn.disabled = true; });
+  [playBtn, simFullBtn, sim4Btn].forEach(btn => { if (btn) btn.disabled = true; });
 
   try {
     let currentQ = quarter;
@@ -273,20 +274,71 @@ async function handleSimToFourth() {
   } finally {
     isSimulating = false;
     if (playBtn) playBtn.disabled = false;
-    if (resultsBtn) resultsBtn.disabled = false;
+    if (simFullBtn) simFullBtn.disabled = false;
     if (sim4Btn) sim4Btn.disabled = true;
+  }
+}
+
+async function handleSimFullGame() {
+  if (isSimulating) return;
+  isSimulating = true;
+  const playBtn = document.querySelector('.play-button');
+  const simFullBtn = document.querySelector('.sim-full-game-button');
+  const sim4Btn = document.querySelector('.sim-to-fourth-button');
+  [playBtn, simFullBtn, sim4Btn].forEach(btn => { if (btn) btn.disabled = true; });
+
+  try {
+    let currentQ = quarter;
+    let gId = gameId;
+    let lastSummary;
+    while (true) {
+      showStatus(`Simulating Q${currentQ}...`);
+      const payload = {
+        home_team: homeTeam,
+        away_team: awayTeam,
+        quarter: currentQ,
+        game_id: gId,
+      };
+      if (currentQ === quarter) {
+        if (Object.keys(homeLineup).length) payload.home_lineup = homeLineup;
+        if (Object.keys(awayLineup).length) payload.away_lineup = awayLineup;
+      }
+      const res = await fetch('/api/simulate-quarter', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error('Simulation failed');
+      lastSummary = await res.json();
+      gId = lastSummary.game_id;
+      if (lastSummary.is_final) break;
+      currentQ += 1;
+    }
+
+    gameId = gId;
+    quarter = lastSummary.quarter || currentQ;
+    periodLabel = lastSummary.period_label || (quarter > 4 ? `OT${quarter - 4}` : `Q${quarter}`);
+
+    const finalScore = await finalizeGame({ simData: lastSummary, tournamentId, franchiseId });
+    showPopup(finalScore);
+  } catch (err) {
+    console.error('Error simming full game:', err);
+    showStatus('Simulation failed. Please try again.');
+    [playBtn, simFullBtn, sim4Btn].forEach(btn => { if (btn) btn.disabled = false; });
+  } finally {
+    isSimulating = false;
   }
 }
 
 function initGame() {
   const playBtn = document.querySelector('.play-button');
-  const resultsBtn = document.querySelector('.results-button');
+  const simFullBtn = document.querySelector('.sim-full-game-button');
   const sim4Btn = document.querySelector('.sim-to-fourth-button');
   if (playBtn) {
     playBtn.addEventListener('click', () => handleButtonClick(true));
   }
-  if (resultsBtn) {
-    resultsBtn.addEventListener('click', () => handleButtonClick(false));
+  if (simFullBtn) {
+    simFullBtn.addEventListener('click', handleSimFullGame);
   }
   if (sim4Btn) {
     if (quarter >= 4) {
