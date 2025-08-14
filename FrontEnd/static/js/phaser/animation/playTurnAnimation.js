@@ -275,7 +275,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
         startTimestamp: shotInfo.step.timestamp,
         result: turnData.result_type,
         shooterPos,
-        isHomeTeam: turnData.possession_team_id === simData.home_team_id
+        isHomeTeam: turnData.starting_possession_team_id === simData.home_team_id
       });
       break;
     }
