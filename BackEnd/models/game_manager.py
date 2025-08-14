@@ -71,7 +71,8 @@ class GameManager:
             "last_ball_handler": None,
             "last_rebounder": None,
             "last_rebound": None,
-            "last_stealer": None
+            "last_stealer": None,
+            "last_turnover_player": None
         }
 
 
@@ -87,6 +88,9 @@ class GameManager:
 
         # Update team stats after each turn
         self.update_team_stats()
+
+        # Log steal-to-score sequences if applicable
+        self._log_steal_to_points(result)
 
         # Persist incremental stats for active games
         deltas = result.get("deltas")
@@ -151,6 +155,29 @@ class GameManager:
             self.home_team.name: self.home_team.get_team_game_stats(),
             self.away_team.name: self.away_team.get_team_game_stats()
         }
+
+    def _find_player_by_name(self, name):
+        for team in [self.home_team, self.away_team]:
+            for player in team.get_all_players():
+                if player.get_name() == name:
+                    return player
+        return None
+
+    def _log_steal_to_points(self, result):
+        last_stealer = self.game_state.get("last_stealer")
+        points = result.get("points")
+        scoring_team = result.get("scoring_team")
+        if last_stealer and points and scoring_team == getattr(last_stealer, "team", None):
+            scorer = self._find_player_by_name(result.get("shooter"))
+            turnover_player = self.game_state.get("last_turnover_player")
+            team_tot_after = self.score.get(scoring_team, 0)
+            scorer_pts_after = scorer.stats["game"].get("PTS", 0) if scorer else 0
+            stealer_stl_after = last_stealer.stats["game"].get("STL", 0)
+            to_player_to_after = turnover_player.stats["game"].get("TO", 0) if turnover_player else 0
+            log_line = f"{result.get('turn_count')}, {result.get('result_type')}, {getattr(scorer, 'player_id', '')}, {points}, {last_stealer.player_id}, {getattr(turnover_player, 'player_id', '')}, {team_tot_after}, {scorer_pts_after}, {stealer_stl_after}, {to_player_to_after}"
+            print(log_line)
+            self.game_state["last_stealer"] = None
+            self.game_state["last_turnover_player"] = None
 
     def print_function_counts(self):
         """Print the number of times each function was called."""
