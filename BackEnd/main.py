@@ -123,6 +123,7 @@ def simulate_quarter(
 
     # Zero per-game stats exactly once per game before the opening tip.
     _initialize_game_stats(gm, game_id)
+    gm.game_state["start_box_score"] = gm.get_box_score()
 
     # Ensure the turn manager is aware of any lineup changes
     gm.turn_manager = TurnManager(gm)
