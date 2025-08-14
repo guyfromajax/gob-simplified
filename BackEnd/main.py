@@ -133,6 +133,14 @@ def simulate_quarter(
     period_label = f"Q{q}" if q <= 4 else f"OT{q - 4}"
     gm.game_state["period_label"] = period_label
 
+    for team in (gm.home_team, gm.away_team):
+        while len(team.points_by_quarter) < q:
+            team.points_by_quarter.append(0)
+    gm.game_state["points_by_quarter"] = {
+        gm.home_team.name: gm.home_team.points_by_quarter,
+        gm.away_team.name: gm.away_team.points_by_quarter,
+    }
+
     # Reset clock and fouls for the upcoming quarter
     gm.game_state["time_remaining"] = 480 if q <= 4 else 240
     gm.game_state["clock"] = "8:00" if q <= 4 else "4:00"
