@@ -173,6 +173,7 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest):
     # If the requested quarter has already been simulated, return the existing state
     if request.quarter < gm.quarter:
         summary = summarize_game_state(gm)
+        summary["start_box_score"] = gm.game_state.get("start_box_score")
         is_final = (
             gm.quarter > 4
             and summary["score"][gm.home_team.name] != summary["score"][gm.away_team.name]
@@ -202,6 +203,7 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest):
     )
 
     summary = summarize_game_state(gm)
+    summary["start_box_score"] = gm.game_state.get("start_box_score")
     is_final = (
         gm.quarter > 4
         and summary["score"][gm.home_team.name] != summary["score"][gm.away_team.name]
