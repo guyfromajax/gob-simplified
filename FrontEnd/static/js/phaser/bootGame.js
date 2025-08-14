@@ -267,7 +267,7 @@ async function handleSimToFourth() {
     });
     const qEl = document.getElementById('quarter');
     if (qEl) qEl.textContent = 'Q:4';
-    showStatus('Simulating Q1…Q2…Q3 complete. Ready for Q4.');
+    showStatus('Simulating Q1…Q2…Q3 complete. Ready for Q4. Press Play Quarter to proceed.');
   } catch (err) {
     console.error('Error simming to 4th quarter:', err);
     showStatus('Simulation failed. Please try again.');
