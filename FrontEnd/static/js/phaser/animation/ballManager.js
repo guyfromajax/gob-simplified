@@ -102,16 +102,14 @@ export function shootBall({
   }
 
   return new Promise((resolve) => {
-    scene.tweens.timeline({
-      tweens: [
-        {
-          targets: ballSprite,
-          x: mid.x,
-          y: mid.y,
-          duration: duration / 2,
-          ease: "Sine.easeOut"
-        },
-        {
+    scene.tweens.add({
+      targets: ballSprite,
+      x: mid.x,
+      y: mid.y,
+      duration: duration / 2,
+      ease: "Sine.easeOut",
+      onComplete: () => {
+        scene.tweens.add({
           targets: ballSprite,
           x: rim.x,
           y: rim.y,
@@ -123,8 +121,8 @@ export function shootBall({
             }
             resolve();
           }
-        }
-      ]
+        });
+      }
     });
   });
 }
