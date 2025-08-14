@@ -1,6 +1,6 @@
 import { animateStep } from "./animateStep.js";
 import { gridToPixels } from "../utils/gridToPixels.js";
-import { lockBallToPlayer } from "./ballManager.js";
+import { lockBallToPlayer, shootBall } from "./ballManager.js";
 
 /**
  * Centralized ball ownership logic
@@ -234,6 +234,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
     });
 
     const promises = [];
+    let shotInfo = null;
 
     for (const anim of turnData.animations) {
       if (scene.skipToEnd) break;
@@ -245,6 +246,10 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
       const prev = movement[stepIndex - 1];
       const curr = movement[stepIndex];
       const duration = (curr.timestamp - prev.timestamp) * 3;
+
+      if (curr.action === "shoot") {
+        shotInfo = { step: curr, playerId: anim.playerId };
+      }
 
       const promise = animateStep({
         scene,
@@ -259,5 +264,19 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
     }
 
     await Promise.all(promises);
+
+    if (shotInfo) {
+      currentBallOwnerRef.value = null;
+      const shooterPos = scene.playerInfo?.[shotInfo.playerId]?.pos;
+      await shootBall({
+        scene,
+        ballSprite,
+        fromCoords: shotInfo.step.coords,
+        startTimestamp: shotInfo.step.timestamp,
+        result: turnData.result_type,
+        shooterPos
+      });
+      break;
+    }
   }
 }

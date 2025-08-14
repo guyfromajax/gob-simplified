@@ -1,4 +1,11 @@
 import { generateBallTween } from "./generateBallTween.js";
+import { gridToPixels } from "../utils/gridToPixels.js";
+
+// Debug flag for logging shot details
+const SHOT_DEBUG = false;
+
+// Half-court rim location in grid coordinates
+const RIM_COORDS = { x: 94, y: 25 };
 
 export function lockBallToPlayer(scene, ballSprite, playerSprite) {
   if (!ballSprite || !playerSprite) {
@@ -48,6 +55,78 @@ export function passBall({
  */
 export function hideBall(ballSprite) {
   if (ballSprite) ballSprite.setVisible(false);
+}
+
+/**
+ * Launches a shot toward the rim with a simple two-part arc.
+ * Resolves after the ball reaches the rim.
+ */
+export function shootBall({
+  scene,
+  ballSprite,
+  fromCoords,
+  startTimestamp,
+  result,
+  shooterPos
+}) {
+  if (!scene || !ballSprite) return Promise.resolve();
+
+  const duration = 600; // fallback duration in ms
+  const start = gridToPixels(
+    fromCoords.x,
+    fromCoords.y,
+    scene.game.config.width,
+    scene.game.config.height
+  );
+  const rim = gridToPixels(
+    RIM_COORDS.x,
+    RIM_COORDS.y,
+    scene.game.config.width,
+    scene.game.config.height
+  );
+  const mid = {
+    x: (start.x + rim.x) / 2,
+    y: Math.min(start.y, rim.y) - 40
+  };
+
+  ballSprite.setPosition(start.x, start.y);
+  ballSprite.setVisible(true);
+
+  if (SHOT_DEBUG) {
+    const endTs = startTimestamp + duration;
+    const outcomeSource = result ? "explicit" : "inferred";
+    console.log(
+      `[shot] pos=${shooterPos} start=(${start.x},${start.y}) rim=(${rim.x},${rim.y}) ` +
+        `ts=${startTimestamp}->${endTs} outcome=${result || "UNKNOWN"} source=${outcomeSource}`
+    );
+  }
+
+  return new Promise((resolve) => {
+    scene.tweens.timeline({
+      tweens: [
+        {
+          targets: ballSprite,
+          x: mid.x,
+          y: mid.y,
+          duration: duration / 2,
+          ease: "Sine.easeOut"
+        },
+        {
+          targets: ballSprite,
+          x: rim.x,
+          y: rim.y,
+          duration: duration / 2,
+          ease: "Sine.easeIn",
+          onComplete: () => {
+            if (result === "MAKE") {
+              ballSprite.setVisible(false);
+            }
+            resolve();
+          }
+        }
+      ]
+    });
+  });
 }
 
 /**
