@@ -391,23 +391,13 @@ def summarize_game_state(game):
         },
     }
 
-    final_box = game.get_box_score()
-    zero_box = {
-        team: {
-            pos: {
-                stat: (0 if isinstance(val, (int, float)) else val)
-                for stat, val in stats.items()
-            }
-            for pos, stats in team_stats.items()
-        }
-        for team, team_stats in final_box.items()
-    }
+    cumulative_box = game.get_box_score()
 
     return {
         "final_score": game.score,
         "points_by_quarter": game.game_state["points_by_quarter"],
-        "box_score": zero_box,
-        "final_box_score": final_box,
+        "box_score": cumulative_box,
+        "final_box_score": cumulative_box,
         "scouting": {
             game.home_team.name: game.home_team.scouting_data,
             game.away_team.name: game.away_team.scouting_data,
