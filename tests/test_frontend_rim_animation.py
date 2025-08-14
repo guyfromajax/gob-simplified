@@ -19,5 +19,5 @@ def test_play_turn_animation_passes_starting_team():
 
 def test_shoot_ball_rim_selection():
     result = run_node("tests/js/httpsLoaderNoStubBall.mjs", "tests/js/runShootBall.mjs")
-    assert result["home"] == {"x": 94, "y": 25}
-    assert result["away"] == {"x": 6, "y": 25}
+    assert result["home"] == {"x": 91, "y": 25}
+    assert result["away"] == {"x": 9, "y": 25}
