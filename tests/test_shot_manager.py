@@ -24,6 +24,7 @@ def test_resolve_shot_returns_make_or_miss():
 def test_resolve_fast_break_shot_works():
     game = build_mock_game()
     shot_manager = ShotManager(game)
+    game.offense_team.team_attributes["shot_threshold"] = 0
 
     fb_roles = {
         "shooter": game.offense_team.lineup["PG"],
@@ -35,6 +36,9 @@ def test_resolve_fast_break_shot_works():
     assert "result_type" in result
     VALID_RESULTS = {"MAKE", "MISS", "FOUL", "TURNOVER", "DEAD BALL"}
     assert result["result_type"] in VALID_RESULTS
+    assert result["result_type"] == "MAKE"
+    assert result["points"] == 2
+    assert result["scoring_team"] == game.offense_team.name
 
 
 def test_offensive_rebound_putback_updates_stats(monkeypatch):
