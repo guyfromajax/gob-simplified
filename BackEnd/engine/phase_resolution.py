@@ -250,9 +250,12 @@ def resolve_free_throw_logic(game):
                 return {
                     "result_type": "FREE_THROW",
                     "ball_handler": shooter,
+                    "shooter": shooter,
                     "text": text,
                     "time_elapsed": 0,
-                    "possession_flips": False
+                    "possession_flips": False,
+                    "points": 1,
+                    "scoring_team": off_team.name
                 }
             else:
                 # Missed front end → dead ball, rebound
@@ -302,7 +305,9 @@ def resolve_free_throw_logic(game):
                     game_state["offensive_state"] = "FAST_BREAK"
             else:
                 # 🟡 Offensive rebound → putback loop
-                return resolve_offensive_rebound_loop(game, rebounder)
+                result = resolve_offensive_rebound_loop(game, rebounder)
+                result["shooter"] = shooter
+                return result
         else:
             possession_flips = True
 
@@ -310,6 +315,7 @@ def resolve_free_throw_logic(game):
     result = {
         "result_type": "FREE_THROW",
         "ball_handler": shooter,
+        "shooter": shooter,
         "text": text,
         "time_elapsed": 0,  # clock does not run
         "possession_flips": possession_flips,
