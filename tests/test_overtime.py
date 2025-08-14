@@ -1,7 +1,6 @@
 import BackEnd.main as main
 from BackEnd.models.game_manager import GameManager
 from BackEnd.models.player import Player
-from BackEnd.utils.roster_loader import load_roster
 
 
 def test_run_simulation_handles_overtime(monkeypatch):
@@ -22,10 +21,20 @@ def test_run_simulation_handles_overtime(monkeypatch):
             self.score[home] = 92
             self.home_team.points_by_quarter[4] = 2
 
-    def fake_build_lineup(team_name):
-        _, players = load_roster(team_name)
+    def fake_build_lineup(team):
+        name = team.name if hasattr(team, "name") else str(team)
         positions = ["PG", "SG", "SF", "PF", "C"]
-        return {pos: Player(p) for pos, p in zip(positions, players[:5])}
+        lineup = {}
+        for i, pos in enumerate(positions):
+            pdata = {
+                "_id": f"{name}_{i}",
+                "first_name": f"{name}{i}",
+                "last_name": pos,
+                "team": name,
+                "attributes": {},
+            }
+            lineup[pos] = Player(pdata)
+        return lineup
 
     monkeypatch.setattr(GameManager, "simulate_macro_turn", fake_simulate_macro_turn)
     monkeypatch.setattr(main, "build_lineup_from_mongo", fake_build_lineup)
