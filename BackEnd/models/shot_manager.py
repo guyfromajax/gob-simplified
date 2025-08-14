@@ -161,6 +161,10 @@ class ShotManager:
                         text += putback_result["text"]
                         possession_flips = putback_result["possession_flips"]
                         time_elapsed += putback_result["time_elapsed"]
+                        if "points" in putback_result:
+                            shooter = rebounder
+                            made = True
+                            points = putback_result["points"]
                     else:
                         text += "...and he kicks it back out to reset the half-court offense"
                 else:

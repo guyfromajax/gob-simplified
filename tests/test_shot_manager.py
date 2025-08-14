@@ -37,3 +37,57 @@ def test_resolve_fast_break_shot_works():
     assert result["result_type"] in VALID_RESULTS
 
 
+def test_offensive_rebound_putback_updates_stats(monkeypatch):
+    game = build_mock_game()
+    shot_manager = ShotManager(game)
+
+    shooter = game.offense_team.lineup["PG"]
+    rebounder = game.offense_team.lineup["C"]
+    defender = game.defense_team.lineup["PG"]
+
+    roles = {"shooter": shooter, "defender": defender}
+
+    # Force an initial miss
+    def fake_calc(self, shooter, passer, screener, defender, playcall, defense_call, is_three):
+        return 0, None, False, None
+
+    monkeypatch.setattr(ShotManager, "calculate_shot_score", fake_calc)
+
+    # Deterministic rebound outcome: offensive C grabs board
+    monkeypatch.setattr("BackEnd.models.shot_manager.choose_rebounder", lambda rebounders, side: "C" if side == "offense" else "PG")
+    monkeypatch.setattr("BackEnd.models.shot_manager.calculate_rebound_score", lambda player: 10)
+
+    # Random sequence: no 3PA, no block, offensive rebound, attempt putback
+    rand_vals = iter([0.9, 0.99, 0.99, 0.1])
+    monkeypatch.setattr("BackEnd.models.shot_manager.random.random", lambda: next(rand_vals))
+
+    # Remove tempo randomness
+    monkeypatch.setattr("BackEnd.models.shot_manager.get_time_elapsed", lambda tempo: 0)
+
+    from BackEnd.utils.shared import record_team_points
+
+    def fake_putback(game_param, rebounder_param):
+        rebounder_param.record_stat("FGA")
+        rebounder_param.record_stat("FGM")
+        record_team_points(game_param, game_param.offense_team, 2)
+        return {
+            "text": " and he scores!",
+            "possession_flips": True,
+            "time_elapsed": 0,
+            "points": 2,
+            "shooter": rebounder_param,
+        }
+
+    monkeypatch.setattr("BackEnd.models.shot_manager.resolve_offensive_rebound_loop", fake_putback)
+
+    result = shot_manager.resolve_shot(roles)
+
+    assert result["result_type"] == "MAKE"
+    assert result["shooter"] is rebounder
+    assert result["points"] == 2
+    assert rebounder.stats["game"]["FGM"] == 1
+    assert rebounder.stats["game"]["FGA"] == 1
+    assert rebounder.stats["game"]["OREB"] == 1
+    assert game.score[game.offense_team.name] == 2
+
+
