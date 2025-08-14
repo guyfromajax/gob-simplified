@@ -1,3 +1,4 @@
+import Phaser from "phaser";
 import { generateBallTween } from "./generateBallTween.js";
 import { gridToPixels } from "../utils/gridToPixels.js";
 
