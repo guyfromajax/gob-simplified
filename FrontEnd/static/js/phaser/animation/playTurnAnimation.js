@@ -273,6 +273,8 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
     if (shotInfo) {
       currentBallOwnerRef.value = null;
       const shooterPos = scene.playerInfo?.[shotInfo.playerId]?.pos;
+      const shooterTeamId = playerSprites[shotInfo.playerId]?.team_id;
+      const isHomeTeam = shooterTeamId === simData.home_team_id;
       await shootBall({
         scene,
         ballSprite,
@@ -280,7 +282,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
         startTimestamp: shotInfo.step.timestamp,
         result: turnData.result_type,
         shooterPos,
-        isHomeTeam: turnData.starting_possession_team_id === simData.home_team_id
+        isHomeTeam
       });
       break;
     }
