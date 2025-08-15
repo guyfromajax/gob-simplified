@@ -22,7 +22,7 @@ async function run(isHomeTeam) {
   const scene = createScene();
   const ballSprite = { setPosition() {}, setVisible() {} };
   const shooterTeamId = isHomeTeam ? 1 : 2;
-  await shootBall({
+  const _res = await shootBall({
     scene,
     ballSprite,
     fromCoords: { x: 0, y: 0 },

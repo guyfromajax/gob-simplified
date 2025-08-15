@@ -31,6 +31,7 @@ async function runCase(startingTeamId) {
     starting_possession_team_id: startingTeamId,
     possession_team_id: startingTeamId,
     result_type: 'MAKE',
+    text: '',
     animations: [{
       playerId: 'p1',
       movement: [
