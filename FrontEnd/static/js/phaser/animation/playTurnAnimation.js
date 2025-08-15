@@ -1,6 +1,11 @@
 import { animateStep } from "./animateStep.js";
 import { gridToPixels } from "../utils/gridToPixels.js";
-import { lockBallToPlayer, shootBall, SHOT_DEBUG } from "./ballManager.js";
+import {
+  lockBallToPlayer,
+  shootBall,
+  SHOT_DEBUG,
+  animateRebound
+} from "./ballManager.js";
 
 // Cap the time spent on any single movement step. Large timestamp gaps can
 // otherwise produce multi‑second tweens that appear as animation stalls.
@@ -289,7 +294,33 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
         shootParams.stepIndex = shotInfo.stepIndex;
         shootParams.turnIndex = scene.currentTurn;
       }
-      await shootBall(shootParams);
+      const shotResult = await shootBall(shootParams);
+      const ballSpot = shotResult?.grid;
+      if (ballSpot) {
+        const match = turnData.text?.match(/rebound(?:ed)? by ([^\.]+)$/i);
+        const rebounderName = match?.[1]?.trim();
+        let rebounderId = null;
+        if (rebounderName && scene.playerInfo) {
+          for (const [id, info] of Object.entries(scene.playerInfo)) {
+            const fullName =
+              info?.name || `${info.first_name ?? ""} ${info.last_name ?? ""}`.trim();
+            if (fullName.toLowerCase() === rebounderName.toLowerCase()) {
+              rebounderId = id;
+              break;
+            }
+          }
+        }
+        if (rebounderId) {
+          await animateRebound({
+            scene,
+            ballSprite,
+            playerSprites,
+            animations: turnData.animations,
+            rebounderId,
+            ballSpot
+          });
+        }
+      }
       break;
     }
   }
