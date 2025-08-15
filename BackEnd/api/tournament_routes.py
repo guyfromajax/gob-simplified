@@ -221,12 +221,17 @@ def save_result(request: TournamentResultRequest):
             user_match_index = i
             home_team = match["home_team"]
             away_team = match["away_team"]
-            summary = {}
-            if ObjectId.is_valid(request.game_id):
-                summary = games_collection.find_one({"_id": ObjectId(request.game_id)}) or {}
-            manager.save_game_result(round_key, i, request.game_id, request.winner, summary.get("score"))
+            gid = (
+                ObjectId(request.game_id)
+                if ObjectId.is_valid(request.game_id)
+                else request.game_id
+            )
+            summary = games_collection.find_one({"_id": gid}) or {}
+            manager.save_game_result(
+                round_key, i, request.game_id, request.winner, summary.get("score")
+            )
             stat_updater.finalize_game(
-                request.game_id,
+                gid,
                 mode="tournament",
                 tournament_id=request.tournament_id,
             )
@@ -249,12 +254,21 @@ def save_result(request: TournamentResultRequest):
         if i == user_match_index:
             continue
         if match.get("game_id"):
-            summary = {}
-            if ObjectId.is_valid(match["game_id"]):
-                summary = games_collection.find_one({"_id": ObjectId(match["game_id"])} ) or {}
-            manager.save_game_result(round_key, i, match["game_id"], match["winner"], summary.get("score"))
-            stat_updater.finalize_game(
+            gid = (
+                ObjectId(match["game_id"])
+                if ObjectId.is_valid(match["game_id"])
+                else match["game_id"]
+            )
+            summary = games_collection.find_one({"_id": gid}) or {}
+            manager.save_game_result(
+                round_key,
+                i,
                 match["game_id"],
+                match["winner"],
+                summary.get("score"),
+            )
+            stat_updater.finalize_game(
+                gid,
                 mode="tournament",
                 tournament_id=request.tournament_id,
             )
