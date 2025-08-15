@@ -37,6 +37,18 @@ export async function finalizeGame({ simData, tournamentId, franchiseId, game })
         console.error("❌ Failed to save tournament result:", await res.text());
       } else {
         console.log("✅ Tournament result saved.");
+        try {
+          if (window && window.opener) {
+            if (typeof window.opener.refreshTeamStats === "function") {
+              window.opener.refreshTeamStats();
+            }
+            if (typeof window.opener.refreshLeaders === "function") {
+              window.opener.refreshLeaders();
+            }
+          }
+        } catch (e) {
+          console.error("Failed to trigger parent refresh", e);
+        }
       }
     } catch (err) {
       console.error("🚨 Error during tournament result save:", err);
