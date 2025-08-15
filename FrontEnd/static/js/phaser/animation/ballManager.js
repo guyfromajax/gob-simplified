@@ -60,9 +60,9 @@ export function hideBall(ballSprite) {
 }
 
 /**
- * Launches a shot toward the rim with a simple two-part arc.
+ * Launches a shot toward the rim along a single tweened path.
  * Resolves after the ball reaches the rim.
- */
+*/
 export function shootBall({
   scene,
   ballSprite,
@@ -86,10 +86,6 @@ export function shootBall({
     scene.game.config.width,
     scene.game.config.height
   );
-  const mid = {
-    x: (start.x + rim.x) / 2,
-    y: Math.min(start.y, rim.y) - 40
-  };
 
   // Scale the flight duration based on shot distance for more natural pacing
   const baseDuration = 1000; // minimum duration in ms
@@ -111,51 +107,42 @@ export function shootBall({
   return new Promise((resolve) => {
     scene.tweens.add({
       targets: ballSprite,
-      x: mid.x,
-      y: mid.y,
-      duration: duration / 2,
-      ease: "Sine.easeOut",
+      x: rim.x,
+      y: rim.y,
+      duration,
+      ease: "Sine.easeInOut",
       onComplete: () => {
-        scene.tweens.add({
-          targets: ballSprite,
-          x: rim.x,
-          y: rim.y,
-          duration: duration / 2,
-          ease: "Sine.easeIn",
-          onComplete: () => {
-            if (result === "MAKE") {
-              // Slight pause before hiding to trigger existing make flow
-              scene.time.delayedCall(250, () => {
-                ballSprite.setVisible(false);
-                resolve();
-              });
-            } else if (result === "MISS") {
-              // Bounce the ball off the rim
-              const bounceGridX = isHomeTeam
-                ? rimCoords.x - 6
-                : rimCoords.x + 6;
-              const bounceGridY =
-                rimCoords.y + Phaser.Math.Between(-6, 6);
-              const bounce = gridToPixels(
-                bounceGridX,
-                bounceGridY,
-                scene.game.config.width,
-                scene.game.config.height
-              );
+        if (result === "MAKE") {
+          // Slight pause before hiding to trigger existing make flow
+          scene.time.delayedCall(250, () => {
+            ballSprite.setVisible(false);
+            resolve();
+          });
+        } else if (result === "MISS") {
+          // Bounce the ball off the rim
+          const bounceGridX = isHomeTeam
+            ? rimCoords.x - 6
+            : rimCoords.x + 6;
+          const bounceGridY =
+            rimCoords.y + Phaser.Math.Between(-6, 6);
+          const bounce = gridToPixels(
+            bounceGridX,
+            bounceGridY,
+            scene.game.config.width,
+            scene.game.config.height
+          );
 
-              scene.tweens.add({
-                targets: ballSprite,
-                x: bounce.x,
-                y: bounce.y,
-                duration: duration / 3,
-                ease: "Sine.easeOut",
-                onComplete: resolve
-              });
-            } else {
-              resolve();
-            }
-          }
-        });
+          scene.tweens.add({
+            targets: ballSprite,
+            x: bounce.x,
+            y: bounce.y,
+            duration: duration / 3,
+            ease: "Sine.easeOut",
+            onComplete: resolve
+          });
+        } else {
+          resolve();
+        }
       }
     });
   });
