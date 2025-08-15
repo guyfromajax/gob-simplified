@@ -95,9 +95,9 @@ export function shootBall({
   );
 
   // Scale the flight duration based on shot distance for more natural pacing
-  const baseDuration = 1000; // minimum duration in ms
+  const baseDuration = 700; // minimum duration in ms
   const shotDistance = Phaser.Math.Distance.Between(start.x, start.y, rim.x, rim.y);
-  const duration = Math.max(baseDuration, shotDistance * 5); // 5ms per pixel
+  const duration = Math.max(baseDuration, shotDistance * 3); // 3ms per pixel
 
   ballSprite.setPosition(start.x, start.y);
   ballSprite.setVisible(true);
