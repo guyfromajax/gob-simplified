@@ -357,7 +357,7 @@ async function loadRoster() {
     const statKeys = ["PTS","FGM","FGA","TPM","TPA","FTM","FTA","REB","AST","STL","BLK","F","MIN","TO"];
     const pstats = tournament?.player_stats || {};
     stats = roster.map(p => {
-      const season = pstats[p.id]?.season || {};
+      const season = pstats[p.id]?.stats?.Season || {};
       const row = { name: p.name };
       statKeys.forEach(k => {
         const val = season[k];
@@ -367,7 +367,7 @@ async function loadRoster() {
     });
     if (DEBUG_TEAM_STATS && roster[0]) {
       const first = roster[0];
-      const s = pstats[first.id]?.season || {};
+      const s = pstats[first.id]?.stats?.Season || {};
       console.log("[DebugTournamentStats]", {
         tournamentId: tournament?._id,
         teamId: userTeamId,
