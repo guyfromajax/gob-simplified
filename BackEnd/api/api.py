@@ -217,6 +217,12 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest):
         }
     )
 
+    try:
+        games_collection.update_one({"_id": game_id}, {"$set": summary}, upsert=True)
+    except Exception as e:
+        print("🚨 Mongo upsert failed:", e)
+        traceback.print_exc()
+
     if is_final and game_id:
         # Scrimmage simulations should not generate aggregate stats.
         # Finalizing with ``mode="scrimmage"`` is a no-op but documents intent.
