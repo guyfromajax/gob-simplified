@@ -21,6 +21,7 @@ function createScene() {
 async function run(isHomeTeam) {
   const scene = createScene();
   const ballSprite = { setPosition() {}, setVisible() {} };
+  const shooterTeamId = isHomeTeam ? 1 : 2;
   await shootBall({
     scene,
     ballSprite,
@@ -28,7 +29,9 @@ async function run(isHomeTeam) {
     startTimestamp: 0,
     result: 'MAKE',
     shooterPos: 'PG',
-    isHomeTeam
+    shooterId: 1,
+    shooterTeamId,
+    homeTeamId: 1
   });
   const last = scene._tweens[scene._tweens.length - 1];
   return { x: last.x, y: last.y };
