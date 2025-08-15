@@ -81,3 +81,8 @@ def test_leaders_return_top_players_and_exclude_others():
     assert all(entry["player_id"] != "p3" for entry in leaders["PTS"])
     assert leaders["TPM"][0]["player_id"] == "p1"
     assert leaders["TPM"][1]["player_id"] == "p2"
+
+    # ensure leaderboards persisted to tournament document
+    stored = tournaments_collection.find_one({"_id": tid})
+    assert "leaderboards" in stored
+    assert stored["leaderboards"]["PTS"][0]["player_id"] == "p1"
