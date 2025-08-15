@@ -3,7 +3,7 @@ import { generateBallTween } from "./generateBallTween.js";
 import { gridToPixels } from "../utils/gridToPixels.js";
 
 // Debug flag for logging shot details
-const SHOT_DEBUG = false;
+export const SHOT_DEBUG = false;
 
 // Hoop locations in grid coordinates for each team
 const HOME_RIM_COORDS = { x: 91, y: 25 };
@@ -70,9 +70,16 @@ export function shootBall({
   startTimestamp,
   result,
   shooterPos,
-  isHomeTeam
+  shooterId,
+  shooterTeamId,
+  homeTeamId,
+  stepIndex,
+  turnIndex
 }) {
   if (!scene || !ballSprite) return Promise.resolve();
+
+  const isHomeTeam = shooterTeamId === homeTeamId;
+
   const start = gridToPixels(
     fromCoords.x,
     fromCoords.y,
@@ -99,7 +106,11 @@ export function shootBall({
     const endTs = startTimestamp + duration;
     const outcomeSource = result ? "explicit" : "inferred";
     console.log(
-      `[shot] pos=${shooterPos} start=(${start.x},${start.y}) rim=(${rim.x},${rim.y}) ` +
+      `[shot] shooter=${shooterId} team=${shooterTeamId} ` +
+        `(matches home? ${isHomeTeam}) ` +
+        `pos=${shooterPos} start=(${start.x},${start.y}) ` +
+        `rim=(${rim.x},${rim.y}) ` +
+        `step=${stepIndex ?? "?"} turn=${turnIndex ?? "?"} ` +
         `ts=${startTimestamp}->${endTs} outcome=${result || "UNKNOWN"} source=${outcomeSource}`
     );
   }

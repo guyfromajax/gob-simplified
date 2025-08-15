@@ -42,7 +42,7 @@ async function runCase(startingTeamId) {
   };
   const simData = { home_team_id: 'HOME' };
   await playTurnAnimation({ scene, simData, playerSprites, turnData, ballSprite });
-  return calls[0].isHomeTeam;
+  return calls[0].shooterTeamId === calls[0].homeTeamId;
 }
 
 const homeResult = await runCase('HOME');
