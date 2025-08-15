@@ -31,8 +31,11 @@ class SimulateRequest(BaseModel):
 
 
 @router.get("/tournament/leaders")
-def get_tournament_leaders(tournament_id: str):
-    """Return top 10 leaders for key stats within a tournament."""
+def get_tournament_leaders(tournament_id: str, recompute: bool = False):
+    """Return top leaders for key stats within a tournament.
+
+    Leaderboards are cached on the tournament document. Pass ``recompute=true``
+    to rebuild them on demand."""
     try:
         tid = ObjectId(tournament_id)
     except Exception:
@@ -42,85 +45,12 @@ def get_tournament_leaders(tournament_id: str):
     if not tourney:
         raise HTTPException(status_code=404, detail="Tournament not found")
 
-    teams: set[str] = set()
-    for round_matches in tourney.get("bracket", {}).values():
-        for match in round_matches:
-            teams.add(match.get("home_team"))
-            teams.add(match.get("away_team"))
-    teams.discard(None)
+    if recompute or "leaderboards" not in tourney:
+        leaderboards = stat_updater.recompute_tournament_leaders(str(tid))
+    else:
+        leaderboards = tourney.get("leaderboards", {})
 
-    # Use stats stored in the tournament document; ignore players from other teams.
-    players = []
-    for pid, pdata in tourney.get("player_stats", {}).items():
-        if pdata.get("team") not in teams:
-            continue
-        players.append(
-            {
-                "player_id": str(pid),
-                "first_name": pdata.get("first_name", ""),
-                "last_name": pdata.get("last_name", ""),
-                "team_name": pdata.get("team", ""),
-                "stats": pdata.get("season", {}),
-            }
-        )
-
-    categories = [
-        ("PTS", "MIN"),
-        ("TPM", "TPA"),
-        ("REB", "MIN"),
-        ("AST", "MIN"),
-        ("STL", "MIN"),
-        ("BLK", "MIN"),
-    ]
-
-    def stat_val(stats: dict, key: str) -> float:
-        if key in stats:
-            return stats.get(key, 0)
-        if key == "TPM":
-            return stats.get("3PTM", 0)
-        if key == "TPA":
-            return stats.get("3PTA", 0)
-        return stats.get(key, 0)
-
-    result: dict[str, list] = {}
-    for stat, tie_key in categories:
-        entries = []
-        for p in players:
-            season = p.get("stats", {})
-            value = stat_val(season, stat)
-            tie_val = stat_val(season, tie_key) if tie_key else 0
-            entries.append(
-                {
-                    "player_id": p.get("player_id"),
-                    "first_name": p.get("first_name", ""),
-                    "last_name": p.get("last_name", ""),
-                    "team_name": p.get("team_name", ""),
-                    "value": value,
-                    "_tie": tie_val,
-                }
-            )
-        entries.sort(
-            key=lambda x: (
-                -x["value"],
-                -x["_tie"],
-                f"{x['first_name']} {x['last_name']}",
-            )
-        )
-        top = []
-        for idx, e in enumerate(entries[:10], start=1):
-            top.append(
-                {
-                    "rank": idx,
-                    "player_id": e["player_id"],
-                    "first_name": e["first_name"],
-                    "last_name": e["last_name"],
-                    "team_name": e["team_name"],
-                    "value": e["value"],
-                }
-            )
-        result[stat] = top
-
-    return result
+    return leaderboards
 
 @router.post("/start-tournament")
 def start_tournament(request: StartTournamentRequest):
