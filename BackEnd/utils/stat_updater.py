@@ -78,6 +78,121 @@ def apply_stats_from_summary(summary: Dict[str, Any], game_id: str, tournament_i
                 )
 
 
+def recompute_tournament_leaders(tournament_id: str, limit: int = 10) -> Dict[str, Any]:
+    """Rebuild cached leaderboards for a tournament.
+
+    Returns the computed leaderboards dict.  If the tournament is not found,
+    an empty dict is returned.  Results are written back to the tournament
+    document under the ``leaderboards`` field.
+    """
+    try:
+        tid = ObjectId(tournament_id)
+    except Exception:
+        return {}
+
+    tourney = tournaments_collection.find_one({"_id": tid})
+    if not tourney:
+        return {}
+
+    teams: set[str] = set()
+    for round_matches in tourney.get("bracket", {}).values():
+        for match in round_matches:
+            teams.add(match.get("home_team"))
+            teams.add(match.get("away_team"))
+    teams.discard(None)
+
+    players: list[Dict[str, Any]] = []
+    for pid, pdata in tourney.get("player_stats", {}).items():
+        if pdata.get("team") not in teams:
+            continue
+        players.append(
+            {
+                "player_id": str(pid),
+                "first_name": pdata.get("first_name", ""),
+                "last_name": pdata.get("last_name", ""),
+                "team_name": pdata.get("team", ""),
+                "stats": pdata.get("season", {}),
+            }
+        )
+
+    categories = [
+        ("PTS", "MIN"),
+        ("REB", "MIN"),
+        ("AST", "MIN"),
+        ("STL", "MIN"),
+        ("BLK", "MIN"),
+        ("TPM", "TPA"),
+        ("FG%", "FGA"),
+        ("FT%", "FTA"),
+    ]
+
+    def stat_val(stats: Dict[str, Any], key: str) -> float:
+        if key == "FG%":
+            makes = stats.get("FGM", 0)
+            attempts = stats.get("FGA", 0)
+            return (makes / attempts * 100) if attempts else 0.0
+        if key == "FT%":
+            makes = stats.get("FTM", 0)
+            attempts = stats.get("FTA", 0)
+            return (makes / attempts * 100) if attempts else 0.0
+        if key == "TPM":
+            return stats.get("3PTM", 0)
+        if key == "TPA":
+            return stats.get("3PTA", 0)
+        return stats.get(key, 0)
+
+    leaderboards: Dict[str, list] = {}
+    for stat, tie_key in categories:
+        entries = []
+        for p in players:
+            season = p.get("stats", {})
+            value = stat_val(season, stat)
+            tie_val = stat_val(season, tie_key) if tie_key else 0
+            if stat == "FG%" and season.get("FGA", 0) == 0:
+                continue
+            if stat == "FT%" and season.get("FTA", 0) == 0:
+                continue
+            if stat == "TPM":
+                attempts = season.get("3PTA", season.get("TPA", 0))
+                if attempts == 0:
+                    continue
+            entries.append(
+                {
+                    "player_id": p["player_id"],
+                    "first_name": p.get("first_name", ""),
+                    "last_name": p.get("last_name", ""),
+                    "team_name": p.get("team_name", ""),
+                    "value": value,
+                    "_tie": tie_val,
+                }
+            )
+        entries.sort(
+            key=lambda x: (
+                -x["value"],
+                -x["_tie"],
+                f"{x['first_name']} {x['last_name']}",
+            )
+        )
+        top = []
+        for idx, e in enumerate(entries[:limit], start=1):
+            top.append(
+                {
+                    "rank": idx,
+                    "player_id": e["player_id"],
+                    "first_name": e["first_name"],
+                    "last_name": e["last_name"],
+                    "team_name": e["team_name"],
+                    "value": e["value"],
+                }
+            )
+        leaderboards[stat] = top
+
+    tournaments_collection.update_one(
+        {"_id": tid}, {"$set": {"leaderboards": leaderboards}}
+    )
+    return leaderboards
+
+
 def finalize_game(
     game_id: str,
     *,
@@ -116,6 +231,7 @@ def finalize_game(
 
         game = games_collection.find_one({"_id": gid}) or {}
         apply_stats_from_summary(game, game_id, tournament_id)
+        recompute_tournament_leaders(tournament_id)
 
         return
 
