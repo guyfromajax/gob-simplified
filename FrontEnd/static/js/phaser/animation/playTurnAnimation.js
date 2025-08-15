@@ -1,6 +1,6 @@
 import { animateStep } from "./animateStep.js";
 import { gridToPixels } from "../utils/gridToPixels.js";
-import { lockBallToPlayer, shootBall } from "./ballManager.js";
+import { lockBallToPlayer, shootBall, SHOT_DEBUG } from "./ballManager.js";
 
 // Cap the time spent on any single movement step. Large timestamp gaps can
 // otherwise produce multi‑second tweens that appear as animation stalls.
@@ -253,7 +253,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
       const duration = Math.min(MAX_STEP_DURATION, rawDuration);
 
       if (curr.action === "shoot") {
-        shotInfo = { step: curr, playerId: anim.playerId };
+        shotInfo = { step: curr, playerId: anim.playerId, stepIndex };
       }
 
       const promise = animateStep({
@@ -274,16 +274,22 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
       currentBallOwnerRef.value = null;
       const shooterPos = scene.playerInfo?.[shotInfo.playerId]?.pos;
       const shooterTeamId = playerSprites[shotInfo.playerId]?.team_id;
-      const isHomeTeam = shooterTeamId === simData.home_team_id;
-      await shootBall({
+      const shootParams = {
         scene,
         ballSprite,
         fromCoords: shotInfo.step.coords,
         startTimestamp: shotInfo.step.timestamp,
         result: turnData.result_type,
         shooterPos,
-        isHomeTeam
-      });
+        shooterId: shotInfo.playerId,
+        shooterTeamId,
+        homeTeamId: simData.home_team_id
+      };
+      if (SHOT_DEBUG) {
+        shootParams.stepIndex = shotInfo.stepIndex;
+        shootParams.turnIndex = scene.currentTurn;
+      }
+      await shootBall(shootParams);
       break;
     }
   }
