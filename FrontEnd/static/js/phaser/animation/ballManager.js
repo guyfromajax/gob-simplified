@@ -296,9 +296,9 @@ export function animateRebound({
           console.log("[rebound]", logPayload);
         }
         if (scene.time?.delayedCall) {
-          scene.time.delayedCall(2000, resolve);
+          scene.time.delayedCall(1000, resolve);
         } else {
-          setTimeout(resolve, 2000);
+          setTimeout(resolve, 1000);
         }
       })
   );
