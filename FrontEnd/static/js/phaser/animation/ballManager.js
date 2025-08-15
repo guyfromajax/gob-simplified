@@ -2,8 +2,9 @@ import * as Phaser from 'https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.
 import { generateBallTween } from "./generateBallTween.js";
 import { gridToPixels } from "../utils/gridToPixels.js";
 
-// Debug flag for logging shot details
+// Debug flags for logging shot / rebound details
 export const SHOT_DEBUG = false;
+export const REBOUND_DEBUG = false;
 
 // Hoop locations in grid coordinates for each team
 const HOME_RIM_COORDS = { x: 91, y: 25 };
@@ -149,13 +150,124 @@ export function shootBall({
             y: bounce.y,
             duration: duration / 3,
             ease: "Sine.easeOut",
-            onComplete: resolve
+            onComplete: () =>
+              resolve({ grid: { x: bounceGridX, y: bounceGridY } })
           });
         } else {
           resolve();
         }
       }
     });
+  });
+}
+
+/**
+ * Animate players collapsing toward a missed shot for a rebound.
+ *
+ * @param {Object} opts
+ * @param {Phaser.Scene} opts.scene
+ * @param {Phaser.GameObjects.Image} opts.ballSprite
+ * @param {Object} opts.playerSprites - map of playerId -> sprite
+ * @param {Array} opts.animations - original turn animations
+ * @param {string} opts.rebounderId - playerId of the rebounder
+ * @param {{x:number, y:number}} opts.ballSpot - grid coordinates where ball landed
+ */
+export function animateRebound({
+  scene,
+  ballSprite,
+  playerSprites,
+  animations,
+  rebounderId,
+  ballSpot
+}) {
+  if (!scene || !ballSprite || !ballSpot) return Promise.resolve();
+
+  const promises = [];
+  const spotPx = gridToPixels(
+    ballSpot.x,
+    ballSpot.y,
+    scene.game.config.width,
+    scene.game.config.height
+  );
+
+  ballSprite.setPosition(spotPx.x, spotPx.y);
+  ballSprite.setVisible(true);
+
+  const rebounderSprite = playerSprites[rebounderId];
+  if (rebounderSprite) {
+    promises.push(
+      new Promise((resolve) => {
+        scene.tweens.add({
+          targets: rebounderSprite,
+          x: spotPx.x,
+          y: spotPx.y,
+          duration: 300,
+          ease: "Linear",
+          onComplete: () => {
+            lockBallToPlayer(scene, ballSprite, rebounderSprite);
+            resolve();
+          },
+          onStop: resolve
+        });
+      })
+    );
+  }
+
+  const offsets = [
+    { x: 1, y: 0 },
+    { x: -1, y: 0 },
+    { x: 0, y: 1 },
+    { x: 0, y: -1 },
+    { x: 1, y: 1 },
+    { x: -1, y: 1 },
+    { x: 1, y: -1 },
+    { x: -1, y: -1 }
+  ];
+  let offsetIndex = 0;
+
+  for (const anim of animations || []) {
+    if (anim.playerId === rebounderId) continue;
+    const sprite = playerSprites[anim.playerId];
+    const lastStep = anim.movement?.[anim.movement.length - 1];
+    if (!sprite || !lastStep) continue;
+
+    const dist =
+      Math.abs(lastStep.coords.x - ballSpot.x) +
+      Math.abs(lastStep.coords.y - ballSpot.y);
+    if (dist > 15) continue;
+
+    const offset = offsets[offsetIndex++] || { x: 0, y: 0 };
+    const targetGrid = { x: ballSpot.x + offset.x, y: ballSpot.y + offset.y };
+    const targetPx = gridToPixels(
+      targetGrid.x,
+      targetGrid.y,
+      scene.game.config.width,
+      scene.game.config.height
+    );
+
+    promises.push(
+      new Promise((resolve) => {
+        scene.tweens.add({
+          targets: sprite,
+          x: targetPx.x,
+          y: targetPx.y,
+          duration: 300,
+          ease: "Linear",
+          onComplete: resolve,
+          onStop: resolve
+        });
+      })
+    );
+  }
+
+  return Promise.all(promises).then(() => {
+    if (REBOUND_DEBUG) {
+      console.log("[rebound]", {
+        rebounderId,
+        ballSpot,
+        movers: promises.length
+      });
+    }
   });
 }
 
