@@ -33,6 +33,7 @@ const logoMap = {
 let roster = [];
 let stats = [];
 const ATTR_HEADERS = ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "AG", "ST", "ND", "IQ", "FT"];
+const DEBUG_TEAM_STATS = window.DEBUG_TEAM_STATS || false;
 
 const leaderBoards = [
   { title: "Points", key: "PTS" },
@@ -343,6 +344,7 @@ async function loadRoster() {
       const best = getBestPosition(p.position_ratings || {});
       const fullName = `${p.first_name || ''} ${p.last_name || ''}`.trim() || p.name || '';
       return {
+        id: p._id,
         name: fullName,
         pos: best.pos,
         year: yearMap[p.year?.toLowerCase()] || p.year || '--',
@@ -350,20 +352,46 @@ async function loadRoster() {
         weight: p.weight ?? '--',
         attributes: p.attributes || {},
         rt: best.rating,
-        rawStats: p.stats || {},
       };
     });
-    roster.sort((a, b) => (b.rt ?? -1) - (a.rt ?? -1));
     const statKeys = ["PTS","FGM","FGA","TPM","TPA","FTM","FTA","REB","AST","STL","BLK","F","MIN","TO"];
+    const pstats = tournament?.player_stats || {};
     stats = roster.map(p => {
+      const season = pstats[p.id]?.season || {};
       const row = { name: p.name };
-      statKeys.forEach(k => row[k] = p.rawStats[k] || 0);
+      statKeys.forEach(k => {
+        const val = season[k];
+        row[k] = typeof val === 'number' ? val : 0;
+      });
       return row;
     });
+    if (DEBUG_TEAM_STATS && roster[0]) {
+      const first = roster[0];
+      const s = pstats[first.id]?.season || {};
+      console.log("[DebugTournamentStats]", {
+        tournamentId: tournament?._id,
+        teamId: userTeamId,
+        playerId: first.id,
+        fgm: s.FGM || 0,
+        fga: s.FGA || 0,
+        pts: s.PTS || 0,
+      });
+    }
   } catch (err) {
     console.error("Failed to load roster", err);
   }
 }
+
+async function refreshTeamStats() {
+  await loadTournament();
+  await loadRoster();
+  renderRoster();
+  renderStats();
+  renderBracket();
+  updateCTA();
+}
+
+window.refreshTeamStats = refreshTeamStats;
 
 document.addEventListener("DOMContentLoaded", async () => {
   await loadTournament();
@@ -433,6 +461,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         const data = await res.json();
         tournament = data;
         localStorage.setItem('activeTournament', JSON.stringify(tournament));
+        await loadRoster();
+        renderRoster();
+        renderStats();
         renderBracket();
         await refreshLeaders();
         updateCTA();
