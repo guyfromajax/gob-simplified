@@ -2,6 +2,10 @@ import { animateStep } from "./animateStep.js";
 import { gridToPixels } from "../utils/gridToPixels.js";
 import { lockBallToPlayer, shootBall } from "./ballManager.js";
 
+// Cap the time spent on any single movement step. Large timestamp gaps can
+// otherwise produce multi‑second tweens that appear as animation stalls.
+const MAX_STEP_DURATION = 1000; // ms
+
 /**
  * Centralized ball ownership logic
  * Assigns the ball to the correct player for the current stepIndex
@@ -245,7 +249,8 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
 
       const prev = movement[stepIndex - 1];
       const curr = movement[stepIndex];
-      const duration = (curr.timestamp - prev.timestamp) * 3;
+      const rawDuration = (curr.timestamp - prev.timestamp) * 3;
+      const duration = Math.min(MAX_STEP_DURATION, rawDuration);
 
       if (curr.action === "shoot") {
         shotInfo = { step: curr, playerId: anim.playerId };
