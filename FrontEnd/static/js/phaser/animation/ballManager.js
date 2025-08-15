@@ -183,6 +183,9 @@ export function animateRebound({
   if (!scene || !ballSprite || !ballSpot) return Promise.resolve();
 
   const promises = [];
+  const finalPositions = [];
+  const MIN_X_SEP = 3;
+  const MIN_Y_SEP = 2;
   const spotPx = gridToPixels(
     ballSpot.x,
     ballSpot.y,
@@ -195,6 +198,7 @@ export function animateRebound({
 
   const rebounderSprite = playerSprites[rebounderId];
   if (rebounderSprite) {
+    finalPositions.push({ playerId: rebounderId, grid: { ...ballSpot } });
     promises.push(
       new Promise((resolve) => {
         scene.tweens.add({
@@ -237,7 +241,27 @@ export function animateRebound({
     if (dist > 15) continue;
 
     const offset = offsets[offsetIndex++] || { x: 0, y: 0 };
-    const targetGrid = { x: ballSpot.x + offset.x, y: ballSpot.y + offset.y };
+    let targetGrid = { x: ballSpot.x + offset.x, y: ballSpot.y + offset.y };
+
+    // Ensure minimum spacing from rebounder and other players
+    let adjusted = false;
+    while (!adjusted) {
+      adjusted = true;
+      for (const pos of finalPositions) {
+        if (Math.abs(targetGrid.x - pos.grid.x) < MIN_X_SEP) {
+          const dirX = targetGrid.x >= pos.grid.x ? 1 : -1;
+          targetGrid.x = pos.grid.x + dirX * MIN_X_SEP;
+          adjusted = false;
+        }
+        if (Math.abs(targetGrid.y - pos.grid.y) < MIN_Y_SEP) {
+          const dirY = targetGrid.y >= pos.grid.y ? 1 : -1;
+          targetGrid.y = pos.grid.y + dirY * MIN_Y_SEP;
+          adjusted = false;
+        }
+      }
+    }
+
+    finalPositions.push({ playerId: anim.playerId, grid: { ...targetGrid } });
     const targetPx = gridToPixels(
       targetGrid.x,
       targetGrid.y,
@@ -260,15 +284,24 @@ export function animateRebound({
     );
   }
 
-  return Promise.all(promises).then(() => {
-    if (REBOUND_DEBUG) {
-      console.log("[rebound]", {
-        rebounderId,
-        ballSpot,
-        movers: promises.length
-      });
-    }
-  });
+  return Promise.all(promises).then(
+    () =>
+      new Promise((resolve) => {
+        const logPayload = {
+          rebounderId,
+          ballSpot,
+          positions: finalPositions
+        };
+        if (REBOUND_DEBUG) {
+          console.log("[rebound]", logPayload);
+        }
+        if (scene.time?.delayedCall) {
+          scene.time.delayedCall(2000, resolve);
+        } else {
+          setTimeout(resolve, 2000);
+        }
+      })
+  );
 }
 
 /**
