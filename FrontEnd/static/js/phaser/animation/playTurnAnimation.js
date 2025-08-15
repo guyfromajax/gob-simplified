@@ -284,7 +284,10 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
         ballSprite,
         fromCoords: shotInfo.step.coords,
         startTimestamp: shotInfo.step.timestamp,
-        result: turnData.result_type,
+        // Map rebound result types to "MISS" so shootBall returns a landing spot
+        result: ["DREB", "OREB"].includes(turnData.result_type)
+          ? "MISS"
+          : turnData.result_type,
         shooterPos,
         shooterId: shotInfo.playerId,
         shooterTeamId,
@@ -297,16 +300,18 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
       const shotResult = await shootBall(shootParams);
       const ballSpot = shotResult?.grid;
       if (ballSpot) {
-        const match = turnData.text?.match(/rebound(?:ed)? by ([^\.]+)$/i);
-        const rebounderName = match?.[1]?.trim();
+        const rebounderName = turnData.ball_handler?.trim();
         let rebounderId = null;
-        if (rebounderName && scene.playerInfo) {
-          for (const [id, info] of Object.entries(scene.playerInfo)) {
-            const fullName =
-              info?.name || `${info.first_name ?? ""} ${info.last_name ?? ""}`.trim();
-            if (fullName.toLowerCase() === rebounderName.toLowerCase()) {
-              rebounderId = id;
-              break;
+        if (rebounderName) {
+          rebounderId = scene.nameToId?.[rebounderName];
+          if (!rebounderId && scene.playerInfo) {
+            for (const [id, info] of Object.entries(scene.playerInfo)) {
+              const fullName =
+                info?.name || `${info.first_name ?? ""} ${info.last_name ?? ""}`.trim();
+              if (fullName.toLowerCase() === rebounderName.toLowerCase()) {
+                rebounderId = id;
+                break;
+              }
             }
           }
         }
