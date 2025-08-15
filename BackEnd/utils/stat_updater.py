@@ -22,11 +22,12 @@ def apply_stats_from_summary(summary: Dict[str, Any], game_id: str, tournament_i
     }
 
     for p in players:
-        pid = p.get("playerId")
+        raw_pid = p.get("playerId")
+        query_pid = ObjectId(raw_pid) if ObjectId.is_valid(raw_pid) else raw_pid
         team_side = p.get("team")
         pos = p.get("pos")
         team_name = team_map.get(team_side)
-        if not pid or not team_name:
+        if not raw_pid or not team_name:
             continue
         stat_block = box_score.get(team_name, {}).get(pos, {})
         inc_fields: Dict[str, Any] = {}
@@ -46,7 +47,7 @@ def apply_stats_from_summary(summary: Dict[str, Any], game_id: str, tournament_i
         if set_fields:
             update_doc["$set"] = set_fields
         players_collection.update_one(
-            {"_id": pid, "stats.applied_games": {"$ne": token}},
+            {"_id": query_pid, "stats.applied_games": {"$ne": token}},
             update_doc,
         )
 
@@ -58,7 +59,7 @@ def apply_stats_from_summary(summary: Dict[str, Any], game_id: str, tournament_i
                 tid = None
             if tid:
                 player_doc = players_collection.find_one(
-                    {"_id": pid},
+                    {"_id": query_pid},
                     {"first_name": 1, "last_name": 1, "team": 1, "stats.season": 1},
                 )
                 if not player_doc:
@@ -74,7 +75,7 @@ def apply_stats_from_summary(summary: Dict[str, Any], game_id: str, tournament_i
                 }
                 tournaments_collection.update_one(
                     {"_id": tid},
-                    {"$set": {f"player_stats.{pid}": player_entry}},
+                    {"$set": {f"player_stats.{str(query_pid)}": player_entry}},
                 )
 
 
