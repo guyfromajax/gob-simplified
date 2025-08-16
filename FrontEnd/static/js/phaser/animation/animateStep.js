@@ -2,7 +2,7 @@ import { gridToPixels } from "../utils/gridToPixels.js";
 
 /**
  * Animates a single step of a player's movement.
- * Called by the centralized step loop in playTurnAnimation.js.
+ * Called by the centralized step loop in turnAnimation.js.
  *
  * @param {Phaser.Scene} scene - The Phaser scene
  * @param {Phaser.GameObjects.Sprite} sprite - The player's sprite

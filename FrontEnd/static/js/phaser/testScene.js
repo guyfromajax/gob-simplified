@@ -1,6 +1,6 @@
 
 import { loadPhaserPlayers } from './setup/loadPhaserPlayers.js';
-import { playTurnAnimation } from './animation/playTurnAnimation.js';
+import { playTurnAnimation } from './animation/turnAnimation.js';
 import { onAction } from './animation/onAction.js';
 import { passBall, lockBallToPlayer } from './animation/ballManager.js';
 import { gridToPixels } from './utils/gridToPixels.js';
