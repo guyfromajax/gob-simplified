@@ -10,7 +10,7 @@ export function generateBallTween({
   }) {
     if (!ballSprite || !scene) return;
   
-    const duration = endTimestamp - startTimestamp;
+    const duration = Math.max(endTimestamp - startTimestamp, 150);
   
     const startPixels = gridToPixels(startCoords.x, startCoords.y, scene.game.config.width, scene.game.config.height);
     const endPixels = gridToPixels(endCoords.x, endCoords.y, scene.game.config.width, scene.game.config.height);
