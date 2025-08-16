@@ -136,6 +136,17 @@ def simulate_round(request: SimulateRequest):
             stat_updater.finalize_game(
                 str(game_id), mode="tournament", tournament_id=request.tournament_id
             )
+            result_doc = {
+                "home_team": matchup["home_team"],
+                "away_team": matchup["away_team"],
+                "score": summary.get("score", {}),
+                "winner": winner,
+                "round": tournament_doc["current_round"],
+                "match_index": i,
+            }
+            tournaments_collection.update_one(
+                {"_id": tournament_id}, {"$push": {"results": result_doc}}
+            )
 
         # Reload tournament to check if round is complete
         updated_doc = tournaments_collection.find_one({"_id": tournament_id})
@@ -144,6 +155,11 @@ def simulate_round(request: SimulateRequest):
             if all_done:
                 manager.tournament = updated_doc
                 manager.advance_round()
+
+        # Sync bracket state with stored results
+        update_bracket_from_results(
+            tournament_id, tournaments_collection=tournaments_collection
+        )
 
         if already_played:
             return {"already_played": True}
