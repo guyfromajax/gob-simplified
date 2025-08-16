@@ -9,8 +9,13 @@ multiple rounds.
 
 from typing import Any
 from bson import ObjectId
+import logging
+import warnings
 
 from BackEnd.db import tournaments_collection as default_tournaments_collection
+
+
+logger = logging.getLogger(__name__)
 
 
 def update_bracket_from_results(
@@ -54,6 +59,14 @@ def update_bracket_from_results(
 
     # Gather all results for the current round and order them by match index
     results = [r for r in tournament.get("results", []) if r.get("round") == current_round]
+    match_indexes = [r.get("match_index") for r in results]
+    logger.info(
+        "Round %s: %d results vs %d matchups (match_indexes=%s)",
+        current_round,
+        len(results),
+        len(matchups),
+        match_indexes,
+    )
     winners = []
 
     if results and len(results) == len(matchups):
@@ -62,7 +75,18 @@ def update_bracket_from_results(
     else:
         winners = [m.get("winner") for m in matchups if m.get("winner") is not None]
         if len(winners) != len(matchups):
-            # Round not complete – nothing to advance
+            logger.warning(
+                "Incomplete results for round %s: %d results vs %d matchups (match_indexes=%s)",
+                current_round,
+                len(results),
+                len(matchups),
+                match_indexes,
+            )
+            if results:
+                warnings.warn(
+                    f"Round {current_round} has {len(results)} results for {len(matchups)} matchups",
+                    RuntimeWarning,
+                )
             return tournament
 
     # Final round complete – mark tournament finished
