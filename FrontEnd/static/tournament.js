@@ -402,6 +402,17 @@ async function refreshTeamStats() {
 
 window.refreshTeamStats = refreshTeamStats;
 
+function handleTournamentUpdate(doc) {
+  tournament = doc;
+  localStorage.setItem("activeTournament", JSON.stringify(doc));
+  renderBracket();
+  renderRoster();
+  renderStats();
+  updateCTA();
+}
+
+window.handleTournamentUpdate = handleTournamentUpdate;
+
 document.addEventListener("DOMContentLoaded", async () => {
   await loadTournament();
   if (!userTeamId && tournament && tournament.user_team_id) {
