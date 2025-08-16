@@ -2,6 +2,7 @@ export function lockBallToPlayer() {}
 export const calls = [];
 export const SHOT_DEBUG = false;
 export const REBOUND_DEBUG = false;
+export const INBOUND_DEBUG = false;
 export function shootBall(opts) {
   calls.push(opts);
   // return a fake landing spot so rebound logic can run in tests
@@ -9,4 +10,16 @@ export function shootBall(opts) {
 }
 export function animateRebound(opts) {
   calls.push({ type: 'rebound', opts });
+}
+
+export function animateInboundPass(scene, ballSprite, fromCoords, toCoords, startTs, endTs) {
+  calls.push({
+    type: 'inboundPass',
+    scene,
+    ballSprite,
+    fromCoords,
+    toCoords,
+    startTs,
+    endTs
+  });
 }
