@@ -493,6 +493,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           alert('This round has already been played.');
           return;
         }
+        await refreshTeamStats();
         await refreshLeaders();
         const { home, away } = data;
         if (!home || !away) throw new Error('Matchup not found');
