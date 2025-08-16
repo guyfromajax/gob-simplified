@@ -1,4 +1,4 @@
-import { playTurnAnimation } from "./playTurnAnimation.js";
+import { playTurnAnimation } from "./turnAnimation.js";
 import { onAction } from "./onAction.js";
 import { passBall, lockBallToPlayer } from "./ballManager.js";
 

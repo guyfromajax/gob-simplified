@@ -1,4 +1,4 @@
-import { playTurnAnimation } from '../../FrontEnd/static/js/phaser/animation/playTurnAnimation.js';
+import { playTurnAnimation } from '../../FrontEnd/static/js/phaser/animation/turnAnimation.js';
 import { calls } from './ballManagerStub.mjs';
 
 function createScene() {
