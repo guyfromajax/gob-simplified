@@ -5,6 +5,7 @@ import { gridToPixels } from "../utils/gridToPixels.js";
 // Debug flags for logging shot / rebound details
 export const SHOT_DEBUG = false;
 export const REBOUND_DEBUG = false;
+export const INBOUND_DEBUG = false;
 
 // Hoop locations in grid coordinates for each team
 const HOME_RIM_COORDS = { x: 91, y: 25 };
@@ -50,6 +51,25 @@ export function passBall({
     endCoords: toCoords,
     startTimestamp: fromTimestamp,
     endTimestamp: toTimestamp
+  });
+}
+
+// Baseline inbound pass from one coordinate to another
+export function animateInboundPass(
+  scene,
+  ballSprite,
+  fromCoords,
+  toCoords,
+  startTs,
+  endTs
+) {
+  generateBallTween({
+    scene,
+    ballSprite,
+    startCoords: fromCoords,
+    endCoords: toCoords,
+    startTimestamp: startTs,
+    endTimestamp: endTs
   });
 }
 

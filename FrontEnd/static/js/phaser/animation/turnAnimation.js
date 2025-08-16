@@ -4,7 +4,9 @@ import {
   lockBallToPlayer,
   shootBall,
   SHOT_DEBUG,
-  animateRebound
+  animateRebound,
+  animateInboundPass,
+  INBOUND_DEBUG
 } from "./ballManager.js";
 
 // Cap the time spent on any single movement step. Large timestamp gaps can
@@ -83,6 +85,103 @@ async function runSetupTween({ scene, ballSprite, animations, playerSprites, cur
   }
 
   await Promise.all(promises);
+}
+
+// Animate baseline inbound play after a made basket
+async function animateInboundSequence({
+  scene,
+  ballSprite,
+  playerSprites,
+  scoringTeamId,
+  homeTeamId
+}) {
+  const isHomeScoring = scoringTeamId === homeTeamId;
+  const inboundTeamId = isHomeScoring ? "AWAY" : "HOME";
+  const dir = inboundTeamId === "HOME" ? 1 : -1;
+
+  const baselineX = inboundTeamId === "HOME" ? 6 : 94;
+  const randY = 25 + Math.floor(Math.random() * 6) - 3;
+  const ballSpot = { x: baselineX, y: randY };
+
+  const oDestinationDict = {
+    PG: { x: baselineX, y: randY },
+    SG: { x: baselineX + dir * 4, y: randY + Math.floor(Math.random() * 4 - 2) },
+    SF: { x: baselineX + dir * 8, y: randY + Math.floor(Math.random() * 4 - 2) },
+    PF: { x: baselineX + dir * 12, y: randY + Math.floor(Math.random() * 4 - 2) },
+    C: { x: baselineX + dir * 16, y: randY + Math.floor(Math.random() * 4 - 2) }
+  };
+
+  if (INBOUND_DEBUG) {
+    console.log("[inbound]", { scoringTeamId, ballSpot, destinations: oDestinationDict });
+  }
+
+  const movePromises = [];
+  let inbounderSprite = null;
+  let receiverSprite = null;
+  for (const [id, sprite] of Object.entries(playerSprites)) {
+    const info = scene.playerInfo?.[id];
+    if (!info) continue;
+    if (sprite.team_id === inboundTeamId) {
+      const dest = oDestinationDict[info.pos];
+      if (dest) {
+        const px = gridToPixels(
+          dest.x,
+          dest.y,
+          scene.game.config.width,
+          scene.game.config.height
+        );
+        movePromises.push(
+          new Promise((resolve) => {
+            scene.tweens.add({
+              targets: sprite,
+              x: px.x,
+              y: px.y,
+              duration: 500,
+              ease: "Sine.easeInOut",
+              onComplete: resolve,
+              onStop: resolve
+            });
+          })
+        );
+      }
+      if (info.pos === "PG") inbounderSprite = sprite;
+      if (info.pos === "SF") receiverSprite = sprite;
+    } else if (sprite.team_id === scoringTeamId) {
+      const targetX = gridToPixels(
+        isHomeScoring ? 45 : 55,
+        25,
+        scene.game.config.width,
+        scene.game.config.height
+      ).x;
+      movePromises.push(
+        new Promise((resolve) => {
+          scene.tweens.add({
+            targets: sprite,
+            x: targetX,
+            y: sprite.y,
+            duration: 500,
+            ease: "Sine.easeInOut",
+            onComplete: resolve,
+            onStop: resolve
+          });
+        })
+      );
+    }
+  }
+
+  await Promise.all(movePromises);
+
+  if (inbounderSprite && receiverSprite) {
+    animateInboundPass(scene, ballSprite, ballSpot, oDestinationDict.SF, 0, 500);
+    await new Promise((resolve) => {
+      if (scene.time?.delayedCall) {
+        scene.time.delayedCall(500, resolve);
+      } else {
+        setTimeout(resolve, 500);
+      }
+    });
+    lockBallToPlayer(scene, ballSprite, receiverSprite);
+  }
 }
 
 /**
@@ -218,7 +317,15 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
       }
       const shotResult = await shootBall(shootParams);
       const ballSpot = shotResult?.grid;
-      if (ballSpot) {
+      if (turnData.result_type === "MAKE") {
+        await animateInboundSequence({
+          scene,
+          ballSprite,
+          playerSprites,
+          scoringTeamId: shooterTeamId,
+          homeTeamId: simData.home_team_id
+        });
+      } else if (ballSpot) {
         const rebounderName = turnData.ball_handler?.trim();
         let rebounderId = null;
         if (rebounderName) {
