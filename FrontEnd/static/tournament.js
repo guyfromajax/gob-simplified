@@ -112,10 +112,19 @@ function renderBracket() {
     const matchup = document.createElement("div");
     matchup.className = "matchup";
 
-    const res = getResult(round, index) || {};
-    const homeScore = res.score ? res.score[m.home_team] : null;
-    const awayScore = res.score ? res.score[m.away_team] : null;
-    const winner = res.winner;
+    // Prefer data directly on the matchup object so scores/winners show
+    // even when tournament.results is not provided. Fallback to
+    // tournament.results only when necessary for additional metadata.
+    let homeScore = m.score ? m.score[m.home_team] : null;
+    let awayScore = m.score ? m.score[m.away_team] : null;
+    let winner = m.winner ?? null;
+
+    if ((homeScore == null || awayScore == null || winner == null) && results.length) {
+      const res = getResult(round, index) || {};
+      if (homeScore == null && res.score) homeScore = res.score[m.home_team];
+      if (awayScore == null && res.score) awayScore = res.score[m.away_team];
+      if (winner == null) winner = res.winner;
+    }
 
     if (side === "center") {
       matchup.appendChild(createTeamEntry(m.home_team, "left", homeScore, winner === m.home_team));
