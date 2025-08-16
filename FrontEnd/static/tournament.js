@@ -288,7 +288,7 @@ function updateCTA() {
   const matchups = tournament.bracket?.[roundKey] || [];
   const userMatch = matchups.find(m => m.home_team === userTeamId || m.away_team === userTeamId);
 
-  if (userMatch) {
+  if (userMatch && !userMatch.winner && !userMatch.game_id) {
     const opponent = userMatch.home_team === userTeamId ? userMatch.away_team : userMatch.home_team;
     playBtn.style.display = 'inline-flex';
     opponentEl.textContent = `vs ${opponent}`;
