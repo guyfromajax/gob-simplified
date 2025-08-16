@@ -34,6 +34,7 @@ let roster = [];
 let stats = [];
 const ATTR_HEADERS = ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "AG", "ST", "ND", "IQ", "FT"];
 const DEBUG_TEAM_STATS = window.DEBUG_TEAM_STATS || false;
+const DEBUG_BRACKET = window.DEBUG_BRACKET || false;
 
 const leaderBoards = [
   { title: "Points", key: "PTS" },
@@ -78,6 +79,41 @@ function renderBracket() {
 
   function getResult(round, index) {
     return results.find(r => r.round === round && r.match_index === index) || null;
+  }
+
+  if (DEBUG_BRACKET) {
+    console.log("[DebugBracket] renderBracket", {
+      id: tournament._id,
+      current_round: tournament.current_round,
+    });
+    const round1Winners = round1
+      .map((m, i) => m.winner ?? getResult(1, i)?.winner)
+      .filter(Boolean);
+    const round2Winners = round2
+      .map((m, i) => m.winner ?? getResult(2, i)?.winner)
+      .filter(Boolean);
+    const finalWinner = finalRound
+      .map((m, i) => m.winner ?? getResult(3, i)?.winner)
+      .filter(Boolean);
+    const semifinalSlots = [
+      round2[0]?.home_team,
+      round2[0]?.away_team,
+      round2[1]?.home_team,
+      round2[1]?.away_team,
+    ].filter(Boolean);
+    const finalSlots = [
+      finalRound[0]?.home_team,
+      finalRound[0]?.away_team,
+    ].filter(Boolean);
+    console.log("[DebugBracket] winners", {
+      round1: round1Winners,
+      round2: round2Winners,
+      final: finalWinner,
+    });
+    console.log("[DebugBracket] slots", {
+      semifinals: semifinalSlots,
+      final: finalSlots,
+    });
   }
 
   function createTeamEntry(team, side, score, isWinner) {
@@ -192,6 +228,8 @@ function renderBracket() {
   bracket.appendChild(final);
   bracket.appendChild(rightSemi);
   bracket.appendChild(rightR1);
+
+  if (DEBUG_BRACKET) console.log("[DebugBracket] bracket render complete");
 }
 
 function renderRoster() {
@@ -403,6 +441,11 @@ async function refreshTeamStats() {
 window.refreshTeamStats = refreshTeamStats;
 
 function handleTournamentUpdate(doc) {
+  if (DEBUG_BRACKET)
+    console.log("[DebugBracket] handleTournamentUpdate", {
+      id: doc?._id,
+      current_round: doc?.current_round,
+    });
   tournament = doc;
   localStorage.setItem("activeTournament", JSON.stringify(doc));
   renderBracket();

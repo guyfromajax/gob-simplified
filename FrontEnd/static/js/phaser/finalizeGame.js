@@ -1,3 +1,5 @@
+const DEBUG_BRACKET = window.DEBUG_BRACKET || false;
+
 export async function finalizeGame({ simData, tournamentId, franchiseId, game }) {
   // Extract score and winner
   const homeTeamObj = simData.homeTeam || { name: simData.home_team };
@@ -42,9 +44,19 @@ export async function finalizeGame({ simData, tournamentId, franchiseId, game })
             r.json()
           );
           if (window.opener && window.opener.handleTournamentUpdate) {
+            if (DEBUG_BRACKET)
+              console.log("[DebugBracket] invoking handleTournamentUpdate", {
+                id: updated?._id,
+                current_round: updated?.current_round,
+              });
             window.opener.handleTournamentUpdate(updated);
             window.opener.refreshLeaders?.();
           } else if (window.handleTournamentUpdate) {
+            if (DEBUG_BRACKET)
+              console.log("[DebugBracket] invoking handleTournamentUpdate", {
+                id: updated?._id,
+                current_round: updated?.current_round,
+              });
             window.handleTournamentUpdate(updated);
             window.refreshLeaders?.();
           } else {
