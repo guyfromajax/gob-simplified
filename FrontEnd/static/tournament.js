@@ -424,6 +424,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (!res.ok) throw new Error('Request failed');
         const data = await res.json();
         if (data.already_played) {
+          playBtn.disabled = false;
+          await refreshTeamStats();
+          await refreshLeaders();
           alert('This round has already been played.');
           return;
         }
