@@ -42,22 +42,17 @@ export async function finalizeGame({ simData, tournamentId, franchiseId, game })
             r.json()
           );
           localStorage.setItem("activeTournament", JSON.stringify(updated));
-          if (window && window.opener) {
-            if (typeof window.opener.refreshTeamStats === "function") {
-              window.opener.refreshTeamStats();
-            }
-            if (typeof window.opener.refreshLeaders === "function") {
-              window.opener.refreshLeaders();
-            }
+          if (window.opener) {
+            window.opener.refreshTeamStats?.();
+            window.opener.refreshLeaders?.();
           } else {
-            if (typeof window.refreshTeamStats === "function") {
-              window.refreshTeamStats();
-            } else {
+            window.refreshTeamStats?.();
+            if (!window.refreshTeamStats) {
               window.location.href = "/static/tournament.html";
             }
           }
         } catch (e) {
-          console.error("Failed to trigger parent refresh", e);
+          console.error("Failed to update tournament state", e);
         }
       }
     } catch (err) {
