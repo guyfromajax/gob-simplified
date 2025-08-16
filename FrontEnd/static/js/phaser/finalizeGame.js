@@ -41,15 +41,15 @@ export async function finalizeGame({ simData, tournamentId, franchiseId, game })
           const updated = await fetch(`/tournament/state/${tournamentId}`).then((r) =>
             r.json()
           );
-          localStorage.setItem("activeTournament", JSON.stringify(updated));
-          if (window.opener) {
-            window.opener.refreshTeamStats?.();
+          if (window.opener && window.opener.handleTournamentUpdate) {
+            window.opener.handleTournamentUpdate(updated);
             window.opener.refreshLeaders?.();
+          } else if (window.handleTournamentUpdate) {
+            window.handleTournamentUpdate(updated);
+            window.refreshLeaders?.();
           } else {
-            window.refreshTeamStats?.();
-            if (!window.refreshTeamStats) {
-              window.location.href = "/static/tournament.html";
-            }
+            localStorage.setItem("activeTournament", JSON.stringify(updated));
+            window.location.href = "/static/tournament.html";
           }
         } catch (e) {
           console.error("Failed to update tournament state", e);
