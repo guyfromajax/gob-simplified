@@ -326,7 +326,7 @@ async function loadTournament() {
     } else {
       url = `/tournament/active?user_team_id=${encodeURIComponent(userTeamId)}`;
     }
-    const res = await fetch(url);
+    const res = await fetch(`${url}?_=${Date.now()}`, { cache: "no-store" });
     tournament = await res.json();
     localStorage.setItem("activeTournament", JSON.stringify(tournament));
     console.log("Bracket data arrives", tournament);
