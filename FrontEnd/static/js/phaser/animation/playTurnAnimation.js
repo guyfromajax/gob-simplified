@@ -17,38 +17,23 @@ const MAX_STEP_DURATION = 1000; // ms
  */
 function updateBallOwnership({ scene, ballSprite, animations, playerSprites, stepIndex, offenseTeamId, currentBallOwnerRef }) {
   if (scene?.skipToEnd) return;
-  console.log("🟡 inside updateBallOwnership → stepIndex:", stepIndex);
+
+  const passHappening = animations.some(
+    anim => anim.movement?.[stepIndex]?.action === "pass"
+  );
+  if (passHappening) return;
+
   for (const anim of animations) {
     if (scene.skipToEnd) break;
     const sprite = playerSprites[anim.playerId];
     const hasBall = anim.hasBallAtStep?.[stepIndex];
-    const team = sprite?.team_id;
-
-    console.log("hasBall", hasBall);
-    console.log("sprite", sprite);
-    console.log("team = sprite.team_id", team);
-    console.log("offenseTeamId", offenseTeamId);
-    console.log("ballSprite", ballSprite);
-    console.log("currentBallOwnerRef", currentBallOwnerRef);
-
-    // if (hasBall && sprite && team === offenseTeamId && ballSprite?.setPosition) {
     if (hasBall && ballSprite?.setPosition) {
-      console.log("All four conditions are met")
       ballSprite.setPosition(sprite.x, sprite.y);
       ballSprite.setVisible(true);
       if (currentBallOwnerRef) currentBallOwnerRef.value = sprite;
       break;
+    }
 
-      console.log("🟡 also inside updateBallOwnership → Ball assigned at step", stepIndex, {
-        playerId: anim.playerId,
-        hasBall,
-        team: sprite?.team_id,
-        offenseTeamId
-      });
-    } else {
-      console.log("🟡 all four conditions are not met at step", stepIndex);
-    }
-    }
   }
 
 
@@ -189,7 +174,6 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
     if (anim.hasBallAtStep?.[0]) {
       step0OwnerSprite = playerSprites[anim.playerId];
       break;
-    }
   }
 
   if (step0OwnerSprite) {
@@ -267,7 +251,8 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
         step: curr,
         duration,
         ballSprite,
-        currentBallOwnerRef
+        currentBallOwnerRef,
+        onAction
       });
 
       promises.push(promise);
@@ -327,6 +312,5 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
         }
       }
       break;
-    }
   }
 }
