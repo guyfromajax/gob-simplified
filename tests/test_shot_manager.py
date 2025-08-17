@@ -75,14 +75,15 @@ def test_offensive_rebound_putback_updates_stats(monkeypatch):
         rebounder_param.record_stat("FGM")
         record_team_points(game_param, game_param.offense_team, 2)
         return {
-            "text": " and he scores!",
-            "possession_flips": True,
-            "time_elapsed": 0,
+            "event_type": "PUTBACK_ATTEMPT",
+            "shooterId": rebounder_param.player_id,
+            "result": "MAKE",
             "points": 2,
-            "shooter": rebounder_param,
+            "timeElapsed": 0,
+            "possession_flips": True,
         }
 
-    monkeypatch.setattr("BackEnd.models.shot_manager.resolve_offensive_rebound_loop", fake_putback)
+    monkeypatch.setattr("BackEnd.models.shot_manager.resolve_offensive_rebound", fake_putback)
 
     result = shot_manager.resolve_shot(roles)
 
