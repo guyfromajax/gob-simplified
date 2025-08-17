@@ -179,19 +179,14 @@ function renderBracket() {
     const matchup = document.createElement("div");
     matchup.className = "matchup";
 
-    // Pull score/winner primarily from tournament.results to ensure
-    // consistency for both user-simmed and computer-simmed games. If no
-    // result exists, fall back to any data stored directly on the matchup.
-    const res = getResult(round, index) || {};
-    let homeScore = res.score ? res.score[m.home_team] : undefined;
-    let awayScore = res.score ? res.score[m.away_team] : undefined;
-    let winner = res.winner;
-
-    if (homeScore == null || awayScore == null || winner == null) {
-      homeScore = homeScore ?? (m.score ? m.score[m.home_team] : null);
-      awayScore = awayScore ?? (m.score ? m.score[m.away_team] : null);
-      winner = winner ?? m.winner ?? null;
-    }
+    // Always prefer results pulled from ``tournament.results`` so the
+    // bracket reflects finalized scores, even after the tournament is
+    // completed.  Fall back to any score/winner information stored
+    // directly on the matchup if results have not yet been recorded.
+    const res = getResult(round, index);
+    const homeScore = res?.score?.[m.home_team] ?? m.score?.[m.home_team];
+    const awayScore = res?.score?.[m.away_team] ?? m.score?.[m.away_team];
+    const winner = res?.winner ?? m.winner ?? null;
 
     if (side === "center") {
       matchup.appendChild(createTeamEntry(m.home_team, "left", homeScore, winner === m.home_team));
