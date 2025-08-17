@@ -559,7 +559,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         alert('Tournament not loaded');
         return;
       }
-      if (simBtn.disabled) return;
+      if (tournament.completed || simBtn.disabled) return;
       console.log('#sim-remaining click start');
       simBtn.disabled = true;
       try {
@@ -583,7 +583,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       } catch (err) {
         console.error('Failed to simulate remaining games', err);
         alert('Unable to simulate remaining games');
-      } finally {
         simBtn.disabled = false;
       }
     });
