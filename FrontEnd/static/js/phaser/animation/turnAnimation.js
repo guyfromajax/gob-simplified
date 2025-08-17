@@ -13,6 +13,9 @@ import {
 // otherwise produce multi‑second tweens that appear as animation stalls.
 const MAX_STEP_DURATION = 1000; // ms
 
+const HOME_RIM_COORDS = { x: 91, y: 25 };
+const AWAY_RIM_COORDS = { x: 9, y: 25 };
+
 /**
  * Centralized ball ownership logic
  * Assigns the ball to the correct player for the current stepIndex
@@ -97,22 +100,60 @@ async function animateInboundSequence({
 }) {
   const isHomeScoring = scoringTeamId === homeTeamId;
   const inboundTeamId = isHomeScoring ? "AWAY" : "HOME";
-  const dir = inboundTeamId === "HOME" ? 1 : -1;
 
-  const baselineX = inboundTeamId === "HOME" ? 6 : 94;
-  const randY = 25 + Math.floor(Math.random() * 6) - 3;
-  const ballSpot = { x: baselineX, y: randY };
-
-  const oDestinationDict = {
-    PG: { x: baselineX, y: randY },
-    SG: { x: baselineX + dir * 4, y: randY + Math.floor(Math.random() * 4 - 2) },
-    SF: { x: baselineX + dir * 8, y: randY + Math.floor(Math.random() * 4 - 2) },
-    PF: { x: baselineX + dir * 12, y: randY + Math.floor(Math.random() * 4 - 2) },
-    C: { x: baselineX + dir * 16, y: randY + Math.floor(Math.random() * 4 - 2) }
+  const INBOUND_TABLE = {
+    HOME: {
+      ballSpot: { x: 6, y: 25 },
+      destinations: {
+        SF: { x: 6, y: 25 },
+        PG: { x: 14, y: 25 },
+        SG: { x: 18, y: 25 },
+        PF: { x: 22, y: 25 },
+        C: { x: 26, y: 25 }
+      }
+    },
+    AWAY: {
+      ballSpot: { x: 94, y: 25 },
+      destinations: {
+        SF: { x: 94, y: 25 },
+        PG: { x: 86, y: 25 },
+        SG: { x: 82, y: 25 },
+        PF: { x: 78, y: 25 },
+        C: { x: 74, y: 25 }
+      }
+    }
   };
 
-  if (INBOUND_DEBUG) {
-    console.log("[inbound]", { scoringTeamId, ballSpot, destinations: oDestinationDict });
+  const { ballSpot, destinations: oDestinationDict } = INBOUND_TABLE[inboundTeamId];
+
+  const rimGrid = isHomeScoring ? HOME_RIM_COORDS : AWAY_RIM_COORDS;
+  const rimPx = gridToPixels(
+    rimGrid.x,
+    rimGrid.y,
+    scene.game.config.width,
+    scene.game.config.height
+  );
+  const spotPx = gridToPixels(
+    ballSpot.x,
+    ballSpot.y,
+    scene.game.config.width,
+    scene.game.config.height
+  );
+
+  if (ballSprite) {
+    ballSprite.setPosition(rimPx.x, rimPx.y);
+    ballSprite.setVisible(true);
+    await new Promise((resolve) => {
+      scene.tweens.add({
+        targets: ballSprite,
+        x: spotPx.x,
+        y: spotPx.y,
+        duration: 500,
+        ease: "Sine.easeInOut",
+        onComplete: resolve,
+        onStop: resolve
+      });
+    });
   }
 
   const movePromises = [];
@@ -121,6 +162,7 @@ async function animateInboundSequence({
   for (const [id, sprite] of Object.entries(playerSprites)) {
     const info = scene.playerInfo?.[id];
     if (!info) continue;
+
     if (sprite.team_id === inboundTeamId) {
       const dest = oDestinationDict[info.pos];
       if (dest) {
@@ -144,8 +186,8 @@ async function animateInboundSequence({
           })
         );
       }
-      if (info.pos === "PG") inbounderSprite = sprite;
-      if (info.pos === "SF") receiverSprite = sprite;
+      if (info.pos === "SF") inbounderSprite = sprite;
+      if (info.pos === "PG") receiverSprite = sprite;
     } else if (sprite.team_id === scoringTeamId) {
       const targetX = gridToPixels(
         isHomeScoring ? 45 : 55,
@@ -172,7 +214,8 @@ async function animateInboundSequence({
   await Promise.all(movePromises);
 
   if (inbounderSprite && receiverSprite) {
-    animateInboundPass(scene, ballSprite, ballSpot, oDestinationDict.SF, 0, 500);
+    lockBallToPlayer(scene, ballSprite, inbounderSprite);
+    animateInboundPass(scene, ballSprite, ballSpot, oDestinationDict.PG, 0, 500);
     await new Promise((resolve) => {
       if (scene.time?.delayedCall) {
         scene.time.delayedCall(500, resolve);
