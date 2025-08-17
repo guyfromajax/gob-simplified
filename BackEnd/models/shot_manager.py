@@ -6,10 +6,10 @@ from BackEnd.constants import (
     AGGRESSION_FOUL_MULTIPLIER
 )
 from BackEnd.utils.shared import (
-    apply_help_defense_if_triggered, 
-    get_fast_break_chance, 
-    get_time_elapsed, 
-    resolve_offensive_rebound_loop,
+    apply_help_defense_if_triggered,
+    get_fast_break_chance,
+    get_time_elapsed,
+    resolve_offensive_rebound,
     get_player_position,
     record_team_points,
     calculate_screen_score,
@@ -34,6 +34,7 @@ class ShotManager:
         game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(self.game)
         
         time_elapsed = 0
+        events = []
 
         shooter = roles["shooter"]
         passer = roles.get("passer", "")
@@ -155,18 +156,28 @@ class ShotManager:
                 possession_flips = rebound_team != off_team
 
                 if stat == "OREB":
-                    if random.random() < 0.65:
-                        text += "... he attempts the putback..."
-                        putback_result = resolve_offensive_rebound_loop(self.game, rebounder)
-                        text += putback_result["text"]
-                        possession_flips = putback_result["possession_flips"]
-                        time_elapsed += putback_result["time_elapsed"]
-                        if "points" in putback_result:
+                    events.append({"event_type": "offReb", "rebounderId": getattr(rebounder, "player_id", None)})
+                    self.game.turn_manager.logger.log("offReb")
+                    rebound_event = resolve_offensive_rebound(self.game, rebounder)
+                    events.append(rebound_event)
+                    time_elapsed += rebound_event.get("timeElapsed", 0)
+
+                    if rebound_event["event_type"] == "PUTBACK_ATTEMPT":
+                        self.game.turn_manager.logger.log("putbackStart")
+                        self.game.turn_manager.logger.log(rebound_event["result"].lower())
+                        if rebound_event["result"] == "MAKE":
                             shooter = rebounder
                             made = True
-                            points = putback_result["points"]
+                            points = rebound_event.get("points", 2)
+                            text += f" {get_name_safe(rebounder)} puts it back in."
+                            possession_flips = True
+                        else:
+                            text += f" {get_name_safe(rebounder)} misses the putback."
+                            possession_flips = rebound_event.get("possession_flips", possession_flips)
                     else:
-                        text += "...and he kicks it back out to reset the half-court offense"
+                        self.game.turn_manager.logger.log("kickoutStart")
+                        text += f" {get_name_safe(rebounder)} kicks it out to reset." 
+                        possession_flips = rebound_event.get("possession_flips", possession_flips)
                 else:
                     self.game_state["last_rebounder"] = rebounder
                     self.game_state["offensive_state"] = (
@@ -189,7 +200,8 @@ class ShotManager:
             "defender": defender,
             "text": text,
             "possession_flips": possession_flips,
-            "time_elapsed": time_elapsed
+            "time_elapsed": time_elapsed,
+            "events": events,
         }
 
         if made:
