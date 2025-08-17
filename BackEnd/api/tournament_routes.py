@@ -482,5 +482,7 @@ def sim_remaining(request: SimulateRequest):
     final_doc = tournaments_collection.find_one({"_id": tid})
     if not final_doc:
         raise HTTPException(status_code=404, detail="Tournament not found")
-    final_doc["_id"] = str(final_doc["_id"])
-    return final_doc
+
+    # Ensure the document is fully JSON serializable before returning so the
+    # API does not raise a 500 error when encoding ``ObjectId`` instances.
+    return jsonable_encoder(final_doc, custom_encoder={ObjectId: str})
