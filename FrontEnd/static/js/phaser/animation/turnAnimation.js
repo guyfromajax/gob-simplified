@@ -1,3 +1,4 @@
+import * as Phaser from "https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.esm.js";
 import { animateStep } from "./animateStep.js";
 import { gridToPixels } from "../utils/gridToPixels.js";
 import {
@@ -117,6 +118,27 @@ async function runInboundSetup({
   const scoringTeamId = isAwayOffense ? homeTeamId : awayTeamId;
   const ballSpot = isAwayOffense ? { x: 98, y: 16 } : { x: 3, y: 16 };
 
+  const homeOffsetRanges = {
+    PG: { x: [8, 12], y: [-2, 2] },
+    SG: { x: [12, 16], y: [-4, 4] },
+    PF: { x: [10, 14], y: [6, 10] },
+    C: { x: [10, 14], y: [-10, -6] }
+  };
+  const awayOffsetRanges = {
+    PG: { x: [-12, -8], y: [-2, 2] },
+    SG: { x: [-16, -12], y: [-4, 4] },
+    PF: { x: [-14, -10], y: [6, 10] },
+    C: { x: [-14, -10], y: [-10, -6] }
+  };
+  const ranges = isAwayOffense ? awayOffsetRanges : homeOffsetRanges;
+  const inboundDest = {};
+  for (const pos of ["PG", "SG", "PF", "C"]) {
+    inboundDest[pos] = {
+      x: ballSpot.x + Phaser.Math.Between(ranges[pos].x[0], ranges[pos].x[1]),
+      y: ballSpot.y + Phaser.Math.Between(ranges[pos].y[0], ranges[pos].y[1])
+    };
+  }
+
   const width = scene.game.config.width;
   const height = scene.game.config.height;
 
@@ -151,11 +173,17 @@ async function runInboundSetup({
     }
   }
 
-  // Identify SF/PG and freeze other inbound players
+  // Identify SF/PG/SG/PF/C and freeze other inbound players
   let sfSprite = null;
   let pgSprite = null;
+  let sgSprite = null;
+  let pfSprite = null;
+  let cSprite = null;
   let sfId = null;
   let pgId = null;
+  let sgId = null;
+  let pfId = null;
+  let cId = null;
   for (const [id, sprite] of Object.entries(playerSprites)) {
     const info = scene.playerInfo?.[id];
     if (
@@ -170,6 +198,15 @@ async function runInboundSetup({
     } else if (info.pos === "PG") {
       pgSprite = sprite;
       pgId = id;
+    } else if (info.pos === "SG") {
+      sgSprite = sprite;
+      sgId = id;
+    } else if (info.pos === "PF") {
+      pfSprite = sprite;
+      pfId = id;
+    } else if (info.pos === "C") {
+      cSprite = sprite;
+      cId = id;
     }
     if (scene.tweens) scene.tweens.killTweensOf(sprite);
   }
@@ -178,16 +215,30 @@ async function runInboundSetup({
     scene.isInboundSetup = false;
     return;
   }
-  console.log(`[inbound][score][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
+  console.log(
+    `[inbound][score][${newOffenseSide}] sf:${sfId} pg:${pgId} sg:${sgId} pf:${pfId} c:${cId}`
+  );
 
   const rimGrid = isAwayOffense ? HOME_RIM_COORDS : AWAY_RIM_COORDS;
   const rimPx = gridToPixels(rimGrid.x, rimGrid.y, width, height);
   const spotPx = gridToPixels(ballSpot.x, ballSpot.y, width, height);
 
+  const pgDestPx = gridToPixels(inboundDest.PG.x, inboundDest.PG.y, width, height);
+  console.log(`inboundDest assigned for PG: (${pgDestPx.x},${pgDestPx.y})`);
+  const sgDestPx = gridToPixels(inboundDest.SG.x, inboundDest.SG.y, width, height);
+  console.log(`inboundDest assigned for SG: (${sgDestPx.x},${sgDestPx.y})`);
+  const pfDestPx = gridToPixels(inboundDest.PF.x, inboundDest.PF.y, width, height);
+  console.log(`inboundDest assigned for PF: (${pfDestPx.x},${pfDestPx.y})`);
+  const cDestPx = gridToPixels(inboundDest.C.x, inboundDest.C.y, width, height);
+  console.log(`inboundDest assigned for C: (${cDestPx.x},${cDestPx.y})`);
+
   if (scene.tweens) {
     scene.tweens.killTweensOf(ballSprite);
     scene.tweens.killTweensOf(sfSprite);
     scene.tweens.killTweensOf(pgSprite);
+    if (sgSprite) scene.tweens.killTweensOf(sgSprite);
+    if (pfSprite) scene.tweens.killTweensOf(pfSprite);
+    if (cSprite) scene.tweens.killTweensOf(cSprite);
   }
 
   ballSprite.setPosition(rimPx.x, rimPx.y);
@@ -231,7 +282,97 @@ async function runInboundSetup({
     });
   });
 
-  await Promise.all([...retreatPromises, ballTween, sfTween]);
+  const pgTween = new Promise((resolve) => {
+    console.log("pgTween start");
+    scene.tweens.add({
+      targets: pgSprite,
+      x: pgDestPx.x,
+      y: pgDestPx.y,
+      duration: 500,
+      ease: "Sine.easeInOut",
+      onComplete: () => {
+        console.log("pgTween end");
+        resolve();
+      },
+      onStop: () => {
+        console.log("pgTween end");
+        resolve();
+      }
+    });
+  });
+
+  const sgTween = sgSprite
+    ? new Promise((resolve) => {
+        console.log("sgTween start");
+        scene.tweens.add({
+          targets: sgSprite,
+          x: sgDestPx.x,
+          y: sgDestPx.y,
+          duration: 500,
+          ease: "Sine.easeInOut",
+          onComplete: () => {
+            console.log("sgTween end");
+            resolve();
+          },
+          onStop: () => {
+            console.log("sgTween end");
+            resolve();
+          }
+        });
+      })
+    : Promise.resolve();
+
+  const pfTween = pfSprite
+    ? new Promise((resolve) => {
+        console.log("pfTween start");
+        scene.tweens.add({
+          targets: pfSprite,
+          x: pfDestPx.x,
+          y: pfDestPx.y,
+          duration: 500,
+          ease: "Sine.easeInOut",
+          onComplete: () => {
+            console.log("pfTween end");
+            resolve();
+          },
+          onStop: () => {
+            console.log("pfTween end");
+            resolve();
+          }
+        });
+      })
+    : Promise.resolve();
+
+  const cTween = cSprite
+    ? new Promise((resolve) => {
+        console.log("cTween start");
+        scene.tweens.add({
+          targets: cSprite,
+          x: cDestPx.x,
+          y: cDestPx.y,
+          duration: 500,
+          ease: "Sine.easeInOut",
+          onComplete: () => {
+            console.log("cTween end");
+            resolve();
+          },
+          onStop: () => {
+            console.log("cTween end");
+            resolve();
+          }
+        });
+      })
+    : Promise.resolve();
+
+  await Promise.all([
+    ...retreatPromises,
+    ballTween,
+    sfTween,
+    pgTween,
+    sgTween,
+    pfTween,
+    cTween
+  ]);
 
   console.log(`[inbound][ballAttach][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
   lockBallToPlayer(scene, ballSprite, sfSprite);
