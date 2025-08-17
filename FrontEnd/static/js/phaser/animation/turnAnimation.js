@@ -156,6 +156,7 @@ async function runInboundSetup({
     scene.isInboundSetup = false;
     return;
   }
+  console.log(`[inbound][score][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
 
   const rimGrid = isAwayOffense ? HOME_RIM_COORDS : AWAY_RIM_COORDS;
   const rimPx = gridToPixels(rimGrid.x, rimGrid.y, width, height);
@@ -169,6 +170,8 @@ async function runInboundSetup({
 
   ballSprite.setPosition(rimPx.x, rimPx.y);
   ballSprite.setVisible(true);
+  console.log(`[inbound][rimHoldEnd][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
+  console.log(`[inbound][ballTweenStart][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
 
   const ballTween = new Promise((resolve) => {
     scene.tweens.add({
@@ -177,8 +180,14 @@ async function runInboundSetup({
       y: spotPx.y,
       duration: 500,
       ease: "Sine.easeInOut",
-      onComplete: resolve,
-      onStop: resolve
+      onComplete: () => {
+        console.log(`[inbound][ballTweenEnd][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
+        resolve();
+      },
+      onStop: () => {
+        console.log(`[inbound][ballTweenEnd][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
+        resolve();
+      }
     });
   });
 
@@ -189,16 +198,24 @@ async function runInboundSetup({
       y: spotPx.y,
       duration: 500,
       ease: "Sine.easeInOut",
-      onComplete: resolve,
-      onStop: resolve
+      onComplete: () => {
+        console.log(`[inbound][sfTweenEnd][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
+        resolve();
+      },
+      onStop: () => {
+        console.log(`[inbound][sfTweenEnd][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
+        resolve();
+      }
     });
   });
 
   await Promise.all([...retreatPromises, ballTween, sfTween]);
 
+  console.log(`[inbound][ballAttach][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
   lockBallToPlayer(scene, ballSprite, sfSprite);
   scene.ballAttachedToPlayerId = sfId;
 
+  console.log(`[inbound][holdStart][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
   await new Promise((resolve) => scene.time.delayedCall(1000, resolve));
 
   if (scene.tweens) {
@@ -206,6 +223,7 @@ async function runInboundSetup({
     scene.tweens.killTweensOf(pgSprite);
   }
 
+  console.log(`[inbound][passStart][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
   await new Promise((resolve) => {
     scene.tweens.add({
       targets: ballSprite,
@@ -214,11 +232,16 @@ async function runInboundSetup({
       duration: 500,
       ease: "Sine.easeInOut",
       onComplete: () => {
+        console.log(`[inbound][passEnd][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
         lockBallToPlayer(scene, ballSprite, pgSprite);
         scene.ballAttachedToPlayerId = pgId;
+        console.log(`[inbound][pgAttach][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
         resolve();
       },
-      onStop: resolve
+      onStop: () => {
+        console.log(`[inbound][passEnd][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
+        resolve();
+      }
     });
   });
 
