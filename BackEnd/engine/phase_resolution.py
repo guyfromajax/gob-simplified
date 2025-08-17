@@ -18,8 +18,8 @@ from BackEnd.utils.shared import (
     get_fast_break_chance, 
     calculate_rebound_score, 
     choose_rebounder, 
-    default_rebounder_dict, 
-    resolve_offensive_rebound_loop,
+    default_rebounder_dict,
+    resolve_offensive_rebound,
     record_team_points,
     unpack_game_context
 )
@@ -304,10 +304,32 @@ def resolve_free_throw_logic(game):
                 if random.random() < get_fast_break_chance(game):
                     game_state["offensive_state"] = "FAST_BREAK"
             else:
-                # 🟡 Offensive rebound → putback loop
-                result = resolve_offensive_rebound_loop(game, rebounder)
-                result["shooter"] = shooter
-                return result
+                # Offensive rebound handling
+                off_event = resolve_offensive_rebound(game, rebounder)
+                if off_event["event_type"] == "PUTBACK_ATTEMPT":
+                    text += f" {get_name_safe(rebounder)} goes back up."
+                    result = {
+                        "result_type": "MAKE" if off_event["result"] == "MAKE" else "MISS",
+                        "ball_handler": rebounder,
+                        "shooter": rebounder,
+                        "text": text,
+                        "time_elapsed": off_event["timeElapsed"],
+                        "possession_flips": off_event.get("possession_flips", False),
+                    }
+                    if off_event["result"] == "MAKE":
+                        result["points"] = off_event.get("points", 2)
+                        result["scoring_team"] = off_team.name
+                    return result
+                else:
+                    text += f" {get_name_safe(rebounder)} kicks it out to reset."
+                    return {
+                        "result_type": "MISS",
+                        "ball_handler": rebounder,
+                        "shooter": shooter,
+                        "text": text,
+                        "time_elapsed": off_event["timeElapsed"],
+                        "possession_flips": False,
+                    }
         else:
             possession_flips = True
 
