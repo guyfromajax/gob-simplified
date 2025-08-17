@@ -179,18 +179,18 @@ function renderBracket() {
     const matchup = document.createElement("div");
     matchup.className = "matchup";
 
-    // Prefer data directly on the matchup object so scores/winners show
-    // even when tournament.results is not provided. Fallback to
-    // tournament.results only when necessary for additional metadata.
-    let homeScore = m.score ? m.score[m.home_team] : null;
-    let awayScore = m.score ? m.score[m.away_team] : null;
-    let winner = m.winner ?? null;
+    // Pull score/winner primarily from tournament.results to ensure
+    // consistency for both user-simmed and computer-simmed games. If no
+    // result exists, fall back to any data stored directly on the matchup.
+    const res = getResult(round, index) || {};
+    let homeScore = res.score ? res.score[m.home_team] : undefined;
+    let awayScore = res.score ? res.score[m.away_team] : undefined;
+    let winner = res.winner;
 
-    if ((homeScore == null || awayScore == null || winner == null) && results.length) {
-      const res = getResult(round, index) || {};
-      if (homeScore == null && res.score) homeScore = res.score[m.home_team];
-      if (awayScore == null && res.score) awayScore = res.score[m.away_team];
-      if (winner == null) winner = res.winner;
+    if (homeScore == null || awayScore == null || winner == null) {
+      homeScore = homeScore ?? (m.score ? m.score[m.home_team] : null);
+      awayScore = awayScore ?? (m.score ? m.score[m.away_team] : null);
+      winner = winner ?? m.winner ?? null;
     }
 
     if (side === "center") {
