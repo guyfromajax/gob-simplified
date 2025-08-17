@@ -20,7 +20,8 @@ function createScene() {
 }
 
 function createSprite(team_id) {
-  return { x: 0, y: 0, team_id, setPosition() {}, setVisible() {} };
+  const team = team_id === 'HOME' ? 'home' : 'away';
+  return { x: 0, y: 0, team_id, team, setPosition() {}, setVisible() {} };
 }
 
 const scene = createScene();
@@ -41,7 +42,7 @@ const turnData = {
     hasBallAtStep: [true, true]
   }]
 };
-const simData = { home_team_id: 'HOME' };
+const simData = { home_team_id: 'HOME', away_team_id: 'AWAY' };
 
 await playTurnAnimation({ scene, simData, playerSprites, turnData, ballSprite });
 const shootOpts = calls.find(c => !c.type);
