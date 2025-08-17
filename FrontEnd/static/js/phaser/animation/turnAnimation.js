@@ -382,8 +382,9 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
       const shotResult = await shootBall(shootParams);
       const ballSpot = shotResult?.grid;
       if (turnData.result_type === "MAKE") {
-        const newOffenseSide =
-          shooterTeamId === simData.home_team_id ? "away" : "home";
+        const shooterTeamIsHome =
+          String(shooterTeamId) === String(simData.home_team_id);
+        const newOffenseSide = shooterTeamIsHome ? "away" : "home";
         await runInboundSetup({
           scene,
           ballSprite,
