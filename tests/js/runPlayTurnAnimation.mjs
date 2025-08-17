@@ -19,7 +19,8 @@ function createScene() {
 }
 
 function createSprite(team_id) {
-  return { x: 0, y: 0, team_id, setPosition() {}, setVisible() {} };
+  const team = team_id === 'HOME' ? 'home' : 'away';
+  return { x: 0, y: 0, team_id, team, setPosition() {}, setVisible() {} };
 }
 
 async function runCase(startingTeamId) {
@@ -41,7 +42,7 @@ async function runCase(startingTeamId) {
       hasBallAtStep: [true, true]
     }]
   };
-  const simData = { home_team_id: 'HOME' };
+  const simData = { home_team_id: 'HOME', away_team_id: 'AWAY' };
   await playTurnAnimation({ scene, simData, playerSprites, turnData, ballSprite });
   return calls[0].shooterTeamId === calls[0].homeTeamId;
 }
