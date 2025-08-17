@@ -88,19 +88,20 @@ async function runSetupTween({ scene, ballSprite, animations, playerSprites, cur
   await Promise.all(promises);
 }
 
-// Animate baseline inbound play after a made basket
-async function animateInboundSequence({
+// Setup baseline inbound play after a made basket
+async function runInboundSetup({
   scene,
   ballSprite,
   playerSprites,
-  scoringTeamId,
+  newOffenseSide,
   homeTeamId,
   awayTeamId
 }) {
   scene.isInboundSetup = true;
-  const isHomeScoring = scoringTeamId === homeTeamId;
-  const inboundTeamId = isHomeScoring ? awayTeamId : homeTeamId;
-  const ballSpot = isHomeScoring ? { x: 98, y: 16 } : { x: 3, y: 16 };
+  const isAwayOffense = newOffenseSide === "away";
+  const inboundTeamId = isAwayOffense ? awayTeamId : homeTeamId;
+  const scoringTeamId = isAwayOffense ? homeTeamId : awayTeamId;
+  const ballSpot = isAwayOffense ? { x: 98, y: 16 } : { x: 3, y: 16 };
 
   const width = scene.game.config.width;
   const height = scene.game.config.height;
@@ -112,7 +113,7 @@ async function animateInboundSequence({
     if (!info) continue;
     if (sprite.team_id === scoringTeamId) {
       const targetX = gridToPixels(
-        isHomeScoring ? 45 : 55,
+        isAwayOffense ? 45 : 55,
         25,
         width,
         height
@@ -133,26 +134,30 @@ async function animateInboundSequence({
     }
   }
 
-  // Identify SF and freeze other inbound players
+  // Identify SF/PG and freeze other inbound players
   let sfSprite = null;
+  let pgSprite = null;
   let sfId = null;
+  let pgId = null;
   for (const [id, sprite] of Object.entries(playerSprites)) {
     const info = scene.playerInfo?.[id];
     if (!info || sprite.team_id !== inboundTeamId) continue;
     if (info.pos === "SF") {
       sfSprite = sprite;
       sfId = id;
-    } else if (scene.tweens) {
-      scene.tweens.killTweensOf(sprite);
+    } else if (info.pos === "PG") {
+      pgSprite = sprite;
+      pgId = id;
     }
+    if (scene.tweens) scene.tweens.killTweensOf(sprite);
   }
 
-  if (!sfSprite) {
+  if (!sfSprite || !pgSprite) {
     scene.isInboundSetup = false;
     return;
   }
 
-  const rimGrid = isHomeScoring ? HOME_RIM_COORDS : AWAY_RIM_COORDS;
+  const rimGrid = isAwayOffense ? HOME_RIM_COORDS : AWAY_RIM_COORDS;
   const rimPx = gridToPixels(rimGrid.x, rimGrid.y, width, height);
   const spotPx = gridToPixels(ballSpot.x, ballSpot.y, width, height);
 
@@ -164,7 +169,6 @@ async function animateInboundSequence({
   ballSprite.setPosition(rimPx.x, rimPx.y);
   ballSprite.setVisible(true);
 
-  console.log("ballTweenStart");
   const ballTween = new Promise((resolve) => {
     scene.tweens.add({
       targets: ballSprite,
@@ -177,7 +181,6 @@ async function animateInboundSequence({
     });
   });
 
-  console.log("sfTweenStart");
   const sfTween = new Promise((resolve) => {
     scene.tweens.add({
       targets: sfSprite,
@@ -192,11 +195,28 @@ async function animateInboundSequence({
 
   await Promise.all([...retreatPromises, ballTween, sfTween]);
 
-  console.log("arrival");
   lockBallToPlayer(scene, ballSprite, sfSprite);
-  console.log("ballAttach");
-  scene.isInboundSetup = false;
   scene.ballAttachedToPlayerId = sfId;
+
+  await new Promise((resolve) => scene.time.delayedCall(1000, resolve));
+
+  await new Promise((resolve) => {
+    scene.tweens.add({
+      targets: ballSprite,
+      x: pgSprite.x,
+      y: pgSprite.y,
+      duration: 500,
+      ease: "Sine.easeInOut",
+      onComplete: () => {
+        lockBallToPlayer(scene, ballSprite, pgSprite);
+        scene.ballAttachedToPlayerId = pgId;
+        resolve();
+      },
+      onStop: resolve
+    });
+  });
+
+  scene.isInboundSetup = false;
 }
 
 /**
@@ -333,11 +353,13 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
       const shotResult = await shootBall(shootParams);
       const ballSpot = shotResult?.grid;
       if (turnData.result_type === "MAKE") {
-        await animateInboundSequence({
+        const newOffenseSide =
+          shooterTeamId === simData.home_team_id ? "away" : "home";
+        await runInboundSetup({
           scene,
           ballSprite,
           playerSprites,
-          scoringTeamId: shooterTeamId,
+          newOffenseSide,
           homeTeamId: simData.home_team_id,
           awayTeamId: simData.away_team_id
         });
