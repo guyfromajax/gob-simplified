@@ -94,11 +94,12 @@ async function animateInboundSequence({
   ballSprite,
   playerSprites,
   scoringTeamId,
-  homeTeamId
+  homeTeamId,
+  awayTeamId
 }) {
   scene.isInboundSetup = true;
   const isHomeScoring = scoringTeamId === homeTeamId;
-  const inboundTeamId = isHomeScoring ? "AWAY" : "HOME";
+  const inboundTeamId = isHomeScoring ? awayTeamId : homeTeamId;
   const ballSpot = isHomeScoring ? { x: 98, y: 16 } : { x: 3, y: 16 };
 
   const width = scene.game.config.width;
@@ -337,7 +338,8 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
           ballSprite,
           playerSprites,
           scoringTeamId: shooterTeamId,
-          homeTeamId: simData.home_team_id
+          homeTeamId: simData.home_team_id,
+          awayTeamId: simData.away_team_id
         });
       } else if (ballSpot) {
         const rebounderName = turnData.ball_handler?.trim();
