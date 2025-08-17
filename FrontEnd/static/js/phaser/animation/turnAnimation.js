@@ -164,6 +164,7 @@ async function runInboundSetup({
   if (scene.tweens) {
     scene.tweens.killTweensOf(ballSprite);
     scene.tweens.killTweensOf(sfSprite);
+    scene.tweens.killTweensOf(pgSprite);
   }
 
   ballSprite.setPosition(rimPx.x, rimPx.y);
@@ -199,6 +200,11 @@ async function runInboundSetup({
   scene.ballAttachedToPlayerId = sfId;
 
   await new Promise((resolve) => scene.time.delayedCall(1000, resolve));
+
+  if (scene.tweens) {
+    scene.tweens.killTweensOf(ballSprite);
+    scene.tweens.killTweensOf(pgSprite);
+  }
 
   await new Promise((resolve) => {
     scene.tweens.add({

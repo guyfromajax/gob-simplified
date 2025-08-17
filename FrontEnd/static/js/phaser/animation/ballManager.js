@@ -10,6 +10,7 @@ export const INBOUND_DEBUG = false;
 // Hoop locations in grid coordinates for each team
 const HOME_RIM_COORDS = { x: 91, y: 25 };
 const AWAY_RIM_COORDS = { x: 9, y: 25 };
+const BALL_SPRITE_DEPTH = 1000;
 
 export function lockBallToPlayer(scene, ballSprite, playerSprite) {
   if (!ballSprite || !playerSprite) {
@@ -30,8 +31,8 @@ export function lockBallToPlayer(scene, ballSprite, playerSprite) {
   ballSprite.setPosition(x, y);
   ballSprite.setVisible(true);
 
-  if (typeof playerSprite.depth === "number" && ballSprite.setDepth) {
-    ballSprite.setDepth(playerSprite.depth + 1);
+  if (ballSprite.setDepth) {
+    ballSprite.setDepth(BALL_SPRITE_DEPTH);
   }
 
   // Track final ball owner on the scene if possible
