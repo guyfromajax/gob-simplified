@@ -550,13 +550,18 @@ document.addEventListener("DOMContentLoaded", async () => {
   const simBtn = document.getElementById('sim-remaining');
   if (simBtn) {
     simBtn.addEventListener('click', async () => {
+      if (simBtn.disabled) return;
+      simBtn.disabled = true;
       if (!tournament || !tournament._id) {
         alert('Tournament not loaded');
+        simBtn.disabled = false;
         return;
       }
-      if (tournament.completed || simBtn.disabled) return;
+      if (tournament.completed) {
+        simBtn.disabled = false;
+        return;
+      }
       console.log('#sim-remaining click start');
-      simBtn.disabled = true;
       try {
         const res = await fetch('/tournament/sim-remaining', {
           method: 'POST',
@@ -574,9 +579,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         renderStats();
         await refreshLeaders();
         updateCTA();
-        console.log('#sim-remaining click complete');
+        console.log('#sim-remaining bracket update complete');
       } catch (err) {
-        console.error('Failed to simulate remaining games', err);
+        console.error('Sim remaining failed:', err.message);
         alert('Unable to simulate remaining games');
         simBtn.disabled = false;
       }
