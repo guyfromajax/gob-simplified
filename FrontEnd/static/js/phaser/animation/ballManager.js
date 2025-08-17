@@ -1,6 +1,7 @@
 import * as Phaser from 'https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.esm.js';
 import { generateBallTween } from "./generateBallTween.js";
 import { gridToPixels } from "../utils/gridToPixels.js";
+import { runInboundSetup } from "./turnAnimation.js";
 
 // Debug flags for logging shot / rebound details
 export const SHOT_DEBUG = false;
@@ -201,6 +202,106 @@ export function shootBall({
         } else {
           resolve();
         }
+      }
+    });
+  });
+}
+
+/**
+ * Animate a putback attempt after an offensive rebound.
+ * Detaches the ball from the rebounder and tweens it to the rim.
+ * Resolves after inbound setup (for makes) or after ball lands (for misses).
+ *
+ * @param {Phaser.Scene} scene
+ * @param {Phaser.GameObjects.Image} ballSprite
+ * @param {string} shooterId
+ * @param {{x:number, y:number}} rimCoords - grid coordinates of the target rim
+ * @param {number} duration - tween duration in ms
+ * @param {string} result - "MAKE", "MISS", or "FOUL"
+ */
+export function animatePutbackAttempt(
+  scene,
+  ballSprite,
+  shooterId,
+  rimCoords,
+  duration = 500,
+  result
+) {
+  if (!scene || !ballSprite) return Promise.resolve();
+  const shooterSprite = scene.playerSprites?.[shooterId];
+  if (!shooterSprite) return Promise.resolve();
+
+  if (scene.tweens) scene.tweens.killTweensOf(ballSprite);
+  scene.ballAttachedToPlayerId = null;
+  ballSprite.setPosition(shooterSprite.x, shooterSprite.y);
+  ballSprite.setVisible(true);
+
+  const rim = gridToPixels(
+    rimCoords.x,
+    rimCoords.y,
+    scene.game.config.width,
+    scene.game.config.height
+  );
+
+  return new Promise((resolve) => {
+    scene.tweens.add({
+      targets: ballSprite,
+      x: rim.x,
+      y: rim.y,
+      duration,
+      ease: "Sine.easeInOut",
+      onComplete: () => {
+        const handleComplete = async () => {
+          if (result === "MAKE") {
+            const wait = () =>
+              scene.time?.delayedCall
+                ? new Promise((res) => scene.time.delayedCall(1000, res))
+                : new Promise((res) => setTimeout(res, 1000));
+            await wait();
+
+            const shooterTeamKey = shooterSprite.team;
+            const newOffenseSide = shooterTeamKey === "home" ? "away" : "home";
+            const sprites = Object.values(scene.playerSprites || {});
+            const homeTeamId = sprites.find(s => s.team === "home")?.team_id;
+            const awayTeamId = sprites.find(s => s.team === "away")?.team_id;
+
+            await runInboundSetup({
+              scene,
+              ballSprite,
+              playerSprites: scene.playerSprites,
+              newOffenseSide,
+              homeTeamId,
+              awayTeamId
+            });
+            resolve();
+          } else if (result === "MISS") {
+            const isHomeTeam = shooterSprite.team === "home";
+            const bounceGridX = isHomeTeam ? rimCoords.x - 6 : rimCoords.x + 6;
+            const bounceGridY =
+              rimCoords.y + Phaser.Math.Between(-6, 6);
+            const bounce = gridToPixels(
+              bounceGridX,
+              bounceGridY,
+              scene.game.config.width,
+              scene.game.config.height
+            );
+
+            scene.tweens.add({
+              targets: ballSprite,
+              x: bounce.x,
+              y: bounce.y,
+              duration: duration / 3,
+              ease: "Sine.easeOut",
+              onComplete: () =>
+                resolve({ grid: { x: bounceGridX, y: bounceGridY } })
+            });
+          } else {
+            // FOUL or unrecognized result: backend will handle next steps
+            resolve();
+          }
+        };
+
+        handleComplete();
       }
     });
   });
