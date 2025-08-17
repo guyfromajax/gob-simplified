@@ -5,9 +5,13 @@ export async function finalizeGame({ simData, tournamentId, franchiseId, game })
   const homeTeamObj = simData.homeTeam || { name: simData.home_team };
   const awayTeamObj = simData.awayTeam || { name: simData.away_team };
   const scoreMap = simData.final_score || simData.score || {};
-  const homeScore = homeTeamObj.score ?? scoreMap[homeTeamObj.name] ?? 0;
-  const awayScore = awayTeamObj.score ?? scoreMap[awayTeamObj.name] ?? 0;
-  const winner = homeScore > awayScore ? homeTeamObj.name : awayTeamObj.name;
+  const homeKey = simData.home_team || homeTeamObj.name;
+  const awayKey = simData.away_team || awayTeamObj.name;
+  const homeScore =
+    homeTeamObj.score ?? scoreMap[homeKey] ?? scoreMap[homeTeamObj.name] ?? 0;
+  const awayScore =
+    awayTeamObj.score ?? scoreMap[awayKey] ?? scoreMap[awayTeamObj.name] ?? 0;
+  const winner = homeScore > awayScore ? homeKey : awayKey;
   const params = new URLSearchParams(window.location.search);
   let week = parseInt(params.get('week'), 10);
   const homeIdParam = params.get('home_id');
@@ -34,8 +38,8 @@ export async function finalizeGame({ simData, tournamentId, franchiseId, game })
           game_id: simData.game_id || simData._id,
           winner: winner,
           score: {
-            [homeTeamObj.name]: homeScore,
-            [awayTeamObj.name]: awayScore,
+            [homeKey]: homeScore,
+            [awayKey]: awayScore,
           },
         }),
       });
