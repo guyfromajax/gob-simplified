@@ -369,6 +369,7 @@ function updateCTA() {
   if (tournament.completed) {
     playBtn.style.display = 'none';
     simBtn.style.display = 'none';
+    simBtn.disabled = true;
     container.style.display = 'none';
     exitBtn.style.display = 'inline-block';
     opponentEl.textContent = '';
@@ -388,6 +389,7 @@ function updateCTA() {
     playBtn.style.display = 'none';
     opponentEl.textContent = '';
     simBtn.style.display = 'inline-block';
+    simBtn.disabled = false;
     return;
   }
 
@@ -396,10 +398,12 @@ function updateCTA() {
     playBtn.style.display = 'inline-flex';
     opponentEl.textContent = `vs ${opponent}`;
     simBtn.style.display = 'none';
+    simBtn.disabled = true;
   } else {
     playBtn.style.display = 'none';
     opponentEl.textContent = '';
     simBtn.style.display = 'inline-block';
+    simBtn.disabled = false;
   }
 }
 
@@ -570,13 +574,14 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (simBtn) {
     simBtn.addEventListener('click', async () => {
       if (simBtn.disabled) return;
-      simBtn.disabled = true;
-      if (!tournament || !tournament._id) {
+      if (!tournament) {
         alert('Tournament not loaded');
-        simBtn.disabled = false;
         return;
       }
-      if (tournament.completed) {
+      if (tournament.completed) return;
+      simBtn.disabled = true;
+      if (!tournament._id) {
+        alert('Tournament not loaded');
         simBtn.disabled = false;
         return;
       }
