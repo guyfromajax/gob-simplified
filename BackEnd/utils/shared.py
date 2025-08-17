@@ -110,15 +110,15 @@ def get_time_elapsed(tempo_call):
     else:
         return int(max(5, min(35, random.gauss(12, 6))))  # Fallback
 
-def resolve_offensive_rebound_loop(game, rebounder):
-    
-    game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
-    total_time = 0
-    text_log = ""
-    turns = 0
-    while True:
+def resolve_offensive_rebound(game, rebounder):
+    """Resolve an offensive rebound by choosing a putback or a kick-out.
 
-        # attempt putback
+    Returns an event dictionary describing the outcome.
+    """
+
+    game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
+
+    if random.random() < 0.65:  # putback attempt
         attrs = rebounder.attributes
         shot_score = (
             attrs["SC"] * 0.6 +
@@ -126,68 +126,58 @@ def resolve_offensive_rebound_loop(game, rebounder):
             attrs["IQ"] * 0.2
         ) * random.randint(1, 6)
         time_elapsed = random.randint(2, 5)
-        total_time += time_elapsed
 
-        # contested by random defender
         defender_pos = random.choice(["C", "C", "C", "PF", "PF", "SF", "SF", "SG", "PG"])
         defender = def_team.lineup[defender_pos]
         defense_attrs = defender.attributes
         defense_penalty = (
-            defense_attrs["ID"] * 0.8 + 
-            defense_attrs["IQ"] * 0.1 + 
+            defense_attrs["ID"] * 0.8 +
+            defense_attrs["IQ"] * 0.1 +
             defense_attrs["CH"] * 0.1
         ) * random.randint(1, 6)
         shot_score -= defense_penalty * 0.2
 
         made = shot_score >= off_team.team_attributes["shot_threshold"]
         rebounder.record_stat("FGA")
-        # print(f"{get_name_safe(rebounder)} attempts an offensive rebound shot")
+
+        event = {
+            "event_type": "PUTBACK_ATTEMPT",
+            "shooterId": getattr(rebounder, "player_id", None),
+            "timeElapsed": time_elapsed,
+            "result": "MAKE" if made else "MISS",
+            "possession_flips": False,
+        }
 
         if made:
             rebounder.record_stat("FGM")
             points = 2
             record_team_points(game, off_team, points)
-            text_log += f" and he scores!"
-            return {
-                "text": text_log,
-                "possession_flips": True,
-                "time_elapsed": total_time,
-                "points": points,
-                "shooter": rebounder,
-            }
+            event["points"] = points
+            event["possession_flips"] = True
+        else:
+            new_rebounder, new_team, new_stat = determine_rebounder(game)
+            new_rebounder.record_stat(new_stat)
+            event["possession_flips"] = new_team != off_team
 
-        # shot missed — determine rebound
-        new_rebounder, new_team, new_stat = determine_rebounder(game)
-        new_rebounder.record_stat(new_stat)
-        # print(f"+1 rebound for {get_name_safe(new_rebounder)} / utils/shared - resolve_offensive_rebound_loop")
-        text_log += f" but misses the shot. {new_rebounder} grabs the rebound."
+        return event
 
-        if new_team != off_team:
-            return {
-                "text": text_log,
-                "possession_flips": True,
-                "time_elapsed": total_time
-            }
+    # Kick out to PG
+    pg = off_team.lineup.get("PG")
+    duration = random.randint(1, 3)
+    from_coords = getattr(rebounder, "coords", {"x": 25, "y": 50})
+    to_coords = getattr(pg, "coords", {"x": 25, "y": 50}) if pg else {"x": 25, "y": 50}
 
-        # else: new offensive rebound, repeat loop
-        rebounder = new_rebounder
-        if random.random() > 0.65:
-            text_log += f"{get_name_safe(rebounder)} kicks it out."
-            return {
-                "text": text_log,
-                "possession_flips": False,
-                "time_elapsed": total_time
-            }
-        
-        if turns > 4:
-            text_log += f"{get_name_safe(rebounder)} kicks it out."
-            return {
-                "text": text_log,
-                "possession_flips": False,
-                "time_elapsed": total_time
-            }
-        
-        turns += 1
+    return {
+        "event_type": "KICKOUT_RESET",
+        "rebounderId": getattr(rebounder, "player_id", None),
+        "pgId": getattr(pg, "player_id", None) if pg else None,
+        "pass": {
+            "fromCoords": from_coords,
+            "toCoords": to_coords,
+            "duration": duration,
+        },
+        "timeElapsed": duration,
+    }
 
 def calculate_screen_score(screen_attrs):
     """

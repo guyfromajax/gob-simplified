@@ -24,7 +24,7 @@ from BackEnd.utils.shared import (
     get_fast_break_chance,
     get_time_elapsed,
     apply_help_defense_if_triggered,
-    resolve_offensive_rebound_loop,
+    resolve_offensive_rebound,
     weighted_random_from_dict,
     generate_pass_chain,
     get_name_safe,
