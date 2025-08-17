@@ -3,7 +3,13 @@ import { generateBallTween } from "./generateBallTween.js";
 import { gridToPixels } from "../utils/gridToPixels.js";
 import { runInboundSetup } from "./turnAnimation.js";
 import animationConfig from "./animation_config.js";
-export { attachBallToPlayer, detachBall, tweenBallTo, runPass } from "./ballTween.js";
+import {
+  attachBallToPlayer,
+  detachBall,
+  tweenBallTo,
+  runPass
+} from "./ballTween.js";
+export { attachBallToPlayer, detachBall, tweenBallTo, runPass };
 
 // Debug flags for logging shot / rebound details
 export const SHOT_DEBUG = false;
@@ -483,46 +489,43 @@ export function animateKickoutReset(
   const pgSprite = scene.playerSprites?.[pgId];
   if (!rebounderSprite || !pgSprite) return Promise.resolve();
 
-  // Ensure ball starts with rebounder
-  lockBallToPlayer(scene, ballSprite, rebounderSprite);
+  // Ensure runPass can locate the ball sprite on the scene
+  if (!scene.ballSprite) {
+    scene.ballSprite = ballSprite;
+  }
 
   const width = scene.game.config.width;
   const height = scene.game.config.height;
-
-  const start = gridToPixels(
-    pass.fromCoords?.x ?? rebounderSprite.x,
-    pass.fromCoords?.y ?? rebounderSprite.y,
-    width,
-    height
-  );
-  const end = gridToPixels(
-    pass.toCoords?.x ?? pgSprite.x,
-    pass.toCoords?.y ?? pgSprite.y,
-    width,
-    height
-  );
-
-  ballSprite.setPosition(start.x, start.y);
-  ballSprite.setVisible(true);
-
   const cfg = animationConfig.kickout;
 
-  return new Promise((resolve) => {
-    scene.tweens.add({
-      targets: ballSprite,
-      x: end.x,
-      y: end.y,
-      duration: duration ?? pass.duration ?? cfg.duration,
-      ease: cfg.easing,
-      onComplete: () => {
-        lockBallToPlayer(scene, ballSprite, pgSprite);
-        resolve();
-      },
-      onStop: () => {
-        lockBallToPlayer(scene, ballSprite, pgSprite);
-        resolve();
-      }
-    });
+  const opts = {
+    fromId: rebounderId,
+    toId: pgId,
+    duration: duration ?? pass.duration ?? cfg.duration,
+    easing: cfg.easing
+  };
+
+  if (pass.fromCoords) {
+    opts.startCoords = gridToPixels(
+      pass.fromCoords.x,
+      pass.fromCoords.y,
+      width,
+      height
+    );
+  }
+  if (pass.toCoords) {
+    opts.endCoords = gridToPixels(
+      pass.toCoords.x,
+      pass.toCoords.y,
+      width,
+      height
+    );
+  }
+
+  return runPass(scene, opts).then(() => {
+    if (!pgSprite.playerId) {
+      scene.ballAttachedToPlayerId = pgId;
+    }
   });
 }
 
