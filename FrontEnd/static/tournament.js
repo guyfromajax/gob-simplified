@@ -261,6 +261,8 @@ function renderBracket() {
   bracket.appendChild(rightR1);
 
   if (DEBUG_BRACKET) console.log("[DebugBracket] bracket render complete");
+  // ensure CTA buttons reflect latest bracket state
+  updateCTA();
 }
 
 function renderRoster() {
@@ -346,7 +348,7 @@ function updateCTA() {
   const playBtn = document.getElementById('play-now');
   const simBtn = document.getElementById('sim-remaining');
   const exitBtn = document.getElementById('exit-tournament');
-  const container = document.querySelector('.play-now-container');
+  const container = document.querySelector ? document.querySelector('.play-now-container') : null;
   const opponentEl = document.getElementById('play-now-opponent');
   if (!container || !playBtn || !simBtn || !exitBtn || !tournament || !opponentEl) return;
 
@@ -366,7 +368,16 @@ function updateCTA() {
   const matchups = tournament.bracket?.[roundKey] || [];
   const userMatch = matchups.find(m => m.home_team === userTeamId || m.away_team === userTeamId);
 
-  if (userMatch && !userMatch.winner && !userMatch.game_id) {
+  // user is out of the tournament when no matchup exists or their matchup is finished
+  const eliminated = !userMatch || !!userMatch.winner;
+  if (eliminated) {
+    playBtn.style.display = 'none';
+    opponentEl.textContent = '';
+    simBtn.style.display = 'inline-block';
+    return;
+  }
+
+  if (!userMatch.game_id) {
     const opponent = userMatch.home_team === userTeamId ? userMatch.away_team : userMatch.home_team;
     playBtn.style.display = 'inline-flex';
     opponentEl.textContent = `vs ${opponent}`;
