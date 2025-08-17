@@ -84,17 +84,18 @@ export async function animateGameTurns({ //hasBallAtStep
               ? { x: receiverSprite.x, y: receiverSprite.y }
               : undefined;
 
-            if (animationConfig.enableBallTween) {
-              await runPass(scene, {
-                fromId: playerId,
-                toId: receiverAnim.playerId,
-                endCoords,
-                duration: receiveStep.timestamp - passStep.timestamp,
-                easing: animationConfig.pass.easing
-              });
-            } else if (receiverSprite) {
-              lockBallToPlayer(scene, ballSprite, receiverSprite);
-            }
+            scene.events?.once('passStart', () => console.log('passStart'));
+            scene.events?.once('ballDetached', () => console.log('ballDetached'));
+            scene.events?.once('ballAttached', () => console.log('ballAttached'));
+            scene.events?.once('passEnd', () => console.log('passEnd'));
+
+            await runPass(scene, {
+              fromId: playerId,
+              toId: receiverAnim.playerId,
+              endCoords,
+              duration: animationConfig.pass.duration,
+              easing: animationConfig.pass.easing
+            });
           }
         }
 
