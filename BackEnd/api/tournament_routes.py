@@ -368,6 +368,8 @@ def sim_remaining(request: SimulateRequest):
     results are preserved.  The updated tournament document is returned."""
 
     try:
+        # Debug: show which tournament is being simulated
+        print(f"[sim_remaining] Incoming tournament_id={request.tournament_id}")
         tid = ObjectId(request.tournament_id)
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid tournament_id")
@@ -403,20 +405,23 @@ def sim_remaining(request: SimulateRequest):
 
         round_num = tournament.get("current_round", 1)
         round_key = "final" if round_num == 3 else f"round{round_num}"
+        print(f"[sim_remaining] Processing round {round_num} ({round_key})")
         matchups = tournament.get("bracket", {}).get(round_key, [])
         manager.tournament = tournament
 
         for i, match in enumerate(matchups):
+            # Skip if a result for this matchup already exists
+            exists_result = tournaments_collection.find_one(
+                {
+                    "_id": tid,
+                    "results": {
+                        "$elemMatch": {"round": round_num, "match_index": i}
+                    },
+                }
+            )
+
             if match.get("game_id"):
-                exists = tournaments_collection.find_one(
-                    {
-                        "_id": tid,
-                        "results": {
-                            "$elemMatch": {"round": round_num, "match_index": i}
-                        },
-                    }
-                )
-                if not exists:
+                if not exists_result:
                     summary = games_collection.find_one({"_id": ObjectId(match["game_id"])}) or {}
                     stat_updater.finalize_game(
                         match["game_id"],
@@ -433,8 +438,21 @@ def sim_remaining(request: SimulateRequest):
                         "match_index": i,
                     }
                     _log_result(result_doc)
+                else:
+                    print(
+                        f"[sim_remaining] Skipping round {round_num} match {i} - already has game and result"
+                    )
                 continue
 
+            if exists_result:
+                print(
+                    f"[sim_remaining] Skipping round {round_num} match {i} - result already recorded"
+                )
+                continue
+
+            print(
+                f"[sim_remaining] Simulating matchup: {match['home_team']} vs {match['away_team']}"
+            )
             game = run_simulation(match["home_team"], match["away_team"])
             summary = summarize_game_state(game)
             game_id = games_collection.insert_one(summary).inserted_id
@@ -459,6 +477,7 @@ def sim_remaining(request: SimulateRequest):
             _log_result(result_doc)
 
         update_bracket_from_results(tid, tournaments_collection=tournaments_collection)
+        print(f"[sim_remaining] Bracket updated after round {round_num}")
 
     final_doc = tournaments_collection.find_one({"_id": tid})
     if not final_doc:
