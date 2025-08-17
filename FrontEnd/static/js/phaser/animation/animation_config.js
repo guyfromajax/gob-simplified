@@ -1,20 +1,30 @@
-export const animationConfig = {
+const defaults = {
   enableBallTween: false,
   pass: {
     duration: 150,
     easing: 'Sine.easeInOut',
-    arc: null
+    arc: null,
   },
   inbound: {
     duration: 150,
     easing: 'Sine.easeInOut',
-    arc: null
+    arc: null,
   },
   kickout: {
     duration: 300,
     easing: 'Sine.easeInOut',
-    arc: null
-  }
+    arc: null,
+  },
+};
+
+const overrides =
+  (typeof globalThis !== 'undefined' && globalThis.animation_config) || {};
+
+export const animationConfig = {
+  enableBallTween: overrides.enableBallTween ?? defaults.enableBallTween,
+  pass: { ...defaults.pass, ...(overrides.pass || {}) },
+  inbound: { ...defaults.inbound, ...(overrides.inbound || {}) },
+  kickout: { ...defaults.kickout, ...(overrides.kickout || {}) },
 };
 
 export default animationConfig;
