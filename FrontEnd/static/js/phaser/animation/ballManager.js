@@ -51,10 +51,12 @@ export function lockBallToPlayer(scene, ballSprite, playerSprite) {
   if (scene) {
     if (playerSprite.playerId) {
       scene.ballAttachedToPlayerId = playerSprite.playerId;
+      scene.ballLastKnownOwnerId = playerSprite.playerId;
     } else if (scene.playerSprites) {
       for (const [pid, sprite] of Object.entries(scene.playerSprites)) {
         if (sprite === playerSprite) {
           scene.ballAttachedToPlayerId = pid;
+          scene.ballLastKnownOwnerId = pid;
           break;
         }
       }
