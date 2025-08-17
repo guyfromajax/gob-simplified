@@ -99,6 +99,20 @@ async function runInboundSetup({
 }) {
   scene.isInboundSetup = true;
   const isAwayOffense = newOffenseSide === "away";
+
+  // Derive missing team IDs from sprite metadata
+  if (!homeTeamId || !awayTeamId) {
+    const sprites = Object.values(playerSprites);
+    if (!homeTeamId) {
+      homeTeamId = sprites.find(s => s.team === "home")?.team_id;
+    }
+    if (!awayTeamId) {
+      awayTeamId = sprites.find(s => s.team === "away")?.team_id;
+    }
+  }
+
+  const inboundTeamKey = isAwayOffense ? "away" : "home";
+  const scoringTeamKey = isAwayOffense ? "home" : "away";
   const inboundTeamId = isAwayOffense ? awayTeamId : homeTeamId;
   const scoringTeamId = isAwayOffense ? homeTeamId : awayTeamId;
   const ballSpot = isAwayOffense ? { x: 98, y: 16 } : { x: 3, y: 16 };
@@ -111,7 +125,10 @@ async function runInboundSetup({
   for (const [id, sprite] of Object.entries(playerSprites)) {
     const info = scene.playerInfo?.[id];
     if (!info) continue;
-    if (sprite.team_id === scoringTeamId) {
+    if (
+      sprite.team_id === scoringTeamId ||
+      (!scoringTeamId && sprite.team === scoringTeamKey)
+    ) {
       const targetX = gridToPixels(
         isAwayOffense ? 45 : 55,
         25,
@@ -141,7 +158,12 @@ async function runInboundSetup({
   let pgId = null;
   for (const [id, sprite] of Object.entries(playerSprites)) {
     const info = scene.playerInfo?.[id];
-    if (!info || sprite.team_id !== inboundTeamId) continue;
+    if (
+      !info ||
+      (sprite.team_id !== inboundTeamId &&
+        !(inboundTeamId === undefined && sprite.team === inboundTeamKey))
+    )
+      continue;
     if (info.pos === "SF") {
       sfSprite = sprite;
       sfId = id;
@@ -263,6 +285,14 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
     ballSprite.setVisible(false);
   }
 
+  const homeTeamId = simData.home_team_id;
+  let awayTeamId = simData.away_team_id;
+  if (!awayTeamId) {
+    const awaySprite = Object.values(playerSprites).find(s => s.team === "away");
+    awayTeamId = awaySprite?.team_id;
+    if (awayTeamId) simData.away_team_id = awayTeamId;
+  }
+
   // Determine which player owns the ball at step 0
   let step0OwnerSprite = null;
   for (const anim of turnData.animations) {
@@ -373,7 +403,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
         shooterPos,
         shooterId: shotInfo.playerId,
         shooterTeamId,
-        homeTeamId: simData.home_team_id
+        homeTeamId
       };
       if (SHOT_DEBUG) {
         shootParams.stepIndex = shotInfo.stepIndex;
@@ -383,15 +413,15 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
       const ballSpot = shotResult?.grid;
       if (turnData.result_type === "MAKE") {
         const shooterTeamIsHome =
-          String(shooterTeamId) === String(simData.home_team_id);
+          String(shooterTeamId) === String(homeTeamId);
         const newOffenseSide = shooterTeamIsHome ? "away" : "home";
         await runInboundSetup({
           scene,
           ballSprite,
           playerSprites,
           newOffenseSide,
-          homeTeamId: simData.home_team_id,
-          awayTeamId: simData.away_team_id
+          homeTeamId,
+          awayTeamId
         });
       } else if (ballSpot) {
         const rebounderName = turnData.ball_handler?.trim();
