@@ -61,8 +61,8 @@ function renderBracket() {
   bracket.innerHTML = "";
 
   const round1 = tournament.bracket?.round1 || [];
-  const round2 = tournament.bracket?.round2 || [];
-  const finalRound = tournament.bracket?.final || [];
+  let round2 = tournament.bracket?.round2 || [];
+  let finalRound = tournament.bracket?.final || [];
   const results = tournament.results || [];
 
   const seedMap = {};
@@ -80,6 +80,37 @@ function renderBracket() {
   function getResult(round, index) {
     return results.find(r => r.round === round && r.match_index === index) || null;
   }
+
+  // Derive next-round matchups from results if bracket slots are missing
+  if (!round2.length) {
+    const r1Winners = round1
+      .map((m, i) => m.winner ?? getResult(1, i)?.winner)
+      .filter(Boolean);
+    if (r1Winners.length === 4) {
+      round2 = [
+        { home_team: r1Winners[0], away_team: r1Winners[1], game_id: null, winner: null, score: {} },
+        { home_team: r1Winners[2], away_team: r1Winners[3], game_id: null, winner: null, score: {} },
+      ];
+      tournament.bracket.round2 = round2;
+      if (tournament.current_round < 2) tournament.current_round = 2;
+    }
+  }
+
+  if (!finalRound.length && round2.length === 2) {
+    const r2Winners = round2
+      .map((m, i) => m.winner ?? getResult(2, i)?.winner)
+      .filter(Boolean);
+    if (r2Winners.length === 2) {
+      finalRound = [
+        { home_team: r2Winners[0], away_team: r2Winners[1], game_id: null, winner: null, score: {} },
+      ];
+      tournament.bracket.final = finalRound;
+      if (tournament.current_round < 3) tournament.current_round = 3;
+    }
+  }
+
+  // persist any derived bracket updates
+  localStorage.setItem("activeTournament", JSON.stringify(tournament));
 
   if (DEBUG_BRACKET) {
     console.log("[DebugBracket] renderBracket", {
