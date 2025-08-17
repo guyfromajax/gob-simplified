@@ -9,6 +9,7 @@ export function createGameScene(Phaser) {
   return class GameScene extends Phaser.Scene {
     constructor() {
       super("GameScene");
+      this.lastTurnShown = -1;
     }
 
     init(data) {
@@ -275,7 +276,6 @@ export function createGameScene(Phaser) {
       let liveClock = simData.clock || '8:00';
       let liveQuarter = this.quarter;
       let livePeriodLabel = simData.period_label || `Q${this.quarter}`;
-      let lastTurnShown = -1;
 
       const updateScoreboard = (turn = {}) => {
         const prevHome = liveScore[homeTeam];
@@ -313,11 +313,11 @@ export function createGameScene(Phaser) {
           });
         }
 
-        if (turn.text && turn.index !== lastTurnShown) {
+        if (turn.text && turn.index !== this.lastTurnShown) {
           if (typeof window !== 'undefined' && window.TEXT_SCROLL_ENABLED) {
             appendToTextScroll(formatTurnText(turn));
           }
-          lastTurnShown = turn.index;
+          this.lastTurnShown = turn.index;
         }
       };
 
