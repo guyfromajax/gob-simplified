@@ -4,7 +4,8 @@ import {
   lockBallToPlayer,
   shootBall,
   SHOT_DEBUG,
-  animateRebound
+  animateRebound,
+  animatePutbackAttempt
 } from "./ballManager.js";
 
 // Cap the time spent on any single movement step. Large timestamp gaps can
@@ -453,7 +454,42 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
       break;
     }
   }
+
+  // Process additional events (e.g., putback attempts)
+  if (!scene.skipToEnd && Array.isArray(turnData.events)) {
+    for (const evt of turnData.events) {
+      if (scene.skipToEnd) break;
+      if (evt.event_type === "PUTBACK_ATTEMPT") {
+        const shooterId = evt.shooterId;
+        const rebounderSprite = playerSprites[shooterId];
+        if (!rebounderSprite) continue;
+        lockBallToPlayer(scene, ballSprite, rebounderSprite);
+        const rimCoords =
+          rebounderSprite.team === "home" ? HOME_RIM_COORDS : AWAY_RIM_COORDS;
+        const putbackResult = await animatePutbackAttempt(
+          scene,
+          ballSprite,
+          shooterId,
+          rimCoords,
+          evt.duration || 500,
+          evt.result
+        );
+        if (evt.result === "MISS" && evt.rebound) {
+          await animateRebound({
+            scene,
+            ballSprite,
+            playerSprites,
+            animations: evt.rebound.animations || turnData.animations,
+            rebounderId: evt.rebound.rebounderId,
+            ballSpot: putbackResult?.grid || evt.rebound.ballSpot
+          });
+        }
+      }
+    }
+  }
 }
+
+export { runInboundSetup };
 
 if (typeof window !== "undefined") {
   window.playTurnAnimation = playTurnAnimation;
