@@ -12,6 +12,7 @@ const BALL_DEPTH = 1000;
  */
 export function attachBallToPlayer(scene, ballSprite, playerSprite, opts = {}) {
   if (!scene || !ballSprite || !playerSprite) return;
+  scene.ballDetached = false;
   const depth = opts.depth ?? (playerSprite.depth != null ? playerSprite.depth + 1 : BALL_DEPTH);
   if (scene.tweens) scene.tweens.killTweensOf(ballSprite);
   ballSprite.setPosition(playerSprite.x, playerSprite.y);
@@ -28,6 +29,7 @@ export function attachBallToPlayer(scene, ballSprite, playerSprite, opts = {}) {
  */
 export function detachBall(scene, ballSprite) {
   if (!scene || !ballSprite) return;
+  scene.ballDetached = true;
   if (scene.tweens) scene.tweens.killTweensOf(ballSprite);
   if (typeof scene.ballAttachedToPlayerId !== 'undefined') {
     scene.ballAttachedToPlayerId = null;

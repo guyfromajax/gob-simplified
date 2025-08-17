@@ -16,6 +16,9 @@ const AWAY_RIM_COORDS = { x: 9, y: 25 };
 const BALL_SPRITE_DEPTH = 1000;
 
 export function lockBallToPlayer(scene, ballSprite, playerSprite) {
+  if (scene?.ballDetached) {
+    return;
+  }
   if (!ballSprite || !playerSprite) {
     console.warn("⚠️ lockBallToPlayer skipped: missing sprite");
     return;
