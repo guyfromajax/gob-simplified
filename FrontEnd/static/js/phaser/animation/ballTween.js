@@ -1,6 +1,7 @@
 import * as Phaser from 'https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.esm.js';
 
 const BALL_DEPTH = 1000;
+export const PASS_DEBUG = false;
 
 /**
  * Position the ball sprite on top of a player's sprite and optionally adjust depth.
@@ -97,10 +98,16 @@ export function tweenBallTo(scene, ballSprite, target, opts = {}) {
 export async function runPass(scene, cfg = {}) {
   if (!scene) return;
   const { fromId, toId, startCoords, endCoords, duration, easing } = cfg;
+  const usedDuration = duration ?? 300;
+  const usedEasing = easing ?? 'Linear';
   const ballSprite = scene.ballSprite;
   if (!ballSprite) return;
   const fromSprite = fromId != null ? scene.playerSprites?.[fromId] : null;
   const toSprite = toId != null ? scene.playerSprites?.[toId] : null;
+
+  scene.events?.emit('passStart', { fromId, toId, duration: usedDuration, easing: usedEasing });
+  if (PASS_DEBUG)
+    console.log(`passStart(${fromId}→${toId})`, { duration: usedDuration, easing: usedEasing });
 
   if (fromSprite) {
     attachBallToPlayer(scene, ballSprite, fromSprite);
@@ -115,13 +122,20 @@ export async function runPass(scene, cfg = {}) {
   }
 
   detachBall(scene, ballSprite);
+  scene.events?.emit('ballDetached');
+  if (PASS_DEBUG) console.log('ballDetached');
 
   const end = endCoords || (toSprite ? { x: toSprite.x, y: toSprite.y } : null);
   if (!end) return;
-  await tweenBallTo(scene, ballSprite, end, { duration, easing });
+  await tweenBallTo(scene, ballSprite, end, { duration: usedDuration, easing: usedEasing });
   if (toSprite) {
     attachBallToPlayer(scene, ballSprite, toSprite);
+    scene.events?.emit('ballAttached', { toId });
+    if (PASS_DEBUG) console.log(`ballAttached(${toId})`);
   }
+
+  scene.events?.emit('passEnd', { toId });
+  if (PASS_DEBUG) console.log(`passEnd(${toId})`);
 }
 
 export default {
