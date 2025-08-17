@@ -4,6 +4,12 @@ import { setCourtOffsets } from './utils/gridToPixels.js';
 import { on, emit } from './utils/eventBus.js';
 import { finalizeGame } from './finalizeGame.js';
 
+if (typeof window !== 'undefined') {
+  window.TEXT_SCROLL_ENABLED =
+    window.TEXT_SCROLL_ENABLED !== undefined ? window.TEXT_SCROLL_ENABLED : true;
+  window.TEXT_SCROLL_CONFIG = window.TEXT_SCROLL_CONFIG || {};
+}
+
 function updateScoreboardScores({ home, away }) {
   const homeScoreEl = document.getElementById('home-score');
   const awayScoreEl = document.getElementById('away-score');

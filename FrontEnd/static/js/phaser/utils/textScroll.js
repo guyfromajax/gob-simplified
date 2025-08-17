@@ -1,20 +1,29 @@
 export const config = {
   containerId: 'text-scroll',
   maxLines: 100,
+  autoScroll: true,
+  timestampPrefix: undefined,
 };
 
 export function appendToTextScroll(message, cfg = {}) {
+  const globalCfg =
+    (typeof window !== 'undefined' && window.TEXT_SCROLL_CONFIG) || {};
+  const finalCfg = { ...config, ...globalCfg, ...cfg };
   const {
-    container = document.getElementById(config.containerId),
-    maxLines = config.maxLines,
+    containerId,
+    maxLines,
+    autoScroll,
     timestampPrefix,
-  } = cfg;
+  } = finalCfg;
+  const container = finalCfg.container || document.getElementById(containerId);
 
   if (!container) {
     return;
   }
 
-  const atBottom = container.scrollTop + container.clientHeight === container.scrollHeight;
+  const atBottom =
+    autoScroll &&
+    container.scrollTop + container.clientHeight === container.scrollHeight;
 
   const line = document.createElement('div');
   line.textContent = timestampPrefix ? `${timestampPrefix} ${message}` : message;
@@ -24,7 +33,7 @@ export function appendToTextScroll(message, cfg = {}) {
     container.removeChild(container.firstChild);
   }
 
-  if (atBottom) {
+  if (autoScroll && atBottom) {
     container.scrollTop = container.scrollHeight - container.clientHeight;
   }
 
