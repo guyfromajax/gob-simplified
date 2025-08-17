@@ -9,6 +9,8 @@
   <style>
     :root {
       --scoreboard-height: 80px;
+      --sidebar-border: 1px solid #444;
+      --sidebar-bg: #111;
     }
 
     body {
@@ -136,6 +138,21 @@
     .stats-box td {
       text-align: center;
       padding: 2px;
+    }
+
+    #text-scroll-panel {
+      height: 35%;
+      overflow-y: auto;
+      border: var(--sidebar-border);
+      background: var(--sidebar-bg);
+      padding: 4px;
+      scroll-behavior: smooth;
+    }
+
+    #text-scroll {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
     }
 
     .controls {
