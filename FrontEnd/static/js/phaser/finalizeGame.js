@@ -33,6 +33,10 @@ export async function finalizeGame({ simData, tournamentId, franchiseId, game })
           tournament_id: tournamentId,
           game_id: simData.game_id || simData._id,
           winner: winner,
+          score: {
+            [homeTeamObj.name]: homeScore,
+            [awayTeamObj.name]: awayScore,
+          },
         }),
       });
       if (!res.ok) {
