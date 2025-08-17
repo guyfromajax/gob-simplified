@@ -1,8 +1,15 @@
 from bson import ObjectId
 
 from BackEnd.tournament.tournament_manager import TournamentManager
-from BackEnd.api.tournament_routes import save_result, TournamentResultRequest, sim_remaining, SimulateRequest
-from BackEnd.db import tournaments_collection, games_collection
+from BackEnd.api.tournament_routes import (
+    save_result,
+    TournamentResultRequest,
+    sim_remaining,
+    SimulateRequest,
+)
+from BackEnd.db import tournaments_collection, games_collection, teams_collection
+from fastapi.testclient import TestClient
+from BackEnd.api.api import app
 
 
 def test_sim_remaining_completes_bracket(monkeypatch):
@@ -57,3 +64,61 @@ def test_sim_remaining_completes_bracket(monkeypatch):
     again = tournaments_collection.find_one({"_id": tid})
     assert len(again.get("results", [])) == 7
     assert again["completed"] is True
+
+
+def test_sim_remaining_endpoint(monkeypatch):
+    tournaments_collection.delete_many({})
+    games_collection.delete_many({})
+    teams_collection.delete_many({})
+
+    for name in ["A", "B", "C", "D", "E", "F", "G", "H"]:
+        teams_collection.insert_one({"name": name})
+
+    manager = TournamentManager(
+        user_team_id="A",
+        tournaments_collection=tournaments_collection,
+        team_ids=["A", "B", "C", "D", "E", "F", "G", "H"],
+    )
+    tournament = manager.create_tournament()
+    tid = ObjectId(tournament["_id"])
+
+    round1 = tournament["bracket"]["round1"]
+    for match in round1:
+        if "A" in (match["home_team"], match["away_team"]):
+            home = match["home_team"]
+            away = match["away_team"]
+            opponent = away if home == "A" else home
+            break
+
+    game_id = games_collection.insert_one({"score": {home: 90, away: 100}}).inserted_id
+
+    def fake_run_simulation(h, a):
+        return {"home": h, "away": a}
+
+    def fake_summarize(game):
+        h = game["home"]
+        a = game["away"]
+        return {"score": {h: 80, a: 70}}
+
+    monkeypatch.setattr("BackEnd.api.tournament_routes.run_simulation", fake_run_simulation)
+    monkeypatch.setattr("BackEnd.api.tournament_routes.summarize_game_state", fake_summarize)
+    monkeypatch.setattr(
+        "BackEnd.api.tournament_routes.stat_updater.finalize_game",
+        lambda *args, **kwargs: None,
+    )
+
+    save_result(
+        TournamentResultRequest(
+            tournament_id=str(tid),
+            game_id=str(game_id),
+            winner=opponent,
+        )
+    )
+
+    client = TestClient(app)
+    resp = client.post("/tournament/sim-remaining", json={"tournament_id": str(tid)})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["completed"] is True
+    assert len(data.get("results", [])) == 7
+    assert data.get("champion")
