@@ -91,6 +91,82 @@ async function runSetupTween({ scene, ballSprite, animations, playerSprites, cur
   await Promise.all(promises);
 }
 
+// Setup sideline inbound play
+async function runSideInboundSetup({ scene, ballSprite, playerSprites, turnData }) {
+  if (!turnData || scene?.skipToEnd) return;
+
+  const { ball_spot, oDestinations = {}, dDestinations = {}, possession_team_id } = turnData;
+
+  const width = scene.game.config.width;
+  const height = scene.game.config.height;
+
+  const cfg = globalThis?.animation_config?.sideInbound || {};
+  const duration = cfg.duration ?? 500;
+  const ease = cfg.ease ?? "Sine.easeInOut";
+
+  const offenseSprites = {};
+  const defenseSprites = {};
+  const offenseIds = {};
+
+  if (scene.tweens) scene.tweens.killTweensOf(ballSprite);
+
+  for (const [id, sprite] of Object.entries(playerSprites)) {
+    const info = scene.playerInfo?.[id];
+    if (!info) continue;
+    if (String(sprite.team_id) === String(possession_team_id)) {
+      offenseSprites[info.pos] = sprite;
+      offenseIds[info.pos] = id;
+    } else {
+      defenseSprites[info.pos] = sprite;
+    }
+    if (scene.tweens) scene.tweens.killTweensOf(sprite);
+  }
+
+  const promises = [];
+  const addTween = (sprite, coords, pos) => {
+    if (!sprite || !coords) return;
+    const { x, y } = gridToPixels(coords.x, coords.y, width, height);
+    promises.push(
+      new Promise((resolve) => {
+        scene.tweens.add({
+          targets: sprite,
+          x,
+          y,
+          duration,
+          ease,
+          onStart: () => console.log(`tweenStart:${pos}`),
+          onComplete: () => {
+            console.log(`tweenEnd:${pos}`);
+            resolve();
+          },
+          onStop: () => {
+            console.log(`tweenEnd:${pos}`);
+            resolve();
+          }
+        });
+      })
+    );
+  };
+
+  Object.entries(oDestinations).forEach(([pos, coords]) => addTween(offenseSprites[pos], coords, pos));
+  Object.entries(dDestinations).forEach(([pos, coords]) => addTween(defenseSprites[pos], coords, pos));
+
+  if (ball_spot && ballSprite?.setPosition) {
+    const spotPx = gridToPixels(ball_spot.x, ball_spot.y, width, height);
+    ballSprite.setPosition(spotPx.x, spotPx.y);
+    ballSprite.setVisible(true);
+  }
+
+  await Promise.all(promises);
+
+  const sfSprite = offenseSprites["SF"];
+  if (sfSprite) {
+    lockBallToPlayer(scene, ballSprite, sfSprite);
+    scene.ballAttachedToPlayerId = offenseIds["SF"];
+    console.log("ballAttach(SF)");
+  }
+}
+
 // Setup baseline inbound play after a made basket
 async function runInboundSetup({
   scene,
@@ -643,7 +719,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   }
 }
 
-export { runInboundSetup };
+export { runInboundSetup, runSideInboundSetup };
 
 if (typeof window !== "undefined") {
   window.playTurnAnimation = playTurnAnimation;
