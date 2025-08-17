@@ -9,6 +9,8 @@ import {
   animatePutbackAttempt,
   animateKickoutReset
 } from "./ballManager.js";
+import { tweenBallTo, runPass } from "./ballTween.js";
+import animationConfig from "./animation_config.js";
 
 // Cap the time spent on any single movement step. Large timestamp gaps can
 // otherwise produce multi‑second tweens that appear as animation stalls.
@@ -160,10 +162,28 @@ async function runSideInboundSetup({ scene, ballSprite, playerSprites, turnData 
   await Promise.all(promises);
 
   const sfSprite = offenseSprites["SF"];
+  const pgSprite = offenseSprites["PG"];
+  const sfId = offenseIds["SF"];
+  const pgId = offenseIds["PG"];
   if (sfSprite) {
     lockBallToPlayer(scene, ballSprite, sfSprite);
-    scene.ballAttachedToPlayerId = offenseIds["SF"];
+    scene.ballAttachedToPlayerId = sfId;
     console.log("ballAttach(SF)");
+
+    console.log(`[sideInbound][holdStart] sf:${sfId} pg:${pgId}`);
+    await new Promise((resolve) => scene.time.delayedCall(1000, resolve));
+
+    console.log(`[sideInbound][passStart] sf:${sfId} pg:${pgId}`);
+    if (animationConfig.enableBallTween && pgSprite) {
+      await runPass(scene, { fromId: sfId, toId: pgId, duration, easing: ease });
+    } else if (pgSprite) {
+      lockBallToPlayer(scene, ballSprite, pgSprite);
+    }
+    console.log(`[sideInbound][passEnd] sf:${sfId} pg:${pgId}`);
+    if (pgSprite) {
+      scene.ballAttachedToPlayerId = pgId;
+      console.log(`[sideInbound][pgAttach] sf:${sfId} pg:${pgId}`);
+    }
   }
 }
 
@@ -323,24 +343,19 @@ async function runInboundSetup({
   ballSprite.setVisible(true);
   console.log(`[inbound][rimHoldEnd][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
   console.log(`[inbound][ballTweenStart][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
-
-  const ballTween = new Promise((resolve) => {
-    scene.tweens.add({
-      targets: ballSprite,
-      x: spotPx.x,
-      y: spotPx.y,
+  let ballTween;
+  if (animationConfig.enableBallTween) {
+    ballTween = tweenBallTo(scene, ballSprite, spotPx, {
       duration: 500,
-      ease: "Sine.easeInOut",
-      onComplete: () => {
-        console.log(`[inbound][ballTweenEnd][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
-        resolve();
-      },
-      onStop: () => {
-        console.log(`[inbound][ballTweenEnd][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
-        resolve();
-      }
+      easing: "Sine.easeInOut"
+    }).then(() => {
+      console.log(`[inbound][ballTweenEnd][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
     });
-  });
+  } else {
+    ballSprite.setPosition(spotPx.x, spotPx.y);
+    console.log(`[inbound][ballTweenEnd][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
+    ballTween = Promise.resolve();
+  }
 
   const sfTween = new Promise((resolve) => {
     scene.tweens.add({
@@ -465,26 +480,20 @@ async function runInboundSetup({
   }
 
   console.log(`[inbound][passStart][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
-  await new Promise((resolve) => {
-    scene.tweens.add({
-      targets: ballSprite,
-      x: pgSprite.x,
-      y: pgSprite.y,
+  if (animationConfig.enableBallTween) {
+    await runPass(scene, {
+      fromId: sfId,
+      toId: pgId,
       duration: 500,
-      ease: "Sine.easeInOut",
-      onComplete: () => {
-        console.log(`[inbound][passEnd][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
-        lockBallToPlayer(scene, ballSprite, pgSprite);
-        scene.ballAttachedToPlayerId = pgId;
-        console.log(`[inbound][pgAttach][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
-        resolve();
-      },
-      onStop: () => {
-        console.log(`[inbound][passEnd][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
-        resolve();
-      }
+      easing: "Sine.easeInOut"
     });
-  });
+  } else {
+    lockBallToPlayer(scene, ballSprite, pgSprite);
+  }
+  console.log(`[inbound][passEnd][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
+  lockBallToPlayer(scene, ballSprite, pgSprite);
+  scene.ballAttachedToPlayerId = pgId;
+  console.log(`[inbound][pgAttach][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
 
   scene.isInboundSetup = false;
 }
