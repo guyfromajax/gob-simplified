@@ -314,7 +314,9 @@ export function createGameScene(Phaser) {
         }
 
         if (turn.text && turn.index !== lastTurnShown) {
-          appendToTextScroll(formatTurnText(turn));
+          if (typeof window !== 'undefined' && window.TEXT_SCROLL_ENABLED) {
+            appendToTextScroll(formatTurnText(turn));
+          }
           lastTurnShown = turn.index;
         }
       };
