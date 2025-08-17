@@ -3,6 +3,7 @@ import { generateBallTween } from "./generateBallTween.js";
 import { gridToPixels } from "../utils/gridToPixels.js";
 import { runInboundSetup } from "./turnAnimation.js";
 import animationConfig from "./animation_config.js";
+export { attachBallToPlayer, detachBall, tweenBallTo, runPass } from "./ballTween.js";
 
 // Debug flags for logging shot / rebound details
 export const SHOT_DEBUG = false;
