@@ -22,6 +22,8 @@ export function appendToTextScroll(message, cfg = {}) {
     return;
   }
 
+  console.debug('textScroll:append', message.slice(0, 40));
+
   const appendLine = () => {
     const atBottom =
       autoScroll &&
