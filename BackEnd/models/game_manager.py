@@ -86,6 +86,16 @@ class GameManager:
         self.turns.append(result)
         self.text_log.append(result["text"])
 
+        # If the turn ended with a dead-ball turnover or a non-shooting foul
+        # that does not result in free throws, prepare a sideline inbound
+        # sequence and append its payload so the front end can animate it.
+        if (
+            (result.get("result_type") == "FOUL" and self.game_state.get("free_throws_remaining", 0) == 0)
+            or result.get("result_type") == "DEAD BALL"
+        ):
+            inbound_payload = self.turn_manager.setup_side_inbound()
+            self.turns.append(inbound_payload)
+
         # Update team stats after each turn
         self.update_team_stats()
 
