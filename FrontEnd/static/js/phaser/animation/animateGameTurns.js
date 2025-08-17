@@ -1,6 +1,7 @@
 import { playTurnAnimation, runSideInboundSetup } from "./turnAnimation.js";
 import { onAction } from "./onAction.js";
-import { passBall, lockBallToPlayer } from "./ballManager.js";
+import { runPass, lockBallToPlayer } from "./ballManager.js";
+import animationConfig from "./animation_config.js";
 
 /**
  * Animate all turns from simData.turns using real backend structure.
@@ -48,7 +49,7 @@ export async function animateGameTurns({ //hasBallAtStep
       playerSprites,
       turnData: turn,
       ballSprite,
-      onAction: (action, sprite, timestamp) => {
+      onAction: async (action, sprite, timestamp) => {
         console.log(`🎬 Action "${action}" fired at ${timestamp}ms for sprite:`, sprite);
         onAction(action, sprite, timestamp);
 
@@ -73,24 +74,27 @@ export async function animateGameTurns({ //hasBallAtStep
           );
           const receiveStep = receiverAnim?.movement.find(
             m => m.action === "receive" && m.timestamp === passStep.timestamp
-          );          
+          );
 
-          if (passStep && receiveStep) {
+          if (passStep && receiveStep && receiverAnim?.playerId != null) {
             console.log("📤 Pass triggered");
-            passBall({
-              scene,
-              ballSprite,
-              fromCoords: passStep.coords,
-              toCoords: receiveStep.coords,
-              fromTimestamp: passStep.timestamp,
-              toTimestamp: receiveStep.timestamp
-            });
-          }
-        }
+            const receiverSprite = playerSprites[receiverAnim.playerId];
+            const endCoords = receiverSprite
+              ? { x: receiverSprite.x, y: receiverSprite.y }
+              : undefined;
 
-        if (action === "receive") {
-          console.log("📥 Ball received by:", playerId);
-          lockBallToPlayer(scene, ballSprite, sprite);
+            if (animationConfig.enableBallTween) {
+              await runPass(scene, {
+                fromId: playerId,
+                toId: receiverAnim.playerId,
+                endCoords,
+                duration: receiveStep.timestamp - passStep.timestamp,
+                easing: animationConfig.pass.easing
+              });
+            } else if (receiverSprite) {
+              lockBallToPlayer(scene, ballSprite, receiverSprite);
+            }
+          }
         }
 
         // if (action === "shoot" || sprite.playerId === shooterId) {
