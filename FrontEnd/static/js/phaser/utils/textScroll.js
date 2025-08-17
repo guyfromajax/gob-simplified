@@ -2,6 +2,7 @@ export const config = {
   containerId: 'text-scroll',
   maxLines: 100,
   autoScroll: true,
+  smooth: false,
   timestampPrefix: undefined,
   lineSpacing: '1em',
 };
@@ -15,6 +16,7 @@ export function appendToTextScroll(message, cfg = {}) {
     containerId,
     maxLines,
     autoScroll,
+    smooth,
     timestampPrefix,
   } = finalCfg;
   const container = finalCfg.container || document.getElementById(containerId);
@@ -47,7 +49,13 @@ export function appendToTextScroll(message, cfg = {}) {
     }
 
     if (autoScroll && atBottom) {
-      container.scrollTop = container.scrollHeight - container.clientHeight;
+      console.debug('textScroll:autoScroll', message.length);
+      requestAnimationFrame(() =>
+        container.scrollTo({
+          top: container.scrollHeight,
+          behavior: smooth ? 'smooth' : 'auto',
+        }),
+      );
     }
 
     console.log('textScroll:append', line.textContent.slice(0, 40));
