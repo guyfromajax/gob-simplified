@@ -8,6 +8,7 @@ if (typeof window !== 'undefined') {
   window.TEXT_SCROLL_ENABLED =
     window.TEXT_SCROLL_ENABLED !== undefined ? window.TEXT_SCROLL_ENABLED : true;
   window.TEXT_SCROLL_CONFIG = window.TEXT_SCROLL_CONFIG || {};
+  window.animation_config = window.animation_config || {};
 }
 
 function updateScoreboardScores({ home, away }) {
