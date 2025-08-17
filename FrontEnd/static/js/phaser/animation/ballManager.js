@@ -145,11 +145,7 @@ export function shootBall({
       ease: "Sine.easeInOut",
       onComplete: () => {
         if (result === "MAKE") {
-          // Slight pause before hiding to trigger existing make flow
-          scene.time.delayedCall(250, () => {
-            ballSprite.setVisible(false);
-            resolve();
-          });
+          scene.time.delayedCall(1000, resolve);
         } else if (result === "MISS") {
           // Bounce the ball off the rim
           const bounceGridX = isHomeTeam
