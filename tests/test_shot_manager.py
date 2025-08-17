@@ -96,3 +96,69 @@ def test_offensive_rebound_putback_updates_stats(monkeypatch):
     assert game.score[game.offense_team.name] == 2
 
 
+def _force_putback_path(monkeypatch, made=True, defensive_reb=False):
+    """Helper to drive resolve_offensive_rebound down specific branches."""
+    from BackEnd.utils.shared import resolve_offensive_rebound
+
+    game = build_mock_game()
+    rebounder = game.offense_team.lineup["C"]
+
+    # Choose putback path
+    monkeypatch.setattr("BackEnd.utils.shared.random.random", lambda: 0.1)
+    # Deterministic scores
+    monkeypatch.setattr("BackEnd.utils.shared.random.randint", lambda a, b: 6)
+
+    if made:
+        game.offense_team.team_attributes["shot_threshold"] = 0
+    else:
+        game.offense_team.team_attributes["shot_threshold"] = 1000
+
+        def fake_determine(game_param):
+            team = game.defense_team if defensive_reb else game.offense_team
+            player = team.lineup["PF"]
+            stat = "DREB" if team == game.defense_team else "OREB"
+            return player, team, stat
+
+        monkeypatch.setattr("BackEnd.utils.shared.determine_rebounder", fake_determine)
+
+    event = resolve_offensive_rebound(game, rebounder)
+    return event
+
+
+import pytest
+
+
+@pytest.mark.parametrize(
+    "made,def_reb,expected_flip",
+    [
+        (True, False, True),
+        (False, True, True),
+        (False, False, False),
+    ],
+)
+def test_putback_event_payload_and_possession(monkeypatch, made, def_reb, expected_flip):
+    event = _force_putback_path(monkeypatch, made=made, defensive_reb=def_reb)
+    assert event["event_type"] == "PUTBACK_ATTEMPT"
+    assert event["result"] == ("MAKE" if made else "MISS")
+    assert event["possession_flips"] is expected_flip
+    base_keys = {"event_type", "shooterId", "timeElapsed", "result", "possession_flips"}
+    if made:
+        base_keys.add("points")
+    assert base_keys <= event.keys()
+
+
+def test_kickout_reset_event_payload(monkeypatch):
+    from BackEnd.utils.shared import resolve_offensive_rebound
+
+    game = build_mock_game()
+    rebounder = game.offense_team.lineup["C"]
+
+    # Force kickout branch and deterministic duration
+    monkeypatch.setattr("BackEnd.utils.shared.random.random", lambda: 0.99)
+    monkeypatch.setattr("BackEnd.utils.shared.random.randint", lambda a, b: 1)
+
+    event = resolve_offensive_rebound(game, rebounder)
+    assert event["event_type"] == "KICKOUT_RESET"
+    assert {"event_type", "rebounderId", "pgId", "pass", "timeElapsed"} == set(event.keys())
+
+
