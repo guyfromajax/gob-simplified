@@ -192,7 +192,7 @@ def save_result(request: TournamentResultRequest):
         raise HTTPException(status_code=404, detail="Tournament not found")
 
     round_num = tournament["current_round"]
-    round_key = f"round{round_num}"
+    round_key = "final" if round_num == 3 else f"round{round_num}"
 
     manager = TournamentManager(tournaments_collection=tournaments_collection)
     manager.tournament = tournament
@@ -243,8 +243,9 @@ def save_result(request: TournamentResultRequest):
                 else request.game_id
             )
             summary = games_collection.find_one({"_id": gid}) or {}
+            score_map = summary.get("score") or summary.get("final_score")
             manager.save_game_result(
-                round_key, i, request.game_id, request.winner, summary.get("score")
+                round_key, i, request.game_id, request.winner, score_map
             )
             stat_updater.finalize_game(
                 gid,
@@ -254,7 +255,7 @@ def save_result(request: TournamentResultRequest):
             user_result = {
                 "home_team": home_team,
                 "away_team": away_team,
-                "score": summary.get("score", {}),
+                "score": score_map or {},
                 "winner": request.winner,
                 "round": round_num,
                 "match_index": i,
@@ -276,12 +277,13 @@ def save_result(request: TournamentResultRequest):
                 else match["game_id"]
             )
             summary = games_collection.find_one({"_id": gid}) or {}
+            score_map = summary.get("score") or summary.get("final_score")
             manager.save_game_result(
                 round_key,
                 i,
                 match["game_id"],
                 match["winner"],
-                summary.get("score"),
+                score_map,
             )
             stat_updater.finalize_game(
                 gid,
@@ -291,7 +293,7 @@ def save_result(request: TournamentResultRequest):
             result_doc = {
                 "home_team": match["home_team"],
                 "away_team": match["away_team"],
-                "score": summary.get("score", {}),
+                "score": score_map or {},
                 "winner": match["winner"],
                 "round": round_num,
                 "match_index": i,
@@ -318,13 +320,14 @@ def save_result(request: TournamentResultRequest):
 
         home = match["home_team"]
         away = match["away_team"]
-        winner = home if summary["score"][home] > summary["score"][away] else away
-        manager.save_game_result(round_key, i, str(game_id), winner, summary.get("score"))
+        score_map = summary.get("score") or summary.get("final_score")
+        winner = home if score_map[home] > score_map[away] else away
+        manager.save_game_result(round_key, i, str(game_id), winner, score_map)
 
         result_doc = {
             "home_team": home,
             "away_team": away,
-            "score": summary.get("score", {}),
+            "score": score_map or {},
             "winner": winner,
             "round": round_num,
             "match_index": i,
@@ -415,10 +418,11 @@ def sim_remaining(request: SimulateRequest):
                         mode="tournament",
                         tournament_id=request.tournament_id,
                     )
+                    score_map = summary.get("score") or summary.get("final_score")
                     result_doc = {
                         "home_team": match["home_team"],
                         "away_team": match["away_team"],
-                        "score": summary.get("score", {}),
+                        "score": score_map or {},
                         "winner": match.get("winner"),
                         "round": round_num,
                         "match_index": i,
@@ -437,11 +441,12 @@ def sim_remaining(request: SimulateRequest):
             home = match["home_team"]
             away = match["away_team"]
             winner = home if summary["score"][home] > summary["score"][away] else away
-            manager.save_game_result(round_key, i, str(game_id), winner, summary.get("score"))
+            score_map = summary.get("score") or summary.get("final_score")
+            manager.save_game_result(round_key, i, str(game_id), winner, score_map)
             result_doc = {
                 "home_team": home,
                 "away_team": away,
-                "score": summary.get("score", {}),
+                "score": score_map or {},
                 "winner": winner,
                 "round": round_num,
                 "match_index": i,
