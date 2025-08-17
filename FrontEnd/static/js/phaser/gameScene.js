@@ -3,6 +3,7 @@ import { loadPhaserPlayers } from './setup/loadPhaserPlayers.js';
 import { gridToPixels } from './utils/gridToPixels.js';
 import { finalizeGame } from './finalizeGame.js';
 import { emit } from './utils/eventBus.js';
+import { appendToTextScroll } from './utils/textScroll.js';
 
 export function createGameScene(Phaser) {
   return class GameScene extends Phaser.Scene {
@@ -237,6 +238,33 @@ export function createGameScene(Phaser) {
         }
       };
 
+      const formatTurnText = (turn = {}) => {
+        const parts = [];
+        const q =
+          turn.period_label ||
+          (turn.quarter != null
+            ? turn.quarter > 4
+              ? `OT${turn.quarter - 4}`
+              : `Q${turn.quarter}`
+            : null);
+        const clk = turn.clock || turn.game_clock;
+        if (q || clk) {
+          const timePart = [q, clk].filter(Boolean).join(' ');
+          parts.push(`[${timePart}]`);
+        }
+        if (turn.team) {
+          const teamName =
+            turn.team === 'home'
+              ? homeTeam
+              : turn.team === 'away'
+              ? awayTeam
+              : turn.team;
+          parts.push(teamName);
+        }
+        if (turn.text) parts.push(turn.text);
+        return parts.join(' ');
+      };
+
       // Live scoreboard state seeded from persisted game data
       const liveScore = {
         [homeTeam]: simData.score?.[homeTeam] ?? 0,
@@ -247,6 +275,7 @@ export function createGameScene(Phaser) {
       let liveClock = simData.clock || '8:00';
       let liveQuarter = this.quarter;
       let livePeriodLabel = simData.period_label || `Q${this.quarter}`;
+      let lastTurnShown = -1;
 
       const updateScoreboard = (turn = {}) => {
         const prevHome = liveScore[homeTeam];
@@ -282,6 +311,11 @@ export function createGameScene(Phaser) {
             home: liveScore[homeTeam],
             away: liveScore[awayTeam],
           });
+        }
+
+        if (turn.text && turn.index !== lastTurnShown) {
+          appendToTextScroll(formatTurnText(turn));
+          lastTurnShown = turn.index;
         }
       };
 
