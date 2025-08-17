@@ -3,6 +3,7 @@ export const config = {
   maxLines: 100,
   autoScroll: true,
   timestampPrefix: undefined,
+  lineSpacing: '1em',
 };
 
 export function appendToTextScroll(message, cfg = {}) {
@@ -29,8 +30,16 @@ export function appendToTextScroll(message, cfg = {}) {
       autoScroll &&
       container.scrollTop + container.clientHeight === container.scrollHeight;
 
+    const lineText = timestampPrefix ? `${timestampPrefix} ${message}` : message;
+    const lastLine = container.lastElementChild;
+    if (lastLine && lastLine.textContent === lineText) {
+      return;
+    }
+
     const line = document.createElement('div');
-    line.textContent = timestampPrefix ? `${timestampPrefix} ${message}` : message;
+    line.className = 'turn-line';
+    line.textContent = lineText;
+    line.style.marginBottom = finalCfg.lineSpacing;
     container.appendChild(line);
 
     while (container.children.length > maxLines) {
