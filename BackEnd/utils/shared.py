@@ -447,9 +447,18 @@ def get_away_player_coords(playerCoords):
         coordsX = playerCoords["x"]
         baseValue = coordsX - 51
         xSpot = coordsX - (1 + (baseValue * 2))   
-        playerCoords = {"x": xSpot, "y": ySpot} 
-        
+        playerCoords = {"x": xSpot, "y": ySpot}
+
         return playerCoords
+
+def getAwayTeamCoords(coordsDict):
+       for position, coords in coordsDict.items():
+           ySpot = coords["y"]
+           coordsX = coords["x"]
+           baseValue = coordsX - 51
+           xSpot = coordsX - (1 + (baseValue * 2))
+           coordsDict[position] = {"x": xSpot, "y": ySpot}
+       return coordsDict
 
 def update_player_coords_from_animations(game, animations):
     for anim in animations:
