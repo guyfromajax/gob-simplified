@@ -84,6 +84,10 @@ export async function animateGameTurns({ //hasBallAtStep
               ? { x: receiverSprite.x, y: receiverSprite.y }
               : undefined;
 
+            const delta = receiveStep.timestamp - passStep.timestamp;
+            const duration = delta > 0 ? delta : animationConfig.pass.duration;
+            console.log(`⏱️ Resolved pass duration: ${duration}ms (delta=${delta})`);
+
             scene.events?.once('passStart', () => console.log('passStart'));
             scene.events?.once('ballDetached', () => console.log('ballDetached'));
             scene.events?.once('ballAttached', () => console.log('ballAttached'));
@@ -93,7 +97,7 @@ export async function animateGameTurns({ //hasBallAtStep
               fromId: playerId,
               toId: receiverAnim.playerId,
               endCoords,
-              duration: animationConfig.pass.duration,
+              duration,
               easing: animationConfig.pass.easing
             });
           }
