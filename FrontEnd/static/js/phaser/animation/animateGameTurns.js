@@ -19,6 +19,7 @@ export async function animateGameTurns({ //hasBallAtStep
   for (let i = 0; i < turns.length; i++) {
     scene.currentTurn = i;
     const turn = turns[i];
+    turn.index = i;
     if (scene.skipToEnd) break;
     console.log(`🔁 Turn ${i + 1}`, turn);
 
@@ -114,6 +115,7 @@ export async function animateGameTurns({ //hasBallAtStep
     if (scene.skipToEnd) {
       for (let j = i + 1; j < turns.length; j++) {
         try {
+          turns[j].index = j;
           if (onUpdate) onUpdate(turns[j]);
         } catch (err) {
           console.error('Scoreboard update failed:', err);
