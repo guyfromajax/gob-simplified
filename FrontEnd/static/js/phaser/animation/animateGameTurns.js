@@ -1,4 +1,4 @@
-import { playTurnAnimation } from "./turnAnimation.js";
+import { playTurnAnimation, runSideInboundSetup } from "./turnAnimation.js";
 import { onAction } from "./onAction.js";
 import { passBall, lockBallToPlayer } from "./ballManager.js";
 
@@ -20,6 +20,18 @@ export async function animateGameTurns({ //hasBallAtStep
     const turn = turns[i];
     if (scene.skipToEnd) break;
     console.log(`🔁 Turn ${i + 1}`, turn);
+
+    if (turn.result_type === "SIDE_INBOUND") {
+      await runSideInboundSetup({ scene, ballSprite, playerSprites, turnData: turn });
+      if (onUpdate) {
+        try {
+          onUpdate(turn);
+        } catch (err) {
+          console.error('Scoreboard update failed:', err);
+        }
+      }
+      continue;
+    }
 
     const shooterName = turn.shooter || "";
     const animations = turn.animations || [];
