@@ -2,6 +2,7 @@ import * as Phaser from 'https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.
 import { generateBallTween } from "./generateBallTween.js";
 import { gridToPixels } from "../utils/gridToPixels.js";
 import { runInboundSetup } from "./turnAnimation.js";
+import animationConfig from "./animation_config.js";
 
 // Debug flags for logging shot / rebound details
 export const SHOT_DEBUG = false;
@@ -70,7 +71,8 @@ export function passBall({
     startCoords: fromCoords,
     endCoords: toCoords,
     startTimestamp: fromTimestamp,
-    endTimestamp: toTimestamp
+    endTimestamp: toTimestamp,
+    type: 'pass'
   });
 }
 
@@ -89,7 +91,8 @@ export function animateInboundPass(
     startCoords: fromCoords,
     endCoords: toCoords,
     startTimestamp: startTs,
-    endTimestamp: endTs
+    endTimestamp: endTs,
+    type: 'inbound'
   });
 }
 
@@ -498,13 +501,15 @@ export function animateKickoutReset(
   ballSprite.setPosition(start.x, start.y);
   ballSprite.setVisible(true);
 
+  const cfg = animationConfig.kickout;
+
   return new Promise((resolve) => {
     scene.tweens.add({
       targets: ballSprite,
       x: end.x,
       y: end.y,
-      duration: duration ?? pass.duration ?? 300,
-      ease: "Sine.easeInOut",
+      duration: duration ?? pass.duration ?? cfg.duration,
+      ease: cfg.easing,
       onComplete: () => {
         lockBallToPlayer(scene, ballSprite, pgSprite);
         resolve();
