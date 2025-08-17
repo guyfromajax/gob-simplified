@@ -81,6 +81,21 @@ function renderBracket() {
     return results.find(r => r.round === round && r.match_index === index) || null;
   }
 
+  function applyResults(matches, round) {
+    matches.forEach((m, i) => {
+      const res = getResult(round, i);
+      if (res) {
+        m.score = res.score || {};
+        m.winner = res.winner ?? null;
+      }
+    });
+  }
+
+  // ensure existing bracket data reflects any recorded results
+  applyResults(round1, 1);
+  applyResults(round2, 2);
+  applyResults(finalRound, 3);
+
   // Derive next-round matchups from results if bracket slots are missing
   if (!round2.length) {
     const r1Winners = round1
@@ -108,6 +123,10 @@ function renderBracket() {
       if (tournament.current_round < 3) tournament.current_round = 3;
     }
   }
+
+  // apply results to newly derived rounds, if any
+  applyResults(round2, 2);
+  applyResults(finalRound, 3);
 
   // persist any derived bracket updates
   localStorage.setItem("activeTournament", JSON.stringify(tournament));
