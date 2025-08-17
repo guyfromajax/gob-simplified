@@ -6,6 +6,7 @@ export const config = {
 };
 
 export function appendToTextScroll(message, cfg = {}) {
+  if (!message) return;
   const globalCfg =
     (typeof window !== 'undefined' && window.TEXT_SCROLL_CONFIG) || {};
   const finalCfg = { ...config, ...globalCfg, ...cfg };
@@ -21,22 +22,30 @@ export function appendToTextScroll(message, cfg = {}) {
     return;
   }
 
-  const atBottom =
-    autoScroll &&
-    container.scrollTop + container.clientHeight === container.scrollHeight;
+  const appendLine = () => {
+    const atBottom =
+      autoScroll &&
+      container.scrollTop + container.clientHeight === container.scrollHeight;
 
-  const line = document.createElement('div');
-  line.textContent = timestampPrefix ? `${timestampPrefix} ${message}` : message;
-  container.appendChild(line);
+    const line = document.createElement('div');
+    line.textContent = timestampPrefix ? `${timestampPrefix} ${message}` : message;
+    container.appendChild(line);
 
-  while (container.children.length > maxLines) {
-    container.removeChild(container.firstChild);
+    while (container.children.length > maxLines) {
+      container.removeChild(container.firstChild);
+    }
+
+    if (autoScroll && atBottom) {
+      container.scrollTop = container.scrollHeight - container.clientHeight;
+    }
+
+    console.log('textScroll:append', line.textContent.slice(0, 40));
+  };
+
+  const heavyUpdate = container.children.length > maxLines + 20;
+  if (heavyUpdate && typeof requestAnimationFrame === 'function') {
+    requestAnimationFrame(appendLine);
+  } else {
+    appendLine();
   }
-
-  if (autoScroll && atBottom) {
-    container.scrollTop = container.scrollHeight - container.clientHeight;
-  }
-
-  console.log('textScroll:append', line.textContent.slice(0, 40));
 }
-
