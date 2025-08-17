@@ -29,6 +29,24 @@ export function lockBallToPlayer(scene, ballSprite, playerSprite) {
   const { x, y } = playerSprite;
   ballSprite.setPosition(x, y);
   ballSprite.setVisible(true);
+
+  if (typeof playerSprite.depth === "number" && ballSprite.setDepth) {
+    ballSprite.setDepth(playerSprite.depth + 1);
+  }
+
+  // Track final ball owner on the scene if possible
+  if (scene) {
+    if (playerSprite.playerId) {
+      scene.ballAttachedToPlayerId = playerSprite.playerId;
+    } else if (scene.playerSprites) {
+      for (const [pid, sprite] of Object.entries(scene.playerSprites)) {
+        if (sprite === playerSprite) {
+          scene.ballAttachedToPlayerId = pid;
+          break;
+        }
+      }
+    }
+  }
 }
 
 
@@ -145,7 +163,17 @@ export function shootBall({
       ease: "Sine.easeInOut",
       onComplete: () => {
         if (result === "MAKE") {
-          scene.time.delayedCall(1000, resolve);
+          console.log("score");
+          console.log("rimHoldStart");
+          const finish = () => {
+            console.log("rimHoldEnd");
+            resolve();
+          };
+          if (scene.time?.delayedCall) {
+            scene.time.delayedCall(1000, finish);
+          } else {
+            setTimeout(finish, 1000);
+          }
         } else if (result === "MISS") {
           // Bounce the ball off the rim
           const bounceGridX = isHomeTeam
