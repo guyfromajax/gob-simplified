@@ -104,6 +104,9 @@ export async function runPass(scene, cfg = {}) {
 
   if (fromSprite) {
     attachBallToPlayer(scene, ballSprite, fromSprite);
+    if (startCoords) {
+      ballSprite.setPosition(startCoords.x, startCoords.y);
+    }
   } else if (startCoords) {
     if (scene.tweens) scene.tweens.killTweensOf(ballSprite);
     ballSprite.setPosition(startCoords.x, startCoords.y);
