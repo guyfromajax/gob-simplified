@@ -10,21 +10,26 @@ from collections import defaultdict
 from BackEnd.playcall_skeletons.inside_skeletons import INSIDE_SCENES
 from BackEnd.constants import ACTIONS
 from BackEnd.constants import (
-    PLAYCALL_ATTRIBUTE_WEIGHTS, 
-    POSITION_LIST, 
-    STRATEGY_CALL_DICTS, 
+    PLAYCALL_ATTRIBUTE_WEIGHTS,
+    POSITION_LIST,
+    STRATEGY_CALL_DICTS,
     TEMPO_PASS_DICT,
     MALLEABLE_ATTRS
 )
 from BackEnd.utils.shared import (
-    weighted_random_from_dict, 
-    generate_pass_chain, 
-    get_team_thresholds, 
+    weighted_random_from_dict,
+    generate_pass_chain,
+    get_team_thresholds,
     get_foul_and_turnover_positions,
     get_name_safe,
     get_player_position,
     update_player_coords_from_animations,
-    serialize_lineup
+    serialize_lineup,
+    getAwayTeamCoords
+)
+from BackEnd.utils.shared_defense import (
+    assign_bh_defender_coords,
+    assign_non_bh_defender_coords
 )
 from BackEnd.engine.phase_resolution import (
     resolve_fast_break_logic, 
@@ -52,6 +57,87 @@ class TurnManager:
                     setattr(player, "player_id", str(id(player)))
                 if not hasattr(player, "coords"):
                     setattr(player, "coords", {"x": 25, "y": 50})
+
+    def setup_side_inbound(self):
+        """
+        Prepare coordinates for a sideline inbound following a dead-ball
+        turnover or a non-shooting foul with no free throws.
+
+        Returns a payload describing offensive and defensive destination
+        coordinates which the front-end can use to animate the inbound
+        sequence.
+        """
+
+        game = self.game
+        offense_team = game.offense_team
+        defense_team = game.defense_team
+        aggression = defense_team.strategy_calls.get("aggression_call", "normal")
+        is_away_offense = offense_team.team_id == game.away_team.team_id
+
+        self.logger.log("sideInbound:start")
+
+        # Baseline spot for the inbounder (SF). These coordinates assume the
+        # home team is on offense. They will be mirrored if the away team has
+        # the ball.
+        inbound_spot_home = {"x": 47, "y": 25}
+
+        # Destination ranges for other offensive players (home orientation).
+        home_ranges = {
+            "PG": {"x": (50, 54), "y": (22, 28)},
+            "SG": {"x": (54, 58), "y": (18, 32)},
+            "PF": {"x": (54, 58), "y": (30, 36)},
+            "C":  {"x": (54, 58), "y": (14, 20)},
+        }
+
+        o_dest_home = {}
+        for pos, ranges in home_ranges.items():
+            o_dest_home[pos] = {
+                "x": random.randint(*ranges["x"]),
+                "y": random.randint(*ranges["y"]),
+            }
+            self.logger.log(f"destAssigned:{pos}")
+
+        # Inbounder (SF) stays at the inbound spot
+        o_dest_home["SF"] = inbound_spot_home.copy()
+
+        # Flip offensive coordinates if the away team has possession
+        o_dest = getAwayTeamCoords(o_dest_home.copy()) if is_away_offense else o_dest_home
+
+        # Determine ball-handler (PG) coordinates in actual orientation
+        bh_coords = o_dest["PG"]
+
+        # --- Defensive positioning ---
+        self.logger.log("defenseUpdate:start")
+        d_dest = {}
+        for pos, defender in defense_team.lineup.items():
+            if pos == "PG":
+                d_coords = assign_bh_defender_coords(
+                    bh_coords, aggression, is_away_offense
+                )
+                if is_away_offense:
+                    d_coords = getAwayTeamCoords({"tmp": d_coords})["tmp"]
+                d_dest[pos] = d_coords
+            elif pos in o_dest:
+                o_coords = o_dest[pos]
+                # Convert offensive coords back to home orientation for calc
+                o_calc = getAwayTeamCoords({"tmp": o_coords})["tmp"] if is_away_offense else o_coords
+                d_coords = assign_non_bh_defender_coords(
+                    o_calc, bh_coords, aggression, is_away_offense
+                )
+                if is_away_offense:
+                    d_coords = getAwayTeamCoords({"tmp": d_coords})["tmp"]
+                d_dest[pos] = d_coords
+        self.logger.log("defenseUpdate:end")
+
+        payload = {
+            "result_type": "SIDE_INBOUND",
+            "ball_spot": getAwayTeamCoords({"tmp": inbound_spot_home})["tmp"] if is_away_offense else inbound_spot_home,
+            "oDestinations": o_dest,
+            "dDestinations": d_dest,
+            "possession_team_id": offense_team.team_id,
+        }
+
+        return payload
 
     def run_micro_turn(self):
         # Increment micro turn counter
