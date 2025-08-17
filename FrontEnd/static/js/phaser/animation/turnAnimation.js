@@ -6,7 +6,8 @@ import {
   shootBall,
   SHOT_DEBUG,
   animateRebound,
-  animatePutbackAttempt
+  animatePutbackAttempt,
+  animateKickoutReset
 } from "./ballManager.js";
 
 // Cap the time spent on any single movement step. Large timestamp gaps can
@@ -624,6 +625,18 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
             rebounderId: evt.rebound.rebounderId,
             ballSpot: putbackResult?.grid || evt.rebound.ballSpot
           });
+        }
+      } else if (evt.event_type === "KICKOUT_RESET") {
+        await animateKickoutReset(
+          scene,
+          ballSprite,
+          evt.rebounderId,
+          evt.pgId,
+          evt.pass,
+          evt.pass?.duration
+        );
+        if (typeof scene.startNextHalfCourtOffense === "function") {
+          scene.startNextHalfCourtOffense();
         }
       }
     }

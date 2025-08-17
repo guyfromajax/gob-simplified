@@ -20,6 +20,11 @@ export function animatePutbackAttempt(scene, ballSprite, shooterId, rimCoords, d
   return Promise.resolve();
 }
 
+export function animateKickoutReset(scene, ballSprite, rebounderId, pgId, pass, duration) {
+  calls.push({ type: 'kickoutReset', scene, ballSprite, rebounderId, pgId, pass, duration });
+  return Promise.resolve();
+}
+
 export function animateInboundPass(scene, ballSprite, fromCoords, toCoords, startTs, endTs) {
   calls.push({
     type: 'inboundPass',
