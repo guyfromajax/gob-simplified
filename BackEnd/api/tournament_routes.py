@@ -25,6 +25,7 @@ class TournamentResultRequest(BaseModel):
     tournament_id: str
     game_id: str
     winner: str
+    score: dict[str, int] | None = None
 
 class SimulateRequest(BaseModel):
     tournament_id: str
@@ -243,7 +244,11 @@ def save_result(request: TournamentResultRequest):
                 else request.game_id
             )
             summary = games_collection.find_one({"_id": gid}) or {}
-            score_map = summary.get("score") or summary.get("final_score")
+            score_map = (
+                summary.get("score")
+                or summary.get("final_score")
+                or request.score
+            )
             manager.save_game_result(
                 round_key, i, request.game_id, request.winner, score_map
             )
