@@ -451,6 +451,73 @@ export function animateRebound({
 }
 
 /**
+ * Animate an offensive rebound kickout pass to reset the half‑court offense.
+ * Attaches the ball to the rebounder, tweens the pass to the point guard,
+ * then locks the ball to the PG on completion.
+ *
+ * @param {Phaser.Scene} scene
+ * @param {Phaser.GameObjects.Image} ballSprite
+ * @param {string} rebounderId
+ * @param {string} pgId
+ * @param {{fromCoords:{x:number,y:number}, toCoords:{x:number,y:number}, duration?:number}} pass
+ * @param {number} [duration]
+ */
+export function animateKickoutReset(
+  scene,
+  ballSprite,
+  rebounderId,
+  pgId,
+  pass = {},
+  duration
+) {
+  if (!scene || !ballSprite) return Promise.resolve();
+
+  const rebounderSprite = scene.playerSprites?.[rebounderId];
+  const pgSprite = scene.playerSprites?.[pgId];
+  if (!rebounderSprite || !pgSprite) return Promise.resolve();
+
+  // Ensure ball starts with rebounder
+  lockBallToPlayer(scene, ballSprite, rebounderSprite);
+
+  const width = scene.game.config.width;
+  const height = scene.game.config.height;
+
+  const start = gridToPixels(
+    pass.fromCoords?.x ?? rebounderSprite.x,
+    pass.fromCoords?.y ?? rebounderSprite.y,
+    width,
+    height
+  );
+  const end = gridToPixels(
+    pass.toCoords?.x ?? pgSprite.x,
+    pass.toCoords?.y ?? pgSprite.y,
+    width,
+    height
+  );
+
+  ballSprite.setPosition(start.x, start.y);
+  ballSprite.setVisible(true);
+
+  return new Promise((resolve) => {
+    scene.tweens.add({
+      targets: ballSprite,
+      x: end.x,
+      y: end.y,
+      duration: duration ?? pass.duration ?? 300,
+      ease: "Sine.easeInOut",
+      onComplete: () => {
+        lockBallToPlayer(scene, ballSprite, pgSprite);
+        resolve();
+      },
+      onStop: () => {
+        lockBallToPlayer(scene, ballSprite, pgSprite);
+        resolve();
+      }
+    });
+  });
+}
+
+/**
  * Checks which player has the ball at the current animation step
  * and locks the ball to that player's sprite.
  *
