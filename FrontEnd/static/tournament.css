@@ -302,7 +302,8 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* --- Bracket State Styles --- */
-.winner {
+/* Highlight winning team entries in every round with a green outline */
+.team-entry.winner {
   outline: 3px solid #00e676;
 }
 
