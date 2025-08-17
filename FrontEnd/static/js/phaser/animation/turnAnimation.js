@@ -4,9 +4,7 @@ import {
   lockBallToPlayer,
   shootBall,
   SHOT_DEBUG,
-  animateRebound,
-  animateInboundPass,
-  INBOUND_DEBUG
+  animateRebound
 } from "./ballManager.js";
 
 // Cap the time spent on any single movement step. Large timestamp gaps can
@@ -98,104 +96,27 @@ async function animateInboundSequence({
   scoringTeamId,
   homeTeamId
 }) {
+  scene.isInboundSetup = true;
   const isHomeScoring = scoringTeamId === homeTeamId;
   const inboundTeamId = isHomeScoring ? "AWAY" : "HOME";
+  const ballSpot = isHomeScoring ? { x: 98, y: 16 } : { x: 3, y: 16 };
 
-  const INBOUND_TABLE = {
-    HOME: {
-      ballSpot: { x: 6, y: 25 },
-      destinations: {
-        SF: { x: 6, y: 25 },
-        PG: { x: 14, y: 25 },
-        SG: { x: 18, y: 25 },
-        PF: { x: 22, y: 25 },
-        C: { x: 26, y: 25 }
-      }
-    },
-    AWAY: {
-      ballSpot: { x: 94, y: 25 },
-      destinations: {
-        SF: { x: 94, y: 25 },
-        PG: { x: 86, y: 25 },
-        SG: { x: 82, y: 25 },
-        PF: { x: 78, y: 25 },
-        C: { x: 74, y: 25 }
-      }
-    }
-  };
+  const width = scene.game.config.width;
+  const height = scene.game.config.height;
 
-  const { ballSpot, destinations: oDestinationDict } = INBOUND_TABLE[inboundTeamId];
-
-  const rimGrid = isHomeScoring ? HOME_RIM_COORDS : AWAY_RIM_COORDS;
-  const rimPx = gridToPixels(
-    rimGrid.x,
-    rimGrid.y,
-    scene.game.config.width,
-    scene.game.config.height
-  );
-  const spotPx = gridToPixels(
-    ballSpot.x,
-    ballSpot.y,
-    scene.game.config.width,
-    scene.game.config.height
-  );
-
-  if (ballSprite) {
-    ballSprite.setPosition(rimPx.x, rimPx.y);
-    ballSprite.setVisible(true);
-    await new Promise((resolve) => {
-      scene.tweens.add({
-        targets: ballSprite,
-        x: spotPx.x,
-        y: spotPx.y,
-        duration: 500,
-        ease: "Sine.easeInOut",
-        onComplete: resolve,
-        onStop: resolve
-      });
-    });
-  }
-
-  const movePromises = [];
-  let inbounderSprite = null;
-  let receiverSprite = null;
+  // Retreat scoring team toward midcourt
+  const retreatPromises = [];
   for (const [id, sprite] of Object.entries(playerSprites)) {
     const info = scene.playerInfo?.[id];
     if (!info) continue;
-
-    if (sprite.team_id === inboundTeamId) {
-      const dest = oDestinationDict[info.pos];
-      if (dest) {
-        const px = gridToPixels(
-          dest.x,
-          dest.y,
-          scene.game.config.width,
-          scene.game.config.height
-        );
-        movePromises.push(
-          new Promise((resolve) => {
-            scene.tweens.add({
-              targets: sprite,
-              x: px.x,
-              y: px.y,
-              duration: 500,
-              ease: "Sine.easeInOut",
-              onComplete: resolve,
-              onStop: resolve
-            });
-          })
-        );
-      }
-      if (info.pos === "SF") inbounderSprite = sprite;
-      if (info.pos === "PG") receiverSprite = sprite;
-    } else if (sprite.team_id === scoringTeamId) {
+    if (sprite.team_id === scoringTeamId) {
       const targetX = gridToPixels(
         isHomeScoring ? 45 : 55,
         25,
-        scene.game.config.width,
-        scene.game.config.height
+        width,
+        height
       ).x;
-      movePromises.push(
+      retreatPromises.push(
         new Promise((resolve) => {
           scene.tweens.add({
             targets: sprite,
@@ -211,20 +132,70 @@ async function animateInboundSequence({
     }
   }
 
-  await Promise.all(movePromises);
-
-  if (inbounderSprite && receiverSprite) {
-    lockBallToPlayer(scene, ballSprite, inbounderSprite);
-    animateInboundPass(scene, ballSprite, ballSpot, oDestinationDict.PG, 0, 500);
-    await new Promise((resolve) => {
-      if (scene.time?.delayedCall) {
-        scene.time.delayedCall(500, resolve);
-      } else {
-        setTimeout(resolve, 500);
-      }
-    });
-    lockBallToPlayer(scene, ballSprite, receiverSprite);
+  // Identify SF and freeze other inbound players
+  let sfSprite = null;
+  let sfId = null;
+  for (const [id, sprite] of Object.entries(playerSprites)) {
+    const info = scene.playerInfo?.[id];
+    if (!info || sprite.team_id !== inboundTeamId) continue;
+    if (info.pos === "SF") {
+      sfSprite = sprite;
+      sfId = id;
+    } else if (scene.tweens) {
+      scene.tweens.killTweensOf(sprite);
+    }
   }
+
+  if (!sfSprite) {
+    scene.isInboundSetup = false;
+    return;
+  }
+
+  const rimGrid = isHomeScoring ? HOME_RIM_COORDS : AWAY_RIM_COORDS;
+  const rimPx = gridToPixels(rimGrid.x, rimGrid.y, width, height);
+  const spotPx = gridToPixels(ballSpot.x, ballSpot.y, width, height);
+
+  if (scene.tweens) {
+    scene.tweens.killTweensOf(ballSprite);
+    scene.tweens.killTweensOf(sfSprite);
+  }
+
+  ballSprite.setPosition(rimPx.x, rimPx.y);
+  ballSprite.setVisible(true);
+
+  console.log("ballTweenStart");
+  const ballTween = new Promise((resolve) => {
+    scene.tweens.add({
+      targets: ballSprite,
+      x: spotPx.x,
+      y: spotPx.y,
+      duration: 500,
+      ease: "Sine.easeInOut",
+      onComplete: resolve,
+      onStop: resolve
+    });
+  });
+
+  console.log("sfTweenStart");
+  const sfTween = new Promise((resolve) => {
+    scene.tweens.add({
+      targets: sfSprite,
+      x: spotPx.x,
+      y: spotPx.y,
+      duration: 500,
+      ease: "Sine.easeInOut",
+      onComplete: resolve,
+      onStop: resolve
+    });
+  });
+
+  await Promise.all([...retreatPromises, ballTween, sfTween]);
+
+  console.log("arrival");
+  lockBallToPlayer(scene, ballSprite, sfSprite);
+  console.log("ballAttach");
+  scene.isInboundSetup = false;
+  scene.ballAttachedToPlayerId = sfId;
 }
 
 /**
