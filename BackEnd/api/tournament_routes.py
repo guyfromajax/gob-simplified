@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException
+from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel
 from BackEnd.db import (
     tournaments_collection,
@@ -356,8 +357,7 @@ def tournament_state(tournament_id: str):
     doc = tournaments_collection.find_one({"_id": tid})
     if not doc:
         raise HTTPException(status_code=404, detail="Tournament not found")
-    doc["_id"] = str(doc["_id"])
-    return doc
+    return jsonable_encoder(doc, custom_encoder={ObjectId: str})
 
 
 @router.post("/tournament/sim-remaining")
