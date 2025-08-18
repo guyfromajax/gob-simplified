@@ -31,6 +31,11 @@ function updateBallOwnership({ scene, ballSprite, animations, playerSprites, ste
   );
   if (passHappening) return;
 
+  if (scene.ballDetached) {
+    console.log('ownershipSkipped');
+    return;
+  }
+
   for (const anim of animations) {
     if (scene.skipToEnd) break;
     const sprite = playerSprites[anim.playerId];
@@ -39,6 +44,7 @@ function updateBallOwnership({ scene, ballSprite, animations, playerSprites, ste
       ballSprite.setPosition(sprite.x, sprite.y);
       ballSprite.setVisible(true);
       if (currentBallOwnerRef) currentBallOwnerRef.value = sprite;
+      console.log('ownershipApplied');
       break;
     }
 
