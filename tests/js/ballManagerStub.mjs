@@ -1,4 +1,4 @@
-export function lockBallToPlayer() {}
+export function attachBallToPlayer() {}
 export const calls = [];
 export const SHOT_DEBUG = false;
 export const REBOUND_DEBUG = false;

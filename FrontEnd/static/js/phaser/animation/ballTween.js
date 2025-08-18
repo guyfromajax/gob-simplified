@@ -1,4 +1,5 @@
 import * as Phaser from 'https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.esm.js';
+import animationConfig from "./animation_config.js";
 
 const BALL_DEPTH = 1000;
 export const PASS_DEBUG = false;
@@ -22,6 +23,14 @@ export function attachBallToPlayer(scene, ballSprite, playerSprite, opts = {}) {
   if (typeof playerSprite.playerId !== 'undefined') {
     scene.ballAttachedToPlayerId = playerSprite.playerId;
     scene.ballLastKnownOwnerId = playerSprite.playerId;
+  } else if (scene.playerSprites) {
+    for (const [pid, sprite] of Object.entries(scene.playerSprites)) {
+      if (sprite === playerSprite) {
+        scene.ballAttachedToPlayerId = pid;
+        scene.ballLastKnownOwnerId = pid;
+        break;
+      }
+    }
   }
 }
 
@@ -166,7 +175,20 @@ export async function runPass(scene, cfg = {}) {
         resolveFn();
         return;
       }
-      await tweenBallTo(scene, ballSprite, end, { duration: usedDuration, easing: usedEasing });
+
+      const doTween = animationConfig.enableBallTween !== false;
+      if (doTween) {
+        scene.events?.emit('tweenStart', { fromId, toId, duration: usedDuration, easing: usedEasing });
+        await tweenBallTo(scene, ballSprite, end, { duration: usedDuration, easing: usedEasing });
+        scene.events?.emit('tweenEnd', { toId });
+      } else {
+        scene.events?.emit('tweenStart', { fromId, toId, skipped: true });
+        if (scene.tweens) scene.tweens.killTweensOf(ballSprite);
+        ballSprite.setPosition(end.x, end.y);
+        ballSprite.setVisible(true);
+        ballSprite.setDepth(BALL_DEPTH);
+        scene.events?.emit('tweenEnd', { toId, skipped: true });
+      }
       if (toSprite) {
         attachBallToPlayer(scene, ballSprite, toSprite);
         scene.ballDetached = false;

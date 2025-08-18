@@ -19,50 +19,6 @@ export const INBOUND_DEBUG = false;
 // Hoop locations in grid coordinates for each team
 const HOME_RIM_COORDS = { x: 91, y: 25 };
 const AWAY_RIM_COORDS = { x: 9, y: 25 };
-const BALL_SPRITE_DEPTH = 1000;
-
-export function lockBallToPlayer(scene, ballSprite, playerSprite) {
-  if (scene?.ballDetached) {
-    return;
-  }
-  if (!ballSprite || !playerSprite) {
-    console.warn("⚠️ lockBallToPlayer skipped: missing sprite");
-    return;
-  }
-
-  console.log(
-    "🔒 lockBallToPlayer invoked for:",
-    playerSprite.name || playerSprite
-  );
-
-  if (scene?.tweens) {
-    scene.tweens.killTweensOf(ballSprite);
-  }
-
-  const { x, y } = playerSprite;
-  ballSprite.setPosition(x, y);
-  ballSprite.setVisible(true);
-
-  if (ballSprite.setDepth) {
-    ballSprite.setDepth(BALL_SPRITE_DEPTH);
-  }
-
-  // Track final ball owner on the scene if possible
-  if (scene) {
-    if (playerSprite.playerId) {
-      scene.ballAttachedToPlayerId = playerSprite.playerId;
-      scene.ballLastKnownOwnerId = playerSprite.playerId;
-    } else if (scene.playerSprites) {
-      for (const [pid, sprite] of Object.entries(scene.playerSprites)) {
-        if (sprite === playerSprite) {
-          scene.ballAttachedToPlayerId = pid;
-          scene.ballLastKnownOwnerId = pid;
-          break;
-        }
-      }
-    }
-  }
-}
 
 
 
@@ -369,7 +325,7 @@ export function animateRebound({
           duration: 300,
           ease: "Linear",
           onComplete: () => {
-            lockBallToPlayer(scene, ballSprite, rebounderSprite);
+            attachBallToPlayer(scene, ballSprite, rebounderSprite);
             resolve();
           },
           onStop: resolve
@@ -524,6 +480,10 @@ export function animateKickoutReset(
     );
   }
 
+  scene.events?.once('passStart', () => console.log('passStart'));
+  scene.events?.once('tweenStart', () => console.log('tweenStart'));
+  scene.events?.once('tweenEnd', () => console.log('tweenEnd'));
+
   return runPass(scene, opts).then(() => {
     if (!pgSprite.playerId) {
       scene.ballAttachedToPlayerId = pgId;
@@ -557,7 +517,7 @@ export function updateBallOwnership(scene, ballSprite, animations, playerSprites
     if (hasBallAtStep[stepIndex]) {
       const playerSprite = playerSprites[playerId];
       if (playerSprite) {
-        lockBallToPlayer(scene, ballSprite, playerSprite);
+        attachBallToPlayer(scene, ballSprite, playerSprite);
       }
       break; // Only one player can have the ball
     }
@@ -565,10 +525,10 @@ export function updateBallOwnership(scene, ballSprite, animations, playerSprites
 }
 
 
-// import { lockBallToPlayer, passBall } from "./ballManager.js";
+// import { attachBallToPlayer, passBall } from "./ballManager.js";
 
 // // Lock to player
-// lockBallToPlayer(ballSprite, playerSprites[playerId]);
+// attachBallToPlayer(ballSprite, playerSprites[playerId]);
 
 // // Animate pass
 // passBall({
