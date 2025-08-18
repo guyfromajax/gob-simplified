@@ -33,6 +33,7 @@ export function passBall({
   fromTimestamp,
   toTimestamp
 }) {
+  if (scene?.ftInProgress) return;
   generateBallTween({
     scene,
     ballSprite,
@@ -53,6 +54,7 @@ export function animateInboundPass(
   startTs,
   endTs
 ) {
+  if (scene?.ftInProgress) return;
   generateBallTween({
     scene,
     ballSprite,
@@ -89,6 +91,7 @@ export function shootBall({
   turnIndex
 }) {
   if (!scene || !ballSprite) return Promise.resolve();
+  if (scene?.ftInProgress) return Promise.resolve();
 
   const isHomeTeam = shooterTeamId === homeTeamId;
 
@@ -199,6 +202,7 @@ export function animatePutbackAttempt(
   result
 ) {
   if (!scene || !ballSprite) return Promise.resolve();
+  if (scene?.ftInProgress) return Promise.resolve();
   const shooterSprite = scene.playerSprites?.[shooterId];
   if (!shooterSprite) return Promise.resolve();
 
@@ -298,6 +302,7 @@ export function animateRebound({
   ballSpot
 }) {
   if (!scene || !ballSprite || !ballSpot) return Promise.resolve();
+  if (scene?.ftInProgress) return Promise.resolve();
 
   const promises = [];
   const finalPositions = [];
@@ -442,6 +447,7 @@ export function animateKickoutReset(
   duration
 ) {
   if (!scene || !ballSprite) return Promise.resolve();
+  if (scene?.ftInProgress) return Promise.resolve();
 
   const rebounderSprite = scene.playerSprites?.[rebounderId];
   const pgSprite = scene.playerSprites?.[pgId];

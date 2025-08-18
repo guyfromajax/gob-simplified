@@ -89,7 +89,6 @@ export async function runFreeThrowSequence(
   if (!scene || !playerSprites || !ballSprite || !turnData) return;
 
   scene.ftInProgress = true;
-  scene.events?.emit("ft:start", {});
   if (scene.tweens) {
     for (const sprite of Object.values(playerSprites)) {
       scene.tweens.killTweensOf(sprite);
@@ -110,6 +109,13 @@ export async function runFreeThrowSequence(
     offenseIsHome,
     turnData.shooter_pos
   );
+
+  scene.events?.emit("ft:start", {
+    team: offenseIsHome ? "home" : "away",
+    shooter: turnData.shooter_id,
+    oDestinations,
+    dDestinations,
+  });
 
   const width = scene.game.config.width;
   const height = scene.game.config.height;
@@ -135,8 +141,28 @@ export async function runFreeThrowSequence(
             y: px.y,
             duration: animationConfig.freeThrow.lineupMoveMs,
             ease: "Linear",
-            onComplete: resolve,
-            onStop: resolve,
+            onStart: () =>
+              scene.events?.emit("ft:tweenStart", {
+                playerId: id,
+                x: px.x,
+                y: px.y,
+              }),
+            onComplete: () => {
+              scene.events?.emit("ft:tweenEnd", {
+                playerId: id,
+                x: px.x,
+                y: px.y,
+              });
+              resolve();
+            },
+            onStop: () => {
+              scene.events?.emit("ft:tweenEnd", {
+                playerId: id,
+                x: px.x,
+                y: px.y,
+              });
+              resolve();
+            },
           });
         })
       );
@@ -151,8 +177,28 @@ export async function runFreeThrowSequence(
         y: spotPx.y,
         duration: animationConfig.freeThrow.lineupMoveMs,
         ease: "Linear",
-        onComplete: resolve,
-        onStop: resolve,
+        onStart: () =>
+          scene.events?.emit("ft:tweenStart", {
+            playerId: turnData.shooter_id,
+            x: spotPx.x,
+            y: spotPx.y,
+          }),
+        onComplete: () => {
+          scene.events?.emit("ft:tweenEnd", {
+            playerId: turnData.shooter_id,
+            x: spotPx.x,
+            y: spotPx.y,
+          });
+          resolve();
+        },
+        onStop: () => {
+          scene.events?.emit("ft:tweenEnd", {
+            playerId: turnData.shooter_id,
+            x: spotPx.x,
+            y: spotPx.y,
+          });
+          resolve();
+        },
       });
     });
   }
@@ -189,6 +235,7 @@ export async function runFreeThrowSequence(
         }
       }
       if (isLast) {
+        scene.ftInProgress = false;
         const newOffenseSide = offenseIsHome ? "away" : "home";
         await inboundSetup({
           scene,
@@ -211,6 +258,7 @@ export async function runFreeThrowSequence(
       }
     } else {
       if (isLast) {
+        scene.ftInProgress = false;
         await rebound({
           scene,
           ballSprite,
