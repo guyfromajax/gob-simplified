@@ -1,9 +1,35 @@
 
+const MAX_LOG_LINES = 500;
+
 async function simulateGame() {
   const team1 = document.getElementById("team1").value;
   const team2 = document.getElementById("team2").value;
   const logContainer = document.getElementById("logContainer");
   const scoreDisplay = document.getElementById("score");
+
+  function addTurnText(text, { prepend = false } = {}) {
+    const newNode = document.createElement("div");
+    newNode.className = "turn-line";
+    newNode.textContent = text;
+
+    if (prepend) {
+      const pinned = logContainer.scrollTop <= 5;
+      logContainer.insertBefore(newNode, logContainer.firstChild);
+      if (pinned) {
+        logContainer.scrollTop = 0;
+      } else {
+        logContainer.scrollTop += newNode.offsetHeight;
+      }
+    } else {
+      logContainer.appendChild(newNode);
+    }
+
+    if (MAX_LOG_LINES && logContainer.childElementCount > MAX_LOG_LINES) {
+      logContainer.removeChild(logContainer.lastChild);
+    }
+
+    return newNode;
+  }
 
   logContainer.innerHTML = "🔄 Simulating game...\n";
   scoreDisplay.textContent = "";
@@ -31,9 +57,8 @@ async function simulateGame() {
     
     const text_log = data.text_log || [];
     logContainer.innerHTML = ""; // clear previous
-    text_log.forEach((turn, i) => {
-      const text = turn.text || JSON.stringify(turn); // fallback in case text is missing
-      logContainer.innerHTML += `Turn ${i + 1}: ${text}\n`;
+    text_log.forEach((turn) => {
+      addTurnText(turn.text || JSON.stringify(turn), { prepend: true });
     });
 
 
