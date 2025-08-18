@@ -40,7 +40,11 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
         }
       },
       onUpdate: () => {
-        if (currentBallOwnerRef?.value === sprite && ballSprite?.setPosition) {
+        if (
+          currentBallOwnerRef?.value === sprite &&
+          ballSprite?.setPosition &&
+          !scene.pendingBallOwnerId
+        ) {
           ballSprite.setPosition(sprite.x, sprite.y);
         }
       },
