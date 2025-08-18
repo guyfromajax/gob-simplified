@@ -1,6 +1,6 @@
 import { playTurnAnimation, runSideInboundSetup } from "./turnAnimation.js";
 import { onAction } from "./onAction.js";
-import { runPass, attachBallToPlayer } from "./ballManager.js";
+import { runPass } from "./ballManager.js";
 import animationConfig from "./animation_config.js";
 
 /**
@@ -60,23 +60,6 @@ export async function animateGameTurns({ //hasBallAtStep
 
         const anim = animations.find(a => a.playerId === playerId);
         const movement = anim?.movement || [];
-
-        if (action === "handle_ball" && anim?.hasBallAtStep?.length) {
-          const stepIndex = movement.findIndex(m => m.timestamp === timestamp);
-          const ownsBall = anim.hasBallAtStep?.[stepIndex];
-
-          if (ownsBall && !scene.ballDetached) {
-            console.log('🔗 attaching ball to player', { playerId, stepIndex });
-            attachBallToPlayer(scene, ballSprite, sprite);
-          } else {
-            console.log('⚠️ attachBallToPlayer skipped', {
-              playerId,
-              stepIndex,
-              ownsBall,
-              ballDetached: scene.ballDetached
-            });
-          }
-        }
 
         if (action === "pass") {
           const passStep = movement.find(m => m.action === "pass");

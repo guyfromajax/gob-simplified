@@ -484,11 +484,7 @@ export function animateKickoutReset(
   scene.events?.once('tweenStart', () => console.log('tweenStart'));
   scene.events?.once('tweenEnd', () => console.log('tweenEnd'));
 
-  return runPass(scene, opts).then(() => {
-    if (!pgSprite.playerId) {
-      scene.ballAttachedToPlayerId = pgId;
-    }
-  });
+  return runPass(scene, opts);
 }
 
 /**
