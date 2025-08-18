@@ -9,7 +9,7 @@ import {
   animatePutbackAttempt,
   animateKickoutReset
 } from "./ballManager.js";
-import { tweenBallTo, runPass } from "./ballTween.js";
+import { tweenBallTo, runPass, PASS_DEBUG } from "./ballTween.js";
 import animationConfig from "./animation_config.js";
 
 // Cap the time spent on any single movement step. Large timestamp gaps can
@@ -29,7 +29,7 @@ function updateBallOwnership({ scene, ballSprite, animations, playerSprites, ste
   if (scene.passInFlight) return;
 
   if (scene.ballDetached) {
-    console.log('ownershipSkipped', { stepIndex });
+    if (PASS_DEBUG) console.log('ownershipSkipped', { stepIndex });
     return;
   }
 
@@ -40,7 +40,7 @@ function updateBallOwnership({ scene, ballSprite, animations, playerSprites, ste
       ballSprite.setPosition(pendingSprite.x, pendingSprite.y);
       ballSprite.setVisible(true);
       if (currentBallOwnerRef) currentBallOwnerRef.value = pendingSprite;
-      console.log('ownershipApplied', { playerId: pendingId, stepIndex });
+      if (PASS_DEBUG) console.log('ownershipUpdate', { target: pendingId, stepIndex });
     }
     scene.pendingBallOwnerId = null;
     return;
@@ -59,7 +59,7 @@ function updateBallOwnership({ scene, ballSprite, animations, playerSprites, ste
       ballSprite.setPosition(sprite.x, sprite.y);
       ballSprite.setVisible(true);
       if (currentBallOwnerRef) currentBallOwnerRef.value = sprite;
-      console.log('ownershipApplied', { playerId: anim.playerId, stepIndex });
+      if (PASS_DEBUG) console.log('ownershipUpdate', { target: anim.playerId, stepIndex });
       break;
     }
 
