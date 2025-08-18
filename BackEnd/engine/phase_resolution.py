@@ -212,7 +212,11 @@ def resolve_fast_break_logic(game: "GameManager"):
         def_scouting["defense"]["vs_Fast_Break"]["success"] += 1
 
 
-    
+    # Build animation packet for the fast break play
+    animator = Animator(game)
+    turn_result["animations"] = animator.capture_fast_break_animation(fb_roles)
+    turn_result["roles"] = fb_roles
+
     # ✅ Add safety checks before returning
     assert turn_result is not None, "turn_result is None"
     assert "time_elapsed" in turn_result, "turn_result missing 'time_elapsed'"

@@ -16,6 +16,85 @@ class Animator:
         self.game = game
         self.latest_packet = []
 
+    def capture_fast_break_animation(self, fb_roles):
+        """Build a basic fast break animation packet.
+
+        This animation is much simpler than the half-court version. Each
+        involved player (ball handler, offensive runners, and defenders)
+        receives a movement timeline from their current coordinates to a
+        lane destination near the rim.  The timeline is represented by two
+        steps: the starting position and the final lane destination.
+
+        Args:
+            fb_roles (dict):
+                {
+                    "ball_handler": Player,
+                    "offense": [Player, ...],
+                    "defense": [Player, ...]
+                }
+
+        Returns:
+            list[dict]: Animation payload matching the schema used by the
+            frontend.
+        """
+
+        offense_team = self.game.offense_team
+        is_away_offense = offense_team.team_id == self.game.away_team.team_id
+
+        ball_handler = fb_roles.get("ball_handler")
+        runners = fb_roles.get("offense", [])
+        defenders = fb_roles.get("defense", [])
+
+        # Simple lane destinations for a fast break (home orientation).
+        lane_coords = [
+            {"x": 94, "y": 25},  # middle lane (rim)
+            {"x": 94, "y": 40},  # upper/left lane
+            {"x": 94, "y": 10},  # lower/right lane
+        ]
+
+        animations = []
+        duration = 800
+
+        # Helper to build movement blocks
+        def build_movement(player, end_coords, has_ball):
+            start = getattr(player, "coords", {"x": 25, "y": 50})
+            if is_away_offense:
+                start = get_away_player_coords(start)
+                end = get_away_player_coords(end_coords)
+            else:
+                end = end_coords
+
+            movement = [
+                {"timestamp": 0, "coords": start, "action": ACTIONS["HANDLE"] if has_ball else ACTIONS["DRIFT"]},
+                {"timestamp": duration, "coords": end, "action": ACTIONS["HANDLE"] if has_ball else ACTIONS["CUT"]},
+            ]
+
+            animations.append({
+                "playerId": getattr(player, "player_id", str(id(player))),
+                "start": start,
+                "end": end,
+                "movement": movement,
+                "hasBallAtStep": [has_ball, has_ball],
+                "duration": duration,
+            })
+
+        # Ball handler always takes the middle lane
+        if ball_handler:
+            build_movement(ball_handler, lane_coords[0], True)
+
+        # Offensive runners take remaining lanes
+        for idx, runner in enumerate(runners, start=1):
+            end = lane_coords[idx % len(lane_coords)]
+            build_movement(runner, end, False)
+
+        # Defenders sprint to protect lanes in order
+        for idx, defender in enumerate(defenders):
+            end = lane_coords[idx % len(lane_coords)]
+            build_movement(defender, end, False)
+
+        self.latest_packet = animations
+        return animations
+
     def capture_halfcourt_animation(self, roles, event_step=None):
         offense_team = self.game.offense_team
         defense_team = self.game.defense_team
