@@ -199,6 +199,11 @@ export async function runPass(scene, cfg = {}) {
       }
       if (toSprite) {
         attachBallToPlayer(scene, ballSprite, toSprite);
+        // Update the global ball owner reference so other systems know who
+        // currently has possession after the pass completes.
+        if (scene.currentBallOwnerRef) {
+          scene.currentBallOwnerRef.value = toSprite;
+        }
         scene.ballDetached = false;
         scene.events?.emit('ballAttached', { toId });
         if (PASS_DEBUG) console.log('attach(B)', { toId });
