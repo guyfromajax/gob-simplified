@@ -1,6 +1,6 @@
 import { playTurnAnimation, runSideInboundSetup } from "./turnAnimation.js";
 import { onAction } from "./onAction.js";
-import { runPass, attachBallToPlayer } from "./ballManager.js";
+import { runPass } from "./ballManager.js";
 import animationConfig from "./animation_config.js";
 
 /**
@@ -90,6 +90,10 @@ export async function animateGameTurns({ //hasBallAtStep
             scene.events?.once('ballAttached', () => console.log('ballAttached'));
             scene.events?.once('passEnd', () => console.log('passEnd'));
 
+            if (scene.__activePass) {
+              console.warn('Active pass tween detected before runPass call; cancelling previous tween');
+            }
+
             await runPass(scene, {
               fromId: playerId,
               toId: receiverAnim.playerId,
@@ -118,6 +122,9 @@ export async function animateGameTurns({ //hasBallAtStep
       const stealerId = stealerRaw ?? playerMap[turn.stealer_name];
       if (ballHandlerId != null && stealerId != null) {
         const cfg = animationConfig.steal || {};
+        if (scene.__activePass) {
+          console.warn('Active pass tween detected before steal; cancelling previous tween');
+        }
         await runPass(scene, {
           fromId: ballHandlerId,
           toId: stealerId,
@@ -125,8 +132,9 @@ export async function animateGameTurns({ //hasBallAtStep
           easing: cfg.easing
         });
         const defenderSprite = playerSprites[stealerId];
+        // runPass reattaches the ball after the tween resolves, so only emit
+        // possession change once that handoff has finished.
         if (defenderSprite) {
-          attachBallToPlayer(scene, ballSprite, defenderSprite);
           scene.events?.emit?.('possessionChange', { offenseTeamId: defenderSprite.team_id });
         }
       }
