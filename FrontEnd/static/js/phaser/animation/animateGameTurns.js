@@ -62,14 +62,18 @@ export async function animateGameTurns({ //hasBallAtStep
         const movement = anim?.movement || [];
 
         if (action === "pass") {
-          const passStep = movement.find(m => m.action === "pass");
+          const passStep = movement.find(
+            m => m.action === "pass" && m.timestamp === timestamp
+          );
           if (!passStep) return;
 
           const receiverAnim = animations.find(a =>
-            a.movement?.some(m => m.action === "receive" && m.timestamp === passStep.timestamp)
+            a.movement?.some(
+              m => m.action === "receive" && m.timestamp === timestamp
+            )
           );
           const receiveStep = receiverAnim?.movement.find(
-            m => m.action === "receive" && m.timestamp === passStep.timestamp
+            m => m.action === "receive" && m.timestamp === timestamp
           );
 
           if (passStep && receiveStep && receiverAnim?.playerId != null) {
@@ -79,19 +83,20 @@ export async function animateGameTurns({ //hasBallAtStep
               ? { x: receiverSprite.x, y: receiverSprite.y }
               : undefined;
 
-            const delta = receiveStep.timestamp - passStep.timestamp;
+            const delta = receiveStep.timestamp - timestamp;
             const duration = delta > 0 ? delta : animationConfig.pass.duration;
             console.log(`⏱️ Resolved pass duration: ${duration}ms (delta=${delta})`);
 
             scene.events?.once('passStart', () => console.log('passStart'));
             scene.events?.once('tweenStart', () => console.log('tweenStart'));
             scene.events?.once('tweenEnd', () => console.log('tweenEnd'));
-            scene.events?.once('ballDetached', () => console.log('ballDetached'));
             scene.events?.once('ballAttached', () => console.log('ballAttached'));
             scene.events?.once('passEnd', () => console.log('passEnd'));
 
             if (scene.__activePass) {
-              console.warn('Active pass tween detected before runPass call; cancelling previous tween');
+              console.warn(
+                'Active pass tween detected before runPass call; cancelling previous tween'
+              );
             }
 
             await runPass(scene, {
