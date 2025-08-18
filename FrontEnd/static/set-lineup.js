@@ -14,6 +14,11 @@ let roster = [];
 const lineup = {};
 const playerMap = {};
 
+function getRT(player) {
+  const ratings = Object.values(player.position_ratings || {});
+  return ratings.length ? Math.max(...ratings) : -Infinity;
+}
+
 function showToast(msg) {
   const toast = document.getElementById('toast');
   if (!toast) return;
@@ -27,8 +32,16 @@ async function loadRoster() {
   const res = await fetch(`/roster/${encodeURIComponent(teamName)}`);
   if (!res.ok) return;
   const data = await res.json();
-  roster = data.players || [];
-  roster.forEach(p => playerMap[p._id] = p);
+  roster = (data.players || []).map((p, idx) => ({ ...p, _idx: idx }));
+  roster.sort((a, b) => {
+    const diff = getRT(b) - getRT(a);
+    return diff !== 0 ? diff : a._idx - b._idx;
+  });
+  console.log("Sorted lineup by RT descending");
+  roster.forEach(p => {
+    delete p._idx;
+    playerMap[p._id] = p;
+  });
   renderRoster();
 }
 
