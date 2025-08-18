@@ -85,6 +85,9 @@ body {
   line-height: 1.1;
   margin: 0 0 var(--spacing-sm);
 }
+.hero-text h1 .headline-line {
+  display: block;
+}
 .hero-text p {
   font-size: 1.125rem;
   margin: 0;
