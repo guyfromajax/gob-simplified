@@ -526,6 +526,9 @@ async function runInboundSetup({
  */
 export async function playTurnAnimation({ scene, simData, playerSprites, turnData, ballSprite, onAction }) {
   const currentBallOwnerRef = { value: null };
+  // Store a reference on the scene so other modules (e.g., runPass)
+  // can update ball ownership consistently.
+  scene.currentBallOwnerRef = currentBallOwnerRef;
   const maxSteps = Math.max(
     ...turnData.animations.map(anim => anim.movement.length)
   );
