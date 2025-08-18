@@ -196,10 +196,28 @@ class TurnManager:
 
         result["possession_team_id"] = self.game.offense_team.team_id
 
-        for key in ["ball_handler", "shooter", "passer", "screener", "defender"]:
+        for key in [
+            "ball_handler",
+            "shooter",
+            "passer",
+            "screener",
+            "defender",
+            "stealer_name",
+            "victim_name",
+        ]:
             if key in result:
                 result[key] = get_name_safe(result[key])
-        for key in ["ball_handler", "shooter", "screener", "passer", "defender"]:
+        for key in [
+            "ball_handler",
+            "shooter",
+            "screener",
+            "passer",
+            "defender",
+            "stealer_name",
+            "victim_name",
+            "stealer_id",
+            "victim_id",
+        ]:
             if key in result:
                 val = result[key]
                 if hasattr(val, "name"):
