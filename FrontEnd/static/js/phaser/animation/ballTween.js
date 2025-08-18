@@ -218,7 +218,7 @@ export async function runPass(scene, cfg = {}) {
       if (scene.__activePass && scene.__activePass.key === key && scene.__activePass.frame === frame) {
         scene.__activePass = null;
         scene.passInFlight = false;
-        scene.pendingBallOwnerId = null;
+        // Allow pendingBallOwnerId to persist so updateBallOwnership can consume it
       }
     }
   })();
