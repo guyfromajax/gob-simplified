@@ -351,17 +351,24 @@ def resolve_free_throw_logic(game):
 
 
 def resolve_turnover_logic(roles, game, turnover_type="DEAD BALL"):
-    
+
     game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
     ball_handler = roles["ball_handler"]
-    defender = roles.get("defender", "")
+    defender = roles.get("defender")
     ball_handler.record_stat("TO")
     turnover_type = random.choice(["STEAL", "DEAD BALL"])
     game_state["last_turnover_player"] = ball_handler
 
+    # Pre-compute IDs/names for logging and return payload
+    stealer_id = getattr(defender, "player_id", None)
+    stealer_name = get_name_safe(defender) if defender else None
+    victim_id = getattr(ball_handler, "player_id", None)
+    victim_name = get_name_safe(ball_handler)
+    events = []
+
     if turnover_type == "STEAL" and defender:
         defender.record_stat("STL")
-        text = f"{get_name_safe(defender)} jumps the pass"
+        text = f"{stealer_name} jumps the pass"
         if random.random() < get_fast_break_chance(game):
             game_state["offensive_state"] = "FAST_BREAK"
             text += " and takes it the other way!"
@@ -370,6 +377,14 @@ def resolve_turnover_logic(roles, game, turnover_type="DEAD BALL"):
             text += " and waits to set up the half-court offense."
         game_state["last_stealer"] = defender
         game_state["last_rebound"] = ""
+
+        events.append({
+            "event_type": "STEAL",
+            "stealer_id": stealer_id,
+            "victim_id": victim_id,
+            "timestamp": game_state.get("time_remaining"),
+            "coords": getattr(defender, "coords", None),
+        })
     else:
         game_state["offensive_state"] = "HCO"
         description = random.choice([
@@ -380,18 +395,28 @@ def resolve_turnover_logic(roles, game, turnover_type="DEAD BALL"):
             "with an errant pass.",
             "dribbles it off his foot and the ball goes out of bounds."
         ])
-        text = f"{ball_handler} {description}"
+        text = f"{victim_name} {description}"
         game_state["last_stealer"] = None
 
     bh_pos = get_player_position(off_lineup, ball_handler)
-    
-    return {
+
+    result = {
         "result_type": turnover_type,
         "ball_handler": ball_handler,
         "text": text,
         "time_elapsed": random.randint(3, 8),
-        "possession_flips": True  # Let the turn loop handle the flip
+        "possession_flips": True,  # Let the turn loop handle the flip
+        "victim_id": victim_id,
+        "victim_name": victim_name,
     }
+
+    if stealer_id:
+        result["stealer_id"] = stealer_id
+        result["stealer_name"] = stealer_name
+    if events:
+        result["events"] = events
+
+    return result
 
 def resolve_half_court_offense_logic(game):
     game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
