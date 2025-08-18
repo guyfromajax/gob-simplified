@@ -28,13 +28,11 @@ export function appendToTextScroll(message, cfg = {}) {
   console.debug('textScroll:append', message.slice(0, 40));
 
   const appendLine = () => {
-    const atBottom =
-      autoScroll &&
-      container.scrollTop + container.clientHeight === container.scrollHeight;
+    const atTop = autoScroll && container.scrollTop === 0;
 
     const lineText = timestampPrefix ? `${timestampPrefix} ${message}` : message;
-    const lastLine = container.lastElementChild;
-    if (lastLine && lastLine.textContent === lineText) {
+    const firstLine = container.firstElementChild;
+    if (firstLine && firstLine.textContent === lineText) {
       return;
     }
 
@@ -42,17 +40,17 @@ export function appendToTextScroll(message, cfg = {}) {
     line.className = 'turn-line';
     line.textContent = lineText;
     line.style.marginBottom = finalCfg.lineSpacing;
-    container.appendChild(line);
+    container.insertBefore(line, container.firstChild);
 
     while (container.children.length > maxLines) {
-      container.removeChild(container.firstChild);
+      container.removeChild(container.lastChild);
     }
 
-    if (autoScroll && atBottom) {
+    if (autoScroll && atTop) {
       console.debug('textScroll:autoScroll', message.length);
       requestAnimationFrame(() =>
         container.scrollTo({
-          top: container.scrollHeight,
+          top: 0,
           behavior: smooth ? 'smooth' : 'auto',
         }),
       );
