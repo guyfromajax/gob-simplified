@@ -75,7 +75,7 @@ body {
   margin: 0 auto;
   padding: var(--spacing-lg) var(--spacing-md);
   display: grid;
-  gap: var(--spacing-lg);
+  gap: var(--spacing-md);
   grid-template-columns: 1fr;
   align-items: center;
 }
@@ -90,11 +90,12 @@ body {
   margin: 0;
 }
 .hero img {
-  max-width: 100%;
+  width: 100%;
   height: auto;
   display: block;
   max-height: 40vh;
   object-fit: contain;
+  justify-self: end;
 }
 
 /* Feature Cards */
@@ -115,6 +116,10 @@ body {
   }
 }
 @media (min-width: 900px) {
+  .hero {
+    grid-template-columns: 2fr 1fr;
+    gap: var(--spacing-lg);
+  }
   .features {
     grid-template-columns: repeat(3, 1fr);
   }
