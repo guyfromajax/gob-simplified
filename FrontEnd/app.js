@@ -33,7 +33,8 @@ async function simulateGame() {
     logContainer.innerHTML = ""; // clear previous
     text_log.forEach((turn, i) => {
       const text = turn.text || JSON.stringify(turn); // fallback in case text is missing
-      logContainer.innerHTML += `Turn ${i + 1}: ${text}\n`;
+      // Prepend so the most recent turn appears first
+      logContainer.innerHTML = `Turn ${i + 1}: ${text}\n` + logContainer.innerHTML;
     });
 
 
