@@ -62,8 +62,14 @@ export async function animateGameTurns({ //hasBallAtStep
         const movement = anim?.movement || [];
 
         if (action === "handle_ball" && anim?.hasBallAtStep?.length) {
-          console.log("🔒 Locking ball to ball handler:", playerId);
-          lockBallToPlayer(scene, ballSprite, sprite);
+          const stepIndex = movement.findIndex(m => m.timestamp === timestamp);
+          const ownsBall = anim.hasBallAtStep?.[stepIndex];
+          if (ownsBall && !scene.ballDetached) {
+            console.log('handleBallAttach', { playerId, stepIndex });
+            lockBallToPlayer(scene, ballSprite, sprite);
+          } else {
+            console.log('handleBallIgnored', { playerId, stepIndex, ownsBall, ballDetached: scene.ballDetached });
+          }
         }
 
         if (action === "pass") {
