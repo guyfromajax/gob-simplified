@@ -1,6 +1,6 @@
 import { playTurnAnimation, runSideInboundSetup } from "./turnAnimation.js";
 import { onAction } from "./onAction.js";
-import { runPass, lockBallToPlayer } from "./ballManager.js";
+import { runPass, attachBallToPlayer } from "./ballManager.js";
 import animationConfig from "./animation_config.js";
 
 /**
@@ -66,7 +66,7 @@ export async function animateGameTurns({ //hasBallAtStep
           const ownsBall = anim.hasBallAtStep?.[stepIndex];
           if (ownsBall && !scene.ballDetached) {
             console.log('handleBallAttach', { playerId, stepIndex });
-            lockBallToPlayer(scene, ballSprite, sprite);
+            attachBallToPlayer(scene, ballSprite, sprite);
           } else {
             console.log('handleBallIgnored', { playerId, stepIndex, ownsBall, ballDetached: scene.ballDetached });
           }
@@ -95,6 +95,8 @@ export async function animateGameTurns({ //hasBallAtStep
             console.log(`⏱️ Resolved pass duration: ${duration}ms (delta=${delta})`);
 
             scene.events?.once('passStart', () => console.log('passStart'));
+            scene.events?.once('tweenStart', () => console.log('tweenStart'));
+            scene.events?.once('tweenEnd', () => console.log('tweenEnd'));
             scene.events?.once('ballDetached', () => console.log('ballDetached'));
             scene.events?.once('ballAttached', () => console.log('ballAttached'));
             scene.events?.once('passEnd', () => console.log('passEnd'));
