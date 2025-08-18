@@ -163,6 +163,8 @@ class TurnManager:
         if state == "FREE_THROW":
             result = self.resolve_free_throw()
         elif state == "FAST_BREAK":
+            self.logger.log("fb:start")
+            self.game.game_state["fastBreakInProgress"] = True
             result = self.resolve_fast_break()
         else:
             calls = self.set_playcalls()
@@ -180,6 +182,9 @@ class TurnManager:
         # STEP 4: Final updates (clock, logs, animation)
         self.update_clock_and_possession(result)
         self.logger.log_turn_result(result)
+        if state == "FAST_BREAK":
+            self.logger.log("fb:end")
+            self.game.game_state["fastBreakInProgress"] = False
         # If animations weren’t assigned yet (e.g. fast break, free throw), use fallback
         if "animations" not in result:
             roles = result.get("roles")
