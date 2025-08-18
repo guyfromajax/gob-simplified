@@ -26,8 +26,23 @@ const AWAY_RIM_COORDS = { x: 9, y: 25 };
 function updateBallOwnership({ scene, ballSprite, animations, playerSprites, stepIndex, offenseTeamId, currentBallOwnerRef }) {
   if (scene?.skipToEnd) return;
 
+  if (scene.passInFlight) return;
+
   if (scene.ballDetached) {
     console.log('ownershipSkipped', { stepIndex });
+    return;
+  }
+
+  if (scene.pendingBallOwnerId != null) {
+    const pendingId = scene.pendingBallOwnerId;
+    const pendingSprite = playerSprites[pendingId];
+    if (pendingSprite && ballSprite?.setPosition) {
+      ballSprite.setPosition(pendingSprite.x, pendingSprite.y);
+      ballSprite.setVisible(true);
+      if (currentBallOwnerRef) currentBallOwnerRef.value = pendingSprite;
+      console.log('ownershipApplied', { playerId: pendingId, stepIndex });
+    }
+    scene.pendingBallOwnerId = null;
     return;
   }
 
