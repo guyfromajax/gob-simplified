@@ -169,6 +169,7 @@ export async function runPass(scene, cfg = {}) {
       await tweenBallTo(scene, ballSprite, end, { duration: usedDuration, easing: usedEasing });
       if (toSprite) {
         attachBallToPlayer(scene, ballSprite, toSprite);
+        scene.ballDetached = false;
         scene.events?.emit('ballAttached', { toId });
         if (PASS_DEBUG) console.log(`ballAttached(${toId})`);
       }
