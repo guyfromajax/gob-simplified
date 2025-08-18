@@ -116,7 +116,7 @@ async function runSetupTween({ scene, ballSprite, animations, playerSprites, cur
 
 // Setup sideline inbound play
 async function runSideInboundSetup({ scene, ballSprite, playerSprites, turnData }) {
-  if (!turnData || scene?.skipToEnd) return;
+  if (!turnData || scene?.skipToEnd || scene?.ftInProgress) return;
 
   const { ball_spot, oDestinations = {}, dDestinations = {}, possession_team_id } = turnData;
 
@@ -219,6 +219,7 @@ async function runInboundSetup({
   homeTeamId,
   awayTeamId
 }) {
+  if (scene?.ftInProgress) return;
   scene.isInboundSetup = true;
   if (!scene.ballSprite) scene.ballSprite = ballSprite;
   const isAwayOffense = newOffenseSide === "away";
