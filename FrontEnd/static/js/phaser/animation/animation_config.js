@@ -21,6 +21,13 @@ const defaults = {
     easing: 'Sine.easeInOut',
     arc: null,
   },
+  freeThrow: {
+    lineupMoveMs: 800,
+    shooterPrepMs: 400,
+    shotMs: 500,
+    arcHeight: 40,
+    rimHoldMs: 300,
+  },
 };
 
 const overrides =
@@ -32,6 +39,7 @@ export const animationConfig = {
   inbound: { ...defaults.inbound, ...(overrides.inbound || {}) },
   kickout: { ...defaults.kickout, ...(overrides.kickout || {}) },
   steal: { ...defaults.steal, ...(overrides.steal || {}) },
+  freeThrow: { ...defaults.freeThrow, ...(overrides.freeThrow || {}) },
 };
 
 export default animationConfig;
