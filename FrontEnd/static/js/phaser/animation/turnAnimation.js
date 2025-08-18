@@ -26,15 +26,15 @@ const AWAY_RIM_COORDS = { x: 9, y: 25 };
 function updateBallOwnership({ scene, ballSprite, animations, playerSprites, stepIndex, offenseTeamId, currentBallOwnerRef }) {
   if (scene?.skipToEnd) return;
 
-  const passHappening = animations.some(
-    anim => anim.movement?.[stepIndex]?.action === "pass"
-  );
-  if (passHappening) return;
-
   if (scene.ballDetached) {
     console.log('ownershipSkipped', { stepIndex });
     return;
   }
+
+  const passHappening = animations.some(
+    anim => anim.movement?.[stepIndex]?.action === "pass"
+  );
+  if (passHappening) return;
 
   for (const anim of animations) {
     if (scene.skipToEnd) break;
