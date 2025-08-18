@@ -29,8 +29,12 @@ const defaults = {
     rimHoldMs: 300,
   },
   fastBreak: {
-    sprintDuration: 800,
-    arcHeight: 50,
+    sprintSpeed: 1.5, // multiplier
+    laneSpacing: 6,
+    passMs: 250,
+    shotMs: 500,
+    arcHeight: 60,
+    rimHoldMs: 800,
   },
 };
 
