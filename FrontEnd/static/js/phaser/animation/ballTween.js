@@ -166,6 +166,7 @@ export async function runPass(scene, cfg = {}) {
       }
 
       detachBall(scene, ballSprite);
+      scene.ballDetached = true;
       scene.events?.emit('ballDetached');
       console.log('ballDetached');
 
