@@ -3,6 +3,7 @@ import { onAction } from "./onAction.js";
 import { runPass } from "./ballManager.js";
 import animationConfig from "./animation_config.js";
 import runFreeThrowSequence from "./freeThrow.js";
+import runFastBreakSequence from "./fastBreak.js";
 
 /**
  * Animate all turns from simData.turns using real backend structure.
@@ -38,6 +39,18 @@ export async function animateGameTurns({ //hasBallAtStep
 
     if (turn.result_type === "SIDE_INBOUND") {
       await runSideInboundSetup({ scene, ballSprite, playerSprites, turnData: turn });
+      if (onUpdate) {
+        try {
+          onUpdate(turn);
+        } catch (err) {
+          console.error('Scoreboard update failed:', err);
+        }
+      }
+      continue;
+    }
+
+    if (turn.fast_break === true || turn.result_type === "FAST_BREAK") {
+      await runFastBreakSequence(scene, { playerSprites, ballSprite, turnData: turn, onUpdate });
       if (onUpdate) {
         try {
           onUpdate(turn);
