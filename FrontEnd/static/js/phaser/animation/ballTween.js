@@ -148,6 +148,9 @@ export async function runPass(scene, cfg = {}) {
   });
   scene.__activePass = { key, frame, promise, reject: rejectFn };
 
+  scene.passInFlight = true;
+  scene.pendingBallOwnerId = toId;
+
   (async () => {
     try {
       scene.events?.emit('passStart', { fromId, toId, duration: usedDuration, easing: usedEasing });
@@ -213,6 +216,8 @@ export async function runPass(scene, cfg = {}) {
     } finally {
       if (scene.__activePass && scene.__activePass.key === key && scene.__activePass.frame === frame) {
         scene.__activePass = null;
+        scene.passInFlight = false;
+        scene.pendingBallOwnerId = null;
       }
     }
   })();
