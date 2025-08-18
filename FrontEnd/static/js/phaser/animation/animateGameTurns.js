@@ -64,10 +64,17 @@ export async function animateGameTurns({ //hasBallAtStep
         if (action === "handle_ball" && anim?.hasBallAtStep?.length) {
           const stepIndex = movement.findIndex(m => m.timestamp === timestamp);
           const ownsBall = anim.hasBallAtStep?.[stepIndex];
-          const logMsg = ownsBall && !scene.ballDetached ? 'handleBallAttach' : 'handleBallIgnored';
-          console.log(logMsg, { playerId, stepIndex, ownsBall, ballDetached: scene.ballDetached });
+
           if (ownsBall && !scene.ballDetached) {
+            console.log('🔗 attaching ball to player', { playerId, stepIndex });
             attachBallToPlayer(scene, ballSprite, sprite);
+          } else {
+            console.log('⚠️ attachBallToPlayer skipped', {
+              playerId,
+              stepIndex,
+              ownsBall,
+              ballDetached: scene.ballDetached
+            });
           }
         }
 
