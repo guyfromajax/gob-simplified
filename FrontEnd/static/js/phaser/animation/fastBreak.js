@@ -1,11 +1,17 @@
-export async function runFastBreakSequence(
+import { runFastBreakSequence } from "./turnAnimation.js";
+
+export function runFastBreakSequenceWrapper(
   scene,
-  { playerSprites, ballSprite, turnData, onUpdate }
+  { playerSprites, ballSprite, turnData }
 ) {
-  // Placeholder fast break animation handler.
-  // Implementation will animate fast break sequences between turns.
-  // Currently, this is a no-op to allow wiring and future expansion.
-  return;
+  return runFastBreakSequence({
+    scene,
+    playerSprites,
+    ballSprite,
+    turnData
+  });
 }
 
-export default runFastBreakSequence;
+export { runFastBreakSequence } from "./turnAnimation.js";
+export default runFastBreakSequenceWrapper;
+
