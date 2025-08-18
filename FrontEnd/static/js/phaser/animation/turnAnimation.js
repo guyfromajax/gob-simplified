@@ -117,6 +117,7 @@ async function runSideInboundSetup({ scene, ballSprite, playerSprites, turnData 
   const offenseIds = {};
 
   if (scene.tweens) scene.tweens.killTweensOf(ballSprite);
+  if (!scene.ballSprite) scene.ballSprite = ballSprite;
 
   for (const [id, sprite] of Object.entries(playerSprites)) {
     const info = scene.playerInfo?.[id];
@@ -173,7 +174,6 @@ async function runSideInboundSetup({ scene, ballSprite, playerSprites, turnData 
   const pgId = offenseIds["PG"];
   if (sfSprite) {
     attachBallToPlayer(scene, ballSprite, sfSprite);
-    scene.ballAttachedToPlayerId = sfId;
     console.log("ballAttach(SF)");
 
     console.log(`[sideInbound][holdStart] sf:${sfId} pg:${pgId}`);
@@ -190,7 +190,6 @@ async function runSideInboundSetup({ scene, ballSprite, playerSprites, turnData 
     }
     console.log(`[sideInbound][passEnd] sf:${sfId} pg:${pgId}`);
     if (pgSprite) {
-      scene.ballAttachedToPlayerId = pgId;
       console.log(`[sideInbound][pgAttach] sf:${sfId} pg:${pgId}`);
     }
   }
@@ -206,6 +205,7 @@ async function runInboundSetup({
   awayTeamId
 }) {
   scene.isInboundSetup = true;
+  if (!scene.ballSprite) scene.ballSprite = ballSprite;
   const isAwayOffense = newOffenseSide === "away";
 
   // Derive missing team IDs from sprite metadata
@@ -478,7 +478,6 @@ async function runInboundSetup({
 
   console.log(`[inbound][ballAttach][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
   attachBallToPlayer(scene, ballSprite, sfSprite);
-  scene.ballAttachedToPlayerId = sfId;
 
   console.log(`[inbound][holdStart][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
   await new Promise((resolve) => scene.time.delayedCall(1000, resolve));
@@ -501,7 +500,6 @@ async function runInboundSetup({
     easing: "Sine.easeInOut"
   });
   console.log(`[inbound][passEnd][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
-  scene.ballAttachedToPlayerId = pgId;
   console.log(`[inbound][pgAttach][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
 
   scene.isInboundSetup = false;
