@@ -2,6 +2,7 @@ import { playTurnAnimation, runSideInboundSetup } from "./turnAnimation.js";
 import { onAction } from "./onAction.js";
 import { runPass } from "./ballManager.js";
 import animationConfig from "./animation_config.js";
+import runFreeThrowSequence from "./freeThrow.js";
 
 /**
  * Animate all turns from simData.turns using real backend structure.
@@ -22,6 +23,18 @@ export async function animateGameTurns({ //hasBallAtStep
     turn.index = i;
     if (scene.skipToEnd) break;
     console.log(`🔁 Turn ${i + 1}`, turn);
+
+    if (turn.result_type === "FREE_THROW") {
+      await runFreeThrowSequence(scene, { playerSprites, ballSprite, turnData: turn, onUpdate });
+      if (onUpdate) {
+        try {
+          onUpdate(turn);
+        } catch (err) {
+          console.error('Scoreboard update failed:', err);
+        }
+      }
+      continue;
+    }
 
     if (turn.result_type === "SIDE_INBOUND") {
       await runSideInboundSetup({ scene, ballSprite, playerSprites, turnData: turn });
