@@ -28,6 +28,10 @@ const defaults = {
     arcHeight: 40,
     rimHoldMs: 300,
   },
+  fastBreak: {
+    sprintDuration: 800,
+    arcHeight: 50,
+  },
 };
 
 const overrides =
@@ -40,6 +44,7 @@ export const animationConfig = {
   kickout: { ...defaults.kickout, ...(overrides.kickout || {}) },
   steal: { ...defaults.steal, ...(overrides.steal || {}) },
   freeThrow: { ...defaults.freeThrow, ...(overrides.freeThrow || {}) },
+  fastBreak: { ...defaults.fastBreak, ...(overrides.fastBreak || {}) },
 };
 
 export default animationConfig;

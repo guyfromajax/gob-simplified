@@ -520,6 +520,161 @@ async function runInboundSetup({
   scene.isInboundSetup = false;
 }
 
+async function runFastBreakSequence({ scene, turnData, playerSprites, ballSprite }) {
+  if (!scene || !turnData || scene.skipToEnd) return;
+  if (!scene.ballSprite) scene.ballSprite = ballSprite;
+
+  const animations = turnData.animations || [];
+  const width = scene.game.config.width;
+  const height = scene.game.config.height;
+  const sprintDuration =
+    animationConfig.fastBreak?.sprintDuration ?? 800;
+
+  const ownerAnim = animations.find(a => a.hasBallAtStep?.[0]);
+  if (ownerAnim) {
+    const ownerSprite = playerSprites[ownerAnim.playerId];
+    if (ownerSprite) attachBallToPlayer(scene, ballSprite, ownerSprite);
+  }
+
+  const sprintPromises = [];
+  for (const anim of animations) {
+    const sprite = playerSprites[anim.playerId];
+    if (!sprite) continue;
+    const start = anim.start || anim.movement?.[0]?.coords;
+    const end = anim.end || anim.movement?.[anim.movement.length - 1]?.coords;
+    if (!start || !end) continue;
+    const startPx = gridToPixels(start.x, start.y, width, height);
+    const endPx = gridToPixels(end.x, end.y, width, height);
+    sprite.setPosition(startPx.x, startPx.y);
+    sprintPromises.push(
+      new Promise(resolve => {
+        scene.tweens.add({
+          targets: sprite,
+          x: endPx.x,
+          y: endPx.y,
+          duration: sprintDuration,
+          ease: "Sine.easeInOut",
+          onUpdate: () => {
+            if (
+              scene.ballAttachedToPlayerId === anim.playerId &&
+              ballSprite?.setPosition
+            ) {
+              ballSprite.setPosition(sprite.x, sprite.y);
+              ballSprite.setVisible(true);
+            }
+          },
+          onComplete: resolve,
+          onStop: resolve
+        });
+      })
+    );
+  }
+  await Promise.all(sprintPromises);
+  if (scene.skipToEnd) return;
+
+  const passEvents = [];
+  for (const anim of animations) {
+    const moves = anim.movement || [];
+    for (const step of moves) {
+      if (step.action === "pass") {
+        const ts = step.timestamp;
+        const receiverAnim = animations.find(a =>
+          a.movement?.some(m => m.action === "receive" && m.timestamp === ts)
+        );
+        const receiveStep = receiverAnim?.movement.find(
+          m => m.action === "receive" && m.timestamp === ts
+        );
+        const delta = receiveStep
+          ? receiveStep.timestamp - ts
+          : animationConfig.pass.duration;
+        passEvents.push({
+          timestamp: ts,
+          fromId: anim.playerId,
+          toId: receiverAnim?.playerId,
+          duration: delta
+        });
+      }
+    }
+  }
+  passEvents.sort((a, b) => a.timestamp - b.timestamp);
+  for (const evt of passEvents) {
+    if (scene.skipToEnd) break;
+    await runPass(scene, {
+      fromId: evt.fromId,
+      toId: evt.toId,
+      duration: evt.duration,
+      easing: animationConfig.pass.easing
+    });
+  }
+  if (scene.skipToEnd) return;
+
+  if (turnData.hold_up) {
+    const center = gridToPixels(50, 25, width, height);
+    const spacing = 10;
+    const holdPromises = [];
+    let idx = 0;
+    for (const anim of animations) {
+      const sprite = playerSprites[anim.playerId];
+      if (!sprite) continue;
+      const targetX = center.x + (idx - animations.length / 2) * spacing;
+      const targetY = sprite.y;
+      idx++;
+      holdPromises.push(
+        new Promise(resolve => {
+          scene.tweens.add({
+            targets: sprite,
+            x: targetX,
+            y: targetY,
+            duration: sprintDuration / 2,
+            ease: "Sine.easeInOut",
+            onComplete: resolve,
+            onStop: resolve
+          });
+        })
+      );
+    }
+    await Promise.all(holdPromises);
+    if (typeof scene.startNextHalfCourtOffense === "function") {
+      scene.startNextHalfCourtOffense();
+    }
+    return;
+  }
+
+  const shooterId = turnData.shooterId || turnData.shooter_id;
+  const shooterSprite = shooterId != null ? playerSprites[shooterId] : null;
+  if (shooterSprite) {
+    attachBallToPlayer(scene, ballSprite, shooterSprite);
+    const rimGrid =
+      shooterSprite.team === "home" ? HOME_RIM_COORDS : AWAY_RIM_COORDS;
+    const rimPx = gridToPixels(rimGrid.x, rimGrid.y, width, height);
+    const arcHeight = animationConfig.fastBreak?.arcHeight ?? 50;
+    await tweenBallTo(scene, ballSprite, rimPx, {
+      duration: animationConfig.inbound.duration,
+      easing: animationConfig.inbound.easing,
+      arc: { height: arcHeight }
+    });
+    if (turnData.result_type === "MAKE") {
+      const newOffenseSide =
+        shooterSprite.team === "home" ? "away" : "home";
+      await runInboundSetup({
+        scene,
+        ballSprite,
+        playerSprites,
+        newOffenseSide
+      });
+    } else {
+      await animateRebound({
+        scene,
+        ballSprite,
+        playerSprites,
+        animations,
+        rebounderId: turnData.rebounderId || turnData.rebounder_id,
+        ballSpot: turnData.ballSpot || turnData.ball_spot
+      });
+    }
+  }
+}
+
 /**
  * Step-synchronized possession animation.
  * Each stepIndex is animated across all players, then the next step begins.
@@ -753,7 +908,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   }
 }
 
-export { runInboundSetup, runSideInboundSetup };
+export { runInboundSetup, runSideInboundSetup, runFastBreakSequence };
 
 if (typeof window !== "undefined") {
   window.playTurnAnimation = playTurnAnimation;
