@@ -93,6 +93,8 @@ body {
   max-width: 100%;
   height: auto;
   display: block;
+  max-height: 40vh;
+  object-fit: contain;
 }
 
 /* Feature Cards */
@@ -115,6 +117,12 @@ body {
 @media (min-width: 900px) {
   .features {
     grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-height: 900px) {
+  .hero img {
+    max-height: 35vh;
   }
 }
 
