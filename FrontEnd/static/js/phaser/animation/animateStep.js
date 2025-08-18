@@ -20,15 +20,18 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
       scene.game.config.height
     );
 
+    let startPromise = Promise.resolve();
+
     const tween = scene.tweens.add({
       targets: [sprite],
       x: targetX,
       y: targetY,
       duration,
       ease: "Linear",
-      onStart: () => {
+      onStart: async () => {
         if (step.action && onAction) {
-          onAction(step.action, sprite, step.timestamp);
+          startPromise = onAction(step.action, sprite, step.timestamp);
+          await startPromise;
         }
       },
       onUpdate: () => {
@@ -36,8 +39,14 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
           ballSprite.setPosition(sprite.x, sprite.y);
         }
       },
-      onComplete: resolve,
-      onStop: resolve
+      onComplete: async () => {
+        await startPromise;
+        resolve();
+      },
+      onStop: async () => {
+        await startPromise;
+        resolve();
+      }
     });
 
     if (scene.skipToEnd) {
