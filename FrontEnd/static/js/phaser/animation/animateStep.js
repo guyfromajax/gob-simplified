@@ -10,6 +10,8 @@ import { gridToPixels } from "../utils/gridToPixels.js";
  * @param {number} duration - Milliseconds for tween duration
  * @returns {Promise} resolves when tween completes
  */
+import { PASS_DEBUG } from "./ballTween.js";
+
 export function animateStep({ scene, sprite, step, duration, ballSprite, currentBallOwnerRef, onAction }) {
   if (scene.skipToEnd) return Promise.resolve();
   return new Promise((resolve) => {
@@ -30,6 +32,9 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
       ease: "Linear",
       onStart: async () => {
         if (step.action && onAction) {
+          if (PASS_DEBUG && step.action === 'pass') {
+            console.log('passStart', { fromId: sprite?.playerId, timestamp: step.timestamp });
+          }
           startPromise = onAction(step.action, sprite, step.timestamp);
           await startPromise;
         }

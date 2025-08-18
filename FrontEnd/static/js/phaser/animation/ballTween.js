@@ -121,7 +121,7 @@ export async function runPass(scene, cfg = {}) {
   const key = `${fromId ?? ''}-${toId ?? ''}`;
 
   if (scene.__activePass && scene.__activePass.key === key && scene.__activePass.frame === frame) {
-    console.log('duplicate runPass ignored', { fromId, toId, frame });
+    if (PASS_DEBUG) console.log('duplicate runPass ignored', { fromId, toId, frame });
     return Promise.resolve();
   }
 
@@ -155,7 +155,7 @@ export async function runPass(scene, cfg = {}) {
   (async () => {
     try {
       scene.events?.emit('passStart', { fromId, toId, duration: usedDuration, easing: usedEasing });
-      console.log('passStart', { fromId, toId, duration: usedDuration, easing: usedEasing });
+      if (PASS_DEBUG) console.log('passStart', { fromId, toId, duration: usedDuration, easing: usedEasing });
 
       if (fromSprite) {
         attachBallToPlayer(scene, ballSprite, fromSprite);
@@ -172,7 +172,7 @@ export async function runPass(scene, cfg = {}) {
       detachBall(scene, ballSprite);
       scene.ballDetached = true;
       scene.events?.emit('ballDetached');
-      console.log('ballDetached');
+      if (PASS_DEBUG) console.log('detach(A)', { fromId });
 
       const end = endCoords || (toSprite ? { x: toSprite.x, y: toSprite.y } : null);
       if (!end) {
@@ -183,29 +183,29 @@ export async function runPass(scene, cfg = {}) {
       const doTween = animationConfig.enableBallTween !== false;
       if (doTween) {
         scene.events?.emit('tweenStart', { fromId, toId, duration: usedDuration, easing: usedEasing });
-        console.log('tweenStart', { fromId, toId, duration: usedDuration, easing: usedEasing });
+        if (PASS_DEBUG) console.log('tweenStart', { fromId, toId, duration: usedDuration, easing: usedEasing });
         await tweenBallTo(scene, ballSprite, end, { duration: usedDuration, easing: usedEasing });
         scene.events?.emit('tweenEnd', { toId });
-        console.log('tweenEnd', { toId });
+        if (PASS_DEBUG) console.log('tweenEnd', { toId });
       } else {
         scene.events?.emit('tweenStart', { fromId, toId, skipped: true });
-        console.log('tweenStart', { fromId, toId, skipped: true });
+        if (PASS_DEBUG) console.log('tweenStart', { fromId, toId, skipped: true });
         if (scene.tweens) scene.tweens.killTweensOf(ballSprite);
         ballSprite.setPosition(end.x, end.y);
         ballSprite.setVisible(true);
         ballSprite.setDepth(BALL_DEPTH);
         scene.events?.emit('tweenEnd', { toId, skipped: true });
-        console.log('tweenEnd', { toId, skipped: true });
+        if (PASS_DEBUG) console.log('tweenEnd', { toId, skipped: true });
       }
       if (toSprite) {
         attachBallToPlayer(scene, ballSprite, toSprite);
         scene.ballDetached = false;
         scene.events?.emit('ballAttached', { toId });
-        console.log('ballAttached', { toId });
+        if (PASS_DEBUG) console.log('attach(B)', { toId });
       }
 
       scene.events?.emit('passEnd', { toId });
-      console.log('passEnd', { toId });
+      if (PASS_DEBUG) console.log('passEnd', { toId });
       resolveFn();
     } catch (err) {
       const lastId = scene.ballLastKnownOwnerId;
