@@ -16,6 +16,11 @@ const defaults = {
     easing: 'Sine.easeInOut',
     arc: null,
   },
+  steal: {
+    duration: 150,
+    easing: 'Sine.easeInOut',
+    arc: null,
+  },
 };
 
 const overrides =
@@ -26,6 +31,7 @@ export const animationConfig = {
   pass: { ...defaults.pass, ...(overrides.pass || {}) },
   inbound: { ...defaults.inbound, ...(overrides.inbound || {}) },
   kickout: { ...defaults.kickout, ...(overrides.kickout || {}) },
+  steal: { ...defaults.steal, ...(overrides.steal || {}) },
 };
 
 export default animationConfig;

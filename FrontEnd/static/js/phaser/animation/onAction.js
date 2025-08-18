@@ -58,7 +58,18 @@ export function onAction(action, sprite, timestamp) {
           ease: "Back.easeOut"
         });
         break;
-  
+
+      case "steal":
+        // Brief flash to highlight defender
+        scene.tweens.add({
+          targets: sprite,
+          alpha: 0.5,
+          duration: 100,
+          yoyo: true,
+          ease: "Sine.easeInOut"
+        });
+        break;
+
       default:
         // No effect for unrecognized actions
         break;
