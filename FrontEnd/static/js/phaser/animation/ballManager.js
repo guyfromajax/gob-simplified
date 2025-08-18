@@ -484,6 +484,10 @@ export function animateKickoutReset(
   scene.events?.once('tweenStart', () => console.log('tweenStart'));
   scene.events?.once('tweenEnd', () => console.log('tweenEnd'));
 
+  if (scene.fastBreakInProgress) {
+    return Promise.resolve();
+  }
+
   return runPass(scene, opts);
 }
 
