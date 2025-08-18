@@ -121,7 +121,8 @@ export async function runPass(scene, cfg = {}) {
   const key = `${fromId ?? ''}-${toId ?? ''}`;
 
   if (scene.__activePass && scene.__activePass.key === key && scene.__activePass.frame === frame) {
-    return scene.__activePass.promise;
+    console.log('duplicate runPass ignored', { fromId, toId, frame });
+    return Promise.resolve();
   }
 
   if (scene.__activePass) {
