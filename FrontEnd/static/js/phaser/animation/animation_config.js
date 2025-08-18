@@ -1,5 +1,6 @@
 const defaults = {
-  enableBallTween: false,
+  // Enable ball tweening by default; tests can override via global animation_config
+  enableBallTween: true,
   pass: {
     duration: 150,
     easing: 'Sine.easeInOut',
