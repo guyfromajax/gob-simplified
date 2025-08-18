@@ -2,7 +2,7 @@ import * as Phaser from "https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.
 import { animateStep } from "./animateStep.js";
 import { gridToPixels } from "../utils/gridToPixels.js";
 import {
-  lockBallToPlayer,
+  attachBallToPlayer,
   shootBall,
   SHOT_DEBUG,
   animateRebound,
@@ -172,18 +172,21 @@ async function runSideInboundSetup({ scene, ballSprite, playerSprites, turnData 
   const sfId = offenseIds["SF"];
   const pgId = offenseIds["PG"];
   if (sfSprite) {
-    lockBallToPlayer(scene, ballSprite, sfSprite);
+    attachBallToPlayer(scene, ballSprite, sfSprite);
     scene.ballAttachedToPlayerId = sfId;
     console.log("ballAttach(SF)");
 
     console.log(`[sideInbound][holdStart] sf:${sfId} pg:${pgId}`);
     await new Promise((resolve) => scene.time.delayedCall(1000, resolve));
 
+    scene.events?.once('passStart', () => console.log('passStart'));
+    scene.events?.once('tweenStart', () => console.log('tweenStart'));
+    scene.events?.once('tweenEnd', () => console.log('tweenEnd'));
+    scene.events?.once('passEnd', () => console.log('passEnd'));
+
     console.log(`[sideInbound][passStart] sf:${sfId} pg:${pgId}`);
-    if (animationConfig.enableBallTween && pgSprite) {
+    if (pgSprite) {
       await runPass(scene, { fromId: sfId, toId: pgId, duration, easing: ease });
-    } else if (pgSprite) {
-      lockBallToPlayer(scene, ballSprite, pgSprite);
     }
     console.log(`[sideInbound][passEnd] sf:${sfId} pg:${pgId}`);
     if (pgSprite) {
@@ -474,7 +477,7 @@ async function runInboundSetup({
   ]);
 
   console.log(`[inbound][ballAttach][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
-  lockBallToPlayer(scene, ballSprite, sfSprite);
+  attachBallToPlayer(scene, ballSprite, sfSprite);
   scene.ballAttachedToPlayerId = sfId;
 
   console.log(`[inbound][holdStart][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
@@ -485,19 +488,19 @@ async function runInboundSetup({
     scene.tweens.killTweensOf(pgSprite);
   }
 
+  scene.events?.once('passStart', () => console.log('passStart'));
+  scene.events?.once('tweenStart', () => console.log('tweenStart'));
+  scene.events?.once('tweenEnd', () => console.log('tweenEnd'));
+  scene.events?.once('passEnd', () => console.log('passEnd'));
+
   console.log(`[inbound][passStart][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
-  if (animationConfig.enableBallTween) {
-    await runPass(scene, {
-      fromId: sfId,
-      toId: pgId,
-      duration: 500,
-      easing: "Sine.easeInOut"
-    });
-  } else {
-    lockBallToPlayer(scene, ballSprite, pgSprite);
-  }
+  await runPass(scene, {
+    fromId: sfId,
+    toId: pgId,
+    duration: 500,
+    easing: "Sine.easeInOut"
+  });
   console.log(`[inbound][passEnd][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
-  lockBallToPlayer(scene, ballSprite, pgSprite);
   scene.ballAttachedToPlayerId = pgId;
   console.log(`[inbound][pgAttach][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
 
@@ -538,7 +541,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   }
 
   if (step0OwnerSprite) {
-    lockBallToPlayer(scene, ballSprite, step0OwnerSprite);
+    attachBallToPlayer(scene, ballSprite, step0OwnerSprite);
     currentBallOwnerRef.value = step0OwnerSprite;
   }
 
@@ -696,7 +699,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
         const shooterId = evt.shooterId;
         const rebounderSprite = playerSprites[shooterId];
         if (!rebounderSprite) continue;
-        lockBallToPlayer(scene, ballSprite, rebounderSprite);
+        attachBallToPlayer(scene, ballSprite, rebounderSprite);
         const rimCoords =
           rebounderSprite.team === "home" ? HOME_RIM_COORDS : AWAY_RIM_COORDS;
         const putbackResult = await animatePutbackAttempt(

@@ -2,7 +2,7 @@
 import { loadPhaserPlayers } from './setup/loadPhaserPlayers.js';
 import { playTurnAnimation } from './animation/turnAnimation.js';
 import { onAction } from './animation/onAction.js';
-import { passBall, lockBallToPlayer } from './animation/ballManager.js';
+import { passBall, attachBallToPlayer } from './animation/ballManager.js';
 import { gridToPixels } from './utils/gridToPixels.js';
 
 
@@ -72,7 +72,7 @@ export function createTestScene(Phaser) {
     const passStep = allPlayers[0].movement[1];
     const receiveStep = allPlayers[1].movement[0];
 
-    lockBallToPlayer(this, this.ballSprite, this.playerSprites[playerId]);
+    attachBallToPlayer(this, this.ballSprite, this.playerSprites[playerId]);
 
     if (!this.playerSprites) {
       console.error("❌ playerSprites is undefined!");
