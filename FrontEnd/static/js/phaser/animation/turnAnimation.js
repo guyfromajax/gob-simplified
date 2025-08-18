@@ -200,7 +200,7 @@ async function runSideInboundSetup({ scene, ballSprite, playerSprites, turnData 
     scene.events?.once('passEnd', () => console.log('passEnd'));
 
     console.log(`[sideInbound][passStart] sf:${sfId} pg:${pgId}`);
-    if (pgSprite) {
+    if (pgSprite && !scene.fastBreakInProgress) {
       await runPass(scene, { fromId: sfId, toId: pgId, duration, easing: ease });
     }
     console.log(`[sideInbound][passEnd] sf:${sfId} pg:${pgId}`);
@@ -508,12 +508,14 @@ async function runInboundSetup({
   scene.events?.once('passEnd', () => console.log('passEnd'));
 
   console.log(`[inbound][passStart][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
-  await runPass(scene, {
-    fromId: sfId,
-    toId: pgId,
-    duration: 500,
-    easing: "Sine.easeInOut"
-  });
+  if (!scene.fastBreakInProgress) {
+    await runPass(scene, {
+      fromId: sfId,
+      toId: pgId,
+      duration: 500,
+      easing: "Sine.easeInOut"
+    });
+  }
   console.log(`[inbound][passEnd][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
   console.log(`[inbound][pgAttach][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
 
@@ -524,121 +526,131 @@ async function runFastBreakSequence({ scene, turnData, playerSprites, ballSprite
   if (!scene || !turnData || scene.skipToEnd) return;
   if (!scene.ballSprite) scene.ballSprite = ballSprite;
 
-  const animations = turnData.animations || [];
-  const width = scene.game.config.width;
-  const height = scene.game.config.height;
-  const sprintDuration =
-    animationConfig.fastBreak?.sprintDuration ?? 800;
+  scene.fastBreakInProgress = true;
+  scene.events?.emit("fb:start");
 
-  const ownerAnim = animations.find(a => a.hasBallAtStep?.[0]);
-  if (ownerAnim) {
-    const ownerSprite = playerSprites[ownerAnim.playerId];
-    if (ownerSprite) attachBallToPlayer(scene, ballSprite, ownerSprite);
-  }
-
-  const sprintPromises = [];
-  for (const anim of animations) {
-    const sprite = playerSprites[anim.playerId];
-    if (!sprite) continue;
-    const start = anim.start || anim.movement?.[0]?.coords;
-    const end = anim.end || anim.movement?.[anim.movement.length - 1]?.coords;
-    if (!start || !end) continue;
-    const startPx = gridToPixels(start.x, start.y, width, height);
-    const endPx = gridToPixels(end.x, end.y, width, height);
-    sprite.setPosition(startPx.x, startPx.y);
-    sprintPromises.push(
-      new Promise(resolve => {
-        scene.tweens.add({
-          targets: sprite,
-          x: endPx.x,
-          y: endPx.y,
-          duration: sprintDuration,
-          ease: "Sine.easeInOut",
-          onUpdate: () => {
-            if (
-              scene.ballAttachedToPlayerId === anim.playerId &&
-              ballSprite?.setPosition
-            ) {
-              ballSprite.setPosition(sprite.x, sprite.y);
-              ballSprite.setVisible(true);
-            }
-          },
-          onComplete: resolve,
-          onStop: resolve
-        });
-      })
-    );
-  }
-  await Promise.all(sprintPromises);
-  if (scene.skipToEnd) return;
-
-  const passEvents = [];
-  for (const anim of animations) {
-    const moves = anim.movement || [];
-    for (const step of moves) {
-      if (step.action === "pass") {
-        const ts = step.timestamp;
-        const receiverAnim = animations.find(a =>
-          a.movement?.some(m => m.action === "receive" && m.timestamp === ts)
-        );
-        const receiveStep = receiverAnim?.movement.find(
-          m => m.action === "receive" && m.timestamp === ts
-        );
-        const delta = receiveStep
-          ? receiveStep.timestamp - ts
-          : animationConfig.pass.duration;
-        passEvents.push({
-          timestamp: ts,
-          fromId: anim.playerId,
-          toId: receiverAnim?.playerId,
-          duration: delta
-        });
-      }
+  if (scene.tweens) {
+    for (const sprite of Object.values(playerSprites)) {
+      scene.tweens.killTweensOf(sprite);
     }
   }
-  passEvents.sort((a, b) => a.timestamp - b.timestamp);
-  for (const evt of passEvents) {
-    if (scene.skipToEnd) break;
-    await runPass(scene, {
-      fromId: evt.fromId,
-      toId: evt.toId,
-      duration: evt.duration,
-      easing: animationConfig.pass.easing
-    });
-  }
-  if (scene.skipToEnd) return;
 
-  if (turnData.hold_up) {
-    const center = gridToPixels(50, 25, width, height);
-    const spacing = 10;
-    const holdPromises = [];
-    let idx = 0;
+  try {
+    const animations = turnData.animations || [];
+    const width = scene.game.config.width;
+    const height = scene.game.config.height;
+    const sprintDuration =
+      animationConfig.fastBreak?.sprintDuration ?? 800;
+
+    const ownerAnim = animations.find(a => a.hasBallAtStep?.[0]);
+    if (ownerAnim) {
+      const ownerSprite = playerSprites[ownerAnim.playerId];
+      if (ownerSprite) attachBallToPlayer(scene, ballSprite, ownerSprite);
+    }
+
+    const sprintPromises = [];
     for (const anim of animations) {
       const sprite = playerSprites[anim.playerId];
       if (!sprite) continue;
-      const targetX = center.x + (idx - animations.length / 2) * spacing;
-      const targetY = sprite.y;
-      idx++;
-      holdPromises.push(
+      const start = anim.start || anim.movement?.[0]?.coords;
+      const end = anim.end || anim.movement?.[anim.movement.length - 1]?.coords;
+      if (!start || !end) continue;
+      const startPx = gridToPixels(start.x, start.y, width, height);
+      const endPx = gridToPixels(end.x, end.y, width, height);
+      sprite.setPosition(startPx.x, startPx.y);
+      sprintPromises.push(
         new Promise(resolve => {
           scene.tweens.add({
             targets: sprite,
-            x: targetX,
-            y: targetY,
-            duration: sprintDuration / 2,
+            x: endPx.x,
+            y: endPx.y,
+            duration: sprintDuration,
             ease: "Sine.easeInOut",
+            onUpdate: () => {
+              if (
+                scene.ballAttachedToPlayerId === anim.playerId &&
+                ballSprite?.setPosition
+              ) {
+                ballSprite.setPosition(sprite.x, sprite.y);
+                ballSprite.setVisible(true);
+              }
+            },
             onComplete: resolve,
             onStop: resolve
           });
         })
       );
     }
-    await Promise.all(holdPromises);
-    if (typeof scene.startNextHalfCourtOffense === "function") {
-      scene.startNextHalfCourtOffense();
+    await Promise.all(sprintPromises);
+    if (scene.skipToEnd) return;
+
+    const passEvents = [];
+    for (const anim of animations) {
+      const moves = anim.movement || [];
+      for (const step of moves) {
+        if (step.action === "pass") {
+          const ts = step.timestamp;
+          const receiverAnim = animations.find(a =>
+            a.movement?.some(m => m.action === "receive" && m.timestamp === ts)
+          );
+          const receiveStep = receiverAnim?.movement.find(
+            m => m.action === "receive" && m.timestamp === ts
+          );
+          const delta = receiveStep
+            ? receiveStep.timestamp - ts
+            : animationConfig.pass.duration;
+          passEvents.push({
+            timestamp: ts,
+            fromId: anim.playerId,
+            toId: receiverAnim?.playerId,
+            duration: delta
+          });
+        }
+      }
     }
-    return;
-  }
+    passEvents.sort((a, b) => a.timestamp - b.timestamp);
+    for (const evt of passEvents) {
+      if (scene.skipToEnd) break;
+      await runPass(scene, {
+        fromId: evt.fromId,
+        toId: evt.toId,
+        duration: evt.duration,
+        easing: animationConfig.pass.easing
+      });
+    }
+    if (scene.skipToEnd) return;
+
+    if (turnData.hold_up) {
+      const center = gridToPixels(50, 25, width, height);
+      const spacing = 10;
+      const holdPromises = [];
+      let idx = 0;
+      for (const anim of animations) {
+        const sprite = playerSprites[anim.playerId];
+        if (!sprite) continue;
+        const targetX = center.x + (idx - animations.length / 2) * spacing;
+        const targetY = sprite.y;
+        idx++;
+        holdPromises.push(
+          new Promise(resolve => {
+            scene.tweens.add({
+              targets: sprite,
+              x: targetX,
+              y: targetY,
+              duration: sprintDuration / 2,
+              ease: "Sine.easeInOut",
+              onComplete: resolve,
+              onStop: resolve
+            });
+          })
+        );
+      }
+      await Promise.all(holdPromises);
+      if (typeof scene.startNextHalfCourtOffense === "function") {
+        scene.startNextHalfCourtOffense();
+      }
+      return;
+    }
 
   const shooterId = turnData.shooterId || turnData.shooter_id;
   const shooterSprite = shooterId != null ? playerSprites[shooterId] : null;
@@ -673,6 +685,10 @@ async function runFastBreakSequence({ scene, turnData, playerSprites, ballSprite
       });
     }
   }
+  } finally {
+    scene.fastBreakInProgress = false;
+    scene.events?.emit("fb:end");
+  }
 }
 
 /**
@@ -687,6 +703,10 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   const maxSteps = Math.max(
     ...turnData.animations.map(anim => anim.movement.length)
   );
+
+  if (scene.fastBreakInProgress) {
+    return;
+  }
 
   if (ballSprite && scene?.tweens) {
     scene.tweens.killTweensOf(ballSprite);
@@ -704,7 +724,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   // Determine which player owns the ball at step 0
   let step0OwnerSprite = null;
   for (const anim of turnData.animations) {
-    if (scene.skipToEnd) break;
+    if (scene.skipToEnd || scene.fastBreakInProgress) break;
     if (anim.hasBallAtStep?.[0]) {
       step0OwnerSprite = playerSprites[anim.playerId];
       break;
@@ -725,7 +745,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
     currentBallOwnerRef
   });
 
-  if (scene.skipToEnd) {
+  if (scene.skipToEnd || scene.fastBreakInProgress) {
     return;
   }
 
@@ -749,7 +769,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   });
 
   for (let stepIndex = 1; stepIndex < maxSteps; stepIndex++) {
-    if (scene.skipToEnd) break;
+    if (scene.skipToEnd || scene.fastBreakInProgress) break;
 
     updateBallOwnership({
       scene,

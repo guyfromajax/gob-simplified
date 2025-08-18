@@ -88,6 +88,7 @@ export async function animateGameTurns({ //hasBallAtStep
         const movement = anim?.movement || [];
 
         if (action === "pass") {
+          if (scene.fastBreakInProgress) return;
           const passStep = movement.find(
             m => m.action === "pass" && m.timestamp === timestamp
           );
@@ -143,7 +144,7 @@ export async function animateGameTurns({ //hasBallAtStep
     });
 
     const stealEvent = turn.events?.find(e => e.event_type === "STEAL");
-    if (turn.result_type === "STEAL" || stealEvent) {
+    if (!scene.fastBreakInProgress && (turn.result_type === "STEAL" || stealEvent)) {
       const ballHandlerId = playerMap[turn.ball_handler] ?? turn.ball_handler;
       const stealerRaw =
         turn.stealerId ||
@@ -165,7 +166,7 @@ export async function animateGameTurns({ //hasBallAtStep
         const defenderSprite = playerSprites[stealerId];
         // runPass reattaches the ball after the tween resolves, so only emit
         // possession change once that handoff has finished.
-        if (defenderSprite) {
+        if (!scene.fastBreakInProgress && defenderSprite) {
           scene.events?.emit?.('possessionChange', { offenseTeamId: defenderSprite.team_id });
         }
       }
