@@ -29,13 +29,14 @@ async function simulateGame() {
     const data = await response.json();
     console.log("📦 Full response from backend:", data);
     
-    const text_log = data.text_log || [];
+    const turns = data.text_log || [];
     logContainer.innerHTML = ""; // clear previous
-    text_log.forEach((turn, i) => {
-      const text = turn.text || JSON.stringify(turn); // fallback in case text is missing
-      // Prepend so the most recent turn appears first
-      logContainer.innerHTML = `Turn ${i + 1}: ${text}\n` + logContainer.innerHTML;
+    turns.forEach((turn, idx) => {
+      const line = document.createElement('div');
+      line.textContent = `Turn ${idx + 1}: ${turn.text || JSON.stringify(turn)}`;
+      logContainer.prepend(line); // newest at top
     });
+    logContainer.scrollTop = 0; // ensure view starts at top
 
 
     // text_log.forEach((turn, i) => {
