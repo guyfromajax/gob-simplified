@@ -1,6 +1,7 @@
 from typing import Any, Dict
 
 from bson import ObjectId
+from pymongo import ReturnDocument
 
 from BackEnd.constants import BOX_SCORE_KEYS
 from BackEnd.db import db, players_collection, tournaments_collection, games_collection
@@ -234,6 +235,118 @@ def recompute_tournament_leaders(tournament_id: str, limit: int = 10) -> Dict[st
         {"_id": tid}, {"$set": {"leaderboards": leaderboards}}
     )
     return leaderboards
+
+
+def rollup_game_to_franchise(franchise_id: str | ObjectId, game_id: str | ObjectId) -> None:
+    """Aggregate a game's stats into a franchise document.
+
+    The update is idempotent per ``game_id`` thanks to the ``processed_games``
+    guard.  Per-player season and career totals are incremented, per-game
+    averages and shooting percentages are recomputed, and ``game_id`` is
+    appended to ``processed_games``.
+    """
+
+    try:
+        fid = ObjectId(franchise_id)
+    except Exception:
+        fid = franchise_id
+
+    game = games_collection.find_one({"_id": game_id})
+    if not game and isinstance(game_id, str):
+        try:
+            game = games_collection.find_one({"_id": ObjectId(game_id)})
+        except Exception:
+            game = None
+    if not game:
+        return
+
+    players = game.get("players", [])
+    box_score = game.get("box_score", {})
+    team_map = {"home": game.get("home_team"), "away": game.get("away_team")}
+
+    inc_doc: Dict[str, Any] = {}
+    set_doc: Dict[str, Any] = {}
+
+    for p in players:
+        pid = str(p.get("playerId"))
+        team_side = p.get("team")
+        pos = p.get("pos")
+        team_name = team_map.get(team_side)
+        if not pid or not team_name:
+            continue
+        stat_block = box_score.get(team_name, {}).get(pos, p.get("stats", {}))
+        for stat, val in stat_block.items():
+            if stat == "name" or not isinstance(val, (int, float)):
+                continue
+            inc_doc[f"player_stats.{pid}.season.{stat}"] = inc_doc.get(
+                f"player_stats.{pid}.season.{stat}", 0
+            ) + val
+            inc_doc[f"player_stats.{pid}.career.{stat}"] = inc_doc.get(
+                f"player_stats.{pid}.career.{stat}", 0
+            ) + val
+        inc_doc[f"player_stats.{pid}.season.GP"] = inc_doc.get(
+            f"player_stats.{pid}.season.GP", 0
+        ) + 1
+        inc_doc[f"player_stats.{pid}.career.GP"] = inc_doc.get(
+            f"player_stats.{pid}.career.GP", 0
+        ) + 1
+
+        meta = players_collection.find_one(
+            {"_id": pid}, {"first_name": 1, "last_name": 1, "team": 1}
+        )
+        if meta:
+            set_doc[f"player_stats.{pid}.first_name"] = meta.get("first_name", "")
+            set_doc[f"player_stats.{pid}.last_name"] = meta.get("last_name", "")
+            set_doc[f"player_stats.{pid}.team"] = meta.get("team", "")
+
+    if not inc_doc:
+        return
+
+    update_doc: Dict[str, Any] = {
+        "$inc": inc_doc,
+        "$addToSet": {"processed_games": game_id},
+    }
+    if set_doc:
+        update_doc["$set"] = set_doc
+
+    result = db.franchises.find_one_and_update(
+        {"_id": fid, "processed_games": {"$ne": game_id}},
+        update_doc,
+        return_document=ReturnDocument.AFTER,
+    )
+
+    if not result:
+        return
+
+    avg_doc: Dict[str, Any] = {}
+    for p in players:
+        pid = str(p.get("playerId"))
+        pdata = result.get("player_stats", {}).get(pid, {})
+        season_totals = pdata.get("season", {})
+        gp = season_totals.get("GP", 0)
+        averages: Dict[str, Any] = {}
+        if gp:
+            for stat in BOX_SCORE_KEYS:
+                averages[stat] = season_totals.get(stat, 0) / gp
+            averages["FG%"] = (
+                season_totals.get("FGM", 0) / season_totals.get("FGA", 0) * 100
+                if season_totals.get("FGA", 0)
+                else 0.0
+            )
+            averages["FT%"] = (
+                season_totals.get("FTM", 0) / season_totals.get("FTA", 0) * 100
+                if season_totals.get("FTA", 0)
+                else 0.0
+            )
+        else:
+            for stat in BOX_SCORE_KEYS:
+                averages[stat] = 0
+            averages["FG%"] = 0.0
+            averages["FT%"] = 0.0
+        avg_doc[f"player_stats.{pid}.averages"] = averages
+
+    if avg_doc:
+        db.franchises.update_one({"_id": fid}, {"$set": avg_doc})
 
 
 def finalize_game(
