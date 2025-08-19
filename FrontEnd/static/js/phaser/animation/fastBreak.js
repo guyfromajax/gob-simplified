@@ -13,5 +13,6 @@ export function runFastBreakSequenceWrapper(
 }
 
 export { runFastBreakSequence } from "./turnAnimation.js";
+export { HOME_RIM_COORDS, AWAY_RIM_COORDS, HOME_TOP_KEY, AWAY_TOP_KEY } from "./courtConstants.js";
 export default runFastBreakSequenceWrapper;
 
