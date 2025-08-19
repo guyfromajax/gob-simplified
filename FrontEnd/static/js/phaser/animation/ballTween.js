@@ -116,6 +116,42 @@ export function tweenBallTo(scene, ballSprite, target, opts = {}) {
 }
 
 /**
+ * Tween a player sprite to a target position. If the player currently has the
+ * ball attached, keep the ball in sync during the movement.
+ * @param {Phaser.Scene} scene
+ * @param {Phaser.GameObjects.Sprite} sprite
+ * @param {{x:number,y:number}} target
+ * @param {{duration?:number, easing?:string}} opts
+ */
+export function tweenPlayerTo(scene, sprite, target, opts = {}) {
+  if (!scene || !sprite || !target) return Promise.resolve();
+  const { duration = 300, easing = 'Linear' } = opts;
+
+  return new Promise((resolve, reject) => {
+    const tween = scene.tweens.add({
+      targets: sprite,
+      x: target.x,
+      y: target.y,
+      duration,
+      ease: easing,
+      onUpdate: () => {
+        const ballSprite = scene.ballSprite;
+        if (
+          ballSprite &&
+          scene.ballAttachedToPlayerId === sprite.playerId &&
+          ballSprite.setPosition
+        ) {
+          ballSprite.setPosition(sprite.x, sprite.y);
+          ballSprite.setVisible(true);
+        }
+      },
+      onComplete: resolve
+    });
+    tween?.once?.('stop', () => reject(new Error('tween stopped')));
+  });
+}
+
+/**
  * Execute a full pass animation between players or coordinates.
  * Uses scene.ballSprite and scene.playerSprites to resolve sprites by id.
  * @param {Phaser.Scene} scene
@@ -249,5 +285,6 @@ export default {
   attachBallToPlayer,
   detachBall,
   tweenBallTo,
+  tweenPlayerTo,
   runPass
 };
