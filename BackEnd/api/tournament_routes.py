@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel
+import logging
 from BackEnd.db import (
     tournaments_collection,
     teams_collection,
@@ -16,6 +17,7 @@ from BackEnd.utils import stat_updater
 from bson import ObjectId
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 class StartTournamentRequest(BaseModel):
@@ -168,8 +170,21 @@ def simulate_round(request: SimulateRequest):
         if user_matchup:
             return user_matchup
 
-        return {"error": "User matchup not found"}
+        current_round = (
+            manager.tournament.get("current_round")
+            if getattr(manager, "tournament", None)
+            else None
+        )
+        logger.error(
+            "User matchup not found: tournament_id=%s current_round=%s user_team_id=%s",
+            str(tournament_id),
+            current_round,
+            user_team_id,
+        )
+        raise HTTPException(status_code=409, detail="User matchup not found")
 
+    except HTTPException:
+        raise
     except Exception as e:
         print("🚨 Error in simulate_round:", str(e))
         raise HTTPException(status_code=500, detail=str(e))
