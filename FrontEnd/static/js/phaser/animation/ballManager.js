@@ -200,11 +200,12 @@ export function shootBall({
           }
         } else if (result === "MISS") {
           // Bounce the ball off the rim
+          const rebCfg = animationConfig.rebound;
           const bounceGridX = isHomeTeam
-            ? rimCoords.x - 6
-            : rimCoords.x + 6;
+            ? rimCoords.x - rebCfg.bounceArea.x
+            : rimCoords.x + rebCfg.bounceArea.x;
           const bounceGridY =
-            rimCoords.y + Phaser.Math.Between(-6, 6);
+            rimCoords.y + Phaser.Math.Between(-rebCfg.bounceArea.y, rebCfg.bounceArea.y);
           const bounce = gridToPixels(
             bounceGridX,
             bounceGridY,
@@ -300,9 +301,12 @@ export function animatePutbackAttempt(
             resolve();
             } else if (result === "MISS") {
               const isHomeTeam = shooterSprite.team === "home";
-              const bounceGridX = isHomeTeam ? rimCoords.x - 6 : rimCoords.x + 6;
+              const rebCfg = animationConfig.rebound;
+              const bounceGridX = isHomeTeam
+                ? rimCoords.x - rebCfg.bounceArea.x
+                : rimCoords.x + rebCfg.bounceArea.x;
               const bounceGridY =
-                rimCoords.y + Phaser.Math.Between(-6, 6);
+                rimCoords.y + Phaser.Math.Between(-rebCfg.bounceArea.y, rebCfg.bounceArea.y);
               const bounce = gridToPixels(
                 bounceGridX,
                 bounceGridY,
@@ -355,6 +359,7 @@ export function animateRebound({
   if (scene?.ftInProgress) return Promise.resolve();
 
   scene.rebounderId = rebounderId;
+  const rebCfg = animationConfig.rebound;
   const promises = [];
   const finalPositions = [];
   const MIN_X_SEP = 3;
@@ -385,7 +390,7 @@ export function animateRebound({
           targets: rebounderSprite,
           x: spotPx.x,
           y: spotPx.y,
-          duration: 300,
+          duration: rebCfg.playerMoveMs,
           ease: "Linear",
           onComplete: () => {
             attachBallToPlayer(scene, ballSprite, rebounderSprite);
@@ -461,7 +466,7 @@ export function animateRebound({
           targets: sprite,
           x: targetPx.x,
           y: targetPx.y,
-          duration: 300,
+          duration: rebCfg.playerMoveMs,
           ease: "Linear",
           onComplete: resolve,
           onStop: resolve
@@ -482,9 +487,9 @@ export function animateRebound({
           console.log("[rebound]", logPayload);
         }
         if (scene.time?.delayedCall) {
-          scene.time.delayedCall(1000, resolve);
+          scene.time.delayedCall(rebCfg.attachDelayMs, resolve);
         } else {
-          setTimeout(resolve, 1000);
+          setTimeout(resolve, rebCfg.attachDelayMs);
         }
       })
   );
