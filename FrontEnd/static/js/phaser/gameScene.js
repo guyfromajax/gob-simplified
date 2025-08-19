@@ -220,23 +220,15 @@ export function createGameScene(Phaser) {
           }
         }
 
-        if ((turn.result_type === 'DREB' || turn.result_type === 'OREB') && turn.ball_handler) {
-          const rebId = this.nameToId[turn.ball_handler];
-          if (rebId) {
-            const ps = this.playerStats[rebId];
+        const rebounderId =
+          turn.rebounder_player_id ||
+          turn.rebounderId ||
+          turn.rebounder_id;
+        if (rebounderId) {
+          const ps = this.playerStats[rebounderId];
+          if (ps) {
             ps.REB += 1;
             if (ps.cells?.reb) ps.cells.reb.textContent = ps.REB;
-          }
-        } else if (turn.text) {
-          const m = turn.text.match(/([A-Za-z\-\'\.\s]+) grabs the rebound/);
-          if (m) {
-            const name = m[1].trim();
-            const rebId = this.nameToId[name];
-            if (rebId) {
-              const ps = this.playerStats[rebId];
-              ps.REB += 1;
-              if (ps.cells?.reb) ps.cells.reb.textContent = ps.REB;
-            }
           }
         }
       };
