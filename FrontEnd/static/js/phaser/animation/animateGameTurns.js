@@ -19,6 +19,7 @@ export async function animateGameTurns({ //hasBallAtStep
   const allPlayers = simData.players || [];
 
   const handlePossessionFlip = (payload = {}) => {
+    if (scene.fastBreakInProgress) return;
     scene.possessionFlipInProgress = true;
     scene.offenseTeamId = payload.offenseTeamId;
     if (REBOUND_DEBUG) {
@@ -48,7 +49,9 @@ export async function animateGameTurns({ //hasBallAtStep
     }
 
     if (turn.result_type === "SIDE_INBOUND") {
-      await runSideInboundSetup({ scene, ballSprite, playerSprites, turnData: turn });
+      if (!scene.fastBreakInProgress) {
+        await runSideInboundSetup({ scene, ballSprite, playerSprites, turnData: turn });
+      }
       if (onUpdate) {
         try {
           onUpdate(turn);

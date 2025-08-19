@@ -23,7 +23,7 @@ const MAX_STEP_DURATION = 1000; // ms
  * Assigns the ball to the correct player for the current stepIndex
  */
 function updateBallOwnership({ scene, ballSprite, animations, playerSprites, stepIndex, offenseTeamId, currentBallOwnerRef }) {
-  if (scene?.skipToEnd) return;
+  if (scene?.skipToEnd || scene?.fastBreakInProgress) return;
 
   if (scene.passInFlight) return;
 
@@ -115,7 +115,7 @@ async function runSetupTween({ scene, ballSprite, animations, playerSprites, cur
 
 // Setup sideline inbound play
 async function runSideInboundSetup({ scene, ballSprite, playerSprites, turnData }) {
-  if (!turnData || scene?.skipToEnd || scene?.ftInProgress) return;
+  if (!turnData || scene?.skipToEnd || scene?.ftInProgress || scene?.fastBreakInProgress) return;
 
   const { ball_spot, oDestinations = {}, dDestinations = {}, possession_team_id } = turnData;
   const offenseTeamId = scene.currentOffenseTeamId ?? possession_team_id;
