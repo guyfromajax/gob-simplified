@@ -270,7 +270,7 @@ def resolve_fast_break_logic(game: "GameManager"):
     # Build animation packet for the fast break play
     animator = Animator(game)
     turn_result["animations"] = animator.capture_fast_break_animation(
-        fb_roles, hold_up, stopper_id
+        fb_roles, hold_up, stopper_id, fb_roles.get("defense", [])
     )
     turn_result["roles"] = fb_roles
     if hold_up:
