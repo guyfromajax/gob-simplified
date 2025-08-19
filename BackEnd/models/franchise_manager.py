@@ -89,28 +89,31 @@ class FranchiseManager:
         if self.franchise_id:
             existing = (
                 self.db.franchises.find_one(
-                    {"_id": self.franchise_id}, {"player_stats": 1}
+                    {"_id": self.franchise_id}, {"players": 1}
                 )
                 or {}
             )
-        prev_stats = existing.get("player_stats", {})
-        player_stats: dict[str, dict] = {}
+        prev_stats = existing.get("players", {})
+        players_map: dict[str, dict] = {}
         players = self.db.players.find(
             {}, {"first_name": 1, "last_name": 1, "team": 1}
         )
         for p in players:
             pid = str(p.get("_id"))
             career = prev_stats.get(pid, {}).get("career", zero_stats.copy())
-            player_stats[pid] = {
+            meta = {
                 "first_name": p.get("first_name", ""),
                 "last_name": p.get("last_name", ""),
                 "team": p.get("team", ""),
+            }
+            players_map[pid] = {
+                "meta": meta,
                 "season": zero_stats.copy(),
                 "career": career,
             }
 
         self.save_season_state(
-            extra_state={"player_stats": player_stats, "applied_games": []}
+            extra_state={"players": players_map, "applied_games": []}
         )
 
     def reset_stats(self):

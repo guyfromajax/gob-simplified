@@ -2,7 +2,49 @@ from typing import Any, Dict
 
 from bson import ObjectId
 
+from BackEnd.constants import BOX_SCORE_KEYS
 from BackEnd.db import db, players_collection, tournaments_collection, games_collection
+
+
+def init_franchise_player_stats(franchise_id: str | ObjectId, roster: list[dict]) -> None:
+    """Seed a franchise document with zeroed player stat containers.
+
+    Args:
+        franchise_id: The ``_id`` of the franchise document to update. Can be
+            a ``str`` or :class:`~bson.objectid.ObjectId`.
+        roster: Iterable of player documents. Each entry should contain at
+            least ``_id``, ``first_name``, ``last_name`` and ``team`` fields.
+
+    The function populates ``players.<player_id>`` with ``meta``, ``season`` and
+    ``career`` blocks. All stat fields start at zero. Player documents in the
+    ``players`` collection are left untouched.
+    """
+
+    try:
+        fid = ObjectId(franchise_id)
+    except Exception:
+        fid = franchise_id
+
+    zero_stats = {k: 0 for k in BOX_SCORE_KEYS}
+    update: Dict[str, Any] = {}
+
+    for player in roster:
+        pid = str(player.get("_id"))
+        if not pid:
+            continue
+        meta = {
+            "first_name": player.get("first_name", ""),
+            "last_name": player.get("last_name", ""),
+            "team": player.get("team", ""),
+        }
+        update[f"players.{pid}"] = {
+            "meta": meta,
+            "season": zero_stats.copy(),
+            "career": zero_stats.copy(),
+        }
+
+    if update:
+        db.franchises.update_one({"_id": fid}, {"$set": update})
 
 
 def apply_stats_from_summary(summary: Dict[str, Any], game_id: str, tournament_id: str | None = None) -> None:
@@ -267,11 +309,11 @@ def finalize_game(
             for stat, val in stat_block.items():
                 if stat == "name" or not isinstance(val, (int, float)):
                     continue
-                inc_doc[f"player_stats.{pid}.season.{stat}"] = inc_doc.get(
-                    f"player_stats.{pid}.season.{stat}", 0
+                inc_doc[f"players.{pid}.season.{stat}"] = inc_doc.get(
+                    f"players.{pid}.season.{stat}", 0
                 ) + val
-                inc_doc[f"player_stats.{pid}.career.{stat}"] = inc_doc.get(
-                    f"player_stats.{pid}.career.{stat}", 0
+                inc_doc[f"players.{pid}.career.{stat}"] = inc_doc.get(
+                    f"players.{pid}.career.{stat}", 0
                 ) + val
 
         update: Dict[str, Any] = {"$addToSet": {"applied_games": game_id}}
