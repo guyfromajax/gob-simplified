@@ -3,6 +3,7 @@ import { generateBallTween } from "./generateBallTween.js";
 import { gridToPixels } from "../utils/gridToPixels.js";
 import { runInboundSetup as baseRunInboundSetup } from "./turnAnimation.js";
 import animationConfig from "./animation_config.js";
+import { HOME_RIM_COORDS, AWAY_RIM_COORDS } from "./courtConstants.js";
 import {
   attachBallToPlayer as baseAttachBallToPlayer,
   detachBall,
@@ -62,10 +63,6 @@ export { attachBallToPlayer, detachBall, tweenBallTo, runPass, runInboundSetup }
 export const SHOT_DEBUG = false;
 export const REBOUND_DEBUG = false;
 export const INBOUND_DEBUG = false;
-
-// Hoop locations in grid coordinates for each team
-const HOME_RIM_COORDS = { x: 91, y: 25 };
-const AWAY_RIM_COORDS = { x: 9, y: 25 };
 
 
 
