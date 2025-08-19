@@ -18,12 +18,15 @@ export async function animateGameTurns({ //hasBallAtStep
   const turns = simData.turns || [];
   const allPlayers = simData.players || [];
 
-  function handlePossessionFlip(turn) {
-    if (turn.starting_possession_team_id !== turn.possession_team_id) {
-      scene.currentOffenseTeamId = turn.possession_team_id;
-      scene.events?.emit('possessionChange', { offenseTeamId: turn.possession_team_id });
+  const handlePossessionFlip = () => {
+    scene.possessionFlipInProgress = true;
+    if (scene.time?.delayedCall) {
+      scene.time.delayedCall(0, () => (scene.possessionFlipInProgress = false));
+    } else {
+      setTimeout(() => (scene.possessionFlipInProgress = false), 0);
     }
-  }
+  };
+  scene.events?.on?.('possessionChange', handlePossessionFlip);
 
   for (let i = 0; i < turns.length; i++) {
     scene.currentTurn = i;
@@ -31,9 +34,6 @@ export async function animateGameTurns({ //hasBallAtStep
     turn.index = i;
     if (scene.skipToEnd) break;
     console.log(`🔁 Turn ${i + 1}`, turn);
-
-    scene.currentOffenseTeamId = turn.starting_possession_team_id;
-    handlePossessionFlip(turn);
 
     if (turn.result_type === "FREE_THROW") {
       await runFreeThrowSequence(scene, { playerSprites, ballSprite, turnData: turn, onUpdate });
@@ -167,13 +167,18 @@ export async function animateGameTurns({ //hasBallAtStep
         if (scene.__activePass) {
           console.warn('Active pass tween detected before steal; cancelling previous tween');
         }
-        handlePossessionFlip(turn);
         await runPass(scene, {
           fromId: ballHandlerId,
           toId: stealerId,
           duration: cfg.duration,
           easing: cfg.easing
         });
+        const defenderSprite = playerSprites[stealerId];
+        // runPass reattaches the ball after the tween resolves, so only emit
+        // possession change once that handoff has finished.
+        if (!scene.fastBreakInProgress && defenderSprite) {
+          scene.events?.emit?.('possessionChange', { offenseTeamId: defenderSprite.team_id });
+        }
       }
     }
 
@@ -196,5 +201,7 @@ export async function animateGameTurns({ //hasBallAtStep
       break;
     }
   }
+
+  scene.events?.off?.('possessionChange', handlePossessionFlip);
 }
 
