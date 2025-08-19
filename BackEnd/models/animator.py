@@ -8,7 +8,7 @@ from BackEnd.utils.shared_defense import (
     assign_non_bh_defender_coords
 )
 from collections import defaultdict
-from BackEnd.constants import HCO_STRING_SPOTS, ACTIONS
+from BackEnd.constants import HCO_STRING_SPOTS, ACTIONS, RIM_COORDS, TOP_KEY_COORDS
 import random
 
 class Animator:
@@ -16,49 +16,37 @@ class Animator:
         self.game = game
         self.latest_packet = []
 
-    def capture_fast_break_animation(self, fb_roles, hold_up=False, stopper_id=None):
-        """Build a basic fast break animation packet.
-
-        This animation is much simpler than the half-court version. Each
-        involved player (ball handler, offensive runners, and defenders)
-        receives a movement timeline from their current coordinates to a
-        lane destination near the rim.  The timeline is represented by two
-        steps: the starting position and the final lane destination.
+    def capture_fast_break_animation(
+        self,
+        fb_roles,
+        hold_up=False,
+        stopper_id=None,
+        in_play_defenders=None,
+    ):
+        """Build a fast break animation packet.
 
         Args:
             fb_roles (dict):
-                {
-                    "ball_handler": Player,
-                    "offense": [Player, ...],
-                    "defense": [Player, ...]
-                }
-            hold_up (bool, optional): Whether a defender slowed the break.
-            stopper_id (str, optional): Player ID of the defender who held it up.
+                {"ball_handler": Player}
+            hold_up (bool): Whether the break was stopped.
+            stopper_id (str): Player ID of the defender who stopped it.
+            in_play_defenders (list[Player]): Defenders ahead of the ball.
 
         Returns:
-            list[dict]: Animation payload matching the schema used by the
-            frontend.
+            list[dict]: Animation payload for the frontend.
         """
 
         offense_team = self.game.offense_team
+        defense_team = self.game.defense_team
         is_away_offense = offense_team.team_id == self.game.away_team.team_id
 
         ball_handler = fb_roles.get("ball_handler")
-        runners = fb_roles.get("offense", [])
-        defenders = fb_roles.get("defense", [])
-
-        # Simple lane destinations for a fast break (home orientation).
-        lane_coords = [
-            {"x": 94, "y": 25},  # middle lane (rim)
-            {"x": 94, "y": 40},  # upper/left lane
-            {"x": 94, "y": 10},  # lower/right lane
-        ]
+        defenders = in_play_defenders or []
 
         animations = []
         duration = 800
 
-        # Helper to build movement blocks
-        def build_movement(player, end_coords, has_ball):
+        def build_movement(player, end_coords, has_ball=False, action=ACTIONS["DRIFT"]):
             start = getattr(player, "coords", {"x": 25, "y": 50})
             if is_away_offense:
                 start = get_away_player_coords(start)
@@ -67,8 +55,8 @@ class Animator:
                 end = end_coords
 
             movement = [
-                {"timestamp": 0, "coords": start, "action": ACTIONS["HANDLE"] if has_ball else ACTIONS["DRIFT"]},
-                {"timestamp": duration, "coords": end, "action": ACTIONS["HANDLE"] if has_ball else ACTIONS["CUT"]},
+                {"timestamp": 0, "coords": start, "action": action if not has_ball else ACTIONS["HANDLE"]},
+                {"timestamp": duration, "coords": end, "action": action if not has_ball else ACTIONS["HANDLE"]},
             ]
 
             animations.append({
@@ -80,19 +68,58 @@ class Animator:
                 "duration": duration,
             })
 
-        # Ball handler always takes the middle lane
+        # Helper to generate spots between the top of the key and the rim
+        def between_key_and_rim():
+            min_x = min(TOP_KEY_COORDS["x"], RIM_COORDS["x"])
+            max_x = max(TOP_KEY_COORDS["x"], RIM_COORDS["x"])
+            x = random.randint(min_x + 1, max_x - 1)
+            y = random.randint(10, 40)
+            return {"x": x, "y": y}
+
+        def half_court_spot():
+            return {"x": random.randint(50, 51), "y": random.randint(10, 40)}
+
+        # Ball handler path
         if ball_handler:
-            build_movement(ball_handler, lane_coords[0], True)
+            bh_end = TOP_KEY_COORDS if hold_up else RIM_COORDS
+            build_movement(ball_handler, bh_end, has_ball=True)
 
-        # Offensive runners take remaining lanes
-        for idx, runner in enumerate(runners, start=1):
-            end = lane_coords[idx % len(lane_coords)]
-            build_movement(runner, end, False)
+        # Identify stopper
+        stopper = None
+        if hold_up and stopper_id:
+            for d in defenders:
+                if getattr(d, "player_id", None) == stopper_id:
+                    stopper = d
+                    break
 
-        # Defenders sprint to protect lanes in order
-        for idx, defender in enumerate(defenders):
-            end = lane_coords[idx % len(lane_coords)]
-            build_movement(defender, end, False)
+        # Stopping defender
+        if stopper:
+            offset_x = 6 if not is_away_offense else -6
+            end = {
+                "x": TOP_KEY_COORDS["x"] + offset_x,
+                "y": TOP_KEY_COORDS["y"] + random.randint(-3, 3),
+            }
+            build_movement(stopper, end, action=ACTIONS["GUARD_BALL"])
+
+        # Other in-play defenders
+        for d in defenders:
+            if d is stopper:
+                continue
+            build_movement(d, between_key_and_rim(), action=ACTIONS["GUARD_OFFBALL"])
+
+        # Non-in-play defenders
+        non_play_defenders = [
+            p for p in defense_team.lineup.values() if p not in defenders
+        ]
+        for d in non_play_defenders:
+            build_movement(d, half_court_spot())
+
+        # Non-ball-handling offensive players
+        non_bh_offense = [
+            p for p in offense_team.lineup.values() if p is not ball_handler
+        ]
+        for o in non_bh_offense:
+            build_movement(o, half_court_spot())
 
         self.latest_packet = animations
         return animations
