@@ -539,13 +539,19 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
       playBtn.disabled = true;
       try {
+        const payload = { tournament_id: tournament._id };
         const res = await fetch('/simulate-tournament-round', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ tournament_id: tournament._id })
+          body: JSON.stringify(payload)
         });
-        if (!res.ok) throw new Error('Request failed');
         const data = await res.json();
+        console.log('[PlayNow] simulate round', { payload, response: data });
+        if (!res.ok || data.error) {
+          alert(data.detail || data.error || 'Unable to start game');
+          playBtn.disabled = false;
+          return;
+        }
         if (data.already_played) {
           playBtn.disabled = false;
           await refreshTeamStats();
