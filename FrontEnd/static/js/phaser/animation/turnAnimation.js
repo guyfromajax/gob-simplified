@@ -937,12 +937,14 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
               scene.game.config.width,
               scene.game.config.height
             );
+            const rebCfg = animationConfig.rebound;
+            scene.rebounderId = rebounderId;
             await new Promise((resolve) => {
               scene.tweens.add({
                 targets: rebounderSprite,
                 x: spotPx.x,
                 y: spotPx.y,
-                duration: 300,
+                duration: rebCfg.playerMoveMs,
                 ease: "Linear",
                 onComplete: () => {
                   attachBallToPlayer(scene, ballSprite, rebounderSprite);
@@ -950,7 +952,13 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
                   scene.events?.emit?.("possessionChange", {
                     offenseTeamId: rebounderSprite.team_id
                   });
-                  resolve();
+                  scene.reboundInProgress = false;
+                  scene.rebounderId = null;
+                  if (scene.time?.delayedCall) {
+                    scene.time.delayedCall(rebCfg.attachDelayMs, resolve);
+                  } else {
+                    setTimeout(resolve, rebCfg.attachDelayMs);
+                  }
                 },
                 onStop: resolve
               });

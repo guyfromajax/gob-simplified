@@ -21,6 +21,14 @@ const defaults = {
     easing: 'Sine.easeInOut',
     arc: null,
   },
+  rebound: {
+    // Area (in grid units) around the rim where missed shots can land
+    bounceArea: { x: 6, y: 6 },
+    // Duration in ms for players to collapse toward the rebound spot
+    playerMoveMs: 300,
+    // Delay before possession is considered secured
+    attachDelayMs: 1000,
+  },
   freeThrow: {
     lineupMoveMs: 800,
     shooterPrepMs: 400,
@@ -47,6 +55,16 @@ export const animationConfig = {
   inbound: { ...defaults.inbound, ...(overrides.inbound || {}) },
   kickout: { ...defaults.kickout, ...(overrides.kickout || {}) },
   steal: { ...defaults.steal, ...(overrides.steal || {}) },
+  rebound: {
+    bounceArea: {
+      ...defaults.rebound.bounceArea,
+      ...(overrides.rebound?.bounceArea || {}),
+    },
+    playerMoveMs:
+      overrides.rebound?.playerMoveMs ?? defaults.rebound.playerMoveMs,
+    attachDelayMs:
+      overrides.rebound?.attachDelayMs ?? defaults.rebound.attachDelayMs,
+  },
   freeThrow: { ...defaults.freeThrow, ...(overrides.freeThrow || {}) },
   fastBreak: { ...defaults.fastBreak, ...(overrides.fastBreak || {}) },
 };
