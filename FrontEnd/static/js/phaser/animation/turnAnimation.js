@@ -923,34 +923,39 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
           awayTeamId
         });
       } else if (ballSpot) {
-        let rebounderId =
+        const rebounderId =
           turnData.rebounder_player_id ||
           turnData.rebounderId ||
           turnData.rebounder_id ||
           null;
-        const rebounderName = turnData.ball_handler?.trim();
-        if (!rebounderId && rebounderName) {
-          rebounderId = scene.nameToId?.[rebounderName];
-          if (!rebounderId && scene.playerInfo) {
-            for (const [id, info] of Object.entries(scene.playerInfo)) {
-              const fullName =
-                info?.name || `${info.first_name ?? ""} ${info.last_name ?? ""}`.trim();
-              if (fullName.toLowerCase() === rebounderName.toLowerCase()) {
-                rebounderId = id;
-                break;
-              }
-            }
-          }
-        }
         if (rebounderId) {
-          await animateRebound({
-            scene,
-            ballSprite,
-            playerSprites,
-            animations: turnData.animations,
-            rebounderId,
-            ballSpot
-          });
+          const rebounderSprite = playerSprites[rebounderId];
+          if (rebounderSprite) {
+            const spotPx = gridToPixels(
+              ballSpot.x,
+              ballSpot.y,
+              scene.game.config.width,
+              scene.game.config.height
+            );
+            await new Promise((resolve) => {
+              scene.tweens.add({
+                targets: rebounderSprite,
+                x: spotPx.x,
+                y: spotPx.y,
+                duration: 300,
+                ease: "Linear",
+                onComplete: () => {
+                  attachBallToPlayer(scene, ballSprite, rebounderSprite);
+                  scene.offenseTeamId = rebounderSprite.team_id;
+                  scene.events?.emit?.("possessionChange", {
+                    offenseTeamId: rebounderSprite.team_id
+                  });
+                  resolve();
+                },
+                onStop: resolve
+              });
+            });
+          }
         }
       }
       break;

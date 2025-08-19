@@ -34,7 +34,7 @@ const turnData = {
   starting_possession_team_id: 'HOME',
   possession_team_id: 'HOME',
   result_type: 'MISS',
-  ball_handler: 'PG A',
+  rebounder_player_id: 'pgA',
   animations: [
     {
       playerId: 'pg',

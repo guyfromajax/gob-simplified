@@ -58,7 +58,7 @@ function createBallSprite() {
     starting_possession_team_id: 'HOME',
     possession_team_id: 'HOME',
     result_type: 'MISS',
-    ball_handler: 'C',
+    rebounder_player_id: 'c',
     animations: [],
     events: [{ event_type: 'PUTBACK_ATTEMPT', shooterId: 'c', result: 'MAKE', duration: 0 }]
   };
@@ -75,7 +75,7 @@ let reboundAttached;
     starting_possession_team_id: 'HOME',
     possession_team_id: 'HOME',
     result_type: 'MISS',
-    ball_handler: 'C',
+    rebounder_player_id: 'c',
     animations: [],
     events: [{ event_type: 'PUTBACK_ATTEMPT', shooterId: 'c', result: 'MISS', duration: 0, rebound: { rebounderId: 'pg', ballSpot: { x: 0, y: 0 } } }]
   };
@@ -93,7 +93,7 @@ let kickoutResult;
     starting_possession_team_id: 'HOME',
     possession_team_id: 'HOME',
     result_type: 'MISS',
-    ball_handler: 'C',
+    rebounder_player_id: 'c',
     animations: [],
     events: [{ event_type: 'KICKOUT_RESET', rebounderId: 'c', pgId: 'pg', pass: { fromCoords: { x: 0, y: 0 }, toCoords: { x: 1, y: 1 }, duration: 0 } }]
   };
