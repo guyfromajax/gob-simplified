@@ -10,6 +10,8 @@ export function createGameScene(Phaser) {
     constructor() {
       super("GameScene");
       this.lastTurnShown = -1;
+      this.reboundInProgress = false;
+      this.rebounderId = null;
     }
 
     init(data) {
