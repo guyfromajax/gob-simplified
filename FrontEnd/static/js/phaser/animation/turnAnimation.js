@@ -722,6 +722,8 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
     if (awayTeamId) simData.away_team_id = awayTeamId;
   }
 
+  scene.offenseTeamId = turnData.possession_team_id;
+
   // Determine which player owns the ball at step 0
   let step0OwnerSprite = null;
   for (const anim of turnData.animations) {
@@ -765,7 +767,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
     animations: turnData.animations,
     playerSprites,
     stepIndex: 0,
-    offenseTeamId: turnData.possession_team_id,
+    offenseTeamId: scene.offenseTeamId,
     currentBallOwnerRef
   });
 
@@ -778,7 +780,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
       animations: turnData.animations,
       playerSprites,
       stepIndex,
-      offenseTeamId: turnData.possession_team_id,
+      offenseTeamId: scene.offenseTeamId,
       currentBallOwnerRef
     });
 
@@ -869,6 +871,8 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
           }
         }
         if (rebounderId) {
+          const rebounderSprite = playerSprites[rebounderId];
+          console.log('reb:event', { team: rebounderSprite?.team_id, playerId: rebounderId });
           await animateRebound({
             scene,
             ballSprite,
@@ -877,6 +881,18 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
             rebounderId,
             ballSpot
           });
+          if (rebounderSprite) {
+            scene.offenseTeamId = rebounderSprite.team_id;
+            scene.possessionFlipInProgress = true;
+            scene.events?.emit?.('possessionChange', { offenseTeamId: rebounderSprite.team_id });
+            console.log('reb:flip', { newPossession: rebounderSprite.team_id });
+            console.log('ui:possIndicator', { team: rebounderSprite.team_id });
+            if (scene.time?.delayedCall) {
+              scene.time.delayedCall(0, () => { scene.possessionFlipInProgress = false; });
+            } else {
+              setTimeout(() => { scene.possessionFlipInProgress = false; }, 0);
+            }
+          }
         }
       }
       break;
@@ -903,14 +919,29 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
           evt.result
         );
         if (evt.result === "MISS" && evt.rebound) {
+          const rbId = evt.rebound.rebounderId;
+          const rbSprite = playerSprites[rbId];
+          console.log('reb:event', { team: rbSprite?.team_id, playerId: rbId });
           await animateRebound({
             scene,
             ballSprite,
             playerSprites,
             animations: evt.rebound.animations || turnData.animations,
-            rebounderId: evt.rebound.rebounderId,
+            rebounderId: rbId,
             ballSpot: putbackResult?.grid || evt.rebound.ballSpot
           });
+          if (rbSprite) {
+            scene.offenseTeamId = rbSprite.team_id;
+            scene.possessionFlipInProgress = true;
+            scene.events?.emit?.('possessionChange', { offenseTeamId: rbSprite.team_id });
+            console.log('reb:flip', { newPossession: rbSprite.team_id });
+            console.log('ui:possIndicator', { team: rbSprite.team_id });
+            if (scene.time?.delayedCall) {
+              scene.time.delayedCall(0, () => { scene.possessionFlipInProgress = false; });
+            } else {
+              setTimeout(() => { scene.possessionFlipInProgress = false; }, 0);
+            }
+          }
         }
       } else if (evt.event_type === "KICKOUT_RESET") {
         await animateKickoutReset(
