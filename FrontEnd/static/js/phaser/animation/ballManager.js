@@ -12,6 +12,36 @@ import {
 
 function attachBallToPlayer(scene, ballSprite, playerSprite, opts = {}) {
   if (scene.possessionFlipInProgress) return;
+
+  let targetId = playerSprite?.playerId;
+  if (targetId == null && scene?.playerSprites) {
+    for (const [pid, sprite] of Object.entries(scene.playerSprites)) {
+      if (sprite === playerSprite) {
+        targetId = pid;
+        break;
+      }
+    }
+  }
+
+  if (REBOUND_DEBUG) {
+    if (
+      scene?.currentBallOwnerRef &&
+      scene.currentBallOwnerRef.value &&
+      scene.currentBallOwnerRef.value !== playerSprite
+    ) {
+      const refId = scene.currentBallOwnerRef.value?.playerId;
+      console.warn("ball:owner mismatch", {
+        ref: refId,
+        target: targetId
+      });
+    }
+    console.log(`ball:attach -> ${targetId}`);
+  }
+
+  if (scene?.currentBallOwnerRef) {
+    scene.currentBallOwnerRef.value = playerSprite;
+  }
+
   return baseAttachBallToPlayer(scene, ballSprite, playerSprite, opts);
 }
 
@@ -336,7 +366,14 @@ export function animateRebound({
   ballSprite.setVisible(true);
 
   const rebounderSprite = playerSprites[rebounderId];
+  if (REBOUND_DEBUG) {
+    const team = rebounderSprite?.team_id ?? rebounderSprite?.team;
+    console.log("reb:event", { team, playerId: rebounderId });
+  }
   if (rebounderSprite) {
+    const teamId = rebounderSprite.team_id;
+    scene.offenseTeamId = teamId;
+    scene.events?.emit?.("possessionChange", { offenseTeamId: teamId });
     finalPositions.push({ playerId: rebounderId, grid: { ...ballSpot } });
     promises.push(
       new Promise((resolve) => {

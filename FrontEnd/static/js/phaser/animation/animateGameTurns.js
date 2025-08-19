@@ -1,6 +1,6 @@
 import { playTurnAnimation, runSideInboundSetup } from "./turnAnimation.js";
 import { onAction } from "./onAction.js";
-import { runPass } from "./ballManager.js";
+import { runPass, REBOUND_DEBUG } from "./ballManager.js";
 import animationConfig from "./animation_config.js";
 import runFreeThrowSequence from "./freeThrow.js";
 import runFastBreakSequence from "./fastBreak.js";
@@ -18,8 +18,12 @@ export async function animateGameTurns({ //hasBallAtStep
   const turns = simData.turns || [];
   const allPlayers = simData.players || [];
 
-  const handlePossessionFlip = () => {
+  const handlePossessionFlip = (payload = {}) => {
     scene.possessionFlipInProgress = true;
+    scene.offenseTeamId = payload.offenseTeamId;
+    if (REBOUND_DEBUG) {
+      console.log("reb:flip", { newPossession: payload.offenseTeamId });
+    }
     scene.time.delayedCall(0, () => (scene.possessionFlipInProgress = false));
   };
   scene.events?.on?.('possessionChange', handlePossessionFlip);
