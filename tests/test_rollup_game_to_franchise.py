@@ -63,3 +63,36 @@ def test_rollup_game_to_franchise_idempotent():
 
     assert doc2 == doc1
 
+
+def test_rollup_game_to_franchise_validates_stats():
+    players_collection.insert_one(
+        {"_id": "p1", "first_name": "A", "last_name": "One", "team": "Team1"}
+    )
+
+    fid = db.franchises.insert_one({"player_stats": {}, "processed_games": []}).inserted_id
+
+    game = {
+        "home_team": "Team1",
+        "away_team": "Team2",
+        "box_score": {
+            "Team1": {
+                "PG": {"name": "A One", "PTS": -5, "FGA": "5", "FGM": 4}
+            },
+            "Team2": {},
+        },
+        "players": [
+            {"playerId": "p1", "team": "home", "pos": "PG"},
+        ],
+    }
+    gid = games_collection.insert_one(game).inserted_id
+
+    rollup_game_to_franchise(str(fid), str(gid))
+    doc = db.franchises.find_one({"_id": fid})
+    p1 = doc["player_stats"]["p1"]
+
+    assert "PTS" not in p1["season"]
+    assert "FGA" not in p1["season"]
+    assert p1["season"]["FGM"] == 4
+    assert p1["season"]["percentages"]["FG%"] == 0
+    assert doc["processed_games"] == [str(gid)]
+

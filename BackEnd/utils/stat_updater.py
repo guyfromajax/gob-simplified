@@ -7,6 +7,50 @@ from BackEnd.constants import BOX_SCORE_KEYS
 from BackEnd.db import db, players_collection, tournaments_collection, games_collection
 
 
+def _clean_stat_block(stats: Dict[str, Any]) -> Dict[str, float]:
+    """Return only numeric, non-negative stat entries.
+
+    Any field that is not a number or is negative is discarded. The ``name``
+    field, sometimes present in box score rows, is also ignored.
+    """
+
+    clean: Dict[str, float] = {}
+    for stat, val in stats.items():
+        if stat == "name":
+            continue
+        if isinstance(val, (int, float)) and val >= 0:
+            clean[stat] = val
+    return clean
+
+
+def _per_game_block(totals: Dict[str, Any]) -> Dict[str, float]:
+    """Return per-game averages for a totals block."""
+
+    gp = totals.get("GP", 0)
+    if not gp:
+        return {stat: 0 for stat in BOX_SCORE_KEYS}
+    return {stat: totals.get(stat, 0) / gp for stat in BOX_SCORE_KEYS}
+
+
+def _pct_block(totals: Dict[str, Any]) -> Dict[str, float]:
+    """Return shooting percentage metrics for a totals block."""
+
+    fga = totals.get("FGA", 0)
+    fgm = totals.get("FGM", 0)
+    tpa = totals.get("3PTA", 0)
+    tpm = totals.get("3PTM", 0)
+    fta = totals.get("FTA", 0)
+    ftm = totals.get("FTM", 0)
+    pts = totals.get("PTS", 0)
+    fg_pct = (fgm / fga * 100) if fga else 0.0
+    fg3_pct = (tpm / tpa * 100) if tpa else 0.0
+    ft_pct = (ftm / fta * 100) if fta else 0.0
+    ts_den = 2 * (fga + 0.44 * fta)
+    ts_pct = (pts / ts_den * 100) if ts_den else 0.0
+    efg_pct = ((fgm + 0.5 * tpm) / fga * 100) if fga else 0.0
+    return {"FG%": fg_pct, "3PT%": fg3_pct, "FT%": ft_pct, "TS%": ts_pct, "eFG%": efg_pct}
+
+
 def init_franchise_player_stats(franchise_id: str | ObjectId, roster: list[dict]) -> None:
     """Seed a franchise document with zeroed player stat containers.
 
@@ -78,13 +122,10 @@ def apply_stats_from_summary(summary: Dict[str, Any], game_id: str, tournament_i
         stat_block = box_score.get(team_name, {}).get(pos, {})
         inc_fields: Dict[str, Any] = {}
         set_fields: Dict[str, Any] = {}
-        for stat, val in stat_block.items():
-            if stat == "name":
-                continue
-            if isinstance(val, (int, float)):
-                inc_fields[f"stats.season.{stat}"] = val
-                inc_fields[f"stats.career.{stat}"] = val
-                set_fields[f"stats.game.{stat}"] = 0
+        for stat, val in _clean_stat_block(stat_block).items():
+            inc_fields[f"stats.season.{stat}"] = val
+            inc_fields[f"stats.career.{stat}"] = val
+            set_fields[f"stats.game.{stat}"] = 0
         if not inc_fields and not set_fields:
             continue
         update_doc: Dict[str, Any] = {"$addToSet": {"stats.applied_games": token}}
@@ -278,9 +319,7 @@ def rollup_game_to_franchise(franchise_id: str | ObjectId, game_id: str | Object
         if not pid or not team_name:
             continue
         stat_block = box_score.get(team_name, {}).get(pos, p.get("stats", {}))
-        for stat, val in stat_block.items():
-            if stat == "name" or not isinstance(val, (int, float)):
-                continue
+        for stat, val in _clean_stat_block(stat_block).items():
             inc_doc[f"player_stats.{pid}.season.{stat}"] = inc_doc.get(
                 f"player_stats.{pid}.season.{stat}", 0
             ) + val
@@ -321,41 +360,72 @@ def rollup_game_to_franchise(franchise_id: str | ObjectId, game_id: str | Object
     if not result:
         return
 
-    def per_game_block(totals: Dict[str, Any]) -> Dict[str, float]:
-        gp = totals.get("GP", 0)
-        if not gp:
-            return {stat: 0 for stat in BOX_SCORE_KEYS}
-        return {stat: totals.get(stat, 0) / gp for stat in BOX_SCORE_KEYS}
-
-    def pct_block(totals: Dict[str, Any]) -> Dict[str, float]:
-        fga = totals.get("FGA", 0)
-        fgm = totals.get("FGM", 0)
-        tpa = totals.get("3PTA", 0)
-        tpm = totals.get("3PTM", 0)
-        fta = totals.get("FTA", 0)
-        ftm = totals.get("FTM", 0)
-        pts = totals.get("PTS", 0)
-        fg_pct = (fgm / fga * 100) if fga else 0.0
-        fg3_pct = (tpm / tpa * 100) if tpa else 0.0
-        ft_pct = (ftm / fta * 100) if fta else 0.0
-        ts_den = 2 * (fga + 0.44 * fta)
-        ts_pct = (pts / ts_den * 100) if ts_den else 0.0
-        efg_pct = ((fgm + 0.5 * tpm) / fga * 100) if fga else 0.0
-        return {"FG%": fg_pct, "3PT%": fg3_pct, "FT%": ft_pct, "TS%": ts_pct, "eFG%": efg_pct}
-
     stats_doc: Dict[str, Any] = {}
     for p in players:
         pid = str(p.get("playerId"))
         pdata = result.get("player_stats", {}).get(pid, {})
         season_totals = pdata.get("season", {})
         career_totals = pdata.get("career", {})
-        stats_doc[f"player_stats.{pid}.season.per_game"] = per_game_block(season_totals)
-        stats_doc[f"player_stats.{pid}.career.per_game"] = per_game_block(career_totals)
-        stats_doc[f"player_stats.{pid}.season.percentages"] = pct_block(season_totals)
-        stats_doc[f"player_stats.{pid}.career.percentages"] = pct_block(career_totals)
+        stats_doc[f"player_stats.{pid}.season.per_game"] = _per_game_block(season_totals)
+        stats_doc[f"player_stats.{pid}.career.per_game"] = _per_game_block(career_totals)
+        stats_doc[f"player_stats.{pid}.season.percentages"] = _pct_block(season_totals)
+        stats_doc[f"player_stats.{pid}.career.percentages"] = _pct_block(career_totals)
 
     if stats_doc:
         db.franchises.update_one({"_id": fid}, {"$set": stats_doc})
+
+
+def backfill_franchise_player_stats(franchise_id: str | ObjectId) -> None:
+    """Migrate a franchise document from legacy ``players`` schema.
+
+    Existing ``players`` entries are converted to the ``player_stats`` structure
+    used by :func:`rollup_game_to_franchise`.  ``applied_games`` is renamed to
+    ``processed_games`` and per-game/percentage helpers are generated for both
+    season and career totals.
+    """
+
+    try:
+        fid = ObjectId(franchise_id)
+    except Exception:
+        fid = franchise_id
+
+    doc = db.franchises.find_one({"_id": fid})
+    if not doc:
+        return
+
+    player_stats: Dict[str, Any] = {}
+    for pid, pdata in (doc.get("players") or {}).items():
+        meta = pdata.get("meta", {})
+        season_totals = _clean_stat_block(pdata.get("season", {}))
+        career_totals = _clean_stat_block(pdata.get("career", {}))
+        player_stats[pid] = {
+            "first_name": meta.get("first_name", ""),
+            "last_name": meta.get("last_name", ""),
+            "team": meta.get("team", ""),
+            "season": {
+                **season_totals,
+                "per_game": _per_game_block(season_totals),
+                "percentages": _pct_block(season_totals),
+            },
+            "career": {
+                **career_totals,
+                "per_game": _per_game_block(career_totals),
+                "percentages": _pct_block(career_totals),
+            },
+        }
+
+    processed_games = [str(g) for g in doc.get("applied_games", []) if g]
+
+    db.franchises.update_one(
+        {"_id": fid},
+        {
+            "$set": {
+                "player_stats": player_stats,
+                "processed_games": processed_games,
+            },
+            "$unset": {"players": "", "applied_games": ""},
+        },
+    )
 
 
 def finalize_game(
@@ -428,9 +498,7 @@ def finalize_game(
             if not pid or not team_name:
                 continue
             stat_block = box_score.get(team_name, {}).get(pos, p.get("stats", {}))
-            for stat, val in stat_block.items():
-                if stat == "name" or not isinstance(val, (int, float)):
-                    continue
+            for stat, val in _clean_stat_block(stat_block).items():
                 inc_doc[f"players.{pid}.season.{stat}"] = inc_doc.get(
                     f"players.{pid}.season.{stat}", 0
                 ) + val
