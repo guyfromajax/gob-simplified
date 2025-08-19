@@ -16,7 +16,7 @@ class Animator:
         self.game = game
         self.latest_packet = []
 
-    def capture_fast_break_animation(self, fb_roles):
+    def capture_fast_break_animation(self, fb_roles, hold_up=False, stopper_id=None):
         """Build a basic fast break animation packet.
 
         This animation is much simpler than the half-court version. Each
@@ -32,6 +32,8 @@ class Animator:
                     "offense": [Player, ...],
                     "defense": [Player, ...]
                 }
+            hold_up (bool, optional): Whether a defender slowed the break.
+            stopper_id (str, optional): Player ID of the defender who held it up.
 
         Returns:
             list[dict]: Animation payload matching the schema used by the
