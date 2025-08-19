@@ -9,9 +9,9 @@ import {
   animatePutbackAttempt,
   animateKickoutReset
 } from "./ballManager.js";
-import { tweenBallTo, runPass, PASS_DEBUG } from "./ballTween.js";
+import { tweenBallTo, runPass, PASS_DEBUG, tweenPlayerTo, detachBall } from "./ballTween.js";
 import animationConfig from "./animation_config.js";
-import { HOME_RIM_COORDS, AWAY_RIM_COORDS } from "./courtConstants.js";
+import { HOME_RIM_COORDS, AWAY_RIM_COORDS, HOME_TOP_KEY, AWAY_TOP_KEY } from "./courtConstants.js";
 
 // Cap the time spent on any single movement step. Large timestamp gaps can
 // otherwise produce multi‑second tweens that appear as animation stalls.
@@ -560,132 +560,194 @@ async function runFastBreakSequence({ scene, turnData, playerSprites, ballSprite
       const endPx = gridToPixels(end.x, end.y, width, height);
       sprite.setPosition(startPx.x, startPx.y);
       sprintPromises.push(
-        new Promise(resolve => {
-          scene.tweens.add({
-            targets: sprite,
-            x: endPx.x,
-            y: endPx.y,
-            duration: sprintDuration,
-            ease: "Sine.easeInOut",
-            onUpdate: () => {
-              if (
-                scene.ballAttachedToPlayerId === anim.playerId &&
-                ballSprite?.setPosition
-              ) {
-                ballSprite.setPosition(sprite.x, sprite.y);
-                ballSprite.setVisible(true);
-              }
-            },
-            onComplete: resolve,
-            onStop: resolve
-          });
+        tweenPlayerTo(scene, sprite, endPx, {
+          duration: sprintDuration,
+          easing: "Sine.easeInOut"
         })
       );
     }
     await Promise.all(sprintPromises);
     if (scene.skipToEnd) return;
 
-    const passEvents = [];
-    for (const anim of animations) {
-      const moves = anim.movement || [];
-      for (const step of moves) {
-        if (step.action === "pass") {
-          const ts = step.timestamp;
-          const receiverAnim = animations.find(a =>
-            a.movement?.some(m => m.action === "receive" && m.timestamp === ts)
-          );
-          const receiveStep = receiverAnim?.movement.find(
-            m => m.action === "receive" && m.timestamp === ts
-          );
-          const delta = receiveStep
-            ? receiveStep.timestamp - ts
-            : animationConfig.pass.duration;
-          passEvents.push({
-            timestamp: ts,
-            fromId: anim.playerId,
-            toId: receiverAnim?.playerId,
-            duration: delta
-          });
+    const passes = turnData.passes || [];
+    if (passes.length > 0) {
+      for (const p of passes) {
+        if (scene.skipToEnd) break;
+        await runPass(scene, {
+          fromId: p.fromId || p.from_id,
+          toId: p.toId || p.to_id,
+          duration: p.duration || animationConfig.pass.duration,
+          easing: animationConfig.pass.easing
+        });
+      }
+    } else {
+      const passEvents = [];
+      for (const anim of animations) {
+        const moves = anim.movement || [];
+        for (const step of moves) {
+          if (step.action === "pass") {
+            const ts = step.timestamp;
+            const receiverAnim = animations.find(a =>
+              a.movement?.some(m => m.action === "receive" && m.timestamp === ts)
+            );
+            const receiveStep = receiverAnim?.movement.find(
+              m => m.action === "receive" && m.timestamp === ts
+            );
+            const delta = receiveStep
+              ? receiveStep.timestamp - ts
+              : animationConfig.pass.duration;
+            passEvents.push({
+              timestamp: ts,
+              fromId: anim.playerId,
+              toId: receiverAnim?.playerId,
+              duration: delta
+            });
+          }
         }
       }
-    }
-    passEvents.sort((a, b) => a.timestamp - b.timestamp);
-    for (const evt of passEvents) {
-      if (scene.skipToEnd) break;
-      await runPass(scene, {
-        fromId: evt.fromId,
-        toId: evt.toId,
-        duration: evt.duration,
-        easing: animationConfig.pass.easing
-      });
+      passEvents.sort((a, b) => a.timestamp - b.timestamp);
+      for (const evt of passEvents) {
+        if (scene.skipToEnd) break;
+        await runPass(scene, {
+          fromId: evt.fromId,
+          toId: evt.toId,
+          duration: evt.duration,
+          easing: animationConfig.pass.easing
+        });
+      }
     }
     if (scene.skipToEnd) return;
 
     if (turnData.hold_up) {
-      const center = gridToPixels(50, 25, width, height);
-      const spacing = 10;
-      const holdPromises = [];
-      let idx = 0;
-      for (const anim of animations) {
-        const sprite = playerSprites[anim.playerId];
-        if (!sprite) continue;
-        const targetX = center.x + (idx - animations.length / 2) * spacing;
-        const targetY = sprite.y;
-        idx++;
-        holdPromises.push(
-          new Promise(resolve => {
-            scene.tweens.add({
-              targets: sprite,
-              x: targetX,
-              y: targetY,
-              duration: sprintDuration / 2,
-              ease: "Sine.easeInOut",
-              onComplete: resolve,
-              onStop: resolve
-            });
+      const bhId = scene.ballAttachedToPlayerId;
+      const bhSprite = bhId != null ? playerSprites[bhId] : null;
+      const stopperId = turnData.stopper_id;
+      const stopperSprite = stopperId != null ? playerSprites[stopperId] : null;
+      const promises = [];
+
+      if (bhSprite) {
+        attachBallToPlayer(scene, ballSprite, bhSprite);
+        const topKey = bhSprite.team === "home" ? HOME_TOP_KEY : AWAY_TOP_KEY;
+        const topKeyPx = gridToPixels(topKey.x, topKey.y, width, height);
+        promises.push(
+          tweenPlayerTo(scene, bhSprite, topKeyPx, {
+            duration: sprintDuration / 2,
+            easing: "Sine.easeInOut"
           })
         );
+
+        const rim = bhSprite.team === "home" ? HOME_RIM_COORDS : AWAY_RIM_COORDS;
+
+        if (stopperSprite) {
+          const offsetX = bhSprite.team === "home" ? 6 : -6;
+          const stopGrid = {
+            x: topKey.x + offsetX,
+            y: topKey.y + Phaser.Math.Between(-3, 3)
+          };
+          const stopPx = gridToPixels(stopGrid.x, stopGrid.y, width, height);
+          promises.push(
+            tweenPlayerTo(scene, stopperSprite, stopPx, {
+              duration: sprintDuration / 2,
+              easing: "Sine.easeInOut"
+            })
+          );
+        }
+
+        const inPlayDef = new Set(
+          (turnData.roles?.defense || []).map(id => String(id))
+        );
+        for (const [id, sprite] of Object.entries(playerSprites)) {
+          if (sprite === bhSprite || sprite === stopperSprite) continue;
+          if (sprite.team === bhSprite.team) {
+            const spotGrid = {
+              x: Phaser.Math.Between(50, 51),
+              y: Phaser.Math.Between(10, 40)
+            };
+            const spotPx = gridToPixels(spotGrid.x, spotGrid.y, width, height);
+            promises.push(
+              tweenPlayerTo(scene, sprite, spotPx, {
+                duration: sprintDuration / 2,
+                easing: "Sine.easeInOut"
+              })
+            );
+          } else {
+            if (inPlayDef.has(String(id))) {
+              const laneGrid = {
+                x: Phaser.Math.Between(
+                  Math.min(topKey.x, rim.x) + 1,
+                  Math.max(topKey.x, rim.x) - 1
+                ),
+                y: Phaser.Math.Between(10, 40)
+              };
+              const lanePx = gridToPixels(laneGrid.x, laneGrid.y, width, height);
+              promises.push(
+                tweenPlayerTo(scene, sprite, lanePx, {
+                  duration: sprintDuration / 2,
+                  easing: "Sine.easeInOut"
+                })
+              );
+            } else {
+              const halfGrid = {
+                x: Phaser.Math.Between(50, 51),
+                y: Phaser.Math.Between(10, 40)
+              };
+              const halfPx = gridToPixels(halfGrid.x, halfGrid.y, width, height);
+              promises.push(
+                tweenPlayerTo(scene, sprite, halfPx, {
+                  duration: sprintDuration / 2,
+                  easing: "Sine.easeInOut"
+                })
+              );
+            }
+          }
+        }
       }
-      await Promise.all(holdPromises);
+
+      await Promise.all(promises);
       if (typeof scene.startNextHalfCourtOffense === "function") {
         scene.startNextHalfCourtOffense();
       }
       return;
     }
 
-  const shooterId = turnData.shooterId || turnData.shooter_id;
-  const shooterSprite = shooterId != null ? playerSprites[shooterId] : null;
-  if (shooterSprite) {
-    attachBallToPlayer(scene, ballSprite, shooterSprite);
-    const rimGrid =
-      shooterSprite.team === "home" ? HOME_RIM_COORDS : AWAY_RIM_COORDS;
-    const rimPx = gridToPixels(rimGrid.x, rimGrid.y, width, height);
-    const arcHeight = animationConfig.fastBreak?.arcHeight ?? 50;
-    await tweenBallTo(scene, ballSprite, rimPx, {
-      duration: animationConfig.inbound.duration,
-      easing: animationConfig.inbound.easing,
-      arc: { height: arcHeight }
-    });
-    if (turnData.result_type === "MAKE") {
-      const newOffenseSide =
-        shooterSprite.team === "home" ? "away" : "home";
-      await runInboundSetup({
-        scene,
-        ballSprite,
-        playerSprites,
-        newOffenseSide
+    const shooterId = turnData.shooterId || turnData.shooter_id || scene.ballAttachedToPlayerId;
+    const shooterSprite = shooterId != null ? playerSprites[shooterId] : null;
+    if (shooterSprite) {
+      attachBallToPlayer(scene, ballSprite, shooterSprite);
+      const rimGrid =
+        shooterSprite.team === "home" ? HOME_RIM_COORDS : AWAY_RIM_COORDS;
+      const rimPx = gridToPixels(rimGrid.x, rimGrid.y, width, height);
+      await tweenPlayerTo(scene, shooterSprite, rimPx, {
+        duration: sprintDuration / 2,
+        easing: "Sine.easeInOut"
       });
-    } else {
-      await animateRebound({
-        scene,
-        ballSprite,
-        playerSprites,
-        animations,
-        rebounderId: turnData.rebounderId || turnData.rebounder_id,
-        ballSpot: turnData.ballSpot || turnData.ball_spot
+      detachBall(scene, ballSprite);
+      const arcHeight = animationConfig.fastBreak?.arcHeight ?? 50;
+      await tweenBallTo(scene, ballSprite, rimPx, {
+        duration: animationConfig.inbound.duration,
+        easing: animationConfig.inbound.easing,
+        arc: { height: arcHeight }
       });
+      if (turnData.result_type === "MAKE") {
+        const newOffenseSide =
+          shooterSprite.team === "home" ? "away" : "home";
+        await runInboundSetup({
+          scene,
+          ballSprite,
+          playerSprites,
+          newOffenseSide
+        });
+      } else {
+        await animateRebound({
+          scene,
+          ballSprite,
+          playerSprites,
+          animations,
+          rebounderId: turnData.rebounderId || turnData.rebounder_id,
+          ballSpot: turnData.ballSpot || turnData.ball_spot
+        });
+      }
     }
-  }
   } finally {
     scene.fastBreakInProgress = false;
     scene.events?.emit("fb:end");
