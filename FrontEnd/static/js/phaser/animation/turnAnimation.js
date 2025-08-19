@@ -119,6 +119,7 @@ async function runSideInboundSetup({ scene, ballSprite, playerSprites, turnData 
   if (!turnData || scene?.skipToEnd || scene?.ftInProgress) return;
 
   const { ball_spot, oDestinations = {}, dDestinations = {}, possession_team_id } = turnData;
+  const offenseTeamId = scene.currentOffenseTeamId ?? possession_team_id;
 
   const width = scene.game.config.width;
   const height = scene.game.config.height;
@@ -137,7 +138,7 @@ async function runSideInboundSetup({ scene, ballSprite, playerSprites, turnData 
   for (const [id, sprite] of Object.entries(playerSprites)) {
     const info = scene.playerInfo?.[id];
     if (!info) continue;
-    if (String(sprite.team_id) === String(possession_team_id)) {
+    if (String(sprite.team_id) === String(offenseTeamId)) {
       offenseSprites[info.pos] = sprite;
       offenseIds[info.pos] = id;
     } else {
@@ -765,7 +766,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
     animations: turnData.animations,
     playerSprites,
     stepIndex: 0,
-    offenseTeamId: turnData.possession_team_id,
+    offenseTeamId: scene.currentOffenseTeamId ?? turnData.possession_team_id,
     currentBallOwnerRef
   });
 
@@ -778,7 +779,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
       animations: turnData.animations,
       playerSprites,
       stepIndex,
-      offenseTeamId: turnData.possession_team_id,
+      offenseTeamId: scene.currentOffenseTeamId ?? turnData.possession_team_id,
       currentBallOwnerRef
     });
 
