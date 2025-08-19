@@ -20,11 +20,7 @@ export async function animateGameTurns({ //hasBallAtStep
 
   const handlePossessionFlip = () => {
     scene.possessionFlipInProgress = true;
-    if (scene.time?.delayedCall) {
-      scene.time.delayedCall(0, () => (scene.possessionFlipInProgress = false));
-    } else {
-      setTimeout(() => (scene.possessionFlipInProgress = false), 0);
-    }
+    scene.time.delayedCall(0, () => (scene.possessionFlipInProgress = false));
   };
   scene.events?.on?.('possessionChange', handlePossessionFlip);
 
