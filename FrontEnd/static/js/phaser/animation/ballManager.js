@@ -11,18 +11,18 @@ import {
 } from "./ballTween.js";
 
 function attachBallToPlayer(scene, ballSprite, playerSprite, opts = {}) {
-  if (scene?.possessionFlipInProgress) return;
+  if (scene.possessionFlipInProgress) return;
   return baseAttachBallToPlayer(scene, ballSprite, playerSprite, opts);
 }
 
 function runInboundSetup(opts) {
-  const scene = opts?.scene;
-  if (scene?.possessionFlipInProgress) return Promise.resolve();
+  const scene = opts.scene;
+  if (scene.possessionFlipInProgress) return Promise.resolve();
   return baseRunInboundSetup(opts);
 }
 
 function runPass(scene, cfg = {}) {
-  if (scene?.possessionFlipInProgress) return Promise.resolve();
+  if (scene.possessionFlipInProgress) return Promise.resolve();
   return baseRunPass(scene, cfg);
 }
 
