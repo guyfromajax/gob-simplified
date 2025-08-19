@@ -1,15 +1,32 @@
 import * as Phaser from 'https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.esm.js';
 import { generateBallTween } from "./generateBallTween.js";
 import { gridToPixels } from "../utils/gridToPixels.js";
-import { runInboundSetup } from "./turnAnimation.js";
+import { runInboundSetup as baseRunInboundSetup } from "./turnAnimation.js";
 import animationConfig from "./animation_config.js";
 import {
-  attachBallToPlayer,
+  attachBallToPlayer as baseAttachBallToPlayer,
   detachBall,
   tweenBallTo,
-  runPass
+  runPass as baseRunPass
 } from "./ballTween.js";
-export { attachBallToPlayer, detachBall, tweenBallTo, runPass };
+
+function attachBallToPlayer(scene, ballSprite, playerSprite, opts = {}) {
+  if (scene?.possessionFlipInProgress) return;
+  return baseAttachBallToPlayer(scene, ballSprite, playerSprite, opts);
+}
+
+function runInboundSetup(opts) {
+  const scene = opts?.scene;
+  if (scene?.possessionFlipInProgress) return Promise.resolve();
+  return baseRunInboundSetup(opts);
+}
+
+function runPass(scene, cfg = {}) {
+  if (scene?.possessionFlipInProgress) return Promise.resolve();
+  return baseRunPass(scene, cfg);
+}
+
+export { attachBallToPlayer, detachBall, tweenBallTo, runPass, runInboundSetup };
 
 // Debug flags for logging shot / rebound details
 export const SHOT_DEBUG = false;
