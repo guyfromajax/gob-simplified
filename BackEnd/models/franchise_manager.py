@@ -96,7 +96,7 @@ class FranchiseManager:
         prev_stats = existing.get("players", {})
         players_map: dict[str, dict] = {}
         players = self.db.players.find(
-            {}, {"first_name": 1, "last_name": 1, "team": 1}
+            {}, {"first_name": 1, "last_name": 1, "team": 1, "team_id": 1}
         )
         for p in players:
             pid = str(p.get("_id"))
@@ -106,6 +106,9 @@ class FranchiseManager:
                 "last_name": p.get("last_name", ""),
                 "team": p.get("team", ""),
             }
+            tid = p.get("team_id")
+            if tid is not None:
+                meta["team_id"] = str(tid)
             players_map[pid] = {
                 "meta": meta,
                 "season": zero_stats.copy(),

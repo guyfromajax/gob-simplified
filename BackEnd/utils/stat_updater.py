@@ -38,6 +38,9 @@ def init_franchise_player_stats(franchise_id: str | ObjectId, roster: list[dict]
             "last_name": player.get("last_name", ""),
             "team": player.get("team", ""),
         }
+        tid = player.get("team_id")
+        if tid is not None:
+            meta["team_id"] = str(tid)
         update[f"players.{pid}"] = {
             "meta": meta,
             "season": zero_stats.copy(),

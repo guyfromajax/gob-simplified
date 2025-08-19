@@ -503,6 +503,108 @@ def team_stats():
     return {"teams": output}
 
 
+def get_team_player_stats(
+    franchise_id: str,
+    team_id: str,
+    scope: str = "season",
+    *,
+    sort: str | None = "PTS",
+    direction: str = "desc",
+    page: int = 1,
+    limit: int | None = None,
+):
+    """Return players for ``team_id`` within ``franchise_id``.
+
+    Filters franchise ``players`` by ``meta.team_id`` and returns the requested
+    stat block (``season`` by default).  Results may be sorted and paginated for
+    UI consumption.
+    """
+
+    try:
+        fid = ObjectId(franchise_id)
+    except Exception:
+        fid = franchise_id
+
+    doc = db.franchises.find_one({"_id": fid}, {"players": 1}) or {}
+    players = doc.get("players", {})
+    team_id_str = str(team_id)
+    results: list[dict] = []
+    for pid, pdata in players.items():
+        meta = pdata.get("meta", {})
+        if str(meta.get("team_id")) != team_id_str:
+            continue
+        block = pdata.get(scope, {})
+        results.append(
+            {
+                "player_id": pid,
+                "first_name": meta.get("first_name", ""),
+                "last_name": meta.get("last_name", ""),
+                "stats": block,
+            }
+        )
+
+    if sort:
+        reverse = direction.lower() != "asc"
+        results.sort(key=lambda x: x["stats"].get(sort, 0), reverse=reverse)
+
+    if limit:
+        start = max(page - 1, 0) * limit
+        results = results[start : start + limit]
+
+    return results
+
+
+@router.get("/franchise/team-player-stats/{team_id}")
+def team_player_stats_endpoint(
+    team_id: str,
+    franchise_id: str,
+    scope: str = "season",
+    page: int = 1,
+    limit: int | None = None,
+    sort: str | None = "PTS",
+    direction: str = "desc",
+):
+    tid = _normalize_team_id(team_id)
+    players = get_team_player_stats(
+        franchise_id,
+        str(tid),
+        scope,
+        sort=sort,
+        direction=direction,
+        page=page,
+        limit=limit,
+    )
+    return {"players": players}
+
+
+@router.get("/franchise/team-player-stats")
+def user_team_player_stats_endpoint(
+    franchise_id: str,
+    scope: str = "season",
+    page: int = 1,
+    limit: int | None = None,
+    sort: str | None = "PTS",
+    direction: str = "desc",
+):
+    state = franchise_state_collection.find_one({"_id": "state"}) or {}
+    team_name = state.get("team")
+    if not team_name:
+        raise HTTPException(status_code=404, detail="User team not selected")
+    team_doc = db.teams.find_one({"name": team_name}, {"_id": 1})
+    if not team_doc:
+        raise HTTPException(status_code=404, detail="Team not found")
+    players = get_team_player_stats(
+        franchise_id,
+        str(team_doc["_id"]),
+        scope,
+        sort=sort,
+        direction=direction,
+        page=page,
+        limit=limit,
+    )
+    return {"players": players}
+
+
 @router.get("/franchise/recruits")
 def recruits():
     recs = list(db.recruits.find({}, {"_id": 0}).limit(40))
