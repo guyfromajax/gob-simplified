@@ -18,6 +18,16 @@ export async function animateGameTurns({ //hasBallAtStep
   const turns = simData.turns || [];
   const allPlayers = simData.players || [];
 
+  const handlePossessionFlip = () => {
+    scene.possessionFlipInProgress = true;
+    if (scene.time?.delayedCall) {
+      scene.time.delayedCall(0, () => (scene.possessionFlipInProgress = false));
+    } else {
+      setTimeout(() => (scene.possessionFlipInProgress = false), 0);
+    }
+  };
+  scene.events?.on?.('possessionChange', handlePossessionFlip);
+
   for (let i = 0; i < turns.length; i++) {
     scene.currentTurn = i;
     const turn = turns[i];
@@ -191,5 +201,7 @@ export async function animateGameTurns({ //hasBallAtStep
       break;
     }
   }
+
+  scene.events?.off?.('possessionChange', handlePossessionFlip);
 }
 
