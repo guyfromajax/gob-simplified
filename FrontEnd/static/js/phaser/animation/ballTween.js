@@ -46,7 +46,6 @@ export function attachBallToPlayer(scene, ballSprite, playerSprite, opts = {}) {
     scene.ballAttachedToPlayerId = targetId;
     scene.ballLastKnownOwnerId = targetId;
   }
-  console.log('ball:attach', targetId);
 }
 
 /**
