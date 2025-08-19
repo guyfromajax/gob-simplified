@@ -348,6 +348,10 @@ export function animateRebound({
           ease: "Linear",
           onComplete: () => {
             attachBallToPlayer(scene, ballSprite, rebounderSprite);
+            scene.offenseTeamId = rebounderSprite.team_id;
+            scene.events?.emit("possessionChange", {
+              offenseTeamId: rebounderSprite.team_id
+            });
             resolve();
           },
           onStop: resolve

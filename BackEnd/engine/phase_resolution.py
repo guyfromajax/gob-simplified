@@ -13,16 +13,41 @@ if TYPE_CHECKING:
 from BackEnd.models.animator import Animator
 
 from BackEnd.utils.shared import (
-    get_name_safe, 
-    get_time_elapsed, 
-    get_fast_break_chance, 
-    calculate_rebound_score, 
-    choose_rebounder, 
+    get_name_safe,
+    get_time_elapsed,
+    get_fast_break_chance,
+    calculate_rebound_score,
+    choose_rebounder,
     default_rebounder_dict,
     resolve_offensive_rebound,
     record_team_points,
     unpack_game_context
 )
+
+
+def get_in_play_defenders(ball_handler, defense_lineup, target_is_away):
+    """Return defenders ahead of the ball handler on the fast break.
+
+    Args:
+        ball_handler (Player): The player leading the break.
+        defense_lineup (dict): Mapping of positions to defensive players.
+        target_is_away (bool): True if the offense is attacking the away hoop.
+
+    Returns:
+        list[Player]: Defensive players considered in play.
+    """
+
+    bh_x = getattr(ball_handler, "coords", {}).get("x", 0)
+    in_play = []
+    for defender in defense_lineup.values():
+        d_x = getattr(defender, "coords", {}).get("x", 0)
+        if target_is_away:
+            if d_x < bh_x:
+                in_play.append(defender)
+        else:
+            if d_x > bh_x:
+                in_play.append(defender)
+    return in_play
     
 def resolve_non_shooting_foul(roles, game):
     
@@ -127,10 +152,6 @@ def resolve_fast_break_logic(game: "GameManager"):
                 if random.random() < {"PG": 0.5, "SG": 0.5, "SF": 0.2, "PF": 0.05}.get(pos, 0):
                     fb_roles["offense"].append(off_lineup[pos])
 
-        # Add defensive players
-        for pos in ["PG", "SG", "SF", "PF"]:
-            if random.random() < {"PG": 0.9, "SG": 0.8, "SF": 0.4, "PF": 0.1}.get(pos, 0):
-                fb_roles["defense"].append(def_lineup[pos])
 
     else:  # STEAL
         ball_handler = game_state.get("last_stealer")
@@ -143,9 +164,43 @@ def resolve_fast_break_logic(game: "GameManager"):
                 if random.random() < {"PG": 0.5, "SG": 0.4, "SF": 0.05}.get(pos, 0):
                     fb_roles["offense"].append(off_lineup[pos])
 
-        for pos in ["PG", "SG", "SF"]:
-            if random.random() < {"PG": 0.8, "SG": 0.5, "SF": 0.2}.get(pos, 0):
-                fb_roles["defense"].append(def_lineup[pos])
+    target_is_away = off_team.team_id == game.away_team.team_id
+    fb_roles["defense"] = get_in_play_defenders(ball_handler, def_lineup, target_is_away)
+
+    # Defensive pressure check
+    die = random.randint(1, 6)
+    bh_x = getattr(ball_handler, "coords", {}).get("x", 0)
+    break_score = ball_handler.attributes["AG"] + ball_handler.attributes["BH"] * die
+    best_defender = None
+    best_stop_score = float("-inf")
+    for defender in fb_roles["defense"]:
+        stop_score = defender.attributes["AG"] + defender.attributes["OD"] * die
+        d_x = getattr(defender, "coords", {}).get("x", 0)
+        if (
+            best_defender is None
+            or stop_score > best_stop_score
+            or (
+                stop_score == best_stop_score
+                and (
+                    abs(d_x - bh_x)
+                    < abs(getattr(best_defender, "coords", {}).get("x", 0) - bh_x)
+                )
+            )
+            or (
+                stop_score == best_stop_score
+                and abs(d_x - bh_x)
+                == abs(getattr(best_defender, "coords", {}).get("x", 0) - bh_x)
+                and defender.player_id < best_defender.player_id
+            )
+        ):
+            best_stop_score = stop_score
+            best_defender = defender
+
+    hold_up = False
+    stopper_id = None
+    if best_defender and best_stop_score >= break_score:
+        hold_up = True
+        stopper_id = best_defender.player_id
 
     # Determine event type
     o_count = len(fb_roles["offense"]) + 1  # include ball handler
@@ -214,8 +269,13 @@ def resolve_fast_break_logic(game: "GameManager"):
 
     # Build animation packet for the fast break play
     animator = Animator(game)
-    turn_result["animations"] = animator.capture_fast_break_animation(fb_roles)
+    turn_result["animations"] = animator.capture_fast_break_animation(
+        fb_roles, hold_up, stopper_id
+    )
     turn_result["roles"] = fb_roles
+    if hold_up:
+        turn_result["hold_up"] = True
+        turn_result["stopper_id"] = stopper_id
 
     # ✅ Add safety checks before returning
     assert turn_result is not None, "turn_result is None"
