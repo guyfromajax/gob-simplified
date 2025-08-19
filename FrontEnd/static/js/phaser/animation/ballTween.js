@@ -14,24 +14,39 @@ export const PASS_DEBUG = false;
  */
 export function attachBallToPlayer(scene, ballSprite, playerSprite, opts = {}) {
   if (!scene || !ballSprite || !playerSprite) return;
+
+  let targetId = playerSprite.playerId;
+  if (targetId == null && scene.playerSprites) {
+    for (const [pid, sprite] of Object.entries(scene.playerSprites)) {
+      if (sprite === playerSprite) {
+        targetId = pid;
+        break;
+      }
+    }
+  }
+
+  const targetTeamId = playerSprite.team_id;
+  if (
+    scene.possessionFlipInProgress &&
+    scene.offenseTeamId != null &&
+    String(targetTeamId) !== String(scene.offenseTeamId)
+  ) {
+    const from = scene.ballAttachedToPlayerId;
+    console.warn('overwrite', { from, to: targetId, reason: 'possessionFlipInProgress' });
+    return;
+  }
+
   scene.ballDetached = false;
   const depth = opts.depth ?? (playerSprite.depth != null ? playerSprite.depth + 1 : BALL_DEPTH);
   if (scene.tweens) scene.tweens.killTweensOf(ballSprite);
   ballSprite.setPosition(playerSprite.x, playerSprite.y);
   ballSprite.setVisible(true);
   ballSprite.setDepth(depth);
-  if (typeof playerSprite.playerId !== 'undefined') {
-    scene.ballAttachedToPlayerId = playerSprite.playerId;
-    scene.ballLastKnownOwnerId = playerSprite.playerId;
-  } else if (scene.playerSprites) {
-    for (const [pid, sprite] of Object.entries(scene.playerSprites)) {
-      if (sprite === playerSprite) {
-        scene.ballAttachedToPlayerId = pid;
-        scene.ballLastKnownOwnerId = pid;
-        break;
-      }
-    }
+  if (targetId != null) {
+    scene.ballAttachedToPlayerId = targetId;
+    scene.ballLastKnownOwnerId = targetId;
   }
+  console.log('ball:attach', targetId);
 }
 
 /**
