@@ -197,12 +197,12 @@ async function init() {
   }
   const standingsData = await fetchJSON(`/franchise/standings?franchise_id=${franchiseId}`);
   renderStandings(standingsData);
-  const scheduleData = await fetchJSON(`/franchise/schedule?franchise_id=${franchiseId}`);
-  renderSchedule(scheduleData);
-  renderLeaders(await fetchJSON('/franchise/leaders'));
-  renderTeamStats(await fetchJSON('/franchise/team-stats'));
-  renderRecruits(await fetchJSON('/franchise/recruits'));
-}
+    const scheduleData = await fetchJSON(`/franchise/schedule?franchise_id=${franchiseId}`);
+    renderSchedule(scheduleData);
+    renderLeaders(await fetchJSON(`/franchise/leaders?franchise_id=${franchiseId}`));
+    renderTeamStats(await fetchJSON('/franchise/team-stats'));
+    renderRecruits(await fetchJSON('/franchise/recruits'));
+  }
 
 const playNowBtn = document.getElementById('play-now');
 playNowBtn.disabled = true;

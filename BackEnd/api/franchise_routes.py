@@ -5,6 +5,7 @@ from pathlib import Path
 from bson import ObjectId
 import logging
 import random
+from typing import Any
 from BackEnd.main import run_simulation
 
 from BackEnd.db import db, franchise_state_collection
@@ -467,24 +468,98 @@ def season_schedule(franchise_id: str):
     return {"schedule": weeks}
 
 
+def get_leaders(
+    franchise_id: str,
+    scope: str = "season",
+    stat: str = "PTS",
+    limit: int = 10,
+):
+    """Return the top players for a given stat within a franchise.
+
+    Players are sourced from the franchise document to avoid cross-collection
+    joins. For small rosters the sorting is performed in-memory. When the
+    number of players grows large an aggregation pipeline is used so MongoDB
+    can leverage indexes on the ``players`` subdocument.
+    """
+
+    try:
+        fid = ObjectId(franchise_id)
+    except Exception:
+        fid = franchise_id
+
+    doc = db.franchises.find_one({"_id": fid}, {"players": 1}) or {}
+    players = doc.get("players", {}) or {}
+
+    if len(players) <= 500:
+        rows: list[dict[str, Any]] = []
+        for pid, pdata in players.items():
+            meta = pdata.get("meta", {})
+            block = pdata.get(scope, {}) or {}
+            totals = block.get("totals", block)
+            value = totals.get(stat, 0)
+            rows.append(
+                {
+                    "player_id": pid,
+                    "first_name": meta.get("first_name", ""),
+                    "last_name": meta.get("last_name", ""),
+                    "team": meta.get("team", meta.get("team_id", "")),
+                    "value": value,
+                }
+            )
+
+        rows.sort(key=lambda r: r["value"], reverse=True)
+        return rows[:limit]
+
+    pipeline = [
+        {"$match": {"_id": fid}},
+        {"$project": {"players": {"$objectToArray": "$players"}}},
+        {"$unwind": "$players"},
+        {
+            "$project": {
+                "player_id": "$players.k",
+                "meta": "$players.v.meta",
+                "value": f"$players.v.{scope}.totals.{stat}",
+            }
+        },
+        {"$sort": {"value": -1}},
+        {"$limit": limit},
+    ]
+
+    agg = list(db.franchises.aggregate(pipeline))
+    results: list[dict[str, Any]] = []
+    for p in agg:
+        meta = p.get("meta", {})
+        results.append(
+            {
+                "player_id": p.get("player_id"),
+                "first_name": meta.get("first_name", ""),
+                "last_name": meta.get("last_name", ""),
+                "team": meta.get("team", meta.get("team_id", "")),
+                "value": p.get("value", 0),
+            }
+        )
+
+    return results
+
+
 @router.get("/franchise/leaders")
-def leaders():
-    players = list(db.players.find())
+def leaders(
+    franchise_id: str,
+    scope: str = "season",
+    limit: int = 10,
+):
     categories = ["PTS", "AST", "TPM", "REB", "BLK", "STL"]
-    result = {}
+    result: dict[str, list[dict[str, Any]]] = {}
     for cat in categories:
-        sorted_players = sorted(
-            players,
-            key=lambda p: p.get("stats", {}).get("season", {}).get(cat, 0),
-            reverse=True
-        )[:10]
+        top = get_leaders(franchise_id, scope=scope, stat=cat, limit=limit)
         result[cat] = [
             {
+                "player_id": p.get("player_id"),
                 "name": f"{p.get('first_name', '')} {p.get('last_name', '')}".strip(),
                 "team": p.get("team"),
-                "value": p.get("stats", {}).get("season", {}).get(cat, 0)
+                "value": p.get("value", 0),
             }
-            for p in sorted_players
+            for p in top
         ]
     return result
 
