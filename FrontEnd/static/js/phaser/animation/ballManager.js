@@ -48,12 +48,12 @@ function attachBallToPlayer(scene, ballSprite, playerSprite, opts = {}) {
 
 function runInboundSetup(opts) {
   const scene = opts.scene;
-  if (scene.possessionFlipInProgress) return Promise.resolve();
+  if (scene.possessionFlipInProgress || scene.fastBreakInProgress) return Promise.resolve();
   return baseRunInboundSetup(opts);
 }
 
 function runPass(scene, cfg = {}) {
-  if (scene.possessionFlipInProgress) return Promise.resolve();
+  if (scene.possessionFlipInProgress || scene.fastBreakInProgress) return Promise.resolve();
   return baseRunPass(scene, cfg);
 }
 
