@@ -245,8 +245,8 @@ def rollup_game_to_franchise(franchise_id: str | ObjectId, game_id: str | Object
 
     The update is idempotent per ``game_id`` thanks to the ``processed_games``
     guard.  Per-player season and career totals are incremented, per-game
-    averages and shooting percentages are recomputed, and ``game_id`` is
-    appended to ``processed_games``.
+    averages and shooting percentages are recomputed within the ``season`` and
+    ``career`` blocks, and ``game_id`` is appended to ``processed_games``.
     """
 
     try:
@@ -321,35 +321,41 @@ def rollup_game_to_franchise(franchise_id: str | ObjectId, game_id: str | Object
     if not result:
         return
 
-    avg_doc: Dict[str, Any] = {}
+    def per_game_block(totals: Dict[str, Any]) -> Dict[str, float]:
+        gp = totals.get("GP", 0)
+        if not gp:
+            return {stat: 0 for stat in BOX_SCORE_KEYS}
+        return {stat: totals.get(stat, 0) / gp for stat in BOX_SCORE_KEYS}
+
+    def pct_block(totals: Dict[str, Any]) -> Dict[str, float]:
+        fga = totals.get("FGA", 0)
+        fgm = totals.get("FGM", 0)
+        tpa = totals.get("3PTA", 0)
+        tpm = totals.get("3PTM", 0)
+        fta = totals.get("FTA", 0)
+        ftm = totals.get("FTM", 0)
+        pts = totals.get("PTS", 0)
+        fg_pct = (fgm / fga * 100) if fga else 0.0
+        fg3_pct = (tpm / tpa * 100) if tpa else 0.0
+        ft_pct = (ftm / fta * 100) if fta else 0.0
+        ts_den = 2 * (fga + 0.44 * fta)
+        ts_pct = (pts / ts_den * 100) if ts_den else 0.0
+        efg_pct = ((fgm + 0.5 * tpm) / fga * 100) if fga else 0.0
+        return {"FG%": fg_pct, "3PT%": fg3_pct, "FT%": ft_pct, "TS%": ts_pct, "eFG%": efg_pct}
+
+    stats_doc: Dict[str, Any] = {}
     for p in players:
         pid = str(p.get("playerId"))
         pdata = result.get("player_stats", {}).get(pid, {})
         season_totals = pdata.get("season", {})
-        gp = season_totals.get("GP", 0)
-        averages: Dict[str, Any] = {}
-        if gp:
-            for stat in BOX_SCORE_KEYS:
-                averages[stat] = season_totals.get(stat, 0) / gp
-            averages["FG%"] = (
-                season_totals.get("FGM", 0) / season_totals.get("FGA", 0) * 100
-                if season_totals.get("FGA", 0)
-                else 0.0
-            )
-            averages["FT%"] = (
-                season_totals.get("FTM", 0) / season_totals.get("FTA", 0) * 100
-                if season_totals.get("FTA", 0)
-                else 0.0
-            )
-        else:
-            for stat in BOX_SCORE_KEYS:
-                averages[stat] = 0
-            averages["FG%"] = 0.0
-            averages["FT%"] = 0.0
-        avg_doc[f"player_stats.{pid}.averages"] = averages
+        career_totals = pdata.get("career", {})
+        stats_doc[f"player_stats.{pid}.season.per_game"] = per_game_block(season_totals)
+        stats_doc[f"player_stats.{pid}.career.per_game"] = per_game_block(career_totals)
+        stats_doc[f"player_stats.{pid}.season.percentages"] = pct_block(season_totals)
+        stats_doc[f"player_stats.{pid}.career.percentages"] = pct_block(career_totals)
 
-    if avg_doc:
-        db.franchises.update_one({"_id": fid}, {"$set": avg_doc})
+    if stats_doc:
+        db.franchises.update_one({"_id": fid}, {"$set": stats_doc})
 
 
 def finalize_game(

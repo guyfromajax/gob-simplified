@@ -1,5 +1,6 @@
 from BackEnd.utils.stat_updater import rollup_game_to_franchise
 from BackEnd.db import db, games_collection, players_collection
+from pytest import approx
 
 
 def setup_function(_fn):
@@ -41,13 +42,19 @@ def test_rollup_game_to_franchise_idempotent():
     assert p1["season"]["FGA"] == 5
     assert p1["season"]["FGM"] == 4
     assert p1["season"]["GP"] == 1
-    assert p1["averages"]["PTS"] == 10
-    assert p1["averages"]["FG%"] == 80.0
-    assert p1["averages"]["FT%"] == 50.0
+    assert p1["season"]["per_game"]["PTS"] == 10
+    assert p1["season"]["percentages"]["FG%"] == 80.0
+    assert p1["season"]["percentages"]["FT%"] == 50.0
+    assert p1["season"]["percentages"]["TS%"] == approx(85.0340136, rel=1e-3)
+    assert p1["season"]["percentages"]["eFG%"] == 80.0
+
+    assert p1["career"]["per_game"]["PTS"] == 10
+    assert p1["career"]["percentages"]["FG%"] == 80.0
 
     assert p2["season"]["PTS"] == 8
-    assert p2["averages"]["FG%"] == 50.0
-    assert p2["averages"]["FT%"] == 100.0
+    assert p2["season"]["percentages"]["FG%"] == 50.0
+    assert p2["season"]["percentages"]["FT%"] == 100.0
+    assert p2["career"]["percentages"]["FG%"] == 50.0
 
     assert doc1["processed_games"] == [str(gid)]
 
