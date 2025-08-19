@@ -114,6 +114,10 @@ HCO_STRING_SPOTS = {
     "lower midBaseline": {"x": 89, "y": 15},
 }
 
+# Shared court coordinates
+RIM_COORDS = {"x": 91, "y": 25}
+TOP_KEY_COORDS = HCO_STRING_SPOTS["key"]
+
 ACTIONS = {
     "HANDLE": "handle_ball",
     "POST": "post_up",
