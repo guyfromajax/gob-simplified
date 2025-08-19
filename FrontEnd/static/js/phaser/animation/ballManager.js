@@ -24,6 +24,10 @@ function attachBallToPlayer(scene, ballSprite, playerSprite, opts = {}) {
     }
   }
 
+  if (scene.reboundInProgress && targetId !== scene.rebounderId) {
+    return;
+  }
+
   if (REBOUND_DEBUG) {
     if (
       scene?.currentBallOwnerRef &&
@@ -207,7 +211,8 @@ export function shootBall({
             scene.game.config.width,
             scene.game.config.height
           );
-
+          scene.reboundInProgress = true;
+          scene.rebounderId = null;
           scene.tweens.add({
             targets: ballSprite,
             x: bounce.x,
@@ -293,28 +298,29 @@ export function animatePutbackAttempt(
               awayTeamId
             });
             resolve();
-          } else if (result === "MISS") {
-            const isHomeTeam = shooterSprite.team === "home";
-            const bounceGridX = isHomeTeam ? rimCoords.x - 6 : rimCoords.x + 6;
-            const bounceGridY =
-              rimCoords.y + Phaser.Math.Between(-6, 6);
-            const bounce = gridToPixels(
-              bounceGridX,
-              bounceGridY,
-              scene.game.config.width,
-              scene.game.config.height
-            );
-
-            scene.tweens.add({
-              targets: ballSprite,
-              x: bounce.x,
-              y: bounce.y,
-              duration: duration / 3,
-              ease: "Sine.easeOut",
-              onComplete: () =>
-                resolve({ grid: { x: bounceGridX, y: bounceGridY } })
-            });
-          } else {
+            } else if (result === "MISS") {
+              const isHomeTeam = shooterSprite.team === "home";
+              const bounceGridX = isHomeTeam ? rimCoords.x - 6 : rimCoords.x + 6;
+              const bounceGridY =
+                rimCoords.y + Phaser.Math.Between(-6, 6);
+              const bounce = gridToPixels(
+                bounceGridX,
+                bounceGridY,
+                scene.game.config.width,
+                scene.game.config.height
+              );
+              scene.reboundInProgress = true;
+              scene.rebounderId = null;
+              scene.tweens.add({
+                targets: ballSprite,
+                x: bounce.x,
+                y: bounce.y,
+                duration: duration / 3,
+                ease: "Sine.easeOut",
+                onComplete: () =>
+                  resolve({ grid: { x: bounceGridX, y: bounceGridY } })
+              });
+            } else {
             // FOUL or unrecognized result: backend will handle next steps
             resolve();
           }
@@ -348,6 +354,7 @@ export function animateRebound({
   if (!scene || !ballSprite || !ballSpot) return Promise.resolve();
   if (scene?.ftInProgress) return Promise.resolve();
 
+  scene.rebounderId = rebounderId;
   const promises = [];
   const finalPositions = [];
   const MIN_X_SEP = 3;
@@ -386,6 +393,8 @@ export function animateRebound({
             scene.events?.emit("possessionChange", {
               offenseTeamId: rebounderSprite.team_id
             });
+            scene.reboundInProgress = false;
+            scene.rebounderId = null;
             resolve();
           },
           onStop: resolve
