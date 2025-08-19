@@ -729,6 +729,9 @@ async function runFastBreakSequence({ scene, turnData, playerSprites, ballSprite
         arc: { height: arcHeight }
       });
       if (turnData.result_type === "MAKE") {
+        await new Promise((resolve) =>
+          scene.time.delayedCall(1000, resolve)
+        );
         const newOffenseSide =
           shooterSprite.team === "home" ? "away" : "home";
         await runInboundSetup({
