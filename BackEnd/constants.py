@@ -115,8 +115,13 @@ HCO_STRING_SPOTS = {
 }
 
 # Shared court coordinates
-RIM_COORDS = {"x": 91, "y": 25}
-TOP_KEY_COORDS = HCO_STRING_SPOTS["key"]
+HOME_RIM_COORDS = {"x": 91, "y": 25}
+AWAY_RIM_COORDS = {"x": 9, "y": 25}
+HOME_TOP_KEY = {"x": 64, "y": 25}
+AWAY_TOP_KEY = {"x": 36, "y": 25}
+
+RIM_COORDS = HOME_RIM_COORDS
+TOP_KEY_COORDS = HOME_TOP_KEY
 
 ACTIONS = {
     "HANDLE": "handle_ball",

@@ -1,5 +1,6 @@
 import { gridToPixels } from "../utils/gridToPixels.js";
 import animationConfig from "./animation_config.js";
+import { HOME_RIM_COORDS, AWAY_RIM_COORDS } from "./courtConstants.js";
 
 const positionList = ["PG", "SG", "SF", "PF", "C"];
 
@@ -18,7 +19,7 @@ const HOME = {
     PF: { x: 89, y: 32 },
     C: { x: 89, y: 19 },
   },
-  rim: { x: 91, y: 25 },
+  rim: HOME_RIM_COORDS,
 };
 
 const AWAY = {
@@ -36,7 +37,7 @@ const AWAY = {
     PF: { x: 11, y: 32 },
     C: { x: 11, y: 19 },
   },
-  rim: { x: 9, y: 25 },
+  rim: AWAY_RIM_COORDS,
 };
 
 export function buildDestinations(offenseIsHome, shooterPos) {

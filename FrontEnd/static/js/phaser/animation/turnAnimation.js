@@ -11,13 +11,12 @@ import {
 } from "./ballManager.js";
 import { tweenBallTo, runPass, PASS_DEBUG } from "./ballTween.js";
 import animationConfig from "./animation_config.js";
+import { HOME_RIM_COORDS, AWAY_RIM_COORDS } from "./courtConstants.js";
 
 // Cap the time spent on any single movement step. Large timestamp gaps can
 // otherwise produce multi‑second tweens that appear as animation stalls.
 const MAX_STEP_DURATION = 1000; // ms
 
-const HOME_RIM_COORDS = { x: 91, y: 25 };
-const AWAY_RIM_COORDS = { x: 9, y: 25 };
 
 /**
  * Centralized ball ownership logic
