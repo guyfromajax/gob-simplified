@@ -743,7 +743,10 @@ async function runFastBreakSequence({ scene, turnData, playerSprites, ballSprite
           ballSprite,
           playerSprites,
           animations,
-          rebounderId: turnData.rebounderId || turnData.rebounder_id,
+          rebounderId:
+            turnData.rebounder_player_id ||
+            turnData.rebounderId ||
+            turnData.rebounder_id,
           ballSpot: turnData.ballSpot || turnData.ball_spot
         });
       }
@@ -888,7 +891,9 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
         fromCoords: shotInfo.step.coords,
         startTimestamp: shotInfo.step.timestamp,
         // Map rebound result types to "MISS" so shootBall returns a landing spot
-        result: ["DREB", "OREB"].includes(turnData.result_type)
+        result: ["DREB", "OREB"].includes(
+          turnData.rebound_type || turnData.result_type
+        )
           ? "MISS"
           : turnData.result_type,
         shooterPos,
@@ -915,9 +920,13 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
           awayTeamId
         });
       } else if (ballSpot) {
+        let rebounderId =
+          turnData.rebounder_player_id ||
+          turnData.rebounderId ||
+          turnData.rebounder_id ||
+          null;
         const rebounderName = turnData.ball_handler?.trim();
-        let rebounderId = null;
-        if (rebounderName) {
+        if (!rebounderId && rebounderName) {
           rebounderId = scene.nameToId?.[rebounderName];
           if (!rebounderId && scene.playerInfo) {
             for (const [id, info] of Object.entries(scene.playerInfo)) {
@@ -970,7 +979,8 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
             ballSprite,
             playerSprites,
             animations: evt.rebound.animations || turnData.animations,
-            rebounderId: evt.rebound.rebounderId,
+            rebounderId:
+              evt.rebound.rebounder_player_id || evt.rebound.rebounderId,
             ballSpot: putbackResult?.grid || evt.rebound.ballSpot
           });
         }
@@ -978,7 +988,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
         await animateKickoutReset(
           scene,
           ballSprite,
-          evt.rebounderId,
+          evt.rebounder_player_id || evt.rebounderId,
           evt.pgId,
           evt.pass,
           evt.pass?.duration
