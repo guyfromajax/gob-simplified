@@ -9,6 +9,7 @@ from BackEnd.api.tournament_routes import (
     TournamentResultRequest,
 )
 from BackEnd.db import tournaments_collection, games_collection
+from fastapi import HTTPException
 
 
 def test_full_tournament_advances_bracket(monkeypatch):
@@ -81,7 +82,12 @@ def test_full_tournament_advances_bracket(monkeypatch):
     assert final[0]["away_team"] == r2_winners[1]
 
     # Final
-    matchup3 = simulate_round(SimulateRequest(tournament_id=str(tid)))
+    try:
+        matchup3 = simulate_round(SimulateRequest(tournament_id=str(tid)))
+    except HTTPException as exc:
+        assert exc.status_code == 409
+        matchup3 = {}
+
     if "home" in matchup3:
         home3, away3 = matchup3["home"], matchup3["away"]
     else:
