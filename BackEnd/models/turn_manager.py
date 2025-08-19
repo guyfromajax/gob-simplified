@@ -266,7 +266,7 @@ class TurnManager:
         result["quarter"] = self.game.game_state["quarter"]
         result["period_label"] = self.game.game_state.get("period_label")
 
-        # print(f"inside run_micro_turn result: {result}")
+        print(f"inside run_micro_turn result: {result}")
         # print(f"result: {result}")
         return result
 
