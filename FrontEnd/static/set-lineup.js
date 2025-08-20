@@ -5,7 +5,7 @@ const homeId = urlParams.get('home_id');
 const awayId = urlParams.get('away_id');
 let myTeamSide = urlParams.get('my_team');
 const userTeamIdParam = urlParams.get('user_team_id');
-const gameId = urlParams.get('game_id');
+const gameId = urlParams.get('game_id') || localStorage.getItem('game_id');
 const quarter = parseInt(urlParams.get('quarter'), 10) || 1;
 const periodLabel = urlParams.get('period') || `Q${quarter}`;
 let teamName = '';
@@ -202,6 +202,8 @@ async function init() {
         const id = lineup[pos];
         if (id) params.set(`${myTeamSide}_${pos.toLowerCase()}`, id);
       });
+      if (gameId) params.set('game_id', gameId);
+      console.log('🔀 Redirecting to court.html with', { quarter, gameId });
       window.location.href = `/court.html?${params.toString()}`;
     });
   }
