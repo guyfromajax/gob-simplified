@@ -149,6 +149,13 @@ class Animator:
         offense_team = game.offense_team
         defense_team = game.defense_team
         shooter_pos = get_player_position(offense_team.lineup, shooter)
+        if not shooter_pos:
+            logging.warning(
+                "capture_free_throw_animation: shooter %s not found in lineup",
+                getattr(shooter, "player_id", shooter),
+            )
+            self.latest_packet = []
+            return []
 
         HOME_CFG = {
             "shooterSpot": {"x": 74, "y": 25},
@@ -197,7 +204,7 @@ class Animator:
         if not no_lane:
             o_destinations = {shooter_pos: shooter_spot}
             other_positions = [p for p in position_list if p != shooter_pos]
-            for i, pos in enumerate(other_positions):
+            for i, pos in enumerate(other_positions[: len(cfg["offenseAlignList"]) ]):
                 o_destinations[pos] = cfg["offenseAlignList"][i]
 
             for pos, player in offense_team.lineup.items():
