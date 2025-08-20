@@ -31,6 +31,7 @@ from .franchise_routes import router as franchise_router
 import traceback
 from unidecode import unidecode
 from typing import Optional
+import logging
 
 app = FastAPI()
 app.include_router(tournament_router)
@@ -163,6 +164,15 @@ def simulate_game(request: SimulationRequest):
 @app.post("/api/simulate-quarter")
 def simulate_quarter_endpoint(request: QuarterSimulationRequest):
     game_id = request.game_id
+    logging.info(
+        "simulate_quarter_endpoint payload: game_id=%s, home_team=%s, away_team=%s, quarter=%s, home_lineup_keys=%s, away_lineup_keys=%s",
+        game_id,
+        request.home_team,
+        request.away_team,
+        request.quarter,
+        list((request.home_lineup or {}).keys()),
+        list((request.away_lineup or {}).keys()),
+    )
     if game_id and game_id in ongoing_games:
         gm = ongoing_games[game_id]
     else:
@@ -203,8 +213,26 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest):
             game_id,
         )
     except ValueError as e:
-        print(f"🚨 simulate_quarter lineup error: {e}")
+        logging.error(
+            "simulate_quarter lineup error for game_id=%s, home_team=%s, away_team=%s, quarter=%s: %s",
+            game_id,
+            request.home_team,
+            request.away_team,
+            request.quarter,
+            e,
+        )
         raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logging.exception(
+            "simulate_quarter failed for game_id=%s, home_team=%s, away_team=%s, quarter=%s, home_lineup_keys=%s, away_lineup_keys=%s",
+            game_id,
+            request.home_team,
+            request.away_team,
+            request.quarter,
+            list((request.home_lineup or {}).keys()),
+            list((request.away_lineup or {}).keys()),
+        )
+        raise HTTPException(status_code=500, detail=str(e))
 
     summary = summarize_game_state(gm)
     summary["start_box_score"] = gm.game_state.get("start_box_score")
