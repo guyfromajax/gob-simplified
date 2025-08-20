@@ -128,5 +128,46 @@ const awayResult = {
   inboundCalled: inboundCalled2,
   reboundCalled: reboundCalled2,
 };
+const sceneFallback = makeScene();
+const playerSpritesFallback = createPlayers();
+sceneFallback.playerInfo = createInfo();
+const ballSpriteFallback = makeBall();
+let reboundCalled3 = false;
+let reboundSpot3;
+await runFreeThrowSequence(sceneFallback, {
+  playerSprites: playerSpritesFallback,
+  ballSprite: ballSpriteFallback,
+  turnData: {
+    result_type: 'FREE_THROW',
+    offense_team_id: 'HOME',
+    shooter_id: 'pg',
+    shooter_pos: 'PG',
+    attempts: ['MISS'],
+    animations: [
+      { playerId: 'pg', movement: [ { timestamp:0, coords:{x:0,y:0} }, { timestamp:800, coords:{x:74,y:25} } ], duration:800 },
+      { playerId: 'ball', movement: [ { timestamp:0, coords:{x:74,y:25} } ], duration:500 }
+    ]
+  },
+  helpers: {
+    tweenBallTo: (scene, ball, target, opts) => { ball.x = target.x; ball.y = target.y; return Promise.resolve(); },
+    runInboundSetup: () => Promise.resolve(),
+    animateRebound: ({ ballSpot }) => { reboundCalled3 = true; reboundSpot3 = ballSpot; return Promise.resolve(); },
+    attachBallToPlayer: () => {},
+    detachBall: () => {},
+  }
+});
 
-console.log(JSON.stringify({ home: homeResult, away: awayResult, expected: { pgDest, sgDest, dPgDest } }));
+const fallbackResult = {
+  reboundCalled: reboundCalled3,
+  ballSpot: reboundSpot3,
+  ballPos: { x: ballSpriteFallback.x, y: ballSpriteFallback.y },
+};
+
+console.log(
+  JSON.stringify({
+    home: homeResult,
+    away: awayResult,
+    fallback: fallbackResult,
+    expected: { pgDest, sgDest, dPgDest },
+  })
+);

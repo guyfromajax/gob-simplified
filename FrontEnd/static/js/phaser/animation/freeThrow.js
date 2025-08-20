@@ -1,5 +1,6 @@
 import { gridToPixels } from "../utils/gridToPixels.js";
 import animationConfig from "./animation_config.js";
+import { HOME_RIM_COORDS, AWAY_RIM_COORDS } from "./courtConstants.js";
 
 function wait(scene, ms) {
   if (!ms) return Promise.resolve();
@@ -106,12 +107,12 @@ export async function runFreeThrowSequence(
 
     const shotStep = moves[moveIndex];
     moveIndex++;
-    const rimPx = gridToPixels(
-      shotStep.coords.x,
-      shotStep.coords.y,
-      width,
-      height
-    );
+    const rimGrid =
+      shotStep?.coords ||
+      (turnData.offense_team_id === scene.simData?.home_team_id
+        ? HOME_RIM_COORDS
+        : AWAY_RIM_COORDS);
+    const rimPx = gridToPixels(rimGrid.x, rimGrid.y, width, height);
     scene.events?.emit("ft:shotStart");
     await tween(scene, ballSprite, rimPx, {
       duration: animationConfig.freeThrow.shotMs,
@@ -147,9 +148,10 @@ export async function runFreeThrowSequence(
       } else {
         const resetStep = moves[moveIndex];
         moveIndex++;
+        const resetGrid = resetStep?.coords || rimGrid;
         const spotPx = gridToPixels(
-          resetStep.coords.x,
-          resetStep.coords.y,
+          resetGrid.x,
+          resetGrid.y,
           width,
           height
         );
@@ -168,15 +170,16 @@ export async function runFreeThrowSequence(
           playerSprites,
           animations: [],
           rebounderId: null,
-          ballSpot: shotStep.coords,
+          ballSpot: rimGrid,
           shooterId: turnData.shooter_id,
         });
       } else {
         const resetStep = moves[moveIndex];
         moveIndex++;
+        const resetGrid = resetStep?.coords || rimGrid;
         const spotPx = gridToPixels(
-          resetStep.coords.x,
-          resetStep.coords.y,
+          resetGrid.x,
+          resetGrid.y,
           width,
           height
         );
