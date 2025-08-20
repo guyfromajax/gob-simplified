@@ -1036,7 +1036,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
                 onStop: resolve
               });
             });
-            if (String(rebounderSprite.team_id) !== String(shooterTeamId)) {
+            if (turnData.rebound_type === "DREB" && !turnData.fast_break) {
               await runDefensiveReboundSetup({
                 scene,
                 ballSprite,
