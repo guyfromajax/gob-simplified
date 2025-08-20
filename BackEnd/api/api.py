@@ -177,7 +177,20 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest):
         gm = ongoing_games.get(game_id)
         if gm is None:
             logging.warning("simulate_quarter_endpoint unknown game_id: %s", game_id)
-            saved = games_collection.find_one({"_id": game_id}) if games_collection else None
+            if games_collection is not None:
+                logging.info(
+                    "simulate_quarter_endpoint querying DB for game_id=%s", game_id
+                )
+            else:
+                logging.info(
+                    "simulate_quarter_endpoint skipping DB lookup for game_id=%s; no collection",
+                    game_id,
+                )
+            saved = (
+                games_collection.find_one({"_id": game_id})
+                if games_collection is not None
+                else None
+            )
             if saved:
                 try:
                     home = saved.get("home_team") or saved.get("homeTeam", {}).get("name")
