@@ -173,8 +173,24 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest):
         list((request.home_lineup or {}).keys()),
         list((request.away_lineup or {}).keys()),
     )
-    if game_id and game_id in ongoing_games:
-        gm = ongoing_games[game_id]
+    if game_id:
+        gm = ongoing_games.get(game_id)
+        if gm is None:
+            logging.warning("simulate_quarter_endpoint unknown game_id: %s", game_id)
+            saved = games_collection.find_one({"_id": game_id}) if games_collection else None
+            if saved:
+                try:
+                    home = saved.get("home_team") or saved.get("homeTeam", {}).get("name")
+                    away = saved.get("away_team") or saved.get("awayTeam", {}).get("name")
+                    if home and away:
+                        gm = GameManager(home, away)
+                        gm.game_state = saved.get("game_state", {})
+                        gm.quarter = saved.get("quarter", 1)
+                        ongoing_games[game_id] = gm
+                except Exception:
+                    logging.exception("Failed to load game state for %s", game_id)
+            if gm is None:
+                raise HTTPException(status_code=400, detail="Unknown game_id")
     else:
         gm = GameManager(request.home_team, request.away_team)
         game_id = str(uuid.uuid4())
