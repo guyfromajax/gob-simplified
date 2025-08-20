@@ -2,6 +2,7 @@ import pytest
 from fastapi import HTTPException
 from tests.test_utils import build_mock_game
 from BackEnd.engine.phase_resolution import resolve_free_throw_logic
+from BackEnd.models.animator import Animator
 
 
 def _setup_game(one_and_one: bool):
@@ -60,3 +61,17 @@ def test_missing_shooter_returns_400():
         resolve_free_throw_logic(game)
 
     assert excinfo.value.status_code == 400
+
+
+def test_free_throw_animation_empty_offense_lineup():
+    game = build_mock_game()
+    shooter = game.offense_team.lineup["PG"]
+    game.offense_team.lineup = {}
+    animator = Animator(game)
+    packet = animator.capture_free_throw_animation(
+        game,
+        shooter,
+        attempts=["MAKE"],
+        offense_is_home=True,
+    )
+    assert packet == []
