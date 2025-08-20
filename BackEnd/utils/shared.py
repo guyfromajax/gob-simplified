@@ -1,4 +1,5 @@
 import random
+import logging
 from BackEnd.constants import TURNOVER_CALC_DICT, POSITION_LIST, HCO_STRING_SPOTS
 
 
@@ -118,6 +119,16 @@ def resolve_offensive_rebound(game, rebounder):
 
     game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
 
+    # If no offensive rebounder is available, treat as a defensive rebound.
+    if rebounder is None:
+        logging.warning("resolve_offensive_rebound called with no rebounder; treating as defensive rebound")
+        return {
+            "event_type": "DEFENSIVE_REBOUND",
+            "rebounderId": None,
+            "timeElapsed": 0,
+            "possession_flips": True,
+        }
+
     if random.random() < 0.65:  # putback attempt
         attrs = rebounder.attributes
         shot_score = (
@@ -193,8 +204,12 @@ def calculate_screen_score(screen_attrs):
     return base_score * random.randint(1, 6)
 
 def choose_rebounder(rebounders, side):
-    players = list(rebounders[side].keys())
-    weights = list(rebounders[side].values())
+    pool = rebounders.get(side, {})
+    if not pool:
+        logging.warning("choose_rebounder called with empty pool for %s", side)
+        return None
+    players = list(pool.keys())
+    weights = list(pool.values())
     return random.choices(players, weights=weights, k=1)[0]
 
 def generate_pass_chain(game, shooter_pos):
