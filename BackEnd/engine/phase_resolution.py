@@ -297,6 +297,17 @@ def resolve_free_throw_logic(game):
     text = f"{get_name_safe(shooter)} steps to the line... "
     possession_flips = False
 
+    attempts = ["MAKE" if makes_shot else "MISS"]
+    animator = Animator(game)
+    animations = animator.capture_free_throw_animation(
+        game,
+        shooter,
+        attempts,
+        offense_is_home=(off_team.team_id == game.home_team.team_id),
+        no_lane=game_state.get("no_lane", False),
+    )
+    shooter_pos = get_player_position(off_lineup, shooter)
+
     if makes_shot:
         shooter.record_stat("FTM")
         record_team_points(game, off_team, 1)
@@ -319,7 +330,13 @@ def resolve_free_throw_logic(game):
                     "time_elapsed": 0,
                     "possession_flips": False,
                     "points": 1,
-                    "scoring_team": off_team.name
+                    "scoring_team": off_team.name,
+                    "animations": animations,
+                    "attempts": attempts,
+                    "shooter_id": getattr(shooter, "player_id", None),
+                    "shooter_pos": shooter_pos,
+                    "offense_team_id": off_team.team_id,
+                    "no_lane": game_state.get("no_lane", False),
                 }
             else:
                 # Missed front end → dead ball, rebound
@@ -397,7 +414,6 @@ def resolve_free_throw_logic(game):
         else:
             possession_flips = True
 
-    shooter_pos = get_player_position(off_lineup, shooter)
     result = {
         "result_type": "FREE_THROW",
         "ball_handler": shooter,
@@ -405,6 +421,12 @@ def resolve_free_throw_logic(game):
         "text": text,
         "time_elapsed": 0,  # clock does not run
         "possession_flips": possession_flips,
+        "animations": animations,
+        "attempts": attempts,
+        "shooter_id": getattr(shooter, "player_id", None),
+        "shooter_pos": shooter_pos,
+        "offense_team_id": off_team.team_id,
+        "no_lane": game_state.get("no_lane", False),
     }
 
     if makes_shot:

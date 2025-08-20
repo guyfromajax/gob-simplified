@@ -124,6 +124,171 @@ class Animator:
         self.latest_packet = animations
         return animations
 
+    def capture_free_throw_animation(
+        self,
+        game,
+        shooter,
+        attempts,
+        offense_is_home,
+        no_lane=False,
+    ):
+        """Build a free throw animation packet.
+
+        Args:
+            game (GameManager): Current game instance.
+            shooter (Player): Player shooting free throws.
+            attempts (list[str]): List of results ("MAKE"/"MISS") for each attempt.
+            offense_is_home (bool): True if offense is attacking the home rim.
+            no_lane (bool): If True, only the shooter moves to the line.
+
+        Returns:
+            list[dict]: Animation payload for the frontend.
+        """
+
+        offense_team = game.offense_team
+        defense_team = game.defense_team
+        shooter_pos = get_player_position(offense_team.lineup, shooter)
+
+        HOME_CFG = {
+            "shooterSpot": {"x": 74, "y": 25},
+            "offenseAlignList": [
+                {"x": 56, "y": 44},
+                {"x": 80, "y": 32},
+                {"x": 86, "y": 19},
+                {"x": 86, "y": 32},
+            ],
+            "dDestinations": {
+                "PG": {"x": 54, "y": 37},
+                "SG": {"x": 83, "y": 32},
+                "SF": {"x": 83, "y": 19},
+                "PF": {"x": 89, "y": 32},
+                "C": {"x": 89, "y": 19},
+            },
+            "rim": {"x": 91, "y": 25},
+        }
+
+        AWAY_CFG = {
+            "shooterSpot": {"x": 27, "y": 25},
+            "offenseAlignList": [
+                {"x": 45, "y": 44},
+                {"x": 20, "y": 32},
+                {"x": 14, "y": 19},
+                {"x": 14, "y": 32},
+            ],
+            "dDestinations": {
+                "PG": {"x": 47, "y": 37},
+                "SG": {"x": 17, "y": 32},
+                "SF": {"x": 17, "y": 19},
+                "PF": {"x": 11, "y": 32},
+                "C": {"x": 11, "y": 19},
+            },
+            "rim": {"x": 9, "y": 25},
+        }
+
+        cfg = HOME_CFG if offense_is_home else AWAY_CFG
+        shooter_spot = cfg["shooterSpot"]
+        rim = cfg["rim"]
+        duration = 800
+
+        animations = []
+        position_list = ["PG", "SG", "SF", "PF", "C"]
+
+        if not no_lane:
+            o_destinations = {shooter_pos: shooter_spot}
+            other_positions = [p for p in position_list if p != shooter_pos]
+            for i, pos in enumerate(other_positions):
+                o_destinations[pos] = cfg["offenseAlignList"][i]
+
+            for pos, player in offense_team.lineup.items():
+                if pos not in o_destinations or not player:
+                    continue
+                start = getattr(player, "coords", {"x": 25, "y": 50})
+                end = o_destinations[pos]
+                movement = [
+                    {"timestamp": 0, "coords": start, "action": ACTIONS["DRIFT"]},
+                    {"timestamp": duration, "coords": end, "action": ACTIONS["DRIFT"]},
+                ]
+                animations.append(
+                    {
+                        "playerId": getattr(player, "player_id", str(id(player))),
+                        "start": start,
+                        "end": end,
+                        "movement": movement,
+                        "hasBallAtStep": [player is shooter, False],
+                        "duration": duration,
+                    }
+                )
+
+            for pos, player in defense_team.lineup.items():
+                dest = cfg["dDestinations"].get(pos)
+                if not player or not dest:
+                    continue
+                start = getattr(player, "coords", {"x": 25, "y": 50})
+                movement = [
+                    {"timestamp": 0, "coords": start, "action": ACTIONS["DRIFT"]},
+                    {"timestamp": duration, "coords": dest, "action": ACTIONS["DRIFT"]},
+                ]
+                animations.append(
+                    {
+                        "playerId": getattr(player, "player_id", str(id(player))),
+                        "start": start,
+                        "end": dest,
+                        "movement": movement,
+                        "hasBallAtStep": [False, False],
+                        "duration": duration,
+                    }
+                )
+        else:
+            start = getattr(shooter, "coords", {"x": 25, "y": 50})
+            movement = [
+                {"timestamp": 0, "coords": start, "action": ACTIONS["DRIFT"]},
+                {"timestamp": duration, "coords": shooter_spot, "action": ACTIONS["DRIFT"]},
+            ]
+            animations.append(
+                {
+                    "playerId": getattr(shooter, "player_id", str(id(shooter))),
+                    "start": start,
+                    "end": shooter_spot,
+                    "movement": movement,
+                    "hasBallAtStep": [True, False],
+                    "duration": duration,
+                }
+            )
+
+        # Ball movement across attempts
+        shot_ms = 500
+        rim_hold_ms = 300
+        time = 0
+        ball_movement = [
+            {"timestamp": time, "coords": shooter_spot, "action": ACTIONS["HANDLE"]}
+        ]
+
+        for idx, outcome in enumerate(attempts or []):
+            time += shot_ms
+            ball_movement.append(
+                {"timestamp": time, "coords": rim, "action": ACTIONS["SHOOT"]}
+            )
+            time += rim_hold_ms
+            if idx < len(attempts) - 1:
+                time += shot_ms
+                ball_movement.append(
+                    {"timestamp": time, "coords": shooter_spot, "action": ACTIONS["DRIFT"]}
+                )
+
+        animations.append(
+            {
+                "playerId": "ball",
+                "start": shooter_spot,
+                "end": rim if attempts else shooter_spot,
+                "movement": ball_movement,
+                "hasBallAtStep": [True] + [False] * (len(ball_movement) - 1),
+                "duration": time,
+            }
+        )
+
+        self.latest_packet = animations
+        return animations
+
     def capture_halfcourt_animation(self, roles, event_step=None):
         offense_team = self.game.offense_team
         defense_team = self.game.defense_team
