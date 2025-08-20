@@ -54,3 +54,43 @@ def test_simulate_quarter_short_roster(monkeypatch, short_side):
     assert response.status_code == 400
     assert "fewer than 5 players" in response.json()["detail"]
     assert short_team_name in response.json()["detail"]
+
+
+def test_simulate_quarter_endpoint_handles_none_games_collection(monkeypatch):
+    class DummyTeam:
+        def __init__(self, name: str):
+            self.name = name
+            self.points_by_quarter = [0, 0, 0, 0]
+
+    class DummyGM:
+        def __init__(self):
+            self.quarter = 1
+            self.home_team = DummyTeam("Home")
+            self.away_team = DummyTeam("Away")
+            self.game_state = {"start_box_score": {}, "score": {"Home": 0, "Away": 0}}
+            self.score = self.game_state["score"]
+
+    dummy_gm = DummyGM()
+    monkeypatch.setattr(api, "ongoing_games", {"gid": dummy_gm})
+    monkeypatch.setattr(api, "games_collection", None)
+
+    def fake_simulate_quarter(gm, home_lineup, away_lineup, game_id):
+        gm.quarter += 1
+
+    def fake_summarize_game_state(gm):
+        return {"score": gm.score}
+
+    monkeypatch.setattr(api, "simulate_quarter", fake_simulate_quarter)
+    monkeypatch.setattr(api, "summarize_game_state", fake_summarize_game_state)
+
+    request = api.QuarterSimulationRequest(
+        game_id="gid",
+        home_team="Home",
+        away_team="Away",
+        quarter=1,
+        home_lineup={},
+        away_lineup={},
+    )
+
+    summary = api.simulate_quarter_endpoint(request)
+    assert summary["game_id"] == "gid"
