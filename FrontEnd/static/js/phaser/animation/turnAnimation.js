@@ -909,6 +909,8 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
     currentBallOwnerRef
   });
 
+  let eventsProcessed = false;
+
   for (let stepIndex = 1; stepIndex < maxSteps; stepIndex++) {
     if (scene.skipToEnd || scene.fastBreakInProgress) break;
 
@@ -1044,6 +1046,61 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
                 playerSprites,
                 rebounderId
               });
+            } else {
+              const pause = animationConfig.offensiveRebound.pauseMs;
+              await new Promise((res) =>
+                scene.time?.delayedCall
+                  ? scene.time.delayedCall(pause, res)
+                  : setTimeout(res, pause)
+              );
+              if (!scene.skipToEnd && Array.isArray(turnData.events)) {
+                eventsProcessed = true;
+                for (const evt of turnData.events) {
+                  if (scene.skipToEnd) break;
+                  if (evt.event_type === "PUTBACK_ATTEMPT") {
+                    const shooterId = evt.shooterId;
+                    const rebounderSprite = playerSprites[shooterId];
+                    if (!rebounderSprite) continue;
+                    attachBallToPlayer(scene, ballSprite, rebounderSprite, {
+                      debugInfo: { shooterId, reboundSpot: evt.rebound?.ballSpot || null }
+                    });
+                    const rimCoords =
+                      rebounderSprite.team === "home" ? HOME_RIM_COORDS : AWAY_RIM_COORDS;
+                    const putbackResult = await animatePutbackAttempt(
+                      scene,
+                      ballSprite,
+                      shooterId,
+                      rimCoords,
+                      evt.duration || 500,
+                      evt.result
+                    );
+                    if (evt.result === "MISS" && evt.rebound) {
+                      await animateRebound({
+                        scene,
+                        ballSprite,
+                        playerSprites,
+                        animations: evt.rebound.animations || turnData.animations,
+                        rebounderId:
+                          evt.rebound.rebounder_player_id || evt.rebound.rebounderId,
+                        ballSpot: putbackResult?.grid || evt.rebound.ballSpot,
+                        shooterId: evt.shooterId
+                      });
+                    }
+                  } else if (evt.event_type === "KICKOUT_RESET") {
+                    await animateKickoutReset(
+                      scene,
+                      ballSprite,
+                      evt.rebounder_player_id || evt.rebounderId,
+                      evt.pgId,
+                      evt.pass,
+                      evt.pass?.duration
+                    );
+                    if (typeof scene.startNextHalfCourtOffense === "function") {
+                      scene.startNextHalfCourtOffense();
+                    }
+                  }
+                }
+              }
             }
           }
         }
@@ -1052,8 +1109,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
     }
   }
 
-  // Process additional events (e.g., putback attempts)
-  if (!scene.skipToEnd && Array.isArray(turnData.events)) {
+  if (!eventsProcessed && !scene.skipToEnd && Array.isArray(turnData.events)) {
     for (const evt of turnData.events) {
       if (scene.skipToEnd) break;
       if (evt.event_type === "PUTBACK_ATTEMPT") {
