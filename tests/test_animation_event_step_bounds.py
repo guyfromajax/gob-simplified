@@ -42,3 +42,16 @@ def test_capture_halfcourt_animation_event_step_bounds():
     }
     # event_step truncates steps to one element; ensure no IndexError
     animator.capture_halfcourt_animation(roles, event_step=0)
+
+
+def test_capture_halfcourt_animation_no_steps_returns_empty():
+    gm = _build_game()
+    animator = Animator(gm)
+    pg = gm.home_team.lineup['PG']
+    roles = {
+        'shooter': pg,
+        'ball_handler': pg,
+        'steps': [],
+        'action_timeline': {pg: [(0, 'handle_ball', 'key')]},
+    }
+    assert animator.capture_halfcourt_animation(roles) == []
