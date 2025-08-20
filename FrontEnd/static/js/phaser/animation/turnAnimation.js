@@ -799,8 +799,9 @@ async function runFastBreakSequence({ scene, turnData, playerSprites, ballSprite
         arc: { height: arcHeight }
       });
       if (turnData.result_type === "MAKE") {
+        const rimHoldMs = animationConfig.fastBreak?.rimHoldMs ?? 2000;
         await new Promise((resolve) =>
-          scene.time.delayedCall(1000, resolve)
+          scene.time.delayedCall(rimHoldMs, resolve)
         );
         const newOffenseSide =
           shooterSprite.team === "home" ? "away" : "home";
