@@ -10,6 +10,7 @@ from BackEnd.utils.shared_defense import (
 from collections import defaultdict
 from BackEnd.constants import HCO_STRING_SPOTS, ACTIONS, RIM_COORDS, TOP_KEY_COORDS
 import random
+import logging
 
 class Animator:
     def __init__(self, game):
@@ -300,12 +301,17 @@ class Animator:
 
         steps = roles["steps"]
         action_timeline = roles["action_timeline"]
-        print(f"[DEBUG] action_timeline: {action_timeline}")
+        logging.debug("action_timeline: %s", action_timeline)
         shooter = roles["shooter"]
         ball_handler = roles["ball_handler"]
 
         if event_step is not None:
             steps = steps[:event_step + 1]
+
+        if not steps:
+            logging.warning("capture_halfcourt_animation: no steps provided")
+            self.latest_packet = []
+            return []
 
         animations = []
 
@@ -338,16 +344,32 @@ class Animator:
 
         for idx, owner in enumerate(ball_owner_by_step):
             if owner is None:
-                print(f"[WARN] No ball owner detected for step {idx}")
+                logging.warning("No ball owner detected for step %d", idx)
 
         for pos, player in off_lineup.items():
             timeline = action_timeline.get(player, [])
-            print("Inside capture_halfcourt_animation")
-            print(f"[DEBUG] timeline for {pos}: {timeline}")
+            logging.debug("Inside capture_halfcourt_animation")
+            logging.debug("timeline for %s: %s", pos, timeline)
             if not timeline:
                 continue
 
-            hasBallAtStep = [ball_owner_by_step[i] is player for i in range(len(timeline))]
+            logging.debug(
+                "capture_halfcourt_animation: %s timeline=%d ball_owner_steps=%d",
+                pos,
+                len(timeline),
+                len(ball_owner_by_step),
+            )
+
+            max_steps = min(len(timeline), len(ball_owner_by_step))
+            if max_steps == 0:
+                logging.warning(
+                    "capture_halfcourt_animation: %s timeline has no matching steps",
+                    pos,
+                )
+                continue
+
+            timeline = timeline[:max_steps]
+            hasBallAtStep = [ball_owner_by_step[i] is player for i in range(max_steps)]
 
             timeline.sort(key=lambda tup: tup[0])
             first_spot = timeline[0][2]
@@ -409,7 +431,7 @@ class Animator:
                 o_coords = HCO_STRING_SPOTS.get(last_spot, HCO_STRING_SPOTS["key"])
                 def_coords = assign_non_bh_defender_coords(o_coords, ball_handler_end_coords, aggression_call, is_away_offense)
             else:
-                print(f"[WARN] No offensive match for defender {pos}, skipping.")
+                logging.warning("No offensive match for defender %s, skipping.", pos)
                 continue
 
             start = getattr(defender, "coords", {"x": 25, "y": 50})
@@ -521,7 +543,7 @@ class Animator:
 
 
         self.latest_packet = animations
-        print(f"[DEBUG] Generated {len(animations)} animations")
+        logging.debug("Generated %d animations", len(animations))
 
         return animations
 
