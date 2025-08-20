@@ -65,7 +65,13 @@ await runFreeThrowSequence(sceneHome, {
     offense_team_id: 'HOME',
     shooter_id: 'pg',
     shooter_pos: 'PG',
-    attempts: ['MAKE']
+    attempts: ['MAKE'],
+    animations: [
+      { playerId: 'pg', movement: [ { timestamp:0, coords:{x:0,y:0} }, { timestamp:800, coords:{x:74,y:25} } ], duration:800 },
+      { playerId: 'sg', movement: [ { timestamp:0, coords:{x:0,y:0} }, { timestamp:800, coords:{x:56,y:44} } ], duration:800 },
+      { playerId: 'pgA', movement: [ { timestamp:0, coords:{x:0,y:0} }, { timestamp:800, coords:{x:54,y:37} } ], duration:800 },
+      { playerId: 'ball', movement: [ { timestamp:0, coords:{x:74,y:25} }, { timestamp:500, coords:{x:91,y:25} } ], duration:500 }
+    ]
   },
   helpers: {
     tweenBallTo: (scene, ball, target, opts) => { arcHeight = opts.arc.height; ball.x = target.x; ball.y = target.y; return Promise.resolve(); },
@@ -103,7 +109,11 @@ await runFreeThrowSequence(sceneAway, {
     offense_team_id: 'AWAY',
     shooter_id: 'pgA',
     shooter_pos: 'PG',
-    attempts: ['MISS']
+    attempts: ['MISS'],
+    animations: [
+      { playerId: 'pgA', movement: [ { timestamp:0, coords:{x:0,y:0} }, { timestamp:800, coords:{x:27,y:25} } ], duration:800 },
+      { playerId: 'ball', movement: [ { timestamp:0, coords:{x:27,y:25} }, { timestamp:500, coords:{x:9,y:25} } ], duration:500 }
+    ]
   },
   helpers: {
     tweenBallTo: (scene, ball, target, opts) => Promise.resolve(),
