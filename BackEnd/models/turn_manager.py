@@ -153,13 +153,13 @@ class TurnManager:
         self.set_strategy_calls()
 
         print("*****RUN TURN*****")
-        print(f"offensive state: {self.game.game_state['offensive_state']}")
-        if self.game.game_state["offensive_state"] in ["HCO", "HALF_COURT"]:
+        state = self.game.game_state.get("offensive_state", "HCO")
+        print(f"offensive state: {state}")
+        if state in ["HCO", "HALF_COURT"]:
             print(f"{self.game.offense_team.name}: {self.game.game_state['current_playcall']}")
             print(f"{self.game.defense_team.name}: {self.game.game_state['defense_playcall']}")
 
         # STEP 3: Route based on offensive state
-        state = self.game.game_state["offensive_state"]
         if state == "FREE_THROW":
             result = self.resolve_free_throw()
         elif state == "FAST_BREAK":
