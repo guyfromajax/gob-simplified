@@ -40,7 +40,15 @@ function attachBallToPlayer(scene, ballSprite, playerSprite, opts = {}) {
         target: targetId
       });
     }
-    console.log(`ball:attach -> ${targetId}`);
+
+    const logPayload = {
+      type: "ballAttach",
+      shooterId: opts?.debugInfo?.shooterId ?? null,
+      reboundSpot: opts?.debugInfo?.reboundSpot ?? null,
+      playerId: targetId,
+      team: playerSprite?.team_id ?? playerSprite?.team ?? null
+    };
+    console.log("ball:attach", logPayload);
   }
 
   if (scene?.currentBallOwnerRef) {
@@ -212,6 +220,15 @@ export function shootBall({
             scene.game.config.width,
             scene.game.config.height
           );
+          if (SHOT_DEBUG) {
+            console.log("shot:miss", {
+              type: "miss",
+              shooterId,
+              reboundSpot: { x: bounceGridX, y: bounceGridY },
+              playerId: shooterId,
+              team: shooterTeamId
+            });
+          }
           scene.reboundInProgress = true;
           scene.rebounderId = null;
           scene.tweens.add({
@@ -353,7 +370,8 @@ export function animateRebound({
   playerSprites,
   animations,
   rebounderId,
-  ballSpot
+  ballSpot,
+  shooterId
 }) {
   if (!scene || !ballSprite || !ballSpot) return Promise.resolve();
   if (scene?.ftInProgress) return Promise.resolve();
@@ -377,7 +395,13 @@ export function animateRebound({
   const rebounderSprite = playerSprites[rebounderId];
   if (REBOUND_DEBUG) {
     const team = rebounderSprite?.team_id ?? rebounderSprite?.team;
-    console.log("reb:event", { team, playerId: rebounderId });
+    console.log("reb:event", {
+      type: "rebound",
+      shooterId,
+      reboundSpot: ballSpot,
+      playerId: rebounderId,
+      team
+    });
   }
   if (rebounderSprite) {
     const teamId = rebounderSprite.team_id;
@@ -393,7 +417,9 @@ export function animateRebound({
           duration: rebCfg.playerMoveMs,
           ease: "Linear",
           onComplete: () => {
-            attachBallToPlayer(scene, ballSprite, rebounderSprite);
+            attachBallToPlayer(scene, ballSprite, rebounderSprite, {
+              debugInfo: { shooterId, reboundSpot: ballSpot }
+            });
             scene.offenseTeamId = rebounderSprite.team_id;
             scene.events?.emit("possessionChange", {
               offenseTeamId: rebounderSprite.team_id

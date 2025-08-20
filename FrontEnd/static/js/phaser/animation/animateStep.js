@@ -12,6 +12,8 @@ import { gridToPixels } from "../utils/gridToPixels.js";
  */
 import { PASS_DEBUG } from "./ballTween.js";
 
+export const PLAYER_TWEEN_DEBUG = false;
+
 export function animateStep({ scene, sprite, step, duration, ballSprite, currentBallOwnerRef, onAction }) {
   if (scene.skipToEnd) return Promise.resolve();
   return new Promise((resolve) => {
@@ -31,6 +33,16 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
       duration,
       ease: "Linear",
       onStart: async () => {
+        if (PLAYER_TWEEN_DEBUG) {
+          const team = sprite?.team_id ?? sprite?.team ?? null;
+          console.log("player:tweenStart", {
+            type: "playerTweenStart",
+            shooterId: null,
+            reboundSpot: null,
+            playerId: sprite?.playerId ?? null,
+            team
+          });
+        }
         if (step.action && onAction) {
           if (PASS_DEBUG && step.action === 'pass') {
             console.log('passStart', { fromId: sprite?.playerId, timestamp: step.timestamp });
