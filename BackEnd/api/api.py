@@ -197,7 +197,8 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest):
                     away = saved.get("away_team") or saved.get("awayTeam", {}).get("name")
                     if home and away:
                         gm = GameManager(home, away)
-                        gm.game_state = saved.get("game_state", {})
+                        gm.game_state = gm._init_game_state()
+                        gm.game_state.update(saved.get("game_state", {}))
                         gm.quarter = saved.get("quarter", 1)
                         ongoing_games[game_id] = gm
                 except Exception:
