@@ -10,6 +10,7 @@ from BackEnd.utils.shared_defense import (
 from collections import defaultdict
 from BackEnd.constants import HCO_STRING_SPOTS, ACTIONS, RIM_COORDS, TOP_KEY_COORDS
 import random
+import logging
 
 class Animator:
     def __init__(self, game):
@@ -347,7 +348,16 @@ class Animator:
             if not timeline:
                 continue
 
-            hasBallAtStep = [ball_owner_by_step[i] is player for i in range(len(timeline))]
+            logging.debug(
+                "capture_halfcourt_animation: %s timeline=%d ball_owner_steps=%d",
+                pos,
+                len(timeline),
+                len(ball_owner_by_step),
+            )
+
+            max_steps = min(len(timeline), len(ball_owner_by_step))
+            timeline = timeline[:max_steps]
+            hasBallAtStep = [ball_owner_by_step[i] is player for i in range(max_steps)]
 
             timeline.sort(key=lambda tup: tup[0])
             first_spot = timeline[0][2]
