@@ -408,6 +408,14 @@ export function animateRebound({
     scene.offenseTeamId = teamId;
     scene.events?.emit?.("possessionChange", { offenseTeamId: teamId });
     finalPositions.push({ playerId: rebounderId, grid: { ...ballSpot } });
+    if (REBOUND_DEBUG) {
+      console.log("reb:moveStart", {
+        playerId: rebounderId,
+        from: { x: rebounderSprite.x, y: rebounderSprite.y },
+        to: { x: spotPx.x, y: spotPx.y },
+        duration: rebCfg.playerMoveMs
+      });
+    }
     promises.push(
       new Promise((resolve) => {
         scene.tweens.add({
@@ -417,6 +425,13 @@ export function animateRebound({
           duration: rebCfg.playerMoveMs,
           ease: "Linear",
           onComplete: () => {
+            if (REBOUND_DEBUG) {
+              console.log("reb:moveEnd", {
+                playerId: rebounderId,
+                x: spotPx.x,
+                y: spotPx.y
+              });
+            }
             attachBallToPlayer(scene, ballSprite, rebounderSprite, {
               debugInfo: { shooterId, reboundSpot: ballSpot }
             });
