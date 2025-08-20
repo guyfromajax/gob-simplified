@@ -1,62 +1,5 @@
 import { gridToPixels } from "../utils/gridToPixels.js";
 import animationConfig from "./animation_config.js";
-import { HOME_RIM_COORDS, AWAY_RIM_COORDS } from "./courtConstants.js";
-
-const positionList = ["PG", "SG", "SF", "PF", "C"];
-
-const HOME = {
-  shooterSpot: { x: 74, y: 25 },
-  offenseAlignList: [
-    { x: 56, y: 44 },
-    { x: 80, y: 32 },
-    { x: 86, y: 19 },
-    { x: 86, y: 32 },
-  ],
-  dDestinationDict: {
-    PG: { x: 54, y: 37 },
-    SG: { x: 83, y: 32 },
-    SF: { x: 83, y: 19 },
-    PF: { x: 89, y: 32 },
-    C: { x: 89, y: 19 },
-  },
-  rim: HOME_RIM_COORDS,
-};
-
-const AWAY = {
-  shooterSpot: { x: 27, y: 25 },
-  offenseAlignList: [
-    { x: 45, y: 44 },
-    { x: 20, y: 32 },
-    { x: 14, y: 19 },
-    { x: 14, y: 32 },
-  ],
-  dDestinationDict: {
-    PG: { x: 47, y: 37 },
-    SG: { x: 17, y: 32 },
-    SF: { x: 17, y: 19 },
-    PF: { x: 11, y: 32 },
-    C: { x: 11, y: 19 },
-  },
-  rim: AWAY_RIM_COORDS,
-};
-
-export function buildDestinations(offenseIsHome, shooterPos) {
-  const cfg = offenseIsHome ? HOME : AWAY;
-  const shooterSpot = cfg.shooterSpot;
-  const oDestinationDict = {};
-  oDestinationDict[shooterPos] = shooterSpot;
-  const positionListMinusShooter = positionList.filter((p) => p !== shooterPos);
-  for (let i = 0; i < positionListMinusShooter.length; i++) {
-    const pos = positionListMinusShooter[i];
-    oDestinationDict[pos] = cfg.offenseAlignList[i];
-  }
-  return {
-    oDestinations: oDestinationDict,
-    dDestinations: cfg.dDestinationDict,
-    shooterSpot,
-    rim: cfg.rim,
-  };
-}
 
 function wait(scene, ms) {
   if (!ms) return Promise.resolve();
@@ -97,131 +40,85 @@ export async function runFreeThrowSequence(
     scene.tweens.killTweensOf(ballSprite);
   }
 
-  const offenseIsHome = (() => {
-    const shooterSprite = playerSprites[turnData.shooter_id];
-    if (shooterSprite?.team) return shooterSprite.team === "home";
-    if (turnData.offense_team_id && scene.simData) {
-      return turnData.offense_team_id === scene.simData.home_team_id;
-    }
-    return true;
-  })();
-
-  const { oDestinations, dDestinations, shooterSpot, rim } = buildDestinations(
-    offenseIsHome,
-    turnData.shooter_pos
-  );
-
-  scene.events?.emit("ft:start", {
-    team: offenseIsHome ? "home" : "away",
-    shooter: turnData.shooter_id,
-    oDestinations,
-    dDestinations,
-  });
-
+  const animations = turnData.animations || [];
+  const playerAnims = animations.filter((a) => a.playerId !== "ball");
+  const ballAnim = animations.find((a) => a.playerId === "ball");
   const width = scene.game.config.width;
   const height = scene.game.config.height;
 
-  const shooterSprite = playerSprites[turnData.shooter_id];
-
   if (!turnData.no_lane) {
     const promises = [];
-    for (const [id, sprite] of Object.entries(playerSprites)) {
-      const info = scene.playerInfo?.[id];
-      if (!info) continue;
-      const dest =
-        info.team_id === turnData.offense_team_id
-          ? oDestinations[info.pos]
-          : dDestinations[info.pos];
-      if (!dest) continue;
-      const px = gridToPixels(dest.x, dest.y, width, height);
+    for (const anim of playerAnims) {
+      const sprite = playerSprites[anim.playerId];
+      const end = anim.movement?.[1]?.coords;
+      if (!sprite || !end) continue;
+      const px = gridToPixels(end.x, end.y, width, height);
       promises.push(
         new Promise((resolve) => {
           scene.tweens.add({
             targets: sprite,
             x: px.x,
             y: px.y,
-            duration: animationConfig.freeThrow.lineupMoveMs,
+            duration: anim.duration || animationConfig.freeThrow.lineupMoveMs,
             ease: "Linear",
-            onStart: () =>
-              scene.events?.emit("ft:tweenStart", {
-                playerId: id,
-                x: px.x,
-                y: px.y,
-              }),
-            onComplete: () => {
-              scene.events?.emit("ft:tweenEnd", {
-                playerId: id,
-                x: px.x,
-                y: px.y,
-              });
-              resolve();
-            },
-            onStop: () => {
-              scene.events?.emit("ft:tweenEnd", {
-                playerId: id,
-                x: px.x,
-                y: px.y,
-              });
-              resolve();
-            },
+            onComplete: resolve,
+            onStop: resolve,
           });
         })
       );
     }
     await Promise.all(promises);
-  } else if (shooterSprite) {
-    const spotPx = gridToPixels(shooterSpot.x, shooterSpot.y, width, height);
-    await new Promise((resolve) => {
-      scene.tweens.add({
-        targets: shooterSprite,
-        x: spotPx.x,
-        y: spotPx.y,
-        duration: animationConfig.freeThrow.lineupMoveMs,
-        ease: "Linear",
-        onStart: () =>
-          scene.events?.emit("ft:tweenStart", {
-            playerId: turnData.shooter_id,
-            x: spotPx.x,
-            y: spotPx.y,
-          }),
-        onComplete: () => {
-          scene.events?.emit("ft:tweenEnd", {
-            playerId: turnData.shooter_id,
-            x: spotPx.x,
-            y: spotPx.y,
-          });
-          resolve();
-        },
-        onStop: () => {
-          scene.events?.emit("ft:tweenEnd", {
-            playerId: turnData.shooter_id,
-            x: spotPx.x,
-            y: spotPx.y,
-          });
-          resolve();
-        },
+  } else {
+    const shooterAnim = playerAnims.find(
+      (a) => a.playerId === turnData.shooter_id
+    );
+    const sprite = playerSprites[turnData.shooter_id];
+    const end = shooterAnim?.movement?.[1]?.coords;
+    if (sprite && end) {
+      const px = gridToPixels(end.x, end.y, width, height);
+      await new Promise((resolve) => {
+        scene.tweens.add({
+          targets: sprite,
+          x: px.x,
+          y: px.y,
+          duration: shooterAnim.duration || animationConfig.freeThrow.lineupMoveMs,
+          ease: "Linear",
+          onComplete: resolve,
+          onStop: resolve,
+        });
       });
-    });
+    }
   }
 
-  if (shooterSprite) {
-    attach(scene, ballSprite, shooterSprite);
-  }
+  const shooterSprite = playerSprites[turnData.shooter_id];
+  if (shooterSprite) attach(scene, ballSprite, shooterSprite);
   scene.events?.emit("ft:lineupComplete", {});
 
   const attempts = turnData.attempts || [];
+  const moves = ballAnim?.movement || [];
+  let moveIndex = 1;
+
   for (let i = 0; i < attempts.length; i++) {
     const result = attempts[i];
     scene.events?.emit("ft:attempt", { attempt: i + 1, total: attempts.length });
     await wait(scene, animationConfig.freeThrow.shooterPrepMs);
     detach(scene, ballSprite);
-    const rimPx = gridToPixels(rim.x, rim.y, width, height);
+
+    const shotStep = moves[moveIndex];
+    moveIndex++;
+    const rimPx = gridToPixels(
+      shotStep.coords.x,
+      shotStep.coords.y,
+      width,
+      height
+    );
     scene.events?.emit("ft:shotStart");
     await tween(scene, ballSprite, rimPx, {
       duration: animationConfig.freeThrow.shotMs,
       easing: "Sine.easeInOut",
       arc: { height: animationConfig.freeThrow.arcHeight },
     });
+
     scene.events?.emit(result === "MAKE" ? "ft:make" : "ft:miss");
     await wait(scene, animationConfig.freeThrow.rimHoldMs);
     scene.events?.emit("ft:rimHoldEnd");
@@ -237,17 +134,22 @@ export async function runFreeThrowSequence(
       }
       if (isLast) {
         scene.ftInProgress = false;
-        const newOffenseSide = offenseIsHome ? "away" : "home";
+        const newOffenseSide =
+          turnData.offense_team_id === scene.simData?.home_team_id
+            ? "away"
+            : "home";
         await inboundSetup({
           scene,
           ballSprite,
           playerSprites,
           newOffenseSide,
         });
-      } else if (shooterSprite) {
+      } else {
+        const resetStep = moves[moveIndex];
+        moveIndex++;
         const spotPx = gridToPixels(
-          shooterSpot.x,
-          shooterSpot.y,
+          resetStep.coords.x,
+          resetStep.coords.y,
           width,
           height
         );
@@ -255,7 +157,7 @@ export async function runFreeThrowSequence(
           duration: animationConfig.freeThrow.shotMs,
           easing: "Sine.easeInOut",
         });
-        attach(scene, ballSprite, shooterSprite);
+        if (shooterSprite) attach(scene, ballSprite, shooterSprite);
       }
     } else {
       if (isLast) {
@@ -266,13 +168,15 @@ export async function runFreeThrowSequence(
           playerSprites,
           animations: [],
           rebounderId: null,
-          ballSpot: rim,
-          shooterId: turnData.shooter_id
+          ballSpot: shotStep.coords,
+          shooterId: turnData.shooter_id,
         });
-      } else if (shooterSprite) {
+      } else {
+        const resetStep = moves[moveIndex];
+        moveIndex++;
         const spotPx = gridToPixels(
-          shooterSpot.x,
-          shooterSpot.y,
+          resetStep.coords.x,
+          resetStep.coords.y,
           width,
           height
         );
@@ -280,7 +184,7 @@ export async function runFreeThrowSequence(
           duration: animationConfig.freeThrow.shotMs,
           easing: "Sine.easeInOut",
         });
-        attach(scene, ballSprite, shooterSprite);
+        if (shooterSprite) attach(scene, ballSprite, shooterSprite);
       }
     }
     scene.events?.emit("ft:repeatOrExit");
@@ -291,3 +195,4 @@ export async function runFreeThrowSequence(
 }
 
 export default runFreeThrowSequence;
+
