@@ -7,6 +7,8 @@ export const config = {
   lineSpacing: '1em',
 };
 
+export const TEXT_SCROLL_DEBUG = false;
+
 export function appendToTextScroll(message, cfg = {}) {
   if (!message) return;
   const globalCfg =
@@ -25,7 +27,9 @@ export function appendToTextScroll(message, cfg = {}) {
     return;
   }
 
-  console.debug('textScroll:append', message.slice(0, 40));
+  if (TEXT_SCROLL_DEBUG) {
+    console.debug('textScroll:append', message.slice(0, 40));
+  }
 
   const appendLine = () => {
     const atTop = autoScroll && container.scrollTop === 0;
@@ -47,7 +51,9 @@ export function appendToTextScroll(message, cfg = {}) {
     }
 
     if (autoScroll && atTop) {
-      console.debug('textScroll:autoScroll', message.length);
+      if (TEXT_SCROLL_DEBUG) {
+        console.debug('textScroll:autoScroll', message.length);
+      }
       requestAnimationFrame(() =>
         container.scrollTo({
           top: 0,
@@ -56,7 +62,16 @@ export function appendToTextScroll(message, cfg = {}) {
       );
     }
 
-    console.log('textScroll:append', line.textContent.slice(0, 40));
+    if (TEXT_SCROLL_DEBUG) {
+      const logPayload = {
+        type: 'textScroll',
+        shooterId: null,
+        reboundSpot: null,
+        playerId: null,
+        team: null
+      };
+      console.log('textScroll:update', logPayload);
+    }
   };
 
   const heavyUpdate = container.children.length > maxLines + 20;

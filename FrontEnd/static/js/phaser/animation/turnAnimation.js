@@ -750,7 +750,8 @@ async function runFastBreakSequence({ scene, turnData, playerSprites, ballSprite
             turnData.rebounder_player_id ||
             turnData.rebounderId ||
             turnData.rebounder_id,
-          ballSpot: turnData.ballSpot || turnData.ball_spot
+          ballSpot: turnData.ballSpot || turnData.ball_spot,
+          shooterId: turnData.shooterId || turnData.shooter_id
         });
       }
     }
@@ -947,7 +948,9 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
                 duration: rebCfg.playerMoveMs,
                 ease: "Linear",
                 onComplete: () => {
-                  attachBallToPlayer(scene, ballSprite, rebounderSprite);
+                  attachBallToPlayer(scene, ballSprite, rebounderSprite, {
+                    debugInfo: { shooterId: shotInfo?.playerId ?? null, reboundSpot: ballSpot }
+                  });
                   scene.offenseTeamId = rebounderSprite.team_id;
                   scene.events?.emit?.("possessionChange", {
                     offenseTeamId: rebounderSprite.team_id
@@ -978,7 +981,9 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
         const shooterId = evt.shooterId;
         const rebounderSprite = playerSprites[shooterId];
         if (!rebounderSprite) continue;
-        attachBallToPlayer(scene, ballSprite, rebounderSprite);
+        attachBallToPlayer(scene, ballSprite, rebounderSprite, {
+          debugInfo: { shooterId, reboundSpot: evt.rebound?.ballSpot || null }
+        });
         const rimCoords =
           rebounderSprite.team === "home" ? HOME_RIM_COORDS : AWAY_RIM_COORDS;
         const putbackResult = await animatePutbackAttempt(
@@ -997,7 +1002,8 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
             animations: evt.rebound.animations || turnData.animations,
             rebounderId:
               evt.rebound.rebounder_player_id || evt.rebound.rebounderId,
-            ballSpot: putbackResult?.grid || evt.rebound.ballSpot
+            ballSpot: putbackResult?.grid || evt.rebound.ballSpot,
+            shooterId: evt.shooterId
           });
         }
       } else if (evt.event_type === "KICKOUT_RESET") {

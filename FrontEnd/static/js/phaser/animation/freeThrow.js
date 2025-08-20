@@ -267,6 +267,7 @@ export async function runFreeThrowSequence(
           animations: [],
           rebounderId: null,
           ballSpot: rim,
+          shooterId: turnData.shooter_id
         });
       } else if (shooterSprite) {
         const spotPx = gridToPixels(
