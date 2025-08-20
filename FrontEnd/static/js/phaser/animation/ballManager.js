@@ -265,8 +265,9 @@ export function animatePutbackAttempt(
   ballSprite,
   shooterId,
   rimCoords,
-  duration = 500,
-  result
+  duration = animationConfig.putback.duration,
+  result,
+  easing = animationConfig.putback.easing
 ) {
   if (!scene || !ballSprite) return Promise.resolve();
   if (scene?.ftInProgress) return Promise.resolve();
@@ -291,7 +292,7 @@ export function animatePutbackAttempt(
       x: rim.x,
       y: rim.y,
       duration,
-      ease: "Sine.easeInOut",
+      ease: easing,
       onComplete: () => {
         const handleComplete = async () => {
           if (result === "MAKE") {
