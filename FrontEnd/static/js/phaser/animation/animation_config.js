@@ -42,7 +42,8 @@ const defaults = {
     passMs: 250,
     shotMs: 500,
     arcHeight: 60,
-    rimHoldMs: 800,
+    // Time to hold the ball at the rim after a made fast break shot
+    rimHoldMs: 2000,
   },
 };
 
