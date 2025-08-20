@@ -331,6 +331,15 @@ class Animator:
         # Determine which offensive player has the ball at each step
         ball_actions = {"handle_ball", "receive", "shoot"}
         ball_owner_by_step = []
+        # Map all players by their ID for quick lookup on events
+        players_by_id = {
+            getattr(p, "player_id", str(id(p))): p for p in off_lineup.values()
+        }
+        players_by_id.update(
+            {getattr(p, "player_id", str(id(p))): p for p in def_lineup.values()}
+        )
+
+        rebounder = None
         for step in steps:
             owner = None
             for pos_key, action_info in step["pos_actions"].items():
@@ -347,7 +356,20 @@ class Animator:
                         owner = off_lineup.get(event.get("by"))
                         if owner:
                             break
+                    elif event.get("event_type") in {"offReb", "defReb"}:
+                        owner = players_by_id.get(event.get("rebounderId"))
+                        rebounder = owner or rebounder
+                        if owner:
+                            break
             ball_owner_by_step.append(owner)
+
+        # Extend ball ownership to cover any additional timeline steps
+        max_timeline_len = max(
+            [len(tl) for tl in action_timeline.values()] + [len(ball_owner_by_step)]
+        )
+        if len(ball_owner_by_step) < max_timeline_len:
+            filler = rebounder or (ball_owner_by_step[-1] if ball_owner_by_step else None)
+            ball_owner_by_step.extend([filler] * (max_timeline_len - len(ball_owner_by_step)))
 
         for idx, owner in enumerate(ball_owner_by_step):
             if owner is None:
@@ -416,7 +438,7 @@ class Animator:
             def_coords = None
             action_type = ACTIONS["GUARD_OFFBALL"]
 
-            hasBallAtStep = [False for _ in ball_owner_by_step]
+            hasBallAtStep = [ball_owner_by_step[i] is defender for i in range(len(ball_owner_by_step))]
 
             if pos == bh_pos:
                 bh_timeline = action_timeline.get(ball_handler, [])
