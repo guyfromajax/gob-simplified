@@ -1,5 +1,6 @@
 import random
 from typing import TYPE_CHECKING
+from fastapi import HTTPException
 from BackEnd.utils.shared import (
     get_name_safe, 
     get_player_position,
@@ -83,16 +84,19 @@ def resolve_non_shooting_foul(roles, game):
     #     ball_handler = shooter
     
     if def_team.team_fouls >= 10:
+        game_state["offensive_state"] = "FREE_THROW"
         game_state["free_throws"] = 2
         game_state["free_throws_remaining"] = 2
         game_state["one_and_one"] = False
         game_state["last_ball_handler"] = ball_handler
+        game_state["shooter"] = ball_handler
     elif def_team.team_fouls >= 5:
         game_state["offensive_state"] = "FREE_THROW"
         game_state["free_throws"] = 2
         game_state["free_throws_remaining"] = 2
         game_state["one_and_one"] = True
         game_state["last_ball_handler"] = ball_handler
+        game_state["shooter"] = ball_handler
     else:
         game_state["offensive_state"] = "HCO"
         game_state["free_throws"] = 0
@@ -285,6 +289,8 @@ def resolve_fast_break_logic(game: "GameManager"):
 def resolve_free_throw_logic(game):
     game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
     shooter = game_state.get("shooter") or game_state.get("last_ball_handler")
+    if shooter is None:
+        raise HTTPException(status_code=400, detail="No shooter set for free throw")
     attrs = shooter.attributes
 
     # FT outcome calculation
