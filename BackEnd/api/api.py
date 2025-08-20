@@ -195,12 +195,16 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest):
             detail=f"Quarter mismatch. Expected {gm.quarter}, got {request.quarter}",
         )
 
-    simulate_quarter(
-        gm,
-        request.home_lineup,
-        request.away_lineup,
-        game_id,
-    )
+    try:
+        simulate_quarter(
+            gm,
+            request.home_lineup,
+            request.away_lineup,
+            game_id,
+        )
+    except ValueError as e:
+        print(f"🚨 simulate_quarter lineup error: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
 
     summary = summarize_game_state(gm)
     summary["start_box_score"] = gm.game_state.get("start_box_score")
