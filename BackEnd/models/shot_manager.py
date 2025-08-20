@@ -179,6 +179,11 @@ class ShotManager:
                         text += f" {get_name_safe(rebounder)} kicks it out to reset." 
                         possession_flips = rebound_event.get("possession_flips", possession_flips)
                 else:
+                    events.append({
+                        "event_type": "defReb",
+                        "rebounderId": getattr(rebounder, "player_id", None),
+                    })
+                    self.game.turn_manager.logger.log("defReb")
                     self.game_state["last_rebounder"] = rebounder
                     self.game_state["offensive_state"] = (
                         "FAST_BREAK" if random.random() < get_fast_break_chance(self.game) else "HCO"
