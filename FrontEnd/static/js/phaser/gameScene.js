@@ -80,7 +80,19 @@ export function createGameScene(Phaser) {
 
 
       if (!res.ok) {
-        console.error("❌ Failed to fetch sim data:", res.statusText);
+        let errorMessage;
+        try {
+          const errData = await res.clone().json();
+          errorMessage = errData.detail || errData.message || errData.error || JSON.stringify(errData);
+        } catch {
+          try {
+            errorMessage = await res.text();
+          } catch {
+            errorMessage = res.statusText;
+          }
+        }
+        console.error("❌ Failed to fetch sim data:", errorMessage);
+        appendToTextScroll(`❌ ${errorMessage}`);
         return;
       }
 
