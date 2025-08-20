@@ -210,6 +210,76 @@ async function runSideInboundSetup({ scene, ballSprite, playerSprites, turnData 
   }
 }
 
+// Setup positions after a defensive rebound before new half-court offense
+async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebounderId }) {
+  if (!scene || !playerSprites || rebounderId == null) return;
+
+  const rebounderSprite = playerSprites[rebounderId];
+  if (!rebounderSprite) return;
+
+  scene.possessionFlipInProgress = true;
+  if (ballSprite) attachBallToPlayer(scene, ballSprite, rebounderSprite);
+
+  const basketGrid =
+    rebounderSprite.team === "home" ? HOME_RIM_COORDS : AWAY_RIM_COORDS;
+  const width = scene.game.config.width;
+  const height = scene.game.config.height;
+
+  const rebGridX = (rebounderSprite.x / width) * 100;
+  const rebGridY = 50 - (rebounderSprite.y / height) * 50;
+
+  let pgId = null;
+  for (const [id, info] of Object.entries(scene.playerInfo || {})) {
+    if (
+      info.pos === "PG" &&
+      String(info.team_id) === String(rebounderSprite.team_id)
+    ) {
+      pgId = id;
+      break;
+    }
+  }
+
+  if (pgId && pgId !== rebounderId) {
+    const pgSprite = playerSprites[pgId];
+    if (pgSprite) {
+      const sign = basketGrid.x > rebGridX ? 1 : -1;
+      const targetGrid = {
+        x: rebGridX + sign * Phaser.Math.Between(3, 9),
+        y: rebGridY + Phaser.Math.Between(-6, 6)
+      };
+      if (sign > 0) targetGrid.x = Math.min(targetGrid.x, basketGrid.x - 1);
+      else targetGrid.x = Math.max(targetGrid.x, basketGrid.x + 1);
+      targetGrid.y = Math.max(0, Math.min(50, targetGrid.y));
+      const pgPx = gridToPixels(targetGrid.x, targetGrid.y, width, height);
+      tweenPlayerTo(scene, pgSprite, pgPx, { duration: 2000 });
+    }
+  }
+
+  for (const [id, sprite] of Object.entries(playerSprites)) {
+    const info = scene.playerInfo?.[id];
+    if (!info || id === rebounderId || id === pgId) continue;
+    const sameTeam = String(info.team_id) === String(rebounderSprite.team_id);
+    const offset = Phaser.Math.Between(
+      sameTeam ? 20 : 5,
+      sameTeam ? 45 : 25
+    );
+    const sign = basketGrid.x > 50 ? -1 : 1;
+    const targetGrid = {
+      x: basketGrid.x + sign * offset,
+      y: Phaser.Math.Between(10, 40)
+    };
+    const targetPx = gridToPixels(targetGrid.x, targetGrid.y, width, height);
+    tweenPlayerTo(scene, sprite, targetPx, { duration: 2000 });
+  }
+
+  await new Promise((resolve) => scene.time.delayedCall(2000, resolve));
+
+  scene.possessionFlipInProgress = false;
+  if (typeof scene.startNextHalfCourtOffense === "function") {
+    scene.startNextHalfCourtOffense();
+  }
+}
+
 // Setup baseline inbound play after a made basket
 async function runInboundSetup({
   scene,
@@ -966,6 +1036,14 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
                 onStop: resolve
               });
             });
+            if (String(rebounderSprite.team_id) !== String(shooterTeamId)) {
+              await runDefensiveReboundSetup({
+                scene,
+                ballSprite,
+                playerSprites,
+                rebounderId
+              });
+            }
           }
         }
       }
@@ -1023,7 +1101,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   }
 }
 
-export { runInboundSetup, runSideInboundSetup, runFastBreakSequence };
+export { runInboundSetup, runSideInboundSetup, runFastBreakSequence, runDefensiveReboundSetup };
 
 if (typeof window !== "undefined") {
   window.playTurnAnimation = playTurnAnimation;
