@@ -92,6 +92,35 @@ def _initialize_game_stats(gm: GameManager, game_id: str | None = None) -> None:
     print(f"[DEV] Initialized game stats for players: {affected}")
 
 
+def _ensure_complete_lineup(team) -> None:
+    """Ensure a team has players at all required positions.
+
+    If any position from ``POSITION_LIST`` is missing, attempt to build a
+    complete lineup from the team's roster.  Raises ``ValueError`` when the
+    roster cannot supply the missing positions.
+    """
+
+    missing = [pos for pos in POSITION_LIST if not team.lineup.get(pos)]
+    if not missing:
+        return
+
+    try:
+        auto = build_lineup_from_mongo(team)
+    except ValueError as exc:
+        raise ValueError(
+            f"Team '{team.name}' lineup missing positions {missing}: {exc}"
+        ) from exc
+
+    for pos in POSITION_LIST:
+        team.lineup.setdefault(pos, auto[pos])
+
+    remaining = [pos for pos in POSITION_LIST if not team.lineup.get(pos)]
+    if remaining:
+        raise ValueError(
+            f"Team '{team.name}' lineup incomplete; missing positions: {remaining}"
+        )
+
+
 def simulate_quarter(
     gm: GameManager,
     home_lineup_ids=None,
@@ -120,6 +149,10 @@ def simulate_quarter(
         gm.away_team.lineup = assign_lineup_from_ids(gm.away_team, away_lineup_ids)
     elif not gm.away_team.lineup:
         gm.away_team.lineup = build_lineup_from_mongo(gm.away_team)
+
+    # Validate that both lineups contain all required positions
+    _ensure_complete_lineup(gm.home_team)
+    _ensure_complete_lineup(gm.away_team)
 
     # Zero per-game stats exactly once per game before the opening tip.
     _initialize_game_stats(gm, game_id)
