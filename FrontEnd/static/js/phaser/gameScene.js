@@ -60,7 +60,7 @@ export function createGameScene(Phaser) {
       const homeTeam = this.rosters.homeRoster.team_name;
       const awayTeam = this.rosters.awayRoster.team_name;
 
-    console.log("📨 Sending /api/simulate request for:", homeTeam, "vs", awayTeam);
+    console.log("📨 Sending /api/simulate-quarter request for:", homeTeam, "vs", awayTeam);
 
       const payload = { home_team: homeTeam, away_team: awayTeam };
       if (this.gameId) payload.game_id = this.gameId;
@@ -73,6 +73,10 @@ export function createGameScene(Phaser) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
       });
+      if (!this.constructor._loggedSimQuarter) {
+        console.debug("🛠️ /api/simulate-quarter payload keys:", Object.keys(payload), "response status:", res.status);
+        this.constructor._loggedSimQuarter = true;
+      }
 
 
       if (!res.ok) {
