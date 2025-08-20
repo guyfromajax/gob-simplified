@@ -45,6 +45,8 @@ const defaults = {
     // Time to hold the ball at the rim after a made fast break shot
     rimHoldMs: 2000,
   },
+  offensiveRebound: { pauseMs: 1000 },
+  putback: { duration: 500, easing: 'Sine.easeInOut' },
 };
 
 const overrides =
@@ -68,6 +70,11 @@ export const animationConfig = {
   },
   freeThrow: { ...defaults.freeThrow, ...(overrides.freeThrow || {}) },
   fastBreak: { ...defaults.fastBreak, ...(overrides.fastBreak || {}) },
+  offensiveRebound: {
+    ...defaults.offensiveRebound,
+    ...(overrides.offensiveRebound || {}),
+  },
+  putback: { ...defaults.putback, ...(overrides.putback || {}) },
 };
 
 export default animationConfig;
