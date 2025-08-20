@@ -1,3 +1,5 @@
+import pytest
+from fastapi import HTTPException
 from tests.test_utils import build_mock_game
 from BackEnd.engine.phase_resolution import resolve_free_throw_logic
 
@@ -43,3 +45,18 @@ def test_one_and_one_front_end_records_points_and_totals():
     assert shooter.stats["game"]["PTS"] == 1
     assert game.game_state["free_throws_remaining"] == 1
     assert game.game_state["one_and_one"] is False
+
+
+def test_missing_shooter_returns_400():
+    game = build_mock_game()
+    game.game_state.update({
+        "offensive_state": "FREE_THROW",
+        "free_throws_remaining": 1,
+        "shooter": None,
+        "last_ball_handler": None,
+    })
+
+    with pytest.raises(HTTPException) as excinfo:
+        resolve_free_throw_logic(game)
+
+    assert excinfo.value.status_code == 400
