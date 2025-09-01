@@ -5,8 +5,18 @@ import { finalizeGame } from './finalizeGame.js';
 import { emit } from './utils/eventBus.js';
 import { appendToTextScroll } from './utils/textScroll.js';
 
-const DEBUG_SIM_PAYLOAD = window.DEBUG_SIM_PAYLOAD || false;
-const DEBUG_TEAMS = window.DEBUG_TEAMS || false;
+const DEBUG_SIM_PAYLOAD =
+  (typeof window !== 'undefined' && window.DEBUG_SIM_PAYLOAD) ||
+  (typeof process !== 'undefined' && process.env.DEBUG_SIM_PAYLOAD) ||
+  false;
+const DEBUG_TEAMS =
+  (typeof window !== 'undefined' && window.DEBUG_TEAMS) ||
+  (typeof process !== 'undefined' && process.env.DEBUG_TEAMS) ||
+  false;
+const DEBUG_SERIALIZATION =
+  (typeof window !== 'undefined' && window.DEBUG_SERIALIZATION) ||
+  (typeof process !== 'undefined' && process.env.DEBUG_SERIALIZATION) ||
+  false;
 
 export function createGameScene(Phaser) {
   return class GameScene extends Phaser.Scene {
@@ -117,6 +127,16 @@ export function createGameScene(Phaser) {
       console.log("📦 simData received:", simData);
       const logHome = simData.homeTeam?.name || simData.home_team;
       const logAway = simData.awayTeam?.name || simData.away_team;
+      const homeId = simData.home_team_id || simData.homeTeam?.team_id;
+      const awayId = simData.away_team_id || simData.awayTeam?.team_id;
+      if (DEBUG_TEAMS) {
+        console.log('Resolved team IDs:', { home_team_id: homeId, away_team_id: awayId });
+        console.log('Team colors from simData:', {
+          mode: this.mode,
+          home: simData.home_team_colors,
+          away: simData.away_team_colors,
+        });
+      }
       this.gameId = simData.game_id || this.gameId;
       if (this.gameId && typeof localStorage !== 'undefined') {
         localStorage.setItem('game_id', this.gameId);
@@ -425,6 +445,9 @@ export function createGameScene(Phaser) {
           }, Phaser);
 
           const spriteKeys = Object.keys(this.playerSprites || {});
+          if (DEBUG_TEAMS) {
+            console.log('playerSprites keys:', spriteKeys);
+          }
           const turnIds = Array.from(new Set((simData.turns || []).flatMap(t => {
             const ids = [];
             if (t.playerId) ids.push(t.playerId);
@@ -437,7 +460,6 @@ export function createGameScene(Phaser) {
             }
             return ids;
           })));
-          console.log('playerSprites keys:', spriteKeys);
           console.log('IDs in turns:', turnIds);
 
           if (DEBUG_TEAMS) {
