@@ -5,7 +5,7 @@ from BackEnd.models.animator import Animator
 import random
 import json
 from BackEnd.db import players_collection, teams_collection
-from BackEnd.models.player import Player
+from BackEnd.models.player import Player, player_to_dict
 from collections import defaultdict
 from BackEnd.playcall_skeletons.inside_skeletons import INSIDE_SCENES
 from BackEnd.constants import ACTIONS
@@ -143,6 +143,16 @@ class TurnManager:
         # Increment micro turn counter
         self.game.micro_turn_count += 1
 
+        def convert_players(obj):
+            """Recursively replace Player objects with serializable dicts."""
+            if isinstance(obj, Player):
+                return player_to_dict(obj)
+            if isinstance(obj, list):
+                return [convert_players(x) for x in obj]
+            if isinstance(obj, dict):
+                return {k: convert_players(v) for k, v in obj.items()}
+            return obj
+
         # Snapshot player stats to compute deltas after the turn
         pre_stats = {}
         for team in (self.game.home_team, self.game.away_team):
@@ -199,9 +209,10 @@ class TurnManager:
                 )
             else:
                 result["animations"] = []  # No animation possible (e.g., free throw or turnover with no roles)
-
-
         result["possession_team_id"] = self.game.offense_team.team_id
+
+        if "roles" in result:
+            result["roles"] = convert_players(result["roles"])
 
         for key in [
             "ball_handler",
@@ -267,6 +278,8 @@ class TurnManager:
         result["clock"] = self.game.game_state["clock"]
         result["quarter"] = self.game.game_state["quarter"]
         result["period_label"] = self.game.game_state.get("period_label")
+        # Ensure no Player objects remain in the result payload
+        result = convert_players(result)
 
         print(f"inside run_micro_turn result: {result}")
         # print(f"result: {result}")
