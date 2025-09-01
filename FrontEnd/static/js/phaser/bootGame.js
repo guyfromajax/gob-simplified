@@ -78,6 +78,15 @@ if (
   }
 }
 let quarter = parseInt(urlParams.get('quarter'), 10) || 1;
+if (quarter === 1) {
+  gameId = null;
+  if (
+    typeof localStorage !== 'undefined' &&
+    typeof localStorage.removeItem === 'function'
+  ) {
+    localStorage.removeItem('game_id');
+  }
+}
 let periodLabel = urlParams.get('period') || `Q${quarter}`;
 
 const homeLineup = {};
