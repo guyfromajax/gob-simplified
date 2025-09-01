@@ -16,6 +16,10 @@ const DEBUG_SERIALIZATION =
   (typeof window !== 'undefined' && window.DEBUG_SERIALIZATION) ||
   (typeof process !== 'undefined' && process.env.DEBUG_SERIALIZATION) ||
   false;
+const DEBUG =
+  (typeof window !== 'undefined' && window.DEBUG) ||
+  (typeof process !== 'undefined' && process.env.DEBUG) ||
+  false;
 
 if (typeof window !== 'undefined') {
   window.TEXT_SCROLL_ENABLED =
@@ -164,6 +168,7 @@ async function fetchTeamRoster(teamName) {
 }
 
 async function startGame({ homeRoster, awayRoster, animate = true }) {
+  DEBUG && console.log('[bootGame] startGame', { quarter, animate });
   if (!game) {
     game = new Phaser.Game({
       type: Phaser.AUTO,
