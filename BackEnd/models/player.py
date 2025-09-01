@@ -109,6 +109,19 @@ class Player:
     def set_coords(self, x, y):
         self.coords = {"x": x, "y": y}
 
+
+def player_to_dict(player):
+    """Return a minimal serializable representation of a Player."""
+    if player is None:
+        return None
+    team = getattr(player, "team", None)
+    team_name = getattr(team, "name", team)
+    return {
+        "player_id": getattr(player, "player_id", None),
+        "name": getattr(player, "name", None),
+        "team": team_name,
+    }
+
     
     
 
