@@ -357,6 +357,23 @@ def unpack_game_context(game):
 def summarize_game_state(game):
 
     
+    def _collect_player_ids(obj, acc):
+        if isinstance(obj, dict):
+            for k, v in obj.items():
+                if k in ("playerId", "player_id"):
+                    if isinstance(v, list):
+                        acc.update(str(pid) for pid in v if pid is not None)
+                    elif v is not None:
+                        acc.add(str(v))
+                else:
+                    _collect_player_ids(v, acc)
+        elif isinstance(obj, list):
+            for item in obj:
+                _collect_player_ids(item, acc)
+
+    referenced_ids = set()
+    _collect_player_ids(game.turns, referenced_ids)
+
     players = []
     for team_key, team_obj in [("home", game.home_team), ("away", game.away_team)]:
         for pos, player in team_obj.lineup.items():
@@ -373,6 +390,57 @@ def summarize_game_state(game):
                 "x": coords.get("x", 0),
                 "y": coords.get("y", 0)
             })
+
+    included_ids = {p["playerId"] for p in players}
+    for pid in referenced_ids:
+        if pid in included_ids:
+            continue
+        player_obj = game.home_team.get_player_by_id(pid) or game.away_team.get_player_by_id(pid)
+        if player_obj:
+            team_key = "home" if game.home_team.get_player_by_id(pid) else "away"
+            team_obj = game.home_team if team_key == "home" else game.away_team
+            coords = getattr(player_obj, "coords", None) or {"x": 0, "y": 0}
+            players.append({
+                "playerId": player_obj.player_id,
+                "name": getattr(player_obj, "name", None) or f"{getattr(player_obj, 'first_name', '')} {getattr(player_obj, 'last_name', '')}".strip(),
+                "team": team_key,
+                "team_id": team_obj.team_id,
+                "pos": getattr(player_obj, "position", None) or getattr(player_obj, "pos", None),
+                "jersey": player_obj.jersey,
+                "primary_color": getattr(team_obj, "primary_color", "#000000"),
+                "secondary_color": getattr(team_obj, "secondary_color", "#ffffff"),
+                "x": coords.get("x", 0),
+                "y": coords.get("y", 0)
+            })
+        else:
+            players.append({
+                "playerId": pid,
+                "name": "",
+                "team": None,
+                "team_id": None,
+                "pos": None,
+                "jersey": None,
+                "primary_color": "#000000",
+                "secondary_color": "#ffffff",
+                "x": 0,
+                "y": 0,
+            })
+        included_ids.add(pid)
+
+    team_info = {
+        "home": {
+            "team_id": game.home_team.team_id,
+            "player_ids": [p["playerId"] for p in players if p["team"] == "home"],
+            "primary_color": game.home_team.primary_color,
+            "secondary_color": game.home_team.secondary_color,
+        },
+        "away": {
+            "team_id": game.away_team.team_id,
+            "player_ids": [p["playerId"] for p in players if p["team"] == "away"],
+            "primary_color": game.away_team.primary_color,
+            "secondary_color": game.away_team.secondary_color,
+        },
+    }
     print(f"Home team primary color: {game.home_team.primary_color}")
     print(f"Home team secondary color: {game.home_team.secondary_color}")
     print(f"Away team primary color: {game.away_team.primary_color}")
@@ -424,6 +492,7 @@ def summarize_game_state(game):
         },
         "score": game.score,
         "home_team_id": game.home_team.team_id,
+        "teamInfo": team_info,
         "players": players,
         "homeTeam": home_team_obj,
         "awayTeam": away_team_obj,
