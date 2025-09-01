@@ -176,7 +176,11 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest):
     if game_id:
         gm = ongoing_games.get(game_id)
         if gm is None:
-            logging.warning("simulate_quarter_endpoint unknown game_id: %s", game_id)
+            logging.warning(
+                "simulate_quarter_endpoint unknown game_id=%s; active=%s",
+                game_id,
+                list(ongoing_games.keys()),
+            )
             if games_collection is not None:
                 logging.info(
                     "simulate_quarter_endpoint querying DB for game_id=%s", game_id
