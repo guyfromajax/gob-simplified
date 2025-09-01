@@ -1096,8 +1096,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
                       ballSprite,
                       evt.rebounder_player_id || evt.rebounderId,
                       evt.pgId,
-                      evt.pass,
-                      evt.pass?.duration
+                      evt.pass
                     );
                     if (typeof scene.startNextHalfCourtOffense === "function") {
                       scene.startNextHalfCourtOffense();
@@ -1151,8 +1150,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
           ballSprite,
           evt.rebounder_player_id || evt.rebounderId,
           evt.pgId,
-          evt.pass,
-          evt.pass?.duration
+          evt.pass
         );
         if (typeof scene.startNextHalfCourtOffense === "function") {
           scene.startNextHalfCourtOffense();
