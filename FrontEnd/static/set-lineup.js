@@ -231,6 +231,7 @@ async function init() {
       if (DEBUG) {
         console.debug('🔀 Redirecting to court.html', { home: homeTeam, away: awayTeam, gameId });
       }
+      DEBUG && console.log('[lineup] launching quarter', quarter);
       window.location.href = `/court.html?${params.toString()}`;
     });
   }
