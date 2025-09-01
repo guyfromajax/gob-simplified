@@ -17,6 +17,12 @@ class Animator:
         self.game = game
         self.latest_packet = []
 
+    def _log_step_timestamps(self, animations):
+        for anim in animations:
+            movement = anim.get("movement", [])
+            timestamps = [step.get("timestamp") for step in movement]
+            logging.debug("Animator timestamps for %s: %s", anim.get("playerId"), timestamps)
+
     def capture_fast_break_animation(
         self,
         fb_roles,
@@ -121,7 +127,7 @@ class Animator:
         ]
         for o in non_bh_offense:
             build_movement(o, half_court_spot())
-
+        self._log_step_timestamps(animations)
         self.latest_packet = animations
         return animations
 
@@ -293,7 +299,7 @@ class Animator:
                 "duration": time,
             }
         )
-
+        self._log_step_timestamps(animations)
         self.latest_packet = animations
         return animations
 
@@ -571,6 +577,7 @@ class Animator:
         #     })
 
 
+        self._log_step_timestamps(animations)
         self.latest_packet = animations
         logging.debug("Generated %d animations", len(animations))
 
