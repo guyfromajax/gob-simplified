@@ -5,6 +5,11 @@ import animationConfig from "./animation_config.js";
 import runFreeThrowSequence from "./freeThrow.js";
 import runFastBreakSequence from "./fastBreak.js";
 
+const DEBUG_FLOW =
+  (typeof window !== 'undefined' && window.DEBUG_FLOW) ||
+  (typeof process !== 'undefined' && process.env.DEBUG_FLOW) ||
+  false;
+
 /**
  * Animate all turns from simData.turns using real backend structure.
  */
@@ -17,6 +22,16 @@ export async function animateGameTurns({ //hasBallAtStep
 }) {
   const turns = simData.turns || [];
   const allPlayers = simData.players || [];
+  if (DEBUG_FLOW) {
+    const stepCount = turns.reduce((acc, t) => {
+      const turnSteps = (t.animations || []).reduce(
+        (sum, a) => sum + (a.movement?.length || 0),
+        0
+      );
+      return acc + turnSteps;
+    }, 0);
+    console.log(`🟢 animateGameTurns start: ${turns.length} turns, ${stepCount} steps`);
+  }
 
   const handlePossessionFlip = (payload = {}) => {
     if (scene.fastBreakInProgress) return;
@@ -34,7 +49,7 @@ export async function animateGameTurns({ //hasBallAtStep
     const turn = turns[i];
     turn.index = i;
     if (scene.skipToEnd) break;
-    console.log(`🔁 Turn ${i + 1}`, turn);
+    if (DEBUG_FLOW) console.log(`🔁 Turn ${i + 1}`, turn);
 
     if (turn.result_type === "FREE_THROW") {
       await runFreeThrowSequence(scene, { playerSprites, ballSprite, turnData: turn, onUpdate });
@@ -90,7 +105,7 @@ export async function animateGameTurns({ //hasBallAtStep
       turnData: turn,
       ballSprite,
       onAction: async (action, sprite, timestamp) => {
-        console.log(`🎬 Action "${action}" fired at ${timestamp}ms for sprite:`, sprite);
+        if (DEBUG_FLOW) console.log(`🎬 Action "${action}" fired at ${timestamp}ms for sprite:`, sprite);
         onAction(action, sprite, timestamp);
 
         const playerId = Object.keys(playerSprites).find(
@@ -117,7 +132,7 @@ export async function animateGameTurns({ //hasBallAtStep
           );
 
           if (passStep && receiveStep && receiverAnim?.playerId != null) {
-            console.log("📤 Pass triggered");
+            if (DEBUG_FLOW) console.log("📤 Pass triggered");
             const receiverSprite = playerSprites[receiverAnim.playerId];
             const endCoords = receiverSprite
               ? { x: receiverSprite.x, y: receiverSprite.y }
@@ -125,18 +140,20 @@ export async function animateGameTurns({ //hasBallAtStep
 
             const delta = receiveStep.timestamp - timestamp;
             const duration = delta > 0 ? delta : animationConfig.pass.duration;
-            console.log(`⏱️ Resolved pass duration: ${duration}ms (delta=${delta})`);
+            if (DEBUG_FLOW) console.log(`⏱️ Resolved pass duration: ${duration}ms (delta=${delta})`);
 
-            scene.events?.once('passStart', () => console.log('passStart'));
-            scene.events?.once('tweenStart', () => console.log('tweenStart'));
-            scene.events?.once('tweenEnd', () => console.log('tweenEnd'));
-            scene.events?.once('ballAttached', () => console.log('ballAttached'));
-            scene.events?.once('passEnd', () => console.log('passEnd'));
+            if (DEBUG_FLOW) {
+              scene.events?.once('passStart', () => console.log('passStart'));
+              scene.events?.once('tweenStart', () => console.log('tweenStart'));
+              scene.events?.once('tweenEnd', () => console.log('tweenEnd'));
+              scene.events?.once('ballAttached', () => console.log('ballAttached'));
+              scene.events?.once('passEnd', () => console.log('passEnd'));
+            }
 
             if (scene.__activePass) {
-              console.warn(
-                'Active pass tween detected before runPass call; cancelling previous tween'
-              );
+          console.warn(
+            'Active pass tween detected before runPass call; cancelling previous tween'
+          );
             }
 
             await runPass(scene, {
@@ -168,7 +185,7 @@ export async function animateGameTurns({ //hasBallAtStep
       if (ballHandlerId != null && stealerId != null) {
         const cfg = animationConfig.steal || {};
         if (scene.__activePass) {
-          console.warn('Active pass tween detected before steal; cancelling previous tween');
+            console.warn('Active pass tween detected before steal; cancelling previous tween');
         }
         await runPass(scene, {
           fromId: ballHandlerId,
@@ -202,6 +219,9 @@ export async function animateGameTurns({ //hasBallAtStep
         }
       }
       break;
+    }
+    if (DEBUG_FLOW && i === turns.length - 1) {
+      console.log('🔚 animateGameTurns last turn complete');
     }
   }
 

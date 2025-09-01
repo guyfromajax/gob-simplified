@@ -17,6 +17,10 @@ const DEBUG_SERIALIZATION =
   (typeof window !== 'undefined' && window.DEBUG_SERIALIZATION) ||
   (typeof process !== 'undefined' && process.env.DEBUG_SERIALIZATION) ||
   false;
+const DEBUG_FLOW =
+  (typeof window !== 'undefined' && window.DEBUG_FLOW) ||
+  (typeof process !== 'undefined' && process.env.DEBUG_FLOW) ||
+  false;
 
 export function createGameScene(Phaser) {
   return class GameScene extends Phaser.Scene {
@@ -44,20 +48,22 @@ export function createGameScene(Phaser) {
         }
         this.quarter = data.quarter || 1;
 
-        console.log("🧠 Game initialized with:", {
-          rosters: this.rosters,
-          tournamentId: this.tournamentId,
-          franchiseId: this.franchiseId,
-          homeTeam: this.homeTeam,
-          awayTeam: this.awayTeam,
-          mode: this.mode,
-          periodLabel: this.periodLabel,
-        });
+        if (DEBUG_FLOW) {
+          console.log("🧠 Game initialized with:", {
+            rosters: this.rosters,
+            tournamentId: this.tournamentId,
+            franchiseId: this.franchiseId,
+            homeTeam: this.homeTeam,
+            awayTeam: this.awayTeam,
+            mode: this.mode,
+            periodLabel: this.periodLabel,
+          });
+        }
       }
-      
+
 
     async preload() {
-      console.log("✅ GameScene preloaded");
+      if (DEBUG_FLOW) console.log("✅ GameScene preloaded");
       if (this.animate) {
         this.load.image("ball", "/static/images/ball.png");
         const normalizeTeamName = (name) => name.toLowerCase().replace(/[\s\-]/g, '_');
@@ -68,7 +74,7 @@ export function createGameScene(Phaser) {
     }
 
     async create() {
-      console.log("🎬 GameScene created");
+      if (DEBUG_FLOW) console.log("🎬 GameScene created");
 
       const homeStatsEl = document.getElementById('home-stats-body');
       const awayStatsEl = document.getElementById('away-stats-body');
@@ -134,7 +140,11 @@ export function createGameScene(Phaser) {
       }
 
       const simData = await res.json();
-      console.log("📦 simData received:", simData);
+      if (DEBUG_FLOW) {
+        console.log("📦 simData received:", simData);
+        const turnsLen = Array.isArray(simData.turns) ? simData.turns.length : 0;
+        console.log('🔄 Sim response arrived', { turns: turnsLen });
+      }
       const logHome = simData.homeTeam?.name || simData.home_team;
       const logAway = simData.awayTeam?.name || simData.away_team;
       const homeId = simData.home_team_id || simData.homeTeam?.team_id;
@@ -152,10 +162,12 @@ export function createGameScene(Phaser) {
         localStorage.setItem('game_id', this.gameId);
       }
       this.isFinal = simData.is_final;
-      console.log(
-        `✅ Simulated matchup: ${logHome} vs ${logAway}`
-      );
-      console.log("📦 First turn:", simData.turns?.[0]);
+      if (DEBUG_FLOW) {
+        console.log(
+          `✅ Simulated matchup: ${logHome} vs ${logAway}`
+        );
+        console.log("📦 First turn:", simData.turns?.[0]);
+      }
 
       const homeLogoEl = document.getElementById('home-logo');
       const awayLogoEl = document.getElementById('away-logo');
@@ -472,7 +484,7 @@ export function createGameScene(Phaser) {
             }
             return ids;
           })));
-          console.log('IDs in turns:', turnIds);
+          if (DEBUG_FLOW) console.log('IDs in turns:', turnIds);
 
           if (DEBUG_TEAMS) {
             simData.players.forEach(p => {
@@ -491,10 +503,24 @@ export function createGameScene(Phaser) {
             ease: 'Sine.easeInOut'
           });
 
-          const quarterTurns = (simData.turns || []).filter(
-            t => t.quarter === this.quarter
-          );
+          const quarterTurns = (simData.turns || []).filter(t => {
+            const turnQ = t.quarter != null ? Number(t.quarter) : this.quarter;
+            return turnQ === this.quarter;
+          });
+          if (DEBUG_FLOW) {
+            console.log('🔢 quarterTurns length', quarterTurns.length);
+          }
+          if (quarterTurns.length === 0) {
+            const total = Array.isArray(simData.turns) ? simData.turns.length : 0;
+            console.warn(`⚠️ No turns found for quarter ${this.quarter} (total turns: ${total}). Navigation halted.`);
+            return;
+          }
 
+          let animStart;
+          if (DEBUG_FLOW) {
+            animStart = Date.now();
+            console.log('🚀 animateGameTurns start', animStart);
+          }
           await animateGameTurns({
             scene: this,
             simData: { ...simData, turns: quarterTurns },
@@ -502,8 +528,20 @@ export function createGameScene(Phaser) {
             ballSprite: this.ballSprite,
             onUpdate: updateScoreboard
           });
+          if (DEBUG_FLOW) {
+            const animEnd = Date.now();
+            console.log('🏁 animateGameTurns finish', animEnd, 'duration', animEnd - animStart);
+          }
 
-          console.log("✅ GameScene animation complete");
+          if (DEBUG_FLOW) {
+            console.log('🧭 Navigation condition', {
+              isFinal: this.isFinal,
+              quarter: this.quarter,
+              turnCount: quarterTurns.length
+            });
+          }
+
+          if (DEBUG_FLOW) console.log("✅ GameScene animation complete");
           if (this.isFinal) {
             await finalize();
           } else {
