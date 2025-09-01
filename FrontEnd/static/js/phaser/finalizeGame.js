@@ -1,4 +1,5 @@
 const DEBUG_BRACKET = window.DEBUG_BRACKET || false;
+const DEBUG_GAME_ID = window.DEBUG_GAME_ID || false;
 
 export async function finalizeGame({ simData, tournamentId, franchiseId, game }) {
   // Extract score and winner
@@ -138,6 +139,13 @@ export async function finalizeGame({ simData, tournamentId, franchiseId, game })
 
   if (game && game.events) {
     game.events.emit("gameComplete", finalScore);
+  }
+
+  if (typeof localStorage !== 'undefined') {
+    localStorage.removeItem('game_id');
+    if (DEBUG_GAME_ID) {
+      console.debug('Cleared game_id after finalize');
+    }
   }
 
   return finalScore;
