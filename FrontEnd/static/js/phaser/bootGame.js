@@ -4,6 +4,8 @@ import { setCourtOffsets } from './utils/gridToPixels.js';
 import { on, emit } from './utils/eventBus.js';
 import { finalizeGame } from './finalizeGame.js';
 
+const DEBUG_GAME_ID = window.DEBUG_GAME_ID || false;
+
 if (typeof window !== 'undefined') {
   window.TEXT_SCROLL_ENABLED =
     window.TEXT_SCROLL_ENABLED !== undefined ? window.TEXT_SCROLL_ENABLED : true;
@@ -64,6 +66,16 @@ if (weekParam && !Number.isNaN(weekParam) && typeof localStorage !== 'undefined'
 }
 const mode = urlParams.get('mode') || getMode({ tournamentId, franchiseId });
 let gameId = urlParams.get('game_id');
+if (
+  !gameId &&
+  typeof localStorage !== 'undefined' &&
+  typeof localStorage.removeItem === 'function'
+) {
+  localStorage.removeItem('game_id');
+  if (DEBUG_GAME_ID) {
+    console.log('Cleared stored game_id from localStorage');
+  }
+}
 let quarter = parseInt(urlParams.get('quarter'), 10) || 1;
 let periodLabel = urlParams.get('period') || `Q${quarter}`;
 
