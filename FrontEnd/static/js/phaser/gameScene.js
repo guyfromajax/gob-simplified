@@ -6,6 +6,7 @@ import { emit } from './utils/eventBus.js';
 import { appendToTextScroll } from './utils/textScroll.js';
 
 const DEBUG_SIM_PAYLOAD = window.DEBUG_SIM_PAYLOAD || false;
+const DEBUG_TEAMS = window.DEBUG_TEAMS || false;
 
 export function createGameScene(Phaser) {
   return class GameScene extends Phaser.Scene {
@@ -65,11 +66,19 @@ export function createGameScene(Phaser) {
       const homeTeam = this.rosters.homeRoster.team_name;
       const awayTeam = this.rosters.awayRoster.team_name;
 
-      console.log("📨 Sending /api/simulate-quarter request for:", homeTeam, "vs", awayTeam);
-      console.log("🔢 Quarter:", this.quarter, "Game ID:", this.gameId);
+      if (DEBUG_TEAMS) {
+        console.log("📨 Sending /api/simulate-quarter request for:", homeTeam, "vs", awayTeam);
+        console.log("🔢 Quarter:", this.quarter, "Game ID:", this.gameId);
+      }
 
       const payload = { home_team: homeTeam, away_team: awayTeam, quarter: this.quarter };
       if (this.gameId) payload.game_id = this.gameId;
+      if (DEBUG_TEAMS) {
+        console.log('/api/simulate-quarter payload teams:', {
+          home: payload.home_team,
+          away: payload.away_team,
+        });
+      }
       if (DEBUG_SIM_PAYLOAD) {
         console.debug('Sim payload teams:', homeTeam, awayTeam, 'gameId:', this.gameId);
       }
@@ -414,6 +423,12 @@ export function createGameScene(Phaser) {
               secondary_color: simData.away_team_colors.secondary_color
             }
           }, Phaser);
+
+          if (DEBUG_TEAMS) {
+            simData.players.forEach(p => {
+              console.log(`Sprite initialized: ${p.name} -> ${p.team}`);
+            });
+          }
 
           this.ballSprite = this.add.image(0, 0, "ball").setVisible(true).setDepth(1000).setScale(1);
 
