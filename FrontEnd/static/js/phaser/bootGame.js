@@ -5,6 +5,7 @@ import { on, emit } from './utils/eventBus.js';
 import { finalizeGame } from './finalizeGame.js';
 
 const DEBUG_GAME_ID = window.DEBUG_GAME_ID || false;
+const DEBUG_TEAMS = window.DEBUG_TEAMS || false;
 
 if (typeof window !== 'undefined') {
   window.TEXT_SCROLL_ENABLED =
@@ -222,6 +223,9 @@ async function handleButtonClick(animate) {
   if (sim4Btn) sim4Btn.style.display = 'none';
 
   try {
+    if (DEBUG_TEAMS) {
+      console.log('Fetching rosters for teams:', { homeTeam, awayTeam });
+    }
     const [homeRoster, awayRoster] = await Promise.all([
       fetchTeamRoster(homeTeam),
       fetchTeamRoster(awayTeam),
@@ -263,6 +267,12 @@ async function handleSimToFourth() {
       if (currentQ === quarter) {
         if (Object.keys(homeLineup).length) payload.home_lineup = homeLineup;
         if (Object.keys(awayLineup).length) payload.away_lineup = awayLineup;
+      }
+      if (DEBUG_TEAMS) {
+        console.log('/api/simulate-quarter payload teams:', {
+          home: payload.home_team,
+          away: payload.away_team,
+        });
       }
       const res = await fetch('/api/simulate-quarter', {
         method: 'POST',
@@ -326,6 +336,12 @@ async function handleSimFullGame() {
       if (currentQ === quarter) {
         if (Object.keys(homeLineup).length) payload.home_lineup = homeLineup;
         if (Object.keys(awayLineup).length) payload.away_lineup = awayLineup;
+      }
+      if (DEBUG_TEAMS) {
+        console.log('/api/simulate-quarter payload teams:', {
+          home: payload.home_team,
+          away: payload.away_team,
+        });
       }
       const res = await fetch('/api/simulate-quarter', {
         method: 'POST',
