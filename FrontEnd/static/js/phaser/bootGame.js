@@ -139,6 +139,17 @@ if (typeof window !== 'undefined' && window.addEventListener) {
   window.addEventListener('resize', updateOffsets);
 }
 
+function resetGameContext() {
+  gameId = null;
+  quarter = 1;
+  periodLabel = 'Q1';
+  isSimulating = false;
+  if (typeof localStorage !== 'undefined' && typeof localStorage.removeItem === 'function') {
+    localStorage.removeItem('game_id');
+  }
+  updateScoreboardScores({ home: 0, away: 0 });
+}
+
 
 async function fetchTeamRoster(teamName) {
   const query = buildQuery({
@@ -226,6 +237,7 @@ function showPopup(score) {
 
 async function handleButtonClick(animate) {
   if (isSimulating) return;
+  resetGameContext();
   isSimulating = true;
   const playBtn = document.querySelector('.play-button');
   const simFullBtn = document.querySelector('.sim-full-game-button');
@@ -258,6 +270,7 @@ async function handleButtonClick(animate) {
 
 async function handleSimToFourth() {
   if (isSimulating || quarter >= 4) return;
+  resetGameContext();
   isSimulating = true;
   const playBtn = document.querySelector('.play-button');
   const simFullBtn = document.querySelector('.sim-full-game-button');
@@ -328,6 +341,7 @@ async function handleSimToFourth() {
 
 async function handleSimFullGame() {
   if (isSimulating) return;
+  resetGameContext();
   isSimulating = true;
   const playBtn = document.querySelector('.play-button');
   const simFullBtn = document.querySelector('.sim-full-game-button');
