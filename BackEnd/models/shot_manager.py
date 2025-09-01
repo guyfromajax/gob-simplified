@@ -35,6 +35,7 @@ class ShotManager:
         
         time_elapsed = 0
         events = []
+        result = {}
 
         shooter = roles["shooter"]
         passer = roles.get("passer", "")
@@ -153,6 +154,8 @@ class ShotManager:
                 self.game_state["last_rebound"] = stat
                 rebounder.record_stat(stat)
                 text += f"...{get_name_safe(rebounder)} grabs the rebound."
+                result["rebounderId"] = getattr(rebounder, "player_id", None)
+                result["rebound_type"] = stat
                 possession_flips = rebound_team != off_team
 
                 if stat == "OREB":
@@ -196,7 +199,7 @@ class ShotManager:
         shooter_pos = get_player_position(off_lineup, shooter)
         print(f"end of resolve_shot, possession_flips: {possession_flips}")
 
-        result = {
+        result.update({
             "result_type": "MAKE" if made else "MISS",
             "ball_handler": shooter,
             "shooter": shooter,
@@ -207,7 +210,7 @@ class ShotManager:
             "possession_flips": possession_flips,
             "time_elapsed": time_elapsed,
             "events": events,
-        }
+        })
 
         if made:
             result["points"] = points
@@ -331,6 +334,7 @@ class ShotManager:
         def_team = self.game.defense_team
         off_lineup = off_team.lineup
         def_lineup = def_team.lineup
+        result = {}
         
         shooter = fb_roles["shooter"]
         passer = fb_roles.get("passer", "")
@@ -375,6 +379,8 @@ class ShotManager:
             rebounder = random.choice(fb_roles["defense"]) if fb_roles["defense"] else self.game.defense_team.lineup["PG"]
             text = f"{shooter} misses the fast break shot -- {rebounder} grabs the rebound."
             rebounder.record_stat("DREB")
+            result["rebounderId"] = getattr(rebounder, "player_id", None)
+            result["rebound_type"] = "DREB"
             # print(f"+1 rebound for {get_name_safe(rebounder)} / shot manager - resolve_fast_break_shot")
             possession_flips = True
             if random.random() < get_fast_break_chance(self.game):
@@ -390,7 +396,7 @@ class ShotManager:
 
         shooter_pos = get_player_position(off_lineup, shooter)
 
-        result = {
+        result.update({
             "result_type": "MAKE" if made else "MISS",
             "ball_handler": shooter,
             "shooter": shooter,
@@ -401,7 +407,7 @@ class ShotManager:
             "text": text,
             "possession_flips": possession_flips,
             "time_elapsed": time_elapsed
-        }
+        })
 
         if made:
             result["points"] = points
