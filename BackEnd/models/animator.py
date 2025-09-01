@@ -129,6 +129,11 @@ class Animator:
             build_movement(o, half_court_spot())
         self._log_step_timestamps(animations)
         self.latest_packet = animations
+        logging.debug(
+            "capture_fast_break_animation generated %d animations first=%s",
+            len(animations),
+            animations[0] if animations else None,
+        )
         return animations
 
     def capture_free_throw_animation(
@@ -301,6 +306,11 @@ class Animator:
         )
         self._log_step_timestamps(animations)
         self.latest_packet = animations
+        logging.debug(
+            "capture_free_throw_animation generated %d animations first=%s",
+            len(animations),
+            animations[0] if animations else None,
+        )
         return animations
 
     def capture_halfcourt_animation(self, roles, event_step=None):
@@ -579,7 +589,11 @@ class Animator:
 
         self._log_step_timestamps(animations)
         self.latest_packet = animations
-        logging.debug("Generated %d animations", len(animations))
+        logging.debug(
+            "capture_halfcourt_animation generated %d animations first=%s",
+            len(animations),
+            animations[0] if animations else None,
+        )
 
         return animations
 

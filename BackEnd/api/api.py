@@ -34,6 +34,8 @@ from typing import Optional
 import logging
 from BackEnd.models.player import Player
 
+logger = logging.getLogger(__name__)
+
 app = FastAPI()
 app.include_router(tournament_router)
 app.include_router(training_router)
@@ -319,7 +321,12 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest):
         # Scrimmage simulations should not generate aggregate stats.
         # Finalizing with ``mode="scrimmage"`` is a no-op but documents intent.
         stat_updater.finalize_game(game_id, mode="scrimmage")
-
+    turns = summary.get("turns", [])
+    logger.debug(
+        "simulate_quarter_endpoint turns len=%s first=%s",
+        len(turns),
+        turns[0] if turns else None,
+    )
     return summary
 
 
