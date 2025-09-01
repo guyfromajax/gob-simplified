@@ -145,6 +145,7 @@ export function createGameScene(Phaser) {
         const turnsLen = Array.isArray(simData.turns) ? simData.turns.length : 0;
         console.log('🔄 Sim response arrived', { turns: turnsLen });
       }
+      DEBUG_FLOW && console.log('[gameScene] quarters', { requested: this.quarter, sim: simData.quarter });
       const logHome = simData.homeTeam?.name || simData.home_team;
       const logAway = simData.awayTeam?.name || simData.away_team;
       const homeId = simData.home_team_id || simData.homeTeam?.team_id;
