@@ -572,11 +572,13 @@ export function animateKickoutReset(
   const width = scene.game.config.width;
   const height = scene.game.config.height;
   const cfg = animationConfig.kickout;
+  const raw = duration ?? pass.duration;
+  const usedDuration = raw != null && raw >= cfg.duration ? raw : cfg.duration;
 
   const opts = {
     fromId: rebounderId,
     toId: pgId,
-    duration: duration ?? pass.duration ?? cfg.duration,
+    duration: usedDuration,
     easing: cfg.easing
   };
 
