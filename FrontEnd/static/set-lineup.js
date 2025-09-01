@@ -5,6 +5,11 @@ const homeId = urlParams.get('home_id');
 const awayId = urlParams.get('away_id');
 let myTeamSide = urlParams.get('my_team');
 const userTeamIdParam = urlParams.get('user_team_id');
+const franchiseId = urlParams.get('franchise_id');
+const weekParam = urlParams.get('week');
+const tournamentId = urlParams.get('tournament_id');
+const modeParam = urlParams.get('mode');
+const DEBUG = urlParams.has('debug');
 const quarter = parseInt(urlParams.get('quarter'), 10) || 1;
 const gameId =
   quarter > 1 ? urlParams.get('game_id') || localStorage.getItem('game_id') : null;
@@ -12,6 +17,14 @@ if (quarter === 1 && typeof localStorage !== 'undefined') {
   localStorage.removeItem('game_id');
 }
 const periodLabel = urlParams.get('period') || `Q${quarter}`;
+
+if ((quarter > 1 || urlParams.has('game_id')) &&
+    typeof history !== 'undefined' && history.replaceState) {
+  const clean = new URLSearchParams(urlParams);
+  ['quarter', 'period', 'game_id'].forEach(k => clean.delete(k));
+  const qs = clean.toString();
+  history.replaceState(null, '', `${window.location.pathname}${qs ? `?${qs}` : ''}`);
+}
 let teamName = '';
 
 let roster = [];
@@ -198,16 +211,26 @@ async function init() {
   if (btn) {
     btn.addEventListener('click', () => {
       if (btn.classList.contains('disabled')) return;
-      const params = new URLSearchParams(window.location.search);
-      ['home','away'].forEach(side => {
-        ['pg','sg','sf','pf','c'].forEach(pos => params.delete(`${side}_${pos}`));
-      });
+      const params = new URLSearchParams();
+      params.set('home', homeTeam);
+      params.set('away', awayTeam);
+      if (homeId) params.set('home_id', homeId);
+      if (awayId) params.set('away_id', awayId);
+      if (myTeamSide) params.set('my_team', myTeamSide);
+      if (userTeamIdParam) params.set('user_team_id', userTeamIdParam);
+      if (franchiseId) params.set('franchise_id', franchiseId);
+      if (weekParam) params.set('week', weekParam);
+      if (tournamentId) params.set('tournament_id', tournamentId);
+      if (modeParam) params.set('mode', modeParam);
+      params.set('quarter', '1');
+      params.set('period', 'Q1');
       ['PG','SG','SF','PF','C'].forEach(pos => {
         const id = lineup[pos];
         if (id) params.set(`${myTeamSide}_${pos.toLowerCase()}`, id);
       });
-      if (gameId !== null) params.set('game_id', gameId);
-      console.log('🔀 Redirecting to court.html with', { quarter, gameId });
+      if (DEBUG) {
+        console.debug('🔀 Redirecting to court.html', { home: homeTeam, away: awayTeam, gameId });
+      }
       window.location.href = `/court.html?${params.toString()}`;
     });
   }
