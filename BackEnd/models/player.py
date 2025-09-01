@@ -2,6 +2,10 @@
 
 from BackEnd.constants import ALL_ATTRS, BOX_SCORE_KEYS, MALLEABLE_ATTRS
 import uuid
+import os
+
+
+DEBUG_SERIALIZATION = os.getenv("DEBUG_SERIALIZATION")
 
 
 class Player:
@@ -116,11 +120,14 @@ def player_to_dict(player):
         return None
     team = getattr(player, "team", None)
     team_name = getattr(team, "name", team)
-    return {
+    data = {
         "player_id": getattr(player, "player_id", None),
         "name": getattr(player, "name", None),
         "team": team_name,
     }
+    if DEBUG_SERIALIZATION:
+        print(f"[DEBUG_SERIALIZATION] player_to_dict keys: {list(data.keys())}")
+    return data
 
     
     
