@@ -54,7 +54,11 @@ function updateBallOwnership({ scene, ballSprite, animations, playerSprites, ste
     if (scene.skipToEnd) break;
     const sprite = playerSprites[anim.playerId];
     const hasBall = anim.hasBallAtStep?.[stepIndex];
-    if (hasBall && ballSprite?.setPosition) {
+    if (hasBall && !sprite) {
+      console.warn(`Missing sprite for player ${anim.playerId}`);
+      continue;
+    }
+    if (hasBall && sprite && ballSprite?.setPosition) {
       ballSprite.setPosition(sprite.x, sprite.y);
       ballSprite.setVisible(true);
       if (currentBallOwnerRef) currentBallOwnerRef.value = sprite;
