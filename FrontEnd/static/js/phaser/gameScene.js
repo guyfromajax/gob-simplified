@@ -120,11 +120,12 @@ export function createGameScene(Phaser) {
       const quarterEl = document.getElementById('quarter');
 
       const positions = ["PG","SG","SF","PF","C"];
-      this.nameToId = Object.fromEntries(simData.players.map(p => [p.name, p.playerId]));
-      this.playerInfo = Object.fromEntries(simData.players.map(p => [p.playerId, { name: p.name, team: p.team, pos: p.pos }]));
+      this.nameToId = Object.fromEntries(simData.players.map(p => [p.name, p.playerId ?? p.player_id]));
+      this.playerInfo = Object.fromEntries(simData.players.map(p => [p.playerId ?? p.player_id, { name: p.name, team: p.team, pos: p.pos }]));
       this.playerStats = {};
       simData.players.forEach(p => {
-        this.playerStats[p.playerId] = { PTS: 0, REB: 0, AST: 0 };
+        const id = p.playerId ?? p.player_id;
+        this.playerStats[id] = { PTS: 0, REB: 0, AST: 0 };
       });
       this.rowRefs = { home: {}, away: {} };
       this.currentLineup = { home: {}, away: {} };
@@ -142,7 +143,7 @@ export function createGameScene(Phaser) {
       const initTeamTable = (teamKey, bodyEl) => {
         positions.forEach(pos => {
           const player = simData.players.find(p => p.team === teamKey && p.pos === pos);
-          const playerId = player?.playerId;
+          const playerId = player?.playerId ?? player?.player_id;
           const tr = document.createElement('tr');
           const nameTd = document.createElement('td');
           const ptsTd = document.createElement('td');
@@ -394,12 +395,12 @@ export function createGameScene(Phaser) {
         const startAnimation = async () => {
           this.playerSprites = loadPhaserPlayers(this, simData.players, {
             home: {
-              player_ids: simData.players.filter(p => p.team === "home").map(p => p.playerId),
+              player_ids: simData.players.filter(p => p.team === "home").map(p => p.playerId ?? p.player_id),
               primary_color: simData.home_team_colors.primary_color,
               secondary_color: simData.home_team_colors.secondary_color
             },
             away: {
-              player_ids: simData.players.filter(p => p.team === "away").map(p => p.playerId),
+              player_ids: simData.players.filter(p => p.team === "away").map(p => p.playerId ?? p.player_id),
               primary_color: simData.away_team_colors.primary_color,
               secondary_color: simData.away_team_colors.secondary_color
             }
