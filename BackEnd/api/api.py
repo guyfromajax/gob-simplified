@@ -32,6 +32,7 @@ import traceback
 from unidecode import unidecode
 from typing import Optional
 import logging
+from BackEnd.models.player import Player
 
 app = FastAPI()
 app.include_router(tournament_router)
@@ -145,6 +146,12 @@ def simulate_game(request: SimulationRequest):
 
     print("\n🔎 DEBUGGING SUMMARY BEFORE INSERT")
     pprint.pprint(summary)
+
+    # Log keys and ensure no Player objects remain at the top level
+    print("Summary top-level keys:", list(summary.keys()))
+    for k, v in summary.items():
+        if isinstance(v, Player):
+            raise TypeError(f"Summary key '{k}' contains a Player instance")
 
     try:
         print("🔍 About to insert summary into Mongo...")
