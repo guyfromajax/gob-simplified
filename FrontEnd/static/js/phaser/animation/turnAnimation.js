@@ -16,6 +16,10 @@ import { HOME_RIM_COORDS, AWAY_RIM_COORDS, HOME_TOP_KEY, AWAY_TOP_KEY } from "./
 // Cap the time spent on any single movement step. Large timestamp gaps can
 // otherwise produce multi‑second tweens that appear as animation stalls.
 const MAX_STEP_DURATION = 1000; // ms
+const DEBUG =
+  (typeof window !== 'undefined' && window.DEBUG) ||
+  (typeof process !== 'undefined' && process.env.DEBUG) ||
+  false;
 
 
 /**
@@ -949,17 +953,28 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
 
       const prev = movement[stepIndex - 1];
       const curr = movement[stepIndex];
-      const rawDuration = (curr.timestamp - prev.timestamp) * 3;
+      const step = prev;
+      const nextStep = curr;
+      const rawDuration = (nextStep.timestamp - step.timestamp) * 3;
       const duration = Math.min(MAX_STEP_DURATION, rawDuration);
 
-      if (curr.action === "shoot") {
-        shotInfo = { step: curr, playerId: anim.playerId, stepIndex };
+      DEBUG && console.log('[turn]', turnData?.id, step.timestamp, nextStep.timestamp, duration);
+      if (duration <= 0) {
+        console.warn('[turn] Non-positive duration', { turnId: turnData?.id, step, nextStep });
+        if (typeof window !== 'undefined') {
+          window.__badStepPayloads = window.__badStepPayloads || [];
+          window.__badStepPayloads.push({ turnId: turnData?.id, step, nextStep });
+        }
+      }
+
+      if (nextStep.action === "shoot") {
+        shotInfo = { step: nextStep, playerId: anim.playerId, stepIndex };
       }
 
       const promise = animateStep({
         scene,
         sprite,
-        step: curr,
+        step: nextStep,
         duration,
         ballSprite,
         currentBallOwnerRef,
