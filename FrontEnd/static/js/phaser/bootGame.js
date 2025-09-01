@@ -66,26 +66,19 @@ if (weekParam && !Number.isNaN(weekParam) && typeof localStorage !== 'undefined'
   localStorage.setItem('franchise_week', weekParam);
 }
 const mode = urlParams.get('mode') || getMode({ tournamentId, franchiseId });
-let gameId = urlParams.get('game_id');
-if (
-  !gameId &&
+let quarter = parseInt(urlParams.get('quarter'), 10) || 1;
+let gameId = null;
+if (quarter > 1) {
+  gameId =
+    urlParams.get('game_id') ||
+    (typeof localStorage !== 'undefined'
+      ? localStorage.getItem('game_id')
+      : null);
+} else if (
   typeof localStorage !== 'undefined' &&
   typeof localStorage.removeItem === 'function'
 ) {
   localStorage.removeItem('game_id');
-  if (DEBUG_GAME_ID) {
-    console.log('Cleared stored game_id from localStorage');
-  }
-}
-let quarter = parseInt(urlParams.get('quarter'), 10) || 1;
-if (quarter === 1) {
-  gameId = null;
-  if (
-    typeof localStorage !== 'undefined' &&
-    typeof localStorage.removeItem === 'function'
-  ) {
-    localStorage.removeItem('game_id');
-  }
 }
 let periodLabel = urlParams.get('period') || `Q${quarter}`;
 
@@ -265,14 +258,14 @@ async function handleSimToFourth() {
     let currentQ = quarter;
     let gId = gameId;
     let lastSummary;
-    while (currentQ <= 3) {
-      showStatus(`Simulating Q${currentQ}...`);
+      while (currentQ <= 3) {
+        showStatus(`Simulating Q${currentQ}...`);
       const payload = {
         home_team: homeTeam,
         away_team: awayTeam,
         quarter: currentQ,
-        game_id: gId,
       };
+      if (gId) payload.game_id = gId;
       if (currentQ === quarter) {
         if (Object.keys(homeLineup).length) payload.home_lineup = homeLineup;
         if (Object.keys(awayLineup).length) payload.away_lineup = awayLineup;
@@ -283,6 +276,7 @@ async function handleSimToFourth() {
           away: payload.away_team,
         });
       }
+      console.log({event:'simulate-quarter:request', mode, homeTeam, awayTeam, quarter: currentQ, gameId: gId});
       const res = await fetch('/api/simulate-quarter', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -340,8 +334,8 @@ async function handleSimFullGame() {
         home_team: homeTeam,
         away_team: awayTeam,
         quarter: currentQ,
-        game_id: gId,
       };
+      if (gId) payload.game_id = gId;
       if (currentQ === quarter) {
         if (Object.keys(homeLineup).length) payload.home_lineup = homeLineup;
         if (Object.keys(awayLineup).length) payload.away_lineup = awayLineup;
@@ -352,6 +346,7 @@ async function handleSimFullGame() {
           away: payload.away_team,
         });
       }
+      console.log({event:'simulate-quarter:request', mode, homeTeam, awayTeam, quarter: currentQ, gameId: gId});
       const res = await fetch('/api/simulate-quarter', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
