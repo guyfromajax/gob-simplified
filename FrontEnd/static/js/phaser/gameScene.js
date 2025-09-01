@@ -70,6 +70,16 @@ export function createGameScene(Phaser) {
     async create() {
       console.log("🎬 GameScene created");
 
+      const homeStatsEl = document.getElementById('home-stats-body');
+      const awayStatsEl = document.getElementById('away-stats-body');
+      if (homeStatsEl) homeStatsEl.innerHTML = '';
+      if (awayStatsEl) awayStatsEl.innerHTML = '';
+
+      this.playerSprites = {};
+      this.nameToId = {};
+      this.playerInfo = {};
+      this.playerStats = {};
+
     //   const homeTeam = this.homeTeam || this.rosters.homeRoster.team || this.rosters.homeRoster.team_name;
     //   const awayTeam = this.awayTeam || this.rosters.awayRoster.team || this.rosters.awayRoster.team_name;
 
@@ -256,6 +266,21 @@ export function createGameScene(Phaser) {
 
       hydrateBoxScore();
 
+      if (this.animate) {
+        this.playerSprites = loadPhaserPlayers(this, simData.players, {
+          home: {
+            player_ids: simData.players.filter(p => p.team === 'home').map(p => p.playerId ?? p.player_id),
+            primary_color: simData.home_team_colors.primary_color,
+            secondary_color: simData.home_team_colors.secondary_color,
+          },
+          away: {
+            player_ids: simData.players.filter(p => p.team === 'away').map(p => p.playerId ?? p.player_id),
+            primary_color: simData.away_team_colors.primary_color,
+            secondary_color: simData.away_team_colors.secondary_color,
+          },
+        }, Phaser);
+      }
+
       const applyPlayerStats = (turn = {}) => {
         if (turn.home_lineup) updateLineup('home', turn.home_lineup);
         if (turn.away_lineup) updateLineup('away', turn.away_lineup);
@@ -431,19 +456,6 @@ export function createGameScene(Phaser) {
         const courtKey = "court-bg";
 
         const startAnimation = async () => {
-          this.playerSprites = loadPhaserPlayers(this, simData.players, {
-            home: {
-              player_ids: simData.players.filter(p => p.team === "home").map(p => p.playerId ?? p.player_id),
-              primary_color: simData.home_team_colors.primary_color,
-              secondary_color: simData.home_team_colors.secondary_color
-            },
-            away: {
-              player_ids: simData.players.filter(p => p.team === "away").map(p => p.playerId ?? p.player_id),
-              primary_color: simData.away_team_colors.primary_color,
-              secondary_color: simData.away_team_colors.secondary_color
-            }
-          }, Phaser);
-
           const spriteKeys = Object.keys(this.playerSprites || {});
           if (DEBUG_TEAMS) {
             console.log('playerSprites keys:', spriteKeys);
