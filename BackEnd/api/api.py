@@ -173,6 +173,7 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest):
         list((request.home_lineup or {}).keys()),
         list((request.away_lineup or {}).keys()),
     )
+    source = "resume"
     if game_id:
         gm = ongoing_games.get(game_id)
         if gm is None:
@@ -208,11 +209,29 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest):
                 except Exception:
                     logging.exception("Failed to load game state for %s", game_id)
             if gm is None:
-                raise HTTPException(status_code=400, detail="Unknown game_id")
+                if request.quarter == 1:
+                    gm = GameManager(request.home_team, request.away_team)
+                    game_id = str(uuid.uuid4())
+                    ongoing_games[game_id] = gm
+                    source = "new"
+                else:
+                    raise HTTPException(status_code=400, detail="Unknown game_id")
     else:
         gm = GameManager(request.home_team, request.away_team)
         game_id = str(uuid.uuid4())
         ongoing_games[game_id] = gm
+        source = "new"
+
+    logging.info(
+        {
+            "event": "simulate-quarter:start",
+            "game_id": game_id,
+            "home_team": request.home_team,
+            "away_team": request.away_team,
+            "quarter": request.quarter,
+            "source": source,
+        }
+    )
 
     # If the requested quarter has already been simulated, return the existing state
     if request.quarter < gm.quarter:
