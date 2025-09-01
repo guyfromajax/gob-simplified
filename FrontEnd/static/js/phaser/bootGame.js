@@ -254,6 +254,7 @@ async function handleButtonClick(animate) {
       fetchTeamRoster(homeTeam),
       fetchTeamRoster(awayTeam),
     ]);
+    console.log('startGame animate:', animate);
     const finalScore = await startGame({ homeRoster, awayRoster, animate });
     showPopup(finalScore);
   } catch (err) {
