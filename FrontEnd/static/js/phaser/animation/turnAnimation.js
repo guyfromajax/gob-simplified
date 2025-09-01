@@ -40,6 +40,14 @@ function updateBallOwnership({ scene, ballSprite, animations, playerSprites, ste
       ballSprite.setVisible(true);
       if (currentBallOwnerRef) currentBallOwnerRef.value = pendingSprite;
       if (PASS_DEBUG) console.log('ownershipUpdate', { target: pendingId, stepIndex });
+    } else {
+      console.warn(`Missing sprite for pending ball owner ${pendingId}`);
+      const fallback = currentBallOwnerRef?.value;
+      if (fallback && ballSprite?.setPosition) {
+        ballSprite.setPosition(fallback.x, fallback.y);
+      } else if (ballSprite?.setVisible) {
+        ballSprite.setVisible(false);
+      }
     }
     scene.pendingBallOwnerId = null;
     return;
@@ -56,6 +64,7 @@ function updateBallOwnership({ scene, ballSprite, animations, playerSprites, ste
     const hasBall = anim.hasBallAtStep?.[stepIndex];
     if (hasBall && !sprite) {
       console.warn(`Missing sprite for player ${anim.playerId}`);
+      if (ballSprite?.setVisible) ballSprite.setVisible(false);
       continue;
     }
     if (hasBall && sprite && ballSprite?.setPosition) {

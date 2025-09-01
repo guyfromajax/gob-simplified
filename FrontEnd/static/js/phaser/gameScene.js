@@ -424,6 +424,22 @@ export function createGameScene(Phaser) {
             }
           }, Phaser);
 
+          const spriteKeys = Object.keys(this.playerSprites || {});
+          const turnIds = Array.from(new Set((simData.turns || []).flatMap(t => {
+            const ids = [];
+            if (t.playerId) ids.push(t.playerId);
+            if (t.player_id) ids.push(t.player_id);
+            if (Array.isArray(t.animations)) {
+              t.animations.forEach(a => {
+                if (a.playerId) ids.push(a.playerId);
+                if (a.player_id) ids.push(a.player_id);
+              });
+            }
+            return ids;
+          })));
+          console.log('playerSprites keys:', spriteKeys);
+          console.log('IDs in turns:', turnIds);
+
           if (DEBUG_TEAMS) {
             simData.players.forEach(p => {
               console.log(`Sprite initialized: ${p.name} -> ${p.team}`);
