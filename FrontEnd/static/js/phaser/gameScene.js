@@ -140,6 +140,7 @@ export function createGameScene(Phaser) {
       }
 
       const simData = await res.json();
+      DEBUG && console.log('[gameScene] simData.turns', simData.turns.length, simData.turns[0]);
       if (DEBUG_FLOW) {
         console.log("📦 simData received:", simData);
         const turnsLen = Array.isArray(simData.turns) ? simData.turns.length : 0;
