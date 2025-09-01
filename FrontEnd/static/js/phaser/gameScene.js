@@ -5,6 +5,8 @@ import { finalizeGame } from './finalizeGame.js';
 import { emit } from './utils/eventBus.js';
 import { appendToTextScroll } from './utils/textScroll.js';
 
+const DEBUG_SIM_PAYLOAD = window.DEBUG_SIM_PAYLOAD || false;
+
 export function createGameScene(Phaser) {
   return class GameScene extends Phaser.Scene {
     constructor() {
@@ -25,7 +27,10 @@ export function createGameScene(Phaser) {
         this.homeLineup = data.homeLineup || {};
         this.awayLineup = data.awayLineup || {};
         this.periodLabel = data.periodLabel;
-        this.gameId = data.gameId || localStorage.getItem('game_id');
+        this.gameId = data.gameId || null;
+        if (!this.gameId && typeof localStorage !== 'undefined') {
+          localStorage.removeItem('game_id');
+        }
         this.quarter = data.quarter || 1;
 
         console.log("🧠 Game initialized with:", {
@@ -60,15 +65,17 @@ export function createGameScene(Phaser) {
       const homeTeam = this.rosters.homeRoster.team_name;
       const awayTeam = this.rosters.awayRoster.team_name;
 
-      const storedGameId = this.gameId || localStorage.getItem('game_id');
       console.log("📨 Sending /api/simulate-quarter request for:", homeTeam, "vs", awayTeam);
-      console.log("🔢 Quarter:", this.quarter, "Game ID:", storedGameId);
+      console.log("🔢 Quarter:", this.quarter, "Game ID:", this.gameId);
 
       const payload = { home_team: homeTeam, away_team: awayTeam, quarter: this.quarter };
-      if (storedGameId) payload.game_id = storedGameId;
+      if (this.gameId) payload.game_id = this.gameId;
+      if (DEBUG_SIM_PAYLOAD) {
+        console.debug('Sim payload teams:', homeTeam, awayTeam, 'gameId:', this.gameId);
+      }
       if (Object.keys(this.homeLineup).length) payload.home_lineup = this.homeLineup;
       if (Object.keys(this.awayLineup).length) payload.away_lineup = this.awayLineup;
-      const url = storedGameId || this.quarter > 1 ? '/api/simulate-quarter' : '/api/simulate-quarter';
+      const url = this.gameId || this.quarter > 1 ? '/api/simulate-quarter' : '/api/simulate-quarter';
       const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -101,8 +108,10 @@ export function createGameScene(Phaser) {
       console.log("📦 simData received:", simData);
       const logHome = simData.homeTeam?.name || simData.home_team;
       const logAway = simData.awayTeam?.name || simData.away_team;
-      this.gameId = simData.game_id || storedGameId;
-      if (this.gameId) localStorage.setItem('game_id', this.gameId);
+      this.gameId = simData.game_id || this.gameId;
+      if (this.gameId && typeof localStorage !== 'undefined') {
+        localStorage.setItem('game_id', this.gameId);
+      }
       this.isFinal = simData.is_final;
       console.log(
         `✅ Simulated matchup: ${logHome} vs ${logAway}`
