@@ -21,6 +21,10 @@ const DEBUG_FLOW =
   (typeof window !== 'undefined' && window.DEBUG_FLOW) ||
   (typeof process !== 'undefined' && process.env.DEBUG_FLOW) ||
   false;
+const DEBUG_SKIP =
+  (typeof window !== 'undefined' && window.DEBUG_SKIP) ||
+  (typeof process !== 'undefined' && process.env.DEBUG_SKIP) ||
+  false;
 
 export function createGameScene(Phaser) {
   return class GameScene extends Phaser.Scene {
@@ -438,7 +442,7 @@ export function createGameScene(Phaser) {
           }
         });
       }
-      if (skipBtn) {
+      if (skipBtn && DEBUG_SKIP) {
         skipBtn.addEventListener('click', async () => {
           if (this.isSkipping) return;
           this.skipToEnd = true;
@@ -551,9 +555,15 @@ export function createGameScene(Phaser) {
             params.set('game_id', this.gameId);
             params.set('quarter', nextQ);
             params.set('period', `Q${nextQ}`);
+            console.log('skipToEnd at navigation:', this.skipToEnd);
             window.location.href = `/static/set-lineup.html?${params.toString()}`;
             return;
           }
+        };
+
+        const logAndStart = () => {
+          console.log('skipToEnd before startAnimation:', this.skipToEnd);
+          startAnimation();
         };
 
         if (this.textures.exists(courtKey)) {
@@ -561,14 +571,14 @@ export function createGameScene(Phaser) {
               .setOrigin(0)
               .setDisplaySize(this.game.config.width, this.game.config.height)
               .setDepth(0);
-          startAnimation();
+          logAndStart();
         } else {
           this.load.once("complete", () => {
               this.add.image(0, 0, courtKey)
               .setOrigin(0)
               .setDisplaySize(this.game.config.width, this.game.config.height)
               .setDepth(0);
-              startAnimation();
+              logAndStart();
           });
           this.load.start();
         }
@@ -581,6 +591,7 @@ export function createGameScene(Phaser) {
           params.set('game_id', this.gameId);
           params.set('quarter', nextQ);
           params.set('period', `Q${nextQ}`);
+          console.log('skipToEnd at navigation:', this.skipToEnd);
           window.location.href = `/static/set-lineup.html?${params.toString()}`;
         }
       }
