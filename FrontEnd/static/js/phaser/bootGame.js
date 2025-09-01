@@ -4,8 +4,18 @@ import { setCourtOffsets } from './utils/gridToPixels.js';
 import { on, emit } from './utils/eventBus.js';
 import { finalizeGame } from './finalizeGame.js';
 
-const DEBUG_GAME_ID = window.DEBUG_GAME_ID || false;
-const DEBUG_TEAMS = window.DEBUG_TEAMS || false;
+const DEBUG_GAME_ID =
+  (typeof window !== 'undefined' && window.DEBUG_GAME_ID) ||
+  (typeof process !== 'undefined' && process.env.DEBUG_GAME_ID) ||
+  false;
+const DEBUG_TEAMS =
+  (typeof window !== 'undefined' && window.DEBUG_TEAMS) ||
+  (typeof process !== 'undefined' && process.env.DEBUG_TEAMS) ||
+  false;
+const DEBUG_SERIALIZATION =
+  (typeof window !== 'undefined' && window.DEBUG_SERIALIZATION) ||
+  (typeof process !== 'undefined' && process.env.DEBUG_SERIALIZATION) ||
+  false;
 
 if (typeof window !== 'undefined') {
   window.TEXT_SCROLL_ENABLED =
