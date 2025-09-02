@@ -132,3 +132,44 @@ def test_simulate_quarter_unknown_id_quarter1(monkeypatch):
     summary = api.simulate_quarter_endpoint(request)
     assert summary["game_id"] != "unknown"
     assert summary["quarter"] == 1
+
+
+def test_simulate_quarter_sequential_game_id(monkeypatch):
+    class DummyTeam:
+        def __init__(self, name: str):
+            self.name = name
+            self.points_by_quarter = [0, 0, 0, 0]
+
+    class DummyGM:
+        def __init__(self, home: str, away: str):
+            self.home_team = DummyTeam(home)
+            self.away_team = DummyTeam(away)
+            self.quarter = 1
+            self.game_state = {"start_box_score": {}, "score": {home: 0, away: 0}}
+            self.score = self.game_state["score"]
+
+    def fake_simulate_quarter(gm, home_lineup, away_lineup, game_id):
+        gm.quarter += 1
+
+    def fake_summarize_game_state(gm):
+        return {"score": gm.score}
+
+    monkeypatch.setattr(api, "GameManager", DummyGM)
+    monkeypatch.setattr(api, "simulate_quarter", fake_simulate_quarter)
+    monkeypatch.setattr(api, "summarize_game_state", fake_summarize_game_state)
+
+    api.ongoing_games.clear()
+
+    res1 = client.post(
+        "/api/simulate-quarter", json={"home_team": "Home", "away_team": "Away"}
+    )
+    assert res1.status_code == 200
+    gid = res1.json()["game_id"]
+
+    res2 = client.post(
+        "/api/simulate-quarter",
+        json={"home_team": "Home", "away_team": "Away", "quarter": 2, "game_id": gid},
+    )
+    assert res2.status_code == 200
+    data2 = res2.json()
+    assert data2["game_id"] == gid
