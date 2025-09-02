@@ -185,6 +185,22 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest):
     source = "resume"
     if game_id:
         gm = ongoing_games.get(game_id)
+        if gm is not None and (
+            request.home_team != gm.home_team.name
+            or request.away_team != gm.away_team.name
+        ):
+            logging.debug(
+                "simulate_quarter_endpoint team mismatch: game_id=%s expected=%s vs %s got=%s vs %s",
+                game_id,
+                gm.home_team.name,
+                gm.away_team.name,
+                request.home_team,
+                request.away_team,
+            )
+            raise HTTPException(
+                status_code=400,
+                detail="game_id belongs to a different matchup",
+            )
         if gm is None:
             logging.warning(
                 "simulate_quarter_endpoint unknown game_id=%s; active=%s",
