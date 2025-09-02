@@ -81,19 +81,9 @@ if (weekParam && !Number.isNaN(weekParam) && typeof localStorage !== 'undefined'
 }
 const mode = urlParams.get('mode') || getMode({ tournamentId, franchiseId });
 let quarter = parseInt(urlParams.get('quarter'), 10) || 1;
-let gameId = null;
-if (quarter > 1) {
-  gameId =
-    urlParams.get('game_id') ||
-    (typeof localStorage !== 'undefined'
-      ? localStorage.getItem('game_id')
-      : null);
-} else if (
-  typeof localStorage !== 'undefined' &&
-  typeof localStorage.removeItem === 'function'
-) {
-  localStorage.removeItem('game_id');
-}
+let gameId =
+  urlParams.get('game_id') ||
+  (typeof localStorage !== 'undefined' ? localStorage.getItem('game_id') : null);
 let periodLabel = urlParams.get('period') || `Q${quarter}`;
 
 const homeLineup = {};
