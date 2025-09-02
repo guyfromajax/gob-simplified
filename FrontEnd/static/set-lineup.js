@@ -229,6 +229,10 @@ async function init() {
         if (id) params.set(`${myTeamSide}_${pos.toLowerCase()}`, id);
       });
       if (DEBUG) {
+        params.set('debug', '1');
+        // optional: params.set('debug_flow', '1');
+      }
+      if (DEBUG) {
         console.debug('🔀 Redirecting to court.html', { home: homeTeam, away: awayTeam, gameId });
       }
       DEBUG && console.log('[lineup] launching quarter', quarter);
