@@ -556,6 +556,7 @@ export function createGameScene(Phaser) {
             params.set('game_id', this.gameId);
             params.set('quarter', nextQ);
             params.set('period', `Q${nextQ}`);
+            DEBUG_FLOW && console.log('➡️ Advancing to lineup', { nextQ, gameId: this.gameId });
             console.log('skipToEnd at navigation:', this.skipToEnd);
             window.location.href = `/static/set-lineup.html?${params.toString()}`;
             return;
@@ -592,6 +593,7 @@ export function createGameScene(Phaser) {
           params.set('game_id', this.gameId);
           params.set('quarter', nextQ);
           params.set('period', `Q${nextQ}`);
+          DEBUG_FLOW && console.log('➡️ Advancing to lineup', { nextQ, gameId: this.gameId });
           console.log('skipToEnd at navigation:', this.skipToEnd);
           window.location.href = `/static/set-lineup.html?${params.toString()}`;
         }

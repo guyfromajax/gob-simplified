@@ -232,7 +232,11 @@ function showPopup(score) {
 
 async function handleButtonClick(animate) {
   if (isSimulating) return;
-  resetGameContext();
+  const startingFresh = !gameId || quarter <= 1;
+  if (startingFresh) {
+    resetGameContext();
+  }
+  DEBUG && console.log('[handleButtonClick]', { startingFresh, quarter, gameId });
   isSimulating = true;
   const playBtn = document.querySelector('.play-button');
   const simFullBtn = document.querySelector('.sim-full-game-button');
