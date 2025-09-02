@@ -11,20 +11,36 @@ const tournamentId = urlParams.get('tournament_id');
 const modeParam = urlParams.get('mode');
 const DEBUG = urlParams.has('debug');
 const quarter = parseInt(urlParams.get('quarter'), 10) || 1;
-const gameId =
-  quarter > 1 ? urlParams.get('game_id') || localStorage.getItem('game_id') : null;
-if (quarter === 1 && typeof localStorage !== 'undefined') {
-  localStorage.removeItem('game_id');
-}
-const periodLabel = urlParams.get('period') || `Q${quarter}`;
-
-if ((quarter > 1 || urlParams.has('game_id')) &&
-    typeof history !== 'undefined' && history.replaceState) {
+let gameId = urlParams.get('game_id') ||
+  (typeof localStorage !== 'undefined' ? localStorage.getItem('game_id') : null);
+const storedHome = typeof localStorage !== 'undefined' ? localStorage.getItem('game_home') : null;
+const storedAway = typeof localStorage !== 'undefined' ? localStorage.getItem('game_away') : null;
+const isNewMatchup = !urlParams.get('game_id') || storedHome !== homeTeam || storedAway !== awayTeam;
+if (isNewMatchup) {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    gameId = crypto.randomUUID();
+  } else {
+    gameId = Math.random().toString(36).slice(2);
+  }
+  if (typeof localStorage !== 'undefined') {
+    localStorage.setItem('game_id', gameId);
+    localStorage.setItem('game_home', homeTeam || '');
+    localStorage.setItem('game_away', awayTeam || '');
+  }
+  if (typeof history !== 'undefined' && history.replaceState) {
+    const clean = new URLSearchParams(urlParams);
+    ['quarter', 'period', 'game_id'].forEach(k => clean.delete(k));
+    const qs = clean.toString();
+    history.replaceState(null, '', `${window.location.pathname}${qs ? `?${qs}` : ''}`);
+  }
+} else if ((quarter > 1 || urlParams.has('game_id')) &&
+           typeof history !== 'undefined' && history.replaceState) {
   const clean = new URLSearchParams(urlParams);
   ['quarter', 'period', 'game_id'].forEach(k => clean.delete(k));
   const qs = clean.toString();
   history.replaceState(null, '', `${window.location.pathname}${qs ? `?${qs}` : ''}`);
 }
+const periodLabel = urlParams.get('period') || `Q${quarter}`;
 let teamName = '';
 
 let roster = [];
@@ -222,8 +238,9 @@ async function init() {
       if (weekParam) params.set('week', weekParam);
       if (tournamentId) params.set('tournament_id', tournamentId);
       if (modeParam) params.set('mode', modeParam);
-      params.set('quarter', '1');
-      params.set('period', 'Q1');
+      params.set('quarter', String(quarter));
+      params.set('period', periodLabel);
+      if (quarter > 1 && gameId) params.set('game_id', gameId);
       ['PG','SG','SF','PF','C'].forEach(pos => {
         const id = lineup[pos];
         if (id) params.set(`${myTeamSide}_${pos.toLowerCase()}`, id);
