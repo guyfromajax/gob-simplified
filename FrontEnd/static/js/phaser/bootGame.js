@@ -4,6 +4,7 @@ import { setCourtOffsets } from './utils/gridToPixels.js';
 import { on, emit } from './utils/eventBus.js';
 import { finalizeGame } from './finalizeGame.js';
 import { DEBUG } from './utils/debug.js';
+import gameStore from '../state/gameStore.js';
 
 const DEBUG_GAME_ID =
   (typeof window !== 'undefined' && window.DEBUG_GAME_ID) ||
@@ -138,6 +139,7 @@ function resetGameContext() {
   if (typeof localStorage !== 'undefined' && typeof localStorage.removeItem === 'function') {
     localStorage.removeItem('game_id');
   }
+  gameStore.reset();
   updateScoreboardScores({ home: 0, away: 0 });
 }
 
@@ -156,6 +158,20 @@ async function fetchTeamRoster(teamName) {
 
 async function startGame({ homeRoster, awayRoster, animate = true }) {
   DEBUG && console.log('[bootGame] startGame', { quarter, animate });
+  gameStore.reset();
+  gameStore.setTeams({ home: homeTeam, away: awayTeam });
+  gameStore.setRosters({ home: homeRoster, away: awayRoster });
+  gameStore.setColors({
+    home: {
+      primary_color: homeRoster.primary_color,
+      secondary_color: homeRoster.secondary_color,
+    },
+    away: {
+      primary_color: awayRoster.primary_color,
+      secondary_color: awayRoster.secondary_color,
+    },
+  });
+  gameStore.setGameId(gameId);
   if (!game) {
     game = new Phaser.Game({
       type: Phaser.AUTO,
@@ -170,16 +186,12 @@ async function startGame({ homeRoster, awayRoster, animate = true }) {
   }
 
   const sceneData = {
-    rosters: { homeRoster, awayRoster },
     tournamentId,
     franchiseId,
-    homeTeam,
-    awayTeam,
     animate,
     homeLineup,
     awayLineup,
     periodLabel,
-    gameId,
     quarter,
   };
 
