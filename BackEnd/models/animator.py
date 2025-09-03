@@ -98,35 +98,43 @@ class Animator:
                 if getattr(d, "player_id", None) == stopper_id:
                     stopper = d
                     break
+        if hold_up:
+            # Stopping defender
+            if stopper:
+                offset_x = 6 if not is_away_offense else -6
+                end = {
+                    "x": TOP_KEY_COORDS["x"] + offset_x,
+                    "y": TOP_KEY_COORDS["y"] + random.randint(-3, 3),
+                }
+                build_movement(stopper, end, action=ACTIONS["GUARD_BALL"])
 
-        # Stopping defender
-        if stopper:
-            offset_x = 6 if not is_away_offense else -6
-            end = {
-                "x": TOP_KEY_COORDS["x"] + offset_x,
-                "y": TOP_KEY_COORDS["y"] + random.randint(-3, 3),
-            }
-            build_movement(stopper, end, action=ACTIONS["GUARD_BALL"])
+            # Other in-play defenders
+            for d in defenders:
+                if d is stopper:
+                    continue
+                build_movement(d, between_key_and_rim(), action=ACTIONS["GUARD_OFFBALL"])
 
-        # Other in-play defenders
-        for d in defenders:
-            if d is stopper:
-                continue
-            build_movement(d, between_key_and_rim(), action=ACTIONS["GUARD_OFFBALL"])
+            # Non-in-play defenders
+            non_play_defenders = [
+                p for p in defense_team.lineup.values() if p not in defenders
+            ]
+            for d in non_play_defenders:
+                build_movement(d, half_court_spot())
 
-        # Non-in-play defenders
-        non_play_defenders = [
-            p for p in defense_team.lineup.values() if p not in defenders
-        ]
-        for d in non_play_defenders:
-            build_movement(d, half_court_spot())
-
-        # Non-ball-handling offensive players
-        non_bh_offense = [
-            p for p in offense_team.lineup.values() if p is not ball_handler
-        ]
-        for o in non_bh_offense:
-            build_movement(o, half_court_spot())
+            # Non-ball-handling offensive players
+            non_bh_offense = [
+                p for p in offense_team.lineup.values() if p is not ball_handler
+            ]
+            for o in non_bh_offense:
+                build_movement(o, half_court_spot())
+        else:
+            # Keep all other players stationary
+            for d in defense_team.lineup.values():
+                build_movement(d, getattr(d, "coords", {"x": 25, "y": 50}))
+            for o in offense_team.lineup.values():
+                if o is ball_handler:
+                    continue
+                build_movement(o, getattr(o, "coords", {"x": 25, "y": 50}))
         self._log_step_timestamps(animations)
         self.latest_packet = animations
         logging.debug(
