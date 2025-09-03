@@ -28,27 +28,58 @@ export function getDebugTransitions() {
   return debugTransitions;
 }
 
+export function safeTransition(machine, next, ctx = {}, required = []) {
+  if (!machine) return;
+  const missing = required.filter(
+    (key) => ctx[key] === undefined || ctx[key] === null
+  );
+  if (missing.length) {
+    const stack = new Error().stack?.split("\n")[2]?.trim();
+    console.warn("safeTransition missing context", { missing, caller: stack });
+    return;
+  }
+
+  const allowed = transitions[machine.state] || [];
+  if (!allowed.includes(next)) {
+    const stack = new Error().stack?.split("\n")[2]?.trim();
+    console.warn(`Invalid transition: ${machine.state} -> ${next}`, {
+      caller: stack,
+    });
+    return;
+  }
+
+  const prevState = machine.state;
+  machine.transition(next);
+  if (debugTransitions) {
+    const { stepIndex, shotResult, currentOwnerId, pendingOwnerId } = ctx;
+    console.log({
+      prevState,
+      event: next,
+      nextState: machine.state,
+      stepIndex,
+      shotResult,
+      currentOwnerId,
+      pendingOwnerId,
+    });
+  }
+}
+
 export function createGameStateMachine(initialState = States.Inbound) {
   let state = initialState;
   return {
-    transition(next, context) {
+    transition(next) {
       const allowed = transitions[state] || [];
       if (!allowed.includes(next)) {
         throw new Error(`Invalid transition: ${state} -> ${next}`);
       }
-      const prevState = state;
       state = next;
-      if (debugTransitions) {
-        const { stepIndex, shotResult } = context || {};
-        console.log({ prevState, nextState: state, event: next, stepIndex, shotResult });
-      }
     },
     is(s) {
       return state === s;
     },
     get state() {
       return state;
-    }
+    },
   };
 }
 
