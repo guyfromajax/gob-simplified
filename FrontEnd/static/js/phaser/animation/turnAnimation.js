@@ -987,16 +987,29 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
                       evt.result
                     );
                     if (evt.result === "MISS" && evt.rebound) {
+                      const reboundData = evt.rebound;
+                      const rebounderId =
+                        reboundData.rebounder_player_id || reboundData.rebounderId;
                       await animateRebound({
                         scene,
                         ballSprite,
                         playerSprites,
-                        animations: evt.rebound.animations || turnData.animations,
-                        rebounderId:
-                          evt.rebound.rebounder_player_id || evt.rebound.rebounderId,
-                        ballSpot: putbackResult?.grid || evt.rebound.ballSpot,
+                        animations: reboundData.animations || turnData.animations,
+                        rebounderId,
+                        ballSpot: putbackResult?.grid || reboundData.ballSpot,
                         shooterId: evt.shooterId
                       });
+                      if (
+                        reboundData.rebound_type === "DREB" &&
+                        !turnData.fast_break
+                      ) {
+                        await runDefensiveReboundSetup({
+                          scene,
+                          ballSprite,
+                          playerSprites,
+                          rebounderId
+                        });
+                      }
                     }
                   } else if (evt.event_type === "KICKOUT_RESET") {
                     await animateKickoutReset(
@@ -1041,16 +1054,29 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
           evt.result
         );
         if (evt.result === "MISS" && evt.rebound) {
+          const reboundData = evt.rebound;
+          const rebounderId =
+            reboundData.rebounder_player_id || reboundData.rebounderId;
           await animateRebound({
             scene,
             ballSprite,
             playerSprites,
-            animations: evt.rebound.animations || turnData.animations,
-            rebounderId:
-              evt.rebound.rebounder_player_id || evt.rebound.rebounderId,
-            ballSpot: putbackResult?.grid || evt.rebound.ballSpot,
+            animations: reboundData.animations || turnData.animations,
+            rebounderId,
+            ballSpot: putbackResult?.grid || reboundData.ballSpot,
             shooterId: evt.shooterId
           });
+          if (
+            reboundData.rebound_type === "DREB" &&
+            !turnData.fast_break
+          ) {
+            await runDefensiveReboundSetup({
+              scene,
+              ballSprite,
+              playerSprites,
+              rebounderId
+            });
+          }
         }
       } else if (evt.event_type === "KICKOUT_RESET") {
         await animateKickoutReset(
