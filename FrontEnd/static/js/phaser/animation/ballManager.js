@@ -10,6 +10,7 @@ import {
   tweenBallTo,
   runPass as baseRunPass
 } from "./ballTween.js";
+import { States } from "../state/gameStateMachine.js";
 
 function attachBallToPlayer(scene, ballSprite, playerSprite, opts = {}) {
   if (scene.possessionFlipInProgress) return;
@@ -24,7 +25,7 @@ function attachBallToPlayer(scene, ballSprite, playerSprite, opts = {}) {
     }
   }
 
-  if (scene.reboundInProgress && targetId !== scene.rebounderId) {
+  if (scene.stateMachine?.is(States.Rebound) && targetId !== scene.rebounderId) {
     return;
   }
 
@@ -60,12 +61,12 @@ function attachBallToPlayer(scene, ballSprite, playerSprite, opts = {}) {
 
 function runInboundSetup(opts) {
   const scene = opts.scene;
-  if (scene.possessionFlipInProgress || scene.fastBreakInProgress) return Promise.resolve();
+  if (scene.possessionFlipInProgress || scene.stateMachine?.is(States.FastBreak)) return Promise.resolve();
   return baseRunInboundSetup(opts);
 }
 
 function runPass(scene, cfg = {}) {
-  if (scene.possessionFlipInProgress || scene.fastBreakInProgress) return Promise.resolve();
+  if (scene.possessionFlipInProgress || scene.stateMachine?.is(States.FastBreak)) return Promise.resolve();
   return baseRunPass(scene, cfg);
 }
 
@@ -89,7 +90,7 @@ export function passBall({
   fromTimestamp,
   toTimestamp
 }) {
-  if (scene?.ftInProgress) return;
+  if (scene?.stateMachine?.is(States.FreeThrow)) return;
   generateBallTween({
     scene,
     ballSprite,
@@ -110,7 +111,7 @@ export function animateInboundPass(
   startTs,
   endTs
 ) {
-  if (scene?.ftInProgress) return;
+  if (scene?.stateMachine?.is(States.FreeThrow)) return;
   generateBallTween({
     scene,
     ballSprite,
@@ -147,7 +148,7 @@ export function shootBall({
   turnIndex
 }) {
   if (!scene || !ballSprite) return Promise.resolve();
-  if (scene?.ftInProgress) return Promise.resolve();
+  if (scene?.stateMachine?.is(States.FreeThrow)) return Promise.resolve();
 
   const isHomeTeam = shooterTeamId === homeTeamId;
 
@@ -229,7 +230,7 @@ export function shootBall({
               team: shooterTeamId
             });
           }
-          scene.reboundInProgress = true;
+          scene.stateMachine?.transition(States.Rebound);
           scene.rebounderId = null;
           scene.tweens.add({
             targets: ballSprite,
@@ -270,7 +271,7 @@ export function animatePutbackAttempt(
   easing = animationConfig.putback.easing
 ) {
   if (!scene || !ballSprite) return Promise.resolve();
-  if (scene?.ftInProgress) return Promise.resolve();
+  if (scene?.stateMachine?.is(States.FreeThrow)) return Promise.resolve();
   const shooterSprite = scene.playerSprites?.[shooterId];
   if (!shooterSprite) return Promise.resolve();
 
@@ -331,7 +332,7 @@ export function animatePutbackAttempt(
                 scene.game.config.width,
                 scene.game.config.height
               );
-              scene.reboundInProgress = true;
+              scene.stateMachine?.transition(States.Rebound);
               scene.rebounderId = null;
               scene.tweens.add({
                 targets: ballSprite,
@@ -375,7 +376,7 @@ export function animateRebound({
   shooterId
 }) {
   if (!scene || !ballSprite || !ballSpot) return Promise.resolve();
-  if (scene?.ftInProgress) return Promise.resolve();
+  if (scene?.stateMachine?.is(States.FreeThrow)) return Promise.resolve();
 
   scene.rebounderId = rebounderId;
   const rebCfg = animationConfig.rebound;
@@ -440,7 +441,7 @@ export function animateRebound({
             scene.events?.emit("possessionChange", {
               offenseTeamId: rebounderSprite.team_id
             });
-            scene.reboundInProgress = false;
+            if (scene.stateMachine?.is(States.Rebound)) scene.stateMachine?.transition(States.HalfCourt);
             scene.rebounderId = null;
             resolve();
           },
@@ -558,7 +559,7 @@ export function animateKickoutReset(
   duration
 ) {
   if (!scene || !ballSprite) return Promise.resolve();
-  if (scene?.ftInProgress) return Promise.resolve();
+  if (scene?.stateMachine?.is(States.FreeThrow)) return Promise.resolve();
 
   const rebounderSprite = scene.playerSprites?.[rebounderId];
   const pgSprite = scene.playerSprites?.[pgId];
@@ -603,7 +604,7 @@ export function animateKickoutReset(
   scene.events?.once('tweenStart', () => console.log('tweenStart'));
   scene.events?.once('tweenEnd', () => console.log('tweenEnd'));
 
-  if (scene.fastBreakInProgress) {
+  if (scene.stateMachine?.is(States.FastBreak)) {
     return Promise.resolve();
   }
 
