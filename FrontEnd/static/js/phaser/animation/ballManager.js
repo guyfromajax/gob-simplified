@@ -153,7 +153,23 @@ export function shootBall({
   if (scene?.stateMachine?.is(States.FreeThrow)) return Promise.resolve();
   cancelBallTween(scene, ballSprite);
   clearCurrentOwner(scene);
-  scene.stateMachine?.transition(States.ShotAttempt);
+  const stateMachine = scene.stateMachine;
+  if (stateMachine) {
+    const prevState = stateMachine.state;
+    const legalState =
+      stateMachine.is(States.HalfCourt) ||
+      stateMachine.is(States.Rebound) ||
+      stateMachine.is(States.FastBreak);
+    if (legalState) {
+      stateMachine.transition(States.ShotAttempt);
+    } else {
+      console.warn("shotBall: illegal state", {
+        prevState,
+        shooterId,
+        stepIndex
+      });
+    }
+  }
   const homeRoster = gameStore.getHomeRoster();
   const storeHomeId =
     homeRoster?.team_id || homeRoster?.teamId || homeRoster?.team_name || homeRoster?.team;
