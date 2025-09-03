@@ -232,7 +232,10 @@ function showPopup(score) {
 
 async function handleButtonClick(animate) {
   if (isSimulating) return;
-  const startingFresh = !gameId || quarter <= 1;
+  if (!gameId && typeof localStorage !== 'undefined') {
+    gameId = localStorage.getItem('game_id');
+  }
+  const startingFresh = !gameId;
   if (startingFresh) {
     resetGameContext();
   }
@@ -270,7 +273,12 @@ async function handleButtonClick(animate) {
 
 async function handleSimToFourth() {
   if (isSimulating || quarter >= 4) return;
-  resetGameContext();
+  if (!gameId && typeof localStorage !== 'undefined') {
+    gameId = localStorage.getItem('game_id');
+  }
+  if (!gameId) {
+    resetGameContext();
+  }
   isSimulating = true;
   const playBtn = document.querySelector('.play-button');
   const simFullBtn = document.querySelector('.sim-full-game-button');
@@ -341,7 +349,12 @@ async function handleSimToFourth() {
 
 async function handleSimFullGame() {
   if (isSimulating) return;
-  resetGameContext();
+  if (!gameId && typeof localStorage !== 'undefined') {
+    gameId = localStorage.getItem('game_id');
+  }
+  if (!gameId) {
+    resetGameContext();
+  }
   isSimulating = true;
   const playBtn = document.querySelector('.play-button');
   const simFullBtn = document.querySelector('.sim-full-game-button');
