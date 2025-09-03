@@ -1,7 +1,8 @@
 import { gridToPixels } from "../utils/gridToPixels.js";
 import animationConfig from "./animation_config.js";
 import { HOME_RIM_COORDS, AWAY_RIM_COORDS } from "./courtConstants.js";
-import { States, getDebugTransitions } from "../state/gameStateMachine.js";
+import { States, safeTransition } from "../state/gameStateMachine.js";
+import { getCurrentOwner, getPendingOwner } from "../ball/ballController.js";
 
 function wait(scene, ms) {
   if (!ms) return Promise.resolve();
@@ -34,7 +35,16 @@ export async function runFreeThrowSequence(
 
   if (!scene || !playerSprites || !ballSprite || !turnData) return;
 
-  scene.stateMachine?.transition(States.FreeThrow, getDebugTransitions() && { stepIndex: 0 });
+  safeTransition(
+    scene.stateMachine,
+    States.FreeThrow,
+    {
+      stepIndex: 0,
+      currentOwnerId: getCurrentOwner(scene),
+      pendingOwnerId: getPendingOwner(scene),
+    },
+    ["stepIndex"]
+  );
   if (scene.tweens) {
     for (const sprite of Object.values(playerSprites)) {
       scene.tweens.killTweensOf(sprite);
@@ -135,7 +145,16 @@ export async function runFreeThrowSequence(
         }
       }
       if (isLast) {
-        scene.stateMachine?.transition(States.Inbound, getDebugTransitions() && { shotResult: result });
+        safeTransition(
+          scene.stateMachine,
+          States.Inbound,
+          {
+            shotResult: result,
+            currentOwnerId: getCurrentOwner(scene),
+            pendingOwnerId: getPendingOwner(scene),
+          },
+          ["shotResult"]
+        );
         const newOffenseSide =
           turnData.offense_team_id === scene.simData?.home_team_id
             ? "away"
@@ -164,7 +183,16 @@ export async function runFreeThrowSequence(
       }
     } else {
       if (isLast) {
-        scene.stateMachine?.transition(States.Rebound, getDebugTransitions() && { shotResult: result });
+        safeTransition(
+          scene.stateMachine,
+          States.Rebound,
+          {
+            shotResult: result,
+            currentOwnerId: getCurrentOwner(scene),
+            pendingOwnerId: getPendingOwner(scene),
+          },
+          ["shotResult"]
+        );
         await rebound({
           scene,
           ballSprite,
@@ -194,7 +222,11 @@ export async function runFreeThrowSequence(
     scene.events?.emit("ft:repeatOrExit");
   }
 
-  if (scene.stateMachine?.is(States.FreeThrow)) scene.stateMachine.transition(States.HalfCourt, getDebugTransitions() && {});
+  if (scene.stateMachine?.is(States.FreeThrow))
+    safeTransition(scene.stateMachine, States.HalfCourt, {
+      currentOwnerId: getCurrentOwner(scene),
+      pendingOwnerId: getPendingOwner(scene),
+    });
   scene.events?.emit("ft:end");
 }
 

@@ -10,9 +10,14 @@ import {
   tweenBallTo,
   runPass as baseRunPass
 } from "./ballTween.js";
-import { States, getDebugTransitions } from "../state/gameStateMachine.js";
+import { States, getDebugTransitions, safeTransition } from "../state/gameStateMachine.js";
 import gameStore from "../../state/gameStore.js";
-import { clearCurrentOwner, cancelBallTween } from "../ball/ballController.js";
+import {
+  clearCurrentOwner,
+  cancelBallTween,
+  getCurrentOwner,
+  getPendingOwner,
+} from "../ball/ballController.js";
 
 function attachBallToPlayer(scene, ballSprite, playerSprite, opts = {}) {
   if (scene.possessionFlipInProgress) return;
@@ -161,7 +166,16 @@ export function shootBall({
       stateMachine.is(States.Rebound) ||
       stateMachine.is(States.FastBreak);
     if (legalState) {
-      stateMachine.transition(States.ShotAttempt);
+      safeTransition(
+        stateMachine,
+        States.ShotAttempt,
+        {
+          stepIndex,
+          currentOwnerId: getCurrentOwner(scene),
+          pendingOwnerId: getPendingOwner(scene),
+        },
+        ["stepIndex"]
+      );
     } else {
       console.warn("shotBall: illegal state", {
         prevState,
@@ -245,17 +259,27 @@ export function shootBall({
             scene.game.config.width,
             scene.game.config.height
           );
-          if (SHOT_DEBUG) {
-            console.log("shot:miss", {
-              type: "miss",
-              shooterId,
-              reboundSpot: { x: bounceGridX, y: bounceGridY },
-              playerId: shooterId,
-              team: shooterTeamId
-            });
-        }
+        if (SHOT_DEBUG) {
+          console.log("shot:miss", {
+            type: "miss",
+            shooterId,
+            reboundSpot: { x: bounceGridX, y: bounceGridY },
+            playerId: shooterId,
+            team: shooterTeamId
+          });
+      }
           if (scene.stateMachine?.is(States.ShotAttempt)) {
-            scene.stateMachine.transition(States.Rebound);
+            safeTransition(
+              scene.stateMachine,
+              States.Rebound,
+              {
+                shotResult: result,
+                stepIndex,
+                currentOwnerId: getCurrentOwner(scene),
+                pendingOwnerId: getPendingOwner(scene),
+              },
+              ["shotResult"]
+            );
           }
           scene.rebounderId = null;
           scene.tweens.add({
@@ -470,7 +494,11 @@ export function animateRebound({
             scene.events?.emit("possessionChange", {
               offenseTeamId: rebounderSprite.team_id
             });
-            if (scene.stateMachine?.is(States.Rebound)) scene.stateMachine?.transition(States.HalfCourt, getDebugTransitions() && {});
+            if (scene.stateMachine?.is(States.Rebound))
+              safeTransition(scene.stateMachine, States.HalfCourt, {
+                currentOwnerId: getCurrentOwner(scene),
+                pendingOwnerId: getPendingOwner(scene),
+              });
             scene.rebounderId = null;
             resolve();
           },
