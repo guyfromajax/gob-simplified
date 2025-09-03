@@ -13,6 +13,7 @@ import { tweenBallTo, runPass, PASS_DEBUG, tweenPlayerTo } from "./ballTween.js"
 import animationConfig from "./animation_config.js";
 import { HOME_RIM_COORDS, AWAY_RIM_COORDS } from "./courtConstants.js";
 import { DEBUG } from "../utils/debug.js";
+import { DebugFlags } from "../utils/debugFlags.js";
 import { States, getDebugTransitions, safeTransition } from "../state/gameStateMachine.js";
 import {
   getPendingOwner,
@@ -270,6 +271,18 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
   scene.possessionFlipInProgress = true;
   if (ballSprite) attachBallToPlayer(scene, ballSprite, rebounderSprite);
 
+  if (scene.stateMachine?.is(States.Rebound)) {
+    if (DebugFlags?.FSM) console.log('FSM: Rebound -> OutletSetup');
+    safeTransition(
+      scene.stateMachine,
+      States.OutletSetup,
+      {
+        currentOwnerId: getCurrentOwner(scene),
+        pendingOwnerId: getPendingOwner(scene),
+      }
+    );
+  }
+
   const basketGrid =
     rebounderSprite.team === "home" ? HOME_RIM_COORDS : AWAY_RIM_COORDS;
   const width = scene.game.config.width;
@@ -289,19 +302,31 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
     }
   }
 
+  const promises = [];
+  let pgTarget = null;
   if (pgId && pgId !== rebounderId) {
     const pgSprite = playerSprites[pgId];
     if (pgSprite) {
       const sign = basketGrid.x > rebGridX ? 1 : -1;
-      const targetGrid = {
-        x: rebGridX + sign * Phaser.Math.Between(3, 9),
-        y: rebGridY + Phaser.Math.Between(-6, 6)
+      pgTarget = {
+        x: Phaser.Math.Clamp(
+          rebGridX + sign * Phaser.Math.Between(3, 6),
+          4,
+          97
+        ),
+        y: Phaser.Math.Clamp(
+          rebGridY + Phaser.Math.Between(-6, 6),
+          1,
+          50
+        ),
       };
-      if (sign > 0) targetGrid.x = Math.min(targetGrid.x, basketGrid.x - 1);
-      else targetGrid.x = Math.max(targetGrid.x, basketGrid.x + 1);
-      targetGrid.y = Math.max(0, Math.min(50, targetGrid.y));
-      const pgPx = gridToPixels(targetGrid.x, targetGrid.y, width, height);
-      tweenPlayerTo(scene, pgSprite, pgPx, { duration: 2000 });
+      const pgPx = gridToPixels(pgTarget.x, pgTarget.y, width, height);
+      promises.push(
+        tweenPlayerTo(scene, pgSprite, pgPx, {
+          duration: animationConfig.outletSetup.playerMoveMs,
+        })
+      );
+      if (DebugFlags?.BALL) console.log('pgOutletTarget', { pgId, pgTarget });
     }
   }
 
@@ -316,15 +341,43 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
     const sign = basketGrid.x > 50 ? -1 : 1;
     const targetGrid = {
       x: basketGrid.x + sign * offset,
-      y: Phaser.Math.Between(10, 40)
+      y: Phaser.Math.Between(10, 40),
     };
     const targetPx = gridToPixels(targetGrid.x, targetGrid.y, width, height);
-    tweenPlayerTo(scene, sprite, targetPx, { duration: 2000 });
+    promises.push(
+      tweenPlayerTo(scene, sprite, targetPx, {
+        duration: animationConfig.outletSetup.playerMoveMs,
+      })
+    );
   }
 
-  await new Promise((resolve) => scene.time.delayedCall(2000, resolve));
+  await Promise.all(promises);
+
+  if (pgId && pgId !== rebounderId) {
+    if (DebugFlags?.BALL)
+      console.log('outletPass', { fromId: rebounderId, toId: pgId });
+    await runPass(scene, {
+      fromId: rebounderId,
+      toId: pgId,
+      duration: animationConfig.outletSetup.passMs,
+      easing: animationConfig.outletSetup.easing,
+    });
+  }
 
   scene.possessionFlipInProgress = false;
+
+  if (scene.stateMachine?.is(States.OutletSetup)) {
+    if (DebugFlags?.FSM) console.log('FSM: OutletSetup -> HalfCourt');
+    safeTransition(
+      scene.stateMachine,
+      States.HalfCourt,
+      {
+        currentOwnerId: getCurrentOwner(scene),
+        pendingOwnerId: getPendingOwner(scene),
+      }
+    );
+  }
+
   if (typeof scene.startNextHalfCourtOffense === "function") {
     scene.startNextHalfCourtOffense();
   }
