@@ -16,9 +16,9 @@ import { runInboundSetup } from "./turnAnimation.js";
 export async function runFastBreakSequence({ scene, turnData, playerSprites, ballSprite }) {
   if (!scene || !turnData || scene.skipToEnd) return;
   if (!scene.ballSprite) scene.ballSprite = ballSprite;
-
-  scene.stateMachine?.transition(States.FastBreak, getDebugTransitions() && { stepIndex: 0 });
-  scene.events?.emit("fb:start");
+  const animations = turnData.animations || [];
+  const width = scene.game.config.width;
+  const height = scene.game.config.height;
 
   // stop any existing timeline/tweens
   if (scene.__activeTimeline) {
@@ -26,11 +26,8 @@ export async function runFastBreakSequence({ scene, turnData, playerSprites, bal
     scene.__activeTimeline = null;
   }
 
-  // Build sprint timeline
-  const animations = turnData.animations || [];
-  const width = scene.game.config.width;
-  const height = scene.game.config.height;
   if (turnData.roles?.outlet_passer) {
+    scene.stateMachine?.transition(States.FastBreakOutlet, getDebugTransitions() && { stepIndex: 0 });
     const passerId = turnData.roles.outlet_passer;
     const receiverId = turnData.roles.outlet_receiver;
     const passerSprite   = playerSprites[passerId];
@@ -60,7 +57,14 @@ export async function runFastBreakSequence({ scene, turnData, playerSprites, bal
       receiverAnim.start = target;
       if (receiverAnim.movement?.length) receiverAnim.movement[0].coords = target;
     }
+    if (scene.skipToEnd) return;
+    scene.stateMachine?.transition(States.FastBreak, getDebugTransitions() && { stepIndex: 1 });
+    scene.events?.emit("fb:start");
+  } else {
+    scene.stateMachine?.transition(States.FastBreak, getDebugTransitions() && { stepIndex: 0 });
+    scene.events?.emit("fb:start");
   }
+
   const sprintDuration = animationConfig.fastBreak?.sprintDuration ?? 800;
   const timeline = createAnimationTimeline(scene);
 
