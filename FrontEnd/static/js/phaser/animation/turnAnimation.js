@@ -313,6 +313,7 @@ async function runInboundSetup({
 }) {
   if (scene?.stateMachine?.is(States.FreeThrow)) return;
   scene.isInboundSetup = true;
+  if (!scene.stateMachine?.is(States.Inbound)) scene.stateMachine?.transition?.(States.Inbound);
   if (!scene.ballSprite) scene.ballSprite = ballSprite;
   const isAwayOffense = newOffenseSide === "away";
 
@@ -611,6 +612,8 @@ async function runInboundSetup({
   }
   console.log(`[inbound][passEnd][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
   console.log(`[inbound][pgAttach][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
+
+  if (scene.stateMachine?.is(States.Inbound)) scene.stateMachine?.transition?.(States.HalfCourt);
 
   scene.isInboundSetup = false;
 }
