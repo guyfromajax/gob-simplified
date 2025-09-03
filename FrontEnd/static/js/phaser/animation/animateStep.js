@@ -11,6 +11,7 @@ import { gridToPixels } from "../utils/gridToPixels.js";
  * @returns {Promise} resolves when tween completes
  */
 import { PASS_DEBUG } from "./ballTween.js";
+import { getPendingOwner } from "../ball/ballController.js";
 
 export const PLAYER_TWEEN_DEBUG = false;
 
@@ -55,7 +56,7 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
         if (
           currentBallOwnerRef?.value === sprite &&
           ballSprite?.setPosition &&
-          !scene.pendingBallOwnerId
+          !getPendingOwner(scene)
         ) {
           ballSprite.setPosition(sprite.x, sprite.y);
         }

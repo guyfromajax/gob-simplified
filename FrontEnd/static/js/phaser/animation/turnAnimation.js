@@ -14,6 +14,12 @@ import animationConfig from "./animation_config.js";
 import { HOME_RIM_COORDS, AWAY_RIM_COORDS, HOME_TOP_KEY, AWAY_TOP_KEY } from "./courtConstants.js";
 import { DEBUG } from "../utils/debug.js";
 import { States } from "../state/gameStateMachine.js";
+import {
+  getPendingOwner,
+  clearPendingOwner,
+  setCurrentOwner,
+  getCurrentOwner
+} from "../ball/ballController.js";
 
 // Cap the time spent on any single movement step. Large timestamp gaps can
 // otherwise produce multi‑second tweens that appear as animation stalls.
@@ -34,13 +40,14 @@ function updateBallOwnership({ scene, ballSprite, animations, playerSprites, ste
     return;
   }
 
-  if (scene.pendingBallOwnerId != null) {
-    const pendingId = scene.pendingBallOwnerId;
+  const pendingId = getPendingOwner(scene);
+  if (pendingId != null) {
     const pendingSprite = playerSprites[pendingId];
     if (pendingSprite && ballSprite?.setPosition) {
       ballSprite.setPosition(pendingSprite.x, pendingSprite.y);
       ballSprite.setVisible(true);
       if (currentBallOwnerRef) currentBallOwnerRef.value = pendingSprite;
+      setCurrentOwner(scene, pendingId);
       if (PASS_DEBUG) console.log('ownershipUpdate', { target: pendingId, stepIndex });
     } else {
       console.warn(`Missing sprite for pending ball owner ${pendingId}`);
@@ -51,7 +58,7 @@ function updateBallOwnership({ scene, ballSprite, animations, playerSprites, ste
         ballSprite.setVisible(false);
       }
     }
-    scene.pendingBallOwnerId = null;
+    clearPendingOwner(scene);
     return;
   }
 
@@ -704,7 +711,7 @@ async function runFastBreakSequence({ scene, turnData, playerSprites, ballSprite
     if (scene.skipToEnd) return;
 
     if (turnData.hold_up) {
-      const bhId = scene.ballAttachedToPlayerId;
+      const bhId = getCurrentOwner(scene);
       const bhSprite = bhId != null ? playerSprites[bhId] : null;
       const stopperId = turnData.stopper_id;
       const stopperSprite = stopperId != null ? playerSprites[stopperId] : null;
@@ -795,7 +802,8 @@ async function runFastBreakSequence({ scene, turnData, playerSprites, ballSprite
       return;
     }
 
-    const shooterId = turnData.shooterId || turnData.shooter_id || scene.ballAttachedToPlayerId;
+    const shooterId =
+      turnData.shooterId || turnData.shooter_id || getCurrentOwner(scene);
     const shooterSprite = shooterId != null ? playerSprites[shooterId] : null;
     if (shooterSprite) {
       attachBallToPlayer(scene, ballSprite, shooterSprite);

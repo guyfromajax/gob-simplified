@@ -1,4 +1,5 @@
 import { playTurnAnimation } from '../../FrontEnd/static/js/phaser/animation/turnAnimation.js';
+import { getCurrentOwner } from '../../FrontEnd/static/js/phaser/ball/ballController.js';
 
 function makeScene() {
   return {
@@ -63,7 +64,7 @@ function createBallSprite() {
     events: [{ event_type: 'PUTBACK_ATTEMPT', shooterId: 'c', result: 'MAKE', duration: 0 }]
   };
   await playTurnAnimation({ scene, simData, playerSprites: scene.playerSprites, turnData, ballSprite });
-  var inboundSetup = scene.ballAttachedToPlayerId === 'pgA';
+  var inboundSetup = getCurrentOwner(scene) === 'pgA';
 }
 
 // Putback miss should trigger rebound animation attaching ball to rebounderId
@@ -80,7 +81,7 @@ let reboundAttached;
     events: [{ event_type: 'PUTBACK_ATTEMPT', shooterId: 'c', result: 'MISS', duration: 0, rebound: { rebounderId: 'pg', ballSpot: { x: 0, y: 0 } } }]
   };
   await playTurnAnimation({ scene, simData, playerSprites: scene.playerSprites, turnData, ballSprite });
-  reboundAttached = scene.ballAttachedToPlayerId;
+  reboundAttached = getCurrentOwner(scene);
 }
 
 // Kickout reset should attach ball to PG and start new turn
@@ -98,7 +99,7 @@ let kickoutResult;
     events: [{ event_type: 'KICKOUT_RESET', rebounderId: 'c', pgId: 'pg', pass: { fromCoords: { x: 0, y: 0 }, toCoords: { x: 1, y: 1 }, duration: 0 } }]
   };
   await playTurnAnimation({ scene, simData, playerSprites: scene.playerSprites, turnData, ballSprite });
-  kickoutResult = { attached: scene.ballAttachedToPlayerId, newTurn: scene.newTurn === true };
+  kickoutResult = { attached: getCurrentOwner(scene), newTurn: scene.newTurn === true };
 }
 
 console.log(JSON.stringify({ inboundSetup, reboundAttached, kickoutResult }));
