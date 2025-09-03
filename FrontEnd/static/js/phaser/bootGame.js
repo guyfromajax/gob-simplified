@@ -3,6 +3,7 @@ import { createGameScene } from './gameScene.js';
 import { setCourtOffsets } from './utils/gridToPixels.js';
 import { on, emit } from './utils/eventBus.js';
 import { finalizeGame } from './finalizeGame.js';
+import { DEBUG } from './utils/debug.js';
 
 const DEBUG_GAME_ID =
   (typeof window !== 'undefined' && window.DEBUG_GAME_ID) ||
@@ -15,10 +16,6 @@ const DEBUG_TEAMS =
 const DEBUG_SERIALIZATION =
   (typeof window !== 'undefined' && window.DEBUG_SERIALIZATION) ||
   (typeof process !== 'undefined' && process.env.DEBUG_SERIALIZATION) ||
-  false;
-const DEBUG =
-  (typeof window !== 'undefined' && window.DEBUG) ||
-  (typeof process !== 'undefined' && process.env.DEBUG) ||
   false;
 
 if (typeof window !== 'undefined') {
