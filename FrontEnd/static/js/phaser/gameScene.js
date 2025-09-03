@@ -6,6 +6,7 @@ import { emit } from './utils/eventBus.js';
 import { appendToTextScroll } from './utils/textScroll.js';
 import { DEBUG } from './utils/debug.js';
 import { createGameStateMachine, States } from './state/gameStateMachine.js';
+import gameStore from '../state/gameStore.js';
 
 const DEBUG_SIM_PAYLOAD =
   (typeof window !== 'undefined' && window.DEBUG_SIM_PAYLOAD) ||
@@ -38,29 +39,27 @@ export function createGameScene(Phaser) {
     }
 
     init(data) {
-        this.rosters = data.rosters;
         this.tournamentId = data.tournamentId;
         this.franchiseId = data.franchiseId;
-        this.homeTeam = data.homeTeam;
-        this.awayTeam = data.awayTeam;
         this.animate = data.animate;
         this.mode = data.mode;
         this.homeLineup = data.homeLineup || {};
         this.awayLineup = data.awayLineup || {};
         this.periodLabel = data.periodLabel;
-        this.gameId = data.gameId || null;
+        this.gameId = gameStore.getGameId();
         if (!this.gameId && typeof localStorage !== 'undefined') {
           localStorage.removeItem('game_id');
         }
         this.quarter = data.quarter || 1;
 
         if (DEBUG_FLOW) {
+          const teams = gameStore.getTeams();
           console.log("🧠 Game initialized with:", {
-            rosters: this.rosters,
+            rosters: gameStore.getRosters(),
             tournamentId: this.tournamentId,
             franchiseId: this.franchiseId,
-            homeTeam: this.homeTeam,
-            awayTeam: this.awayTeam,
+            homeTeam: teams.home,
+            awayTeam: teams.away,
             mode: this.mode,
             periodLabel: this.periodLabel,
           });
@@ -72,8 +71,9 @@ export function createGameScene(Phaser) {
       if (DEBUG_FLOW) console.log("✅ GameScene preloaded");
       if (this.animate) {
         this.load.image("ball", "/static/images/ball.png");
+        const { home } = gameStore.getTeams();
         const normalizeTeamName = (name) => name.toLowerCase().replace(/[\s\-]/g, '_');
-        const teamId = normalizeTeamName(this.homeTeam);
+        const teamId = normalizeTeamName(home);
         this.load.image("court-bg", `/static/images/courts/${teamId}.jpg`);
       }
 
@@ -92,11 +92,7 @@ export function createGameScene(Phaser) {
       this.playerInfo = {};
       this.playerStats = {};
 
-    //   const homeTeam = this.homeTeam || this.rosters.homeRoster.team || this.rosters.homeRoster.team_name;
-    //   const awayTeam = this.awayTeam || this.rosters.awayRoster.team || this.rosters.awayRoster.team_name;
-
-      const homeTeam = this.rosters.homeRoster.team_name;
-      const awayTeam = this.rosters.awayRoster.team_name;
+      const { home: homeTeam, away: awayTeam } = gameStore.getTeams();
 
       if (DEBUG_TEAMS) {
         console.log("📨 Sending /api/simulate-quarter request for:", homeTeam, "vs", awayTeam);
@@ -181,6 +177,11 @@ export function createGameScene(Phaser) {
       if (this.gameId && typeof localStorage !== 'undefined') {
         localStorage.setItem('game_id', this.gameId);
       }
+      gameStore.setGameId(this.gameId);
+      gameStore.setColors({
+        home: simData.home_team_colors,
+        away: simData.away_team_colors,
+      });
       this.isFinal = simData.is_final;
       if (DEBUG_FLOW) {
         console.log(
@@ -299,18 +300,7 @@ export function createGameScene(Phaser) {
       hydrateBoxScore();
 
       if (this.animate) {
-        this.playerSprites = loadPhaserPlayers(this, simData.players, {
-          home: {
-            player_ids: simData.players.filter(p => p.team === 'home').map(p => p.playerId ?? p.player_id),
-            primary_color: simData.home_team_colors.primary_color,
-            secondary_color: simData.home_team_colors.secondary_color,
-          },
-          away: {
-            player_ids: simData.players.filter(p => p.team === 'away').map(p => p.playerId ?? p.player_id),
-            primary_color: simData.away_team_colors.primary_color,
-            secondary_color: simData.away_team_colors.secondary_color,
-          },
-        }, Phaser);
+        this.playerSprites = loadPhaserPlayers(this, simData.players, Phaser);
       }
 
       const applyPlayerStats = (turn = {}) => {

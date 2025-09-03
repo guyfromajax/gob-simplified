@@ -1,21 +1,52 @@
 import { createPhaserPlayer } from "./createPhaserPlayer.js";
+import gameStore from "../../state/gameStore.js";
 
 /**
  * Creates Phaser player containers for all players and stores them by ID.
  * 
  * @param {Phaser.Scene} scene - The active Phaser scene
  * @param {Array} allPlayers - Array of player objects from simData
- * @param {Object} teamInfo - { home: { colors }, away: { colors } }
+ * @param {Object} [teamInfo] - Optional colors; defaults to gameStore values
  * @returns {Object} Map of playerId -> Phaser container
  */
-export function loadPhaserPlayers(scene, allPlayers, teamInfo, Phaser) {
+export function loadPhaserPlayers(
+  scene,
+  allPlayers,
+  teamInfoOrPhaser,
+  maybePhaser
+) {
+  let teamInfo = teamInfoOrPhaser;
+  let PhaserLib = maybePhaser;
+  if (typeof maybePhaser === "undefined") {
+    PhaserLib = teamInfoOrPhaser;
+    teamInfo = null;
+  }
+
+  if (!teamInfo) {
+    const colors = gameStore.getColors();
+    teamInfo = {
+      home: {
+        player_ids: allPlayers
+          .filter(p => p.team === "home")
+          .map(p => p.playerId ?? p.player_id),
+        ...colors.home,
+      },
+      away: {
+        player_ids: allPlayers
+          .filter(p => p.team === "away")
+          .map(p => p.playerId ?? p.player_id),
+        ...colors.away,
+      },
+    };
+  }
+
   const playerSprites = {};
 
   for (const player of allPlayers) {
     const id = player.playerId ?? player.player_id;
-    const isHome = teamInfo.home.player_ids.includes(id);
+    const isHome = teamInfo.home.player_ids.includes(id) || player.team === "home";
     const teamColors = isHome ? teamInfo.home : teamInfo.away;
-    
+
     const sprite = createPhaserPlayer({
       scene,
       player,
@@ -24,7 +55,7 @@ export function loadPhaserPlayers(scene, allPlayers, teamInfo, Phaser) {
         isHome
       },
       position: player.pos,
-      Phaser
+      Phaser: PhaserLib
     });
     // ✅ Attach team metadata for later logic
     sprite.team_id = player.team_id; // e.g., "MORRISTOWN"
