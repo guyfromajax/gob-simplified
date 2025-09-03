@@ -892,17 +892,22 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
       const shotResult = await shootBall(shootParams);
       const ballSpot = shotResult?.grid;
       if (turnData.result_type === "MAKE") {
-        const shooterTeamIsHome =
-          String(shooterTeamId) === String(homeTeamId);
-        const newOffenseSide = shooterTeamIsHome ? "away" : "home";
-        await runInboundSetup({
-          scene,
-          ballSprite,
-          playerSprites,
-          newOffenseSide,
-          homeTeamId,
-          awayTeamId
-        });
+        const nextTurn = simData?.turns?.[scene.currentTurn + 1];
+        const hasPendingFreeThrow =
+          nextTurn?.result_type === "FREE_THROW";
+        if (!hasPendingFreeThrow) {
+          const shooterTeamIsHome =
+            String(shooterTeamId) === String(homeTeamId);
+          const newOffenseSide = shooterTeamIsHome ? "away" : "home";
+          await runInboundSetup({
+            scene,
+            ballSprite,
+            playerSprites,
+            newOffenseSide,
+            homeTeamId,
+            awayTeamId,
+          });
+        }
       } else if (ballSpot) {
         const rebounderId =
           turnData.rebounder_player_id ||
