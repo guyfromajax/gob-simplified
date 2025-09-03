@@ -418,7 +418,9 @@ def resolve_free_throw_logic(game):
                         "possession_flips": False,
                     }
         else:
-            possession_flips = True
+            if not game_state.get("no_lane", False):
+                possession_flips = True
+    # When additional free throws remain, possession stays with the shooter’s team
 
     result = {
         "result_type": "FREE_THROW",
