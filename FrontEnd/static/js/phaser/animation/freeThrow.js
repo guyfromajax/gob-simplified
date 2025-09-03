@@ -1,5 +1,7 @@
 import { gridToPixels } from "../utils/gridToPixels.js";
-import animationConfig from "./animation_config.js";
+import animationConfig, {
+  FT_BETWEEN_SHOTS_DELAY_MS,
+} from "./animation_config.js";
 import { HOME_RIM_COORDS, AWAY_RIM_COORDS } from "./courtConstants.js";
 import { States, safeTransition } from "../state/gameStateMachine.js";
 import { getCurrentOwner, getPendingOwner } from "../ball/ballController.js";
@@ -164,7 +166,6 @@ export async function runFreeThrowSequence(
     const isLastAttempt = i === attempts.length - 1;
     const isFinalFT = isLastAttempt && isFinalTurn;
     const earlyExit = bonusType === 'ONE_AND_ONE' && result === 'MISS';
-    const exitNow = isFinalFT || earlyExit;
     if (result === "MAKE") {
       if (onUpdate) {
         try {
@@ -173,7 +174,7 @@ export async function runFreeThrowSequence(
           console.error("Scoreboard update failed:", err);
         }
       }
-      if (exitNow) {
+      if (isFinalFT) {
         safeTransition(
           scene.stateMachine,
           States.Inbound,
@@ -195,6 +196,12 @@ export async function runFreeThrowSequence(
           newOffenseSide,
         });
       } else {
+        if (scene.tweens) {
+          for (const sprite of Object.values(playerSprites))
+            scene.tweens.killTweensOf(sprite);
+          scene.tweens.killTweensOf(ballSprite);
+        }
+        await wait(scene, FT_BETWEEN_SHOTS_DELAY_MS);
         const resetStep = moves[moveIndex];
         moveIndex++;
         const resetGrid = resetStep?.coords || rimGrid;
@@ -211,7 +218,7 @@ export async function runFreeThrowSequence(
         if (shooterSprite) attach(scene, ballSprite, shooterSprite);
       }
     } else {
-      if (exitNow) {
+      if (isFinalFT || earlyExit) {
         safeTransition(
           scene.stateMachine,
           States.Rebound,
@@ -232,6 +239,12 @@ export async function runFreeThrowSequence(
           shooterId: turnData.shooter_id,
         });
       } else {
+        if (scene.tweens) {
+          for (const sprite of Object.values(playerSprites))
+            scene.tweens.killTweensOf(sprite);
+          scene.tweens.killTweensOf(ballSprite);
+        }
+        await wait(scene, FT_BETWEEN_SHOTS_DELAY_MS);
         const resetStep = moves[moveIndex];
         moveIndex++;
         const resetGrid = resetStep?.coords || rimGrid;
