@@ -139,6 +139,9 @@ async function runSetupTween({ scene, ballSprite, animations, playerSprites, cur
 async function runSideInboundSetup({ scene, ballSprite, playerSprites, turnData }) {
   if (!turnData || scene?.skipToEnd || scene?.stateMachine?.is(States.FreeThrow) || scene?.stateMachine?.is(States.FastBreak)) return;
 
+  scene.isInboundSetup = true;
+  if (!scene.stateMachine?.is(States.Inbound)) scene.stateMachine?.transition?.(States.Inbound, getDebugTransitions() && { stepIndex: 0 });
+
   const { ball_spot, oDestinations = {}, dDestinations = {}, possession_team_id } = turnData;
   const offenseTeamId = scene.currentOffenseTeamId ?? possession_team_id;
 
@@ -229,7 +232,9 @@ async function runSideInboundSetup({ scene, ballSprite, playerSprites, turnData 
     if (pgSprite) {
       console.log(`[sideInbound][pgAttach] sf:${sfId} pg:${pgId}`);
     }
+    if (scene.stateMachine?.is(States.Inbound)) scene.stateMachine?.transition?.(States.HalfCourt, getDebugTransitions() && { stepIndex: 0 });
   }
+  scene.isInboundSetup = false;
 }
 
 // Setup positions after a defensive rebound before new half-court offense
