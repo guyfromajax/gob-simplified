@@ -7,7 +7,8 @@ import {
   SHOT_DEBUG,
   animateRebound,
   animatePutbackAttempt,
-  animateKickoutReset
+  animateKickoutReset,
+  animateReboundPass
 } from "./ballManager.js";
 import { tweenBallTo, runPass, PASS_DEBUG } from "./ballTween.js";
 import animationConfig from "./animation_config.js";
@@ -887,6 +888,17 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
             rebounderId: evt.rebound.rebounderId,
             ballSpot: putbackResult?.grid || evt.rebound.ballSpot
           });
+        }
+      } else if (evt.event_type === "REBOUND_PASS") {
+        await animateReboundPass(
+          scene,
+          ballSprite,
+          evt.rebounderId,
+          evt.pgId,
+          evt.rebounderCoords
+        );
+        if (typeof scene.startNextHalfCourtOffense === "function") {
+          scene.startNextHalfCourtOffense();
         }
       } else if (evt.event_type === "KICKOUT_RESET") {
         await animateKickoutReset(
