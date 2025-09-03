@@ -5,6 +5,7 @@ import { finalizeGame } from './finalizeGame.js';
 import { emit } from './utils/eventBus.js';
 import { appendToTextScroll } from './utils/textScroll.js';
 import { DEBUG } from './utils/debug.js';
+import { createGameStateMachine, States } from './state/gameStateMachine.js';
 
 const DEBUG_SIM_PAYLOAD =
   (typeof window !== 'undefined' && window.DEBUG_SIM_PAYLOAD) ||
@@ -32,8 +33,8 @@ export function createGameScene(Phaser) {
     constructor() {
       super("GameScene");
       this.lastTurnShown = -1;
-      this.reboundInProgress = false;
       this.rebounderId = null;
+      this.stateMachine = createGameStateMachine(States.Inbound);
     }
 
     init(data) {
