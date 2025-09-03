@@ -327,6 +327,19 @@ export function animatePutbackAttempt(
   const shooterSprite = scene.playerSprites?.[shooterId];
   if (!shooterSprite) return Promise.resolve();
 
+  const stateMachine = scene.stateMachine;
+  if (
+    stateMachine &&
+    (stateMachine.is(States.HalfCourt) ||
+      stateMachine.is(States.Rebound) ||
+      stateMachine.is(States.FastBreak))
+  ) {
+    safeTransition(stateMachine, States.ShotAttempt, {
+      currentOwnerId: getCurrentOwner(scene),
+      pendingOwnerId: getPendingOwner(scene),
+    });
+  }
+
   if (scene.tweens) scene.tweens.killTweensOf(ballSprite);
   clearCurrentOwner(scene);
   ballSprite.setPosition(shooterSprite.x, shooterSprite.y);
@@ -372,6 +385,12 @@ export function animatePutbackAttempt(
             });
             resolve();
             } else if (result === "MISS") {
+              if (scene.stateMachine?.is(States.ShotAttempt)) {
+                safeTransition(scene.stateMachine, States.Rebound, {
+                  shotResult: result,
+                });
+              }
+
               const isHomeTeam = shooterSprite.team === "home";
               const rebCfg = animationConfig.rebound;
               const bounceGridX = isHomeTeam
@@ -385,7 +404,6 @@ export function animatePutbackAttempt(
                 scene.game.config.width,
                 scene.game.config.height
               );
-              scene.stateMachine?.transition(States.Rebound, getDebugTransitions() && { shotResult: result });
               scene.rebounderId = null;
               scene.tweens.add({
                 targets: ballSprite,
@@ -397,9 +415,12 @@ export function animatePutbackAttempt(
                   resolve({ grid: { x: bounceGridX, y: bounceGridY } })
               });
             } else {
-            // FOUL or unrecognized result: backend will handle next steps
-            resolve();
-          }
+              safeTransition(scene.stateMachine, States.FreeThrow, {
+                shotResult: result,
+              });
+              // FOUL or unrecognized result: backend will handle next steps
+              resolve();
+            }
         };
 
         handleComplete();
