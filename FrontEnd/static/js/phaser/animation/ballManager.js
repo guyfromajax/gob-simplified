@@ -11,6 +11,7 @@ import {
   runPass as baseRunPass
 } from "./ballTween.js";
 import { States } from "../state/gameStateMachine.js";
+import gameStore from "../../state/gameStore.js";
 
 function attachBallToPlayer(scene, ballSprite, playerSprite, opts = {}) {
   if (scene.possessionFlipInProgress) return;
@@ -149,8 +150,11 @@ export function shootBall({
 }) {
   if (!scene || !ballSprite) return Promise.resolve();
   if (scene?.stateMachine?.is(States.FreeThrow)) return Promise.resolve();
-
-  const isHomeTeam = shooterTeamId === homeTeamId;
+  const homeRoster = gameStore.getHomeRoster();
+  const storeHomeId =
+    homeRoster?.team_id || homeRoster?.teamId || homeRoster?.team_name || homeRoster?.team;
+  const effectiveHomeId = homeTeamId ?? storeHomeId;
+  const isHomeTeam = String(shooterTeamId) === String(effectiveHomeId);
 
   const start = gridToPixels(
     fromCoords.x,
@@ -305,9 +309,10 @@ export function animatePutbackAttempt(
 
             const shooterTeamKey = shooterSprite.team;
             const newOffenseSide = shooterTeamKey === "home" ? "away" : "home";
-            const sprites = Object.values(scene.playerSprites || {});
-            const homeTeamId = sprites.find(s => s.team === "home")?.team_id;
-            const awayTeamId = sprites.find(s => s.team === "away")?.team_id;
+            const homeTeamId =
+              gameStore.getHomeRoster()?.team_id || gameStore.getHomeRoster()?.teamId;
+            const awayTeamId =
+              gameStore.getAwayRoster()?.team_id || gameStore.getAwayRoster()?.teamId;
 
             await runInboundSetup({
               scene,
