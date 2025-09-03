@@ -5,6 +5,7 @@ import animationConfig, {
 import { HOME_RIM_COORDS, AWAY_RIM_COORDS } from "./courtConstants.js";
 import { States, safeTransition } from "../state/gameStateMachine.js";
 import { getCurrentOwner, getPendingOwner } from "../ball/ballController.js";
+import { DebugFlags } from "../utils/debugFlags.js";
 
 function wait(scene, ms) {
   if (!ms) return Promise.resolve();
@@ -17,7 +18,11 @@ function createTransitionGuard(machine, disallowed = []) {
   if (!machine) return () => {};
   const original = machine.transition.bind(machine);
   machine.transition = (next, ...args) => {
-    if (disallowed.includes(next)) return;
+    if (disallowed.includes(next)) {
+      if (DebugFlags?.FSM)
+        console.log("FSM: FreeThrow guard rejected", next); // remove when stable
+      return;
+    }
     return original(next, ...args);
   };
   return () => {
@@ -166,6 +171,7 @@ export async function runFreeThrowSequence(
     const isLastAttempt = i === attempts.length - 1;
     const isFinalFT = isLastAttempt && isFinalTurn;
     const earlyExit = bonusType === 'ONE_AND_ONE' && result === 'MISS';
+    let nextStateResolved = States.FreeThrow;
     if (result === "MAKE") {
       if (onUpdate) {
         try {
@@ -195,6 +201,7 @@ export async function runFreeThrowSequence(
           playerSprites,
           newOffenseSide,
         });
+        nextStateResolved = States.Inbound;
       } else {
         if (scene.tweens) {
           for (const sprite of Object.values(playerSprites))
@@ -238,6 +245,7 @@ export async function runFreeThrowSequence(
           ballSpot: rimGrid,
           shooterId: turnData.shooter_id,
         });
+        nextStateResolved = States.Rebound;
       } else {
         if (scene.tweens) {
           for (const sprite of Object.values(playerSprites))
@@ -260,6 +268,17 @@ export async function runFreeThrowSequence(
         });
         if (shooterSprite) attach(scene, ballSprite, shooterSprite);
       }
+    }
+    if (DebugFlags?.FSM) {
+      console.log({
+        state: States.FreeThrow,
+        ftIndex,
+        ftTotal,
+        bonusType,
+        shotResult: result,
+        isFinalFT,
+        nextStateResolved,
+      }); // remove when stable
     }
     scene.events?.emit("ft:repeatOrExit");
   }
