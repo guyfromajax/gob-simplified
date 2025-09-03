@@ -13,7 +13,7 @@ import { tweenBallTo, runPass, PASS_DEBUG, tweenPlayerTo } from "./ballTween.js"
 import animationConfig from "./animation_config.js";
 import { HOME_RIM_COORDS, AWAY_RIM_COORDS } from "./courtConstants.js";
 import { DEBUG } from "../utils/debug.js";
-import { States, getDebugTransitions } from "../state/gameStateMachine.js";
+import { States, getDebugTransitions, safeTransition } from "../state/gameStateMachine.js";
 import {
   getPendingOwner,
   clearPendingOwner,
@@ -140,7 +140,18 @@ async function runSideInboundSetup({ scene, ballSprite, playerSprites, turnData 
   if (!turnData || scene?.skipToEnd || scene?.stateMachine?.is(States.FreeThrow) || scene?.stateMachine?.is(States.FastBreak)) return;
 
   scene.isInboundSetup = true;
-  if (!scene.stateMachine?.is(States.Inbound)) scene.stateMachine?.transition?.(States.Inbound, getDebugTransitions() && { stepIndex: 0 });
+  if (!scene.stateMachine?.is(States.Inbound)) {
+    safeTransition(
+      scene.stateMachine,
+      States.Inbound,
+      {
+        stepIndex: 0,
+        currentOwnerId: getCurrentOwner(scene),
+        pendingOwnerId: getPendingOwner(scene),
+      },
+      ["stepIndex"]
+    );
+  }
 
   const { ball_spot, oDestinations = {}, dDestinations = {}, possession_team_id } = turnData;
   const offenseTeamId = scene.currentOffenseTeamId ?? possession_team_id;
@@ -232,7 +243,17 @@ async function runSideInboundSetup({ scene, ballSprite, playerSprites, turnData 
     if (pgSprite) {
       console.log(`[sideInbound][pgAttach] sf:${sfId} pg:${pgId}`);
     }
-    if (scene.stateMachine?.is(States.Inbound)) scene.stateMachine?.transition?.(States.HalfCourt, getDebugTransitions() && { stepIndex: 0 });
+    if (scene.stateMachine?.is(States.Inbound))
+      safeTransition(
+        scene.stateMachine,
+        States.HalfCourt,
+        {
+          stepIndex: 0,
+          currentOwnerId: getCurrentOwner(scene),
+          pendingOwnerId: getPendingOwner(scene),
+        },
+        ["stepIndex"]
+      );
   }
   scene.isInboundSetup = false;
 }
@@ -318,7 +339,18 @@ async function runInboundSetup({
 }) {
   if (scene?.stateMachine?.is(States.FreeThrow)) return;
   scene.isInboundSetup = true;
-  if (!scene.stateMachine?.is(States.Inbound)) scene.stateMachine?.transition?.(States.Inbound, getDebugTransitions() && { stepIndex: 0 });
+  if (!scene.stateMachine?.is(States.Inbound)) {
+    safeTransition(
+      scene.stateMachine,
+      States.Inbound,
+      {
+        stepIndex: 0,
+        currentOwnerId: getCurrentOwner(scene),
+        pendingOwnerId: getPendingOwner(scene),
+      },
+      ["stepIndex"]
+    );
+  }
   if (!scene.ballSprite) scene.ballSprite = ballSprite;
   const isAwayOffense = newOffenseSide === "away";
 
@@ -618,7 +650,17 @@ async function runInboundSetup({
   console.log(`[inbound][passEnd][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
   console.log(`[inbound][pgAttach][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
 
-  if (scene.stateMachine?.is(States.Inbound)) scene.stateMachine?.transition?.(States.HalfCourt, getDebugTransitions() && { stepIndex: 0 });
+  if (scene.stateMachine?.is(States.Inbound))
+    safeTransition(
+      scene.stateMachine,
+      States.HalfCourt,
+      {
+        stepIndex: 0,
+        currentOwnerId: getCurrentOwner(scene),
+        pendingOwnerId: getPendingOwner(scene),
+      },
+      ["stepIndex"]
+    );
 
   scene.isInboundSetup = false;
 }
