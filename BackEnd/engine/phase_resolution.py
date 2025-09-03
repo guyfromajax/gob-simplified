@@ -167,10 +167,14 @@ def resolve_fast_break_logic(game: "GameManager"):
         fb_roles["outlet_passer"] = None
         fb_roles["outlet_receiver"] = None
 
-        for pos in ["PG", "SG", "SF"]:
-            if off_lineup[pos] != ball_handler:
-                if random.random() < {"PG": 0.5, "SG": 0.4, "SF": 0.05}.get(pos, 0):
-                    fb_roles["offense"].append(off_lineup[pos])
+        # Previous logic added additional offensive players to the fast break,
+        # potentially scheduling runners beyond the ball handler. The current
+        # approach freezes all non-ball-handlers so no extra offense is added
+        # to the break.
+        # for pos in ["PG", "SG", "SF"]:
+        #     if off_lineup[pos] != ball_handler:
+        #         if random.random() < {"PG": 0.5, "SG": 0.4, "SF": 0.05}.get(pos, 0):
+        #             fb_roles["offense"].append(off_lineup[pos])
 
     target_is_away = off_team.team_id == game.away_team.team_id
     fb_roles["defense"] = get_in_play_defenders(ball_handler, def_lineup, target_is_away)
