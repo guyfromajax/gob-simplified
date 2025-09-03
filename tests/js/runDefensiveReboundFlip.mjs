@@ -1,4 +1,5 @@
 import { playTurnAnimation } from '../../FrontEnd/static/js/phaser/animation/turnAnimation.js';
+import { getCurrentOwner } from '../../FrontEnd/static/js/phaser/ball/ballController.js';
 
 function makeScene() {
   const log = {};
@@ -49,4 +50,4 @@ const turnData = {
 
 await playTurnAnimation({ scene, simData, playerSprites: scene.playerSprites, turnData, ballSprite });
 
-console.log(JSON.stringify({ newOffense: scene.offenseTeamId, eventOffense: scene.possessionLog.event, attached: scene.ballAttachedToPlayerId }));
+console.log(JSON.stringify({ newOffense: scene.offenseTeamId, eventOffense: scene.possessionLog.event, attached: getCurrentOwner(scene) }));
