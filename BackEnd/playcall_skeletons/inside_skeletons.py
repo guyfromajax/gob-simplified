@@ -28,6 +28,7 @@ from BackEnd.constants import HCO_STRING_SPOTS, ACTIONS
 #frequencyoptions are strong offense, neutral, strong defense
 INSIDE_HIGHLOW_ENTRY = {
     "primary_shooter": "C",
+    "screener": "PF",
     "kickout_shooters": ["PG", "SG", "SF"],
     "pass_sequence": ["PG", "PF", "C"],
     "steps": [
