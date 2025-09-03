@@ -17,7 +17,9 @@ import {
   cancelBallTween,
   getCurrentOwner,
   getPendingOwner,
+  setPendingOwner,
 } from "../ball/ballController.js";
+import { DebugFlags } from "../utils/debugFlags.js";
 
 function attachBallToPlayer(scene, ballSprite, playerSprite, opts = {}) {
   if (scene.possessionFlipInProgress) return;
@@ -627,6 +629,9 @@ export function animateKickoutReset(
     scene.ballSprite = ballSprite;
   }
 
+  // Attach to the rebounder before starting the pass
+  attachBallToPlayer(scene, ballSprite, rebounderSprite);
+
   const width = scene.game.config.width;
   const height = scene.game.config.height;
   const cfg = animationConfig.kickout;
@@ -634,8 +639,6 @@ export function animateKickoutReset(
   const usedDuration = raw != null && raw >= cfg.duration ? raw : cfg.duration;
 
   const opts = {
-    fromId: rebounderId,
-    toId: pgId,
     duration: usedDuration,
     easing: cfg.easing
   };
@@ -647,6 +650,8 @@ export function animateKickoutReset(
       width,
       height
     );
+  } else {
+    opts.startCoords = { x: rebounderSprite.x, y: rebounderSprite.y };
   }
   if (pass.toCoords) {
     opts.endCoords = gridToPixels(
@@ -655,17 +660,36 @@ export function animateKickoutReset(
       width,
       height
     );
+  } else {
+    opts.endCoords = { x: pgSprite.x, y: pgSprite.y };
   }
-
-  scene.events?.once('passStart', () => console.log('passStart'));
-  scene.events?.once('tweenStart', () => console.log('tweenStart'));
-  scene.events?.once('tweenEnd', () => console.log('tweenEnd'));
 
   if (scene.stateMachine?.is(States.FastBreak)) {
     return Promise.resolve();
   }
 
-  return runPass(scene, opts);
+  const ownerBefore = getCurrentOwner(scene);
+  detachBall(scene, ballSprite);
+
+  return runPass(scene, opts).then(() => {
+    attachBallToPlayer(scene, ballSprite, pgSprite);
+    setPendingOwner(scene, pgId);
+    const ownerAfter = getCurrentOwner(scene);
+
+    if (scene.stateMachine?.is(States.Rebound)) {
+      safeTransition(scene.stateMachine, States.HalfCourt);
+    }
+
+    if (DebugFlags?.BALL || DebugFlags?.FSM) {
+      console.log({
+        event: 'KICK_OUT_PASS',
+        from: rebounderId,
+        to: pgId,
+        ownerBefore,
+        ownerAfter
+      });
+    }
+  });
 }
 
 /**
