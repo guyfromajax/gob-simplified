@@ -1,4 +1,5 @@
 import { attachBallToPlayer, animateRebound } from '../../FrontEnd/static/js/phaser/animation/ballManager.js';
+import { createGameStateMachine, States } from '../../FrontEnd/static/js/phaser/state/gameStateMachine.js';
 
 function makeScene() {
   return {
@@ -20,8 +21,8 @@ function makeScene() {
       b: { x: 0, y: 0, playerId: 'b', team: 'home', team_id: 'HOME' }
     },
     events: { emit: () => {} },
-    reboundInProgress: true,
-    rebounderId: 'a'
+    rebounderId: 'a',
+    stateMachine: createGameStateMachine(States.Rebound)
   };
 }
 
@@ -42,7 +43,7 @@ await animateRebound({
   ballSpot: { x: 0, y: 0 }
 });
 const afterRebound = scene.ballAttachedToPlayerId;
-const flagAfterRebound = scene.reboundInProgress;
+const flagAfterRebound = scene.stateMachine.is(States.Rebound);
 
 // Now that flag is cleared, attaching to another player works
 attachBallToPlayer(scene, ballSprite, scene.playerSprites.b);

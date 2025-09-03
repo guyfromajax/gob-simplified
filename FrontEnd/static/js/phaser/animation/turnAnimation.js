@@ -13,6 +13,7 @@ import { tweenBallTo, runPass, PASS_DEBUG, tweenPlayerTo, detachBall } from "./b
 import animationConfig from "./animation_config.js";
 import { HOME_RIM_COORDS, AWAY_RIM_COORDS, HOME_TOP_KEY, AWAY_TOP_KEY } from "./courtConstants.js";
 import { DEBUG } from "../utils/debug.js";
+import { States } from "../state/gameStateMachine.js";
 
 // Cap the time spent on any single movement step. Large timestamp gaps can
 // otherwise produce multi‑second tweens that appear as animation stalls.
@@ -24,7 +25,7 @@ const MAX_STEP_DURATION = 1000; // ms
  * Assigns the ball to the correct player for the current stepIndex
  */
 function updateBallOwnership({ scene, ballSprite, animations, playerSprites, stepIndex, offenseTeamId, currentBallOwnerRef }) {
-  if (scene?.skipToEnd || scene?.fastBreakInProgress) return;
+  if (scene?.skipToEnd || scene?.stateMachine?.is(States.FastBreak)) return;
 
   if (scene.passInFlight) return;
 
@@ -129,7 +130,7 @@ async function runSetupTween({ scene, ballSprite, animations, playerSprites, cur
 
 // Setup sideline inbound play
 async function runSideInboundSetup({ scene, ballSprite, playerSprites, turnData }) {
-  if (!turnData || scene?.skipToEnd || scene?.ftInProgress || scene?.fastBreakInProgress) return;
+  if (!turnData || scene?.skipToEnd || scene?.stateMachine?.is(States.FreeThrow) || scene?.stateMachine?.is(States.FastBreak)) return;
 
   const { ball_spot, oDestinations = {}, dDestinations = {}, possession_team_id } = turnData;
   const offenseTeamId = scene.currentOffenseTeamId ?? possession_team_id;
@@ -214,7 +215,7 @@ async function runSideInboundSetup({ scene, ballSprite, playerSprites, turnData 
     scene.events?.once('passEnd', () => console.log('passEnd'));
 
     console.log(`[sideInbound][passStart] sf:${sfId} pg:${pgId}`);
-    if (pgSprite && !scene.fastBreakInProgress) {
+    if (pgSprite && !scene.stateMachine?.is(States.FastBreak)) {
       await runPass(scene, { fromId: sfId, toId: pgId, duration, easing: ease });
     }
     console.log(`[sideInbound][passEnd] sf:${sfId} pg:${pgId}`);
@@ -303,7 +304,7 @@ async function runInboundSetup({
   homeTeamId,
   awayTeamId
 }) {
-  if (scene?.ftInProgress) return;
+  if (scene?.stateMachine?.is(States.FreeThrow)) return;
   scene.isInboundSetup = true;
   if (!scene.ballSprite) scene.ballSprite = ballSprite;
   const isAwayOffense = newOffenseSide === "away";
@@ -593,7 +594,7 @@ async function runInboundSetup({
   scene.events?.once('passEnd', () => console.log('passEnd'));
 
   console.log(`[inbound][passStart][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
-  if (!scene.fastBreakInProgress) {
+  if (!scene.stateMachine?.is(States.FastBreak)) {
     await runPass(scene, {
       fromId: sfId,
       toId: pgId,
@@ -611,7 +612,7 @@ async function runFastBreakSequence({ scene, turnData, playerSprites, ballSprite
   if (!scene || !turnData || scene.skipToEnd) return;
   if (!scene.ballSprite) scene.ballSprite = ballSprite;
 
-  scene.fastBreakInProgress = true;
+  scene.stateMachine?.transition(States.FastBreak);
   scene.events?.emit("fb:start");
 
   if (scene.tweens) {
@@ -841,7 +842,7 @@ async function runFastBreakSequence({ scene, turnData, playerSprites, ballSprite
       }
     }
   } finally {
-    scene.fastBreakInProgress = false;
+    if (scene.stateMachine?.is(States.FastBreak)) scene.stateMachine?.transition(States.HalfCourt);
     scene.events?.emit("fb:end");
   }
 }
@@ -859,7 +860,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
     ...turnData.animations.map(anim => anim.movement.length)
   );
 
-  if (scene.fastBreakInProgress) {
+  if (scene.stateMachine?.is(States.FastBreak)) {
     return;
   }
 
@@ -879,7 +880,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   // Determine which player owns the ball at step 0
   let step0OwnerSprite = null;
   for (const anim of turnData.animations) {
-    if (scene.skipToEnd || scene.fastBreakInProgress) break;
+    if (scene.skipToEnd || scene.stateMachine?.is(States.FastBreak)) break;
     if (anim.hasBallAtStep?.[0]) {
       step0OwnerSprite = playerSprites[anim.playerId];
       break;
@@ -900,7 +901,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
     currentBallOwnerRef
   });
 
-  if (scene.skipToEnd || scene.fastBreakInProgress) {
+  if (scene.skipToEnd || scene.stateMachine?.is(States.FastBreak)) {
     return;
   }
 
@@ -926,7 +927,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   let eventsProcessed = false;
 
   for (let stepIndex = 1; stepIndex < maxSteps; stepIndex++) {
-    if (scene.skipToEnd || scene.fastBreakInProgress) break;
+    if (scene.skipToEnd || scene.stateMachine?.is(States.FastBreak)) break;
 
     updateBallOwnership({
       scene,
@@ -1053,7 +1054,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
                   scene.events?.emit?.("possessionChange", {
                     offenseTeamId: rebounderSprite.team_id
                   });
-                  scene.reboundInProgress = false;
+                  if (scene.stateMachine?.is(States.Rebound)) scene.stateMachine?.transition(States.HalfCourt);
                   scene.rebounderId = null;
                   if (scene.time?.delayedCall) {
                     scene.time.delayedCall(rebCfg.attachDelayMs, resolve);
