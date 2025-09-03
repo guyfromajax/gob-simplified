@@ -1,3 +1,5 @@
+import { DebugFlags } from "../utils/debugFlags.js";
+
 export const States = {
   Inbound: 'Inbound',
   HalfCourt: 'HalfCourt',
@@ -28,6 +30,22 @@ export function setDebugTransitions(value) {
 
 export function getDebugTransitions() {
   return debugTransitions;
+}
+
+export function createTransitionGuard(machine, disallowed = []) {
+  if (!machine) return () => {};
+  const original = machine.transition.bind(machine);
+  machine.transition = (next, ...args) => {
+    if (disallowed.includes(next)) {
+      if (DebugFlags?.FSM)
+        console.log("FSM: guard rejected", next);
+      return;
+    }
+    return original(next, ...args);
+  };
+  return () => {
+    machine.transition = original;
+  };
 }
 
 export function safeTransition(machine, next, ctx = {}, required = []) {

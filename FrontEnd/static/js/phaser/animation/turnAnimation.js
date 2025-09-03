@@ -14,7 +14,7 @@ import animationConfig from "./animation_config.js";
 import { HOME_RIM_COORDS, AWAY_RIM_COORDS } from "./courtConstants.js";
 import { DEBUG } from "../utils/debug.js";
 import { DebugFlags } from "../utils/debugFlags.js";
-import { States, getDebugTransitions, safeTransition } from "../state/gameStateMachine.js";
+import { States, getDebugTransitions, safeTransition, createTransitionGuard } from "../state/gameStateMachine.js";
 import {
   getPendingOwner,
   clearPendingOwner,
@@ -899,6 +899,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
           const shooterTeamIsHome =
             String(shooterTeamId) === String(homeTeamId);
           const newOffenseSide = shooterTeamIsHome ? "away" : "home";
+          const releaseGuard = createTransitionGuard(scene.stateMachine, [States.Rebound]);
           await runInboundSetup({
             scene,
             ballSprite,
@@ -907,6 +908,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
             homeTeamId,
             awayTeamId,
           });
+          releaseGuard?.();
         }
       } else if (ballSpot) {
         const rebounderId =

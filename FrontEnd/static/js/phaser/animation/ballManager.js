@@ -10,7 +10,7 @@ import {
   tweenBallTo,
   runPass as baseRunPass
 } from "./ballTween.js";
-import { States, getDebugTransitions, safeTransition } from "../state/gameStateMachine.js";
+import { States, getDebugTransitions, safeTransition, createTransitionGuard } from "../state/gameStateMachine.js";
 import gameStore from "../../state/gameStore.js";
 import {
   clearCurrentOwner,
@@ -375,6 +375,7 @@ export function animatePutbackAttempt(
             const awayTeamId =
               gameStore.getAwayRoster()?.team_id || gameStore.getAwayRoster()?.teamId;
 
+            const releaseGuard = createTransitionGuard(scene.stateMachine, [States.Rebound]);
             await runInboundSetup({
               scene,
               ballSprite,
@@ -383,6 +384,7 @@ export function animatePutbackAttempt(
               homeTeamId,
               awayTeamId
             });
+            releaseGuard?.();
             resolve();
             } else if (result === "MISS") {
               if (scene.stateMachine?.is(States.ShotAttempt)) {
