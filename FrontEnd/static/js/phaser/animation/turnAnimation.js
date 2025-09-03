@@ -13,7 +13,7 @@ import { tweenBallTo, runPass, PASS_DEBUG, tweenPlayerTo } from "./ballTween.js"
 import animationConfig from "./animation_config.js";
 import { HOME_RIM_COORDS, AWAY_RIM_COORDS } from "./courtConstants.js";
 import { DEBUG } from "../utils/debug.js";
-import { States } from "../state/gameStateMachine.js";
+import { States, getDebugTransitions } from "../state/gameStateMachine.js";
 import {
   getPendingOwner,
   clearPendingOwner,
@@ -313,7 +313,7 @@ async function runInboundSetup({
 }) {
   if (scene?.stateMachine?.is(States.FreeThrow)) return;
   scene.isInboundSetup = true;
-  if (!scene.stateMachine?.is(States.Inbound)) scene.stateMachine?.transition?.(States.Inbound);
+  if (!scene.stateMachine?.is(States.Inbound)) scene.stateMachine?.transition?.(States.Inbound, getDebugTransitions() && { stepIndex: 0 });
   if (!scene.ballSprite) scene.ballSprite = ballSprite;
   const isAwayOffense = newOffenseSide === "away";
 
@@ -613,7 +613,7 @@ async function runInboundSetup({
   console.log(`[inbound][passEnd][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
   console.log(`[inbound][pgAttach][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
 
-  if (scene.stateMachine?.is(States.Inbound)) scene.stateMachine?.transition?.(States.HalfCourt);
+  if (scene.stateMachine?.is(States.Inbound)) scene.stateMachine?.transition?.(States.HalfCourt, getDebugTransitions() && { stepIndex: 0 });
 
   scene.isInboundSetup = false;
 }
@@ -826,7 +826,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
                   scene.events?.emit?.("possessionChange", {
                     offenseTeamId: rebounderSprite.team_id
                   });
-                  if (scene.stateMachine?.is(States.Rebound)) scene.stateMachine?.transition(States.HalfCourt);
+                  if (scene.stateMachine?.is(States.Rebound)) scene.stateMachine?.transition(States.HalfCourt, getDebugTransitions() && { stepIndex: shotInfo?.stepIndex, shotResult: turnData.result_type });
                   scene.rebounderId = null;
                   if (scene.time?.delayedCall) {
                     scene.time.delayedCall(rebCfg.attachDelayMs, resolve);
