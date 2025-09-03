@@ -8,16 +8,18 @@ export const States = {
   OutletSetup: 'OutletSetup',
   FastBreak: 'FastBreak',
   FreeThrow: 'FreeThrow',
+  Turnover: 'Turnover',
   EndQuarter: 'EndQuarter'
 };
 
 const transitions = {
   [States.Inbound]: [States.HalfCourt, States.EndQuarter],
-  [States.HalfCourt]: [States.ShotAttempt, States.FreeThrow, States.FastBreak, States.EndQuarter],
+  [States.HalfCourt]: [States.ShotAttempt, States.FreeThrow, States.FastBreak, States.Turnover, States.EndQuarter],
   [States.ShotAttempt]: [States.Rebound, States.FastBreak, States.FreeThrow, States.Inbound, States.EndQuarter],
   [States.Rebound]: [States.OutletSetup, States.HalfCourt, States.ShotAttempt, States.FastBreak, States.FreeThrow, States.EndQuarter],
   [States.OutletSetup]: [States.HalfCourt],
   [States.FastBreak]: [States.ShotAttempt, States.Rebound, States.FreeThrow, States.Inbound, States.EndQuarter],
+  [States.Turnover]: [States.FastBreak, States.Inbound],
   [States.FreeThrow]: [States.Rebound, States.Inbound, States.EndQuarter],
   [States.EndQuarter]: [States.Inbound]
 };

@@ -4,6 +4,7 @@ import { runPass, REBOUND_DEBUG } from "./ballManager.js";
 import animationConfig from "./animation_config.js";
 import runFreeThrowSequence from "./freeThrow.js";
 import runFastBreakSequence from "./fastBreak.js";
+import { handleTurnover } from "./turnoverAdapter.js";
 import { States } from "../state/gameStateMachine.js";
 
 const DEBUG_FLOW =
@@ -99,6 +100,18 @@ export async function animateGameTurns({ //hasBallAtStep
       if (!scene.stateMachine?.is(States.FastBreak)) {
         await runSideInboundSetup({ scene, ballSprite, playerSprites, turnData: turn });
       }
+      if (onUpdate) {
+        try {
+          onUpdate(turn);
+        } catch (err) {
+          console.error('Scoreboard update failed:', err);
+        }
+      }
+      continue;
+    }
+
+    if (turn.result_type === "TURNOVER") {
+      await handleTurnover(scene, { playerSprites, ballSprite, turnData: turn, onUpdate });
       if (onUpdate) {
         try {
           onUpdate(turn);
