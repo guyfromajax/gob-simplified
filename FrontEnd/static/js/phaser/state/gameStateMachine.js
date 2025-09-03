@@ -18,15 +18,30 @@ const transitions = {
   [States.EndQuarter]: [States.Inbound]
 };
 
+let debugTransitions = false;
+
+export function setDebugTransitions(value) {
+  debugTransitions = !!value;
+}
+
+export function getDebugTransitions() {
+  return debugTransitions;
+}
+
 export function createGameStateMachine(initialState = States.Inbound) {
   let state = initialState;
   return {
-    transition(next) {
+    transition(next, context) {
       const allowed = transitions[state] || [];
       if (!allowed.includes(next)) {
         throw new Error(`Invalid transition: ${state} -> ${next}`);
       }
+      const prevState = state;
       state = next;
+      if (debugTransitions) {
+        const { stepIndex, shotResult } = context || {};
+        console.log({ prevState, nextState: state, event: next, stepIndex, shotResult });
+      }
     },
     is(s) {
       return state === s;
