@@ -33,34 +33,32 @@ export async function runFastBreakSequence({ scene, turnData, playerSprites, bal
   if (turnData.roles?.outlet_passer) {
     const passerId = turnData.roles.outlet_passer;
     const receiverId = turnData.roles.outlet_receiver;
-    const passerSprite = playerSprites[passerId];
+    const passerSprite   = playerSprites[passerId];
     const receiverSprite = playerSprites[receiverId];
-    const receiverAnim = animations.find(a => a.playerId === receiverId);
-    const startGrid = receiverAnim?.start || receiverAnim?.movement?.[0]?.coords;
+    const receiverAnim   = animations.find(a => a.playerId === receiverId);
+    const startGrid      = receiverAnim?.start || receiverAnim?.movement?.[0]?.coords;
     if (passerSprite && receiverSprite && startGrid) {
       attachBallToPlayer(scene, ballSprite, passerSprite);
-      const rim = passerSprite.team === "home" ? HOME_RIM_COORDS : AWAY_RIM_COORDS;
-      const sign = rim.x > startGrid.x ? -1 : 1;
+      const rim  = passerSprite.team === "home" ? HOME_RIM_COORDS : AWAY_RIM_COORDS;
+      const dir  = rim.x > startGrid.x ? -1 : 1;
       const target = {
-        x: Phaser.Math.Clamp(startGrid.x + sign * Phaser.Math.Between(15, 20), 4, 97),
+        x: Phaser.Math.Clamp(startGrid.x + dir * Phaser.Math.Between(15, 20), 4, 97),
         y: Phaser.Math.Clamp(startGrid.y + Phaser.Math.Between(-6, 6), 1, 50)
       };
       const targetPx = gridToPixels(target.x, target.y, width, height);
       await tweenPlayerTo(scene, receiverSprite, targetPx, {
         duration: animationConfig.fastBreak.outletMoveMs,
-        easing: animationConfig.pass.easing
+        easing:  animationConfig.pass.easing,
       });
       if (scene.skipToEnd) return;
       await runPass(scene, {
         fromId: passerId,
-        toId: receiverId,
+        toId:   receiverId,
         duration: animationConfig.fastBreak.passMs,
-        easing: animationConfig.pass.easing
+        easing:  animationConfig.pass.easing,
       });
       receiverAnim.start = target;
-      if (receiverAnim.movement && receiverAnim.movement.length > 0) {
-        receiverAnim.movement[0].coords = target;
-      }
+      if (receiverAnim.movement?.length) receiverAnim.movement[0].coords = target;
     }
   }
   const sprintDuration = animationConfig.fastBreak?.sprintDuration ?? 800;
