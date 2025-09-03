@@ -3,7 +3,7 @@ import animationConfig, {
   FT_BETWEEN_SHOTS_DELAY_MS,
 } from "./animation_config.js";
 import { HOME_RIM_COORDS, AWAY_RIM_COORDS } from "./courtConstants.js";
-import { States, safeTransition } from "../state/gameStateMachine.js";
+import { States, safeTransition, createTransitionGuard } from "../state/gameStateMachine.js";
 import { getCurrentOwner, getPendingOwner } from "../ball/ballController.js";
 import { DebugFlags } from "../utils/debugFlags.js";
 
@@ -12,22 +12,6 @@ function wait(scene, ms) {
   return scene.time?.delayedCall
     ? new Promise((res) => scene.time.delayedCall(ms, res))
     : new Promise((res) => setTimeout(res, ms));
-}
-
-function createTransitionGuard(machine, disallowed = []) {
-  if (!machine) return () => {};
-  const original = machine.transition.bind(machine);
-  machine.transition = (next, ...args) => {
-    if (disallowed.includes(next)) {
-      if (DebugFlags?.FSM)
-        console.log("FSM: FreeThrow guard rejected", next); // remove when stable
-      return;
-    }
-    return original(next, ...args);
-  };
-  return () => {
-    machine.transition = original;
-  };
 }
 
 export async function runFreeThrowSequence(
