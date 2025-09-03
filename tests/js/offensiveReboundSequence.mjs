@@ -4,11 +4,12 @@ import {
   animatePutbackAttempt,
   calls
 } from './ballManagerStub.mjs';
+import { setCurrentOwner, clearCurrentOwner, getCurrentOwner } from '../../FrontEnd/static/js/phaser/ball/ballController.js';
 
 const PAUSE_MS = 400;
 
 function makeScene() {
-  return { ballAttachedToPlayerId: null };
+  return {};
 }
 
 function makeBall() { return {}; }
@@ -24,12 +25,12 @@ async function scenarioA() {
   const events = [];
 
   await animateRebound({ scene, ballSprite: ball, playerSprites: players, animations: [], rebounderId: 'c', ballSpot: { x: 0, y: 0 } });
-  scene.ballAttachedToPlayerId = 'c';
+  setCurrentOwner(scene, 'c');
   events.push({ type: 'attach', id: 'c' });
 
   await animateKickoutReset(scene, ball, 'c', 'pg', {}, 0);
   events.push({ type: 'detach', id: 'c' });
-  scene.ballAttachedToPlayerId = 'pg';
+  setCurrentOwner(scene, 'pg');
   events.push({ type: 'attach', id: 'pg' });
 
   return { branch: 'kickout', pause: PAUSE_MS, attachments: { rebound: 'c', afterKickout: 'pg' }, events };
@@ -42,12 +43,12 @@ async function scenarioB(result) {
   const events = [];
 
   await animateRebound({ scene, ballSprite: ball, playerSprites: players, animations: [], rebounderId: 'c', ballSpot: { x: 0, y: 0 } });
-  scene.ballAttachedToPlayerId = 'c';
+  setCurrentOwner(scene, 'c');
   events.push({ type: 'attach', id: 'c' });
 
   const outcome = await animatePutbackAttempt(scene, ball, 'c', { x: 0, y: 0 }, 0, result);
   events.push({ type: 'detach', id: 'c' });
-  scene.ballAttachedToPlayerId = null;
+  clearCurrentOwner(scene);
 
   return { branch: 'putback', result, outcome, pause: 0, events };
 }
