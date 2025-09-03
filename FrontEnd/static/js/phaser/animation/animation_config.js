@@ -36,6 +36,12 @@ const defaults = {
     arcHeight: 60,
     rimHoldMs: 800,
   },
+  reboundPass: {
+    moveDuration: 400,
+    moveEase: 'Sine.easeInOut',
+    passDuration: 150,
+    passEase: 'Sine.easeInOut',
+  },
 };
 
 const overrides =
@@ -49,6 +55,7 @@ export const animationConfig = {
   steal: { ...defaults.steal, ...(overrides.steal || {}) },
   freeThrow: { ...defaults.freeThrow, ...(overrides.freeThrow || {}) },
   fastBreak: { ...defaults.fastBreak, ...(overrides.fastBreak || {}) },
+  reboundPass: { ...defaults.reboundPass, ...(overrides.reboundPass || {}) },
 };
 
 export default animationConfig;

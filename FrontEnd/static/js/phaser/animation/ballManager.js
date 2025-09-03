@@ -491,6 +491,49 @@ export function animateKickoutReset(
   return runPass(scene, opts);
 }
 
+// Outlet pass from a rebounder to the point guard.
+// The PG first moves to a randomized spot before receiving the pass.
+export async function animateReboundPass(scene, ballSprite, rebounderId, pgId, rebounderCoords) {
+  if (!scene || !ballSprite) return;
+
+  const rebounderSprite = scene.playerSprites?.[rebounderId];
+  const pgSprite = scene.playerSprites?.[pgId];
+  if (!rebounderSprite || !pgSprite) return;
+
+  // Ensure runPass can locate the ball sprite on the scene
+  if (!scene.ballSprite) {
+    scene.ballSprite = ballSprite;
+  }
+
+  const width = scene.game.config.width;
+  const height = scene.game.config.height;
+
+  const isAway = pgSprite.team === "away";
+  const dx = Phaser.Math.Between(3, 9) * (isAway ? -1 : 1);
+  const dy = Phaser.Math.Between(-6, 6);
+  let x = Phaser.Math.Clamp(rebounderCoords.x + dx, 4, 97);
+  let y = Phaser.Math.Clamp(rebounderCoords.y + dy, 1, 50);
+  const dest = gridToPixels(x, y, width, height);
+
+  await new Promise((resolve) => {
+    scene.tweens.add({
+      targets: pgSprite,
+      x: dest.x,
+      y: dest.y,
+      duration: animationConfig.reboundPass.moveDuration,
+      ease: animationConfig.reboundPass.moveEase,
+      onComplete: resolve,
+    });
+  });
+
+  return runPass(scene, {
+    fromId: rebounderId,
+    toId: pgId,
+    duration: animationConfig.reboundPass.passDuration,
+    easing: animationConfig.reboundPass.passEase,
+  });
+}
+
 /**
  * Checks which player has the ball at the current animation step
  * and locks the ball to that player's sprite.
