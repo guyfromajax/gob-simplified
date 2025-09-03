@@ -17,13 +17,9 @@ const storedHome = typeof localStorage !== 'undefined' ? localStorage.getItem('g
 const storedAway = typeof localStorage !== 'undefined' ? localStorage.getItem('game_away') : null;
 const isNewMatchup = !urlParams.get('game_id') || storedHome !== homeTeam || storedAway !== awayTeam;
 if (isNewMatchup) {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-    gameId = crypto.randomUUID();
-  } else {
-    gameId = Math.random().toString(36).slice(2);
-  }
+  gameId = null;
   if (typeof localStorage !== 'undefined') {
-    localStorage.setItem('game_id', gameId);
+    localStorage.removeItem('game_id');
     localStorage.setItem('game_home', homeTeam || '');
     localStorage.setItem('game_away', awayTeam || '');
   }
@@ -227,6 +223,8 @@ async function init() {
   if (btn) {
     btn.addEventListener('click', () => {
       if (btn.classList.contains('disabled')) return;
+      const currentGameId = urlParams.get('game_id') ||
+        (typeof localStorage !== 'undefined' ? localStorage.getItem('game_id') : null);
       const params = new URLSearchParams();
       params.set('home', homeTeam);
       params.set('away', awayTeam);
@@ -240,7 +238,7 @@ async function init() {
       if (modeParam) params.set('mode', modeParam);
       params.set('quarter', String(quarter));
       params.set('period', periodLabel);
-      if (quarter > 1 && gameId) params.set('game_id', gameId);
+      if (quarter > 1 && currentGameId) params.set('game_id', currentGameId);
       ['PG','SG','SF','PF','C'].forEach(pos => {
         const id = lineup[pos];
         if (id) params.set(`${myTeamSide}_${pos.toLowerCase()}`, id);
@@ -250,7 +248,7 @@ async function init() {
         // optional: params.set('debug_flow', '1');
       }
       if (DEBUG) {
-        console.debug('🔀 Redirecting to court.html', { home: homeTeam, away: awayTeam, gameId });
+        console.debug('🔀 Redirecting to court.html', { home: homeTeam, away: awayTeam, gameId: currentGameId });
       }
       DEBUG && console.log('[lineup] launching quarter', quarter);
       window.location.href = `/court.html?${params.toString()}`;

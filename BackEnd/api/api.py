@@ -171,7 +171,7 @@ def simulate_game(request: SimulationRequest):
 
 
 @app.post("/api/simulate-quarter")
-def simulate_quarter_endpoint(request: QuarterSimulationRequest):
+def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = False):
     game_id = request.game_id
     logging.info(
         "simulate_quarter_endpoint payload: game_id=%s, home_team=%s, away_team=%s, quarter=%s, home_lineup_keys=%s, away_lineup_keys=%s",
@@ -182,6 +182,16 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest):
         list((request.home_lineup or {}).keys()),
         list((request.away_lineup or {}).keys()),
     )
+    if debug:
+        logging.debug(
+            "simulate_quarter_endpoint request detail: %s",
+            {
+                "game_id": game_id,
+                "home_team": request.home_team,
+                "away_team": request.away_team,
+                "quarter": request.quarter,
+            },
+        )
     source = "resume"
     if game_id:
         gm = ongoing_games.get(game_id)
@@ -189,14 +199,15 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest):
             request.home_team != gm.home_team.name
             or request.away_team != gm.away_team.name
         ):
-            logging.debug(
-                "simulate_quarter_endpoint team mismatch: game_id=%s expected=%s vs %s got=%s vs %s",
-                game_id,
-                gm.home_team.name,
-                gm.away_team.name,
-                request.home_team,
-                request.away_team,
-            )
+            if debug:
+                logging.debug(
+                    "simulate_quarter_endpoint team mismatch: game_id=%s expected=%s vs %s got=%s vs %s",
+                    game_id,
+                    gm.home_team.name,
+                    gm.away_team.name,
+                    request.home_team,
+                    request.away_team,
+                )
             raise HTTPException(
                 status_code=400,
                 detail="game_id belongs to a different matchup",
@@ -231,6 +242,12 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest):
                         gm.game_state.update(saved.get("game_state", {}))
                         gm.quarter = saved.get("quarter", 1)
                         ongoing_games[game_id] = gm
+                        if debug:
+                            logging.debug(
+                                "simulate_quarter_endpoint loaded from DB: %s vs %s",
+                                home,
+                                away,
+                            )
                 except Exception:
                     logging.exception("Failed to load game state for %s", game_id)
             if gm is None:
@@ -240,12 +257,21 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest):
                     ongoing_games[game_id] = gm
                     source = "new"
                 else:
+                    if debug:
+                        logging.debug("simulate_quarter_endpoint unknown game_id=%s", game_id)
                     raise HTTPException(status_code=400, detail="Unknown game_id")
     else:
         gm = GameManager(request.home_team, request.away_team)
         game_id = str(uuid.uuid4())
         ongoing_games[game_id] = gm
         source = "new"
+    if debug and gm is not None:
+        logging.debug(
+            "simulate_quarter_endpoint using matchup: %s vs %s (quarter=%s)",
+            gm.home_team.name,
+            gm.away_team.name,
+            gm.quarter,
+        )
 
     logging.info(
         {
@@ -278,6 +304,13 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest):
 
     # Prevent skipping ahead or repeating quarters unintentionally
     if request.quarter != gm.quarter:
+        if debug:
+            logging.debug(
+                "simulate_quarter_endpoint quarter mismatch: game_id=%s expected=%s got=%s",
+                game_id,
+                gm.quarter,
+                request.quarter,
+            )
         raise HTTPException(
             status_code=400,
             detail=f"Quarter mismatch. Expected {gm.quarter}, got {request.quarter}",

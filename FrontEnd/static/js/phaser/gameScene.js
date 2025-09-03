@@ -103,6 +103,15 @@ export function createGameScene(Phaser) {
 
       const payload = { home_team: homeTeam, away_team: awayTeam, quarter: this.quarter };
       if (this.gameId) payload.game_id = this.gameId;
+      if (DEBUG_FLOW) {
+        console.log('[gameScene] request payload', {
+          mode: this.mode,
+          home: homeTeam,
+          away: awayTeam,
+          quarter: this.quarter,
+          gameId: this.gameId,
+        });
+      }
       if (DEBUG_TEAMS) {
         console.log('/api/simulate-quarter payload teams:', {
           home: payload.home_team,
@@ -120,6 +129,9 @@ export function createGameScene(Phaser) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
       });
+      if (DEBUG_FLOW) {
+        console.log('[gameScene] response status', res.status);
+      }
       if (!this.constructor._loggedSimQuarter) {
         console.debug("🛠️ /api/simulate-quarter payload keys:", Object.keys(payload), "response status:", res.status);
         this.constructor._loggedSimQuarter = true;
@@ -552,19 +564,22 @@ export function createGameScene(Phaser) {
             await finalize();
           } else {
             const nextQ = this.quarter + 1;
-            const params = new URLSearchParams(window.location.search);
-            params.set('game_id', this.gameId);
-            params.set('quarter', nextQ);
-            params.set('period', `Q${nextQ}`);
-            DEBUG_FLOW && console.log('➡️ Advancing to lineup', { nextQ, gameId: this.gameId });
-            console.log('skipToEnd at navigation:', this.skipToEnd);
-            window.location.href = `/static/set-lineup.html?${params.toString()}`;
-            return;
+          const params = new URLSearchParams(window.location.search);
+          params.set('game_id', this.gameId);
+          params.set('quarter', nextQ);
+          params.set('period', `Q${nextQ}`);
+          if (this.gameId && typeof localStorage !== 'undefined') {
+            localStorage.setItem('game_id', this.gameId);
           }
-        };
+          DEBUG_FLOW && console.log('➡️ Advancing to lineup', { nextQ, gameId: this.gameId });
+          DEBUG_FLOW && console.log('skipToEnd at navigation:', this.skipToEnd);
+          window.location.href = `/static/set-lineup.html?${params.toString()}`;
+          return;
+        }
+      };
 
         const logAndStart = () => {
-          console.log('skipToEnd before startAnimation:', this.skipToEnd);
+          DEBUG_FLOW && console.log('skipToEnd before startAnimation:', this.skipToEnd);
           startAnimation();
         };
 
@@ -593,8 +608,11 @@ export function createGameScene(Phaser) {
           params.set('game_id', this.gameId);
           params.set('quarter', nextQ);
           params.set('period', `Q${nextQ}`);
+          if (this.gameId && typeof localStorage !== 'undefined') {
+            localStorage.setItem('game_id', this.gameId);
+          }
           DEBUG_FLOW && console.log('➡️ Advancing to lineup', { nextQ, gameId: this.gameId });
-          console.log('skipToEnd at navigation:', this.skipToEnd);
+          DEBUG_FLOW && console.log('skipToEnd at navigation:', this.skipToEnd);
           window.location.href = `/static/set-lineup.html?${params.toString()}`;
         }
       }
