@@ -12,14 +12,11 @@ import {
 import { tweenBallTo, runPass, PASS_DEBUG, tweenPlayerTo, detachBall } from "./ballTween.js";
 import animationConfig from "./animation_config.js";
 import { HOME_RIM_COORDS, AWAY_RIM_COORDS, HOME_TOP_KEY, AWAY_TOP_KEY } from "./courtConstants.js";
+import { DEBUG } from "../utils/debug.js";
 
 // Cap the time spent on any single movement step. Large timestamp gaps can
 // otherwise produce multi‑second tweens that appear as animation stalls.
 const MAX_STEP_DURATION = 1000; // ms
-const DEBUG =
-  (typeof window !== 'undefined' && window.DEBUG) ||
-  (typeof process !== 'undefined' && process.env.DEBUG) ||
-  false;
 
 
 /**

@@ -4,6 +4,7 @@ import { gridToPixels } from './utils/gridToPixels.js';
 import { finalizeGame } from './finalizeGame.js';
 import { emit } from './utils/eventBus.js';
 import { appendToTextScroll } from './utils/textScroll.js';
+import { DEBUG } from './utils/debug.js';
 
 const DEBUG_SIM_PAYLOAD =
   (typeof window !== 'undefined' && window.DEBUG_SIM_PAYLOAD) ||
