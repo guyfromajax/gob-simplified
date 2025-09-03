@@ -414,11 +414,19 @@ export function animatePutbackAttempt(
                 onComplete: () =>
                   resolve({ grid: { x: bounceGridX, y: bounceGridY } })
               });
+            } else if (result === "FOUL") {
+              detachBall(scene, ballSprite);
+              hideBall(ballSprite);
+              scene.rebounderId = null;
+              safeTransition(scene.stateMachine, States.FreeThrow, {
+                shotResult: result,
+              });
+              resolve();
             } else {
               safeTransition(scene.stateMachine, States.FreeThrow, {
                 shotResult: result,
               });
-              // FOUL or unrecognized result: backend will handle next steps
+              // unrecognized result: backend will handle next steps
               resolve();
             }
         };
