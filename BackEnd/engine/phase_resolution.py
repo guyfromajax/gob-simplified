@@ -129,7 +129,8 @@ def resolve_fast_break_logic(game: "GameManager"):
         "offense": [],
         "defense": [],
         "ball_handler": None,
-        "outlet_passer": None
+        "outlet_passer": None,
+        "outlet_receiver": None,
     }
     
     rebound = game_state.get("last_rebound") == "DREB"
@@ -139,22 +140,23 @@ def resolve_fast_break_logic(game: "GameManager"):
         game_state["last_rebound"] = "" 
         
         # Choose outlet passer (rebounder)
-        rebounder = game_state.get("last_rebounder", None) #object
+        rebounder = game_state.get("last_rebounder", None)
 
         bh_pos = random.choices(["PG", "SG", "SF"], weights=[75, 15, 10])[0]
         ball_handler = off_lineup[bh_pos]
 
-        # Ensure outlet passer != ball handler
+        fb_roles["ball_handler"] = ball_handler
+
+        # Ensure outlet passer and receiver are set to IDs and only if different
         if rebounder and rebounder != ball_handler:
-            fb_roles["outlet_passer"] = rebounder
+            fb_roles["outlet_passer"] = getattr(rebounder, "player_id", None)
+            fb_roles["outlet_receiver"] = getattr(ball_handler, "player_id", None)
         else:
             fb_roles["outlet_passer"] = None
-        fb_roles["ball_handler"] = ball_handler
-        # Add other offensive players in play
-        for pos in ["PG", "SG", "SF", "PF"]:
-            if off_lineup[pos] != ball_handler and off_lineup[pos] != rebounder:
-                if random.random() < {"PG": 0.5, "SG": 0.5, "SF": 0.2, "PF": 0.05}.get(pos, 0):
-                    fb_roles["offense"].append(off_lineup[pos])
+            fb_roles["outlet_receiver"] = None
+
+        # No additional offensive players when starting from a rebound
+        fb_roles["offense"] = []
 
 
     else:  # STEAL
@@ -162,6 +164,8 @@ def resolve_fast_break_logic(game: "GameManager"):
         if ball_handler is None:
             ball_handler = off_lineup["PG"]
         fb_roles["ball_handler"] = ball_handler
+        fb_roles["outlet_passer"] = None
+        fb_roles["outlet_receiver"] = None
 
         for pos in ["PG", "SG", "SF"]:
             if off_lineup[pos] != ball_handler:
