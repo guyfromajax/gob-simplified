@@ -621,31 +621,8 @@ async function runFastBreakSequence({ scene, turnData, playerSprites, ballSprite
     if (scene.skipToEnd) return;
 
     if (turnData.hold_up) {
-      const center = gridToPixels(50, 25, width, height);
-      const spacing = 10;
-      const holdPromises = [];
-      let idx = 0;
-      for (const anim of animations) {
-        const sprite = playerSprites[anim.playerId];
-        if (!sprite) continue;
-        const targetX = center.x + (idx - animations.length / 2) * spacing;
-        const targetY = sprite.y;
-        idx++;
-        holdPromises.push(
-          new Promise(resolve => {
-            scene.tweens.add({
-              targets: sprite,
-              x: targetX,
-              y: targetY,
-              duration: sprintDuration / 2,
-              ease: "Sine.easeInOut",
-              onComplete: resolve,
-              onStop: resolve
-            });
-          })
-        );
-      }
-      await Promise.all(holdPromises);
+      const holdMs = animationConfig.fastBreak.goodHoldMs ?? 2000;
+      await new Promise(r => scene.time.delayedCall(holdMs, r));
       if (typeof scene.startNextHalfCourtOffense === "function") {
         scene.startNextHalfCourtOffense();
       }
