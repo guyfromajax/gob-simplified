@@ -1,5 +1,6 @@
 import { attachBallToPlayer, animateRebound } from '../../FrontEnd/static/js/phaser/animation/ballManager.js';
 import { createGameStateMachine, States } from '../../FrontEnd/static/js/phaser/state/gameStateMachine.js';
+import { getCurrentOwner } from '../../FrontEnd/static/js/phaser/ball/ballController.js';
 
 function makeScene() {
   return {
@@ -31,7 +32,7 @@ const ballSprite = { setPosition(){}, setVisible(){}, setDepth(){} };
 
 // Attempt to attach to non-rebounder while rebound in progress
 attachBallToPlayer(scene, ballSprite, scene.playerSprites.b);
-const first = scene.ballAttachedToPlayerId ?? null;
+const first = getCurrentOwner(scene) ?? null;
 
 // Animate rebound to attach to rebounder and clear flag
 await animateRebound({
@@ -42,11 +43,11 @@ await animateRebound({
   rebounderId: 'a',
   ballSpot: { x: 0, y: 0 }
 });
-const afterRebound = scene.ballAttachedToPlayerId;
+const afterRebound = getCurrentOwner(scene);
 const flagAfterRebound = scene.stateMachine.is(States.Rebound);
 
 // Now that flag is cleared, attaching to another player works
 attachBallToPlayer(scene, ballSprite, scene.playerSprites.b);
-const final = scene.ballAttachedToPlayerId;
+const final = getCurrentOwner(scene);
 
 console.log(JSON.stringify({ first, afterRebound, flagAfterRebound, final }));

@@ -1,5 +1,13 @@
 import * as Phaser from 'https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.esm.js';
 import animationConfig from "./animation_config.js";
+import {
+  setCurrentOwner,
+  clearCurrentOwner,
+  getCurrentOwner,
+  getLastKnownOwner,
+  setPendingOwner,
+  cancelBallTween
+} from "../ball/ballController.js";
 
 const BALL_DEPTH = 1000;
 export const PASS_DEBUG = false;
@@ -31,7 +39,7 @@ export function attachBallToPlayer(scene, ballSprite, playerSprite, opts = {}) {
     scene.offenseTeamId != null &&
     String(targetTeamId) !== String(scene.offenseTeamId)
   ) {
-    const from = scene.ballAttachedToPlayerId;
+    const from = getCurrentOwner(scene);
     console.warn('overwrite', { from, to: targetId, reason: 'possessionFlipInProgress' });
     return;
   }
@@ -43,8 +51,9 @@ export function attachBallToPlayer(scene, ballSprite, playerSprite, opts = {}) {
   ballSprite.setVisible(true);
   ballSprite.setDepth(depth);
   if (targetId != null) {
-    scene.ballAttachedToPlayerId = targetId;
-    scene.ballLastKnownOwnerId = targetId;
+    setCurrentOwner(scene, targetId);
+  } else {
+    clearCurrentOwner(scene);
   }
 }
 
@@ -55,10 +64,8 @@ export function attachBallToPlayer(scene, ballSprite, playerSprite, opts = {}) {
 export function detachBall(scene, ballSprite) {
   if (!scene || !ballSprite) return;
   scene.ballDetached = true;
-  if (scene.tweens) scene.tweens.killTweensOf(ballSprite);
-  if (typeof scene.ballAttachedToPlayerId !== 'undefined') {
-    scene.ballAttachedToPlayerId = null;
-  }
+  cancelBallTween(scene, ballSprite);
+  clearCurrentOwner(scene);
 }
 
 /**
@@ -138,7 +145,7 @@ export function tweenPlayerTo(scene, sprite, target, opts = {}) {
         const ballSprite = scene.ballSprite;
         if (
           ballSprite &&
-          scene.ballAttachedToPlayerId === sprite.playerId &&
+          getCurrentOwner(scene) === sprite.playerId &&
           ballSprite.setPosition
         ) {
           ballSprite.setPosition(sprite.x, sprite.y);
@@ -177,7 +184,7 @@ export async function runPass(scene, cfg = {}) {
 
   if (scene.__activePass) {
     if (scene.tweens) scene.tweens.killTweensOf(ballSprite);
-    const lastId = scene.ballLastKnownOwnerId;
+    const lastId = getLastKnownOwner(scene);
     const lastSprite = lastId != null ? scene.playerSprites?.[lastId] : null;
     if (lastSprite) {
       attachBallToPlayer(scene, ballSprite, lastSprite);
@@ -186,9 +193,9 @@ export async function runPass(scene, cfg = {}) {
     scene.__activePass = null;
   }
 
-  if (scene.tweens) scene.tweens.killTweensOf(ballSprite);
-  if (scene.ballDetached && scene.ballLastKnownOwnerId != null) {
-    const owner = scene.playerSprites?.[scene.ballLastKnownOwnerId];
+  cancelBallTween(scene, ballSprite);
+  if (scene.ballDetached && getLastKnownOwner(scene) != null) {
+    const owner = scene.playerSprites?.[getLastKnownOwner(scene)];
     if (owner) attachBallToPlayer(scene, ballSprite, owner);
   }
 
@@ -200,7 +207,7 @@ export async function runPass(scene, cfg = {}) {
   scene.__activePass = { key, frame, promise, reject: rejectFn };
 
   scene.passInFlight = true;
-  scene.pendingBallOwnerId = toId;
+  setPendingOwner(scene, toId);
 
   (async () => {
     try {
@@ -263,7 +270,7 @@ export async function runPass(scene, cfg = {}) {
       if (PASS_DEBUG) console.log('passEnd', { toId });
       resolveFn();
     } catch (err) {
-      const lastId = scene.ballLastKnownOwnerId;
+      const lastId = getLastKnownOwner(scene);
       const lastSprite = lastId != null ? scene.playerSprites?.[lastId] : null;
       if (lastSprite) {
         attachBallToPlayer(scene, ballSprite, lastSprite);
@@ -273,7 +280,7 @@ export async function runPass(scene, cfg = {}) {
       if (scene.__activePass && scene.__activePass.key === key && scene.__activePass.frame === frame) {
         scene.__activePass = null;
         scene.passInFlight = false;
-        // Allow pendingBallOwnerId to persist so updateBallOwnership can consume it
+        // Allow pending owner to persist so updateBallOwnership can consume it
       }
     }
   })();

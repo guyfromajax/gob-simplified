@@ -12,6 +12,7 @@ import {
 } from "./ballTween.js";
 import { States } from "../state/gameStateMachine.js";
 import gameStore from "../../state/gameStore.js";
+import { clearCurrentOwner, cancelBallTween } from "../ball/ballController.js";
 
 function attachBallToPlayer(scene, ballSprite, playerSprite, opts = {}) {
   if (scene.possessionFlipInProgress) return;
@@ -150,6 +151,8 @@ export function shootBall({
 }) {
   if (!scene || !ballSprite) return Promise.resolve();
   if (scene?.stateMachine?.is(States.FreeThrow)) return Promise.resolve();
+  cancelBallTween(scene, ballSprite);
+  clearCurrentOwner(scene);
   const homeRoster = gameStore.getHomeRoster();
   const storeHomeId =
     homeRoster?.team_id || homeRoster?.teamId || homeRoster?.team_name || homeRoster?.team;
@@ -280,7 +283,7 @@ export function animatePutbackAttempt(
   if (!shooterSprite) return Promise.resolve();
 
   if (scene.tweens) scene.tweens.killTweensOf(ballSprite);
-  scene.ballAttachedToPlayerId = null;
+  clearCurrentOwner(scene);
   ballSprite.setPosition(shooterSprite.x, shooterSprite.y);
   ballSprite.setVisible(true);
 
@@ -382,6 +385,8 @@ export function animateRebound({
 }) {
   if (!scene || !ballSprite || !ballSpot) return Promise.resolve();
   if (scene?.stateMachine?.is(States.FreeThrow)) return Promise.resolve();
+  cancelBallTween(scene, ballSprite);
+  clearCurrentOwner(scene);
 
   scene.rebounderId = rebounderId;
   const rebCfg = animationConfig.rebound;
