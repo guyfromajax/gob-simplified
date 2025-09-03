@@ -14,4 +14,9 @@ try {
   illegalError = true;
 }
 
-console.log(JSON.stringify({ allowedFinal, illegalError }));
+const sm3 = createGameStateMachine(States.HalfCourt);
+sm3.transition(States.Turnover);
+sm3.transition(States.Inbound);
+const turnoverFinal = sm3.state;
+
+console.log(JSON.stringify({ allowedFinal, illegalError, turnoverFinal }));
