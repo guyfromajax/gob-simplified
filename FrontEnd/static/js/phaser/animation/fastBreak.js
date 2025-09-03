@@ -4,7 +4,7 @@ import { attachBallToPlayer } from "./ballManager.js";
 import { tweenBallTo, tweenPlayerTo, runPass } from "./ballTween.js";
 import animationConfig from "./animation_config.js";
 import { HOME_RIM_COORDS, AWAY_RIM_COORDS, HOME_TOP_KEY, AWAY_TOP_KEY } from "./courtConstants.js";
-import { States } from "../state/gameStateMachine.js";
+import { States, getDebugTransitions } from "../state/gameStateMachine.js";
 import { getCurrentOwner } from "../ball/ballController.js";
 import { createAnimationTimeline } from "./animationTimeline.js";
 import { runInboundSetup } from "./turnAnimation.js";
@@ -17,7 +17,7 @@ export async function runFastBreakSequence({ scene, turnData, playerSprites, bal
   if (!scene || !turnData || scene.skipToEnd) return;
   if (!scene.ballSprite) scene.ballSprite = ballSprite;
 
-  scene.stateMachine?.transition(States.FastBreak);
+  scene.stateMachine?.transition(States.FastBreak, getDebugTransitions() && { stepIndex: 0 });
   scene.events?.emit("fb:start");
 
   // stop any existing timeline/tweens

@@ -10,7 +10,7 @@ import {
   tweenBallTo,
   runPass as baseRunPass
 } from "./ballTween.js";
-import { States } from "../state/gameStateMachine.js";
+import { States, getDebugTransitions } from "../state/gameStateMachine.js";
 import gameStore from "../../state/gameStore.js";
 import { clearCurrentOwner, cancelBallTween } from "../ball/ballController.js";
 
@@ -237,7 +237,7 @@ export function shootBall({
               team: shooterTeamId
             });
           }
-          scene.stateMachine?.transition(States.Rebound);
+          scene.stateMachine?.transition(States.Rebound, getDebugTransitions() && { stepIndex, shotResult: result });
           scene.rebounderId = null;
           scene.tweens.add({
             targets: ballSprite,
@@ -340,7 +340,7 @@ export function animatePutbackAttempt(
                 scene.game.config.width,
                 scene.game.config.height
               );
-              scene.stateMachine?.transition(States.Rebound);
+              scene.stateMachine?.transition(States.Rebound, getDebugTransitions() && { shotResult: result });
               scene.rebounderId = null;
               scene.tweens.add({
                 targets: ballSprite,
@@ -451,7 +451,7 @@ export function animateRebound({
             scene.events?.emit("possessionChange", {
               offenseTeamId: rebounderSprite.team_id
             });
-            if (scene.stateMachine?.is(States.Rebound)) scene.stateMachine?.transition(States.HalfCourt);
+            if (scene.stateMachine?.is(States.Rebound)) scene.stateMachine?.transition(States.HalfCourt, getDebugTransitions() && {});
             scene.rebounderId = null;
             resolve();
           },
