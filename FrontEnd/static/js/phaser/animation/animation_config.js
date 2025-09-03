@@ -45,6 +45,7 @@ const defaults = {
     sprintSpeed: 1.5, // multiplier
     laneSpacing: 6,
     passMs: 250,
+    outletMoveMs: 300, // duration for outlet receiver’s advance
     shotMs: 500,
     arcHeight: 60,
     // Time to hold the ball at the rim after a made fast break shot
