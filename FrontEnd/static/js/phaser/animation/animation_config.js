@@ -35,11 +35,12 @@ const defaults = {
     shotMs: 500,
     arcHeight: 60,
     rimHoldMs: 800,
+    goodHoldMs: 2000,
   },
   reboundPass: {
-    moveDuration: 400,
+    moveDuration: 300,
     moveEase: 'Sine.easeInOut',
-    passDuration: 150,
+    passDuration: 250,
     passEase: 'Sine.easeInOut',
   },
 };

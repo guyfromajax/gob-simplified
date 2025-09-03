@@ -12,6 +12,11 @@ export function animateRebound(opts) {
   calls.push({ type: 'rebound', opts });
 }
 
+export async function animateReboundPass(scene, ballSprite, rebounderId, pgId, rebounderCoords) {
+  calls.push({ type: 'reboundPass', scene, ballSprite, rebounderId, pgId, rebounderCoords });
+  return Promise.resolve();
+}
+
 export function animatePutbackAttempt(scene, ballSprite, shooterId, rimCoords, duration, result) {
   calls.push({ type: 'putback', scene, ballSprite, shooterId, rimCoords, duration, result });
   if (result === 'MISS') {
