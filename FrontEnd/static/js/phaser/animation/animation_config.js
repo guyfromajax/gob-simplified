@@ -58,6 +58,9 @@ const defaults = {
 const overrides =
   (typeof globalThis !== 'undefined' && globalThis.animation_config) || {};
 
+export const FT_BETWEEN_SHOTS_DELAY_MS =
+  overrides.FT_BETWEEN_SHOTS_DELAY_MS ?? 0;
+
 export const animationConfig = {
   enableBallTween: overrides.enableBallTween ?? defaults.enableBallTween,
   pass: { ...defaults.pass, ...(overrides.pass || {}) },
