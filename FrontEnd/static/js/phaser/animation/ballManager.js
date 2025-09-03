@@ -153,6 +153,7 @@ export function shootBall({
   if (scene?.stateMachine?.is(States.FreeThrow)) return Promise.resolve();
   cancelBallTween(scene, ballSprite);
   clearCurrentOwner(scene);
+  scene.stateMachine?.transition(States.ShotAttempt);
   const homeRoster = gameStore.getHomeRoster();
   const storeHomeId =
     homeRoster?.team_id || homeRoster?.teamId || homeRoster?.team_name || homeRoster?.team;
@@ -236,8 +237,10 @@ export function shootBall({
               playerId: shooterId,
               team: shooterTeamId
             });
+        }
+          if (scene.stateMachine?.is(States.ShotAttempt)) {
+            scene.stateMachine.transition(States.Rebound);
           }
-          scene.stateMachine?.transition(States.Rebound);
           scene.rebounderId = null;
           scene.tweens.add({
             targets: ballSprite,
