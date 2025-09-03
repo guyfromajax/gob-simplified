@@ -21,6 +21,11 @@ const defaults = {
     easing: 'Sine.easeInOut',
     arc: null,
   },
+  outletSetup: {
+    playerMoveMs: 800,
+    passMs: 300,
+    easing: 'Sine.easeInOut',
+  },
   rebound: {
     // Area (in grid units) around the rim where missed shots can land
     bounceArea: { x: 6, y: 6 },
@@ -75,6 +80,15 @@ export const animationConfig = {
     ...(overrides.offensiveRebound || {}),
   },
   putback: { ...defaults.putback, ...(overrides.putback || {}) },
+};
+
+animationConfig.outletSetup = {
+  playerMoveMs:
+    overrides.outletSetup?.playerMoveMs ?? defaults.outletSetup.playerMoveMs,
+  passMs:
+    overrides.outletSetup?.passMs ?? defaults.outletSetup.passMs,
+  easing:
+    overrides.outletSetup?.easing ?? animationConfig.pass.easing,
 };
 
 export default animationConfig;
