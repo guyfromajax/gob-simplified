@@ -1,6 +1,7 @@
 import { gridToPixels } from "../utils/gridToPixels.js";
 import animationConfig from "./animation_config.js";
 import { HOME_RIM_COORDS, AWAY_RIM_COORDS } from "./courtConstants.js";
+import { States } from "../state/gameStateMachine.js";
 
 function wait(scene, ms) {
   if (!ms) return Promise.resolve();
@@ -33,7 +34,7 @@ export async function runFreeThrowSequence(
 
   if (!scene || !playerSprites || !ballSprite || !turnData) return;
 
-  scene.ftInProgress = true;
+  scene.stateMachine?.transition(States.FreeThrow);
   if (scene.tweens) {
     for (const sprite of Object.values(playerSprites)) {
       scene.tweens.killTweensOf(sprite);
@@ -134,7 +135,7 @@ export async function runFreeThrowSequence(
         }
       }
       if (isLast) {
-        scene.ftInProgress = false;
+        scene.stateMachine?.transition(States.Inbound);
         const newOffenseSide =
           turnData.offense_team_id === scene.simData?.home_team_id
             ? "away"
@@ -163,7 +164,7 @@ export async function runFreeThrowSequence(
       }
     } else {
       if (isLast) {
-        scene.ftInProgress = false;
+        scene.stateMachine?.transition(States.Rebound);
         await rebound({
           scene,
           ballSprite,
@@ -193,7 +194,7 @@ export async function runFreeThrowSequence(
     scene.events?.emit("ft:repeatOrExit");
   }
 
-  scene.ftInProgress = false;
+  if (scene.stateMachine?.is(States.FreeThrow)) scene.stateMachine.transition(States.HalfCourt);
   scene.events?.emit("ft:end");
 }
 

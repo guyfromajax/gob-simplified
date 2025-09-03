@@ -4,6 +4,7 @@ import { runPass, REBOUND_DEBUG } from "./ballManager.js";
 import animationConfig from "./animation_config.js";
 import runFreeThrowSequence from "./freeThrow.js";
 import runFastBreakSequence from "./fastBreak.js";
+import { States } from "../state/gameStateMachine.js";
 
 const DEBUG_FLOW =
   (typeof window !== 'undefined' && window.DEBUG_FLOW) ||
@@ -34,7 +35,7 @@ export async function animateGameTurns({ //hasBallAtStep
   }
 
   const handlePossessionFlip = (payload = {}) => {
-    if (scene.fastBreakInProgress) return;
+    if (scene.stateMachine?.is(States.FastBreak)) return;
     scene.possessionFlipInProgress = true;
     scene.offenseTeamId = payload.offenseTeamId;
     if (REBOUND_DEBUG) {
@@ -64,7 +65,7 @@ export async function animateGameTurns({ //hasBallAtStep
     }
 
     if (turn.result_type === "SIDE_INBOUND") {
-      if (!scene.fastBreakInProgress) {
+      if (!scene.stateMachine?.is(States.FastBreak)) {
         await runSideInboundSetup({ scene, ballSprite, playerSprites, turnData: turn });
       }
       if (onUpdate) {
@@ -116,7 +117,7 @@ export async function animateGameTurns({ //hasBallAtStep
         const movement = anim?.movement || [];
 
         if (action === "pass") {
-          if (scene.fastBreakInProgress) return;
+          if (scene.stateMachine?.is(States.FastBreak)) return;
           const passStep = movement.find(
             m => m.action === "pass" && m.timestamp === timestamp
           );
@@ -174,7 +175,7 @@ export async function animateGameTurns({ //hasBallAtStep
     });
 
     const stealEvent = turn.events?.find(e => e.event_type === "STEAL");
-    if (!scene.fastBreakInProgress && (turn.result_type === "STEAL" || stealEvent)) {
+    if (!scene.stateMachine?.is(States.FastBreak) && (turn.result_type === "STEAL" || stealEvent)) {
       const ballHandlerId = playerMap[turn.ball_handler] ?? turn.ball_handler;
       const stealerRaw =
         turn.stealerId ||
@@ -196,7 +197,7 @@ export async function animateGameTurns({ //hasBallAtStep
         const defenderSprite = playerSprites[stealerId];
         // runPass reattaches the ball after the tween resolves, so only emit
         // possession change once that handoff has finished.
-        if (!scene.fastBreakInProgress && defenderSprite) {
+        if (!scene.stateMachine?.is(States.FastBreak) && defenderSprite) {
           scene.events?.emit?.('possessionChange', { offenseTeamId: defenderSprite.team_id });
         }
       }
