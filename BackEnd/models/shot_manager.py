@@ -180,9 +180,18 @@ class ShotManager:
                         possession_flips = rebound_event.get("possession_flips", possession_flips)
                 else:
                     self.game_state["last_rebounder"] = rebounder
-                    self.game_state["offensive_state"] = (
-                        "FAST_BREAK" if random.random() < get_fast_break_chance(self.game) else "HCO"
-                    )
+                    is_fb = random.random() < get_fast_break_chance(self.game)
+                    self.game_state["offensive_state"] = "FAST_BREAK" if is_fb else "HCO"
+                    if not is_fb and rebounder is not rebound_team.lineup["PG"]:
+                        pg = rebound_team.lineup["PG"]
+                        events.append(
+                            {
+                                "event_type": "REBOUND_PASS",
+                                "rebounderId": rebounder.player_id,
+                                "pgId": pg.player_id,
+                                "rebounderCoords": rebounder.coords,
+                            }
+                        )
 
         # ⏱️ Add tempo-based time to turn
         tempo = off_team.strategy_calls["tempo_call"]
