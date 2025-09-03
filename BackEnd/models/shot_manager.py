@@ -401,6 +401,7 @@ class ShotManager:
         if made:
             result["points"] = points
             result["scoring_team"] = off_team.name
+            result["hold_up"] = True
 
         return result
 
