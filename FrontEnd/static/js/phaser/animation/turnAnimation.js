@@ -256,6 +256,8 @@ async function runSideInboundSetup({ scene, ballSprite, playerSprites, turnData 
       );
   }
   scene.isInboundSetup = false;
+  scene.passInFlight = false;
+  scene.ballDetached = false;
 }
 
 // Setup positions after a defensive rebound before new half-court offense
@@ -663,6 +665,8 @@ async function runInboundSetup({
     );
 
   scene.isInboundSetup = false;
+  scene.passInFlight = false;
+  scene.ballDetached = false;
 }
 
 
@@ -671,6 +675,11 @@ async function runInboundSetup({
  * Each stepIndex is animated across all players, then the next step begins.
  */
 export async function playTurnAnimation({ scene, simData, playerSprites, turnData, ballSprite, onAction }) {
+  scene.passInFlight = false;
+  scene.ballDetached = false;
+  scene.rebounderId = null;
+  clearPendingOwner(scene);
+
   const currentBallOwnerRef = { value: null };
   // Store a reference on the scene so other modules (e.g., runPass)
   // can update ball ownership consistently.
