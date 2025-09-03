@@ -11,6 +11,18 @@ function wait(scene, ms) {
     : new Promise((res) => setTimeout(res, ms));
 }
 
+function createTransitionGuard(machine, disallowed = []) {
+  if (!machine) return () => {};
+  const original = machine.transition.bind(machine);
+  machine.transition = (next, ...args) => {
+    if (disallowed.includes(next)) return;
+    return original(next, ...args);
+  };
+  return () => {
+    machine.transition = original;
+  };
+}
+
 export async function runFreeThrowSequence(
   scene,
   {
@@ -19,6 +31,7 @@ export async function runFreeThrowSequence(
     turnData,
     onUpdate,
     helpers = {},
+    ftContext = {},
   }
 ) {
   const attach =
@@ -33,18 +46,31 @@ export async function runFreeThrowSequence(
   const rebound =
     helpers.animateRebound || (await import("./ballManager.js")).animateRebound;
 
-  if (!scene || !playerSprites || !ballSprite || !turnData) return;
+  const { ftIndex = 1, ftTotal = 1, bonusType } = ftContext || {};
+  const isFinalTurn = ftIndex >= ftTotal;
 
-  safeTransition(
-    scene.stateMachine,
-    States.FreeThrow,
-    {
-      stepIndex: 0,
-      currentOwnerId: getCurrentOwner(scene),
-      pendingOwnerId: getPendingOwner(scene),
-    },
-    ["stepIndex"]
-  );
+  const releaseGuard =
+    !isFinalTurn && scene.stateMachine
+      ? createTransitionGuard(scene.stateMachine, [States.Inbound, 'DeadBall'])
+      : null;
+
+  if (!scene || !playerSprites || !ballSprite || !turnData) {
+    releaseGuard?.();
+    return;
+  }
+
+  if (!scene.stateMachine?.is(States.FreeThrow)) {
+    safeTransition(
+      scene.stateMachine,
+      States.FreeThrow,
+      {
+        stepIndex: 0,
+        currentOwnerId: getCurrentOwner(scene),
+        pendingOwnerId: getPendingOwner(scene),
+      },
+      ["stepIndex"]
+    );
+  }
   if (scene.tweens) {
     for (const sprite of Object.values(playerSprites)) {
       scene.tweens.killTweensOf(sprite);
@@ -135,7 +161,10 @@ export async function runFreeThrowSequence(
     await wait(scene, animationConfig.freeThrow.rimHoldMs);
     scene.events?.emit("ft:rimHoldEnd");
 
-    const isLast = i === attempts.length - 1;
+    const isLastAttempt = i === attempts.length - 1;
+    const isFinalFT = isLastAttempt && isFinalTurn;
+    const earlyExit = bonusType === 'ONE_AND_ONE' && result === 'MISS';
+    const exitNow = isFinalFT || earlyExit;
     if (result === "MAKE") {
       if (onUpdate) {
         try {
@@ -144,7 +173,7 @@ export async function runFreeThrowSequence(
           console.error("Scoreboard update failed:", err);
         }
       }
-      if (isLast) {
+      if (exitNow) {
         safeTransition(
           scene.stateMachine,
           States.Inbound,
@@ -182,7 +211,7 @@ export async function runFreeThrowSequence(
         if (shooterSprite) attach(scene, ballSprite, shooterSprite);
       }
     } else {
-      if (isLast) {
+      if (exitNow) {
         safeTransition(
           scene.stateMachine,
           States.Rebound,
@@ -222,7 +251,9 @@ export async function runFreeThrowSequence(
     scene.events?.emit("ft:repeatOrExit");
   }
 
-  if (scene.stateMachine?.is(States.FreeThrow))
+  releaseGuard?.();
+
+  if (isFinalTurn && scene.stateMachine?.is(States.FreeThrow))
     safeTransition(scene.stateMachine, States.HalfCourt, {
       currentOwnerId: getCurrentOwner(scene),
       pendingOwnerId: getPendingOwner(scene),

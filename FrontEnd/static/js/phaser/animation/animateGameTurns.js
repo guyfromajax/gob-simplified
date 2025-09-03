@@ -11,6 +11,36 @@ const DEBUG_FLOW =
   (typeof process !== 'undefined' && process.env.DEBUG_FLOW) ||
   false;
 
+function annotateFreeThrowTurns(turns = []) {
+  let group = null;
+  const flush = () => {
+    if (!group) return;
+    const total = group.turns.length;
+    group.turns.forEach((t, idx) => {
+      t.ftContext = {
+        ftIndex: idx + 1,
+        ftTotal: total,
+        bonusType: group.bonusType,
+      };
+    });
+    group = null;
+  };
+  for (const turn of turns) {
+    if (turn.result_type === "FREE_THROW") {
+      if (!group) {
+        group = {
+          turns: [],
+          bonusType: turn.bonus_type || turn.bonusType,
+        };
+      }
+      group.turns.push(turn);
+    } else {
+      flush();
+    }
+  }
+  flush();
+}
+
 /**
  * Animate all turns from simData.turns using real backend structure.
  */
@@ -22,6 +52,7 @@ export async function animateGameTurns({ //hasBallAtStep
   onUpdate
 }) {
   const turns = simData.turns || [];
+  annotateFreeThrowTurns(turns);
   const allPlayers = simData.players || [];
   if (DEBUG_FLOW) {
     const stepCount = turns.reduce((acc, t) => {
@@ -53,7 +84,7 @@ export async function animateGameTurns({ //hasBallAtStep
     if (DEBUG_FLOW) console.log(`🔁 Turn ${i + 1}`, turn);
 
     if (turn.result_type === "FREE_THROW") {
-      await runFreeThrowSequence(scene, { playerSprites, ballSprite, turnData: turn, onUpdate });
+      await runFreeThrowSequence(scene, { playerSprites, ballSprite, turnData: turn, onUpdate, ftContext: turn.ftContext });
       if (onUpdate) {
         try {
           onUpdate(turn);
