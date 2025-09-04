@@ -286,6 +286,29 @@ export async function runFastBreakSequence({ scene, turnData, playerSprites, bal
       const newOffenseSide = shooterSprite.team === "home" ? "away" : "home";
       await runInboundSetup({ scene, ballSprite, playerSprites, newOffenseSide });
     } else {
+      // Handle missed fast break shot with ball bounce
+      const { bounceFromRim } = await import('./ballManager.js');
+      const isHomeTeam = shooterSprite.team === "home";
+      const miss = await bounceFromRim(
+        scene,
+        ballSprite,
+        rimGrid,
+        isHomeTeam,
+        animationConfig.fastBreak.shotMs / 3
+      );
+      
+      // Then handle the rebound
+      const { animateRebound } = await import('./ballManager.js');
+      await animateRebound({
+        scene,
+        ballSprite,
+        playerSprites,
+        animations: [],
+        rebounderId: turnData.rebounderId || turnData.rebounder_player_id,
+        ballSpot: miss.grid,
+        shooterId: shooterId
+      });
+      
       await fastBreakEndPause(scene);
     }
   }
