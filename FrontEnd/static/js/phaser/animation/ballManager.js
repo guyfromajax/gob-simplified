@@ -152,14 +152,24 @@ export function bounceFromRim(
 ) {
   return new Promise((resolve) => {
     const rebCfg = animationConfig.rebound;
-    const bounceGridX = isHomeTeam
-      ? rimCoords.x - rebCfg.bounceArea.x
-      : rimCoords.x + rebCfg.bounceArea.x;
+    
+    // For missed shots, ball should bounce toward the center of the court
+    // Away basket (x=11): bounce right (increase x)
+    // Home basket (x=89): bounce left (decrease x)
+    const bounceGridX = rimCoords.x > 50 // Home basket
+      ? rimCoords.x - rebCfg.bounceArea.x  // Bounce left toward center
+      : rimCoords.x + rebCfg.bounceArea.x; // Bounce right toward center
+      
     const bounceGridY =
       rimCoords.y + Phaser.Math.Between(-rebCfg.bounceArea.y, rebCfg.bounceArea.y);
+      
+    // Ensure bounce stays in bounds
+    const clampedBounceX = Phaser.Math.Clamp(bounceGridX, 4, 97);
+    const clampedBounceY = Phaser.Math.Clamp(bounceGridY, 1, 50);
+    
     const bounce = gridToPixels(
-      bounceGridX,
-      bounceGridY,
+      clampedBounceX,
+      clampedBounceY,
       scene.game.config.width,
       scene.game.config.height
     );
@@ -169,7 +179,7 @@ export function bounceFromRim(
       y: bounce.y,
       duration,
       ease: "Sine.easeOut",
-      onComplete: () => resolve({ grid: { x: bounceGridX, y: bounceGridY } })
+      onComplete: () => resolve({ grid: { x: clampedBounceX, y: clampedBounceY } })
     });
   });
 }

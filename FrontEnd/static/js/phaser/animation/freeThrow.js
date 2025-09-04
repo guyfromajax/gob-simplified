@@ -146,7 +146,7 @@ export async function runFreeThrowSequence(
     await tween(scene, ballSprite, rimPx, {
       duration: animationConfig.freeThrow.shotMs,
       easing: "Sine.easeInOut",
-      arc: { height: animationConfig.freeThrow.arcHeight },
+      arc: null, // Straight line path instead of arc
     });
 
     scene.events?.emit(result === "MAKE" ? "ft:make" : "ft:miss");
