@@ -169,6 +169,7 @@ export async function runPass(scene, cfg = {}) {
   const { fromId, toId, startCoords, endCoords, duration, easing } = cfg;
   const usedDuration = duration ?? 300;
   const usedEasing = easing ?? 'Linear';
+  const deferOwnership = typeof cfg.onComplete === 'function';
   const ballSprite = scene.ballSprite;
   if (!ballSprite) return;
   const fromSprite = fromId != null ? scene.playerSprites?.[fromId] : null;
@@ -207,7 +208,7 @@ export async function runPass(scene, cfg = {}) {
   scene.__activePass = { key, frame, promise, reject: rejectFn };
 
   scene.passInFlight = true;
-  setPendingOwner(scene, toId);
+  if (!deferOwnership) setPendingOwner(scene, toId);
 
   (async () => {
     try {
@@ -268,6 +269,7 @@ export async function runPass(scene, cfg = {}) {
 
       scene.events?.emit('passEnd', { toId });
       if (PASS_DEBUG) console.log('passEnd', { toId });
+      cfg.onComplete?.();
       resolveFn();
     } catch (err) {
       const lastId = getLastKnownOwner(scene);
