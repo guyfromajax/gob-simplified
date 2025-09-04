@@ -165,27 +165,47 @@ export async function runFreeThrowSequence(
         }
       }
       if (isFinalFT) {
-        safeTransition(
-          scene.stateMachine,
-          States.Inbound,
-          {
-            shotResult: result,
-            currentOwnerId: getCurrentOwner(scene),
-            pendingOwnerId: getPendingOwner(scene),
-          },
-          ["shotResult"]
-        );
-        const newOffenseSide =
-          turnData.offense_team_id === scene.simData?.home_team_id
-            ? "away"
-            : "home";
-        await inboundSetup({
-          scene,
-          ballSprite,
-          playerSprites,
-          newOffenseSide,
-        });
-        nextStateResolved = States.Inbound;
+        const possessionChanged =
+          typeof turnData.possession_team_id !== "undefined" &&
+          turnData.possession_team_id !== turnData.offense_team_id;
+        if (possessionChanged) {
+          safeTransition(
+            scene.stateMachine,
+            States.Inbound,
+            {
+              shotResult: result,
+              currentOwnerId: getCurrentOwner(scene),
+              pendingOwnerId: getPendingOwner(scene),
+            },
+            ["shotResult"]
+          );
+          const newOffenseSide =
+            turnData.possession_team_id === scene.simData?.home_team_id
+              ? "home"
+              : "away";
+          await inboundSetup({
+            scene,
+            ballSprite,
+            playerSprites,
+            newOffenseSide,
+          });
+          scene.events?.emit?.("possessionChange", {
+            offenseTeamId: turnData.possession_team_id,
+          });
+          nextStateResolved = States.Inbound;
+        } else {
+          safeTransition(
+            scene.stateMachine,
+            States.HalfCourt,
+            {
+              shotResult: result,
+              currentOwnerId: getCurrentOwner(scene),
+              pendingOwnerId: getPendingOwner(scene),
+            },
+            ["shotResult"]
+          );
+          nextStateResolved = States.HalfCourt;
+        }
       } else {
         if (scene.tweens) {
           for (const sprite of Object.values(playerSprites))

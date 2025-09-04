@@ -16,3 +16,10 @@ def test_free_throw_sequence_defaults_to_rim():
     assert result["fallback"]["reboundCalled"] is True
     assert result["fallback"]["ballSpot"] == {"x": 91, "y": 25}
     assert result["fallback"]["ballPos"] == {"x": 91, "y": 25}
+
+
+def test_free_throw_possession_change_event():
+    result = run_node("tests/js/httpsLoaderNoStubBall.mjs", "tests/js/runFreeThrowSequence.mjs")
+    assert result["home"]["posChange"] is True
+    assert result["technical"]["posChange"] is False
+    assert result["technical"]["inboundCalled"] is False
