@@ -160,10 +160,8 @@ def resolve_offensive_rebound(game, rebounder):
         }
 
         if made:
-            rebounder.record_stat("FGM")
-            points = 2
-            record_team_points(game, off_team, points)
-            event["points"] = points
+            apply_scoring(game, off_team, rebounder, 2, ["FGM"])
+            event["points"] = 2
             event["possession_flips"] = True
         else:
             new_rebounder, new_team, new_stat = determine_rebounder(game)
@@ -330,6 +328,20 @@ def get_quarter_index_from_game(game):
 def calculate_rebound_score(player):
     attr = player.attributes
     return attr["RB"] * 0.5 + attr["ST"] * 0.3 + attr["AG"] * 0.2
+
+def apply_scoring(game, team, player, points, stats):
+    """Record player scoring stats and update team points.
+
+    Parameters:
+        game: GameManager object
+        team: TeamManager object receiving the points
+        player: Player object recording the stats
+        points: int number of points scored
+        stats: iterable of stat strings to record on the player
+    """
+    for stat in stats:
+        player.record_stat(stat)
+    record_team_points(game, team, points)
 
 def record_team_points(game, team, points):
     """

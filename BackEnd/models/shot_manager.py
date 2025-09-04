@@ -7,11 +7,11 @@ from BackEnd.constants import (
 )
 from BackEnd.utils.shared import (
     apply_help_defense_if_triggered,
+    apply_scoring,
     get_fast_break_chance,
     get_time_elapsed,
     resolve_offensive_rebound,
     get_player_position,
-    record_team_points,
     calculate_screen_score,
     choose_rebounder,
     calculate_rebound_score,
@@ -67,14 +67,10 @@ class ShotManager:
         # 🎯 Shot is Made
         # ------------------------
         if made:
-            shooter.record_stat("FGM")
             if passer:
                 passer.record_stat("AST")
-            if is_three:
-                shooter.record_stat("3PTM")
-
-            points = 3 if is_three else 2
-            record_team_points(self.game, off_team, points)
+            stats = ["FGM", "3PTM"] if is_three else ["FGM"]
+            apply_scoring(self.game, off_team, shooter, 3 if is_three else 2, stats)
 
             possession_flips = True
             if screener:
@@ -364,15 +360,13 @@ class ShotManager:
         # print(f"{get_name_safe(shooter)} attempts a fast breakshot")
 
         if made:
-            shooter.record_stat("FGM")
             if passer:
                 passer.record_stat("AST")
+            points = 2
+            apply_scoring(self.game, off_team, shooter, points, ["FGM"])
             text = f"{shooter} converts the fast break shot!"
             possession_flips = True
             self.game_state["offensive_state"] = "HCO"
-            is_three = False
-            points = 3 if is_three else 2
-            record_team_points(self.game, off_team, points)
         else:
             if defender:
                 defender.record_stat("DEF_S")
