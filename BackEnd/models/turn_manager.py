@@ -268,6 +268,14 @@ class TurnManager:
                     deltas[player.player_id] = {"team": team.name, "stats": diff}
         result["deltas"] = deltas
 
+        # Reconcile player point totals with the authoritative team score.
+        # Clients should treat ``turn.score`` and ``turn.deltas`` as canonical
+        # and never re-apply ``turn.points`` to avoid double counting. To guard
+        # against any desync, compare the team score against the sum of player
+        # PTS at the end of a possession or quarter and push a corrective delta
+        # if they differ.
+        self._reconcile_player_points(result)
+
         # Sync and expose fouls/clock/quarter for live scoreboard updates
         self.game.game_state["team_fouls"] = {
             self.game.home_team.name: self.game.home_team.team_fouls,
@@ -343,6 +351,48 @@ class TurnManager:
         # 🔁 Flip possession if flagged
         if result.get("possession_flips"):
             self.game.switch_possession()
+
+    def _reconcile_player_points(self, result):
+        """Ensure summed player PTS match the official team score.
+
+        This check runs when a possession ends or the quarter expires. If the
+        total points recorded across players for a team does not match the
+        team's score, a corrective delta is added and the discrepancy is
+        logged. This prevents clients from double counting when ``turn.points``
+        is present in the payload.
+        """
+        possession_end = result.get("possession_flips")
+        quarter_end = self.game.game_state.get("time_remaining", 0) == 0
+        if not (possession_end or quarter_end):
+            return
+
+        for team in (self.game.home_team, self.game.away_team):
+            team_score = self.game.score[team.name]
+            total_pts = sum(
+                player.stats["game"].get("PTS", 0) for player in team.get_all_players()
+            )
+            if total_pts == team_score:
+                continue
+
+            diff = team_score - total_pts
+            # Log the discrepancy for debugging/auditing purposes
+            self.logger.log(f"ptsReconcile:{team.name}:{total_pts}->{team_score}")
+
+            # Choose a player to receive the adjustment. Prefer the full roster
+            # but fall back to the current lineup in test environments where the
+            # roster may be empty.
+            players = list(team.get_all_players())
+            if not players:
+                players = list(team.lineup.values())
+            if not players:
+                continue  # nothing we can do
+            player = players[0]
+            player.stats["game"]["PTS"] = player.stats["game"].get("PTS", 0) + diff
+
+            # Reflect the correction in the deltas payload
+            deltas = result.setdefault("deltas", {})
+            entry = deltas.setdefault(player.player_id, {"team": team.name, "stats": {}})
+            entry["stats"]["PTS"] = entry["stats"].get("PTS", 0) + diff
 
     def assign_roles(self, off_call="INSIDE", def_call="MAN"):
         game = self.game
