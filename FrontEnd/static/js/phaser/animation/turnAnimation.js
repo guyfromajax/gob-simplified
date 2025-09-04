@@ -418,10 +418,11 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
   // For HCO scenarios, move all other players toward the new offense basket
   if (nextPlayType === "HCO") {
     console.log('HCO scenario detected, moving other players toward new offense basket');
-    // Determine the new offense basket (opposite of current rebounder's basket)
-    // The rebounder is on defense, so the new offense team is the opposite team
-    const newOffenseBasket = rebounderSprite.team === "home" ? AWAY_RIM_COORDS : HOME_RIM_COORDS;
-    console.log('New offense basket:', newOffenseBasket, 'Rebounder team:', rebounderSprite.team, 'New offense team:', rebounderSprite.team === "home" ? "away" : "home");
+    // Determine the new offense basket
+    // In defensive rebound: rebounder's team becomes the new offense team
+    const newOffenseTeam = rebounderSprite.team;
+    const newOffenseBasket = newOffenseTeam === "home" ? HOME_RIM_COORDS : AWAY_RIM_COORDS;
+    console.log('New offense basket:', newOffenseBasket, 'Rebounder team:', rebounderSprite.team, 'New offense team:', newOffenseTeam);
     
     let playersMoved = 0;
     for (const [id, sprite] of Object.entries(playerSprites)) {
@@ -446,9 +447,10 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
       // Move 20-30 grid spots toward new offense basket
       const distance = Phaser.Math.Between(20, 30);
       // Determine direction based on new offense team:
+      // In defensive rebound: rebounder's team becomes the new offense team
       // If new offense team is home (basket at x=89), all players move right (increase x)
       // If new offense team is away (basket at x=11), all players move left (decrease x)
-      const newOffenseTeam = rebounderSprite.team === "home" ? "away" : "home";
+      const newOffenseTeam = rebounderSprite.team; // Rebounder's team becomes new offense
       const direction = newOffenseTeam === "home" ? 1 : -1;
       
       const targetGrid = {
