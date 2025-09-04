@@ -23,3 +23,12 @@ def test_free_throw_possession_change_event():
     assert result["home"]["posChange"] is True
     assert result["technical"]["posChange"] is False
     assert result["technical"]["inboundCalled"] is False
+
+
+def test_free_throw_halftime_inbound_orientation():
+    result = run_node(
+        "tests/js/httpsLoaderNoStubBall.mjs",
+        "tests/js/runFreeThrowHalftime.mjs",
+    )
+    assert result["inboundSide"] == "home"
+    assert result["ballSpotX"] == 3
