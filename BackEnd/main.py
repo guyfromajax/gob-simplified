@@ -404,6 +404,19 @@ def run_simulation(home_team_name, away_team_name, home_lineup_ids=None, away_li
     """
 
     gm = GameManager(home_team_name, away_team_name)
+    
+    # Execute opening tip logic here (before setting quarter)
+    from BackEnd.utils.opening_tip import execute_opening_tip
+    offense_team, defense_team = execute_opening_tip(gm)
+    
+    # Update the offense/defense teams based on tip result
+    gm.offense_team = offense_team
+    gm.defense_team = defense_team
+    
+    # Update game_state to reflect the correct teams
+    gm.game_state["offense_team"] = offense_team.name
+    gm.game_state["defense_team"] = defense_team.name
+    
 
     print("Inside run_simulation")
     print(f"Home team: {home_team_name}, Away team: {away_team_name}")
