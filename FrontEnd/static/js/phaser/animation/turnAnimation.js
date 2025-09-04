@@ -398,8 +398,9 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
   if (nextPlayType === "HCO") {
     console.log('HCO scenario detected, moving other players toward new offense basket');
     // Determine the new offense basket (opposite of current rebounder's basket)
+    // The rebounder is on defense, so the new offense team is the opposite team
     const newOffenseBasket = rebounderSprite.team === "home" ? AWAY_RIM_COORDS : HOME_RIM_COORDS;
-    console.log('New offense basket:', newOffenseBasket, 'Rebounder team:', rebounderSprite.team);
+    console.log('New offense basket:', newOffenseBasket, 'Rebounder team:', rebounderSprite.team, 'New offense team:', rebounderSprite.team === "home" ? "away" : "home");
     
     let playersMoved = 0;
     for (const [id, sprite] of Object.entries(playerSprites)) {
@@ -423,9 +424,11 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
       
       // Move 20-30 grid spots toward new offense basket
       const distance = Phaser.Math.Between(20, 30);
-      // If new offense basket is at x=11 (away), move left (negative direction)
-      // If new offense basket is at x=89 (home), move right (positive direction)
-      const direction = newOffenseBasket.x > 50 ? 1 : -1;
+      // Determine direction based on new offense team:
+      // If new offense team is home (basket at x=89), all players move right (increase x)
+      // If new offense team is away (basket at x=11), all players move left (decrease x)
+      const newOffenseTeam = rebounderSprite.team === "home" ? "away" : "home";
+      const direction = newOffenseTeam === "home" ? 1 : -1;
       
       const targetGrid = {
         x: Phaser.Math.Clamp(
@@ -448,7 +451,7 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
       );
       
       playersMoved++;
-      console.log(`HCO player movement: ${id} from (${currentGridX.toFixed(1)}, ${currentGridY.toFixed(1)}) to (${targetGrid.x}, ${targetGrid.y})`);
+      console.log(`HCO player movement: ${id} from (${currentGridX.toFixed(1)}, ${currentGridY.toFixed(1)}) to (${targetGrid.x}, ${targetGrid.y}) [direction: ${direction}, newOffenseTeam: ${newOffenseTeam}]`);
     }
     console.log(`Total players moved for HCO: ${playersMoved}`);
   } else {
