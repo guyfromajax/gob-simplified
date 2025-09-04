@@ -393,28 +393,48 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
     }
   }
 
-  /*
-  for (const [id, sprite] of Object.entries(playerSprites)) {
-    const info = scene.playerInfo?.[id];
-    if (!info || id === rebounderId || id === pgId) continue;
-    const sameTeam = String(info.team_id) === String(rebounderSprite.team_id);
-    const offset = Phaser.Math.Between(
-      sameTeam ? 20 : 5,
-      sameTeam ? 45 : 25
-    );
-    const sign = basketGrid.x > 50 ? -1 : 1;
-    const targetGrid = {
-      x: basketGrid.x + sign * offset,
-      y: Phaser.Math.Between(10, 40),
-    };
-    const targetPx = gridToPixels(targetGrid.x, targetGrid.y, width, height);
-    promises.push(
-      tweenPlayerTo(scene, sprite, targetPx, {
-        duration: animationConfig.outletSetup.playerMoveMs,
-      })
-    );
+  // For HCO scenarios, move all other players toward the new offense basket
+  if (nextPlayType === "HCO") {
+    // Determine the new offense basket (opposite of current rebounder's basket)
+    const newOffenseBasket = rebounderSprite.team === "home" ? AWAY_RIM_COORDS : HOME_RIM_COORDS;
+    
+    for (const [id, sprite] of Object.entries(playerSprites)) {
+      const info = scene.playerInfo?.[id];
+      if (!info || id === rebounderId || id === outletReceiverId) continue;
+      
+      // Calculate movement toward new offense basket
+      const currentGridX = (sprite.x / width) * 100;
+      const currentGridY = 50 - (sprite.y / height) * 50;
+      
+      // Move 20-30 grid spots toward new offense basket
+      const distance = Phaser.Math.Between(20, 30);
+      const direction = newOffenseBasket.x > currentGridX ? 1 : -1;
+      
+      const targetGrid = {
+        x: Phaser.Math.Clamp(
+          currentGridX + direction * distance,
+          4,  // Stay in bounds
+          97
+        ),
+        y: Phaser.Math.Clamp(
+          currentGridY + Phaser.Math.Between(-10, 10),
+          1,  // Stay in bounds
+          50
+        ),
+      };
+      
+      const targetPx = gridToPixels(targetGrid.x, targetGrid.y, width, height);
+      promises.push(
+        tweenPlayerTo(scene, sprite, targetPx, {
+          duration: animationConfig.outletSetup.playerMoveMs,
+        })
+      );
+      
+      if (DebugFlags?.OUTLET) {
+        console.log(`HCO player movement: ${id} from (${currentGridX.toFixed(1)}, ${currentGridY.toFixed(1)}) to (${targetGrid.x}, ${targetGrid.y})`);
+      }
+    }
   }
-  */
 
   await Promise.all(promises);
 
