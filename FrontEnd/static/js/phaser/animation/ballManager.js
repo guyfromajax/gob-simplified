@@ -158,8 +158,14 @@ export function shootBall({
     scene.game.config.height
   );
   const rimCoords = isHomeTeam ? HOME_RIM_COORDS : AWAY_RIM_COORDS;
+  const rimGridX =
+    result === "MAKE"
+      ? isHomeTeam
+        ? rimCoords.x - 2
+        : rimCoords.x + 2
+      : rimCoords.x;
   const rim = gridToPixels(
-    rimCoords.x,
+    rimGridX,
     rimCoords.y,
     scene.game.config.width,
     scene.game.config.height
