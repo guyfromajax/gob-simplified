@@ -395,8 +395,8 @@ def resolve_free_throw_logic(game):
             if rebound_team == def_team:
                 possession_flips = True
                 text += f" {get_name_safe(rebounder)} grabs the defensive rebound."
-                if random.random() < get_fast_break_chance(game):
-                    game_state["offensive_state"] = "FAST_BREAK"
+                next_play_type = "FAST_BREAK" if random.random() < get_fast_break_chance(game) else "HCO"
+                game_state["offensive_state"] = next_play_type
             else:
                 # Offensive rebound handling
                 off_event = resolve_offensive_rebound(game, rebounder)
@@ -452,6 +452,9 @@ def resolve_free_throw_logic(game):
         if game_state.get("last_rebounder"):
             result["rebounderId"] = getattr(game_state["last_rebounder"], "player_id", None)
             result["rebound_type"] = game_state.get("last_rebound", "")
+            # Add next play type for defensive rebounds
+            if game_state.get("last_rebound") == "DREB":
+                result["next_play_type"] = game_state.get("offensive_state", "HCO")
 
     return result
 

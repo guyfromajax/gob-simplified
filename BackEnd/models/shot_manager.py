@@ -197,9 +197,9 @@ class ShotManager:
                     })
                     self.game.turn_manager.logger.log("defReb")
                     self.game_state["last_rebounder"] = rebounder
-                    self.game_state["offensive_state"] = (
-                        "FAST_BREAK" if random.random() < get_fast_break_chance(self.game) else "HCO"
-                    )
+                    next_play_type = "FAST_BREAK" if random.random() < get_fast_break_chance(self.game) else "HCO"
+                    self.game_state["offensive_state"] = next_play_type
+                    result["next_play_type"] = next_play_type
 
         # ⏱️ Add tempo-based time to turn
         tempo = off_team.strategy_calls["tempo_call"]

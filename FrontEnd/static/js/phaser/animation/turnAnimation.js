@@ -262,8 +262,8 @@ async function runSideInboundSetup({ scene, ballSprite, playerSprites, turnData 
   scene.ballDetached = false;
 }
 
-// Setup positions after a defensive rebound before new half-court offense
-async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebounderId }) {
+// Setup positions after a defensive rebound before new half-court offense or fast break
+async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebounderId, nextPlayType = "HCO" }) {
   if (!scene || !playerSprites || rebounderId == null) return;
 
   const rebounderSprite = playerSprites[rebounderId];
@@ -292,14 +292,31 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
   const rebGridX = (rebounderSprite.x / width) * 100;
   const rebGridY = 50 - (rebounderSprite.y / height) * 50;
 
-  let pgId = null;
-  for (const [id, info] of Object.entries(scene.playerInfo || {})) {
-    if (
-      info.pos === "PG" &&
-      info.team === rebounderSprite.team
-    ) {
-      pgId = id;
-      break;
+  // Find the outlet pass receiver (PG for HCO, or outlet_receiver for Fast Break)
+  let outletReceiverId = null;
+  let outletReceiverSprite = null;
+  
+  if (nextPlayType === "FAST_BREAK") {
+    // For fast break, find the outlet receiver (usually PG, SG, or SF)
+    const outletPositions = ["PG", "SG", "SF"];
+    for (const pos of outletPositions) {
+      for (const [id, info] of Object.entries(scene.playerInfo || {})) {
+        if (info.pos === pos && info.team === rebounderSprite.team) {
+          outletReceiverId = id;
+          outletReceiverSprite = playerSprites[id];
+          break;
+        }
+      }
+      if (outletReceiverId) break;
+    }
+  } else {
+    // For HCO, find the PG
+    for (const [id, info] of Object.entries(scene.playerInfo || {})) {
+      if (info.pos === "PG" && info.team === rebounderSprite.team) {
+        outletReceiverId = id;
+        outletReceiverSprite = playerSprites[id];
+        break;
+      }
     }
   }
   
@@ -307,22 +324,42 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
   if (DebugFlags?.OUTLET) {
     console.log('Outlet setup debug:', {
       rebounderId,
+      nextPlayType,
+      outletReceiverId,
       rebounderSprite: rebounderSprite ? {
         team: rebounderSprite.team
       } : null,
-      pgId,
       playerInfo: scene.playerInfo,
       allPlayerIds: Object.keys(scene.playerInfo || {})
     });
   }
 
   const promises = [];
-  let pgTarget = null;
-  if (pgId && pgId !== rebounderId) {
-    const pgSprite = playerSprites[pgId];
-    if (pgSprite) {
+  let outletTarget = null;
+  
+  if (outletReceiverId && outletReceiverId !== rebounderId && outletReceiverSprite) {
+    if (nextPlayType === "FAST_BREAK") {
+      // For fast break: move outlet receiver 15-25 grid spots toward offense basket
+      const offenseBasket = rebounderSprite.team === "home" ? HOME_RIM_COORDS : AWAY_RIM_COORDS;
+      const distance = Phaser.Math.Between(15, 25);
+      const direction = offenseBasket.x > rebGridX ? 1 : -1; // Move toward offense basket
+      
+      outletTarget = {
+        x: Phaser.Math.Clamp(
+          rebGridX + direction * distance,
+          4,
+          97
+        ),
+        y: Phaser.Math.Clamp(
+          rebGridY + Phaser.Math.Between(-8, 8),
+          1,
+          50
+        ),
+      };
+    } else {
+      // For HCO: move PG near the rebounder (current behavior)
       const sign = basketGrid.x > rebGridX ? 1 : -1;
-      pgTarget = {
+      outletTarget = {
         x: Phaser.Math.Clamp(
           rebGridX + sign * Phaser.Math.Between(3, 6),
           4,
@@ -334,24 +371,24 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
           50
         ),
       };
-      const pgPx = gridToPixels(pgTarget.x, pgTarget.y, width, height);
-      promises.push(
-        tweenPlayerTo(scene, pgSprite, pgPx, {
-          duration: animationConfig.outletSetup.playerMoveMs,
-        })
-      );
-      if (DebugFlags?.BALL) console.log('pgOutletTarget', { pgId, pgTarget });
-      if (DebugFlags?.OUTLET) console.log('PG movement queued for outlet pass');
-    } else {
-      if (DebugFlags?.OUTLET) console.log('PG sprite not found for outlet pass');
     }
+    
+    const outletPx = gridToPixels(outletTarget.x, outletTarget.y, width, height);
+    promises.push(
+      tweenPlayerTo(scene, outletReceiverSprite, outletPx, {
+        duration: animationConfig.outletSetup.playerMoveMs,
+      })
+    );
+    
+    if (DebugFlags?.BALL) console.log('outletTarget', { outletReceiverId, outletTarget, nextPlayType });
+    if (DebugFlags?.OUTLET) console.log(`${nextPlayType} outlet receiver movement queued`);
   } else {
     if (DebugFlags?.OUTLET) {
       console.log('Outlet pass skipped:', { 
-        pgId, 
+        outletReceiverId, 
         rebounderId, 
-        samePerson: pgId === rebounderId,
-        reason: !pgId ? 'No PG found' : 'PG is rebounder'
+        samePerson: outletReceiverId === rebounderId,
+        reason: !outletReceiverId ? 'No outlet receiver found' : 'Outlet receiver is rebounder'
       });
     }
   }
@@ -381,24 +418,25 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
 
   await Promise.all(promises);
 
-  if (pgId && pgId !== rebounderId) {
+  if (outletReceiverId && outletReceiverId !== rebounderId) {
     const outletLog = {
       event: 'OUTLET_PASS',
       from: rebounderId,
-      to: pgId,
-      pgTarget,
+      to: outletReceiverId,
+      outletTarget,
+      nextPlayType,
       startedAt: Date.now(),
     };
     if (DebugFlags?.OUTLET) console.log(outletLog);
     if (DebugFlags?.OUTLET) console.log('Starting outlet pass animation...');
     await runPass(scene, {
       fromId: rebounderId,
-      toId: pgId,
+      toId: outletReceiverId,
       duration: animationConfig.outletSetup.passMs,
       easing: animationConfig.outletSetup.easing,
       onComplete: () => {
-        setPendingOwner(scene, pgId);
-        setCurrentOwner(scene, pgId);
+        setPendingOwner(scene, outletReceiverId);
+        setCurrentOwner(scene, outletReceiverId);
         outletLog.completedAt = Date.now();
         if (DebugFlags?.OUTLET) console.log(outletLog);
         if (DebugFlags?.OUTLET) console.log('Outlet pass completed!');
@@ -407,10 +445,10 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
   } else {
     if (DebugFlags?.OUTLET) {
       console.log('Outlet pass not executed:', { 
-        pgId, 
+        outletReceiverId, 
         rebounderId, 
-        samePerson: pgId === rebounderId,
-        reason: !pgId ? 'No PG found' : 'PG is rebounder'
+        samePerson: outletReceiverId === rebounderId,
+        reason: !outletReceiverId ? 'No outlet receiver found' : 'Outlet receiver is rebounder'
       });
     }
   }
@@ -1024,7 +1062,8 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
                 scene,
                 ballSprite,
                 playerSprites,
-                rebounderId
+                rebounderId,
+                nextPlayType: turnData.next_play_type || "HCO"
               });
             } else {
               const pause = animationConfig.offensiveRebound.pauseMs;
@@ -1142,7 +1181,8 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
               scene,
               ballSprite,
               playerSprites,
-              rebounderId
+              rebounderId,
+              nextPlayType: turnData.next_play_type || "HCO"
             });
           }
         }
