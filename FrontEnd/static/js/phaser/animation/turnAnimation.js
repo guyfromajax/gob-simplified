@@ -264,6 +264,7 @@ async function runSideInboundSetup({ scene, ballSprite, playerSprites, turnData 
 
 // Setup positions after a defensive rebound before new half-court offense or fast break
 async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebounderId, nextPlayType = "HCO" }) {
+  console.log('runDefensiveReboundSetup called with:', { rebounderId, nextPlayType });
   if (!scene || !playerSprites || rebounderId == null) return;
 
   const rebounderSprite = playerSprites[rebounderId];
@@ -395,12 +396,26 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
 
   // For HCO scenarios, move all other players toward the new offense basket
   if (nextPlayType === "HCO") {
+    console.log('HCO scenario detected, moving other players toward new offense basket');
     // Determine the new offense basket (opposite of current rebounder's basket)
     const newOffenseBasket = rebounderSprite.team === "home" ? AWAY_RIM_COORDS : HOME_RIM_COORDS;
+    console.log('New offense basket:', newOffenseBasket, 'Rebounder team:', rebounderSprite.team);
     
+    let playersMoved = 0;
     for (const [id, sprite] of Object.entries(playerSprites)) {
       const info = scene.playerInfo?.[id];
-      if (!info || id === rebounderId || id === outletReceiverId) continue;
+      console.log(`Checking player ${id}:`, { 
+        hasInfo: !!info, 
+        isRebounder: id === rebounderId, 
+        isOutletReceiver: id === outletReceiverId,
+        spriteTeam: sprite.team,
+        rebounderTeam: rebounderSprite.team
+      });
+      
+      if (!info || id === rebounderId || id === outletReceiverId) {
+        console.log(`Skipping player ${id}`);
+        continue;
+      }
       
       // Calculate movement toward new offense basket
       const currentGridX = (sprite.x / width) * 100;
@@ -408,7 +423,9 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
       
       // Move 20-30 grid spots toward new offense basket
       const distance = Phaser.Math.Between(20, 30);
-      const direction = newOffenseBasket.x > currentGridX ? 1 : -1;
+      // If new offense basket is at x=11 (away), move left (negative direction)
+      // If new offense basket is at x=89 (home), move right (positive direction)
+      const direction = newOffenseBasket.x > 50 ? 1 : -1;
       
       const targetGrid = {
         x: Phaser.Math.Clamp(
@@ -430,10 +447,12 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
         })
       );
       
-      if (DebugFlags?.OUTLET) {
-        console.log(`HCO player movement: ${id} from (${currentGridX.toFixed(1)}, ${currentGridY.toFixed(1)}) to (${targetGrid.x}, ${targetGrid.y})`);
-      }
+      playersMoved++;
+      console.log(`HCO player movement: ${id} from (${currentGridX.toFixed(1)}, ${currentGridY.toFixed(1)}) to (${targetGrid.x}, ${targetGrid.y})`);
     }
+    console.log(`Total players moved for HCO: ${playersMoved}`);
+  } else {
+    console.log('Not HCO scenario, nextPlayType:', nextPlayType);
   }
 
   await Promise.all(promises);
