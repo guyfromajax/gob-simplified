@@ -257,7 +257,7 @@ export async function runFreeThrowSequence(
           ballSprite,
           playerSprites,
           animations: [],
-          rebounderId: null,
+          rebounderId: turnData.rebounderId || turnData.rebounder_player_id,
           ballSpot: miss.grid,
           shooterId: turnData.shooter_id,
         });
