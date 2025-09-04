@@ -75,3 +75,66 @@ def test_free_throw_animation_empty_offense_lineup():
         offense_is_home=True,
     )
     assert packet == []
+
+
+def test_two_shot_final_make_flips_possession():
+    game, shooter = _setup_game(one_and_one=False)
+    game.game_state["free_throws_remaining"] = 2
+
+    first = resolve_free_throw_logic(game)
+    assert first["possession_flips"] is False
+    assert game.game_state["free_throws_remaining"] == 1
+
+    game.game_state["shooter"] = shooter
+    second = resolve_free_throw_logic(game)
+    assert second["possession_flips"] is True
+    game.turn_manager.update_clock_and_possession(second)
+    assert game.offense_team == game.away_team
+
+
+def test_and_one_make_results_in_baseline_inbound():
+    game, _ = _setup_game(one_and_one=False)
+    result = resolve_free_throw_logic(game)
+    assert result["possession_flips"] is True
+    game.turn_manager.update_clock_and_possession(result)
+    assert game.offense_team == game.away_team
+
+
+def test_and_one_miss_results_in_rebound(monkeypatch):
+    game, _ = _setup_game(one_and_one=False)
+    game.offense_team.team_attributes["ft_shot_threshold"] = 999
+    monkeypatch.setattr("BackEnd.engine.phase_resolution.random.randint", lambda a, b: 1)
+    monkeypatch.setattr("BackEnd.engine.phase_resolution.random.random", lambda: 0.0)
+    monkeypatch.setattr("BackEnd.engine.phase_resolution.choose_rebounder", lambda r, s: "C")
+    result = resolve_free_throw_logic(game)
+    assert result["possession_flips"] is True
+    assert game.game_state["last_rebounder"] is game.defense_team.lineup["C"]
+
+
+def test_one_and_one_make_unlocks_second_shot():
+    game, _ = _setup_game(one_and_one=True)
+    result = resolve_free_throw_logic(game)
+    assert result["possession_flips"] is False
+    assert game.game_state["free_throws_remaining"] == 1
+    assert game.game_state["one_and_one"] is False
+
+
+def test_one_and_one_miss_ends_possession(monkeypatch):
+    game, _ = _setup_game(one_and_one=True)
+    game.offense_team.team_attributes["ft_shot_threshold"] = 999
+    monkeypatch.setattr("BackEnd.engine.phase_resolution.random.randint", lambda a, b: 1)
+    monkeypatch.setattr("BackEnd.engine.phase_resolution.random.random", lambda: 0.0)
+    monkeypatch.setattr("BackEnd.engine.phase_resolution.choose_rebounder", lambda r, s: "C")
+    result = resolve_free_throw_logic(game)
+    assert result["possession_flips"] is True
+    assert game.game_state["free_throws_remaining"] <= 0
+    assert game.game_state["one_and_one"] is False
+
+
+def test_technical_free_throw_retains_possession():
+    game, _ = _setup_game(one_and_one=False)
+    game.game_state["no_lane"] = True
+    result = resolve_free_throw_logic(game)
+    assert result["possession_flips"] is False
+    game.turn_manager.update_clock_and_possession(result)
+    assert game.offense_team == game.home_team
