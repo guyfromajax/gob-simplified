@@ -19,8 +19,9 @@ class GameManager:
         self.turns = []
         self.text_log = []
         
-        self.offense_team = None
-        self.defense_team = None
+        # Set default offense/defense teams (will be updated by opening tip)
+        self.offense_team = self.home_team
+        self.defense_team = self.away_team
 
         self.game_state = self._init_game_state()
 
@@ -34,11 +35,27 @@ class GameManager:
         # optional database identifier for live games
         self.game_id: str | None = None
 
+    def setup_opening_tip(self):
+        """Execute opening tip logic and update offense/defense teams."""
+        from BackEnd.utils.opening_tip import execute_opening_tip
+        
+        offense_team, defense_team = execute_opening_tip(self)
+        
+        # Update offense/defense teams
+        self.offense_team = offense_team
+        self.defense_team = defense_team
+        
+        # Update game_state to reflect the correct teams
+        self.game_state["offense_team"] = offense_team.name
+        self.game_state["defense_team"] = defense_team.name
+        
+        print(f"Opening tip winner: {offense_team.name}")
+
     
     def _init_game_state(self):
         return {
-            "offense_team": None,
-            "defense_team": None,
+            "offense_team": self.offense_team.name,
+            "defense_team": self.defense_team.name,
             "score": self.score,
             "points_by_quarter": {
                 self.home_team.name: self.home_team.points_by_quarter,
