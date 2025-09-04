@@ -21,7 +21,7 @@ from BackEnd.utils.shared import (
     choose_rebounder,
     default_rebounder_dict,
     resolve_offensive_rebound,
-    record_team_points,
+    apply_scoring,
     unpack_game_context
 )
 
@@ -323,8 +323,7 @@ def resolve_free_throw_logic(game):
     shooter_pos = get_player_position(off_lineup, shooter)
 
     if makes_shot:
-        shooter.record_stat("FTM")
-        record_team_points(game, off_team, 1)
+        apply_scoring(game, off_team, shooter, 1, ["FTM"])
         text += "and hits the free throw!"
     else:
         text += "but misses the free throw."
