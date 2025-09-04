@@ -415,11 +415,22 @@ export function animatePutbackAttempt(
                 });
               }
 
-              // Don't animate the ball bounce here - let the calling code handle it with animateRebound
-              // This prevents conflicts with the rebound animation system
+              // Bounce the ball from the rim for putback misses
               detachBall(scene, ballSprite);
               scene.rebounderId = null;
-              resolve({ grid: { x: rimCoords.x, y: rimCoords.y } });
+              
+              // Determine if this is home team shooting (for bounce direction)
+              const isHomeTeam = rimCoords.x > 50; // Home rim is at x=89, away rim is at x=11
+              
+              bounceFromRim(
+                scene,
+                ballSprite,
+                rimCoords,
+                isHomeTeam,
+                duration / 3
+              ).then((miss) => {
+                resolve(miss);
+              });
             } else if (result === "FOUL") {
               detachBall(scene, ballSprite);
               hideBall(ballSprite);
