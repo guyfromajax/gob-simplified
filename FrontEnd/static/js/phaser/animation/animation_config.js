@@ -61,6 +61,9 @@ const overrides =
 export const FT_BETWEEN_SHOTS_DELAY_MS =
   overrides.FT_BETWEEN_SHOTS_DELAY_MS ?? 0;
 
+export const FAST_BREAK_END_PAUSE_MS =
+  overrides.FAST_BREAK_END_PAUSE_MS ?? 3000;
+
 export const animationConfig = {
   enableBallTween: overrides.enableBallTween ?? defaults.enableBallTween,
   pass: { ...defaults.pass, ...(overrides.pass || {}) },
