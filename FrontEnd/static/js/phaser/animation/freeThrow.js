@@ -3,6 +3,7 @@ import animationConfig, {
   FT_BETWEEN_SHOTS_DELAY_MS,
 } from "./animation_config.js";
 import { HOME_RIM_COORDS, AWAY_RIM_COORDS } from "./courtConstants.js";
+import { bounceFromRim } from "./ballManager.js";
 import { States, safeTransition, createTransitionGuard } from "../state/gameStateMachine.js";
 import { getCurrentOwner, getPendingOwner } from "../ball/ballController.js";
 import { DebugFlags } from "../utils/debugFlags.js";
@@ -244,13 +245,20 @@ export async function runFreeThrowSequence(
           },
           ["shotResult"]
         );
+        const miss = await bounceFromRim(
+          scene,
+          ballSprite,
+          rimGrid,
+          turnData.offense_team_id === scene.simData?.home_team_id,
+          animationConfig.freeThrow.shotMs / 3
+        );
         await rebound({
           scene,
           ballSprite,
           playerSprites,
           animations: [],
           rebounderId: null,
-          ballSpot: rimGrid,
+          ballSpot: miss.grid,
           shooterId: turnData.shooter_id,
         });
         nextStateResolved = States.Rebound;

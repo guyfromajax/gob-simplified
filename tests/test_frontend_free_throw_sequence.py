@@ -14,8 +14,12 @@ def run_node(loader, script):
 def test_free_throw_sequence_defaults_to_rim():
     result = run_node("tests/js/httpsLoaderNoStubBall.mjs", "tests/js/runFreeThrowSequence.mjs")
     assert result["fallback"]["reboundCalled"] is True
-    assert result["fallback"]["ballSpot"] == {"x": 91, "y": 25}
-    assert result["fallback"]["ballPos"] == {"x": 91, "y": 25}
+    spot = result["fallback"]["ballSpot"]
+    assert spot["x"] == 85
+    assert 19 <= spot["y"] <= 31
+    pos = result["fallback"]["ballPos"]
+    assert pos["x"] == spot["x"]
+    assert pos["y"] == 50 - spot["y"]
 
 
 def test_free_throw_possession_change_event():
