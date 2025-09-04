@@ -166,9 +166,7 @@ export async function runFreeThrowSequence(
         }
       }
       if (isFinalFT) {
-        const possessionChanged =
-          typeof turnData.possession_team_id !== "undefined" &&
-          turnData.possession_team_id !== turnData.offense_team_id;
+        const possessionChanged = turnData.possession_flips;
         if (possessionChanged) {
           safeTransition(
             scene.stateMachine,
@@ -184,9 +182,14 @@ export async function runFreeThrowSequence(
             helpers.getOffenseSide ||
             ((scene, teamId) =>
               teamId === scene.simData?.home_team_id ? "home" : "away");
+          
+          // When possession flips after a made free throw, the NEW offense team
+          // (the team that was previously on defense) should do the inbound
           const newOffenseSide = resolveOffenseSide(
             scene,
-            turnData.possession_team_id
+            turnData.offense_team_id === scene.simData?.home_team_id 
+              ? scene.simData?.away_team_id 
+              : scene.simData?.home_team_id
           );
           await inboundSetup({
             scene,
