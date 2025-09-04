@@ -78,6 +78,7 @@ class ShotManager:
                 screener.record_stat("SCR_S")
 
             if d_foul:
+                possession_flips = False
                 # AND-1 situation
                 self.game_state["shooter"] = shooter 
                 foul_player.record_stat("F")
