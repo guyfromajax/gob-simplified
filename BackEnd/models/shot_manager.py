@@ -70,7 +70,8 @@ class ShotManager:
             if passer:
                 passer.record_stat("AST")
             stats = ["FGM", "3PTM"] if is_three else ["FGM"]
-            apply_scoring(self.game, off_team, shooter, 3 if is_three else 2, stats)
+            points = 3 if is_three else 2
+            apply_scoring(self.game, off_team, shooter, points, stats)
 
             possession_flips = True
             if screener:
