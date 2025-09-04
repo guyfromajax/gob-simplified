@@ -289,6 +289,10 @@ class TurnManager:
         # Ensure no Player objects remain in the result payload
         result = convert_players(result)
 
+        # Ensure every turn has text for the in-game text scroll
+        if not result.get("text") or result.get("text").strip() == "":
+            result["text"] = "No text in this turn"
+
         print(f"inside run_micro_turn result: {result}")
         # print(f"result: {result}")
         return result
