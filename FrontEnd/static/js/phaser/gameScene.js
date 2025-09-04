@@ -365,6 +365,9 @@ export function createGameScene(Phaser) {
         const prevHome = liveScore[homeTeam];
         const prevAway = liveScore[awayTeam];
 
+        // ``turn.score`` is authoritative. ``turn.points`` may appear in the
+        // payload for context but must **not** be re-applied here to avoid
+        // double counting.
         if (turn.score) {
           if (typeof turn.score[homeTeam] === 'number') liveScore[homeTeam] = turn.score[homeTeam];
           if (typeof turn.score[awayTeam] === 'number') liveScore[awayTeam] = turn.score[awayTeam];
