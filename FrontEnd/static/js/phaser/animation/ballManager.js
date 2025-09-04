@@ -75,11 +75,29 @@ function runInboundSetup(opts) {
 }
 
 function runPass(scene, cfg = {}) {
+  // Debug logging for kickout passes
+  if (cfg.fromId && cfg.toId) {
+    console.log('runPass called for kickout:', {
+      fromId: cfg.fromId,
+      toId: cfg.toId,
+      currentState: scene.stateMachine?.state,
+      possessionFlipInProgress: scene.possessionFlipInProgress,
+      isFastBreak: scene.stateMachine?.is(States.FastBreak)
+    });
+  }
+  
   // Allow kickout passes even during possession flip
-  const isKickoutPass = cfg.fromId && cfg.toId && scene.stateMachine?.is(States.Rebound);
+  const isKickoutPass = cfg.fromId && cfg.toId;
+  
   if ((scene.possessionFlipInProgress && !isKickoutPass) || scene.stateMachine?.is(States.FastBreak)) {
+    console.log('runPass blocked:', {
+      reason: scene.possessionFlipInProgress ? 'possessionFlipInProgress' : 'FastBreak state',
+      isKickoutPass
+    });
     return Promise.resolve();
   }
+  
+  console.log('runPass proceeding with baseRunPass');
   return baseRunPass(scene, cfg);
 }
 
