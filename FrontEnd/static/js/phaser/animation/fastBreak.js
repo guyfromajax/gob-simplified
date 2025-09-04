@@ -306,10 +306,29 @@ export async function runFastBreakSequence({ scene, turnData, playerSprites, bal
       const rimHoldMs = animationConfig.fastBreak?.rimHoldMs ?? 2000;
       await new Promise(resolve => scene.time.delayedCall(rimHoldMs, resolve));
       await fastBreakEndPause(scene);
-      const newOffenseSide = shooterSprite.team === "home" ? "away" : "home";
+      
+      // Use backend possession_team_id to determine new offense team for inbound
+      const resolveOffenseSide = (scene, teamId) =>
+        teamId === scene.simData?.home_team_id ? "home" : "away";
+      const newOffenseSide = resolveOffenseSide(scene, turnData.possession_team_id);
+      
+      console.log('Fast break made shot - inbound setup:', {
+        shooterTeam: shooterSprite.team,
+        possession_team_id: turnData.possession_team_id,
+        newOffenseSide,
+        home_team_id: scene.simData?.home_team_id
+      });
+      
       await runInboundSetup({ scene, ballSprite, playerSprites, newOffenseSide });
     } else {
       // Handle missed fast break shot with ball bounce
+      console.log('Fast break missed shot - rebound progression:', {
+        shooterId,
+        rebounderId: turnData.rebounderId || turnData.rebounder_player_id,
+        rebound_type: turnData.rebound_type,
+        possession_team_id: turnData.possession_team_id
+      });
+      
       const { bounceFromRim } = await import('./ballManager.js');
       const isHomeTeam = shooterSprite.team === "home";
       const miss = await bounceFromRim(
