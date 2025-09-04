@@ -179,10 +179,14 @@ export async function runFreeThrowSequence(
             },
             ["shotResult"]
           );
-          const newOffenseSide =
-            turnData.possession_team_id === scene.simData?.home_team_id
-              ? "home"
-              : "away";
+          const resolveOffenseSide =
+            helpers.getOffenseSide ||
+            ((scene, teamId) =>
+              teamId === scene.simData?.home_team_id ? "home" : "away");
+          const newOffenseSide = resolveOffenseSide(
+            scene,
+            turnData.possession_team_id
+          );
           await inboundSetup({
             scene,
             ballSprite,
