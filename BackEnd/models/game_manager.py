@@ -19,8 +19,8 @@ class GameManager:
         self.turns = []
         self.text_log = []
         
-        self.offense_team = self.home_team #vary based on opening tip
-        self.defense_team = self.away_team
+        self.offense_team = None
+        self.defense_team = None
 
         self.game_state = self._init_game_state()
 
@@ -37,8 +37,8 @@ class GameManager:
     
     def _init_game_state(self):
         return {
-            "offense_team": self.offense_team.name,
-            "defense_team": self.defense_team.name,
+            "offense_team": None,
+            "defense_team": None,
             "score": self.score,
             "points_by_quarter": {
                 self.home_team.name: self.home_team.points_by_quarter,
