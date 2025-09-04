@@ -364,8 +364,6 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
     });
   }
 
-  scene.possessionFlipInProgress = false;
-
   if (scene.stateMachine?.is(States.OutletSetup)) {
     if (DebugFlags?.FSM) console.log('FSM: OutletSetup -> HalfCourt');
     safeTransition(
@@ -377,6 +375,8 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
       }
     );
   }
+
+  scene.possessionFlipInProgress = false;
 
   if (typeof scene.startNextHalfCourtOffense === "function") {
     scene.startNextHalfCourtOffense();
@@ -942,7 +942,18 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
                   scene.events?.emit?.("possessionChange", {
                     offenseTeamId: rebounderSprite.team_id
                   });
-                  if (scene.stateMachine?.is(States.Rebound)) scene.stateMachine?.transition(States.HalfCourt, getDebugTransitions() && { stepIndex: shotInfo?.stepIndex, shotResult: turnData.result_type });
+                    if (
+                      turnData.rebound_type !== "DREB" &&
+                      scene.stateMachine?.is(States.Rebound)
+                    ) {
+                      scene.stateMachine?.transition(
+                        States.HalfCourt,
+                        getDebugTransitions() && {
+                          stepIndex: shotInfo?.stepIndex,
+                          shotResult: turnData.result_type,
+                        }
+                      );
+                    }
                   scene.rebounderId = null;
                   if (scene.time?.delayedCall) {
                     scene.time.delayedCall(rebCfg.attachDelayMs, resolve);
