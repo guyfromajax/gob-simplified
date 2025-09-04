@@ -272,12 +272,23 @@ export async function runFastBreakSequence({ scene, turnData, playerSprites, bal
     if (typeof scene.startNextHalfCourtOffense === "function") {
       scene.startNextHalfCourtOffense();
     }
-    return;
+    // Don't return here - continue to shot animation even in hold-up scenarios
   }
 
+  // Shot animation - runs for both hold-up and non-hold-up scenarios
   const shooterId = turnData.shooterId || turnData.shooter_id || getCurrentOwner(scene);
   const shooterSprite = shooterId != null ? playerSprites[shooterId] : null;
-  if (shooterSprite) {
+  
+  console.log('Fast break shot animation check:', {
+    shooterId,
+    hasShooterSprite: !!shooterSprite,
+    result_type: turnData.result_type,
+    hold_up: turnData.hold_up,
+    willAnimateShot: shooterSprite && (turnData.result_type === "MAKE" || turnData.result_type === "MISS")
+  });
+  
+  // Only animate shot if there's a shot attempt (result_type indicates a shot was taken)
+  if (shooterSprite && (turnData.result_type === "MAKE" || turnData.result_type === "MISS")) {
     attachBallToPlayer(scene, ballSprite, shooterSprite);
     const rimGrid = shooterSprite.team === "home" ? HOME_RIM_COORDS : AWAY_RIM_COORDS;
     const rimPx = gridToPixels(rimGrid.x, rimGrid.y, width, height);
