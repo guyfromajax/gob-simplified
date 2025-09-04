@@ -668,7 +668,10 @@ export function animateKickoutReset(
 
   const rebounderSprite = scene.playerSprites?.[rebounderId];
   const pgSprite = scene.playerSprites?.[pgId];
-  if (!rebounderSprite || !pgSprite) return Promise.resolve();
+  if (!rebounderSprite || !pgSprite) {
+    console.warn('animateKickoutReset: Missing sprites', { rebounderId, pgId, rebounderSprite: !!rebounderSprite, pgSprite: !!pgSprite });
+    return Promise.resolve();
+  }
 
   // Ensure runPass can locate the ball sprite on the scene
   if (!scene.ballSprite) {
@@ -685,6 +688,8 @@ export function animateKickoutReset(
   const usedDuration = raw != null && raw >= cfg.duration ? raw : cfg.duration;
 
   const opts = {
+    fromId: rebounderId,
+    toId: pgId,
     duration: usedDuration,
     easing: cfg.easing
   };
@@ -717,7 +722,10 @@ export function animateKickoutReset(
   const ownerBefore = getCurrentOwner(scene);
   detachBall(scene, ballSprite);
 
+  console.log('animateKickoutReset: Starting pass', { rebounderId, pgId, opts });
+  
   return runPass(scene, opts).then(() => {
+    console.log('animateKickoutReset: Pass completed, attaching ball to PG');
     attachBallToPlayer(scene, ballSprite, pgSprite);
     setPendingOwner(scene, pgId);
     const ownerAfter = getCurrentOwner(scene);
@@ -735,6 +743,11 @@ export function animateKickoutReset(
         ownerAfter
       });
     }
+  }).catch((error) => {
+    console.error('animateKickoutReset: Pass failed', error);
+    // Fallback: just attach ball to PG
+    attachBallToPlayer(scene, ballSprite, pgSprite);
+    setPendingOwner(scene, pgId);
   });
 }
 
