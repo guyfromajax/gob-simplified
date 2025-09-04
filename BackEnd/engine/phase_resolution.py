@@ -536,8 +536,9 @@ def resolve_half_court_offense_logic(game):
     # 2. Event Determination
     event_type = game.turn_manager.determine_event_type(roles)
 
-    print(f"event_type: {event_type}")
+    print(f"event_type 0: {event_type}")
     event_type = "SHOT"
+    print(f"event_type 1: {event_type}")
 
     if event_type != "SHOT":
         #need to add animations to each of these
