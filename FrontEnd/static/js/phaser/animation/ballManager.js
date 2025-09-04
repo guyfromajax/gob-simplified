@@ -415,29 +415,11 @@ export function animatePutbackAttempt(
                 });
               }
 
-              const isHomeTeam = shooterSprite.team === "home";
-              const rebCfg = animationConfig.rebound;
-              const bounceGridX = isHomeTeam
-                ? rimCoords.x - rebCfg.bounceArea.x
-                : rimCoords.x + rebCfg.bounceArea.x;
-              const bounceGridY =
-                rimCoords.y + Phaser.Math.Between(-rebCfg.bounceArea.y, rebCfg.bounceArea.y);
-              const bounce = gridToPixels(
-                bounceGridX,
-                bounceGridY,
-                scene.game.config.width,
-                scene.game.config.height
-              );
+              // Don't animate the ball bounce here - let the calling code handle it with animateRebound
+              // This prevents conflicts with the rebound animation system
+              detachBall(scene, ballSprite);
               scene.rebounderId = null;
-              scene.tweens.add({
-                targets: ballSprite,
-                x: bounce.x,
-                y: bounce.y,
-                duration: duration / 3,
-                ease: "Sine.easeOut",
-                onComplete: () =>
-                  resolve({ grid: { x: bounceGridX, y: bounceGridY } })
-              });
+              resolve({ grid: { x: rimCoords.x, y: rimCoords.y } });
             } else if (result === "FOUL") {
               detachBall(scene, ballSprite);
               hideBall(ballSprite);
