@@ -44,6 +44,8 @@ const defaults = {
     arcHeight: 60,
     // Time to hold the ball at the rim after a made fast break shot
     rimHoldMs: 2000,
+    // Extra pause after fast break sequence completes
+    endPauseMs: 3000,
   },
   offensiveRebound: { pauseMs: 1000 },
   putback: { duration: 500, easing: 'Sine.easeInOut' },
