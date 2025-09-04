@@ -185,11 +185,10 @@ export async function runFreeThrowSequence(
           
           // When possession flips after a made free throw, the NEW offense team
           // (the team that was previously on defense) should do the inbound
+          // Use possession_team_id which is set AFTER the possession flip
           const newOffenseSide = resolveOffenseSide(
             scene,
-            turnData.offense_team_id === scene.simData?.home_team_id 
-              ? scene.simData?.away_team_id 
-              : scene.simData?.home_team_id
+            turnData.possession_team_id
           );
           await inboundSetup({
             scene,
