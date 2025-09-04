@@ -75,7 +75,11 @@ function runInboundSetup(opts) {
 }
 
 function runPass(scene, cfg = {}) {
-  if (scene.possessionFlipInProgress || scene.stateMachine?.is(States.FastBreak)) return Promise.resolve();
+  // Allow kickout passes even during possession flip
+  const isKickoutPass = cfg.fromId && cfg.toId && scene.stateMachine?.is(States.Rebound);
+  if ((scene.possessionFlipInProgress && !isKickoutPass) || scene.stateMachine?.is(States.FastBreak)) {
+    return Promise.resolve();
+  }
   return baseRunPass(scene, cfg);
 }
 
