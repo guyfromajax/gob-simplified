@@ -175,6 +175,17 @@ class ShotManager:
                         else:
                             text += f" {get_name_safe(rebounder)} misses the putback."
                             possession_flips = rebound_event.get("possession_flips", possession_flips)
+                            
+                            # Add defensive rebound text if possession flips
+                            if possession_flips and rebound_event.get("rebound"):
+                                def_rebounder_id = rebound_event["rebound"]["rebounderId"]
+                                def_rebounder = None
+                                for player in def_team.get_all_players():
+                                    if getattr(player, "player_id", None) == def_rebounder_id:
+                                        def_rebounder = player
+                                        break
+                                if def_rebounder:
+                                    text += f" {get_name_safe(def_rebounder)} grabs the defensive rebound."
                     else:
                         self.game.turn_manager.logger.log("kickoutStart")
                         text += f" {get_name_safe(rebounder)} kicks it out to reset." 

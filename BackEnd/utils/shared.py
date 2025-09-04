@@ -167,6 +167,14 @@ def resolve_offensive_rebound(game, rebounder):
             new_rebounder, new_team, new_stat = determine_rebounder(game)
             new_rebounder.record_stat(new_stat)
             event["possession_flips"] = new_team != off_team
+            
+            # Add rebound information for frontend animation
+            event["rebound"] = {
+                "rebounderId": getattr(new_rebounder, "player_id", None),
+                "rebounder_player_id": getattr(new_rebounder, "player_id", None),
+                "rebound_type": new_stat,
+                "ballSpot": {"x": 91, "y": 25} if new_team == game.home_team else {"x": 9, "y": 25}
+            }
 
         return event
 
