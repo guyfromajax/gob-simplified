@@ -2,16 +2,23 @@ import * as Phaser from "https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.
 import { gridToPixels } from "../utils/gridToPixels.js";
 import { attachBallToPlayer } from "./ballManager.js";
 import { tweenBallTo, tweenPlayerTo, runPass } from "./ballTween.js";
-import animationConfig from "./animation_config.js";
+import animationConfig, { FAST_BREAK_END_PAUSE_MS } from "./animation_config.js";
 import { HOME_RIM_COORDS, AWAY_RIM_COORDS, HOME_TOP_KEY, AWAY_TOP_KEY } from "./courtConstants.js";
 import { States, getDebugTransitions } from "../state/gameStateMachine.js";
 import { getCurrentOwner } from "../ball/ballController.js";
 import { createAnimationTimeline } from "./animationTimeline.js";
 import { runInboundSetup } from "./turnAnimation.js";
+import { DebugFlags } from "../utils/debugFlags.js";
 
 // Timeline-driven fast break sequence. Handles the initial sprint phase via a
 // Phaser timeline so all player movements can be cancelled together if
 // necessary. Subsequent passes and shots reuse existing tween helpers.
+
+function fastBreakEndPause(scene) {
+  const delay = DebugFlags?.FB_PAUSE ? FAST_BREAK_END_PAUSE_MS : 0;
+  if (scene.skipToEnd || delay <= 0) return Promise.resolve();
+  return new Promise((resolve) => scene.time.delayedCall(delay, resolve));
+}
 
 export async function runFastBreakSequence({ scene, turnData, playerSprites, ballSprite }) {
   if (!scene || !turnData || scene.skipToEnd) return;
@@ -238,6 +245,7 @@ export async function runFastBreakSequence({ scene, turnData, playerSprites, bal
     }
 
     await Promise.all(promises);
+    await fastBreakEndPause(scene);
     if (typeof scene.startNextHalfCourtOffense === "function") {
       scene.startNextHalfCourtOffense();
     }
@@ -263,8 +271,11 @@ export async function runFastBreakSequence({ scene, turnData, playerSprites, bal
     if (turnData.result_type === "MAKE") {
       const rimHoldMs = animationConfig.fastBreak?.rimHoldMs ?? 2000;
       await new Promise(resolve => scene.time.delayedCall(rimHoldMs, resolve));
+      await fastBreakEndPause(scene);
       const newOffenseSide = shooterSprite.team === "home" ? "away" : "home";
       await runInboundSetup({ scene, ballSprite, playerSprites, newOffenseSide });
+    } else {
+      await fastBreakEndPause(scene);
     }
   }
 }
