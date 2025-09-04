@@ -340,16 +340,37 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
   
   if (outletReceiverId && outletReceiverId !== rebounderId && outletReceiverSprite) {
     if (nextPlayType === "FAST_BREAK") {
-      // For fast break: move outlet receiver 15-25 grid spots toward offense basket
-      const offenseBasket = rebounderSprite.team === "home" ? HOME_RIM_COORDS : AWAY_RIM_COORDS;
+      // For fast break: move outlet receiver 15-25 grid spots toward NEW offense basket
+      // The rebounder is on defense, so the new offense team is the opposite team
+      const newOffenseTeam = rebounderSprite.team === "home" ? "away" : "home";
+      const newOffenseBasket = newOffenseTeam === "home" ? HOME_RIM_COORDS : AWAY_RIM_COORDS;
       const distance = Phaser.Math.Between(15, 25);
-      const direction = offenseBasket.x > rebGridX ? 1 : -1; // Move toward offense basket
+      const direction = newOffenseBasket.x > rebGridX ? 1 : -1; // Move toward new offense basket
+      
+      // Apply team-specific constraints to move outlet receiver further down court
+      let minX = 4, maxX = 97;
+      if (outletReceiverSprite.team === "home") {
+        minX = 45; // Home team outlet receiver moves further down toward away basket (x ≥ 45)
+      } else {
+        maxX = 55; // Away team outlet receiver moves further down toward home basket (x ≤ 55)
+      }
+      
+      console.log('Fast break outlet receiver - moving further down court:', {
+        outletReceiverId,
+        team: outletReceiverSprite.team,
+        minX,
+        maxX,
+        originalTarget: rebGridX + direction * distance,
+        newOffenseTeam,
+        newOffenseBasket,
+        purpose: 'Create separation from other players by moving further down court'
+      });
       
       outletTarget = {
         x: Phaser.Math.Clamp(
           rebGridX + direction * distance,
-          4,
-          97
+          minX,
+          maxX
         ),
         y: Phaser.Math.Clamp(
           rebGridY + Phaser.Math.Between(-8, 8),

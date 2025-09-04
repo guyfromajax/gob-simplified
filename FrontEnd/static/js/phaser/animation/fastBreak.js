@@ -98,7 +98,19 @@ export async function runFastBreakSequence({ scene, turnData, playerSprites, bal
 
     // Use backend's duration and timing
     const duration = endStep.timestamp - startStep.timestamp;
-    const endPx = gridToPixels(endStep.coords.x, endStep.coords.y, width, height);
+    
+    // Apply team-specific constraints to move players further down court for separation
+    let endX = endStep.coords.x;
+    let endY = endStep.coords.y;
+    
+    // Apply constraints based on player team to create separation
+    if (sprite.team === "home") {
+      endX = Math.max(endX, 45); // Home team players move further down toward away basket (x ≥ 45)
+    } else {
+      endX = Math.min(endX, 55); // Away team players move further down toward home basket (x ≤ 55)
+    }
+    
+    const endPx = gridToPixels(endX, endY, width, height);
 
     // Add to timeline with backend timing
     timeline.add({
