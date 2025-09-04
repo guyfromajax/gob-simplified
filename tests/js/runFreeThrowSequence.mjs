@@ -57,12 +57,17 @@ const ballSpriteHome = makeBall();
 let inboundCalled = false;
 let reboundCalled = false;
 let arcHeight;
+let posChangeHome = false;
+sceneHome.events.emit = (evt) => {
+  if (evt === 'possessionChange') posChangeHome = true;
+};
 await runFreeThrowSequence(sceneHome, {
   playerSprites: playerSpritesHome,
   ballSprite: ballSpriteHome,
   turnData: {
     result_type: 'FREE_THROW',
     offense_team_id: 'HOME',
+    possession_team_id: 'AWAY',
     shooter_id: 'pg',
     shooter_pos: 'PG',
     attempts: ['MAKE'],
@@ -90,6 +95,7 @@ const homeResult = {
   inboundCalled,
   reboundCalled,
   arcHeight,
+  posChange: posChangeHome,
   pg: { x: playerSpritesHome.pg.x, y: playerSpritesHome.pg.y },
   sg: { x: playerSpritesHome.sg.x, y: playerSpritesHome.sg.y },
   pgA: { x: playerSpritesHome.pgA.x, y: playerSpritesHome.pgA.y }
@@ -127,6 +133,43 @@ await runFreeThrowSequence(sceneAway, {
 const awayResult = {
   inboundCalled: inboundCalled2,
   reboundCalled: reboundCalled2,
+};
+const sceneTechnical = makeScene();
+const playerSpritesTechnical = createPlayers();
+sceneTechnical.playerInfo = createInfo();
+const ballSpriteTechnical = makeBall();
+let inboundCalledTech = false;
+let posChangeTech = false;
+sceneTechnical.events.emit = (evt) => {
+  if (evt === 'possessionChange') posChangeTech = true;
+};
+await runFreeThrowSequence(sceneTechnical, {
+  playerSprites: playerSpritesTechnical,
+  ballSprite: ballSpriteTechnical,
+  turnData: {
+    result_type: 'FREE_THROW',
+    offense_team_id: 'HOME',
+    possession_team_id: 'HOME',
+    shooter_id: 'pg',
+    shooter_pos: 'PG',
+    attempts: ['MAKE'],
+    animations: [
+      { playerId: 'pg', movement: [ { timestamp:0, coords:{x:0,y:0} }, { timestamp:800, coords:{x:74,y:25} } ], duration:800 },
+      { playerId: 'ball', movement: [ { timestamp:0, coords:{x:74,y:25} }, { timestamp:500, coords:{x:91,y:25} } ], duration:500 }
+    ]
+  },
+  helpers: {
+    tweenBallTo: (scene, ball, target, opts) => Promise.resolve(),
+    runInboundSetup: () => { inboundCalledTech = true; return Promise.resolve(); },
+    animateRebound: () => Promise.resolve(),
+    attachBallToPlayer: () => {},
+    detachBall: () => {},
+  },
+});
+
+const technicalResult = {
+  inboundCalled: inboundCalledTech,
+  posChange: posChangeTech,
 };
 const sceneFallback = makeScene();
 const playerSpritesFallback = createPlayers();
@@ -167,6 +210,7 @@ console.log(
   JSON.stringify({
     home: homeResult,
     away: awayResult,
+    technical: technicalResult,
     fallback: fallbackResult,
     expected: { pgDest, sgDest, dPgDest },
   })
