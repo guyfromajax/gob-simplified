@@ -357,8 +357,14 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
   await Promise.all(promises);
 
   if (pgId && pgId !== rebounderId) {
-    if (DebugFlags?.BALL)
-      console.log('outletPass', { fromId: rebounderId, toId: pgId });
+    const outletLog = {
+      event: 'OUTLET_PASS',
+      from: rebounderId,
+      to: pgId,
+      pgTarget,
+      startedAt: Date.now(),
+    };
+    if (DebugFlags?.OUTLET) console.log(outletLog);
     await runPass(scene, {
       fromId: rebounderId,
       toId: pgId,
@@ -367,6 +373,8 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
       onComplete: () => {
         setPendingOwner(scene, pgId);
         setCurrentOwner(scene, pgId);
+        outletLog.completedAt = Date.now();
+        if (DebugFlags?.OUTLET) console.log(outletLog);
       }
     });
   }
@@ -950,6 +958,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
                     offenseTeamId: rebounderSprite.team_id
                   });
                     if (
+                      turnData.rebound_type &&
                       turnData.rebound_type !== "DREB" &&
                       scene.stateMachine?.is(States.Rebound)
                     ) {
@@ -971,7 +980,10 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
                 onStop: resolve
               });
             });
-            if (turnData.rebound_type === "DREB" && !turnData.fast_break) {
+            const isDreb = turnData.rebound_type
+              ? turnData.rebound_type === "DREB"
+              : rebounderSprite?.team_id !== turnData.possession_team_id;
+            if (isDreb && !turnData.fast_break) {
               await runDefensiveReboundSetup({
                 scene,
                 ballSprite,
