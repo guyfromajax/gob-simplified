@@ -330,6 +330,7 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
     }
   }
 
+  /*
   for (const [id, sprite] of Object.entries(playerSprites)) {
     const info = scene.playerInfo?.[id];
     if (!info || id === rebounderId || id === pgId) continue;
@@ -350,6 +351,7 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
       })
     );
   }
+  */
 
   await Promise.all(promises);
 
