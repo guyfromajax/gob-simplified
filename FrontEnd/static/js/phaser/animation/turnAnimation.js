@@ -296,11 +296,24 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
   for (const [id, info] of Object.entries(scene.playerInfo || {})) {
     if (
       info.pos === "PG" &&
-      String(info.team_id) === String(rebounderSprite.team_id)
+      info.team === rebounderSprite.team
     ) {
       pgId = id;
       break;
     }
+  }
+  
+  // Debug logging for outlet pass setup
+  if (DebugFlags?.OUTLET) {
+    console.log('Outlet setup debug:', {
+      rebounderId,
+      rebounderSprite: rebounderSprite ? {
+        team: rebounderSprite.team
+      } : null,
+      pgId,
+      playerInfo: scene.playerInfo,
+      allPlayerIds: Object.keys(scene.playerInfo || {})
+    });
   }
 
   const promises = [];
@@ -328,6 +341,18 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
         })
       );
       if (DebugFlags?.BALL) console.log('pgOutletTarget', { pgId, pgTarget });
+      if (DebugFlags?.OUTLET) console.log('PG movement queued for outlet pass');
+    } else {
+      if (DebugFlags?.OUTLET) console.log('PG sprite not found for outlet pass');
+    }
+  } else {
+    if (DebugFlags?.OUTLET) {
+      console.log('Outlet pass skipped:', { 
+        pgId, 
+        rebounderId, 
+        samePerson: pgId === rebounderId,
+        reason: !pgId ? 'No PG found' : 'PG is rebounder'
+      });
     }
   }
 
@@ -365,6 +390,7 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
       startedAt: Date.now(),
     };
     if (DebugFlags?.OUTLET) console.log(outletLog);
+    if (DebugFlags?.OUTLET) console.log('Starting outlet pass animation...');
     await runPass(scene, {
       fromId: rebounderId,
       toId: pgId,
@@ -375,8 +401,18 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
         setCurrentOwner(scene, pgId);
         outletLog.completedAt = Date.now();
         if (DebugFlags?.OUTLET) console.log(outletLog);
+        if (DebugFlags?.OUTLET) console.log('Outlet pass completed!');
       }
     });
+  } else {
+    if (DebugFlags?.OUTLET) {
+      console.log('Outlet pass not executed:', { 
+        pgId, 
+        rebounderId, 
+        samePerson: pgId === rebounderId,
+        reason: !pgId ? 'No PG found' : 'PG is rebounder'
+      });
+    }
   }
 
   if (scene.stateMachine?.is(States.OutletSetup)) {
