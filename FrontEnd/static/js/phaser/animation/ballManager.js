@@ -140,6 +140,41 @@ export function hideBall(ballSprite) {
 }
 
 /**
+ * Bounce a missed shot off the rim to a landing spot.
+ * Resolves with the grid coordinates of the landing spot.
+ */
+export function bounceFromRim(
+  scene,
+  ballSprite,
+  rimCoords,
+  isHomeTeam,
+  duration
+) {
+  return new Promise((resolve) => {
+    const rebCfg = animationConfig.rebound;
+    const bounceGridX = isHomeTeam
+      ? rimCoords.x - rebCfg.bounceArea.x
+      : rimCoords.x + rebCfg.bounceArea.x;
+    const bounceGridY =
+      rimCoords.y + Phaser.Math.Between(-rebCfg.bounceArea.y, rebCfg.bounceArea.y);
+    const bounce = gridToPixels(
+      bounceGridX,
+      bounceGridY,
+      scene.game.config.width,
+      scene.game.config.height
+    );
+    scene.tweens.add({
+      targets: ballSprite,
+      x: bounce.x,
+      y: bounce.y,
+      duration,
+      ease: "Sine.easeOut",
+      onComplete: () => resolve({ grid: { x: bounceGridX, y: bounceGridY } })
+    });
+  });
+}
+
+/**
  * Launches a shot toward the rim along a single tweened path.
  * Resolves after the ball reaches the rim.
 */
@@ -248,28 +283,6 @@ export function shootBall({
             setTimeout(finish, 1000);
           }
         } else if (result === "MISS") {
-          // Bounce the ball off the rim
-          const rebCfg = animationConfig.rebound;
-          const bounceGridX = isHomeTeam
-            ? rimCoords.x - rebCfg.bounceArea.x
-            : rimCoords.x + rebCfg.bounceArea.x;
-          const bounceGridY =
-            rimCoords.y + Phaser.Math.Between(-rebCfg.bounceArea.y, rebCfg.bounceArea.y);
-          const bounce = gridToPixels(
-            bounceGridX,
-            bounceGridY,
-            scene.game.config.width,
-            scene.game.config.height
-          );
-        if (SHOT_DEBUG) {
-          console.log("shot:miss", {
-            type: "miss",
-            shooterId,
-            reboundSpot: { x: bounceGridX, y: bounceGridY },
-            playerId: shooterId,
-            team: shooterTeamId
-          });
-      }
           if (scene.stateMachine?.is(States.ShotAttempt)) {
             safeTransition(
               scene.stateMachine,
@@ -284,14 +297,23 @@ export function shootBall({
             );
           }
           scene.rebounderId = null;
-          scene.tweens.add({
-            targets: ballSprite,
-            x: bounce.x,
-            y: bounce.y,
-            duration: duration / 3,
-            ease: "Sine.easeOut",
-            onComplete: () =>
-              resolve({ grid: { x: bounceGridX, y: bounceGridY } })
+          bounceFromRim(
+            scene,
+            ballSprite,
+            rimCoords,
+            isHomeTeam,
+            duration / 3
+          ).then((miss) => {
+            if (SHOT_DEBUG) {
+              console.log("shot:miss", {
+                type: "miss",
+                shooterId,
+                reboundSpot: miss.grid,
+                playerId: shooterId,
+                team: shooterTeamId,
+              });
+            }
+            resolve(miss);
           });
         } else {
           resolve();
