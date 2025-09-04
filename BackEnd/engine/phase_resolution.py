@@ -447,6 +447,11 @@ def resolve_free_throw_logic(game):
     if makes_shot:
         result["points"] = 1
         result["scoring_team"] = off_team.name
+    else:
+        # Add rebounder information for missed free throws
+        if game_state.get("last_rebounder"):
+            result["rebounderId"] = getattr(game_state["last_rebounder"], "player_id", None)
+            result["rebound_type"] = game_state.get("last_rebound", "")
 
     return result
 
