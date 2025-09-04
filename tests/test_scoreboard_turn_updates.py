@@ -82,3 +82,36 @@ def test_turn_payload_includes_clock_quarter_fouls():
     assert result["quarter"] == 1
     assert result["homeFouls"] == 0
     assert result["awayFouls"] == 1
+
+
+def test_pts_reconciliation_adjusts_player_stats():
+    game = build_mock_game()
+    tm = game.turn_manager
+
+    # Create a scoreboard/player stat mismatch for the home team
+    game.score[game.home_team.name] = 3
+    for p in game.home_team.get_all_players():
+        p.stats["game"]["PTS"] = 0
+
+    def fake_turn():
+        return {
+            "result_type": "MISS",
+            "ball_handler": game.offense_team.lineup["PG"],
+            "shooter": game.offense_team.lineup["PG"],
+            "screener": game.offense_team.lineup["SG"],
+            "passer": game.offense_team.lineup["SG"],
+            "defender": game.defense_team.lineup["PG"],
+            "text": "miss",
+            "possession_flips": True,
+            "time_elapsed": 24,
+        }
+
+    tm.resolve_half_court_offense = types.MethodType(lambda self: fake_turn(), tm)
+    result = tm.run_micro_turn()
+
+    # Exactly one player should receive the corrective points
+    players = [p for p in game.home_team.lineup.values() if p.stats["game"].get("PTS")]
+    assert len(players) == 1
+    player = players[0]
+    assert player.stats["game"]["PTS"] == 3
+    assert result["deltas"][player.player_id]["stats"]["PTS"] == 3
