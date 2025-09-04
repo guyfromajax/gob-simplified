@@ -72,7 +72,7 @@ export async function runFastBreakSequence({ scene, turnData, playerSprites, bal
     scene.events?.emit("fb:start");
   }
 
-  const sprintDuration = animationConfig.fastBreak?.sprintDuration ?? 800;
+  // Use backend timeline data instead of fixed duration
   const timeline = createAnimationTimeline(scene);
 
   const ownerAnim = animations.find(a => a.hasBallAtStep?.[0]);
@@ -81,22 +81,33 @@ export async function runFastBreakSequence({ scene, turnData, playerSprites, bal
     if (ownerSprite) attachBallToPlayer(scene, ballSprite, ownerSprite);
   }
 
+  // Process each animation using backend movement timeline
   for (const anim of animations) {
     const sprite = playerSprites[anim.playerId];
-    if (!sprite) continue;
-    const start = anim.start || anim.movement?.[0]?.coords;
-    const end = anim.end || anim.movement?.[anim.movement.length - 1]?.coords;
-    if (!start || !end) continue;
-    const startPx = gridToPixels(start.x, start.y, width, height);
-    const endPx = gridToPixels(end.x, end.y, width, height);
+    if (!sprite || !anim.movement || anim.movement.length < 2) continue;
+
+    const movement = anim.movement;
+    const startStep = movement[0];
+    const endStep = movement[movement.length - 1];
+    
+    if (!startStep || !endStep) continue;
+
+    // Set initial position
+    const startPx = gridToPixels(startStep.coords.x, startStep.coords.y, width, height);
     sprite.setPosition(startPx.x, startPx.y);
+
+    // Use backend's duration and timing
+    const duration = endStep.timestamp - startStep.timestamp;
+    const endPx = gridToPixels(endStep.coords.x, endStep.coords.y, width, height);
+
+    // Add to timeline with backend timing
     timeline.add({
       targets: sprite,
       x: endPx.x,
       y: endPx.y,
-      duration: sprintDuration,
+      duration: duration,
       ease: "Sine.easeInOut"
-    }, 0);
+    }, startStep.timestamp);
   }
 
   scene.__activeTimeline = timeline;
