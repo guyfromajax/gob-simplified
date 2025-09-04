@@ -115,28 +115,12 @@ class Animator:
                 build_movement(d, between_key_and_rim(), action=ACTIONS["GUARD_OFFBALL"])
 
             # Non-in-play defenders should remain frozen in their current spots
-            # rather than drifting to legacy half-court positions.
-            non_play_defenders = [
-                p for p in defense_team.lineup.values() if p not in defenders
-            ]
-            for d in non_play_defenders:
-                build_movement(d, getattr(d, "coords", {"x": 25, "y": 50}))
-
-            # Non-ball-handling offensive players also freeze at their existing
-            # coordinates to avoid half-court repositioning.
-            non_bh_offense = [
-                p for p in offense_team.lineup.values() if p is not ball_handler
-            ]
-            for o in non_bh_offense:
-                build_movement(o, getattr(o, "coords", {"x": 25, "y": 50}))
+            # Don't create animation data for stationary players
+            # Only players with actual movement get animation data
         else:
-            # Keep all other players stationary
-            for d in defense_team.lineup.values():
-                build_movement(d, getattr(d, "coords", {"x": 25, "y": 50}))
-            for o in offense_team.lineup.values():
-                if o is ball_handler:
-                    continue
-                build_movement(o, getattr(o, "coords", {"x": 25, "y": 50}))
+            # Don't create animation data for stationary players
+            # Only players with actual movement get animation data
+            pass
         self._log_step_timestamps(animations)
         self.latest_packet = animations
         logging.debug(
