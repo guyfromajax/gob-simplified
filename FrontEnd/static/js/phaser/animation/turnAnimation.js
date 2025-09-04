@@ -18,6 +18,7 @@ import { States, getDebugTransitions, safeTransition, createTransitionGuard } fr
 import {
   getPendingOwner,
   clearPendingOwner,
+  setPendingOwner,
   setCurrentOwner,
   getCurrentOwner
 } from "../ball/ballController.js";
@@ -363,6 +364,10 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
       toId: pgId,
       duration: animationConfig.outletSetup.passMs,
       easing: animationConfig.outletSetup.easing,
+      onComplete: () => {
+        setPendingOwner(scene, pgId);
+        setCurrentOwner(scene, pgId);
+      }
     });
   }
 
