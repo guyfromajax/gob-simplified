@@ -307,32 +307,18 @@ export function createGameScene(Phaser) {
         if (turn.home_lineup) updateLineup('home', turn.home_lineup);
         if (turn.away_lineup) updateLineup('away', turn.away_lineup);
 
-        if (turn.points && turn.shooter) {
-          const shooterId = this.nameToId[turn.shooter];
-          if (shooterId) {
-            const ps = this.playerStats[shooterId];
-            ps.PTS += turn.points;
-            if (ps.cells?.pts) ps.cells.pts.textContent = ps.PTS;
-          }
-          if (turn.passer) {
-            const passerId = this.nameToId[turn.passer];
-            if (passerId) {
-              const ps = this.playerStats[passerId];
-              ps.AST += 1;
-              if (ps.cells?.ast) ps.cells.ast.textContent = ps.AST;
+        if (turn.deltas) {
+          for (const [playerId, delta] of Object.entries(turn.deltas)) {
+            const ps = this.playerStats[playerId];
+            if (ps && delta.stats) {
+              for (const [stat, value] of Object.entries(delta.stats)) {
+                ps[stat] = (ps[stat] || 0) + value;
+                if (ps.cells) {
+                  const key = stat.toLowerCase();
+                  if (ps.cells[key]) ps.cells[key].textContent = ps[stat];
+                }
+              }
             }
-          }
-        }
-
-        const rebounderId =
-          turn.rebounder_player_id ||
-          turn.rebounderId ||
-          turn.rebounder_id;
-        if (rebounderId) {
-          const ps = this.playerStats[rebounderId];
-          if (ps) {
-            ps.REB += 1;
-            if (ps.cells?.reb) ps.cells.reb.textContent = ps.REB;
           }
         }
       };
