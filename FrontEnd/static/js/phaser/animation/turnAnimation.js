@@ -556,6 +556,8 @@ async function runInboundSetup({
     console.log('runInboundSetup blocked - FreeThrow state');
     return;
   }
+  
+  console.log('runInboundSetup proceeding - not blocked by FreeThrow state');
   scene.isInboundSetup = true;
   if (!scene.stateMachine?.is(States.Inbound)) {
     safeTransition(
