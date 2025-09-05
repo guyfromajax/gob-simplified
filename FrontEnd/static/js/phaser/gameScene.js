@@ -301,6 +301,28 @@ export function createGameScene(Phaser) {
 
       if (this.animate) {
         this.playerSprites = loadPhaserPlayers(this, simData.players, Phaser);
+        
+        // Clean up any extra sprites that don't have corresponding playerInfo
+        const spriteKeys = Object.keys(this.playerSprites);
+        const playerInfoKeys = Object.keys(this.playerInfo || {});
+        const extraSprites = spriteKeys.filter(id => !this.playerInfo?.[id]);
+        
+        if (extraSprites.length > 0) {
+          console.warn('EXTRA SPRITES DETECTED at game start (no playerInfo):', extraSprites);
+          extraSprites.forEach(id => {
+            const sprite = this.playerSprites[id];
+            if (sprite) {
+              console.log(`Hiding extra sprite at game start: ${id}`, { 
+                team: sprite.team, 
+                position: { x: sprite.x, y: sprite.y },
+                visible: sprite.visible
+              });
+              sprite.setVisible(false);
+              // Remove from playerSprites object to prevent future issues
+              delete this.playerSprites[id];
+            }
+          });
+        }
       }
 
       const applyPlayerStats = (turn = {}) => {

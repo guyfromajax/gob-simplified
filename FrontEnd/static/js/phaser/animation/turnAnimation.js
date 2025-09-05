@@ -424,6 +424,22 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
     const newOffenseBasket = newOffenseTeam === "home" ? HOME_RIM_COORDS : AWAY_RIM_COORDS;
     console.log('New offense basket:', newOffenseBasket, 'Rebounder team:', rebounderSprite.team, 'New offense team:', newOffenseTeam);
     
+    // Debug: Check for extra sprites without playerInfo
+    console.log('Player sprites keys:', Object.keys(playerSprites));
+    console.log('Scene playerInfo keys:', Object.keys(scene.playerInfo || {}));
+    const extraSprites = Object.keys(playerSprites).filter(id => !scene.playerInfo?.[id]);
+    if (extraSprites.length > 0) {
+      console.warn('EXTRA SPRITES DETECTED (no playerInfo):', extraSprites);
+      // Hide these extra sprites
+      extraSprites.forEach(id => {
+        const sprite = playerSprites[id];
+        if (sprite) {
+          console.log(`Hiding extra sprite: ${id}`, { team: sprite.team, position: sprite.x, sprite.y });
+          sprite.setVisible(false);
+        }
+      });
+    }
+    
     let playersMoved = 0;
     for (const [id, sprite] of Object.entries(playerSprites)) {
       const info = scene.playerInfo?.[id];
