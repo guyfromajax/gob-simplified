@@ -546,7 +546,16 @@ async function runInboundSetup({
   homeTeamId,
   awayTeamId
 }) {
-  if (scene?.stateMachine?.is(States.FreeThrow)) return;
+  console.log('runInboundSetup called:', {
+    newOffenseSide,
+    currentState: scene.stateMachine?.state,
+    isFreeThrow: scene?.stateMachine?.is(States.FreeThrow)
+  });
+  
+  if (scene?.stateMachine?.is(States.FreeThrow)) {
+    console.log('runInboundSetup blocked - FreeThrow state');
+    return;
+  }
   scene.isInboundSetup = true;
   if (!scene.stateMachine?.is(States.Inbound)) {
     safeTransition(
@@ -848,14 +857,15 @@ async function runInboundSetup({
   scene.events?.once('passEnd', () => console.log('passEnd'));
 
   console.log(`[inbound][passStart][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
-  if (!scene.stateMachine?.is(States.FastBreak)) {
-    await runPass(scene, {
-      fromId: sfId,
-      toId: pgId,
-      duration: 500,
-      easing: "Sine.easeInOut"
-    });
-  }
+  console.log(`[inbound][stateCheck] current state: ${scene.stateMachine?.state}, isFastBreak: ${scene.stateMachine?.is(States.FastBreak)}`);
+  
+  // Allow inbound pass regardless of current state (including FastBreak)
+  await runPass(scene, {
+    fromId: sfId,
+    toId: pgId,
+    duration: 500,
+    easing: "Sine.easeInOut"
+  });
   console.log(`[inbound][passEnd][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
   console.log(`[inbound][pgAttach][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
 
