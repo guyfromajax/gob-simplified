@@ -78,8 +78,16 @@ export async function animateGameTurns({ //hasBallAtStep
       currentState: scene.stateMachine?.state,
       possessionFlipInProgress: scene.possessionFlipInProgress,
       currentTurn: scene.currentTurn,
-      stackTrace: new Error().stack?.split('\n').slice(1, 4)
+      stackTrace: new Error().stack?.split('\n').slice(1, 6)
     });
+    
+    // Check if this is a duplicate possession change
+    if (previousOffenseTeamId === newOffenseTeamId) {
+      console.warn('DUPLICATE POSSESSION CHANGE DETECTED - same team!', {
+        teamId: newOffenseTeamId,
+        stackTrace: new Error().stack?.split('\n').slice(1, 6)
+      });
+    }
     
     scene.possessionFlipInProgress = true;
     scene.offenseTeamId = newOffenseTeamId;

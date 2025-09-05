@@ -6,6 +6,7 @@ import { emit } from './utils/eventBus.js';
 import { appendToTextScroll } from './utils/textScroll.js';
 import { DEBUG } from './utils/debug.js';
 import { createGameStateMachine, States } from './state/gameStateMachine.js';
+import { initializePossessionManager } from './utils/possessionManager.js';
 import gameStore from '../state/gameStore.js';
 
 const DEBUG_SIM_PAYLOAD =
@@ -36,6 +37,9 @@ export function createGameScene(Phaser) {
       this.lastTurnShown = -1;
       this.rebounderId = null;
       this.stateMachine = createGameStateMachine(States.Inbound);
+      
+      // Initialize centralized possession manager
+      this.possessionManager = null; // Will be initialized in create()
     }
 
     init(data) {
