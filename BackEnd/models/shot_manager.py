@@ -390,12 +390,9 @@ class ShotManager:
             result["rebound_type"] = "DREB"
             # print(f"+1 rebound for {get_name_safe(rebounder)} / shot manager - resolve_fast_break_shot")
             possession_flips = True
-            if random.random() < get_fast_break_chance(self.game):
-                text += " -- entering a fast break!"
-                self.game_state["offensive_state"] = "FAST_BREAK"
-            else:
-                text += " -- entering half court."
-                self.game_state["offensive_state"] = "HCO"
+            # Force HCO after defensive rebound from missed fast break shot
+            text += " -- entering half court."
+            self.game_state["offensive_state"] = "HCO"
             self.game_state["last_rebounder"] = rebounder
             self.game_state["last_rebound"] = "DREB"
 
