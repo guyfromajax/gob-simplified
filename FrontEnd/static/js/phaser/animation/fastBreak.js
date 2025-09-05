@@ -303,9 +303,12 @@ export async function runFastBreakSequence({ scene, turnData, playerSprites, bal
       arc: { height: arcHeight }
     });
     if (turnData.result_type === "MAKE") {
+      console.log('Fast break made shot detected - starting rim hold');
       const rimHoldMs = animationConfig.fastBreak?.rimHoldMs ?? 2000;
       await new Promise(resolve => scene.time.delayedCall(rimHoldMs, resolve));
+      console.log('Fast break rim hold completed - starting end pause');
       await fastBreakEndPause(scene);
+      console.log('Fast break end pause completed - proceeding to inbound setup');
       
       // Use backend possession_team_id to determine new offense team for inbound
       const resolveOffenseSide = (scene, teamId) =>
@@ -319,7 +322,9 @@ export async function runFastBreakSequence({ scene, turnData, playerSprites, bal
         home_team_id: scene.simData?.home_team_id
       });
       
+      console.log('About to call runInboundSetup for fast break made shot');
       await runInboundSetup({ scene, ballSprite, playerSprites, newOffenseSide });
+      console.log('runInboundSetup completed for fast break made shot');
     } else {
       // Handle missed fast break shot with ball bounce
       console.log('Fast break missed shot - rebound progression:', {
