@@ -6,6 +6,7 @@ import runFreeThrowSequence from "./freeThrow.js";
 import runFastBreakSequence from "./fastBreak.js";
 import { handleTurnover } from "./turnoverAdapter.js";
 import { States } from "../state/gameStateMachine.js";
+import { AnimationRouter } from "./AnimationRouter.js";
 
 const DEBUG_FLOW =
   (typeof window !== 'undefined' && window.DEBUG_FLOW) ||
@@ -55,6 +56,10 @@ export async function animateGameTurns({ //hasBallAtStep
   const turns = simData.turns || [];
   annotateFreeThrowTurns(turns);
   const allPlayers = simData.players || [];
+  
+  // Initialize new animation router
+  const animationRouter = new AnimationRouter(scene, playerSprites, ballSprite, onUpdate);
+  
   if (DEBUG_FLOW) {
     const stepCount = turns.reduce((acc, t) => {
       const turnSteps = (t.animations || []).reduce(
@@ -64,6 +69,7 @@ export async function animateGameTurns({ //hasBallAtStep
       return acc + turnSteps;
     }, 0);
     console.log(`🟢 animateGameTurns start: ${turns.length} turns, ${stepCount} steps`);
+    console.log('🆕 Using new AnimationRouter system');
   }
 
   const handlePossessionFlip = (payload = {}) => {
@@ -106,7 +112,8 @@ export async function animateGameTurns({ //hasBallAtStep
     if (DEBUG_FLOW) console.log(`🔁 Turn ${i + 1}`, turn);
 
     if (turn.result_type === "FREE_THROW") {
-      await runFreeThrowSequence(scene, { playerSprites, ballSprite, turnData: turn, onUpdate, ftContext: turn.ftContext });
+      console.log('🆕 Using new AnimationRouter for FREE_THROW');
+      await animationRouter.processTurn(turn);
       if (onUpdate) {
         try {
           onUpdate(turn);
@@ -145,12 +152,12 @@ export async function animateGameTurns({ //hasBallAtStep
 
     // Debug fast break routing
     if (turn.fast_break === true || turn.result_type === "FAST_BREAK") {
-      console.log('FAST BREAK TURN DETECTED - routing to runFastBreakSequence:', {
+      console.log('🆕 Using new AnimationRouter for FAST_BREAK:', {
         fast_break: turn.fast_break,
         result_type: turn.result_type,
         turn_index: i
       });
-      await runFastBreakSequence(scene, { playerSprites, ballSprite, turnData: turn, onUpdate });
+      await animationRouter.processTurn(turn);
       if (onUpdate) {
         try {
           onUpdate(turn);
@@ -173,8 +180,8 @@ export async function animateGameTurns({ //hasBallAtStep
       
       // Check if this is a fast break turn (now properly flagged by backend)
       if (turn.fast_break === true) {
-        console.log('FAST BREAK TURN DETECTED - routing to runFastBreakSequence');
-        await runFastBreakSequence(scene, { playerSprites, ballSprite, turnData: turn, onUpdate });
+        console.log('🆕 Using new AnimationRouter for FAST_BREAK shot');
+        await animationRouter.processTurn(turn);
         if (onUpdate) {
           try {
             onUpdate(turn);
@@ -195,80 +202,9 @@ export async function animateGameTurns({ //hasBallAtStep
 
     const shooterId = playerMap[shooterName];
 
-    await playTurnAnimation({
-      scene,
-      simData,
-      playerSprites,
-      turnData: turn,
-      ballSprite,
-      onAction: async (action, sprite, timestamp) => {
-        if (DEBUG_FLOW) console.log(`🎬 Action "${action}" fired at ${timestamp}ms for sprite:`, sprite);
-        onAction(action, sprite, timestamp);
-
-        const playerId = Object.keys(playerSprites).find(
-          key => playerSprites[key] === sprite
-        );
-
-        const anim = animations.find(a => a.playerId === playerId);
-        const movement = anim?.movement || [];
-
-        if (action === "pass") {
-          if (scene.stateMachine?.is(States.FastBreak)) return;
-          const passStep = movement.find(
-            m => m.action === "pass" && m.timestamp === timestamp
-          );
-          if (!passStep) return;
-
-          const receiverAnim = animations.find(a =>
-            a.movement?.some(
-              m => m.action === "receive" && m.timestamp === timestamp
-            )
-          );
-          const receiveStep = receiverAnim?.movement.find(
-            m => m.action === "receive" && m.timestamp === timestamp
-          );
-
-          if (passStep && receiveStep && receiverAnim?.playerId != null) {
-            if (DEBUG_FLOW) console.log("📤 Pass triggered");
-            const receiverSprite = playerSprites[receiverAnim.playerId];
-            const endCoords = receiverSprite
-              ? { x: receiverSprite.x, y: receiverSprite.y }
-              : undefined;
-
-            const delta = receiveStep.timestamp - timestamp;
-            const duration = delta > 0 ? delta : animationConfig.pass.duration;
-            if (DEBUG_FLOW) console.log(`⏱️ Resolved pass duration: ${duration}ms (delta=${delta})`);
-
-            if (DEBUG_FLOW) {
-              scene.events?.once('passStart', () => console.log('passStart'));
-              scene.events?.once('tweenStart', () => console.log('tweenStart'));
-              scene.events?.once('tweenEnd', () => console.log('tweenEnd'));
-              scene.events?.once('ballAttached', () => console.log('ballAttached'));
-              scene.events?.once('passEnd', () => console.log('passEnd'));
-            }
-
-            if (scene.__activePass) {
-          console.warn(
-            'Active pass tween detected before runPass call; cancelling previous tween'
-          );
-            }
-
-            await runPass(scene, {
-              fromId: playerId,
-              toId: receiverAnim.playerId,
-              endCoords,
-              duration,
-              easing: animationConfig.pass.easing
-            });
-          }
-        }
-
-        // if (action === "shoot" || sprite.playerId === shooterId) {
-        //   console.log("🏀 Shot triggered. Hiding ball.");
-        //   ballSprite.setVisible(false);
-        // }
-      }
-    });
+    // Use new AnimationRouter for all other turns
+    console.log('🆕 Using new AnimationRouter for turn:', turn.result_type);
+    await animationRouter.processTurn(turn);
 
     const stealEvent = turn.events?.find(e => e.event_type === "STEAL");
     if (!scene.stateMachine?.is(States.FastBreak) && (turn.result_type === "STEAL" || stealEvent)) {
