@@ -307,6 +307,14 @@ export function createGameScene(Phaser) {
         const playerInfoKeys = Object.keys(this.playerInfo || {});
         const extraSprites = spriteKeys.filter(id => !this.playerInfo?.[id]);
         
+        console.log('SPRITE CLEANUP DEBUG:', {
+          totalSprites: spriteKeys.length,
+          totalPlayerInfo: playerInfoKeys.length,
+          spriteKeys,
+          playerInfoKeys,
+          extraSprites
+        });
+        
         if (extraSprites.length > 0) {
           console.warn('EXTRA SPRITES DETECTED at game start (no playerInfo):', extraSprites);
           extraSprites.forEach(id => {
@@ -315,7 +323,9 @@ export function createGameScene(Phaser) {
               console.log(`Hiding extra sprite at game start: ${id}`, { 
                 team: sprite.team, 
                 position: { x: sprite.x, y: sprite.y },
-                visible: sprite.visible
+                visible: sprite.visible,
+                team_id: sprite.team_id,
+                playerId: sprite.playerId
               });
               sprite.setVisible(false);
               // Remove from playerSprites object to prevent future issues
@@ -323,6 +333,23 @@ export function createGameScene(Phaser) {
             }
           });
         }
+        
+        // Also check for any sprites that might have been created elsewhere
+        console.log('Final playerSprites after cleanup:', Object.keys(this.playerSprites));
+        
+        // Check all children in the scene to see if there are any extra sprites
+        const allChildren = this.children.list;
+        const playerSprites = allChildren.filter(child => 
+          child.type === 'Container' && 
+          child.list && 
+          child.list.some(item => item.type === 'Circle')
+        );
+        console.log('All container sprites in scene:', playerSprites.map(sprite => ({
+          id: sprite.playerId,
+          team: sprite.team,
+          position: { x: sprite.x, y: sprite.y },
+          visible: sprite.visible
+        })));
       }
 
       const applyPlayerStats = (turn = {}) => {
