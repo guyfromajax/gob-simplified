@@ -54,6 +54,13 @@ export function loadPhaserPlayers(
 
   for (const player of allPlayers) {
     const id = player.playerId ?? player.player_id;
+    
+    // Skip the ball - it shouldn't be a player sprite
+    if (id === "ball" || id === "Ball" || player.name === "ball" || player.name === "Ball") {
+      console.warn(`Skipping ball object from player sprites: ${id}`, player);
+      continue;
+    }
+    
     const isHome = teamInfo.home.player_ids.includes(id) || player.team === "home";
     const teamColors = isHome ? teamInfo.home : teamInfo.away;
 
