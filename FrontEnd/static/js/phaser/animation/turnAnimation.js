@@ -434,7 +434,7 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
       extraSprites.forEach(id => {
         const sprite = playerSprites[id];
         if (sprite) {
-          console.log(`Hiding extra sprite: ${id}`, { team: sprite.team, position: sprite.x, sprite.y });
+          console.log(`Hiding extra sprite: ${id}`, { team: sprite.team, position: { x: sprite.x, y: sprite.y } });
           sprite.setVisible(false);
         }
       });
