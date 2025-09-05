@@ -159,8 +159,29 @@ export async function animateGameTurns({ //hasBallAtStep
         result_type: turn.result_type,
         fast_break: turn.fast_break,
         turn_index: i,
-        all_turn_keys: Object.keys(turn)
+        all_turn_keys: Object.keys(turn),
+        full_turn_data: turn
       });
+      
+      // TEMPORARY FIX: If this is a shot after a fast break defensive rebound setup, treat it as a fast break
+      const isAfterFastBreakSetup = scene.stateMachine?.is(States.FastBreak) || 
+                                   (i > 0 && turns[i-1]?.result_type === "FAST_BREAK") ||
+                                   turn.fast_break === true;
+      
+      if (isAfterFastBreakSetup && !turn.fast_break) {
+        console.log('FORCING FAST BREAK DETECTION for shot after fast break setup');
+        turn.fast_break = true;
+        // Re-route to fast break sequence
+        await runFastBreakSequence(scene, { playerSprites, ballSprite, turnData: turn, onUpdate });
+        if (onUpdate) {
+          try {
+            onUpdate(turn);
+          } catch (err) {
+            console.error('Scoreboard update failed:', err);
+          }
+        }
+        continue;
+      }
     }
 
     const shooterName = turn.shooter || "";
