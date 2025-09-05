@@ -122,7 +122,13 @@ export async function animateGameTurns({ //hasBallAtStep
       continue;
     }
 
+    // Debug fast break routing
     if (turn.fast_break === true || turn.result_type === "FAST_BREAK") {
+      console.log('FAST BREAK TURN DETECTED - routing to runFastBreakSequence:', {
+        fast_break: turn.fast_break,
+        result_type: turn.result_type,
+        turn_index: i
+      });
       await runFastBreakSequence(scene, { playerSprites, ballSprite, turnData: turn, onUpdate });
       if (onUpdate) {
         try {
@@ -132,6 +138,16 @@ export async function animateGameTurns({ //hasBallAtStep
         }
       }
       continue;
+    }
+    
+    // Debug: Check if this should be a fast break but isn't being detected
+    if (turn.result_type === "MAKE" || turn.result_type === "MISS") {
+      console.log('SHOT TURN - checking for fast break indicators:', {
+        result_type: turn.result_type,
+        fast_break: turn.fast_break,
+        turn_index: i,
+        all_turn_keys: Object.keys(turn)
+      });
     }
 
     const shooterName = turn.shooter || "";
