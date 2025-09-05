@@ -14,6 +14,7 @@
 import { States } from '../state/gameStateMachine.js';
 import ShotAnimationSystem from './ShotAnimationSystem.js';
 import ReboundAnimationSystem from './ReboundAnimationSystem.js';
+import PassAnimationSystem from './PassAnimationSystem.js';
 
 export class AnimationEngine {
   constructor(scene) {
@@ -27,6 +28,7 @@ export class AnimationEngine {
     // Animation systems
     this.shotSystem = null; // Will be initialized after dependencies are injected
     this.reboundSystem = null; // Will be initialized after dependencies are injected
+    this.passSystem = null; // Will be initialized after dependencies are injected
     
     // Initialize default handlers
     this.initializeDefaultHandlers();
@@ -45,6 +47,7 @@ export class AnimationEngine {
     this.animationHandlers.set('FAST_BREAK', this.handleFastBreak.bind(this));
     this.animationHandlers.set('SHOT_ATTEMPT', this.handleShotAttempt.bind(this));
     this.animationHandlers.set('REBOUND', this.handleRebound.bind(this));
+    this.animationHandlers.set('PASS', this.handlePass.bind(this));
     this.animationHandlers.set('DEFAULT', this.handleDefault.bind(this));
   }
 
@@ -109,6 +112,11 @@ export class AnimationEngine {
       return this.animationHandlers.get('REBOUND');
     }
 
+    // Pass detection
+    if (this.isPass(turnData)) {
+      return this.animationHandlers.get('PASS');
+    }
+
     // Default handler
     return this.animationHandlers.get('DEFAULT');
   }
@@ -131,6 +139,17 @@ export class AnimationEngine {
            turnData.rebound_type ||
            turnData.result_type === "OREB" ||
            turnData.result_type === "DREB";
+  }
+
+  /**
+   * Check if this is a pass
+   */
+  isPass(turnData) {
+    return turnData.passer_id ||
+           turnData.receiver_id ||
+           turnData.pass_type ||
+           turnData.result_type === "PASS" ||
+           (turnData.result_type === "MAKE" && turnData.pass_type);
   }
 
   /**
@@ -229,6 +248,27 @@ export class AnimationEngine {
     }
   }
 
+  async handlePass(turnData, context) {
+    console.log('AnimationEngine: Handling pass with new PassAnimationSystem');
+    
+    // Use new pass animation system if available
+    if (this.passSystem) {
+      await this.passSystem.processPass(turnData);
+    } else {
+      // Fallback to existing system
+      console.warn('AnimationEngine: PassAnimationSystem not available, using fallback');
+      const { playTurnAnimation } = await import('./turnAnimation.js');
+      await playTurnAnimation({
+        scene: this.scene,
+        simData: context.simData,
+        playerSprites: context.playerSprites,
+        turnData: turnData,
+        ballSprite: context.ballSprite,
+        onAction: context.onAction
+      });
+    }
+  }
+
   async handleDefault(turnData, context) {
     console.log('AnimationEngine: Handling default animation');
     // Import and use existing turn animation handler for now
@@ -287,6 +327,14 @@ export class AnimationEngine {
         this.playerSprites
       );
       console.log('AnimationEngine: ReboundAnimationSystem initialized');
+      
+      this.passSystem = new PassAnimationSystem(
+        this.scene,
+        this.ballController,
+        this.stateMachine,
+        this.playerSprites
+      );
+      console.log('AnimationEngine: PassAnimationSystem initialized');
     }
     
     console.log('AnimationEngine: Dependencies injected', {
@@ -294,7 +342,8 @@ export class AnimationEngine {
       hasStateMachine: !!this.stateMachine,
       hasPlayerSprites: !!this.playerSprites,
       hasShotSystem: !!this.shotSystem,
-      hasReboundSystem: !!this.reboundSystem
+      hasReboundSystem: !!this.reboundSystem,
+      hasPassSystem: !!this.passSystem
     });
   }
 }
