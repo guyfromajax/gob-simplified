@@ -213,6 +213,40 @@ export async function animateGameTurns({ //hasBallAtStep
         }
         continue;
       }
+      
+      // COMPREHENSIVE FIX: Check for fast break indicators in the turn data itself
+      const hasFastBreakRoles = turn.roles && (
+        turn.roles.outlet_passer || 
+        turn.roles.outlet_receiver ||
+        turn.roles.fast_break_players
+      );
+      
+      const hasFastBreakText = turn.text && turn.text.toLowerCase().includes('fast break');
+      
+      const isFastBreakShot = hasFastBreakRoles || hasFastBreakText;
+      
+      console.log('COMPREHENSIVE FAST BREAK CHECK:', {
+        hasFastBreakRoles,
+        hasFastBreakText,
+        isFastBreakShot,
+        roles: turn.roles,
+        text: turn.text
+      });
+      
+      if (isFastBreakShot && !turn.fast_break) {
+        console.log('FORCING FAST BREAK DETECTION based on turn data');
+        turn.fast_break = true;
+        // Re-route to fast break sequence
+        await runFastBreakSequence(scene, { playerSprites, ballSprite, turnData: turn, onUpdate });
+        if (onUpdate) {
+          try {
+            onUpdate(turn);
+          } catch (err) {
+            console.error('Scoreboard update failed:', err);
+          }
+        }
+        continue;
+      }
     }
 
     const shooterName = turn.shooter || "";
