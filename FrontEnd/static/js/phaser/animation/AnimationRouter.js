@@ -38,9 +38,6 @@ export class AnimationRouter {
     this.animationQueue = [];
     this.isInitialized = false;
     
-    // Event handlers
-    this.setupEventHandlers();
-    
     // Initialize the system
     this.initialize();
     
