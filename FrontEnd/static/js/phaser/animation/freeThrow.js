@@ -277,6 +277,50 @@ export async function runFreeThrowSequence(
           ballSpot: miss.grid,
           shooterId: turnData.shooter_id,
         });
+        
+        // Add defensive rebound setup for free throws (same as regular shots)
+        const reboundData = {
+          rebounderId: turnData.rebounderId || turnData.rebounder_player_id,
+          rebound_type: turnData.rebound_type,
+          next_play_type: turnData.next_play_type
+        };
+        
+        console.log('Free throw missed - defensive rebound setup:', {
+          rebounderId: reboundData.rebounderId,
+          rebound_type: reboundData.rebound_type,
+          next_play_type: reboundData.next_play_type,
+          fast_break: turnData.fast_break
+        });
+        
+        // Check if this is a defensive rebound and handle accordingly
+        const isDreb = reboundData.rebound_type === "DREB";
+        if (isDreb) {
+          if (turnData.fast_break) {
+            // Handle fast break after defensive rebound on free throw
+            const { runFastBreakSequence } = await import('./fastBreak.js');
+            await runFastBreakSequence({
+              scene,
+              playerSprites,
+              ballSprite,
+              turnData: {
+                ...turnData,
+                result_type: "FAST_BREAK",
+                roles: turnData.roles || {}
+              }
+            });
+          } else {
+            // Handle HCO after defensive rebound on free throw
+            const { runDefensiveReboundSetup } = await import('./turnAnimation.js');
+            await runDefensiveReboundSetup({
+              scene,
+              ballSprite,
+              playerSprites,
+              rebounderId: reboundData.rebounderId,
+              nextPlayType: reboundData.next_play_type || "HCO"
+            });
+          }
+        }
+        
         nextStateResolved = States.Rebound;
       } else {
         if (scene.tweens) {
