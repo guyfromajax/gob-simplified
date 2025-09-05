@@ -27,7 +27,10 @@ export class AnimationRouter {
     // Initialize core components
     this.stateMachine = new SimplifiedStateMachine(AnimationStates.IDLE);
     this.ballController = new BallController(scene, ballSprite);
-    this.animationEngine = new AnimationEngine(scene, playerSprites, ballSprite, onUpdate);
+    this.animationEngine = new AnimationEngine(scene);
+    
+    // Inject dependencies into animation engine
+    this.animationEngine.injectDependencies(this.ballController, this.stateMachine, playerSprites);
     
     // Router state
     this.isProcessing = false;
@@ -110,7 +113,13 @@ export class AnimationRouter {
       }
 
       // Process the turn through the animation engine
-      await this.animationEngine.processTurn(turnData);
+      const context = {
+        playerSprites: this.playerSprites,
+        ballSprite: this.ballSprite,
+        onUpdate: this.onUpdate,
+        simData: this.scene.simData
+      };
+      await this.animationEngine.processTurn(turnData, context);
 
       // Handle any queued turns
       await this.processQueue();
