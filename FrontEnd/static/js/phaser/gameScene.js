@@ -201,8 +201,14 @@ export function createGameScene(Phaser) {
       const quarterEl = document.getElementById('quarter');
 
       const positions = ["PG","SG","SF","PF","C"];
-      this.nameToId = Object.fromEntries(simData.players.map(p => [p.name, p.playerId ?? p.player_id]));
-      this.playerInfo = Object.fromEntries(simData.players.map(p => [p.playerId ?? p.player_id, { name: p.name, team: p.team, pos: p.pos }]));
+      // Filter out the ball from player data
+      const actualPlayers = simData.players.filter(p => {
+        const id = p.playerId ?? p.player_id;
+        return id !== "ball" && id !== "Ball" && p.name !== "ball" && p.name !== "Ball";
+      });
+      
+      this.nameToId = Object.fromEntries(actualPlayers.map(p => [p.name, p.playerId ?? p.player_id]));
+      this.playerInfo = Object.fromEntries(actualPlayers.map(p => [p.playerId ?? p.player_id, { name: p.name, team: p.team, pos: p.pos }]));
       this.playerStats = {};
       simData.players.forEach(p => {
         const id = p.playerId ?? p.player_id;
@@ -300,7 +306,7 @@ export function createGameScene(Phaser) {
       hydrateBoxScore();
 
       if (this.animate) {
-        this.playerSprites = loadPhaserPlayers(this, simData.players, Phaser);
+        this.playerSprites = loadPhaserPlayers(this, actualPlayers, Phaser);
         
         // Clean up any extra sprites that don't have corresponding playerInfo
         const spriteKeys = Object.keys(this.playerSprites);
