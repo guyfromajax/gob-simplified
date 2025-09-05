@@ -183,25 +183,34 @@ export async function runFreeThrowSequence(
             ((scene, teamId) =>
               teamId === scene.simData?.home_team_id ? "home" : "away");
           
-          // When possession flips after a made free throw, the NEW offense team
-          // (the team that was previously on defense) should do the inbound
-          // If possession_flips is true, the new offense team is the opposite of the original offense team
-          const newOffenseTeamId = possessionChanged 
+          // Try using possession_team_id directly (this should be the correct team after possession flip)
+          const newOffenseSide = resolveOffenseSide(scene, turnData.possession_team_id);
+          
+          // Also calculate what we think it should be for comparison
+          const expectedNewOffenseTeamId = possessionChanged 
             ? (turnData.offense_team_id === scene.simData?.home_team_id 
                 ? scene.simData?.away_team_id 
                 : scene.simData?.home_team_id)
             : turnData.offense_team_id;
-          
-          const newOffenseSide = resolveOffenseSide(scene, newOffenseTeamId);
+          const expectedNewOffenseSide = resolveOffenseSide(scene, expectedNewOffenseTeamId);
           
           console.log('Final free throw made - inbound setup:', {
             possession_flips: possessionChanged,
             original_offense_team_id: turnData.offense_team_id,
-            newOffenseTeamId,
             possession_team_id: turnData.possession_team_id,
             newOffenseSide,
+            expectedNewOffenseTeamId,
+            expectedNewOffenseSide,
             home_team_id: scene.simData?.home_team_id,
-            away_team_id: scene.simData?.away_team_id
+            away_team_id: scene.simData?.away_team_id,
+            shooter_team_id: turnData.shooter_team_id,
+            all_turnData_keys: Object.keys(turnData)
+          });
+          
+          // Let's also check what the current scene offense team is
+          console.log('Scene offense team info:', {
+            scene_offenseTeamId: scene.offenseTeamId,
+            scene_simData: scene.simData
           });
           
           await inboundSetup({
