@@ -356,6 +356,17 @@ export async function runFastBreakSequence({ scene, turnData, playerSprites, bal
         shooterId: shooterId
       });
       
+      // Handle defensive rebound setup after missed fast break shot
+      // Since we force HCO after missed fast break shots, always use HCO
+      const { runDefensiveReboundSetup } = await import('./turnAnimation.js');
+      await runDefensiveReboundSetup({
+        scene,
+        ballSprite,
+        playerSprites,
+        rebounderId: turnData.rebounderId || turnData.rebounder_player_id,
+        nextPlayType: "HCO" // Always HCO after missed fast break shot
+      });
+      
       await fastBreakEndPause(scene);
     }
   }
