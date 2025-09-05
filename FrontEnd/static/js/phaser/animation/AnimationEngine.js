@@ -1,0 +1,257 @@
+/**
+ * AnimationEngine - Centralized Animation System
+ * 
+ * This class replaces the scattered animation logic across multiple files
+ * with a single, clean system for routing and executing animations.
+ * 
+ * Key Benefits:
+ * - Single entry point for all animations
+ * - Centralized ball ownership management
+ * - Simplified state management
+ * - No race conditions or conflicts
+ */
+
+import { States } from '../state/gameStateMachine.js';
+
+export class AnimationEngine {
+  constructor(scene) {
+    this.scene = scene;
+    this.ballController = null; // Will be injected
+    this.stateMachine = null; // Will be injected
+    this.animationHandlers = new Map();
+    this.isProcessing = false;
+    
+    // Initialize default handlers
+    this.initializeDefaultHandlers();
+  }
+
+  /**
+   * Initialize default animation handlers
+   * These will be replaced by the new simplified handlers
+   */
+  initializeDefaultHandlers() {
+    // For now, we'll use the existing handlers as fallbacks
+    // This ensures backward compatibility during transition
+    this.animationHandlers.set('FREE_THROW', this.handleFreeThrow.bind(this));
+    this.animationHandlers.set('SIDE_INBOUND', this.handleSideInbound.bind(this));
+    this.animationHandlers.set('TURNOVER', this.handleTurnover.bind(this));
+    this.animationHandlers.set('FAST_BREAK', this.handleFastBreak.bind(this));
+    this.animationHandlers.set('SHOT_ATTEMPT', this.handleShotAttempt.bind(this));
+    this.animationHandlers.set('REBOUND', this.handleRebound.bind(this));
+    this.animationHandlers.set('DEFAULT', this.handleDefault.bind(this));
+  }
+
+  /**
+   * Main entry point for all animations
+   * Routes turn data to the appropriate handler
+   */
+  async processTurn(turnData, context = {}) {
+    if (this.isProcessing) {
+      console.warn('AnimationEngine: Already processing a turn, skipping');
+      return;
+    }
+
+    this.isProcessing = true;
+
+    try {
+      console.log('AnimationEngine: Processing turn', {
+        result_type: turnData.result_type,
+        fast_break: turnData.fast_break,
+        turn_index: turnData.index
+      });
+
+      // Determine the appropriate handler
+      const handler = this.determineHandler(turnData);
+      
+      // Execute the animation
+      await handler(turnData, context);
+
+      console.log('AnimationEngine: Turn processing complete', {
+        result_type: turnData.result_type
+      });
+
+    } catch (error) {
+      console.error('AnimationEngine: Error processing turn', error);
+      throw error;
+    } finally {
+      this.isProcessing = false;
+    }
+  }
+
+  /**
+   * Determine which handler to use for a turn
+   */
+  determineHandler(turnData) {
+    // Fast break detection (highest priority)
+    if (turnData.fast_break === true || turnData.result_type === "FAST_BREAK") {
+      return this.animationHandlers.get('FAST_BREAK');
+    }
+
+    // Specific result types
+    if (turnData.result_type && this.animationHandlers.has(turnData.result_type)) {
+      return this.animationHandlers.get(turnData.result_type);
+    }
+
+    // Shot attempt detection
+    if (this.isShotAttempt(turnData)) {
+      return this.animationHandlers.get('SHOT_ATTEMPT');
+    }
+
+    // Rebound detection
+    if (this.isRebound(turnData)) {
+      return this.animationHandlers.get('REBOUND');
+    }
+
+    // Default handler
+    return this.animationHandlers.get('DEFAULT');
+  }
+
+  /**
+   * Check if this is a shot attempt
+   */
+  isShotAttempt(turnData) {
+    return turnData.result_type === "MAKE" || 
+           turnData.result_type === "MISS" ||
+           turnData.shooter ||
+           turnData.shot_score !== undefined;
+  }
+
+  /**
+   * Check if this is a rebound
+   */
+  isRebound(turnData) {
+    return turnData.rebounderId ||
+           turnData.rebound_type ||
+           turnData.result_type === "OREB" ||
+           turnData.result_type === "DREB";
+  }
+
+  /**
+   * Animation Handlers
+   * Each handler is responsible for a specific type of animation
+   */
+
+  async handleFreeThrow(turnData, context) {
+    console.log('AnimationEngine: Handling free throw');
+    // Import and use existing free throw handler for now
+    const { runFreeThrowSequence } = await import('./freeThrow.js');
+    await runFreeThrowSequence(this.scene, {
+      playerSprites: context.playerSprites,
+      ballSprite: context.ballSprite,
+      turnData: turnData,
+      onUpdate: context.onUpdate,
+      ftContext: turnData.ftContext
+    });
+  }
+
+  async handleSideInbound(turnData, context) {
+    console.log('AnimationEngine: Handling side inbound');
+    // Import and use existing side inbound handler for now
+    const { runSideInboundSetup } = await import('./turnAnimation.js');
+    await runSideInboundSetup({
+      scene: this.scene,
+      ballSprite: context.ballSprite,
+      playerSprites: context.playerSprites,
+      turnData: turnData
+    });
+  }
+
+  async handleTurnover(turnData, context) {
+    console.log('AnimationEngine: Handling turnover');
+    // Import and use existing turnover handler for now
+    const { handleTurnover } = await import('./turnoverAdapter.js');
+    await handleTurnover(this.scene, {
+      playerSprites: context.playerSprites,
+      ballSprite: context.ballSprite,
+      turnData: turnData,
+      onUpdate: context.onUpdate
+    });
+  }
+
+  async handleFastBreak(turnData, context) {
+    console.log('AnimationEngine: Handling fast break');
+    // Import and use existing fast break handler for now
+    const { runFastBreakSequence } = await import('./fastBreak.js');
+    await runFastBreakSequence(this.scene, {
+      playerSprites: context.playerSprites,
+      ballSprite: context.ballSprite,
+      turnData: turnData,
+      onUpdate: context.onUpdate
+    });
+  }
+
+  async handleShotAttempt(turnData, context) {
+    console.log('AnimationEngine: Handling shot attempt');
+    // Import and use existing turn animation handler for now
+    const { playTurnAnimation } = await import('./turnAnimation.js');
+    await playTurnAnimation({
+      scene: this.scene,
+      simData: context.simData,
+      playerSprites: context.playerSprites,
+      turnData: turnData,
+      ballSprite: context.ballSprite,
+      onAction: context.onAction
+    });
+  }
+
+  async handleRebound(turnData, context) {
+    console.log('AnimationEngine: Handling rebound');
+    // Import and use existing turn animation handler for now
+    const { playTurnAnimation } = await import('./turnAnimation.js');
+    await playTurnAnimation({
+      scene: this.scene,
+      simData: context.simData,
+      playerSprites: context.playerSprites,
+      turnData: turnData,
+      ballSprite: context.ballSprite,
+      onAction: context.onAction
+    });
+  }
+
+  async handleDefault(turnData, context) {
+    console.log('AnimationEngine: Handling default animation');
+    // Import and use existing turn animation handler for now
+    const { playTurnAnimation } = await import('./turnAnimation.js');
+    await playTurnAnimation({
+      scene: this.scene,
+      simData: context.simData,
+      playerSprites: context.playerSprites,
+      turnData: turnData,
+      ballSprite: context.ballSprite,
+      onAction: context.onAction
+    });
+  }
+
+  /**
+   * Register a custom animation handler
+   */
+  registerHandler(type, handler) {
+    this.animationHandlers.set(type, handler);
+  }
+
+  /**
+   * Get current processing status
+   */
+  getStatus() {
+    return {
+      isProcessing: this.isProcessing,
+      registeredHandlers: Array.from(this.animationHandlers.keys()),
+      hasBallController: !!this.ballController,
+      hasStateMachine: !!this.stateMachine
+    };
+  }
+
+  /**
+   * Inject dependencies (will be called after other components are created)
+   */
+  injectDependencies(ballController, stateMachine) {
+    this.ballController = ballController;
+    this.stateMachine = stateMachine;
+    console.log('AnimationEngine: Dependencies injected', {
+      hasBallController: !!this.ballController,
+      hasStateMachine: !!this.stateMachine
+    });
+  }
+}
+
+export default AnimationEngine;
