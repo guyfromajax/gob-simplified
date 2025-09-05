@@ -34,6 +34,11 @@ export async function runFastBreakSequence({ scene, turnData, playerSprites, bal
   }
 
   if (turnData.roles?.outlet_passer) {
+    // Ensure we're in a valid state for fast break transition
+    if (scene.stateMachine?.is(States.Inbound)) {
+      console.log('Fast break: correcting state from Inbound to Rebound before FastBreakOutlet transition');
+      scene.stateMachine?.transition(States.Rebound, getDebugTransitions() && { stepIndex: 0 });
+    }
     scene.stateMachine?.transition(States.FastBreakOutlet, getDebugTransitions() && { stepIndex: 0 });
     const passerId = turnData.roles.outlet_passer;
     const receiverId = turnData.roles.outlet_receiver;
