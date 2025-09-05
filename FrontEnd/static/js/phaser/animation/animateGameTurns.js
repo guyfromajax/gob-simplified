@@ -68,8 +68,21 @@ export async function animateGameTurns({ //hasBallAtStep
 
   const handlePossessionFlip = (payload = {}) => {
     if (scene.stateMachine?.is(States.FastBreak)) return;
+    
+    const previousOffenseTeamId = scene.offenseTeamId;
+    const newOffenseTeamId = payload.offenseTeamId;
+    
+    console.log('POSSESSION CHANGE EVENT:', {
+      previousOffenseTeamId,
+      newOffenseTeamId,
+      currentState: scene.stateMachine?.state,
+      possessionFlipInProgress: scene.possessionFlipInProgress,
+      currentTurn: scene.currentTurn,
+      stackTrace: new Error().stack?.split('\n').slice(1, 4)
+    });
+    
     scene.possessionFlipInProgress = true;
-    scene.offenseTeamId = payload.offenseTeamId;
+    scene.offenseTeamId = newOffenseTeamId;
     if (REBOUND_DEBUG) {
       console.log("reb:flip", { newPossession: payload.offenseTeamId });
     }
