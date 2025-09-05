@@ -15,6 +15,7 @@ import { States } from '../state/gameStateMachine.js';
 import ShotAnimationSystem from './ShotAnimationSystem.js';
 import ReboundAnimationSystem from './ReboundAnimationSystem.js';
 import PassAnimationSystem from './PassAnimationSystem.js';
+import FreeThrowAnimationSystem from './FreeThrowAnimationSystem.js';
 
 export class AnimationEngine {
   constructor(scene) {
@@ -29,6 +30,7 @@ export class AnimationEngine {
     this.shotSystem = null; // Will be initialized after dependencies are injected
     this.reboundSystem = null; // Will be initialized after dependencies are injected
     this.passSystem = null; // Will be initialized after dependencies are injected
+    this.freeThrowSystem = null; // Will be initialized after dependencies are injected
     
     // Initialize default handlers
     this.initializeDefaultHandlers();
@@ -158,16 +160,23 @@ export class AnimationEngine {
    */
 
   async handleFreeThrow(turnData, context) {
-    console.log('AnimationEngine: Handling free throw');
-    // Import and use existing free throw handler for now
-    const { runFreeThrowSequence } = await import('./freeThrow.js');
-    await runFreeThrowSequence(this.scene, {
-      playerSprites: context.playerSprites,
-      ballSprite: context.ballSprite,
-      turnData: turnData,
-      onUpdate: context.onUpdate,
-      ftContext: turnData.ftContext
-    });
+    console.log('AnimationEngine: Handling free throw with new FreeThrowAnimationSystem');
+    
+    // Use new free throw animation system if available
+    if (this.freeThrowSystem) {
+      await this.freeThrowSystem.processFreeThrow(turnData);
+    } else {
+      // Fallback to existing system
+      console.warn('AnimationEngine: FreeThrowAnimationSystem not available, using fallback');
+      const { runFreeThrowSequence } = await import('./freeThrow.js');
+      await runFreeThrowSequence(this.scene, {
+        playerSprites: context.playerSprites,
+        ballSprite: context.ballSprite,
+        turnData: turnData,
+        onUpdate: context.onUpdate,
+        ftContext: turnData.ftContext
+      });
+    }
   }
 
   async handleSideInbound(turnData, context) {
@@ -335,6 +344,14 @@ export class AnimationEngine {
         this.playerSprites
       );
       console.log('AnimationEngine: PassAnimationSystem initialized');
+      
+      this.freeThrowSystem = new FreeThrowAnimationSystem(
+        this.scene,
+        this.ballController,
+        this.stateMachine,
+        this.playerSprites
+      );
+      console.log('AnimationEngine: FreeThrowAnimationSystem initialized');
     }
     
     console.log('AnimationEngine: Dependencies injected', {
@@ -343,7 +360,8 @@ export class AnimationEngine {
       hasPlayerSprites: !!this.playerSprites,
       hasShotSystem: !!this.shotSystem,
       hasReboundSystem: !!this.reboundSystem,
-      hasPassSystem: !!this.passSystem
+      hasPassSystem: !!this.passSystem,
+      hasFreeThrowSystem: !!this.freeThrowSystem
     });
   }
 }
