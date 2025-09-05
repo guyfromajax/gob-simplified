@@ -12,14 +12,19 @@
  */
 
 import { States } from '../state/gameStateMachine.js';
+import ShotAnimationSystem from './ShotAnimationSystem.js';
 
 export class AnimationEngine {
   constructor(scene) {
     this.scene = scene;
     this.ballController = null; // Will be injected
     this.stateMachine = null; // Will be injected
+    this.playerSprites = null; // Will be injected
     this.animationHandlers = new Map();
     this.isProcessing = false;
+    
+    // Shot animation system
+    this.shotSystem = null; // Will be initialized after dependencies are injected
     
     // Initialize default handlers
     this.initializeDefaultHandlers();
@@ -181,17 +186,24 @@ export class AnimationEngine {
   }
 
   async handleShotAttempt(turnData, context) {
-    console.log('AnimationEngine: Handling shot attempt');
-    // Import and use existing turn animation handler for now
-    const { playTurnAnimation } = await import('./turnAnimation.js');
-    await playTurnAnimation({
-      scene: this.scene,
-      simData: context.simData,
-      playerSprites: context.playerSprites,
-      turnData: turnData,
-      ballSprite: context.ballSprite,
-      onAction: context.onAction
-    });
+    console.log('AnimationEngine: Handling shot attempt with new ShotAnimationSystem');
+    
+    // Use new shot animation system if available
+    if (this.shotSystem) {
+      await this.shotSystem.processShot(turnData);
+    } else {
+      // Fallback to existing system
+      console.warn('AnimationEngine: ShotAnimationSystem not available, using fallback');
+      const { playTurnAnimation } = await import('./turnAnimation.js');
+      await playTurnAnimation({
+        scene: this.scene,
+        simData: context.simData,
+        playerSprites: context.playerSprites,
+        turnData: turnData,
+        ballSprite: context.ballSprite,
+        onAction: context.onAction
+      });
+    }
   }
 
   async handleRebound(turnData, context) {
@@ -244,12 +256,27 @@ export class AnimationEngine {
   /**
    * Inject dependencies (will be called after other components are created)
    */
-  injectDependencies(ballController, stateMachine) {
+  injectDependencies(ballController, stateMachine, playerSprites) {
     this.ballController = ballController;
     this.stateMachine = stateMachine;
+    this.playerSprites = playerSprites;
+    
+    // Initialize shot animation system
+    if (this.ballController && this.stateMachine && this.playerSprites) {
+      this.shotSystem = new ShotAnimationSystem(
+        this.scene,
+        this.ballController,
+        this.stateMachine,
+        this.playerSprites
+      );
+      console.log('AnimationEngine: ShotAnimationSystem initialized');
+    }
+    
     console.log('AnimationEngine: Dependencies injected', {
       hasBallController: !!this.ballController,
-      hasStateMachine: !!this.stateMachine
+      hasStateMachine: !!this.stateMachine,
+      hasPlayerSprites: !!this.playerSprites,
+      hasShotSystem: !!this.shotSystem
     });
   }
 }
