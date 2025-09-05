@@ -163,80 +163,9 @@ export async function animateGameTurns({ //hasBallAtStep
         full_turn_data: turn
       });
       
-      // TEMPORARY FIX: If this is a shot after a fast break defensive rebound setup, treat it as a fast break
-      const isAfterFastBreakSetup = scene.stateMachine?.is(States.FastBreak) || 
-                                   (i > 0 && turns[i-1]?.result_type === "FAST_BREAK") ||
-                                   turn.fast_break === true;
-      
-      console.log('FAST BREAK DETECTION CHECK:', {
-        isAfterFastBreakSetup,
-        currentState: scene.stateMachine?.state,
-        previousTurnResultType: i > 0 ? turns[i-1]?.result_type : 'none',
-        turnFastBreak: turn.fast_break,
-        willForce: isAfterFastBreakSetup && !turn.fast_break
-      });
-      
-      if (isAfterFastBreakSetup && !turn.fast_break) {
-        console.log('FORCING FAST BREAK DETECTION for shot after fast break setup');
-        turn.fast_break = true;
-        // Re-route to fast break sequence
-        await runFastBreakSequence(scene, { playerSprites, ballSprite, turnData: turn, onUpdate });
-        if (onUpdate) {
-          try {
-            onUpdate(turn);
-          } catch (err) {
-            console.error('Scoreboard update failed:', err);
-          }
-        }
-        continue;
-      }
-      
-      // ADDITIONAL FIX: If we see a shot turn that should be a fast break based on context
-      // Check if the previous turn was a defensive rebound setup that led to fast break
-      const previousTurn = i > 0 ? turns[i-1] : null;
-      const isShotAfterDefensiveRebound = previousTurn && 
-                                        (previousTurn.result_type === "MISS" || 
-                                         previousTurn.result_type === "DREB") &&
-                                        (turn.result_type === "MAKE" || turn.result_type === "MISS");
-      
-      if (isShotAfterDefensiveRebound && !turn.fast_break) {
-        console.log('FORCING FAST BREAK DETECTION for shot after defensive rebound');
-        turn.fast_break = true;
-        // Re-route to fast break sequence
-        await runFastBreakSequence(scene, { playerSprites, ballSprite, turnData: turn, onUpdate });
-        if (onUpdate) {
-          try {
-            onUpdate(turn);
-          } catch (err) {
-            console.error('Scoreboard update failed:', err);
-          }
-        }
-        continue;
-      }
-      
-      // COMPREHENSIVE FIX: Check for fast break indicators in the turn data itself
-      const hasFastBreakRoles = turn.roles && (
-        turn.roles.outlet_passer || 
-        turn.roles.outlet_receiver ||
-        turn.roles.fast_break_players
-      );
-      
-      const hasFastBreakText = turn.text && turn.text.toLowerCase().includes('fast break');
-      
-      const isFastBreakShot = hasFastBreakRoles || hasFastBreakText;
-      
-      console.log('COMPREHENSIVE FAST BREAK CHECK:', {
-        hasFastBreakRoles,
-        hasFastBreakText,
-        isFastBreakShot,
-        roles: turn.roles,
-        text: turn.text
-      });
-      
-      if (isFastBreakShot && !turn.fast_break) {
-        console.log('FORCING FAST BREAK DETECTION based on turn data');
-        turn.fast_break = true;
-        // Re-route to fast break sequence
+      // Check if this is a fast break turn (now properly flagged by backend)
+      if (turn.fast_break === true) {
+        console.log('FAST BREAK TURN DETECTED - routing to runFastBreakSequence');
         await runFastBreakSequence(scene, { playerSprites, ballSprite, turnData: turn, onUpdate });
         if (onUpdate) {
           try {

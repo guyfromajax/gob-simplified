@@ -285,6 +285,7 @@ def resolve_fast_break_logic(game: "GameManager"):
         fb_roles, hold_up, stopper_id, fb_roles.get("defense", [])
     )
     turn_result["roles"] = fb_roles
+    turn_result["fast_break"] = True  # ✅ Add fast_break flag for frontend routing
     if hold_up:
         turn_result["hold_up"] = True
         turn_result["stopper_id"] = stopper_id
