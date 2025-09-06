@@ -91,22 +91,25 @@ export class AnimationRouter {
     this.currentTurn = turnData;
 
     try {
-      if (DebugFlags.ANIMATION_ROUTER) {
-        console.log('AnimationRouter: Processing turn', {
-          index: turnData.index,
-          result_type: turnData.result_type,
-          currentState: this.stateMachine.getCurrentState()
-        });
-      }
+      console.log('🎬 AnimationRouter: Starting turn processing', {
+        result_type: turnData.result_type,
+        turn_index: turnData.index,
+        currentState: this.stateMachine.getCurrentState(),
+        hasAnimationEngine: !!this.animationEngine,
+        hasBallController: !!this.ballController,
+        hasPlayerSprites: !!this.playerSprites
+      });
 
       // Determine the appropriate state transition
       const nextState = this.determineNextState(turnData);
+      console.log('🎯 AnimationRouter: Determined next state', { nextState, currentState: this.stateMachine.getCurrentState() });
       
       // Transition to the new state
       if (nextState && this.stateMachine.isValidTransition(nextState)) {
+        console.log('✅ AnimationRouter: Transitioning to state', nextState);
         this.stateMachine.transition(nextState, { turnData });
       } else {
-        console.warn('AnimationRouter: Cannot transition to state', nextState);
+        console.warn('⚠️ AnimationRouter: Cannot transition to state', { nextState, currentState: this.stateMachine.getCurrentState() });
       }
 
       // Process the turn through the animation engine
@@ -116,14 +119,30 @@ export class AnimationRouter {
         onUpdate: this.onUpdate,
         simData: this.scene.simData
       };
+      
+      console.log('🚀 AnimationRouter: Calling animationEngine.processTurn');
       await this.animationEngine.processTurn(turnData, context);
+      console.log('✅ AnimationRouter: animationEngine.processTurn completed');
 
       // Handle any queued turns
       await this.processQueue();
 
+      console.log('🎉 AnimationRouter: Turn processing completed successfully');
+
     } catch (error) {
-      console.error('AnimationRouter: Error processing turn', error);
+      console.error('❌ AnimationRouter: Error processing turn', {
+        error: error.message,
+        stack: error.stack,
+        turnData: {
+          result_type: turnData.result_type,
+          index: turnData.index
+        }
+      });
       this.handleError(error, turnData);
+      
+      // CRITICAL: Don't let the error propagate silently
+      // This ensures the calling code knows something failed
+      throw error;
     } finally {
       this.isProcessing = false;
       this.currentTurn = null;
