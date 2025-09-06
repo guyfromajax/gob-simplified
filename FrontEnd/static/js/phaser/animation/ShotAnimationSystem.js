@@ -76,6 +76,7 @@ export class ShotAnimationSystem {
         shooter_id: turnData.shooter_id,
         player_id: turnData.player_id,
         shot_type: turnData.shot_type,
+        allKeys: Object.keys(turnData),
         fullTurnData: turnData
       });
       
