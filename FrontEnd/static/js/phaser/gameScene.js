@@ -575,10 +575,17 @@ export function createGameScene(Phaser) {
           }
 
           let animStart;
+          console.log('🎬 GameScene: About to call animateGameTurns', { 
+            quarterTurnsLength: quarterTurns.length,
+            hasPlayerSprites: !!this.playerSprites,
+            hasBallSprite: !!this.ballSprite
+          });
+          
           if (DEBUG_FLOW) {
             animStart = Date.now();
             console.log('🚀 animateGameTurns start', animStart);
           }
+          
           await animateGameTurns({
             scene: this,
             simData: { ...simData, turns: quarterTurns },
@@ -586,6 +593,8 @@ export function createGameScene(Phaser) {
             ballSprite: this.ballSprite,
             onUpdate: updateScoreboard
           });
+          
+          console.log('🎬 GameScene: animateGameTurns completed');
           if (DEBUG_FLOW) {
             const animEnd = Date.now();
             console.log('🏁 animateGameTurns finish', animEnd, 'duration', animEnd - animStart);
