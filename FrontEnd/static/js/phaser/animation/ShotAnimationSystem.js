@@ -25,6 +25,10 @@ export class ShotAnimationSystem {
     this.playerSprites = playerSprites;
     this.gameStore = gameStore;
     
+    console.log('🔍 ShotAnimationSystem: Constructor called with playerSprites:', playerSprites);
+    console.log('🔍 ShotAnimationSystem: playerSprites keys:', Object.keys(playerSprites));
+    console.log('🔍 ShotAnimationSystem: gameStore:', gameStore);
+    
     // Shot configuration
     this.shotConfig = {
       // Ball flight parameters
@@ -84,11 +88,11 @@ export class ShotAnimationSystem {
       if (!this.validateShotData(turnData)) {
         console.error('❌ ShotAnimationSystem: Shot data validation failed', {
           result_type: turnData.result_type,
-          shooter_id: turnData.shooter_id,
-          player_id: turnData.player_id,
+          shooter: turnData.shooter,
+          ball_handler: turnData.ball_handler,
           hasResultType: !!turnData.result_type,
           isMakeOrMiss: turnData.result_type === 'MAKE' || turnData.result_type === 'MISS',
-          hasShooterId: !!(turnData.shooter_id || turnData.player_id)
+          hasShooter: !!(turnData.shooter || turnData.ball_handler)
         });
         throw new Error('Invalid shot data');
       }
@@ -313,43 +317,68 @@ export class ShotAnimationSystem {
    * Get shooter sprite
    */
   getShooterSprite(turnData) {
+    console.log('🔍 ShotAnimationSystem: getShooterSprite called with turnData:', turnData);
+    
     // Try to get shooter ID from the turn data
     let shooterId = turnData.shooter_id || turnData.player_id;
+    console.log('🔍 ShotAnimationSystem: Initial shooterId:', shooterId);
     
     // If no ID, try to find by name using rosters
     if (!shooterId) {
       const shooterName = turnData.shooter || turnData.ball_handler;
+      console.log('🔍 ShotAnimationSystem: Looking up by name:', shooterName);
       if (shooterName) {
         shooterId = this.findPlayerIdByName(shooterName);
+        console.log('🔍 ShotAnimationSystem: Found shooterId by name:', shooterId);
       }
     }
     
-    return this.playerSprites[shooterId] || null;
+    console.log('🔍 ShotAnimationSystem: Final shooterId:', shooterId);
+    console.log('🔍 ShotAnimationSystem: Available playerSprites keys:', Object.keys(this.playerSprites));
+    console.log('🔍 ShotAnimationSystem: Looking for sprite with key:', shooterId);
+    
+    const sprite = this.playerSprites[shooterId] || null;
+    console.log('🔍 ShotAnimationSystem: Found sprite:', sprite);
+    
+    return sprite;
   }
 
   findPlayerIdByName(playerName) {
+    console.log('🔍 ShotAnimationSystem: findPlayerIdByName called with:', playerName);
+    
     if (!playerName) return null;
     
     // Check home roster
     const homeRoster = this.gameStore.getHomeRoster();
+    console.log('🔍 ShotAnimationSystem: Home roster:', homeRoster);
     if (homeRoster && homeRoster.players) {
+      console.log('🔍 ShotAnimationSystem: Home roster players:', homeRoster.players);
       for (const player of homeRoster.players) {
+        console.log('🔍 ShotAnimationSystem: Checking home player:', player.name, 'vs', playerName);
         if (player.name === playerName) {
-          return player.playerId || player.player_id;
+          const foundId = player.playerId || player.player_id;
+          console.log('🔍 ShotAnimationSystem: Found in home roster with ID:', foundId);
+          return foundId;
         }
       }
     }
     
     // Check away roster
     const awayRoster = this.gameStore.getAwayRoster();
+    console.log('🔍 ShotAnimationSystem: Away roster:', awayRoster);
     if (awayRoster && awayRoster.players) {
+      console.log('🔍 ShotAnimationSystem: Away roster players:', awayRoster.players);
       for (const player of awayRoster.players) {
+        console.log('🔍 ShotAnimationSystem: Checking away player:', player.name, 'vs', playerName);
         if (player.name === playerName) {
-          return player.playerId || player.player_id;
+          const foundId = player.playerId || player.player_id;
+          console.log('🔍 ShotAnimationSystem: Found in away roster with ID:', foundId);
+          return foundId;
         }
       }
     }
     
+    console.log('🔍 ShotAnimationSystem: Player not found in any roster');
     return null;
   }
 
