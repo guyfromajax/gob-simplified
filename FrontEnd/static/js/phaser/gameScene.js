@@ -522,7 +522,11 @@ export function createGameScene(Phaser) {
         return finalScore;
       };
 
+      console.log('🚨 GAMESCENE: animate parameter:', this.animate);
+      console.log('🚨 GAMESCENE: typeof animate:', typeof this.animate);
+      
       if (this.animate) {
+        console.log('🚨 GAMESCENE: Taking animation path');
         const courtKey = "court-bg";
 
         const startAnimation = async () => {
@@ -649,6 +653,7 @@ export function createGameScene(Phaser) {
           this.load.start();
         }
       } else {
+        console.log('🚨 GAMESCENE: Taking NO animation path - skipping to next quarter');
         if (this.isFinal) {
           await finalize();
         } else {
