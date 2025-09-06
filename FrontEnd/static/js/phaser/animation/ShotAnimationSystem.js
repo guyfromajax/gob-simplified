@@ -312,8 +312,44 @@ export class ShotAnimationSystem {
    * Get shooter sprite
    */
   getShooterSprite(turnData) {
-    const shooterId = turnData.shooter_id || turnData.player_id;
+    // Try to get shooter ID from the turn data
+    let shooterId = turnData.shooter_id || turnData.player_id;
+    
+    // If no ID, try to find by name using rosters
+    if (!shooterId) {
+      const shooterName = turnData.shooter || turnData.ball_handler;
+      if (shooterName) {
+        shooterId = this.findPlayerIdByName(shooterName);
+      }
+    }
+    
     return this.playerSprites[shooterId] || null;
+  }
+
+  findPlayerIdByName(playerName) {
+    if (!playerName) return null;
+    
+    // Check home roster
+    const homeRoster = this.gameStore.getHomeRoster();
+    if (homeRoster && homeRoster.players) {
+      for (const player of homeRoster.players) {
+        if (player.name === playerName) {
+          return player.playerId || player.player_id;
+        }
+      }
+    }
+    
+    // Check away roster
+    const awayRoster = this.gameStore.getAwayRoster();
+    if (awayRoster && awayRoster.players) {
+      for (const player of awayRoster.players) {
+        if (player.name === playerName) {
+          return player.playerId || player.player_id;
+        }
+      }
+    }
+    
+    return null;
   }
 
   /**
@@ -332,7 +368,7 @@ export class ShotAnimationSystem {
     return turnData && 
            turnData.result_type && 
            (turnData.result_type === 'MAKE' || turnData.result_type === 'MISS') &&
-           (turnData.shooter_id || turnData.player_id);
+           (turnData.shooter || turnData.ball_handler);
   }
 
   /**
