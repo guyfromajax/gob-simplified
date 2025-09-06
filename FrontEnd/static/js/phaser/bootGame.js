@@ -240,14 +240,25 @@ function showPopup(score) {
 }
 
 async function handleButtonClick(animate) {
-  if (isSimulating) return;
+  console.log('handleButtonClick called with animate:', animate);
+  console.log('Current state:', { isSimulating, gameId, quarter, homeTeam, awayTeam });
+  
+  if (isSimulating) {
+    console.log('Already simulating, returning early');
+    return;
+  }
+  
   if (!gameId && typeof localStorage !== 'undefined') {
     gameId = localStorage.getItem('game_id');
+    console.log('Retrieved gameId from localStorage:', gameId);
   }
+  
   const startingFresh = !gameId;
   if (startingFresh) {
+    console.log('Starting fresh game, resetting context');
     resetGameContext();
   }
+  
   DEBUG && console.log('[handleButtonClick]', { startingFresh, quarter, gameId });
   isSimulating = true;
   const playBtn = document.querySelector('.play-button');
@@ -258,6 +269,7 @@ async function handleButtonClick(animate) {
   if (sim4Btn) sim4Btn.style.display = 'none';
 
   try {
+    console.log('About to fetch rosters for teams:', { homeTeam, awayTeam });
     if (DEBUG_TEAMS) {
       console.log('Fetching rosters for teams:', { homeTeam, awayTeam });
     }
@@ -265,11 +277,14 @@ async function handleButtonClick(animate) {
       fetchTeamRoster(homeTeam),
       fetchTeamRoster(awayTeam),
     ]);
-    console.log('startGame animate:', animate);
+    console.log('Rosters fetched successfully:', { homeRoster: !!homeRoster, awayRoster: !!awayRoster });
+    console.log('About to start game with animate:', animate);
     const finalScore = await startGame({ homeRoster, awayRoster, animate });
+    console.log('Game completed, final score:', finalScore);
     showPopup(finalScore);
   } catch (err) {
     console.error('Error starting game:', err);
+    console.error('Error details:', err.message, err.stack);
   } finally {
     if (isSimulating) {
       isSimulating = false;
@@ -424,9 +439,19 @@ function initGame() {
   const playBtn = document.querySelector('.play-button');
   const simFullBtn = document.querySelector('.sim-full-game-button');
   const sim4Btn = document.querySelector('.sim-to-fourth-button');
+  
+  console.log('Initializing game buttons:', { playBtn, simFullBtn, sim4Btn });
+  
   if (playBtn) {
-    playBtn.addEventListener('click', () => handleButtonClick(true));
+    console.log('Adding click listener to Play Quarter button');
+    playBtn.addEventListener('click', () => {
+      console.log('Play Quarter button clicked!');
+      handleButtonClick(true);
+    });
+  } else {
+    console.error('Play Quarter button not found!');
   }
+  
   if (simFullBtn) {
     simFullBtn.addEventListener('click', handleSimFullGame);
   }
