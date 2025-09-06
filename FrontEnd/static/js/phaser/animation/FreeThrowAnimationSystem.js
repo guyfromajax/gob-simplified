@@ -95,6 +95,7 @@ export class FreeThrowAnimationSystem {
         shooter_id: turnData.shooter_id,
         player_id: turnData.player_id,
         ftContext: turnData.ftContext,
+        allKeys: Object.keys(turnData),
         fullTurnData: turnData
       });
       
