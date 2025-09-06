@@ -25,9 +25,7 @@ export class ShotAnimationSystem {
     this.playerSprites = playerSprites;
     this.gameStore = gameStore;
     
-    console.log('🔍 ShotAnimationSystem: Constructor called with playerSprites:', playerSprites);
-    console.log('🔍 ShotAnimationSystem: playerSprites keys:', Object.keys(playerSprites));
-    console.log('🔍 ShotAnimationSystem: gameStore:', gameStore);
+    // Debug logging removed for cleaner console
     
     // Shot configuration
     this.shotConfig = {
@@ -105,17 +103,9 @@ export class ShotAnimationSystem {
         throw new Error('Shooter sprite not found');
       }
       
-      console.log('🔍 ShotAnimationSystem: Shooter sprite found:', shooterSprite);
-      console.log('🔍 ShotAnimationSystem: Shooter sprite position:', { x: shooterSprite.x, y: shooterSprite.y });
-      console.log('🔍 ShotAnimationSystem: Shooter sprite visible:', shooterSprite.visible);
-
       // Determine shot outcome
       const isMake = turnData.result_type === 'MAKE';
       const rimCoords = this.getRimCoordinates(turnData);
-      
-      console.log('🔍 ShotAnimationSystem: Shot outcome:', isMake ? 'MAKE' : 'MISS');
-      console.log('🔍 ShotAnimationSystem: Rim coordinates:', rimCoords);
-      console.log('🔍 ShotAnimationSystem: Turn data team_id:', turnData.team_id);
 
       // Execute shot sequence
       await this.executeShotSequence(shooterSprite, rimCoords, isMake, turnData);
