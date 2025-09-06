@@ -16,6 +16,7 @@ import ShotAnimationSystem from './ShotAnimationSystem.js';
 import ReboundAnimationSystem from './ReboundAnimationSystem.js';
 import PassAnimationSystem from './PassAnimationSystem.js';
 import FreeThrowAnimationSystem from './FreeThrowAnimationSystem.js';
+import gameStore from '../state/gameStore.js';
 
 export class AnimationEngine {
   constructor(scene) {
@@ -339,7 +340,8 @@ export class AnimationEngine {
         this.scene,
         this.ballController,
         this.stateMachine,
-        this.playerSprites
+        this.playerSprites,
+        gameStore
       );
       console.log('AnimationEngine: ShotAnimationSystem initialized');
       
@@ -363,7 +365,8 @@ export class AnimationEngine {
         this.scene,
         this.ballController,
         this.stateMachine,
-        this.playerSprites
+        this.playerSprites,
+        gameStore
       );
       console.log('AnimationEngine: FreeThrowAnimationSystem initialized');
     }
