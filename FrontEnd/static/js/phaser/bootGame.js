@@ -444,11 +444,15 @@ function initGame() {
   
   if (playBtn) {
     console.log('Adding click listener to Play Quarter button');
-    playBtn.addEventListener('click', () => {
+    playBtn.addEventListener('click', async () => {
       console.log('🚨 BUTTON CLICKED: Play Quarter button clicked!');
       console.log('🚨 BUTTON CLICKED: About to call handleButtonClick');
-      handleButtonClick(true);
-      console.log('🚨 BUTTON CLICKED: handleButtonClick completed');
+      try {
+        await handleButtonClick(true);
+        console.log('🚨 BUTTON CLICKED: handleButtonClick completed successfully');
+      } catch (error) {
+        console.error('🚨 BUTTON CLICKED: handleButtonClick failed:', error);
+      }
     });
   } else {
     console.error('Play Quarter button not found!');

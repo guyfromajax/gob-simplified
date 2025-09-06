@@ -616,6 +616,14 @@ export function createGameScene(Phaser) {
           if (this.isFinal) {
             await finalize();
           } else {
+            console.log('🚨 GAMESCENE: Animation complete, about to navigate to next quarter - BLOCKING FOR DEBUG');
+            
+            // TEMPORARY DEBUG: Block navigation to see what's happening
+            if (window.DEBUG_BLOCK_NAVIGATION !== false) {
+              console.log('🚨 GAMESCENE: Navigation blocked for debugging. Set window.DEBUG_BLOCK_NAVIGATION = false to allow navigation.');
+              return; // Block navigation
+            }
+            
             const nextQ = this.quarter + 1;
           const params = new URLSearchParams(window.location.search);
           params.set('game_id', this.gameId);
@@ -657,6 +665,15 @@ export function createGameScene(Phaser) {
         if (this.isFinal) {
           await finalize();
         } else {
+          console.log('🚨 GAMESCENE: About to navigate to next quarter - BLOCKING FOR DEBUG');
+          console.log('🚨 GAMESCENE: If you see this, the animation was skipped!');
+          
+          // TEMPORARY DEBUG: Block navigation to see what's happening
+          if (window.DEBUG_BLOCK_NAVIGATION !== false) {
+            console.log('🚨 GAMESCENE: Navigation blocked for debugging. Set window.DEBUG_BLOCK_NAVIGATION = false to allow navigation.');
+            return; // Block navigation
+          }
+          
           const nextQ = this.quarter + 1;
           const params = new URLSearchParams(window.location.search);
           params.set('game_id', this.gameId);
