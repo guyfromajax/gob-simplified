@@ -65,8 +65,8 @@ export class AnimationRouter {
     });
 
     // Set up state machine listeners
-    this.stateMachine.on('stateChange', (data) => {
-      this.handleStateChange(data);
+    this.stateMachine.addListener('stateChange', (fromState, toState, context) => {
+      this.handleStateChange({ fromState, toState, context });
     });
 
     // Mark as initialized
