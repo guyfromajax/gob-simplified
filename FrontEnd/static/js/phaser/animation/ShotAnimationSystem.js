@@ -356,7 +356,13 @@ export class ShotAnimationSystem {
       for (const player of homeRoster.players) {
         console.log('🔍 ShotAnimationSystem: Checking home player:', player.name, 'vs', playerName);
         if (player.name === playerName) {
-          const foundId = player.playerId || player.player_id;
+          console.log('🔍 ShotAnimationSystem: Found matching player, full object:', player);
+          console.log('🔍 ShotAnimationSystem: Player keys:', Object.keys(player));
+          console.log('🔍 ShotAnimationSystem: player._id:', player._id);
+          console.log('🔍 ShotAnimationSystem: player.playerId:', player.playerId);
+          console.log('🔍 ShotAnimationSystem: player.player_id:', player.player_id);
+          console.log('🔍 ShotAnimationSystem: player.id:', player.id);
+          const foundId = player._id || player.playerId || player.player_id || player.id;
           console.log('🔍 ShotAnimationSystem: Found in home roster with ID:', foundId);
           return foundId;
         }
@@ -371,7 +377,13 @@ export class ShotAnimationSystem {
       for (const player of awayRoster.players) {
         console.log('🔍 ShotAnimationSystem: Checking away player:', player.name, 'vs', playerName);
         if (player.name === playerName) {
-          const foundId = player.playerId || player.player_id;
+          console.log('🔍 ShotAnimationSystem: Found matching player, full object:', player);
+          console.log('🔍 ShotAnimationSystem: Player keys:', Object.keys(player));
+          console.log('🔍 ShotAnimationSystem: player._id:', player._id);
+          console.log('🔍 ShotAnimationSystem: player.playerId:', player.playerId);
+          console.log('🔍 ShotAnimationSystem: player.player_id:', player.player_id);
+          console.log('🔍 ShotAnimationSystem: player.id:', player.id);
+          const foundId = player._id || player.playerId || player.player_id || player.id;
           console.log('🔍 ShotAnimationSystem: Found in away roster with ID:', foundId);
           return foundId;
         }
