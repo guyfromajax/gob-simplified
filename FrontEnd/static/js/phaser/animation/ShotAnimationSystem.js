@@ -18,11 +18,12 @@ import { AnimationStates } from './SimplifiedStateMachine.js';
 import { DebugFlags } from '../utils/debugFlags.js';
 
 export class ShotAnimationSystem {
-  constructor(scene, ballController, stateMachine, playerSprites) {
+  constructor(scene, ballController, stateMachine, playerSprites, gameStore) {
     this.scene = scene;
     this.ballController = ballController;
     this.stateMachine = stateMachine;
     this.playerSprites = playerSprites;
+    this.gameStore = gameStore;
     
     // Shot configuration
     this.shotConfig = {

@@ -19,11 +19,12 @@ import { AnimationStates } from './SimplifiedStateMachine.js';
 import { DebugFlags } from '../utils/debugFlags.js';
 
 export class FreeThrowAnimationSystem {
-  constructor(scene, ballController, stateMachine, playerSprites) {
+  constructor(scene, ballController, stateMachine, playerSprites, gameStore) {
     this.scene = scene;
     this.ballController = ballController;
     this.stateMachine = stateMachine;
     this.playerSprites = playerSprites;
+    this.gameStore = gameStore;
     
     // Free throw configuration
     this.ftConfig = {
@@ -468,7 +469,7 @@ export class FreeThrowAnimationSystem {
   validateFreeThrowData(turnData) {
     return turnData && 
            (turnData.shooter || turnData.ball_handler) &&
-           (turnData.result_type === 'MAKE' || turnData.result_type === 'MISS');
+           turnData.result_type === 'FREE_THROW';
   }
 
   /**
