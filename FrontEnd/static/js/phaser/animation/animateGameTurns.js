@@ -53,12 +53,16 @@ export async function animateGameTurns({ //hasBallAtStep
   ballSprite,
   onUpdate
 }) {
+  console.log('🎬 animateGameTurns: Starting animation system');
   const turns = simData.turns || [];
+  console.log('🎬 animateGameTurns: Processing turns', { turnCount: turns.length });
   annotateFreeThrowTurns(turns);
   const allPlayers = simData.players || [];
   
   // Initialize new animation router
+  console.log('🎬 animateGameTurns: Creating AnimationRouter');
   const animationRouter = new AnimationRouter(scene, playerSprites, ballSprite, onUpdate);
+  console.log('🎬 animateGameTurns: AnimationRouter created successfully');
   
   if (DEBUG_FLOW) {
     const stepCount = turns.reduce((acc, t) => {
@@ -104,11 +108,21 @@ export async function animateGameTurns({ //hasBallAtStep
   };
   scene.events?.on?.('possessionChange', handlePossessionFlip);
 
+  console.log('🎬 animateGameTurns: Starting turn processing loop', { totalTurns: turns.length });
+  
   for (let i = 0; i < turns.length; i++) {
     scene.currentTurn = i;
     const turn = turns[i];
     turn.index = i;
-    if (scene.skipToEnd) break;
+    console.log(`🎬 animateGameTurns: Processing turn ${i + 1}/${turns.length}`, { 
+      result_type: turn.result_type,
+      skipToEnd: scene.skipToEnd 
+    });
+    
+    if (scene.skipToEnd) {
+      console.log('🎬 animateGameTurns: Skipping to end, breaking loop');
+      break;
+    }
     if (DEBUG_FLOW) console.log(`🔁 Turn ${i + 1}`, turn);
 
     if (turn.result_type === "FREE_THROW") {
@@ -282,5 +296,6 @@ export async function animateGameTurns({ //hasBallAtStep
   }
 
   scene.events?.off?.('possessionChange', handlePossessionFlip);
+  console.log('🎬 animateGameTurns: Animation system completed');
 }
 
