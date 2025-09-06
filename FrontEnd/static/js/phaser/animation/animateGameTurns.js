@@ -204,7 +204,30 @@ export async function animateGameTurns({ //hasBallAtStep
 
     // Use new AnimationRouter for all other turns
     console.log('🆕 Using new AnimationRouter for turn:', turn.result_type);
-    await animationRouter.processTurn(turn);
+    try {
+      await animationRouter.processTurn(turn);
+      console.log('✅ AnimationRouter completed turn:', turn.result_type);
+    } catch (error) {
+      console.error('❌ AnimationRouter failed for turn:', turn.result_type, error);
+      console.log('🔄 Falling back to old animation system for turn:', turn.result_type);
+      
+      // Fallback to old system
+      try {
+        const { playTurnAnimation } = await import('./turnAnimation.js');
+        await playTurnAnimation({
+          scene: scene,
+          simData: simData,
+          playerSprites: playerSprites,
+          turnData: turn,
+          ballSprite: ballSprite,
+          onAction: onUpdate
+        });
+        console.log('✅ Fallback animation completed for turn:', turn.result_type);
+      } catch (fallbackError) {
+        console.error('❌ Fallback animation also failed for turn:', turn.result_type, fallbackError);
+        // Continue to next turn - don't let one failed turn stop the whole game
+      }
+    }
 
     const stealEvent = turn.events?.find(e => e.event_type === "STEAL");
     if (!scene.stateMachine?.is(States.FastBreak) && (turn.result_type === "STEAL" || stealEvent)) {

@@ -66,24 +66,38 @@ export class AnimationEngine {
     this.isProcessing = true;
 
     try {
-      console.log('AnimationEngine: Processing turn', {
+      console.log('🎬 AnimationEngine: Processing turn', {
         result_type: turnData.result_type,
         fast_break: turnData.fast_break,
-        turn_index: turnData.index
+        turn_index: turnData.index,
+        hasShotSystem: !!this.shotSystem,
+        hasPassSystem: !!this.passSystem,
+        hasReboundSystem: !!this.reboundSystem,
+        hasFreeThrowSystem: !!this.freeThrowSystem
       });
 
       // Determine the appropriate handler
       const handler = this.determineHandler(turnData);
+      console.log('🎯 AnimationEngine: Determined handler', { 
+        result_type: turnData.result_type,
+        handlerName: handler.name 
+      });
       
       // Execute the animation
+      console.log('🚀 AnimationEngine: Executing handler');
       await handler(turnData, context);
+      console.log('✅ AnimationEngine: Handler completed');
 
-      console.log('AnimationEngine: Turn processing complete', {
+      console.log('🎉 AnimationEngine: Turn processing complete', {
         result_type: turnData.result_type
       });
 
     } catch (error) {
-      console.error('AnimationEngine: Error processing turn', error);
+      console.error('❌ AnimationEngine: Error processing turn', {
+        error: error.message,
+        stack: error.stack,
+        result_type: turnData.result_type
+      });
       throw error;
     } finally {
       this.isProcessing = false;
