@@ -95,7 +95,7 @@ export class AnimationRouter {
         console.log('AnimationRouter: Processing turn', {
           index: turnData.index,
           result_type: turnData.result_type,
-          currentState: this.stateMachine.state
+          currentState: this.stateMachine.getCurrentState()
         });
       }
 
@@ -103,8 +103,8 @@ export class AnimationRouter {
       const nextState = this.determineNextState(turnData);
       
       // Transition to the new state
-      if (nextState && this.stateMachine.canTransitionTo(nextState)) {
-        this.stateMachine.transitionTo(nextState, { turnData });
+      if (nextState && this.stateMachine.isValidTransition(nextState)) {
+        this.stateMachine.transition(nextState, { turnData });
       } else {
         console.warn('AnimationRouter: Cannot transition to state', nextState);
       }
@@ -134,7 +134,7 @@ export class AnimationRouter {
    * Determine the next state based on turn data
    */
   determineNextState(turnData) {
-    const currentState = this.stateMachine.state;
+    const currentState = this.stateMachine.getCurrentState();
     
     // State transition logic based on turn type
     switch (turnData.result_type) {
@@ -185,13 +185,13 @@ export class AnimationRouter {
       console.log('AnimationRouter: Ball attached', {
         from: previousOwner?.playerId,
         to: newOwner?.playerId,
-        state: this.stateMachine.state
+        state: this.stateMachine.getCurrentState()
       });
     }
 
     // Update state machine if needed
-    if (this.stateMachine.state === AnimationStates.IDLE && newOwner) {
-      this.stateMachine.transitionTo(AnimationStates.POSSESSION, { 
+    if (this.stateMachine.getCurrentState() === AnimationStates.IDLE && newOwner) {
+      this.stateMachine.transition(AnimationStates.POSSESSION, { 
         reason: 'ball_attached',
         playerId: newOwner.playerId 
       });
@@ -206,14 +206,14 @@ export class AnimationRouter {
       console.log('AnimationRouter: Ball detached', {
         from: previousOwner?.playerId,
         reason,
-        state: this.stateMachine.state
+        state: this.stateMachine.getCurrentState()
       });
     }
 
     // Update state machine based on detachment reason
     switch (reason) {
       case 'shot':
-        this.stateMachine.transitionTo(AnimationStates.SHOOTING, { 
+        this.stateMachine.transition(AnimationStates.SHOOTING, { 
           reason: 'ball_detached_for_shot',
           playerId: previousOwner?.playerId 
         });
@@ -224,7 +224,7 @@ export class AnimationRouter {
         break;
         
       case 'turnover':
-        this.stateMachine.transitionTo(AnimationStates.IDLE, { 
+        this.stateMachine.transition(AnimationStates.IDLE, { 
           reason: 'turnover',
           playerId: previousOwner?.playerId 
         });
@@ -342,7 +342,7 @@ export class AnimationRouter {
     });
 
     // Reset to a safe state
-    this.stateMachine.transitionTo(AnimationStates.IDLE, { reason: 'error_recovery' });
+    this.stateMachine.transition(AnimationStates.IDLE, { reason: 'error_recovery' });
     this.ballController.reset();
   }
 
@@ -354,9 +354,9 @@ export class AnimationRouter {
       isProcessing: this.isProcessing,
       currentTurn: this.currentTurn?.index || null,
       stateMachine: {
-        state: this.stateMachine.state,
+        state: this.stateMachine.getCurrentState(),
         canTransition: Object.values(AnimationStates).filter(state => 
-          this.stateMachine.canTransitionTo(state)
+          this.stateMachine.isValidTransition(state)
         )
       },
       ballController: this.ballController.getState(),
@@ -379,7 +379,7 @@ export class AnimationRouter {
     this.currentTurn = null;
     this.animationQueue = [];
     
-    this.stateMachine.transitionTo(AnimationStates.IDLE, { reason: 'system_reset' });
+    this.stateMachine.transition(AnimationStates.IDLE, { reason: 'system_reset' });
     this.ballController.reset();
     
     if (DebugFlags.ANIMATION_ROUTER) {
