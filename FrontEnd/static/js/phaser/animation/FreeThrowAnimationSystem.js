@@ -90,9 +90,27 @@ export class FreeThrowAnimationSystem {
       }
 
       // Validate free throw data
+      console.log('🔍 FreeThrowAnimationSystem: Validating free throw data', {
+        result_type: turnData.result_type,
+        shooter_id: turnData.shooter_id,
+        player_id: turnData.player_id,
+        ftContext: turnData.ftContext,
+        fullTurnData: turnData
+      });
+      
       if (!this.validateFreeThrowData(turnData)) {
+        console.error('❌ FreeThrowAnimationSystem: Free throw data validation failed', {
+          result_type: turnData.result_type,
+          shooter_id: turnData.shooter_id,
+          player_id: turnData.player_id,
+          hasResultType: !!turnData.result_type,
+          isFreeThrow: turnData.result_type === 'FREE_THROW',
+          hasShooterId: !!(turnData.shooter_id || turnData.player_id)
+        });
         throw new Error('Invalid free throw data');
       }
+      
+      console.log('✅ FreeThrowAnimationSystem: Free throw data validation passed');
 
       // Get shooter sprite
       const shooterSprite = this.getShooterSprite(turnData);
@@ -169,7 +187,7 @@ export class FreeThrowAnimationSystem {
    */
   async executeFreeThrowShot(shooterSprite, turnData, ftContext) {
     // 1. Transition to SHOOTING state
-    this.stateMachine.transitionTo(AnimationStates.SHOOTING, {
+    this.stateMachine.transition(AnimationStates.SHOOTING, {
       reason: 'free_throw_initiated',
       shooter_id: turnData.shooter_id,
       attempt: ftContext.attempt,
@@ -264,14 +282,14 @@ export class FreeThrowAnimationSystem {
     // Check if this is the final free throw
     if (ftContext.attempt >= ftContext.total) {
       // Final free throw made - transition to IDLE (end of possession)
-      this.stateMachine.transitionTo(AnimationStates.IDLE, {
+      this.stateMachine.transition(AnimationStates.IDLE, {
         reason: 'free_throw_sequence_complete',
         shooter_id: turnData.shooter_id,
         made: true
       });
     } else {
       // More free throws to come - stay in POSSESSION
-      this.stateMachine.transitionTo(AnimationStates.POSSESSION, {
+      this.stateMachine.transition(AnimationStates.POSSESSION, {
         reason: 'free_throw_made_more_to_come',
         shooter_id: turnData.shooter_id,
         attempt: ftContext.attempt,
@@ -300,7 +318,7 @@ export class FreeThrowAnimationSystem {
     await this.animateBallBounce(rimCoords, turnData);
 
     // Transition to REBOUNDING state
-    this.stateMachine.transitionTo(AnimationStates.REBOUNDING, {
+    this.stateMachine.transition(AnimationStates.REBOUNDING, {
       reason: 'free_throw_missed',
       shooter_id: turnData.shooter_id,
       attempt: ftContext.attempt,
@@ -440,7 +458,7 @@ export class FreeThrowAnimationSystem {
     });
 
     // Reset to safe state
-    this.stateMachine.transitionTo(AnimationStates.IDLE, {
+    this.stateMachine.transition(AnimationStates.IDLE, {
       reason: 'free_throw_error',
       error: error.message
     });

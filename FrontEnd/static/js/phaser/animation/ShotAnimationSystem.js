@@ -71,9 +71,27 @@ export class ShotAnimationSystem {
       }
 
       // Validate shot data
+      console.log('🔍 ShotAnimationSystem: Validating shot data', {
+        result_type: turnData.result_type,
+        shooter_id: turnData.shooter_id,
+        player_id: turnData.player_id,
+        shot_type: turnData.shot_type,
+        fullTurnData: turnData
+      });
+      
       if (!this.validateShotData(turnData)) {
+        console.error('❌ ShotAnimationSystem: Shot data validation failed', {
+          result_type: turnData.result_type,
+          shooter_id: turnData.shooter_id,
+          player_id: turnData.player_id,
+          hasResultType: !!turnData.result_type,
+          isMakeOrMiss: turnData.result_type === 'MAKE' || turnData.result_type === 'MISS',
+          hasShooterId: !!(turnData.shooter_id || turnData.player_id)
+        });
         throw new Error('Invalid shot data');
       }
+      
+      console.log('✅ ShotAnimationSystem: Shot data validation passed');
 
       // Get shooter sprite
       const shooterSprite = this.getShooterSprite(turnData);
@@ -104,7 +122,7 @@ export class ShotAnimationSystem {
    */
   async executeShotSequence(shooterSprite, rimCoords, isMake, turnData) {
     // 1. Transition to SHOOTING state
-    this.stateMachine.transitionTo(AnimationStates.SHOOTING, {
+    this.stateMachine.transition(AnimationStates.SHOOTING, {
       reason: 'shot_initiated',
       shooter_id: turnData.shooter_id,
       shot_type: turnData.shot_type
@@ -201,7 +219,7 @@ export class ShotAnimationSystem {
     }
 
     // Transition to IDLE state (end of possession)
-    this.stateMachine.transitionTo(AnimationStates.IDLE, {
+    this.stateMachine.transition(AnimationStates.IDLE, {
       reason: 'shot_made',
       shooter_id: turnData.shooter_id
     });
@@ -225,7 +243,7 @@ export class ShotAnimationSystem {
     await this.animateBallBounce(rimCoords, turnData);
 
     // Transition to REBOUNDING state
-    this.stateMachine.transitionTo(AnimationStates.REBOUNDING, {
+    this.stateMachine.transition(AnimationStates.REBOUNDING, {
       reason: 'shot_missed',
       shooter_id: turnData.shooter_id
     });
@@ -339,7 +357,7 @@ export class ShotAnimationSystem {
     });
 
     // Reset to safe state
-    this.stateMachine.transitionTo(AnimationStates.IDLE, {
+    this.stateMachine.transition(AnimationStates.IDLE, {
       reason: 'shot_error',
       error: error.message
     });
