@@ -16,7 +16,7 @@ import ShotAnimationSystem from './ShotAnimationSystem.js';
 import ReboundAnimationSystem from './ReboundAnimationSystem.js';
 import PassAnimationSystem from './PassAnimationSystem.js';
 import FreeThrowAnimationSystem from './FreeThrowAnimationSystem.js';
-import gameStore from '../state/gameStore.js';
+import gameStore from '../../state/gameStore.js';
 
 export class AnimationEngine {
   constructor(scene) {
