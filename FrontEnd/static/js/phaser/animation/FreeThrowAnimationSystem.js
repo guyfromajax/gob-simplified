@@ -448,7 +448,7 @@ export class FreeThrowAnimationSystem {
     if (homeRoster && homeRoster.players) {
       for (const player of homeRoster.players) {
         if (player.name === playerName) {
-          return player.playerId || player.player_id;
+          return player._id || player.playerId || player.player_id;
         }
       }
     }
@@ -458,7 +458,7 @@ export class FreeThrowAnimationSystem {
     if (awayRoster && awayRoster.players) {
       for (const player of awayRoster.players) {
         if (player.name === playerName) {
-          return player.playerId || player.player_id;
+          return player._id || player.playerId || player.player_id;
         }
       }
     }
