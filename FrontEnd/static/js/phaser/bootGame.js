@@ -445,8 +445,10 @@ function initGame() {
   if (playBtn) {
     console.log('Adding click listener to Play Quarter button');
     playBtn.addEventListener('click', () => {
-      console.log('Play Quarter button clicked!');
+      console.log('🚨 BUTTON CLICKED: Play Quarter button clicked!');
+      console.log('🚨 BUTTON CLICKED: About to call handleButtonClick');
       handleButtonClick(true);
+      console.log('🚨 BUTTON CLICKED: handleButtonClick completed');
     });
   } else {
     console.error('Play Quarter button not found!');
@@ -465,7 +467,9 @@ function initGame() {
   }
 }
 
+console.log('🚨 BOOTGAME: JavaScript is loading and executing!');
 initGame();
 updateOffsets();
+console.log('🚨 BOOTGAME: Initialization complete!');
 
 // new Phaser.Game(config);
