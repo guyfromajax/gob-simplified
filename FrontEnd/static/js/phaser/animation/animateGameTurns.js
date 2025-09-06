@@ -126,8 +126,28 @@ export async function animateGameTurns({ //hasBallAtStep
     if (DEBUG_FLOW) console.log(`🔁 Turn ${i + 1}`, turn);
 
     if (turn.result_type === "FREE_THROW") {
-      console.log('🆕 Using new AnimationRouter for FREE_THROW');
-      await animationRouter.processTurn(turn);
+      console.log('🎬 Using proven playTurnAnimation for FREE_THROW');
+      try {
+        const { playTurnAnimation } = await import('./turnAnimation.js');
+        await playTurnAnimation({
+          scene: scene,
+          simData: simData,
+          playerSprites: playerSprites,
+          turnData: turn,
+          ballSprite: ballSprite,
+          onAction: onUpdate
+        });
+        console.log('✅ playTurnAnimation completed for FREE_THROW');
+      } catch (error) {
+        console.error('❌ playTurnAnimation failed for FREE_THROW:', error);
+        console.log('🔄 Falling back to new AnimationRouter for FREE_THROW');
+        try {
+          await animationRouter.processTurn(turn);
+          console.log('✅ AnimationRouter fallback completed for FREE_THROW');
+        } catch (fallbackError) {
+          console.error('❌ Both animation systems failed for FREE_THROW:', fallbackError);
+        }
+      }
       if (onUpdate) {
         try {
           onUpdate(turn);
@@ -194,8 +214,28 @@ export async function animateGameTurns({ //hasBallAtStep
       
       // Check if this is a fast break turn (now properly flagged by backend)
       if (turn.fast_break === true) {
-        console.log('🆕 Using new AnimationRouter for FAST_BREAK shot');
-        await animationRouter.processTurn(turn);
+        console.log('🎬 Using proven playTurnAnimation for FAST_BREAK shot');
+        try {
+          const { playTurnAnimation } = await import('./turnAnimation.js');
+          await playTurnAnimation({
+            scene: scene,
+            simData: simData,
+            playerSprites: playerSprites,
+            turnData: turn,
+            ballSprite: ballSprite,
+            onAction: onUpdate
+          });
+          console.log('✅ playTurnAnimation completed for FAST_BREAK');
+        } catch (error) {
+          console.error('❌ playTurnAnimation failed for FAST_BREAK:', error);
+          console.log('🔄 Falling back to new AnimationRouter for FAST_BREAK');
+          try {
+            await animationRouter.processTurn(turn);
+            console.log('✅ AnimationRouter fallback completed for FAST_BREAK');
+          } catch (fallbackError) {
+            console.error('❌ Both animation systems failed for FAST_BREAK:', fallbackError);
+          }
+        }
         if (onUpdate) {
           try {
             onUpdate(turn);
@@ -216,29 +256,31 @@ export async function animateGameTurns({ //hasBallAtStep
 
     const shooterId = playerMap[shooterName];
 
-    // Use new AnimationRouter for all other turns
-    console.log('🆕 Using new AnimationRouter for turn:', turn.result_type);
+    // 🎯 HYBRID APPROACH: Use old animation system by default
+    // This ensures animations work immediately while preserving new architecture
+    console.log('🎬 Using proven playTurnAnimation for turn:', turn.result_type);
+    
     try {
-      await animationRouter.processTurn(turn);
-      console.log('✅ AnimationRouter completed turn:', turn.result_type);
+      const { playTurnAnimation } = await import('./turnAnimation.js');
+      await playTurnAnimation({
+        scene: scene,
+        simData: simData,
+        playerSprites: playerSprites,
+        turnData: turn,
+        ballSprite: ballSprite,
+        onAction: onUpdate
+      });
+      console.log('✅ playTurnAnimation completed for turn:', turn.result_type);
     } catch (error) {
-      console.error('❌ AnimationRouter failed for turn:', turn.result_type, error);
-      console.log('🔄 Falling back to old animation system for turn:', turn.result_type);
+      console.error('❌ playTurnAnimation failed for turn:', turn.result_type, error);
       
-      // Fallback to old system
+      // Fallback to new system if old system fails
+      console.log('🔄 Falling back to new AnimationRouter for turn:', turn.result_type);
       try {
-        const { playTurnAnimation } = await import('./turnAnimation.js');
-        await playTurnAnimation({
-          scene: scene,
-          simData: simData,
-          playerSprites: playerSprites,
-          turnData: turn,
-          ballSprite: ballSprite,
-          onAction: onUpdate
-        });
-        console.log('✅ Fallback animation completed for turn:', turn.result_type);
+        await animationRouter.processTurn(turn);
+        console.log('✅ AnimationRouter fallback completed for turn:', turn.result_type);
       } catch (fallbackError) {
-        console.error('❌ Fallback animation also failed for turn:', turn.result_type, fallbackError);
+        console.error('❌ Both animation systems failed for turn:', turn.result_type, fallbackError);
         // Continue to next turn - don't let one failed turn stop the whole game
       }
     }
