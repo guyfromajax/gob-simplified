@@ -253,15 +253,8 @@ export async function animateGameTurns({ //hasBallAtStep
       continue;
     }
     
-    // Debug: Check if this should be a fast break but isn't being detected
+    // Check for fast break shots
     if (turn.result_type === "MAKE" || turn.result_type === "MISS") {
-      console.log('SHOT TURN - checking for fast break indicators:', {
-        result_type: turn.result_type,
-        fast_break: turn.fast_break,
-        turn_index: i,
-        all_turn_keys: Object.keys(turn),
-        full_turn_data: turn
-      });
       
       // Fast break shots now use the new system (same as HCO shots)
       if (turn.fast_break === true) {
@@ -312,7 +305,6 @@ export async function animateGameTurns({ //hasBallAtStep
 
     // 🎯 HYBRID APPROACH: Use new system for shots, old system for everything else
     if (turn.result_type === 'MAKE' || turn.result_type === 'MISS') {
-      console.log('🎬 Using new ShotAnimationSystem for shot:', turn.result_type);
       
       try {
         // Use the new ShotAnimationSystem for shot animations
@@ -368,7 +360,6 @@ export async function animateGameTurns({ //hasBallAtStep
       }
     } else {
       // Use old system for other non-shot turns
-      console.log('🎬 Using proven playTurnAnimation for turn:', turn.result_type);
       
       try {
         const { playTurnAnimation } = await import('./turnAnimation.js');
