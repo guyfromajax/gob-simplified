@@ -46,6 +46,7 @@ export class AnimationEngine {
     // This ensures backward compatibility during transition
     this.animationHandlers.set('FREE_THROW', this.handleFreeThrow.bind(this));
     this.animationHandlers.set('SIDE_INBOUND', this.handleSideInbound.bind(this));
+    this.animationHandlers.set('BASELINE_INBOUND', this.handleBaselineInbound.bind(this));
     this.animationHandlers.set('TURNOVER', this.handleTurnover.bind(this));
     this.animationHandlers.set('FAST_BREAK', this.handleFastBreak.bind(this));
     this.animationHandlers.set('SHOT_ATTEMPT', this.handleShotAttempt.bind(this));
@@ -203,6 +204,25 @@ export class AnimationEngine {
     } else {
       console.warn('AnimationEngine: PassAnimationSystem not available, using fallback');
       // Fallback to old system
+      const { runSideInboundSetup } = await import('./turnAnimation.js');
+      await runSideInboundSetup({
+        scene: this.scene,
+        ballSprite: context.ballSprite,
+        playerSprites: context.playerSprites,
+        turnData: turnData
+      });
+    }
+  }
+
+  async handleBaselineInbound(turnData, context) {
+    console.log('AnimationEngine: Handling baseline inbound with new PassAnimationSystem');
+    
+    if (this.passSystem) {
+      await this.passSystem.processPass(turnData);
+      console.log('AnimationEngine: PassAnimationSystem completed for BASELINE_INBOUND');
+    } else {
+      console.warn('AnimationEngine: PassAnimationSystem not available, using fallback');
+      // Fallback to old system - use the same logic as side inbound for now
       const { runSideInboundSetup } = await import('./turnAnimation.js');
       await runSideInboundSetup({
         scene: this.scene,
