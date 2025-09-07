@@ -73,7 +73,7 @@ const createMockShotTurnData = (resultType = 'MAKE', shooterId = 'player1') => (
   index: 1,
   result_type: resultType,
   shooter_id: shooterId,
-  team_id: 'home_team',
+  possession_team_id: 'home_team',
   shot_type: 'jump_shot'
 });
 

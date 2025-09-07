@@ -397,7 +397,7 @@ export class ShotAnimationSystem {
    */
   getRimCoordinates(turnData) {
     // Determine which rim based on shot context
-    const isHomeTeam = turnData.team_id === this.scene.homeTeamId;
+    const isHomeTeam = turnData.possession_team_id === this.scene.homeTeamId;
     return isHomeTeam ? this.shotConfig.homeRim : this.shotConfig.awayRim;
   }
 
@@ -408,7 +408,7 @@ export class ShotAnimationSystem {
     return turnData && 
            turnData.result_type && 
            (turnData.result_type === 'MAKE' || turnData.result_type === 'MISS') &&
-           (turnData.shooter || turnData.ball_handler);
+           (turnData.shooter || turnData.ball_handler || turnData.shooter_id);
   }
 
   /**

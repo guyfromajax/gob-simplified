@@ -367,7 +367,7 @@ export class PassAnimationSystem {
     const courtHeight = this.scene.game.config.height;
     
     // Determine inbound side
-    const isHomeTeam = turnData.team_id === this.scene.homeTeamId;
+    const isHomeTeam = turnData.possession_team_id === this.scene.homeTeamId;
     const inboundX = isHomeTeam ? 50 : courtWidth - 50; // Near baseline
     const inboundY = courtHeight / 2; // Middle of court
     
@@ -379,7 +379,7 @@ export class PassAnimationSystem {
    */
   calculateFastBreakPosition(receiverSprite, turnData) {
     // Move receiver further down court for fast break
-    const isHomeTeam = turnData.team_id === this.scene.homeTeamId;
+    const isHomeTeam = turnData.possession_team_id === this.scene.homeTeamId;
     const fastBreakX = isHomeTeam ? 
       Math.min(receiverSprite.x + 40, this.passConfig.courtBounds.maxX) :
       Math.max(receiverSprite.x - 40, this.passConfig.courtBounds.minX);

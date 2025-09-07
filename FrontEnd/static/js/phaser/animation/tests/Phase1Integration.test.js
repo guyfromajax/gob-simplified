@@ -84,7 +84,7 @@ const createMockTurnData = (resultType, index = 1, additionalData = {}) => ({
   index,
   result_type: resultType,
   player_id: 'player1',
-  team_id: 'home',
+  possession_team_id: 'home',
   ...additionalData
 });
 

@@ -212,6 +212,7 @@ class ShotManager:
             "result_type": "MAKE" if made else "MISS",
             "ball_handler": shooter,
             "shooter": shooter,
+            "shooter_id": shooter.player_id,
             "screener": screener,
             "passer": passer,
             "defender": defender,

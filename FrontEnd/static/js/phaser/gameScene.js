@@ -182,6 +182,10 @@ export function createGameScene(Phaser) {
         localStorage.setItem('game_id', this.gameId);
       }
       gameStore.setGameId(this.gameId);
+      
+      // Set team IDs on scene for animation systems
+      this.homeTeamId = homeId;
+      this.awayTeamId = awayId;
       gameStore.setColors({
         home: simData.home_team_colors,
         away: simData.away_team_colors,
