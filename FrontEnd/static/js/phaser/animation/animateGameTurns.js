@@ -338,8 +338,36 @@ export async function animateGameTurns({ //hasBallAtStep
           console.error('❌ Both animation systems failed for shot:', turn.result_type, fallbackError);
         }
       }
+    } else if (turn.result_type === 'DREB' || turn.result_type === 'OREB') {
+      // Use new system for rebounds
+      console.log('🎬 Using new ReboundAnimationSystem for rebound:', turn.result_type);
+      
+      try {
+        // Use the new ReboundAnimationSystem for rebound animations
+        await animationRouter.processTurn(turn);
+        console.log('✅ ReboundAnimationSystem completed for rebound:', turn.result_type);
+      } catch (error) {
+        console.error('❌ ReboundAnimationSystem failed for rebound:', turn.result_type, error);
+        
+        // Fallback to old system if new system fails
+        console.log('🔄 Falling back to playTurnAnimation for rebound:', turn.result_type);
+        try {
+          const { playTurnAnimation } = await import('./turnAnimation.js');
+          await playTurnAnimation({
+            scene: scene,
+            simData: simData,
+            playerSprites: playerSprites,
+            turnData: turn,
+            ballSprite: ballSprite,
+            onAction: onUpdate
+          });
+          console.log('✅ playTurnAnimation fallback completed for rebound:', turn.result_type);
+        } catch (fallbackError) {
+          console.error('❌ Both animation systems failed for rebound:', turn.result_type, fallbackError);
+        }
+      }
     } else {
-      // Use old system for non-shot turns
+      // Use old system for other non-shot turns
       console.log('🎬 Using proven playTurnAnimation for turn:', turn.result_type);
       
       try {
