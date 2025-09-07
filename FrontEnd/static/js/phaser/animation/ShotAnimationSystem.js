@@ -571,8 +571,11 @@ export class ShotAnimationSystem {
    * Get rim coordinates based on shot context (converted to pixels)
    */
   getRimCoordinates(turnData) {
-    // Determine which rim based on shot context
-    const isHomeTeam = turnData.possession_team_id === this.scene.homeTeamId;
+    // Get shooter sprite to determine team
+    const shooterSprite = this.getShooterSprite(turnData);
+    
+    // Determine which rim based on shooter's team (like the old system)
+    const isHomeTeam = shooterSprite?.team === 'home';
     const gridRimCoords = isHomeTeam ? this.shotConfig.homeRim : this.shotConfig.awayRim;
     
     // Convert grid coordinates to pixel coordinates (like the old system does)
@@ -584,8 +587,8 @@ export class ShotAnimationSystem {
     );
     
     console.log('🎯 ShotAnimationSystem: Getting rim coordinates', {
-      possession_team_id: turnData.possession_team_id,
-      scene_homeTeamId: this.scene.homeTeamId,
+      shooter_id: turnData.shooter_id,
+      shooter_team: shooterSprite?.team,
       isHomeTeam,
       gridRimCoords,
       pixelRimCoords,
