@@ -491,8 +491,8 @@ export class ShotAnimationSystem {
       });
     }
 
-    // Animate players collapsing toward rebounder (after rebounder gets the ball)
-    await this.animatePlayerCollapse(rebounderSprite);
+    // Animate players collapsing toward rebound spot (after rebounder gets the ball)
+    await this.animatePlayerCollapse(rebounderSprite, { x: ballBounceX, y: ballBounceY });
 
     // Determine next action based on rebound type
     if (turnData.rebound_type === 'DREB') {
@@ -510,21 +510,43 @@ export class ShotAnimationSystem {
   }
 
   /**
-   * Animate players collapsing toward rebounder
+   * Animate players collapsing toward rebound spot
    */
-  async animatePlayerCollapse(rebounderSprite) {
+  async animatePlayerCollapse(rebounderSprite, ballBounceCoords) {
     return new Promise((resolve) => {
       const collapsePromises = [];
       
       // Get all player sprites
       const allPlayers = Object.values(this.playerSprites);
       
-      // Animate each player moving toward rebounder
+      // Convert ball bounce coords to grid for distance calculations
+      const bounceGridX = ballBounceCoords.x / (this.scene.game.config.width / 100);
+      const bounceGridY = ballBounceCoords.y / (this.scene.game.config.height / 100);
+      
+      console.log('🎬 ShotAnimationSystem: Multi-player rebound animation', {
+        bounceGrid: { x: bounceGridX, y: bounceGridY },
+        totalPlayers: allPlayers.length
+      });
+      
+      // Animate each player based on their distance from the basket
       allPlayers.forEach(playerSprite => {
-        if (playerSprite === rebounderSprite) return; // Skip rebounder
+        if (playerSprite === rebounderSprite) return; // Skip rebounder (handled separately)
         
-        const collapsePromise = this.animatePlayerCollapseToRebounder(playerSprite, rebounderSprite);
-        collapsePromises.push(collapsePromise);
+        // Convert player position to grid
+        const playerGridX = playerSprite.x / (this.scene.game.config.width / 100);
+        const playerGridY = playerSprite.y / (this.scene.game.config.height / 100);
+        
+        // Calculate distance from basket (using actual rim coords)
+        const rimCoords = this.getRimCoordinates(rebounderSprite, { possession_team_id: rebounderSprite.team === 'home' ? this.scene.homeTeamId : this.scene.awayTeamId });
+        const rimGridX = rimCoords.x / (this.scene.game.config.width / 100);
+        const rimGridY = rimCoords.y / (this.scene.game.config.height / 100);
+        const distanceFromBasket = Math.abs(playerGridX - rimGridX) + Math.abs(playerGridY - rimGridY);
+        
+        // Only animate players within 15 grid spots of the basket
+        if (distanceFromBasket <= 15) {
+          const collapsePromise = this.animatePlayerToReboundSpot(playerSprite, ballBounceCoords, bounceGridX, bounceGridY);
+          collapsePromises.push(collapsePromise);
+        }
       });
       
       // Wait for all collapse animations to complete
@@ -535,27 +557,40 @@ export class ShotAnimationSystem {
   }
 
   /**
-   * Animate individual player collapse to rebounder
+   * Animate individual player to rebound spot (within 10 grid spots of ball)
    */
-  async animatePlayerCollapseToRebounder(playerSprite, rebounderSprite) {
+  async animatePlayerToReboundSpot(playerSprite, ballBounceCoords, bounceGridX, bounceGridY) {
     return new Promise((resolve) => {
-      // Calculate collapse direction
-      const dx = rebounderSprite.x - playerSprite.x;
-      const dy = rebounderSprite.y - playerSprite.y;
-      const distance = Math.sqrt(dx * dx + dy * dy);
+      // Generate random position within 10 grid spots of the ball bounce
+      const maxDistance = 10;
+      const angle = Math.random() * 2 * Math.PI;
+      const distance = Math.random() * maxDistance;
       
-      // Limit collapse distance
-      const collapseDistance = Math.min(distance * 0.3, 40);
-      const collapseRatio = collapseDistance / distance;
+      const targetGridX = bounceGridX + Math.cos(angle) * distance;
+      const targetGridY = bounceGridY + Math.sin(angle) * distance;
       
-      const targetX = playerSprite.x + (dx * collapseRatio);
-      const targetY = playerSprite.y + (dy * collapseRatio);
+      // Convert back to pixel coordinates
+      const targetX = targetGridX * (this.scene.game.config.width / 100);
+      const targetY = targetGridY * (this.scene.game.config.height / 100);
+      
+      // Ensure target is within court bounds
+      const courtWidth = this.scene.game.config.width;
+      const courtHeight = this.scene.game.config.height;
+      const clampedX = Math.max(20, Math.min(courtWidth - 20, targetX));
+      const clampedY = Math.max(20, Math.min(courtHeight - 20, targetY));
+      
+      console.log('🎬 ShotAnimationSystem: Player moving to rebound spot', {
+        playerId: playerSprite.playerId,
+        from: { x: playerSprite.x, y: playerSprite.y },
+        to: { x: clampedX, y: clampedY },
+        ballSpot: { x: ballBounceCoords.x, y: ballBounceCoords.y }
+      });
       
       // Animate player movement
       const tween = this.scene.tweens.add({
         targets: playerSprite,
-        x: targetX,
-        y: targetY,
+        x: clampedX,
+        y: clampedY,
         duration: 500,
         ease: 'Power2',
         onComplete: () => {
@@ -698,18 +733,38 @@ export class ShotAnimationSystem {
   }
 
   /**
-   * Calculate bounce coordinates
+   * Calculate bounce coordinates with realistic variance
    */
   calculateBounceCoords(rimCoords, turnData) {
-    // Get court bounds
-    const courtWidth = this.scene.game.config.width;
-    const courtHeight = this.scene.game.config.height;
-
-    // Calculate random bounce within bounds
-    const bounceX = Math.max(20, Math.min(courtWidth - 20, 
-      rimCoords.x + (Math.random() - 0.5) * this.shotConfig.bounceDistance * 2));
-    const bounceY = Math.max(20, Math.min(courtHeight - 20,
-      rimCoords.y + (Math.random() - 0.5) * this.shotConfig.bounceDistance * 2));
+    // Get shooter sprite to determine which basket
+    const shooterSprite = this.getShooterSprite(turnData);
+    const isHomeTeam = shooterSprite?.team === 'home';
+    
+    // Convert rim coords back to grid for calculations
+    const rimGridX = Math.round(rimCoords.x / (this.scene.game.config.width / 100));
+    const rimGridY = Math.round(rimCoords.y / (this.scene.game.config.height / 100));
+    
+    // Y variance: -6 to +6 from basket y coord
+    const yVariance = (Math.random() - 0.5) * 12; // -6 to +6
+    const bounceGridY = rimGridY + yVariance;
+    
+    // X variance: 1-9 from basket x coord
+    // +1 to +9 for away team basket, -1 to -9 for home team basket
+    const xVariance = Math.random() * 9 + 1; // 1 to 9
+    const bounceGridX = isHomeTeam ? rimGridX - xVariance : rimGridX + xVariance;
+    
+    // Convert back to pixel coordinates
+    const bounceX = bounceGridX * (this.scene.game.config.width / 100);
+    const bounceY = bounceGridY * (this.scene.game.config.height / 100);
+    
+    console.log('🎯 ShotAnimationSystem: Bounce variance calculation', {
+      rimGrid: { x: rimGridX, y: rimGridY },
+      isHomeTeam,
+      xVariance,
+      yVariance,
+      bounceGrid: { x: bounceGridX, y: bounceGridY },
+      bouncePixels: { x: bounceX, y: bounceY }
+    });
 
     return { x: bounceX, y: bounceY };
   }
