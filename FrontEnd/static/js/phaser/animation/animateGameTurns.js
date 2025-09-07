@@ -257,60 +257,32 @@ export async function animateGameTurns({ //hasBallAtStep
 
     const shooterId = playerMap[shooterName];
 
-    // 🎯 HYBRID APPROACH: Use new system for shots, old system for everything else
-    if (turn.result_type === 'MAKE' || turn.result_type === 'MISS') {
-      console.log('🎬 Using new ShotAnimationSystem for shot:', turn.result_type);
+    // 🎯 HYBRID APPROACH: Use old animation system by default
+    // This ensures animations work immediately while preserving new architecture
+    console.log('🎬 Using proven playTurnAnimation for turn:', turn.result_type);
+    
+    try {
+      const { playTurnAnimation } = await import('./turnAnimation.js');
+      await playTurnAnimation({
+        scene: scene,
+        simData: simData,
+        playerSprites: playerSprites,
+        turnData: turn,
+        ballSprite: ballSprite,
+        onAction: onUpdate
+      });
+      console.log('✅ playTurnAnimation completed for turn:', turn.result_type);
+    } catch (error) {
+      console.error('❌ playTurnAnimation failed for turn:', turn.result_type, error);
       
+      // Fallback to new system if old system fails
+      console.log('🔄 Falling back to new AnimationRouter for turn:', turn.result_type);
       try {
-        // Use the new ShotAnimationSystem for shot animations
         await animationRouter.processTurn(turn);
-        console.log('✅ ShotAnimationSystem completed for shot:', turn.result_type);
-      } catch (error) {
-        console.error('❌ ShotAnimationSystem failed for shot:', turn.result_type, error);
-        
-        // Fallback to old system if new system fails
-        console.log('🔄 Falling back to playTurnAnimation for shot:', turn.result_type);
-        try {
-          const { playTurnAnimation } = await import('./turnAnimation.js');
-          await playTurnAnimation({
-            scene: scene,
-            simData: simData,
-            playerSprites: playerSprites,
-            turnData: turn,
-            ballSprite: ballSprite,
-            onAction: onUpdate
-          });
-          console.log('✅ playTurnAnimation fallback completed for shot:', turn.result_type);
-        } catch (fallbackError) {
-          console.error('❌ Both animation systems failed for shot:', turn.result_type, fallbackError);
-        }
-      }
-    } else {
-      // Use old system for non-shot turns
-      console.log('🎬 Using proven playTurnAnimation for turn:', turn.result_type);
-      
-      try {
-        const { playTurnAnimation } = await import('./turnAnimation.js');
-        await playTurnAnimation({
-          scene: scene,
-          simData: simData,
-          playerSprites: playerSprites,
-          turnData: turn,
-          ballSprite: ballSprite,
-          onAction: onUpdate
-        });
-        console.log('✅ playTurnAnimation completed for turn:', turn.result_type);
-      } catch (error) {
-        console.error('❌ playTurnAnimation failed for turn:', turn.result_type, error);
-        
-        // Fallback to new system if old system fails
-        console.log('🔄 Falling back to new AnimationRouter for turn:', turn.result_type);
-        try {
-          await animationRouter.processTurn(turn);
-          console.log('✅ AnimationRouter fallback completed for turn:', turn.result_type);
-        } catch (fallbackError) {
-          console.error('❌ Both animation systems failed for turn:', turn.result_type, fallbackError);
-        }
+        console.log('✅ AnimationRouter fallback completed for turn:', turn.result_type);
+      } catch (fallbackError) {
+        console.error('❌ Both animation systems failed for turn:', turn.result_type, fallbackError);
+        // Continue to next turn - don't let one failed turn stop the whole game
       }
     }
 
