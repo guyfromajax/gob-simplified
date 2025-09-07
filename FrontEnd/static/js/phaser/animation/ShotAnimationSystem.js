@@ -16,6 +16,9 @@
 
 import { AnimationStates } from './SimplifiedStateMachine.js';
 import { DebugFlags } from '../utils/debugFlags.js';
+import { gridToPixels } from '../utils/gridToPixels.js';
+import { animateStep } from './animateStep.js';
+import { attachBallToPlayer } from './ballManager.js';
 
 export class ShotAnimationSystem {
   constructor(scene, ballController, stateMachine, playerSprites, gameStore) {
@@ -53,7 +56,7 @@ export class ShotAnimationSystem {
   }
 
   /**
-   * Process a shot turn
+   * Process a shot turn with complete player movement
    */
   async processShot(turnData) {
     if (this.activeShot) {
@@ -97,18 +100,8 @@ export class ShotAnimationSystem {
       
       console.log('✅ ShotAnimationSystem: Shot data validation passed');
 
-      // Get shooter sprite
-      const shooterSprite = this.getShooterSprite(turnData);
-      if (!shooterSprite) {
-        throw new Error('Shooter sprite not found');
-      }
-      
-      // Determine shot outcome
-      const isMake = turnData.result_type === 'MAKE';
-      const rimCoords = this.getRimCoordinates(turnData);
-
-      // Execute shot sequence
-      await this.executeShotSequence(shooterSprite, rimCoords, isMake, turnData);
+      // Execute complete shot sequence with player movement
+      await this.executeCompleteShotSequence(turnData);
 
       // Process any queued shots
       await this.processShotQueue();
@@ -122,28 +115,182 @@ export class ShotAnimationSystem {
   }
 
   /**
-   * Execute the complete shot sequence
+   * Execute complete shot sequence with player movement
    */
-  async executeShotSequence(shooterSprite, rimCoords, isMake, turnData) {
-    // 1. Transition to SHOOTING state
-    this.stateMachine.transition(AnimationStates.SHOOTING, {
-      reason: 'shot_initiated',
-      shooter_id: turnData.shooter_id,
-      shot_type: turnData.shot_type
+  async executeCompleteShotSequence(turnData) {
+    const ballSprite = this.ballController.ballSprite;
+    const currentBallOwnerRef = { value: null };
+    
+    // Store reference on scene for other modules
+    this.scene.currentBallOwnerRef = currentBallOwnerRef;
+    
+    // Get maximum steps across all animations
+    const maxSteps = Math.max(
+      ...turnData.animations.map(anim => anim.movement.length)
+    );
+    
+    console.log('🎬 ShotAnimationSystem: Starting complete shot sequence', {
+      maxSteps,
+      animationCount: turnData.animations.length
     });
-
-    // 2. Detach ball from shooter
-    this.ballController.detachFromPlayer('shot');
-
-    // 3. Start ball flight to rim
-    await this.animateBallFlight(shooterSprite, rimCoords, turnData);
-
+    
+    // 1. Setup: Move players to step 0 positions
+    await this.runSetupTween(turnData, ballSprite, currentBallOwnerRef);
+    
+    // 2. Determine ball owner at step 0
+    let step0OwnerSprite = null;
+    for (const anim of turnData.animations) {
+      if (anim.hasBallAtStep?.[0]) {
+        step0OwnerSprite = this.playerSprites[anim.playerId];
+        break;
+      }
+    }
+    
+    if (step0OwnerSprite) {
+      attachBallToPlayer(this.scene, ballSprite, step0OwnerSprite);
+      currentBallOwnerRef.value = step0OwnerSprite;
+    }
+    
+    // 3. Animate step-by-step player movement
+    await this.animatePlayerMovement(turnData, ballSprite, currentBallOwnerRef, maxSteps);
+    
     // 4. Handle shot outcome
+    const isMake = turnData.result_type === 'MAKE';
+    const rimCoords = this.getRimCoordinates(turnData);
+    
     if (isMake) {
       await this.handleMadeShot(rimCoords, turnData);
     } else {
       await this.handleMissedShot(rimCoords, turnData);
     }
+  }
+  
+  /**
+   * Move all players to their step 0 positions
+   */
+  async runSetupTween(turnData, ballSprite, currentBallOwnerRef) {
+    if (this.scene.skipToEnd) return;
+    
+    const stepIndex = 0;
+    const promises = [];
+    
+    console.log('🎬 ShotAnimationSystem: Running setup tween for step 0');
+    
+    for (const anim of turnData.animations) {
+      if (this.scene.skipToEnd) break;
+      const sprite = this.playerSprites[anim.playerId];
+      const firstStep = anim.movement?.[stepIndex];
+      if (!sprite || !firstStep) continue;
+      
+      const { x, y } = gridToPixels(
+        firstStep.coords.x,
+        firstStep.coords.y,
+        this.scene.game.config.width,
+        this.scene.game.config.height
+      );
+      
+      promises.push(new Promise((resolve) => {
+        const tween = this.scene.tweens.add({
+          targets: [sprite],
+          x,
+          y,
+          duration: 1000,
+          ease: "Linear",
+          onUpdate: () => {
+            if (currentBallOwnerRef?.value === sprite && ballSprite?.setPosition) {
+              ballSprite.setPosition(sprite.x, sprite.y);
+              ballSprite.setVisible(true);
+            }
+          },
+          onComplete: resolve,
+          onStop: resolve
+        });
+        if (this.scene.skipToEnd) {
+          tween.stop();
+        }
+      }));
+    }
+    
+    await Promise.all(promises);
+    console.log('✅ ShotAnimationSystem: Setup tween completed');
+  }
+  
+  /**
+   * Animate player movement step by step
+   */
+  async animatePlayerMovement(turnData, ballSprite, currentBallOwnerRef, maxSteps) {
+    if (this.scene.skipToEnd) return;
+    
+    console.log('🎬 ShotAnimationSystem: Starting player movement animation');
+    
+    for (let stepIndex = 1; stepIndex < maxSteps; stepIndex++) {
+      if (this.scene.skipToEnd) break;
+      
+      const promises = [];
+      let shotInfo = null;
+      
+      for (const anim of turnData.animations) {
+        if (this.scene.skipToEnd) break;
+        const sprite = this.playerSprites[anim.playerId];
+        const movement = anim.movement;
+        
+        if (!sprite || stepIndex >= movement.length) continue;
+        
+        const prev = movement[stepIndex - 1];
+        const curr = movement[stepIndex];
+        const step = prev;
+        const nextStep = curr;
+        const rawDuration = (nextStep.timestamp - step.timestamp) * 3;
+        const duration = Math.min(1000, rawDuration); // Cap at 1 second
+        
+        if (nextStep.action === "shoot") {
+          shotInfo = { step: nextStep, playerId: anim.playerId, stepIndex };
+        }
+        
+        const promise = animateStep({
+          scene: this.scene,
+          sprite,
+          step: nextStep,
+          duration,
+          ballSprite,
+          currentBallOwnerRef,
+          onAction: null // We'll handle actions separately
+        });
+        
+        promises.push(promise);
+      }
+      
+      await Promise.all(promises);
+      
+      // Handle shot if this step contains one
+      if (shotInfo) {
+        currentBallOwnerRef.value = null;
+        await this.handleShotAtStep(shotInfo, turnData);
+      }
+    }
+    
+    console.log('✅ ShotAnimationSystem: Player movement animation completed');
+  }
+  
+  /**
+   * Handle shot at a specific step
+   */
+  async handleShotAtStep(shotInfo, turnData) {
+    const shooterSprite = this.playerSprites[shotInfo.playerId];
+    const rimCoords = this.getRimCoordinates(turnData);
+    const isMake = turnData.result_type === 'MAKE';
+    
+    console.log('🎯 ShotAnimationSystem: Handling shot at step', {
+      stepIndex: shotInfo.stepIndex,
+      shooterId: shotInfo.playerId,
+      isMake
+    });
+    
+    // Detach ball from shooter
+    this.ballController.detachFromPlayer('shot');
+    
+    // Animate ball flight
+    await this.animateBallFlight(shooterSprite, rimCoords, turnData);
   }
 
   /**
@@ -159,15 +306,15 @@ export class ShotAnimationSystem {
         return;
       }
 
+      console.log('🎯 ShotAnimationSystem: Starting ball flight', {
+        from: { x: shooterSprite.x, y: shooterSprite.y },
+        to: rimCoords,
+        shooterId: turnData.shooter_id
+      });
+
       // Position ball at shooter
       ballSprite.setPosition(shooterSprite.x, shooterSprite.y - 10);
       ballSprite.setVisible(true);
-
-      // Start flight
-      this.ballController.startFlight(rimCoords, {
-        duration: this.shotConfig.flightDuration,
-        ease: this.shotConfig.flightEase
-      });
 
       // Animate ball to rim
       const tween = this.scene.tweens.add({
