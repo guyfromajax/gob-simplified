@@ -199,7 +199,7 @@ export class AnimationEngine {
     console.log('AnimationEngine: Handling side inbound with new PassAnimationSystem');
     
     if (this.passSystem) {
-      await this.passSystem.processPass(turnData);
+      await this.passSystem.processPass(turnData, context);
       console.log('AnimationEngine: PassAnimationSystem completed for SIDE_INBOUND');
     } else {
       console.warn('AnimationEngine: PassAnimationSystem not available, using fallback');
@@ -218,7 +218,7 @@ export class AnimationEngine {
     console.log('AnimationEngine: Handling baseline inbound with new PassAnimationSystem');
     
     if (this.passSystem) {
-      await this.passSystem.processPass(turnData);
+      await this.passSystem.processPass(turnData, context);
       console.log('AnimationEngine: PassAnimationSystem completed for BASELINE_INBOUND');
     } else {
       console.warn('AnimationEngine: PassAnimationSystem not available, using fallback');

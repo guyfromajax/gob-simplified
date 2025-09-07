@@ -69,7 +69,7 @@ export class PassAnimationSystem {
   /**
    * Process a pass turn
    */
-  async processPass(turnData) {
+  async processPass(turnData, context = {}) {
     console.log('🎬 PassAnimationSystem: Starting pass processing', {
       result_type: turnData.result_type,
       activePass: !!this.activePass
@@ -100,7 +100,7 @@ export class PassAnimationSystem {
       // Handle inbound passes differently from regular passes
       if (turnData.result_type === 'SIDE_INBOUND' || turnData.result_type === 'BASELINE_INBOUND') {
         console.log('🎬 PassAnimationSystem: Processing inbound pass with positioning data');
-        await this.executeInboundSequence(turnData);
+        await this.executeInboundSequence(turnData, context);
       } else {
         // Regular pass logic
         const passerSprite = this.getPasserSprite(turnData);
@@ -352,7 +352,7 @@ export class PassAnimationSystem {
   /**
    * Execute inbound pass sequence using positioning data
    */
-  async executeInboundSequence(turnData) {
+  async executeInboundSequence(turnData, context = {}) {
     console.log('🎬 PassAnimationSystem: Executing inbound sequence', {
       result_type: turnData.result_type,
       oDestinations: turnData.oDestinations,
@@ -380,7 +380,7 @@ export class PassAnimationSystem {
         
         await runInboundSetup({
           scene: this.scene,
-          ballSprite: this.ballSprite,
+          ballSprite: context.ballSprite,
           playerSprites: this.playerSprites,
           newOffenseSide: newOffenseSide,
           homeTeamId: this.scene.homeTeamId,
@@ -391,7 +391,7 @@ export class PassAnimationSystem {
         console.log('🎯 PassAnimationSystem: Using runSideInboundSetup for side inbound');
         await runSideInboundSetup({
           scene: this.scene,
-          ballSprite: this.ballSprite,
+          ballSprite: context.ballSprite,
           playerSprites: this.playerSprites,
           turnData: turnData
         });

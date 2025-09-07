@@ -85,6 +85,9 @@ export function createGameScene(Phaser) {
 
     async create() {
       if (DEBUG_FLOW) console.log("🎬 GameScene created");
+      
+      // Run structure validation for inbound passes
+      this.runStructureValidation();
 
       const homeStatsEl = document.getElementById('home-stats-body');
       const awayStatsEl = document.getElementById('away-stats-body');
@@ -690,6 +693,35 @@ export function createGameScene(Phaser) {
           DEBUG_FLOW && console.log('skipToEnd at navigation:', this.skipToEnd);
           window.location.href = `/static/set-lineup.html?${params.toString()}`;
         }
+      }
+    }
+
+    /**
+     * Run structure validation for inbound pass system
+     */
+    runStructureValidation() {
+      try {
+        console.log('🔍 Running inbound pass structure validation...');
+        
+        // Import and run validation
+        import('./animation/validateStructure.js').then(module => {
+          const result = module.validateInboundPassStructure();
+          
+          if (result.isValid) {
+            console.log('✅ Inbound pass structure validation passed!');
+          } else {
+            console.log('❌ Inbound pass structure validation failed:');
+            result.issues.forEach(issue => {
+              console.log(`   - ${issue}`);
+            });
+            console.log('💡 Check the PotentialIssues.md file for solutions');
+          }
+        }).catch(error => {
+          console.log('⚠️ Could not run structure validation:', error.message);
+        });
+        
+      } catch (error) {
+        console.log('⚠️ Structure validation error:', error.message);
       }
     }
   };
