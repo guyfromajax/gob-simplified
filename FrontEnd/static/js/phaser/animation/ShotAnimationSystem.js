@@ -411,20 +411,234 @@ export class ShotAnimationSystem {
    * Handle missed shot
    */
   async handleMissedShot(rimCoords, turnData) {
-    if (DebugFlags.SHOT_ANIMATION) {
-      console.log('ShotAnimationSystem: Shot missed', {
-        shooter_id: turnData.shooter_id,
-        shot_type: turnData.shot_type
-      });
-    }
+    console.log('ShotAnimationSystem: Shot missed', {
+      shooter_id: turnData.shooter_id,
+      shot_type: turnData.shot_type,
+      rebounderId: turnData.rebounderId,
+      rebound_type: turnData.rebound_type
+    });
 
     // Animate ball bounce from rim
     await this.animateBallBounce(rimCoords, turnData);
 
-    // Transition to REBOUNDING state
-    this.stateMachine.transition(AnimationStates.REBOUNDING, {
-      reason: 'shot_missed',
-      shooter_id: turnData.shooter_id
+    // Check if this shot turn includes rebound data
+    if (turnData.rebounderId && turnData.rebound_type) {
+      console.log('🎬 ShotAnimationSystem: Handling embedded rebound', {
+        rebounderId: turnData.rebounderId,
+        rebound_type: turnData.rebound_type
+      });
+      
+      // Handle the rebound within the shot turn
+      await this.handleEmbeddedRebound(turnData);
+    } else {
+      // Transition to REBOUNDING state (fallback)
+      this.stateMachine.transition(AnimationStates.REBOUNDING, {
+        reason: 'shot_missed',
+        shooter_id: turnData.shooter_id
+      });
+    }
+  }
+
+  /**
+   * Handle rebound that's embedded within a shot turn
+   */
+  async handleEmbeddedRebound(turnData) {
+    console.log('🎬 ShotAnimationSystem: Processing embedded rebound', {
+      rebounderId: turnData.rebounderId,
+      rebound_type: turnData.rebound_type
+    });
+
+    // Get the rebounder sprite
+    const rebounderSprite = this.playerSprites[turnData.rebounderId];
+    if (!rebounderSprite) {
+      console.error('ShotAnimationSystem: Rebounder sprite not found', turnData.rebounderId);
+      return;
+    }
+
+    // Animate ball to rebounder
+    const ballSprite = this.ballController.ballSprite;
+    if (ballSprite) {
+      // Make ball visible if it was hidden
+      ballSprite.setVisible(true);
+      
+      // Animate ball to rebounder
+      this.scene.tweens.add({
+        targets: ballSprite,
+        x: rebounderSprite.x,
+        y: rebounderSprite.y - 10,
+        duration: 400,
+        ease: 'Power2',
+        onComplete: () => {
+          // Attach ball to rebounder
+          this.ballController.attachToPlayer(rebounderSprite, {
+            offset: { x: 0, y: -10 }
+          });
+        }
+      });
+    }
+
+    // Animate players collapsing toward rebounder
+    await this.animatePlayerCollapse(rebounderSprite);
+
+    // Determine next action based on rebound type
+    if (turnData.rebound_type === 'DREB') {
+      await this.handleDefensiveRebound(rebounderSprite, turnData);
+    } else if (turnData.rebound_type === 'OREB') {
+      await this.handleOffensiveRebound(rebounderSprite, turnData);
+    }
+
+    // Transition to POSSESSION state
+    this.stateMachine.transition(AnimationStates.POSSESSION, {
+      reason: 'rebound_complete',
+      rebounder_id: turnData.rebounderId,
+      rebound_type: turnData.rebound_type
+    });
+  }
+
+  /**
+   * Animate players collapsing toward rebounder
+   */
+  async animatePlayerCollapse(rebounderSprite) {
+    return new Promise((resolve) => {
+      const collapsePromises = [];
+      
+      // Get all player sprites
+      const allPlayers = Object.values(this.playerSprites);
+      
+      // Animate each player moving toward rebounder
+      allPlayers.forEach(playerSprite => {
+        if (playerSprite === rebounderSprite) return; // Skip rebounder
+        
+        const collapsePromise = this.animatePlayerCollapseToRebounder(playerSprite, rebounderSprite);
+        collapsePromises.push(collapsePromise);
+      });
+      
+      // Wait for all collapse animations to complete
+      Promise.all(collapsePromises).then(() => {
+        resolve();
+      });
+    });
+  }
+
+  /**
+   * Animate individual player collapse to rebounder
+   */
+  async animatePlayerCollapseToRebounder(playerSprite, rebounderSprite) {
+    return new Promise((resolve) => {
+      // Calculate collapse direction
+      const dx = rebounderSprite.x - playerSprite.x;
+      const dy = rebounderSprite.y - playerSprite.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      
+      // Limit collapse distance
+      const collapseDistance = Math.min(distance * 0.3, 40);
+      const collapseRatio = collapseDistance / distance;
+      
+      const targetX = playerSprite.x + (dx * collapseRatio);
+      const targetY = playerSprite.y + (dy * collapseRatio);
+      
+      // Animate player movement
+      const tween = this.scene.tweens.add({
+        targets: playerSprite,
+        x: targetX,
+        y: targetY,
+        duration: 500,
+        ease: 'Power2',
+        onComplete: () => {
+          resolve();
+        }
+      });
+    });
+  }
+
+  /**
+   * Handle defensive rebound
+   */
+  async handleDefensiveRebound(rebounderSprite, turnData) {
+    console.log('🎬 ShotAnimationSystem: Handling defensive rebound');
+    
+    // Move PG to outlet position
+    const pgSprite = this.findPointGuard(rebounderSprite.team);
+    if (pgSprite) {
+      await this.animatePGToOutlet(pgSprite, rebounderSprite);
+      
+      // Execute outlet pass
+      await this.executeOutletPass(rebounderSprite, pgSprite);
+    }
+  }
+
+  /**
+   * Handle offensive rebound
+   */
+  async handleOffensiveRebound(rebounderSprite, turnData) {
+    console.log('🎬 ShotAnimationSystem: Handling offensive rebound');
+    
+    // For now, just keep the ball with the rebounder
+    // Future: handle putback attempts or kickouts
+  }
+
+  /**
+   * Find point guard by team
+   */
+  findPointGuard(team) {
+    return Object.values(this.playerSprites).find(sprite => 
+      sprite.team === team && sprite.position === 'PG'
+    );
+  }
+
+  /**
+   * Animate PG to outlet position
+   */
+  async animatePGToOutlet(pgSprite, rebounderSprite) {
+    return new Promise((resolve) => {
+      // Calculate outlet position (near rebounder)
+      const outletX = rebounderSprite.x + (Math.random() - 0.5) * 20;
+      const outletY = rebounderSprite.y + (Math.random() - 0.5) * 20;
+      
+      const tween = this.scene.tweens.add({
+        targets: pgSprite,
+        x: outletX,
+        y: outletY,
+        duration: 600,
+        ease: 'Power2',
+        onComplete: () => {
+          resolve();
+        }
+      });
+    });
+  }
+
+  /**
+   * Execute outlet pass
+   */
+  async executeOutletPass(passerSprite, receiverSprite) {
+    return new Promise((resolve) => {
+      // Detach ball from passer
+      this.ballController.detachFromPlayer('outlet_pass');
+      
+      // Start ball flight
+      this.ballController.startFlight({
+        x: receiverSprite.x,
+        y: receiverSprite.y - 10
+      });
+      
+      // Animate ball to receiver
+      const ballSprite = this.ballController.ballSprite;
+      const tween = this.scene.tweens.add({
+        targets: ballSprite,
+        x: receiverSprite.x,
+        y: receiverSprite.y - 10,
+        duration: 400,
+        ease: 'Power2',
+        onComplete: () => {
+          // Attach ball to receiver
+          this.ballController.endFlight(receiverSprite);
+          resolve();
+        },
+        onUpdate: () => {
+          this.ballController.updatePosition(ballSprite.x, ballSprite.y);
+        }
+      });
     });
   }
 
