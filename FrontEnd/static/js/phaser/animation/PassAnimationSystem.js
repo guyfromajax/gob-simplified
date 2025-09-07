@@ -97,19 +97,25 @@ export class PassAnimationSystem {
         throw new Error('Invalid pass data');
       }
 
-      // Get passer and receiver sprites
-      const passerSprite = this.getPasserSprite(turnData);
-      const receiverSprite = this.getReceiverSprite(turnData);
-      
-      if (!passerSprite) {
-        throw new Error('Passer sprite not found');
-      }
-      if (!receiverSprite) {
-        throw new Error('Receiver sprite not found');
-      }
+      // Handle inbound passes differently from regular passes
+      if (turnData.result_type === 'SIDE_INBOUND' || turnData.result_type === 'BASELINE_INBOUND') {
+        console.log('🎬 PassAnimationSystem: Processing inbound pass with positioning data');
+        await this.executeInboundSequence(turnData);
+      } else {
+        // Regular pass logic
+        const passerSprite = this.getPasserSprite(turnData);
+        const receiverSprite = this.getReceiverSprite(turnData);
+        
+        if (!passerSprite) {
+          throw new Error('Passer sprite not found');
+        }
+        if (!receiverSprite) {
+          throw new Error('Receiver sprite not found');
+        }
 
-      // Execute pass sequence
-      await this.executePassSequence(passerSprite, receiverSprite, turnData);
+        // Execute pass sequence
+        await this.executePassSequence(passerSprite, receiverSprite, turnData);
+      }
 
       // Process any queued passes
       await this.processPassQueue();
@@ -344,6 +350,39 @@ export class PassAnimationSystem {
   }
 
   /**
+   * Execute inbound pass sequence using positioning data
+   */
+  async executeInboundSequence(turnData) {
+    console.log('🎬 PassAnimationSystem: Executing inbound sequence', {
+      result_type: turnData.result_type,
+      oDestinations: turnData.oDestinations,
+      dDestinations: turnData.dDestinations,
+      ball_spot: turnData.ball_spot
+    });
+
+    try {
+      // For now, we'll use the old system's inbound logic as a fallback
+      // This ensures we get working animations while we develop the new system
+      console.log('🔄 PassAnimationSystem: Using fallback inbound animation');
+      
+      // Import and use the old inbound setup
+      const { runSideInboundSetup } = await import('./turnAnimation.js');
+      await runSideInboundSetup({
+        scene: this.scene,
+        ballSprite: this.ballSprite,
+        playerSprites: this.playerSprites,
+        turnData: turnData
+      });
+      
+      console.log('✅ PassAnimationSystem: Inbound sequence completed');
+      
+    } catch (error) {
+      console.error('❌ PassAnimationSystem: Inbound sequence failed', error);
+      throw error;
+    }
+  }
+
+  /**
    * Handle failed pass (turnover)
    */
   async handleFailedPass(turnData) {
@@ -416,17 +455,35 @@ export class PassAnimationSystem {
       passer_id: turnData.passer_id,
       player_id: turnData.player_id,
       receiver_id: turnData.receiver_id,
+      oDestinations: turnData.oDestinations,
+      dDestinations: turnData.dDestinations,
+      ball_spot: turnData.ball_spot,
       allKeys: Object.keys(turnData),
       fullTurnData: turnData
     });
     
-    const isValid = turnData && 
-           (turnData.passer_id || turnData.player_id) &&
-           turnData.receiver_id &&
-           (turnData.result_type === 'MAKE' || turnData.result_type === 'MISS' || turnData.result_type === 'SIDE_INBOUND' || turnData.result_type === 'BASELINE_INBOUND');
-           
-    console.log('✅ PassAnimationSystem: Pass data validation result:', isValid);
-    return isValid;
+    // For regular passes (MAKE/MISS), check for passer and receiver
+    if (turnData.result_type === 'MAKE' || turnData.result_type === 'MISS') {
+      const isValid = turnData && 
+             (turnData.passer_id || turnData.player_id) &&
+             turnData.receiver_id;
+      console.log('✅ PassAnimationSystem: Regular pass validation result:', isValid);
+      return isValid;
+    }
+    
+    // For inbound passes (SIDE_INBOUND/BASELINE_INBOUND), check for positioning data
+    if (turnData.result_type === 'SIDE_INBOUND' || turnData.result_type === 'BASELINE_INBOUND') {
+      const isValid = turnData && 
+             turnData.oDestinations &&
+             turnData.dDestinations &&
+             turnData.ball_spot &&
+             turnData.possession_team_id;
+      console.log('✅ PassAnimationSystem: Inbound pass validation result:', isValid);
+      return isValid;
+    }
+    
+    console.log('✅ PassAnimationSystem: Unknown pass type validation result: false');
+    return false;
   }
 
   /**
