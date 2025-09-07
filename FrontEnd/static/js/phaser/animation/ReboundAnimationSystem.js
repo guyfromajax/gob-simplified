@@ -63,6 +63,14 @@ export class ReboundAnimationSystem {
    * Process a rebound turn
    */
   async processRebound(turnData) {
+    console.log('ReboundAnimationSystem: processRebound called', {
+      result_type: turnData.result_type,
+      rebounder_id: turnData.rebounder_id,
+      rebounderId: turnData.rebounderId,
+      rebound_type: turnData.rebound_type,
+      allKeys: Object.keys(turnData)
+    });
+
     if (this.activeRebound) {
       console.warn('ReboundAnimationSystem: Already processing a rebound, queuing...');
       this.reboundQueue.push(turnData);
@@ -72,16 +80,15 @@ export class ReboundAnimationSystem {
     this.activeRebound = turnData;
     
     try {
-      if (DebugFlags.REBOUND_ANIMATION) {
-        console.log('ReboundAnimationSystem: Processing rebound', {
-          rebounder_id: turnData.rebounder_id,
-          rebound_type: turnData.rebound_type,
-          result_type: turnData.result_type
-        });
-      }
+      console.log('ReboundAnimationSystem: Processing rebound', {
+        rebounder_id: turnData.rebounder_id,
+        rebound_type: turnData.rebound_type,
+        result_type: turnData.result_type
+      });
 
       // Validate rebound data
       if (!this.validateReboundData(turnData)) {
+        console.error('ReboundAnimationSystem: Validation failed', turnData);
         throw new Error('Invalid rebound data');
       }
 

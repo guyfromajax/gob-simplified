@@ -68,31 +68,15 @@ export class AnimationEngine {
     this.isProcessing = true;
 
     try {
-      console.log('🎬 AnimationEngine: Processing turn', {
-        result_type: turnData.result_type,
-        fast_break: turnData.fast_break,
-        turn_index: turnData.index,
-        hasShotSystem: !!this.shotSystem,
-        hasPassSystem: !!this.passSystem,
-        hasReboundSystem: !!this.reboundSystem,
-        hasFreeThrowSystem: !!this.freeThrowSystem
-      });
+      console.log('🎬 AnimationEngine: Processing turn', turnData.result_type);
 
       // Determine the appropriate handler
       const handler = this.determineHandler(turnData);
-      console.log('🎯 AnimationEngine: Determined handler', { 
-        result_type: turnData.result_type,
-        handlerName: handler.name 
-      });
+      console.log('🎯 AnimationEngine: Using handler for', turnData.result_type);
       
       // Execute the animation
-      console.log('🚀 AnimationEngine: Executing handler');
       await handler(turnData, context);
-      console.log('✅ AnimationEngine: Handler completed');
-
-      console.log('🎉 AnimationEngine: Turn processing complete', {
-        result_type: turnData.result_type
-      });
+      console.log('✅ AnimationEngine: Completed', turnData.result_type);
 
     } catch (error) {
       console.error('❌ AnimationEngine: Error processing turn', {
@@ -279,7 +263,13 @@ export class AnimationEngine {
   }
 
   async handleRebound(turnData, context) {
-    console.log('AnimationEngine: Handling rebound with new ReboundAnimationSystem');
+    console.log('AnimationEngine: Handling rebound with new ReboundAnimationSystem', {
+      result_type: turnData.result_type,
+      rebounder_id: turnData.rebounder_id,
+      rebounderId: turnData.rebounderId,
+      rebound_type: turnData.rebound_type,
+      hasReboundSystem: !!this.reboundSystem
+    });
     
     // Use new rebound animation system if available
     if (this.reboundSystem) {
