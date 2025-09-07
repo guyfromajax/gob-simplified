@@ -139,6 +139,87 @@ class TurnManager:
 
         return payload
 
+    def setup_baseline_inbound(self):
+        """
+        Prepare coordinates for a baseline inbound following a made shot.
+        The opposing team gets the ball and starts their possession from the baseline.
+
+        Returns a payload describing offensive and defensive destination
+        coordinates which the front-end can use to animate the inbound
+        sequence.
+        """
+
+        game = self.game
+        offense_team = game.offense_team
+        defense_team = game.defense_team
+        aggression = defense_team.strategy_calls.get("aggression_call", "normal")
+        is_away_offense = offense_team.team_id == game.away_team.team_id
+
+        self.logger.log("baselineInbound:start")
+
+        # Baseline spot for the inbounder (PG). These coordinates assume the
+        # home team is on offense. They will be mirrored if the away team has
+        # the ball.
+        inbound_spot_home = {"x": 50, "y": 25}  # Center baseline
+
+        # Destination ranges for other offensive players (home orientation).
+        home_ranges = {
+            "SG": {"x": (52, 56), "y": (22, 28)},
+            "SF": {"x": (54, 58), "y": (18, 32)},
+            "PF": {"x": (54, 58), "y": (30, 36)},
+            "C":  {"x": (54, 58), "y": (14, 20)},
+        }
+
+        o_dest_home = {}
+        for pos, ranges in home_ranges.items():
+            o_dest_home[pos] = {
+                "x": random.randint(*ranges["x"]),
+                "y": random.randint(*ranges["y"]),
+            }
+            self.logger.log(f"destAssigned:{pos}")
+
+        # Inbounder (PG) stays at the inbound spot
+        o_dest_home["PG"] = inbound_spot_home.copy()
+
+        # Flip offensive coordinates if the away team has possession
+        o_dest = getAwayTeamCoords(o_dest_home.copy()) if is_away_offense else o_dest_home
+
+        # Determine ball-handler (PG) coordinates in actual orientation
+        bh_coords = o_dest["PG"]
+
+        # --- Defensive positioning ---
+        self.logger.log("defenseUpdate:start")
+        d_dest = {}
+        for pos, defender in defense_team.lineup.items():
+            if pos == "PG":
+                d_coords = assign_bh_defender_coords(
+                    bh_coords, aggression, is_away_offense
+                )
+                if is_away_offense:
+                    d_coords = getAwayTeamCoords({"tmp": d_coords})["tmp"]
+                d_dest[pos] = d_coords
+            elif pos in o_dest:
+                o_coords = o_dest[pos]
+                # Convert offensive coords back to home orientation for calc
+                o_calc = getAwayTeamCoords({"tmp": o_coords})["tmp"] if is_away_offense else o_coords
+                d_coords = assign_non_bh_defender_coords(
+                    o_calc, bh_coords, aggression, is_away_offense
+                )
+                if is_away_offense:
+                    d_coords = getAwayTeamCoords({"tmp": d_coords})["tmp"]
+                d_dest[pos] = d_coords
+        self.logger.log("defenseUpdate:end")
+
+        payload = {
+            "result_type": "BASELINE_INBOUND",
+            "ball_spot": getAwayTeamCoords({"tmp": inbound_spot_home})["tmp"] if is_away_offense else inbound_spot_home,
+            "oDestinations": o_dest,
+            "dDestinations": d_dest,
+            "possession_team_id": offense_team.team_id,
+        }
+
+        return payload
+
     def run_micro_turn(self):
         # Increment micro turn counter
         self.game.micro_turn_count += 1

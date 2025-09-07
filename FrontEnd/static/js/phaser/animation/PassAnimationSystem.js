@@ -423,7 +423,7 @@ export class PassAnimationSystem {
     const isValid = turnData && 
            (turnData.passer_id || turnData.player_id) &&
            turnData.receiver_id &&
-           (turnData.result_type === 'MAKE' || turnData.result_type === 'MISS' || turnData.result_type === 'SIDE_INBOUND');
+           (turnData.result_type === 'MAKE' || turnData.result_type === 'MISS' || turnData.result_type === 'SIDE_INBOUND' || turnData.result_type === 'BASELINE_INBOUND');
            
     console.log('✅ PassAnimationSystem: Pass data validation result:', isValid);
     return isValid;

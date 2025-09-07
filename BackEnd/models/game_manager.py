@@ -112,6 +112,12 @@ class GameManager:
         ):
             inbound_payload = self.turn_manager.setup_side_inbound()
             self.turns.append(inbound_payload)
+        
+        # If the turn ended with a made shot, prepare a baseline inbound
+        # sequence for the opposing team to start their possession
+        elif result.get("result_type") == "MAKE" and result.get("possession_flips"):
+            inbound_payload = self.turn_manager.setup_baseline_inbound()
+            self.turns.append(inbound_payload)
 
         # Update team stats after each turn
         self.update_team_stats()

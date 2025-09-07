@@ -191,6 +191,38 @@ export async function animateGameTurns({ //hasBallAtStep
       continue;
     }
 
+    if (turn.result_type === "BASELINE_INBOUND") {
+      console.log('🎬 Using new PassAnimationSystem for BASELINE_INBOUND');
+      
+      try {
+        // Use the new PassAnimationSystem for baseline inbound passes
+        await animationRouter.processTurn(turn);
+        console.log('✅ PassAnimationSystem completed for BASELINE_INBOUND');
+      } catch (error) {
+        console.error('❌ PassAnimationSystem failed for BASELINE_INBOUND:', error);
+        
+        // Fallback to old system if new system fails
+        console.log('🔄 Falling back to runSideInboundSetup for BASELINE_INBOUND');
+        try {
+          if (!scene.stateMachine?.is(States.FastBreak)) {
+            await runSideInboundSetup({ scene, ballSprite, playerSprites, turnData: turn });
+          }
+          console.log('✅ runSideInboundSetup fallback completed for BASELINE_INBOUND');
+        } catch (fallbackError) {
+          console.error('❌ Both animation systems failed for BASELINE_INBOUND:', fallbackError);
+        }
+      }
+      
+      if (onUpdate) {
+        try {
+          onUpdate(turn);
+        } catch (err) {
+          console.error('Scoreboard update failed:', err);
+        }
+      }
+      continue;
+    }
+
     if (turn.result_type === "TURNOVER") {
       await handleTurnover(scene, { playerSprites, ballSprite, turnData: turn, onUpdate });
       if (onUpdate) {
