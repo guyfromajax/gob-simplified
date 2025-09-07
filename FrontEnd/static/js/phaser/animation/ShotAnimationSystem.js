@@ -19,6 +19,7 @@ import { DebugFlags } from '../utils/debugFlags.js';
 import { gridToPixels } from '../utils/gridToPixels.js';
 import { animateStep } from './animateStep.js';
 import { attachBallToPlayer } from './ballManager.js';
+import { HOME_RIM_COORDS, AWAY_RIM_COORDS } from './courtConstants.js';
 
 export class ShotAnimationSystem {
   constructor(scene, ballController, stateMachine, playerSprites, gameStore) {
@@ -42,8 +43,8 @@ export class ShotAnimationSystem {
       bounceDistance: 30, // pixels
       
       // Rim coordinates (from courtConstants.js)
-      homeRim: { x: 89, y: 25 },
-      awayRim: { x: 11, y: 25 }
+      homeRim: HOME_RIM_COORDS,
+      awayRim: AWAY_RIM_COORDS
     };
     
     // Active shot tracking
@@ -226,6 +227,9 @@ export class ShotAnimationSystem {
     for (let stepIndex = 1; stepIndex < maxSteps; stepIndex++) {
       if (this.scene.skipToEnd) break;
       
+      // Update ball ownership for this step
+      this.updateBallOwnership(turnData, ballSprite, currentBallOwnerRef, stepIndex);
+      
       const promises = [];
       let shotInfo = null;
       
@@ -270,6 +274,30 @@ export class ShotAnimationSystem {
     }
     
     console.log('✅ ShotAnimationSystem: Player movement animation completed');
+  }
+  
+  /**
+   * Update ball ownership for a specific step
+   */
+  updateBallOwnership(turnData, ballSprite, currentBallOwnerRef, stepIndex) {
+    // Find who should have the ball at this step
+    for (const anim of turnData.animations) {
+      if (anim.hasBallAtStep?.[stepIndex]) {
+        const newOwnerSprite = this.playerSprites[anim.playerId];
+        if (newOwnerSprite && newOwnerSprite !== currentBallOwnerRef.value) {
+          console.log('🔄 ShotAnimationSystem: Transferring ball ownership', {
+            from: currentBallOwnerRef.value?.playerId || 'none',
+            to: anim.playerId,
+            stepIndex
+          });
+          
+          // Transfer ball to new owner
+          attachBallToPlayer(this.scene, ballSprite, newOwnerSprite);
+          currentBallOwnerRef.value = newOwnerSprite;
+        }
+        break;
+      }
+    }
   }
   
   /**
@@ -545,7 +573,18 @@ export class ShotAnimationSystem {
   getRimCoordinates(turnData) {
     // Determine which rim based on shot context
     const isHomeTeam = turnData.possession_team_id === this.scene.homeTeamId;
-    return isHomeTeam ? this.shotConfig.homeRim : this.shotConfig.awayRim;
+    const rimCoords = isHomeTeam ? this.shotConfig.homeRim : this.shotConfig.awayRim;
+    
+    console.log('🎯 ShotAnimationSystem: Getting rim coordinates', {
+      possession_team_id: turnData.possession_team_id,
+      scene_homeTeamId: this.scene.homeTeamId,
+      isHomeTeam,
+      rimCoords,
+      homeRim: this.shotConfig.homeRim,
+      awayRim: this.shotConfig.awayRim
+    });
+    
+    return rimCoords;
   }
 
   /**
