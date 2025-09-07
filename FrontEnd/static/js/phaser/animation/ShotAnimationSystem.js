@@ -455,29 +455,43 @@ export class ShotAnimationSystem {
       return;
     }
 
-    // Animate ball to rebounder
+    // Get the ball's current position (where it bounced)
     const ballSprite = this.ballController.ballSprite;
     if (ballSprite) {
       // Make ball visible if it was hidden
       ballSprite.setVisible(true);
       
-      // Animate ball to rebounder
-      this.scene.tweens.add({
-        targets: ballSprite,
-        x: rebounderSprite.x,
-        y: rebounderSprite.y - 10,
-        duration: 400,
-        ease: 'Power2',
-        onComplete: () => {
-          // Attach ball to rebounder
-          this.ballController.attachToPlayer(rebounderSprite, {
-            offset: { x: 0, y: -10 }
-          });
-        }
+      // Get the ball's bounce position (where it currently is)
+      const ballBounceX = ballSprite.x;
+      const ballBounceY = ballSprite.y;
+      
+      console.log('🎬 ShotAnimationSystem: Ball bounce position', {
+        ballX: ballBounceX,
+        ballY: ballBounceY,
+        rebounderX: rebounderSprite.x,
+        rebounderY: rebounderSprite.y
+      });
+      
+      // Animate rebounder to the ball's bounce position
+      await new Promise((resolve) => {
+        this.scene.tweens.add({
+          targets: rebounderSprite,
+          x: ballBounceX,
+          y: ballBounceY,
+          duration: 400,
+          ease: 'Power2',
+          onComplete: () => {
+            // Attach ball to rebounder once they reach the bounce spot
+            this.ballController.attachToPlayer(rebounderSprite, {
+              offset: { x: 0, y: -10 }
+            });
+            resolve();
+          }
+        });
       });
     }
 
-    // Animate players collapsing toward rebounder
+    // Animate players collapsing toward rebounder (after rebounder gets the ball)
     await this.animatePlayerCollapse(rebounderSprite);
 
     // Determine next action based on rebound type
