@@ -568,23 +568,32 @@ export class ShotAnimationSystem {
   }
 
   /**
-   * Get rim coordinates based on shot context
+   * Get rim coordinates based on shot context (converted to pixels)
    */
   getRimCoordinates(turnData) {
     // Determine which rim based on shot context
     const isHomeTeam = turnData.possession_team_id === this.scene.homeTeamId;
-    const rimCoords = isHomeTeam ? this.shotConfig.homeRim : this.shotConfig.awayRim;
+    const gridRimCoords = isHomeTeam ? this.shotConfig.homeRim : this.shotConfig.awayRim;
+    
+    // Convert grid coordinates to pixel coordinates (like the old system does)
+    const pixelRimCoords = gridToPixels(
+      gridRimCoords.x,
+      gridRimCoords.y,
+      this.scene.game.config.width,
+      this.scene.game.config.height
+    );
     
     console.log('🎯 ShotAnimationSystem: Getting rim coordinates', {
       possession_team_id: turnData.possession_team_id,
       scene_homeTeamId: this.scene.homeTeamId,
       isHomeTeam,
-      rimCoords,
+      gridRimCoords,
+      pixelRimCoords,
       homeRim: this.shotConfig.homeRim,
       awayRim: this.shotConfig.awayRim
     });
     
-    return rimCoords;
+    return pixelRimCoords;
   }
 
   /**
