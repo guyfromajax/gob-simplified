@@ -228,6 +228,7 @@ class TurnManager:
         for key in [
             "ball_handler",
             "shooter",
+            "shooter_id",
             "screener",
             "passer",
             "defender",

@@ -384,7 +384,7 @@ export class ReboundAnimationSystem {
   async animatePlayerToOffenseBasket(playerSprite, turnData) {
     return new Promise((resolve) => {
       // Determine offense basket direction
-      const isHomeTeam = turnData.team_id === this.scene.homeTeamId;
+      const isHomeTeam = turnData.possession_team_id === this.scene.homeTeamId;
       const offenseBasketX = isHomeTeam ? 89 : 11; // From courtConstants.js
       
       // Calculate movement direction

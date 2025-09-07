@@ -75,7 +75,7 @@ const createMockFreeThrowTurnData = (resultType = 'MAKE', ftContext = {}) => ({
   index: 1,
   result_type: 'FREE_THROW',
   shooter_id: 'player1',
-  team_id: 'home_team',
+  possession_team_id: 'home_team',
   ftContext: {
     attempt: 1,
     total: 1,
@@ -264,7 +264,7 @@ describe('FreeThrowAnimationSystem', () => {
 
     test('should calculate correct free throw position for home team', () => {
       const turnData = createMockFreeThrowTurnData('MAKE');
-      turnData.team_id = 'home_team';
+      turnData.possession_team_id = 'home_team';
       
       const position = ftSystem.calculateFreeThrowPosition(turnData);
       
@@ -274,7 +274,7 @@ describe('FreeThrowAnimationSystem', () => {
 
     test('should calculate correct free throw position for away team', () => {
       const turnData = createMockFreeThrowTurnData('MAKE');
-      turnData.team_id = 'away_team';
+      turnData.possession_team_id = 'away_team';
       
       const position = ftSystem.calculateFreeThrowPosition(turnData);
       
@@ -390,7 +390,7 @@ describe('FreeThrowAnimationSystem', () => {
   describe('Rim Coordinate Calculation', () => {
     test('should use home rim for home team free throws', async () => {
       const turnData = createMockFreeThrowTurnData('MAKE');
-      turnData.team_id = 'home_team';
+      turnData.possession_team_id = 'home_team';
       
       await ftSystem.processFreeThrow(turnData);
       
@@ -405,7 +405,7 @@ describe('FreeThrowAnimationSystem', () => {
 
     test('should use away rim for away team free throws', async () => {
       const turnData = createMockFreeThrowTurnData('MAKE');
-      turnData.team_id = 'away_team';
+      turnData.possession_team_id = 'away_team';
       
       await ftSystem.processFreeThrow(turnData);
       

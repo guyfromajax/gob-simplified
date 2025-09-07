@@ -59,7 +59,7 @@ const createMockTurnData = (resultType = 'MAKE', index = 1) => ({
   index,
   result_type: resultType,
   player_id: 'player1',
-  team_id: 'home'
+  possession_team_id: 'home'
 });
 
 describe('AnimationRouter', () => {

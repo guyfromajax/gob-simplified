@@ -85,7 +85,7 @@ const createMockPassTurnData = (resultType = 'MAKE', passType = 'assist') => ({
   receiver_id: 'player2',
   pass_type: passType,
   result_type: resultType,
-  team_id: 'home_team'
+  possession_team_id: 'home_team'
 });
 
 describe('PassAnimationSystem', () => {
@@ -464,7 +464,7 @@ describe('PassAnimationSystem', () => {
   describe('Position Calculations', () => {
     test('should calculate inbound position correctly', () => {
       const turnData = createMockPassTurnData('MAKE', 'inbound');
-      turnData.team_id = 'home_team';
+      turnData.possession_team_id = 'home_team';
       
       const position = passSystem.calculateInboundPosition(turnData);
       
@@ -474,7 +474,7 @@ describe('PassAnimationSystem', () => {
 
     test('should calculate fast break position correctly', () => {
       const turnData = createMockPassTurnData('MAKE', 'fast_break');
-      turnData.team_id = 'home_team';
+      turnData.possession_team_id = 'home_team';
       
       const receiverSprite = mockPlayerSprites['player2'];
       const position = passSystem.calculateFastBreakPosition(receiverSprite, turnData);

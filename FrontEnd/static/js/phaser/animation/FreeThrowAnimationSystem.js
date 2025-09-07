@@ -367,7 +367,7 @@ export class FreeThrowAnimationSystem {
    */
   calculateFreeThrowPosition(turnData) {
     // Determine which free throw line to use
-    const isHomeTeam = turnData.team_id === this.scene.homeTeamId;
+    const isHomeTeam = turnData.possession_team_id === this.scene.homeTeamId;
     
     if (isHomeTeam) {
       return { x: this.ftConfig.ftLine.x, y: this.ftConfig.ftLine.y };
@@ -385,7 +385,7 @@ export class FreeThrowAnimationSystem {
    */
   getRimCoordinates(turnData) {
     // Determine which rim based on team
-    const isHomeTeam = turnData.team_id === this.scene.homeTeamId;
+    const isHomeTeam = turnData.possession_team_id === this.scene.homeTeamId;
     return isHomeTeam ? this.ftConfig.homeRim : this.ftConfig.awayRim;
   }
 
@@ -468,7 +468,7 @@ export class FreeThrowAnimationSystem {
 
   validateFreeThrowData(turnData) {
     return turnData && 
-           (turnData.shooter || turnData.ball_handler) &&
+           (turnData.shooter || turnData.ball_handler || turnData.shooter_id) &&
            turnData.result_type === 'FREE_THROW';
   }
 

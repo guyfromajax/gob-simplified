@@ -90,7 +90,7 @@ const createMockReboundTurnData = (reboundType = 'defensive', rebounderId = 'pla
   index: 1,
   rebounder_id: rebounderId,
   rebound_type: reboundType,
-  team_id: 'home_team'
+  possession_team_id: 'home_team'
 });
 
 describe('ReboundAnimationSystem', () => {

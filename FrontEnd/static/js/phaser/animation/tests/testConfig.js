@@ -19,7 +19,7 @@ export const TestConfig = {
       index,
       result_type: resultType,
       player_id: 'player1',
-      team_id: 'home',
+      possession_team_id: 'home',
       timestamp: Date.now(),
       ...additionalData
     }),
