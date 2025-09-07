@@ -195,15 +195,22 @@ export class AnimationEngine {
   }
 
   async handleSideInbound(turnData, context) {
-    console.log('AnimationEngine: Handling side inbound');
-    // Import and use existing side inbound handler for now
-    const { runSideInboundSetup } = await import('./turnAnimation.js');
-    await runSideInboundSetup({
-      scene: this.scene,
-      ballSprite: context.ballSprite,
-      playerSprites: context.playerSprites,
-      turnData: turnData
-    });
+    console.log('AnimationEngine: Handling side inbound with new PassAnimationSystem');
+    
+    if (this.passSystem) {
+      await this.passSystem.processPass(turnData);
+      console.log('AnimationEngine: PassAnimationSystem completed for SIDE_INBOUND');
+    } else {
+      console.warn('AnimationEngine: PassAnimationSystem not available, using fallback');
+      // Fallback to old system
+      const { runSideInboundSetup } = await import('./turnAnimation.js');
+      await runSideInboundSetup({
+        scene: this.scene,
+        ballSprite: context.ballSprite,
+        playerSprites: context.playerSprites,
+        turnData: turnData
+      });
+    }
   }
 
   async handleTurnover(turnData, context) {

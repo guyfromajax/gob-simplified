@@ -160,9 +160,27 @@ export async function animateGameTurns({ //hasBallAtStep
     }
 
     if (turn.result_type === "SIDE_INBOUND") {
-      if (!scene.stateMachine?.is(States.FastBreak)) {
-        await runSideInboundSetup({ scene, ballSprite, playerSprites, turnData: turn });
+      console.log('🎬 Using new PassAnimationSystem for SIDE_INBOUND');
+      
+      try {
+        // Use the new PassAnimationSystem for inbound passes
+        await animationRouter.processTurn(turn);
+        console.log('✅ PassAnimationSystem completed for SIDE_INBOUND');
+      } catch (error) {
+        console.error('❌ PassAnimationSystem failed for SIDE_INBOUND:', error);
+        
+        // Fallback to old system if new system fails
+        console.log('🔄 Falling back to runSideInboundSetup for SIDE_INBOUND');
+        try {
+          if (!scene.stateMachine?.is(States.FastBreak)) {
+            await runSideInboundSetup({ scene, ballSprite, playerSprites, turnData: turn });
+          }
+          console.log('✅ runSideInboundSetup fallback completed for SIDE_INBOUND');
+        } catch (fallbackError) {
+          console.error('❌ Both animation systems failed for SIDE_INBOUND:', fallbackError);
+        }
       }
+      
       if (onUpdate) {
         try {
           onUpdate(turn);
