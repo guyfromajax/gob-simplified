@@ -357,7 +357,9 @@ export class PassAnimationSystem {
       result_type: turnData.result_type,
       oDestinations: turnData.oDestinations,
       dDestinations: turnData.dDestinations,
-      ball_spot: turnData.ball_spot
+      ball_spot: turnData.ball_spot,
+      possession_team_id: turnData.possession_team_id,
+      fullTurnData: turnData
     });
 
     try {
@@ -365,14 +367,35 @@ export class PassAnimationSystem {
       // This ensures we get working animations while we develop the new system
       console.log('🔄 PassAnimationSystem: Using fallback inbound animation');
       
-      // Import and use the old inbound setup
-      const { runSideInboundSetup } = await import('./turnAnimation.js');
-      await runSideInboundSetup({
-        scene: this.scene,
-        ballSprite: this.ballSprite,
-        playerSprites: this.playerSprites,
-        turnData: turnData
-      });
+      // Import and use the correct inbound setup based on type
+      const { runSideInboundSetup, runInboundSetup } = await import('./turnAnimation.js');
+      
+      if (turnData.result_type === 'BASELINE_INBOUND') {
+        // For baseline inbound passes (after made shots), use runInboundSetup
+        console.log('🎯 PassAnimationSystem: Using runInboundSetup for baseline inbound');
+        
+        // Determine the new offense side based on possession_team_id
+        const isHomeOffense = turnData.possession_team_id === this.scene.homeTeamId;
+        const newOffenseSide = isHomeOffense ? 'home' : 'away';
+        
+        await runInboundSetup({
+          scene: this.scene,
+          ballSprite: this.ballSprite,
+          playerSprites: this.playerSprites,
+          newOffenseSide: newOffenseSide,
+          homeTeamId: this.scene.homeTeamId,
+          awayTeamId: this.scene.awayTeamId
+        });
+      } else {
+        // For side inbound passes (after dead balls/fouls), use runSideInboundSetup
+        console.log('🎯 PassAnimationSystem: Using runSideInboundSetup for side inbound');
+        await runSideInboundSetup({
+          scene: this.scene,
+          ballSprite: this.ballSprite,
+          playerSprites: this.playerSprites,
+          turnData: turnData
+        });
+      }
       
       console.log('✅ PassAnimationSystem: Inbound sequence completed');
       
