@@ -213,26 +213,29 @@ export async function animateGameTurns({ //hasBallAtStep
         full_turn_data: turn
       });
       
-      // Check if this is a fast break turn (now properly flagged by backend)
+      // Fast break shots now use the new system (same as HCO shots)
       if (turn.fast_break === true) {
-        console.log('🎬 Using proven playTurnAnimation for FAST_BREAK shot');
+        console.log('🎬 Using new ShotAnimationSystem for FAST_BREAK shot');
         try {
-          const { playTurnAnimation } = await import('./turnAnimation.js');
-          await playTurnAnimation({
-            scene: scene,
-            simData: simData,
-            playerSprites: playerSprites,
-            turnData: turn,
-            ballSprite: ballSprite,
-            onAction: onUpdate
-          });
-          console.log('✅ playTurnAnimation completed for FAST_BREAK');
+          // Use the new ShotAnimationSystem for fast break shots
+          await animationRouter.processTurn(turn);
+          console.log('✅ ShotAnimationSystem completed for FAST_BREAK');
         } catch (error) {
-          console.error('❌ playTurnAnimation failed for FAST_BREAK:', error);
-          console.log('🔄 Falling back to new AnimationRouter for FAST_BREAK');
+          console.error('❌ ShotAnimationSystem failed for FAST_BREAK:', error);
+          
+          // Fallback to old system if new system fails
+          console.log('🔄 Falling back to playTurnAnimation for FAST_BREAK');
           try {
-            await animationRouter.processTurn(turn);
-            console.log('✅ AnimationRouter fallback completed for FAST_BREAK');
+            const { playTurnAnimation } = await import('./turnAnimation.js');
+            await playTurnAnimation({
+              scene: scene,
+              simData: simData,
+              playerSprites: playerSprites,
+              turnData: turn,
+              ballSprite: ballSprite,
+              onAction: onUpdate
+            });
+            console.log('✅ playTurnAnimation fallback completed for FAST_BREAK');
           } catch (fallbackError) {
             console.error('❌ Both animation systems failed for FAST_BREAK:', fallbackError);
           }
