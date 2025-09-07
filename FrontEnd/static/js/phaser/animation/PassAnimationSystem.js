@@ -70,6 +70,11 @@ export class PassAnimationSystem {
    * Process a pass turn
    */
   async processPass(turnData) {
+    console.log('🎬 PassAnimationSystem: Starting pass processing', {
+      result_type: turnData.result_type,
+      activePass: !!this.activePass
+    });
+    
     if (this.activePass) {
       console.warn('PassAnimationSystem: Already processing a pass, queuing...');
       this.passQueue.push(turnData);
@@ -79,14 +84,13 @@ export class PassAnimationSystem {
     this.activePass = turnData;
     
     try {
-      if (DebugFlags.PASS_ANIMATION) {
-        console.log('PassAnimationSystem: Processing pass', {
-          passer_id: turnData.passer_id,
-          receiver_id: turnData.receiver_id,
-          pass_type: turnData.pass_type,
-          result_type: turnData.result_type
-        });
-      }
+      console.log('PassAnimationSystem: Processing pass', {
+        passer_id: turnData.passer_id,
+        receiver_id: turnData.receiver_id,
+        pass_type: turnData.pass_type,
+        result_type: turnData.result_type,
+        allKeys: Object.keys(turnData)
+      });
 
       // Validate pass data
       if (!this.validatePassData(turnData)) {
@@ -407,10 +411,22 @@ export class PassAnimationSystem {
   }
 
   validatePassData(turnData) {
-    return turnData && 
+    console.log('🔍 PassAnimationSystem: Validating pass data', {
+      result_type: turnData.result_type,
+      passer_id: turnData.passer_id,
+      player_id: turnData.player_id,
+      receiver_id: turnData.receiver_id,
+      allKeys: Object.keys(turnData),
+      fullTurnData: turnData
+    });
+    
+    const isValid = turnData && 
            (turnData.passer_id || turnData.player_id) &&
            turnData.receiver_id &&
-           (turnData.result_type === 'MAKE' || turnData.result_type === 'MISS');
+           (turnData.result_type === 'MAKE' || turnData.result_type === 'MISS' || turnData.result_type === 'SIDE_INBOUND');
+           
+    console.log('✅ PassAnimationSystem: Pass data validation result:', isValid);
+    return isValid;
   }
 
   /**
