@@ -200,10 +200,10 @@ export class AnimationRouter {
    * Check if this is an HCO turn that needs positioning step
    */
   isHCOWithPositioning(turnData) {
-    // HCO turns are shot attempts (MAKE/MISS) with offensive_state: "HCO"
+    // HCO turns are shot attempts (MAKE/MISS) with next_play_type: "HCO"
     // that follow a defensive rebound
     return (turnData.result_type === 'MAKE' || turnData.result_type === 'MISS') &&
-           turnData.offensive_state === 'HCO' &&
+           turnData.next_play_type === 'HCO' &&
            this.followsDefensiveRebound(turnData);
   }
 
@@ -211,10 +211,11 @@ export class AnimationRouter {
    * Check if this HCO turn follows a defensive rebound
    */
   followsDefensiveRebound(turnData) {
-    // Check if the previous turn was a defensive rebound
-    // This could be determined by checking the previous turn or a flag
-    // For now, we'll assume HCO shots need positioning
-    return true;
+    // Check if this turn has defensive rebound information
+    // This indicates the shot was missed and resulted in a defensive rebound
+    return turnData.rebound_type === 'DREB' || 
+           turnData.rebounderId || 
+           turnData.next_play_type === 'HCO';
   }
 
   /**
