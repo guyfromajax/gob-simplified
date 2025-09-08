@@ -520,6 +520,7 @@ export class ShotAnimationSystem {
         rebound_type: turnData.rebound_type
       });
     }
+  }
 
   /**
    * Animate players collapsing toward rebound spot
