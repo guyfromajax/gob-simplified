@@ -151,6 +151,7 @@ export class AnimationEngine {
            turnData.receiver_id ||
            turnData.pass_type ||
            turnData.result_type === "PASS" ||
+           turnData.result_type === "HCO" ||
            (turnData.result_type === "MAKE" && turnData.pass_type);
   }
 

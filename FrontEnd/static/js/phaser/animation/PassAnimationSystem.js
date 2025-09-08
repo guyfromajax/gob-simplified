@@ -97,10 +97,13 @@ export class PassAnimationSystem {
         throw new Error('Invalid pass data');
       }
 
-      // Handle inbound passes differently from regular passes
+      // Handle different pass types
       if (turnData.result_type === 'SIDE_INBOUND' || turnData.result_type === 'BASELINE_INBOUND') {
         console.log('🎬 PassAnimationSystem: Processing inbound pass with positioning data');
         await this.executeInboundSequence(turnData, context);
+      } else if (this.isHCOPass(turnData)) {
+        console.log('🎬 PassAnimationSystem: Processing HCO pass with positioning');
+        await this.executeHCOSequence(turnData, context);
       } else {
         // Regular pass logic
         const passerSprite = this.getPasserSprite(turnData);
@@ -591,6 +594,292 @@ export class PassAnimationSystem {
     if (DebugFlags.PASS_ANIMATION) {
       console.log('PassAnimationSystem: Reset');
     }
+  }
+
+  /**
+   * Check if this is an HCO pass that needs positioning
+   */
+  isHCOPass(turnData) {
+    // Check if this is an HCO pass following a defensive rebound
+    return turnData.result_type === 'HCO' || 
+           (turnData.pass_type === 'HCO' && turnData.follows_defensive_rebound);
+  }
+
+  /**
+   * Execute HCO sequence with positioning step
+   */
+  async executeHCOSequence(turnData, context = {}) {
+    console.log('🎬 PassAnimationSystem: Executing HCO sequence with positioning');
+    
+    // Check if this follows a defensive rebound (needs positioning step)
+    if (this.followsDefensiveRebound(turnData)) {
+      console.log('🎬 HCO follows defensive rebound - executing positioning step');
+      await this.executeHCOPositioningStep(turnData);
+    }
+    
+    // Now execute the actual HCO pass
+    const passerSprite = this.getPasserSprite(turnData);
+    const receiverSprite = this.getReceiverSprite(turnData);
+    
+    if (!passerSprite) {
+      throw new Error('HCO passer sprite not found');
+    }
+    if (!receiverSprite) {
+      throw new Error('HCO receiver sprite not found');
+    }
+
+    // Execute the actual HCO pass
+    await this.executePassSequence(passerSprite, receiverSprite, turnData);
+  }
+
+  /**
+   * Check if this HCO pass follows a defensive rebound
+   */
+  followsDefensiveRebound(turnData) {
+    // This could be determined by checking the previous turn or a flag
+    // For now, we'll assume HCO passes need positioning
+    return true;
+  }
+
+  /**
+   * Execute HCO positioning step (Rebound HCO Outlet animation)
+   */
+  async executeHCOPositioningStep(turnData) {
+    console.log('🎬 Executing HCO positioning step');
+    
+    // Find the rebounder (should be the current ball holder)
+    const rebounderSprite = this.findRebounder(turnData);
+    if (!rebounderSprite) {
+      console.warn('🎬 No rebounder found for HCO positioning');
+      return;
+    }
+
+    // 1. Move PG to outlet position
+    const pgSprite = this.findPointGuard(rebounderSprite.team);
+    console.log('🎬 HCO Positioning: PG found:', !!pgSprite, 'Team:', rebounderSprite.team);
+    
+    if (pgSprite) {
+      console.log('🎬 HCO Positioning: Moving PG to outlet position');
+      await this.animatePGToOutlet(pgSprite, rebounderSprite);
+    } else {
+      console.warn('🎬 HCO Positioning: No PG found for team:', rebounderSprite.team);
+    }
+
+    // 2. Move other 8 players toward offense basket
+    console.log('🎬 HCO Positioning: Moving other players toward offense basket');
+    await this.animatePlayersToOffenseBasket(rebounderSprite, turnData);
+
+    // 3. Execute outlet pass from rebounder to PG
+    if (pgSprite) {
+      console.log('🎬 HCO Positioning: Executing outlet pass from rebounder to PG');
+      await this.executeOutletPass(rebounderSprite, pgSprite, turnData);
+      console.log('🎬 HCO Positioning: Outlet pass completed');
+    } else {
+      console.warn('🎬 HCO Positioning: Cannot execute outlet pass - no PG found');
+    }
+  }
+
+  /**
+   * Find the rebounder (current ball holder)
+   */
+  findRebounder(turnData) {
+    // Try to find the rebounder from turn data or current ball holder
+    const rebounderId = turnData.rebounder_id || turnData.passer_id;
+    if (rebounderId) {
+      return this.playerSprites[rebounderId];
+    }
+    
+    // Fallback: find any player with the ball
+    return Object.values(this.playerSprites).find(sprite => 
+      sprite.hasBall || sprite.isBallHolder
+    );
+  }
+
+  /**
+   * Find point guard for a team
+   */
+  findPointGuard(team) {
+    return Object.values(this.playerSprites).find(sprite => 
+      sprite.team === team && sprite.position === 'PG'
+    );
+  }
+
+  /**
+   * Animate PG to outlet position (authentic basketball positioning)
+   */
+  async animatePGToOutlet(pgSprite, rebounderSprite) {
+    return new Promise((resolve) => {
+      // Convert to grid coordinates for precise positioning
+      const width = this.scene.game.config.width;
+      const height = this.scene.game.config.height;
+      
+      const rebGridX = (rebounderSprite.x / width) * 100;
+      const rebGridY = 50 - (rebounderSprite.y / height) * 50;
+      
+      // Get basket coordinates to determine direction
+      const basketGrid = { x: 89, y: 25 }; // Home basket
+      if (rebounderSprite.team === 'away') {
+        basketGrid.x = 11; // Away basket
+      }
+      
+      // For HCO: move PG near the rebounder (authentic basketball positioning)
+      // PG moves 3-6 grid spots toward the basket from rebounder position
+      const sign = basketGrid.x > rebGridX ? 1 : -1;
+      const outletTarget = {
+        x: Phaser.Math.Clamp(
+          rebGridX + sign * Phaser.Math.Between(3, 6),
+          4,
+          97
+        ),
+        y: Phaser.Math.Clamp(
+          rebGridY + Phaser.Math.Between(-6, 6),
+          1,
+          50
+        ),
+      };
+      
+      // Convert back to pixel coordinates
+      const outletPx = this.gridToPixels(outletTarget.x, outletTarget.y, width, height);
+      
+      const tween = this.scene.tweens.add({
+        targets: pgSprite,
+        x: outletPx.x,
+        y: outletPx.y,
+        duration: this.passConfig.movementDuration || 500,
+        ease: this.passConfig.movementEase || 'Power2',
+        onComplete: () => {
+          resolve();
+        }
+      });
+      
+      console.log('🎬 PG outlet positioning:', {
+        rebounderGrid: { x: rebGridX, y: rebGridY },
+        outletTarget,
+        outletPx,
+        direction: sign
+      });
+    });
+  }
+
+  /**
+   * Animate players to offense basket (authentic basketball positioning)
+   */
+  async animatePlayersToOffenseBasket(rebounderSprite, turnData) {
+    return new Promise((resolve) => {
+      const movementPromises = [];
+      
+      // Get all players except rebounder and PG
+      const allPlayers = Object.values(this.playerSprites);
+      const pgSprite = this.findPointGuard(rebounderSprite.team);
+      
+      allPlayers.forEach(playerSprite => {
+        if (playerSprite === rebounderSprite || playerSprite === pgSprite) return;
+        
+        const movementPromise = this.animatePlayerToOffenseBasket(playerSprite, turnData);
+        movementPromises.push(movementPromise);
+      });
+      
+      Promise.all(movementPromises).then(() => {
+        resolve();
+      });
+    });
+  }
+
+  /**
+   * Animate individual player to offense basket (authentic basketball positioning)
+   */
+  async animatePlayerToOffenseBasket(playerSprite, turnData) {
+    return new Promise((resolve) => {
+      // Convert to grid coordinates for precise positioning
+      const width = this.scene.game.config.width;
+      const height = this.scene.game.config.height;
+      
+      const currentGridX = (playerSprite.x / width) * 100;
+      const currentGridY = 50 - (playerSprite.y / height) * 50;
+      
+      // Move 20-30 grid spots toward new offense basket (authentic basketball)
+      const distance = Phaser.Math.Between(20, 30);
+      
+      // Determine direction based on new offense team
+      const newOffenseTeam = turnData.possession_team_id === this.scene.homeTeamId ? 'home' : 'away';
+      const direction = newOffenseTeam === "home" ? 1 : -1;
+      
+      const targetGrid = {
+        x: Phaser.Math.Clamp(
+          currentGridX + direction * distance,
+          4,  // Stay in bounds
+          97
+        ),
+        y: Phaser.Math.Clamp(
+          currentGridY + Phaser.Math.Between(-10, 10),
+          1,  // Stay in bounds
+          50
+        ),
+      };
+      
+      // Convert back to pixel coordinates
+      const targetPx = this.gridToPixels(targetGrid.x, targetGrid.y, width, height);
+      
+      const tween = this.scene.tweens.add({
+        targets: playerSprite,
+        x: targetPx.x,
+        y: targetPx.y,
+        duration: this.passConfig.movementDuration || 500,
+        ease: this.passConfig.movementEase || 'Power2',
+        onComplete: () => {
+          resolve();
+        }
+      });
+      
+      console.log(`HCO player movement: ${playerSprite.id || 'unknown'} from (${currentGridX.toFixed(1)}, ${currentGridY.toFixed(1)}) to (${targetGrid.x}, ${targetGrid.y}) [direction: ${direction}, newOffenseTeam: ${newOffenseTeam}]`);
+    });
+  }
+
+  /**
+   * Execute outlet pass from rebounder to PG
+   */
+  async executeOutletPass(passerSprite, receiverSprite, turnData) {
+    console.log('🎬 Executing outlet pass from rebounder to PG');
+    return new Promise((resolve) => {
+      // Detach ball from passer
+      this.ballController.detachFromPlayer('outlet_pass');
+      console.log('🎬 Ball detached from rebounder');
+      
+      // Start ball flight
+      this.ballController.startFlight({
+        x: receiverSprite.x,
+        y: receiverSprite.y - 10
+      });
+      console.log('🎬 Ball flight started to PG position');
+      
+      // Animate ball to receiver
+      const ballSprite = this.ballController.ballSprite;
+      const tween = this.scene.tweens.add({
+        targets: ballSprite,
+        x: receiverSprite.x,
+        y: receiverSprite.y - 10,
+        duration: this.passConfig.outletPassDuration || 400,
+        ease: this.passConfig.outletPassEase || 'Power2',
+        onComplete: () => {
+          // Attach ball to receiver
+          this.ballController.endFlight(receiverSprite);
+          console.log('🎬 Outlet pass completed - ball attached to PG');
+          resolve();
+        },
+        onUpdate: () => {
+          this.ballController.updatePosition(ballSprite.x, ballSprite.y);
+        }
+      });
+    });
+  }
+
+  /**
+   * Convert grid coordinates to pixel coordinates
+   */
+  gridToPixels(gridX, gridY, width, height) {
+    const x = (gridX / 100) * width;
+    const y = height - ((gridY / 50) * height);
+    return { x, y };
   }
 }
 
