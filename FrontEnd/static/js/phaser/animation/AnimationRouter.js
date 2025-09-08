@@ -92,6 +92,12 @@ export class AnimationRouter {
         hasPlayerSprites: !!this.playerSprites
       });
 
+      // Check if this is an HCO turn that needs positioning step
+      if (this.isHCOWithPositioning(turnData)) {
+        console.log('🎬 AnimationRouter: HCO turn detected - executing positioning step first');
+        await this.executeHCOPositioningStep(turnData);
+      }
+
       // No state machine needed - just process the turn directly
       console.log('🎯 AnimationRouter: Processing turn directly (no state machine)');
 
@@ -187,6 +193,41 @@ export class AnimationRouter {
     
     if (DebugFlags.ANIMATION_ROUTER) {
       console.log('AnimationRouter: System reset');
+    }
+  }
+
+  /**
+   * Check if this is an HCO turn that needs positioning step
+   */
+  isHCOWithPositioning(turnData) {
+    // HCO turns are shot attempts (MAKE/MISS) with offensive_state: "HCO"
+    // that follow a defensive rebound
+    return (turnData.result_type === 'MAKE' || turnData.result_type === 'MISS') &&
+           turnData.offensive_state === 'HCO' &&
+           this.followsDefensiveRebound(turnData);
+  }
+
+  /**
+   * Check if this HCO turn follows a defensive rebound
+   */
+  followsDefensiveRebound(turnData) {
+    // Check if the previous turn was a defensive rebound
+    // This could be determined by checking the previous turn or a flag
+    // For now, we'll assume HCO shots need positioning
+    return true;
+  }
+
+  /**
+   * Execute HCO positioning step (Rebound HCO Outlet animation)
+   */
+  async executeHCOPositioningStep(turnData) {
+    console.log('🎬 AnimationRouter: Executing HCO positioning step');
+    
+    // Use the HCO animation system if available
+    if (this.animationEngine && this.animationEngine.hcoSystem) {
+      await this.animationEngine.hcoSystem.processHCO(turnData);
+    } else {
+      console.warn('🎬 AnimationRouter: HCOAnimationSystem not available, skipping positioning step');
     }
   }
 

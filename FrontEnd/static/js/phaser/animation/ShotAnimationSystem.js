@@ -982,6 +982,7 @@ export class ShotAnimationSystem {
       console.log('ShotAnimationSystem: Reset');
     }
   }
+
 }
 
 export default ShotAnimationSystem;

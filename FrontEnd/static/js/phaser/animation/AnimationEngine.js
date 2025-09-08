@@ -16,6 +16,7 @@ import ShotAnimationSystem from './ShotAnimationSystem.js';
 import ReboundAnimationSystem from './ReboundAnimationSystem.js';
 import PassAnimationSystem from './PassAnimationSystem.js';
 import FreeThrowAnimationSystem from './FreeThrowAnimationSystem.js';
+import HCOAnimationSystem from './HCOAnimationSystem.js';
 import gameStore from '../../state/gameStore.js';
 
 export class AnimationEngine {
@@ -32,6 +33,7 @@ export class AnimationEngine {
     this.reboundSystem = null; // Will be initialized after dependencies are injected
     this.passSystem = null; // Will be initialized after dependencies are injected
     this.freeThrowSystem = null; // Will be initialized after dependencies are injected
+    this.hcoSystem = null; // Will be initialized after dependencies are injected
     
     // Initialize default handlers
     this.initializeDefaultHandlers();
@@ -151,7 +153,6 @@ export class AnimationEngine {
            turnData.receiver_id ||
            turnData.pass_type ||
            turnData.result_type === "PASS" ||
-           turnData.result_type === "HCO" ||
            (turnData.result_type === "MAKE" && turnData.pass_type);
   }
 
@@ -387,6 +388,14 @@ export class AnimationEngine {
         gameStore
       );
       console.log('AnimationEngine: FreeThrowAnimationSystem initialized');
+      
+      this.hcoSystem = new HCOAnimationSystem(
+        this.scene,
+        this.ballController,
+        this.stateMachine,
+        this.playerSprites
+      );
+      console.log('AnimationEngine: HCOAnimationSystem initialized');
     }
     
     console.log('AnimationEngine: Dependencies injected', {
