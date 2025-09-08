@@ -92,6 +92,9 @@ export class BallController {
     // Position ball on player
     this.positionBallOnPlayer(playerSprite, options);
 
+    // Start following the player during movements
+    this.startFollowingPlayer(playerSprite, options);
+
     // Record ownership change
     this.recordOwnershipChange(previousOwner, playerSprite, 'attach', options);
 
@@ -119,6 +122,9 @@ export class BallController {
     }
 
     const previousOwner = this.currentOwner;
+    
+    // Stop following the player
+    this.stopFollowingPlayer();
     
     // Update state
     this.currentOwner = null;
@@ -183,6 +189,9 @@ export class BallController {
       console.warn('BallController: Ball is already in flight');
       return false;
     }
+
+    // Stop following player when ball starts flight
+    this.stopFollowingPlayer();
 
     this.isInFlight = true;
     this.targetPosition = targetPosition;
@@ -261,6 +270,54 @@ export class BallController {
     this.ballSprite.setPosition(x, y);
     this.ballSprite.setVisible(true);
     this.ballSprite.setDepth(playerSprite.depth + 1);
+  }
+
+  /**
+   * Start following a player during movement animations
+   */
+  startFollowingPlayer(playerSprite, options = {}) {
+    if (!this.ballSprite || !playerSprite) return;
+
+    this.stopFollowingPlayer(); // Stop any existing following
+
+    this.followingPlayer = playerSprite;
+    this.followOffset = options.offset || { x: 0, y: -10 };
+    this.followCallback = () => {
+      if (this.followingPlayer && this.ballSprite && this.isAttached) {
+        const x = this.followingPlayer.x + this.followOffset.x;
+        const y = this.followingPlayer.y + this.followOffset.y;
+        this.ballSprite.setPosition(x, y);
+      }
+    };
+
+    // Add update callback to scene
+    if (this.scene && this.scene.events) {
+      this.scene.events.on('update', this.followCallback);
+    }
+
+    if (this.debug) {
+      console.log('BallController: Started following player', {
+        playerId: playerSprite.playerId,
+        offset: this.followOffset
+      });
+    }
+  }
+
+  /**
+   * Stop following player
+   */
+  stopFollowingPlayer() {
+    if (this.followCallback && this.scene && this.scene.events) {
+      this.scene.events.off('update', this.followCallback);
+    }
+
+    this.followingPlayer = null;
+    this.followOffset = null;
+    this.followCallback = null;
+
+    if (this.debug) {
+      console.log('BallController: Stopped following player');
+    }
   }
 
   /**
@@ -394,6 +451,7 @@ export class BallController {
    * Reset ball to initial state
    */
   reset() {
+    this.stopFollowingPlayer();
     this.currentOwner = null;
     this.pendingOwner = null;
     this.isAttached = false;
@@ -428,6 +486,15 @@ export class BallController {
       },
       debug: this.debug
     };
+  }
+
+  /**
+   * Cleanup method - call when destroying the controller
+   */
+  destroy() {
+    this.stopFollowingPlayer();
+    this.attachmentCallbacks = [];
+    this.detachmentCallbacks = [];
   }
 }
 
