@@ -316,6 +316,9 @@ export class FreeThrowAnimationSystem {
     // Ball holds in rim for 1 second (authentic basketball feel)
     const ballSprite = this.ballController.ballSprite;
     if (ballSprite) {
+      // Keep ball visible during hold
+      ballSprite.setVisible(true);
+      
       // Hold ball in rim for 1 second
       await new Promise(resolve => {
         if (this.scene.time?.delayedCall) {
@@ -332,7 +335,8 @@ export class FreeThrowAnimationSystem {
         duration: 200,
         ease: 'Power2',
         onComplete: () => {
-          ballSprite.setVisible(false);
+          // Keep ball visible after going through rim
+          ballSprite.setVisible(true);
         }
       });
     }
@@ -368,8 +372,8 @@ export class FreeThrowAnimationSystem {
     }
 
     // Use existing bounce system for authentic basketball feel
-    const rimCoords = this.getRimCoordinatesFromAnimation(turnData);
-    await this.animateBallBounceFromRim(rimCoords, turnData);
+    const rimGridCoords = this.getRimGridCoordinates(turnData);
+    await this.animateBallBounceFromRim(rimGridCoords, turnData);
 
     // Check if this is the final free throw
     if (ftContext.attempt >= ftContext.total) {
@@ -401,18 +405,21 @@ export class FreeThrowAnimationSystem {
     // Determine if this is home team shooting (for bounce direction)
     const isHomeTeam = turnData.offense_team_id === this.scene.simData?.home_team_id;
     
+    // Get rim grid coordinates (bounceFromRim expects grid coordinates, not pixels)
+    const rimGridCoords = this.getRimGridCoordinates(turnData);
+    
     // Use existing bounce system for authentic basketball feel
     const miss = await bounceFromRim(
       this.scene,
       ballSprite,
-      rimCoords,
+      rimGridCoords, // Pass grid coordinates, not pixel coordinates
       isHomeTeam,
       this.ftConfig.bounceDuration
     );
 
     if (DebugFlags.FREE_THROW_ANIMATION) {
       console.log('FreeThrowAnimationSystem: Ball bounced from rim', {
-        rimCoords,
+        rimGridCoords,
         bounceSpot: miss.grid,
         isHomeTeam
       });
@@ -483,8 +490,8 @@ export class FreeThrowAnimationSystem {
     const { animateRebound } = await import('./ballManager.js');
     
     // Get the bounce spot from the previous bounce
-    const rimCoords = this.getRimCoordinatesFromAnimation(turnData);
-    const miss = await this.animateBallBounceFromRim(rimCoords, turnData);
+    const rimGridCoords = this.getRimGridCoordinates(turnData);
+    const miss = await this.animateBallBounceFromRim(rimGridCoords, turnData);
     
     // Execute the rebound animation
     await animateRebound({
@@ -515,7 +522,7 @@ export class FreeThrowAnimationSystem {
   }
 
   /**
-   * Get rim coordinates from animation data
+   * Get rim coordinates from animation data (pixel coordinates for ball animation)
    */
   getRimCoordinatesFromAnimation(turnData) {
     const animations = turnData.animations || [];
@@ -538,6 +545,27 @@ export class FreeThrowAnimationSystem {
     const width = this.scene.game.config.width;
     const height = this.scene.game.config.height;
     return gridToPixels(rimGrid.x, rimGrid.y, width, height);
+  }
+
+  /**
+   * Get rim grid coordinates (for bounce system)
+   */
+  getRimGridCoordinates(turnData) {
+    const animations = turnData.animations || [];
+    const ballAnim = animations.find((a) => a.playerId === "ball");
+    const moves = ballAnim?.movement || [];
+    
+    if (moves.length > 1) {
+      // Get the shot step (usually the second movement)
+      const shotStep = moves[1];
+      if (shotStep?.coords) {
+        return shotStep.coords; // Return grid coordinates directly
+      }
+    }
+    
+    // Fallback to team-based rim coordinates
+    const isHomeTeam = turnData.offense_team_id === this.scene.simData?.home_team_id;
+    return isHomeTeam ? HOME_RIM_COORDS : AWAY_RIM_COORDS;
   }
 
   /**
