@@ -455,24 +455,10 @@ export class FreeThrowAnimationSystem {
       });
     }
 
-    // Execute inbound pass using existing system
-    const { runInboundSetup } = await import('./turnAnimation.js');
-    
-    // Determine the new offense side based on possession_team_id
-    const isHomeOffense = turnData.possession_team_id === this.scene.simData?.home_team_id;
-    const newOffenseSide = isHomeOffense ? 'home' : 'away';
-    
-    await runInboundSetup({
-      scene: this.scene,
-      ballSprite: this.ballController.ballSprite,
-      playerSprites: this.playerSprites,
-      newOffenseSide: newOffenseSide,
-      homeTeamId: this.scene.simData?.home_team_id,
-      awayTeamId: this.scene.simData?.away_team_id
-    });
-
+    // Note: Inbound pass will be handled by the next turn in the sequence
+    // The backend will send a separate inbound turn after the free throw
     if (DebugFlags.FREE_THROW_ANIMATION) {
-      console.log('FreeThrowAnimationSystem: Inbound pass completed after final made free throw');
+      console.log('FreeThrowAnimationSystem: Final made free throw completed - inbound will be handled by next turn');
     }
   }
 
