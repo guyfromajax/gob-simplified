@@ -1,6 +1,6 @@
 import * as Phaser from "https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.esm.js";
 import { gridToPixels } from "../utils/gridToPixels.js";
-import { attachBallToPlayer } from "./ballManager.js";
+import { attachBallToPlayer } from "./BallControllerAdapter.js";
 import { tweenBallTo, tweenPlayerTo, runPass } from "./ballTween.js";
 import animationConfig, { FAST_BREAK_END_PAUSE_MS } from "./animation_config.js";
 import { HOME_RIM_COORDS, AWAY_RIM_COORDS, HOME_TOP_KEY, AWAY_TOP_KEY } from "./courtConstants.js";

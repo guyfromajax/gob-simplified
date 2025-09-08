@@ -2,13 +2,13 @@ import * as Phaser from "https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.
 import { animateStep } from "./animateStep.js";
 import { gridToPixels } from "../utils/gridToPixels.js";
 import {
-  attachBallToPlayer,
   shootBall,
   SHOT_DEBUG,
   animateRebound,
   animatePutbackAttempt,
   animateKickoutReset
 } from "./ballManager.js";
+import { attachBallToPlayer } from "./BallControllerAdapter.js";
 import { tweenBallTo, runPass, PASS_DEBUG, tweenPlayerTo } from "./ballTween.js";
 import animationConfig from "./animation_config.js";
 import { HOME_RIM_COORDS, AWAY_RIM_COORDS } from "./courtConstants.js";
