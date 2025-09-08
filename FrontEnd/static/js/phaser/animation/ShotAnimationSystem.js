@@ -642,10 +642,116 @@ export class ShotAnimationSystem {
    * Handle offensive rebound
    */
   async handleOffensiveRebound(rebounderSprite, turnData) {
-    console.log('🎬 ShotAnimationSystem: Handling offensive rebound');
+    console.log('🎬 ShotAnimationSystem: Handling offensive rebound', {
+      rebounderId: turnData.rebounderId,
+      putback_attempt: turnData.putback_attempt,
+      events: turnData.events
+    });
     
-    // For now, just keep the ball with the rebounder
-    // Future: handle putback attempts or kickouts
+    // Determine if this is a putback attempt or kickout
+    const isPutbackAttempt = this.isPutbackAttempt(turnData);
+    
+    if (isPutbackAttempt) {
+      console.log('🎬 ShotAnimationSystem: Executing putback attempt');
+      await this.executePutbackAttempt(rebounderSprite, turnData);
+    } else {
+      console.log('🎬 ShotAnimationSystem: Executing kickout pass');
+      await this.executeKickoutPass(rebounderSprite, turnData);
+    }
+  }
+
+  /**
+   * Check if this is a putback attempt
+   */
+  isPutbackAttempt(turnData) {
+    // Check for putback attempt flag
+    if (turnData.putback_attempt === true) {
+      return true;
+    }
+    
+    // Check for PUTBACK_ATTEMPT event
+    if (turnData.events && Array.isArray(turnData.events)) {
+      return turnData.events.some(event => event.event_type === 'PUTBACK_ATTEMPT');
+    }
+    
+    return false;
+  }
+
+  /**
+   * Execute putback attempt
+   */
+  async executePutbackAttempt(rebounderSprite, turnData) {
+    console.log('🎬 ShotAnimationSystem: Executing putback attempt');
+    
+    // Find the putback event data
+    const putbackEvent = turnData.events?.find(event => event.event_type === 'PUTBACK_ATTEMPT');
+    if (!putbackEvent) {
+      console.warn('🎬 ShotAnimationSystem: No putback event found');
+      return;
+    }
+    
+    // Get rim coordinates
+    const rimCoords = rebounderSprite.team === "home" ? 
+      { x: 89, y: 50 } : // Home rim
+      { x: 11, y: 50 };  // Away rim
+    
+    // Import and use the existing putback animation function
+    const { animatePutbackAttempt } = await import('./ballManager.js');
+    
+    // Execute putback attempt
+    const putbackResult = await animatePutbackAttempt(
+      this.scene,
+      this.ballController.ballSprite,
+      turnData.rebounderId,
+      rimCoords,
+      putbackEvent.duration || 500,
+      putbackEvent.result
+    );
+    
+    console.log('🎬 ShotAnimationSystem: Putback attempt completed', {
+      result: putbackEvent.result,
+      putbackResult
+    });
+    
+    // Handle the result - the animatePutbackAttempt function already handles:
+    // - Make + no foul → inbound pass
+    // - Make + foul → free throw
+    // - Miss + foul → free throw  
+    // - Miss + no foul → rebound (which will trigger the next turn)
+  }
+
+  /**
+   * Execute kickout pass
+   */
+  async executeKickoutPass(rebounderSprite, turnData) {
+    console.log('🎬 ShotAnimationSystem: Executing kickout pass');
+    
+    // Find the kickout event data
+    const kickoutEvent = turnData.events?.find(event => event.event_type === 'KICKOUT_RESET');
+    if (!kickoutEvent) {
+      console.warn('🎬 ShotAnimationSystem: No kickout event found');
+      return;
+    }
+    
+    // Import and use the existing kickout animation function
+    const { animateKickoutReset } = await import('./ballManager.js');
+    
+    // Execute kickout pass
+    await animateKickoutReset(
+      this.scene,
+      this.ballController.ballSprite,
+      turnData.rebounderId,
+      kickoutEvent.pgId,
+      kickoutEvent.pass
+    );
+    
+    console.log('🎬 ShotAnimationSystem: Kickout pass completed');
+    
+    // The animateKickoutReset function already handles:
+    // - Pass from rebounder to PG
+    // - Ball attachment to PG
+    // - State transition to HalfCourt
+    // - HCO re-entry will be handled by the next turn
   }
 
   /**
