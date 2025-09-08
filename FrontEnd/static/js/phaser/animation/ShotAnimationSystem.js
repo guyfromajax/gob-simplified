@@ -18,7 +18,6 @@ import { AnimationStates } from './SimplifiedStateMachine.js';
 import { DebugFlags } from '../utils/debugFlags.js';
 import { gridToPixels } from '../utils/gridToPixels.js';
 import { animateStep } from './animateStep.js';
-import { attachBallToPlayer } from './ballManager.js';
 import { HOME_RIM_COORDS, AWAY_RIM_COORDS } from './courtConstants.js';
 
 export class ShotAnimationSystem {
@@ -291,8 +290,8 @@ export class ShotAnimationSystem {
             stepIndex
           });
           
-          // Transfer ball to new owner
-          attachBallToPlayer(this.scene, ballSprite, newOwnerSprite);
+          // Transfer ball to new owner using BallController
+          this.ballController.attachToPlayer(newOwnerSprite);
           currentBallOwnerRef.value = newOwnerSprite;
         }
         break;
