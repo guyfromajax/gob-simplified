@@ -16,6 +16,7 @@
 
 import { AnimationStates } from './SimplifiedStateMachine.js';
 import { DebugFlags } from '../utils/debugFlags.js';
+import { gridToPixels } from '../utils/gridToPixels.js';
 
 export class ReboundAnimationSystem {
   constructor(scene, ballController, stateMachine, playerSprites) {
@@ -344,24 +345,61 @@ export class ReboundAnimationSystem {
   }
 
   /**
-   * Animate PG to outlet position
+   * Animate PG to outlet position (authentic basketball positioning)
    */
   async animatePGToOutlet(pgSprite, rebounderSprite) {
     return new Promise((resolve) => {
-      // Calculate outlet position (near rebounder)
-      const outletX = rebounderSprite.x + (Math.random() - 0.5) * 20;
-      const outletY = rebounderSprite.y + (Math.random() - 0.5) * 20;
+      // Convert to grid coordinates for precise positioning
+      const width = this.scene.game.config.width;
+      const height = this.scene.game.config.height;
+      
+      const rebGridX = (rebounderSprite.x / width) * 100;
+      const rebGridY = 50 - (rebounderSprite.y / height) * 50;
+      
+      // Get basket coordinates to determine direction
+      const basketGrid = { x: 89, y: 25 }; // Home basket (away team rebounds toward home basket)
+      if (rebounderSprite.team === 'away') {
+        basketGrid.x = 11; // Away basket (home team rebounds toward away basket)
+      }
+      
+      // For HCO: move PG near the rebounder (authentic basketball positioning)
+      // PG moves 3-6 grid spots toward the basket from rebounder position
+      const sign = basketGrid.x > rebGridX ? 1 : -1;
+      const outletTarget = {
+        x: Phaser.Math.Clamp(
+          rebGridX + sign * Phaser.Math.Between(3, 6),
+          4,
+          97
+        ),
+        y: Phaser.Math.Clamp(
+          rebGridY + Phaser.Math.Between(-6, 6),
+          1,
+          50
+        ),
+      };
+      
+      // Convert back to pixel coordinates
+      const outletPx = gridToPixels(outletTarget.x, outletTarget.y, width, height);
       
       const tween = this.scene.tweens.add({
         targets: pgSprite,
-        x: outletX,
-        y: outletY,
+        x: outletPx.x,
+        y: outletPx.y,
         duration: this.reboundConfig.movementDuration,
         ease: this.reboundConfig.movementEase,
         onComplete: () => {
           resolve();
         }
       });
+      
+      if (DebugFlags.REBOUND_ANIMATION) {
+        console.log('ReboundAnimationSystem: PG outlet positioning', {
+          rebounderGrid: { x: rebGridX, y: rebGridY },
+          outletTarget,
+          outletPx,
+          direction: sign
+        });
+      }
     });
   }
 
@@ -390,37 +428,57 @@ export class ReboundAnimationSystem {
   }
 
   /**
-   * Animate individual player to offense basket
+   * Animate individual player to offense basket (authentic basketball positioning)
    */
   async animatePlayerToOffenseBasket(playerSprite, turnData) {
     return new Promise((resolve) => {
-      // Determine offense basket direction
-      const isHomeTeam = turnData.possession_team_id === this.scene.homeTeamId;
-      const offenseBasketX = isHomeTeam ? 89 : 11; // From courtConstants.js
+      // Convert to grid coordinates for precise positioning
+      const width = this.scene.game.config.width;
+      const height = this.scene.game.config.height;
       
-      // Calculate movement direction
-      const currentX = playerSprite.x;
-      const direction = offenseBasketX > 50 ? 1 : -1; // Move toward offense basket
+      const currentGridX = (playerSprite.x / width) * 100;
+      const currentGridY = 50 - (playerSprite.y / height) * 50;
       
-      // Random movement amount (20-30 x spots, ±10 y spots)
-      const moveX = direction * (20 + Math.random() * 10);
-      const moveY = (Math.random() - 0.5) * 20;
+      // Move 20-30 grid spots toward new offense basket (authentic basketball)
+      const distance = Phaser.Math.Between(20, 30);
       
-      const targetX = Math.max(this.reboundConfig.courtBounds.minX,
-        Math.min(this.reboundConfig.courtBounds.maxX, currentX + moveX));
-      const targetY = Math.max(this.reboundConfig.courtBounds.minY,
-        Math.min(this.reboundConfig.courtBounds.maxY, playerSprite.y + moveY));
+      // Determine direction based on new offense team:
+      // In defensive rebound: rebounder's team becomes the new offense team
+      // If new offense team is home (basket at x=89), all players move right (increase x)
+      // If new offense team is away (basket at x=11), all players move left (decrease x)
+      const newOffenseTeam = turnData.possession_team_id === this.scene.homeTeamId ? 'home' : 'away';
+      const direction = newOffenseTeam === "home" ? 1 : -1;
+      
+      const targetGrid = {
+        x: Phaser.Math.Clamp(
+          currentGridX + direction * distance,
+          4,  // Stay in bounds
+          97
+        ),
+        y: Phaser.Math.Clamp(
+          currentGridY + Phaser.Math.Between(-10, 10),
+          1,  // Stay in bounds
+          50
+        ),
+      };
+      
+      // Convert back to pixel coordinates
+      const targetPx = gridToPixels(targetGrid.x, targetGrid.y, width, height);
       
       const tween = this.scene.tweens.add({
         targets: playerSprite,
-        x: targetX,
-        y: targetY,
+        x: targetPx.x,
+        y: targetPx.y,
         duration: this.reboundConfig.movementDuration,
         ease: this.reboundConfig.movementEase,
         onComplete: () => {
           resolve();
         }
       });
+      
+      if (DebugFlags.REBOUND_ANIMATION) {
+        console.log(`HCO player movement: ${playerSprite.id || 'unknown'} from (${currentGridX.toFixed(1)}, ${currentGridY.toFixed(1)}) to (${targetGrid.x}, ${targetGrid.y}) [direction: ${direction}, newOffenseTeam: ${newOffenseTeam}]`);
+      }
     });
   }
 
