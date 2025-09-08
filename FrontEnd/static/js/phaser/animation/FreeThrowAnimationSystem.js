@@ -34,22 +34,12 @@ export class FreeThrowAnimationSystem {
       shotDuration: 1000, // ms
       shotEase: 'Sine.easeInOut',
       
-      // Bounce parameters (inherited from shot system)
+      // Bounce parameters (used by existing bounce system)
       bounceDuration: 600, // ms
-      bounceEase: 'Bounce',
-      bounceDistance: 30, // pixels
       
       // Setup parameters (fallback values, will use animation data when available)
       setupDuration: 800, // ms
-      setupEase: 'Linear',
-      
-      // Court bounds for bounce calculations
-      courtBounds: {
-        minX: 20,
-        maxX: 780,
-        minY: 20,
-        maxY: 580
-      }
+      setupEase: 'Linear'
     };
     
     // Free throw sequence tracking
@@ -323,10 +313,19 @@ export class FreeThrowAnimationSystem {
       });
     }
 
-    // Ball goes through rim (no bounce)
+    // Ball holds in rim for 1 second (authentic basketball feel)
     const ballSprite = this.ballController.ballSprite;
     if (ballSprite) {
-      // Animate ball going through rim
+      // Hold ball in rim for 1 second
+      await new Promise(resolve => {
+        if (this.scene.time?.delayedCall) {
+          this.scene.time.delayedCall(1000, resolve);
+        } else {
+          setTimeout(resolve, 1000);
+        }
+      });
+
+      // Then animate ball going through rim
       this.scene.tweens.add({
         targets: ballSprite,
         y: ballSprite.y + 20, // Slight drop through rim
@@ -340,12 +339,8 @@ export class FreeThrowAnimationSystem {
 
     // Check if this is the final free throw
     if (ftContext.attempt >= ftContext.total) {
-      // Final free throw made - transition to IDLE (end of possession)
-      this.stateMachine.transition(AnimationStates.IDLE, {
-        reason: 'free_throw_sequence_complete',
-        shooter_id: turnData.shooter_id,
-        made: true
-      });
+      // Final free throw made - execute inbound pass
+      await this.handleFinalMadeFreeThrow(turnData);
     } else {
       // More free throws to come - stay in POSSESSION
       this.stateMachine.transition(AnimationStates.POSSESSION, {
@@ -372,53 +367,152 @@ export class FreeThrowAnimationSystem {
       });
     }
 
-    // Animate ball bounce from rim using proper coordinates
+    // Use existing bounce system for authentic basketball feel
     const rimCoords = this.getRimCoordinatesFromAnimation(turnData);
-    await this.animateBallBounce(rimCoords, turnData);
+    await this.animateBallBounceFromRim(rimCoords, turnData);
+
+    // Check if this is the final free throw
+    if (ftContext.attempt >= ftContext.total) {
+      // Final free throw missed - execute rebound system
+      await this.handleFinalMissedFreeThrow(turnData);
+    } else {
+      // More free throws to come - stay in POSSESSION
+      this.stateMachine.transition(AnimationStates.POSSESSION, {
+        reason: 'free_throw_missed_more_to_come',
+        shooter_id: turnData.shooter_id,
+        attempt: ftContext.attempt,
+        total: ftContext.total
+      });
+    }
+  }
+
+  /**
+   * Animate ball bounce from rim using existing bounce system
+   */
+  async animateBallBounceFromRim(rimCoords, turnData) {
+    const ballSprite = this.ballController.ballSprite;
+    if (!ballSprite) {
+      return;
+    }
+
+    // Import the existing bounce system
+    const { bounceFromRim } = await import('./ballManager.js');
+    
+    // Determine if this is home team shooting (for bounce direction)
+    const isHomeTeam = turnData.offense_team_id === this.scene.simData?.home_team_id;
+    
+    // Use existing bounce system for authentic basketball feel
+    const miss = await bounceFromRim(
+      this.scene,
+      ballSprite,
+      rimCoords,
+      isHomeTeam,
+      this.ftConfig.bounceDuration
+    );
+
+    if (DebugFlags.FREE_THROW_ANIMATION) {
+      console.log('FreeThrowAnimationSystem: Ball bounced from rim', {
+        rimCoords,
+        bounceSpot: miss.grid,
+        isHomeTeam
+      });
+    }
+
+    return miss;
+  }
+
+  /**
+   * Handle final made free throw - execute inbound pass
+   */
+  async handleFinalMadeFreeThrow(turnData) {
+    if (DebugFlags.FREE_THROW_ANIMATION) {
+      console.log('FreeThrowAnimationSystem: Final free throw made - executing inbound pass', {
+        shooter_id: turnData.shooter_id,
+        possession_team_id: turnData.possession_team_id,
+        possession_flips: turnData.possession_flips
+      });
+    }
+
+    // Transition to IDLE state
+    this.stateMachine.transition(AnimationStates.IDLE, {
+      reason: 'free_throw_sequence_complete',
+      shooter_id: turnData.shooter_id,
+      made: true
+    });
+
+    // Execute inbound pass using existing system
+    const { runInboundSetup } = await import('./turnAnimation.js');
+    
+    // Determine the new offense side based on possession_team_id
+    const isHomeOffense = turnData.possession_team_id === this.scene.simData?.home_team_id;
+    const newOffenseSide = isHomeOffense ? 'home' : 'away';
+    
+    await runInboundSetup({
+      scene: this.scene,
+      ballSprite: this.ballController.ballSprite,
+      playerSprites: this.playerSprites,
+      newOffenseSide: newOffenseSide,
+      homeTeamId: this.scene.simData?.home_team_id,
+      awayTeamId: this.scene.simData?.away_team_id
+    });
+
+    if (DebugFlags.FREE_THROW_ANIMATION) {
+      console.log('FreeThrowAnimationSystem: Inbound pass completed after final made free throw');
+    }
+  }
+
+  /**
+   * Handle final missed free throw - execute rebound system
+   */
+  async handleFinalMissedFreeThrow(turnData) {
+    if (DebugFlags.FREE_THROW_ANIMATION) {
+      console.log('FreeThrowAnimationSystem: Final free throw missed - executing rebound system', {
+        shooter_id: turnData.shooter_id,
+        rebounderId: turnData.rebounderId,
+        rebound_type: turnData.rebound_type
+      });
+    }
 
     // Transition to REBOUNDING state
     this.stateMachine.transition(AnimationStates.REBOUNDING, {
       reason: 'free_throw_missed',
-      shooter_id: turnData.shooter_id,
-      attempt: ftContext.attempt,
-      total: ftContext.total
+      shooter_id: turnData.shooter_id
     });
-  }
 
-  /**
-   * Animate ball bounce from rim (similar to shot system)
-   */
-  async animateBallBounce(rimCoords, turnData) {
-    return new Promise((resolve) => {
-      const ballSprite = this.ballController.ballSprite;
-      if (!ballSprite) {
-        resolve();
-        return;
-      }
+    // Execute rebound system using existing system
+    const { animateRebound } = await import('./ballManager.js');
+    
+    // Get the bounce spot from the previous bounce
+    const rimCoords = this.getRimCoordinatesFromAnimation(turnData);
+    const miss = await this.animateBallBounceFromRim(rimCoords, turnData);
+    
+    // Execute the rebound animation
+    await animateRebound({
+      scene: this.scene,
+      ballSprite: this.ballController.ballSprite,
+      playerSprites: this.playerSprites,
+      animations: [],
+      rebounderId: turnData.rebounderId || turnData.rebounder_player_id,
+      ballSpot: miss.grid,
+      shooterId: turnData.shooter_id
+    });
 
-      // Calculate bounce destination
-      const bounceCoords = this.calculateBounceCoords(rimCoords, turnData);
-
-      // Animate bounce
-      const tween = this.scene.tweens.add({
-        targets: ballSprite,
-        x: bounceCoords.x,
-        y: bounceCoords.y,
-        duration: this.ftConfig.bounceDuration,
-        ease: this.ftConfig.bounceEase,
-        onComplete: () => {
-          // Hide ball after bounce
-          ballSprite.setVisible(false);
-          resolve();
-        },
-        onUpdate: () => {
-          // Update ball controller position
-          this.ballController.updatePosition(ballSprite.x, ballSprite.y);
-        }
+    // Handle defensive rebound setup if needed
+    if (turnData.rebound_type === "DREB") {
+      const { runDefensiveReboundSetup } = await import('./turnAnimation.js');
+      await runDefensiveReboundSetup({
+        scene: this.scene,
+        ballSprite: this.ballController.ballSprite,
+        playerSprites: this.playerSprites,
+        rebounderId: turnData.rebounderId || turnData.rebounder_player_id,
+        nextPlayType: turnData.next_play_type || "HCO"
       });
-    });
-  }
+    }
 
+    if (DebugFlags.FREE_THROW_ANIMATION) {
+      console.log('FreeThrowAnimationSystem: Rebound system completed after final missed free throw');
+    }
+  }
 
   /**
    * Get rim coordinates from animation data
@@ -455,24 +549,6 @@ export class FreeThrowAnimationSystem {
     return isHomeTeam ? this.ftConfig.homeRim : this.ftConfig.awayRim;
   }
 
-  /**
-   * Calculate bounce coordinates
-   */
-  calculateBounceCoords(rimCoords, turnData) {
-    // Get court bounds
-    const courtWidth = this.scene.game.config.width;
-    const courtHeight = this.scene.game.config.height;
-
-    // Calculate random bounce within bounds
-    const bounceX = Math.max(this.ftConfig.courtBounds.minX, 
-      Math.min(this.ftConfig.courtBounds.maxX, 
-        rimCoords.x + (Math.random() - 0.5) * this.ftConfig.bounceDistance * 2));
-    const bounceY = Math.max(this.ftConfig.courtBounds.minY, 
-      Math.min(this.ftConfig.courtBounds.maxY,
-        rimCoords.y + (Math.random() - 0.5) * this.ftConfig.bounceDistance * 2));
-
-    return { x: bounceX, y: bounceY };
-  }
 
   /**
    * Adapt backend data structure to new system format
