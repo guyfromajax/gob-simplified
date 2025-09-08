@@ -135,10 +135,11 @@ export class PassAnimationSystem {
     // 1. Ensure we're in POSSESSION state
     if (this.stateMachine && !this.stateMachine.is(AnimationStates.POSSESSION)) {
       if (this.stateMachine) {
-      this.stateMachine.transition(AnimationStates.POSSESSION, {
-        reason: 'pass_initiated',
-        passer_id: turnData.passer_id
-      });
+        this.stateMachine.transition(AnimationStates.POSSESSION, {
+          reason: 'pass_initiated',
+          passer_id: turnData.passer_id
+        });
+      }
     }
 
     // 2. Position receiver if needed
