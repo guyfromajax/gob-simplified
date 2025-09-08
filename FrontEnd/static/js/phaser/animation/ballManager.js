@@ -5,11 +5,11 @@ import { runInboundSetup as baseRunInboundSetup } from "./turnAnimation.js";
 import animationConfig from "./animation_config.js";
 import { HOME_RIM_COORDS, AWAY_RIM_COORDS } from "./courtConstants.js";
 import {
-  attachBallToPlayer as baseAttachBallToPlayer,
   detachBall,
   tweenBallTo,
   runPass as baseRunPass
 } from "./ballTween.js";
+import { attachBallToPlayer as baseAttachBallToPlayer } from "./BallControllerAdapter.js";
 import { States, getDebugTransitions, safeTransition, createTransitionGuard } from "../state/gameStateMachine.js";
 import gameStore from "../../state/gameStore.js";
 import {
