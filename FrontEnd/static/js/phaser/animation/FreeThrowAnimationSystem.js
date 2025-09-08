@@ -17,6 +17,7 @@
 
 import { AnimationStates } from './SimplifiedStateMachine.js';
 import { DebugFlags } from '../utils/debugFlags.js';
+import { HOME_RIM_COORDS, AWAY_RIM_COORDS } from './courtConstants.js';
 
 export class FreeThrowAnimationSystem {
   constructor(scene, ballController, stateMachine, playerSprites, gameStore) {
@@ -46,8 +47,8 @@ export class FreeThrowAnimationSystem {
       setupEase: 'Power2',
       
       // Rim coordinates (from courtConstants.js)
-      homeRim: { x: 89, y: 25 },
-      awayRim: { x: 11, y: 25 },
+      homeRim: HOME_RIM_COORDS,
+      awayRim: AWAY_RIM_COORDS,
       
       // Court bounds
       courtBounds: {
@@ -90,24 +91,27 @@ export class FreeThrowAnimationSystem {
         });
       }
 
+      // Adapt backend data structure to new system format
+      const adaptedTurnData = this.adaptBackendData(turnData);
+      
       // Validate free throw data
       console.log('🔍 FreeThrowAnimationSystem: Validating free throw data', {
-        result_type: turnData.result_type,
-        shooter_id: turnData.shooter_id,
-        player_id: turnData.player_id,
-        ftContext: turnData.ftContext,
-        allKeys: Object.keys(turnData),
-        fullTurnData: turnData
+        result_type: adaptedTurnData.result_type,
+        shooter_id: adaptedTurnData.shooter_id,
+        player_id: adaptedTurnData.player_id,
+        ftContext: adaptedTurnData.ftContext,
+        allKeys: Object.keys(adaptedTurnData),
+        fullTurnData: adaptedTurnData
       });
       
-      if (!this.validateFreeThrowData(turnData)) {
+      if (!this.validateFreeThrowData(adaptedTurnData)) {
         console.error('❌ FreeThrowAnimationSystem: Free throw data validation failed', {
-          result_type: turnData.result_type,
-          shooter_id: turnData.shooter_id,
-          player_id: turnData.player_id,
-          hasResultType: !!turnData.result_type,
-          isFreeThrow: turnData.result_type === 'FREE_THROW',
-          hasShooterId: !!(turnData.shooter_id || turnData.player_id)
+          result_type: adaptedTurnData.result_type,
+          shooter_id: adaptedTurnData.shooter_id,
+          player_id: adaptedTurnData.player_id,
+          hasResultType: !!adaptedTurnData.result_type,
+          isFreeThrow: adaptedTurnData.result_type === 'FREE_THROW',
+          hasShooterId: !!(adaptedTurnData.shooter_id || adaptedTurnData.player_id)
         });
         throw new Error('Invalid free throw data');
       }
@@ -115,16 +119,16 @@ export class FreeThrowAnimationSystem {
       console.log('✅ FreeThrowAnimationSystem: Free throw data validation passed');
 
       // Get shooter sprite
-      const shooterSprite = this.getShooterSprite(turnData);
+      const shooterSprite = this.getShooterSprite(adaptedTurnData);
       if (!shooterSprite) {
         throw new Error('Shooter sprite not found');
       }
 
       // Determine free throw context
-      const ftContext = this.determineFreeThrowContext(turnData);
+      const ftContext = this.determineFreeThrowContext(adaptedTurnData);
 
       // Execute free throw sequence
-      await this.executeFreeThrowSequence(shooterSprite, turnData, ftContext);
+      await this.executeFreeThrowSequence(shooterSprite, adaptedTurnData, ftContext);
 
       // Process any queued sequences
       await this.processSequenceQueue();
@@ -148,7 +152,7 @@ export class FreeThrowAnimationSystem {
     await this.executeFreeThrowShot(shooterSprite, turnData, ftContext);
 
     // 3. Handle free throw outcome
-    if (turnData.result_type === 'MAKE') {
+    if (turnData.actual_result === 'MAKE') {
       await this.handleMadeFreeThrow(turnData, ftContext);
     } else {
       await this.handleMissedFreeThrow(turnData, ftContext);
@@ -409,6 +413,34 @@ export class FreeThrowAnimationSystem {
   }
 
   /**
+   * Adapt backend data structure to new system format
+   */
+  adaptBackendData(backendData) {
+    // Backend provides: attempts: ["MAKE"] or ["MISS"]
+    // New system expects: actual_result: "MAKE" or "MISS"
+    
+    const attempts = backendData.attempts || [];
+    const actualResult = attempts.length > 0 ? attempts[0] : 'MISS';
+    
+    // Backend provides: ftContext from annotateFreeThrowTurns
+    // New system expects: ftContext with attempt/total structure
+    
+    const ftContext = backendData.ftContext || {};
+    const adaptedFtContext = {
+      attempt: ftContext.ftIndex || 1,
+      total: ftContext.ftTotal || 1,
+      type: ftContext.bonusType || 'single',
+      isFinal: (ftContext.ftIndex || 1) >= (ftContext.ftTotal || 1)
+    };
+    
+    return {
+      ...backendData,
+      actual_result: actualResult,
+      ftContext: adaptedFtContext
+    };
+  }
+
+  /**
    * Determine free throw context
    */
   determineFreeThrowContext(turnData) {
@@ -469,7 +501,8 @@ export class FreeThrowAnimationSystem {
   validateFreeThrowData(turnData) {
     return turnData && 
            (turnData.shooter || turnData.ball_handler || turnData.shooter_id) &&
-           turnData.result_type === 'FREE_THROW';
+           turnData.result_type === 'FREE_THROW' &&
+           (turnData.actual_result === 'MAKE' || turnData.actual_result === 'MISS');
   }
 
   /**

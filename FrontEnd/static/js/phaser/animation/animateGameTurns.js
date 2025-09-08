@@ -127,24 +127,27 @@ export async function animateGameTurns({ //hasBallAtStep
     if (DEBUG_FLOW) console.log(`🔁 Turn ${i + 1}`, turn);
 
     if (turn.result_type === "FREE_THROW") {
-      console.log('🎬 Using proven playTurnAnimation for FREE_THROW');
+      console.log('🎬 Using new FreeThrowAnimationSystem for FREE_THROW');
       try {
-        const { playTurnAnimation } = await import('./turnAnimation.js');
-        await playTurnAnimation({
-          scene: scene,
-          simData: simData,
-          playerSprites: playerSprites,
-          turnData: turn,
-          ballSprite: ballSprite,
-          onAction: onUpdate
-        });
-        console.log('✅ playTurnAnimation completed for FREE_THROW');
+        // Use the new FreeThrowAnimationSystem for free throw animations
+        await animationRouter.processTurn(turn);
+        console.log('✅ FreeThrowAnimationSystem completed for FREE_THROW');
       } catch (error) {
-        console.error('❌ playTurnAnimation failed for FREE_THROW:', error);
-        console.log('🔄 Falling back to new AnimationRouter for FREE_THROW');
+        console.error('❌ FreeThrowAnimationSystem failed for FREE_THROW:', error);
+        
+        // Fallback to old system if new system fails
+        console.log('🔄 Falling back to playTurnAnimation for FREE_THROW');
         try {
-          await animationRouter.processTurn(turn);
-          console.log('✅ AnimationRouter fallback completed for FREE_THROW');
+          const { playTurnAnimation } = await import('./turnAnimation.js');
+          await playTurnAnimation({
+            scene: scene,
+            simData: simData,
+            playerSprites: playerSprites,
+            turnData: turn,
+            ballSprite: ballSprite,
+            onAction: onUpdate
+          });
+          console.log('✅ playTurnAnimation fallback completed for FREE_THROW');
         } catch (fallbackError) {
           console.error('❌ Both animation systems failed for FREE_THROW:', fallbackError);
         }
