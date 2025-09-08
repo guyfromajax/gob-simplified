@@ -147,7 +147,7 @@ export class ShotAnimationSystem {
     }
     
     if (step0OwnerSprite) {
-      attachBallToPlayer(this.scene, ballSprite, step0OwnerSprite);
+      this.ballController.attachToPlayer(step0OwnerSprite);
       currentBallOwnerRef.value = step0OwnerSprite;
     }
     
@@ -314,7 +314,12 @@ export class ShotAnimationSystem {
     });
     
     // Detach ball from shooter
+    console.log('🎯 ShotAnimationSystem: Detaching ball from shooter', {
+      shooterId: shotInfo.playerId,
+      ballControllerState: this.ballController.getState()
+    });
     this.ballController.detachFromPlayer('shot');
+    console.log('🎯 ShotAnimationSystem: Ball detached, new state:', this.ballController.getState());
     
     // Animate ball flight
     await this.animateBallFlight(shooterSprite, rimCoords, turnData);
