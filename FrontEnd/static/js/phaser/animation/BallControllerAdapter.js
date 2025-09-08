@@ -1,0 +1,238 @@
+/**
+ * BallController Adapter - Backward Compatibility Layer
+ * 
+ * This adapter makes the new BallController system backward compatible
+ * with the old attachBallToPlayer function signature and behavior.
+ * 
+ * This allows gradual migration from the old system to the new system
+ * without breaking existing code.
+ */
+
+import { BallController } from './BallController.js';
+
+/**
+ * Global BallController instance - single source of truth
+ */
+let globalBallController = null;
+
+/**
+ * Initialize the global BallController
+ * This should be called once when the game scene is created
+ */
+export function initializeBallController(scene, ballSprite) {
+  if (globalBallController) {
+    console.warn('BallControllerAdapter: Global BallController already initialized');
+    return globalBallController;
+  }
+  
+  globalBallController = new BallController(scene, ballSprite);
+  globalBallController.debug = true; // Enable debug logging for adapter
+  
+  console.log('BallControllerAdapter: Global BallController initialized');
+  return globalBallController;
+}
+
+/**
+ * Get the global BallController instance
+ */
+export function getBallController() {
+  if (!globalBallController) {
+    console.error('BallControllerAdapter: Global BallController not initialized. Call initializeBallController() first.');
+    return null;
+  }
+  return globalBallController;
+}
+
+/**
+ * Backward compatible attachBallToPlayer function
+ * 
+ * This function maintains the exact same signature and behavior as the old
+ * attachBallToPlayer function, but uses the new BallController internally.
+ * 
+ * @param {Phaser.Scene} scene - The game scene
+ * @param {Phaser.GameObjects.Image} ballSprite - The ball sprite
+ * @param {Phaser.GameObjects.Sprite} playerSprite - The player sprite to attach to
+ * @param {Object} opts - Options object (depth, debugInfo, etc.)
+ */
+export function attachBallToPlayer(scene, ballSprite, playerSprite, opts = {}) {
+  const ballController = getBallController();
+  
+  if (!ballController) {
+    console.error('BallControllerAdapter: Cannot attach ball - BallController not initialized');
+    return;
+  }
+
+  // Handle possession flip in progress (old system behavior)
+  if (scene.possessionFlipInProgress) {
+    console.log('BallControllerAdapter: Skipping attach due to possessionFlipInProgress');
+    return;
+  }
+
+  // Handle rebound state restrictions (old system behavior)
+  if (scene.stateMachine?.is('Rebound') && playerSprite.playerId !== scene.rebounderId) {
+    console.log('BallControllerAdapter: Skipping attach - not the rebounder during rebound state');
+    return;
+  }
+
+  // Handle possession flip restrictions (old system behavior)
+  const targetTeamId = playerSprite.team_id;
+  if (
+    scene.possessionFlipInProgress &&
+    scene.offenseTeamId != null &&
+    String(targetTeamId) !== String(scene.offenseTeamId)
+  ) {
+    const from = getCurrentOwner(scene);
+    console.warn('BallControllerAdapter: Skipping attach due to possession flip', { 
+      from: from?.playerId, 
+      to: playerSprite.playerId, 
+      reason: 'possessionFlipInProgress' 
+    });
+    return;
+  }
+
+  // Convert old system options to new system options
+  const ballControllerOptions = {
+    offset: { x: 0, y: 0 }, // Centered positioning
+    debugInfo: opts.debugInfo || null
+  };
+
+  // Handle depth setting (old system behavior)
+  if (opts.depth !== undefined) {
+    if (ballSprite) {
+      ballSprite.setDepth(opts.depth);
+    }
+  }
+
+  // Use BallController to attach
+  const success = ballController.attachToPlayer(playerSprite, ballControllerOptions);
+  
+  if (success) {
+    // Update old system references for backward compatibility
+    if (scene?.currentBallOwnerRef) {
+      scene.currentBallOwnerRef.value = playerSprite;
+    }
+    
+    // Set old system ball state
+    scene.ballDetached = false;
+    
+    // Log for debugging (old system style)
+    if (opts.debugInfo) {
+      console.log('BallControllerAdapter: Ball attached', {
+        type: 'ballAttach',
+        shooterId: opts.debugInfo.shooterId ?? null,
+        reboundSpot: opts.debugInfo.reboundSpot ?? null,
+        playerId: playerSprite.playerId,
+        team: playerSprite.team_id ?? playerSprite.team ?? null
+      });
+    }
+  } else {
+    console.warn('BallControllerAdapter: Failed to attach ball to player', {
+      playerId: playerSprite.playerId,
+      team: playerSprite.team_id ?? playerSprite.team
+    });
+  }
+}
+
+/**
+ * Backward compatible detachBall function
+ * 
+ * @param {Phaser.Scene} scene - The game scene
+ * @param {Phaser.GameObjects.Image} ballSprite - The ball sprite
+ */
+export function detachBall(scene, ballSprite) {
+  const ballController = getBallController();
+  
+  if (!ballController) {
+    console.error('BallControllerAdapter: Cannot detach ball - BallController not initialized');
+    return;
+  }
+
+  // Use BallController to detach
+  ballController.detachFromPlayer('detach');
+  
+  // Update old system references
+  scene.ballDetached = true;
+  
+  console.log('BallControllerAdapter: Ball detached');
+}
+
+/**
+ * Backward compatible tweenBallTo function
+ * 
+ * @param {Phaser.Scene} scene - The game scene
+ * @param {Phaser.GameObjects.Image} ballSprite - The ball sprite
+ * @param {Object} targetCoords - Target coordinates
+ * @param {Object} options - Tween options
+ */
+export function tweenBallTo(scene, ballSprite, targetCoords, options = {}) {
+  const ballController = getBallController();
+  
+  if (!ballController) {
+    console.error('BallControllerAdapter: Cannot tween ball - BallController not initialized');
+    return Promise.resolve();
+  }
+
+  // Use BallController to start flight
+  ballController.startFlight(targetCoords, options);
+  
+  // Return a promise that resolves when the tween completes
+  return new Promise((resolve) => {
+    if (options.duration) {
+      setTimeout(resolve, options.duration);
+    } else {
+      resolve();
+    }
+  });
+}
+
+/**
+ * Helper function to get current ball owner (old system compatibility)
+ */
+export function getCurrentOwner(scene) {
+  const ballController = getBallController();
+  return ballController ? ballController.currentOwner : null;
+}
+
+/**
+ * Helper function to set current ball owner (old system compatibility)
+ */
+export function setCurrentOwner(scene, playerId) {
+  const ballController = getBallController();
+  if (ballController && scene.playerSprites && scene.playerSprites[playerId]) {
+    ballController.attachToPlayer(scene.playerSprites[playerId]);
+  }
+}
+
+/**
+ * Helper function to clear current ball owner (old system compatibility)
+ */
+export function clearCurrentOwner(scene) {
+  const ballController = getBallController();
+  if (ballController) {
+    ballController.detachFromPlayer('clear');
+  }
+}
+
+// Named exports for individual functions
+export {
+  attachBallToPlayer,
+  detachBall,
+  tweenBallTo,
+  getCurrentOwner,
+  setCurrentOwner,
+  clearCurrentOwner,
+  initializeBallController,
+  getBallController
+};
+
+// Default export for backward compatibility
+export default {
+  attachBallToPlayer,
+  detachBall,
+  tweenBallTo,
+  getCurrentOwner,
+  setCurrentOwner,
+  clearCurrentOwner,
+  initializeBallController,
+  getBallController
+};
