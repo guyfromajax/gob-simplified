@@ -14,7 +14,7 @@
 
 import AnimationEngine from './AnimationEngine.js';
 import SimplifiedStateMachine, { AnimationStates } from './SimplifiedStateMachine.js';
-import BallController from './BallController.js';
+import { getBallController } from './BallControllerAdapter.js';
 import { DebugFlags } from '../utils/debugFlags.js';
 
 export class AnimationRouter {
@@ -26,7 +26,7 @@ export class AnimationRouter {
     
     // Initialize core components
     this.stateMachine = new SimplifiedStateMachine(AnimationStates.IDLE);
-    this.ballController = new BallController(scene, ballSprite);
+    this.ballController = getBallController(); // Use the global BallController from adapter
     this.animationEngine = new AnimationEngine(scene);
     
     // Inject dependencies into animation engine
