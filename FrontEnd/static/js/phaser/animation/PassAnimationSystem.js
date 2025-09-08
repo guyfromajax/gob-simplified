@@ -346,9 +346,10 @@ export class PassAnimationSystem {
     // Stay in POSSESSION state
     if (this.stateMachine) {
       this.stateMachine.transition(AnimationStates.POSSESSION, {
-      reason: 'pass_successful',
-      receiver_id: turnData.receiver_id
-    });
+        reason: 'pass_successful',
+        receiver_id: turnData.receiver_id
+      });
+    }
   }
 
   /**
@@ -422,9 +423,10 @@ export class PassAnimationSystem {
     // Transition to IDLE state
     if (this.stateMachine) {
       this.stateMachine.transition(AnimationStates.IDLE, {
-      reason: 'pass_failed',
-      passer_id: turnData.passer_id
-    });
+        reason: 'pass_failed',
+        passer_id: turnData.passer_id
+      });
+    }
   }
 
   /**
@@ -537,9 +539,10 @@ export class PassAnimationSystem {
     // Reset to safe state
     if (this.stateMachine) {
       this.stateMachine.transition(AnimationStates.IDLE, {
-      reason: 'pass_error',
-      error: error.message
-    });
+        reason: 'pass_error',
+        error: error.message
+      });
+    }
 
     // Hide ball if visible
     const ballSprite = this.ballController.ballSprite;
