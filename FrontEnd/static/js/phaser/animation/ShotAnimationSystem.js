@@ -619,13 +619,22 @@ export class ShotAnimationSystem {
   async handleDefensiveRebound(rebounderSprite, turnData) {
     console.log('🎬 ShotAnimationSystem: Handling defensive rebound');
     
-    // Move PG to outlet position
-    const pgSprite = this.findPointGuard(rebounderSprite.team);
-    if (pgSprite) {
-      await this.animatePGToOutlet(pgSprite, rebounderSprite);
+    // Use the same defensive rebound setup as free throws
+    if (turnData.next_play_type === 'HCO') {
+      console.log('🎬 ShotAnimationSystem: Defensive rebound leads to HCO - using runDefensiveReboundSetup');
       
-      // Execute outlet pass
-      await this.executeOutletPass(rebounderSprite, pgSprite);
+      // Import and use the same function that works for free throws
+      const { runDefensiveReboundSetup } = await import('./turnAnimation.js');
+      await runDefensiveReboundSetup({
+        scene: this.scene,
+        ballSprite: this.ballController.ballSprite,
+        playerSprites: this.playerSprites,
+        rebounderId: turnData.rebounderId,
+        nextPlayType: turnData.next_play_type || "HCO"
+      });
+    } else {
+      console.log('🎬 ShotAnimationSystem: Defensive rebound leads to Fast Break or other');
+      // Handle other cases if needed
     }
   }
 
