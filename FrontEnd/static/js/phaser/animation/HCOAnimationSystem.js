@@ -20,10 +20,10 @@ export class HCOAnimationSystem {
   }
 
   /**
-   * Process HCO positioning step
+   * Process HCO outlet pass step
    */
   async processHCO(turnData, context = {}) {
-    console.log('🎬 HCOAnimationSystem: Starting HCO processing', {
+    console.log('🎬 HCOAnimationSystem: Starting HCO outlet pass processing', {
       result_type: turnData.result_type,
       offensive_state: turnData.offensive_state,
       activeHCO: !!this.activeHCO
@@ -39,10 +39,10 @@ export class HCOAnimationSystem {
     this.activeHCO = turnData;
     
     try {
-      console.log('🎬 HCOAnimationSystem: Processing HCO positioning step');
+      console.log('🎬 HCOAnimationSystem: Processing HCO outlet pass step');
       
-      // Execute HCO positioning step (Rebound HCO Outlet animation)
-      await this.executeHCOPositioningStep(turnData, context);
+      // Execute HCO outlet pass step (Rebound HCO Outlet animation)
+      await this.executeHCOOutletPassStep(turnData, context);
 
       // Process any queued HCO animations
       await this.processHCOQueue();
@@ -57,40 +57,40 @@ export class HCOAnimationSystem {
   }
 
   /**
-   * Execute HCO positioning step (Rebound HCO Outlet animation)
+   * Execute HCO outlet pass step (Rebound HCO Outlet animation)
    */
-  async executeHCOPositioningStep(turnData, context = {}) {
-    console.log('🎬 HCOAnimationSystem: Executing HCO positioning step');
+  async executeHCOOutletPassStep(turnData, context = {}) {
+    console.log('🎬 HCOAnimationSystem: Executing HCO outlet pass step');
     
     // Find the rebounder (should be the current ball holder)
     const rebounderSprite = this.findRebounder(turnData);
     if (!rebounderSprite) {
-      console.warn('🎬 No rebounder found for HCO positioning');
+      console.warn('🎬 No rebounder found for HCO outlet pass');
       return;
     }
 
     // 1. Move PG to outlet position
     const pgSprite = this.findPointGuard(rebounderSprite.team);
-    console.log('🎬 HCO Positioning: PG found:', !!pgSprite, 'Team:', rebounderSprite.team);
+    console.log('🎬 HCO Outlet Pass: PG found:', !!pgSprite, 'Team:', rebounderSprite.team);
     
     if (pgSprite) {
-      console.log('🎬 HCO Positioning: Moving PG to outlet position');
+      console.log('🎬 HCO Outlet Pass: Moving PG to outlet position');
       await this.animatePGToOutlet(pgSprite, rebounderSprite);
     } else {
-      console.warn('🎬 HCO Positioning: No PG found for team:', rebounderSprite.team);
+      console.warn('🎬 HCO Outlet Pass: No PG found for team:', rebounderSprite.team);
     }
 
     // 2. Move other 8 players toward offense basket
-    console.log('🎬 HCO Positioning: Moving other players toward offense basket');
+    console.log('🎬 HCO Outlet Pass: Moving other players toward offense basket');
     await this.animatePlayersToOffenseBasket(rebounderSprite, turnData);
 
     // 3. Execute outlet pass from rebounder to PG
     if (pgSprite) {
-      console.log('🎬 HCO Positioning: Executing outlet pass from rebounder to PG');
+      console.log('🎬 HCO Outlet Pass: Executing outlet pass from rebounder to PG');
       await this.executeOutletPass(rebounderSprite, pgSprite, turnData);
-      console.log('🎬 HCO Positioning: Outlet pass completed');
+      console.log('🎬 HCO Outlet Pass: Outlet pass completed');
     } else {
-      console.warn('🎬 HCO Positioning: Cannot execute outlet pass - no PG found');
+      console.warn('🎬 HCO Outlet Pass: Cannot execute outlet pass - no PG found');
     }
   }
 
