@@ -72,7 +72,7 @@ function startBallFollowing(scene, ballSprite, playerSprite, opts = {}) {
   // Stop any existing following
   stopBallFollowing(scene);
 
-  const offset = opts.offset || { x: 0, y: -10 };
+  const offset = opts.offset || { x: 0, y: 0 };
   
   // Store following state on the scene
   scene._ballFollowing = {

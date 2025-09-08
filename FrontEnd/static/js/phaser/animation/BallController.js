@@ -273,7 +273,7 @@ export class BallController {
   positionBallOnPlayer(playerSprite, options = {}) {
     if (!this.ballSprite || !playerSprite) return;
 
-    const offset = options.offset || { x: 0, y: -10 };
+    const offset = options.offset || { x: 0, y: 0 };
     const x = playerSprite.x + offset.x;
     const y = playerSprite.y + offset.y;
 
@@ -291,7 +291,7 @@ export class BallController {
     this.stopFollowingPlayer(); // Stop any existing following
 
     this.followingPlayer = playerSprite;
-    this.followOffset = options.offset || { x: 0, y: -10 };
+    this.followOffset = options.offset || { x: 0, y: 0 };
     this.followCallback = () => {
       if (this.followingPlayer && this.ballSprite && this.isAttached) {
         const x = this.followingPlayer.x + this.followOffset.x;
