@@ -44,6 +44,9 @@ export function attachBallToPlayer(scene, ballSprite, playerSprite, opts = {}) {
     return;
   }
 
+  // Stop any existing ball following
+  stopBallFollowing(scene);
+
   scene.ballDetached = false;
   const depth = opts.depth ?? (playerSprite.depth != null ? playerSprite.depth + 1 : BALL_DEPTH);
   if (scene.tweens) scene.tweens.killTweensOf(ballSprite);
@@ -55,6 +58,62 @@ export function attachBallToPlayer(scene, ballSprite, playerSprite, opts = {}) {
   } else {
     clearCurrentOwner(scene);
   }
+
+  // Start ball following for this player
+  startBallFollowing(scene, ballSprite, playerSprite, opts);
+}
+
+/**
+ * Start ball following a player during movement animations
+ */
+function startBallFollowing(scene, ballSprite, playerSprite, opts = {}) {
+  if (!scene || !ballSprite || !playerSprite) return;
+
+  // Stop any existing following
+  stopBallFollowing(scene);
+
+  const offset = opts.offset || { x: 0, y: -10 };
+  
+  // Store following state on the scene
+  scene._ballFollowing = {
+    ballSprite,
+    playerSprite,
+    offset,
+    callback: () => {
+      if (scene._ballFollowing && 
+          scene._ballFollowing.ballSprite && 
+          scene._ballFollowing.playerSprite &&
+          !scene.ballDetached) {
+        const x = scene._ballFollowing.playerSprite.x + scene._ballFollowing.offset.x;
+        const y = scene._ballFollowing.playerSprite.y + scene._ballFollowing.offset.y;
+        scene._ballFollowing.ballSprite.setPosition(x, y);
+      }
+    }
+  };
+
+  // Add update callback to scene
+  if (scene.events) {
+    scene.events.on('update', scene._ballFollowing.callback);
+  }
+
+  if (PASS_DEBUG) {
+    console.log('Ball following started for player', playerSprite.playerId);
+  }
+}
+
+/**
+ * Stop ball following
+ */
+function stopBallFollowing(scene) {
+  if (scene._ballFollowing && scene._ballFollowing.callback && scene.events) {
+    scene.events.off('update', scene._ballFollowing.callback);
+  }
+  
+  scene._ballFollowing = null;
+
+  if (PASS_DEBUG) {
+    console.log('Ball following stopped');
+  }
 }
 
 /**
@@ -63,6 +122,10 @@ export function attachBallToPlayer(scene, ballSprite, playerSprite, opts = {}) {
  */
 export function detachBall(scene, ballSprite) {
   if (!scene || !ballSprite) return;
+  
+  // Stop ball following
+  stopBallFollowing(scene);
+  
   scene.ballDetached = true;
   cancelBallTween(scene, ballSprite);
   clearCurrentOwner(scene);
@@ -79,6 +142,10 @@ export function detachBall(scene, ballSprite) {
 export function tweenBallTo(scene, ballSprite, target, opts = {}) {
   if (!scene || !ballSprite || !target) return Promise.resolve();
   const { duration = 300, easing = 'Linear', arc } = opts;
+  
+  // Stop ball following when ball starts flight
+  stopBallFollowing(scene);
+  
   if (scene.tweens) scene.tweens.killTweensOf(ballSprite);
   ballSprite.setDepth(BALL_DEPTH);
   ballSprite.setVisible(true);
