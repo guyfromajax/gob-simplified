@@ -276,16 +276,26 @@ export class ReboundAnimationSystem {
 
     // 1. Move PG to outlet position
     const pgSprite = this.findPointGuard(rebounderSprite.team);
+    console.log('🎬 HCO Sequence: PG found:', !!pgSprite, 'Team:', rebounderSprite.team);
+    
     if (pgSprite) {
+      console.log('🎬 HCO Sequence: Moving PG to outlet position');
       await this.animatePGToOutlet(pgSprite, rebounderSprite);
+    } else {
+      console.warn('🎬 HCO Sequence: No PG found for team:', rebounderSprite.team);
     }
 
     // 2. Move other 8 players toward offense basket
+    console.log('🎬 HCO Sequence: Moving other players toward offense basket');
     await this.animatePlayersToOffenseBasket(rebounderSprite, turnData);
 
     // 3. Execute outlet pass
     if (pgSprite) {
+      console.log('🎬 HCO Sequence: Executing outlet pass from rebounder to PG');
       await this.executeOutletPass(rebounderSprite, pgSprite, turnData);
+      console.log('🎬 HCO Sequence: Outlet pass completed');
+    } else {
+      console.warn('🎬 HCO Sequence: Cannot execute outlet pass - no PG found');
     }
   }
 
@@ -486,15 +496,18 @@ export class ReboundAnimationSystem {
    * Execute outlet pass
    */
   async executeOutletPass(passerSprite, receiverSprite, turnData) {
+    console.log('🎬 Executing outlet pass from rebounder to PG');
     return new Promise((resolve) => {
       // Detach ball from passer
       this.ballController.detachFromPlayer('outlet_pass');
+      console.log('🎬 Ball detached from rebounder');
       
       // Start ball flight
       this.ballController.startFlight({
         x: receiverSprite.x,
         y: receiverSprite.y - 10
       });
+      console.log('🎬 Ball flight started to PG position');
       
       // Animate ball to receiver
       const ballSprite = this.ballController.ballSprite;
@@ -507,6 +520,7 @@ export class ReboundAnimationSystem {
         onComplete: () => {
           // Attach ball to receiver
           this.ballController.endFlight(receiverSprite);
+          console.log('🎬 Outlet pass completed - ball attached to PG');
           resolve();
         },
         onUpdate: () => {
@@ -598,9 +612,20 @@ export class ReboundAnimationSystem {
 
   findPointGuard(team) {
     // Find PG by team and position
-    return Object.values(this.playerSprites).find(sprite => 
+    const allPlayers = Object.values(this.playerSprites);
+    console.log('🔍 Finding PG for team:', team);
+    console.log('🔍 Available players:', allPlayers.map(p => ({ 
+      id: p.id || 'unknown', 
+      team: p.team, 
+      position: p.position 
+    })));
+    
+    const pgSprite = allPlayers.find(sprite => 
       sprite.team === team && sprite.position === 'PG'
     );
+    
+    console.log('🔍 PG found:', !!pgSprite, pgSprite ? { id: pgSprite.id, team: pgSprite.team, position: pgSprite.position } : 'none');
+    return pgSprite;
   }
 
   findOutletReceiver(team) {
