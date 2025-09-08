@@ -455,10 +455,31 @@ export class FreeThrowAnimationSystem {
       });
     }
 
-    // Note: Inbound pass will be handled by the next turn in the sequence
-    // The backend will send a separate inbound turn after the free throw
+    // Execute inbound pass using the existing system
+    // The key is to use the correct possession_team_id to prevent double possession flips
+    const { runInboundSetup } = await import('./turnAnimation.js');
+    
+    // Determine the new offense side based on possession_team_id (this should be correct after possession flip)
+    const isHomeOffense = turnData.possession_team_id === this.scene.simData?.home_team_id;
+    const newOffenseSide = isHomeOffense ? 'home' : 'away';
+    
+    console.log('FreeThrowAnimationSystem: Executing inbound pass after final made free throw', {
+      possession_team_id: turnData.possession_team_id,
+      newOffenseSide,
+      home_team_id: this.scene.simData?.home_team_id
+    });
+    
+    await runInboundSetup({
+      scene: this.scene,
+      ballSprite: this.ballController.ballSprite,
+      playerSprites: this.playerSprites,
+      newOffenseSide: newOffenseSide,
+      homeTeamId: this.scene.simData?.home_team_id,
+      awayTeamId: this.scene.simData?.away_team_id
+    });
+
     if (DebugFlags.FREE_THROW_ANIMATION) {
-      console.log('FreeThrowAnimationSystem: Final made free throw completed - inbound will be handled by next turn');
+      console.log('FreeThrowAnimationSystem: Inbound pass completed after final made free throw');
     }
   }
 
