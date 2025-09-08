@@ -156,10 +156,11 @@ export class ReboundAnimationSystem {
     // 4. Transition to POSSESSION state
     if (this.stateMachine) {
       this.stateMachine.transition(AnimationStates.POSSESSION, {
-      reason: 'defensive_rebound_complete',
-      rebounder_id: turnData.rebounder_id,
-      next_play_type: nextPlayType
-    });
+        reason: 'defensive_rebound_complete',
+        rebounder_id: turnData.rebounder_id,
+        next_play_type: nextPlayType
+      });
+    }
   }
 
   /**
@@ -195,10 +196,11 @@ export class ReboundAnimationSystem {
     // 4. Transition to POSSESSION state
     if (this.stateMachine) {
       this.stateMachine.transition(AnimationStates.POSSESSION, {
-      reason: 'offensive_rebound_complete',
-      rebounder_id: turnData.rebounder_id,
-      outcome: outcome
-    });
+        reason: 'offensive_rebound_complete',
+        rebounder_id: turnData.rebounder_id,
+        outcome: outcome
+      });
+    }
   }
 
   /**
@@ -586,9 +588,10 @@ export class ReboundAnimationSystem {
     // Reset to safe state
     if (this.stateMachine) {
       this.stateMachine.transition(AnimationStates.IDLE, {
-      reason: 'rebound_error',
-      error: error.message
-    });
+        reason: 'rebound_error',
+        error: error.message
+      });
+    }
   }
 
   /**

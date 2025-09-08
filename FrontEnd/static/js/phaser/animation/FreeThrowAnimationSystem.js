@@ -356,6 +356,7 @@ export class FreeThrowAnimationSystem {
         attempt: ftContext.attempt,
         total: ftContext.total
       });
+      }
     }
 
     // Wait for ball to go through rim
@@ -391,6 +392,7 @@ export class FreeThrowAnimationSystem {
         attempt: ftContext.attempt,
         total: ftContext.total
       });
+      }
     }
   }
 
@@ -447,10 +449,11 @@ export class FreeThrowAnimationSystem {
     // Transition to IDLE state
     if (this.stateMachine) {
       this.stateMachine.transition(AnimationStates.IDLE, {
-      reason: 'free_throw_sequence_complete',
-      shooter_id: turnData.shooter_id,
-      made: true
-    });
+        reason: 'free_throw_sequence_complete',
+        shooter_id: turnData.shooter_id,
+        made: true
+      });
+    }
 
     // Execute inbound pass using existing system
     const { runInboundSetup } = await import('./turnAnimation.js');
@@ -488,9 +491,10 @@ export class FreeThrowAnimationSystem {
     // Transition to REBOUNDING state
     if (this.stateMachine) {
       this.stateMachine.transition(AnimationStates.REBOUNDING, {
-      reason: 'free_throw_missed',
-      shooter_id: turnData.shooter_id
-    });
+        reason: 'free_throw_missed',
+        shooter_id: turnData.shooter_id
+      });
+    }
 
     // Execute rebound system using existing system
     const { animateRebound } = await import('./ballManager.js');
@@ -702,9 +706,10 @@ export class FreeThrowAnimationSystem {
     // Reset to safe state
     if (this.stateMachine) {
       this.stateMachine.transition(AnimationStates.IDLE, {
-      reason: 'free_throw_error',
-      error: error.message
-    });
+        reason: 'free_throw_error',
+        error: error.message
+      });
+    }
 
     // Hide ball if visible
     const ballSprite = this.ballController.ballSprite;
