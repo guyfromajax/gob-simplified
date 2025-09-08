@@ -133,7 +133,8 @@ export class PassAnimationSystem {
    */
   async executePassSequence(passerSprite, receiverSprite, turnData) {
     // 1. Ensure we're in POSSESSION state
-    if (!this.stateMachine.is(AnimationStates.POSSESSION)) {
+    if (this.stateMachine && !this.stateMachine.is(AnimationStates.POSSESSION)) {
+      if (this.stateMachine) {
       this.stateMachine.transition(AnimationStates.POSSESSION, {
         reason: 'pass_initiated',
         passer_id: turnData.passer_id
@@ -343,7 +344,8 @@ export class PassAnimationSystem {
 
     // Ball is already attached to receiver by executePass
     // Stay in POSSESSION state
-    this.stateMachine.transition(AnimationStates.POSSESSION, {
+    if (this.stateMachine) {
+      this.stateMachine.transition(AnimationStates.POSSESSION, {
       reason: 'pass_successful',
       receiver_id: turnData.receiver_id
     });
@@ -418,7 +420,8 @@ export class PassAnimationSystem {
 
     // Ball should be detached (handled by executePass)
     // Transition to IDLE state
-    this.stateMachine.transition(AnimationStates.IDLE, {
+    if (this.stateMachine) {
+      this.stateMachine.transition(AnimationStates.IDLE, {
       reason: 'pass_failed',
       passer_id: turnData.passer_id
     });
@@ -532,7 +535,8 @@ export class PassAnimationSystem {
     });
 
     // Reset to safe state
-    this.stateMachine.transition(AnimationStates.IDLE, {
+    if (this.stateMachine) {
+      this.stateMachine.transition(AnimationStates.IDLE, {
       reason: 'pass_error',
       error: error.message
     });

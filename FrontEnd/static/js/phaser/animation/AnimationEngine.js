@@ -351,8 +351,8 @@ export class AnimationEngine {
     this.stateMachine = stateMachine;
     this.playerSprites = playerSprites;
     
-    // Initialize animation systems
-    if (this.ballController && this.stateMachine && this.playerSprites) {
+    // Initialize animation systems (stateMachine is optional)
+    if (this.ballController && this.playerSprites) {
       this.shotSystem = new ShotAnimationSystem(
         this.scene,
         this.ballController,

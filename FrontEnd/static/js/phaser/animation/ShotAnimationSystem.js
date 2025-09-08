@@ -402,10 +402,12 @@ export class ShotAnimationSystem {
     }
 
     // Transition to IDLE state (end of possession)
-    this.stateMachine.transition(AnimationStates.IDLE, {
-      reason: 'shot_made',
-      shooter_id: turnData.shooter_id
-    });
+    if (this.stateMachine) {
+      this.stateMachine.transition(AnimationStates.IDLE, {
+        reason: 'shot_made',
+        shooter_id: turnData.shooter_id
+      });
+    }
 
     // Wait for ball to go through rim
     await new Promise(resolve => setTimeout(resolve, 200));
@@ -436,10 +438,12 @@ export class ShotAnimationSystem {
       await this.handleEmbeddedRebound(turnData);
     } else {
       // Transition to REBOUNDING state (fallback)
-      this.stateMachine.transition(AnimationStates.REBOUNDING, {
-        reason: 'shot_missed',
-        shooter_id: turnData.shooter_id
-      });
+      if (this.stateMachine) {
+        this.stateMachine.transition(AnimationStates.REBOUNDING, {
+          reason: 'shot_missed',
+          shooter_id: turnData.shooter_id
+        });
+      }
     }
   }
 
@@ -509,12 +513,13 @@ export class ShotAnimationSystem {
     }
 
     // Transition to POSSESSION state
-    this.stateMachine.transition(AnimationStates.POSSESSION, {
-      reason: 'rebound_complete',
-      rebounder_id: turnData.rebounderId,
-      rebound_type: turnData.rebound_type
-    });
-  }
+    if (this.stateMachine) {
+      this.stateMachine.transition(AnimationStates.POSSESSION, {
+        reason: 'rebound_complete',
+        rebounder_id: turnData.rebounderId,
+        rebound_type: turnData.rebound_type
+      });
+    }
 
   /**
    * Animate players collapsing toward rebound spot
@@ -922,10 +927,12 @@ export class ShotAnimationSystem {
     });
 
     // Reset to safe state
-    this.stateMachine.transition(AnimationStates.IDLE, {
-      reason: 'shot_error',
-      error: error.message
-    });
+    if (this.stateMachine) {
+      this.stateMachine.transition(AnimationStates.IDLE, {
+        reason: 'shot_error',
+        error: error.message
+      });
+    }
 
     // Hide ball if visible
     const ballSprite = this.ballController.ballSprite;

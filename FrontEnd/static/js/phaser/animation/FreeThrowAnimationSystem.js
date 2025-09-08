@@ -222,12 +222,14 @@ export class FreeThrowAnimationSystem {
    */
   async executeFreeThrowShot(shooterSprite, turnData, ftContext) {
     // 1. Transition to SHOOTING state
-    this.stateMachine.transition(AnimationStates.SHOOTING, {
-      reason: 'free_throw_initiated',
-      shooter_id: turnData.shooter_id,
-      attempt: ftContext.attempt,
-      total: ftContext.total
-    });
+    if (this.stateMachine) {
+      this.stateMachine.transition(AnimationStates.SHOOTING, {
+        reason: 'free_throw_initiated',
+        shooter_id: turnData.shooter_id,
+        attempt: ftContext.attempt,
+        total: ftContext.total
+      });
+    }
 
     // 2. Detach ball from shooter
     this.ballController.detachFromPlayer('free_throw_shot');
@@ -347,6 +349,7 @@ export class FreeThrowAnimationSystem {
       await this.handleFinalMadeFreeThrow(turnData);
     } else {
       // More free throws to come - stay in POSSESSION
+      if (this.stateMachine) {
       this.stateMachine.transition(AnimationStates.POSSESSION, {
         reason: 'free_throw_made_more_to_come',
         shooter_id: turnData.shooter_id,
@@ -381,6 +384,7 @@ export class FreeThrowAnimationSystem {
       await this.handleFinalMissedFreeThrow(turnData);
     } else {
       // More free throws to come - stay in POSSESSION
+      if (this.stateMachine) {
       this.stateMachine.transition(AnimationStates.POSSESSION, {
         reason: 'free_throw_missed_more_to_come',
         shooter_id: turnData.shooter_id,
@@ -441,7 +445,8 @@ export class FreeThrowAnimationSystem {
     }
 
     // Transition to IDLE state
-    this.stateMachine.transition(AnimationStates.IDLE, {
+    if (this.stateMachine) {
+      this.stateMachine.transition(AnimationStates.IDLE, {
       reason: 'free_throw_sequence_complete',
       shooter_id: turnData.shooter_id,
       made: true
@@ -481,7 +486,8 @@ export class FreeThrowAnimationSystem {
     }
 
     // Transition to REBOUNDING state
-    this.stateMachine.transition(AnimationStates.REBOUNDING, {
+    if (this.stateMachine) {
+      this.stateMachine.transition(AnimationStates.REBOUNDING, {
       reason: 'free_throw_missed',
       shooter_id: turnData.shooter_id
     });
@@ -694,7 +700,8 @@ export class FreeThrowAnimationSystem {
     });
 
     // Reset to safe state
-    this.stateMachine.transition(AnimationStates.IDLE, {
+    if (this.stateMachine) {
+      this.stateMachine.transition(AnimationStates.IDLE, {
       reason: 'free_throw_error',
       error: error.message
     });
