@@ -154,7 +154,8 @@ export class ReboundAnimationSystem {
     }
 
     // 4. Transition to POSSESSION state
-    this.stateMachine.transition(AnimationStates.POSSESSION, {
+    if (this.stateMachine) {
+      this.stateMachine.transition(AnimationStates.POSSESSION, {
       reason: 'defensive_rebound_complete',
       rebounder_id: turnData.rebounder_id,
       next_play_type: nextPlayType
@@ -192,7 +193,8 @@ export class ReboundAnimationSystem {
     }
 
     // 4. Transition to POSSESSION state
-    this.stateMachine.transition(AnimationStates.POSSESSION, {
+    if (this.stateMachine) {
+      this.stateMachine.transition(AnimationStates.POSSESSION, {
       reason: 'offensive_rebound_complete',
       rebounder_id: turnData.rebounder_id,
       outcome: outcome
@@ -582,7 +584,8 @@ export class ReboundAnimationSystem {
     });
 
     // Reset to safe state
-    this.stateMachine.transition(AnimationStates.IDLE, {
+    if (this.stateMachine) {
+      this.stateMachine.transition(AnimationStates.IDLE, {
       reason: 'rebound_error',
       error: error.message
     });
