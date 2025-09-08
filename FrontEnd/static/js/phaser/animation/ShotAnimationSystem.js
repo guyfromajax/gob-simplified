@@ -356,7 +356,7 @@ export class ShotAnimationSystem {
         duration: this.shotConfig.flightDuration,
         ease: this.shotConfig.flightEase,
         onComplete: () => {
-          this.ballController.endFlight();
+          // Ball flight completed - no need to call endFlight since we're managing the tween ourselves
           resolve();
         },
         onUpdate: () => {
@@ -461,13 +461,16 @@ export class ShotAnimationSystem {
 
     // Get the ball's current position (where it bounced)
     const ballSprite = this.ballController.ballSprite;
+    let ballBounceX = 0;
+    let ballBounceY = 0;
+    
     if (ballSprite) {
       // Make ball visible if it was hidden
       ballSprite.setVisible(true);
       
       // Get the ball's bounce position (where it currently is)
-      const ballBounceX = ballSprite.x;
-      const ballBounceY = ballSprite.y;
+      ballBounceX = ballSprite.x;
+      ballBounceY = ballSprite.y;
       
       console.log('🎬 ShotAnimationSystem: Ball bounce position', {
         ballX: ballBounceX,
