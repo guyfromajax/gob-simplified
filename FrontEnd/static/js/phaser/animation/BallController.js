@@ -123,8 +123,13 @@ export class BallController {
 
     const previousOwner = this.currentOwner;
     
-    // Stop following the player
+    // Stop following the player (new system)
     this.stopFollowingPlayer();
+    
+    // Also stop old ball following system if it exists
+    if (this.scene._ballFollowing) {
+      this.stopOldBallFollowing();
+    }
     
     // Update state
     this.currentOwner = null;
@@ -190,8 +195,13 @@ export class BallController {
       return false;
     }
 
-    // Stop following player when ball starts flight
+    // Stop following player when ball starts flight (new system)
     this.stopFollowingPlayer();
+
+    // Also stop old ball following system if it exists
+    if (this.scene._ballFollowing) {
+      this.stopOldBallFollowing();
+    }
 
     this.isInFlight = true;
     this.targetPosition = targetPosition;
@@ -317,6 +327,21 @@ export class BallController {
 
     if (this.debug) {
       console.log('BallController: Stopped following player');
+    }
+  }
+
+  /**
+   * Stop old ball following system (from ballTween.js)
+   */
+  stopOldBallFollowing() {
+    if (this.scene._ballFollowing && this.scene._ballFollowing.callback && this.scene.events) {
+      this.scene.events.off('update', this.scene._ballFollowing.callback);
+    }
+    
+    this.scene._ballFollowing = null;
+
+    if (this.debug) {
+      console.log('BallController: Stopped old ball following system');
     }
   }
 
