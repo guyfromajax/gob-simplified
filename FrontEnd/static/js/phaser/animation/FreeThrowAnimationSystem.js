@@ -18,6 +18,7 @@
 import { AnimationStates } from './SimplifiedStateMachine.js';
 import { DebugFlags } from '../utils/debugFlags.js';
 import { HOME_RIM_COORDS, AWAY_RIM_COORDS } from './courtConstants.js';
+import { gridToPixels } from '../utils/gridToPixels.js';
 
 export class FreeThrowAnimationSystem {
   constructor(scene, ballController, stateMachine, playerSprites, gameStore) {
@@ -29,28 +30,20 @@ export class FreeThrowAnimationSystem {
     
     // Free throw configuration
     this.ftConfig = {
-      // Free throw positioning
-      ftLine: { x: 50, y: 25 }, // Free throw line coordinates
-      ftSpot: { x: 50, y: 20 }, // Free throw spot coordinates
-      
-      // Shot parameters (inherited from shot system)
+      // Shot parameters (fallback values, will use animation data when available)
       shotDuration: 1000, // ms
-      shotEase: 'Power2',
+      shotEase: 'Sine.easeInOut',
       
       // Bounce parameters (inherited from shot system)
       bounceDuration: 600, // ms
       bounceEase: 'Bounce',
       bounceDistance: 30, // pixels
       
-      // Setup parameters
+      // Setup parameters (fallback values, will use animation data when available)
       setupDuration: 800, // ms
-      setupEase: 'Power2',
+      setupEase: 'Linear',
       
-      // Rim coordinates (from courtConstants.js)
-      homeRim: HOME_RIM_COORDS,
-      awayRim: AWAY_RIM_COORDS,
-      
-      // Court bounds
+      // Court bounds for bounce calculations
       courtBounds: {
         minX: 20,
         maxX: 780,
@@ -160,32 +153,78 @@ export class FreeThrowAnimationSystem {
   }
 
   /**
-   * Setup free throw positioning
+   * Setup free throw positioning using backend animation data
    */
   async setupFreeThrowPositioning(shooterSprite, turnData) {
-    return new Promise((resolve) => {
-      // Calculate free throw position
-      const ftPosition = this.calculateFreeThrowPosition(turnData);
-      
-      // Move shooter to free throw line
-      const tween = this.scene.tweens.add({
-        targets: shooterSprite,
-        x: ftPosition.x,
-        y: ftPosition.y,
-        duration: this.ftConfig.setupDuration,
-        ease: this.ftConfig.setupEase,
-        onComplete: () => {
-          resolve();
-        }
-      });
+    const animations = turnData.animations || [];
+    const playerAnims = animations.filter((a) => a.playerId !== "ball");
+    const width = this.scene.game.config.width;
+    const height = this.scene.game.config.height;
 
-      if (DebugFlags.FREE_THROW_ANIMATION) {
-        console.log('FreeThrowAnimationSystem: Free throw positioning', {
-          shooter_id: turnData.shooter_id,
-          position: ftPosition
+    if (DebugFlags.FREE_THROW_ANIMATION) {
+      console.log('FreeThrowAnimationSystem: Setting up free throw positioning', {
+        shooter_id: turnData.shooter_id,
+        animations_count: animations.length,
+        player_anims_count: playerAnims.length,
+        no_lane: turnData.no_lane
+      });
+    }
+
+    if (!turnData.no_lane) {
+      // Move all players to their free throw positions
+      const promises = [];
+      for (const anim of playerAnims) {
+        const sprite = this.playerSprites[anim.playerId];
+        const end = anim.movement?.[1]?.coords;
+        if (!sprite || !end) continue;
+        
+        const px = gridToPixels(end.x, end.y, width, height);
+        promises.push(
+          new Promise((resolve) => {
+            this.scene.tweens.add({
+              targets: sprite,
+              x: px.x,
+              y: px.y,
+              duration: anim.duration || this.ftConfig.setupDuration,
+              ease: "Linear",
+              onComplete: resolve,
+              onStop: resolve,
+            });
+          })
+        );
+      }
+      await Promise.all(promises);
+    } else {
+      // Only move the shooter to the free throw line
+      const shooterAnim = playerAnims.find(
+        (a) => a.playerId === turnData.shooter_id
+      );
+      const sprite = this.playerSprites[turnData.shooter_id];
+      const end = shooterAnim?.movement?.[1]?.coords;
+      if (sprite && end) {
+        const px = gridToPixels(end.x, end.y, width, height);
+        await new Promise((resolve) => {
+          this.scene.tweens.add({
+            targets: sprite,
+            x: px.x,
+            y: px.y,
+            duration: shooterAnim.duration || this.ftConfig.setupDuration,
+            ease: "Linear",
+            onComplete: resolve,
+            onStop: resolve,
+          });
         });
       }
-    });
+    }
+
+    // Attach ball to shooter
+    if (shooterSprite) {
+      this.ballController.attachToPlayer(shooterSprite);
+    }
+
+    if (DebugFlags.FREE_THROW_ANIMATION) {
+      console.log('FreeThrowAnimationSystem: Free throw positioning complete');
+    }
   }
 
   /**
@@ -203,21 +242,22 @@ export class FreeThrowAnimationSystem {
     // 2. Detach ball from shooter
     this.ballController.detachFromPlayer('free_throw_shot');
 
-    // 3. Animate ball to rim
-    const rimCoords = this.getRimCoordinates(turnData);
+    // 3. Get rim coordinates from animation data
+    const rimCoords = this.getRimCoordinatesFromAnimation(turnData);
     await this.animateBallToRim(shooterSprite, rimCoords, turnData);
 
     if (DebugFlags.FREE_THROW_ANIMATION) {
       console.log('FreeThrowAnimationSystem: Free throw shot executed', {
         shooter_id: turnData.shooter_id,
         attempt: ftContext.attempt,
-        total: ftContext.total
+        total: ftContext.total,
+        rimCoords: rimCoords
       });
     }
   }
 
   /**
-   * Animate ball to rim (similar to shot system but with free throw specifics)
+   * Animate ball to rim using animation data
    */
   async animateBallToRim(shooterSprite, rimCoords, turnData) {
     return new Promise((resolve) => {
@@ -229,13 +269,18 @@ export class FreeThrowAnimationSystem {
         return;
       }
 
+      // Get shot duration from animation data
+      const animations = turnData.animations || [];
+      const ballAnim = animations.find((a) => a.playerId === "ball");
+      const shotDuration = ballAnim?.duration || this.ftConfig.shotDuration;
+
       // Position ball at shooter
       ballSprite.setPosition(shooterSprite.x, shooterSprite.y - 10);
       ballSprite.setVisible(true);
 
       // Start flight
       this.ballController.startFlight(rimCoords, {
-        duration: this.ftConfig.shotDuration,
+        duration: shotDuration,
         ease: this.ftConfig.shotEase
       });
 
@@ -244,8 +289,8 @@ export class FreeThrowAnimationSystem {
         targets: ballSprite,
         x: rimCoords.x,
         y: rimCoords.y,
-        duration: this.ftConfig.shotDuration,
-        ease: this.ftConfig.shotEase,
+        duration: shotDuration,
+        ease: "Sine.easeInOut", // Use same easing as old system
         onComplete: () => {
           this.ballController.endFlight();
           resolve();
@@ -255,6 +300,14 @@ export class FreeThrowAnimationSystem {
           this.ballController.updatePosition(ballSprite.x, ballSprite.y);
         }
       });
+
+      if (DebugFlags.FREE_THROW_ANIMATION) {
+        console.log('FreeThrowAnimationSystem: Ball animation to rim', {
+          from: { x: shooterSprite.x, y: shooterSprite.y - 10 },
+          to: rimCoords,
+          duration: shotDuration
+        });
+      }
     });
   }
 
@@ -319,8 +372,8 @@ export class FreeThrowAnimationSystem {
       });
     }
 
-    // Animate ball bounce from rim
-    const rimCoords = this.getRimCoordinates(turnData);
+    // Animate ball bounce from rim using proper coordinates
+    const rimCoords = this.getRimCoordinatesFromAnimation(turnData);
     await this.animateBallBounce(rimCoords, turnData);
 
     // Transition to REBOUNDING state
@@ -366,26 +419,35 @@ export class FreeThrowAnimationSystem {
     });
   }
 
+
   /**
-   * Calculate free throw position
+   * Get rim coordinates from animation data
    */
-  calculateFreeThrowPosition(turnData) {
-    // Determine which free throw line to use
-    const isHomeTeam = turnData.possession_team_id === this.scene.homeTeamId;
+  getRimCoordinatesFromAnimation(turnData) {
+    const animations = turnData.animations || [];
+    const ballAnim = animations.find((a) => a.playerId === "ball");
+    const moves = ballAnim?.movement || [];
     
-    if (isHomeTeam) {
-      return { x: this.ftConfig.ftLine.x, y: this.ftConfig.ftLine.y };
-    } else {
-      // Away team free throw line (opposite side)
-      return { 
-        x: this.scene.game.config.width - this.ftConfig.ftLine.x, 
-        y: this.ftConfig.ftLine.y 
-      };
+    if (moves.length > 1) {
+      // Get the shot step (usually the second movement)
+      const shotStep = moves[1];
+      if (shotStep?.coords) {
+        const width = this.scene.game.config.width;
+        const height = this.scene.game.config.height;
+        return gridToPixels(shotStep.coords.x, shotStep.coords.y, width, height);
+      }
     }
+    
+    // Fallback to team-based rim coordinates
+    const isHomeTeam = turnData.offense_team_id === this.scene.simData?.home_team_id;
+    const rimGrid = isHomeTeam ? HOME_RIM_COORDS : AWAY_RIM_COORDS;
+    const width = this.scene.game.config.width;
+    const height = this.scene.game.config.height;
+    return gridToPixels(rimGrid.x, rimGrid.y, width, height);
   }
 
   /**
-   * Get rim coordinates based on free throw context
+   * Get rim coordinates based on free throw context (legacy method)
    */
   getRimCoordinates(turnData) {
     // Determine which rim based on team
