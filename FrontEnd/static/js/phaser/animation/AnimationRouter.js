@@ -92,47 +92,23 @@ export class AnimationRouter {
         hasPlayerSprites: !!this.playerSprites
       });
 
-      // Check if this is an HCO turn that needs outlet pass step
-      if (this.isHCOWithPositioning(turnData)) {
-        console.log('🎬 AnimationRouter: HCO turn detected - executing outlet pass step first');
-        await this.executeHCOOutletPassStep(turnData);
-        
-        // After positioning, create a modified turn data for the HCO sequence
-        // Remove the positioning-related fields so the HCO sequence doesn't duplicate the positioning
-        const hcoSequenceTurnData = { ...turnData };
-        delete hcoSequenceTurnData.next_play_type;
-        delete hcoSequenceTurnData.rebound_type;
-        delete hcoSequenceTurnData.rebounderId;
-        
-        console.log('🎬 AnimationRouter: Processing HCO sequence after outlet pass');
-        
-        // Process the HCO sequence through the animation engine
-        const context = {
-          playerSprites: this.playerSprites,
-          ballSprite: this.ballSprite,
-          onUpdate: this.onUpdate,
-          simData: this.scene.simData
-        };
-        
-        console.log('🚀 AnimationRouter: Calling animationEngine.processTurn for HCO sequence');
-        await this.animationEngine.processTurn(hcoSequenceTurnData, context);
-        console.log('✅ AnimationRouter: animationEngine.processTurn completed for HCO sequence');
-      } else {
-        // No state machine needed - just process the turn directly
-        console.log('🎯 AnimationRouter: Processing turn directly (no state machine)');
+      // Note: HCO outlet pass step is now handled directly in ShotAnimationSystem.handleDefensiveRebound
+      // using the same runDefensiveReboundSetup function that works for free throws
+      
+      // No state machine needed - just process the turn directly
+      console.log('🎯 AnimationRouter: Processing turn directly (no state machine)');
 
-        // Process the turn through the animation engine
-        const context = {
-          playerSprites: this.playerSprites,
-          ballSprite: this.ballSprite,
-          onUpdate: this.onUpdate,
-          simData: this.scene.simData
-        };
-        
-        console.log('🚀 AnimationRouter: Calling animationEngine.processTurn');
-        await this.animationEngine.processTurn(turnData, context);
-        console.log('✅ AnimationRouter: animationEngine.processTurn completed');
-      }
+      // Process the turn through the animation engine
+      const context = {
+        playerSprites: this.playerSprites,
+        ballSprite: this.ballSprite,
+        onUpdate: this.onUpdate,
+        simData: this.scene.simData
+      };
+      
+      console.log('🚀 AnimationRouter: Calling animationEngine.processTurn');
+      await this.animationEngine.processTurn(turnData, context);
+      console.log('✅ AnimationRouter: animationEngine.processTurn completed');
 
       // Handle any queued turns
       await this.processQueue();
