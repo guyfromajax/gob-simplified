@@ -1,19 +1,18 @@
 /**
- * AnimationRouter - Basic Routing System
+ * AnimationRouter - Simplified Routing System
  * 
- * Connects all Phase 1 components (AnimationEngine, SimplifiedStateMachine, BallController)
- * into a cohesive, working system that can replace the existing animation system.
+ * Connects AnimationEngine and BallController into a cohesive, working system
+ * that can replace the existing animation system.
  * 
  * Key Benefits:
  * - Single entry point for all animations
- * - Coordinated state management
  * - Proper ball ownership handling
  * - Event-driven architecture
  * - Easy integration with existing code
+ * - No complex state management
  */
 
 import AnimationEngine from './AnimationEngine.js';
-import SimplifiedStateMachine, { AnimationStates } from './SimplifiedStateMachine.js';
 import { getBallController } from './BallControllerAdapter.js';
 import { DebugFlags } from '../utils/debugFlags.js';
 
@@ -25,12 +24,11 @@ export class AnimationRouter {
     this.onUpdate = onUpdate;
     
     // Initialize core components
-    this.stateMachine = new SimplifiedStateMachine(AnimationStates.IDLE);
     this.ballController = getBallController(); // Use the global BallController from adapter
     this.animationEngine = new AnimationEngine(scene);
     
-    // Inject dependencies into animation engine
-    this.animationEngine.injectDependencies(this.ballController, this.stateMachine, playerSprites);
+    // Inject dependencies into animation engine (no state machine needed)
+    this.animationEngine.injectDependencies(this.ballController, null, playerSprites);
     
     // Router state
     this.isProcessing = false;
@@ -55,18 +53,13 @@ export class AnimationRouter {
       return;
     }
 
-    // Set up ball controller callbacks
+    // Set up ball controller event listeners
     this.ballController.onAttachment((previousOwner, newOwner, options) => {
       this.handleBallAttachment(previousOwner, newOwner, options);
     });
 
     this.ballController.onDetachment((previousOwner, reason, options) => {
       this.handleBallDetachment(previousOwner, reason, options);
-    });
-
-    // Set up state machine listeners
-    this.stateMachine.addListener('stateChange', (fromState, toState, context) => {
-      this.handleStateChange({ fromState, toState, context });
     });
 
     // Mark as initialized
@@ -94,23 +87,13 @@ export class AnimationRouter {
       console.log('🎬 AnimationRouter: Starting turn processing', {
         result_type: turnData.result_type,
         turn_index: turnData.index,
-        currentState: this.stateMachine.getCurrentState(),
         hasAnimationEngine: !!this.animationEngine,
         hasBallController: !!this.ballController,
         hasPlayerSprites: !!this.playerSprites
       });
 
-      // Determine the appropriate state transition
-      const nextState = this.determineNextState(turnData);
-      console.log('🎯 AnimationRouter: Determined next state', { nextState, currentState: this.stateMachine.getCurrentState() });
-      
-      // Transition to the new state
-      if (nextState && this.stateMachine.isValidTransition(nextState)) {
-        console.log('✅ AnimationRouter: Transitioning to state', nextState);
-        this.stateMachine.transition(nextState, { turnData });
-      } else {
-        console.warn('⚠️ AnimationRouter: Cannot transition to state', { nextState, currentState: this.stateMachine.getCurrentState() });
-      }
+      // No state machine needed - just process the turn directly
+      console.log('🎯 AnimationRouter: Processing turn directly (no state machine)');
 
       // Process the turn through the animation engine
       const context = {
@@ -133,15 +116,8 @@ export class AnimationRouter {
       console.error('❌ AnimationRouter: Error processing turn', {
         error: error.message,
         stack: error.stack,
-        turnData: {
-          result_type: turnData.result_type,
-          index: turnData.index
-        }
+        result_type: turnData.result_type
       });
-      this.handleError(error, turnData);
-      
-      // CRITICAL: Don't let the error propagate silently
-      // This ensures the calling code knows something failed
       throw error;
     } finally {
       this.isProcessing = false;
@@ -150,49 +126,12 @@ export class AnimationRouter {
   }
 
   /**
-   * Determine the next state based on turn data
+   * Process queued turns
    */
-  determineNextState(turnData) {
-    const currentState = this.stateMachine.getCurrentState();
-    
-    // State transition logic based on turn type
-    switch (turnData.result_type) {
-      case 'FREE_THROW':
-        return AnimationStates.SHOOTING;
-        
-      case 'FAST_BREAK':
-        return AnimationStates.POSSESSION;
-        
-      case 'SIDE_INBOUND':
-        return AnimationStates.POSSESSION;
-        
-      case 'TURNOVER':
-        return AnimationStates.IDLE;
-        
-      case 'MAKE':
-        if (currentState === AnimationStates.SHOOTING) {
-          return AnimationStates.IDLE;
-        }
-        return AnimationStates.POSSESSION;
-        
-      case 'MISS':
-        if (currentState === AnimationStates.SHOOTING) {
-          return AnimationStates.REBOUNDING;
-        }
-        return AnimationStates.POSSESSION;
-        
-      case 'REBOUND':
-        if (currentState === AnimationStates.REBOUNDING) {
-          return AnimationStates.POSSESSION;
-        }
-        return AnimationStates.REBOUNDING;
-        
-      default:
-        // For unknown turn types, try to maintain current state or go to POSSESSION
-        if (currentState === AnimationStates.IDLE) {
-          return AnimationStates.POSSESSION;
-        }
-        return currentState;
+  async processQueue() {
+    while (this.animationQueue.length > 0) {
+      const queuedTurn = this.animationQueue.shift();
+      await this.processTurn(queuedTurn);
     }
   }
 
@@ -203,18 +142,11 @@ export class AnimationRouter {
     if (DebugFlags.ANIMATION_ROUTER) {
       console.log('AnimationRouter: Ball attached', {
         from: previousOwner?.playerId,
-        to: newOwner?.playerId,
-        state: this.stateMachine.getCurrentState()
+        to: newOwner?.playerId
       });
     }
 
-    // Update state machine if needed
-    if (this.stateMachine.getCurrentState() === AnimationStates.IDLE && newOwner) {
-      this.stateMachine.transition(AnimationStates.POSSESSION, { 
-        reason: 'ball_attached',
-        playerId: newOwner.playerId 
-      });
-    }
+    // No state machine updates needed
   }
 
   /**
@@ -224,145 +156,11 @@ export class AnimationRouter {
     if (DebugFlags.ANIMATION_ROUTER) {
       console.log('AnimationRouter: Ball detached', {
         from: previousOwner?.playerId,
-        reason,
-        state: this.stateMachine.getCurrentState()
+        reason
       });
     }
 
-    // Update state machine based on detachment reason
-    switch (reason) {
-      case 'shot':
-        this.stateMachine.transition(AnimationStates.SHOOTING, { 
-          reason: 'ball_detached_for_shot',
-          playerId: previousOwner?.playerId 
-        });
-        break;
-        
-      case 'pass':
-        // Stay in POSSESSION for passes
-        break;
-        
-      case 'turnover':
-        this.stateMachine.transition(AnimationStates.IDLE, { 
-          reason: 'turnover',
-          playerId: previousOwner?.playerId 
-        });
-        break;
-        
-      default:
-        // For other reasons, maintain current state
-        break;
-    }
-  }
-
-  /**
-   * Handle state machine changes
-   */
-  handleStateChange(data) {
-    if (DebugFlags.ANIMATION_ROUTER) {
-      console.log('AnimationRouter: State changed', {
-        from: data.prevState,
-        to: data.newState,
-        context: data.context
-      });
-    }
-
-    // Handle state-specific logic
-    switch (data.newState) {
-      case AnimationStates.IDLE:
-        this.handleIdleState(data);
-        break;
-        
-      case AnimationStates.POSSESSION:
-        this.handlePossessionState(data);
-        break;
-        
-      case AnimationStates.SHOOTING:
-        this.handleShootingState(data);
-        break;
-        
-      case AnimationStates.REBOUNDING:
-        this.handleReboundingState(data);
-        break;
-    }
-  }
-
-  /**
-   * Handle IDLE state
-   */
-  handleIdleState(data) {
-    // Ball should be detached in IDLE state
-    if (this.ballController.isBallAttached()) {
-      this.ballController.detachFromPlayer('state_idle');
-    }
-  }
-
-  /**
-   * Handle POSSESSION state
-   */
-  handlePossessionState(data) {
-    // Ensure ball is attached to a player
-    if (!this.ballController.isBallAttached() && data.context?.playerId) {
-      const playerSprite = this.findPlayerSprite(data.context.playerId);
-      if (playerSprite) {
-        this.ballController.attachToPlayer(playerSprite);
-      }
-    }
-  }
-
-  /**
-   * Handle SHOOTING state
-   */
-  handleShootingState(data) {
-    // Ball should be in flight for shots
-    if (this.ballController.isBallAttached() && !this.ballController.isBallInFlight()) {
-      // This will be handled by the specific shot animation
-    }
-  }
-
-  /**
-   * Handle REBOUNDING state
-   */
-  handleReboundingState(data) {
-    // Ball should be detached for rebounds
-    if (this.ballController.isBallAttached()) {
-      this.ballController.detachFromPlayer('rebound');
-    }
-  }
-
-  /**
-   * Find player sprite by ID
-   */
-  findPlayerSprite(playerId) {
-    return this.playerSprites[playerId] || null;
-  }
-
-  /**
-   * Process queued animations
-   */
-  async processQueue() {
-    if (this.animationQueue.length === 0) return;
-
-    const nextTurn = this.animationQueue.shift();
-    if (nextTurn) {
-      await this.processTurn(nextTurn);
-    }
-  }
-
-  /**
-   * Handle errors gracefully
-   */
-  handleError(error, turnData) {
-    console.error('AnimationRouter: Error occurred', {
-      error: error.message,
-      turnData,
-      currentState: this.stateMachine.state,
-      ballState: this.ballController.getState()
-    });
-
-    // Reset to a safe state
-    this.stateMachine.transition(AnimationStates.IDLE, { reason: 'error_recovery' });
-    this.ballController.reset();
+    // No state machine updates needed
   }
 
   /**
@@ -371,35 +169,21 @@ export class AnimationRouter {
   getStatus() {
     return {
       isProcessing: this.isProcessing,
-      currentTurn: this.currentTurn?.index || null,
-      stateMachine: {
-        state: this.stateMachine.getCurrentState(),
-        canTransition: Object.values(AnimationStates).filter(state => 
-          this.stateMachine.isValidTransition(state)
-        )
-      },
-      ballController: this.ballController.getState(),
-      animationEngine: {
-        isProcessing: this.animationEngine.isProcessingTurn
-      },
-      queue: {
-        length: this.animationQueue.length,
-        next: this.animationQueue[0]?.index || null
-      },
-      isInitialized: this.isInitialized
+      currentTurn: this.currentTurn,
+      queueLength: this.animationQueue.length,
+      isInitialized: this.isInitialized,
+      hasBallController: !!this.ballController,
+      hasAnimationEngine: !!this.animationEngine
     };
   }
 
   /**
-   * Reset the entire system
+   * Reset the animation system
    */
   reset() {
     this.isProcessing = false;
     this.currentTurn = null;
     this.animationQueue = [];
-    
-    this.stateMachine.transition(AnimationStates.IDLE, { reason: 'system_reset' });
-    this.ballController.reset();
     
     if (DebugFlags.ANIMATION_ROUTER) {
       console.log('AnimationRouter: System reset');
@@ -407,34 +191,14 @@ export class AnimationRouter {
   }
 
   /**
-   * Enable/disable debug logging
+   * Destroy the animation system
    */
-  setDebug(enabled) {
-    this.ballController.setDebug(enabled);
+  destroy() {
+    this.reset();
+    this.isInitialized = false;
+    
     if (DebugFlags.ANIMATION_ROUTER) {
-      console.log('AnimationRouter: Debug mode', enabled ? 'enabled' : 'disabled');
+      console.log('AnimationRouter: System destroyed');
     }
   }
-
-  /**
-   * Get comprehensive system information
-   */
-  getSystemInfo() {
-    return {
-      components: {
-        stateMachine: 'SimplifiedStateMachine',
-        ballController: 'BallController',
-        animationEngine: 'AnimationEngine'
-      },
-      status: this.getStatus(),
-      capabilities: {
-        canProcessTurns: this.isInitialized && !this.isProcessing,
-        canHandleStateTransitions: true,
-        canManageBallOwnership: true,
-        canQueueAnimations: true
-      }
-    };
-  }
 }
-
-export default AnimationRouter;
