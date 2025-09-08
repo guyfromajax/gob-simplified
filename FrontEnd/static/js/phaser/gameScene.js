@@ -564,10 +564,14 @@ export function createGameScene(Phaser) {
           this.ballSprite = this.add.image(0, 0, "ball").setVisible(true).setDepth(1000).setScale(1);
 
           // Initialize BallController for the new animation system
-          const { initializeBallController } = await import('./animation/BallControllerAdapter.js');
-          this.ballController = initializeBallController(this, this.ballSprite);
-          if (DEBUG_FLOW) {
-            console.log('🎬 GameScene: BallController initialized');
+          try {
+            const { initializeBallController } = await import('./animation/BallControllerAdapter.js');
+            this.ballController = initializeBallController(this, this.ballSprite);
+            if (DEBUG_FLOW) {
+              console.log('🎬 GameScene: BallController initialized');
+            }
+          } catch (error) {
+            console.error('🎬 GameScene: Failed to initialize BallController:', error);
           }
 
           this.tweens.add({

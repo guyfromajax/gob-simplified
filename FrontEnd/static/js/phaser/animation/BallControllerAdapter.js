@@ -19,7 +19,7 @@ let globalBallController = null;
  * Initialize the global BallController
  * This should be called once when the game scene is created
  */
-export function initializeBallController(scene, ballSprite) {
+function initializeBallController(scene, ballSprite) {
   if (globalBallController) {
     console.warn('BallControllerAdapter: Global BallController already initialized');
     return globalBallController;
@@ -35,7 +35,7 @@ export function initializeBallController(scene, ballSprite) {
 /**
  * Get the global BallController instance
  */
-export function getBallController() {
+function getBallController() {
   if (!globalBallController) {
     console.error('BallControllerAdapter: Global BallController not initialized. Call initializeBallController() first.');
     return null;
@@ -54,7 +54,7 @@ export function getBallController() {
  * @param {Phaser.GameObjects.Sprite} playerSprite - The player sprite to attach to
  * @param {Object} opts - Options object (depth, debugInfo, etc.)
  */
-export function attachBallToPlayer(scene, ballSprite, playerSprite, opts = {}) {
+function attachBallToPlayer(scene, ballSprite, playerSprite, opts = {}) {
   const ballController = getBallController();
   
   if (!ballController) {
@@ -139,7 +139,7 @@ export function attachBallToPlayer(scene, ballSprite, playerSprite, opts = {}) {
  * @param {Phaser.Scene} scene - The game scene
  * @param {Phaser.GameObjects.Image} ballSprite - The ball sprite
  */
-export function detachBall(scene, ballSprite) {
+function detachBall(scene, ballSprite) {
   const ballController = getBallController();
   
   if (!ballController) {
@@ -164,7 +164,7 @@ export function detachBall(scene, ballSprite) {
  * @param {Object} targetCoords - Target coordinates
  * @param {Object} options - Tween options
  */
-export function tweenBallTo(scene, ballSprite, targetCoords, options = {}) {
+function tweenBallTo(scene, ballSprite, targetCoords, options = {}) {
   const ballController = getBallController();
   
   if (!ballController) {
@@ -188,7 +188,7 @@ export function tweenBallTo(scene, ballSprite, targetCoords, options = {}) {
 /**
  * Helper function to get current ball owner (old system compatibility)
  */
-export function getCurrentOwner(scene) {
+function getCurrentOwner(scene) {
   const ballController = getBallController();
   return ballController ? ballController.currentOwner : null;
 }
@@ -196,7 +196,7 @@ export function getCurrentOwner(scene) {
 /**
  * Helper function to set current ball owner (old system compatibility)
  */
-export function setCurrentOwner(scene, playerId) {
+function setCurrentOwner(scene, playerId) {
   const ballController = getBallController();
   if (ballController && scene.playerSprites && scene.playerSprites[playerId]) {
     ballController.attachToPlayer(scene.playerSprites[playerId]);
@@ -206,7 +206,7 @@ export function setCurrentOwner(scene, playerId) {
 /**
  * Helper function to clear current ball owner (old system compatibility)
  */
-export function clearCurrentOwner(scene) {
+function clearCurrentOwner(scene) {
   const ballController = getBallController();
   if (ballController) {
     ballController.detachFromPlayer('clear');
