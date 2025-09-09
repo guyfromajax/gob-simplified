@@ -691,14 +691,23 @@ export class ShotAnimationSystem {
    * Execute putback attempt
    */
   async executePutbackAttempt(rebounderSprite, turnData) {
-    console.log('🎬 ShotAnimationSystem: Executing putback attempt');
+    console.log('🎬 ShotAnimationSystem: Executing putback attempt', {
+      turnDataKeys: Object.keys(turnData),
+      events: turnData.events,
+      putback_attempt: turnData.putback_attempt
+    });
     
     // Find the putback event data
     const putbackEvent = turnData.events?.find(event => event.event_type === 'PUTBACK_ATTEMPT');
     if (!putbackEvent) {
-      console.warn('🎬 ShotAnimationSystem: No putback event found');
+      console.warn('🎬 ShotAnimationSystem: No putback event found', {
+        events: turnData.events,
+        eventTypes: turnData.events?.map(e => e.event_type)
+      });
       return;
     }
+    
+    console.log('🎬 ShotAnimationSystem: Found putback event', putbackEvent);
     
     // Get rim coordinates
     const rimCoords = rebounderSprite.team === "home" ? 
