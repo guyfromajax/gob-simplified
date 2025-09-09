@@ -735,7 +735,7 @@ export class ShotAnimationSystem {
       this.ballController.ballSprite,
       shooterId,
       rimCoords,
-      putbackEvent.duration || 500,
+      putbackEvent.duration || 1000, // Increased from 500 to 1000ms for better visibility
       putbackEvent.result
     );
     
