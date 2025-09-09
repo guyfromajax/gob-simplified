@@ -440,8 +440,11 @@ export function animatePutbackAttempt(
     rimPixels: rim,
     ballPosition: { x: ballSprite.x, y: ballSprite.y },
     ballVisible: ballSprite.visible,
+    ballAlpha: ballSprite.alpha,
+    ballScale: ballSprite.scale,
     duration,
-    distance: Math.sqrt(Math.pow(rim.x - ballSprite.x, 2) + Math.pow(rim.y - ballSprite.y, 2))
+    distance: Math.sqrt(Math.pow(rim.x - ballSprite.x, 2) + Math.pow(rim.y - ballSprite.y, 2)),
+    willMove: Math.sqrt(Math.pow(rim.x - ballSprite.x, 2) + Math.pow(rim.y - ballSprite.y, 2)) > 10
   });
 
   return new Promise((resolve) => {
@@ -459,7 +462,16 @@ export function animatePutbackAttempt(
       duration,
       ease: easing,
       onStart: () => {
-        console.log('🎯 animatePutbackAttempt: Tween started');
+        console.log('🎯 animatePutbackAttempt: Tween started', {
+          ballPosition: { x: ballSprite.x, y: ballSprite.y },
+          ballVisible: ballSprite.visible
+        });
+      },
+      onUpdate: () => {
+        console.log('🎯 animatePutbackAttempt: Tween update', {
+          ballPosition: { x: ballSprite.x, y: ballSprite.y },
+          progress: Math.round((ballSprite.x - rim.x) / (ballSprite.x - rim.x) * 100) + '%'
+        });
       },
       onComplete: () => {
         console.log('🎯 animatePutbackAttempt: Tween completed', {
