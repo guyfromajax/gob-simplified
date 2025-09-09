@@ -712,10 +712,10 @@ export class ShotAnimationSystem {
     
     console.log('🎬 ShotAnimationSystem: Found putback event', putbackEvent);
     
-    // Get rim coordinates
+    // Get rim coordinates (using correct constants)
     const rimCoords = rebounderSprite.team === "home" ? 
-      { x: 89, y: 50 } : // Home rim
-      { x: 11, y: 50 };  // Away rim
+      { x: 90, y: 25 } : // Home rim (correct coordinates)
+      { x: 10, y: 25 };  // Away rim (correct coordinates)
     
     // Import and use the existing putback animation function
     const { animatePutbackAttempt } = await import('./ballManager.js');
