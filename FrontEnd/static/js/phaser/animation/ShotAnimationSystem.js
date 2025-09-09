@@ -718,10 +718,20 @@ export class ShotAnimationSystem {
     const { animatePutbackAttempt } = await import('./ballManager.js');
     
     // Execute putback attempt
+    // Use the shooter ID from the putback event, not the rebounder ID
+    const shooterId = putbackEvent.shooterId || putbackEvent.shooter_id || turnData.rebounderId;
+    
+    console.log('🎬 ShotAnimationSystem: Putback shooter ID resolved', {
+      putbackEventShooterId: putbackEvent.shooterId,
+      putbackEventShooter_id: putbackEvent.shooter_id,
+      turnDataRebounderId: turnData.rebounderId,
+      finalShooterId: shooterId
+    });
+    
     const putbackResult = await animatePutbackAttempt(
       this.scene,
       this.ballController.ballSprite,
-      turnData.rebounderId,
+      shooterId,
       rimCoords,
       putbackEvent.duration || 500,
       putbackEvent.result
