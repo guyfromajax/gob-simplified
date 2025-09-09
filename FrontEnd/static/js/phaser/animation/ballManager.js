@@ -412,6 +412,12 @@ export function animatePutbackAttempt(
     shooterSprite: shooterSprite.playerId || 'unknown',
     shooterPosition: { x: shooterSprite.x, y: shooterSprite.y }
   });
+  
+  // CRITICAL: Set up ball position and visibility like regular shots do
+  ballSprite.setPosition(shooterSprite.x, shooterSprite.y);
+  ballSprite.setVisible(true);
+  ballSprite.setAlpha(1);
+  ballSprite.setScale(1);
 
   const stateMachine = scene.stateMachine;
   if (
