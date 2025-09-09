@@ -506,10 +506,23 @@ export class ShotAnimationSystem {
     await this.animatePlayerCollapse(rebounderSprite, { x: ballBounceX, y: ballBounceY });
 
     // Determine next action based on rebound type
+    console.log('🎬 ShotAnimationSystem: Determining rebound action', {
+      rebound_type: turnData.rebound_type,
+      isDREB: turnData.rebound_type === 'DREB',
+      isOREB: turnData.rebound_type === 'OREB',
+      allKeys: Object.keys(turnData)
+    });
+    
     if (turnData.rebound_type === 'DREB') {
+      console.log('🎬 ShotAnimationSystem: Calling handleDefensiveRebound');
       await this.handleDefensiveRebound(rebounderSprite, turnData);
     } else if (turnData.rebound_type === 'OREB') {
+      console.log('🎬 ShotAnimationSystem: Calling handleOffensiveRebound');
       await this.handleOffensiveRebound(rebounderSprite, turnData);
+    } else {
+      console.log('🎬 ShotAnimationSystem: Unknown rebound type, skipping', {
+        rebound_type: turnData.rebound_type
+      });
     }
 
     // Transition to POSSESSION state
@@ -658,9 +671,15 @@ export class ShotAnimationSystem {
       events: turnData.events
     });
     
-    // TEMPORARY: Force all offensive rebounds to be putback attempts for testing
-    console.log('🎬 ShotAnimationSystem: TEMPORARY - Forcing all offensive rebounds to be putback attempts');
-    await this.executePutbackAttempt(rebounderSprite, turnData);
+    try {
+      // TEMPORARY: Force all offensive rebounds to be putback attempts for testing
+      console.log('🎬 ShotAnimationSystem: TEMPORARY - Forcing all offensive rebounds to be putback attempts');
+      await this.executePutbackAttempt(rebounderSprite, turnData);
+      console.log('🎬 ShotAnimationSystem: executePutbackAttempt completed successfully');
+    } catch (error) {
+      console.error('🎬 ShotAnimationSystem: executePutbackAttempt failed', error);
+      throw error;
+    }
     
     // Original logic (commented out for testing):
     // const isPutbackAttempt = this.isPutbackAttempt(turnData);
@@ -691,14 +710,10 @@ export class ShotAnimationSystem {
   }
 
   /**
-   * Execute putback attempt
+   * Execute putback attempt using standard shot animation
    */
   async executePutbackAttempt(rebounderSprite, turnData) {
-    console.log('🎬 ShotAnimationSystem: Executing putback attempt', {
-      turnDataKeys: Object.keys(turnData),
-      events: turnData.events,
-      putback_attempt: turnData.putback_attempt
-    });
+    console.log('🎬 ShotAnimationSystem: Executing putback attempt using standard shot animation');
     
     // Find the putback event data
     const putbackEvent = turnData.events?.find(event => event.event_type === 'PUTBACK_ATTEMPT');
@@ -710,48 +725,34 @@ export class ShotAnimationSystem {
       return;
     }
     
-    console.log('🎬 ShotAnimationSystem: Found putback event', putbackEvent);
+    console.log('🎬 ShotAnimationSystem: Found putback event, using standard shot animation', putbackEvent);
     
-    // Get rim coordinates (using correct constants)
-    const rimCoords = rebounderSprite.team === "home" ? 
-      { x: 90, y: 25 } : // Home rim (correct coordinates)
-      { x: 10, y: 25 };  // Away rim (correct coordinates)
-    
-    // Import and use the existing putback animation function
-    const { animatePutbackAttempt } = await import('./ballManager.js');
-    
-    // Execute putback attempt
     // Use the shooter ID from the putback event, not the rebounder ID
     const shooterId = putbackEvent.shooterId || putbackEvent.shooter_id || turnData.rebounderId;
     
-    console.log('🎬 ShotAnimationSystem: Putback shooter ID resolved', {
-      putbackEventShooterId: putbackEvent.shooterId,
-      putbackEventShooter_id: putbackEvent.shooter_id,
-      turnDataRebounderId: turnData.rebounderId,
-      finalShooterId: shooterId,
-      availablePlayerSprites: Object.keys(this.playerSprites),
-      shooterSpriteExists: !!this.playerSprites[shooterId]
-    });
+    // Import and use the proven shootBall function
+    const { shootBall } = await import('./ballManager.js');
     
-    const putbackResult = await animatePutbackAttempt(
-      this.scene,
-      this.ballController.ballSprite,
-      shooterId,
-      rimCoords,
-      putbackEvent.duration || 3000, // Increased to 3000ms (3 seconds) for testing visibility
-      putbackEvent.result
-    );
-    
-    console.log('🎬 ShotAnimationSystem: Putback attempt completed', {
+    // Execute putback as a standard shot from the rebounder's position
+    const putbackResult = await shootBall({
+      scene: this.scene,
+      ballSprite: this.ballController.ballSprite,
+      fromCoords: { x: rebounderSprite.x, y: rebounderSprite.y },
+      startTimestamp: Date.now(),
       result: putbackEvent.result,
-      putbackResult
+      shooterPos: { x: rebounderSprite.x, y: rebounderSprite.y },
+      shooterId: shooterId,
+      shooterTeamId: rebounderSprite.team === "home" ? this.scene.homeTeamId : this.scene.awayTeamId,
+      homeTeamId: this.scene.homeTeamId,
+      stepIndex: 0,
+      turnIndex: this.scene.currentTurn || 0
     });
     
-    // Handle the result - the animatePutbackAttempt function already handles:
-    // - Make + no foul → inbound pass
-    // - Make + foul → free throw
-    // - Miss + foul → free throw  
-    // - Miss + no foul → rebound (which will trigger the next turn)
+    console.log('🎬 ShotAnimationSystem: Putback shot completed using standard animation', {
+      result: putbackResult
+    });
+    
+    return putbackResult;
   }
 
   /**
