@@ -715,31 +715,21 @@ export class ShotAnimationSystem {
   async executePutbackAttempt(rebounderSprite, turnData) {
     console.log('🎬 ShotAnimationSystem: Executing putback attempt using standard shot animation');
     
-    // Find the putback event data
-    const putbackEvent = turnData.events?.find(event => event.event_type === 'PUTBACK_ATTEMPT');
-    if (!putbackEvent) {
-      console.warn('🎬 ShotAnimationSystem: No putback event found', {
-        events: turnData.events,
-        eventTypes: turnData.events?.map(e => e.event_type)
-      });
-      return;
-    }
+    // Simple approach: Use the rebounder as the shooter (they're attempting the putback)
+    const shooterId = turnData.rebounderId;
+    const result = 'MISS'; // Default to MISS for putbacks (can be enhanced later)
     
-    console.log('🎬 ShotAnimationSystem: Found putback event, using standard shot animation', putbackEvent);
-    
-    // Use the shooter ID from the putback event, not the rebounder ID
-    const shooterId = putbackEvent.shooterId || putbackEvent.shooter_id || turnData.rebounderId;
+    // Use rebounder as shooter for putback attempt
     
     // Import and use the proven shootBall function
     const { shootBall } = await import('./ballManager.js');
     
-    // Execute putback as a standard shot from the rebounder's position
     const putbackResult = await shootBall({
       scene: this.scene,
       ballSprite: this.ballController.ballSprite,
       fromCoords: { x: rebounderSprite.x, y: rebounderSprite.y },
       startTimestamp: Date.now(),
-      result: putbackEvent.result,
+      result: result,
       shooterPos: { x: rebounderSprite.x, y: rebounderSprite.y },
       shooterId: shooterId,
       shooterTeamId: rebounderSprite.team === "home" ? this.scene.homeTeamId : this.scene.awayTeamId,
@@ -748,10 +738,7 @@ export class ShotAnimationSystem {
       turnIndex: this.scene.currentTurn || 0
     });
     
-    console.log('🎬 ShotAnimationSystem: Putback shot completed using standard animation', {
-      result: putbackResult
-    });
-    
+    // Putback shot completed
     return putbackResult;
   }
 
@@ -936,80 +923,44 @@ export class ShotAnimationSystem {
    * Get shooter sprite
    */
   getShooterSprite(turnData) {
-    console.log('🔍 ShotAnimationSystem: getShooterSprite called with turnData:', turnData);
-    
     // Try to get shooter ID from the turn data
     let shooterId = turnData.shooter_id || turnData.player_id;
-    console.log('🔍 ShotAnimationSystem: Initial shooterId:', shooterId);
     
     // If no ID, try to find by name using rosters
     if (!shooterId) {
       const shooterName = turnData.shooter || turnData.ball_handler;
-      console.log('🔍 ShotAnimationSystem: Looking up by name:', shooterName);
       if (shooterName) {
         shooterId = this.findPlayerIdByName(shooterName);
-        console.log('🔍 ShotAnimationSystem: Found shooterId by name:', shooterId);
       }
     }
     
-    console.log('🔍 ShotAnimationSystem: Final shooterId:', shooterId);
-    console.log('🔍 ShotAnimationSystem: Available playerSprites keys:', Object.keys(this.playerSprites));
-    console.log('🔍 ShotAnimationSystem: Looking for sprite with key:', shooterId);
-    
     const sprite = this.playerSprites[shooterId] || null;
-    console.log('🔍 ShotAnimationSystem: Found sprite:', sprite);
-    
     return sprite;
   }
 
   findPlayerIdByName(playerName) {
-    console.log('🔍 ShotAnimationSystem: findPlayerIdByName called with:', playerName);
-    
     if (!playerName) return null;
     
     // Check home roster
     const homeRoster = this.gameStore.getHomeRoster();
-    console.log('🔍 ShotAnimationSystem: Home roster:', homeRoster);
     if (homeRoster && homeRoster.players) {
-      console.log('🔍 ShotAnimationSystem: Home roster players:', homeRoster.players);
       for (const player of homeRoster.players) {
-        console.log('🔍 ShotAnimationSystem: Checking home player:', player.name, 'vs', playerName);
         if (player.name === playerName) {
-          console.log('🔍 ShotAnimationSystem: Found matching player, full object:', player);
-          console.log('🔍 ShotAnimationSystem: Player keys:', Object.keys(player));
-          console.log('🔍 ShotAnimationSystem: player._id:', player._id);
-          console.log('🔍 ShotAnimationSystem: player.playerId:', player.playerId);
-          console.log('🔍 ShotAnimationSystem: player.player_id:', player.player_id);
-          console.log('🔍 ShotAnimationSystem: player.id:', player.id);
-          const foundId = player._id || player.playerId || player.player_id || player.id;
-          console.log('🔍 ShotAnimationSystem: Found in home roster with ID:', foundId);
-          return foundId;
+          return player._id || player.playerId || player.player_id || player.id;
         }
       }
     }
     
     // Check away roster
     const awayRoster = this.gameStore.getAwayRoster();
-    console.log('🔍 ShotAnimationSystem: Away roster:', awayRoster);
     if (awayRoster && awayRoster.players) {
-      console.log('🔍 ShotAnimationSystem: Away roster players:', awayRoster.players);
       for (const player of awayRoster.players) {
-        console.log('🔍 ShotAnimationSystem: Checking away player:', player.name, 'vs', playerName);
         if (player.name === playerName) {
-          console.log('🔍 ShotAnimationSystem: Found matching player, full object:', player);
-          console.log('🔍 ShotAnimationSystem: Player keys:', Object.keys(player));
-          console.log('🔍 ShotAnimationSystem: player._id:', player._id);
-          console.log('🔍 ShotAnimationSystem: player.playerId:', player.playerId);
-          console.log('🔍 ShotAnimationSystem: player.player_id:', player.player_id);
-          console.log('🔍 ShotAnimationSystem: player.id:', player.id);
-          const foundId = player._id || player.playerId || player.player_id || player.id;
-          console.log('🔍 ShotAnimationSystem: Found in away roster with ID:', foundId);
-          return foundId;
+          return player._id || player.playerId || player.player_id || player.id;
         }
       }
     }
     
-    console.log('🔍 ShotAnimationSystem: Player not found in any roster');
     return null;
   }
 
@@ -1032,15 +983,7 @@ export class ShotAnimationSystem {
       this.scene.game.config.height
     );
     
-    console.log('🎯 ShotAnimationSystem: Getting rim coordinates', {
-      shooter_id: turnData.shooter_id,
-      shooter_team: shooterSprite?.team,
-      isHomeTeam,
-      gridRimCoords,
-      pixelRimCoords,
-      homeRim: this.shotConfig.homeRim,
-      awayRim: this.shotConfig.awayRim
-    });
+    // Return pixel coordinates for rim
     
     return pixelRimCoords;
   }
