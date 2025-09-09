@@ -617,21 +617,31 @@ export class ShotAnimationSystem {
    * Handle defensive rebound
    */
   async handleDefensiveRebound(rebounderSprite, turnData) {
-    console.log('🎬 ShotAnimationSystem: Handling defensive rebound');
+    console.log('🎬 ShotAnimationSystem: Handling defensive rebound', {
+      rebounderId: turnData.rebounderId,
+      next_play_type: turnData.next_play_type,
+      rebound_type: turnData.rebound_type
+    });
     
     // Use the same defensive rebound setup as free throws
     if (turnData.next_play_type === 'HCO') {
       console.log('🎬 ShotAnimationSystem: Defensive rebound leads to HCO - using runDefensiveReboundSetup');
       
-      // Import and use the same function that works for free throws
-      const { runDefensiveReboundSetup } = await import('./turnAnimation.js');
-      await runDefensiveReboundSetup({
-        scene: this.scene,
-        ballSprite: this.ballController.ballSprite,
-        playerSprites: this.playerSprites,
-        rebounderId: turnData.rebounderId,
-        nextPlayType: turnData.next_play_type || "HCO"
-      });
+      try {
+        // Import and use the same function that works for free throws
+        const { runDefensiveReboundSetup } = await import('./turnAnimation.js');
+        await runDefensiveReboundSetup({
+          scene: this.scene,
+          ballSprite: this.ballController.ballSprite,
+          playerSprites: this.playerSprites,
+          rebounderId: turnData.rebounderId,
+          nextPlayType: turnData.next_play_type || "HCO"
+        });
+        console.log('✅ ShotAnimationSystem: runDefensiveReboundSetup completed successfully');
+      } catch (error) {
+        console.error('❌ ShotAnimationSystem: runDefensiveReboundSetup failed', error);
+        throw error; // Re-throw to trigger fallback
+      }
     } else {
       console.log('🎬 ShotAnimationSystem: Defensive rebound leads to Fast Break or other');
       // Handle other cases if needed
