@@ -223,6 +223,19 @@ export function shootBall({
   stepIndex,
   turnIndex
 }) {
+  console.log('🎯 shootBall: Starting', {
+    shooterId,
+    result,
+    sceneExists: !!scene,
+    ballSpriteExists: !!ballSprite,
+    ballSpriteType: ballSprite?.constructor?.name,
+    ballSpriteId: ballSprite?.id || ballSprite?.name,
+    // CRITICAL: Check if we're animating the right ball sprite
+    isSameBallSprite: ballSprite === scene?.ballSprite,
+    ballSpritePosition: ballSprite ? { x: ballSprite.x, y: ballSprite.y } : null,
+    sceneBallSpritePosition: scene?.ballSprite ? { x: scene.ballSprite.x, y: scene.ballSprite.y } : null
+  });
+  
   if (!scene || !ballSprite) return Promise.resolve();
   if (scene?.stateMachine?.is(States.FreeThrow)) return Promise.resolve();
   cancelBallTween(scene, ballSprite);
@@ -388,7 +401,11 @@ export function animatePutbackAttempt(
     playerSpritesKeys: Object.keys(scene?.playerSprites || {}),
     shooterSpriteExists: !!scene?.playerSprites?.[shooterId],
     sceneBallSprite: scene?.ballSprite?.constructor?.name,
-    sceneBallSpriteId: scene?.ballSprite?.id || scene?.ballSprite?.name
+    sceneBallSpriteId: scene?.ballSprite?.id || scene?.ballSprite?.name,
+    // CRITICAL: Check if we're animating the right ball sprite
+    isSameBallSprite: ballSprite === scene?.ballSprite,
+    ballSpritePosition: ballSprite ? { x: ballSprite.x, y: ballSprite.y } : null,
+    sceneBallSpritePosition: scene?.ballSprite ? { x: scene.ballSprite.x, y: scene.ballSprite.y } : null
   });
   
   if (!scene || !ballSprite) {
@@ -479,17 +496,14 @@ export function animatePutbackAttempt(
         });
       },
       onUpdate: (tween) => {
+        // Only log every 20% progress to reduce console spam
         const progress = Math.round(tween.progress * 100);
-        console.log('🎯 animatePutbackAttempt: Tween update', {
-          ballPosition: { x: ballSprite.x, y: ballSprite.y },
-          progress: progress + '%',
-          targetPosition: { x: rim.x, y: rim.y },
-          ballVisible: ballSprite.visible,
-          ballAlpha: ballSprite.alpha,
-          ballScale: ballSprite.scale,
-          ballDepth: ballSprite.depth,
-          isBallSprite: ballSprite.constructor.name
-        });
+        if (progress % 20 === 0) {
+          console.log('🎯 animatePutbackAttempt: Progress', progress + '%', {
+            ballPosition: { x: ballSprite.x, y: ballSprite.y },
+            targetPosition: { x: rim.x, y: rim.y }
+          });
+        }
       },
       onComplete: () => {
         console.log('🎯 animatePutbackAttempt: Tween completed', {
