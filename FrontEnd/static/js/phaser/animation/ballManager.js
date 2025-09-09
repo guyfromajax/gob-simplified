@@ -440,7 +440,8 @@ export function animatePutbackAttempt(
     rimPixels: rim,
     ballPosition: { x: ballSprite.x, y: ballSprite.y },
     ballVisible: ballSprite.visible,
-    duration
+    duration,
+    distance: Math.sqrt(Math.pow(rim.x - ballSprite.x, 2) + Math.pow(rim.y - ballSprite.y, 2))
   });
 
   return new Promise((resolve) => {
