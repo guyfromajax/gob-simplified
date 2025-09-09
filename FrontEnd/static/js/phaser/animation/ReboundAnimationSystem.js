@@ -1,17 +1,19 @@
 /**
- * ReboundAnimationSystem - Universal Rebound Animation Handler
+ * ReboundAnimationSystem - Rebound Positioning Handler
  * 
- * Handles all rebound scenarios using the new Phase 1 components:
- * - Defensive rebounds (regular shots, free throws, fast breaks)
- * - Offensive rebounds (putbacks, kickouts)
- * - Rebound positioning and player movement
- * - Follow-up actions (HCO, fast break, putback)
+ * Handles rebound positioning and player movement:
+ * - Defensive rebounds (positioning and HCO outlet setup)
+ * - Offensive rebounds (positioning only)
+ * - Player collapse animations
+ * - Ball attachment to rebounders
+ * 
+ * Note: Shot attempts (putbacks) and passes (kickouts) are handled by ShotAnimationSystem
  * 
  * Key Benefits:
- * - Single system for all rebound types
- * - Proper player positioning
- * - Coordinated with shot system
- * - No teleports or floating balls
+ * - Focused on rebound positioning only
+ * - Proper player movement and ball attachment
+ * - Coordinated with shot system for follow-up actions
+ * - No conflicts with shot/pass animations
  */
 
 import { AnimationStates } from './SimplifiedStateMachine.js';
@@ -155,11 +157,12 @@ export class ReboundAnimationSystem {
   }
 
   /**
-   * Execute offensive rebound sequence
+   * Execute offensive rebound sequence (positioning only)
+   * Note: Shot attempts (putbacks) are handled by ShotAnimationSystem
    */
   async executeOffensiveReboundSequence(rebounderSprite, turnData) {
     if (DebugFlags.REBOUND_ANIMATION) {
-      console.log('ReboundAnimationSystem: Executing offensive rebound sequence');
+      console.log('ReboundAnimationSystem: Executing offensive rebound sequence (positioning only)');
     }
 
     // 1. Animate players collapsing for rebound
@@ -170,19 +173,10 @@ export class ReboundAnimationSystem {
       offset: this.reboundConfig.rebounderOffset
     });
 
-    // 3. Determine offensive rebound outcome
+    // 3. Determine offensive rebound outcome for logging only
     const outcome = this.determineOffensiveReboundOutcome(turnData);
-    
-    switch (outcome) {
-      case 'putback':
-        await this.executePutbackSequence(rebounderSprite, turnData);
-        break;
-      case 'kickout':
-        await this.executeKickoutSequence(rebounderSprite, turnData);
-        break;
-      default:
-        console.warn('ReboundAnimationSystem: Unknown offensive rebound outcome', outcome);
-    }
+    console.log('ReboundAnimationSystem: Offensive rebound outcome determined:', outcome);
+    console.log('ReboundAnimationSystem: Shot attempts will be handled by ShotAnimationSystem');
 
     // 4. Transition to POSSESSION state
     if (this.stateMachine) {
@@ -281,73 +275,11 @@ export class ReboundAnimationSystem {
     }
   }
 
-  /**
-   * Execute putback sequence
-   */
-  async executePutbackSequence(rebounderSprite, turnData) {
-    if (DebugFlags.REBOUND_ANIMATION) {
-      console.log('ReboundAnimationSystem: Executing putback sequence');
-    }
-
-    // Putback is handled by the shot system
-    // This is just a placeholder for future putback-specific logic
-    console.log('ReboundAnimationSystem: Putback sequence - handled by shot system');
-  }
-
-  /**
-   * Execute kickout sequence
-   */
-  async executeKickoutSequence(rebounderSprite, turnData) {
-    if (DebugFlags.REBOUND_ANIMATION) {
-      console.log('ReboundAnimationSystem: Executing kickout sequence');
-    }
-
-    // 1. Find kickout target (usually PG)
-    const kickoutTarget = this.findKickoutTarget(rebounderSprite.team);
-    if (!kickoutTarget) {
-      console.warn('ReboundAnimationSystem: No kickout target found');
-      return;
-    }
-
-    // 2. Execute kickout pass
-    await this.executeKickoutPass(rebounderSprite, kickoutTarget, turnData);
-  }
+  // Note: Putback and kickout sequences are now handled by ShotAnimationSystem
 
   // HCO positioning methods moved to HCOAnimationSystem
 
-  /**
-   * Execute kickout pass
-   */
-  async executeKickoutPass(passerSprite, receiverSprite, turnData) {
-    return new Promise((resolve) => {
-      // Detach ball from passer
-      this.ballController.detachFromPlayer('kickout_pass');
-      
-      // Start ball flight
-      this.ballController.startFlight({
-        x: receiverSprite.x,
-        y: receiverSprite.y - 10
-      });
-      
-      // Animate ball to receiver
-      const ballSprite = this.ballController.ballSprite;
-      const tween = this.scene.tweens.add({
-        targets: ballSprite,
-        x: receiverSprite.x,
-        y: receiverSprite.y - 10,
-        duration: this.reboundConfig.outletPassDuration,
-        ease: this.reboundConfig.outletPassEase,
-        onComplete: () => {
-          // Attach ball to receiver
-          this.ballController.endFlight(receiverSprite);
-          resolve();
-        },
-        onUpdate: () => {
-          this.ballController.updatePosition(ballSprite.x, ballSprite.y);
-        }
-      });
-    });
-  }
+  // Note: Kickout passes are now handled by ShotAnimationSystem
 
   /**
    * Helper methods
@@ -404,10 +336,7 @@ export class ReboundAnimationSystem {
     ) || this.findPointGuard(team);
   }
 
-  findKickoutTarget(team) {
-    // Usually the PG for kickouts
-    return this.findPointGuard(team);
-  }
+  // Note: findKickoutTarget removed - kickouts handled by ShotAnimationSystem
 
   validateReboundData(turnData) {
     return turnData && 
