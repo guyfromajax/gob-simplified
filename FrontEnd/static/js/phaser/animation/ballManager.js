@@ -376,10 +376,38 @@ export function animatePutbackAttempt(
   result,
   easing = animationConfig.putback.easing
 ) {
-  if (!scene || !ballSprite) return Promise.resolve();
-  if (scene?.stateMachine?.is(States.FreeThrow)) return Promise.resolve();
+  console.log('🎯 animatePutbackAttempt: Starting', {
+    shooterId,
+    rimCoords,
+    duration,
+    result,
+    sceneExists: !!scene,
+    ballSpriteExists: !!ballSprite,
+    playerSpritesKeys: Object.keys(scene?.playerSprites || {}),
+    shooterSpriteExists: !!scene?.playerSprites?.[shooterId]
+  });
+  
+  if (!scene || !ballSprite) {
+    console.log('🎯 animatePutbackAttempt: Early return - missing scene or ballSprite');
+    return Promise.resolve();
+  }
+  if (scene?.stateMachine?.is(States.FreeThrow)) {
+    console.log('🎯 animatePutbackAttempt: Early return - FreeThrow state');
+    return Promise.resolve();
+  }
   const shooterSprite = scene.playerSprites?.[shooterId];
-  if (!shooterSprite) return Promise.resolve();
+  if (!shooterSprite) {
+    console.log('🎯 animatePutbackAttempt: Early return - shooter sprite not found', {
+      shooterId,
+      availableSprites: Object.keys(scene.playerSprites || {})
+    });
+    return Promise.resolve();
+  }
+  
+  console.log('🎯 animatePutbackAttempt: Proceeding with animation', {
+    shooterSprite: shooterSprite.playerId || 'unknown',
+    shooterPosition: { x: shooterSprite.x, y: shooterSprite.y }
+  });
 
   const stateMachine = scene.stateMachine;
   if (

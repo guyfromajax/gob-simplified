@@ -725,7 +725,9 @@ export class ShotAnimationSystem {
       putbackEventShooterId: putbackEvent.shooterId,
       putbackEventShooter_id: putbackEvent.shooter_id,
       turnDataRebounderId: turnData.rebounderId,
-      finalShooterId: shooterId
+      finalShooterId: shooterId,
+      availablePlayerSprites: Object.keys(this.playerSprites),
+      shooterSpriteExists: !!this.playerSprites[shooterId]
     });
     
     const putbackResult = await animatePutbackAttempt(
