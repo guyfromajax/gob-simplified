@@ -383,8 +383,12 @@ export function animatePutbackAttempt(
     result,
     sceneExists: !!scene,
     ballSpriteExists: !!ballSprite,
+    ballSpriteType: ballSprite?.constructor?.name,
+    ballSpriteId: ballSprite?.id || ballSprite?.name,
     playerSpritesKeys: Object.keys(scene?.playerSprites || {}),
-    shooterSpriteExists: !!scene?.playerSprites?.[shooterId]
+    shooterSpriteExists: !!scene?.playerSprites?.[shooterId],
+    sceneBallSprite: scene?.ballSprite?.constructor?.name,
+    sceneBallSpriteId: scene?.ballSprite?.id || scene?.ballSprite?.name
   });
   
   if (!scene || !ballSprite) {
@@ -473,7 +477,12 @@ export function animatePutbackAttempt(
         console.log('🎯 animatePutbackAttempt: Tween update', {
           ballPosition: { x: ballSprite.x, y: ballSprite.y },
           progress: progress + '%',
-          targetPosition: { x: rim.x, y: rim.y }
+          targetPosition: { x: rim.x, y: rim.y },
+          ballVisible: ballSprite.visible,
+          ballAlpha: ballSprite.alpha,
+          ballScale: ballSprite.scale,
+          ballDepth: ballSprite.depth,
+          isBallSprite: ballSprite.constructor.name
         });
       },
       onComplete: () => {
