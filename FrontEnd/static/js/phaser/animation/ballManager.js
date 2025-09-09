@@ -433,15 +433,38 @@ export function animatePutbackAttempt(
     scene.game.config.width,
     scene.game.config.height
   );
+  
+  console.log('🎯 animatePutbackAttempt: Ball positioning', {
+    shooterPosition: { x: shooterSprite.x, y: shooterSprite.y },
+    rimCoords,
+    rimPixels: rim,
+    ballPosition: { x: ballSprite.x, y: ballSprite.y },
+    ballVisible: ballSprite.visible,
+    duration
+  });
 
   return new Promise((resolve) => {
+    console.log('🎯 animatePutbackAttempt: Starting tween', {
+      from: { x: ballSprite.x, y: ballSprite.y },
+      to: { x: rim.x, y: rim.y },
+      duration,
+      easing
+    });
+    
     scene.tweens.add({
       targets: ballSprite,
       x: rim.x,
       y: rim.y,
       duration,
       ease: easing,
+      onStart: () => {
+        console.log('🎯 animatePutbackAttempt: Tween started');
+      },
       onComplete: () => {
+        console.log('🎯 animatePutbackAttempt: Tween completed', {
+          finalPosition: { x: ballSprite.x, y: ballSprite.y },
+          result
+        });
         const handleComplete = async () => {
           if (result === "MAKE") {
             const wait = () =>
