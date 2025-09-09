@@ -5,7 +5,6 @@ import {
   shootBall,
   SHOT_DEBUG,
   animateRebound,
-  animatePutbackAttempt,
   animateKickoutReset
 } from "./ballManager.js";
 import { attachBallToPlayer } from "./BallControllerAdapter.js";
@@ -1178,14 +1177,19 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
                     });
                     const rimCoords =
                       rebounderSprite.team === "home" ? HOME_RIM_COORDS : AWAY_RIM_COORDS;
-                    const putbackResult = await animatePutbackAttempt(
+                    const putbackResult = await shootBall({
                       scene,
                       ballSprite,
-                      shooterId,
-                      rimCoords,
-                      evt.duration || 500,
-                      evt.result
-                    );
+                      fromCoords: { x: rebounderSprite.x, y: rebounderSprite.y },
+                      startTimestamp: Date.now(),
+                      result: evt.result,
+                      shooterPos: { x: rebounderSprite.x, y: rebounderSprite.y },
+                      shooterId: shooterId,
+                      shooterTeamId: rebounderSprite.team === "home" ? scene.homeTeamId : scene.awayTeamId,
+                      homeTeamId: scene.homeTeamId,
+                      stepIndex: 0,
+                      turnIndex: scene.currentTurn || 0
+                    });
                     if (evt.result === "MISS" && evt.rebound) {
                       const reboundData = evt.rebound;
                       const rebounderId =
@@ -1245,14 +1249,19 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
         });
         const rimCoords =
           rebounderSprite.team === "home" ? HOME_RIM_COORDS : AWAY_RIM_COORDS;
-        const putbackResult = await animatePutbackAttempt(
+        const putbackResult = await shootBall({
           scene,
           ballSprite,
-          shooterId,
-          rimCoords,
-          evt.duration || 500,
-          evt.result
-        );
+          fromCoords: { x: rebounderSprite.x, y: rebounderSprite.y },
+          startTimestamp: Date.now(),
+          result: evt.result,
+          shooterPos: { x: rebounderSprite.x, y: rebounderSprite.y },
+          shooterId: shooterId,
+          shooterTeamId: rebounderSprite.team === "home" ? scene.homeTeamId : scene.awayTeamId,
+          homeTeamId: scene.homeTeamId,
+          stepIndex: 0,
+          turnIndex: scene.currentTurn || 0
+        });
         if (evt.result === "MISS" && evt.rebound) {
           const reboundData = evt.rebound;
           const rebounderId =
