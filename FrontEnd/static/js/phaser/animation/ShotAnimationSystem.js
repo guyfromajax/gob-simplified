@@ -658,16 +658,19 @@ export class ShotAnimationSystem {
       events: turnData.events
     });
     
-    // Determine if this is a putback attempt or kickout
-    const isPutbackAttempt = this.isPutbackAttempt(turnData);
+    // TEMPORARY: Force all offensive rebounds to be putback attempts for testing
+    console.log('🎬 ShotAnimationSystem: TEMPORARY - Forcing all offensive rebounds to be putback attempts');
+    await this.executePutbackAttempt(rebounderSprite, turnData);
     
-    if (isPutbackAttempt) {
-      console.log('🎬 ShotAnimationSystem: Executing putback attempt');
-      await this.executePutbackAttempt(rebounderSprite, turnData);
-    } else {
-      console.log('🎬 ShotAnimationSystem: Executing kickout pass');
-      await this.executeKickoutPass(rebounderSprite, turnData);
-    }
+    // Original logic (commented out for testing):
+    // const isPutbackAttempt = this.isPutbackAttempt(turnData);
+    // if (isPutbackAttempt) {
+    //   console.log('🎬 ShotAnimationSystem: Executing putback attempt');
+    //   await this.executePutbackAttempt(rebounderSprite, turnData);
+    // } else {
+    //   console.log('🎬 ShotAnimationSystem: Executing kickout pass');
+    //   await this.executeKickoutPass(rebounderSprite, turnData);
+    // }
   }
 
   /**
