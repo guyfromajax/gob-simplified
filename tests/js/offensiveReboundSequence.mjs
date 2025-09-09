@@ -1,7 +1,7 @@
 import {
   animateRebound,
   animateKickoutReset,
-  animatePutbackAttempt,
+  shootBall,
   calls
 } from './ballManagerStub.mjs';
 import { setCurrentOwner, clearCurrentOwner, getCurrentOwner } from '../../FrontEnd/static/js/phaser/ball/ballController.js';
@@ -46,7 +46,19 @@ async function scenarioB(result) {
   setCurrentOwner(scene, 'c');
   events.push({ type: 'attach', id: 'c' });
 
-  const outcome = await animatePutbackAttempt(scene, ball, 'c', { x: 0, y: 0 }, 0, result);
+  const outcome = await shootBall({
+    scene,
+    ballSprite: ball,
+    fromCoords: { x: 0, y: 0 },
+    startTimestamp: Date.now(),
+    result: result,
+    shooterPos: { x: 0, y: 0 },
+    shooterId: 'c',
+    shooterTeamId: 'home',
+    homeTeamId: 'home',
+    stepIndex: 0,
+    turnIndex: 0
+  });
   events.push({ type: 'detach', id: 'c' });
   clearCurrentOwner(scene);
 
