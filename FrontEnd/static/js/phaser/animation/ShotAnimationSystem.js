@@ -713,35 +713,39 @@ export class ShotAnimationSystem {
    * Execute putback attempt using standard shot animation
    */
   async executePutbackAttempt(rebounderSprite, turnData) {
-    console.log('🎬 ShotAnimationSystem: Executing putback attempt using standard shot animation');
+    console.log('🎬 ShotAnimationSystem: Executing putback attempt using OLD SYSTEM');
     
-    // Simple approach: Use the rebounder as the shooter (they're attempting the putback)
-    const shooterId = turnData.rebounderId;
-    const result = 'MISS'; // Default to MISS for putbacks (can be enhanced later)
+    // SIMPLE APPROACH: Use the old system that already works for regular shots
+    const { playTurnAnimation } = await import('./turnAnimation.js');
     
-    // CRITICAL: Detach ball from rebounder before shooting
-    this.ballController.detachBall();
-    console.log('🎬 ShotAnimationSystem: Ball detached from rebounder for putback shot');
+    // Create a simple turn data object for the putback shot
+    const putbackTurnData = {
+      result_type: 'MISS', // Default to MISS for putbacks
+      shooter: rebounderSprite.playerName || 'Unknown',
+      shooter_id: turnData.rebounderId,
+      ball_handler: rebounderSprite.playerName || 'Unknown',
+      shot_type: 'putback',
+      animations: [{
+        type: 'shot',
+        duration: 1000,
+        result: 'MISS'
+      }]
+    };
     
-    // Import and use the proven shootBall function
-    const { shootBall } = await import('./ballManager.js');
+    console.log('🎬 ShotAnimationSystem: Using old system for putback', putbackTurnData);
     
-    const putbackResult = await shootBall({
+    // Use the old system - it already works perfectly for regular shots
+    await playTurnAnimation({
       scene: this.scene,
+      simData: { turns: [] }, // Not needed for single turn
+      playerSprites: this.playerSprites,
+      turnData: putbackTurnData,
       ballSprite: this.ballController.ballSprite,
-      fromCoords: { x: rebounderSprite.x, y: rebounderSprite.y },
-      startTimestamp: Date.now(),
-      result: result,
-      shooterPos: { x: rebounderSprite.x, y: rebounderSprite.y },
-      shooterId: shooterId,
-      shooterTeamId: rebounderSprite.team === "home" ? this.scene.homeTeamId : this.scene.awayTeamId,
-      homeTeamId: this.scene.homeTeamId,
-      stepIndex: 0,
-      turnIndex: this.scene.currentTurn || 0
+      onAction: () => {} // No callback needed
     });
     
-    console.log('🎬 ShotAnimationSystem: Putback shot completed', { result: putbackResult });
-    return putbackResult;
+    console.log('🎬 ShotAnimationSystem: Putback completed using old system');
+    return { success: true };
   }
 
   /**
