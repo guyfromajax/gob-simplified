@@ -719,7 +719,9 @@ export class ShotAnimationSystem {
     const shooterId = turnData.rebounderId;
     const result = 'MISS'; // Default to MISS for putbacks (can be enhanced later)
     
-    // Use rebounder as shooter for putback attempt
+    // CRITICAL: Detach ball from rebounder before shooting
+    this.ballController.detachBall();
+    console.log('🎬 ShotAnimationSystem: Ball detached from rebounder for putback shot');
     
     // Import and use the proven shootBall function
     const { shootBall } = await import('./ballManager.js');
@@ -738,7 +740,7 @@ export class ShotAnimationSystem {
       turnIndex: this.scene.currentTurn || 0
     });
     
-    // Putback shot completed
+    console.log('🎬 ShotAnimationSystem: Putback shot completed', { result: putbackResult });
     return putbackResult;
   }
 
