@@ -197,6 +197,8 @@ def simulate_quarter(
 
     return gm
 
+#minor change for new push
+
 def initialize_team_attributes():
     settings = {}
     for team in ["Lancaster", "Bentley-Truman"]:
