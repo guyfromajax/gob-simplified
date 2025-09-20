@@ -28,13 +28,24 @@ export function computeFastBreakOutletTarget({
   const distance = randomDistance();
   const direction = newOffenseBasket.x > rebounderGridX ? 1 : -1;
 
+  const rimX = newOffenseBasket.x;
   let minX = COURT_BOUNDS.minX;
   let maxX = COURT_BOUNDS.maxX;
 
   if (newOffenseTeam === "home") {
-    minX = Math.max(minX, newOffenseBasket.x - separationBuffer);
+    minX = Math.max(
+      minX,
+      rimX - separationBuffer,
+      Math.min(rimX, rebounderGridX)
+    );
+    maxX = Math.min(maxX, rimX + separationBuffer);
   } else {
-    maxX = Math.min(maxX, newOffenseBasket.x + separationBuffer);
+    minX = Math.max(minX, rimX - separationBuffer);
+    maxX = Math.min(
+      maxX,
+      rimX + separationBuffer,
+      Math.max(rimX, rebounderGridX)
+    );
   }
 
   const targetX = clamp(

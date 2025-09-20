@@ -297,7 +297,8 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
     );
   }
 
-  const { newOffenseTeam, newOffenseBasket } = deriveOffenseContext(rebounderSprite.team);
+  const rebounderTeamKey = rebounderSprite.team;
+  const { newOffenseTeam, newOffenseBasket } = deriveOffenseContext(rebounderTeamKey);
   const width = scene.game.config.width;
   const height = scene.game.config.height;
 
