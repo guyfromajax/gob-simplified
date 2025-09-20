@@ -4,8 +4,11 @@ import { attachBallToPlayer } from "./ballManager.js";
 import { tweenBallTo, tweenPlayerTo, runPass } from "./ballTween.js";
 import animationConfig, { FAST_BREAK_END_PAUSE_MS } from "./animation_config.js";
 import { HOME_RIM_COORDS, AWAY_RIM_COORDS, HOME_TOP_KEY, AWAY_TOP_KEY } from "./courtConstants.js";
-import { States } from "../state/gameStateMachine.js";
-import { transitionFastBreakState } from "./fastBreakStateHelpers.js";
+import {
+  States,
+  safeTransition,
+  getDebugTransitions,
+} from "../state/gameStateMachine.js";
 import { getCurrentOwner } from "../ball/ballController.js";
 import { createAnimationTimeline } from "./animationTimeline.js";
 import { runInboundSetup } from "./turnAnimation.js";
@@ -25,6 +28,132 @@ function fastBreakEndPause(scene) {
   const delay = DebugFlags?.FB_PAUSE ? FAST_BREAK_END_PAUSE_MS : 0;
   if (scene.skipToEnd || delay <= 0) return Promise.resolve();
   return new Promise((resolve) => scene.time.delayedCall(delay, resolve));
+}
+
+function mergePayload(base, extra) {
+  const normalizedBase = base != null ? base : undefined;
+  if (!extra) return normalizedBase;
+  if (!normalizedBase) return { ...extra };
+  return { ...normalizedBase, ...extra };
+}
+
+function computeFastBreakHopPath(start, target) {
+  if (!target || start === target) return [];
+
+  if (target === States.FastBreakOutlet) {
+    switch (start) {
+      case States.FastBreakOutlet:
+        return [];
+      case States.Rebound:
+        return [States.FastBreakOutlet];
+      case States.FastBreak:
+      case States.ShotAttempt:
+        return [States.Rebound, States.FastBreakOutlet];
+      case States.HalfCourt:
+        return [States.FastBreak, States.Rebound, States.FastBreakOutlet];
+      case States.Inbound:
+        return [
+          States.HalfCourt,
+          States.FastBreak,
+          States.Rebound,
+          States.FastBreakOutlet,
+        ];
+      case States.OutletSetup:
+        return [
+          States.HalfCourt,
+          States.FastBreak,
+          States.Rebound,
+          States.FastBreakOutlet,
+        ];
+      case States.Turnover:
+        return [States.FastBreak, States.Rebound, States.FastBreakOutlet];
+      default:
+        return [States.Rebound, States.FastBreakOutlet];
+    }
+  }
+
+  if (target === States.FastBreak) {
+    switch (start) {
+      case States.FastBreak:
+        return [];
+      case States.FastBreakOutlet:
+        return [States.FastBreak];
+      case States.Rebound:
+        return [States.FastBreak];
+      case States.ShotAttempt:
+        return [States.Rebound, States.FastBreak];
+      case States.HalfCourt:
+        return [States.FastBreak];
+      case States.Inbound:
+        return [States.HalfCourt, States.FastBreak];
+      case States.OutletSetup:
+        return [States.HalfCourt, States.FastBreak];
+      case States.Turnover:
+        return [States.FastBreak];
+      default:
+        return [States.FastBreak];
+    }
+  }
+
+  return [target];
+}
+
+function runFastBreakTransition(scene, target, options = {}) {
+  const machine = scene?.stateMachine;
+  if (!machine || !target) return;
+
+  const startState = machine.state;
+  const path = computeFastBreakHopPath(startState, target);
+  if (!path.length) return;
+
+  const {
+    debugStepIndex = null,
+    context,
+    applyContextToAllSteps = false,
+  } = options;
+
+  const debugTransitionsEnabled = getDebugTransitions();
+  const debugPayload =
+    debugTransitionsEnabled && debugStepIndex != null
+      ? { stepIndex: debugStepIndex }
+      : undefined;
+
+  let blocked = false;
+
+  for (let index = 0; index < path.length; index++) {
+    const step = path[index];
+    if (machine.state === step) continue;
+
+    const prevState = machine.state;
+    const includeContext = applyContextToAllSteps || index === path.length - 1;
+    const payload = includeContext
+      ? mergePayload(context, debugPayload)
+      : debugPayload;
+
+    safeTransition(machine, step, payload);
+
+    if (machine.state === prevState) {
+      blocked = true;
+      animationDebugWarn("fastBreak: blocked transition", {
+        start: startState,
+        target,
+        attempted: step,
+        fromState: prevState,
+        current: machine.state,
+      });
+      break;
+    }
+  }
+
+  const expectedFinal = path[path.length - 1];
+  if (!blocked && machine.state !== expectedFinal) {
+    animationDebugWarn("fastBreak: final state mismatch", {
+      start: startState,
+      target,
+      expected: expectedFinal,
+      current: machine.state,
+    });
+  }
 }
 
 export async function runFastBreakSequence({
@@ -88,7 +217,7 @@ export async function runFastBreakSequence({
       if (debugEnabled)
         animationDebugLog('Fast break: correcting state from Inbound to Rebound before FastBreakOutlet transition');
     }
-    transitionFastBreakState(scene, States.FastBreakOutlet, { debugStepIndex: 0 });
+    runFastBreakTransition(scene, States.FastBreakOutlet, { debugStepIndex: 0 });
     const passerId = turnData.roles.outlet_passer;
     const receiverId = turnData.roles.outlet_receiver;
     const passerSprite   = playerSprites[passerId];
@@ -119,10 +248,10 @@ export async function runFastBreakSequence({
       if (receiverAnim.movement?.length) receiverAnim.movement[0].coords = target;
     }
     if (scene.skipToEnd) return;
-    transitionFastBreakState(scene, States.FastBreak, { debugStepIndex: 1 });
+    runFastBreakTransition(scene, States.FastBreak, { debugStepIndex: 1 });
     scene.events?.emit("fb:start");
   } else {
-    transitionFastBreakState(scene, States.FastBreak, { debugStepIndex: 0 });
+    runFastBreakTransition(scene, States.FastBreak, { debugStepIndex: 0 });
     scene.events?.emit("fb:start");
   }
 
