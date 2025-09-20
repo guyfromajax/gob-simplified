@@ -382,12 +382,11 @@ class TurnManager:
             # Log the discrepancy for debugging/auditing purposes
             self.logger.log(f"ptsReconcile:{team.name}:{total_pts}->{team_score}")
 
-            # Choose a player to receive the adjustment. Prefer the full roster
-            # but fall back to the current lineup in test environments where the
-            # roster may be empty.
-            players = list(team.get_all_players())
-            if not players:
-                players = list(team.lineup.values())
+            # Choose a player to receive the adjustment. Prefer the players on
+            # the floor (``team.lineup``) so the correction reflects what
+            # viewers see.  Fall back to the full roster for edge cases where
+            # the lineup has not yet been populated.
+            players = list(team.lineup.values()) or list(team.get_all_players())
             if not players:
                 continue  # nothing we can do
             player = players[0]
