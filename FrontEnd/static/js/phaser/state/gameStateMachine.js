@@ -52,11 +52,15 @@ function toObject(payload) {
 }
 
 function emitTransitionWarning(message, payload = {}, debugPayload = {}) {
-  const merged = { ...toObject(debugPayload), ...toObject(payload) };
+  const structured = {
+    message,
+    ...toObject(debugPayload),
+    ...toObject(payload),
+  };
   if (isAnimationDebugEnabled()) {
-    animationDebugWarn(message, merged);
+    animationDebugWarn(message, structured);
   } else {
-    console.warn(message, merged);
+    console.warn(message, structured);
   }
 }
 
