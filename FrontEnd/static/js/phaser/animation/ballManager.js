@@ -498,13 +498,29 @@ export function animatePutbackAttempt(
   });
 }
 
+function coerceFastBreakFlag(value) {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return value !== 0;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    return normalized === "true" || normalized === "1" || normalized === "fast_break";
+  }
+  return false;
+}
+
 function isUpcomingFastBreak(scene, explicitFlag) {
-  if (typeof explicitFlag === "boolean") return explicitFlag;
+  if (explicitFlag != null) {
+    return coerceFastBreakFlag(explicitFlag);
+  }
   const currentIndex = typeof scene?.currentTurn === "number" ? scene.currentTurn : null;
   if (currentIndex == null) return false;
   const nextTurn = scene?.simData?.turns?.[currentIndex + 1];
   if (!nextTurn) return false;
-  return nextTurn.fast_break === true || nextTurn.result_type === "FAST_BREAK";
+  if (coerceFastBreakFlag(nextTurn.fast_break)) return true;
+  const resultType = typeof nextTurn.result_type === "string"
+    ? nextTurn.result_type.toUpperCase()
+    : null;
+  return resultType === "FAST_BREAK";
 }
 
 /**
@@ -534,7 +550,7 @@ export function animateRebound({
   clearCurrentOwner(scene);
 
   const debugEnabled = isAnimationDebugEnabled();
-  const holdReboundState = isUpcomingFastBreak(scene, upcomingFastBreak);
+  const shouldHoldForFastBreak = () => isUpcomingFastBreak(scene, upcomingFastBreak);
 
   scene.rebounderId = rebounderId;
   const rebCfg = animationConfig.rebound;
@@ -600,6 +616,7 @@ export function animateRebound({
               offenseTeamId: rebounderSprite.team_id
             });
             if (scene.stateMachine?.is(States.Rebound)) {
+              const holdReboundState = shouldHoldForFastBreak();
               if (holdReboundState) {
                 if (debugEnabled && getDebugTransitions()) {
                   animationDebugLog(
