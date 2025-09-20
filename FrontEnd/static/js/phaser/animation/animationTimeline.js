@@ -8,20 +8,19 @@ export function createAnimationTimeline(scene) {
     scene.__activeTimeline = null;
   }
   const { tweens } = scene;
-  let timelineFactory = null;
+  let timeline = null;
 
   if (typeof tweens.createTimeline === "function") {
-    timelineFactory = () => tweens.createTimeline();
+    timeline = tweens.createTimeline();
   } else if (typeof tweens.timeline === "function") {
-    timelineFactory = () => tweens.timeline();
+    timeline = tweens.timeline();
   } else if (typeof tweens.addTimeline === "function") {
-    timelineFactory = () => tweens.addTimeline();
+    timeline = tweens.addTimeline();
   }
 
-  if (!timelineFactory) return null;
-
-  const timeline = timelineFactory();
   if (!timeline) return null;
+  scene.__activeTimeline = timeline;
+
   timeline.once("complete", () => {
     if (scene.__activeTimeline === timeline) {
       scene.__activeTimeline = null;
