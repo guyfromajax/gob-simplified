@@ -4,7 +4,8 @@ import { attachBallToPlayer } from "./ballManager.js";
 import { tweenBallTo, tweenPlayerTo, runPass } from "./ballTween.js";
 import animationConfig, { FAST_BREAK_END_PAUSE_MS } from "./animation_config.js";
 import { HOME_RIM_COORDS, AWAY_RIM_COORDS, HOME_TOP_KEY, AWAY_TOP_KEY } from "./courtConstants.js";
-import { States, getDebugTransitions } from "../state/gameStateMachine.js";
+import { States } from "../state/gameStateMachine.js";
+import { transitionFastBreakState } from "./fastBreakStateHelpers.js";
 import { getCurrentOwner } from "../ball/ballController.js";
 import { createAnimationTimeline } from "./animationTimeline.js";
 import { runInboundSetup } from "./turnAnimation.js";
@@ -37,9 +38,8 @@ export async function runFastBreakSequence({ scene, turnData, playerSprites, bal
     // Ensure we're in a valid state for fast break transition
     if (scene.stateMachine?.is(States.Inbound)) {
       console.log('Fast break: correcting state from Inbound to Rebound before FastBreakOutlet transition');
-      scene.stateMachine?.transition(States.Rebound, getDebugTransitions() && { stepIndex: 0 });
     }
-    scene.stateMachine?.transition(States.FastBreakOutlet, getDebugTransitions() && { stepIndex: 0 });
+    transitionFastBreakState(scene, States.FastBreakOutlet, { debugStepIndex: 0 });
     const passerId = turnData.roles.outlet_passer;
     const receiverId = turnData.roles.outlet_receiver;
     const passerSprite   = playerSprites[passerId];
@@ -70,10 +70,10 @@ export async function runFastBreakSequence({ scene, turnData, playerSprites, bal
       if (receiverAnim.movement?.length) receiverAnim.movement[0].coords = target;
     }
     if (scene.skipToEnd) return;
-    scene.stateMachine?.transition(States.FastBreak, getDebugTransitions() && { stepIndex: 1 });
+    transitionFastBreakState(scene, States.FastBreak, { debugStepIndex: 1 });
     scene.events?.emit("fb:start");
   } else {
-    scene.stateMachine?.transition(States.FastBreak, getDebugTransitions() && { stepIndex: 0 });
+    transitionFastBreakState(scene, States.FastBreak, { debugStepIndex: 0 });
     scene.events?.emit("fb:start");
   }
 
