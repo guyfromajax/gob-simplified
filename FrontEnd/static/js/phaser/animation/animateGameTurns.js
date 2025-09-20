@@ -6,6 +6,12 @@ import runFreeThrowSequence from "./freeThrow.js";
 import runFastBreakSequence from "./fastBreak.js";
 import { handleTurnover } from "./turnoverAdapter.js";
 import { States } from "../state/gameStateMachine.js";
+import {
+  animationDebugLog,
+  animationDebugWarn,
+  isAnimationDebugEnabled,
+} from "../utils/debugFlags.js";
+import { getSceneStepLogger } from "./debugStepLogger.js";
 
 const DEBUG_FLOW =
   (typeof window !== 'undefined' && window.DEBUG_FLOW) ||
@@ -56,7 +62,68 @@ export async function animateGameTurns({ //hasBallAtStep
   if (scene) scene.simData = simData;
   annotateFreeThrowTurns(turns);
   const allPlayers = simData.players || [];
-  if (DEBUG_FLOW) {
+  const debugEnabled = isAnimationDebugEnabled();
+  const stepLogger = debugEnabled ? getSceneStepLogger(scene) : null;
+
+  const clone = value => {
+    if (!value) return value;
+    try {
+      return JSON.parse(JSON.stringify(value));
+    } catch (err) {
+      return { ...value };
+    }
+  };
+
+  if (debugEnabled && scene) {
+    const baseScore = clone(simData.score || {});
+    scene.__debugScoreSnapshot = {
+      ...(scene.__debugScoreSnapshot || {}),
+      ...baseScore,
+    };
+    if (typeof scene.__debugScoreDelta === "undefined") {
+      scene.__debugScoreDelta = null;
+    }
+  }
+
+  const updateDebugScore = (turn, meta = {}) => {
+    if (!debugEnabled || !scene || !turn?.score) {
+      if (debugEnabled && scene) scene.__debugScoreDelta = null;
+      return;
+    }
+    const previous = scene.__debugScoreSnapshot || {};
+    const next = turn.score || {};
+    const teamKeys = new Set([
+      ...Object.keys(previous || {}),
+      ...Object.keys(next || {}),
+    ]);
+    const delta = {};
+    for (const key of teamKeys) {
+      const before = typeof previous?.[key] === "number" ? previous[key] : 0;
+      const after = typeof next?.[key] === "number" ? next[key] : before;
+      delta[key] = after - before;
+    }
+    scene.__debugScoreSnapshot = {
+      ...previous,
+      ...clone(next),
+    };
+    scene.__debugScoreDelta = delta;
+    animationDebugLog("ANIM: score update", {
+      ...meta,
+      delta,
+      score: clone(scene.__debugScoreSnapshot),
+    });
+  };
+
+  const logVerbose = (...args) => {
+    if (isAnimationDebugEnabled()) {
+      animationDebugLog(...args);
+      return;
+    }
+    if (DEBUG_FLOW) {
+      console.log(...args);
+    }
+  };
+  if (DEBUG_FLOW || debugEnabled) {
     const stepCount = turns.reduce((acc, t) => {
       const turnSteps = (t.animations || []).reduce(
         (sum, a) => sum + (a.movement?.length || 0),
@@ -64,7 +131,7 @@ export async function animateGameTurns({ //hasBallAtStep
       );
       return acc + turnSteps;
     }, 0);
-    console.log(`🟢 animateGameTurns start: ${turns.length} turns, ${stepCount} steps`);
+    logVerbose(`🟢 animateGameTurns start: ${turns.length} turns, ${stepCount} steps`);
   }
 
   const handlePossessionFlip = (payload = {}) => {
@@ -73,7 +140,7 @@ export async function animateGameTurns({ //hasBallAtStep
     const previousOffenseTeamId = scene.offenseTeamId;
     const newOffenseTeamId = payload.offenseTeamId;
     
-    console.log('POSSESSION CHANGE EVENT:', {
+    animationDebugLog('POSSESSION CHANGE EVENT:', {
       previousOffenseTeamId,
       newOffenseTeamId,
       currentState: scene.stateMachine?.state,
@@ -81,10 +148,10 @@ export async function animateGameTurns({ //hasBallAtStep
       currentTurn: scene.currentTurn,
       stackTrace: new Error().stack?.split('\n').slice(1, 6)
     });
-    
+
     // Check if this is a duplicate possession change
     if (previousOffenseTeamId === newOffenseTeamId) {
-      console.warn('DUPLICATE POSSESSION CHANGE DETECTED - same team!', {
+      animationDebugWarn('DUPLICATE POSSESSION CHANGE DETECTED - same team!', {
         teamId: newOffenseTeamId,
         stackTrace: new Error().stack?.split('\n').slice(1, 6)
       });
@@ -93,7 +160,7 @@ export async function animateGameTurns({ //hasBallAtStep
     scene.possessionFlipInProgress = true;
     scene.offenseTeamId = newOffenseTeamId;
     if (REBOUND_DEBUG) {
-      console.log("reb:flip", { newPossession: payload.offenseTeamId });
+      animationDebugLog("reb:flip", { newPossession: payload.offenseTeamId });
     }
     scene.time.delayedCall(0, () => (scene.possessionFlipInProgress = false));
   };
@@ -104,7 +171,45 @@ export async function animateGameTurns({ //hasBallAtStep
     const turn = turns[i];
     turn.index = i;
     if (scene.skipToEnd) break;
-    if (DEBUG_FLOW) console.log(`🔁 Turn ${i + 1}`, turn);
+    const possessionId =
+      turn.possession_id ?? turn.possessionId ?? turn.possessionID ?? null;
+    const animations = turn.animations || [];
+    if (debugEnabled && stepLogger) {
+      const maxSteps = Math.max(
+        0,
+        ...animations.map(anim => anim.movement?.length || 0)
+      );
+      for (let stepIndex = 0; stepIndex < maxSteps; stepIndex++) {
+        const stepPayload = {
+          turnIndex: i,
+          turnId: turn.id ?? turn.turn_id ?? null,
+          possessionId,
+          possessionTeamId:
+            turn.possession_team_id ?? turn.possessionTeamId ?? null,
+          stepIndex,
+          timestamp: null,
+          actions: [],
+        };
+        for (const anim of animations) {
+          const step = anim.movement?.[stepIndex];
+          if (!step) continue;
+          if (
+            stepPayload.timestamp == null &&
+            typeof step.timestamp === "number"
+          ) {
+            stepPayload.timestamp = step.timestamp;
+          }
+          stepPayload.actions.push({
+            playerId: anim.playerId ?? anim.player_id ?? null,
+            action: step.action || null,
+          });
+        }
+        if (stepPayload.actions.length) {
+          stepLogger.logStep(stepPayload);
+        }
+      }
+    }
+    if (DEBUG_FLOW || debugEnabled) logVerbose(`🔁 Turn ${i + 1}`, turn);
 
     if (turn.result_type === "FREE_THROW") {
       await runFreeThrowSequence(scene, { playerSprites, ballSprite, turnData: turn, onUpdate, ftContext: turn.ftContext });
@@ -115,6 +220,7 @@ export async function animateGameTurns({ //hasBallAtStep
           console.error('Scoreboard update failed:', err);
         }
       }
+      updateDebugScore(turn, { turnIndex: i, possessionId });
       continue;
     }
 
@@ -129,6 +235,7 @@ export async function animateGameTurns({ //hasBallAtStep
           console.error('Scoreboard update failed:', err);
         }
       }
+      updateDebugScore(turn, { turnIndex: i, possessionId });
       continue;
     }
 
@@ -141,17 +248,18 @@ export async function animateGameTurns({ //hasBallAtStep
           console.error('Scoreboard update failed:', err);
         }
       }
+      updateDebugScore(turn, { turnIndex: i, possessionId });
       continue;
     }
 
     // Debug fast break routing
     if (turn.fast_break === true || turn.result_type === "FAST_BREAK") {
-      console.log('FAST BREAK TURN DETECTED - routing to runFastBreakSequence:', {
+      animationDebugLog('FAST BREAK TURN DETECTED - routing to runFastBreakSequence:', {
         fast_break: turn.fast_break,
         result_type: turn.result_type,
         turn_index: i
       });
-      await runFastBreakSequence(scene, { playerSprites, ballSprite, turnData: turn, onUpdate });
+      await runFastBreakSequence(scene, { playerSprites, ballSprite, turnData: turn, onUpdate, turnIndex: i });
       if (onUpdate) {
         try {
           onUpdate(turn);
@@ -159,12 +267,13 @@ export async function animateGameTurns({ //hasBallAtStep
           console.error('Scoreboard update failed:', err);
         }
       }
+      updateDebugScore(turn, { turnIndex: i, possessionId });
       continue;
     }
     
     // Debug: Check if this should be a fast break but isn't being detected
     if (turn.result_type === "MAKE" || turn.result_type === "MISS") {
-      console.log('SHOT TURN - checking for fast break indicators:', {
+      animationDebugLog('SHOT TURN - checking for fast break indicators:', {
         result_type: turn.result_type,
         fast_break: turn.fast_break,
         turn_index: i,
@@ -174,8 +283,8 @@ export async function animateGameTurns({ //hasBallAtStep
       
       // Check if this is a fast break turn (now properly flagged by backend)
       if (turn.fast_break === true) {
-        console.log('FAST BREAK TURN DETECTED - routing to runFastBreakSequence');
-        await runFastBreakSequence(scene, { playerSprites, ballSprite, turnData: turn, onUpdate });
+        animationDebugLog('FAST BREAK TURN DETECTED - routing to runFastBreakSequence');
+        await runFastBreakSequence(scene, { playerSprites, ballSprite, turnData: turn, onUpdate, turnIndex: i });
         if (onUpdate) {
           try {
             onUpdate(turn);
@@ -183,12 +292,12 @@ export async function animateGameTurns({ //hasBallAtStep
             console.error('Scoreboard update failed:', err);
           }
         }
+        updateDebugScore(turn, { turnIndex: i, possessionId });
         continue;
       }
     }
 
     const shooterName = turn.shooter || "";
-    const animations = turn.animations || [];
 
     const playerMap = Object.fromEntries(
       allPlayers.map(p => [p.name, p.playerId])
@@ -203,7 +312,8 @@ export async function animateGameTurns({ //hasBallAtStep
       turnData: turn,
       ballSprite,
       onAction: async (action, sprite, timestamp) => {
-        if (DEBUG_FLOW) console.log(`🎬 Action "${action}" fired at ${timestamp}ms for sprite:`, sprite);
+        if (DEBUG_FLOW || debugEnabled)
+          logVerbose(`🎬 Action "${action}" fired at ${timestamp}ms for sprite:`, sprite);
         onAction(action, sprite, timestamp);
 
         const playerId = Object.keys(playerSprites).find(
@@ -230,7 +340,7 @@ export async function animateGameTurns({ //hasBallAtStep
           );
 
           if (passStep && receiveStep && receiverAnim?.playerId != null) {
-            if (DEBUG_FLOW) console.log("📤 Pass triggered");
+            if (DEBUG_FLOW || debugEnabled) logVerbose("📤 Pass triggered");
             const receiverSprite = playerSprites[receiverAnim.playerId];
             const endCoords = receiverSprite
               ? { x: receiverSprite.x, y: receiverSprite.y }
@@ -238,20 +348,21 @@ export async function animateGameTurns({ //hasBallAtStep
 
             const delta = receiveStep.timestamp - timestamp;
             const duration = delta > 0 ? delta : animationConfig.pass.duration;
-            if (DEBUG_FLOW) console.log(`⏱️ Resolved pass duration: ${duration}ms (delta=${delta})`);
+            if (DEBUG_FLOW || debugEnabled)
+              logVerbose(`⏱️ Resolved pass duration: ${duration}ms (delta=${delta})`);
 
-            if (DEBUG_FLOW) {
-              scene.events?.once('passStart', () => console.log('passStart'));
-              scene.events?.once('tweenStart', () => console.log('tweenStart'));
-              scene.events?.once('tweenEnd', () => console.log('tweenEnd'));
-              scene.events?.once('ballAttached', () => console.log('ballAttached'));
-              scene.events?.once('passEnd', () => console.log('passEnd'));
+            if (DEBUG_FLOW || debugEnabled) {
+              scene.events?.once('passStart', () => logVerbose('passStart'));
+              scene.events?.once('tweenStart', () => logVerbose('tweenStart'));
+              scene.events?.once('tweenEnd', () => logVerbose('tweenEnd'));
+              scene.events?.once('ballAttached', () => logVerbose('ballAttached'));
+              scene.events?.once('passEnd', () => logVerbose('passEnd'));
             }
 
             if (scene.__activePass) {
-          console.warn(
-            'Active pass tween detected before runPass call; cancelling previous tween'
-          );
+              animationDebugWarn(
+                'Active pass tween detected before runPass call; cancelling previous tween'
+              );
             }
 
             await runPass(scene, {
@@ -283,7 +394,7 @@ export async function animateGameTurns({ //hasBallAtStep
       if (ballHandlerId != null && stealerId != null) {
         const cfg = animationConfig.steal || {};
         if (scene.__activePass) {
-            console.warn('Active pass tween detected before steal; cancelling previous tween');
+          animationDebugWarn('Active pass tween detected before steal; cancelling previous tween');
         }
         await runPass(scene, {
           fromId: ballHandlerId,
@@ -307,19 +418,32 @@ export async function animateGameTurns({ //hasBallAtStep
         console.error('Scoreboard update failed:', err);
       }
     }
+    updateDebugScore(turn, { turnIndex: i, possessionId });
     if (scene.skipToEnd) {
       for (let j = i + 1; j < turns.length; j++) {
         try {
-          turns[j].index = j;
-          if (onUpdate) onUpdate(turns[j]);
+          const futureTurn = turns[j];
+          futureTurn.index = j;
+          if (onUpdate) onUpdate(futureTurn);
+          if (debugEnabled) {
+            const futurePossession =
+              futureTurn.possession_id ??
+              futureTurn.possessionId ??
+              futureTurn.possessionID ??
+              null;
+            updateDebugScore(futureTurn, {
+              turnIndex: j,
+              possessionId: futurePossession,
+            });
+          }
         } catch (err) {
           console.error('Scoreboard update failed:', err);
         }
       }
       break;
     }
-    if (DEBUG_FLOW && i === turns.length - 1) {
-      console.log('🔚 animateGameTurns last turn complete');
+    if ((DEBUG_FLOW || debugEnabled) && i === turns.length - 1) {
+      logVerbose('🔚 animateGameTurns last turn complete');
     }
   }
 

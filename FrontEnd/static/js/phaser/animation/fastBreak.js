@@ -9,7 +9,13 @@ import { transitionFastBreakState } from "./fastBreakStateHelpers.js";
 import { getCurrentOwner } from "../ball/ballController.js";
 import { createAnimationTimeline } from "./animationTimeline.js";
 import { runInboundSetup } from "./turnAnimation.js";
-import { DebugFlags } from "../utils/debugFlags.js";
+import {
+  DebugFlags,
+  animationDebugLog,
+  animationDebugWarn,
+  isAnimationDebugEnabled,
+} from "../utils/debugFlags.js";
+import { getSceneStepLogger } from "./debugStepLogger.js";
 
 // Timeline-driven fast break sequence. Handles the initial sprint phase via a
 // Phaser timeline so all player movements can be cancelled together if
@@ -21,12 +27,54 @@ function fastBreakEndPause(scene) {
   return new Promise((resolve) => scene.time.delayedCall(delay, resolve));
 }
 
-export async function runFastBreakSequence({ scene, turnData, playerSprites, ballSprite }) {
+export async function runFastBreakSequence({
+  scene,
+  turnData,
+  playerSprites,
+  ballSprite,
+  turnIndex = null,
+}) {
   if (!scene || !turnData || scene.skipToEnd) return;
   if (!scene.ballSprite) scene.ballSprite = ballSprite;
   const animations = turnData.animations || [];
   const width = scene.game.config.width;
   const height = scene.game.config.height;
+  const debugEnabled = isAnimationDebugEnabled();
+  const stepLogger = debugEnabled ? getSceneStepLogger(scene) : null;
+  const possessionId =
+    turnData.possession_id ?? turnData.possessionId ?? turnData.possessionID ?? null;
+
+  if (debugEnabled && stepLogger) {
+    const maxSteps = Math.max(
+      0,
+      ...animations.map(anim => anim.movement?.length || 0)
+    );
+    for (let stepIndex = 0; stepIndex < maxSteps; stepIndex++) {
+      const payload = {
+        phase: "fastBreak",
+        turnIndex,
+        possessionId,
+        turnId: turnData.id ?? turnData.turn_id ?? null,
+        stepIndex,
+        timestamp: null,
+        actions: [],
+      };
+      for (const anim of animations) {
+        const step = anim.movement?.[stepIndex];
+        if (!step) continue;
+        if (payload.timestamp == null && typeof step.timestamp === "number") {
+          payload.timestamp = step.timestamp;
+        }
+        payload.actions.push({
+          playerId: anim.playerId ?? anim.player_id ?? null,
+          action: step.action || null,
+        });
+      }
+      if (payload.actions.length) {
+        stepLogger.logStep(payload);
+      }
+    }
+  }
 
   // stop any existing timeline/tweens
   if (scene.__activeTimeline) {
@@ -37,7 +85,8 @@ export async function runFastBreakSequence({ scene, turnData, playerSprites, bal
   if (turnData.roles?.outlet_passer) {
     // Ensure we're in a valid state for fast break transition
     if (scene.stateMachine?.is(States.Inbound)) {
-      console.log('Fast break: correcting state from Inbound to Rebound before FastBreakOutlet transition');
+      if (debugEnabled)
+        animationDebugLog('Fast break: correcting state from Inbound to Rebound before FastBreakOutlet transition');
     }
     transitionFastBreakState(scene, States.FastBreakOutlet, { debugStepIndex: 0 });
     const passerId = turnData.roles.outlet_passer;
@@ -284,13 +333,16 @@ export async function runFastBreakSequence({ scene, turnData, playerSprites, bal
   const shooterId = turnData.shooterId || turnData.shooter_id || getCurrentOwner(scene);
   const shooterSprite = shooterId != null ? playerSprites[shooterId] : null;
   
-  console.log('Fast break shot animation check:', {
-    shooterId,
-    hasShooterSprite: !!shooterSprite,
-    result_type: turnData.result_type,
-    hold_up: turnData.hold_up,
-    willAnimateShot: shooterSprite && (turnData.result_type === "MAKE" || turnData.result_type === "MISS")
-  });
+  if (debugEnabled)
+    animationDebugLog('Fast break shot animation check:', {
+      shooterId,
+      hasShooterSprite: !!shooterSprite,
+      result_type: turnData.result_type,
+      hold_up: turnData.hold_up,
+      willAnimateShot:
+        shooterSprite &&
+        (turnData.result_type === "MAKE" || turnData.result_type === "MISS"),
+    });
   
   // Only animate shot if there's a shot attempt (result_type indicates a shot was taken)
   if (shooterSprite && (turnData.result_type === "MAKE" || turnData.result_type === "MISS")) {
@@ -308,36 +360,43 @@ export async function runFastBreakSequence({ scene, turnData, playerSprites, bal
       arc: { height: arcHeight }
     });
     if (turnData.result_type === "MAKE") {
-      console.log('Fast break made shot detected - starting rim hold');
+      if (debugEnabled)
+        animationDebugLog('Fast break made shot detected - starting rim hold');
       const rimHoldMs = animationConfig.fastBreak?.rimHoldMs ?? 2000;
       await new Promise(resolve => scene.time.delayedCall(rimHoldMs, resolve));
-      console.log('Fast break rim hold completed - starting end pause');
+      if (debugEnabled)
+        animationDebugLog('Fast break rim hold completed - starting end pause');
       await fastBreakEndPause(scene);
-      console.log('Fast break end pause completed - proceeding to inbound setup');
+      if (debugEnabled)
+        animationDebugLog('Fast break end pause completed - proceeding to inbound setup');
       
       // Use backend possession_team_id to determine new offense team for inbound
       const resolveOffenseSide = (scene, teamId) =>
         teamId === scene.simData?.home_team_id ? "home" : "away";
       const newOffenseSide = resolveOffenseSide(scene, turnData.possession_team_id);
       
-      console.log('Fast break made shot - inbound setup:', {
-        shooterTeam: shooterSprite.team,
-        possession_team_id: turnData.possession_team_id,
-        newOffenseSide,
-        home_team_id: scene.simData?.home_team_id
-      });
-      
-      console.log('About to call runInboundSetup for fast break made shot');
+      if (debugEnabled)
+        animationDebugLog('Fast break made shot - inbound setup:', {
+          shooterTeam: shooterSprite.team,
+          possession_team_id: turnData.possession_team_id,
+          newOffenseSide,
+          home_team_id: scene.simData?.home_team_id,
+        });
+
+      if (debugEnabled)
+        animationDebugLog('About to call runInboundSetup for fast break made shot');
       await runInboundSetup({ scene, ballSprite, playerSprites, newOffenseSide });
-      console.log('runInboundSetup completed for fast break made shot');
+      if (debugEnabled)
+        animationDebugLog('runInboundSetup completed for fast break made shot');
     } else {
       // Handle missed fast break shot with ball bounce
-      console.log('Fast break missed shot - rebound progression:', {
-        shooterId,
-        rebounderId: turnData.rebounderId || turnData.rebounder_player_id,
-        rebound_type: turnData.rebound_type,
-        possession_team_id: turnData.possession_team_id
-      });
+      if (debugEnabled)
+        animationDebugLog('Fast break missed shot - rebound progression:', {
+          shooterId,
+          rebounderId: turnData.rebounderId || turnData.rebounder_player_id,
+          rebound_type: turnData.rebound_type,
+          possession_team_id: turnData.possession_team_id,
+        });
       
       const { bounceFromRim } = await import('./ballManager.js');
       const isHomeTeam = shooterSprite.team === "home";

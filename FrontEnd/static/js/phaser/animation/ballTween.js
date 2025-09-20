@@ -6,8 +6,14 @@ import {
   getCurrentOwner,
   getLastKnownOwner,
   setPendingOwner,
-  cancelBallTween
+  cancelBallTween,
+  getPendingOwner,
 } from "../ball/ballController.js";
+import {
+  animationDebugLog,
+  animationDebugWarn,
+  isAnimationDebugEnabled,
+} from "../utils/debugFlags.js";
 
 const BALL_DEPTH = 1000;
 export const PASS_DEBUG = false;
@@ -135,6 +141,53 @@ export function tweenPlayerTo(scene, sprite, target, opts = {}) {
   const { duration = 300, easing = 'Linear' } = opts;
 
   return new Promise((resolve, reject) => {
+    const startPosition = { x: sprite.x, y: sprite.y };
+    const plannedDistance = Math.hypot(target.x - startPosition.x, target.y - startPosition.y);
+    let settled = false;
+
+    const finalize = (status, err) => {
+      if (settled) return;
+      settled = true;
+      if (isAnimationDebugEnabled()) {
+        const ownerId = getCurrentOwner(scene);
+        const pendingOwnerId = getPendingOwner(scene);
+        const actualDistance = Math.hypot(sprite.x - startPosition.x, sprite.y - startPosition.y);
+        const summary = {
+          type: 'tweenPlayerTo',
+          status,
+          playerId: sprite?.playerId ?? null,
+          duration,
+          easing,
+          plannedDistance,
+          actualDistance,
+          ownerId,
+          pendingOwnerId,
+          passInFlight: !!scene?.passInFlight,
+          ballDetached: !!scene?.ballDetached,
+          scoreDelta: scene?.__debugScoreDelta ?? null,
+          start: startPosition,
+          target: { x: target.x, y: target.y },
+          final: { x: sprite.x, y: sprite.y },
+        };
+        animationDebugLog('ANIM tween summary', summary);
+        const tolerance = 2;
+        if (actualDistance - plannedDistance > tolerance) {
+          animationDebugWarn('ANIM teleport suspicion', {
+            playerId: sprite?.playerId ?? null,
+            plannedDistance,
+            actualDistance,
+            start: startPosition,
+            target,
+          });
+        }
+      }
+      if (err) {
+        reject(err);
+      } else {
+        resolve();
+      }
+    };
+
     const tween = scene.tweens.add({
       targets: sprite,
       x: target.x,
@@ -152,9 +205,9 @@ export function tweenPlayerTo(scene, sprite, target, opts = {}) {
           ballSprite.setVisible(true);
         }
       },
-      onComplete: resolve
+      onComplete: () => finalize('complete')
     });
-    tween?.once?.('stop', () => reject(new Error('tween stopped')));
+    tween?.once?.('stop', () => finalize('stop', new Error('tween stopped')));
   });
 }
 
@@ -179,7 +232,7 @@ export async function runPass(scene, cfg = {}) {
   const key = `${fromId ?? ''}-${toId ?? ''}`;
 
   if (scene.__activePass && scene.__activePass.key === key && scene.__activePass.frame === frame) {
-    if (PASS_DEBUG) console.log('duplicate runPass ignored', { fromId, toId, frame });
+    if (PASS_DEBUG) animationDebugLog('duplicate runPass ignored', { fromId, toId, frame });
     return Promise.resolve();
   }
 
@@ -210,10 +263,57 @@ export async function runPass(scene, cfg = {}) {
   scene.passInFlight = true;
   if (!deferOwnership) setPendingOwner(scene, toId);
 
+  let startPosition = null;
+  let endPosition = null;
+  let plannedDistance = 0;
+  let summaryEmitted = false;
+  const emitSummary = (status, extra = {}) => {
+    if (summaryEmitted) return;
+    summaryEmitted = true;
+    if (!isAnimationDebugEnabled()) return;
+    const ownerId = getCurrentOwner(scene);
+    const pendingOwnerId = getPendingOwner(scene);
+    const finalPosition = { x: ballSprite.x, y: ballSprite.y };
+    const actualDistance = startPosition
+      ? Math.hypot(finalPosition.x - startPosition.x, finalPosition.y - startPosition.y)
+      : 0;
+    const summary = {
+      type: 'pass',
+      status,
+      fromId,
+      toId,
+      duration: usedDuration,
+      easing: usedEasing,
+      plannedDistance,
+      actualDistance,
+      ownerId,
+      pendingOwnerId,
+      passInFlight: !!scene.passInFlight,
+      ballDetached: !!scene.ballDetached,
+      scoreDelta: scene.__debugScoreDelta ?? null,
+      start: startPosition,
+      target: endPosition,
+      final: finalPosition,
+      ...extra,
+    };
+    animationDebugLog('ANIM pass summary', summary);
+    const tolerance = 2;
+    if (plannedDistance && actualDistance - plannedDistance > tolerance) {
+      animationDebugWarn('ANIM teleport suspicion', {
+        fromId,
+        toId,
+        plannedDistance,
+        actualDistance,
+        start: startPosition,
+        target: endPosition,
+      });
+    }
+  };
+
   (async () => {
     try {
       scene.events?.emit('passStart', { fromId, toId, duration: usedDuration, easing: usedEasing });
-      if (PASS_DEBUG) console.log('passStart', { fromId, toId, duration: usedDuration, easing: usedEasing });
+      if (PASS_DEBUG) animationDebugLog('passStart', { fromId, toId, duration: usedDuration, easing: usedEasing });
 
       if (fromSprite) {
         attachBallToPlayer(scene, ballSprite, fromSprite);
@@ -227,48 +327,56 @@ export async function runPass(scene, cfg = {}) {
         ballSprite.setDepth(BALL_DEPTH);
       }
 
+      if (!startPosition) {
+        startPosition = { x: ballSprite.x, y: ballSprite.y };
+      }
+
       detachBall(scene, ballSprite);
       scene.ballDetached = true;
       scene.events?.emit('ballDetached');
-      if (PASS_DEBUG) console.log('detach(A)', { fromId });
+      if (PASS_DEBUG) animationDebugLog('detach(A)', { fromId });
 
       const end = endCoords || (toSprite ? { x: toSprite.x, y: toSprite.y } : null);
       if (!end) {
+        emitSummary('skipped');
         resolveFn();
         return;
+      }
+      endPosition = { ...end };
+      if (startPosition) {
+        plannedDistance = Math.hypot(end.x - startPosition.x, end.y - startPosition.y);
       }
 
       const doTween = animationConfig.enableBallTween !== false;
       if (doTween) {
         scene.events?.emit('tweenStart', { fromId, toId, duration: usedDuration, easing: usedEasing });
-        if (PASS_DEBUG) console.log('tweenStart', { fromId, toId, duration: usedDuration, easing: usedEasing });
+        if (PASS_DEBUG) animationDebugLog('tweenStart', { fromId, toId, duration: usedDuration, easing: usedEasing });
         await tweenBallTo(scene, ballSprite, end, { duration: usedDuration, easing: usedEasing });
         scene.events?.emit('tweenEnd', { toId });
-        if (PASS_DEBUG) console.log('tweenEnd', { toId });
+        if (PASS_DEBUG) animationDebugLog('tweenEnd', { toId });
       } else {
         scene.events?.emit('tweenStart', { fromId, toId, skipped: true });
-        if (PASS_DEBUG) console.log('tweenStart', { fromId, toId, skipped: true });
+        if (PASS_DEBUG) animationDebugLog('tweenStart', { fromId, toId, skipped: true });
         if (scene.tweens) scene.tweens.killTweensOf(ballSprite);
         ballSprite.setPosition(end.x, end.y);
         ballSprite.setVisible(true);
         ballSprite.setDepth(BALL_DEPTH);
         scene.events?.emit('tweenEnd', { toId, skipped: true });
-        if (PASS_DEBUG) console.log('tweenEnd', { toId, skipped: true });
+        if (PASS_DEBUG) animationDebugLog('tweenEnd', { toId, skipped: true });
       }
       if (toSprite) {
         attachBallToPlayer(scene, ballSprite, toSprite);
-        // Update the global ball owner reference so other systems know who
-        // currently has possession after the pass completes.
         if (scene.currentBallOwnerRef) {
           scene.currentBallOwnerRef.value = toSprite;
         }
         scene.ballDetached = false;
         scene.events?.emit('ballAttached', { toId });
-        if (PASS_DEBUG) console.log('attach(B)', { toId });
+        if (PASS_DEBUG) animationDebugLog('attach(B)', { toId });
       }
 
       scene.events?.emit('passEnd', { toId });
-      if (PASS_DEBUG) console.log('passEnd', { toId });
+      if (PASS_DEBUG) animationDebugLog('passEnd', { toId });
+      emitSummary('complete');
       cfg.onComplete?.();
       resolveFn();
     } catch (err) {
@@ -277,6 +385,7 @@ export async function runPass(scene, cfg = {}) {
       if (lastSprite) {
         attachBallToPlayer(scene, ballSprite, lastSprite);
       }
+      emitSummary('error', { error: err?.message });
       rejectFn(err);
     } finally {
       if (scene.__activePass && scene.__activePass.key === key && scene.__activePass.frame === frame) {
