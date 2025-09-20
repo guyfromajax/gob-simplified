@@ -1,6 +1,7 @@
 import {
   DebugFlags,
   animationDebugLog,
+  animationDebugWarn,
   isAnimationDebugEnabled,
 } from "../utils/debugFlags.js";
 
@@ -50,6 +51,15 @@ function toObject(payload) {
   return { payload };
 }
 
+function emitTransitionWarning(message, payload = {}, debugPayload = {}) {
+  const merged = { ...toObject(debugPayload), ...toObject(payload) };
+  if (isAnimationDebugEnabled()) {
+    animationDebugWarn(message, merged);
+  } else {
+    console.warn(message, merged);
+  }
+}
+
 function emitTransitionLog(fromState, toState, payload = {}) {
   if (!shouldLogTransitions()) return;
   const basePayload = toObject(payload);
@@ -88,23 +98,35 @@ export function createTransitionGuard(machine, disallowed = []) {
   };
 }
 
-export function safeTransition(machine, next, ctx = {}, required = []) {
+export function safeTransition(
+  machine,
+  next,
+  ctx = {},
+  required = [],
+  debugPayload = {}
+) {
   if (!machine) return;
   const missing = required.filter(
     (key) => ctx[key] === undefined || ctx[key] === null
   );
   if (missing.length) {
     const stack = new Error().stack?.split("\n")[2]?.trim();
-    console.warn("safeTransition missing context", { missing, caller: stack });
+    emitTransitionWarning(
+      "safeTransition missing context",
+      { missing, caller: stack, toState: next, fromState: machine.state },
+      debugPayload
+    );
     return;
   }
 
   const allowed = transitions[machine.state] || [];
   if (!allowed.includes(next)) {
     const stack = new Error().stack?.split("\n")[2]?.trim();
-    console.warn(`Invalid transition: ${machine.state} -> ${next}`, {
-      caller: stack,
-    });
+    emitTransitionWarning(
+      `Invalid transition: ${machine.state} -> ${next}`,
+      { caller: stack, fromState: machine.state, toState: next },
+      debugPayload
+    );
     return;
   }
 
