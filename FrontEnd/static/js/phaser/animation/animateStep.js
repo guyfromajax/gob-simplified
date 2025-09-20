@@ -11,7 +11,15 @@ import { gridToPixels } from "../utils/gridToPixels.js";
  * @returns {Promise} resolves when tween completes
  */
 import { PASS_DEBUG } from "./ballTween.js";
-import { getPendingOwner } from "../ball/ballController.js";
+import {
+  getPendingOwner,
+  getCurrentOwner,
+} from "../ball/ballController.js";
+import {
+  animationDebugLog,
+  animationDebugWarn,
+  isAnimationDebugEnabled,
+} from "../utils/debugFlags.js";
 
 export const PLAYER_TWEEN_DEBUG = false;
 
@@ -24,6 +32,42 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
       scene.game.config.width,
       scene.game.config.height
     );
+
+    const startPosition = { x: sprite.x, y: sprite.y };
+    const plannedDistance = Math.hypot(targetX - startPosition.x, targetY - startPosition.y);
+
+    const emitSummary = (status) => {
+      if (!isAnimationDebugEnabled()) return;
+      const ownerId = getCurrentOwner(scene);
+      const pendingOwnerId = getPendingOwner(scene);
+      const actualDistance = Math.hypot(sprite.x - startPosition.x, sprite.y - startPosition.y);
+      const summary = {
+        type: 'step',
+        status,
+        playerId: sprite?.playerId ?? null,
+        action: step.action ?? null,
+        timestamp: step.timestamp,
+        plannedDistance,
+        actualDistance,
+        ownerId,
+        pendingOwnerId,
+        passInFlight: !!scene?.passInFlight,
+        ballDetached: !!scene?.ballDetached,
+        scoreDelta: scene?.__debugScoreDelta ?? null,
+        position: { x: sprite.x, y: sprite.y },
+      };
+      animationDebugLog('ANIM step summary', summary);
+      const tolerance = 2;
+      if (actualDistance - plannedDistance > tolerance) {
+        animationDebugWarn('ANIM teleport suspicion', {
+          playerId: sprite?.playerId ?? null,
+          plannedDistance,
+          actualDistance,
+          start: startPosition,
+          target: { x: targetX, y: targetY },
+        });
+      }
+    };
 
     let startPromise = Promise.resolve();
 
@@ -63,10 +107,12 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
       },
       onComplete: async () => {
         await startPromise;
+        emitSummary('complete');
         resolve();
       },
       onStop: async () => {
         await startPromise;
+        emitSummary('stop');
         resolve();
       }
     });
