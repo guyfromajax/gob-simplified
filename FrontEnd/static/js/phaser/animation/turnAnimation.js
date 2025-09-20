@@ -12,6 +12,7 @@ import {
 import { tweenBallTo, runPass, PASS_DEBUG, tweenPlayerTo } from "./ballTween.js";
 import animationConfig from "./animation_config.js";
 import { HOME_RIM_COORDS, AWAY_RIM_COORDS } from "./courtConstants.js";
+import { deriveOffenseContext, computeFastBreakOutletTarget } from "./outletUtils.js";
 import { DEBUG } from "../utils/debug.js";
 import { DebugFlags } from "../utils/debugFlags.js";
 import { States, getDebugTransitions, safeTransition, createTransitionGuard } from "../state/gameStateMachine.js";
@@ -285,8 +286,7 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
     );
   }
 
-  const basketGrid =
-    rebounderSprite.team === "home" ? HOME_RIM_COORDS : AWAY_RIM_COORDS;
+  const { newOffenseTeam, newOffenseBasket } = deriveOffenseContext(rebounderSprite.team);
   const width = scene.game.config.width;
   const height = scene.game.config.height;
 
@@ -337,50 +337,45 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
 
   const promises = [];
   let outletTarget = null;
-  
+  let outletContext = null;
+
   if (outletReceiverId && outletReceiverId !== rebounderId && outletReceiverSprite) {
     if (nextPlayType === "FAST_BREAK") {
-      // For fast break: move outlet receiver 15-25 grid spots toward NEW offense basket
-      // The rebounder is on defense, so the new offense team is the opposite team
-      const newOffenseTeam = rebounderSprite.team === "home" ? "away" : "home";
-      const newOffenseBasket = newOffenseTeam === "home" ? HOME_RIM_COORDS : AWAY_RIM_COORDS;
-      const distance = Phaser.Math.Between(15, 25);
-      const direction = newOffenseBasket.x > rebGridX ? 1 : -1; // Move toward new offense basket
-      
-      // Apply team-specific constraints to move outlet receiver further down court
-      let minX = 4, maxX = 97;
-      if (outletReceiverSprite.team === "home") {
-        minX = 45; // Home team outlet receiver moves further down toward away basket (x ≥ 45)
-      } else {
-        maxX = 55; // Away team outlet receiver moves further down toward home basket (x ≤ 55)
-      }
-      
-      console.log('Fast break outlet receiver - moving further down court:', {
-        outletReceiverId,
-        team: outletReceiverSprite.team,
-        minX,
-        maxX,
-        originalTarget: rebGridX + direction * distance,
+      // For fast break: move outlet receiver 15-25 grid spots toward the new offense basket
+      const fastBreakPlan = computeFastBreakOutletTarget({
+        rebounderGridX: rebGridX,
+        rebounderGridY: rebGridY,
         newOffenseTeam,
         newOffenseBasket,
-        purpose: 'Create separation from other players by moving further down court'
+        randomDistance: () => Phaser.Math.Between(15, 25),
+        randomYOffset: () => Phaser.Math.Between(-8, 8),
+        clamp: Phaser.Math.Clamp,
       });
-      
-      outletTarget = {
-        x: Phaser.Math.Clamp(
-          rebGridX + direction * distance,
-          minX,
-          maxX
-        ),
-        y: Phaser.Math.Clamp(
-          rebGridY + Phaser.Math.Between(-8, 8),
-          1,
-          50
-        ),
+
+      const intendedX = rebGridX + fastBreakPlan.direction * fastBreakPlan.distance;
+
+      console.log('Fast break outlet receiver - moving toward attack rim:', {
+        outletReceiverId,
+        team: outletReceiverSprite.team,
+        bounds: fastBreakPlan.bounds,
+        intendedTarget: intendedX,
+        clampedTarget: fastBreakPlan.target.x,
+        newOffenseTeam,
+        rebounderTeam: rebounderSprite.team,
+        attackRim: newOffenseBasket,
+        purpose: 'Create separation from other players by moving toward transition lane'
+      });
+
+      outletTarget = fastBreakPlan.target;
+      outletContext = {
+        newOffenseTeam,
+        newOffenseBasket,
+        direction: fastBreakPlan.direction,
+        bounds: fastBreakPlan.bounds,
       };
     } else {
       // For HCO: move PG near the rebounder (current behavior)
-      const sign = basketGrid.x > rebGridX ? 1 : -1;
+      const sign = newOffenseBasket.x > rebGridX ? 1 : -1;
       outletTarget = {
         x: Phaser.Math.Clamp(
           rebGridX + sign * Phaser.Math.Between(3, 6),
@@ -393,8 +388,13 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
           50
         ),
       };
+      outletContext = {
+        newOffenseTeam,
+        newOffenseBasket,
+        direction: sign,
+      };
     }
-    
+
     const outletPx = gridToPixels(outletTarget.x, outletTarget.y, width, height);
     promises.push(
       tweenPlayerTo(scene, outletReceiverSprite, outletPx, {
@@ -402,7 +402,17 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
       })
     );
     
-    if (DebugFlags?.BALL) console.log('outletTarget', { outletReceiverId, outletTarget, nextPlayType });
+    if (DebugFlags?.BALL) {
+      console.log('outletTarget', {
+        outletReceiverId,
+        outletTarget,
+        nextPlayType,
+        newOffenseTeam,
+        rebounderTeam: rebounderSprite.team,
+        attackRimX: newOffenseBasket.x,
+        bounds: outletContext?.bounds,
+      });
+    }
     if (DebugFlags?.OUTLET) console.log(`${nextPlayType} outlet receiver movement queued`);
   } else {
     if (DebugFlags?.OUTLET) {
@@ -420,8 +430,6 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
     console.log('HCO scenario detected, moving other players toward new offense basket');
     // Determine the new offense basket
     // In defensive rebound: rebounder's team becomes the new offense team
-    const newOffenseTeam = rebounderSprite.team;
-    const newOffenseBasket = newOffenseTeam === "home" ? HOME_RIM_COORDS : AWAY_RIM_COORDS;
     console.log('New offense basket:', newOffenseBasket, 'Rebounder team:', rebounderSprite.team, 'New offense team:', newOffenseTeam);
     
     // Debug: Check for extra sprites without playerInfo
@@ -466,7 +474,6 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
       // In defensive rebound: rebounder's team becomes the new offense team
       // If new offense team is home (basket at x=89), all players move right (increase x)
       // If new offense team is away (basket at x=11), all players move left (decrease x)
-      const newOffenseTeam = rebounderSprite.team; // Rebounder's team becomes new offense
       const direction = newOffenseTeam === "home" ? 1 : -1;
       
       const targetGrid = {
@@ -508,6 +515,13 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
       nextPlayType,
       startedAt: Date.now(),
     };
+    if (outletContext) {
+      outletLog.newOffenseTeam = outletContext.newOffenseTeam;
+      outletLog.attackRim = outletContext.newOffenseBasket;
+    } else {
+      outletLog.newOffenseTeam = newOffenseTeam;
+      outletLog.attackRim = newOffenseBasket;
+    }
     if (DebugFlags?.OUTLET) console.log(outletLog);
     if (DebugFlags?.OUTLET) console.log('Starting outlet pass animation...');
     await runPass(scene, {
