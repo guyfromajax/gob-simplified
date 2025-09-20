@@ -1,4 +1,8 @@
-import { DebugFlags } from "../utils/debugFlags.js";
+import {
+  DebugFlags,
+  animationDebugLog,
+  isAnimationDebugEnabled,
+} from "../utils/debugFlags.js";
 
 export const States = {
   Inbound: 'Inbound',
@@ -35,6 +39,30 @@ export const transitions = {
 };
 
 let debugTransitions = false;
+
+function shouldLogTransitions() {
+  return debugTransitions || isAnimationDebugEnabled();
+}
+
+function toObject(payload) {
+  if (payload && typeof payload === 'object') return { ...payload };
+  if (payload === undefined) return {};
+  return { payload };
+}
+
+function emitTransitionLog(fromState, toState, payload = {}) {
+  if (!shouldLogTransitions()) return;
+  const basePayload = toObject(payload);
+  if (basePayload.event == null) {
+    basePayload.event = toState;
+  }
+  const message = { fromState, toState, ...basePayload };
+  if (debugTransitions && !isAnimationDebugEnabled()) {
+    console.log(message);
+  } else {
+    animationDebugLog('FSM transition', message);
+  }
+}
 
 export function setDebugTransitions(value) {
   debugTransitions = !!value;
@@ -80,31 +108,27 @@ export function safeTransition(machine, next, ctx = {}, required = []) {
     return;
   }
 
-  const prevState = machine.state;
-  machine.transition(next);
-  if (debugTransitions) {
-    const { stepIndex, shotResult, currentOwnerId, pendingOwnerId } = ctx;
-    console.log({
-      prevState,
-      event: next,
-      nextState: machine.state,
-      stepIndex,
-      shotResult,
-      currentOwnerId,
-      pendingOwnerId,
-    });
-  }
+  transitionWithDebug(machine, next, ctx);
+}
+
+export function transitionWithDebug(machine, next, payload = {}) {
+  if (!machine) return;
+  const normalized = toObject(payload);
+  if (normalized.event == null) normalized.event = next;
+  machine.transition(next, normalized);
 }
 
 export function createGameStateMachine(initialState = States.Inbound) {
   let state = initialState;
   return {
-    transition(next) {
+    transition(next, payload = {}) {
       const allowed = transitions[state] || [];
       if (!allowed.includes(next)) {
         throw new Error(`Invalid transition: ${state} -> ${next}`);
       }
+      const fromState = state;
       state = next;
+      emitTransitionLog(fromState, state, payload);
     },
     is(s) {
       return state === s;
