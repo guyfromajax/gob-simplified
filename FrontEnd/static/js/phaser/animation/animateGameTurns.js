@@ -53,6 +53,7 @@ export async function animateGameTurns({ //hasBallAtStep
   onUpdate
 }) {
   const turns = simData.turns || [];
+  if (scene) scene.simData = simData;
   annotateFreeThrowTurns(turns);
   const allPlayers = simData.players || [];
   if (DEBUG_FLOW) {

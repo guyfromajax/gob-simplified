@@ -486,6 +486,15 @@ export function animatePutbackAttempt(
   });
 }
 
+function isUpcomingFastBreak(scene, explicitFlag) {
+  if (typeof explicitFlag === "boolean") return explicitFlag;
+  const currentIndex = typeof scene?.currentTurn === "number" ? scene.currentTurn : null;
+  if (currentIndex == null) return false;
+  const nextTurn = scene?.simData?.turns?.[currentIndex + 1];
+  if (!nextTurn) return false;
+  return nextTurn.fast_break === true || nextTurn.result_type === "FAST_BREAK";
+}
+
 /**
  * Animate players collapsing toward a missed shot for a rebound.
  *
@@ -504,12 +513,15 @@ export function animateRebound({
   animations,
   rebounderId,
   ballSpot,
-  shooterId
+  shooterId,
+  upcomingFastBreak,
 }) {
   if (!scene || !ballSprite || !ballSpot) return Promise.resolve();
   if (scene?.stateMachine?.is(States.FreeThrow)) return Promise.resolve();
   cancelBallTween(scene, ballSprite);
   clearCurrentOwner(scene);
+
+  const holdReboundState = isUpcomingFastBreak(scene, upcomingFastBreak);
 
   scene.rebounderId = rebounderId;
   const rebCfg = animationConfig.rebound;
@@ -574,11 +586,21 @@ export function animateRebound({
             scene.events?.emit("possessionChange", {
               offenseTeamId: rebounderSprite.team_id
             });
-            if (scene.stateMachine?.is(States.Rebound))
-              safeTransition(scene.stateMachine, States.HalfCourt, {
-                currentOwnerId: getCurrentOwner(scene),
-                pendingOwnerId: getPendingOwner(scene),
-              });
+            if (scene.stateMachine?.is(States.Rebound)) {
+              if (holdReboundState) {
+                if (getDebugTransitions()) {
+                  console.log("animateRebound: holding Rebound state for fast break handoff", {
+                    rebounderId,
+                    currentTurn: scene.currentTurn,
+                  });
+                }
+              } else {
+                safeTransition(scene.stateMachine, States.HalfCourt, {
+                  currentOwnerId: getCurrentOwner(scene),
+                  pendingOwnerId: getPendingOwner(scene),
+                });
+              }
+            }
             scene.rebounderId = null;
             resolve();
           },
