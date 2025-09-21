@@ -1,0 +1,568 @@
+import { gridToPixels } from "../../utils/gridToPixels.js";
+import animationConfig from "../animation_config.js";
+import {
+  safeTransition,
+  States,
+} from "../../state/gameStateMachine.js";
+import {
+  isAnimationDebugEnabled,
+} from "../../utils/debugFlags.js";
+import { getSceneStepLogger } from "../debugStepLogger.js";
+
+function toNumber(value) {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (value == null) return null;
+  const coerced = Number(value);
+  return Number.isFinite(coerced) ? coerced : null;
+}
+
+function findOwnerFromFrame(frame) {
+  if (!frame || typeof frame !== "object") return null;
+  const players = frame.players || {};
+  for (const [playerId, payload] of Object.entries(players)) {
+    if (payload?.hasBall) return playerId;
+  }
+  return null;
+}
+
+function normalizeActionName(action) {
+  if (typeof action !== "string") return null;
+  return action.trim().toLowerCase();
+}
+
+function isShotAction(action) {
+  const normalized = normalizeActionName(action);
+  return normalized === "shoot" || normalized === "shot";
+}
+
+function isReboundAction(action) {
+  return normalizeActionName(action) === "rebound";
+}
+
+function buildStepPayload({
+  frame,
+  frameIndex,
+  possessionId,
+  turnId,
+}) {
+  return {
+    frameIndex,
+    timestamp: frame?.timestamp ?? null,
+    duration: frame?.duration ?? null,
+    possessionId: possessionId ?? null,
+    turnId: turnId ?? null,
+    actions: Array.isArray(frame?.actions)
+      ? frame.actions.map((action) => ({
+          playerId: action?.playerId ?? null,
+          action: action?.action ?? null,
+        }))
+      : [],
+    passes: Array.isArray(frame?.passes)
+      ? frame.passes.map((pass) => ({
+          fromId: pass?.fromId ?? null,
+          toId: pass?.toId ?? null,
+          duration: pass?.duration ?? null,
+        }))
+      : [],
+  };
+}
+
+export class PossessionRunner {
+  constructor({
+    scene,
+    ballSprite,
+    playerSprites,
+    graph,
+    config = {},
+  } = {}) {
+    this.scene = scene || null;
+    this.ballSprite = ballSprite || scene?.ballSprite || null;
+    this.playerSprites = playerSprites || scene?.playerSprites || {};
+    this.graph = graph || null;
+    this.config = config || {};
+    this.helpers = {
+      attachBallToPlayer: this.config.helpers?.attachBallToPlayer || null,
+      runPass: this.config.helpers?.runPass || null,
+      animateRebound: this.config.helpers?.animateRebound || null,
+      shootBall: this.config.helpers?.shootBall || null,
+    };
+    this.helpersLoaded = Boolean(
+      this.helpers.attachBallToPlayer &&
+        this.helpers.runPass &&
+        this.helpers.animateRebound &&
+        this.helpers.shootBall
+    );
+    this.helperLoadPromise = null;
+    this.pendingPromises = [];
+    this.frameSummaries = new Map();
+    this.currentOwnerId = this.graph?.setup?.ball?.ownerId ?? null;
+    this.lastMissLocation = null;
+    this.lastShotOutcome = null;
+    this.stepLogger = scene ? getSceneStepLogger(scene, "ANIM") : null;
+    this.timelineFactoryPromise = null;
+  }
+
+  async run() {
+    if (!this.scene || !this.graph) return null;
+    await this.ensureHelpersLoaded();
+    this.preloadSprites();
+    const timeline = await this.resolveTimeline();
+    const frames = Array.isArray(this.graph?.timeline?.frames)
+      ? this.graph.timeline.frames
+      : [];
+
+    if (!timeline || frames.length === 0) {
+      await this.handleTerminalState();
+      return null;
+    }
+
+    frames.forEach((frame, index) => {
+      this.enqueueFrame(timeline, frame, index);
+    });
+
+    const completion = new Promise((resolve, reject) => {
+      timeline.once?.("complete", resolve);
+      timeline.once?.("stop", () => reject(new Error("timeline stopped")));
+    });
+
+    timeline.play?.();
+
+    try {
+      await completion;
+    } catch (error) {
+      if (isAnimationDebugEnabled()) {
+        this.scene?.events?.emit?.("possessionRunner:error", { error });
+      }
+    }
+
+    await Promise.all(this.pendingPromises).catch(() => {});
+    await this.handleTerminalState();
+    return null;
+  }
+
+  preloadSprites() {
+    const setup = this.graph?.setup;
+    if (!setup) return;
+
+    const players = setup.players || {};
+    const order = Array.isArray(setup.order) ? setup.order : Object.keys(players);
+
+    order.forEach((playerId) => {
+      const payload = players[playerId];
+      if (!payload) return;
+      const sprite = this.playerSprites?.[playerId];
+      if (!sprite) return;
+      if (payload.x == null || payload.y == null) return;
+      const { x, y } = this.toPixels(payload.x, payload.y);
+      if (typeof sprite.setPosition === "function") {
+        sprite.setPosition(x, y);
+      } else {
+        sprite.x = x;
+        sprite.y = y;
+      }
+    });
+
+    if (this.ballSprite && setup.ball?.coords) {
+      const coords = setup.ball.coords;
+      if (coords?.x != null && coords?.y != null) {
+        const { x, y } = this.toPixels(coords.x, coords.y);
+        if (typeof this.ballSprite.setPosition === "function") {
+          this.ballSprite.setPosition(x, y);
+        } else {
+          this.ballSprite.x = x;
+          this.ballSprite.y = y;
+        }
+        this.ballSprite.setVisible?.(true);
+      }
+    }
+
+    if (setup.ball?.ownerId && this.ballSprite) {
+      const sprite = this.playerSprites?.[setup.ball.ownerId];
+      if (sprite) {
+        this.helpers.attachBallToPlayer?.(this.scene, this.ballSprite, sprite);
+        this.currentOwnerId = setup.ball.ownerId;
+      }
+    }
+
+    if (this.scene?.stateMachine?.is?.(States.Inbound)) {
+      const ctx = {
+        event: "possessionSetup",
+        possessionId: this.graph?.context?.possessionId ?? null,
+        turnId: this.graph?.context?.turnId ?? null,
+      };
+      this.transitionTo(States.HalfCourt, ctx);
+    }
+  }
+
+  enqueueFrame(timeline, frame, frameIndex) {
+    const tracker = { progress: 0 };
+    const duration = Math.max(0, toNumber(frame?.duration) ?? 0);
+
+    timeline.add?.({
+      targets: tracker,
+      progress: 1,
+      duration,
+      ease: "Linear",
+      onStart: () => this.onFrameStart(frame, frameIndex, duration),
+      onComplete: () => this.onFrameComplete(frame, frameIndex),
+    });
+  }
+
+  onFrameStart(frame, frameIndex, duration) {
+    const debugEnabled = isAnimationDebugEnabled();
+    if (debugEnabled) {
+      this.scene?.events?.emit?.(
+        "possessionRunner:step",
+        buildStepPayload({
+          frame,
+          frameIndex,
+          possessionId: this.graph?.context?.possessionId,
+          turnId: this.graph?.context?.turnId,
+        })
+      );
+    }
+
+    if (debugEnabled && this.stepLogger) {
+      const actions = Array.isArray(frame?.actions)
+        ? frame.actions.map((action) => ({
+            playerId: action?.playerId ?? null,
+            action: action?.action ?? null,
+          }))
+        : [];
+      this.stepLogger.logStep({
+        turnIndex: this.config?.turnIndex ?? this.graph?.context?.possessionIndex ?? null,
+        turnId: this.graph?.context?.turnId ?? null,
+        possessionId: this.graph?.context?.possessionId ?? null,
+        stepIndex: frameIndex,
+        timestamp: frame?.timestamp ?? null,
+        actions,
+      });
+    }
+
+    const promises = [];
+    const ownerId = findOwnerFromFrame(frame);
+    if (ownerId && ownerId !== this.currentOwnerId) {
+      const sprite = this.playerSprites?.[ownerId];
+      if (sprite && this.ballSprite) {
+        this.helpers.attachBallToPlayer?.(this.scene, this.ballSprite, sprite);
+        this.currentOwnerId = ownerId;
+      }
+    }
+
+    const players = frame?.players || {};
+    for (const [playerId, payload] of Object.entries(players)) {
+      const tweenPromise = this.createPlayerTween({
+        playerId,
+        payload,
+        duration,
+        frameIndex,
+        timestamp: frame?.timestamp ?? null,
+      });
+      if (tweenPromise) {
+        promises.push(tweenPromise.catch(() => {}));
+      }
+    }
+
+    if (Array.isArray(frame?.passes)) {
+      frame.passes.forEach((pass) => {
+        const promise = this.handlePass(pass, frameIndex, frame?.timestamp ?? null);
+        if (promise) promises.push(promise.catch(() => {}));
+      });
+    }
+
+    if (Array.isArray(frame?.actions)) {
+      frame.actions.forEach((action) => {
+        const promise = this.handleAction(action, frame, frameIndex);
+        if (promise) promises.push(promise.catch(() => {}));
+      });
+    }
+
+    const summaryPromise = Promise.all(promises).then(() =>
+      this.buildFrameSummary(frame, frameIndex)
+    );
+
+    this.pendingPromises.push(summaryPromise.catch(() => {}));
+    this.frameSummaries.set(frameIndex, summaryPromise);
+  }
+
+  onFrameComplete(frame, frameIndex) {
+    const summaryPromise = this.frameSummaries.get(frameIndex);
+    this.frameSummaries.delete(frameIndex);
+    if (!summaryPromise) return;
+    summaryPromise
+      .then((summary) => {
+        if (isAnimationDebugEnabled()) {
+          this.scene?.events?.emit?.("possessionRunner:postStep", summary);
+        }
+      })
+      .catch(() => {});
+  }
+
+  createPlayerTween({ playerId, payload, duration, frameIndex }) {
+    const sprite = this.playerSprites?.[playerId];
+    if (!sprite || !this.scene?.tweens?.add) return null;
+    if (payload?.x == null || payload?.y == null) return null;
+    const { x, y } = this.toPixels(payload.x, payload.y);
+
+    return new Promise((resolve) => {
+      const tween = this.scene.tweens.add({
+        targets: sprite,
+        x,
+        y,
+        duration,
+        ease: "Linear",
+        onStart: () => {
+          if (payload?.hasBall && this.ballSprite) {
+            if (this.currentOwnerId !== playerId) {
+              this.helpers.attachBallToPlayer?.(
+                this.scene,
+                this.ballSprite,
+                sprite
+              );
+              this.currentOwnerId = playerId;
+            }
+          }
+        },
+        onUpdate: () => {
+          if (payload?.hasBall && this.ballSprite) {
+            this.ballSprite.setPosition?.(sprite.x, sprite.y);
+          }
+        },
+        onComplete: () => {
+          sprite.x = x;
+          sprite.y = y;
+          resolve();
+        },
+        onStop: () => {
+          resolve();
+        },
+      });
+      if (!tween) resolve();
+    });
+  }
+
+  handlePass(pass, frameIndex, timestamp) {
+    if (!this.helpers.runPass || !this.scene) return null;
+    const duration = toNumber(pass?.duration) ?? animationConfig.pass.duration;
+    const easing = pass?.easing ?? animationConfig.pass.easing;
+    const promise = Promise.resolve(
+      this.helpers.runPass(this.scene, {
+        fromId: pass?.fromId ?? null,
+        toId: pass?.toId ?? null,
+        duration,
+        easing,
+        timestamp,
+      })
+    ).then(() => {
+      if (pass?.toId) this.currentOwnerId = pass.toId;
+    });
+    return promise;
+  }
+
+  handleAction(action, frame, frameIndex) {
+    const normalized = normalizeActionName(action?.action);
+    if (isShotAction(normalized)) {
+      return this.handleShot(action, frame, frameIndex);
+    }
+    if (isReboundAction(normalized)) {
+      return this.handleRebound(action, frame, frameIndex);
+    }
+    return null;
+  }
+
+  handleShot(action, frame, frameIndex) {
+    if (!this.helpers.shootBall || !this.ballSprite) return null;
+    const shooterId = action?.playerId ?? null;
+    if (!shooterId) return null;
+    const playerState = frame?.players?.[shooterId];
+    if (!playerState || playerState.x == null || playerState.y == null) return null;
+
+    this.transitionTo(States.ShotAttempt, {
+      event: "shot",
+      shooterId,
+      frameIndex,
+      timestamp: frame?.timestamp ?? null,
+    });
+
+    const shotMeta = this.graph?.terminal?.shot ?? {};
+    const result = shotMeta?.outcome ?? null;
+    const promise = Promise.resolve(
+      this.helpers.shootBall({
+        scene: this.scene,
+        ballSprite: this.ballSprite,
+        fromCoords: { x: playerState.x, y: playerState.y },
+        startTimestamp: frame?.timestamp ?? null,
+        result,
+        shooterPos: playerState?.position ?? null,
+        shooterId,
+        shooterTeamId: playerState?.teamId ?? shotMeta?.teamId ?? null,
+        homeTeamId: this.config?.homeTeamId ?? this.graph?.context?.homeTeamId ?? null,
+        stepIndex: frameIndex,
+        turnIndex: this.config?.turnIndex ?? this.graph?.context?.turnIndex ?? null,
+      })
+    );
+
+    return promise.then((outcome) => {
+      this.lastShotOutcome = result ?? null;
+      if (outcome?.grid) {
+        this.lastMissLocation = outcome.grid;
+      }
+      return outcome;
+    });
+  }
+
+  handleRebound(action, frame, frameIndex) {
+    if (!this.helpers.animateRebound) return null;
+    const reboundMeta = this.graph?.terminal?.rebound;
+    if (!reboundMeta?.rebounderId) return null;
+    const ballSpot = this.lastMissLocation ?? {
+      x: frame?.players?.[reboundMeta.rebounderId]?.x ?? null,
+      y: frame?.players?.[reboundMeta.rebounderId]?.y ?? null,
+    };
+    if (!ballSpot?.x && !ballSpot?.y) return null;
+
+    const promise = Promise.resolve(
+      this.helpers.animateRebound({
+        scene: this.scene,
+        ballSprite: this.ballSprite,
+        playerSprites: this.playerSprites,
+        animations: this.config?.animations ?? null,
+        rebounderId: reboundMeta.rebounderId,
+        ballSpot,
+        shooterId: this.graph?.terminal?.shot?.shooterId ?? null,
+        upcomingFastBreak: this.graph?.context?.fastBreak ?? false,
+      })
+    );
+
+    return promise.then(() => {
+      this.currentOwnerId = reboundMeta.rebounderId;
+    });
+  }
+
+  buildFrameSummary(frame, frameIndex) {
+    return {
+      frameIndex,
+      timestamp: frame?.timestamp ?? null,
+      duration: frame?.duration ?? null,
+      ownerId: this.currentOwnerId ?? null,
+      actions: Array.isArray(frame?.actions)
+        ? frame.actions.map((action) => ({
+            playerId: action?.playerId ?? null,
+            action: action?.action ?? null,
+          }))
+        : [],
+      passes: Array.isArray(frame?.passes)
+        ? frame.passes.map((pass) => ({
+            fromId: pass?.fromId ?? null,
+            toId: pass?.toId ?? null,
+            duration: pass?.duration ?? null,
+          }))
+        : [],
+    };
+  }
+
+  async handleTerminalState() {
+    const stateMachine = this.scene?.stateMachine;
+    if (!stateMachine) return;
+    const terminal = this.graph?.terminal ?? {};
+
+    if (terminal.turnover?.playerId) {
+      this.transitionTo(States.Turnover, {
+        event: "turnover",
+        playerId: terminal.turnover.playerId,
+        cause: terminal.turnover.cause ?? null,
+      });
+      return;
+    }
+
+    if (terminal.shot?.outcome === "MAKE") {
+      this.transitionTo(States.Inbound, {
+        event: "shotMake",
+        shooterId: terminal.shot?.shooterId ?? null,
+        points: terminal.shot?.points ?? null,
+      });
+      return;
+    }
+
+    if (terminal.shot?.outcome === "MISS" && !terminal.rebound?.rebounderId) {
+      this.transitionTo(States.Rebound, {
+        event: "shotMiss",
+        shooterId: terminal.shot?.shooterId ?? null,
+      });
+    }
+  }
+
+  transitionTo(nextState, ctx = {}) {
+    const stateMachine = this.scene?.stateMachine;
+    if (!stateMachine) return;
+    const previous = stateMachine.state;
+    safeTransition(stateMachine, nextState, ctx);
+    if (stateMachine.state !== previous && isAnimationDebugEnabled()) {
+      this.scene?.events?.emit?.("possessionRunner:transition", {
+        fromState: previous,
+        toState: stateMachine.state,
+        context: { ...ctx },
+      });
+    }
+  }
+
+  toPixels(x, y) {
+    return gridToPixels(
+      x,
+      y,
+      this.scene?.game?.config?.width,
+      this.scene?.game?.config?.height
+    );
+  }
+
+  async resolveTimeline() {
+    if (typeof this.config?.createTimeline === "function") {
+      return this.config.createTimeline(this.scene);
+    }
+
+    if (!this.timelineFactoryPromise) {
+      const isNodeEnv =
+        typeof process !== "undefined" &&
+        process?.release?.name === "node";
+      const basePath = "../animationTimeline";
+      const modulePath = isNodeEnv ? `${basePath}.stub.js` : `${basePath}.js`;
+      this.timelineFactoryPromise = import(modulePath);
+    }
+
+    const module = await this.timelineFactoryPromise;
+    const factory = module?.createAnimationTimeline || module?.default || (() => null);
+    return factory(this.scene);
+  }
+
+  async ensureHelpersLoaded() {
+    if (this.helpersLoaded) return;
+    if (!this.helperLoadPromise) {
+      this.helperLoadPromise = (async () => {
+        const isNodeEnv =
+          typeof process !== "undefined" &&
+          process?.release?.name === "node";
+        const basePath = "../ballManager";
+        const modulePath = isNodeEnv ? `${basePath}.stub.js` : `${basePath}.js`;
+        const module = await import(modulePath);
+        const source = module?.default || module || {};
+        this.helpers = {
+          attachBallToPlayer:
+            this.helpers.attachBallToPlayer || source.attachBallToPlayer,
+          runPass: this.helpers.runPass || source.runPass,
+          animateRebound: this.helpers.animateRebound || source.animateRebound,
+          shootBall: this.helpers.shootBall || source.shootBall,
+        };
+        this.helpersLoaded = Boolean(
+          this.helpers.attachBallToPlayer &&
+            this.helpers.runPass &&
+            this.helpers.animateRebound &&
+            this.helpers.shootBall
+        );
+      })();
+    }
+
+    await this.helperLoadPromise;
+  }
+}
+
+export default PossessionRunner;
