@@ -38,6 +38,7 @@ const defaults = {
     lineupMoveMs: 800,
     shooterPrepMs: 400,
     shotMs: 500,
+    useArc: false,
     arcHeight: 40,
     rimHoldMs: 300,
   },

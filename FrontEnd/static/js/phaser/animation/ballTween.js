@@ -90,11 +90,21 @@ export function tweenBallTo(scene, ballSprite, target, opts = {}) {
   ballSprite.setVisible(true);
 
   return new Promise((resolve, reject) => {
-    if (arc) {
+    const arcEnabled =
+      !!arc &&
+      !(
+        typeof arc === 'object' &&
+        Object.prototype.hasOwnProperty.call(arc, 'enabled') &&
+        arc.enabled === false
+      );
+
+    if (arcEnabled) {
       const startX = ballSprite.x;
       const startY = ballSprite.y;
       const controlX = (startX + target.x) / 2;
-      const height = typeof arc === 'object' && arc.height ? arc.height : 50;
+      const hasHeightProp =
+        typeof arc === 'object' && Object.prototype.hasOwnProperty.call(arc, 'height');
+      const height = hasHeightProp && arc.height != null && arc.height !== false ? arc.height : 50;
       const controlY = Math.min(startY, target.y) - height;
       const curve = new Phaser.Curves.QuadraticBezier(
         new Phaser.Math.Vector2(startX, startY),
