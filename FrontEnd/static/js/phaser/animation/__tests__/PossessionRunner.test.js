@@ -1,8 +1,8 @@
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
 
-const runnerPromise = import('../possession/PossessionRunner.js');
-const statePromise = import('../../state/gameStateMachine.js');
+import { PossessionRunner } from '../possession/PossessionRunner.js';
+import { States, transitions } from '../../state/gameStateMachine.js';
 
 function createTimelineRecorder() {
   const records = [];
@@ -51,8 +51,6 @@ function createTweenStub(invocations) {
 
 test('PossessionRunner schedules frames and emits debug events', async () => {
   globalThis.DEBUG_ANIM = true;
-  const { PossessionRunner } = await runnerPromise;
-  const { States, transitions } = await statePromise;
 
   const timelineRecorder = createTimelineRecorder();
   const tweenCalls = [];
@@ -209,10 +207,13 @@ test('PossessionRunner schedules frames and emits debug events', async () => {
 
   await runner.run();
 
+  const frameDurations = timelineRecorder.records.map((record) => record.duration);
+  assert.deepEqual(frameDurations, [320, 320, 320]);
   assert.equal(helperCalls.attach[0], 'pg');
   assert.equal(helperCalls.passes.length, 1);
   assert.equal(helperCalls.passes[0].fromId, 'pg');
   assert.equal(helperCalls.passes[0].toId, 'sg');
+  assert.equal(helperCalls.passes[0].duration, 288);
   assert.equal(helperCalls.shots.length, 1);
   assert.equal(helperCalls.shots[0].shooterId, 'sg');
 

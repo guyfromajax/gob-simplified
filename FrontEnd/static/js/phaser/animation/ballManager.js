@@ -242,11 +242,21 @@ export function shootBall({
   const stateMachine = scene.stateMachine;
   if (stateMachine) {
     const prevState = stateMachine.state;
+    const alreadyInShotAttempt = stateMachine.is(States.ShotAttempt);
     const legalState =
+      alreadyInShotAttempt ||
       stateMachine.is(States.HalfCourt) ||
       stateMachine.is(States.Rebound) ||
       stateMachine.is(States.FastBreak);
-    if (legalState) {
+    if (alreadyInShotAttempt) {
+      if (isAnimationDebugEnabled()) {
+        animationDebugLog("shotBall: already in ShotAttempt", {
+          prevState,
+          shooterId,
+          stepIndex,
+        });
+      }
+    } else if (legalState) {
       safeTransition(
         stateMachine,
         States.ShotAttempt,
@@ -581,8 +591,6 @@ export function animateRebound({
   }
   if (rebounderSprite) {
     const teamId = rebounderSprite.team_id;
-    scene.offenseTeamId = teamId;
-    scene.events?.emit?.("possessionChange", { offenseTeamId: teamId });
     finalPositions.push({ playerId: rebounderId, grid: { ...ballSpot } });
     if (debugEnabled && REBOUND_DEBUG) {
       animationDebugLog("reb:moveStart", {
@@ -611,10 +619,17 @@ export function animateRebound({
             attachBallToPlayer(scene, ballSprite, rebounderSprite, {
               debugInfo: { shooterId, reboundSpot: ballSpot }
             });
-            scene.offenseTeamId = rebounderSprite.team_id;
-            scene.events?.emit("possessionChange", {
-              offenseTeamId: rebounderSprite.team_id
-            });
+            const newOffenseId = rebounderSprite.team_id;
+            const previousOffenseId = scene.offenseTeamId;
+            scene.offenseTeamId = newOffenseId;
+            const changed =
+              newOffenseId != null &&
+              (previousOffenseId == null || String(previousOffenseId) !== String(newOffenseId));
+            if (changed) {
+              scene.events?.emit?.("possessionChange", {
+                offenseTeamId: newOffenseId,
+              });
+            }
             if (scene.stateMachine?.is(States.Rebound)) {
               const holdReboundState = shouldHoldForFastBreak();
               if (holdReboundState) {
