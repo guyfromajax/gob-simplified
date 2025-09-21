@@ -19,6 +19,7 @@ import {
   isAnimationDebugEnabled,
 } from "../utils/debugFlags.js";
 import { getSceneStepLogger } from "./debugStepLogger.js";
+import { appendToTextScroll } from "../utils/textScroll.js";
 
 // Timeline-driven fast break sequence. Handles the initial sprint phase via a
 // Phaser timeline so all player movements can be cancelled together if
@@ -173,6 +174,23 @@ export async function runFastBreakSequence({
   const possessionId =
     turnData.possession_id ?? turnData.possessionId ?? turnData.possessionID ?? null;
 
+  const fastBreakTurnKey =
+    turnIndex ??
+    turnData.id ??
+    turnData.turn_id ??
+    turnData.turnId ??
+    null;
+
+  if (fastBreakTurnKey != null) {
+    if (scene.__fastBreakBannerTurnKey !== fastBreakTurnKey) {
+      scene.__fastBreakBannerTurnKey = fastBreakTurnKey;
+      scene.__fastBreakBannerLoggedThisTurn = false;
+    }
+  } else {
+    scene.__fastBreakBannerTurnKey = null;
+    scene.__fastBreakBannerLoggedThisTurn = false;
+  }
+
   if (debugEnabled && stepLogger) {
     const maxSteps = Math.max(
       0,
@@ -218,6 +236,14 @@ export async function runFastBreakSequence({
         animationDebugLog('Fast break: correcting state from Inbound to Rebound before FastBreakOutlet transition');
     }
     runFastBreakTransition(scene, States.FastBreakOutlet, { debugStepIndex: 0 });
+
+    if (!scene.__fastBreakBannerLoggedThisTurn) {
+      if (typeof window !== "undefined" && window.TEXT_SCROLL_ENABLED) {
+        appendToTextScroll("FAST BREAK!");
+      }
+      scene.__fastBreakBannerLoggedThisTurn = true;
+    }
+
     const passerId = turnData.roles.outlet_passer;
     const receiverId = turnData.roles.outlet_receiver;
     const passerSprite   = playerSprites[passerId];
