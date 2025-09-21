@@ -166,6 +166,18 @@ export class PossessionRunner {
     this.durationScale = 1;
   }
 
+  emitPossessionChange(teamId, payload = {}) {
+    if (!this.scene || teamId == null) return;
+    const previous = this.scene.offenseTeamId;
+    const nextId = String(teamId);
+    if (previous != null && String(previous) === nextId) return;
+    this.scene.offenseTeamId = teamId;
+    this.scene.events?.emit?.("possessionChange", {
+      offenseTeamId: teamId,
+      ...payload,
+    });
+  }
+
   resolveDurationScale(frames = []) {
     const durations = [];
     let totalRaw = 0;
@@ -313,6 +325,12 @@ export class PossessionRunner {
 
     const players = setup.players || {};
     const order = Array.isArray(setup.order) ? setup.order : Object.keys(players);
+
+    const offenseTeamId =
+      this.graph?.context?.offenseTeamId ?? setup.offenseTeamId ?? null;
+    if (offenseTeamId != null) {
+      this.scene.offenseTeamId = offenseTeamId;
+    }
 
     order.forEach((playerId) => {
       const payload = players[playerId];
@@ -648,6 +666,13 @@ export class PossessionRunner {
     const terminal = this.graph?.terminal ?? {};
 
     if (terminal.turnover?.playerId) {
+      const newOffenseId = this.graph?.context?.defenseTeamId ?? null;
+      if (newOffenseId != null) {
+        this.emitPossessionChange(newOffenseId, {
+          event: "turnover",
+          source: "runner",
+        });
+      }
       this.transitionTo(States.Turnover, {
         event: "turnover",
         playerId: terminal.turnover.playerId,
@@ -657,6 +682,14 @@ export class PossessionRunner {
     }
 
     if (terminal.shot?.outcome === "MAKE") {
+      const newOffenseId = this.graph?.context?.defenseTeamId ?? null;
+      if (newOffenseId != null) {
+        this.emitPossessionChange(newOffenseId, {
+          event: "shotMake",
+          source: "runner",
+          points: terminal.shot?.points ?? null,
+        });
+      }
       this.transitionTo(States.Inbound, {
         event: "shotMake",
         shooterId: terminal.shot?.shooterId ?? null,
