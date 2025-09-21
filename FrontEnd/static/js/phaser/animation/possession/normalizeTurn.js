@@ -1,3 +1,5 @@
+import animationConfig from "../animation_config.js";
+
 const BALL_PLAYER_ID = "ball";
 const PASS_ACTION = "pass";
 const RECEIVE_ACTION = "receive";
@@ -10,6 +12,36 @@ function toNumber(value) {
   if (value == null) return null;
   const coerced = Number(value);
   return Number.isFinite(coerced) ? coerced : null;
+}
+
+const POSSESSION_TIMING = animationConfig?.possession ?? {};
+const PASS_CONFIG = animationConfig?.pass ?? {};
+const resolvedMsPerTick = toNumber(POSSESSION_TIMING.msPerTick);
+const MS_PER_TICK = resolvedMsPerTick != null && resolvedMsPerTick > 0 ? resolvedMsPerTick : 1;
+const resolvedMinFrameDuration = toNumber(POSSESSION_TIMING.minFrameDurationMs);
+const MIN_FRAME_DURATION_MS =
+  resolvedMinFrameDuration != null && resolvedMinFrameDuration >= 0
+    ? resolvedMinFrameDuration
+    : 120;
+const MIN_PASS_DURATION_MS = (() => {
+  const configValue = toNumber(POSSESSION_TIMING.minPassDurationMs);
+  if (configValue != null && configValue >= 0) {
+    return Math.max(MIN_FRAME_DURATION_MS, configValue);
+  }
+  const passConfigDuration = toNumber(PASS_CONFIG.duration);
+  if (passConfigDuration != null && passConfigDuration >= 0) {
+    return Math.max(MIN_FRAME_DURATION_MS, passConfigDuration);
+  }
+  return MIN_FRAME_DURATION_MS;
+})();
+
+function scaleDurationFromTicks(ticks, { minMs = MIN_FRAME_DURATION_MS } = {}) {
+  const numeric = toNumber(ticks);
+  if (numeric == null) return Math.max(0, minMs ?? 0);
+  const scaled = numeric * MS_PER_TICK;
+  if (!Number.isFinite(scaled)) return Math.max(0, minMs ?? 0);
+  const sanitized = Math.max(0, scaled);
+  return minMs != null ? Math.max(minMs, sanitized) : sanitized;
 }
 
 function compactObject(value) {
@@ -140,21 +172,39 @@ function buildPassKey(timestamp, fromId, toId) {
 function normalizeExplicitPasses(passes = [], defaultDuration = 250) {
   if (!Array.isArray(passes)) return [];
   const results = [];
+  const defaultDurationTicks = Math.max(0, toNumber(defaultDuration) ?? 0);
   for (const entry of passes) {
     const timestamp = toNumber(entry?.timestamp ?? entry?.start ?? entry?.startTimestamp);
     const fromId = entry?.fromId ?? entry?.from_id ?? entry?.source ?? null;
     const toId = entry?.toId ?? entry?.to_id ?? entry?.target ?? null;
-    const duration = toNumber(entry?.duration);
-    const completionTimestamp =
-      toNumber(entry?.completionTimestamp ?? entry?.endTimestamp ?? entry?.completeTimestamp) ??
-      (timestamp != null && duration != null ? timestamp + duration : null);
-    const resolvedDuration =
-      duration ??
-      (timestamp != null && completionTimestamp != null ? Math.max(0, completionTimestamp - timestamp) : defaultDuration);
+    const explicitDuration = toNumber(entry?.duration);
+    let completionTimestamp = toNumber(
+      entry?.completionTimestamp ?? entry?.endTimestamp ?? entry?.completeTimestamp
+    );
+
+    let resolvedDurationTicks = null;
+    if (explicitDuration != null && explicitDuration >= 0) {
+      resolvedDurationTicks = explicitDuration;
+      if (completionTimestamp == null && timestamp != null) {
+        completionTimestamp = timestamp + resolvedDurationTicks;
+      }
+    } else if (timestamp != null && completionTimestamp != null) {
+      resolvedDurationTicks = Math.max(0, completionTimestamp - timestamp);
+    } else {
+      resolvedDurationTicks = defaultDurationTicks;
+      if (timestamp != null && completionTimestamp == null) {
+        completionTimestamp = timestamp + resolvedDurationTicks;
+      }
+    }
+
+    const durationMs = scaleDurationFromTicks(resolvedDurationTicks, {
+      minMs: MIN_PASS_DURATION_MS,
+    });
+
     results.push({
       timestamp,
       completionTimestamp,
-      duration: resolvedDuration ?? defaultDuration,
+      duration: durationMs,
       fromId,
       toId,
       source: "explicit",
@@ -167,6 +217,7 @@ function normalizeExplicitPasses(passes = [], defaultDuration = 250) {
 function inferPassesFromTracks(tracks = [], knownKeys = new Set(), defaultDuration = 250) {
   const passes = [];
   const receiveLookup = new Map();
+  const defaultDurationTicks = Math.max(0, toNumber(defaultDuration) ?? 0);
 
   for (const track of tracks) {
     if (track.playerId === BALL_PLAYER_ID) continue;
@@ -198,27 +249,31 @@ function inferPassesFromTracks(tracks = [], knownKeys = new Set(), defaultDurati
       if (key && knownKeys.has(key)) continue;
 
       let completionTimestamp = null;
-      let duration = defaultDuration;
+      let durationTicks = defaultDurationTicks;
       if (receiver?.step?.timestamp != null && receiver.step.timestamp > step.timestamp) {
         completionTimestamp = receiver.step.timestamp;
-        duration = receiver.step.timestamp - step.timestamp;
+        durationTicks = Math.max(0, receiver.step.timestamp - step.timestamp);
       } else if (receiver?.step?.raw) {
         const raw = receiver.step.raw;
         const inferredEnd = toNumber(raw?.completionTimestamp ?? raw?.endTimestamp ?? raw?.timestampComplete);
         if (inferredEnd != null && inferredEnd >= step.timestamp) {
           completionTimestamp = inferredEnd;
-          duration = inferredEnd - step.timestamp;
+          durationTicks = Math.max(0, inferredEnd - step.timestamp);
         }
       }
 
-      if (completionTimestamp == null && duration != null && step.timestamp != null) {
-        completionTimestamp = step.timestamp + duration;
+      if (completionTimestamp == null && durationTicks != null && step.timestamp != null) {
+        completionTimestamp = step.timestamp + durationTicks;
       }
+
+      const durationMs = scaleDurationFromTicks(durationTicks, {
+        minMs: MIN_PASS_DURATION_MS,
+      });
 
       passes.push({
         timestamp: step.timestamp,
         completionTimestamp,
-        duration: duration ?? defaultDuration,
+        duration: durationMs,
         fromId: track.playerId,
         toId: receiver?.playerId ?? null,
         source: "inferred",
@@ -302,12 +357,16 @@ function buildFrames({ tracks, timestamps, passes, defaultFrameDuration = 0 }) {
       framePlayers[track.playerId] = payload;
     }
 
+    const rawDurationTicks =
+      nextTimestamp != null && Number.isFinite(nextTimestamp)
+        ? Math.max(0, nextTimestamp - timestamp)
+        : defaultFrameDuration;
+
     const frame = {
       timestamp,
-      duration:
-        nextTimestamp != null && Number.isFinite(nextTimestamp)
-          ? Math.max(0, nextTimestamp - timestamp)
-          : defaultFrameDuration,
+      duration: scaleDurationFromTicks(rawDurationTicks, {
+        minMs: MIN_FRAME_DURATION_MS,
+      }),
       players: framePlayers,
     };
 
