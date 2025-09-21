@@ -6,14 +6,14 @@ export function createPhaserPlayer({ scene, player, teamInfo, position, Phaser }
 
   const isHome = player.team === "home"; // ✅ Determine team side
   
-  console.log(`createPhaserPlayer for ${player.playerId ?? player.player_id}:`, {
-    name: player.name,
-    team: player.team,
-    position: position,
-    startingCoords: { x, y },
-    pixelCoords: { px, py },
-    isHome
-  });
+  // console.log(`createPhaserPlayer for ${player.playerId ?? player.player_id}:`, {
+  //   name: player.name,
+  //   team: player.team,
+  //   position: position,
+  //   startingCoords: { x, y },
+  //   pixelCoords: { px, py },
+  //   isHome
+  // });
 
   // ✅ Style logic per GDD
   const fillColor = isHome
