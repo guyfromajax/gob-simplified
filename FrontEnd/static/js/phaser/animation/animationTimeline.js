@@ -1,3 +1,5 @@
+import * as Phaser from "https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.esm.js";
+
 // Simple wrapper around Phaser's timeline creation. Ensures any previously
 // active timeline on the scene is stopped before creating a new one so that
 // overlapping sequences do not conflict.
@@ -16,6 +18,13 @@ export function createAnimationTimeline(scene) {
     timeline = tweens.timeline();
   } else if (typeof tweens.addTimeline === "function") {
     timeline = tweens.addTimeline();
+  } else if (Phaser?.Tweens?.Timeline) {
+    try {
+      timeline = new Phaser.Tweens.Timeline(tweens);
+    } catch (error) {
+      console.warn("Failed to construct Phaser timeline", error);
+      timeline = null;
+    }
   }
 
   if (!timeline) return null;
