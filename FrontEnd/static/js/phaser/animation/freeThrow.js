@@ -143,11 +143,16 @@ export async function runFreeThrowSequence(
         : AWAY_RIM_COORDS);
     const rimPx = gridToPixels(rimGrid.x, rimGrid.y, width, height);
     scene.events?.emit("ft:shotStart");
-    await tween(scene, ballSprite, rimPx, {
+    const shotTweenOptions = {
       duration: animationConfig.freeThrow.shotMs,
       easing: "Sine.easeInOut",
-      arc: { height: 0 },
-    });
+    };
+
+    shotTweenOptions.arc = animationConfig.freeThrow.useArc
+      ? { height: animationConfig.freeThrow.arcHeight }
+      : { height: animationConfig.freeThrow.arcHeight, enabled: false };
+
+    await tween(scene, ballSprite, rimPx, shotTweenOptions);
 
     scene.events?.emit(result === "MAKE" ? "ft:make" : "ft:miss");
     await wait(scene, animationConfig.freeThrow.rimHoldMs);
