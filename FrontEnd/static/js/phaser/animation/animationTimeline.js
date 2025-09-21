@@ -1,4 +1,5 @@
 import * as Phaser from "https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.esm.js";
+import { createTimelinePolyfill } from "./timelinePolyfill.js";
 
 // Simple wrapper around Phaser's timeline creation. Ensures any previously
 // active timeline on the scene is stopped before creating a new one so that
@@ -27,6 +28,13 @@ export function createAnimationTimeline(scene) {
     }
   }
 
+  if (!timeline) {
+    console.warn(
+      "Phaser tween timeline unavailable; using timeline polyfill fallback"
+    );
+    timeline = createTimelinePolyfill(scene);
+  }
+
   if (!timeline) return null;
   scene.__activeTimeline = timeline;
 
@@ -35,6 +43,14 @@ export function createAnimationTimeline(scene) {
       scene.__activeTimeline = null;
     }
   });
+
+  if (typeof timeline.once === "function") {
+    timeline.once("stop", () => {
+      if (scene.__activeTimeline === timeline) {
+        scene.__activeTimeline = null;
+      }
+    });
+  }
   return timeline;
 }
 
