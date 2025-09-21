@@ -283,6 +283,14 @@ export async function runFastBreakSequence({
 
   // Use backend timeline data instead of fixed duration
   const timeline = createAnimationTimeline(scene);
+  if (!timeline && debugEnabled) {
+    animationDebugWarn("fastBreak: timeline unavailable - skipping sprint animation", {
+      hasTweenManager: !!scene?.tweens,
+      hasCreateTimeline: typeof scene?.tweens?.createTimeline === "function",
+      hasTimelineFactory: typeof scene?.tweens?.timeline === "function",
+      hasAddTimeline: typeof scene?.tweens?.addTimeline === "function",
+    });
+  }
 
   const fallbackSprintDuration =
     animationConfig.fastBreak?.shotMs ?? animationConfig.fastBreak.shotMs ?? 0;
@@ -340,14 +348,19 @@ export async function runFastBreakSequence({
     
     const endPx = gridToPixels(endX, endY, width, height);
 
-    // Add to timeline with backend timing
-    timeline.add({
-      targets: sprite,
-      x: endPx.x,
-      y: endPx.y,
-      duration: duration,
-      ease: "Sine.easeInOut"
-    }, startStep.timestamp);
+    if (timeline) {
+      // Add to timeline with backend timing
+      timeline.add({
+        targets: sprite,
+        x: endPx.x,
+        y: endPx.y,
+        duration: duration,
+        ease: "Sine.easeInOut"
+      }, startStep.timestamp);
+    } else {
+      // Without a timeline, snap directly to the destination to avoid leaving players behind
+      sprite.setPosition(endPx.x, endPx.y);
+    }
   }
 
   if (
@@ -358,15 +371,19 @@ export async function runFastBreakSequence({
     sprintDuration = latestSprintTimestamp - earliestSprintTimestamp;
   }
 
-  scene.__activeTimeline = timeline;
+  if (timeline) {
+    scene.__activeTimeline = timeline;
 
-  await new Promise(resolve => {
-    timeline.once("complete", resolve);
-    timeline.play();
-  });
+    await new Promise(resolve => {
+      timeline.once("complete", resolve);
+      timeline.play();
+    });
 
-  scene.__activeTimeline = null;
-  if (scene.skipToEnd) return;
+    scene.__activeTimeline = null;
+    if (scene.skipToEnd) return;
+  } else if (scene.skipToEnd) {
+    return;
+  }
 
   // Handle passes after sprint
   const passes = turnData.passes || [];
