@@ -44,11 +44,29 @@ function buildStepPayload({
   frameIndex,
   possessionId,
   turnId,
+  resolvedDuration,
+  rawDuration,
+  durationScale,
+  scalePass,
 }) {
+  const normalizePass = (pass) => {
+    const raw = toNumber(pass?.duration);
+    return {
+      fromId: pass?.fromId ?? null,
+      toId: pass?.toId ?? null,
+      duration: raw,
+      scaledDuration:
+        typeof scalePass === "function" && raw != null
+          ? scalePass(raw)
+          : null,
+    };
+  };
   return {
     frameIndex,
     timestamp: frame?.timestamp ?? null,
-    duration: frame?.duration ?? null,
+    duration: resolvedDuration ?? frame?.duration ?? null,
+    rawDuration: rawDuration ?? frame?.duration ?? null,
+    durationScale: durationScale ?? null,
     possessionId: possessionId ?? null,
     turnId: turnId ?? null,
     actions: Array.isArray(frame?.actions)
@@ -58,11 +76,7 @@ function buildStepPayload({
         }))
       : [],
     passes: Array.isArray(frame?.passes)
-      ? frame.passes.map((pass) => ({
-          fromId: pass?.fromId ?? null,
-          toId: pass?.toId ?? null,
-          duration: pass?.duration ?? null,
-        }))
+      ? frame.passes.map((pass) => normalizePass(pass))
       : [],
   };
 }
@@ -100,6 +114,149 @@ export class PossessionRunner {
     this.lastShotOutcome = null;
     this.stepLogger = scene ? getSceneStepLogger(scene, "ANIM") : null;
     this.timelineFactoryPromise = null;
+    this.targetFrameDurationMs =
+      toNumber(this.config?.targetFrameDurationMs) ??
+      toNumber(animationConfig?.possession?.targetFrameMs) ??
+      320;
+    this.minFrameDurationMs =
+      toNumber(this.config?.minFrameDurationMs) ??
+      toNumber(animationConfig?.possession?.minFrameMs) ??
+      120;
+    if (!this.minFrameDurationMs || this.minFrameDurationMs < 0) {
+      this.minFrameDurationMs = 120;
+    }
+    const resolvedMaxFrame =
+      toNumber(this.config?.maxFrameDurationMs) ??
+      toNumber(animationConfig?.possession?.maxFrameMs) ??
+      null;
+    this.maxFrameDurationMs =
+      resolvedMaxFrame && resolvedMaxFrame > 0
+        ? Math.max(resolvedMaxFrame, this.minFrameDurationMs)
+        : null;
+    this.minPassDurationMs =
+      toNumber(this.config?.minPassDurationMs) ??
+      toNumber(animationConfig?.possession?.minPassDurationMs) ??
+      toNumber(animationConfig?.pass?.duration) ??
+      150;
+    if (!this.minPassDurationMs || this.minPassDurationMs <= 0) {
+      this.minPassDurationMs = 150;
+    }
+    const resolvedMaxPass =
+      toNumber(this.config?.maxPassDurationMs) ??
+      toNumber(animationConfig?.possession?.maxPassDurationMs) ??
+      null;
+    this.maxPassDurationMs =
+      resolvedMaxPass && resolvedMaxPass > 0
+        ? Math.max(resolvedMaxPass, this.minPassDurationMs)
+        : null;
+    this.minDurationScale =
+      toNumber(this.config?.minDurationScale) ??
+      toNumber(animationConfig?.possession?.minDurationScale) ??
+      0.35;
+    if (!this.minDurationScale || this.minDurationScale <= 0) {
+      this.minDurationScale = 0.35;
+    }
+    this.maxDurationScale =
+      toNumber(this.config?.maxDurationScale) ??
+      toNumber(animationConfig?.possession?.maxDurationScale) ??
+      6;
+    if (!this.maxDurationScale || this.maxDurationScale < this.minDurationScale) {
+      this.maxDurationScale = Math.max(this.minDurationScale, 6);
+    }
+    this.durationScale = 1;
+  }
+
+  resolveDurationScale(frames = []) {
+    const durations = [];
+    let totalRaw = 0;
+    for (const frame of frames) {
+      const value = toNumber(frame?.duration);
+      if (!value || value <= 0) continue;
+      durations.push(value);
+      totalRaw += value;
+    }
+    if (!durations.length || totalRaw <= 0) {
+      return 1;
+    }
+
+    let scale = 1;
+    const contextDuration = toNumber(this.graph?.context?.timeElapsed);
+    if (contextDuration && contextDuration > 0) {
+      const minTotal = this.minFrameDurationMs * durations.length * 0.5;
+      if (!minTotal || contextDuration >= minTotal) {
+        const contextScale = contextDuration / totalRaw;
+        if (Number.isFinite(contextScale) && contextScale > 0) {
+          scale = contextScale;
+        }
+      }
+    }
+
+    if (scale === 1) {
+      const averageRaw = totalRaw / durations.length;
+      const target =
+        (this.targetFrameDurationMs && this.targetFrameDurationMs > 0)
+          ? this.targetFrameDurationMs
+          : 320;
+      if (averageRaw > 0 && target > 0) {
+        const baselineScale = target / averageRaw;
+        if (Number.isFinite(baselineScale) && baselineScale > 0) {
+          scale = baselineScale;
+        }
+      }
+    }
+
+    if (!Number.isFinite(scale) || scale <= 0) {
+      scale = 1;
+    }
+    if (this.minDurationScale && scale < this.minDurationScale) {
+      scale = this.minDurationScale;
+    }
+    if (this.maxDurationScale && scale > this.maxDurationScale) {
+      scale = this.maxDurationScale;
+    }
+    return scale;
+  }
+
+  clampDuration(value, min, max) {
+    let resolved = Number.isFinite(value) ? value : 0;
+    const resolvedMin = toNumber(min);
+    if (resolvedMin != null && resolvedMin > 0 && (resolved <= 0 || resolved < resolvedMin)) {
+      resolved = resolvedMin;
+    }
+    const resolvedMax = toNumber(max);
+    if (resolvedMax != null && resolvedMax > 0 && resolved > resolvedMax) {
+      resolved = resolvedMax;
+    }
+    if (!Number.isFinite(resolved) || resolved < 0) {
+      resolved = resolvedMin != null ? resolvedMin : 0;
+    }
+    return Math.round(resolved);
+  }
+
+  scaleFrameDuration(rawDuration) {
+    const base = toNumber(rawDuration);
+    if (!base || base <= 0) {
+      return this.clampDuration(
+        this.minFrameDurationMs,
+        this.minFrameDurationMs,
+        this.maxFrameDurationMs
+      );
+    }
+    const scaled = base * (this.durationScale || 1);
+    return this.clampDuration(scaled, this.minFrameDurationMs, this.maxFrameDurationMs);
+  }
+
+  scalePassDuration(rawDuration) {
+    const base = toNumber(rawDuration);
+    if (!base || base <= 0) {
+      return this.clampDuration(
+        this.minPassDurationMs,
+        this.minPassDurationMs,
+        this.maxPassDurationMs
+      );
+    }
+    const scaled = base * (this.durationScale || 1);
+    return this.clampDuration(scaled, this.minPassDurationMs, this.maxPassDurationMs);
   }
 
   async run() {
@@ -114,6 +271,16 @@ export class PossessionRunner {
     if (!timeline || frames.length === 0) {
       await this.handleTerminalState();
       return null;
+    }
+
+    this.durationScale = this.resolveDurationScale(frames);
+    if (isAnimationDebugEnabled()) {
+      this.scene?.events?.emit?.("possessionRunner:timing", {
+        scale: this.durationScale,
+        targetFrameMs: this.targetFrameDurationMs,
+        minFrameMs: this.minFrameDurationMs,
+        maxFrameMs: this.maxFrameDurationMs,
+      });
     }
 
     frames.forEach((frame, index) => {
@@ -196,19 +363,20 @@ export class PossessionRunner {
 
   enqueueFrame(timeline, frame, frameIndex) {
     const tracker = { progress: 0 };
-    const duration = Math.max(0, toNumber(frame?.duration) ?? 0);
+    const rawDuration = Math.max(0, toNumber(frame?.duration) ?? 0);
+    const duration = this.scaleFrameDuration(rawDuration);
 
     timeline.add?.({
       targets: tracker,
       progress: 1,
       duration,
       ease: "Linear",
-      onStart: () => this.onFrameStart(frame, frameIndex, duration),
+      onStart: () => this.onFrameStart(frame, frameIndex, duration, rawDuration),
       onComplete: () => this.onFrameComplete(frame, frameIndex),
     });
   }
 
-  onFrameStart(frame, frameIndex, duration) {
+  onFrameStart(frame, frameIndex, duration, rawDuration) {
     const debugEnabled = isAnimationDebugEnabled();
     if (debugEnabled) {
       this.scene?.events?.emit?.(
@@ -218,6 +386,10 @@ export class PossessionRunner {
           frameIndex,
           possessionId: this.graph?.context?.possessionId,
           turnId: this.graph?.context?.turnId,
+          resolvedDuration: duration,
+          rawDuration,
+          durationScale: this.durationScale,
+          scalePass: (value) => this.scalePassDuration(value),
         })
       );
     }
@@ -278,7 +450,7 @@ export class PossessionRunner {
     }
 
     const summaryPromise = Promise.all(promises).then(() =>
-      this.buildFrameSummary(frame, frameIndex)
+      this.buildFrameSummary(frame, frameIndex, duration, rawDuration)
     );
 
     this.pendingPromises.push(summaryPromise.catch(() => {}));
@@ -343,7 +515,11 @@ export class PossessionRunner {
 
   handlePass(pass, frameIndex, timestamp) {
     if (!this.helpers.runPass || !this.scene) return null;
-    const duration = toNumber(pass?.duration) ?? animationConfig.pass.duration;
+    const rawDuration = toNumber(pass?.duration);
+    const duration =
+      rawDuration != null
+        ? this.scalePassDuration(rawDuration)
+        : animationConfig.pass.duration;
     const easing = pass?.easing ?? animationConfig.pass.easing;
     const promise = Promise.resolve(
       this.helpers.runPass(this.scene, {
@@ -439,11 +615,12 @@ export class PossessionRunner {
     });
   }
 
-  buildFrameSummary(frame, frameIndex) {
+  buildFrameSummary(frame, frameIndex, duration, rawDuration) {
     return {
       frameIndex,
       timestamp: frame?.timestamp ?? null,
-      duration: frame?.duration ?? null,
+      duration: toNumber(duration) ?? null,
+      rawDuration: toNumber(rawDuration ?? frame?.duration) ?? null,
       ownerId: this.currentOwnerId ?? null,
       actions: Array.isArray(frame?.actions)
         ? frame.actions.map((action) => ({
@@ -455,7 +632,11 @@ export class PossessionRunner {
         ? frame.passes.map((pass) => ({
             fromId: pass?.fromId ?? null,
             toId: pass?.toId ?? null,
-            duration: pass?.duration ?? null,
+            duration: toNumber(pass?.duration) ?? null,
+            scaledDuration:
+              pass?.duration != null
+                ? this.scalePassDuration(pass.duration)
+                : null,
           }))
         : [],
     };

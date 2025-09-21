@@ -6,6 +6,15 @@ const defaults = {
     easing: 'Sine.easeInOut',
     arc: null,
   },
+  possession: {
+    targetFrameMs: 320,
+    minFrameMs: 120,
+    maxFrameMs: 900,
+    minDurationScale: 0.35,
+    maxDurationScale: 6,
+    minPassDurationMs: 160,
+    maxPassDurationMs: 750,
+  },
   inbound: {
     duration: 150,
     easing: 'Sine.easeInOut',
@@ -73,6 +82,7 @@ export const FAST_BREAK_END_PAUSE_MS =
 export const animationConfig = {
   enableBallTween: overrides.enableBallTween ?? defaults.enableBallTween,
   pass: { ...defaults.pass, ...(overrides.pass || {}) },
+  possession: { ...defaults.possession, ...(overrides.possession || {}) },
   inbound: { ...defaults.inbound, ...(overrides.inbound || {}) },
   kickout: { ...defaults.kickout, ...(overrides.kickout || {}) },
   steal: { ...defaults.steal, ...(overrides.steal || {}) },
