@@ -609,6 +609,8 @@ export function normalizeTurn(turn = {}, simData = {}, options = {}) {
     possessionIndex: turn?.possession_index ?? turn?.possessionIndex ?? null,
     offenseTeamId,
     defenseTeamId,
+    homeTeamId: simData?.home_team_id ?? simData?.homeTeamId ?? null,
+    awayTeamId: simData?.away_team_id ?? simData?.awayTeamId ?? null,
     startingOffenseTeamId:
       turn?.starting_possession_team_id ?? turn?.startingPossessionTeamId ?? null,
     fastBreak: fastBreak ? true : undefined,

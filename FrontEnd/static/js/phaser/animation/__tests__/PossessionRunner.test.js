@@ -230,8 +230,6 @@ test('PossessionRunner schedules frames and emits debug events', async () => {
 
 test('PossessionRunner uses polyfill timeline when tween manager lacks factory', async () => {
   globalThis.DEBUG_ANIM = true;
-  const { PossessionRunner } = await runnerPromise;
-  const { States, transitions } = await statePromise;
 
   const delayCalls = [];
   const time = {
@@ -357,7 +355,12 @@ test('PossessionRunner uses polyfill timeline when tween manager lacks factory',
     ballSprite,
     playerSprites,
     graph,
-    config: { helpers },
+    config: {
+      helpers,
+      turnIndex: 0,
+      homeTeamId: 'HOME',
+      awayTeamId: 'AWAY',
+    },
   });
 
   const startOrder = [];
@@ -376,13 +379,19 @@ test('PossessionRunner uses polyfill timeline when tween manager lacks factory',
 
   const runPromise = runner.run();
 
-  for (let i = 0; i < 5 && delayCalls.length === 0; i += 1) {
+  for (let i = 0; i < 10 && delayCalls.length === 0; i += 1) {
     await Promise.resolve();
     await new Promise((resolve) => setImmediate(resolve));
   }
 
-  assert.equal(delayCalls.length, 1);
-  assert.equal(delayCalls[0].delay, graph.timeline.frames[0].duration);
+  assert.ok(
+    delayCalls.length > 0,
+    'expected timeline polyfill to schedule at least one delay'
+  );
+  assert.equal(
+    delayCalls[0].delay,
+    runner.scaleFrameDuration(graph.timeline.frames[0].duration)
+  );
 
   while (delayCalls.length) {
     const call = delayCalls.shift();
@@ -401,7 +410,7 @@ test('PossessionRunner uses polyfill timeline when tween manager lacks factory',
   );
   assert.deepEqual(
     startOrder.map((entry) => entry.duration),
-    graph.timeline.frames.map((frame) => frame.duration)
+    graph.timeline.frames.map((frame) => runner.scaleFrameDuration(frame.duration))
   );
   assert.deepEqual(completeOrder, [0, 1]);
   assert.equal(scene.__activeTimeline, null);

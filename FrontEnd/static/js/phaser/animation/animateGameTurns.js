@@ -76,7 +76,7 @@ async function maybeRunPossession({
   }
 
   try {
-    const { normalizeTurnFn, PossessionRunnerClass } =
+  const { normalizeTurnFn, PossessionRunnerClass } =
       await loadPossessionRunnerDependencies();
     if (typeof normalizeTurnFn !== "function") return false;
     if (typeof PossessionRunnerClass !== "function") return false;
@@ -89,6 +89,19 @@ async function maybeRunPossession({
       ? graph.timeline.frames
       : [];
     if (!frames.length) return false;
+
+    const homeTeamId =
+      simData?.home_team_id ?? simData?.homeTeamId ?? graph?.context?.homeTeamId ?? null;
+    const awayTeamId =
+      simData?.away_team_id ?? simData?.awayTeamId ?? graph?.context?.awayTeamId ?? null;
+    if (graph.context) {
+      if (typeof graph.context.homeTeamId === "undefined") {
+        graph.context.homeTeamId = homeTeamId;
+      }
+      if (typeof graph.context.awayTeamId === "undefined") {
+        graph.context.awayTeamId = awayTeamId;
+      }
+    }
 
     if (graph.context) {
       if (typeof graph.context.turnIndex === "undefined") {
@@ -104,7 +117,11 @@ async function maybeRunPossession({
       ballSprite,
       playerSprites,
       graph,
-      config: { turnIndex },
+      config: {
+        turnIndex,
+        homeTeamId,
+        awayTeamId,
+      },
     });
     await runner.run();
 
@@ -284,7 +301,12 @@ export async function animateGameTurns({ //hasBallAtStep
     const possessionId =
       turn.possession_id ?? turn.possessionId ?? turn.possessionID ?? null;
     const animations = turn.animations || [];
-    if (debugEnabled && stepLogger) {
+    const shouldLogLegacySteps =
+      debugEnabled &&
+      stepLogger &&
+      (!isPossessionRunnerEnabled() || !isStandardHalfCourtPossession(turn));
+
+    if (shouldLogLegacySteps) {
       const maxSteps = Math.max(
         0,
         ...animations.map(anim => anim.movement?.length || 0)
@@ -580,4 +602,3 @@ export async function animateGameTurns({ //hasBallAtStep
 
   scene.events?.off?.('possessionChange', handlePossessionFlip);
 }
-
