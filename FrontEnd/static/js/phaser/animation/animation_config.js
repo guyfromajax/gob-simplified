@@ -54,6 +54,11 @@ const defaults = {
   },
   offensiveRebound: { pauseMs: 1000 },
   putback: { duration: 500, easing: 'Sine.easeInOut' },
+  possession: {
+    msPerTick: 1,
+    minFrameDurationMs: 120,
+    minPassDurationMs: 150,
+  },
 };
 
 const overrides =
@@ -88,6 +93,18 @@ export const animationConfig = {
     ...(overrides.offensiveRebound || {}),
   },
   putback: { ...defaults.putback, ...(overrides.putback || {}) },
+  possession: {
+    msPerTick: overrides.possession?.msPerTick ?? defaults.possession.msPerTick,
+    minFrameDurationMs:
+      overrides.possession?.minFrameDurationMs ??
+      overrides.possession?.minDurationMs ??
+      defaults.possession.minFrameDurationMs,
+    minPassDurationMs:
+      overrides.possession?.minPassDurationMs ??
+      overrides.possession?.minFrameDurationMs ??
+      overrides.possession?.minDurationMs ??
+      defaults.possession.minPassDurationMs,
+  },
 };
 
 animationConfig.outletSetup = {
