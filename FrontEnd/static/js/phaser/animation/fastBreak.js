@@ -258,6 +258,12 @@ export async function runFastBreakSequence({
   // Use backend timeline data instead of fixed duration
   const timeline = createAnimationTimeline(scene);
 
+  const fallbackSprintDuration =
+    animationConfig.fastBreak?.shotMs ?? animationConfig.fastBreak.shotMs ?? 0;
+  let sprintDuration = fallbackSprintDuration;
+  let earliestSprintTimestamp = null;
+  let latestSprintTimestamp = null;
+
   const ownerAnim = animations.find(a => a.hasBallAtStep?.[0]);
   if (ownerAnim) {
     const ownerSprite = playerSprites[ownerAnim.playerId];
@@ -281,7 +287,20 @@ export async function runFastBreakSequence({
 
     // Use backend's duration and timing
     const duration = endStep.timestamp - startStep.timestamp;
-    
+
+    if (typeof startStep.timestamp === "number") {
+      earliestSprintTimestamp =
+        earliestSprintTimestamp == null
+          ? startStep.timestamp
+          : Math.min(earliestSprintTimestamp, startStep.timestamp);
+    }
+    if (typeof endStep.timestamp === "number") {
+      latestSprintTimestamp =
+        latestSprintTimestamp == null
+          ? endStep.timestamp
+          : Math.max(latestSprintTimestamp, endStep.timestamp);
+    }
+
     // Apply team-specific constraints to move players further down court for separation
     let endX = endStep.coords.x;
     let endY = endStep.coords.y;
@@ -303,6 +322,14 @@ export async function runFastBreakSequence({
       duration: duration,
       ease: "Sine.easeInOut"
     }, startStep.timestamp);
+  }
+
+  if (
+    typeof earliestSprintTimestamp === "number" &&
+    typeof latestSprintTimestamp === "number" &&
+    latestSprintTimestamp > earliestSprintTimestamp
+  ) {
+    sprintDuration = latestSprintTimestamp - earliestSprintTimestamp;
   }
 
   scene.__activeTimeline = timeline;
