@@ -2,6 +2,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 
 const normalizerPromise = import('../possession/normalizeTurn.js');
+const animationConfigPromise = import('../animation_config.js');
 
 function baseSimData() {
   return {
@@ -163,6 +164,9 @@ test('normalizeTurn infers passes and fast break metadata', async () => {
 
 test('normalizeTurn captures offensive rebound context', async () => {
   const { normalizeTurn } = await normalizerPromise;
+  const { default: animationConfig } = await animationConfigPromise;
+  const minFrameDuration =
+    animationConfig.possession?.minFrameDurationMs ?? animationConfig.pass?.duration ?? 0;
 
   const turn = {
     id: 'turn-or',
@@ -216,6 +220,80 @@ test('normalizeTurn captures offensive rebound context', async () => {
   assert.equal(normalized.terminal.rebound.timestamp, 900);
   const finalFrame = normalized.timeline.frames[normalized.timeline.frames.length - 1];
   assert.equal(finalFrame.timestamp, 1100);
-  assert.equal(finalFrame.duration, 0);
+  assert.ok(finalFrame.duration >= minFrameDuration);
   assert.ok(finalFrame.actions.some(action => action.action === 'shoot'));
+});
+
+test('normalizeTurn enforces minimum frame and pass durations', async () => {
+  const { normalizeTurn } = await normalizerPromise;
+  const { default: animationConfig } = await animationConfigPromise;
+  const minFrameDuration =
+    animationConfig.possession?.minFrameDurationMs ?? animationConfig.pass?.duration ?? 0;
+  const minPassDuration =
+    animationConfig.possession?.minPassDurationMs ??
+    animationConfig.pass?.duration ??
+    minFrameDuration;
+
+  const turn = {
+    id: 'turn-mini',
+    possession_id: 'pos-mini',
+    possession_team_id: 'HOME',
+    result_type: 'MAKE',
+    shooter_id: 'sg',
+    passes: [{ timestamp: 1, fromId: 'pg', toId: 'sg', duration: 1 }],
+    animations: [
+      {
+        playerId: 'pg',
+        teamId: 'HOME',
+        position: 'PG',
+        hasBallAtStep: [true, false, false],
+        movement: [
+          { timestamp: 0, coords: { x: 30, y: 20 }, action: 'handle_ball' },
+          { timestamp: 1, coords: { x: 31, y: 20 }, action: 'pass' },
+          { timestamp: 2, coords: { x: 32, y: 20 }, action: 'space' },
+        ],
+      },
+      {
+        playerId: 'sg',
+        teamId: 'HOME',
+        position: 'SG',
+        movement: [
+          { timestamp: 0, coords: { x: 40, y: 22 }, action: 'wait' },
+          { timestamp: 1, coords: { x: 40, y: 22 }, action: 'receive' },
+          { timestamp: 2, coords: { x: 42, y: 22 }, action: 'shoot' },
+        ],
+      },
+      {
+        playerId: 'ball',
+        hasBallAtStep: [true, false, false],
+        movement: [
+          { timestamp: 0, coords: { x: 30, y: 20 } },
+          { timestamp: 1, coords: { x: 40, y: 22 } },
+          { timestamp: 2, coords: { x: 42, y: 22 }, action: 'shoot' },
+        ],
+      },
+    ],
+  };
+
+  const normalized = normalizeTurn(turn, baseSimData());
+
+  const frameDurations = normalized.timeline.frames.map(frame => frame.duration);
+  assert.ok(
+    frameDurations.every(duration => duration >= minFrameDuration),
+    `expected every frame duration >= ${minFrameDuration}, got ${frameDurations.join(', ')}`
+  );
+
+  const globalPassDurations = normalized.timeline.passes.map(pass => pass.duration);
+  assert.ok(
+    globalPassDurations.every(duration => duration >= minPassDuration),
+    `expected timeline pass durations >= ${minPassDuration}, got ${globalPassDurations.join(', ')}`
+  );
+
+  const framePassDurations = normalized.timeline.frames.flatMap(frame =>
+    (frame.passes || []).map(pass => pass.duration)
+  );
+  assert.ok(
+    framePassDurations.every(duration => duration >= minPassDuration),
+    `expected frame pass durations >= ${minPassDuration}, got ${framePassDurations.join(', ')}`
+  );
 });
