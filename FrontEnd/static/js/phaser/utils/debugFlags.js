@@ -31,6 +31,17 @@ function resolveAnimationDebug() {
   return false;
 }
 
+function resolveFeatureFlag(flagName, defaultValue = false) {
+  if (!flagName) return defaultValue;
+  if (globalScope && typeof globalScope[flagName] !== 'undefined') {
+    return coerceBoolean(globalScope[flagName]);
+  }
+  if (envScope && typeof envScope[flagName] !== 'undefined') {
+    return coerceBoolean(envScope[flagName]);
+  }
+  return defaultValue;
+}
+
 export function isAnimationDebugEnabled() {
   return resolveAnimationDebug();
 }
@@ -38,6 +49,16 @@ export function isAnimationDebugEnabled() {
 export function setAnimationDebugEnabled(value) {
   if (globalScope) {
     globalScope.DEBUG_ANIM = coerceBoolean(value);
+  }
+}
+
+export function isPossessionRunnerEnabled() {
+  return resolveFeatureFlag('FEATURE_POSSESSION_RUNNER');
+}
+
+export function setPossessionRunnerEnabled(value) {
+  if (globalScope) {
+    globalScope.FEATURE_POSSESSION_RUNNER = coerceBoolean(value);
   }
 }
 
@@ -62,6 +83,11 @@ export function animationDebugWarn(...args) {
 Object.defineProperty(DebugFlags, 'ANIM', {
   enumerable: true,
   get: () => isAnimationDebugEnabled(),
+});
+
+Object.defineProperty(DebugFlags, 'FEATURE_POSSESSION_RUNNER', {
+  enumerable: true,
+  get: () => isPossessionRunnerEnabled(),
 });
 
 export { DebugFlags };

@@ -10,6 +10,7 @@ import {
   animationDebugLog,
   animationDebugWarn,
   isAnimationDebugEnabled,
+  isPossessionRunnerEnabled,
 } from "../utils/debugFlags.js";
 import { getSceneStepLogger } from "./debugStepLogger.js";
 
@@ -17,6 +18,115 @@ const DEBUG_FLOW =
   (typeof window !== 'undefined' && window.DEBUG_FLOW) ||
   (typeof process !== 'undefined' && process.env.DEBUG_FLOW) ||
   false;
+
+const NON_STANDARD_RESULTS = new Set([
+  "FREE_THROW",
+  "TURNOVER",
+  "FAST_BREAK",
+  "SIDE_INBOUND",
+]);
+
+let normalizeTurnModulePromise = null;
+let possessionRunnerModulePromise = null;
+
+function getResultType(turn = {}) {
+  return turn?.result_type ?? turn?.resultType ?? null;
+}
+
+function isStandardHalfCourtPossession(turn = {}) {
+  if (!turn) return false;
+  const animations = Array.isArray(turn?.animations) ? turn.animations : [];
+  if (!animations.length) return false;
+  if (turn.fast_break === true) return false;
+  const resultType = getResultType(turn);
+  if (resultType && NON_STANDARD_RESULTS.has(resultType)) return false;
+  return true;
+}
+
+async function loadPossessionRunnerDependencies() {
+  if (!normalizeTurnModulePromise) {
+    normalizeTurnModulePromise = import("./possession/normalizeTurn.js");
+  }
+  if (!possessionRunnerModulePromise) {
+    possessionRunnerModulePromise = import("./possession/PossessionRunner.js");
+  }
+  const [normalizerModule, runnerModule] = await Promise.all([
+    normalizeTurnModulePromise,
+    possessionRunnerModulePromise,
+  ]);
+  const normalizeTurnFn =
+    normalizerModule?.normalizeTurn || normalizerModule?.default || null;
+  const PossessionRunnerClass =
+    runnerModule?.PossessionRunner || runnerModule?.default || null;
+  return { normalizeTurnFn, PossessionRunnerClass };
+}
+
+async function maybeRunPossession({
+  scene,
+  ballSprite,
+  playerSprites,
+  simData,
+  turn,
+  turnIndex,
+  possessionId,
+  debugEnabled,
+}) {
+  if (!isStandardHalfCourtPossession(turn)) {
+    return false;
+  }
+
+  try {
+    const { normalizeTurnFn, PossessionRunnerClass } =
+      await loadPossessionRunnerDependencies();
+    if (typeof normalizeTurnFn !== "function") return false;
+    if (typeof PossessionRunnerClass !== "function") return false;
+
+    const graph = normalizeTurnFn(turn, simData, { turnIndex });
+    if (!graph) return false;
+    if (graph?.context?.fastBreak) return false;
+
+    const frames = Array.isArray(graph?.timeline?.frames)
+      ? graph.timeline.frames
+      : [];
+    if (!frames.length) return false;
+
+    if (graph.context) {
+      if (typeof graph.context.turnIndex === "undefined") {
+        graph.context.turnIndex = turnIndex;
+      }
+      if (typeof graph.context.possessionId === "undefined") {
+        graph.context.possessionId = possessionId ?? null;
+      }
+    }
+
+    const runner = new PossessionRunnerClass({
+      scene,
+      ballSprite,
+      playerSprites,
+      graph,
+      config: { turnIndex },
+    });
+    await runner.run();
+
+    if (debugEnabled) {
+      const parts = [`Turn ${turnIndex + 1}`];
+      const resultType = graph.context?.resultType || getResultType(turn);
+      if (resultType) parts.push(`result=${resultType}`);
+      if (possessionId != null) parts.push(`possession=${possessionId}`);
+      animationDebugLog(
+        `ANIM: PossessionRunner handled ${parts.join(" ")}`
+      );
+    }
+
+    return true;
+  } catch (error) {
+    animationDebugWarn(
+      "PossessionRunner failed, falling back to legacy animation",
+      error
+    );
+    return false;
+  }
+}
 
 function annotateFreeThrowTurns(turns = []) {
   let group = null;
@@ -305,82 +415,103 @@ export async function animateGameTurns({ //hasBallAtStep
 
     const shooterId = playerMap[shooterName];
 
-    await playTurnAnimation({
-      scene,
-      simData,
-      playerSprites,
-      turnData: turn,
-      ballSprite,
-      onAction: async (action, sprite, timestamp) => {
-        if (DEBUG_FLOW || debugEnabled)
-          logVerbose(`🎬 Action "${action}" fired at ${timestamp}ms for sprite:`, sprite);
-        onAction(action, sprite, timestamp);
+    const handledByRunner =
+      isPossessionRunnerEnabled() &&
+      (await maybeRunPossession({
+        scene,
+        ballSprite,
+        playerSprites,
+        simData,
+        turn,
+        turnIndex: i,
+        possessionId,
+        debugEnabled,
+      }));
 
-        const playerId = Object.keys(playerSprites).find(
-          key => playerSprites[key] === sprite
-        );
+    if (!handledByRunner) {
+      await playTurnAnimation({
+        scene,
+        simData,
+        playerSprites,
+        turnData: turn,
+        ballSprite,
+        onAction: async (action, sprite, timestamp) => {
+          if (DEBUG_FLOW || debugEnabled)
+            logVerbose(
+              `🎬 Action "${action}" fired at ${timestamp}ms for sprite:`,
+              sprite
+            );
+          onAction(action, sprite, timestamp);
 
-        const anim = animations.find(a => a.playerId === playerId);
-        const movement = anim?.movement || [];
-
-        if (action === "pass") {
-          if (scene.stateMachine?.is(States.FastBreak)) return;
-          const passStep = movement.find(
-            m => m.action === "pass" && m.timestamp === timestamp
+          const playerId = Object.keys(playerSprites).find(
+            key => playerSprites[key] === sprite
           );
-          if (!passStep) return;
 
-          const receiverAnim = animations.find(a =>
-            a.movement?.some(
+          const anim = animations.find(a => a.playerId === playerId);
+          const movement = anim?.movement || [];
+
+          if (action === "pass") {
+            if (scene.stateMachine?.is(States.FastBreak)) return;
+            const passStep = movement.find(
+              m => m.action === "pass" && m.timestamp === timestamp
+            );
+            if (!passStep) return;
+
+            const receiverAnim = animations.find(a =>
+              a.movement?.some(
+                m => m.action === "receive" && m.timestamp === timestamp
+              )
+            );
+            const receiveStep = receiverAnim?.movement.find(
               m => m.action === "receive" && m.timestamp === timestamp
-            )
-          );
-          const receiveStep = receiverAnim?.movement.find(
-            m => m.action === "receive" && m.timestamp === timestamp
-          );
+            );
 
-          if (passStep && receiveStep && receiverAnim?.playerId != null) {
-            if (DEBUG_FLOW || debugEnabled) logVerbose("📤 Pass triggered");
-            const receiverSprite = playerSprites[receiverAnim.playerId];
-            const endCoords = receiverSprite
-              ? { x: receiverSprite.x, y: receiverSprite.y }
-              : undefined;
+            if (passStep && receiveStep && receiverAnim?.playerId != null) {
+              if (DEBUG_FLOW || debugEnabled) logVerbose("📤 Pass triggered");
+              const receiverSprite = playerSprites[receiverAnim.playerId];
+              const endCoords = receiverSprite
+                ? { x: receiverSprite.x, y: receiverSprite.y }
+                : undefined;
 
-            const delta = receiveStep.timestamp - timestamp;
-            const duration = delta > 0 ? delta : animationConfig.pass.duration;
-            if (DEBUG_FLOW || debugEnabled)
-              logVerbose(`⏱️ Resolved pass duration: ${duration}ms (delta=${delta})`);
+              const delta = receiveStep.timestamp - timestamp;
+              const duration =
+                delta > 0 ? delta : animationConfig.pass.duration;
+              if (DEBUG_FLOW || debugEnabled)
+                logVerbose(
+                  `⏱️ Resolved pass duration: ${duration}ms (delta=${delta})`
+                );
 
-            if (DEBUG_FLOW || debugEnabled) {
-              scene.events?.once('passStart', () => logVerbose('passStart'));
-              scene.events?.once('tweenStart', () => logVerbose('tweenStart'));
-              scene.events?.once('tweenEnd', () => logVerbose('tweenEnd'));
-              scene.events?.once('ballAttached', () => logVerbose('ballAttached'));
-              scene.events?.once('passEnd', () => logVerbose('passEnd'));
+              if (DEBUG_FLOW || debugEnabled) {
+                scene.events?.once('passStart', () => logVerbose('passStart'));
+                scene.events?.once('tweenStart', () => logVerbose('tweenStart'));
+                scene.events?.once('tweenEnd', () => logVerbose('tweenEnd'));
+                scene.events?.once('ballAttached', () => logVerbose('ballAttached'));
+                scene.events?.once('passEnd', () => logVerbose('passEnd'));
+              }
+
+              if (scene.__activePass) {
+                animationDebugWarn(
+                  'Active pass tween detected before runPass call; cancelling previous tween'
+                );
+              }
+
+              await runPass(scene, {
+                fromId: playerId,
+                toId: receiverAnim.playerId,
+                endCoords,
+                duration,
+                easing: animationConfig.pass.easing
+              });
             }
-
-            if (scene.__activePass) {
-              animationDebugWarn(
-                'Active pass tween detected before runPass call; cancelling previous tween'
-              );
-            }
-
-            await runPass(scene, {
-              fromId: playerId,
-              toId: receiverAnim.playerId,
-              endCoords,
-              duration,
-              easing: animationConfig.pass.easing
-            });
           }
-        }
 
-        // if (action === "shoot" || sprite.playerId === shooterId) {
-        //   console.log("🏀 Shot triggered. Hiding ball.");
-        //   ballSprite.setVisible(false);
-        // }
-      }
-    });
+          // if (action === "shoot" || sprite.playerId === shooterId) {
+          //   console.log("🏀 Shot triggered. Hiding ball.");
+          //   ballSprite.setVisible(false);
+          // }
+        }
+      });
+    }
 
     const stealEvent = turn.events?.find(e => e.event_type === "STEAL");
     if (!scene.stateMachine?.is(States.FastBreak) && (turn.result_type === "STEAL" || stealEvent)) {
