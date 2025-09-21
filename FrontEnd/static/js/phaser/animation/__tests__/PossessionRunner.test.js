@@ -226,3 +226,187 @@ test('PossessionRunner schedules frames and emits debug events', async () => {
 
   globalThis.DEBUG_ANIM = false;
 });
+
+test('PossessionRunner uses polyfill timeline when tween manager lacks factory', async () => {
+  globalThis.DEBUG_ANIM = true;
+  const { PossessionRunner } = await runnerPromise;
+  const { States, transitions } = await statePromise;
+
+  const delayCalls = [];
+  const time = {
+    delayedCall(delay, callback) {
+      const record = {
+        delay,
+        callback,
+        cancelled: false,
+      };
+      delayCalls.push(record);
+      return {
+        remove() {
+          record.cancelled = true;
+        },
+        destroy() {
+          record.cancelled = true;
+        },
+      };
+    },
+  };
+
+  const tweenCalls = [];
+  const scene = {
+    tweens: {
+      add: createTweenStub(tweenCalls),
+    },
+    time,
+    events: {
+      emitted: [],
+      emit(event, payload) {
+        this.emitted.push({ event, payload });
+      },
+    },
+    game: { config: { width: 94, height: 50 } },
+  };
+
+  const stateMachine = {
+    state: States.Inbound,
+    transitionCalls: [],
+    transition(next, payload = {}) {
+      const allowed = transitions[this.state] || [];
+      if (!allowed.includes(next)) {
+        throw new Error(`Invalid transition: ${this.state} -> ${next}`);
+      }
+      this.transitionCalls.push({ next, payload, from: this.state });
+      this.state = next;
+    },
+    is(value) {
+      return this.state === value;
+    },
+  };
+
+  scene.stateMachine = stateMachine;
+
+  const ballSprite = {
+    setPosition(x, y) {
+      this.x = x;
+      this.y = y;
+    },
+    setVisible() {},
+    setDepth() {},
+  };
+
+  const playerSprites = {
+    pg: {
+      playerId: 'pg',
+      setPosition(x, y) {
+        this.x = x;
+        this.y = y;
+      },
+    },
+  };
+
+  const helpers = {
+    attachBallToPlayer() {},
+    runPass() {
+      return Promise.resolve();
+    },
+    animateRebound() {
+      return Promise.resolve();
+    },
+    shootBall() {
+      return Promise.resolve();
+    },
+  };
+
+  const graph = {
+    context: {
+      possessionId: 'pos-2',
+      turnId: 'turn-2',
+      turnIndex: 0,
+    },
+    setup: {
+      ball: { ownerId: 'pg', coords: { x: 20, y: 20 } },
+      players: {
+        pg: { x: 20, y: 20, hasBall: true, teamId: 'HOME', position: 'PG' },
+      },
+      order: ['pg'],
+    },
+    timeline: {
+      frames: [
+        {
+          timestamp: 0,
+          duration: 120,
+          players: {
+            pg: { x: 22, y: 22, hasBall: true, teamId: 'HOME', position: 'PG' },
+          },
+        },
+        {
+          timestamp: 120,
+          duration: 150,
+          players: {
+            pg: { x: 30, y: 25, hasBall: true, teamId: 'HOME', position: 'PG' },
+          },
+        },
+      ],
+    },
+    terminal: {},
+  };
+
+  const runner = new PossessionRunner({
+    scene,
+    ballSprite,
+    playerSprites,
+    graph,
+    config: { helpers },
+  });
+
+  const startOrder = [];
+  const completeOrder = [];
+  const originalStart = runner.onFrameStart.bind(runner);
+  runner.onFrameStart = function onFrameStart(frame, index, duration) {
+    startOrder.push({ index, duration });
+    return originalStart(frame, index, duration);
+  };
+
+  const originalComplete = runner.onFrameComplete.bind(runner);
+  runner.onFrameComplete = function onFrameComplete(frame, index) {
+    completeOrder.push(index);
+    return originalComplete(frame, index);
+  };
+
+  const runPromise = runner.run();
+
+  for (let i = 0; i < 5 && delayCalls.length === 0; i += 1) {
+    await Promise.resolve();
+    await new Promise((resolve) => setImmediate(resolve));
+  }
+
+  assert.equal(delayCalls.length, 1);
+  assert.equal(delayCalls[0].delay, graph.timeline.frames[0].duration);
+
+  while (delayCalls.length) {
+    const call = delayCalls.shift();
+    if (!call.cancelled) {
+      call.callback();
+    }
+    await Promise.resolve();
+    await new Promise((resolve) => setImmediate(resolve));
+  }
+
+  await runPromise;
+
+  assert.deepEqual(
+    startOrder.map((entry) => entry.index),
+    [0, 1]
+  );
+  assert.deepEqual(
+    startOrder.map((entry) => entry.duration),
+    graph.timeline.frames.map((frame) => frame.duration)
+  );
+  assert.deepEqual(completeOrder, [0, 1]);
+  assert.equal(scene.__activeTimeline, null);
+  assert.ok(
+    scene.events.emitted.some((evt) => evt.event === 'possessionRunner:step')
+  );
+
+  globalThis.DEBUG_ANIM = false;
+});

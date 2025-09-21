@@ -1,24 +1,47 @@
+import { createTimelinePolyfill } from "./timelinePolyfill.js";
+
 export function createAnimationTimeline(scene) {
-  const callbacks = new Map();
-  const steps = [];
-  return {
-    add(config = {}) {
-      steps.push(config);
-      return this;
-    },
-    once(event, handler) {
-      if (!callbacks.has(event)) callbacks.set(event, []);
-      callbacks.get(event).push(handler);
-      return this;
-    },
-    play() {
-      for (const step of steps) {
-        step.onStart?.();
-        step.onComplete?.();
-      }
-      (callbacks.get('complete') || []).forEach((handler) => handler?.());
-    },
-  };
+  if (!scene || !scene.tweens) return null;
+
+  if (scene.__activeTimeline) {
+    scene.__activeTimeline.stop?.();
+    scene.__activeTimeline = null;
+  }
+
+  const { tweens } = scene;
+  let timeline = null;
+
+  if (typeof tweens.createTimeline === "function") {
+    timeline = tweens.createTimeline();
+  } else if (typeof tweens.timeline === "function") {
+    timeline = tweens.timeline();
+  } else if (typeof tweens.addTimeline === "function") {
+    timeline = tweens.addTimeline();
+  }
+
+  if (!timeline) {
+    timeline = createTimelinePolyfill(scene);
+  }
+
+  if (!timeline) return null;
+
+  scene.__activeTimeline = timeline;
+
+  timeline.once?.("complete", () => {
+    if (scene.__activeTimeline === timeline) {
+      scene.__activeTimeline = null;
+    }
+  });
+
+  timeline.once?.("stop", () => {
+    if (scene.__activeTimeline === timeline) {
+      scene.__activeTimeline = null;
+    }
+  });
+
+  return timeline;
 }
+
+export { createTimelinePolyfill };
 
 export default createAnimationTimeline;
