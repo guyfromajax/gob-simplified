@@ -1091,11 +1091,17 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
         shooterPos,
         shooterId: shotInfo.playerId,
         shooterTeamId,
-        homeTeamId
+        homeTeamId,
+        stepIndex: shotInfo.stepIndex,
+        turnIndex: scene.currentTurn
       };
       if (SHOT_DEBUG) {
-        shootParams.stepIndex = shotInfo.stepIndex;
-        shootParams.turnIndex = scene.currentTurn;
+        animationDebugLog("shootParams", {
+          stepIndex: shootParams.stepIndex,
+          turnIndex: shootParams.turnIndex,
+          shooterId: shootParams.shooterId,
+          result: shootParams.result,
+        });
       }
       const shotResult = await shootBall(shootParams);
       const ballSpot = shotResult?.grid;
