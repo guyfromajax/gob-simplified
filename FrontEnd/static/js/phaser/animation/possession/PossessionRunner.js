@@ -114,6 +114,7 @@ export class PossessionRunner {
     this.lastShotOutcome = null;
     this.stepLogger = scene ? getSceneStepLogger(scene, "ANIM") : null;
     this.timelineFactoryPromise = null;
+    this.activePendingCount = 0;
     this.targetFrameDurationMs =
       toNumber(this.config?.targetFrameDurationMs) ??
       toNumber(animationConfig?.possession?.targetFrameMs) ??
@@ -164,6 +165,32 @@ export class PossessionRunner {
       this.maxDurationScale = Math.max(this.minDurationScale, 6);
     }
     this.durationScale = 1;
+  }
+
+  getDebugContext(additional = {}) {
+    return {
+      turnIndex:
+        this.config?.turnIndex ?? this.graph?.context?.turnIndex ?? null,
+      possessionId: this.graph?.context?.possessionId ?? null,
+      turnId: this.graph?.context?.turnId ?? null,
+      ...additional,
+    };
+  }
+
+  emitDebug(event, payload = {}) {
+    if (!isAnimationDebugEnabled()) return;
+    this.scene?.events?.emit?.(event, {
+      ...this.getDebugContext(payload),
+      timestamp: Date.now(),
+    });
+  }
+
+  emitPendingSummary(reason, extra = {}) {
+    this.emitDebug("possessionRunner:pending", {
+      reason,
+      pendingCount: this.activePendingCount,
+      ...extra,
+    });
   }
 
   emitPossessionChange(teamId, payload = {}) {
@@ -304,17 +331,33 @@ export class PossessionRunner {
       timeline.once?.("stop", () => reject(new Error("timeline stopped")));
     });
 
+    this.emitDebug("possessionRunner:timelinePlay", {
+      frameCount: frames.length,
+      durationScale: this.durationScale,
+    });
+
     timeline.play?.();
 
     try {
       await completion;
+      this.emitDebug("possessionRunner:timelineResolved", {
+        pendingCount: this.activePendingCount,
+      });
     } catch (error) {
       if (isAnimationDebugEnabled()) {
         this.scene?.events?.emit?.("possessionRunner:error", { error });
       }
     }
 
-    await Promise.all(this.pendingPromises).catch(() => {});
+    await Promise.all(this.pendingPromises)
+      .catch(() => {})
+      .finally(() => {
+        this.emitDebug("possessionRunner:helpersSettled", {
+          pendingCount: this.activePendingCount,
+        });
+        this.pendingPromises = [];
+        this.activePendingCount = 0;
+      });
     await this.handleTerminalState();
     return null;
   }
@@ -383,6 +426,12 @@ export class PossessionRunner {
     const tracker = { progress: 0 };
     const rawDuration = Math.max(0, toNumber(frame?.duration) ?? 0);
     const duration = this.scaleFrameDuration(rawDuration);
+
+    this.emitDebug("possessionRunner:timelineEnqueue", {
+      frameIndex,
+      rawDuration,
+      duration,
+    });
 
     timeline.add?.({
       targets: tracker,
@@ -471,8 +520,16 @@ export class PossessionRunner {
       this.buildFrameSummary(frame, frameIndex, duration, rawDuration)
     );
 
-    this.pendingPromises.push(summaryPromise.catch(() => {}));
+    const wrappedPromise = summaryPromise.catch(() => {});
+    this.pendingPromises.push(wrappedPromise);
+    this.activePendingCount += 1;
+    this.emitPendingSummary("frame-enqueued", { frameIndex });
     this.frameSummaries.set(frameIndex, summaryPromise);
+
+    wrappedPromise.finally(() => {
+      this.activePendingCount = Math.max(0, this.activePendingCount - 1);
+      this.emitPendingSummary("frame-resolved", { frameIndex });
+    });
   }
 
   onFrameComplete(frame, frameIndex) {
@@ -481,6 +538,7 @@ export class PossessionRunner {
     if (!summaryPromise) return;
     summaryPromise
       .then((summary) => {
+        this.emitPendingSummary("frame-complete", { frameIndex });
         if (isAnimationDebugEnabled()) {
           this.scene?.events?.emit?.("possessionRunner:postStep", summary);
         }
