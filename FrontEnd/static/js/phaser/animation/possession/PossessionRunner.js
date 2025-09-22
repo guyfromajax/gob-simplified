@@ -768,6 +768,9 @@ export class PossessionRunner {
     const stateMachine = this.scene?.stateMachine;
     if (!stateMachine) return;
     const previous = stateMachine.state;
+    if (previous === nextState) {
+      return;
+    }
     safeTransition(stateMachine, nextState, ctx);
     if (stateMachine.state !== previous && isAnimationDebugEnabled()) {
       this.scene?.events?.emit?.("possessionRunner:transition", {

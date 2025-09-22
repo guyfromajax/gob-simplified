@@ -1,22 +1,24 @@
 import { createTimelinePolyfill } from "./timelinePolyfill.js";
 
 export function createAnimationTimeline(scene) {
-  if (!scene || !scene.tweens) return null;
+  if (!scene) return null;
 
   if (scene.__activeTimeline) {
     scene.__activeTimeline.stop?.();
     scene.__activeTimeline = null;
   }
 
-  const { tweens } = scene;
+  const tweens = scene.tweens || scene.sys?.tweens || null;
   let timeline = null;
 
-  if (typeof tweens.createTimeline === "function") {
-    timeline = tweens.createTimeline();
-  } else if (typeof tweens.timeline === "function") {
-    timeline = tweens.timeline();
-  } else if (typeof tweens.addTimeline === "function") {
-    timeline = tweens.addTimeline();
+  if (tweens) {
+    if (typeof tweens.createTimeline === "function") {
+      timeline = tweens.createTimeline();
+    } else if (typeof tweens.timeline === "function") {
+      timeline = tweens.timeline();
+    } else if (typeof tweens.addTimeline === "function") {
+      timeline = tweens.addTimeline();
+    }
   }
 
   if (!timeline) {

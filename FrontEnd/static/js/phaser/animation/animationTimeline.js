@@ -5,26 +5,28 @@ import { createTimelinePolyfill } from "./timelinePolyfill.js";
 // active timeline on the scene is stopped before creating a new one so that
 // overlapping sequences do not conflict.
 export function createAnimationTimeline(scene) {
-  if (!scene || !scene.tweens) return null;
+  if (!scene) return null;
   if (scene.__activeTimeline) {
     scene.__activeTimeline.stop();
     scene.__activeTimeline = null;
   }
-  const { tweens } = scene;
+  const tweens = scene.tweens || scene.sys?.tweens || null;
   let timeline = null;
 
-  if (typeof tweens.createTimeline === "function") {
-    timeline = tweens.createTimeline();
-  } else if (typeof tweens.timeline === "function") {
-    timeline = tweens.timeline();
-  } else if (typeof tweens.addTimeline === "function") {
-    timeline = tweens.addTimeline();
-  } else if (Phaser?.Tweens?.Timeline) {
-    try {
-      timeline = new Phaser.Tweens.Timeline(tweens);
-    } catch (error) {
-      console.warn("Failed to construct Phaser timeline", error);
-      timeline = null;
+  if (tweens) {
+    if (typeof tweens.createTimeline === "function") {
+      timeline = tweens.createTimeline();
+    } else if (typeof tweens.timeline === "function") {
+      timeline = tweens.timeline();
+    } else if (typeof tweens.addTimeline === "function") {
+      timeline = tweens.addTimeline();
+    } else if (Phaser?.Tweens?.Timeline) {
+      try {
+        timeline = new Phaser.Tweens.Timeline(tweens);
+      } catch (error) {
+        console.warn("Failed to construct Phaser timeline", error);
+        timeline = null;
+      }
     }
   }
 
