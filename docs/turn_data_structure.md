@@ -1,337 +1,222 @@
 # Turn Data Structure
 
-This document defines the standardized turn data structure used throughout the GOB basketball simulation system.
+This document summarises the payload our backend returns for each **micro-turn**
+(the smallest unit of game simulation) and how the frontend consumes it.
 
-## Overview
+The data is produced inside `BackEnd/models/turn_manager.py::run_micro_turn`.
+Additional helpers (animator, fast break logic, free-throw resolution) augment
+the result before it is serialised to JSON and sent to the client.
 
-The turn data structure represents a single turn/action in a basketball game, containing all necessary information for both backend logic and frontend animations.
+## High-Level Shape
 
-## Core Structure
+```json5
+{
+  "turn_count": 42,
+  "result_type": "MAKE" | "DREB" | "OREB" | "TURNOVER" | "FOUL" | "FREE_THROW" | "HCO" | "FAST_BREAK",
+  "time_elapsed": 1280,
+  "possession_team_id": "TEAM_UUID",
+  "possession_flips": true,
+  "score": { "Home": 44, "Away": 40 },
 
-```python
-turn = {
-    # === CORE TURN DATA ===
-    "turn_count": 1,
-    "result_type": "MAKE" | "DREB" | "OREB" | "TURNOVER" | "FOUL" | "FREE_THROW" | "HCO",
-    "shooter_id": "player-uuid" | None,
-    "shooter": "player-name" | None,
-    "time_elapsed": 1000,
-    "possession_team_id": "team-uuid",
-    "possession_flips": True | False,
-    
-    # === AUTHORITATIVE SCORING ===
-    "score": {  # This is the authoritative score
-        "Team A": 15,
-        "Team B": 12
-    },
-    
-    # === SPECIAL FLAGS ===
-    "fast_break": True | False,        # Animation routing
-    "hold_up": True | False,           # Fast break defense
-    "stopper_id": "player-uuid" | None, # Hold-up scenarios
-    "is_three_pointer": True | False,  # Three-point shot flag
-    "is_and_one": True | False,        # And-one situation flag
-    "putback_attempt": True | False,   # Putback animations
-    
-    # === FREE THROW SPECIFIC ===
-    "attempts": ["MAKE", "DREB", "OREB"],      # Backend generated for multiple attempts
-    "ftContext": "AND_ONE" | "TECHNICAL" | "REGULAR",  # Frontend generated
-    
-    # === REBOUND SPECIFIC ===
-    "rebound_type": "DREB" | "OREB" | None,  # Essential
-    "rebounder_id": "player-uuid" | None,    # Essential
-    
-    # === ANIMATION DATA ===
-    "animations": [...],  # Essential for animations
+  // Participant metadata (strings; player objects are normalised away)
+  "shooter_id": "PLAYER_UUID",
+  "shooter": "Player Name",
+  "ball_handler": "Player Name",
+  "passer": "Player Name",
+  "stealer_id": "PLAYER_UUID",
+  "victim_id": "PLAYER_UUID",
+
+  // Animation + role context
+  "animations": [...],
+  "events": [...],
+  "roles": {...},
+  "next_play_type": "HCO" | "FAST_BREAK" | "FREE_THROW" | null,
+
+  // Free throw details (optional)
+  "attempts": ["MAKE", "DREB"],
+  "ftContext": { "ftIndex": 1, "ftTotal": 2, "bonusType": "REGULAR" },
+
+  // Rebound information (optional)
+  "rebound_type": "DREB" | "OREB" | null,
+  "rebounder_id": "PLAYER_UUID" | null,
+
+  // Scoreboard snapshots
+  "home_lineup": { "PG": {...}, ... },
+  "away_lineup": { "PG": {...}, ... },
+  "deltas": {
+    "PLAYER_UUID": {
+      "team": "Home",
+      "stats": { "PTS": 2, "REB": 1 }
+    }
+  },
+  "homeFouls": 4,
+  "awayFouls": 3,
+  "clock": "3:12",
+  "quarter": 2,
+  "period_label": "Q2",
+
+  // Narrative & flags
+  "text": "Player drills the mid-range jumper.",
+  "fast_break": false,
+  "hold_up": false,
+  "stopper_id": "PLAYER_UUID",
+  "is_three_pointer": false,
+  "is_and_one": false,
+  "putback_attempt": false
 }
 ```
 
-## Field Descriptions
+All player references are serialised to ids/names via `convert_players` before
+the turn leaves the backend. The frontend should not expect live class
+instances.
 
-### Core Turn Data
+## Core Fields
 
-- **`turn_count`** (int): Sequential turn number in the game
-- **`result_type`** (string): The outcome of the turn
-  - `"MAKE"`: Shot was made
-  - `"DREB"`: Defensive rebound (shot missed, defense got rebound)
-  - `"OREB"`: Offensive rebound (shot missed, offense got rebound)
-  - `"TURNOVER"`: Ball was turned over
-  - `"FOUL"`: Foul was committed
-  - `"FREE_THROW"`: Free throw attempt
-- **`shooter_id`** (string|null): UUID of the player who shot (if applicable)
-- **`shooter`** (string|null): Name of the player who shot (if applicable)
-- **`time_elapsed`** (int): Time in milliseconds that elapsed during this turn
-- **`possession_team_id`** (string): UUID of the team with possession
-- **`possession_flips`** (boolean): Whether possession changed hands
+| Field | Type | Notes |
+| ----- | ---- | ----- |
+| `turn_count` | int | Sequential counter for micro-turns. |
+| `result_type` | string | Primary routing key (MAKE/DREB/OREB/TURNOVER/FOUL/FREE_THROW/HCO/FAST_BREAK). |
+| `time_elapsed` | int | Milliseconds deducted from the game clock. |
+| `possession_team_id` | string | Team that started the turn on offense. |
+| `possession_flips` | bool | If true, backend flips possession immediately after the turn. |
+| `score` | object | Authoritative team scores after the turn. Always use this rather than re-adding `points`. |
+| `text` | string | Guaranteed non-empty narrative for the play-by-play ticker. |
 
-### Authoritative Scoring
+## Participant Metadata (optional)
 
-- **`score`** (object): The authoritative team scores after this turn
-  - Keys: Team names
-  - Values: Current score totals
-  - **This is the single source of truth for scoring**
+Depending on the play type, one or more of the following string fields may be
+present: `shooter_id`, `shooter`, `ball_handler`, `passer`, `screener`,
+`defender`, `stealer_id`, `victim_id`, `stopper_id`. These are already coerced
+into simple strings.
 
-### Special Flags
+## Animation & Roles
 
-- **`fast_break`** (boolean): Whether this was a fast break play
-- **`hold_up`** (boolean): Whether the fast break was stopped by defense
-- **`stopper_id`** (string|null): Player ID who stopped the fast break (if hold_up is true)
-- **`is_three_pointer`** (boolean): Whether this was a three-point shot attempt
-- **`is_and_one`** (boolean): Whether this was an and-one situation
-- **`putback_attempt`** (boolean): Whether this was a putback shot attempt
+- **`animations`** – Array of per-player movement tracks (positions, actions,
+  `hasBallAtStep`) used by both the legacy animator and the new
+  `PossessionRunner`.
+- **`events`** – Optional array of high-level events (`PUTBACK_ATTEMPT`,
+  `KICKOUT_RESET`, `STEAL`, etc.) the frontend uses to trigger specialised
+  flows.
+- **`roles`** – Optional map describing offensive/defensive roles for the turn
+  (ball handler, rebounder, outlet receiver, etc.).
+- **`next_play_type`** – Hint about what the backend expects next (`HCO`,
+  `FAST_BREAK`, `FREE_THROW`), useful when staging transitions.
 
-### Free Throw Specific
+## Free Throw Metadata
 
-- **`attempts`** (array): Array of free throw results for multiple attempts
-  - `["MAKE"]`: Made the free throw
-  - `["DREB"]`: Missed the free throw (defensive rebound)
-  - `["OREB"]`: Missed the free throw (offensive rebound)
-  - `["MAKE", "DREB"]`: Multiple attempts (made first, missed second)
-  - `["DREB", "MAKE"]`: Multiple attempts (missed first, made second)
-- **`ftContext`** (string): Context of the free throw
-  - `"AND_ONE"`: And-one free throw
-  - `"TECHNICAL"`: Technical free throw
-  - `"REGULAR"`: Regular free throw
+- **`attempts`** – Ordered results of each free throw (`MAKE`, `DREB`, `OREB`).
+- **`ftContext`** – Added by `animateGameTurns.annotateFreeThrowTurns` to expose
+  attempt index/total and bonus type for UI copy.
 
-### Rebound Specific
+## Rebounds
 
-- **`rebound_type`** (string|null): Type of rebound (used for missed shots and free throws)
-  - `"DREB"`: Defensive rebound
-  - `"OREB"`: Offensive rebound
-- **`rebounder_id`** (string|null): Player ID who got the rebound
+- **`rebound_type`** – `DREB` or `OREB` for missed shots/free throws.
+- **`rebounder_id`** – Player securing the rebound.
 
-### Animation Data
+When an offensive rebound occurs, the backend now emits *two* turns:
 
-- **`animations`** (array): Animation data for frontend rendering
-- **`events`** (array): Complex event data for animation routing
-  - Contains events like `PUTBACK_ATTEMPT`, `KICKOUT_RESET`, `STEAL`, etc.
+1. `result_type = "OREB"` describing the rebound itself.
+2. A follow-up turn (putback attempt, kick-out reset, etc.) where normal shot or
+   HCO logic applies.
 
-## Design Principles
+## Scoreboard Snapshots & Deltas
 
-### Removed Redundant Fields
+- **`home_lineup` / `away_lineup`** – Serialised lineup info (position → player
+  metadata) used by overlays and debugging.
+- **`deltas`** – Per-player stat increments accumulated during the turn (scoring,
+  rebounds, steals, etc.).
+- **`homeFouls` / `awayFouls`** – Team foul totals this quarter.
+- **`clock`**, **`quarter`**, **`period_label`** – Human-readable game-clock
+  state after the turn.
 
-The following fields were removed as they were redundant or could be derived:
+## Flags & Routing Helpers
 
-- **`points`** - Redundant with `score` field (backend updates team scores directly)
-- **`scoring_team`** - Can derive from `score` comparison
-- **`shot_result`** - Redundant with `result_type`
-- **`"MISS"` result_type** - Every miss becomes either DREB or OREB
+- **`fast_break`** – Set when the backend is resolving a transition play. Paired
+  with `hold_up` and `stopper_id` for defensive stops.
+- **`is_three_pointer`**, **`is_and_one`**, **`putback_attempt`** – Shot context
+  used for commentary and animation choices.
 
-### Key Benefits
-
-1. **Simplified Data Model** - Removed 4 redundant fields
-2. **Clear Result Types** - No more confusing "MISS" type, every miss is either DREB or OREB
-3. **Authoritative Scoring** - `turn.score` is the single source of truth
-4. **Essential Flags Only** - Every field serves a specific purpose
-5. **Cleaner Logic** - Frontend can derive missing information from existing data
-6. **Better Performance** - Smaller payload, less data to process
-7. **Easier Maintenance** - Fewer fields to manage and validate
-
-## Usage Examples
+## Sample Payloads
 
 ### Made Shot
 ```python
 {
-    "turn_count": 1,
+    "turn_count": 47,
     "result_type": "MAKE",
     "shooter_id": "player-123",
     "shooter": "John Smith",
-    "time_elapsed": 2000,
-    "possession_team_id": "team-456",
-    "possession_flips": True,
-    "score": {"Team A": 2, "Team B": 0},
-    "fast_break": False,
-    "is_three_pointer": False,
-    "is_and_one": False,
-    "putback_attempt": False,
+    "time_elapsed": 1820,
+    "possession_team_id": "TEAM_HOME",
+    "possession_flips": true,
+    "score": {"Home": 44, "Away": 40},
+    "is_three_pointer": false,
+    "fast_break": false,
     "animations": [...],
-    "events": []
+    "events": [],
+    "deltas": {"player-123": {"team": "Home", "stats": {"PTS": 2}}},
+    "homeFouls": 4,
+    "awayFouls": 3,
+    "clock": "3:12",
+    "quarter": 2,
+    "text": "John Smith sinks the jumper from mid-range."
 }
 ```
 
-### Defensive Rebound
+### Defensive Rebound Launching a Fast Break
 ```python
 {
-    "turn_count": 2,
+    "turn_count": 48,
     "result_type": "DREB",
-    "shooter_id": "player-123",
-    "shooter": "John Smith",
-    "time_elapsed": 1500,
-    "possession_team_id": "team-789",
-    "possession_flips": True,
-    "score": {"Team A": 2, "Team B": 0},
+    "shooter_id": "player-321",
+    "time_elapsed": 860,
+    "possession_team_id": "TEAM_AWAY",
+    "possession_flips": true,
+    "score": {"Home": 44, "Away": 40},
     "rebound_type": "DREB",
     "rebounder_id": "player-456",
-    "fast_break": True,
-    "animations": [...],
-    "events": []
-}
-```
-
-### Offensive Rebound with Putback
-```python
-{
-    "turn_count": 3,
-    "result_type": "OREB",
-    "shooter_id": "player-123",
-    "shooter": "John Smith",
-    "time_elapsed": 1200,
-    "possession_team_id": "team-456",
-    "possession_flips": False,
-    "score": {"Team A": 2, "Team B": 0},
-    "rebound_type": "OREB",
-    "rebounder_id": "player-789",
-    "putback_attempt": True,
+    "fast_break": true,
+    "next_play_type": "FAST_BREAK",
     "animations": [...],
     "events": [
-        {
-            "event_type": "PUTBACK_ATTEMPT",
-            "shooterId": "player-789",
-            "timeElapsed": 800,
-            "result": "MAKE",
-            "possession_flips": True
-        }
-    ]
+        {"event_type": "FAST_BREAK_START", "rebounderId": "player-456"}
+    ],
+    "text": "Doe pulls down the board and immediately looks to run."
 }
 ```
 
-### Free Throw (Made)
+### Free Throw (Missed – Defensive Rebound)
 ```python
 {
-    "turn_count": 4,
+    "turn_count": 52,
     "result_type": "FREE_THROW",
     "shooter_id": "player-123",
-    "shooter": "John Smith",
     "time_elapsed": 0,
-    "possession_team_id": "team-456",
-    "possession_flips": False,
-    "score": {"Team A": 3, "Team B": 0},
-    "attempts": ["MAKE"],
-    "ftContext": "REGULAR",
-    "animations": [...],
-    "events": []
-}
-```
-
-### Free Throw (Missed - Defensive Rebound)
-```python
-{
-    "turn_count": 5,
-    "result_type": "FREE_THROW",
-    "shooter_id": "player-123",
-    "shooter": "John Smith",
-    "time_elapsed": 0,
-    "possession_team_id": "team-456",
-    "possession_flips": True,
-    "score": {"Team A": 3, "Team B": 0},
+    "possession_team_id": "TEAM_HOME",
+    "possession_flips": true,
+    "score": {"Home": 45, "Away": 40},
     "attempts": ["DREB"],
-    "ftContext": "REGULAR",
+    "ftContext": {"ftIndex": 1, "ftTotal": 2, "bonusType": "REGULAR"},
     "rebound_type": "DREB",
     "rebounder_id": "player-789",
     "next_play_type": "HCO",
     "animations": [...],
-    "events": []
+    "events": [],
+    "text": "Smith misses the first, but the defense controls the glass."
 }
 ```
 
-### Free Throw (Missed - Offensive Rebound)
-```python
-{
-    "turn_count": 6,
-    "result_type": "FREE_THROW",
-    "shooter_id": "player-123",
-    "shooter": "John Smith",
-    "time_elapsed": 0,
-    "possession_team_id": "team-456",
-    "possession_flips": False,
-    "score": {"Team A": 3, "Team B": 0},
-    "attempts": ["OREB"],
-    "ftContext": "REGULAR",
-    "rebound_type": "OREB",
-    "rebounder_id": "player-456",
-    "animations": [...],
-    "events": []
-}
-```
+## Design Notes
 
-### Three-Pointer
-```python
-{
-    "turn_count": 5,
-    "result_type": "MAKE",
-    "shooter_id": "player-123",
-    "shooter": "John Smith",
-    "time_elapsed": 1800,
-    "possession_team_id": "team-456",
-    "possession_flips": True,
-    "score": {"Team A": 6, "Team B": 0},
-    "is_three_pointer": True,
-    "is_and_one": False,
-    "putback_attempt": False,
-    "animations": [...],
-    "events": []
-}
-```
+- **Authoritative scoring** – `turn.score` always reflects the official game
+  score. Even if a turn includes a `points` field (legacy helpers occasionally
+  add it), treat it as informational only.
+- **No generic "MISS"** – Missed shots resolve to either `DREB` or `OREB`. Use
+  `rebound_type` to differentiate defensive/offensive rebounds.
+- **Frontend annotations** – The frontend may append helper context (currently
+  `ftContext`). Do not mutate core fields that the backend controls.
+- **Telemetry** – With `window.DEBUG_ANIM = true` the Possession Runner emits
+  `possessionRunner:*` events to help reason about timeline stalls and FSM
+  transitions.
 
-## Implementation Notes
-
-- The `score` field is authoritative and should be used instead of calculating from individual turn points
-- The `result_type` field directly indicates the outcome without needing additional mapping
-- Every missed shot becomes either "DREB" or "OREB" - there is no generic "MISS" type
-- The `events` array contains complex animation logic that the frontend processes
-- All player references use UUIDs for consistency
-- Time values are in milliseconds
-- The backend generates `attempts` and `ftContext` for free throws
-- The frontend can derive additional context from the turn sequence and existing data
-
-## OREB Follow-Up System
-
-When an offensive rebound occurs, the system now generates **separate turns** instead of using events:
-
-### Turn 1: OREB
-```python
-{
-    "result_type": "OREB",
-    "rebounder_id": "player-uuid",
-    "rebound_type": "OREB",
-    "text": "Player grabs the offensive rebound",
-    "possession_flips": False
-}
-```
-
-### Turn 2: Follow-Up Action
-The backend automatically generates a follow-up turn with one of two outcomes:
-
-#### Putback Attempt
-```python
-{
-    "result_type": "MAKE" | "DREB" | "OREB",  # Outcome of putback
-    "shooter": "player-name",
-    "is_putback": True,
-    "text": "Player goes back up for the putback",
-    "points": 2,  # If made
-    "possession_flips": True  # If made
-}
-```
-
-#### Kickout Pass
-```python
-{
-    "result_type": "HCO",
-    "ball_handler": "player-name",
-    "is_kickout": True,
-    "text": "Player kicks it out to reset",
-    "pass": {
-        "fromCoords": {"x": 25, "y": 50},
-        "toCoords": {"x": 25, "y": 50},
-        "duration": 300
-    },
-    "possession_flips": False
-}
-```
-
-This approach provides:
-- **Architectural consistency** - All actions are turns
-- **Simpler data structure** - No complex events processing
-- **Better turn counting** - Each action gets proper turn_count
-- **Easier maintenance** - Clear turn boundaries
+Keep this document in sync whenever backend fields change so frontend and
+instrumentation work remain aligned.
