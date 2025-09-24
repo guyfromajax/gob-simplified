@@ -33,7 +33,7 @@ the result before it is serialised to JSON and sent to the client.
   "next_play_type": "HCO" | "FAST_BREAK" | "FREE_THROW" | null,
 
   // Free throw details (optional)
-  "attempts": ["MAKE", "DREB"],
+  "attempts": ["MAKE", "MISS"],
   "ftContext": { "ftIndex": 1, "ftTotal": 2, "bonusType": "REGULAR" },
 
   // Rebound information (optional)
@@ -104,7 +104,7 @@ into simple strings.
 
 ## Free Throw Metadata
 
-- **`attempts`** – Ordered results of each free throw (`MAKE`, `DREB`, `OREB`).
+- **`attempts`** – Ordered results of each free throw (`MAKE` or `MISS`).
 - **`ftContext`** – Added by `animateGameTurns.annotateFreeThrowTurns` to expose
   attempt index/total and bonus type for UI copy.
 
@@ -194,7 +194,7 @@ When an offensive rebound occurs, the backend now emits *two* turns:
     "possession_team_id": "TEAM_HOME",
     "possession_flips": true,
     "score": {"Home": 45, "Away": 40},
-    "attempts": ["DREB"],
+    "attempts": ["MISS"],
     "ftContext": {"ftIndex": 1, "ftTotal": 2, "bonusType": "REGULAR"},
     "rebound_type": "DREB",
     "rebounder_id": "player-789",
