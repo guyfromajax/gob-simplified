@@ -57,8 +57,8 @@ class TeamManager:
             "tempo": random.randint(0, 4),
             "aggression": random.randint(0, 4),
             "fast_break": random.randint(0, 4),
-            "half_court_trap": 0,
-            "full_court_press": 0,
+            "half_court_trap": 4,
+            "full_court_press": 4,
         }
 
     def _init_playcall_settings(self):
