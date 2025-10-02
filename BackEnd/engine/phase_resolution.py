@@ -726,19 +726,54 @@ def resolve_full_court_press_logic(game: "GameManager"):
     Returns turn data with FCP result and potential progression to HCO.
     """
     game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
+
+    text = "PRESS!"
+    offenseScore = 0
+    defenseScore = 0
+
+    for pos, player in off_lineup.items():
+        if pos == "PG":
+            offenseScore += 3 * (player.attributes["BH"] * player.attributes["AG"] * 0.2 + player.attributes["IQ"] * 0.2 + player.attributes["CH"] * 0.1)
+        elif pos in ["SG", "SF"]:
+            offenseScore += (player.attributes["BH"] * player.attributes["AG"] * 0.2 + player.attributes["IQ"] * 0.2 + player.attributes["CH"] * 0.1)
+    for pos, player in def_lineup.items():
+        if pos == "PG":
+            defenseScore += 3 * (player.attributes["BH"] * player.attributes["AG"] * 0.2 + player.attributes["IQ"] * 0.2 + player.attributes["CH"] * 0.1)
+        elif pos in ["SG", "SF"]:
+            defenseScore += (player.attributes["BH"] * player.attributes["AG"] * 0.2 + player.attributes["IQ"] * 0.2 + player.attributes["CH"] * 0.1)
     
-    # TODO: Implement FCP simulation logic
-    # For now, placeholder that defaults to HCO
-    # This will be expanded with actual FCP simulation
+    offenseScore *= random.randint(1, 6)
+    defenseScore *= random.randint(1, 6)
+    print("Inside resolve_full_court_press_logic")
+    print(f"offenseScore: {offenseScore}")
+    print(f"defenseScore: {defenseScore}")
+
+    if (offenseScore + 500) > defenseScore:
+        if offenseScore - defenseScore > 1000:
+            result_type = random.choices(["D_FOUL", "HCO", "SHOT"], weights=[0.5, 0.3, 0.2])[0]
+        else:
+            result_type = "HCO"
+    else:
+        result_type = random.choices(["O_FOUL", "DEAD_BALL_TURNOVER", "STEAL"], weights=[0.5, 0.3, 0.2])[0]
+    
+    text += " " + result_type
+
+    print(f"{text}")
     
     result = {
-        "result_type": "FCP",
-        "text": f"{def_team.name} applies full court pressure!\nPRESS!",
-        "next_play_type": "HCO",  # Default progression
+        "result_type": result_type,
+        "text": text,
+        "next_play_type": "HCO" if result_type in ["HCO", "SHOT"] else result_type,
         "ball_handler": off_lineup.get("PG", list(off_lineup.values())[0]),
         "defender": def_lineup.get("PG", list(def_lineup.values())[0]),
+        "shooter": off_lineup.get("PG", list(off_lineup.values())[0]),
+        "passer": "",
+        "screener": "",
+        "possession_flips": result_type in ["O_FOUL", "DEAD_BALL_TURNOVER", "STEAL"],
+        "events": []
     }
     
+    print(f"result: {result}")
     return result
 
 
@@ -748,17 +783,51 @@ def resolve_half_court_trap_logic(game: "GameManager"):
     Returns turn data with HCT result and potential progression to HCO.
     """
     game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
+
+    text = "TRAP!"
+    offenseScore = 0
+    defenseScore = 0
+
+    for pos, player in off_lineup.items():
+        if pos == "PG":
+            offenseScore += 3 * (player.attributes["BH"] * player.attributes["AG"] * 0.2 + player.attributes["IQ"] * 0.2 + player.attributes["CH"] * 0.1)
+        elif pos in ["SG", "SF"]:
+            offenseScore += (player.attributes["BH"] * player.attributes["AG"] * 0.2 + player.attributes["IQ"] * 0.2 + player.attributes["CH"] * 0.1)
+    for pos, player in def_lineup.items():
+        if pos == "PG":
+            defenseScore += 3 * (player.attributes["BH"] * player.attributes["AG"] * 0.2 + player.attributes["IQ"] * 0.2 + player.attributes["CH"] * 0.1)
+        elif pos in ["SG", "SF"]:
+            defenseScore += (player.attributes["BH"] * player.attributes["AG"] * 0.2 + player.attributes["IQ"] * 0.2 + player.attributes["CH"] * 0.1)
     
-    # TODO: Implement HCT simulation logic
-    # For now, placeholder that defaults to HCO
-    # This will be expanded with actual HCT simulation
+    offenseScore *= random.randint(1, 6)
+    defenseScore *= random.randint(1, 6)
+    print("Inside resolve_half_court_trap_logic")
+    print(f"offenseScore: {offenseScore}")
+    print(f"defenseScore: {defenseScore}")
+
+    if (offenseScore + 300) > defenseScore:
+        if offenseScore - defenseScore > 1000:
+            result_type = random.choices(["D_FOUL", "HCO", "SHOT"], weights=[0.5, 0.3, 0.2])[0]
+        else:
+            result_type = "HCO"
+    else:
+        result_type = random.choices(["O_FOUL", "DEAD_BALL_TURNOVER", "STEAL"], weights=[0.5, 0.3, 0.2])[0]
+    
+    text += " " + result_type
+
+    print(f"{text}")
     
     result = {
-        "result_type": "HCT", 
-        "text": f"{def_team.name} sets up a half court trap!\nTRAP!",
-        "next_play_type": "HCO",  # Default progression
+        "result_type": result_type,
+        "text": text,
+        "next_play_type": "HCO" if result_type in ["HCO", "SHOT"] else result_type,
         "ball_handler": off_lineup.get("PG", list(off_lineup.values())[0]),
         "defender": def_lineup.get("PG", list(def_lineup.values())[0]),
+        "shooter": off_lineup.get("PG", list(off_lineup.values())[0]),
+        "passer": "",
+        "screener": "",
+        "possession_flips": result_type in ["O_FOUL", "DEAD_BALL_TURNOVER", "STEAL"],
+        "events": []
     }
     
-    return result
+    print(f"result: {result}")
