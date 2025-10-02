@@ -569,7 +569,7 @@ def resolve_half_court_offense_logic(game):
     shot_result["animations"] = animator.capture_halfcourt_animation(roles)
     
     # Add skeleton data for unified animation system
-    shot_result["skeleton"] = get_skeleton_for_turn(shot_result.get("result_type", "HCO"), "HCO", game)
+    shot_result["skeleton"] = get_skeleton_for_turn(shot_result.get("result_type", "HCO"), "HCO", game) or {}
 
     # 4. scouting report update
     if shot_result["result_type"] == "MAKE":
@@ -775,7 +775,7 @@ def resolve_full_court_press_logic(game: "GameManager"):
         "screener": "",
         "possession_flips": result_type in ["O_FOUL", "DEAD_BALL_TURNOVER", "STEAL"],
         "events": [],
-        "skeleton": get_skeleton_for_turn(result_type, "FCP", game)
+        "skeleton": get_skeleton_for_turn(result_type, "FCP", game) or {}
     }
     
     print(f"result: {result}")
@@ -969,7 +969,7 @@ def resolve_half_court_trap_logic(game: "GameManager"):
         "screener": "",
         "possession_flips": result_type in ["O_FOUL", "DEAD_BALL_TURNOVER", "STEAL"],
         "events": [],
-        "skeleton": get_skeleton_for_turn(result_type, "HCT", game)
+        "skeleton": get_skeleton_for_turn(result_type, "HCT", game) or {}
     }
     
     print(f"result: {result}")
