@@ -1,4 +1,4 @@
-from BackEnd.constants import HCO_STRING_SPOTS, FCP_STRING_SPOTS, ACTIONS
+from BackEnd.constants import HCO_STRING_SPOTS, ACTIONS
 
 # HCO_STRING_SPOTS = {
 #     "key": {"x": 64, "y": 25},
