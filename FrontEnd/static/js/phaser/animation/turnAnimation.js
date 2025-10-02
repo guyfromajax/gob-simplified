@@ -11,9 +11,21 @@ import { attachBallToPlayer } from "./BallControllerAdapter.js";
 import { tweenBallTo, runPass, PASS_DEBUG, tweenPlayerTo } from "./ballTween.js";
 import animationConfig from "./animation_config.js";
 import { HOME_RIM_COORDS, AWAY_RIM_COORDS } from "./courtConstants.js";
+import { deriveOffenseContext, computeFastBreakOutletTarget } from "./outletUtils.js";
 import { DEBUG } from "../utils/debug.js";
-import { DebugFlags } from "../utils/debugFlags.js";
-import { States, getDebugTransitions, safeTransition, createTransitionGuard } from "../state/gameStateMachine.js";
+import {
+  DebugFlags,
+  animationDebugLog,
+  animationDebugWarn,
+  isAnimationDebugEnabled,
+} from "../utils/debugFlags.js";
+import {
+  States,
+  getDebugTransitions,
+  safeTransition,
+  createTransitionGuard,
+  transitionWithDebug,
+} from "../state/gameStateMachine.js";
 import {
   getPendingOwner,
   clearPendingOwner,
@@ -37,7 +49,7 @@ function updateBallOwnership({ scene, ballSprite, animations, playerSprites, ste
   if (scene.passInFlight) return;
 
   if (scene.ballDetached) {
-    if (PASS_DEBUG) console.log('ownershipSkipped', { stepIndex });
+    if (PASS_DEBUG) animationDebugLog('ownershipSkipped', { stepIndex });
     return;
   }
 
@@ -49,9 +61,9 @@ function updateBallOwnership({ scene, ballSprite, animations, playerSprites, ste
       ballSprite.setVisible(true);
       if (currentBallOwnerRef) currentBallOwnerRef.value = pendingSprite;
       setCurrentOwner(scene, pendingId);
-      if (PASS_DEBUG) console.log('ownershipUpdate', { target: pendingId, stepIndex });
+      if (PASS_DEBUG) animationDebugLog('ownershipUpdate', { target: pendingId, stepIndex });
     } else {
-      console.warn(`Missing sprite for pending ball owner ${pendingId}`);
+      animationDebugWarn(`Missing sprite for pending ball owner ${pendingId}`);
       const fallback = currentBallOwnerRef?.value;
       if (fallback && ballSprite?.setPosition) {
         ballSprite.setPosition(fallback.x, fallback.y);
@@ -73,7 +85,7 @@ function updateBallOwnership({ scene, ballSprite, animations, playerSprites, ste
     const sprite = playerSprites[anim.playerId];
     const hasBall = anim.hasBallAtStep?.[stepIndex];
     if (hasBall && !sprite) {
-      console.warn(`Missing sprite for player ${anim.playerId}`);
+      animationDebugWarn(`Missing sprite for player ${anim.playerId}`);
       if (ballSprite?.setVisible) ballSprite.setVisible(false);
       continue;
     }
@@ -81,7 +93,7 @@ function updateBallOwnership({ scene, ballSprite, animations, playerSprites, ste
       ballSprite.setPosition(sprite.x, sprite.y);
       ballSprite.setVisible(true);
       if (currentBallOwnerRef) currentBallOwnerRef.value = sprite;
-      if (PASS_DEBUG) console.log('ownershipUpdate', { target: anim.playerId, stepIndex });
+      if (PASS_DEBUG) animationDebugLog('ownershipUpdate', { target: anim.playerId, stepIndex });
       break;
     }
 
@@ -195,13 +207,13 @@ async function runSideInboundSetup({ scene, ballSprite, playerSprites, turnData 
           y,
           duration,
           ease,
-          onStart: () => console.log(`tweenStart:${pos}`),
+          onStart: () => animationDebugLog(`tweenStart:${pos}`),
           onComplete: () => {
-            console.log(`tweenEnd:${pos}`);
+            animationDebugLog(`tweenEnd:${pos}`);
             resolve();
           },
           onStop: () => {
-            console.log(`tweenEnd:${pos}`);
+            animationDebugLog(`tweenEnd:${pos}`);
             resolve();
           }
         });
@@ -226,23 +238,23 @@ async function runSideInboundSetup({ scene, ballSprite, playerSprites, turnData 
   const pgId = offenseIds["PG"];
   if (sfSprite) {
     attachBallToPlayer(scene, ballSprite, sfSprite);
-    console.log("ballAttach(SF)");
+    animationDebugLog("ballAttach(SF)");
 
-    console.log(`[sideInbound][holdStart] sf:${sfId} pg:${pgId}`);
+    animationDebugLog(`[sideInbound][holdStart] sf:${sfId} pg:${pgId}`);
     await new Promise((resolve) => scene.time.delayedCall(1000, resolve));
 
-    scene.events?.once('passStart', () => console.log('passStart'));
-    scene.events?.once('tweenStart', () => console.log('tweenStart'));
-    scene.events?.once('tweenEnd', () => console.log('tweenEnd'));
-    scene.events?.once('passEnd', () => console.log('passEnd'));
+    scene.events?.once('passStart', () => animationDebugLog('passStart'));
+    scene.events?.once('tweenStart', () => animationDebugLog('tweenStart'));
+    scene.events?.once('tweenEnd', () => animationDebugLog('tweenEnd'));
+    scene.events?.once('passEnd', () => animationDebugLog('passEnd'));
 
-    console.log(`[sideInbound][passStart] sf:${sfId} pg:${pgId}`);
+    animationDebugLog(`[sideInbound][passStart] sf:${sfId} pg:${pgId}`);
     if (pgSprite && !scene.stateMachine?.is(States.FastBreak)) {
       await runPass(scene, { fromId: sfId, toId: pgId, duration, easing: ease });
     }
-    console.log(`[sideInbound][passEnd] sf:${sfId} pg:${pgId}`);
+    animationDebugLog(`[sideInbound][passEnd] sf:${sfId} pg:${pgId}`);
     if (pgSprite) {
-      console.log(`[sideInbound][pgAttach] sf:${sfId} pg:${pgId}`);
+      animationDebugLog(`[sideInbound][pgAttach] sf:${sfId} pg:${pgId}`);
     }
     if (scene.stateMachine?.is(States.Inbound))
       safeTransition(
@@ -263,7 +275,7 @@ async function runSideInboundSetup({ scene, ballSprite, playerSprites, turnData 
 
 // Setup positions after a defensive rebound before new half-court offense or fast break
 async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebounderId, nextPlayType = "HCO" }) {
-  console.log('runDefensiveReboundSetup called with:', { rebounderId, nextPlayType });
+  animationDebugLog('runDefensiveReboundSetup called with:', { rebounderId, nextPlayType });
   if (!scene || !playerSprites || rebounderId == null) return;
 
   const rebounderSprite = playerSprites[rebounderId];
@@ -273,7 +285,7 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
   if (ballSprite) attachBallToPlayer(scene, ballSprite, rebounderSprite);
 
   if (scene.stateMachine?.is(States.Rebound)) {
-    if (DebugFlags?.FSM) console.log('FSM: Rebound -> OutletSetup');
+    if (DebugFlags?.FSM) animationDebugLog('FSM: Rebound -> OutletSetup');
     safeTransition(
       scene.stateMachine,
       States.OutletSetup,
@@ -284,8 +296,8 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
     );
   }
 
-  const basketGrid =
-    rebounderSprite.team === "home" ? HOME_RIM_COORDS : AWAY_RIM_COORDS;
+  const rebounderTeamKey = rebounderSprite.team;
+  const { newOffenseTeam, newOffenseBasket } = deriveOffenseContext(rebounderTeamKey);
   const width = scene.game.config.width;
   const height = scene.game.config.height;
 
@@ -322,7 +334,7 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
   
   // Debug logging for outlet pass setup
   if (DebugFlags?.OUTLET) {
-    console.log('Outlet setup debug:', {
+    animationDebugLog('Outlet setup debug:', {
       rebounderId,
       nextPlayType,
       outletReceiverId,
@@ -336,50 +348,45 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
 
   const promises = [];
   let outletTarget = null;
-  
+  let outletContext = null;
+
   if (outletReceiverId && outletReceiverId !== rebounderId && outletReceiverSprite) {
     if (nextPlayType === "FAST_BREAK") {
-      // For fast break: move outlet receiver 15-25 grid spots toward NEW offense basket
-      // The rebounder is on defense, so the new offense team is the opposite team
-      const newOffenseTeam = rebounderSprite.team === "home" ? "away" : "home";
-      const newOffenseBasket = newOffenseTeam === "home" ? HOME_RIM_COORDS : AWAY_RIM_COORDS;
-      const distance = Phaser.Math.Between(15, 25);
-      const direction = newOffenseBasket.x > rebGridX ? 1 : -1; // Move toward new offense basket
-      
-      // Apply team-specific constraints to move outlet receiver further down court
-      let minX = 4, maxX = 97;
-      if (outletReceiverSprite.team === "home") {
-        minX = 45; // Home team outlet receiver moves further down toward away basket (x ≥ 45)
-      } else {
-        maxX = 55; // Away team outlet receiver moves further down toward home basket (x ≤ 55)
-      }
-      
-      console.log('Fast break outlet receiver - moving further down court:', {
-        outletReceiverId,
-        team: outletReceiverSprite.team,
-        minX,
-        maxX,
-        originalTarget: rebGridX + direction * distance,
+      // For fast break: move outlet receiver 15-25 grid spots toward the new offense basket
+      const fastBreakPlan = computeFastBreakOutletTarget({
+        rebounderGridX: rebGridX,
+        rebounderGridY: rebGridY,
         newOffenseTeam,
         newOffenseBasket,
-        purpose: 'Create separation from other players by moving further down court'
+        randomDistance: () => Phaser.Math.Between(15, 25),
+        randomYOffset: () => Phaser.Math.Between(-8, 8),
+        clamp: Phaser.Math.Clamp,
       });
-      
-      outletTarget = {
-        x: Phaser.Math.Clamp(
-          rebGridX + direction * distance,
-          minX,
-          maxX
-        ),
-        y: Phaser.Math.Clamp(
-          rebGridY + Phaser.Math.Between(-8, 8),
-          1,
-          50
-        ),
+
+      const intendedX = rebGridX + fastBreakPlan.direction * fastBreakPlan.distance;
+
+      animationDebugLog('Fast break outlet receiver - moving toward attack rim:', {
+        outletReceiverId,
+        team: outletReceiverSprite.team,
+        bounds: fastBreakPlan.bounds,
+        intendedTarget: intendedX,
+        clampedTarget: fastBreakPlan.target.x,
+        newOffenseTeam,
+        rebounderTeam: rebounderSprite.team,
+        attackRim: newOffenseBasket,
+        purpose: 'Create separation from other players by moving toward transition lane'
+      });
+
+      outletTarget = fastBreakPlan.target;
+      outletContext = {
+        newOffenseTeam,
+        newOffenseBasket,
+        direction: fastBreakPlan.direction,
+        bounds: fastBreakPlan.bounds,
       };
     } else {
       // For HCO: move PG near the rebounder (current behavior)
-      const sign = basketGrid.x > rebGridX ? 1 : -1;
+      const sign = newOffenseBasket.x > rebGridX ? 1 : -1;
       outletTarget = {
         x: Phaser.Math.Clamp(
           rebGridX + sign * Phaser.Math.Between(3, 6),
@@ -392,8 +399,13 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
           50
         ),
       };
+      outletContext = {
+        newOffenseTeam,
+        newOffenseBasket,
+        direction: sign,
+      };
     }
-    
+
     const outletPx = gridToPixels(outletTarget.x, outletTarget.y, width, height);
     promises.push(
       tweenPlayerTo(scene, outletReceiverSprite, outletPx, {
@@ -401,11 +413,21 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
       })
     );
     
-    if (DebugFlags?.BALL) console.log('outletTarget', { outletReceiverId, outletTarget, nextPlayType });
-    if (DebugFlags?.OUTLET) console.log(`${nextPlayType} outlet receiver movement queued`);
+    if (DebugFlags?.BALL) {
+      animationDebugLog('outletTarget', {
+        outletReceiverId,
+        outletTarget,
+        nextPlayType,
+        newOffenseTeam,
+        rebounderTeam: rebounderSprite.team,
+        attackRimX: newOffenseBasket.x,
+        bounds: outletContext?.bounds,
+      });
+    }
+    if (DebugFlags?.OUTLET) animationDebugLog(`${nextPlayType} outlet receiver movement queued`);
   } else {
     if (DebugFlags?.OUTLET) {
-      console.log('Outlet pass skipped:', { 
+      animationDebugLog('Outlet pass skipped:', { 
         outletReceiverId, 
         rebounderId, 
         samePerson: outletReceiverId === rebounderId,
@@ -416,24 +438,22 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
 
   // For HCO scenarios, move all other players toward the new offense basket
   if (nextPlayType === "HCO") {
-    console.log('HCO scenario detected, moving other players toward new offense basket');
+    animationDebugLog('HCO scenario detected, moving other players toward new offense basket');
     // Determine the new offense basket
     // In defensive rebound: rebounder's team becomes the new offense team
-    const newOffenseTeam = rebounderSprite.team;
-    const newOffenseBasket = newOffenseTeam === "home" ? HOME_RIM_COORDS : AWAY_RIM_COORDS;
-    console.log('New offense basket:', newOffenseBasket, 'Rebounder team:', rebounderSprite.team, 'New offense team:', newOffenseTeam);
+    animationDebugLog('New offense basket:', newOffenseBasket, 'Rebounder team:', rebounderSprite.team, 'New offense team:', newOffenseTeam);
     
     // Debug: Check for extra sprites without playerInfo
-    console.log('Player sprites keys:', Object.keys(playerSprites));
-    console.log('Scene playerInfo keys:', Object.keys(scene.playerInfo || {}));
+    animationDebugLog('Player sprites keys:', Object.keys(playerSprites));
+    animationDebugLog('Scene playerInfo keys:', Object.keys(scene.playerInfo || {}));
     const extraSprites = Object.keys(playerSprites).filter(id => !scene.playerInfo?.[id]);
     if (extraSprites.length > 0) {
-      console.warn('EXTRA SPRITES DETECTED (no playerInfo):', extraSprites);
+      animationDebugWarn('EXTRA SPRITES DETECTED (no playerInfo):', extraSprites);
       // Hide these extra sprites
       extraSprites.forEach(id => {
         const sprite = playerSprites[id];
         if (sprite) {
-          console.log(`Hiding extra sprite: ${id}`, { team: sprite.team, position: { x: sprite.x, y: sprite.y } });
+          animationDebugLog(`Hiding extra sprite: ${id}`, { team: sprite.team, position: { x: sprite.x, y: sprite.y } });
           sprite.setVisible(false);
         }
       });
@@ -442,7 +462,7 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
     let playersMoved = 0;
     for (const [id, sprite] of Object.entries(playerSprites)) {
       const info = scene.playerInfo?.[id];
-      console.log(`Checking player ${id}:`, { 
+      animationDebugLog(`Checking player ${id}:`, { 
         hasInfo: !!info, 
         isRebounder: id === rebounderId, 
         isOutletReceiver: id === outletReceiverId,
@@ -451,7 +471,7 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
       });
       
       if (!info || id === rebounderId || id === outletReceiverId) {
-        console.log(`Skipping player ${id}`);
+        animationDebugLog(`Skipping player ${id}`);
         continue;
       }
       
@@ -465,7 +485,6 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
       // In defensive rebound: rebounder's team becomes the new offense team
       // If new offense team is home (basket at x=89), all players move right (increase x)
       // If new offense team is away (basket at x=11), all players move left (decrease x)
-      const newOffenseTeam = rebounderSprite.team; // Rebounder's team becomes new offense
       const direction = newOffenseTeam === "home" ? 1 : -1;
       
       const targetGrid = {
@@ -489,11 +508,11 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
       );
       
       playersMoved++;
-      console.log(`HCO player movement: ${id} from (${currentGridX.toFixed(1)}, ${currentGridY.toFixed(1)}) to (${targetGrid.x}, ${targetGrid.y}) [direction: ${direction}, newOffenseTeam: ${newOffenseTeam}]`);
+      animationDebugLog(`HCO player movement: ${id} from (${currentGridX.toFixed(1)}, ${currentGridY.toFixed(1)}) to (${targetGrid.x}, ${targetGrid.y}) [direction: ${direction}, newOffenseTeam: ${newOffenseTeam}]`);
     }
-    console.log(`Total players moved for HCO: ${playersMoved}`);
+    animationDebugLog(`Total players moved for HCO: ${playersMoved}`);
   } else {
-    console.log('Not HCO scenario, nextPlayType:', nextPlayType);
+    animationDebugLog('Not HCO scenario, nextPlayType:', nextPlayType);
   }
 
   await Promise.all(promises);
@@ -507,8 +526,15 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
       nextPlayType,
       startedAt: Date.now(),
     };
-    if (DebugFlags?.OUTLET) console.log(outletLog);
-    if (DebugFlags?.OUTLET) console.log('Starting outlet pass animation...');
+    if (outletContext) {
+      outletLog.newOffenseTeam = outletContext.newOffenseTeam;
+      outletLog.attackRim = outletContext.newOffenseBasket;
+    } else {
+      outletLog.newOffenseTeam = newOffenseTeam;
+      outletLog.attackRim = newOffenseBasket;
+    }
+    if (DebugFlags?.OUTLET) animationDebugLog(outletLog);
+    if (DebugFlags?.OUTLET) animationDebugLog('Starting outlet pass animation...');
     await runPass(scene, {
       fromId: rebounderId,
       toId: outletReceiverId,
@@ -518,13 +544,13 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
         setPendingOwner(scene, outletReceiverId);
         setCurrentOwner(scene, outletReceiverId);
         outletLog.completedAt = Date.now();
-        if (DebugFlags?.OUTLET) console.log(outletLog);
-        if (DebugFlags?.OUTLET) console.log('Outlet pass completed!');
+        if (DebugFlags?.OUTLET) animationDebugLog(outletLog);
+        if (DebugFlags?.OUTLET) animationDebugLog('Outlet pass completed!');
       }
     });
   } else {
     if (DebugFlags?.OUTLET) {
-      console.log('Outlet pass not executed:', { 
+      animationDebugLog('Outlet pass not executed:', { 
         outletReceiverId, 
         rebounderId, 
         samePerson: outletReceiverId === rebounderId,
@@ -534,7 +560,7 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
   }
 
   if (scene.stateMachine?.is(States.OutletSetup)) {
-    if (DebugFlags?.FSM) console.log('FSM: OutletSetup -> HalfCourt');
+    if (DebugFlags?.FSM) animationDebugLog('FSM: OutletSetup -> HalfCourt');
     safeTransition(
       scene.stateMachine,
       States.HalfCourt,
@@ -561,18 +587,18 @@ async function runInboundSetup({
   homeTeamId,
   awayTeamId
 }) {
-  console.log('runInboundSetup called:', {
+  animationDebugLog('runInboundSetup called:', {
     newOffenseSide,
     currentState: scene.stateMachine?.state,
     isFreeThrow: scene?.stateMachine?.is(States.FreeThrow)
   });
   
   if (scene?.stateMachine?.is(States.FreeThrow)) {
-    console.log('runInboundSetup blocked - FreeThrow state');
+    animationDebugLog('runInboundSetup blocked - FreeThrow state');
     return;
   }
   
-  console.log('runInboundSetup proceeding - not blocked by FreeThrow state');
+  animationDebugLog('runInboundSetup proceeding - not blocked by FreeThrow state');
   scene.isInboundSetup = true;
   if (!scene.stateMachine?.is(States.Inbound)) {
     safeTransition(
@@ -703,7 +729,7 @@ async function runInboundSetup({
     scene.isInboundSetup = false;
     return;
   }
-  console.log(
+  animationDebugLog(
     `[inbound][score][${newOffenseSide}] sf:${sfId} pg:${pgId} sg:${sgId} pf:${pfId} c:${cId}`
   );
 
@@ -712,13 +738,13 @@ async function runInboundSetup({
   const spotPx = gridToPixels(ballSpot.x, ballSpot.y, width, height);
 
   const pgDestPx = gridToPixels(inboundDest.PG.x, inboundDest.PG.y, width, height);
-  console.log(`inboundDest assigned for PG: (${pgDestPx.x},${pgDestPx.y})`);
+  animationDebugLog(`inboundDest assigned for PG: (${pgDestPx.x},${pgDestPx.y})`);
   const sgDestPx = gridToPixels(inboundDest.SG.x, inboundDest.SG.y, width, height);
-  console.log(`inboundDest assigned for SG: (${sgDestPx.x},${sgDestPx.y})`);
+  animationDebugLog(`inboundDest assigned for SG: (${sgDestPx.x},${sgDestPx.y})`);
   const pfDestPx = gridToPixels(inboundDest.PF.x, inboundDest.PF.y, width, height);
-  console.log(`inboundDest assigned for PF: (${pfDestPx.x},${pfDestPx.y})`);
+  animationDebugLog(`inboundDest assigned for PF: (${pfDestPx.x},${pfDestPx.y})`);
   const cDestPx = gridToPixels(inboundDest.C.x, inboundDest.C.y, width, height);
-  console.log(`inboundDest assigned for C: (${cDestPx.x},${cDestPx.y})`);
+  animationDebugLog(`inboundDest assigned for C: (${cDestPx.x},${cDestPx.y})`);
 
   if (scene.tweens) {
     scene.tweens.killTweensOf(ballSprite);
@@ -731,19 +757,19 @@ async function runInboundSetup({
 
   ballSprite.setPosition(rimPx.x, rimPx.y);
   ballSprite.setVisible(true);
-  console.log(`[inbound][rimHoldEnd][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
-  console.log(`[inbound][ballTweenStart][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
+  animationDebugLog(`[inbound][rimHoldEnd][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
+  animationDebugLog(`[inbound][ballTweenStart][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
   let ballTween;
   if (animationConfig.enableBallTween) {
     ballTween = tweenBallTo(scene, ballSprite, spotPx, {
       duration: 500,
       easing: "Sine.easeInOut"
     }).then(() => {
-      console.log(`[inbound][ballTweenEnd][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
+      animationDebugLog(`[inbound][ballTweenEnd][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
     });
   } else {
     ballSprite.setPosition(spotPx.x, spotPx.y);
-    console.log(`[inbound][ballTweenEnd][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
+    animationDebugLog(`[inbound][ballTweenEnd][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
     ballTween = Promise.resolve();
   }
 
@@ -755,18 +781,18 @@ async function runInboundSetup({
       duration: 500,
       ease: "Sine.easeInOut",
       onComplete: () => {
-        console.log(`[inbound][sfTweenEnd][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
+        animationDebugLog(`[inbound][sfTweenEnd][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
         resolve();
       },
       onStop: () => {
-        console.log(`[inbound][sfTweenEnd][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
+        animationDebugLog(`[inbound][sfTweenEnd][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
         resolve();
       }
     });
   });
 
   const pgTween = new Promise((resolve) => {
-    console.log("pgTween start");
+    animationDebugLog("pgTween start");
     scene.tweens.add({
       targets: pgSprite,
       x: pgDestPx.x,
@@ -774,11 +800,11 @@ async function runInboundSetup({
       duration: 500,
       ease: "Sine.easeInOut",
       onComplete: () => {
-        console.log("pgTween end");
+        animationDebugLog("pgTween end");
         resolve();
       },
       onStop: () => {
-        console.log("pgTween end");
+        animationDebugLog("pgTween end");
         resolve();
       }
     });
@@ -786,7 +812,7 @@ async function runInboundSetup({
 
   const sgTween = sgSprite
     ? new Promise((resolve) => {
-        console.log("sgTween start");
+        animationDebugLog("sgTween start");
         scene.tweens.add({
           targets: sgSprite,
           x: sgDestPx.x,
@@ -794,11 +820,11 @@ async function runInboundSetup({
           duration: 500,
           ease: "Sine.easeInOut",
           onComplete: () => {
-            console.log("sgTween end");
+            animationDebugLog("sgTween end");
             resolve();
           },
           onStop: () => {
-            console.log("sgTween end");
+            animationDebugLog("sgTween end");
             resolve();
           }
         });
@@ -807,7 +833,7 @@ async function runInboundSetup({
 
   const pfTween = pfSprite
     ? new Promise((resolve) => {
-        console.log("pfTween start");
+        animationDebugLog("pfTween start");
         scene.tweens.add({
           targets: pfSprite,
           x: pfDestPx.x,
@@ -815,11 +841,11 @@ async function runInboundSetup({
           duration: 500,
           ease: "Sine.easeInOut",
           onComplete: () => {
-            console.log("pfTween end");
+            animationDebugLog("pfTween end");
             resolve();
           },
           onStop: () => {
-            console.log("pfTween end");
+            animationDebugLog("pfTween end");
             resolve();
           }
         });
@@ -828,7 +854,7 @@ async function runInboundSetup({
 
   const cTween = cSprite
     ? new Promise((resolve) => {
-        console.log("cTween start");
+        animationDebugLog("cTween start");
         scene.tweens.add({
           targets: cSprite,
           x: cDestPx.x,
@@ -836,11 +862,11 @@ async function runInboundSetup({
           duration: 500,
           ease: "Sine.easeInOut",
           onComplete: () => {
-            console.log("cTween end");
+            animationDebugLog("cTween end");
             resolve();
           },
           onStop: () => {
-            console.log("cTween end");
+            animationDebugLog("cTween end");
             resolve();
           }
         });
@@ -857,10 +883,10 @@ async function runInboundSetup({
     cTween
   ]);
 
-  console.log(`[inbound][ballAttach][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
+  animationDebugLog(`[inbound][ballAttach][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
   attachBallToPlayer(scene, ballSprite, sfSprite);
 
-  console.log(`[inbound][holdStart][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
+  animationDebugLog(`[inbound][holdStart][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
   await new Promise((resolve) => scene.time.delayedCall(1000, resolve));
 
   if (scene.tweens) {
@@ -868,13 +894,13 @@ async function runInboundSetup({
     scene.tweens.killTweensOf(pgSprite);
   }
 
-  scene.events?.once('passStart', () => console.log('passStart'));
-  scene.events?.once('tweenStart', () => console.log('tweenStart'));
-  scene.events?.once('tweenEnd', () => console.log('tweenEnd'));
-  scene.events?.once('passEnd', () => console.log('passEnd'));
+  scene.events?.once('passStart', () => animationDebugLog('passStart'));
+  scene.events?.once('tweenStart', () => animationDebugLog('tweenStart'));
+  scene.events?.once('tweenEnd', () => animationDebugLog('tweenEnd'));
+  scene.events?.once('passEnd', () => animationDebugLog('passEnd'));
 
-  console.log(`[inbound][passStart][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
-  console.log(`[inbound][stateCheck] current state: ${scene.stateMachine?.state}, isFastBreak: ${scene.stateMachine?.is(States.FastBreak)}`);
+  animationDebugLog(`[inbound][passStart][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
+  animationDebugLog(`[inbound][stateCheck] current state: ${scene.stateMachine?.state}, isFastBreak: ${scene.stateMachine?.is(States.FastBreak)}`);
   
   // Allow inbound pass regardless of current state (including FastBreak)
   await runPass(scene, {
@@ -883,8 +909,8 @@ async function runInboundSetup({
     duration: 500,
     easing: "Sine.easeInOut"
   });
-  console.log(`[inbound][passEnd][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
-  console.log(`[inbound][pgAttach][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
+  animationDebugLog(`[inbound][passEnd][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
+  animationDebugLog(`[inbound][pgAttach][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
 
   if (scene.stateMachine?.is(States.Inbound))
     safeTransition(
@@ -968,14 +994,14 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   }
 
   // ✅ NEW: Lock ball ownership to correct player at step
-  console.log("🟡 inside playTurnAnimation → ");
+  animationDebugLog("🟡 inside playTurnAnimation → ");
   //print turnData here in the console logs
-  console.log("turnData", turnData);
-  // console.log("turnData.animations", turnData.animations);
-  // console.log("turnData.possession_team_id", turnData.possession_team_id);
-  // console.log("turnData.animations[0].hasBallAtStep", turnData.animations[0].hasBallAtStep);
-  // console.log("turnData.animations[0].playerId", turnData.animations[0].playerId);
-  // console.log("turnData.animations[0].movement", turnData.animations[0].movement);
+  animationDebugLog("turnData", turnData);
+  // animationDebugLog("turnData.animations", turnData.animations);
+  // animationDebugLog("turnData.possession_team_id", turnData.possession_team_id);
+  // animationDebugLog("turnData.animations[0].hasBallAtStep", turnData.animations[0].hasBallAtStep);
+  // animationDebugLog("turnData.animations[0].playerId", turnData.animations[0].playerId);
+  // animationDebugLog("turnData.animations[0].movement", turnData.animations[0].movement);
   updateBallOwnership({
     scene,
     ballSprite,
@@ -1018,9 +1044,9 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
       const rawDuration = (nextStep.timestamp - step.timestamp) * 3;
       const duration = Math.min(MAX_STEP_DURATION, rawDuration);
 
-      DEBUG && console.log('[turn]', turnData?.id, step.timestamp, nextStep.timestamp, duration);
+      DEBUG && animationDebugLog('[turn]', turnData?.id, step.timestamp, nextStep.timestamp, duration);
       if (duration <= 0) {
-        console.warn('[turn] Non-positive duration', { turnId: turnData?.id, step, nextStep });
+        animationDebugWarn('[turn] Non-positive duration', { turnId: turnData?.id, step, nextStep });
         if (typeof window !== 'undefined') {
           window.__badStepPayloads = window.__badStepPayloads || [];
           window.__badStepPayloads.push({ turnId: turnData?.id, step, nextStep });
@@ -1064,11 +1090,17 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
         shooterPos,
         shooterId: shotInfo.playerId,
         shooterTeamId,
-        homeTeamId
+        homeTeamId,
+        stepIndex: shotInfo.stepIndex,
+        turnIndex: scene.currentTurn
       };
       if (SHOT_DEBUG) {
-        shootParams.stepIndex = shotInfo.stepIndex;
-        shootParams.turnIndex = scene.currentTurn;
+        animationDebugLog("shootParams", {
+          stepIndex: shootParams.stepIndex,
+          turnIndex: shootParams.turnIndex,
+          shooterId: shootParams.shooterId,
+          result: shootParams.result,
+        });
       }
       const shotResult = await shootBall(shootParams);
       const ballSpot = shotResult?.grid;
@@ -1128,7 +1160,8 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
                       turnData.rebound_type !== "DREB" &&
                       scene.stateMachine?.is(States.Rebound)
                     ) {
-                      scene.stateMachine?.transition(
+                      transitionWithDebug(
+                        scene.stateMachine,
                         States.HalfCourt,
                         getDebugTransitions() && {
                           stepIndex: shotInfo?.stepIndex,

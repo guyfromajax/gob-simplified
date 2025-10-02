@@ -6,7 +6,7 @@ import { HOME_RIM_COORDS, AWAY_RIM_COORDS } from "./courtConstants.js";
 import { bounceFromRim } from "./ballManager.js";
 import { States, safeTransition, createTransitionGuard } from "../state/gameStateMachine.js";
 import { getCurrentOwner, getPendingOwner } from "../ball/ballController.js";
-import { DebugFlags } from "../utils/debugFlags.js";
+import { DebugFlags, animationDebugLog } from "../utils/debugFlags.js";
 
 function wait(scene, ms) {
   if (!ms) return Promise.resolve();
@@ -143,11 +143,16 @@ export async function runFreeThrowSequence(
         : AWAY_RIM_COORDS);
     const rimPx = gridToPixels(rimGrid.x, rimGrid.y, width, height);
     scene.events?.emit("ft:shotStart");
-    await tween(scene, ballSprite, rimPx, {
+    const shotTweenOptions = {
       duration: animationConfig.freeThrow.shotMs,
       easing: "Sine.easeInOut",
-      arc: null, // Straight line path instead of arc
-    });
+    };
+
+    shotTweenOptions.arc = animationConfig.freeThrow.useArc
+      ? { height: animationConfig.freeThrow.arcHeight }
+      : { height: animationConfig.freeThrow.arcHeight, enabled: false };
+
+    await tween(scene, ballSprite, rimPx, shotTweenOptions);
 
     scene.events?.emit(result === "MAKE" ? "ft:make" : "ft:miss");
     await wait(scene, animationConfig.freeThrow.rimHoldMs);
@@ -166,7 +171,11 @@ export async function runFreeThrowSequence(
         }
       }
       if (isFinalFT) {
-        const possessionChanged = turnData.possession_flips;
+        const possessionChanged =
+          turnData.possession_flips ??
+          (turnData.possession_team_id != null &&
+            turnData.offense_team_id != null &&
+            turnData.possession_team_id !== turnData.offense_team_id);
         if (possessionChanged) {
           safeTransition(
             scene.stateMachine,
@@ -194,7 +203,7 @@ export async function runFreeThrowSequence(
             : turnData.offense_team_id;
           const expectedNewOffenseSide = resolveOffenseSide(scene, expectedNewOffenseTeamId);
           
-          console.log('Final free throw made - inbound setup:', {
+          animationDebugLog('Final free throw made - inbound setup:', {
             possession_flips: possessionChanged,
             original_offense_team_id: turnData.offense_team_id,
             possession_team_id: turnData.possession_team_id,
@@ -208,7 +217,7 @@ export async function runFreeThrowSequence(
           });
           
           // Let's also check what the current scene offense team is
-          console.log('Scene offense team info:', {
+          animationDebugLog('Scene offense team info:', {
             scene_offenseTeamId: scene.offenseTeamId,
             scene_simData: scene.simData
           });
@@ -294,7 +303,7 @@ export async function runFreeThrowSequence(
           next_play_type: turnData.next_play_type
         };
         
-        console.log('Free throw missed - defensive rebound setup:', {
+        animationDebugLog('Free throw missed - defensive rebound setup:', {
           rebounderId: reboundData.rebounderId,
           rebound_type: reboundData.rebound_type,
           next_play_type: reboundData.next_play_type,
@@ -355,7 +364,7 @@ export async function runFreeThrowSequence(
       }
     }
     if (DebugFlags?.FSM) {
-      console.log({
+      animationDebugLog({
         state: States.FreeThrow,
         ftIndex,
         ftTotal,
