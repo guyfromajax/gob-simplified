@@ -197,6 +197,8 @@ def simulate_quarter(
 
     return gm
 
+#minor change for new push
+
 def initialize_team_attributes():
     settings = {}
     for team in ["Lancaster", "Bentley-Truman"]:
@@ -404,7 +406,16 @@ def run_simulation(home_team_name, away_team_name, home_lineup_ids=None, away_li
     """
 
     gm = GameManager(home_team_name, away_team_name)
-    
+
+    # Ensure default lineups exist before the opening tip so tip-off logic and
+    # tests that patch ``build_lineup_from_mongo`` have actual players to work
+    # with. ``simulate_quarter`` will reuse these lineups unless explicit ids
+    # are provided.
+    if not gm.home_team.lineup:
+        gm.home_team.lineup = build_lineup_from_mongo(gm.home_team)
+    if not gm.away_team.lineup:
+        gm.away_team.lineup = build_lineup_from_mongo(gm.away_team)
+
     # Execute opening tip logic
     gm.setup_opening_tip()
 

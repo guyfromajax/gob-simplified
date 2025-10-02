@@ -15,6 +15,13 @@ class Player:
         self.last_name = data["last_name"]
         self.name = f"{self.first_name} {self.last_name}"
         self.team = data.get("team")
+        # Expose common biographical fields directly so downstream logic can
+        # reference them without depending on the ``attributes`` payload. Many
+        # tests construct lightweight player dictionaries (or patch lineup
+        # builders) that omit a dedicated attribute block, so default to a
+        # reasonable value when ``height``/``weight`` are missing.
+        self.height = data.get("height", data.get("HT", 75))
+        self.weight = data.get("weight", data.get("WT", 200))
         self.attributes = self._extract_attributes(data)
         self.jersey = data.get("jersey", 0)
         self.year = data.get("year", "")

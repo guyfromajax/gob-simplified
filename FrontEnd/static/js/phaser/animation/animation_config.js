@@ -6,6 +6,15 @@ const defaults = {
     easing: 'Sine.easeInOut',
     arc: null,
   },
+  possession: {
+    targetFrameMs: 320,
+    minFrameMs: 120,
+    maxFrameMs: 900,
+    minDurationScale: 0.35,
+    maxDurationScale: 6,
+    minPassDurationMs: 160,
+    maxPassDurationMs: 750,
+  },
   inbound: {
     duration: 150,
     easing: 'Sine.easeInOut',
@@ -38,6 +47,7 @@ const defaults = {
     lineupMoveMs: 800,
     shooterPrepMs: 400,
     shotMs: 500,
+    useArc: false,
     arcHeight: 40,
     rimHoldMs: 300,
   },
@@ -53,6 +63,11 @@ const defaults = {
   },
   offensiveRebound: { pauseMs: 1000 },
   putback: { duration: 500, easing: 'Sine.easeInOut' },
+  possession: {
+    msPerTick: 1,
+    minFrameDurationMs: 120,
+    minPassDurationMs: 150,
+  },
 };
 
 const overrides =
@@ -67,6 +82,7 @@ export const FAST_BREAK_END_PAUSE_MS =
 export const animationConfig = {
   enableBallTween: overrides.enableBallTween ?? defaults.enableBallTween,
   pass: { ...defaults.pass, ...(overrides.pass || {}) },
+  possession: { ...defaults.possession, ...(overrides.possession || {}) },
   inbound: { ...defaults.inbound, ...(overrides.inbound || {}) },
   kickout: { ...defaults.kickout, ...(overrides.kickout || {}) },
   steal: { ...defaults.steal, ...(overrides.steal || {}) },
@@ -87,6 +103,18 @@ export const animationConfig = {
     ...(overrides.offensiveRebound || {}),
   },
   putback: { ...defaults.putback, ...(overrides.putback || {}) },
+  possession: {
+    msPerTick: overrides.possession?.msPerTick ?? defaults.possession.msPerTick,
+    minFrameDurationMs:
+      overrides.possession?.minFrameDurationMs ??
+      overrides.possession?.minDurationMs ??
+      defaults.possession.minFrameDurationMs,
+    minPassDurationMs:
+      overrides.possession?.minPassDurationMs ??
+      overrides.possession?.minFrameDurationMs ??
+      overrides.possession?.minDurationMs ??
+      defaults.possession.minPassDurationMs,
+  },
 };
 
 animationConfig.outletSetup = {

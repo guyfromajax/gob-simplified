@@ -4,11 +4,22 @@ import { attachBallToPlayer } from "./BallControllerAdapter.js";
 import { tweenBallTo, tweenPlayerTo, runPass } from "./ballTween.js";
 import animationConfig, { FAST_BREAK_END_PAUSE_MS } from "./animation_config.js";
 import { HOME_RIM_COORDS, AWAY_RIM_COORDS, HOME_TOP_KEY, AWAY_TOP_KEY } from "./courtConstants.js";
-import { States, getDebugTransitions } from "../state/gameStateMachine.js";
+import {
+  States,
+  safeTransition,
+  getDebugTransitions,
+} from "../state/gameStateMachine.js";
 import { getCurrentOwner } from "../ball/ballController.js";
 import { createAnimationTimeline } from "./animationTimeline.js";
 import { runInboundSetup } from "./turnAnimation.js";
-import { DebugFlags } from "../utils/debugFlags.js";
+import {
+  DebugFlags,
+  animationDebugLog,
+  animationDebugWarn,
+  isAnimationDebugEnabled,
+} from "../utils/debugFlags.js";
+import { getSceneStepLogger } from "./debugStepLogger.js";
+import { appendToTextScroll } from "../utils/textScroll.js";
 
 // Timeline-driven fast break sequence. Handles the initial sprint phase via a
 // Phaser timeline so all player movements can be cancelled together if
@@ -20,12 +31,197 @@ function fastBreakEndPause(scene) {
   return new Promise((resolve) => scene.time.delayedCall(delay, resolve));
 }
 
-export async function runFastBreakSequence({ scene, turnData, playerSprites, ballSprite }) {
+function mergePayload(base, extra) {
+  const normalizedBase = base != null ? base : undefined;
+  if (!extra) return normalizedBase;
+  if (!normalizedBase) return { ...extra };
+  return { ...normalizedBase, ...extra };
+}
+
+function computeFastBreakHopPath(start, target) {
+  if (!target || start === target) return [];
+
+  if (target === States.FastBreakOutlet) {
+    switch (start) {
+      case States.FastBreakOutlet:
+        return [];
+      case States.Rebound:
+        return [States.FastBreakOutlet];
+      case States.FastBreak:
+      case States.ShotAttempt:
+        return [States.Rebound, States.FastBreakOutlet];
+      case States.HalfCourt:
+        return [States.FastBreak, States.Rebound, States.FastBreakOutlet];
+      case States.Inbound:
+        return [
+          States.HalfCourt,
+          States.FastBreak,
+          States.Rebound,
+          States.FastBreakOutlet,
+        ];
+      case States.OutletSetup:
+        return [
+          States.HalfCourt,
+          States.FastBreak,
+          States.Rebound,
+          States.FastBreakOutlet,
+        ];
+      case States.Turnover:
+        return [States.FastBreak, States.Rebound, States.FastBreakOutlet];
+      default:
+        return [States.Rebound, States.FastBreakOutlet];
+    }
+  }
+
+  if (target === States.FastBreak) {
+    switch (start) {
+      case States.FastBreak:
+        return [];
+      case States.FastBreakOutlet:
+        return [States.FastBreak];
+      case States.Rebound:
+        return [States.FastBreak];
+      case States.ShotAttempt:
+        return [States.Rebound, States.FastBreak];
+      case States.HalfCourt:
+        return [States.FastBreak];
+      case States.Inbound:
+        return [States.HalfCourt, States.FastBreak];
+      case States.OutletSetup:
+        return [States.HalfCourt, States.FastBreak];
+      case States.Turnover:
+        return [States.FastBreak];
+      default:
+        return [States.FastBreak];
+    }
+  }
+
+  return [target];
+}
+
+function runFastBreakTransition(scene, target, options = {}) {
+  const machine = scene?.stateMachine;
+  if (!machine || !target) return;
+
+  const startState = machine.state;
+  const path = computeFastBreakHopPath(startState, target);
+  if (!path.length) return;
+
+  const {
+    debugStepIndex = null,
+    context,
+    applyContextToAllSteps = false,
+  } = options;
+
+  const debugTransitionsEnabled = getDebugTransitions();
+  const debugPayload =
+    debugTransitionsEnabled && debugStepIndex != null
+      ? { stepIndex: debugStepIndex }
+      : undefined;
+
+  let blocked = false;
+
+  for (let index = 0; index < path.length; index++) {
+    const step = path[index];
+    if (machine.state === step) continue;
+
+    const prevState = machine.state;
+    const includeContext = applyContextToAllSteps || index === path.length - 1;
+    const payload = includeContext
+      ? mergePayload(context, debugPayload)
+      : debugPayload;
+
+    safeTransition(machine, step, payload);
+
+    if (machine.state === prevState) {
+      blocked = true;
+      animationDebugWarn("fastBreak: blocked transition", {
+        start: startState,
+        target,
+        attempted: step,
+        fromState: prevState,
+        current: machine.state,
+      });
+      break;
+    }
+  }
+
+  const expectedFinal = path[path.length - 1];
+  if (!blocked && machine.state !== expectedFinal) {
+    animationDebugWarn("fastBreak: final state mismatch", {
+      start: startState,
+      target,
+      expected: expectedFinal,
+      current: machine.state,
+    });
+  }
+}
+
+export async function runFastBreakSequence({
+  scene,
+  turnData,
+  playerSprites,
+  ballSprite,
+  turnIndex = null,
+}) {
   if (!scene || !turnData || scene.skipToEnd) return;
   if (!scene.ballSprite) scene.ballSprite = ballSprite;
   const animations = turnData.animations || [];
   const width = scene.game.config.width;
   const height = scene.game.config.height;
+  const debugEnabled = isAnimationDebugEnabled();
+  const stepLogger = debugEnabled ? getSceneStepLogger(scene) : null;
+  const possessionId =
+    turnData.possession_id ?? turnData.possessionId ?? turnData.possessionID ?? null;
+
+  const fastBreakTurnKey =
+    turnIndex ??
+    turnData.id ??
+    turnData.turn_id ??
+    turnData.turnId ??
+    null;
+
+  if (fastBreakTurnKey != null) {
+    if (scene.__fastBreakBannerTurnKey !== fastBreakTurnKey) {
+      scene.__fastBreakBannerTurnKey = fastBreakTurnKey;
+      scene.__fastBreakBannerLoggedThisTurn = false;
+    }
+  } else {
+    scene.__fastBreakBannerTurnKey = null;
+    scene.__fastBreakBannerLoggedThisTurn = false;
+  }
+
+  if (debugEnabled && stepLogger) {
+    const maxSteps = Math.max(
+      0,
+      ...animations.map(anim => anim.movement?.length || 0)
+    );
+    for (let stepIndex = 0; stepIndex < maxSteps; stepIndex++) {
+      const payload = {
+        phase: "fastBreak",
+        turnIndex,
+        possessionId,
+        turnId: turnData.id ?? turnData.turn_id ?? null,
+        stepIndex,
+        timestamp: null,
+        actions: [],
+      };
+      for (const anim of animations) {
+        const step = anim.movement?.[stepIndex];
+        if (!step) continue;
+        if (payload.timestamp == null && typeof step.timestamp === "number") {
+          payload.timestamp = step.timestamp;
+        }
+        payload.actions.push({
+          playerId: anim.playerId ?? anim.player_id ?? null,
+          action: step.action || null,
+        });
+      }
+      if (payload.actions.length) {
+        stepLogger.logStep(payload);
+      }
+    }
+  }
 
   // stop any existing timeline/tweens
   if (scene.__activeTimeline) {
@@ -36,10 +232,18 @@ export async function runFastBreakSequence({ scene, turnData, playerSprites, bal
   if (turnData.roles?.outlet_passer) {
     // Ensure we're in a valid state for fast break transition
     if (scene.stateMachine?.is(States.Inbound)) {
-      console.log('Fast break: correcting state from Inbound to Rebound before FastBreakOutlet transition');
-      scene.stateMachine?.transition(States.Rebound, getDebugTransitions() && { stepIndex: 0 });
+      if (debugEnabled)
+        animationDebugLog('Fast break: correcting state from Inbound to Rebound before FastBreakOutlet transition');
     }
-    scene.stateMachine?.transition(States.FastBreakOutlet, getDebugTransitions() && { stepIndex: 0 });
+    runFastBreakTransition(scene, States.FastBreakOutlet, { debugStepIndex: 0 });
+
+    if (!scene.__fastBreakBannerLoggedThisTurn) {
+      if (typeof window !== "undefined" && window.TEXT_SCROLL_ENABLED) {
+        appendToTextScroll("FAST BREAK!");
+      }
+      scene.__fastBreakBannerLoggedThisTurn = true;
+    }
+
     const passerId = turnData.roles.outlet_passer;
     const receiverId = turnData.roles.outlet_receiver;
     const passerSprite   = playerSprites[passerId];
@@ -70,15 +274,29 @@ export async function runFastBreakSequence({ scene, turnData, playerSprites, bal
       if (receiverAnim.movement?.length) receiverAnim.movement[0].coords = target;
     }
     if (scene.skipToEnd) return;
-    scene.stateMachine?.transition(States.FastBreak, getDebugTransitions() && { stepIndex: 1 });
+    runFastBreakTransition(scene, States.FastBreak, { debugStepIndex: 1 });
     scene.events?.emit("fb:start");
   } else {
-    scene.stateMachine?.transition(States.FastBreak, getDebugTransitions() && { stepIndex: 0 });
+    runFastBreakTransition(scene, States.FastBreak, { debugStepIndex: 0 });
     scene.events?.emit("fb:start");
   }
 
   // Use backend timeline data instead of fixed duration
   const timeline = createAnimationTimeline(scene);
+  if (!timeline && debugEnabled) {
+    animationDebugWarn("fastBreak: timeline unavailable - skipping sprint animation", {
+      hasTweenManager: !!scene?.tweens,
+      hasCreateTimeline: typeof scene?.tweens?.createTimeline === "function",
+      hasTimelineFactory: typeof scene?.tweens?.timeline === "function",
+      hasAddTimeline: typeof scene?.tweens?.addTimeline === "function",
+    });
+  }
+
+  const fallbackSprintDuration =
+    animationConfig.fastBreak?.shotMs ?? animationConfig.fastBreak.shotMs ?? 0;
+  let sprintDuration = fallbackSprintDuration;
+  let earliestSprintTimestamp = null;
+  let latestSprintTimestamp = null;
 
   const ownerAnim = animations.find(a => a.hasBallAtStep?.[0]);
   if (ownerAnim) {
@@ -103,7 +321,20 @@ export async function runFastBreakSequence({ scene, turnData, playerSprites, bal
 
     // Use backend's duration and timing
     const duration = endStep.timestamp - startStep.timestamp;
-    
+
+    if (typeof startStep.timestamp === "number") {
+      earliestSprintTimestamp =
+        earliestSprintTimestamp == null
+          ? startStep.timestamp
+          : Math.min(earliestSprintTimestamp, startStep.timestamp);
+    }
+    if (typeof endStep.timestamp === "number") {
+      latestSprintTimestamp =
+        latestSprintTimestamp == null
+          ? endStep.timestamp
+          : Math.max(latestSprintTimestamp, endStep.timestamp);
+    }
+
     // Apply team-specific constraints to move players further down court for separation
     let endX = endStep.coords.x;
     let endY = endStep.coords.y;
@@ -117,25 +348,42 @@ export async function runFastBreakSequence({ scene, turnData, playerSprites, bal
     
     const endPx = gridToPixels(endX, endY, width, height);
 
-    // Add to timeline with backend timing
-    timeline.add({
-      targets: sprite,
-      x: endPx.x,
-      y: endPx.y,
-      duration: duration,
-      ease: "Sine.easeInOut"
-    }, startStep.timestamp);
+    if (timeline) {
+      // Add to timeline with backend timing
+      timeline.add({
+        targets: sprite,
+        x: endPx.x,
+        y: endPx.y,
+        duration: duration,
+        ease: "Sine.easeInOut"
+      }, startStep.timestamp);
+    } else {
+      // Without a timeline, snap directly to the destination to avoid leaving players behind
+      sprite.setPosition(endPx.x, endPx.y);
+    }
   }
 
-  scene.__activeTimeline = timeline;
+  if (
+    typeof earliestSprintTimestamp === "number" &&
+    typeof latestSprintTimestamp === "number" &&
+    latestSprintTimestamp > earliestSprintTimestamp
+  ) {
+    sprintDuration = latestSprintTimestamp - earliestSprintTimestamp;
+  }
 
-  await new Promise(resolve => {
-    timeline.once("complete", resolve);
-    timeline.play();
-  });
+  if (timeline) {
+    scene.__activeTimeline = timeline;
 
-  scene.__activeTimeline = null;
-  if (scene.skipToEnd) return;
+    await new Promise(resolve => {
+      timeline.once("complete", resolve);
+      timeline.play();
+    });
+
+    scene.__activeTimeline = null;
+    if (scene.skipToEnd) return;
+  } else if (scene.skipToEnd) {
+    return;
+  }
 
   // Handle passes after sprint
   const passes = turnData.passes || [];
@@ -284,13 +532,16 @@ export async function runFastBreakSequence({ scene, turnData, playerSprites, bal
   const shooterId = turnData.shooterId || turnData.shooter_id || getCurrentOwner(scene);
   const shooterSprite = shooterId != null ? playerSprites[shooterId] : null;
   
-  console.log('Fast break shot animation check:', {
-    shooterId,
-    hasShooterSprite: !!shooterSprite,
-    result_type: turnData.result_type,
-    hold_up: turnData.hold_up,
-    willAnimateShot: shooterSprite && (turnData.result_type === "MAKE" || turnData.result_type === "MISS")
-  });
+  if (debugEnabled)
+    animationDebugLog('Fast break shot animation check:', {
+      shooterId,
+      hasShooterSprite: !!shooterSprite,
+      result_type: turnData.result_type,
+      hold_up: turnData.hold_up,
+      willAnimateShot:
+        shooterSprite &&
+        (turnData.result_type === "MAKE" || turnData.result_type === "MISS"),
+    });
   
   // Only animate shot if there's a shot attempt (result_type indicates a shot was taken)
   if (shooterSprite && (turnData.result_type === "MAKE" || turnData.result_type === "MISS")) {
@@ -308,36 +559,43 @@ export async function runFastBreakSequence({ scene, turnData, playerSprites, bal
       arc: { height: arcHeight }
     });
     if (turnData.result_type === "MAKE") {
-      console.log('Fast break made shot detected - starting rim hold');
+      if (debugEnabled)
+        animationDebugLog('Fast break made shot detected - starting rim hold');
       const rimHoldMs = animationConfig.fastBreak?.rimHoldMs ?? 2000;
       await new Promise(resolve => scene.time.delayedCall(rimHoldMs, resolve));
-      console.log('Fast break rim hold completed - starting end pause');
+      if (debugEnabled)
+        animationDebugLog('Fast break rim hold completed - starting end pause');
       await fastBreakEndPause(scene);
-      console.log('Fast break end pause completed - proceeding to inbound setup');
+      if (debugEnabled)
+        animationDebugLog('Fast break end pause completed - proceeding to inbound setup');
       
       // Use backend possession_team_id to determine new offense team for inbound
       const resolveOffenseSide = (scene, teamId) =>
         teamId === scene.simData?.home_team_id ? "home" : "away";
       const newOffenseSide = resolveOffenseSide(scene, turnData.possession_team_id);
       
-      console.log('Fast break made shot - inbound setup:', {
-        shooterTeam: shooterSprite.team,
-        possession_team_id: turnData.possession_team_id,
-        newOffenseSide,
-        home_team_id: scene.simData?.home_team_id
-      });
-      
-      console.log('About to call runInboundSetup for fast break made shot');
+      if (debugEnabled)
+        animationDebugLog('Fast break made shot - inbound setup:', {
+          shooterTeam: shooterSprite.team,
+          possession_team_id: turnData.possession_team_id,
+          newOffenseSide,
+          home_team_id: scene.simData?.home_team_id,
+        });
+
+      if (debugEnabled)
+        animationDebugLog('About to call runInboundSetup for fast break made shot');
       await runInboundSetup({ scene, ballSprite, playerSprites, newOffenseSide });
-      console.log('runInboundSetup completed for fast break made shot');
+      if (debugEnabled)
+        animationDebugLog('runInboundSetup completed for fast break made shot');
     } else {
       // Handle missed fast break shot with ball bounce
-      console.log('Fast break missed shot - rebound progression:', {
-        shooterId,
-        rebounderId: turnData.rebounderId || turnData.rebounder_player_id,
-        rebound_type: turnData.rebound_type,
-        possession_team_id: turnData.possession_team_id
-      });
+      if (debugEnabled)
+        animationDebugLog('Fast break missed shot - rebound progression:', {
+          shooterId,
+          rebounderId: turnData.rebounderId || turnData.rebounder_player_id,
+          rebound_type: turnData.rebound_type,
+          possession_team_id: turnData.possession_team_id,
+        });
       
       const { bounceFromRim } = await import('./ballManager.js');
       const isHomeTeam = shooterSprite.team === "home";

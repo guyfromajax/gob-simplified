@@ -31,9 +31,30 @@ def _load_from_db(team_name: str) -> Tuple[Dict | None, List[Dict]]:
 
 
 def _team_file_path(team_name: str) -> Path:
+    """Return the path to the bundled roster JSON for ``team_name``.
+
+    Test environments (and local development without Mongo) rely on the
+    repository's ``teams`` directory which lives at the project root rather
+    than inside ``BackEnd``.  The previous implementation assumed the latter
+    which meant we never discovered the JSON files, leaving the roster empty
+    and causing any access to ``team.lineup["C"]`` to explode during opening
+    tip logic.  To make the loader resilient we walk the parent directories
+    until we find the first ``teams`` folder that contains the requested
+    roster file and fall back to the project root if necessary.
+    """
+
     snake = team_name.lower().replace(" ", "_").replace("-", "_")
-    base = Path(__file__).resolve().parents[1]
-    return base / "teams" / f"{snake}.json"
+    filename = f"{snake}.json"
+    current = Path(__file__).resolve()
+
+    for parent in current.parents:
+        candidate = parent / "teams" / filename
+        if candidate.exists():
+            return candidate
+
+    # Preserve the old behaviour (which effectively pointed one level up) so
+    # that callers still receive a sensible path even if the file is missing.
+    return current.parents[1] / "teams" / filename
 
 
 def _load_from_file(team_name: str) -> Tuple[Dict | None, List[Dict]]:

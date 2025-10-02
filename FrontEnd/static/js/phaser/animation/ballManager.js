@@ -19,7 +19,12 @@ import {
   getPendingOwner,
   setPendingOwner,
 } from "../ball/ballController.js";
-import { DebugFlags } from "../utils/debugFlags.js";
+import {
+  DebugFlags,
+  animationDebugLog,
+  animationDebugWarn,
+  isAnimationDebugEnabled,
+} from "../utils/debugFlags.js";
 
 function attachBallToPlayer(scene, ballSprite, playerSprite, opts = {}) {
   if (scene.possessionFlipInProgress) return;
@@ -38,14 +43,15 @@ function attachBallToPlayer(scene, ballSprite, playerSprite, opts = {}) {
     return;
   }
 
-  if (REBOUND_DEBUG) {
+  const debugEnabled = isAnimationDebugEnabled();
+  if (debugEnabled && REBOUND_DEBUG) {
     if (
       scene?.currentBallOwnerRef &&
       scene.currentBallOwnerRef.value &&
       scene.currentBallOwnerRef.value !== playerSprite
     ) {
       const refId = scene.currentBallOwnerRef.value?.playerId;
-      console.warn("ball:owner mismatch", {
+      animationDebugWarn("ball:owner mismatch", {
         ref: refId,
         target: targetId
       });
@@ -58,7 +64,7 @@ function attachBallToPlayer(scene, ballSprite, playerSprite, opts = {}) {
       playerId: targetId,
       team: playerSprite?.team_id ?? playerSprite?.team ?? null
     };
-    console.log("ball:attach", logPayload);
+    animationDebugLog("ball:attach", logPayload);
   }
 
   if (scene?.currentBallOwnerRef) {
@@ -75,9 +81,11 @@ function runInboundSetup(opts) {
 }
 
 function runPass(scene, cfg = {}) {
+  const debugEnabled = isAnimationDebugEnabled();
+
   // Debug logging for kickout passes
-  if (cfg.fromId && cfg.toId) {
-    console.log('runPass called for kickout:', {
+  if (debugEnabled && cfg.fromId && cfg.toId) {
+    animationDebugLog('runPass called for kickout:', {
       fromId: cfg.fromId,
       toId: cfg.toId,
       currentState: scene.stateMachine?.state,
@@ -85,19 +93,23 @@ function runPass(scene, cfg = {}) {
       isFastBreak: scene.stateMachine?.is(States.FastBreak)
     });
   }
-  
+
   // Allow kickout passes even during possession flip
   const isKickoutPass = cfg.fromId && cfg.toId;
-  
+
   if ((scene.possessionFlipInProgress && !isKickoutPass) || scene.stateMachine?.is(States.FastBreak)) {
-    console.log('runPass blocked:', {
-      reason: scene.possessionFlipInProgress ? 'possessionFlipInProgress' : 'FastBreak state',
-      isKickoutPass
-    });
+    if (debugEnabled) {
+      animationDebugWarn('runPass blocked:', {
+        reason: scene.possessionFlipInProgress ? 'possessionFlipInProgress' : 'FastBreak state',
+        isKickoutPass
+      });
+    }
     return Promise.resolve();
   }
-  
-  console.log('runPass proceeding with baseRunPass');
+
+  if (debugEnabled) {
+    animationDebugLog('runPass proceeding with baseRunPass');
+  }
   return baseRunPass(scene, cfg);
 }
 
@@ -236,11 +248,21 @@ export function shootBall({
   const stateMachine = scene.stateMachine;
   if (stateMachine) {
     const prevState = stateMachine.state;
+    const alreadyInShotAttempt = stateMachine.is(States.ShotAttempt);
     const legalState =
+      alreadyInShotAttempt ||
       stateMachine.is(States.HalfCourt) ||
       stateMachine.is(States.Rebound) ||
       stateMachine.is(States.FastBreak);
-    if (legalState) {
+    if (alreadyInShotAttempt) {
+      if (isAnimationDebugEnabled()) {
+        animationDebugLog("shotBall: already in ShotAttempt", {
+          prevState,
+          shooterId,
+          stepIndex,
+        });
+      }
+    } else if (legalState) {
       safeTransition(
         stateMachine,
         States.ShotAttempt,
@@ -363,6 +385,31 @@ export function shootBall({
 
 // Note: animatePutbackAttempt function removed - putbacks now use standard shootBall function
 
+function coerceFastBreakFlag(value) {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return value !== 0;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    return normalized === "true" || normalized === "1" || normalized === "fast_break";
+  }
+  return false;
+}
+
+function isUpcomingFastBreak(scene, explicitFlag) {
+  if (explicitFlag != null) {
+    return coerceFastBreakFlag(explicitFlag);
+  }
+  const currentIndex = typeof scene?.currentTurn === "number" ? scene.currentTurn : null;
+  if (currentIndex == null) return false;
+  const nextTurn = scene?.simData?.turns?.[currentIndex + 1];
+  if (!nextTurn) return false;
+  if (coerceFastBreakFlag(nextTurn.fast_break)) return true;
+  const resultType = typeof nextTurn.result_type === "string"
+    ? nextTurn.result_type.toUpperCase()
+    : null;
+  return resultType === "FAST_BREAK";
+}
+
 /**
  * Animate players collapsing toward a missed shot for a rebound.
  *
@@ -381,12 +428,16 @@ export function animateRebound({
   animations,
   rebounderId,
   ballSpot,
-  shooterId
+  shooterId,
+  upcomingFastBreak,
 }) {
   if (!scene || !ballSprite || !ballSpot) return Promise.resolve();
   if (scene?.stateMachine?.is(States.FreeThrow)) return Promise.resolve();
   cancelBallTween(scene, ballSprite);
   clearCurrentOwner(scene);
+
+  const debugEnabled = isAnimationDebugEnabled();
+  const shouldHoldForFastBreak = () => isUpcomingFastBreak(scene, upcomingFastBreak);
 
   scene.rebounderId = rebounderId;
   const rebCfg = animationConfig.rebound;
@@ -405,9 +456,9 @@ export function animateRebound({
   ballSprite.setVisible(true);
 
   const rebounderSprite = playerSprites[rebounderId];
-  if (REBOUND_DEBUG) {
+  if (debugEnabled && REBOUND_DEBUG) {
     const team = rebounderSprite?.team_id ?? rebounderSprite?.team;
-    console.log("reb:event", {
+    animationDebugLog("reb:event", {
       type: "rebound",
       shooterId,
       reboundSpot: ballSpot,
@@ -417,11 +468,9 @@ export function animateRebound({
   }
   if (rebounderSprite) {
     const teamId = rebounderSprite.team_id;
-    scene.offenseTeamId = teamId;
-    scene.events?.emit?.("possessionChange", { offenseTeamId: teamId });
     finalPositions.push({ playerId: rebounderId, grid: { ...ballSpot } });
-    if (REBOUND_DEBUG) {
-      console.log("reb:moveStart", {
+    if (debugEnabled && REBOUND_DEBUG) {
+      animationDebugLog("reb:moveStart", {
         playerId: rebounderId,
         from: { x: rebounderSprite.x, y: rebounderSprite.y },
         to: { x: spotPx.x, y: spotPx.y },
@@ -437,8 +486,8 @@ export function animateRebound({
           duration: rebCfg.playerMoveMs,
           ease: "Linear",
           onComplete: () => {
-            if (REBOUND_DEBUG) {
-              console.log("reb:moveEnd", {
+            if (debugEnabled && REBOUND_DEBUG) {
+              animationDebugLog("reb:moveEnd", {
                 playerId: rebounderId,
                 x: spotPx.x,
                 y: spotPx.y
@@ -447,15 +496,36 @@ export function animateRebound({
             attachBallToPlayer(scene, ballSprite, rebounderSprite, {
               debugInfo: { shooterId, reboundSpot: ballSpot }
             });
-            scene.offenseTeamId = rebounderSprite.team_id;
-            scene.events?.emit("possessionChange", {
-              offenseTeamId: rebounderSprite.team_id
-            });
-            if (scene.stateMachine?.is(States.Rebound))
-              safeTransition(scene.stateMachine, States.HalfCourt, {
-                currentOwnerId: getCurrentOwner(scene),
-                pendingOwnerId: getPendingOwner(scene),
+            const newOffenseId = rebounderSprite.team_id;
+            const previousOffenseId = scene.offenseTeamId;
+            scene.offenseTeamId = newOffenseId;
+            const changed =
+              newOffenseId != null &&
+              (previousOffenseId == null || String(previousOffenseId) !== String(newOffenseId));
+            if (changed) {
+              scene.events?.emit?.("possessionChange", {
+                offenseTeamId: newOffenseId,
               });
+            }
+            if (scene.stateMachine?.is(States.Rebound)) {
+              const holdReboundState = shouldHoldForFastBreak();
+              if (holdReboundState) {
+                if (debugEnabled && getDebugTransitions()) {
+                  animationDebugLog(
+                    "animateRebound: holding Rebound state for fast break handoff",
+                    {
+                      rebounderId,
+                      currentTurn: scene.currentTurn,
+                    }
+                  );
+                }
+              } else {
+                safeTransition(scene.stateMachine, States.HalfCourt, {
+                  currentOwnerId: getCurrentOwner(scene),
+                  pendingOwnerId: getPendingOwner(scene),
+                });
+              }
+            }
             scene.rebounderId = null;
             resolve();
           },
@@ -540,8 +610,8 @@ export function animateRebound({
           ballSpot,
           positions: finalPositions
         };
-        if (REBOUND_DEBUG) {
-          console.log("[rebound]", logPayload);
+        if (debugEnabled && REBOUND_DEBUG) {
+          animationDebugLog("[rebound]", logPayload);
         }
         if (scene.time?.delayedCall) {
           scene.time.delayedCall(rebCfg.attachDelayMs, resolve);
@@ -575,10 +645,18 @@ export function animateKickoutReset(
   if (!scene || !ballSprite) return Promise.resolve();
   if (scene?.stateMachine?.is(States.FreeThrow)) return Promise.resolve();
 
+  const debugEnabled = isAnimationDebugEnabled();
   const rebounderSprite = scene.playerSprites?.[rebounderId];
   const pgSprite = scene.playerSprites?.[pgId];
   if (!rebounderSprite || !pgSprite) {
-    console.warn('animateKickoutReset: Missing sprites', { rebounderId, pgId, rebounderSprite: !!rebounderSprite, pgSprite: !!pgSprite });
+    if (debugEnabled) {
+      animationDebugWarn('animateKickoutReset: Missing sprites', {
+        rebounderId,
+        pgId,
+        rebounderSprite: !!rebounderSprite,
+        pgSprite: !!pgSprite,
+      });
+    }
     return Promise.resolve();
   }
 
@@ -631,10 +709,14 @@ export function animateKickoutReset(
   const ownerBefore = getCurrentOwner(scene);
   detachBall(scene, ballSprite);
 
-  console.log('animateKickoutReset: Starting pass', { rebounderId, pgId, opts });
-  
+  if (debugEnabled) {
+    animationDebugLog('animateKickoutReset: Starting pass', { rebounderId, pgId, opts });
+  }
+
   return runPass(scene, opts).then(() => {
-    console.log('animateKickoutReset: Pass completed, attaching ball to PG');
+    if (debugEnabled) {
+      animationDebugLog('animateKickoutReset: Pass completed, attaching ball to PG');
+    }
     attachBallToPlayer(scene, ballSprite, pgSprite);
     setPendingOwner(scene, pgId);
     const ownerAfter = getCurrentOwner(scene);
@@ -643,8 +725,8 @@ export function animateKickoutReset(
       safeTransition(scene.stateMachine, States.HalfCourt);
     }
 
-    if (DebugFlags?.BALL || DebugFlags?.FSM) {
-      console.log({
+    if (debugEnabled && (DebugFlags?.BALL || DebugFlags?.FSM)) {
+      animationDebugLog({
         event: 'KICK_OUT_PASS',
         from: rebounderId,
         to: pgId,
@@ -653,7 +735,9 @@ export function animateKickoutReset(
       });
     }
   }).catch((error) => {
-    console.error('animateKickoutReset: Pass failed', error);
+    if (debugEnabled) {
+      animationDebugWarn('animateKickoutReset: Pass failed', error);
+    }
     // Fallback: just attach ball to PG
     attachBallToPlayer(scene, ballSprite, pgSprite);
     setPendingOwner(scene, pgId);
