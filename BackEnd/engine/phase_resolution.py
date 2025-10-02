@@ -24,6 +24,8 @@ from BackEnd.utils.shared import (
     apply_scoring,
     unpack_game_context
 )
+from BackEnd.playcall_skeletons.fcp_skeletons import FCP_1, FCP_SKELETONS_DICT
+from BackEnd.playcall_skeletons.inside_skeletons import INSIDE_SCENES
 
 
 def get_in_play_defenders(ball_handler, defense_lineup, target_is_away):
@@ -565,7 +567,9 @@ def resolve_half_court_offense_logic(game):
     shot_result = game.shot_manager.resolve_shot(roles)
     animator = Animator(game)
     shot_result["animations"] = animator.capture_halfcourt_animation(roles)
-
+    
+    # Add skeleton data for unified animation system
+    shot_result["skeleton"] = get_skeleton_for_turn(shot_result.get("result_type", "HCO"), "HCO", game)
 
     # 4. scouting report update
     if shot_result["result_type"] == "MAKE":
@@ -770,11 +774,68 @@ def resolve_full_court_press_logic(game: "GameManager"):
         "passer": "",
         "screener": "",
         "possession_flips": result_type in ["O_FOUL", "DEAD_BALL_TURNOVER", "STEAL"],
-        "events": []
+        "events": [],
+        "skeleton": get_skeleton_for_turn(result_type, "FCP", game)
     }
     
     print(f"result: {result}")
     return result
+
+
+def get_skeleton_for_turn(result_type, turn_type, game_context=None):
+    """
+    Universal skeleton getter for all turn types.
+    Returns filtered skeleton data based on result_type and turn_type.
+    """
+    if turn_type == "FCP":
+        return get_fcp_skeleton(result_type)
+    elif turn_type == "HCT":
+        return get_hct_skeleton(result_type)
+    elif turn_type == "HCO":
+        return get_hco_skeleton(result_type, game_context)
+    # Future: Add FAST_BREAK, FREE_THROW, etc.
+    return None
+
+
+def get_fcp_skeleton(result_type):
+    """Get FCP skeleton filtered by result_type"""
+    end_timestamp = FCP_SKELETONS_DICT.get(result_type, 1200)  # Default to HCO timestamp
+    
+    return {
+        "steps": [step for step in FCP_1["steps"] if step["timestamp"] <= end_timestamp]
+    }
+
+
+def get_hct_skeleton(result_type):
+    """Get HCT skeleton filtered by result_type"""
+    # For now, use the same FCP skeleton structure
+    # This will be updated when HCT skeletons are created
+    end_timestamp = FCP_SKELETONS_DICT.get(result_type, 1200)  # Default to HCO timestamp
+    
+    return {
+        "steps": [step for step in FCP_1["steps"] if step["timestamp"] <= end_timestamp]
+    }
+
+
+def get_hco_skeleton(result_type, game_context):
+    """Get HCO skeleton - convert existing INSIDE_SCENES logic to skeleton format"""
+    # For now, return a basic HCO skeleton structure
+    # This will be expanded to convert the existing INSIDE_SCENES logic
+    return {
+        "steps": [
+            {
+                "timestamp": 0,
+                "pos_actions": {
+                    "PG": {"action": "HANDLE", "spot": "key"},
+                    "SG": {"action": "DRIFT", "spot": "upper wing"},
+                    "SF": {"action": "DRIFT", "spot": "lower wing"},
+                    "PF": {"action": "DRIFT", "spot": "upper highPost"},
+                    "C": {"action": "DRIFT", "spot": "lower highPost"}
+                },
+                "events": []
+            }
+        ]
+    }
 
 
 def resolve_half_court_trap_logic(game: "GameManager"):
@@ -827,7 +888,8 @@ def resolve_half_court_trap_logic(game: "GameManager"):
         "passer": "",
         "screener": "",
         "possession_flips": result_type in ["O_FOUL", "DEAD_BALL_TURNOVER", "STEAL"],
-        "events": []
+        "events": [],
+        "skeleton": get_skeleton_for_turn(result_type, "HCT", game)
     }
     
     print(f"result: {result}")
