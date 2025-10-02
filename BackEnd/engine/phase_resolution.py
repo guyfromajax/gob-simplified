@@ -788,33 +788,47 @@ def get_skeleton_for_turn(result_type, turn_type, game_context=None):
     Returns filtered skeleton data based on result_type and turn_type.
     """
     if turn_type == "FCP":
-        return get_fcp_skeleton(result_type)
+        return get_fcp_skeleton(result_type, game_context)
     elif turn_type == "HCT":
-        return get_hct_skeleton(result_type)
+        return get_hct_skeleton(result_type, game_context)
     elif turn_type == "HCO":
         return get_hco_skeleton(result_type, game_context)
     # Future: Add FAST_BREAK, FREE_THROW, etc.
     return None
 
 
-def get_fcp_skeleton(result_type):
+def get_fcp_skeleton(result_type, game_context=None):
     """Get FCP skeleton filtered by result_type"""
     end_timestamp = FCP_SKELETONS_DICT.get(result_type, 1200)  # Default to HCO timestamp
     
-    return {
+    skeleton_data = {
         "steps": [step for step in FCP_1["steps"] if step["timestamp"] <= end_timestamp]
     }
+    
+    # Apply opposite side logic if game context is provided
+    if game_context:
+        is_away_offense = game_context.offense_team.team_id == game_context.away_team.team_id
+        skeleton_data = apply_opposite_side_logic(skeleton_data, is_away_offense)
+    
+    return skeleton_data
 
 
-def get_hct_skeleton(result_type):
+def get_hct_skeleton(result_type, game_context=None):
     """Get HCT skeleton filtered by result_type"""
     # For now, use the same FCP skeleton structure
     # This will be updated when HCT skeletons are created
     end_timestamp = FCP_SKELETONS_DICT.get(result_type, 1200)  # Default to HCO timestamp
     
-    return {
+    skeleton_data = {
         "steps": [step for step in FCP_1["steps"] if step["timestamp"] <= end_timestamp]
     }
+    
+    # Apply opposite side logic if game context is provided
+    if game_context:
+        is_away_offense = game_context.offense_team.team_id == game_context.away_team.team_id
+        skeleton_data = apply_opposite_side_logic(skeleton_data, is_away_offense)
+    
+    return skeleton_data
 
 
 def get_hco_skeleton(result_type, game_context):
@@ -836,6 +850,72 @@ def get_hco_skeleton(result_type, game_context):
             }
         ]
     }
+
+
+def apply_opposite_side_logic(skeleton_data, is_away_offense):
+    """
+    Apply opposite side logic to skeleton data based on 'opp' field.
+    
+    For FCP scenarios:
+    - Offensive players with 'opp': True should be positioned on the opposite side 
+      of the court (defensive side) - these are ball handlers trying to break the press
+    - Offensive players without 'opp' field stay on the same side as normal offense
+      (offensive side) - these are outlet options
+    
+    All players in skeleton are offensive players. Defensive players are positioned 
+    separately based on how they guard the offensive players.
+    """
+    if not skeleton_data or "steps" not in skeleton_data:
+        return skeleton_data
+    
+    from BackEnd.utils.shared import get_away_player_coords
+    from BackEnd.constants import HCO_STRING_SPOTS
+    
+    modified_skeleton = {"steps": []}
+    
+    for step in skeleton_data["steps"]:
+        modified_step = {
+            "timestamp": step["timestamp"],
+            "pos_actions": {},
+            "events": step.get("events", [])
+        }
+        
+        for position, action_data in step["pos_actions"].items():
+            modified_action = action_data.copy()
+            
+            # Get the spot coordinates
+            spot = action_data.get("spot", "key")
+            spot_coords = HCO_STRING_SPOTS.get(spot, {"x": 64, "y": 25})
+            
+            # Check if this offensive player should be on opposite side
+            if action_data.get("opp", False):
+                # Offensive player with opp=True should be on opposite side (defensive side)
+                if is_away_offense:
+                    # Away team offense - ball handlers go to home side (defensive side)
+                    # No coordinate flip needed - they stay on home side
+                    pass
+                else:
+                    # Home team offense - ball handlers go to away side (defensive side)
+                    # Flip coordinates to away side
+                    spot_coords = get_away_player_coords(spot_coords)
+            else:
+                # Offensive player without opp field stays on same side as normal offense
+                if is_away_offense:
+                    # Away team offense - outlet players go to away side (offensive side)
+                    # Flip coordinates to away side
+                    spot_coords = get_away_player_coords(spot_coords)
+                else:
+                    # Home team offense - outlet players stay on home side (offensive side)
+                    # No coordinate flip needed
+                    pass
+            
+            # Update the spot coordinates in the action data
+            modified_action["coords"] = spot_coords
+            modified_step["pos_actions"][position] = modified_action
+        
+        modified_skeleton["steps"].append(modified_step)
+    
+    return modified_skeleton
 
 
 def resolve_half_court_trap_logic(game: "GameManager"):
