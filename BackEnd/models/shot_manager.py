@@ -88,6 +88,9 @@ class ShotManager:
                 self.game_state["free_throws_remaining"] = 1
                 text = f"{get_name_safe(shooter)} makes the shot. {get_name_safe(foul_player)} fouls him! AND-1 opportunity!"
             else:
+                # Check for defensive pressure opportunity (FCP/HCT)
+                pressure_type = self.game.turn_manager.determine_defensive_pressure_type()
+                self.game_state["offensive_state"] = pressure_type
                 text = f"{get_name_safe(shooter)} drains a 3!" if is_three else f"{get_name_safe(shooter)} makes the shot."
 
         # ------------------------

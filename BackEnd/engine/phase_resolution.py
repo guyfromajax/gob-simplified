@@ -718,3 +718,47 @@ def calculate_foul_turnover(game, positions, roles):
         roles["foul_player"] = o_foul_player
 
     return event_type
+
+
+def resolve_full_court_press_logic(game: "GameManager"):
+    """
+    Resolve full court press defensive pressure.
+    Returns turn data with FCP result and potential progression to HCO.
+    """
+    game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
+    
+    # TODO: Implement FCP simulation logic
+    # For now, placeholder that defaults to HCO
+    # This will be expanded with actual FCP simulation
+    
+    result = {
+        "result_type": "FCP",
+        "text": f"{def_team.name} applies full court pressure!\nPRESS!",
+        "next_play_type": "HCO",  # Default progression
+        "ball_handler": off_lineup.get("PG", list(off_lineup.values())[0]),
+        "defender": def_lineup.get("PG", list(def_lineup.values())[0]),
+    }
+    
+    return result
+
+
+def resolve_half_court_trap_logic(game: "GameManager"):
+    """
+    Resolve half court trap defensive pressure.
+    Returns turn data with HCT result and potential progression to HCO.
+    """
+    game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
+    
+    # TODO: Implement HCT simulation logic
+    # For now, placeholder that defaults to HCO
+    # This will be expanded with actual HCT simulation
+    
+    result = {
+        "result_type": "HCT", 
+        "text": f"{def_team.name} sets up a half court trap!\nTRAP!",
+        "next_play_type": "HCO",  # Default progression
+        "ball_handler": off_lineup.get("PG", list(off_lineup.values())[0]),
+        "defender": def_lineup.get("PG", list(def_lineup.values())[0]),
+    }
+    
+    return result
