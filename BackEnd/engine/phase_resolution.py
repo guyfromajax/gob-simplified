@@ -729,6 +729,7 @@ def resolve_full_court_press_logic(game: "GameManager"):
     Resolve full court press defensive pressure.
     Returns turn data with FCP result and potential progression to HCO.
     """
+    print("DEBUG: Starting resolve_full_court_press_logic")
     game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
 
     text = "PRESS!"
@@ -778,7 +779,7 @@ def resolve_full_court_press_logic(game: "GameManager"):
         "skeleton": get_skeleton_for_turn(result_type, "FCP", game) or {}
     }
     
-    print(f"result: {result}")
+    print(f"DEBUG: FCP result before return = {result}")
     return result
 
 
@@ -799,6 +800,7 @@ def get_skeleton_for_turn(result_type, turn_type, game_context=None):
 
 def get_fcp_skeleton(result_type, game_context=None):
     """Get FCP skeleton filtered by result_type"""
+    print(f"DEBUG: get_fcp_skeleton called with result_type={result_type}")
     end_timestamp = FCP_SKELETONS_DICT.get(result_type, 1200)  # Default to HCO timestamp
     
     skeleton_data = {
@@ -810,6 +812,7 @@ def get_fcp_skeleton(result_type, game_context=None):
         is_away_offense = game_context.offense_team.team_id == game_context.away_team.team_id
         skeleton_data = apply_opposite_side_logic(skeleton_data, is_away_offense)
     
+    print(f"DEBUG: get_fcp_skeleton returning = {skeleton_data}")
     return skeleton_data
 
 
@@ -865,6 +868,7 @@ def apply_opposite_side_logic(skeleton_data, is_away_offense):
     All players in skeleton are offensive players. Defensive players are positioned 
     separately based on how they guard the offensive players.
     """
+    print(f"DEBUG: apply_opposite_side_logic called with is_away_offense={is_away_offense}")
     if not skeleton_data or "steps" not in skeleton_data:
         return skeleton_data
     
@@ -920,6 +924,7 @@ def apply_opposite_side_logic(skeleton_data, is_away_offense):
         
         modified_skeleton["steps"].append(modified_step)
     
+    print(f"DEBUG: apply_opposite_side_logic returning = {modified_skeleton}")
     return modified_skeleton
 
 
@@ -928,6 +933,7 @@ def resolve_half_court_trap_logic(game: "GameManager"):
     Resolve half court trap defensive pressure.
     Returns turn data with HCT result and potential progression to HCO.
     """
+    print("DEBUG: Starting resolve_half_court_trap_logic")
     game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
 
     text = "TRAP!"
@@ -977,4 +983,5 @@ def resolve_half_court_trap_logic(game: "GameManager"):
         "skeleton": get_skeleton_for_turn(result_type, "HCT", game) or {}
     }
     
-    print(f"result: {result}")
+    print(f"DEBUG: HCT result before return = {result}")
+    return result
