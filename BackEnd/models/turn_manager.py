@@ -142,9 +142,6 @@ class TurnManager:
         return payload
 
     def run_micro_turn(self):
-        print("=" * 80)
-        print("DEBUG: run_micro_turn CALLED")
-        print("=" * 80)
         # Increment micro turn counter
         self.game.micro_turn_count += 1
 
@@ -177,26 +174,21 @@ class TurnManager:
         # STEP 3: Route based on offensive state
         if state == "FREE_THROW":
             result = self.resolve_free_throw()
-            print(f"DEBUG: FREE_THROW result = {result}")
         elif state == "FAST_BREAK":
             self.logger.log("fb:start")
             self.game.game_state["fastBreakInProgress"] = True
             result = resolve_fast_break_logic(self.game)
-            print(f"DEBUG: FAST_BREAK result = {result}")
         elif state == "FCP":
             self.logger.log("fcp:start")
             result = resolve_full_court_press_logic(self.game)
-            print(f"DEBUG: FCP result = {result}")
         elif state == "HCT":
             self.logger.log("hct:start")
             result = resolve_half_court_trap_logic(self.game)
-            print(f"DEBUG: HCT result = {result}")
         else:
             calls = self.set_playcalls()
             self.game.game_state["current_playcall"] = calls["offense"]
             self.game.game_state["defense_playcall"] = calls["defense"]
             result = self.resolve_half_court_offense()
-            print(f"DEBUG: HCO result = {result}")
 
         print("Inside run_micro_turn // coming out of resolve offensive state functions")
         print(f"offense team id: {self.game.offense_team.team_id}")
