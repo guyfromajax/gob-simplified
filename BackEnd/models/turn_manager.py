@@ -258,6 +258,9 @@ class TurnManager:
         result["turn_count"] = self.game.micro_turn_count
         # result["possession_team_id"] = self.game.offense_team.team_id
         update_player_coords_from_animations(self.game, result["animations"])
+        
+        # Print turn summary for debugging
+        self._print_turn_summary(result, state)
 
         result["home_lineup"] = serialize_lineup(self.game.home_team.lineup)
         result["away_lineup"] = serialize_lineup(self.game.away_team.lineup)
@@ -694,4 +697,43 @@ class TurnManager:
             return selected_strategy
         else:
             return "HCO"
+    
+    def _print_turn_summary(self, result, offensive_state):
+        """Print a clean summary of the turn for debugging."""
+        print("\n" + "="*80)
+        print(f"TURN #{result.get('turn_count', 0)} SUMMARY")
+        print("="*80)
+        print(f"Offensive State: {offensive_state}")
+        print(f"Result Type: {result.get('result_type', 'N/A')}")
+        print(f"Text: {result.get('text', 'N/A')}")
+        print(f"Possession Flips: {result.get('possession_flips', False)}")
+        
+        # Animation data summary
+        animations = result.get('animations', [])
+        skeleton = result.get('skeleton', {})
+        
+        print(f"\nAnimation Data:")
+        print(f"  - Animations array: {len(animations)} players")
+        if skeleton and 'steps' in skeleton:
+            print(f"  - Skeleton steps: {len(skeleton['steps'])} timestamps")
+        else:
+            print(f"  - Skeleton: None")
+        
+        # Roles summary
+        roles = result.get('roles', {})
+        if roles:
+            print(f"\nRoles:")
+            for role_name, role_value in roles.items():
+                if role_name in ['offense', 'defense']:
+                    print(f"  - {role_name}: {len(role_value) if isinstance(role_value, list) else role_value}")
+                else:
+                    print(f"  - {role_name}: {role_value}")
+        
+        # Key player info
+        print(f"\nKey Players:")
+        for key in ['ball_handler', 'shooter', 'passer', 'defender']:
+            if key in result and result[key]:
+                print(f"  - {key}: {result[key]}")
+        
+        print("="*80 + "\n")
 
