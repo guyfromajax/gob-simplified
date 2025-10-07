@@ -89,7 +89,7 @@ def _initialize_game_stats(gm: GameManager, game_id: str | None = None) -> None:
             upsert=True,
         )
 
-    print(f"[DEV] Initialized game stats for players: {affected}")
+    # print(f"[DEV] Initialized game stats for players: {affected}")
 
 
 def _ensure_complete_lineup(team) -> None:
@@ -439,7 +439,7 @@ def run_simulation(home_team_name, away_team_name, home_lineup_ids=None, away_li
             gm.home_team.points_by_quarter.append(0)
             gm.away_team.points_by_quarter.append(0)
 
-    print(f"*********gm:\n{gm}")
+    # print(f"*********gm:\n{gm}")
     return gm
 
 
