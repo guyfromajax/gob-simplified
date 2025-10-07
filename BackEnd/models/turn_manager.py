@@ -142,6 +142,9 @@ class TurnManager:
         return payload
 
     def run_micro_turn(self):
+        print("=" * 80)
+        print("DEBUG: run_micro_turn CALLED")
+        print("=" * 80)
         # Increment micro turn counter
         self.game.micro_turn_count += 1
 
