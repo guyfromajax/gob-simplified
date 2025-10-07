@@ -651,6 +651,9 @@ class TurnManager:
         Determine if defensive team should attempt FCP or HCT after a made shot.
         Returns 'FCP', 'HCT', or 'HCO' based on strategy settings and random rolls.
         """
+        # TEMPORARILY DISABLED - causing infinite loop
+        return "HCO"
+        
         def_team = self.game.defense_team
         
         # Get strategy settings
