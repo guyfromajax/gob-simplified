@@ -591,5 +591,85 @@ class Animator:
 
         return animations
 
+    def skeleton_to_animations(self, skeleton, off_lineup, def_lineup):
+        """
+        Convert skeleton data to animation format.
+        
+        Args:
+            skeleton: Skeleton data with steps and pos_actions
+            off_lineup: Dict of offensive players by position
+            def_lineup: Dict of defensive players by position
+            
+        Returns:
+            List of animation dicts for each player
+        """
+        if not skeleton or "steps" not in skeleton:
+            return []
+        
+        animations = []
+        steps = skeleton["steps"]
+        
+        # Group all positions that appear in any step
+        all_positions = set()
+        for step in steps:
+            all_positions.update(step.get("pos_actions", {}).keys())
+        
+        # Build animation for each position
+        for position in all_positions:
+            # Determine if this is an offensive or defensive position
+            player = off_lineup.get(position) or def_lineup.get(position)
+            if not player:
+                continue
+            
+            player_id = getattr(player, "player_id", None)
+            if not player_id:
+                continue
+            
+            # Build movement array from steps
+            movement = []
+            has_ball_steps = []
+            start_coords = None
+            end_coords = None
+            
+            for step in steps:
+                pos_action = step.get("pos_actions", {}).get(position)
+                if not pos_action:
+                    continue
+                
+                timestamp = step.get("timestamp", 0)
+                coords = pos_action.get("coords", {"x": 50, "y": 25})
+                action = pos_action.get("action", "drift")
+                
+                if start_coords is None:
+                    start_coords = coords
+                end_coords = coords
+                
+                # Determine if player has ball at this step
+                has_ball = action in ["handle_ball", "receive", "shoot", "pass"]
+                
+                movement.append({
+                    "timestamp": timestamp,
+                    "coords": coords,
+                    "action": action
+                })
+                has_ball_steps.append(has_ball)
+            
+            if not movement:
+                continue
+            
+            # Calculate duration (last timestamp)
+            duration = movement[-1]["timestamp"] if movement else 0
+            
+            animations.append({
+                "playerId": player_id,
+                "start": start_coords or {"x": 50, "y": 25},
+                "end": end_coords or {"x": 50, "y": 25},
+                "movement": movement,
+                "hasBallAtStep": has_ball_steps,
+                "duration": duration
+            })
+        
+        return animations
+
     def get_latest_animation_packet(self):
         return self.latest_packet

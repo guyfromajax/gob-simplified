@@ -764,18 +764,35 @@ def resolve_full_court_press_logic(game: "GameManager"):
 
     print(f"{text}")
     
+    # Build roles dict for animation generation
+    roles = {
+        "ball_handler": off_lineup.get("PG", list(off_lineup.values())[0]),
+        "defender": def_lineup.get("PG", list(def_lineup.values())[0]),
+        "shooter": off_lineup.get("PG", list(off_lineup.values())[0]),
+        "passer": None,
+        "screener": None,
+    }
+    
+    # Generate animations from skeleton
+    from BackEnd.models.animator import Animator
+    animator = Animator(game)
+    skeleton = get_skeleton_for_turn(result_type, "FCP", game) or {}
+    animations = animator.skeleton_to_animations(skeleton, off_lineup, def_lineup) if skeleton else []
+    
     result = {
         "result_type": result_type,
         "text": text,
         "next_play_type": "HCO" if result_type in ["HCO", "SHOT"] else result_type,
-        "ball_handler": off_lineup.get("PG", list(off_lineup.values())[0]),
-        "defender": def_lineup.get("PG", list(def_lineup.values())[0]),
-        "shooter": off_lineup.get("PG", list(off_lineup.values())[0]),
+        "ball_handler": roles["ball_handler"],
+        "defender": roles["defender"],
+        "shooter": roles["shooter"],
         "passer": "",
         "screener": "",
         "possession_flips": result_type in ["O_FOUL", "DEAD_BALL_TURNOVER", "STEAL"],
         "events": [],
-        "skeleton": get_skeleton_for_turn(result_type, "FCP", game) or {}
+        "skeleton": skeleton,
+        "animations": animations,
+        "roles": roles
     }
     
     return result
@@ -962,18 +979,35 @@ def resolve_half_court_trap_logic(game: "GameManager"):
 
     print(f"{text}")
     
+    # Build roles dict for animation generation
+    roles = {
+        "ball_handler": off_lineup.get("PG", list(off_lineup.values())[0]),
+        "defender": def_lineup.get("PG", list(def_lineup.values())[0]),
+        "shooter": off_lineup.get("PG", list(off_lineup.values())[0]),
+        "passer": None,
+        "screener": None,
+    }
+    
+    # Generate animations from skeleton
+    from BackEnd.models.animator import Animator
+    animator = Animator(game)
+    skeleton = get_skeleton_for_turn(result_type, "HCT", game) or {}
+    animations = animator.skeleton_to_animations(skeleton, off_lineup, def_lineup) if skeleton else []
+    
     result = {
         "result_type": result_type,
         "text": text,
         "next_play_type": "HCO" if result_type in ["HCO", "SHOT"] else result_type,
-        "ball_handler": off_lineup.get("PG", list(off_lineup.values())[0]),
-        "defender": def_lineup.get("PG", list(def_lineup.values())[0]),
-        "shooter": off_lineup.get("PG", list(off_lineup.values())[0]),
+        "ball_handler": roles["ball_handler"],
+        "defender": roles["defender"],
+        "shooter": roles["shooter"],
         "passer": "",
         "screener": "",
         "possession_flips": result_type in ["O_FOUL", "DEAD_BALL_TURNOVER", "STEAL"],
         "events": [],
-        "skeleton": get_skeleton_for_turn(result_type, "HCT", game) or {}
+        "skeleton": skeleton,
+        "animations": animations,
+        "roles": roles
     }
     
     return result
