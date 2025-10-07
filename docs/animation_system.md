@@ -1,9 +1,18 @@
-# Animation System Overview
+# Animation System Overview - PossessionRunner (EXPERIMENTAL)
 
-This document gives incoming contributors a concise tour of the new front-end
+> ⚠️ **IMPORTANT**: This document describes an **experimental animation system** (PossessionRunner) 
+> that is **currently disabled by default**. The production system uses the "legacy" animation 
+> approach documented in `basic_animation_overview.md`. 
+> 
+> To enable PossessionRunner: `window.FEATURE_POSSESSION_RUNNER = true`
+> 
+> **For most development work, refer to `basic_animation_overview.md` first.**
+
+---
+
+This document gives incoming contributors a concise tour of the **experimental** front-end
 animation stack for **GOB**. It covers the architectural goals, the current
-state of the migration, and the major components you will work with while
-stabilising the Possession Runner and surrounding flows.
+state of the migration, and the major components for the PossessionRunner system.
 
 ## Goals
 
