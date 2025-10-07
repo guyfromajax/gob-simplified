@@ -906,10 +906,9 @@ def apply_opposite_side_logic(skeleton_data, is_away_offense):
             # Check if this offensive player should be on opposite side
             if action_data.get("opp", False):
                 print("Inside apply_opposite_side_logic, opp=True")
-                print(f"position: {position}")
-                print(f"spot: {spot}")
+                print(f"spot for {position}: {spot}")
                 print(f"spot_coords 1 for {position}: {spot_coords}")
-                print(f"is_away_offense: {is_away_offense}")
+                print(f"is_away_offense for {position}: {is_away_offense}")
                 # Offensive player with opp=True should be on opposite side (defensive side)
                 if is_away_offense:
                     # Away team offense - ball handlers go to home side (defensive side)
