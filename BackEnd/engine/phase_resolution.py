@@ -546,9 +546,9 @@ def resolve_half_court_offense_logic(game):
     # 2. Event Determination
     event_type = game.turn_manager.determine_event_type(roles)
 
-    print(f"event_type 0: {event_type}")
+    # print(f"event_type 0: {event_type}")
     event_type = "SHOT"
-    print(f"event_type 1: {event_type}")
+    # print(f"event_type 1: {event_type}")
 
     if event_type != "SHOT":
         #need to add animations to each of these
@@ -748,9 +748,9 @@ def resolve_full_court_press_logic(game: "GameManager"):
     
     offenseScore *= random.randint(1, 6)
     defenseScore *= random.randint(1, 6)
-    print("Inside resolve_full_court_press_logic")
-    print(f"offenseScore: {offenseScore}")
-    print(f"defenseScore: {defenseScore}")
+    # print("Inside resolve_full_court_press_logic")
+    # print(f"offenseScore: {offenseScore}")
+    # print(f"defenseScore: {defenseScore}")
 
     if (offenseScore + 500) > defenseScore:
         if offenseScore - defenseScore > 1000:
@@ -762,7 +762,7 @@ def resolve_full_court_press_logic(game: "GameManager"):
     
     text += " " + result_type
 
-    print(f"{text}")
+    # print(f"{text}")
     
     # Build roles dict for animation generation
     roles = {
@@ -909,6 +909,7 @@ def apply_opposite_side_logic(skeleton_data, is_away_offense):
                 print(f"position: {position}")
                 print(f"spot: {spot}")
                 print(f"spot_coords: {spot_coords}")
+                print(f"is_away_offense: {is_away_offense}")
                 # Offensive player with opp=True should be on opposite side (defensive side)
                 if is_away_offense:
                     # Away team offense - ball handlers go to home side (defensive side)
@@ -963,9 +964,9 @@ def resolve_half_court_trap_logic(game: "GameManager"):
     
     offenseScore *= random.randint(1, 6)
     defenseScore *= random.randint(1, 6)
-    print("Inside resolve_half_court_trap_logic")
-    print(f"offenseScore: {offenseScore}")
-    print(f"defenseScore: {defenseScore}")
+    # print("Inside resolve_half_court_trap_logic")
+    # print(f"offenseScore: {offenseScore}")
+    # print(f"defenseScore: {defenseScore}")
 
     if (offenseScore + 300) > defenseScore:
         if offenseScore - defenseScore > 1000:
@@ -977,7 +978,7 @@ def resolve_half_court_trap_logic(game: "GameManager"):
     
     text += " " + result_type
 
-    print(f"{text}")
+    # print(f"{text}")
     
     # Build roles dict for animation generation
     roles = {

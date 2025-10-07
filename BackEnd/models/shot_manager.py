@@ -209,7 +209,6 @@ class ShotManager:
         time_elapsed += get_time_elapsed(tempo)
 
         shooter_pos = get_player_position(off_lineup, shooter)
-        print(f"end of resolve_shot, possession_flips: {possession_flips}")
 
         result.update({
             "result_type": "MAKE" if made else "MISS",
@@ -312,10 +311,10 @@ class ShotManager:
         gravity_boost = total_gravity * 0.02
         shot_score += gravity_boost
 
-        print(f"Off-ball gravity boost: +{round(gravity_boost, 2)} from {gravity_contributors}")
-        print(f"offense call: {playcall} // defense call: {defense_call}")
-        print(f"shooter: {get_name_safe(shooter)} | passer: {get_name_safe(passer)}")
-        print(f"shot score = {round(shot_score, 2)} | (defense penalty: {round(defense_score * 0.2, 2)})")
+        # print(f"Off-ball gravity boost: +{round(gravity_boost, 2)} from {gravity_contributors}")
+        # print(f"offense call: {playcall} // defense call: {defense_call}")
+        # print(f"shooter: {get_name_safe(shooter)} | passer: {get_name_safe(passer)}")
+        # print(f"shot score = {round(shot_score, 2)} | (defense penalty: {round(defense_score * 0.2, 2)})")
 
         return shot_score, help_defender, d_foul, foul_player
 
@@ -336,8 +335,8 @@ class ShotManager:
         foul_threshold = defense_team.team_attributes.get("foul_threshold", 30)
 
         d_foul = defense_score < (foul_threshold * aggression_factor)
-        print("End of check_defensive_foul_on_shot")
-        print(f"defense_score: {defense_score} < foul_threshold: {foul_threshold} * aggression_factor: {aggression_factor}")
+        # print("End of check_defensive_foul_on_shot")
+        # print(f"defense_score: {defense_score} < foul_threshold: {foul_threshold} * aggression_factor: {aggression_factor}")
         return d_foul, defender if d_foul else None
 
 
@@ -373,7 +372,6 @@ class ShotManager:
 
         made = shot_score >= off_team.team_attributes["shot_threshold"]
         shooter.record_stat("FGA")
-        # print(f"{get_name_safe(shooter)} attempts a fast breakshot")
 
         if made:
             if passer:

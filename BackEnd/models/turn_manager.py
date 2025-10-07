@@ -167,9 +167,9 @@ class TurnManager:
         print("*****RUN TURN*****")
         state = self.game.game_state.get("offensive_state", "HCO")
         print(f"offensive state: {state}")
-        if state in ["HCO", "HALF_COURT"]:
-            print(f"{self.game.offense_team.name}: {self.game.game_state['current_playcall']}")
-            print(f"{self.game.defense_team.name}: {self.game.game_state['defense_playcall']}")
+        # if state in ["HCO", "HALF_COURT"]:
+        #     print(f"{self.game.offense_team.name}: {self.game.game_state['current_playcall']}")
+        #     print(f"{self.game.defense_team.name}: {self.game.game_state['defense_playcall']}")
 
         # STEP 3: Route based on offensive state
         if state == "FREE_THROW":
@@ -189,10 +189,6 @@ class TurnManager:
             self.game.game_state["current_playcall"] = calls["offense"]
             self.game.game_state["defense_playcall"] = calls["defense"]
             result = self.resolve_half_court_offense()
-
-        print("Inside run_micro_turn // coming out of resolve offensive state functions")
-        print(f"offense team id: {self.game.offense_team.team_id}")
-        print(f"defense team id: {self.game.defense_team.team_id}")
 
         # Record possession team before any potential flip
         result["starting_possession_team_id"] = self.game.offense_team.team_id
@@ -307,8 +303,8 @@ class TurnManager:
         if not result.get("text") or result.get("text").strip() == "":
             result["text"] = "No text in this turn"
 
-        print(f"inside run_micro_turn result: {result}")
-        # print(f"result: {result}")
+        # print(f"inside run_micro_turn result: {result}")
+        
         return result
 
 
