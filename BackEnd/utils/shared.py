@@ -461,10 +461,10 @@ def summarize_game_state(game):
             "secondary_color": game.away_team.secondary_color,
         },
     }
-    print(f"Home team primary color: {game.home_team.primary_color}")
-    print(f"Home team secondary color: {game.home_team.secondary_color}")
-    print(f"Away team primary color: {game.away_team.primary_color}")
-    print(f"Away team secondary color: {game.away_team.secondary_color}")
+    # print(f"Home team primary color: {game.home_team.primary_color}")
+    # print(f"Home team secondary color: {game.home_team.secondary_color}")
+    # print(f"Away team primary color: {game.away_team.primary_color}")
+    # print(f"Away team secondary color: {game.away_team.secondary_color}")
 
     home_team_obj = {
         "name": game.home_team.name,
