@@ -201,6 +201,12 @@ class TurnManager:
         try:
             self.update_clock_and_possession(result)
             self.logger.log_turn_result(result)
+            
+            # Update offensive_state based on next_play_type (e.g., after FCP/HCT)
+            next_play = result.get("next_play_type")
+            if next_play:
+                self.game.game_state["offensive_state"] = next_play
+                
         finally:
             if state == "FAST_BREAK":
                 self.logger.log("fb:end")
@@ -651,9 +657,6 @@ class TurnManager:
         Determine if defensive team should attempt FCP or HCT after a made shot.
         Returns 'FCP', 'HCT', or 'HCO' based on strategy settings and random rolls.
         """
-        # TEMPORARILY DISABLED - causing infinite loop
-        return "HCO"
-        
         def_team = self.game.defense_team
         
         # Get strategy settings
