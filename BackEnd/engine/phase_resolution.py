@@ -24,6 +24,8 @@ from BackEnd.utils.shared import (
     apply_scoring,
     unpack_game_context
 )
+from BackEnd.playcall_skeletons.fcp_skeletons import FCP_1, FCP_SKELETONS_DICT
+from BackEnd.playcall_skeletons.inside_skeletons import INSIDE_SCENES
 
 
 def get_in_play_defenders(ball_handler, defense_lineup, target_is_away):
@@ -544,9 +546,9 @@ def resolve_half_court_offense_logic(game):
     # 2. Event Determination
     event_type = game.turn_manager.determine_event_type(roles)
 
-    print(f"event_type 0: {event_type}")
+    # print(f"event_type 0: {event_type}")
     event_type = "SHOT"
-    print(f"event_type 1: {event_type}")
+    # print(f"event_type 1: {event_type}")
 
     if event_type != "SHOT":
         #need to add animations to each of these
@@ -563,9 +565,16 @@ def resolve_half_court_offense_logic(game):
 
     # 3. Shot Result
     shot_result = game.shot_manager.resolve_shot(roles)
+    
+    # Pass next_defensive_setup to animator via roles
+    if "next_defensive_setup" in shot_result:
+        roles["next_defensive_setup"] = shot_result["next_defensive_setup"]
+    
     animator = Animator(game)
     shot_result["animations"] = animator.capture_halfcourt_animation(roles)
-
+    
+    # Add skeleton data for unified animation system
+    shot_result["skeleton"] = get_skeleton_for_turn(shot_result.get("result_type", "HCO"), "HCO", game) or {}
 
     # 4. scouting report update
     if shot_result["result_type"] == "MAKE":
@@ -718,3 +727,376 @@ def calculate_foul_turnover(game, positions, roles):
         roles["foul_player"] = o_foul_player
 
     return event_type
+
+
+def resolve_full_court_press_logic(game: "GameManager"):
+    """
+    Resolve full court press defensive pressure.
+    Returns turn data with FCP result and potential progression to HCO.
+    """
+    game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
+
+    text = "PRESS!"
+    offenseScore = 0
+    defenseScore = 0
+
+    for pos, player in off_lineup.items():
+        if pos == "PG":
+            offenseScore += 3 * (player.attributes["BH"] * player.attributes["AG"] * 0.2 + player.attributes["IQ"] * 0.2 + player.attributes["CH"] * 0.1)
+        elif pos in ["SG", "SF"]:
+            offenseScore += (player.attributes["BH"] * player.attributes["AG"] * 0.2 + player.attributes["IQ"] * 0.2 + player.attributes["CH"] * 0.1)
+    for pos, player in def_lineup.items():
+        if pos == "PG":
+            defenseScore += 3 * (player.attributes["BH"] * player.attributes["AG"] * 0.2 + player.attributes["IQ"] * 0.2 + player.attributes["CH"] * 0.1)
+        elif pos in ["SG", "SF"]:
+            defenseScore += (player.attributes["BH"] * player.attributes["AG"] * 0.2 + player.attributes["IQ"] * 0.2 + player.attributes["CH"] * 0.1)
+    
+    offenseScore *= random.randint(1, 6)
+    defenseScore *= random.randint(1, 6)
+    # print("Inside resolve_full_court_press_logic")
+    # print(f"offenseScore: {offenseScore}")
+    # print(f"defenseScore: {defenseScore}")
+
+    if (offenseScore + 500) > defenseScore:
+        if offenseScore - defenseScore > 1000:
+            result_type = random.choices(["D_FOUL", "HCO", "SHOT"], weights=[0.5, 0.3, 0.2])[0]
+        else:
+            result_type = "HCO"
+    else:
+        turnover_type = random.choices(["TRAVEL", "DOUBLE DRIBBLE", "BAD PASS"], weights=[0.6, 0.3, 0.1])[0]
+        result_type = random.choices(["O_FOUL", "DEAD_BALL_TURNOVER", "STEAL"], weights=[0.5, 0.3, 0.2])[0]
+    
+    result_text_dict = {
+        "HCO": "they break the press & establish their half court offense",
+        "D_FOUL": "defensive foul!",
+        "O_FOUL": "offensive foul!",
+        "DEAD_BALL_TURNOVER": f"they force a {turnover_type}!",
+        "STEAL": "steal!",
+        "SHOT": "they break the press & attempt a shot!"
+    }
+    
+    text += "\n" + result_text_dict[result_type]
+
+    # Handle SHOT result - execute actual shot resolution
+    if result_type == "SHOT":
+        # Build roles for shot
+        passer = off_lineup.get("PG", list(off_lineup.values())[0])
+        shooter = random.choice([off_lineup.get("PF"), off_lineup.get("C")])
+        defender = def_lineup.get("PG", list(def_lineup.values())[0])
+        
+        shot_roles = {
+            "ball_handler": passer,
+            "shooter": shooter,
+            "passer": passer,
+            "screener": None,
+            "defender": defender,
+        }
+        
+        # Use shot manager to resolve the shot
+        shot_result = game.shot_manager.resolve_shot(shot_roles)
+        
+        # Add FCP-specific data
+        shot_result["fcp_shot"] = True
+        shot_result["text"] = "PRESS! " + shot_result.get("text", "")
+        
+        # Generate animations from skeleton for the pass, then rely on standard shot animation
+        from BackEnd.models.animator import Animator
+        animator = Animator(game)
+        skeleton = get_skeleton_for_turn("SHOT", "FCP", game) or {}
+        animations = animator.skeleton_to_animations(
+            skeleton, 
+            off_lineup, 
+            def_lineup, 
+            add_defenders=True,
+            is_fcp=True
+        ) if skeleton else []
+        
+        shot_result["skeleton"] = skeleton
+        shot_result["animations"] = animations
+        shot_result["roles"] = shot_roles
+        
+        return shot_result
+    
+    # Handle foul results - use standard foul types
+    if result_type == "D_FOUL":
+        game_state["foul_team"] = "DEFENSE"
+        # For now, treat as non-shooting foul (FCP happens before shot attempt)
+        # This will trigger side inbound or bonus free throws via existing logic
+        result_type = "FOUL"
+        text = "PRESS! Defensive foul"
+    elif result_type == "O_FOUL":
+        game_state["foul_team"] = "OFFENSE"
+        result_type = "FOUL"
+        text = "PRESS! Offensive foul"
+    elif result_type == "DEAD_BALL_TURNOVER":
+        result_type = "DEAD BALL"
+        text = "PRESS! Turnover"
+    elif result_type == "STEAL":
+        text = "PRESS! Steal!"
+    
+    # Build roles dict for animation generation
+    roles = {
+        "ball_handler": off_lineup.get("PG", list(off_lineup.values())[0]),
+        "defender": def_lineup.get("PG", list(def_lineup.values())[0]),
+        "shooter": off_lineup.get("PG", list(off_lineup.values())[0]),
+        "passer": None,
+        "screener": None,
+    }
+    
+    # Generate animations from skeleton
+    from BackEnd.models.animator import Animator
+    animator = Animator(game)
+    skeleton = get_skeleton_for_turn(result_type, "FCP", game) or {}
+    animations = animator.skeleton_to_animations(
+        skeleton, 
+        off_lineup, 
+        def_lineup, 
+        add_defenders=True,
+        is_fcp=True
+    ) if skeleton else []
+    
+    # Determine possession flip
+    possession_flips = False
+    if result_type == "FOUL" and game_state.get("foul_team") == "OFFENSE":
+        possession_flips = True
+    elif result_type in ["DEAD BALL", "STEAL"]:
+        possession_flips = True
+    
+    result = {
+        "result_type": result_type,
+        "text": text,
+        "next_play_type": "HCO" if result_type == "HCO" or result_type == "STEAL" else None,
+        "ball_handler": roles["ball_handler"],
+        "defender": roles["defender"],
+        "shooter": roles["shooter"],
+        "passer": "",
+        "screener": "",
+        "possession_flips": possession_flips,
+        "events": [],
+        "skeleton": skeleton,
+        "animations": animations,
+        "roles": roles
+    }
+    
+    return result
+
+
+def get_skeleton_for_turn(result_type, turn_type, game_context=None):
+    """
+    Universal skeleton getter for all turn types.
+    Returns filtered skeleton data based on result_type and turn_type.
+    """
+    if turn_type == "FCP":
+        return get_fcp_skeleton(result_type, game_context)
+    elif turn_type == "HCT":
+        return get_hct_skeleton(result_type, game_context)
+    elif turn_type == "HCO":
+        return get_hco_skeleton(result_type, game_context)
+    # Future: Add FAST_BREAK, FREE_THROW, etc.
+    return None
+
+
+def get_fcp_skeleton(result_type, game_context=None):
+    """Get FCP skeleton filtered by result_type"""
+    end_timestamp = FCP_SKELETONS_DICT.get(result_type, 1200)  # Default to HCO timestamp
+    
+    skeleton_data = {
+        "steps": [step for step in FCP_1["steps"] if step["timestamp"] <= end_timestamp]
+    }
+    
+    # Apply opposite side logic if game context is provided
+    if game_context:
+        is_away_offense = game_context.offense_team.team_id == game_context.away_team.team_id
+        skeleton_data = apply_opposite_side_logic(skeleton_data, is_away_offense)
+    
+    return skeleton_data
+
+
+def get_hct_skeleton(result_type, game_context=None):
+    """Get HCT skeleton filtered by result_type"""
+    # For now, use the same FCP skeleton structure
+    # This will be updated when HCT skeletons are created
+    end_timestamp = FCP_SKELETONS_DICT.get(result_type, 1200)  # Default to HCO timestamp
+    
+    skeleton_data = {
+        "steps": [step for step in FCP_1["steps"] if step["timestamp"] <= end_timestamp]
+    }
+    
+    # Apply opposite side logic if game context is provided
+    if game_context:
+        is_away_offense = game_context.offense_team.team_id == game_context.away_team.team_id
+        skeleton_data = apply_opposite_side_logic(skeleton_data, is_away_offense)
+    
+    return skeleton_data
+
+
+def get_hco_skeleton(result_type, game_context):
+    """Get HCO skeleton - convert existing INSIDE_SCENES logic to skeleton format"""
+    # For now, return a basic HCO skeleton structure
+    # This will be expanded to convert the existing INSIDE_SCENES logic
+    return {
+        "steps": [
+            {
+                "timestamp": 0,
+                "pos_actions": {
+                    "PG": {"action": "HANDLE", "spot": "key"},
+                    "SG": {"action": "DRIFT", "spot": "upper wing"},
+                    "SF": {"action": "DRIFT", "spot": "lower wing"},
+                    "PF": {"action": "DRIFT", "spot": "upper highPost"},
+                    "C": {"action": "DRIFT", "spot": "lower highPost"}
+                },
+                "events": []
+            }
+        ]
+    }
+
+
+def apply_opposite_side_logic(skeleton_data, is_away_offense):
+    """
+    Apply opposite side logic to skeleton data based on 'opp' field.
+    
+    For FCP scenarios:
+    - Offensive players with 'opp': True should be positioned on the opposite side 
+      of the court (defensive side) - these are ball handlers trying to break the press
+    - Offensive players without 'opp' field stay on the same side as normal offense
+      (offensive side) - these are outlet options
+    
+    All players in skeleton are offensive players. Defensive players are positioned 
+    separately based on how they guard the offensive players.
+    """
+    if not skeleton_data or "steps" not in skeleton_data:
+        return skeleton_data
+    
+    from BackEnd.utils.shared import get_away_player_coords
+    from BackEnd.constants import HCO_STRING_SPOTS
+    
+    modified_skeleton = {"steps": []}
+    
+    for step in skeleton_data["steps"]:
+        modified_step = {
+            "timestamp": step["timestamp"],
+            "pos_actions": {},
+            "events": step.get("events", [])
+        }
+        
+        for position, action_data in step["pos_actions"].items():
+            modified_action = action_data.copy()
+            
+            # Get the spot coordinates
+            spot = action_data.get("spot", "key")
+            spot_coords = HCO_STRING_SPOTS.get(spot, {"x": 64, "y": 25})
+            
+            # Check if this offensive player should be on opposite side
+            if action_data.get("opp", False):
+                print("Inside apply_opposite_side_logic, opp=True")
+                print(f"spot for {position}: {spot}")
+                print(f"spot_coords 1 for {position}: {spot_coords}")
+                print(f"is_away_offense for {position}: {is_away_offense}")
+                # Offensive player with opp=True should be on opposite side (defensive side)
+                if is_away_offense:
+                    # Away team offense - ball handlers go to home side (defensive side)
+                    # No coordinate flip needed - they stay on home side
+                    pass
+                else:
+                    # Home team offense - ball handlers go to away side (defensive side)
+                    # Flip coordinates to away side
+                    spot_coords = get_away_player_coords(spot_coords)
+                print(f"spot_coords 2 for {position}: {spot_coords}")
+            else:
+                # Offensive player without opp field stays on same side as normal offense
+                if is_away_offense:
+                    # Away team offense - outlet players go to away side (offensive side)
+                    # Flip coordinates to away side
+                    spot_coords = get_away_player_coords(spot_coords)
+                else:
+                    # Home team offense - outlet players stay on home side (offensive side)
+                    # No coordinate flip needed
+                    pass
+            
+            # Update the spot coordinates in the action data
+            modified_action["coords"] = spot_coords
+            modified_step["pos_actions"][position] = modified_action
+        
+        modified_skeleton["steps"].append(modified_step)
+    
+    return modified_skeleton
+
+
+def resolve_half_court_trap_logic(game: "GameManager"):
+    """
+    Resolve half court trap defensive pressure.
+    Returns turn data with HCT result and potential progression to HCO.
+    """
+    game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
+
+    text = "TRAP!"
+    offenseScore = 0
+    defenseScore = 0
+
+    for pos, player in off_lineup.items():
+        if pos == "PG":
+            offenseScore += 3 * (player.attributes["BH"] * player.attributes["AG"] * 0.2 + player.attributes["IQ"] * 0.2 + player.attributes["CH"] * 0.1)
+        elif pos in ["SG", "SF"]:
+            offenseScore += (player.attributes["BH"] * player.attributes["AG"] * 0.2 + player.attributes["IQ"] * 0.2 + player.attributes["CH"] * 0.1)
+    for pos, player in def_lineup.items():
+        if pos == "PG":
+            defenseScore += 3 * (player.attributes["BH"] * player.attributes["AG"] * 0.2 + player.attributes["IQ"] * 0.2 + player.attributes["CH"] * 0.1)
+        elif pos in ["SG", "SF"]:
+            defenseScore += (player.attributes["BH"] * player.attributes["AG"] * 0.2 + player.attributes["IQ"] * 0.2 + player.attributes["CH"] * 0.1)
+    
+    offenseScore *= random.randint(1, 6)
+    defenseScore *= random.randint(1, 6)
+    # print("Inside resolve_half_court_trap_logic")
+    # print(f"offenseScore: {offenseScore}")
+    # print(f"defenseScore: {defenseScore}")
+
+    if (offenseScore + 300) > defenseScore:
+        if offenseScore - defenseScore > 1000:
+            result_type = random.choices(["D_FOUL", "HCO", "SHOT"], weights=[0.5, 0.3, 0.2])[0]
+        else:
+            result_type = "HCO"
+    else:
+        result_type = random.choices(["O_FOUL", "DEAD_BALL_TURNOVER", "STEAL"], weights=[0.5, 0.3, 0.2])[0]
+    
+    text += " " + result_type
+
+    # print(f"{text}")
+    
+    # Build roles dict for animation generation
+    roles = {
+        "ball_handler": off_lineup.get("PG", list(off_lineup.values())[0]),
+        "defender": def_lineup.get("PG", list(def_lineup.values())[0]),
+        "shooter": off_lineup.get("PG", list(off_lineup.values())[0]),
+        "passer": None,
+        "screener": None,
+    }
+    
+    # Generate animations from skeleton
+    from BackEnd.models.animator import Animator
+    animator = Animator(game)
+    skeleton = get_skeleton_for_turn(result_type, "HCT", game) or {}
+    animations = animator.skeleton_to_animations(
+        skeleton, 
+        off_lineup, 
+        def_lineup, 
+        add_defenders=False,  # TODO: Implement HCT-specific defensive positioning
+        is_fcp=False
+    ) if skeleton else []
+    
+    result = {
+        "result_type": result_type,
+        "text": text,
+        "next_play_type": "HCO" if result_type in ["HCO", "SHOT"] else result_type,
+        "ball_handler": roles["ball_handler"],
+        "defender": roles["defender"],
+        "shooter": roles["shooter"],
+        "passer": "",
+        "screener": "",
+        "possession_flips": result_type in ["O_FOUL", "DEAD_BALL_TURNOVER", "STEAL"],
+        "events": [],
+        "skeleton": skeleton,
+        "animations": animations,
+        "roles": roles
+    }
+    
+    return result

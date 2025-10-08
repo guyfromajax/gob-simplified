@@ -495,8 +495,8 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
         ),
         y: Phaser.Math.Clamp(
           currentGridY + Phaser.Math.Between(-10, 10),
-          1,  // Stay in bounds
-          50
+          5,  // Keep players well inside court
+          45  // Keep players well inside court
         ),
       };
       
@@ -585,12 +585,14 @@ async function runInboundSetup({
   playerSprites,
   newOffenseSide,
   homeTeamId,
-  awayTeamId
+  awayTeamId,
+  skipRetreat = false  // Allow skipping retreat for FCP
 }) {
   animationDebugLog('runInboundSetup called:', {
     newOffenseSide,
     currentState: scene.stateMachine?.state,
-    isFreeThrow: scene?.stateMachine?.is(States.FreeThrow)
+    isFreeThrow: scene?.stateMachine?.is(States.FreeThrow),
+    skipRetreat
   });
   
   if (scene?.stateMachine?.is(States.FreeThrow)) {
@@ -647,43 +649,129 @@ async function runInboundSetup({
   const ranges = isAwayOffense ? awayOffsetRanges : homeOffsetRanges;
   const inboundDest = {};
   for (const pos of ["PG", "SG", "PF", "C"]) {
-    inboundDest[pos] = {
-      x: ballSpot.x + Phaser.Math.Between(ranges[pos].x[0], ranges[pos].x[1]),
-      y: ballSpot.y + Phaser.Math.Between(ranges[pos].y[0], ranges[pos].y[1])
-    };
+    if (pos === "PF" || pos === "C") {
+      // PF and C go to half court area
+      inboundDest[pos] = {
+        x: Phaser.Math.Between(40, 60),
+        y: Phaser.Math.Between(15, 35)
+      };
+    } else {
+      // PG and SG use offset-based positioning
+      inboundDest[pos] = {
+        x: ballSpot.x + Phaser.Math.Between(ranges[pos].x[0], ranges[pos].x[1]),
+        y: ballSpot.y + Phaser.Math.Between(ranges[pos].y[0], ranges[pos].y[1])
+      };
+    }
   }
 
   const width = scene.game.config.width;
   const height = scene.game.config.height;
 
-  // Retreat scoring team toward midcourt
+  // If FCP is next, position defenders in press formation
+  const fcpDefensiveSetup = {};
+  if (skipRetreat) {
+    // Define FCP defensive positions (in grid coordinates)
+    // Base positions for AWAY team defending (LEFT basket)
+    const fcpHomePositions = {
+      PG: { x: 80, y: 25 },   // Midlane - pressing (will be on right when away defends)
+      SG: { x: 73, y: 40 },   // Upper wing - pressing (will be on right when away defends)
+      SF: { x: 73, y: 10 },   // Lower wing - pressing (will be on right when away defends)
+      PF: { x: 21, y: 36 },   // Upper apex - protecting (will be on left when away defends)
+      C: { x: 21, y: 15 }     // Lower apex - protecting (will be on left when away defends)
+    };
+
+    // Apply positioning logic based on which team is defending
+    // Midcourt is X=50
+    // Left basket (away) is X=9, Right basket (home) is X=91
+    for (const pos of ['PG', 'SG', 'SF', 'PF', 'C']) {
+      let coords = fcpHomePositions[pos];
+      
+      if (isAwayOffense) {
+        // AWAY on offense (attacking LEFT basket X=9), HOME defending LEFT basket
+        // HOME defends: PF/C protect LEFT half (X < 50), PG/SG/SF press on RIGHT half (X > 50)
+        
+        if (['PG', 'SG', 'SF'].includes(pos)) {
+          // PG/SG/SF press on RIGHT half (X > 50) - already at 80/73
+          fcpDefensiveSetup[pos] = coords;  // No flip needed
+        } else {
+          // PF/C protect on LEFT half (X < 50) - already at 21
+          fcpDefensiveSetup[pos] = coords;  // No flip needed
+        }
+      } else {
+        // HOME on offense (attacking RIGHT basket X=91), AWAY defending RIGHT basket
+        // AWAY defends: PF/C protect RIGHT half (X > 50), PG/SG/SF press on LEFT half (X < 50)
+        
+        if (['PG', 'SG', 'SF'].includes(pos)) {
+          // PG/SG/SF press on LEFT half (X < 50)
+          fcpDefensiveSetup[pos] = { x: 101 - coords.x, y: coords.y };  // Flip 80→21, 73→28
+        } else {
+          // PF/C protect on RIGHT half (X > 50)
+          fcpDefensiveSetup[pos] = { x: 101 - coords.x, y: coords.y };  // Flip 21→80
+        }
+      }
+    }
+  }
+
+  // Retreat scoring team toward midcourt (unless FCP is next)
   const retreatPromises = [];
-  for (const [id, sprite] of Object.entries(playerSprites)) {
-    const info = scene.playerInfo?.[id];
-    if (!info) continue;
-    if (
-      sprite.team_id === scoringTeamId ||
-      (!scoringTeamId && sprite.team === scoringTeamKey)
-    ) {
-      const targetX = gridToPixels(
-        isAwayOffense ? 45 : 55,
-        25,
-        width,
-        height
-      ).x;
-      retreatPromises.push(
-        new Promise((resolve) => {
-          scene.tweens.add({
-            targets: sprite,
-            x: targetX,
-            y: sprite.y,
-            duration: 500,
-            ease: "Sine.easeInOut",
-            onComplete: resolve,
-            onStop: resolve
-          });
-        })
-      );
+  if (!skipRetreat) {
+    for (const [id, sprite] of Object.entries(playerSprites)) {
+      const info = scene.playerInfo?.[id];
+      if (!info) continue;
+      if (
+        sprite.team_id === scoringTeamId ||
+        (!scoringTeamId && sprite.team === scoringTeamKey)
+      ) {
+        const targetX = gridToPixels(
+          isAwayOffense ? 45 : 55,
+          25,
+          width,
+          height
+        ).x;
+        retreatPromises.push(
+          new Promise((resolve) => {
+            scene.tweens.add({
+              targets: sprite,
+              x: targetX,
+              y: sprite.y,
+              duration: 500,
+              ease: "Sine.easeInOut",
+              onComplete: resolve,
+              onStop: resolve
+            });
+          })
+        );
+      }
+    }
+  } else if (Object.keys(fcpDefensiveSetup).length > 0) {
+    // Move defending players to FCP press positions
+    for (const [id, sprite] of Object.entries(playerSprites)) {
+      const info = scene.playerInfo?.[id];
+      if (!info) continue;
+      
+      // Check if this is a defending player
+      if (
+        sprite.team_id === scoringTeamId ||
+        (!scoringTeamId && sprite.team === scoringTeamKey)
+      ) {
+        const targetPos = fcpDefensiveSetup[info.pos];
+        if (targetPos) {
+          const targetPx = gridToPixels(targetPos.x, targetPos.y, width, height);
+          retreatPromises.push(
+            new Promise((resolve) => {
+              scene.tweens.add({
+                targets: sprite,
+                x: targetPx.x,
+                y: targetPx.y,
+                duration: 500,
+                ease: "Sine.easeInOut",
+                onComplete: resolve,
+                onStop: resolve
+              });
+            })
+          );
+        }
+      }
     }
   }
 
@@ -1104,6 +1192,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
       }
       const shotResult = await shootBall(shootParams);
       const ballSpot = shotResult?.grid;
+      console.log("result_type", turnData.result_type);
       if (turnData.result_type === "MAKE") {
         const nextTurn = simData?.turns?.[scene.currentTurn + 1];
         const hasPendingFreeThrow =
@@ -1112,6 +1201,13 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
           const shooterTeamIsHome =
             String(shooterTeamId) === String(homeTeamId);
           const newOffenseSide = shooterTeamIsHome ? "away" : "home";
+          
+          // Check if FCP is coming next - if so, skip retreat animation
+          const skipRetreat = turnData.next_defensive_setup === "FCP";
+          if (skipRetreat) {
+            console.log('FCP detected - skipping defensive retreat to midcourt');
+          }
+          
           const releaseGuard = createTransitionGuard(scene.stateMachine, [States.Rebound]);
           await runInboundSetup({
             scene,
@@ -1120,6 +1216,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
             newOffenseSide,
             homeTeamId,
             awayTeamId,
+            skipRetreat,
           });
           releaseGuard?.();
         }

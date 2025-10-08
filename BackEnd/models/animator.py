@@ -84,12 +84,16 @@ class Animator:
             return {"x": x, "y": y}
 
         def half_court_spot():
-            return {"x": random.randint(50, 51), "y": random.randint(10, 40)}
+            return {"x": random.randint(40, 60), "y": random.randint(10, 40)}
+
+        # Track which players are already animated
+        animated_player_ids = set()
 
         # Ball handler path
         if ball_handler:
             bh_end = TOP_KEY_COORDS if hold_up else RIM_COORDS
             build_movement(ball_handler, bh_end, has_ball=True)
+            animated_player_ids.add(getattr(ball_handler, "player_id", None))
 
         # Identify stopper
         stopper = None
@@ -107,20 +111,25 @@ class Animator:
                     "y": TOP_KEY_COORDS["y"] + random.randint(-3, 3),
                 }
                 build_movement(stopper, end, action=ACTIONS["GUARD_BALL"])
+                animated_player_ids.add(getattr(stopper, "player_id", None))
 
             # Other in-play defenders
             for d in defenders:
                 if d is stopper:
                     continue
                 build_movement(d, between_key_and_rim(), action=ACTIONS["GUARD_OFFBALL"])
-
-            # Non-in-play defenders should remain frozen in their current spots
-            # Don't create animation data for stationary players
-            # Only players with actual movement get animation data
-        else:
-            # Don't create animation data for stationary players
-            # Only players with actual movement get animation data
-            pass
+                animated_player_ids.add(getattr(d, "player_id", None))
+        
+        # Animate non-involved players to half court
+        # Get all players from both teams
+        all_offensive_players = list(offense_team.lineup.values())
+        all_defensive_players = list(defense_team.lineup.values())
+        
+        for player in all_offensive_players + all_defensive_players:
+            player_id = getattr(player, "player_id", None)
+            if player_id and player_id not in animated_player_ids:
+                # Move to random half court spot
+                build_movement(player, half_court_spot(), has_ball=False, action=ACTIONS["DRIFT"])
         self._log_step_timestamps(animations)
         self.latest_packet = animations
         logging.debug(
@@ -278,10 +287,55 @@ class Animator:
 
         for idx, outcome in enumerate(attempts or []):
             time += shot_ms
+            
+            # Calculate ball landing position based on make/miss
+            from BackEnd.constants import MADE_SHOT_BALL_OFFSET
+            
+            if outcome == "MAKE":
+                # Made shot: ball lands closer to shooter
+                ball_coords = {
+                    "x": rim["x"] - MADE_SHOT_BALL_OFFSET if offense_is_home else rim["x"] + MADE_SHOT_BALL_OFFSET,
+                    "y": rim["y"]
+                }
+            else:
+                # Missed shot: ball goes to rim first
+                ball_coords = rim
+            
             ball_movement.append(
-                {"timestamp": time, "coords": rim, "action": ACTIONS["SHOOT"]}
+                {"timestamp": time, "coords": ball_coords, "action": ACTIONS["SHOOT"]}
             )
-            time += rim_hold_ms
+            
+            # Handle post-shot animation
+            if outcome == "MAKE":
+                # Made shot: ball stays at landing spot
+                time += rim_hold_ms
+            else:
+                # Missed shot: ball bounces away from rim
+                # First, ball hits rim (already added above)
+                time += rim_hold_ms  # Brief pause at rim
+                
+                # Then bounce to random spot AWAY from basket
+                # Y: ±6 from rim center
+                # X: 1-6 grid units AWAY from basket (outward)
+                y_bounce = random.randint(-6, 6)
+                x_bounce = random.randint(1, 6)
+                
+                # Home basket (X=91): bounce left (decrease X)
+                # Away basket (X=9): bounce right (increase X)
+                bounce_coords = {
+                    "x": rim["x"] - x_bounce if offense_is_home else rim["x"] + x_bounce,
+                    "y": rim["y"] + y_bounce
+                }
+                # Clamp to valid court bounds
+                bounce_coords["x"] = max(0, min(100, bounce_coords["x"]))
+                bounce_coords["y"] = max(0, min(50, bounce_coords["y"]))
+                
+                # Add bounce animation
+                ball_movement.append(
+                    {"timestamp": time, "coords": bounce_coords, "action": ACTIONS["DRIFT"]}
+                )
+            
+            # If more attempts remain, return ball to shooter
             if idx < len(attempts) - 1:
                 time += shot_ms
                 ball_movement.append(
@@ -314,6 +368,9 @@ class Animator:
         def_lineup = defense_team.lineup
         aggression_call = defense_team.strategy_calls.get("aggression_call", "normal")
         is_away_offense = offense_team.team_id == self.game.away_team.team_id
+        
+        # Check if next play will be FCP/HCT (set after made shots)
+        next_defensive_setup = roles.get("next_defensive_setup")
 
 
         steps = roles["steps"]
@@ -459,7 +516,19 @@ class Animator:
                 if is_away_offense:
                     first_coords = get_away_player_coords(first_coords)
                     final_coords = get_away_player_coords(final_coords)
-                def_coords = assign_bh_defender_coords(final_coords, aggression_call, is_away_offense)
+                
+                # Override end position if FCP is next
+                if next_defensive_setup == "FCP":
+                    # Position for full court press: same Y as offensive player, 3 units closer to new offensive basket
+                    # After possession flip, this team will be on offense attacking opposite basket
+                    # So "closer to new offensive basket" means closer to where they currently are on defense
+                    x_offset = 3 if is_away_offense else -3
+                    def_coords = {
+                        "x": max(0, min(100, final_coords["x"] + x_offset)),
+                        "y": final_coords["y"]
+                    }
+                else:
+                    def_coords = assign_bh_defender_coords(final_coords, aggression_call, is_away_offense)
                 action_type = ACTIONS["GUARD_BALL"]
             elif pos in off_lineup:
                 off_player = off_lineup[pos]
@@ -468,7 +537,17 @@ class Animator:
                     "key"
                 )
                 o_coords = HCO_STRING_SPOTS.get(last_spot, HCO_STRING_SPOTS["key"])
-                def_coords = assign_non_bh_defender_coords(o_coords, ball_handler_end_coords, aggression_call, is_away_offense)
+                
+                # Override end position if FCP is next
+                if next_defensive_setup == "FCP":
+                    # Position for full court press
+                    x_offset = 3 if is_away_offense else -3
+                    def_coords = {
+                        "x": max(0, min(100, o_coords["x"] + x_offset)),
+                        "y": o_coords["y"]
+                    }
+                else:
+                    def_coords = assign_non_bh_defender_coords(o_coords, ball_handler_end_coords, aggression_call, is_away_offense)
             else:
                 logging.warning("No offensive match for defender %s, skipping.", pos)
                 continue
@@ -590,6 +669,195 @@ class Animator:
         )
 
         return animations
+
+    def skeleton_to_animations(self, skeleton, off_lineup, def_lineup, add_defenders=True, is_fcp=False):
+        """
+        Convert skeleton data to animation format.
+        
+        Args:
+            skeleton: Skeleton data with steps and pos_actions
+            off_lineup: Dict of offensive players by position
+            def_lineup: Dict of defensive players by position
+            add_defenders: Whether to add defensive player animations
+            is_fcp: Whether this is a full court press (uses special defensive positioning)
+            
+        Returns:
+            List of animation dicts for each player
+        """
+        if not skeleton or "steps" not in skeleton:
+            return []
+        
+        animations = []
+        steps = skeleton["steps"]
+        
+        # Group all positions that appear in any step
+        all_positions = set()
+        for step in steps:
+            all_positions.update(step.get("pos_actions", {}).keys())
+        
+        # Build animation for OFFENSIVE players from skeleton
+        offensive_animations = {}  # Store by position for defensive matching
+        
+        for position in all_positions:
+            player = off_lineup.get(position)
+            if not player:
+                continue
+            
+            player_id = getattr(player, "player_id", None)
+            if not player_id:
+                continue
+            
+            # Build movement array from steps
+            movement = []
+            has_ball_steps = []
+            start_coords = None
+            end_coords = None
+            
+            for step in steps:
+                pos_action = step.get("pos_actions", {}).get(position)
+                if not pos_action:
+                    continue
+                
+                timestamp = step.get("timestamp", 0)
+                coords = pos_action.get("coords", {"x": 50, "y": 25})
+                action = pos_action.get("action", "drift")
+                
+                if start_coords is None:
+                    start_coords = coords
+                end_coords = coords
+                
+                # Determine if player has ball at this step
+                has_ball = action in ["handle_ball", "receive", "shoot", "pass"]
+                
+                movement.append({
+                    "timestamp": timestamp,
+                    "coords": coords,
+                    "action": action
+                })
+                has_ball_steps.append(has_ball)
+            
+            if not movement:
+                continue
+            
+            # Calculate duration (last timestamp)
+            duration = movement[-1]["timestamp"] if movement else 0
+            
+            anim = {
+                "playerId": player_id,
+                "start": start_coords or {"x": 50, "y": 25},
+                "end": end_coords or {"x": 50, "y": 25},
+                "movement": movement,
+                "hasBallAtStep": has_ball_steps,
+                "duration": duration
+            }
+            
+            animations.append(anim)
+            offensive_animations[position] = anim  # Store for defensive matching
+        
+        # Add DEFENSIVE player animations
+        if add_defenders and def_lineup:
+            if is_fcp:
+                # Use FCP-specific defensive positioning
+                defensive_anims = self._position_fcp_defenders(
+                    offensive_animations, 
+                    def_lineup, 
+                    steps
+                )
+                animations.extend(defensive_anims)
+            else:
+                # Use standard defensive positioning (future implementation)
+                pass
+        
+        return animations
+    
+    def _position_fcp_defenders(self, offensive_animations, def_lineup, skeleton_steps):
+        """
+        Position defensive players for Full Court Press scenarios.
+        
+        Strategy:
+        - Each defender guards the offensive player at their position
+        - Defender maintains same Y coordinate as their assignment
+        - Defender is positioned 3 grid units closer to the offensive basket
+        
+        Args:
+            offensive_animations: Dict mapping position → offensive player animation
+            def_lineup: Dict of defensive players by position
+            skeleton_steps: List of skeleton steps for timing
+            
+        Returns:
+            List of defensive player animations
+        """
+        defensive_animations = []
+        
+        # Determine which direction is "closer to offensive basket"
+        is_away_offense = self.game.offense_team.team_id == self.game.away_team.team_id
+        
+        # For away team offense: offensive basket is on the LEFT (lower x)
+        # For home team offense: offensive basket is on the RIGHT (higher x)
+        x_offset = -3 if is_away_offense else 3
+        
+        # Match each defensive position to offensive position
+        for position, off_anim in offensive_animations.items():
+            # Get the defensive player at this position
+            def_player = def_lineup.get(position)
+            if not def_player:
+                continue
+            
+            def_player_id = getattr(def_player, "player_id", None)
+            if not def_player_id:
+                continue
+            
+            # Build defensive movement matching offensive player's path
+            def_movement = []
+            def_start = None
+            def_end = None
+            
+            for off_step in off_anim["movement"]:
+                timestamp = off_step["timestamp"]
+                off_coords = off_step["coords"]
+                
+                # Defender position: same Y, X offset toward offensive basket
+                def_coords = {
+                    "x": off_coords["x"] + x_offset,
+                    "y": off_coords["y"]
+                }
+                
+                # Clamp X to valid court bounds (0-100)
+                def_coords["x"] = max(0, min(100, def_coords["x"]))
+                
+                # Determine defensive action based on offensive action
+                if off_step.get("action") in ["handle_ball", "receive", "shoot", "pass"]:
+                    def_action = "guard_ball"  # Guarding ball handler
+                else:
+                    def_action = "guard_offball"  # Guarding off-ball player
+                
+                if def_start is None:
+                    def_start = def_coords
+                def_end = def_coords
+                
+                def_movement.append({
+                    "timestamp": timestamp,
+                    "coords": def_coords,
+                    "action": def_action
+                })
+            
+            if not def_movement:
+                continue
+            
+            # All defenders have ball at no steps
+            has_ball_steps = [False] * len(def_movement)
+            duration = def_movement[-1]["timestamp"] if def_movement else 0
+            
+            defensive_animations.append({
+                "playerId": def_player_id,
+                "start": def_start or {"x": 50, "y": 25},
+                "end": def_end or {"x": 50, "y": 25},
+                "movement": def_movement,
+                "hasBallAtStep": has_ball_steps,
+                "duration": duration
+            })
+        
+        return defensive_animations
 
     def get_latest_animation_packet(self):
         return self.latest_packet

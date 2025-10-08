@@ -81,6 +81,9 @@ TURNOVER_CALC_DICT = {
 
 POSITION_LIST = ["PG", "SG", "SF", "PF", "C"]
 
+# Ball landing adjustment for made shots (grid units closer to shooter)
+MADE_SHOT_BALL_OFFSET = 1
+
 # constants/strategy_factors.py
 AGGRESSION_FOUL_MULTIPLIER = {
     0: 0.8,
@@ -112,6 +115,11 @@ HCO_STRING_SPOTS = {
     "lower apex": {"x": 80, "y": 15},
     "upper midBaseline": {"x": 89, "y": 36}, 
     "lower midBaseline": {"x": 89, "y": 15},
+    "deep key": {"x": 57, "y": 25},
+    "deep lower wing": {"x": 57, "y": 15},
+    "deep lower baseline": {"x": 57, "y": 5},
+    "deep upper wing": {"x": 57, "y": 35},
+    "deep upper baseline": {"x": 57, "y": 45}
 }
 
 # Shared court coordinates

@@ -465,7 +465,41 @@ export async function animateGameTurns({ //hasBallAtStep
       continue;
     }
     
-    // Check for fast break shots
+    // Check for FCP shots - route to standard shot animation
+    if (turn.fcp_shot === true) {
+      animationDebugLog('FCP SHOT TURN - routing to standard shot animation:', {
+        result_type: turn.result_type,
+        turn_index: i
+      });
+      await playTurnAnimation({
+        scene,
+        simData,
+        playerSprites,
+        turnData: turn,
+        ballSprite,
+        onUpdate,
+        turnIndex: i,
+        onAction: async (action, sprite, timestamp) => {
+          if (DEBUG_FLOW || debugEnabled)
+            logVerbose(
+              `🎬 Action "${action}" fired at ${timestamp}ms for sprite:`,
+              sprite
+            );
+          if (onAction) onAction(action, sprite, timestamp);
+        },
+      });
+      if (onUpdate) {
+        try {
+          onUpdate(turn);
+        } catch (err) {
+          console.error('Scoreboard update failed:', err);
+        }
+      }
+      updateDebugScore(turn, { turnIndex: i, possessionId });
+      continue;
+    }
+    
+    // Debug: Check if this should be a fast break but isn't being detected
     if (turn.result_type === "MAKE" || turn.result_type === "MISS") {
       animationDebugLog('SHOT TURN - checking for fast break indicators:', {
         result_type: turn.result_type,

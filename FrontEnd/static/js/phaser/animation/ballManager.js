@@ -294,9 +294,17 @@ export function shootBall({
     scene.game.config.height
   );
   const rimCoords = isHomeTeam ? HOME_RIM_COORDS : AWAY_RIM_COORDS;
+  
+  // Adjust rim position for made shots (grid units closer to shooter)
+  const MADE_SHOT_BALL_OFFSET = 1;  // Should match BackEnd/constants.py
+  const adjustedRimCoords = { ...rimCoords };
+  if (result === "MAKE") {
+    adjustedRimCoords.x = isHomeTeam ? rimCoords.x - MADE_SHOT_BALL_OFFSET : rimCoords.x + MADE_SHOT_BALL_OFFSET;
+  }
+  
   const rim = gridToPixels(
-    rimCoords.x,
-    rimCoords.y,
+    adjustedRimCoords.x,
+    adjustedRimCoords.y,
     scene.game.config.width,
     scene.game.config.height
   );
@@ -535,51 +543,43 @@ export function animateRebound({
     );
   }
 
-  const offsets = [
-    { x: 1, y: 0 },
-    { x: -1, y: 0 },
-    { x: 0, y: 1 },
-    { x: 0, y: -1 },
-    { x: 1, y: 1 },
-    { x: -1, y: 1 },
-    { x: 1, y: -1 },
-    { x: -1, y: -1 }
-  ];
-  let offsetIndex = 0;
+  // Determine shooting team to apply proximity criteria
+  const shooterSprite = playerSprites[shooterId];
+  const shootingTeam = shooterSprite?.team; // "home" or "away"
+  const isHomeTeamShot = shootingTeam === "home";
 
-  for (const anim of animations || []) {
-    if (anim.playerId === rebounderId) continue;
-    const sprite = playerSprites[anim.playerId];
-    const lastStep = anim.movement?.[anim.movement.length - 1];
-    if (!sprite || !lastStep) continue;
+  // Animate other players attempting to rebound
+  for (const sprite of Object.values(playerSprites)) {
+    if (!sprite || sprite.playerId === rebounderId) continue;
 
-    const dist =
-      Math.abs(lastStep.coords.x - ballSpot.x) +
-      Math.abs(lastStep.coords.y - ballSpot.y);
-    if (dist > 15) continue;
+    // Get current position in grid coordinates
+    const currentGridX = (sprite.x / scene.game.config.width) * 100;
+    const currentGridY = 50 - (sprite.y / scene.game.config.height) * 50;
 
-    const offset = offsets[offsetIndex++] || { x: 0, y: 0 };
-    let targetGrid = { x: ballSpot.x + offset.x, y: ballSpot.y + offset.y };
+    // Apply proximity criteria based on shooting team
+    // Home team shot (attacking right, X=91): only players with X >= 74 can rebound
+    // Away team shot (attacking left, X=9): only players with X <= 25 can rebound
+    const meetsProximityCriteria = isHomeTeamShot 
+      ? currentGridX >= 74 
+      : currentGridX <= 25;
 
-    // Ensure minimum spacing from rebounder and other players
-    let adjusted = false;
-    while (!adjusted) {
-      adjusted = true;
-      for (const pos of finalPositions) {
-        if (Math.abs(targetGrid.x - pos.grid.x) < MIN_X_SEP) {
-          const dirX = targetGrid.x >= pos.grid.x ? 1 : -1;
-          targetGrid.x = pos.grid.x + dirX * MIN_X_SEP;
-          adjusted = false;
-        }
-        if (Math.abs(targetGrid.y - pos.grid.y) < MIN_Y_SEP) {
-          const dirY = targetGrid.y >= pos.grid.y ? 1 : -1;
-          targetGrid.y = pos.grid.y + dirY * MIN_Y_SEP;
-          adjusted = false;
-        }
-      }
-    }
+    if (!meetsProximityCriteria) continue;
 
-    finalPositions.push({ playerId: anim.playerId, grid: { ...targetGrid } });
+    // Random spot within 10 X and 12 Y of ball, staying in bounds
+    const targetX = Phaser.Math.Clamp(
+      ballSpot.x + Phaser.Math.Between(-10, 10),
+      4,
+      97
+    );
+    const targetY = Phaser.Math.Clamp(
+      ballSpot.y + Phaser.Math.Between(-12, 12),
+      5,
+      45
+    );
+
+    const targetGrid = { x: targetX, y: targetY };
+    finalPositions.push({ playerId: sprite.playerId, grid: { ...targetGrid } });
+
     const targetPx = gridToPixels(
       targetGrid.x,
       targetGrid.y,

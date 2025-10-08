@@ -35,7 +35,9 @@ from BackEnd.engine.phase_resolution import (
     resolve_fast_break_logic, 
     resolve_free_throw_logic, 
     resolve_turnover_logic, 
-    calculate_foul_turnover
+    calculate_foul_turnover,
+    resolve_full_court_press_logic,
+    resolve_half_court_trap_logic
 )
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
@@ -246,9 +248,9 @@ class TurnManager:
         print("*****RUN TURN*****")
         state = self.game.game_state.get("offensive_state", "HCO")
         print(f"offensive state: {state}")
-        if state in ["HCO", "HALF_COURT"]:
-            print(f"{self.game.offense_team.name}: {self.game.game_state['current_playcall']}")
-            print(f"{self.game.defense_team.name}: {self.game.game_state['defense_playcall']}")
+        # if state in ["HCO", "HALF_COURT"]:
+        #     print(f"{self.game.offense_team.name}: {self.game.game_state['current_playcall']}")
+        #     print(f"{self.game.defense_team.name}: {self.game.game_state['defense_playcall']}")
 
         # STEP 3: Route based on offensive state
         if state == "FREE_THROW":
@@ -257,15 +259,17 @@ class TurnManager:
             self.logger.log("fb:start")
             self.game.game_state["fastBreakInProgress"] = True
             result = resolve_fast_break_logic(self.game)
+        elif state == "FCP":
+            self.logger.log("fcp:start")
+            result = resolve_full_court_press_logic(self.game)
+        elif state == "HCT":
+            self.logger.log("hct:start")
+            result = resolve_half_court_trap_logic(self.game)
         else:
             calls = self.set_playcalls()
             self.game.game_state["current_playcall"] = calls["offense"]
             self.game.game_state["defense_playcall"] = calls["defense"]
             result = self.resolve_half_court_offense()
-
-        print("Inside run_micro_turn // coming out of resolve offensive state functions")
-        print(f"offense team id: {self.game.offense_team.team_id}")
-        print(f"defense team id: {self.game.defense_team.team_id}")
 
         # Record possession team before any potential flip
         result["starting_possession_team_id"] = self.game.offense_team.team_id
@@ -274,6 +278,12 @@ class TurnManager:
         try:
             self.update_clock_and_possession(result)
             self.logger.log_turn_result(result)
+            
+            # Update offensive_state based on next_play_type (e.g., after FCP/HCT)
+            next_play = result.get("next_play_type")
+            if next_play:
+                self.game.game_state["offensive_state"] = next_play
+                
         finally:
             if state == "FAST_BREAK":
                 self.logger.log("fb:end")
@@ -330,6 +340,9 @@ class TurnManager:
         result["turn_count"] = self.game.micro_turn_count
         # result["possession_team_id"] = self.game.offense_team.team_id
         update_player_coords_from_animations(self.game, result["animations"])
+        
+        # Print turn summary for debugging
+        self._print_turn_summary(result, state)
 
         result["home_lineup"] = serialize_lineup(self.game.home_team.lineup)
         result["away_lineup"] = serialize_lineup(self.game.away_team.lineup)
@@ -375,8 +388,8 @@ class TurnManager:
         if not result.get("text") or result.get("text").strip() == "":
             result["text"] = "No text in this turn"
 
-        print(f"inside run_micro_turn result: {result}")
-        # print(f"result: {result}")
+        # print(f"inside run_micro_turn result: {result}")
+        
         return result
 
 
@@ -719,4 +732,90 @@ class TurnManager:
 
         # No event = clean possession
         return "SHOT"
+
+    def determine_defensive_pressure_type(self):
+        """
+        Determine if defensive team should attempt FCP or HCT after a made shot.
+        Returns 'FCP', 'HCT', or 'HCO' based on strategy settings and random rolls.
+        """
+        def_team = self.game.defense_team
+        
+        # Get strategy settings
+        hct_value = def_team.strategy_settings.get("half_court_trap", 0)
+        fcp_value = def_team.strategy_settings.get("full_court_press", 0)
+        
+        # If both are 0, default to HCO
+        if hct_value == 0 and fcp_value == 0:
+            return "HCO"
+        
+        # Remove any strategy with value 0 from consideration
+        strategies = {}
+        if hct_value > 0:
+            strategies["HCT"] = hct_value
+        if fcp_value > 0:
+            strategies["FCP"] = fcp_value
+        
+        # If only one strategy available, use it
+        if len(strategies) == 1:
+            selected_strategy = list(strategies.keys())[0]
+        else:
+            # Weighted random selection between available strategies
+            total_value = sum(strategies.values())
+            rand = random.randint(1, 100)
+            
+            hct_chance = (strategies["HCT"] / total_value) * 100 if "HCT" in strategies else 0
+            fcp_chance = (strategies["FCP"] / total_value) * 100 if "FCP" in strategies else 0
+            
+            if rand <= hct_chance:
+                selected_strategy = "HCT"
+            else:
+                selected_strategy = "FCP"
+        
+        # Second die roll to determine if the selected strategy actually executes
+        strategy_value = strategies[selected_strategy]
+        execution_roll = random.randint(1, 4)
+        
+        if strategy_value >= execution_roll:
+            return selected_strategy
+        else:
+            return "HCO"
+    
+    def _print_turn_summary(self, result, offensive_state):
+        """Print a clean summary of the turn for debugging."""
+        print("\n" + "="*80)
+        print(f"TURN #{result.get('turn_count', 0)} SUMMARY")
+        print("="*80)
+        print(f"Offensive State: {offensive_state}")
+        print(f"Result Type: {result.get('result_type', 'N/A')}")
+        print(f"Text: {result.get('text', 'N/A')}")
+        print(f"Possession Flips: {result.get('possession_flips', False)}")
+        
+        # Animation data summary
+        animations = result.get('animations', [])
+        skeleton = result.get('skeleton', {})
+        
+        print(f"\nAnimation Data for turn {result.get('turn_count', 0)} {offensive_state}:")
+        print(f"  - Animations array: {len(animations)} players")
+        if skeleton and 'steps' in skeleton:
+            print(f"  - Skeleton steps: {len(skeleton['steps'])} timestamps")
+        else:
+            print(f"  - Skeleton: None")
+        
+        # Roles summary
+        roles = result.get('roles', {})
+        if roles:
+            print(f"\nRoles:")
+            for role_name, role_value in roles.items():
+                if role_name in ['offense', 'defense']:
+                    print(f"  - {role_name}: {len(role_value) if isinstance(role_value, list) else role_value}")
+                else:
+                    print(f"  - {role_name}: {role_value}")
+        
+        # Key player info
+        print(f"\nKey Players:")
+        for key in ['ball_handler', 'shooter', 'passer', 'defender']:
+            if key in result and result[key]:
+                print(f"  - {key}: {result[key]}")
+        
+        print("="*80 + "\n")
 
