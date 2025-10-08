@@ -777,7 +777,13 @@ def resolve_full_court_press_logic(game: "GameManager"):
     from BackEnd.models.animator import Animator
     animator = Animator(game)
     skeleton = get_skeleton_for_turn(result_type, "FCP", game) or {}
-    animations = animator.skeleton_to_animations(skeleton, off_lineup, def_lineup) if skeleton else []
+    animations = animator.skeleton_to_animations(
+        skeleton, 
+        off_lineup, 
+        def_lineup, 
+        add_defenders=True,
+        is_fcp=True
+    ) if skeleton else []
     
     result = {
         "result_type": result_type,
@@ -992,7 +998,13 @@ def resolve_half_court_trap_logic(game: "GameManager"):
     from BackEnd.models.animator import Animator
     animator = Animator(game)
     skeleton = get_skeleton_for_turn(result_type, "HCT", game) or {}
-    animations = animator.skeleton_to_animations(skeleton, off_lineup, def_lineup) if skeleton else []
+    animations = animator.skeleton_to_animations(
+        skeleton, 
+        off_lineup, 
+        def_lineup, 
+        add_defenders=False,  # TODO: Implement HCT-specific defensive positioning
+        is_fcp=False
+    ) if skeleton else []
     
     result = {
         "result_type": result_type,
