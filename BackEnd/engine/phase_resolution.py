@@ -763,9 +763,19 @@ def resolve_full_court_press_logic(game: "GameManager"):
         else:
             result_type = "HCO"
     else:
+        turnover_type = random.choices(["TRAVEL", "DOUBLE DRIBBLE", "BAD PASS"], weights=[0.6, 0.3, 0.1])[0]
         result_type = random.choices(["O_FOUL", "DEAD_BALL_TURNOVER", "STEAL"], weights=[0.5, 0.3, 0.2])[0]
     
-    text += " " + result_type
+    result_text_dict = {
+        "HCO": "they break the press & establish their half court offense",
+        "D_FOUL": "defensive foul!",
+        "O_FOUL": "offensive foul!",
+        "DEAD_BALL_TURNOVER": f"they force a {turnover_type}!",
+        "STEAL": "steal!",
+        "SHOT": "they break the press & attempt a shot!"
+    }
+    
+    text += "\n" + result_text_dict[result_type]
 
     # Handle SHOT result - execute actual shot resolution
     if result_type == "SHOT":
