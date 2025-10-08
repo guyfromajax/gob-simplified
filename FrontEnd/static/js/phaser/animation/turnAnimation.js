@@ -496,8 +496,8 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
         ),
         y: Phaser.Math.Clamp(
           currentGridY + Phaser.Math.Between(-10, 10),
-          5,  // Keep players well inside court
-          45  // Keep players well inside court
+          10,  // Keep players well inside court
+          40   // Keep players well inside court
         ),
       };
       
