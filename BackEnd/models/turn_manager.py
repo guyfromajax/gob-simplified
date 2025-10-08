@@ -118,20 +118,49 @@ class TurnManager:
         d_dest = {}
         for pos, defender in defense_team.lineup.items():
             if use_fcp_positioning:
-                # Position for FCP: same Y as offensive player, 3 units closer to new offensive basket
-                # After possession flip, defenders will become offense attacking the opposite basket
-                # So position them toward their own basket (where they'll attack from)
-                o_coords = o_dest.get(pos, {"x": 50, "y": 25})
+                # Position defenders in FCP press formation
+                # PG/SG/SF: Defensive half (pressuring ball handlers)
+                # PF/C: Offensive half (back line protection)
                 
-                # Calculate X offset toward the basket they'll be attacking
-                # is_away_offense tells us current offense orientation
-                # After flip, defense becomes offense with opposite orientation
-                x_offset = 3 if is_away_offense else -3
+                from BackEnd.constants import HCO_STRING_SPOTS
+                from BackEnd.utils.shared import get_away_player_coords
                 
-                d_coords = {
-                    "x": max(0, min(100, o_coords["x"] + x_offset)),
-                    "y": o_coords["y"]
+                # Define base positions for FCP setup (in home orientation)
+                fcp_defensive_positions = {
+                    "PG": HCO_STRING_SPOTS["midlane"],      # Midlane on defensive half (opp=True)
+                    "SG": HCO_STRING_SPOTS["upper wing"],   # Upper wing on defensive half (opp=True)
+                    "SF": HCO_STRING_SPOTS["lower wing"],   # Lower wing on defensive half (opp=True)
+                    "PF": HCO_STRING_SPOTS["lower apex"],   # Lower apex on offensive half (opp=False)
+                    "C": HCO_STRING_SPOTS["upper apex"],    # Upper apex on offensive half (opp=False)
                 }
+                
+                base_coords = fcp_defensive_positions.get(pos, {"x": 50, "y": 25})
+                
+                # Apply "opp" logic for positions that should be on defensive half
+                # After possession flip, defense becomes offense
+                # PG/SG/SF pressure on what will be their defensive half
+                if pos in ["PG", "SG", "SF"]:
+                    # These positions go to defensive half (opp=True)
+                    # is_away_offense tells us current offense orientation
+                    if is_away_offense:
+                        # Away team currently on offense, will become defense
+                        # Their defensive half is home side - no flip needed
+                        d_coords = base_coords
+                    else:
+                        # Home team currently on offense, will become defense
+                        # Their defensive half is away side - flip coordinates
+                        d_coords = get_away_player_coords(base_coords)
+                else:
+                    # PF/C stay on offensive half (opp=False)
+                    if is_away_offense:
+                        # Away team currently on offense, will become defense
+                        # Their offensive half is away side - flip coordinates
+                        d_coords = get_away_player_coords(base_coords)
+                    else:
+                        # Home team currently on offense, will become defense
+                        # Their offensive half is home side - no flip needed
+                        d_coords = base_coords
+                
                 d_dest[pos] = d_coords
             else:
                 # Standard defensive positioning
