@@ -289,10 +289,11 @@ export function shootBall({
   );
   const rimCoords = isHomeTeam ? HOME_RIM_COORDS : AWAY_RIM_COORDS;
   
-  // Adjust rim position for made shots (1 grid unit closer to shooter)
+  // Adjust rim position for made shots (grid units closer to shooter)
+  const MADE_SHOT_BALL_OFFSET = 1;  // Should match BackEnd/constants.py
   const adjustedRimCoords = { ...rimCoords };
   if (result === "MAKE") {
-    adjustedRimCoords.x = isHomeTeam ? rimCoords.x - 1 : rimCoords.x + 1;
+    adjustedRimCoords.x = isHomeTeam ? rimCoords.x - MADE_SHOT_BALL_OFFSET : rimCoords.x + MADE_SHOT_BALL_OFFSET;
   }
   
   const rim = gridToPixels(
