@@ -706,14 +706,14 @@ export function animateRebound({
 
     if (!meetsProximityCriteria) continue;
 
-    // Random spot within 10 X and 12 Y of ball, staying in bounds
+    // Random spot within 6 X and 8 Y of ball, staying in bounds
     const targetX = Phaser.Math.Clamp(
-      ballSpot.x + Phaser.Math.Between(-10, 10),
-      4,
-      97
+      ballSpot.x + Phaser.Math.Between(-6, 6),
+      9,
+      92
     );
     const targetY = Phaser.Math.Clamp(
-      ballSpot.y + Phaser.Math.Between(-12, 12),
+      ballSpot.y + Phaser.Math.Between(-8, 8),
       5,
       45
     );
