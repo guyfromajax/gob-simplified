@@ -228,6 +228,7 @@ class ShotManager:
         if made:
             result["points"] = points
             result["scoring_team"] = off_team.name
+            # next_defensive_setup is already in result from line 95
 
         return result
 

@@ -586,12 +586,14 @@ async function runInboundSetup({
   playerSprites,
   newOffenseSide,
   homeTeamId,
-  awayTeamId
+  awayTeamId,
+  skipRetreat = false  // Allow skipping retreat for FCP
 }) {
   animationDebugLog('runInboundSetup called:', {
     newOffenseSide,
     currentState: scene.stateMachine?.state,
-    isFreeThrow: scene?.stateMachine?.is(States.FreeThrow)
+    isFreeThrow: scene?.stateMachine?.is(States.FreeThrow),
+    skipRetreat
   });
   
   if (scene?.stateMachine?.is(States.FreeThrow)) {
@@ -657,34 +659,36 @@ async function runInboundSetup({
   const width = scene.game.config.width;
   const height = scene.game.config.height;
 
-  // Retreat scoring team toward midcourt
+  // Retreat scoring team toward midcourt (unless FCP is next)
   const retreatPromises = [];
-  for (const [id, sprite] of Object.entries(playerSprites)) {
-    const info = scene.playerInfo?.[id];
-    if (!info) continue;
-    if (
-      sprite.team_id === scoringTeamId ||
-      (!scoringTeamId && sprite.team === scoringTeamKey)
-    ) {
-      const targetX = gridToPixels(
-        isAwayOffense ? 45 : 55,
-        25,
-        width,
-        height
-      ).x;
-      retreatPromises.push(
-        new Promise((resolve) => {
-          scene.tweens.add({
-            targets: sprite,
-            x: targetX,
-            y: sprite.y,
-            duration: 500,
-            ease: "Sine.easeInOut",
-            onComplete: resolve,
-            onStop: resolve
-          });
-        })
-      );
+  if (!skipRetreat) {
+    for (const [id, sprite] of Object.entries(playerSprites)) {
+      const info = scene.playerInfo?.[id];
+      if (!info) continue;
+      if (
+        sprite.team_id === scoringTeamId ||
+        (!scoringTeamId && sprite.team === scoringTeamKey)
+      ) {
+        const targetX = gridToPixels(
+          isAwayOffense ? 45 : 55,
+          25,
+          width,
+          height
+        ).x;
+        retreatPromises.push(
+          new Promise((resolve) => {
+            scene.tweens.add({
+              targets: sprite,
+              x: targetX,
+              y: sprite.y,
+              duration: 500,
+              ease: "Sine.easeInOut",
+              onComplete: resolve,
+              onStop: resolve
+            });
+          })
+        );
+      }
     }
   }
 
@@ -1113,6 +1117,13 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
           const shooterTeamIsHome =
             String(shooterTeamId) === String(homeTeamId);
           const newOffenseSide = shooterTeamIsHome ? "away" : "home";
+          
+          // Check if FCP is coming next - if so, skip retreat animation
+          const skipRetreat = turnData.next_defensive_setup === "FCP";
+          if (skipRetreat) {
+            console.log('FCP detected - skipping defensive retreat to midcourt');
+          }
+          
           const releaseGuard = createTransitionGuard(scene.stateMachine, [States.Rebound]);
           await runInboundSetup({
             scene,
@@ -1121,6 +1132,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
             newOffenseSide,
             homeTeamId,
             awayTeamId,
+            skipRetreat,
           });
           releaseGuard?.();
         }
