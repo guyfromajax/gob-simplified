@@ -81,11 +81,11 @@ class TurnManager:
         # Sideline spot for the inbounder (SF). These coordinates assume the
         # home team is on offense. They will be mirrored if the away team has
         # the ball. Y=51 is out of bounds at the top of the court.
-        inbound_spot_home = {"x": 47, "y": 51}
+        inbound_spot_home = {"x": 47, "y": 46}
 
         # Destination ranges for other offensive players (home orientation).
         home_ranges = {
-            "PG": {"x": (50, 54), "y": (40, 45)},
+            "PG": {"x": (50, 54), "y": (37, 43)},
             "SG": {"x": (55, 64), "y": (18, 32)},
             "PF": {"x": (65, 80), "y": (26, 36)},
             "C":  {"x": (65, 80), "y": (14, 24)},
