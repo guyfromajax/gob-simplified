@@ -671,6 +671,15 @@ export function animateRebound({
   const shootingTeam = shooterSprite?.team; // "home" or "away"
   const isHomeTeamShot = shootingTeam === "home";
 
+  console.log('REBOUND ANIMATION DEBUG:', {
+    shooterId,
+    shootingTeam,
+    isHomeTeamShot,
+    rebounderId,
+    ballSpot,
+    totalPlayers: Object.keys(playerSprites).length
+  });
+
   // Animate other players attempting to rebound
   for (const sprite of Object.values(playerSprites)) {
     if (!sprite || sprite.playerId === rebounderId) continue;
@@ -685,6 +694,15 @@ export function animateRebound({
     const meetsProximityCriteria = isHomeTeamShot 
       ? currentGridX >= 74 
       : currentGridX <= 25;
+
+    console.log('Player proximity check:', {
+      playerId: sprite.playerId,
+      currentGridX,
+      currentGridY,
+      meetsProximityCriteria,
+      isHomeTeamShot,
+      threshold: isHomeTeamShot ? '>=74' : '<=25'
+    });
 
     if (!meetsProximityCriteria) continue;
 
