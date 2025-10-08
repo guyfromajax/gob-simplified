@@ -287,8 +287,30 @@ class Animator:
 
         for idx, outcome in enumerate(attempts or []):
             time += shot_ms
+            
+            # Calculate ball landing position based on make/miss
+            if outcome == "MAKE":
+                # Made shot: ball lands 1 grid unit closer to shooter
+                ball_coords = {
+                    "x": rim["x"] - 1 if offense_is_home else rim["x"] + 1,
+                    "y": rim["y"]
+                }
+            else:
+                # Missed shot: ball bounces to random spot
+                # Y: ±6 from rim center
+                # X: 1-6 grid units outward from rim
+                y_bounce = random.randint(-6, 6)
+                x_bounce = random.randint(1, 6)
+                ball_coords = {
+                    "x": rim["x"] + x_bounce if offense_is_home else rim["x"] - x_bounce,
+                    "y": rim["y"] + y_bounce
+                }
+                # Clamp to valid court bounds
+                ball_coords["x"] = max(0, min(100, ball_coords["x"]))
+                ball_coords["y"] = max(0, min(50, ball_coords["y"]))
+            
             ball_movement.append(
-                {"timestamp": time, "coords": rim, "action": ACTIONS["SHOOT"]}
+                {"timestamp": time, "coords": ball_coords, "action": ACTIONS["SHOOT"]}
             )
             time += rim_hold_ms
             if idx < len(attempts) - 1:
