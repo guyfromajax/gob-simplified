@@ -650,10 +650,19 @@ async function runInboundSetup({
   const ranges = isAwayOffense ? awayOffsetRanges : homeOffsetRanges;
   const inboundDest = {};
   for (const pos of ["PG", "SG", "PF", "C"]) {
-    inboundDest[pos] = {
-      x: ballSpot.x + Phaser.Math.Between(ranges[pos].x[0], ranges[pos].x[1]),
-      y: ballSpot.y + Phaser.Math.Between(ranges[pos].y[0], ranges[pos].y[1])
-    };
+    if (pos === "PF" || pos === "C") {
+      // PF and C go to half court area
+      inboundDest[pos] = {
+        x: Phaser.Math.Between(40, 60),
+        y: Phaser.Math.Between(15, 35)
+      };
+    } else {
+      // PG and SG use offset-based positioning
+      inboundDest[pos] = {
+        x: ballSpot.x + Phaser.Math.Between(ranges[pos].x[0], ranges[pos].x[1]),
+        y: ballSpot.y + Phaser.Math.Between(ranges[pos].y[0], ranges[pos].y[1])
+      };
+    }
   }
 
   const width = scene.game.config.width;
