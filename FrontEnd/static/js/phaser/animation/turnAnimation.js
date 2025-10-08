@@ -663,13 +663,13 @@ async function runInboundSetup({
   const fcpDefensiveSetup = {};
   if (skipRetreat) {
     // Define FCP defensive positions (in grid coordinates)
-    // These are in "home orientation" (LEFT side = defensive half, RIGHT side = offensive half)
+    // These are in "LEFT side orientation" (defensive half for FCP)
     const fcpHomePositions = {
-      PG: { x: 80, y: 25 },   // Midlane on defensive half (will flip for opp)
-      SG: { x: 28, y: 40 },   // Upper wing on defensive half (will flip for opp)
-      SF: { x: 28, y: 10 },   // Lower wing on defensive half (will flip for opp)
-      PF: { x: 80, y: 15 },   // Lower apex on offensive half
-      C: { x: 80, y: 36 }     // Upper apex on offensive half
+      PG: { x: 21, y: 25 },   // Midlane on defensive half (LEFT side mirror of X=80)
+      SG: { x: 28, y: 40 },   // Upper wing on defensive half
+      SF: { x: 28, y: 10 },   // Lower wing on defensive half
+      PF: { x: 80, y: 15 },   // Lower apex on offensive half (RIGHT side)
+      C: { x: 80, y: 36 }     // Upper apex on offensive half (RIGHT side)
     };
 
     // Apply opp logic for PG/SG/SF (they should be on opposite side)
