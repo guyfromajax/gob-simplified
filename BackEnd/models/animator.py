@@ -288,31 +288,42 @@ class Animator:
         for idx, outcome in enumerate(attempts or []):
             time += shot_ms
             
-            # Calculate ball landing position based on make/miss
+            # Ball always goes to rim first
+            ball_movement.append(
+                {"timestamp": time, "coords": rim, "action": ACTIONS["SHOOT"]}
+            )
+            
+            # Calculate final position based on make/miss
             if outcome == "MAKE":
-                # Made shot: ball lands 1 grid unit closer to shooter
-                ball_coords = {
-                    "x": rim["x"] - 1 if offense_is_home else rim["x"] + 1,
-                    "y": rim["y"]
-                }
+                # Made shot: ball stays at rim (already added above)
+                time += rim_hold_ms
             else:
-                # Missed shot: ball bounces to random spot
+                # Missed shot: ball bounces away from rim
+                # First, ball hits rim (already added above)
+                time += rim_hold_ms  # Brief pause at rim
+                
+                # Then bounce to random spot AWAY from basket
                 # Y: ±6 from rim center
-                # X: 1-6 grid units outward from rim
+                # X: 1-6 grid units AWAY from basket (outward)
                 y_bounce = random.randint(-6, 6)
                 x_bounce = random.randint(1, 6)
-                ball_coords = {
-                    "x": rim["x"] + x_bounce if offense_is_home else rim["x"] - x_bounce,
+                
+                # Home basket (X=91): bounce left (decrease X)
+                # Away basket (X=9): bounce right (increase X)
+                bounce_coords = {
+                    "x": rim["x"] - x_bounce if offense_is_home else rim["x"] + x_bounce,
                     "y": rim["y"] + y_bounce
                 }
                 # Clamp to valid court bounds
-                ball_coords["x"] = max(0, min(100, ball_coords["x"]))
-                ball_coords["y"] = max(0, min(50, ball_coords["y"]))
+                bounce_coords["x"] = max(0, min(100, bounce_coords["x"]))
+                bounce_coords["y"] = max(0, min(50, bounce_coords["y"]))
+                
+                # Add bounce animation
+                ball_movement.append(
+                    {"timestamp": time, "coords": bounce_coords, "action": ACTIONS["DRIFT"]}
+                )
             
-            ball_movement.append(
-                {"timestamp": time, "coords": ball_coords, "action": ACTIONS["SHOOT"]}
-            )
-            time += rim_hold_ms
+            # If more attempts remain, return ball to shooter
             if idx < len(attempts) - 1:
                 time += shot_ms
                 ball_movement.append(
