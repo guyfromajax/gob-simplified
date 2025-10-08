@@ -78,10 +78,10 @@ class TurnManager:
 
         self.logger.log("sideInbound:start")
 
-        # Baseline spot for the inbounder (SF). These coordinates assume the
+        # Sideline spot for the inbounder (SF). These coordinates assume the
         # home team is on offense. They will be mirrored if the away team has
-        # the ball.
-        inbound_spot_home = {"x": 47, "y": 25}
+        # the ball. Y=51 is out of bounds at the top of the court.
+        inbound_spot_home = {"x": 47, "y": 51}
 
         # Destination ranges for other offensive players (home orientation).
         home_ranges = {
