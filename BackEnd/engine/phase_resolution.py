@@ -291,6 +291,9 @@ def resolve_fast_break_logic(game: "GameManager"):
     if hold_up:
         turn_result["hold_up"] = True
         turn_result["stopper_id"] = stopper_id
+    
+    # Prepend "Fast Break!" to the text
+    turn_result["text"] = "Fast Break! " + turn_result.get("text", "")
 
     # ✅ Add safety checks before returning
     assert turn_result is not None, "turn_result is None"

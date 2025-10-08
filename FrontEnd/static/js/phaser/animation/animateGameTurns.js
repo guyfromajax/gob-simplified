@@ -419,10 +419,11 @@ export async function animateGameTurns({ //hasBallAtStep
     }
 
     // Debug fast break routing
-    if (turn.fast_break === true || turn.result_type === "FAST_BREAK") {
+    if (turn.fast_break === true || turn.result_type === "FAST_BREAK" || turn.next_play_type === "FAST_BREAK") {
       animationDebugLog('FAST BREAK TURN DETECTED - routing to runFastBreakSequence:', {
         fast_break: turn.fast_break,
         result_type: turn.result_type,
+        next_play_type: turn.next_play_type,
         turn_index: i
       });
       await runFastBreakSequence(scene, { playerSprites, ballSprite, turnData: turn, onUpdate, turnIndex: i });
