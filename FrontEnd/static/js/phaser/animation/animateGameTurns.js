@@ -356,6 +356,20 @@ export async function animateGameTurns({ //hasBallAtStep
       continue;
     }
 
+    if (turn.result_type === "FOUL") {
+      // FOUL turns are metadata only - the actual animation happens in the SIDE_INBOUND turn that follows
+      // Just update the scoreboard and continue
+      if (onUpdate) {
+        try {
+          onUpdate(turn);
+        } catch (err) {
+          console.error('Scoreboard update failed:', err);
+        }
+      }
+      updateDebugScore(turn, { turnIndex: i, possessionId });
+      continue;
+    }
+
     if (turn.result_type === "SIDE_INBOUND") {
       if (!scene.stateMachine?.is(States.FastBreak)) {
         await runSideInboundSetup({ scene, ballSprite, playerSprites, turnData: turn });
