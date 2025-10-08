@@ -85,10 +85,10 @@ class TurnManager:
 
         # Destination ranges for other offensive players (home orientation).
         home_ranges = {
-            "PG": {"x": (50, 54), "y": (22, 28)},
-            "SG": {"x": (54, 58), "y": (18, 32)},
-            "PF": {"x": (54, 58), "y": (30, 36)},
-            "C":  {"x": (54, 58), "y": (14, 20)},
+            "PG": {"x": (50, 54), "y": (40, 45)},
+            "SG": {"x": (55, 64), "y": (18, 32)},
+            "PF": {"x": (65, 80), "y": (26, 36)},
+            "C":  {"x": (65, 80), "y": (14, 24)},
         }
 
         o_dest_home = {}
