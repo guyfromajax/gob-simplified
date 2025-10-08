@@ -112,6 +112,8 @@ class GameManager:
         ):
             inbound_payload = self.turn_manager.setup_side_inbound()
             self.turns.append(inbound_payload)
+            # Reset offensive state to HCO after side inbound (FCP/HCT only apply after made shots)
+            self.game_state["offensive_state"] = "HCO"
 
         # Update team stats after each turn
         self.update_team_stats()
