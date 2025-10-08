@@ -1109,6 +1109,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
       }
       const shotResult = await shootBall(shootParams);
       const ballSpot = shotResult?.grid;
+      console.log("result_type", turnData.result_type);
       if (turnData.result_type === "MAKE") {
         const nextTurn = simData?.turns?.[scene.currentTurn + 1];
         const hasPendingFreeThrow =
