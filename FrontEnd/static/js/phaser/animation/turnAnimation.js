@@ -679,9 +679,19 @@ async function runInboundSetup({
       let coords = fcpHomePositions[pos];
       
       if (isAwayOffense) {
-        // Away team scored, HOME team defending RIGHT basket (X=91)
-        // PF/C protect RIGHT half (X > 50) - flip from 21 to 80
-        // PG/SG/SF press on LEFT half (X < 50) - flip from 80/73 to 21/28
+        // AWAY on offense (attacking LEFT basket X=9), HOME defending LEFT basket
+        // HOME defends: PF/C protect LEFT half (X < 50), PG/SG/SF press on RIGHT half (X > 50)
+        
+        if (['PG', 'SG', 'SF'].includes(pos)) {
+          // PG/SG/SF press on RIGHT half (X > 50) - already at 80/73
+          fcpDefensiveSetup[pos] = coords;  // No flip needed
+        } else {
+          // PF/C protect on LEFT half (X < 50) - already at 21
+          fcpDefensiveSetup[pos] = coords;  // No flip needed
+        }
+      } else {
+        // HOME on offense (attacking RIGHT basket X=91), AWAY defending RIGHT basket
+        // AWAY defends: PF/C protect RIGHT half (X > 50), PG/SG/SF press on LEFT half (X < 50)
         
         if (['PG', 'SG', 'SF'].includes(pos)) {
           // PG/SG/SF press on LEFT half (X < 50)
@@ -689,18 +699,6 @@ async function runInboundSetup({
         } else {
           // PF/C protect on RIGHT half (X > 50)
           fcpDefensiveSetup[pos] = { x: 101 - coords.x, y: coords.y };  // Flip 21→80
-        }
-      } else {
-        // Home team scored, AWAY team defending LEFT basket (X=9)
-        // PF/C protect LEFT half (X < 50) - stay at 21
-        // PG/SG/SF press on RIGHT half (X > 50) - stay at 80/73
-        
-        if (['PG', 'SG', 'SF'].includes(pos)) {
-          // PG/SG/SF press on RIGHT half (X > 50)
-          fcpDefensiveSetup[pos] = coords;  // Already at X=80/73 (RIGHT)
-        } else {
-          // PF/C protect on LEFT half (X < 50)
-          fcpDefensiveSetup[pos] = coords;  // Already at X=21 (LEFT)
         }
       }
     }
