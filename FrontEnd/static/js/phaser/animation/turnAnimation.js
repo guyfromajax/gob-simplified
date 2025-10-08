@@ -677,8 +677,8 @@ async function runInboundSetup({
       PG: { x: 80, y: 25 },   // Midlane - pressing (will be on right when away defends)
       SG: { x: 73, y: 40 },   // Upper wing - pressing (will be on right when away defends)
       SF: { x: 73, y: 10 },   // Lower wing - pressing (will be on right when away defends)
-      PF: { x: 21, y: 15 },   // Lower apex - protecting (will be on left when away defends)
-      C: { x: 21, y: 36 }     // Upper apex - protecting (will be on left when away defends)
+      PF: { x: 21, y: 36 },   // Upper apex - protecting (will be on left when away defends)
+      C: { x: 21, y: 15 }     // Lower apex - protecting (will be on left when away defends)
     };
 
     // Apply positioning logic based on which team is defending
