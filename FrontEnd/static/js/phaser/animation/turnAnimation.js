@@ -678,29 +678,21 @@ async function runInboundSetup({
       
       if (isAwayOffense) {
         // Away team scored, HOME team defending
-        // Home will attack RIGHT basket (X=91)
-        // Defensive half = LEFT side (where away just scored)
-        // Offensive half = RIGHT side (where home will attack)
-        
         if (['PG', 'SG', 'SF'].includes(pos)) {
-          // Pressuring defenders stay on LEFT (defensive half)
-          fcpDefensiveSetup[pos] = coords;  // No flip
-        } else {
-          // PF/C protect on RIGHT (offensive half)
+          // Pressuring defenders go to RIGHT
           fcpDefensiveSetup[pos] = { x: 101 - coords.x, y: coords.y };  // Flip to right
+        } else {
+          // PF/C protect on LEFT
+          fcpDefensiveSetup[pos] = coords;  // No flip
         }
       } else {
         // Home team scored, AWAY team defending
-        // Away will attack LEFT basket (X=9)
-        // Defensive half = RIGHT side (where home just scored)
-        // Offensive half = LEFT side (where away will attack)
-        
         if (['PG', 'SG', 'SF'].includes(pos)) {
-          // Pressuring defenders go to RIGHT (defensive half)
-          fcpDefensiveSetup[pos] = { x: 101 - coords.x, y: coords.y };  // Flip to right
-        } else {
-          // PF/C protect on LEFT (offensive half)
+          // Pressuring defenders stay on LEFT
           fcpDefensiveSetup[pos] = coords;  // No flip
+        } else {
+          // PF/C protect on RIGHT
+          fcpDefensiveSetup[pos] = { x: 101 - coords.x, y: coords.y };  // Flip to right
         }
       }
     }
