@@ -672,31 +672,35 @@ async function runInboundSetup({
       C: { x: 80, y: 36 }     // Upper apex on offensive half (RIGHT side)
     };
 
-    // Apply opp logic for PG/SG/SF (they should be on opposite side)
+    // Apply positioning logic based on which team is defending
     for (const pos of ['PG', 'SG', 'SF', 'PF', 'C']) {
       let coords = fcpHomePositions[pos];
       
-      // PG/SG/SF go to defensive half (far end from where they'll attack)
-      if (['PG', 'SG', 'SF'].includes(pos)) {
-        // After made shot, possession flips
-        // Current defense becomes new offense
-        if (isAwayOffense) {
-          // Away team scored, home team will defend and then attack RIGHT (X=91)
-          // Defensive half is LEFT side - coords already left-oriented, no flip
-          fcpDefensiveSetup[pos] = coords;
+      if (isAwayOffense) {
+        // Away team scored, HOME team defending
+        // Home will attack RIGHT basket (X=91)
+        // Defensive half = LEFT side (where away just scored)
+        // Offensive half = RIGHT side (where home will attack)
+        
+        if (['PG', 'SG', 'SF'].includes(pos)) {
+          // Pressuring defenders stay on LEFT (defensive half)
+          fcpDefensiveSetup[pos] = coords;  // No flip
         } else {
-          // Home team scored, away team will defend and then attack LEFT (X=9)
-          // Defensive half is LEFT side - coords already left-oriented, no flip
-          fcpDefensiveSetup[pos] = coords;
+          // PF/C protect on RIGHT (offensive half)
+          fcpDefensiveSetup[pos] = { x: 101 - coords.x, y: coords.y };  // Flip to right
         }
       } else {
-        // PF/C stay on offensive half (near where they'll attack)
-        if (isAwayOffense) {
-          // Home team will attack RIGHT - flip to right side
-          fcpDefensiveSetup[pos] = { x: 101 - coords.x, y: coords.y };
+        // Home team scored, AWAY team defending
+        // Away will attack LEFT basket (X=9)
+        // Defensive half = RIGHT side (where home just scored)
+        // Offensive half = LEFT side (where away will attack)
+        
+        if (['PG', 'SG', 'SF'].includes(pos)) {
+          // Pressuring defenders go to RIGHT (defensive half)
+          fcpDefensiveSetup[pos] = { x: 101 - coords.x, y: coords.y };  // Flip to right
         } else {
-          // Away team will attack LEFT - coords already left-oriented, no flip
-          fcpDefensiveSetup[pos] = coords;
+          // PF/C protect on LEFT (offensive half)
+          fcpDefensiveSetup[pos] = coords;  // No flip
         }
       }
     }
