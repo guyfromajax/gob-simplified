@@ -91,6 +91,8 @@ class ShotManager:
                 # Check for defensive pressure opportunity (FCP/HCT)
                 pressure_type = self.game.turn_manager.determine_defensive_pressure_type()
                 self.game_state["offensive_state"] = pressure_type
+                # Store pressure type for animator to use
+                result["next_defensive_setup"] = pressure_type
                 text = f"{get_name_safe(shooter)} drains a 3!" if is_three else f"{get_name_safe(shooter)} makes the shot."
 
         # ------------------------

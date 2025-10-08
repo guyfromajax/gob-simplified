@@ -565,6 +565,11 @@ def resolve_half_court_offense_logic(game):
 
     # 3. Shot Result
     shot_result = game.shot_manager.resolve_shot(roles)
+    
+    # Pass next_defensive_setup to animator via roles
+    if "next_defensive_setup" in shot_result:
+        roles["next_defensive_setup"] = shot_result["next_defensive_setup"]
+    
     animator = Animator(game)
     shot_result["animations"] = animator.capture_halfcourt_animation(roles)
     
