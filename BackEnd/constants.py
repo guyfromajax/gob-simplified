@@ -81,6 +81,9 @@ TURNOVER_CALC_DICT = {
 
 POSITION_LIST = ["PG", "SG", "SF", "PF", "C"]
 
+# Ball landing adjustment for made shots (grid units closer to shooter)
+MADE_SHOT_BALL_OFFSET = 1
+
 # constants/strategy_factors.py
 AGGRESSION_FOUL_MULTIPLIER = {
     0: 0.8,

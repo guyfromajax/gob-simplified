@@ -288,14 +288,26 @@ class Animator:
         for idx, outcome in enumerate(attempts or []):
             time += shot_ms
             
-            # Ball always goes to rim first
+            # Calculate ball landing position based on make/miss
+            from BackEnd.constants import MADE_SHOT_BALL_OFFSET
+            
+            if outcome == "MAKE":
+                # Made shot: ball lands closer to shooter
+                ball_coords = {
+                    "x": rim["x"] - MADE_SHOT_BALL_OFFSET if offense_is_home else rim["x"] + MADE_SHOT_BALL_OFFSET,
+                    "y": rim["y"]
+                }
+            else:
+                # Missed shot: ball goes to rim first
+                ball_coords = rim
+            
             ball_movement.append(
-                {"timestamp": time, "coords": rim, "action": ACTIONS["SHOOT"]}
+                {"timestamp": time, "coords": ball_coords, "action": ACTIONS["SHOOT"]}
             )
             
-            # Calculate final position based on make/miss
+            # Handle post-shot animation
             if outcome == "MAKE":
-                # Made shot: ball stays at rim (already added above)
+                # Made shot: ball stays at landing spot
                 time += rim_hold_ms
             else:
                 # Missed shot: ball bounces away from rim
