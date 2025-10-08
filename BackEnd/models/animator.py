@@ -591,7 +591,7 @@ class Animator:
 
         return animations
 
-    def skeleton_to_animations(self, skeleton, off_lineup, def_lineup):
+    def skeleton_to_animations(self, skeleton, off_lineup, def_lineup, add_defenders=True, is_fcp=False):
         """
         Convert skeleton data to animation format.
         
@@ -599,6 +599,8 @@ class Animator:
             skeleton: Skeleton data with steps and pos_actions
             off_lineup: Dict of offensive players by position
             def_lineup: Dict of defensive players by position
+            add_defenders: Whether to add defensive player animations
+            is_fcp: Whether this is a full court press (uses special defensive positioning)
             
         Returns:
             List of animation dicts for each player
@@ -614,10 +616,11 @@ class Animator:
         for step in steps:
             all_positions.update(step.get("pos_actions", {}).keys())
         
-        # Build animation for each position
+        # Build animation for OFFENSIVE players from skeleton
+        offensive_animations = {}  # Store by position for defensive matching
+        
         for position in all_positions:
-            # Determine if this is an offensive or defensive position
-            player = off_lineup.get(position) or def_lineup.get(position)
+            player = off_lineup.get(position)
             if not player:
                 continue
             
@@ -660,16 +663,122 @@ class Animator:
             # Calculate duration (last timestamp)
             duration = movement[-1]["timestamp"] if movement else 0
             
-            animations.append({
+            anim = {
                 "playerId": player_id,
                 "start": start_coords or {"x": 50, "y": 25},
                 "end": end_coords or {"x": 50, "y": 25},
                 "movement": movement,
                 "hasBallAtStep": has_ball_steps,
                 "duration": duration
-            })
+            }
+            
+            animations.append(anim)
+            offensive_animations[position] = anim  # Store for defensive matching
+        
+        # Add DEFENSIVE player animations
+        if add_defenders and def_lineup:
+            if is_fcp:
+                # Use FCP-specific defensive positioning
+                defensive_anims = self._position_fcp_defenders(
+                    offensive_animations, 
+                    def_lineup, 
+                    steps
+                )
+                animations.extend(defensive_anims)
+            else:
+                # Use standard defensive positioning (future implementation)
+                pass
         
         return animations
+    
+    def _position_fcp_defenders(self, offensive_animations, def_lineup, skeleton_steps):
+        """
+        Position defensive players for Full Court Press scenarios.
+        
+        Strategy:
+        - Each defender guards the offensive player at their position
+        - Defender maintains same Y coordinate as their assignment
+        - Defender is positioned 3 grid units closer to the offensive basket
+        
+        Args:
+            offensive_animations: Dict mapping position → offensive player animation
+            def_lineup: Dict of defensive players by position
+            skeleton_steps: List of skeleton steps for timing
+            
+        Returns:
+            List of defensive player animations
+        """
+        defensive_animations = []
+        
+        # Determine which direction is "closer to offensive basket"
+        is_away_offense = self.game.offense_team.team_id == self.game.away_team.team_id
+        
+        # For away team offense: offensive basket is on the LEFT (lower x)
+        # For home team offense: offensive basket is on the RIGHT (higher x)
+        x_offset = -3 if is_away_offense else 3
+        
+        # Match each defensive position to offensive position
+        for position, off_anim in offensive_animations.items():
+            # Get the defensive player at this position
+            def_player = def_lineup.get(position)
+            if not def_player:
+                continue
+            
+            def_player_id = getattr(def_player, "player_id", None)
+            if not def_player_id:
+                continue
+            
+            # Build defensive movement matching offensive player's path
+            def_movement = []
+            def_start = None
+            def_end = None
+            
+            for off_step in off_anim["movement"]:
+                timestamp = off_step["timestamp"]
+                off_coords = off_step["coords"]
+                
+                # Defender position: same Y, X offset toward offensive basket
+                def_coords = {
+                    "x": off_coords["x"] + x_offset,
+                    "y": off_coords["y"]
+                }
+                
+                # Clamp X to valid court bounds (0-100)
+                def_coords["x"] = max(0, min(100, def_coords["x"]))
+                
+                # Determine defensive action based on offensive action
+                if off_step.get("action") in ["handle_ball", "receive", "shoot", "pass"]:
+                    def_action = "guard_ball"  # Guarding ball handler
+                else:
+                    def_action = "guard_offball"  # Guarding off-ball player
+                
+                if def_start is None:
+                    def_start = def_coords
+                def_end = def_coords
+                
+                def_movement.append({
+                    "timestamp": timestamp,
+                    "coords": def_coords,
+                    "action": def_action
+                })
+            
+            if not def_movement:
+                continue
+            
+            # All defenders have ball at no steps
+            has_ball_steps = [False] * len(def_movement)
+            duration = def_movement[-1]["timestamp"] if def_movement else 0
+            
+            defensive_animations.append({
+                "playerId": def_player_id,
+                "start": def_start or {"x": 50, "y": 25},
+                "end": def_end or {"x": 50, "y": 25},
+                "movement": def_movement,
+                "hasBallAtStep": has_ball_steps,
+                "duration": duration
+            })
+        
+        return defensive_animations
 
     def get_latest_animation_packet(self):
         return self.latest_packet
