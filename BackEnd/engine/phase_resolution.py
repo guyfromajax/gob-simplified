@@ -838,16 +838,16 @@ def resolve_full_court_press_logic(game: "GameManager"):
         # For now, treat as non-shooting foul (FCP happens before shot attempt)
         # This will trigger side inbound or bonus free throws via existing logic
         result_type = "FOUL"
-        text = "PRESS! Defensive foul"
+        # text = "PRESS! Defensive foul"
     elif result_type == "O_FOUL":
         game_state["foul_team"] = "OFFENSE"
         result_type = "FOUL"
-        text = "PRESS! Offensive foul"
+        # text = "PRESS! Offensive foul"
     elif result_type == "DEAD_BALL_TURNOVER":
         result_type = "DEAD BALL"
-        text = "PRESS! Turnover"
-    elif result_type == "STEAL":
-        text = "PRESS! Steal!"
+        # text = "PRESS! Turnover"
+    # elif result_type == "STEAL":
+    #     text = "PRESS! Steal!"
     animations = animator.skeleton_to_animations(
         skeleton, 
         off_lineup, 
