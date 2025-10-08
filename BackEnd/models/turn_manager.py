@@ -110,77 +110,25 @@ class TurnManager:
 
         # --- Defensive positioning ---
         self.logger.log("defenseUpdate:start")
-        
-        # Check if FCP will be next (set in game_state after made shots)
-        next_offensive_state = game.game_state.get("offensive_state", "HCO")
-        use_fcp_positioning = next_offensive_state == "FCP"
-        
         d_dest = {}
         for pos, defender in defense_team.lineup.items():
-            if use_fcp_positioning:
-                # Position defenders in FCP press formation
-                # PG/SG/SF: Defensive half (pressuring ball handlers)
-                # PF/C: Offensive half (back line protection)
-                
-                from BackEnd.constants import HCO_STRING_SPOTS
-                from BackEnd.utils.shared import get_away_player_coords
-                
-                # Define base positions for FCP setup (in home orientation)
-                fcp_defensive_positions = {
-                    "PG": HCO_STRING_SPOTS["midlane"],      # Midlane on defensive half (opp=True)
-                    "SG": HCO_STRING_SPOTS["upper wing"],   # Upper wing on defensive half (opp=True)
-                    "SF": HCO_STRING_SPOTS["lower wing"],   # Lower wing on defensive half (opp=True)
-                    "PF": HCO_STRING_SPOTS["lower apex"],   # Lower apex on offensive half (opp=False)
-                    "C": HCO_STRING_SPOTS["upper apex"],    # Upper apex on offensive half (opp=False)
-                }
-                
-                base_coords = fcp_defensive_positions.get(pos, {"x": 50, "y": 25})
-                
-                # Apply "opp" logic for positions that should be on defensive half
-                # After possession flip, defense becomes offense
-                # PG/SG/SF pressure on what will be their defensive half
-                if pos in ["PG", "SG", "SF"]:
-                    # These positions go to defensive half (opp=True)
-                    # is_away_offense tells us current offense orientation
-                    if is_away_offense:
-                        # Away team currently on offense, will become defense
-                        # Their defensive half is home side - no flip needed
-                        d_coords = base_coords
-                    else:
-                        # Home team currently on offense, will become defense
-                        # Their defensive half is away side - flip coordinates
-                        d_coords = get_away_player_coords(base_coords)
-                else:
-                    # PF/C stay on offensive half (opp=False)
-                    if is_away_offense:
-                        # Away team currently on offense, will become defense
-                        # Their offensive half is away side - flip coordinates
-                        d_coords = get_away_player_coords(base_coords)
-                    else:
-                        # Home team currently on offense, will become defense
-                        # Their offensive half is home side - no flip needed
-                        d_coords = base_coords
-                
+            if pos == "PG":
+                d_coords = assign_bh_defender_coords(
+                    bh_coords, aggression, is_away_offense
+                )
+                if is_away_offense:
+                    d_coords = getAwayTeamCoords({"tmp": d_coords})["tmp"]
                 d_dest[pos] = d_coords
-            else:
-                # Standard defensive positioning
-                if pos == "PG":
-                    d_coords = assign_bh_defender_coords(
-                        bh_coords, aggression, is_away_offense
-                    )
-                    if is_away_offense:
-                        d_coords = getAwayTeamCoords({"tmp": d_coords})["tmp"]
-                    d_dest[pos] = d_coords
-                elif pos in o_dest:
-                    o_coords = o_dest[pos]
-                    # Convert offensive coords back to home orientation for calc
-                    o_calc = getAwayTeamCoords({"tmp": o_coords})["tmp"] if is_away_offense else o_coords
-                    d_coords = assign_non_bh_defender_coords(
-                        o_calc, bh_coords, aggression, is_away_offense
-                    )
-                    if is_away_offense:
-                        d_coords = getAwayTeamCoords({"tmp": d_coords})["tmp"]
-                    d_dest[pos] = d_coords
+            elif pos in o_dest:
+                o_coords = o_dest[pos]
+                # Convert offensive coords back to home orientation for calc
+                o_calc = getAwayTeamCoords({"tmp": o_coords})["tmp"] if is_away_offense else o_coords
+                d_coords = assign_non_bh_defender_coords(
+                    o_calc, bh_coords, aggression, is_away_offense
+                )
+                if is_away_offense:
+                    d_coords = getAwayTeamCoords({"tmp": d_coords})["tmp"]
+                d_dest[pos] = d_coords
         self.logger.log("defenseUpdate:end")
 
         payload = {

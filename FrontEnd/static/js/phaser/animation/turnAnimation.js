@@ -659,6 +659,46 @@ async function runInboundSetup({
   const width = scene.game.config.width;
   const height = scene.game.config.height;
 
+  // If FCP is next, position defenders in press formation
+  const fcpDefensiveSetup = {};
+  if (skipRetreat) {
+    // Define FCP defensive positions (in grid coordinates)
+    // These are in "home orientation" and will be flipped if needed
+    const fcpHomePositions = {
+      PG: { x: 64, y: 25 },   // Midlane on defensive half (will flip for opp)
+      SG: { x: 28, y: 40 },   // Upper wing on defensive half (will flip for opp)
+      SF: { x: 28, y: 10 },   // Lower wing on defensive half (will flip for opp)
+      PF: { x: 80, y: 15 },   // Lower apex on offensive half
+      C: { x: 80, y: 36 }     // Upper apex on offensive half
+    };
+
+    // Apply opp logic for PG/SG/SF (they should be on opposite side)
+    for (const pos of ['PG', 'SG', 'SF', 'PF', 'C']) {
+      let coords = fcpHomePositions[pos];
+      
+      // PG/SG/SF go to defensive half (opposite side after flip)
+      if (['PG', 'SG', 'SF'].includes(pos)) {
+        // Flip for defensive half
+        if (isAwayOffense) {
+          // Away team will defend home side - no flip needed
+          fcpDefensiveSetup[pos] = coords;
+        } else {
+          // Home team will defend away side - flip coordinates
+          fcpDefensiveSetup[pos] = { x: 101 - coords.x, y: coords.y };
+        }
+      } else {
+        // PF/C stay on offensive half
+        if (isAwayOffense) {
+          // Away team offensive half is away side - flip coordinates
+          fcpDefensiveSetup[pos] = { x: 101 - coords.x, y: coords.y };
+        } else {
+          // Home team offensive half is home side - no flip needed
+          fcpDefensiveSetup[pos] = coords;
+        }
+      }
+    }
+  }
+
   // Retreat scoring team toward midcourt (unless FCP is next)
   const retreatPromises = [];
   if (!skipRetreat) {
@@ -688,6 +728,36 @@ async function runInboundSetup({
             });
           })
         );
+      }
+    }
+  } else if (Object.keys(fcpDefensiveSetup).length > 0) {
+    // Move defending players to FCP press positions
+    for (const [id, sprite] of Object.entries(playerSprites)) {
+      const info = scene.playerInfo?.[id];
+      if (!info) continue;
+      
+      // Check if this is a defending player
+      if (
+        sprite.team_id === scoringTeamId ||
+        (!scoringTeamId && sprite.team === scoringTeamKey)
+      ) {
+        const targetPos = fcpDefensiveSetup[info.pos];
+        if (targetPos) {
+          const targetPx = gridToPixels(targetPos.x, targetPos.y, width, height);
+          retreatPromises.push(
+            new Promise((resolve) => {
+              scene.tweens.add({
+                targets: sprite,
+                x: targetPx.x,
+                y: targetPx.y,
+                duration: 500,
+                ease: "Sine.easeInOut",
+                onComplete: resolve,
+                onStop: resolve
+              });
+            })
+          );
+        }
       }
     }
   }
