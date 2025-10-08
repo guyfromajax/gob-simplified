@@ -753,6 +753,7 @@ def resolve_full_court_press_logic(game: "GameManager"):
     
     offenseScore *= random.randint(1, 6)
     defenseScore *= random.randint(1, 6)
+    turnover_type = random.choices(["TRAVEL", "DOUBLE DRIBBLE", "BAD PASS"], weights=[0.6, 0.3, 0.1])[0]
     # print("Inside resolve_full_court_press_logic")
     # print(f"offenseScore: {offenseScore}")
     # print(f"defenseScore: {defenseScore}")
@@ -763,7 +764,6 @@ def resolve_full_court_press_logic(game: "GameManager"):
         else:
             result_type = "HCO"
     else:
-        turnover_type = random.choices(["TRAVEL", "DOUBLE DRIBBLE", "BAD PASS"], weights=[0.6, 0.3, 0.1])[0]
         result_type = random.choices(["O_FOUL", "DEAD_BALL_TURNOVER", "STEAL"], weights=[0.5, 0.3, 0.2])[0]
     
     result_text_dict = {
