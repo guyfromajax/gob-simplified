@@ -40,48 +40,30 @@ class GameManager:
 
     def _update_position_ratings(self):
         """Recalculate position ratings for all players based on current attributes."""
-        print("=" * 80)
-        print("STARTING POSITION RATINGS RECALCULATION")
-        print("=" * 80)
+        from BackEnd.utils.position_ratings import compute_position_ratings
+        from BackEnd.db import players_collection
         
-        try:
-            from BackEnd.utils.position_ratings import compute_position_ratings
-            from BackEnd.db import players_collection
-            
-            players_updated = 0
-            for team in [self.home_team, self.away_team]:
-                print(f"\nProcessing team: {team.name}")
-                for player in team.get_all_players():
-                    # Convert player object to dict for rating calculation
-                    player_dict = {
-                        "attributes": player.attributes,
-                        "height": player.height,
-                        "name": player.name
-                    }
-                    
-                    # Recalculate ratings
-                    new_ratings = compute_position_ratings(player_dict)
-                    
-                    # Update player object
-                    player.ratings = new_ratings
-                    
-                    # Update database
-                    if hasattr(player, 'player_id') and player.player_id:
-                        result = players_collection.update_one(
-                            {"_id": player.player_id},
-                            {"$set": {"position_ratings": new_ratings}}
-                        )
-                        if result.modified_count > 0:
-                            players_updated += 1
-                    
-            print(f"\n{'=' * 80}")
-            print(f"POSITION RATINGS RECALCULATION COMPLETE - {players_updated} players updated")
-            print(f"{'=' * 80}\n")
-                    
-        except Exception as e:
-            print(f"ERROR in _update_position_ratings: {e}")
-            import traceback
-            traceback.print_exc()
+        for team in [self.home_team, self.away_team]:
+            for player in team.get_all_players():
+                # Convert player object to dict for rating calculation
+                player_dict = {
+                    "attributes": player.attributes,
+                    "height": player.height,
+                    "name": player.name
+                }
+                
+                # Recalculate ratings
+                new_ratings = compute_position_ratings(player_dict)
+                
+                # Update player object
+                player.ratings = new_ratings
+                
+                # Update database
+                if hasattr(player, 'player_id') and player.player_id:
+                    players_collection.update_one(
+                        {"_id": player.player_id},
+                        {"$set": {"position_ratings": new_ratings}}
+                    )
     
     def setup_opening_tip(self):
         """Execute opening tip logic and update offense/defense teams."""
