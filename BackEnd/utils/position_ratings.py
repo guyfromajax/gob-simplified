@@ -105,17 +105,32 @@ def compute_position_ratings(player: dict) -> Dict[str, int]:
     """
 
     ratings: Dict[str, int] = {}
-    height_rating = _height_to_rating(_get_attr(player, "height"))
+    raw_height = _get_attr(player, "height")
+    height_rating = _height_to_rating(raw_height)
+    
+    # Debug logging for height
+    player_name = player.get("name", "Unknown")
+    print(f"[POSITION_RATINGS] Player: {player_name}")
+    print(f"  Raw height value: {raw_height} (type: {type(raw_height)})")
+    print(f"  Height rating: {height_rating}")
 
     for pos, weights in POSITION_WEIGHTS.items():
         total = 0.0
+        breakdown = []
         for attr, weight in weights.items():
             if attr == "height":
                 val = height_rating
             else:
                 val = _get_attr(player, attr)
-            total += val * weight
+            contribution = val * weight
+            total += contribution
+            breakdown.append(f"{attr}={val}*{weight}={contribution:.2f}")
+        
         ratings[pos] = _clamp(total)
+        
+        # Debug logging for C and PF
+        if pos in ["C", "PF"]:
+            print(f"  {pos} rating calculation: {' + '.join(breakdown)} = {total:.2f} → {ratings[pos]}")
 
     return ratings
 
