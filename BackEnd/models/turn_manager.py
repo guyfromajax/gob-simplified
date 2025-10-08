@@ -109,26 +109,18 @@ class TurnManager:
         bh_coords = o_dest["PG"]
 
         # --- Defensive positioning ---
+        # Fixed positions for home team defense (when home is defending)
         self.logger.log("defenseUpdate:start")
-        d_dest = {}
-        for pos, defender in defense_team.lineup.items():
-            if pos == "PG":
-                d_coords = assign_bh_defender_coords(
-                    bh_coords, aggression, is_away_offense
-                )
-                if is_away_offense:
-                    d_coords = getAwayTeamCoords({"tmp": d_coords})["tmp"]
-                d_dest[pos] = d_coords
-            elif pos in o_dest:
-                o_coords = o_dest[pos]
-                # Convert offensive coords back to home orientation for calc
-                o_calc = getAwayTeamCoords({"tmp": o_coords})["tmp"] if is_away_offense else o_coords
-                d_coords = assign_non_bh_defender_coords(
-                    o_calc, bh_coords, aggression, is_away_offense
-                )
-                if is_away_offense:
-                    d_coords = getAwayTeamCoords({"tmp": d_coords})["tmp"]
-                d_dest[pos] = d_coords
+        d_dest_home = {
+            "PG": {"x": 60, "y": 25},
+            "SG": {"x": 64, "y": 33},
+            "SF": {"x": 66, "y": 17},
+            "PF": {"x": 80, "y": 25},
+            "C": {"x": 85, "y": 28}
+        }
+        
+        # Flip defensive coordinates if away team is defending (home team has ball)
+        d_dest = getAwayTeamCoords(d_dest_home.copy()) if is_away_offense else d_dest_home
         self.logger.log("defenseUpdate:end")
 
         payload = {
