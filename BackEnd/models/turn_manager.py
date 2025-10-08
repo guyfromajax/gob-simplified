@@ -712,7 +712,7 @@ class TurnManager:
         animations = result.get('animations', [])
         skeleton = result.get('skeleton', {})
         
-        print(f"\nAnimation Data:")
+        print(f"\nAnimation Data for turn {result.get('turn_count', 0)} {offensive_state}:")
         print(f"  - Animations array: {len(animations)} players")
         if skeleton and 'steps' in skeleton:
             print(f"  - Skeleton steps: {len(skeleton['steps'])} timestamps")

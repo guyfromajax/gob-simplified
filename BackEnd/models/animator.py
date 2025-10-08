@@ -84,12 +84,16 @@ class Animator:
             return {"x": x, "y": y}
 
         def half_court_spot():
-            return {"x": random.randint(50, 51), "y": random.randint(10, 40)}
+            return {"x": random.randint(40, 60), "y": random.randint(10, 40)}
+
+        # Track which players are already animated
+        animated_player_ids = set()
 
         # Ball handler path
         if ball_handler:
             bh_end = TOP_KEY_COORDS if hold_up else RIM_COORDS
             build_movement(ball_handler, bh_end, has_ball=True)
+            animated_player_ids.add(getattr(ball_handler, "player_id", None))
 
         # Identify stopper
         stopper = None
@@ -107,20 +111,25 @@ class Animator:
                     "y": TOP_KEY_COORDS["y"] + random.randint(-3, 3),
                 }
                 build_movement(stopper, end, action=ACTIONS["GUARD_BALL"])
+                animated_player_ids.add(getattr(stopper, "player_id", None))
 
             # Other in-play defenders
             for d in defenders:
                 if d is stopper:
                     continue
                 build_movement(d, between_key_and_rim(), action=ACTIONS["GUARD_OFFBALL"])
-
-            # Non-in-play defenders should remain frozen in their current spots
-            # Don't create animation data for stationary players
-            # Only players with actual movement get animation data
-        else:
-            # Don't create animation data for stationary players
-            # Only players with actual movement get animation data
-            pass
+                animated_player_ids.add(getattr(d, "player_id", None))
+        
+        # Animate non-involved players to half court
+        # Get all players from both teams
+        all_offensive_players = list(offense_team.lineup.values())
+        all_defensive_players = list(defense_team.lineup.values())
+        
+        for player in all_offensive_players + all_defensive_players:
+            player_id = getattr(player, "player_id", None)
+            if player_id and player_id not in animated_player_ids:
+                # Move to random half court spot
+                build_movement(player, half_court_spot(), has_ball=False, action=ACTIONS["DRIFT"])
         self._log_step_timestamps(animations)
         self.latest_packet = animations
         logging.debug(
