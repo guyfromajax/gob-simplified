@@ -288,9 +288,16 @@ export function shootBall({
     scene.game.config.height
   );
   const rimCoords = isHomeTeam ? HOME_RIM_COORDS : AWAY_RIM_COORDS;
+  
+  // Adjust rim position for made shots (1 grid unit closer to shooter)
+  const adjustedRimCoords = { ...rimCoords };
+  if (result === "MAKE") {
+    adjustedRimCoords.x = isHomeTeam ? rimCoords.x - 1 : rimCoords.x + 1;
+  }
+  
   const rim = gridToPixels(
-    rimCoords.x,
-    rimCoords.y,
+    adjustedRimCoords.x,
+    adjustedRimCoords.y,
     scene.game.config.width,
     scene.game.config.height
   );
