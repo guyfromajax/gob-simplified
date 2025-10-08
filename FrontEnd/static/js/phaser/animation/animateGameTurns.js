@@ -357,8 +357,28 @@ export async function animateGameTurns({ //hasBallAtStep
     }
 
     if (turn.result_type === "FOUL") {
-      // FOUL turns are metadata only - the actual animation happens in the SIDE_INBOUND turn that follows
-      // Just update the scoreboard and continue
+      // Check if this is an FCP foul with animations
+      if (turn.fcp_foul === true && turn.animations && turn.animations.length > 0) {
+        // FCP foul with animations - animate it like a standard turn
+        await playTurnAnimation({
+          scene,
+          simData,
+          playerSprites,
+          turnData: turn,
+          ballSprite,
+          onUpdate,
+          turnIndex: i,
+          onAction: async (action, sprite, timestamp) => {
+            if (DEBUG_FLOW || debugEnabled)
+              logVerbose(
+                `🎬 Action "${action}" fired at ${timestamp}ms for sprite:`,
+                sprite
+              );
+            if (onAction) onAction(action, sprite, timestamp);
+          },
+        });
+      }
+      // Update scoreboard for all fouls (FCP or not)
       if (onUpdate) {
         try {
           onUpdate(turn);
