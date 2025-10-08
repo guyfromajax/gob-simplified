@@ -323,6 +323,9 @@ class Animator:
         def_lineup = defense_team.lineup
         aggression_call = defense_team.strategy_calls.get("aggression_call", "normal")
         is_away_offense = offense_team.team_id == self.game.away_team.team_id
+        
+        # Check if next play will be FCP/HCT (set after made shots)
+        next_defensive_setup = roles.get("next_defensive_setup")
 
 
         steps = roles["steps"]
@@ -468,7 +471,19 @@ class Animator:
                 if is_away_offense:
                     first_coords = get_away_player_coords(first_coords)
                     final_coords = get_away_player_coords(final_coords)
-                def_coords = assign_bh_defender_coords(final_coords, aggression_call, is_away_offense)
+                
+                # Override end position if FCP is next
+                if next_defensive_setup == "FCP":
+                    # Position for full court press: same Y as offensive player, 3 units closer to new offensive basket
+                    # After possession flip, this team will be on offense attacking opposite basket
+                    # So "closer to new offensive basket" means closer to where they currently are on defense
+                    x_offset = 3 if is_away_offense else -3
+                    def_coords = {
+                        "x": max(0, min(100, final_coords["x"] + x_offset)),
+                        "y": final_coords["y"]
+                    }
+                else:
+                    def_coords = assign_bh_defender_coords(final_coords, aggression_call, is_away_offense)
                 action_type = ACTIONS["GUARD_BALL"]
             elif pos in off_lineup:
                 off_player = off_lineup[pos]
@@ -477,7 +492,17 @@ class Animator:
                     "key"
                 )
                 o_coords = HCO_STRING_SPOTS.get(last_spot, HCO_STRING_SPOTS["key"])
-                def_coords = assign_non_bh_defender_coords(o_coords, ball_handler_end_coords, aggression_call, is_away_offense)
+                
+                # Override end position if FCP is next
+                if next_defensive_setup == "FCP":
+                    # Position for full court press
+                    x_offset = 3 if is_away_offense else -3
+                    def_coords = {
+                        "x": max(0, min(100, o_coords["x"] + x_offset)),
+                        "y": o_coords["y"]
+                    }
+                else:
+                    def_coords = assign_non_bh_defender_coords(o_coords, ball_handler_end_coords, aggression_call, is_away_offense)
             else:
                 logging.warning("No offensive match for defender %s, skipping.", pos)
                 continue
