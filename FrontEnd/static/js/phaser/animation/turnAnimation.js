@@ -663,36 +663,44 @@ async function runInboundSetup({
   const fcpDefensiveSetup = {};
   if (skipRetreat) {
     // Define FCP defensive positions (in grid coordinates)
-    // These are in "LEFT side orientation" (defensive half for FCP)
+    // Base positions for AWAY team defending (LEFT basket)
     const fcpHomePositions = {
-      PG: { x: 21, y: 25 },   // Midlane on defensive half (LEFT side mirror of X=80)
-      SG: { x: 28, y: 40 },   // Upper wing on defensive half
-      SF: { x: 28, y: 10 },   // Lower wing on defensive half
-      PF: { x: 80, y: 15 },   // Lower apex on offensive half (RIGHT side)
-      C: { x: 80, y: 36 }     // Upper apex on offensive half (RIGHT side)
+      PG: { x: 80, y: 25 },   // Midlane - pressing (will be on right when away defends)
+      SG: { x: 73, y: 40 },   // Upper wing - pressing (will be on right when away defends)
+      SF: { x: 73, y: 10 },   // Lower wing - pressing (will be on right when away defends)
+      PF: { x: 21, y: 15 },   // Lower apex - protecting (will be on left when away defends)
+      C: { x: 21, y: 36 }     // Upper apex - protecting (will be on left when away defends)
     };
 
     // Apply positioning logic based on which team is defending
+    // Midcourt is X=50
+    // Left basket (away) is X=9, Right basket (home) is X=91
     for (const pos of ['PG', 'SG', 'SF', 'PF', 'C']) {
       let coords = fcpHomePositions[pos];
       
       if (isAwayOffense) {
-        // Away team scored, HOME team defending
+        // Away team scored, HOME team defending RIGHT basket (X=91)
+        // PF/C protect RIGHT half (X > 50) - flip from 21 to 80
+        // PG/SG/SF press on LEFT half (X < 50) - flip from 80/73 to 21/28
+        
         if (['PG', 'SG', 'SF'].includes(pos)) {
-          // Pressuring defenders go to RIGHT
-          fcpDefensiveSetup[pos] = { x: 101 - coords.x, y: coords.y };  // Flip to right
+          // PG/SG/SF press on LEFT half (X < 50)
+          fcpDefensiveSetup[pos] = { x: 101 - coords.x, y: coords.y };  // Flip 80→21, 73→28
         } else {
-          // PF/C protect on LEFT
-          fcpDefensiveSetup[pos] = coords;  // No flip
+          // PF/C protect on RIGHT half (X > 50)
+          fcpDefensiveSetup[pos] = { x: 101 - coords.x, y: coords.y };  // Flip 21→80
         }
       } else {
-        // Home team scored, AWAY team defending
+        // Home team scored, AWAY team defending LEFT basket (X=9)
+        // PF/C protect LEFT half (X < 50) - stay at 21
+        // PG/SG/SF press on RIGHT half (X > 50) - stay at 80/73
+        
         if (['PG', 'SG', 'SF'].includes(pos)) {
-          // Pressuring defenders stay on LEFT
-          fcpDefensiveSetup[pos] = coords;  // No flip
+          // PG/SG/SF press on RIGHT half (X > 50)
+          fcpDefensiveSetup[pos] = coords;  // Already at X=80/73 (RIGHT)
         } else {
-          // PF/C protect on RIGHT
-          fcpDefensiveSetup[pos] = { x: 101 - coords.x, y: coords.y };  // Flip to right
+          // PF/C protect on LEFT half (X < 50)
+          fcpDefensiveSetup[pos] = coords;  // Already at X=21 (LEFT)
         }
       }
     }
