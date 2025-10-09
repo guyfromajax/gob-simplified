@@ -951,7 +951,14 @@ def run_franchise_training(req: FranchiseTrainingRequest):
         pid = player["_id"]
         if pid in player_updates:
             for attr, val in player_updates[pid].items():
+                # Save the anchor field
                 franchise_update[f"players.{pid}.attributes.{attr}"] = val
+                
+                # Also update the base attribute (without "anchor_" prefix)
+                # e.g., if attr is "anchor_SC", also update "SC"
+                if attr.startswith("anchor_"):
+                    base_attr = attr.replace("anchor_", "")
+                    franchise_update[f"players.{pid}.attributes.{base_attr}"] = val
         
         # Update position ratings for this player
         if pid in position_ratings_updates:
