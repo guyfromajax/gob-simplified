@@ -761,17 +761,24 @@ def get_franchise_roster(franchise_id: str, team_name: str = None):
         meta = franchise_player_data.get("meta", {})
         attributes = franchise_player_data.get("attributes", {})
         
+        # Get franchise-specific position ratings (if available), otherwise use core ratings
+        position_ratings = franchise_player_data.get("position_ratings", {})
+        
         # Get additional data from core collection
         core_player = db.players.find_one({"_id": pid}, {
             "position_ratings": 1, "height": 1, "weight": 1, "jersey": 1, "year": 1
         })
+        
+        # Use franchise position ratings if available, otherwise fall back to core
+        if not position_ratings and core_player:
+            position_ratings = core_player.get("position_ratings", {})
         
         player = {
             "first_name": meta.get("first_name", ""),
             "last_name": meta.get("last_name", ""),
             "team": team_name,
             "attributes": attributes,
-            "position_ratings": core_player.get("position_ratings", {}) if core_player else {},
+            "position_ratings": position_ratings,
             "height": core_player.get("height") if core_player else None,
             "weight": core_player.get("weight") if core_player else None,
             "jersey": core_player.get("jersey") if core_player else None,
@@ -871,6 +878,27 @@ def run_franchise_training(req: FranchiseTrainingRequest):
     # Apply training
     player_updates = session.apply_training(players_for_training, team_stats)
 
+    # Recalculate position ratings for each player after training
+    from BackEnd.utils.position_ratings import compute_position_ratings
+    position_ratings_updates = {}
+    
+    for player in players_for_training:
+        pid = player["_id"]
+        # Get player's height (from core collection or franchise meta)
+        core_player = db.players.find_one({"_id": pid}, {"height": 1})
+        height = core_player.get("height") if core_player else None
+        
+        # Build player dict for position ratings calculation with updated attributes
+        player_for_ratings = {
+            "attributes": player.get("attributes", {}),
+            "height": height,
+            "name": f"{player.get('first_name', '')} {player.get('last_name', '')}"
+        }
+        
+        # Compute new position ratings
+        new_ratings = compute_position_ratings(player_for_ratings)
+        position_ratings_updates[pid] = new_ratings
+
     # Compute player deltas for response
     player_logs = {}
     for player in players_for_training:
@@ -894,13 +922,17 @@ def run_franchise_training(req: FranchiseTrainingRequest):
         if delta != 0:
             team_log[field] = delta
 
-    # Update franchise document with new attribute values
+    # Update franchise document with new attribute values and position ratings
     franchise_update = {}
     for player in players_for_training:
         pid = player["_id"]
         if pid in player_updates:
             for attr, val in player_updates[pid].items():
                 franchise_update[f"players.{pid}.attributes.{attr}"] = val
+        
+        # Update position ratings for this player
+        if pid in position_ratings_updates:
+            franchise_update[f"players.{pid}.position_ratings"] = position_ratings_updates[pid]
 
     # Update franchise team stats
     for field, value in team_stats.items():
