@@ -35,33 +35,62 @@ def load_franchise_names() -> tuple[list[str], list[str]]:
         ValueError: if the JSON is malformed or missing required keys.
     """
 
+    # Try multiple path resolution strategies
+    paths_to_try = []
+    
+    # 1. Environment variable
     env_path = os.environ.get("FRANCHISE_NAMES_FILE")
-    default_path = Path(__file__).resolve().parents[1] / "data" / "names" / "franchise_names.json"
-    path = Path(env_path).expanduser() if env_path else default_path
-    abs_path = path.resolve()
-    exists = abs_path.is_file()
-    logger.info("Loading franchise names from %s (exists=%s)", abs_path, exists)
-    if not exists:
-        msg = f"franchise names file not found: {abs_path}"
-        logger.warning(msg)
-        raise FileNotFoundError(msg)
-
+    if env_path:
+        paths_to_try.append(Path(env_path).expanduser())
+    
+    # 2. Relative to this file
+    paths_to_try.append(Path(__file__).resolve().parents[1] / "data" / "names" / "franchise_names.json")
+    
+    # 3. Relative to current working directory (for deployed environments)
+    paths_to_try.append(Path("BackEnd/data/names/franchise_names.json"))
+    
+    # 4. Try using importlib.resources for packaged data
     try:
-        with abs_path.open("r", encoding="utf-8") as f:
-            payload = json.load(f)
-    except Exception as exc:  # pragma: no cover - json errors
-        logger.warning("Failed to parse franchise names JSON %s: %s", abs_path, exc)
-        raise ValueError(f"invalid franchise names JSON: {exc}") from exc
-
-    fn = payload.get("first_names")
-    ln = payload.get("last_names")
-    if not isinstance(fn, list) or not isinstance(ln, list) or not fn or not ln:
-        msg = "Names JSON malformed: expected non-empty 'first_names' and 'last_names' lists"
-        logger.warning(msg)
-        raise ValueError(msg)
-
-    logger.info("Loaded %d first names and %d last names", len(fn), len(ln))
-    return fn, ln
+        import importlib.resources as pkg_resources
+        from BackEnd.data import names
+        if hasattr(pkg_resources, 'files'):
+            # Python 3.9+
+            names_path = pkg_resources.files(names) / "franchise_names.json"
+            paths_to_try.append(Path(str(names_path)))
+        elif hasattr(pkg_resources, 'path'):
+            # Python 3.7-3.8
+            with pkg_resources.path(names, "franchise_names.json") as p:
+                paths_to_try.append(p)
+    except Exception as e:
+        logger.debug("Could not use importlib.resources: %s", e)
+    
+    # Try each path
+    for path in paths_to_try:
+        abs_path = path.resolve() if hasattr(path, 'resolve') else Path(path)
+        exists = abs_path.is_file()
+        logger.info("Checking franchise names at %s (exists=%s)", abs_path, exists)
+        
+        if exists:
+            try:
+                with abs_path.open("r", encoding="utf-8") as f:
+                    payload = json.load(f)
+                
+                fn = payload.get("first_names")
+                ln = payload.get("last_names")
+                if not isinstance(fn, list) or not isinstance(ln, list) or not fn or not ln:
+                    logger.warning("Names JSON malformed at %s", abs_path)
+                    continue
+                
+                logger.info("✅ Loaded %d first names and %d last names from %s", len(fn), len(ln), abs_path)
+                return fn, ln
+            except Exception as exc:
+                logger.warning("Failed to parse franchise names JSON %s: %s", abs_path, exc)
+                continue
+    
+    # If we get here, none of the paths worked
+    msg = f"franchise names file not found. Tried paths: {[str(p) for p in paths_to_try]}"
+    logger.error(msg)
+    raise FileNotFoundError(msg)
 
 
 class FranchiseManager:
@@ -353,9 +382,13 @@ class RecruitManager:
         self.diagnostics = None
 
         try:
-            self.first_names, self.last_names = load_franchise_names()
+            loaded_first, loaded_last = load_franchise_names()
+            self.first_names = loaded_first
+            self.last_names = loaded_last
+            logger.info(f"✅ Loaded {len(self.first_names)} first names and {len(self.last_names)} last names for recruits")
         except Exception as exc:
-            logger.warning("Using fallback recruit names: %s", exc)
+            logger.error(f"❌ Failed to load franchise names, using fallback: {exc}")
+            logger.error(f"Fallback names: {len(self.first_names)} first, {len(self.last_names)} last")
 
     def generate_recruits(self, count=40):
         recruits = []
