@@ -124,6 +124,69 @@ function renderRecruits(data) {
   });
 }
 
+function renderTrainingResults(data) {
+  const container = document.getElementById('training-results-container');
+  if (!container) return;
+  
+  if (!data || (!data.player_logs || Object.keys(data.player_logs).length === 0)) {
+    container.innerHTML = '<p>No training session completed yet.</p>';
+    return;
+  }
+  
+  container.innerHTML = '';
+  
+  // Add session type header
+  const sessionHeader = document.createElement('h4');
+  const sessionLabel = data.session_type === 'preseason' ? 'Training Camp' : 'In-Season Training';
+  sessionHeader.textContent = sessionLabel + (data.week ? ` (Week ${data.week})` : '');
+  sessionHeader.style.marginBottom = '15px';
+  container.appendChild(sessionHeader);
+  
+  // Player Results
+  const playerHeader = document.createElement('h5');
+  playerHeader.textContent = 'Player Attribute Changes';
+  playerHeader.style.marginTop = '10px';
+  container.appendChild(playerHeader);
+  
+  const traitOrder = ['SH','SC','ID','OD','PS','BH','RB','AG','ST','ND','IQ','FT'];
+  
+  if (data.player_logs && typeof data.player_logs === 'object') {
+    Object.entries(data.player_logs).forEach(([name, traits]) => {
+      const row = document.createElement('p');
+      row.style.marginBottom = '5px';
+      const bold = document.createElement('strong');
+      bold.textContent = name + ': ';
+      row.appendChild(bold);
+
+      const parts = traitOrder.map(attr => {
+        const val = Object.hasOwnProperty.call(traits, attr) ? traits[attr] : 0;
+        if (val === 0) return null;
+        const sign = val > 0 ? '+' : '';
+        return `${attr} ${sign}${val}`;
+      }).filter(p => p !== null);
+
+      row.appendChild(document.createTextNode(parts.join(', ')));
+      container.appendChild(row);
+    });
+  }
+  
+  // Team Results
+  if (data.team_log && typeof data.team_log === 'object' && Object.keys(data.team_log).length > 0) {
+    const teamHeader = document.createElement('h5');
+    teamHeader.textContent = 'Team Attribute Changes';
+    teamHeader.style.marginTop = '20px';
+    container.appendChild(teamHeader);
+
+    Object.entries(data.team_log).forEach(([attr, delta]) => {
+      const row = document.createElement('p');
+      row.style.marginBottom = '5px';
+      const sign = delta > 0 ? '+' : '';
+      row.textContent = `${attr}: ${sign}${delta}`;
+      container.appendChild(row);
+    });
+  }
+}
+
 function renderTeam(data) {
   if (!data) return;
   const tbody = document.getElementById('team-body');
@@ -207,6 +270,7 @@ async function init() {
     renderLeaders(await fetchJSON(`/franchise/leaders?franchise_id=${franchiseId}`));
     renderTeamStats(await fetchJSON('/franchise/team-stats'));
     renderRecruits(await fetchJSON('/franchise/recruits'));
+    renderTrainingResults(await fetchJSON(`/franchise/latest-training?franchise_id=${franchiseId}`));
   }
 
 function updatePlayButton(data) {

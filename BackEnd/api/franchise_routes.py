@@ -719,6 +719,29 @@ def recruits():
     return {"recruits": recs}
 
 
+@router.get("/franchise/latest-training")
+def get_latest_training(franchise_id: str):
+    """
+    Get the latest training session results for display on Training tab.
+    """
+    try:
+        fid = ObjectId(franchise_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid franchise ID")
+    
+    franchise_doc = db.franchises.find_one({"_id": fid}, {"latest_training": 1})
+    if not franchise_doc:
+        raise HTTPException(status_code=404, detail="Franchise not found")
+    
+    latest_training = franchise_doc.get("latest_training", {})
+    return latest_training if latest_training else {
+        "player_logs": {},
+        "team_log": {},
+        "session_type": "in-season",
+        "week": 0
+    }
+
+
 @router.get("/franchise/roster")
 def get_franchise_roster(franchise_id: str, team_name: str = None):
     """
@@ -940,6 +963,14 @@ def run_franchise_training(req: FranchiseTrainingRequest):
 
     # Mark training as completed
     franchise_update["training_status.training_completed"] = True
+    
+    # Save the latest training results for display on Training tab
+    franchise_update["latest_training"] = {
+        "player_logs": player_logs,
+        "team_log": team_log,
+        "session_type": session_type,
+        "week": franchise_doc.get("week", 0)
+    }
 
     # Save to franchise document
     db.franchises.update_one({"_id": franchise_id}, {"$set": franchise_update})
