@@ -384,6 +384,40 @@ export async function animateGameTurns({ //hasBallAtStep
       continue;
     }
 
+    if (turn.result_type === "FOUL") {
+      // Check if this is an FCP foul with animations
+      if (turn.fcp_foul === true && turn.animations && turn.animations.length > 0) {
+        // FCP foul with animations - animate it like a standard turn
+        await playTurnAnimation({
+          scene,
+          simData,
+          playerSprites,
+          turnData: turn,
+          ballSprite,
+          onUpdate,
+          turnIndex: i,
+          onAction: async (action, sprite, timestamp) => {
+            if (DEBUG_FLOW || debugEnabled)
+              logVerbose(
+                `🎬 Action "${action}" fired at ${timestamp}ms for sprite:`,
+                sprite
+              );
+            if (onAction) onAction(action, sprite, timestamp);
+          },
+        });
+      }
+      // Update scoreboard for all fouls (FCP or not)
+      if (onUpdate) {
+        try {
+          onUpdate(turn);
+        } catch (err) {
+          console.error('Scoreboard update failed:', err);
+        }
+      }
+      updateDebugScore(turn, { turnIndex: i, possessionId });
+      continue;
+    }
+
     if (turn.result_type === "SIDE_INBOUND") {
       if (!scene.stateMachine?.is(States.FastBreak)) {
         await runSideInboundSetup({ scene, ballSprite, playerSprites, turnData: turn });
@@ -447,10 +481,11 @@ export async function animateGameTurns({ //hasBallAtStep
     }
 
     // Debug fast break routing
-    if (turn.fast_break === true || turn.result_type === "FAST_BREAK") {
+    if (turn.fast_break === true || turn.result_type === "FAST_BREAK" || turn.next_play_type === "FAST_BREAK") {
       animationDebugLog('FAST BREAK TURN DETECTED - routing to runFastBreakSequence:', {
         fast_break: turn.fast_break,
         result_type: turn.result_type,
+        next_play_type: turn.next_play_type,
         turn_index: i
       });
       await runFastBreakSequence(scene, { playerSprites, ballSprite, turnData: turn, onUpdate, turnIndex: i });

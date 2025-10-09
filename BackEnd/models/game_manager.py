@@ -14,6 +14,9 @@ class GameManager:
         self.home_team = TeamManager(home_team_name)
         self.away_team = TeamManager(away_team_name)
 
+        # Recalculate position ratings for all players (attributes may have changed)
+        self._update_position_ratings()
+
         self.score = {home_team_name: 0, away_team_name: 0}
         self.quarter = 1
         self.turns = []
@@ -35,6 +38,33 @@ class GameManager:
         # optional database identifier for live games
         self.game_id: str | None = None
 
+    def _update_position_ratings(self):
+        """Recalculate position ratings for all players based on current attributes."""
+        from BackEnd.utils.position_ratings import compute_position_ratings
+        from BackEnd.db import players_collection
+        
+        for team in [self.home_team, self.away_team]:
+            for player in team.get_all_players():
+                # Convert player object to dict for rating calculation
+                player_dict = {
+                    "attributes": player.attributes,
+                    "height": player.height,
+                    "name": player.name
+                }
+                
+                # Recalculate ratings
+                new_ratings = compute_position_ratings(player_dict)
+                
+                # Update player object
+                player.ratings = new_ratings
+                
+                # Update database
+                if hasattr(player, 'player_id') and player.player_id:
+                    players_collection.update_one(
+                        {"_id": player.player_id},
+                        {"$set": {"position_ratings": new_ratings}}
+                    )
+    
     def setup_opening_tip(self):
         """Execute opening tip logic and update offense/defense teams."""
         from BackEnd.utils.opening_tip import execute_opening_tip
@@ -112,12 +142,8 @@ class GameManager:
         ):
             inbound_payload = self.turn_manager.setup_side_inbound()
             self.turns.append(inbound_payload)
-        
-        # If the turn ended with a made shot, prepare a baseline inbound
-        # sequence for the opposing team to start their possession
-        elif result.get("result_type") == "MAKE" and result.get("possession_flips"):
-            inbound_payload = self.turn_manager.setup_baseline_inbound()
-            self.turns.append(inbound_payload)
+            # Reset offensive state to HCO after side inbound (FCP/HCT only apply after made shots)
+            self.game_state["offensive_state"] = "HCO"
 
         # Update team stats after each turn
         self.update_team_stats()

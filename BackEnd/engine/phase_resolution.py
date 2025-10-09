@@ -291,6 +291,9 @@ def resolve_fast_break_logic(game: "GameManager"):
     if hold_up:
         turn_result["hold_up"] = True
         turn_result["stopper_id"] = stopper_id
+    
+    # Prepend "Fast Break!" to the text
+    turn_result["text"] = "Fast Break! " + turn_result.get("text", "")
 
     # ✅ Add safety checks before returning
     assert turn_result is not None, "turn_result is None"
@@ -753,6 +756,7 @@ def resolve_full_court_press_logic(game: "GameManager"):
     
     offenseScore *= random.randint(1, 6)
     defenseScore *= random.randint(1, 6)
+    turnover_type = random.choices(["TRAVEL", "DOUBLE DRIBBLE", "BAD PASS"], weights=[0.6, 0.3, 0.1])[0]
     # print("Inside resolve_full_court_press_logic")
     # print(f"offenseScore: {offenseScore}")
     # print(f"defenseScore: {defenseScore}")
@@ -763,7 +767,6 @@ def resolve_full_court_press_logic(game: "GameManager"):
         else:
             result_type = "HCO"
     else:
-        turnover_type = random.choices(["TRAVEL", "DOUBLE DRIBBLE", "BAD PASS"], weights=[0.6, 0.3, 0.1])[0]
         result_type = random.choices(["O_FOUL", "DEAD_BALL_TURNOVER", "STEAL"], weights=[0.5, 0.3, 0.2])[0]
     
     result_text_dict = {
@@ -817,23 +820,6 @@ def resolve_full_court_press_logic(game: "GameManager"):
         
         return shot_result
     
-    # Handle foul results - use standard foul types
-    if result_type == "D_FOUL":
-        game_state["foul_team"] = "DEFENSE"
-        # For now, treat as non-shooting foul (FCP happens before shot attempt)
-        # This will trigger side inbound or bonus free throws via existing logic
-        result_type = "FOUL"
-        text = "PRESS! Defensive foul"
-    elif result_type == "O_FOUL":
-        game_state["foul_team"] = "OFFENSE"
-        result_type = "FOUL"
-        text = "PRESS! Offensive foul"
-    elif result_type == "DEAD_BALL_TURNOVER":
-        result_type = "DEAD BALL"
-        text = "PRESS! Turnover"
-    elif result_type == "STEAL":
-        text = "PRESS! Steal!"
-    
     # Build roles dict for animation generation
     roles = {
         "ball_handler": off_lineup.get("PG", list(off_lineup.values())[0]),
@@ -843,10 +829,28 @@ def resolve_full_court_press_logic(game: "GameManager"):
         "screener": None,
     }
     
-    # Generate animations from skeleton
+    # Generate animations from skeleton BEFORE changing result_type
+    # (skeleton keys use D_FOUL/O_FOUL, not FOUL)
     from BackEnd.models.animator import Animator
     animator = Animator(game)
     skeleton = get_skeleton_for_turn(result_type, "FCP", game) or {}
+    
+    # Handle foul results - use standard foul types for frontend
+    if result_type == "D_FOUL":
+        game_state["foul_team"] = "DEFENSE"
+        # For now, treat as non-shooting foul (FCP happens before shot attempt)
+        # This will trigger side inbound or bonus free throws via existing logic
+        result_type = "FOUL"
+        # text = "PRESS! Defensive foul"
+    elif result_type == "O_FOUL":
+        game_state["foul_team"] = "OFFENSE"
+        result_type = "FOUL"
+        # text = "PRESS! Offensive foul"
+    elif result_type == "DEAD_BALL_TURNOVER":
+        result_type = "DEAD BALL"
+        # text = "PRESS! Turnover"
+    # elif result_type == "STEAL":
+    #     text = "PRESS! Steal!"
     animations = animator.skeleton_to_animations(
         skeleton, 
         off_lineup, 
@@ -875,7 +879,8 @@ def resolve_full_court_press_logic(game: "GameManager"):
         "events": [],
         "skeleton": skeleton,
         "animations": animations,
-        "roles": roles
+        "roles": roles,
+        "fcp_foul": True  # Flag to indicate this FOUL has FCP animations
     }
     
     return result

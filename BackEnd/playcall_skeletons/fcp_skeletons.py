@@ -121,8 +121,8 @@ FCP_1 = {
 FCP_SKELETONS_DICT = {
     "HCO": 1200,
     "Shot": 1500,
-    "O_FOUL": 900,
-    "D_FOUL": 600,
+    "O_FOUL": 1200,
+    "D_FOUL": 900,
     "DEAD_BALL_TURNOVER": 600,
     "STEAL": 900
 }

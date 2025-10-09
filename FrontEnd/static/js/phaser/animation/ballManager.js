@@ -548,6 +548,15 @@ export function animateRebound({
   const shootingTeam = shooterSprite?.team; // "home" or "away"
   const isHomeTeamShot = shootingTeam === "home";
 
+  console.log('REBOUND ANIMATION DEBUG:', {
+    shooterId,
+    shootingTeam,
+    isHomeTeamShot,
+    rebounderId,
+    ballSpot,
+    totalPlayers: Object.keys(playerSprites).length
+  });
+
   // Animate other players attempting to rebound
   for (const sprite of Object.values(playerSprites)) {
     if (!sprite || sprite.playerId === rebounderId) continue;
@@ -563,16 +572,25 @@ export function animateRebound({
       ? currentGridX >= 74 
       : currentGridX <= 25;
 
+    console.log('Player proximity check:', {
+      playerId: sprite.playerId,
+      currentGridX,
+      currentGridY,
+      meetsProximityCriteria,
+      isHomeTeamShot,
+      threshold: isHomeTeamShot ? '>=74' : '<=25'
+    });
+
     if (!meetsProximityCriteria) continue;
 
-    // Random spot within 10 X and 12 Y of ball, staying in bounds
+    // Random spot within 6 X and 8 Y of ball, staying in bounds
     const targetX = Phaser.Math.Clamp(
-      ballSpot.x + Phaser.Math.Between(-10, 10),
-      4,
-      97
+      ballSpot.x + Phaser.Math.Between(-6, 6),
+      9,
+      92
     );
     const targetY = Phaser.Math.Clamp(
-      ballSpot.y + Phaser.Math.Between(-12, 12),
+      ballSpot.y + Phaser.Math.Between(-8, 8),
       5,
       45
     );

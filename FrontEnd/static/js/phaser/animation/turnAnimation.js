@@ -495,8 +495,8 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
         ),
         y: Phaser.Math.Clamp(
           currentGridY + Phaser.Math.Between(-10, 10),
-          5,  // Keep players well inside court
-          45  // Keep players well inside court
+          10,  // Keep players well inside court
+          40   // Keep players well inside court
         ),
       };
       
@@ -1227,135 +1227,93 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
           turnData.rebounder_id ||
           null;
         if (rebounderId) {
+          // Use the unified animateRebound function for all rebounds
+          await animateRebound({
+            scene,
+            ballSprite,
+            playerSprites,
+            animations: turnData.animations || [],
+            rebounderId,
+            ballSpot,
+            shooterId: shotInfo?.playerId ?? null,
+            upcomingFastBreak: turnData.fast_break || false,
+          });
+          
           const rebounderSprite = playerSprites[rebounderId];
-          if (rebounderSprite) {
-            const spotPx = gridToPixels(
-              ballSpot.x,
-              ballSpot.y,
-              scene.game.config.width,
-              scene.game.config.height
-            );
-            const rebCfg = animationConfig.rebound;
-            scene.rebounderId = rebounderId;
-            await new Promise((resolve) => {
-              scene.tweens.add({
-                targets: rebounderSprite,
-                x: spotPx.x,
-                y: spotPx.y,
-                duration: rebCfg.playerMoveMs,
-                ease: "Linear",
-                onComplete: () => {
-                  attachBallToPlayer(scene, ballSprite, rebounderSprite, {
-                    debugInfo: { shooterId: shotInfo?.playerId ?? null, reboundSpot: ballSpot }
-                  });
-                  scene.offenseTeamId = rebounderSprite.team_id;
-                  scene.events?.emit?.("possessionChange", {
-                    offenseTeamId: rebounderSprite.team_id
-                  });
-                    if (
-                      turnData.rebound_type &&
-                      turnData.rebound_type !== "DREB" &&
-                      scene.stateMachine?.is(States.Rebound)
-                    ) {
-                      transitionWithDebug(
-                        scene.stateMachine,
-                        States.HalfCourt,
-                        getDebugTransitions() && {
-                          stepIndex: shotInfo?.stepIndex,
-                          shotResult: turnData.result_type,
-                        }
-                      );
-                    }
-                  scene.rebounderId = null;
-                  if (scene.time?.delayedCall) {
-                    scene.time.delayedCall(rebCfg.attachDelayMs, resolve);
-                  } else {
-                    setTimeout(resolve, rebCfg.attachDelayMs);
-                  }
-                },
-                onStop: resolve
-              });
+          const isDreb = turnData.rebound_type
+            ? turnData.rebound_type === "DREB"
+            : rebounderSprite?.team_id !== turnData.possession_team_id;
+          if (isDreb && !turnData.fast_break) {
+            await runDefensiveReboundSetup({
+              scene,
+              ballSprite,
+              playerSprites,
+              rebounderId,
+              nextPlayType: turnData.next_play_type || "HCO"
             });
-            const isDreb = turnData.rebound_type
-              ? turnData.rebound_type === "DREB"
-              : rebounderSprite?.team_id !== turnData.possession_team_id;
-            if (isDreb && !turnData.fast_break) {
-              await runDefensiveReboundSetup({
-                scene,
-                ballSprite,
-                playerSprites,
-                rebounderId,
-                nextPlayType: turnData.next_play_type || "HCO"
-              });
-            } else {
-              const pause = animationConfig.offensiveRebound.pauseMs;
-              await new Promise((res) =>
-                scene.time?.delayedCall
-                  ? scene.time.delayedCall(pause, res)
-                  : setTimeout(res, pause)
-              );
-              if (!scene.skipToEnd && Array.isArray(turnData.events)) {
-                eventsProcessed = true;
-                for (const evt of turnData.events) {
-                  if (scene.skipToEnd) break;
-                  if (evt.event_type === "PUTBACK_ATTEMPT") {
-                    const shooterId = evt.shooterId;
-                    const rebounderSprite = playerSprites[shooterId];
-                    if (!rebounderSprite) continue;
-                    attachBallToPlayer(scene, ballSprite, rebounderSprite, {
-                      debugInfo: { shooterId, reboundSpot: evt.rebound?.ballSpot || null }
-                    });
-                    const rimCoords =
-                      rebounderSprite.team === "home" ? HOME_RIM_COORDS : AWAY_RIM_COORDS;
-                    const putbackResult = await shootBall({
+          } else {
+            const pause = animationConfig.offensiveRebound.pauseMs;
+            await new Promise((res) =>
+              scene.time?.delayedCall
+                ? scene.time.delayedCall(pause, res)
+                : setTimeout(res, pause)
+            );
+            if (!scene.skipToEnd && Array.isArray(turnData.events)) {
+              eventsProcessed = true;
+              for (const evt of turnData.events) {
+                if (scene.skipToEnd) break;
+                if (evt.event_type === "PUTBACK_ATTEMPT") {
+                  const shooterId = evt.shooterId;
+                  const rebounderSprite = playerSprites[shooterId];
+                  if (!rebounderSprite) continue;
+                  attachBallToPlayer(scene, ballSprite, rebounderSprite, {
+                    debugInfo: { shooterId, reboundSpot: evt.rebound?.ballSpot || null }
+                  });
+                  const rimCoords =
+                    rebounderSprite.team === "home" ? HOME_RIM_COORDS : AWAY_RIM_COORDS;
+                  const putbackResult = await animatePutbackAttempt(
+                    scene,
+                    ballSprite,
+                    shooterId,
+                    rimCoords,
+                    evt.duration || 500,
+                    evt.result
+                  );
+                  if (evt.result === "MISS" && evt.rebound) {
+                    const reboundData = evt.rebound;
+                    const rebounderId =
+                      reboundData.rebounder_player_id || reboundData.rebounderId;
+                    await animateRebound({
                       scene,
                       ballSprite,
-                      fromCoords: { x: rebounderSprite.x, y: rebounderSprite.y },
-                      startTimestamp: Date.now(),
-                      result: evt.result,
-                      shooterPos: { x: rebounderSprite.x, y: rebounderSprite.y },
-                      shooterId: shooterId,
-                      shooterTeamId: rebounderSprite.team === "home" ? scene.homeTeamId : scene.awayTeamId,
-                      homeTeamId: scene.homeTeamId,
-                      stepIndex: 0,
-                      turnIndex: scene.currentTurn || 0
+                      playerSprites,
+                      animations: reboundData.animations || turnData.animations,
+                      rebounderId,
+                      ballSpot: putbackResult?.grid || reboundData.ballSpot,
+                      shooterId: evt.shooterId
                     });
-                    if (evt.result === "MISS" && evt.rebound) {
-                      const reboundData = evt.rebound;
-                      const rebounderId =
-                        reboundData.rebounder_player_id || reboundData.rebounderId;
-                      await animateRebound({
+                    if (
+                      reboundData.rebound_type === "DREB" &&
+                      !turnData.fast_break
+                    ) {
+                      await runDefensiveReboundSetup({
                         scene,
                         ballSprite,
                         playerSprites,
-                        animations: reboundData.animations || turnData.animations,
-                        rebounderId,
-                        ballSpot: putbackResult?.grid || reboundData.ballSpot,
-                        shooterId: evt.shooterId
+                        rebounderId
                       });
-                      if (
-                        reboundData.rebound_type === "DREB" &&
-                        !turnData.fast_break
-                      ) {
-                        await runDefensiveReboundSetup({
-                          scene,
-                          ballSprite,
-                          playerSprites,
-                          rebounderId
-                        });
-                      }
                     }
-                  } else if (evt.event_type === "KICKOUT_RESET") {
-                    await animateKickoutReset(
-                      scene,
-                      ballSprite,
-                      evt.rebounder_player_id || evt.rebounderId,
-                      evt.pgId,
-                      evt.pass
-                    );
-                    if (typeof scene.startNextHalfCourtOffense === "function") {
-                      scene.startNextHalfCourtOffense();
-                    }
+                  }
+                } else if (evt.event_type === "KICKOUT_RESET") {
+                  await animateKickoutReset(
+                    scene,
+                    ballSprite,
+                    evt.rebounder_player_id || evt.rebounderId,
+                    evt.pgId,
+                    evt.pass
+                  );
+                  if (typeof scene.startNextHalfCourtOffense === "function") {
+                    scene.startNextHalfCourtOffense();
                   }
                 }
               }

@@ -39,11 +39,6 @@ export async function runFastBreakSequence({
     scene.__activeTimeline = null;
   }
   
-  // Display "FAST BREAK!" banner
-  if (typeof window !== "undefined" && window.TEXT_SCROLL_ENABLED) {
-    appendToTextScroll("FAST BREAK!");
-  }
-  
   // Transition to FastBreakOutlet or FastBreak state
   if (turnData.roles?.outlet_passer) {
     safeTransition(scene.stateMachine, States.FastBreakOutlet);
