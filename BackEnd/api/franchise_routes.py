@@ -901,7 +901,19 @@ def run_franchise_training(req: FranchiseTrainingRequest):
     # Apply training
     player_updates = session.apply_training(players_for_training, team_stats)
 
-    # Recalculate position ratings for each player after training
+    # Apply the attribute updates to the player objects first
+    for player in players_for_training:
+        pid = player["_id"]
+        if pid in player_updates:
+            for attr, val in player_updates[pid].items():
+                # Update the player object's attributes with new values
+                player["attributes"][attr] = val
+                # Also update base attribute if this is an anchor field
+                if attr.startswith("anchor_"):
+                    base_attr = attr.replace("anchor_", "")
+                    player["attributes"][base_attr] = val
+
+    # Recalculate position ratings for each player after training (with updated attributes)
     from BackEnd.utils.position_ratings import compute_position_ratings
     position_ratings_updates = {}
     
@@ -913,7 +925,7 @@ def run_franchise_training(req: FranchiseTrainingRequest):
         
         # Build player dict for position ratings calculation with updated attributes
         player_for_ratings = {
-            "attributes": player.get("attributes", {}),
+            "attributes": player.get("attributes", {}),  # Now contains updated values!
             "height": height,
             "name": f"{player.get('first_name', '')} {player.get('last_name', '')}"
         }
