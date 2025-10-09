@@ -98,7 +98,7 @@ class FranchiseManager:
         
         # Load all players with their full attributes for franchise-specific storage
         players = self.db.players.find(
-            {}, {"first_name": 1, "last_name": 1, "team": 1, "team_id": 1, "attributes": 1}
+            {}, {"first_name": 1, "last_name": 1, "team": 1, "team_id": 1, "attributes": 1, "position_ratings": 1}
         )
         for p in players:
             pid = str(p.get("_id"))
@@ -112,12 +112,13 @@ class FranchiseManager:
             if tid is not None:
                 meta["team_id"] = str(tid)
             
-            # Store franchise-specific player attributes (cloned from core collection)
+            # Store franchise-specific player attributes and position ratings (cloned from core collection)
             players_map[pid] = {
                 "meta": meta,
                 "season": zero_stats.copy(),
                 "career": career,
                 "attributes": p.get("attributes", {}).copy(),  # Clone player attributes for this franchise
+                "position_ratings": p.get("position_ratings", {}).copy(),  # Clone position ratings for this franchise
             }
 
         # Initialize franchise-specific team stats (clone from core teams)
