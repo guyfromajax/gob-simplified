@@ -95,8 +95,10 @@ class FranchiseManager:
             )
         prev_stats = existing.get("players", {})
         players_map: dict[str, dict] = {}
+        
+        # Load all players with their full attributes for franchise-specific storage
         players = self.db.players.find(
-            {}, {"first_name": 1, "last_name": 1, "team": 1, "team_id": 1}
+            {}, {"first_name": 1, "last_name": 1, "team": 1, "team_id": 1, "attributes": 1}
         )
         for p in players:
             pid = str(p.get("_id"))
@@ -109,14 +111,46 @@ class FranchiseManager:
             tid = p.get("team_id")
             if tid is not None:
                 meta["team_id"] = str(tid)
+            
+            # Store franchise-specific player attributes (cloned from core collection)
             players_map[pid] = {
                 "meta": meta,
                 "season": zero_stats.copy(),
                 "career": career,
+                "attributes": p.get("attributes", {}).copy(),  # Clone player attributes for this franchise
             }
 
+        # Initialize franchise-specific team stats (clone from core teams)
+        franchise_teams = {}
+        for team in self.teams:
+            team_id = str(team["_id"])
+            franchise_teams[team_id] = {
+                "team_chemistry": team.get("team_chemistry", 0),
+                "offensive_efficiency": team.get("offensive_efficiency", 0),
+                "offensive_adjust": team.get("offensive_adjust", 0),
+                "defense_threshold": team.get("defense_threshold", 0),
+                "shot_threshold": team.get("shot_threshold", 0),
+                "turnover_threshold": team.get("turnover_threshold", 0),
+                "foul_threshold": team.get("foul_threshold", 0),
+                "rebound_modifier": team.get("rebound_modifier", 0),
+                "o_tendency_reads": team.get("o_tendency_reads", 0),
+                "d_tendency_reads": team.get("d_tendency_reads", 0),
+            }
+
+        # Initialize training status - needs training before week 1 (training camp)
+        training_status = {
+            "current_week": 0,
+            "training_completed": False,
+            "session_type": "preseason"  # First training is always training camp
+        }
+
         self.save_season_state(
-            extra_state={"players": players_map, "applied_games": []}
+            extra_state={
+                "players": players_map, 
+                "applied_games": [],
+                "franchise_teams": franchise_teams,
+                "training_status": training_status
+            }
         )
 
     def reset_stats(self):

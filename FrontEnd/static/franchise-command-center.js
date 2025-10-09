@@ -190,8 +190,12 @@ function renderSchedule(data) {
 }
 
 async function init() {
-  const topData = await fetchJSON('/franchise/command-center/data');
+  const topData = await fetchJSON(`/franchise/command-center/data?franchise_id=${franchiseId}`);
   populateTop(topData);
+  
+  // Update button based on training status
+  updatePlayButton(topData);
+  
   if (topData && topData.team) {
     renderTeam(await fetchJSON(`/roster/${encodeURIComponent(topData.team)}`));
   }
@@ -204,9 +208,36 @@ async function init() {
     renderRecruits(await fetchJSON('/franchise/recruits'));
   }
 
+function updatePlayButton(data) {
+  const playNowBtn = document.getElementById('play-now');
+  if (!data) return;
+  
+  const trainingCompleted = data.training_completed || false;
+  const sessionType = data.session_type || 'in-season';
+  
+  if (!trainingCompleted) {
+    playNowBtn.textContent = sessionType === 'preseason' ? 'Run Training Camp' : 'Run Training';
+    playNowBtn.dataset.mode = 'training';
+  } else {
+    playNowBtn.textContent = 'Play Now';
+    playNowBtn.dataset.mode = 'play';
+  }
+}
+
 const playNowBtn = document.getElementById('play-now');
 playNowBtn.disabled = true;
 playNowBtn.addEventListener('click', async () => {
+  const mode = playNowBtn.dataset.mode || 'play';
+  
+  if (mode === 'training') {
+    // Navigate to training page
+    const topData = await fetchJSON(`/franchise/command-center/data?franchise_id=${franchiseId}`);
+    const sessionType = topData?.session_type || 'in-season';
+    window.location.href = `/static/training.html?franchise_id=${franchiseId}&mode=franchise&session_type=${sessionType}`;
+    return;
+  }
+  
+  // Otherwise, play the game
   console.log('Play Now click search:', window.location.search);
   const originalText = playNowBtn.textContent;
   playNowBtn.disabled = true;
