@@ -295,25 +295,26 @@
       resultsDiv.appendChild(err);
     }
     
-    // Add Continue button for franchise mode
-    if (mode === 'franchise' && franchiseId) {
-      const continueBtn = document.createElement('button');
-      continueBtn.textContent = 'Continue';
-      continueBtn.style.marginTop = '20px';
-      continueBtn.style.padding = '10px 20px';
-      continueBtn.style.fontSize = '16px';
-      continueBtn.style.cursor = 'pointer';
-      continueBtn.addEventListener('click', () => {
-        window.location.href = `/static/franchise-command-center.html?franchise_id=${franchiseId}`;
-      });
-      resultsDiv.appendChild(continueBtn);
-    }
-
+    // Add navigation button
     const btnWrap = document.createElement('div');
     btnWrap.style.textAlign = 'center';
     btnWrap.style.marginTop = '20px';
-    btnWrap.innerHTML = '<button id="locker-btn" class="main-button">Go To Locker Room</button>';
-    resultsDiv.appendChild(btnWrap);
+    
+    if (mode === 'franchise' && franchiseId) {
+      // Franchise mode - go back to command center
+      btnWrap.innerHTML = '<button id="locker-btn" class="main-button">Back to Command Center</button>';
+      resultsDiv.appendChild(btnWrap);
+      
+      document.addEventListener('click', (e) => {
+        if (e.target && e.target.id === 'locker-btn') {
+          window.location.href = `/static/franchise-command-center.html?franchise_id=${franchiseId}`;
+        }
+      });
+    } else {
+      // Standalone mode - original button
+      btnWrap.innerHTML = '<button id="locker-btn" class="main-button">Go To Locker Room</button>';
+      resultsDiv.appendChild(btnWrap);
+    }
   }
 
   runBtn.addEventListener('click', runTraining);
