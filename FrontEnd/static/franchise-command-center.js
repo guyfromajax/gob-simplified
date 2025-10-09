@@ -197,7 +197,8 @@ async function init() {
   updatePlayButton(topData);
   
   if (topData && topData.team) {
-    renderTeam(await fetchJSON(`/roster/${encodeURIComponent(topData.team)}`));
+    // Use franchise-specific roster endpoint to get updated player attributes
+    renderTeam(await fetchJSON(`/franchise/roster?franchise_id=${franchiseId}&team_name=${encodeURIComponent(topData.team)}`));
   }
   const standingsData = await fetchJSON(`/franchise/standings?franchise_id=${franchiseId}`);
   renderStandings(standingsData);

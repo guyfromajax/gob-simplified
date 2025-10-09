@@ -719,6 +719,69 @@ def recruits():
     return {"recruits": recs}
 
 
+@router.get("/franchise/roster")
+def get_franchise_roster(franchise_id: str, team_name: str = None):
+    """
+    Get roster with franchise-specific player attributes.
+    """
+    try:
+        fid = ObjectId(franchise_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid franchise ID")
+    
+    # Get team name from state if not provided
+    if not team_name:
+        state = franchise_state_collection.find_one({"_id": "state"}) or {}
+        team_name = state.get("team")
+    
+    if not team_name:
+        raise HTTPException(status_code=404, detail="Team not found")
+    
+    # Get team document
+    team_doc = db.teams.find_one({"name": team_name})
+    if not team_doc:
+        raise HTTPException(status_code=404, detail="Team not found")
+    
+    # Get franchise document
+    franchise_doc = db.franchises.find_one({"_id": fid})
+    if not franchise_doc:
+        raise HTTPException(status_code=404, detail="Franchise not found")
+    
+    franchise_players = franchise_doc.get("players", {})
+    team_player_ids = team_doc.get("player_ids", [])
+    
+    # Build player list with franchise-specific attributes
+    players = []
+    for pid in team_player_ids:
+        pid_str = str(pid)
+        franchise_player_data = franchise_players.get(pid_str, {})
+        if not franchise_player_data:
+            continue
+        
+        meta = franchise_player_data.get("meta", {})
+        attributes = franchise_player_data.get("attributes", {})
+        
+        # Get additional data from core collection
+        core_player = db.players.find_one({"_id": pid}, {
+            "position_ratings": 1, "height": 1, "weight": 1, "jersey": 1, "year": 1
+        })
+        
+        player = {
+            "first_name": meta.get("first_name", ""),
+            "last_name": meta.get("last_name", ""),
+            "team": team_name,
+            "attributes": attributes,
+            "position_ratings": core_player.get("position_ratings", {}) if core_player else {},
+            "height": core_player.get("height") if core_player else None,
+            "weight": core_player.get("weight") if core_player else None,
+            "jersey": core_player.get("jersey") if core_player else None,
+            "year": core_player.get("year") if core_player else None
+        }
+        players.append(player)
+    
+    return {"players": players}
+
+
 class FranchiseTrainingRequest(BaseModel):
     franchise_id: str
     allocations: dict
