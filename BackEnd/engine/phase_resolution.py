@@ -1084,8 +1084,9 @@ def resolve_half_court_trap_logic(game: "GameManager"):
         skeleton, 
         off_lineup, 
         def_lineup, 
-        add_defenders=False,  # TODO: Implement HCT-specific defensive positioning
-        is_fcp=False
+        add_defenders=True,  # Enable HCT-specific defensive positioning
+        is_fcp=False,
+        is_hct=True
     ) if skeleton else []
     
     result = {
