@@ -164,7 +164,12 @@ class TrainingSession:
         ]
 
         if team_level and trait_name in TEAM_TRAITS_WITH_MULTIPLIER:
-            return result * 10
+            result = result * 10
+        
+        # TRAINING CAMP BONUS: Double all changes for preseason training
+        if self.session_type == "preseason":
+            result = result * 2
+        
         return result
 
 
