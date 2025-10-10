@@ -822,25 +822,18 @@ export function animateKickoutReset(
     easing: cfg.easing
   };
 
-  if (pass.fromCoords) {
-    opts.startCoords = gridToPixels(
-      pass.fromCoords.x,
-      pass.fromCoords.y,
-      width,
-      height
-    );
-  } else {
-    opts.startCoords = { x: rebounderSprite.x, y: rebounderSprite.y };
-  }
-  if (pass.toCoords) {
-    opts.endCoords = gridToPixels(
-      pass.toCoords.x,
-      pass.toCoords.y,
-      width,
-      height
-    );
-  } else {
-    opts.endCoords = { x: pgSprite.x, y: pgSprite.y };
+  // ALWAYS use actual sprite positions for kickout passes (ignore backend coords)
+  // Backend coords may be stale after rebound animation moves players
+  opts.startCoords = { x: rebounderSprite.x, y: rebounderSprite.y };
+  opts.endCoords = { x: pgSprite.x, y: pgSprite.y };
+  
+  if (debugEnabled) {
+    animationDebugLog('animateKickoutReset: Using sprite positions', {
+      from: opts.startCoords,
+      to: opts.endCoords,
+      rebounderPos: { x: rebounderSprite.x, y: rebounderSprite.y },
+      pgPos: { x: pgSprite.x, y: pgSprite.y }
+    });
   }
 
   if (scene.stateMachine?.is(States.FastBreak)) {
