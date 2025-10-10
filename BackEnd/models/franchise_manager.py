@@ -182,6 +182,9 @@ class FranchiseManager:
                 "training_status": training_status
             }
         )
+        
+        # Generate initial recruits for the franchise
+        self.recruit_manager.generate_recruits()
 
     def reset_stats(self):
         for team in self.teams:
