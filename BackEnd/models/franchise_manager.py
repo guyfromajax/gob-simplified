@@ -396,7 +396,12 @@ class RecruitManager:
     def generate_recruits(self, count=40):
         recruits = []
         for _ in range(count):
-            name = f"{random.choice(self.first_names)} {random.choice(self.last_names)}"
+            first_name = random.choice(self.first_names)
+            last_name = random.choice(self.last_names)
+            # Format last name to title case (only first letter capitalized)
+            last_name_formatted = last_name.title()
+            name = f"{first_name} {last_name_formatted}"
+            
             attributes = {k: random.randint(1, 30) for k in
                           ["SC","SH","ID","OD","PS","BH","RB","AG","ST","ND","IQ","FT"]}
             recruits.append({"name": name, "attributes": attributes,
