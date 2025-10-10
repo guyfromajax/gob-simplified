@@ -55,6 +55,14 @@ export function createGameScene(Phaser) {
           localStorage.removeItem('game_id');
         }
         this.quarter = data.quarter || 1;
+        this.gamePlanSettings = data.gamePlanSettings;
+        this.userTeamSide = data.userTeamSide;
+        
+        console.log('🎮 [gameScene.init] Received game plan data:', { 
+          hasSettings: !!this.gamePlanSettings, 
+          userTeamSide: this.userTeamSide,
+          quarter: this.quarter 
+        });
 
         if (DEBUG_FLOW) {
           const teams = gameStore.getTeams();
