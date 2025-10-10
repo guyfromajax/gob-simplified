@@ -51,6 +51,7 @@
         <button data-tab="leaders-tab">Leaders</button>
         <button data-tab="teamstats-tab">Team Stats</button>
         <button data-tab="recruits-tab">Recruits</button>
+        <button data-tab="training-tab">Training</button>
       </div>
       <div id="standings-tab" class="tab-content active">
         <h3>Team Standings</h3>
@@ -111,10 +112,16 @@
         <div class="scroll-x">
           <table class="roster-table">
             <thead>
-              <tr><th>Name</th><th>SC</th><th>SH</th><th>ID</th><th>OD</th><th>PS</th><th>BH</th><th>RB</th><th>AG</th><th>ST</th><th>ND</th><th>IQ</th><th>FT</th></tr>
+              <tr><th>Name</th><th>POS</th><th>SC</th><th>SH</th><th>ID</th><th>OD</th><th>PS</th><th>BH</th><th>RB</th><th>AG</th><th>ST</th><th>ND</th><th>IQ</th><th>FT</th><th>RT</th></tr>
             </thead>
             <tbody id="recruits-body"></tbody>
           </table>
+        </div>
+      </div>
+      <div id="training-tab" class="tab-content">
+        <h3>Latest Training Session</h3>
+        <div id="training-results-container">
+          <p>No training session completed yet.</p>
         </div>
       </div>
     </div>

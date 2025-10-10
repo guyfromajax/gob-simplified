@@ -116,12 +116,94 @@ function renderRecruits(data) {
   if (!data) return;
   const tbody = document.getElementById('recruits-body');
   tbody.innerHTML = '';
-  data.recruits.forEach(r => {
-    const tr = document.createElement('tr');
+  
+  // Process recruits to add position and rating info
+  let recruits = (data.recruits || []).map(r => {
     const a = r.attributes || {};
-    tr.innerHTML = `<td>${r.name}</td><td>${a.SC}</td><td>${a.SH}</td><td>${a.ID}</td><td>${a.OD}</td><td>${a.PS}</td><td>${a.BH}</td><td>${a.RB}</td><td>${a.AG}</td><td>${a.ST}</td><td>${a.ND}</td><td>${a.IQ}</td><td>${a.FT}</td>`;
+    const ratings = r.position_ratings || {};
+    const best = getBestPosition(ratings);
+    
+    return {
+      name: r.name,
+      pos: best.pos,
+      rt: best.rating,
+      attributes: a
+    };
+  });
+  
+  // Sort by rating (highest to lowest)
+  recruits.sort((a, b) => (b.rt ?? -1) - (a.rt ?? -1));
+  
+  // Render sorted recruits
+  recruits.forEach(r => {
+    const tr = document.createElement('tr');
+    const a = r.attributes;
+    tr.innerHTML = `<td>${r.name}</td><td>${r.pos}</td><td>${a.SC}</td><td>${a.SH}</td><td>${a.ID}</td><td>${a.OD}</td><td>${a.PS}</td><td>${a.BH}</td><td>${a.RB}</td><td>${a.AG}</td><td>${a.ST}</td><td>${a.ND}</td><td>${a.IQ}</td><td>${a.FT}</td><td>${r.rt ?? '-'}</td>`;
     tbody.appendChild(tr);
   });
+}
+
+function renderTrainingResults(data) {
+  const container = document.getElementById('training-results-container');
+  if (!container) return;
+  
+  if (!data || (!data.player_logs || Object.keys(data.player_logs).length === 0)) {
+    container.innerHTML = '<p>No training session completed yet.</p>';
+    return;
+  }
+  
+  container.innerHTML = '';
+  
+  // Add session type header
+  const sessionHeader = document.createElement('h4');
+  const sessionLabel = data.session_type === 'preseason' ? 'Training Camp' : 'In-Season Training';
+  sessionHeader.textContent = sessionLabel + (data.week ? ` (Week ${data.week})` : '');
+  sessionHeader.style.marginBottom = '15px';
+  container.appendChild(sessionHeader);
+  
+  // Player Results
+  const playerHeader = document.createElement('h5');
+  playerHeader.textContent = 'Player Attribute Changes';
+  playerHeader.style.marginTop = '10px';
+  container.appendChild(playerHeader);
+  
+  const traitOrder = ['SH','SC','ID','OD','PS','BH','RB','AG','ST','ND','IQ','FT'];
+  
+  if (data.player_logs && typeof data.player_logs === 'object') {
+    Object.entries(data.player_logs).forEach(([name, traits]) => {
+      const row = document.createElement('p');
+      row.style.marginBottom = '5px';
+      const bold = document.createElement('strong');
+      bold.textContent = name + ': ';
+      row.appendChild(bold);
+
+      const parts = traitOrder.map(attr => {
+        const val = Object.hasOwnProperty.call(traits, attr) ? traits[attr] : 0;
+        if (val === 0) return null;
+        const sign = val > 0 ? '+' : '';
+        return `${attr} ${sign}${val}`;
+      }).filter(p => p !== null);
+
+      row.appendChild(document.createTextNode(parts.join(', ')));
+      container.appendChild(row);
+    });
+  }
+  
+  // Team Results
+  if (data.team_log && typeof data.team_log === 'object' && Object.keys(data.team_log).length > 0) {
+    const teamHeader = document.createElement('h5');
+    teamHeader.textContent = 'Team Attribute Changes';
+    teamHeader.style.marginTop = '20px';
+    container.appendChild(teamHeader);
+
+    Object.entries(data.team_log).forEach(([attr, delta]) => {
+      const row = document.createElement('p');
+      row.style.marginBottom = '5px';
+      const sign = delta > 0 ? '+' : '';
+      row.textContent = `${attr}: ${sign}${delta}`;
+      container.appendChild(row);
+    });
+  }
 }
 
 function renderTeam(data) {
@@ -190,10 +272,15 @@ function renderSchedule(data) {
 }
 
 async function init() {
-  const topData = await fetchJSON('/franchise/command-center/data');
+  const topData = await fetchJSON(`/franchise/command-center/data?franchise_id=${franchiseId}`);
   populateTop(topData);
+  
+  // Update button based on training status
+  updatePlayButton(topData);
+  
   if (topData && topData.team) {
-    renderTeam(await fetchJSON(`/roster/${encodeURIComponent(topData.team)}`));
+    // Use franchise-specific roster endpoint to get updated player attributes
+    renderTeam(await fetchJSON(`/franchise/roster?franchise_id=${franchiseId}&team_name=${encodeURIComponent(topData.team)}`));
   }
   const standingsData = await fetchJSON(`/franchise/standings?franchise_id=${franchiseId}`);
   renderStandings(standingsData);
@@ -202,11 +289,39 @@ async function init() {
     renderLeaders(await fetchJSON(`/franchise/leaders?franchise_id=${franchiseId}`));
     renderTeamStats(await fetchJSON('/franchise/team-stats'));
     renderRecruits(await fetchJSON('/franchise/recruits'));
+    renderTrainingResults(await fetchJSON(`/franchise/latest-training?franchise_id=${franchiseId}`));
   }
+
+function updatePlayButton(data) {
+  const playNowBtn = document.getElementById('play-now');
+  if (!data) return;
+  
+  const trainingCompleted = data.training_completed || false;
+  const sessionType = data.session_type || 'in-season';
+  
+  if (!trainingCompleted) {
+    playNowBtn.textContent = sessionType === 'preseason' ? 'Run Training Camp' : 'Run Training';
+    playNowBtn.dataset.mode = 'training';
+  } else {
+    playNowBtn.textContent = 'Play Now';
+    playNowBtn.dataset.mode = 'play';
+  }
+}
 
 const playNowBtn = document.getElementById('play-now');
 playNowBtn.disabled = true;
 playNowBtn.addEventListener('click', async () => {
+  const mode = playNowBtn.dataset.mode || 'play';
+  
+  if (mode === 'training') {
+    // Navigate to training page
+    const topData = await fetchJSON(`/franchise/command-center/data?franchise_id=${franchiseId}`);
+    const sessionType = topData?.session_type || 'in-season';
+    window.location.href = `/static/training.html?franchise_id=${franchiseId}&mode=franchise&session_type=${sessionType}`;
+    return;
+  }
+  
+  // Otherwise, play the game
   console.log('Play Now click search:', window.location.search);
   const originalText = playNowBtn.textContent;
   playNowBtn.disabled = true;

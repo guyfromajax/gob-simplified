@@ -35,33 +35,62 @@ def load_franchise_names() -> tuple[list[str], list[str]]:
         ValueError: if the JSON is malformed or missing required keys.
     """
 
+    # Try multiple path resolution strategies
+    paths_to_try = []
+    
+    # 1. Environment variable
     env_path = os.environ.get("FRANCHISE_NAMES_FILE")
-    default_path = Path(__file__).resolve().parents[1] / "data" / "names" / "franchise_names.json"
-    path = Path(env_path).expanduser() if env_path else default_path
-    abs_path = path.resolve()
-    exists = abs_path.is_file()
-    logger.info("Loading franchise names from %s (exists=%s)", abs_path, exists)
-    if not exists:
-        msg = f"franchise names file not found: {abs_path}"
-        logger.warning(msg)
-        raise FileNotFoundError(msg)
-
+    if env_path:
+        paths_to_try.append(Path(env_path).expanduser())
+    
+    # 2. Relative to this file
+    paths_to_try.append(Path(__file__).resolve().parents[1] / "data" / "names" / "franchise_names.json")
+    
+    # 3. Relative to current working directory (for deployed environments)
+    paths_to_try.append(Path("BackEnd/data/names/franchise_names.json"))
+    
+    # 4. Try using importlib.resources for packaged data
     try:
-        with abs_path.open("r", encoding="utf-8") as f:
-            payload = json.load(f)
-    except Exception as exc:  # pragma: no cover - json errors
-        logger.warning("Failed to parse franchise names JSON %s: %s", abs_path, exc)
-        raise ValueError(f"invalid franchise names JSON: {exc}") from exc
-
-    fn = payload.get("first_names")
-    ln = payload.get("last_names")
-    if not isinstance(fn, list) or not isinstance(ln, list) or not fn or not ln:
-        msg = "Names JSON malformed: expected non-empty 'first_names' and 'last_names' lists"
-        logger.warning(msg)
-        raise ValueError(msg)
-
-    logger.info("Loaded %d first names and %d last names", len(fn), len(ln))
-    return fn, ln
+        import importlib.resources as pkg_resources
+        from BackEnd.data import names
+        if hasattr(pkg_resources, 'files'):
+            # Python 3.9+
+            names_path = pkg_resources.files(names) / "franchise_names.json"
+            paths_to_try.append(Path(str(names_path)))
+        elif hasattr(pkg_resources, 'path'):
+            # Python 3.7-3.8
+            with pkg_resources.path(names, "franchise_names.json") as p:
+                paths_to_try.append(p)
+    except Exception as e:
+        logger.debug("Could not use importlib.resources: %s", e)
+    
+    # Try each path
+    for path in paths_to_try:
+        abs_path = path.resolve() if hasattr(path, 'resolve') else Path(path)
+        exists = abs_path.is_file()
+        logger.info("Checking franchise names at %s (exists=%s)", abs_path, exists)
+        
+        if exists:
+            try:
+                with abs_path.open("r", encoding="utf-8") as f:
+                    payload = json.load(f)
+                
+                fn = payload.get("first_names")
+                ln = payload.get("last_names")
+                if not isinstance(fn, list) or not isinstance(ln, list) or not fn or not ln:
+                    logger.warning("Names JSON malformed at %s", abs_path)
+                    continue
+                
+                logger.info("✅ Loaded %d first names and %d last names from %s", len(fn), len(ln), abs_path)
+                return fn, ln
+            except Exception as exc:
+                logger.warning("Failed to parse franchise names JSON %s: %s", abs_path, exc)
+                continue
+    
+    # If we get here, none of the paths worked
+    msg = f"franchise names file not found. Tried paths: {[str(p) for p in paths_to_try]}"
+    logger.error(msg)
+    raise FileNotFoundError(msg)
 
 
 class FranchiseManager:
@@ -95,8 +124,10 @@ class FranchiseManager:
             )
         prev_stats = existing.get("players", {})
         players_map: dict[str, dict] = {}
+        
+        # Load all players with their full attributes for franchise-specific storage
         players = self.db.players.find(
-            {}, {"first_name": 1, "last_name": 1, "team": 1, "team_id": 1}
+            {}, {"first_name": 1, "last_name": 1, "team": 1, "team_id": 1, "attributes": 1, "position_ratings": 1}
         )
         for p in players:
             pid = str(p.get("_id"))
@@ -109,15 +140,51 @@ class FranchiseManager:
             tid = p.get("team_id")
             if tid is not None:
                 meta["team_id"] = str(tid)
+            
+            # Store franchise-specific player attributes and position ratings (cloned from core collection)
             players_map[pid] = {
                 "meta": meta,
                 "season": zero_stats.copy(),
                 "career": career,
+                "attributes": p.get("attributes", {}).copy(),  # Clone player attributes for this franchise
+                "position_ratings": p.get("position_ratings", {}).copy(),  # Clone position ratings for this franchise
             }
 
+        # Initialize franchise-specific team stats (clone from core teams)
+        franchise_teams = {}
+        for team in self.teams:
+            team_id = str(team["_id"])
+            franchise_teams[team_id] = {
+                "team_chemistry": team.get("team_chemistry", 0),
+                "offensive_efficiency": team.get("offensive_efficiency", 0),
+                "offensive_adjust": team.get("offensive_adjust", 0),
+                "defense_threshold": team.get("defense_threshold", 0),
+                "shot_threshold": team.get("shot_threshold", 0),
+                "turnover_threshold": team.get("turnover_threshold", 0),
+                "foul_threshold": team.get("foul_threshold", 0),
+                "rebound_modifier": team.get("rebound_modifier", 0),
+                "o_tendency_reads": team.get("o_tendency_reads", 0),
+                "d_tendency_reads": team.get("d_tendency_reads", 0),
+            }
+
+        # Initialize training status - needs training before week 1 (training camp)
+        training_status = {
+            "current_week": 0,
+            "training_completed": False,
+            "session_type": "preseason"  # First training is always training camp
+        }
+
         self.save_season_state(
-            extra_state={"players": players_map, "applied_games": []}
+            extra_state={
+                "players": players_map, 
+                "applied_games": [],
+                "franchise_teams": franchise_teams,
+                "training_status": training_status
+            }
         )
+        
+        # Generate initial recruits for the franchise
+        self.recruit_manager.generate_recruits()
 
     def reset_stats(self):
         for team in self.teams:
@@ -318,18 +385,45 @@ class RecruitManager:
         self.diagnostics = None
 
         try:
-            self.first_names, self.last_names = load_franchise_names()
+            loaded_first, loaded_last = load_franchise_names()
+            self.first_names = loaded_first
+            self.last_names = loaded_last
+            logger.info(f"✅ Loaded {len(self.first_names)} first names and {len(self.last_names)} last names for recruits")
         except Exception as exc:
-            logger.warning("Using fallback recruit names: %s", exc)
+            logger.error(f"❌ Failed to load franchise names, using fallback: {exc}")
+            logger.error(f"Fallback names: {len(self.first_names)} first, {len(self.last_names)} last")
 
     def generate_recruits(self, count=40):
+        from BackEnd.utils.position_ratings import compute_position_ratings
+        
         recruits = []
         for _ in range(count):
-            name = f"{random.choice(self.first_names)} {random.choice(self.last_names)}"
+            first_name = random.choice(self.first_names)
+            last_name = random.choice(self.last_names)
+            # Format last name to title case (only first letter capitalized)
+            last_name_formatted = last_name.title()
+            name = f"{first_name} {last_name_formatted}"
+            
             attributes = {k: random.randint(1, 30) for k in
                           ["SC","SH","ID","OD","PS","BH","RB","AG","ST","ND","IQ","FT"]}
-            recruits.append({"name": name, "attributes": attributes,
-                             "year": "Freshman", "created_at": datetime.utcnow()})
+            
+            # Calculate position ratings for the recruit
+            height = random.randint(66, 84)  # Random height between 5'6" and 7'0"
+            recruit_for_ratings = {
+                "attributes": attributes,
+                "height": height,
+                "name": name
+            }
+            position_ratings = compute_position_ratings(recruit_for_ratings)
+            
+            recruits.append({
+                "name": name, 
+                "attributes": attributes,
+                "position_ratings": position_ratings,
+                "height": height,
+                "year": "Freshman", 
+                "created_at": datetime.utcnow()
+            })
 
         if recruits:
             self.db.recruits.delete_many({})

@@ -670,7 +670,7 @@ class Animator:
 
         return animations
 
-    def skeleton_to_animations(self, skeleton, off_lineup, def_lineup, add_defenders=True, is_fcp=False):
+    def skeleton_to_animations(self, skeleton, off_lineup, def_lineup, add_defenders=True, is_fcp=False, is_hct=False):
         """
         Convert skeleton data to animation format.
         
@@ -764,6 +764,13 @@ class Animator:
                     steps
                 )
                 animations.extend(defensive_anims)
+            elif is_hct:
+                # Use HCT-specific defensive positioning
+                defensive_anims = self._position_hct_defenders(
+                    def_lineup,
+                    steps
+                )
+                animations.extend(defensive_anims)
             else:
                 # Use standard defensive positioning (future implementation)
                 pass
@@ -854,6 +861,97 @@ class Animator:
                 "end": def_end or {"x": 50, "y": 25},
                 "movement": def_movement,
                 "hasBallAtStep": has_ball_steps,
+                "duration": duration
+            })
+        
+        return defensive_animations
+
+    def _position_hct_defenders(self, def_lineup, skeleton_steps):
+        """
+        Position defensive players for Half Court Trap scenarios.
+        
+        Strategy:
+        - Defenders take specific court positions based on trap setup
+        - PG: Deep Key (protecting basket)
+        - SG: Deep Upper Wing (trap position)
+        - SF: Deep Lower Wing (trap position)
+        - PF: Key (mid-range defense)
+        - C: Mid Lane (protecting paint)
+        
+        Positions are mirrored based on which team is on offense.
+        
+        Args:
+            def_lineup: Dict of defensive players by position
+            skeleton_steps: List of skeleton steps for timing
+            
+        Returns:
+            List of defensive player animations
+        """
+        defensive_animations = []
+        
+        # Determine court orientation
+        is_away_offense = self.game.offense_team.team_id == self.game.away_team.team_id
+        
+        # Define base positions for away team defending (home team on offense)
+        # These are the RIGHT side positions (defending right basket)
+        hct_away_defending_positions = {
+            "PG": {"x": 57, "y": 25},   # Deep Key (right)
+            "SG": {"x": 57, "y": 35},   # Deep Upper Wing (right)
+            "SF": {"x": 57, "y": 15},   # Deep Lower Wing (right)
+            "PF": {"x": 64, "y": 25},   # Key (right)
+            "C": {"x": 80, "y": 25}     # Mid Lane (right)
+        }
+        
+        # Determine actual positions based on who's defending
+        hct_positions = {}
+        for pos in ['PG', 'SG', 'SF', 'PF', 'C']:
+            base_coords = hct_away_defending_positions[pos]
+            if is_away_offense:
+                # Home team defending - flip to LEFT side
+                hct_positions[pos] = {
+                    "x": 101 - base_coords["x"],
+                    "y": base_coords["y"]
+                }
+            else:
+                # Away team defending RIGHT basket - use base positions
+                hct_positions[pos] = base_coords
+        
+        # Get the duration from skeleton steps
+        duration = skeleton_steps[-1].get("timestamp", 0) if skeleton_steps else 0
+        
+        # Create animation for each defensive position
+        for position in ['PG', 'SG', 'SF', 'PF', 'C']:
+            def_player = def_lineup.get(position)
+            if not def_player:
+                continue
+            
+            def_player_id = getattr(def_player, "player_id", None)
+            if not def_player_id:
+                continue
+            
+            # Get the position for this defender
+            def_coords = hct_positions[position]
+            
+            # Create simple movement to the trap position
+            movement = [
+                {
+                    "timestamp": 0,
+                    "coords": def_coords,
+                    "action": "trap_position"
+                },
+                {
+                    "timestamp": duration,
+                    "coords": def_coords,
+                    "action": "trap_position"
+                }
+            ]
+            
+            defensive_animations.append({
+                "playerId": def_player_id,
+                "start": def_coords,
+                "end": def_coords,
+                "movement": movement,
+                "hasBallAtStep": [False, False],
                 "duration": duration
             })
         

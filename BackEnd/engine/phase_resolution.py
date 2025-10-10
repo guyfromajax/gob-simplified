@@ -539,6 +539,7 @@ def resolve_half_court_offense_logic(game):
     # 1. Tactical Setup
     off_call = game_state["current_playcall"]
     def_call = game_state["defense_playcall"]
+    print(f"🏀 HCO Playcall Selected: {off_call}")
     roles = game.turn_manager.assign_roles(off_call, def_call)
     # print("inside resolve_half_court_offense_logic")
     # print("[DEBUG] roles:", roles.keys())
@@ -568,6 +569,10 @@ def resolve_half_court_offense_logic(game):
 
     # 3. Shot Result
     shot_result = game.shot_manager.resolve_shot(roles)
+    
+    # Add playcall to the text
+    playcall_text = f"[{off_call}] "
+    shot_result["text"] = playcall_text + shot_result.get("text", "")
     
     # Pass next_defensive_setup to animator via roles
     if "next_defensive_setup" in shot_result:
@@ -936,9 +941,46 @@ def get_hct_skeleton(result_type, game_context=None):
 
 
 def get_hco_skeleton(result_type, game_context):
-    """Get HCO skeleton - convert existing INSIDE_SCENES logic to skeleton format"""
-    # For now, return a basic HCO skeleton structure
-    # This will be expanded to convert the existing INSIDE_SCENES logic
+    """Get HCO skeleton based on the current playcall"""
+    # Import all playcall skeletons
+    from BackEnd.playcall_skeletons.inside_skeletons import INSIDE_SCENES
+    from BackEnd.playcall_skeletons.outside_skeletons import OUTSIDE_SCENES
+    from BackEnd.playcall_skeletons.attack_skeletons import ATTACK_SCENES
+    from BackEnd.playcall_skeletons.set_play_skeletons import SET_PLAY_SCENES
+    from BackEnd.playcall_skeletons.freelance_skeletons import FREELANCE_SCENES
+    from BackEnd.playcall_skeletons.base_skeletons import BASE_SCENES
+    
+    # Get the current playcall from game context
+    playcall = game_context.game_state.get("current_playcall", "Inside") if game_context else "Inside"
+    
+    print(f"📋 get_hco_skeleton called - Playcall: {playcall}, Result Type: {result_type}")
+    
+    # Map playcall to skeleton scenes
+    playcall_map = {
+        "Inside": INSIDE_SCENES,
+        "Outside": OUTSIDE_SCENES,
+        "Attack": ATTACK_SCENES,
+        "Set": SET_PLAY_SCENES,
+        "Freelance": FREELANCE_SCENES,
+        "Base": BASE_SCENES
+    }
+    
+    # Get the skeleton scenes for this playcall
+    print(f"📋 Available playcalls in map: {list(playcall_map.keys())}")
+    print(f"📋 Looking for playcall: '{playcall}' (type: {type(playcall)})")
+    
+    scenes = playcall_map.get(playcall, INSIDE_SCENES)
+    
+    actual_key = playcall if playcall in playcall_map else "FALLBACK TO INSIDE"
+    print(f"📋 Found {len(scenes)} scenes for playcall '{actual_key}'")
+    
+    # Randomly select one scene from the available scenes
+    if scenes and len(scenes) > 0:
+        selected_scene = random.choice(scenes)
+        print(f"📋 Selected scene has {len(selected_scene.get('steps', []))} steps")
+        return selected_scene
+    
+    # Fallback to basic skeleton if no scenes available
     return {
         "steps": [
             {
@@ -1084,8 +1126,9 @@ def resolve_half_court_trap_logic(game: "GameManager"):
         skeleton, 
         off_lineup, 
         def_lineup, 
-        add_defenders=False,  # TODO: Implement HCT-specific defensive positioning
-        is_fcp=False
+        add_defenders=True,  # Enable HCT-specific defensive positioning
+        is_fcp=False,
+        is_hct=True
     ) if skeleton else []
     
     result = {
