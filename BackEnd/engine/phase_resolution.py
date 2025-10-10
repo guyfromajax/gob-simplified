@@ -948,7 +948,7 @@ def get_hco_skeleton(result_type, game_context):
     from BackEnd.playcall_skeletons.attack_skeletons import ATTACK_SCENES
     from BackEnd.playcall_skeletons.set_play_skeletons import SET_PLAY_SCENES
     from BackEnd.playcall_skeletons.freelance_skeletons import FREELANCE_SCENES
-    from BackEnd.playcall_skeletons.motion_skeletons import MOTION_SCENES
+    from BackEnd.playcall_skeletons.base_skeletons import BASE_SCENES
     
     # Get the current playcall from game context
     playcall = game_context.game_state.get("current_playcall", "Inside") if game_context else "Inside"
@@ -962,8 +962,7 @@ def get_hco_skeleton(result_type, game_context):
         "Attack": ATTACK_SCENES,
         "Set": SET_PLAY_SCENES,
         "Freelance": FREELANCE_SCENES,
-        "Motion": MOTION_SCENES,
-        "Base": INSIDE_SCENES  # Base defaults to Inside
+        "Base": BASE_SCENES
     }
     
     # Get the skeleton scenes for this playcall
