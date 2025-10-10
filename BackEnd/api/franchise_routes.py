@@ -974,10 +974,16 @@ def run_franchise_training(req: FranchiseTrainingRequest):
         if deltas:
             player_logs[name] = deltas
 
-    # Compute team deltas
+    # Compute team deltas (skip non-numeric fields like playcall_settings, strategy_settings)
     team_log = {}
     for field, old_val in team_baseline.items():
+        # Skip dict fields (playcall_settings, strategy_settings)
+        if isinstance(old_val, dict):
+            continue
         new_val = team_stats.get(field, old_val)
+        # Skip if new value is also a dict
+        if isinstance(new_val, dict):
+            continue
         delta = new_val - old_val
         if delta != 0:
             team_log[field] = delta
