@@ -116,10 +116,29 @@ function renderRecruits(data) {
   if (!data) return;
   const tbody = document.getElementById('recruits-body');
   tbody.innerHTML = '';
-  data.recruits.forEach(r => {
-    const tr = document.createElement('tr');
+  
+  // Process recruits to add position and rating info
+  let recruits = (data.recruits || []).map(r => {
     const a = r.attributes || {};
-    tr.innerHTML = `<td>${r.name}</td><td>${a.SC}</td><td>${a.SH}</td><td>${a.ID}</td><td>${a.OD}</td><td>${a.PS}</td><td>${a.BH}</td><td>${a.RB}</td><td>${a.AG}</td><td>${a.ST}</td><td>${a.ND}</td><td>${a.IQ}</td><td>${a.FT}</td>`;
+    const ratings = r.position_ratings || {};
+    const best = getBestPosition(ratings);
+    
+    return {
+      name: r.name,
+      pos: best.pos,
+      rt: best.rating,
+      attributes: a
+    };
+  });
+  
+  // Sort by rating (highest to lowest)
+  recruits.sort((a, b) => (b.rt ?? -1) - (a.rt ?? -1));
+  
+  // Render sorted recruits
+  recruits.forEach(r => {
+    const tr = document.createElement('tr');
+    const a = r.attributes;
+    tr.innerHTML = `<td>${r.name}</td><td>${r.pos}</td><td>${a.SC}</td><td>${a.SH}</td><td>${a.ID}</td><td>${a.OD}</td><td>${a.PS}</td><td>${a.BH}</td><td>${a.RB}</td><td>${a.AG}</td><td>${a.ST}</td><td>${a.ND}</td><td>${a.IQ}</td><td>${a.FT}</td><td>${r.rt ?? '-'}</td>`;
     tbody.appendChild(tr);
   });
 }
