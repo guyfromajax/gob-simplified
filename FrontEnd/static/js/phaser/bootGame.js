@@ -388,11 +388,14 @@ async function handleSimToFourth() {
         if (Object.keys(homeLineup).length) payload.home_lineup = homeLineup;
         if (Object.keys(awayLineup).length) payload.away_lineup = awayLineup;
         // Add game plan settings for ALL modes (Q1 only)
+        console.log('🔍 Game plan check:', { currentQ, quarter, hasSettings: !!gamePlanSettings, userTeamSide, mode });
         if (currentQ === 1 && gamePlanSettings && userTeamSide) {
           payload.user_team_side = userTeamSide;
           payload.playcall_settings = gamePlanSettings.playcall_settings;
           payload.strategy_settings = gamePlanSettings.strategy_settings;
           console.log(`🎮 Sending game plan settings to backend (${mode} mode):`, { userTeamSide, playcall: gamePlanSettings.playcall_settings });
+        } else if (currentQ === 1) {
+          console.warn('⚠️ Not sending game plan settings:', { hasSettings: !!gamePlanSettings, userTeamSide });
         }
       }
       if (DEBUG_TEAMS) {
@@ -471,11 +474,14 @@ async function handleSimFullGame() {
         if (Object.keys(homeLineup).length) payload.home_lineup = homeLineup;
         if (Object.keys(awayLineup).length) payload.away_lineup = awayLineup;
         // Add game plan settings for ALL modes (Q1 only)
+        console.log('🔍 Game plan check (sim full):', { currentQ, quarter, hasSettings: !!gamePlanSettings, userTeamSide, mode });
         if (currentQ === 1 && gamePlanSettings && userTeamSide) {
           payload.user_team_side = userTeamSide;
           payload.playcall_settings = gamePlanSettings.playcall_settings;
           payload.strategy_settings = gamePlanSettings.strategy_settings;
           console.log(`🎮 Sending game plan settings to backend (${mode} mode, sim full):`, { userTeamSide, playcall: gamePlanSettings.playcall_settings });
+        } else if (currentQ === 1) {
+          console.warn('⚠️ Not sending game plan settings (sim full):', { hasSettings: !!gamePlanSettings, userTeamSide });
         }
       }
       if (DEBUG_TEAMS) {
