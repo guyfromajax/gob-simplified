@@ -414,8 +414,26 @@ class TurnManager:
         def_lineup = def_team.lineup
         tempo_call = off_team.strategy_calls["tempo_call"]
 
-        # --- Step 1: Pick scene and step count
-        scene = random.choice(INSIDE_SCENES)
+        # --- Step 1: Pick scene based on playcall
+        from BackEnd.playcall_skeletons.outside_skeletons import OUTSIDE_SCENES
+        from BackEnd.playcall_skeletons.attack_skeletons import ATTACK_SCENES
+        from BackEnd.playcall_skeletons.set_play_skeletons import SET_PLAY_SCENES
+        from BackEnd.playcall_skeletons.freelance_skeletons import FREELANCE_SCENES
+        from BackEnd.playcall_skeletons.base_skeletons import BASE_SCENES
+        
+        playcall_scenes_map = {
+            "Inside": INSIDE_SCENES,
+            "Outside": OUTSIDE_SCENES,
+            "Attack": ATTACK_SCENES,
+            "Set": SET_PLAY_SCENES,
+            "Freelance": FREELANCE_SCENES,
+            "Base": BASE_SCENES
+        }
+        
+        scenes_list = playcall_scenes_map.get(off_call, INSIDE_SCENES)
+        scene = random.choice(scenes_list)
+        print(f"🎬 assign_roles using '{off_call}' skeleton with {len(scene['steps'])} steps")
+        
         tempo_to_steps = {"slow": 7, "normal": 5, "fast": 4}
         requested = tempo_to_steps.get(tempo_call.lower(), len(scene["steps"]))
 
