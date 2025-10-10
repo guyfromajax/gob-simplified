@@ -1,6 +1,8 @@
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from bson import ObjectId
+from pathlib import Path
 import logging
 from typing import Optional
 
@@ -8,6 +10,13 @@ from BackEnd.db import db
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+STATIC_DIR = Path(__file__).resolve().parents[2] / "FrontEnd" / "static"
+
+@router.get("/game-plan.html")
+def serve_game_plan_html():
+    """Return the game plan page so query params work in production."""
+    return FileResponse(STATIC_DIR / "game-plan.html")
 
 class GamePlanSettings(BaseModel):
     playcall_settings: dict[str, int]
