@@ -394,6 +394,8 @@ class RecruitManager:
             logger.error(f"Fallback names: {len(self.first_names)} first, {len(self.last_names)} last")
 
     def generate_recruits(self, count=40):
+        from BackEnd.utils.position_ratings import compute_position_ratings
+        
         recruits = []
         for _ in range(count):
             first_name = random.choice(self.first_names)
@@ -404,8 +406,24 @@ class RecruitManager:
             
             attributes = {k: random.randint(1, 30) for k in
                           ["SC","SH","ID","OD","PS","BH","RB","AG","ST","ND","IQ","FT"]}
-            recruits.append({"name": name, "attributes": attributes,
-                             "year": "Freshman", "created_at": datetime.utcnow()})
+            
+            # Calculate position ratings for the recruit
+            height = random.randint(66, 84)  # Random height between 5'6" and 7'0"
+            recruit_for_ratings = {
+                "attributes": attributes,
+                "height": height,
+                "name": name
+            }
+            position_ratings = compute_position_ratings(recruit_for_ratings)
+            
+            recruits.append({
+                "name": name, 
+                "attributes": attributes,
+                "position_ratings": position_ratings,
+                "height": height,
+                "year": "Freshman", 
+                "created_at": datetime.utcnow()
+            })
 
         if recruits:
             self.db.recruits.delete_many({})
