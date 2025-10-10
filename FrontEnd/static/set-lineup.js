@@ -259,10 +259,10 @@ async function init() {
         // optional: params.set('debug_flow', '1');
       }
       if (DEBUG) {
-        console.debug('🔀 Redirecting to court.html', { home: homeTeam, away: awayTeam, gameId: currentGameId });
+        console.debug('🔀 Redirecting to game-plan.html', { home: homeTeam, away: awayTeam, gameId: currentGameId });
       }
       DEBUG && console.log('[lineup] launching quarter', quarter);
-      window.location.href = `/court.html?${params.toString()}`;
+      window.location.href = `/game-plan.html?${params.toString()}`;
     });
   }
 }

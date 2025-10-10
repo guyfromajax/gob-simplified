@@ -165,6 +165,23 @@ class FranchiseManager:
                 "rebound_modifier": team.get("rebound_modifier", 0),
                 "o_tendency_reads": team.get("o_tendency_reads", 0),
                 "d_tendency_reads": team.get("d_tendency_reads", 0),
+                # Game plan settings (all start at 2 = Normal)
+                "playcall_settings": {
+                    "Base": 2,
+                    "Freelance": 2,
+                    "Inside": 2,
+                    "Attack": 2,
+                    "Outside": 2,
+                    "Set": 2
+                },
+                "strategy_settings": {
+                    "defense": 2,
+                    "tempo": 2,
+                    "aggression": 2,
+                    "fast_break": 2,
+                    "half_court_trap": 2,
+                    "full_court_press": 2
+                }
             }
 
         # Initialize training status - needs training before week 1 (training camp)

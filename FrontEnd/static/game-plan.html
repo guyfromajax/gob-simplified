@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Set Your Game Plan</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/game-plan.css" />
+</head>
+<body>
+  <div class="container">
+    <header>
+      <img id="team-logo" alt="team logo" class="team-logo" hidden>
+      <h1 id="page-title">Set Your Game Plan</h1>
+      <p id="team-subtitle"></p>
+    </header>
+
+    <div class="sliders-container">
+      <!-- Left Column: Offense -->
+      <div class="slider-column">
+        <h2 class="column-title">Offense</h2>
+        
+        <div class="slider-group">
+          <label for="slider-base">Base</label>
+          <div class="slider-wrapper">
+            <input type="range" id="slider-base" class="offense-slider" min="0" max="4" step="1" value="2" />
+            <span class="slider-value" id="value-base">2</span>
+          </div>
+          <div class="slider-labels">
+            <span>Never</span>
+            <span>Normal</span>
+            <span>Most</span>
+          </div>
+        </div>
+
+        <div class="slider-group">
+          <label for="slider-freelance">Freelance</label>
+          <div class="slider-wrapper">
+            <input type="range" id="slider-freelance" class="offense-slider" min="0" max="4" step="1" value="2" />
+            <span class="slider-value" id="value-freelance">2</span>
+          </div>
+          <div class="slider-labels">
+            <span>Never</span>
+            <span>Normal</span>
+            <span>Most</span>
+          </div>
+        </div>
+
+        <div class="slider-group">
+          <label for="slider-inside">Inside</label>
+          <div class="slider-wrapper">
+            <input type="range" id="slider-inside" class="offense-slider" min="0" max="4" step="1" value="2" />
+            <span class="slider-value" id="value-inside">2</span>
+          </div>
+          <div class="slider-labels">
+            <span>Never</span>
+            <span>Normal</span>
+            <span>Most</span>
+          </div>
+        </div>
+
+        <div class="slider-group">
+          <label for="slider-attack">Attack</label>
+          <div class="slider-wrapper">
+            <input type="range" id="slider-attack" class="offense-slider" min="0" max="4" step="1" value="2" />
+            <span class="slider-value" id="value-attack">2</span>
+          </div>
+          <div class="slider-labels">
+            <span>Never</span>
+            <span>Normal</span>
+            <span>Most</span>
+          </div>
+        </div>
+
+        <div class="slider-group">
+          <label for="slider-outside">Outside</label>
+          <div class="slider-wrapper">
+            <input type="range" id="slider-outside" class="offense-slider" min="0" max="4" step="1" value="2" />
+            <span class="slider-value" id="value-outside">2</span>
+          </div>
+          <div class="slider-labels">
+            <span>Never</span>
+            <span>Normal</span>
+            <span>Most</span>
+          </div>
+        </div>
+
+        <div class="slider-group">
+          <label for="slider-set">Set</label>
+          <div class="slider-wrapper">
+            <input type="range" id="slider-set" class="offense-slider" min="0" max="4" step="1" value="2" />
+            <span class="slider-value" id="value-set">2</span>
+          </div>
+          <div class="slider-labels">
+            <span>Never</span>
+            <span>Normal</span>
+            <span>Most</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Column: Defense / General -->
+      <div class="slider-column">
+        <h2 class="column-title">Defense / General</h2>
+        
+        <div class="slider-group">
+          <label for="slider-defense">Defense</label>
+          <div class="slider-wrapper">
+            <input type="range" id="slider-defense" class="strategy-slider" min="0" max="4" step="1" value="2" />
+            <span class="slider-value" id="value-defense">2</span>
+          </div>
+          <div class="slider-labels">
+            <span>100% Man</span>
+            <span>50/50</span>
+            <span>100% Zone</span>
+          </div>
+        </div>
+
+        <div class="slider-group">
+          <label for="slider-tempo">Tempo</label>
+          <div class="slider-wrapper">
+            <input type="range" id="slider-tempo" class="strategy-slider" min="0" max="4" step="1" value="2" />
+            <span class="slider-value" id="value-tempo">2</span>
+          </div>
+          <div class="slider-labels">
+            <span>Slow</span>
+            <span>Normal</span>
+            <span>Fast</span>
+          </div>
+        </div>
+
+        <div class="slider-group">
+          <label for="slider-aggression">Aggression</label>
+          <div class="slider-wrapper">
+            <input type="range" id="slider-aggression" class="strategy-slider" min="0" max="4" step="1" value="2" />
+            <span class="slider-value" id="value-aggression">2</span>
+          </div>
+          <div class="slider-labels">
+            <span>Passive</span>
+            <span>Normal</span>
+            <span>Aggressive</span>
+          </div>
+        </div>
+
+        <div class="slider-group">
+          <label for="slider-fast-break">Fast Breaks</label>
+          <div class="slider-wrapper">
+            <input type="range" id="slider-fast-break" class="strategy-slider" min="0" max="4" step="1" value="2" />
+            <span class="slider-value" id="value-fast-break">2</span>
+          </div>
+          <div class="slider-labels">
+            <span>Never</span>
+            <span>Normal</span>
+            <span>Always</span>
+          </div>
+        </div>
+
+        <div class="slider-group">
+          <label for="slider-fc-press">FC Press</label>
+          <div class="slider-wrapper">
+            <input type="range" id="slider-fc-press" class="strategy-slider" min="0" max="4" step="1" value="2" />
+            <span class="slider-value" id="value-fc-press">2</span>
+          </div>
+          <div class="slider-labels">
+            <span>Never</span>
+            <span>Normal</span>
+            <span>Always</span>
+          </div>
+        </div>
+
+        <div class="slider-group">
+          <label for="slider-hc-trap">HC Trap</label>
+          <div class="slider-wrapper">
+            <input type="range" id="slider-hc-trap" class="strategy-slider" min="0" max="4" step="1" value="2" />
+            <span class="slider-value" id="value-hc-trap">2</span>
+          </div>
+          <div class="slider-labels">
+            <span>Never</span>
+            <span>Normal</span>
+            <span>Always</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="button-container">
+      <button id="btn-reset" class="btn btn-secondary">Reset</button>
+      <button id="btn-cancel" class="btn btn-secondary">Cancel</button>
+      <button id="btn-save" class="btn btn-primary">Save & Continue</button>
+    </div>
+  </div>
+
+  <!-- Validation Modal -->
+  <div id="validation-modal" class="modal" hidden>
+    <div class="modal-content">
+      <h2>Invalid Game Plan</h2>
+      <p id="modal-message">At least one Offense setting must be above 'Never'. Please increase any Offense slider.</p>
+      <button id="modal-close" class="btn btn-primary">OK</button>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" hidden></div>
+
+  <script src="/static/common.js"></script>
+  <script src="/static/game-plan.js"></script>
+</body>
+</html>
+
