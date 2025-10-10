@@ -145,11 +145,21 @@ function resetGameContext() {
 
 
 async function fetchTeamRoster(teamName) {
-  const query = buildQuery({
-    tournament_id: mode === 'tournament' ? tournamentId : null,
-    franchise_id: mode === 'franchise' ? franchiseId : null,
-  });
-  const res = await fetch(`/roster/${encodeURIComponent(teamName)}${query}`);
+  // Use franchise-specific roster endpoint if in franchise mode
+  let url;
+  if (mode === 'franchise' && franchiseId) {
+    url = `/franchise/roster?franchise_id=${franchiseId}&team_name=${encodeURIComponent(teamName)}`;
+    console.log(`Loading franchise-specific roster for ${teamName}`);
+  } else {
+    const query = buildQuery({
+      tournament_id: mode === 'tournament' ? tournamentId : null,
+      franchise_id: mode === 'franchise' ? franchiseId : null,
+    });
+    url = `/roster/${encodeURIComponent(teamName)}${query}`;
+    console.log(`Loading standard roster for ${teamName}`);
+  }
+  
+  const res = await fetch(url);
   if (!res.ok) {
     throw new Error(`Failed to load roster for ${teamName}`);
   }
