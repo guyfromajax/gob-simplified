@@ -304,11 +304,14 @@ class TurnManager:
 
 
     def set_playcalls(self):
-
+        print(f"🎲 Playcall weights: {self.game.offense_team.playcall_weights}")
+        
         chosen_playcall = weighted_random_from_dict(self.game.offense_team.playcall_weights)
         defense_setting = self.game.defense_team.strategy_settings["defense"]
         chosen_defense = random.choice(STRATEGY_CALL_DICTS["defense"][defense_setting])
 
+        print(f"🎲 Chosen playcall: {chosen_playcall}")
+        
         # Track usage
         self.game.offense_team.playcall_tracker[chosen_playcall] += 1
         self.game.defense_team.defense_playcall_tracker[chosen_defense] += 1

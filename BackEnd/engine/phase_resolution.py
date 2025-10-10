@@ -539,6 +539,7 @@ def resolve_half_court_offense_logic(game):
     # 1. Tactical Setup
     off_call = game_state["current_playcall"]
     def_call = game_state["defense_playcall"]
+    print(f"🏀 HCO Playcall Selected: {off_call}")
     roles = game.turn_manager.assign_roles(off_call, def_call)
     # print("inside resolve_half_court_offense_logic")
     # print("[DEBUG] roles:", roles.keys())
@@ -568,6 +569,10 @@ def resolve_half_court_offense_logic(game):
 
     # 3. Shot Result
     shot_result = game.shot_manager.resolve_shot(roles)
+    
+    # Add playcall to the text
+    playcall_text = f"[{off_call}] "
+    shot_result["text"] = playcall_text + shot_result.get("text", "")
     
     # Pass next_defensive_setup to animator via roles
     if "next_defensive_setup" in shot_result:
@@ -948,6 +953,8 @@ def get_hco_skeleton(result_type, game_context):
     # Get the current playcall from game context
     playcall = game_context.game_state.get("current_playcall", "Inside") if game_context else "Inside"
     
+    print(f"📋 get_hco_skeleton called - Playcall: {playcall}, Result Type: {result_type}")
+    
     # Map playcall to skeleton scenes
     playcall_map = {
         "Inside": INSIDE_SCENES,
@@ -962,9 +969,12 @@ def get_hco_skeleton(result_type, game_context):
     # Get the skeleton scenes for this playcall
     scenes = playcall_map.get(playcall, INSIDE_SCENES)
     
+    print(f"📋 Found {len(scenes)} scenes for playcall '{playcall}'")
+    
     # Randomly select one scene from the available scenes
     if scenes and len(scenes) > 0:
         selected_scene = random.choice(scenes)
+        print(f"📋 Selected scene has {len(selected_scene.get('steps', []))} steps")
         return selected_scene
     
     # Fallback to basic skeleton if no scenes available
