@@ -125,6 +125,22 @@ export function createGameScene(Phaser) {
       }
       if (Object.keys(this.homeLineup).length) payload.home_lineup = this.homeLineup;
       if (Object.keys(this.awayLineup).length) payload.away_lineup = this.awayLineup;
+      
+      // Add game plan settings for Q1
+      if (this.quarter === 1 && this.gamePlanSettings && this.userTeamSide) {
+        payload.user_team_side = this.userTeamSide;
+        payload.playcall_settings = this.gamePlanSettings.playcall_settings;
+        payload.strategy_settings = this.gamePlanSettings.strategy_settings;
+        console.log(`🎮 [gameScene] Sending game plan settings (${this.mode} mode):`, { 
+          userTeamSide: this.userTeamSide, 
+          playcall: this.gamePlanSettings.playcall_settings 
+        });
+      } else if (this.quarter === 1) {
+        console.warn('⚠️ [gameScene] Not sending game plan:', { 
+          hasSettings: !!this.gamePlanSettings, 
+          userTeamSide: this.userTeamSide 
+        });
+      }
       const url = this.gameId || this.quarter > 1 ? '/api/simulate-quarter' : '/api/simulate-quarter';
       const res = await fetch(url, {
       method: 'POST',

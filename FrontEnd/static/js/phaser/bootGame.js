@@ -271,6 +271,9 @@ async function startGame({ homeRoster, awayRoster, animate = true }) {
     awayLineup,
     periodLabel,
     quarter,
+    gamePlanSettings,
+    userTeamSide,
+    mode,
   };
 
   if (game.scene.isActive('GameScene')) {
