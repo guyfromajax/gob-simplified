@@ -411,7 +411,9 @@ async function animateDefensiveStop(scene, turnData, playerSprites, ballSprite, 
 }
 
 /**
- * Helper: Move all non-involved players to half court positions
+ * Helper: Move all non-involved players to their positions
+ * - Defenders in list: chase toward basket (X: 50 to basket-15, Y: 15-35)
+ * - Other players: move to half court (X: 45-55, Y: 15-35)
  */
 async function moveOtherPlayersToStandardPositions(
   scene,
@@ -426,21 +428,40 @@ async function moveOtherPlayersToStandardPositions(
   const defendersList = turnData.roles?.defense || [];
   const defendersSet = new Set(defendersList.map(d => d.player_id || d));
   
+  // Determine which basket is being attacked
+  const shooterSprite = playerSprites[ballHandlerId];
+  const isHomeOffense = shooterSprite?.team === "home";
+  const basket = isHomeOffense ? HOME_RIM_COORDS : AWAY_RIM_COORDS;
+  
   for (const [id, sprite] of Object.entries(playerSprites)) {
-    // Skip if already animated
-    if (id === ballHandlerId || id === primaryDefenderId || defendersSet.has(id)) {
+    // Skip shooter and primary defender (already animated)
+    if (id === ballHandlerId || id === primaryDefenderId) {
       continue;
     }
     
-    // Move to half court: Y (15-35), X (45-55)
-    const halfCourtSpot = {
-      x: Phaser.Math.Between(45, 55),
-      y: Phaser.Math.Between(15, 35)
-    };
+    let targetSpot;
     
-    const halfCourtPx = gridToPixels(halfCourtSpot.x, halfCourtSpot.y, width, height);
+    // Animate defenders in the list to chase positions
+    if (defendersSet.has(id)) {
+      // Defenders chase: X between 50 and 15 spots closer to basket
+      const minX = isHomeOffense ? 50 : basket.x + 2;
+      const maxX = isHomeOffense ? basket.x - 2 : 50;
+      
+      targetSpot = {
+        x: Phaser.Math.Between(Math.min(minX, maxX), Math.max(minX, maxX)),
+        y: Phaser.Math.Between(15, 35)
+      };
+    } else {
+      // All other players: move to half court
+      targetSpot = {
+        x: Phaser.Math.Between(45, 55),
+        y: Phaser.Math.Between(15, 35)
+      };
+    }
+    
+    const targetPx = gridToPixels(targetSpot.x, targetSpot.y, width, height);
     promises.push(
-      tweenPlayerTo(scene, sprite, halfCourtPx, {
+      tweenPlayerTo(scene, sprite, targetPx, {
         duration: 600,
         easing: "Sine.easeInOut"
       })
