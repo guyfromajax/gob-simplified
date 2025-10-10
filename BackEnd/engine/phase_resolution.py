@@ -936,9 +936,38 @@ def get_hct_skeleton(result_type, game_context=None):
 
 
 def get_hco_skeleton(result_type, game_context):
-    """Get HCO skeleton - convert existing INSIDE_SCENES logic to skeleton format"""
-    # For now, return a basic HCO skeleton structure
-    # This will be expanded to convert the existing INSIDE_SCENES logic
+    """Get HCO skeleton based on the current playcall"""
+    # Import all playcall skeletons
+    from BackEnd.playcall_skeletons.inside_skeletons import INSIDE_SCENES
+    from BackEnd.playcall_skeletons.outside_skeletons import OUTSIDE_SCENES
+    from BackEnd.playcall_skeletons.attack_skeletons import ATTACK_SCENES
+    from BackEnd.playcall_skeletons.set_play_skeletons import SET_PLAY_SCENES
+    from BackEnd.playcall_skeletons.freelance_skeletons import FREELANCE_SCENES
+    from BackEnd.playcall_skeletons.motion_skeletons import MOTION_SCENES
+    
+    # Get the current playcall from game context
+    playcall = game_context.game_state.get("current_playcall", "Inside") if game_context else "Inside"
+    
+    # Map playcall to skeleton scenes
+    playcall_map = {
+        "Inside": INSIDE_SCENES,
+        "Outside": OUTSIDE_SCENES,
+        "Attack": ATTACK_SCENES,
+        "Set": SET_PLAY_SCENES,
+        "Freelance": FREELANCE_SCENES,
+        "Motion": MOTION_SCENES,
+        "Base": INSIDE_SCENES  # Base defaults to Inside
+    }
+    
+    # Get the skeleton scenes for this playcall
+    scenes = playcall_map.get(playcall, INSIDE_SCENES)
+    
+    # Randomly select one scene from the available scenes
+    if scenes and len(scenes) > 0:
+        selected_scene = random.choice(scenes)
+        return selected_scene
+    
+    # Fallback to basic skeleton if no scenes available
     return {
         "steps": [
             {
