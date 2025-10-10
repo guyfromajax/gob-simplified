@@ -78,10 +78,26 @@ if (weekParam && !Number.isNaN(weekParam) && typeof localStorage !== 'undefined'
   localStorage.setItem('franchise_week', weekParam);
 }
 const mode = urlParams.get('mode') || getMode({ tournamentId, franchiseId });
+const userTeamSide = urlParams.get('my_team');  // "home" or "away"
 let quarter = parseInt(urlParams.get('quarter'), 10) || 1;
 let gameId =
   urlParams.get('game_id') ||
   (typeof localStorage !== 'undefined' ? localStorage.getItem('game_id') : null);
+
+// Load game plan settings from localStorage (for single game mode)
+let gamePlanSettings = null;
+if (mode === 'single' && typeof localStorage !== 'undefined') {
+  const storageKey = `gameplan_${userTeamSide === 'home' ? homeTeam : awayTeam}_${homeTeam}_${awayTeam}`;
+  const stored = localStorage.getItem(storageKey);
+  if (stored) {
+    try {
+      gamePlanSettings = JSON.parse(stored);
+      console.log('📋 Loaded game plan settings from localStorage:', gamePlanSettings);
+    } catch (e) {
+      console.error('Failed to parse game plan settings:', e);
+    }
+  }
+}
 let periodLabel = urlParams.get('period') || `Q${quarter}`;
 
 const homeLineup = {};
@@ -319,6 +335,13 @@ async function handleSimToFourth() {
       if (currentQ === quarter) {
         if (Object.keys(homeLineup).length) payload.home_lineup = homeLineup;
         if (Object.keys(awayLineup).length) payload.away_lineup = awayLineup;
+        // Add game plan settings for single game mode (Q1 only)
+        if (currentQ === 1 && mode === 'single' && gamePlanSettings && userTeamSide) {
+          payload.user_team_side = userTeamSide;
+          payload.playcall_settings = gamePlanSettings.playcall_settings;
+          payload.strategy_settings = gamePlanSettings.strategy_settings;
+          console.log('🎮 Sending game plan settings to backend:', { userTeamSide, playcall: gamePlanSettings.playcall_settings });
+        }
       }
       if (DEBUG_TEAMS) {
         console.log('/api/simulate-quarter payload teams:', {
@@ -395,6 +418,13 @@ async function handleSimFullGame() {
       if (currentQ === quarter) {
         if (Object.keys(homeLineup).length) payload.home_lineup = homeLineup;
         if (Object.keys(awayLineup).length) payload.away_lineup = awayLineup;
+        // Add game plan settings for single game mode (Q1 only)
+        if (currentQ === 1 && mode === 'single' && gamePlanSettings && userTeamSide) {
+          payload.user_team_side = userTeamSide;
+          payload.playcall_settings = gamePlanSettings.playcall_settings;
+          payload.strategy_settings = gamePlanSettings.strategy_settings;
+          console.log('🎮 Sending game plan settings to backend (sim full):', { userTeamSide, playcall: gamePlanSettings.playcall_settings });
+        }
       }
       if (DEBUG_TEAMS) {
         console.log('/api/simulate-quarter payload teams:', {
