@@ -719,6 +719,20 @@ def recruits():
     return {"recruits": recs}
 
 
+@router.get("/franchise/debug-names")
+def debug_names():
+    """Debug endpoint to check if franchise names are loading correctly."""
+    from BackEnd.models.franchise_manager import RecruitManager
+    rm = RecruitManager(db)
+    return {
+        "first_names_count": len(rm.first_names),
+        "last_names_count": len(rm.last_names),
+        "sample_first_names": rm.first_names[:10],
+        "sample_last_names": rm.last_names[:10],
+        "using_fallback": len(rm.first_names) == 5 and len(rm.last_names) == 5
+    }
+
+
 @router.get("/franchise/latest-training")
 def get_latest_training(franchise_id: str):
     """
