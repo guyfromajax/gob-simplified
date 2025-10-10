@@ -810,9 +810,14 @@ def get_franchise_roster(franchise_id: str, team_name: str = None):
         if not position_ratings and core_player:
             position_ratings = core_player.get("position_ratings", {})
         
+        first = meta.get("first_name", "")
+        last = meta.get("last_name", "")
+        
         player = {
-            "first_name": meta.get("first_name", ""),
-            "last_name": meta.get("last_name", ""),
+            "_id": pid_str,  # Add _id for lineup tracking
+            "first_name": first,
+            "last_name": last,
+            "name": f"{first} {last}".strip(),  # Add combined name for display
             "team": team_name,
             "attributes": attributes,
             "position_ratings": position_ratings,
