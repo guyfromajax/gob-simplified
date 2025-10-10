@@ -27,7 +27,7 @@ from BackEnd.constants import HCO_STRING_SPOTS, ACTIONS
 
 #frequencyoptions are strong offense, neutral, strong defense
 COLORADO = {
-    "primary_shooter": "SG",
+    "primary_shooter": "C",
     "screener": "PF",
     # "kickout_shooters": ["PG", "SG", "SF"],
     "pass_sequence": ["PG", "SF", "SG"],
@@ -97,20 +97,31 @@ COLORADO = {
                 "PF": {"action": ACTIONS["POST"], "spot": "lower lowPost"},
                 "C": {"action": ACTIONS["POST"], "spot": "upper lowPost"}
             },
-            "events": [{"type": "pass", "from": "SF", "to": "SG"}]
+            "events": [{"type": "pass", "from": "SG", "to": "PG"}]
         },
         {
             "timestamp": 1800,
             "pos_actions": {
-                "PG": {"action": ACTIONS["DRIFT"], "spot": "upper wing"},
-                "SG": {"action": ACTIONS["SHOOT"], "spot": "lower wing"},
-                "SF": {"action": ACTIONS["DRIFT"], "spot": "key"},
-                "PF": {"action": ACTIONS["DRIFT"], "spot": "upper lowPost"},
-                "C": {"action": ACTIONS["DRIFT"], "spot": "upper highPost"}
+                "PG": {"action": ACTIONS["PASS"], "spot": "upper wing"},
+                "SG": {"action": ACTIONS["DRIFT"], "spot": "key"},
+                "SF": {"action": ACTIONS["DRIFT"], "spot": "lower wing"},
+                "PF": {"action": ACTIONS["POST"], "spot": "lower lowPost"},
+                "C": {"action": ACTIONS["RECEIVE"], "spot": "upper lowPost"}
             },
-            "events": [{"type": "shot", "by": "SG"}]
+            "events": [{"type": "pass", "from": "PG", "to": "C"}]
+        },
+        {
+            "timestamp": 2100,
+            "pos_actions": {
+                "PG": {"action": ACTIONS["DRIFT"], "spot": "upper wing"},
+                "SG": {"action": ACTIONS["DRIFT"], "spot": "key"},
+                "SF": {"action": ACTIONS["DRIFT"], "spot": "lower wing"},
+                "PF": {"action": ACTIONS["DRIFT"], "spot": "lower lowPost"},
+                "C": {"action": ACTIONS["SHOOT"], "spot": "upper lowPost"}
+            },
+            "events": [{"type": "shot", "by": "C"}]
         }
     ]
 }
 
-MOTION_SCENES = [COLORADO]
+BASE_SCENES = [COLORADO]
