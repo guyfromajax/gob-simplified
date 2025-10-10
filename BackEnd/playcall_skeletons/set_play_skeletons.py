@@ -27,7 +27,7 @@ from BackEnd.constants import HCO_STRING_SPOTS, ACTIONS
 
 #frequencyoptions are strong offense, neutral, strong defense
 PICK_AND_ROLL = {
-    "primary_shooter": "SG",
+    "primary_shooter": "SF",
     "screener": "PF",
     # "kickout_shooters": ["PG", "SG", "SF"],
     "pass_sequence": ["PG", "SF", "SG"],
