@@ -939,7 +939,8 @@ def run_franchise_training(req: FranchiseTrainingRequest):
     for player in players_for_training:
         pid = player["_id"]
         # Get player's height (from core collection or franchise meta)
-        core_player = db.players.find_one({"_id": pid}, {"height": 1})
+        # Convert string ID to ObjectId for MongoDB query
+        core_player = db.players.find_one({"_id": ObjectId(pid)}, {"height": 1})
         height = core_player.get("height") if core_player else None
         
         # Build player dict for position ratings calculation with updated attributes
