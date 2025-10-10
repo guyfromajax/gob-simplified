@@ -966,9 +966,13 @@ def get_hco_skeleton(result_type, game_context):
     }
     
     # Get the skeleton scenes for this playcall
+    print(f"📋 Available playcalls in map: {list(playcall_map.keys())}")
+    print(f"📋 Looking for playcall: '{playcall}' (type: {type(playcall)})")
+    
     scenes = playcall_map.get(playcall, INSIDE_SCENES)
     
-    print(f"📋 Found {len(scenes)} scenes for playcall '{playcall}'")
+    actual_key = playcall if playcall in playcall_map else "FALLBACK TO INSIDE"
+    print(f"📋 Found {len(scenes)} scenes for playcall '{actual_key}'")
     
     # Randomly select one scene from the available scenes
     if scenes and len(scenes) > 0:
