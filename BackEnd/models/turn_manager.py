@@ -675,6 +675,8 @@ class TurnManager:
         hct_value = def_team.strategy_settings.get("half_court_trap", 0)
         fcp_value = def_team.strategy_settings.get("full_court_press", 0)
         
+        print(f"🛡️ Defense pressure check - {def_team.name}: HCT={hct_value}, FCP={fcp_value}")
+        
         # If both are 0, default to HCO
         if hct_value == 0 and fcp_value == 0:
             return "HCO"
@@ -707,8 +709,10 @@ class TurnManager:
         execution_roll = random.randint(1, 4)
         
         if strategy_value >= execution_roll:
+            print(f"✅ Executing {selected_strategy} (value: {strategy_value}, roll: {execution_roll})")
             return selected_strategy
         else:
+            print(f"❌ {selected_strategy} skipped (value: {strategy_value}, roll: {execution_roll}) -> HCO")
             return "HCO"
     
     def _print_turn_summary(self, result, offensive_state):
