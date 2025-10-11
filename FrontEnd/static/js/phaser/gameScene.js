@@ -141,7 +141,9 @@ export function createGameScene(Phaser) {
         payload.strategy_settings = this.gamePlanSettings.strategy_settings;
         console.log(`🎮 [gameScene] Sending game plan settings (${this.mode} mode):`, { 
           userTeamSide: this.userTeamSide, 
-          playcall: this.gamePlanSettings.playcall_settings 
+          playcall: this.gamePlanSettings.playcall_settings,
+          strategy: this.gamePlanSettings.strategy_settings,
+          fullSettings: this.gamePlanSettings
         });
       } else if (this.quarter === 1) {
         console.warn('⚠️ [gameScene] Not sending game plan:', { 
