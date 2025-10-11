@@ -264,12 +264,18 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
     
     // Inbound setup
     const newOffenseSide = isHomeOffense ? "away" : "home";
+    const skipRetreat = turnData.next_defensive_setup === "FCP" || turnData.next_defensive_setup === "HCT";
+    if (skipRetreat) {
+      console.log(`${turnData.next_defensive_setup} detected after fast break - skipping defensive retreat`);
+    }
     await runInboundSetup({ 
       scene, 
       ballSprite, 
       playerSprites, 
       newOffenseSide,
-      skipRetreat: turnData.next_defensive_setup === "FCP"
+      homeTeamId: scene.simData?.home_team_id,
+      awayTeamId: scene.simData?.away_team_id,
+      skipRetreat
     });
   } else {
     // Miss - handle rebound

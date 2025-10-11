@@ -1203,10 +1203,10 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
             String(shooterTeamId) === String(homeTeamId);
           const newOffenseSide = shooterTeamIsHome ? "away" : "home";
           
-          // Check if FCP is coming next - if so, skip retreat animation
-          const skipRetreat = turnData.next_defensive_setup === "FCP";
+          // Check if FCP/HCT is coming next - if so, skip retreat animation
+          const skipRetreat = turnData.next_defensive_setup === "FCP" || turnData.next_defensive_setup === "HCT";
           if (skipRetreat) {
-            console.log('FCP detected - skipping defensive retreat to midcourt');
+            console.log(`${turnData.next_defensive_setup} detected - skipping defensive retreat to midcourt`);
           }
           
           const releaseGuard = createTransitionGuard(scene.stateMachine, [States.Rebound]);
