@@ -175,11 +175,14 @@ async function loadSettings() {
       currentSettings = data;
     }
     
-    // Update UI with loaded values
+    // Update UI with loaded values AND ensure currentSettings is fully populated
     for (const [key, sliderId] of Object.entries(offenseSliders)) {
       const slider = document.getElementById(sliderId);
       const valueDisplay = document.getElementById(`value-${sliderId.replace('slider-', '')}`);
       const value = currentSettings.playcall_settings[key] || 2;
+      
+      // Ensure value is in currentSettings (in case it wasn't loaded)
+      currentSettings.playcall_settings[key] = value;
       
       if (slider) slider.value = value;
       if (valueDisplay) valueDisplay.textContent = value;
@@ -189,6 +192,9 @@ async function loadSettings() {
       const slider = document.getElementById(sliderId);
       const valueDisplay = document.getElementById(`value-${sliderId.replace('slider-', '')}`);
       const value = currentSettings.strategy_settings[key] || 2;
+      
+      // Ensure value is in currentSettings (in case it wasn't loaded)
+      currentSettings.strategy_settings[key] = value;
       
       if (slider) slider.value = value;
       if (valueDisplay) valueDisplay.textContent = value;
