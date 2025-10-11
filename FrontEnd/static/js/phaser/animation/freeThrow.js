@@ -225,6 +225,7 @@ export async function runFreeThrowSequence(
           
           // Check if FCP/HCT is coming next - if so, skip retreat animation
           const skipRetreat = turnData.next_defensive_setup === "FCP" || turnData.next_defensive_setup === "HCT";
+          const pressureType = skipRetreat ? turnData.next_defensive_setup : null;
           if (skipRetreat) {
             console.log(`${turnData.next_defensive_setup} detected after FT - skipping defensive retreat to midcourt`);
           }
@@ -237,6 +238,7 @@ export async function runFreeThrowSequence(
             homeTeamId: scene.simData?.home_team_id,
             awayTeamId: scene.simData?.away_team_id,
             skipRetreat,
+            pressureType,
           });
           scene.events?.emit?.("possessionChange", {
             offenseTeamId: turnData.possession_team_id,

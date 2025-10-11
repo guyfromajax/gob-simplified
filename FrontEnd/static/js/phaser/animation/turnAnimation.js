@@ -587,13 +587,15 @@ async function runInboundSetup({
   newOffenseSide,
   homeTeamId,
   awayTeamId,
-  skipRetreat = false  // Allow skipping retreat for FCP
+  skipRetreat = false,  // Allow skipping retreat for FCP/HCT
+  pressureType = null   // "FCP" or "HCT" to determine defensive positioning
 }) {
   animationDebugLog('runInboundSetup called:', {
     newOffenseSide,
     currentState: scene.stateMachine?.state,
     isFreeThrow: scene?.stateMachine?.is(States.FreeThrow),
-    skipRetreat
+    skipRetreat,
+    pressureType
   });
   
   if (scene?.stateMachine?.is(States.FreeThrow)) {
@@ -668,47 +670,48 @@ async function runInboundSetup({
   const width = scene.game.config.width;
   const height = scene.game.config.height;
 
-  // If FCP is next, position defenders in press formation
+  // If FCP/HCT is next, position defenders in press formation
   const fcpDefensiveSetup = {};
   if (skipRetreat) {
-    // Define FCP defensive positions (in grid coordinates)
-    // Base positions for AWAY team defending (LEFT basket)
-    const fcpHomePositions = {
-      PG: { x: 80, y: 25 },   // Midlane - pressing (will be on right when away defends)
-      SG: { x: 73, y: 40 },   // Upper wing - pressing (will be on right when away defends)
-      SF: { x: 73, y: 10 },   // Lower wing - pressing (will be on right when away defends)
-      PF: { x: 21, y: 36 },   // Upper apex - protecting (will be on left when away defends)
-      C: { x: 21, y: 15 }     // Lower apex - protecting (will be on left when away defends)
-    };
+    // Define defensive positions based on pressure type
+    // FCP (Full Court Press): Aggressive full court pressure
+    // HCT (Half Court Trap): Trap at half court line
+    
+    let basePositions;
+    if (pressureType === "HCT") {
+      // HCT: Half court trap positions (defenders closer to midcourt)
+      basePositions = {
+        PG: { x: 60, y: 25 },   // Just past midcourt
+        SG: { x: 55, y: 35 },   // Upper side of half court
+        SF: { x: 55, y: 15 },   // Lower side of half court
+        PF: { x: 45, y: 30 },   // Opposite side upper
+        C: { x: 45, y: 20 }     // Opposite side lower
+      };
+    } else {
+      // FCP: Full court press positions (defenders spread across court)
+      basePositions = {
+        PG: { x: 80, y: 25 },   // Deep in offensive zone
+        SG: { x: 73, y: 40 },   // Upper wing
+        SF: { x: 73, y: 10 },   // Lower wing
+        PF: { x: 21, y: 36 },   // Protecting opposite end
+        C: { x: 21, y: 15 }     // Protecting opposite end
+      };
+    }
 
     // Apply positioning logic based on which team is defending
     // Midcourt is X=50
     // Left basket (away) is X=9, Right basket (home) is X=91
     for (const pos of ['PG', 'SG', 'SF', 'PF', 'C']) {
-      let coords = fcpHomePositions[pos];
+      let coords = basePositions[pos];
       
       if (isAwayOffense) {
         // AWAY on offense (attacking LEFT basket X=9), HOME defending LEFT basket
-        // HOME defends: PF/C protect LEFT half (X < 50), PG/SG/SF press on RIGHT half (X > 50)
-        
-        if (['PG', 'SG', 'SF'].includes(pos)) {
-          // PG/SG/SF press on RIGHT half (X > 50) - already at 80/73
-          fcpDefensiveSetup[pos] = coords;  // No flip needed
-        } else {
-          // PF/C protect on LEFT half (X < 50) - already at 21
-          fcpDefensiveSetup[pos] = coords;  // No flip needed
-        }
+        // No flip needed - positions are already oriented correctly
+        fcpDefensiveSetup[pos] = coords;
       } else {
         // HOME on offense (attacking RIGHT basket X=91), AWAY defending RIGHT basket
-        // AWAY defends: PF/C protect RIGHT half (X > 50), PG/SG/SF press on LEFT half (X < 50)
-        
-        if (['PG', 'SG', 'SF'].includes(pos)) {
-          // PG/SG/SF press on LEFT half (X < 50)
-          fcpDefensiveSetup[pos] = { x: 101 - coords.x, y: coords.y };  // Flip 80→21, 73→28
-        } else {
-          // PF/C protect on RIGHT half (X > 50)
-          fcpDefensiveSetup[pos] = { x: 101 - coords.x, y: coords.y };  // Flip 21→80
-        }
+        // Flip X coordinates: 101 - x
+        fcpDefensiveSetup[pos] = { x: 101 - coords.x, y: coords.y };
       }
     }
   }
@@ -1205,6 +1208,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
           
           // Check if FCP/HCT is coming next - if so, skip retreat animation
           const skipRetreat = turnData.next_defensive_setup === "FCP" || turnData.next_defensive_setup === "HCT";
+          const pressureType = skipRetreat ? turnData.next_defensive_setup : null;
           if (skipRetreat) {
             console.log(`${turnData.next_defensive_setup} detected - skipping defensive retreat to midcourt`);
           }
@@ -1218,6 +1222,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
             homeTeamId,
             awayTeamId,
             skipRetreat,
+            pressureType,
           });
           releaseGuard?.();
         }
