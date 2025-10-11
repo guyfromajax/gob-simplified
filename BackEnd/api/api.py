@@ -267,11 +267,17 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                     if request.user_team_side == "home" and request.playcall_settings and request.strategy_settings:
                         home_playcall = request.playcall_settings
                         home_strategy = request.strategy_settings
-                        print(f"🎮 Applying user's game plan to home team ({request.home_team})")
+                        # In single game mode, apply defensive strategy to BOTH teams for consistent pressure
+                        away_strategy = request.strategy_settings
+                        print(f"🎮 Applying user's playcall settings to home team ({request.home_team})")
+                        print(f"🎮 Applying user's strategy settings to BOTH teams for consistent defense")
                     elif request.user_team_side == "away" and request.playcall_settings and request.strategy_settings:
                         away_playcall = request.playcall_settings
                         away_strategy = request.strategy_settings
-                        print(f"🎮 Applying user's game plan to away team ({request.away_team})")
+                        # In single game mode, apply defensive strategy to BOTH teams for consistent pressure
+                        home_strategy = request.strategy_settings
+                        print(f"🎮 Applying user's playcall settings to away team ({request.away_team})")
+                        print(f"🎮 Applying user's strategy settings to BOTH teams for consistent defense")
                     
                     gm = GameManager(
                         request.home_team, 
@@ -298,11 +304,17 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
         if request.user_team_side == "home" and request.playcall_settings and request.strategy_settings:
             home_playcall = request.playcall_settings
             home_strategy = request.strategy_settings
-            print(f"🎮 Applying user's game plan to home team ({request.home_team})")
+            # In single game mode, apply defensive strategy to BOTH teams for consistent pressure
+            away_strategy = request.strategy_settings
+            print(f"🎮 Applying user's playcall settings to home team ({request.home_team})")
+            print(f"🎮 Applying user's strategy settings to BOTH teams for consistent defense")
         elif request.user_team_side == "away" and request.playcall_settings and request.strategy_settings:
             away_playcall = request.playcall_settings
             away_strategy = request.strategy_settings
-            print(f"🎮 Applying user's game plan to away team ({request.away_team})")
+            # In single game mode, apply defensive strategy to BOTH teams for consistent pressure
+            home_strategy = request.strategy_settings
+            print(f"🎮 Applying user's playcall settings to away team ({request.away_team})")
+            print(f"🎮 Applying user's strategy settings to BOTH teams for consistent defense")
         
         gm = GameManager(
             request.home_team, 
