@@ -924,12 +924,18 @@ def get_fcp_skeleton(result_type, game_context=None):
 
 def get_hct_skeleton(result_type, game_context=None):
     """Get HCT skeleton filtered by result_type"""
-    # For now, use the same FCP skeleton structure
-    # This will be updated when HCT skeletons are created
-    end_timestamp = FCP_SKELETONS_DICT.get(result_type, 1200)  # Default to HCO timestamp
+    from BackEnd.playcall_skeletons.hct_skeletons import HCT_SCENES, HCT_SKELETONS_DICT
     
+    # Get the appropriate end timestamp for this result type
+    end_timestamp = HCT_SKELETONS_DICT.get(result_type, 1200)
+    
+    # Randomly select an HCT scene
+    import random
+    selected_scene = random.choice(HCT_SCENES)
+    
+    # Filter steps by timestamp
     skeleton_data = {
-        "steps": [step for step in FCP_1["steps"] if step["timestamp"] <= end_timestamp]
+        "steps": [step for step in selected_scene["steps"] if step["timestamp"] <= end_timestamp]
     }
     
     # Apply opposite side logic if game context is provided

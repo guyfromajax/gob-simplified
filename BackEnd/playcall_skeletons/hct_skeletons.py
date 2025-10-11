@@ -118,11 +118,13 @@ HCT_1 = {
     ]
 }
 
-FCP_SKELETONS_DICT = {
+HCT_SKELETONS_DICT = {
     "HCO": 1200,
-    "Shot": 1800,
+    "SHOT": 1800,
     "O_FOUL": 1200,
     "D_FOUL": 900,
     "DEAD_BALL_TURNOVER": 900,
     "STEAL": 900
 }
+
+HCT_SCENES = [HCT_1]
