@@ -177,6 +177,10 @@ class ShotManager:
                             points = rebound_event.get("points", 2)
                             text += f" {get_name_safe(rebounder)} puts it back in."
                             possession_flips = True
+                            # Check for defensive pressure opportunity (FCP/HCT) after putback make
+                            pressure_type = self.game.turn_manager.determine_defensive_pressure_type()
+                            self.game_state["offensive_state"] = pressure_type
+                            result["next_defensive_setup"] = pressure_type
                         else:
                             text += f" {get_name_safe(rebounder)} misses the putback."
                             possession_flips = rebound_event.get("possession_flips", possession_flips)
@@ -383,7 +387,10 @@ class ShotManager:
             apply_scoring(self.game, off_team, shooter, points, ["FGM"])
             text = f"{shooter} converts the fast break shot!"
             possession_flips = True
-            self.game_state["offensive_state"] = "HCO"
+            # Check for defensive pressure opportunity (FCP/HCT) after fast break make
+            pressure_type = self.game.turn_manager.determine_defensive_pressure_type()
+            self.game_state["offensive_state"] = pressure_type
+            result["next_defensive_setup"] = pressure_type
         else:
             if defender:
                 defender.record_stat("DEF_S")

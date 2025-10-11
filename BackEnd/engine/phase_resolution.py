@@ -368,7 +368,14 @@ def resolve_free_throw_logic(game):
 
     # If no FTs remain, determine next state
     if game_state["free_throws_remaining"] <= 0:
-        game_state["offensive_state"] = "HCO"
+        # Check for defensive pressure if the last FT was made
+        if makes_shot:
+            from BackEnd.models.turn_manager import TurnManager
+            pressure_type = TurnManager(game).determine_defensive_pressure_type()
+            game_state["offensive_state"] = pressure_type
+            print(f"🏀 Last FT made - setting offensive_state to: {pressure_type}")
+        else:
+            game_state["offensive_state"] = "HCO"
 
         if not makes_shot:
             # Rebound logic
@@ -419,6 +426,12 @@ def resolve_free_throw_logic(game):
                     if off_event["result"] == "MAKE":
                         result["points"] = off_event.get("points", 2)
                         result["scoring_team"] = off_team.name
+                        # Check for defensive pressure after made putback from FT miss
+                        from BackEnd.models.turn_manager import TurnManager
+                        pressure_type = TurnManager(game).determine_defensive_pressure_type()
+                        game_state["offensive_state"] = pressure_type
+                        result["next_defensive_setup"] = pressure_type
+                        print(f"🏀 FT putback made - setting offensive_state to: {pressure_type}")
                     return result
                 else:
                     text += f" {get_name_safe(rebounder)} kicks it out to reset."
