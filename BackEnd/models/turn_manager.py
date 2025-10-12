@@ -682,12 +682,20 @@ class TurnManager:
             return "HCO"
         
         # Remove any strategy with value 0 from consideration
-        strategies = {}
+        strategies = {"HCO": 8}
         if hct_value > 0:
             strategies["HCT"] = hct_value
+            if hct_value == 4:
+                strategies["HCO"] = 0
+            else:
+                strategies["HCO"] -= hct_value
         if fcp_value > 0:
             strategies["FCP"] = fcp_value
-        
+            if fcp_value == 4:
+                strategies["HCO"] = 0
+            else:
+                strategies["HCO"] -= fcp_value
+
         # If only one strategy available, use it
         if len(strategies) == 1:
             selected_strategy = list(strategies.keys())[0]
