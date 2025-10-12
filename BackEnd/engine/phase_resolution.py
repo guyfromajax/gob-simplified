@@ -1124,9 +1124,57 @@ def resolve_half_court_trap_logic(game: "GameManager"):
     else:
         result_type = random.choices(["O_FOUL", "DEAD_BALL_TURNOVER", "STEAL"], weights=[0.5, 0.3, 0.2])[0]
     
-    text += " " + result_type
+    result_text_dict = {
+        "HCO": "they break the trap & establish their half court offense",
+        "D_FOUL": "defensive foul!",
+        "O_FOUL": "offensive foul!",
+        "DEAD_BALL_TURNOVER": f"they force a turnover!",
+        "STEAL": "steal!",
+        "SHOT": "they break the trap & attempt a shot!"
+    }
+    
+    text += " " + result_text_dict.get(result_type, result_type)
 
-    # print(f"{text}")
+    # Handle SHOT result - execute actual shot resolution (same as FCP)
+    if result_type == "SHOT":
+        # Build roles for shot
+        passer = off_lineup.get("PG", list(off_lineup.values())[0])
+        shooter = random.choice([off_lineup.get("PF"), off_lineup.get("C")])
+        defender = def_lineup.get("PG", list(def_lineup.values())[0])
+        
+        shot_roles = {
+            "ball_handler": passer,
+            "shooter": shooter,
+            "passer": passer,
+            "screener": None,
+            "defender": defender,
+        }
+        
+        # Use shot manager to resolve the shot
+        shot_result = game.shot_manager.resolve_shot(shot_roles)
+        
+        # Add HCT-specific data
+        shot_result["hct_shot"] = True
+        shot_result["text"] = "TRAP! " + shot_result.get("text", "")
+        
+        # Generate animations from skeleton
+        from BackEnd.models.animator import Animator
+        animator = Animator(game)
+        skeleton = get_skeleton_for_turn("SHOT", "HCT", game) or {}
+        animations = animator.skeleton_to_animations(
+            skeleton, 
+            off_lineup, 
+            def_lineup, 
+            add_defenders=True,
+            is_fcp=False,
+            is_hct=True
+        ) if skeleton else []
+        
+        shot_result["skeleton"] = skeleton
+        shot_result["animations"] = animations
+        shot_result["roles"] = shot_roles
+        
+        return shot_result
     
     # Build roles dict for animation generation
     roles = {
@@ -1137,33 +1185,52 @@ def resolve_half_court_trap_logic(game: "GameManager"):
         "screener": None,
     }
     
-    # Generate animations from skeleton
+    # Generate animations from skeleton BEFORE changing result_type
     from BackEnd.models.animator import Animator
     animator = Animator(game)
     skeleton = get_skeleton_for_turn(result_type, "HCT", game) or {}
+    
+    # Handle foul results - use standard foul types for frontend (same as FCP)
+    if result_type == "D_FOUL":
+        game_state["foul_team"] = "DEFENSE"
+        result_type = "FOUL"
+    elif result_type == "O_FOUL":
+        game_state["foul_team"] = "OFFENSE"
+        result_type = "FOUL"
+    elif result_type == "DEAD_BALL_TURNOVER":
+        result_type = "DEAD BALL"
+    
     animations = animator.skeleton_to_animations(
         skeleton, 
         off_lineup, 
         def_lineup, 
-        add_defenders=True,  # Enable HCT-specific defensive positioning
+        add_defenders=True,
         is_fcp=False,
         is_hct=True
     ) if skeleton else []
     
+    # Determine possession flip (same logic as FCP)
+    possession_flips = False
+    if result_type == "FOUL" and game_state.get("foul_team") == "OFFENSE":
+        possession_flips = True
+    elif result_type in ["DEAD BALL", "STEAL"]:
+        possession_flips = True
+    
     result = {
         "result_type": result_type,
         "text": text,
-        "next_play_type": "HCO" if result_type in ["HCO", "SHOT"] else result_type,
+        "next_play_type": "HCO" if result_type == "HCO" or result_type == "STEAL" else None,
         "ball_handler": roles["ball_handler"],
         "defender": roles["defender"],
         "shooter": roles["shooter"],
         "passer": "",
         "screener": "",
-        "possession_flips": result_type in ["O_FOUL", "DEAD_BALL_TURNOVER", "STEAL"],
+        "possession_flips": possession_flips,
         "events": [],
         "skeleton": skeleton,
         "animations": animations,
-        "roles": roles
+        "roles": roles,
+        "hct_foul": True if result_type == "FOUL" else False  # Flag for HCT fouls with animations
     }
     
     return result
