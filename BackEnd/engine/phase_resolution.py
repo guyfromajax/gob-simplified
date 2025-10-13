@@ -883,10 +883,25 @@ def resolve_full_court_press_logic(game: "GameManager"):
     elif result_type in ["DEAD BALL", "STEAL"]:
         possession_flips = True
     
+    # Handle STEAL: Check for fast break opportunity (STEAL only, not DEAD BALL)
+    next_play_type = None
+    if result_type == "STEAL":
+        if random.random() < get_fast_break_chance(game):
+            next_play_type = "FAST_BREAK"
+            game_state["offensive_state"] = "FAST_BREAK"
+            print(f"🏃 FCP Steal → Fast break triggered")
+        else:
+            next_play_type = "HCO"
+            game_state["offensive_state"] = "HCO"
+            print(f"🏃 FCP Steal → HCO (no fast break)")
+    elif result_type == "HCO":
+        next_play_type = "HCO"
+    # For DEAD BALL, O_FOUL, D_FOUL: next_play_type stays None (will use side inbound → HCO)
+    
     result = {
         "result_type": result_type,
         "text": text,
-        "next_play_type": "HCO" if result_type == "HCO" or result_type == "STEAL" else None,
+        "next_play_type": next_play_type,
         "ball_handler": roles["ball_handler"],
         "defender": roles["defender"],
         "shooter": roles["shooter"],
@@ -1208,10 +1223,25 @@ def resolve_half_court_trap_logic(game: "GameManager"):
     elif result_type in ["DEAD BALL", "STEAL"]:
         possession_flips = True
     
+    # Handle STEAL: Check for fast break opportunity (STEAL only, not DEAD BALL)
+    next_play_type = None
+    if result_type == "STEAL":
+        if random.random() < get_fast_break_chance(game):
+            next_play_type = "FAST_BREAK"
+            game_state["offensive_state"] = "FAST_BREAK"
+            print(f"🏃 HCT Steal → Fast break triggered")
+        else:
+            next_play_type = "HCO"
+            game_state["offensive_state"] = "HCO"
+            print(f"🏃 HCT Steal → HCO (no fast break)")
+    elif result_type == "HCO":
+        next_play_type = "HCO"
+    # For DEAD BALL, O_FOUL, D_FOUL: next_play_type stays None (will use side inbound → HCO)
+    
     result = {
         "result_type": result_type,
         "text": text,
-        "next_play_type": "HCO" if result_type == "HCO" or result_type == "STEAL" else None,
+        "next_play_type": next_play_type,
         "ball_handler": roles["ball_handler"],
         "defender": roles["defender"],
         "shooter": roles["shooter"],
