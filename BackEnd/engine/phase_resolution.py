@@ -466,6 +466,9 @@ def resolve_free_throw_logic(game):
     if makes_shot:
         result["points"] = 1
         result["scoring_team"] = off_team.name
+        # Add next_defensive_setup if final FT was made
+        if game_state["free_throws_remaining"] <= 0:
+            result["next_defensive_setup"] = game_state.get("offensive_state", "HCO")
     else:
         # Add rebounder information for missed free throws
         if game_state.get("last_rebounder"):
