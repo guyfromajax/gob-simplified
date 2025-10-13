@@ -6,6 +6,7 @@ import runFreeThrowSequence from "./freeThrow.js";
 import runFastBreakSequence from "./fastBreak.js";
 import { handleTurnover } from "./turnoverAdapter.js";
 import { States } from "../state/gameStateMachine.js";
+import { appendToTextScroll } from "../utils/textScroll.js";
 import {
   animationDebugLog,
   animationDebugWarn,
