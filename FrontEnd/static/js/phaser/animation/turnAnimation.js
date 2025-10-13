@@ -1334,50 +1334,78 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   if (!eventsProcessed && !scene.skipToEnd && Array.isArray(turnData.events)) {
     for (const evt of turnData.events) {
       if (scene.skipToEnd) break;
-      if (evt.event_type === "PUTBACK_ATTEMPT") {
-        const shooterId = evt.shooterId;
-        const rebounderSprite = playerSprites[shooterId];
-        if (!rebounderSprite) continue;
-        attachBallToPlayer(scene, ballSprite, rebounderSprite, {
-          debugInfo: { shooterId, reboundSpot: evt.rebound?.ballSpot || null }
-        });
-        const rimCoords =
-          rebounderSprite.team === "home" ? HOME_RIM_COORDS : AWAY_RIM_COORDS;
-        const putbackResult = await animatePutbackAttempt(
-          scene,
-          ballSprite,
-          shooterId,
-          rimCoords,
-          evt.duration || 500,
-          evt.result
-        );
-        if (evt.result === "MISS" && evt.rebound) {
-          const reboundData = evt.rebound;
-          const rebounderId =
-            reboundData.rebounder_player_id || reboundData.rebounderId;
-          await animateRebound({
-            scene,
-            ballSprite,
-            playerSprites,
-            animations: reboundData.animations || turnData.animations,
-            rebounderId,
-            ballSpot: putbackResult?.grid || reboundData.ballSpot,
-            shooterId: evt.shooterId
-          });
-          if (
-            reboundData.rebound_type === "DREB" &&
-            !turnData.fast_break
-          ) {
-            await runDefensiveReboundSetup({
-              scene,
-              ballSprite,
-              playerSprites,
-              rebounderId,
-              nextPlayType: turnData.next_play_type || "HCO"
-            });
-          }
-        }
-      } else if (evt.event_type === "KICKOUT_RESET") {
+                if (evt.event_type === "PUTBACK_ATTEMPT") {
+                  const shooterId = evt.shooterId;
+                  const rebounderSprite = playerSprites[shooterId];
+                  if (!rebounderSprite) continue;
+                  attachBallToPlayer(scene, ballSprite, rebounderSprite, {
+                    debugInfo: { shooterId, reboundSpot: evt.rebound?.ballSpot || null }
+                  });
+                  const rimCoords =
+                    rebounderSprite.team === "home" ? HOME_RIM_COORDS : AWAY_RIM_COORDS;
+                  const putbackResult = await animatePutbackAttempt(
+                    scene,
+                    ballSprite,
+                    shooterId,
+                    rimCoords,
+                    evt.duration || 500,
+                    evt.result
+                  );
+                  
+                  // Handle made putbacks
+                  if (evt.result === "MAKE") {
+                    console.log("Putback made - setting up inbound pass");
+                    // Possession flips after made putback
+                    const shooterTeamId = rebounderSprite.team_id;
+                    const shooterTeamIsHome = String(shooterTeamId) === String(homeTeamId);
+                    const newOffenseSide = shooterTeamIsHome ? "away" : "home";
+                    
+                    // Check for defensive pressure
+                    const skipRetreat = turnData.next_defensive_setup === "FCP" || turnData.next_defensive_setup === "HCT";
+                    const pressureType = skipRetreat ? turnData.next_defensive_setup : null;
+                    if (skipRetreat) {
+                      console.log(`${turnData.next_defensive_setup} detected after putback - skipping defensive retreat`);
+                    }
+                    
+                    await runInboundSetup({
+                      scene,
+                      ballSprite,
+                      playerSprites,
+                      newOffenseSide,
+                      homeTeamId,
+                      awayTeamId,
+                      skipRetreat,
+                      pressureType,
+                    });
+                  }
+                  // Handle missed putbacks
+                  else if (evt.result === "MISS" && evt.rebound) {
+                    const reboundData = evt.rebound;
+                    const rebounderId =
+                      reboundData.rebounder_player_id || reboundData.rebounderId;
+                    await animateRebound({
+                      scene,
+                      ballSprite,
+                      playerSprites,
+                      animations: reboundData.animations || turnData.animations,
+                      rebounderId,
+                      ballSpot: putbackResult?.grid || reboundData.ballSpot,
+                      shooterId: evt.shooterId
+                    });
+                    if (
+                      reboundData.rebound_type === "DREB" &&
+                      !turnData.fast_break
+                    ) {
+                      await runDefensiveReboundSetup({
+                        scene,
+                        ballSprite,
+                        playerSprites,
+                        rebounderId,
+                        nextPlayType: turnData.next_play_type || "HCO"
+                      });
+                    }
+                  }
+                } else if (evt.event_type === "KICKOUT_RESET") {
         await animateKickoutReset(
           scene,
           ballSprite,
