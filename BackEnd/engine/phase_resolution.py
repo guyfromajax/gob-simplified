@@ -229,13 +229,22 @@ def resolve_fast_break_logic(game: "GameManager"):
     else:
         event_type = random.choices(["SHOT", "HCO"], weights=[0.4, 0.6])[0]
 
-    # If HCO triggered, skip fast break
+    # If HCO triggered, defense stopped the fast break
     if event_type == "HCO":
         def_scouting["defense"]["vs_Fast_Break"]["success"] += 1
         game.game_state["offensive_state"] = "HCO"
-
-        from BackEnd.models.turn_manager import TurnManager
-        return TurnManager(game).run_micro_turn()
+        
+        # Return a defensive stop result instead of recursively calling run_micro_turn
+        ball_handler = fb_roles["ball_handler"]
+        return {
+            "result_type": "DEFENSIVE_STOP",
+            "ball_handler": ball_handler,
+            "text": "Defense stops the fast break! Offense sets up half court.",
+            "possession_flips": False,
+            "time_elapsed": 3,
+            "animations": [],
+            "next_play_type": "HCO",
+        }
 
     #get shooter and passer (if applicable)
     # Assign shooter and passer for shot, turnover, or foul scenarios

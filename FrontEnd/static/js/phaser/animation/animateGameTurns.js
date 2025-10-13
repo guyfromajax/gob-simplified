@@ -405,6 +405,20 @@ export async function animateGameTurns({ //hasBallAtStep
       continue;
     }
 
+    if (turn.result_type === "DEFENSIVE_STOP") {
+      // Fast break was stopped by defense - just display text and continue to next turn (HCO)
+      appendToTextScroll(turn.text || "Defense stops the break!");
+      if (onUpdate) {
+        try {
+          onUpdate(turn);
+        } catch (err) {
+          console.error('Scoreboard update failed:', err);
+        }
+      }
+      updateDebugScore(turn, { turnIndex: i, possessionId });
+      continue;
+    }
+
     if (turn.result_type === "TURNOVER") {
       await handleTurnover(scene, { playerSprites, ballSprite, turnData: turn, onUpdate });
       if (onUpdate) {
