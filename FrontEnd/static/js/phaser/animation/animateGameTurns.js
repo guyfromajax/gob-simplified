@@ -419,7 +419,9 @@ export async function animateGameTurns({ //hasBallAtStep
     }
 
     // Debug fast break routing
-    if (turn.fast_break === true || turn.result_type === "FAST_BREAK" || turn.next_play_type === "FAST_BREAK") {
+    // NOTE: next_play_type indicates what the NEXT turn will be, not this turn
+    // Only route to fast break if THIS turn is actually a fast break
+    if (turn.fast_break === true || turn.result_type === "FAST_BREAK") {
       animationDebugLog('FAST BREAK TURN DETECTED - routing to runFastBreakSequence:', {
         fast_break: turn.fast_break,
         result_type: turn.result_type,
