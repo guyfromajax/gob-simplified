@@ -236,10 +236,12 @@ def resolve_fast_break_logic(game: "GameManager"):
         
         # Return a defensive stop result instead of recursively calling run_micro_turn
         ball_handler = fb_roles["ball_handler"]
+        defender_name = get_name_safe(best_defender) if best_defender else "Defense"
         return {
             "result_type": "DEFENSIVE_STOP",
             "ball_handler": ball_handler,
-            "text": "Defense stops the fast break! Offense sets up half court.",
+            "defender": best_defender,
+            "text": f"Fast Break! Nice stop by {defender_name}!",
             "possession_flips": False,
             "time_elapsed": 3,
             "animations": [],
