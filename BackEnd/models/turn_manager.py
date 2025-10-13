@@ -252,7 +252,7 @@ class TurnManager:
         update_player_coords_from_animations(self.game, result["animations"])
         
         # Print turn summary for debugging
-        self._print_turn_summary(result, state)
+        # self._print_turn_summary(result, state)
 
         result["home_lineup"] = serialize_lineup(self.game.home_team.lineup)
         result["away_lineup"] = serialize_lineup(self.game.away_team.lineup)
