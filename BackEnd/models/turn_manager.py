@@ -305,13 +305,13 @@ class TurnManager:
 
 
     def set_playcalls(self):
-        print(f"🎲 Playcall weights: {self.game.offense_team.playcall_weights}")
-        
+        # print(f"🎲 Playcall weights: {self.game.offense_team.playcall_weights}")
+
         chosen_playcall = weighted_random_from_dict(self.game.offense_team.playcall_weights)
         defense_setting = self.game.defense_team.strategy_settings["defense"]
         chosen_defense = random.choice(STRATEGY_CALL_DICTS["defense"][defense_setting])
 
-        print(f"🎲 Chosen playcall: {chosen_playcall}")
+        # print(f"🎲 Chosen playcall: {chosen_playcall}")
         
         # Track usage
         self.game.offense_team.playcall_tracker[chosen_playcall] += 1
@@ -433,7 +433,7 @@ class TurnManager:
         
         scenes_list = playcall_scenes_map.get(off_call, INSIDE_SCENES)
         scene = random.choice(scenes_list)
-        print(f"🎬 assign_roles using '{off_call}' skeleton with {len(scene['steps'])} steps")
+        # print(f"🎬 assign_roles using '{off_call}' skeleton with {len(scene['steps'])} steps")
         
         tempo_to_steps = {"slow": 7, "normal": 5, "fast": 4}
         requested = tempo_to_steps.get(tempo_call.lower(), len(scene["steps"]))
@@ -676,7 +676,7 @@ class TurnManager:
         hct_value = def_team.strategy_settings.get("half_court_trap", 0)
         fcp_value = def_team.strategy_settings.get("full_court_press", 0)
         
-        print(f"🛡️ Defense pressure check - {def_team.name}: HCT={hct_value}, FCP={fcp_value}")
+        # print(f"🛡️ Defense pressure check - {def_team.name}: HCT={hct_value}, FCP={fcp_value}")
         
         # If both are 0, default to HCO
         if hct_value == 0 and fcp_value == 0:
@@ -718,10 +718,10 @@ class TurnManager:
         execution_roll = random.randint(1, 4)
         
         if strategy_value >= execution_roll:
-            print(f"✅ Executing {selected_strategy} (value: {strategy_value}, roll: {execution_roll})")
+            # print(f"✅ Executing {selected_strategy} (value: {strategy_value}, roll: {execution_roll})")
             return selected_strategy
         else:
-            print(f"❌ {selected_strategy} skipped (value: {strategy_value}, roll: {execution_roll}) -> HCO")
+            # print(f"❌ {selected_strategy} skipped (value: {strategy_value}, roll: {execution_roll}) -> HCO")
             return "HCO"
     
     def _print_turn_summary(self, result, offensive_state):
