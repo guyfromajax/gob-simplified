@@ -216,13 +216,15 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
   const defenderSprite = defenderId ? playerSprites[defenderId] : null;
   
   if (defenderSprite) {
+    // Defender position: 3 spots closer to basket, ±2 Y from shooter
     const defenderSpot = {
       x: isHomeOffense
-        ? shotSpot.x - 3  // 3 closer to basket
-        : shotSpot.x + 3,
-      y: shotSpot.y  // Same Y as shooter
+        ? shotSpot.x + 3  // Home attacking right (X=91): defender is +3 (toward basket)
+        : shotSpot.x - 3, // Away attacking left (X=9): defender is -3 (toward basket)
+      y: shotSpot.y + Phaser.Math.Between(-2, 2)  // ±2 Y range from shooter
     };
     defenderSpot.x = Phaser.Math.Clamp(defenderSpot.x, 4, 97);
+    defenderSpot.y = Phaser.Math.Clamp(defenderSpot.y, 1, 49);
     
     const defenderPx = gridToPixels(defenderSpot.x, defenderSpot.y, width, height);
     promises.push(
