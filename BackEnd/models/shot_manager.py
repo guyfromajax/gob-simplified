@@ -198,7 +198,8 @@ class ShotManager:
                     else:
                         self.game.turn_manager.logger.log("kickoutStart")
                         text += f" {get_name_safe(rebounder)} kicks it out to reset." 
-                        self.game_state["offensive_state"] = pressure_type
+                        self.game_state["offensive_state"] = "HCO"
+                else:
                     events.append({
                         "event_type": "defReb",
                         "rebounderId": getattr(rebounder, "player_id", None),
