@@ -210,8 +210,9 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
     })
   );
   
-  // Move primary defender (from roles.defender or first in defense list)
-  const defenderData = turnData.roles?.defender;
+  // Move primary defender
+  // Check top-level defender field first (from shot_manager), then roles.defense array
+  const defenderData = turnData.defender || (turnData.roles?.defense && turnData.roles.defense[0]);
   const defenderId = defenderData?.player_id || defenderData;
   const defenderSprite = defenderId ? playerSprites[defenderId] : null;
   
