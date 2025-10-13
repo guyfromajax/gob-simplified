@@ -357,9 +357,9 @@ export async function animateGameTurns({ //hasBallAtStep
     }
 
     if (turn.result_type === "FOUL") {
-      // Check if this is an FCP foul with animations
-      if (turn.fcp_foul === true && turn.animations && turn.animations.length > 0) {
-        // FCP foul with animations - animate it like a standard turn
+      // Check if this is an FCP or HCT foul with animations
+      if ((turn.fcp_foul === true || turn.hct_foul === true) && turn.animations && turn.animations.length > 0) {
+        // FCP/HCT foul with animations - animate it like a standard turn
         await playTurnAnimation({
           scene,
           simData,
@@ -454,9 +454,10 @@ export async function animateGameTurns({ //hasBallAtStep
       continue;
     }
     
-    // Check for FCP shots - route to standard shot animation
-    if (turn.fcp_shot === true) {
-      animationDebugLog('FCP SHOT TURN - routing to standard shot animation:', {
+    // Check for FCP/HCT shots - route to standard shot animation
+    if (turn.fcp_shot === true || turn.hct_shot === true) {
+      const pressureType = turn.fcp_shot ? 'FCP' : 'HCT';
+      animationDebugLog(`${pressureType} SHOT TURN - routing to standard shot animation:`, {
         result_type: turn.result_type,
         turn_index: i
       });
