@@ -1197,11 +1197,17 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
       const shotResult = await shootBall(shootParams);
       const ballSpot = shotResult?.grid;
       console.log("result_type", turnData.result_type);
+      
+      // Check if this MAKE is from a putback (already handled in events)
+      const hasPutbackMake = turnData.events?.some(evt => 
+        evt.event_type === "PUTBACK_ATTEMPT" && evt.result === "MAKE"
+      );
+      
       if (turnData.result_type === "MAKE") {
         const nextTurn = simData?.turns?.[scene.currentTurn + 1];
         const hasPendingFreeThrow =
           nextTurn?.result_type === "FREE_THROW";
-        if (!hasPendingFreeThrow) {
+        if (!hasPendingFreeThrow && !hasPutbackMake) {
           const shooterTeamIsHome =
             String(shooterTeamId) === String(homeTeamId);
           const newOffenseSide = shooterTeamIsHome ? "away" : "home";
