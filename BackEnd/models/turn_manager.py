@@ -156,9 +156,10 @@ class TurnManager:
         # STEP 1: Set strategy calls (tempo + aggression)
         self.set_strategy_calls()
 
-        print("*****RUN TURN*****")
         state = self.game.game_state.get("offensive_state", "HCO")
-        print(f"offensive state: {state}")
+        turn_num = self.game.micro_turn_count
+        time_remaining = self.game.game_state.get("clock", "N/A")
+        print(f"***** RUN TURN, turn number: {turn_num}, time remaining: {time_remaining}, offensive state: {state} *****")
         # if state in ["HCO", "HALF_COURT"]:
         #     print(f"{self.game.offense_team.name}: {self.game.game_state['current_playcall']}")
         #     print(f"{self.game.defense_team.name}: {self.game.game_state['defense_playcall']}")
