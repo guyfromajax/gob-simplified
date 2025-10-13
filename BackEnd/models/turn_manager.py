@@ -252,7 +252,16 @@ class TurnManager:
         # result["possession_team_id"] = self.game.offense_team.team_id
         update_player_coords_from_animations(self.game, result["animations"])
         
-        # Print turn summary for debugging
+        # Print turn result summary for debugging
+        turn_num = self.game.micro_turn_count
+        result_type = result.get("result_type", "N/A")
+        next_play_type = result.get("next_play_type", "None")
+        next_defensive_setup = result.get("next_defensive_setup", "None")
+        text = result.get("text", "")
+        possession_flips = result.get("possession_flips", False)
+        print(f"Turn {turn_num} RESULT: {result_type} | Next: {next_play_type} | Defense Setup: {next_defensive_setup} | Possession Flips: {possession_flips}")
+        print(f"Turn {turn_num} TEXT: {text}")
+        
         # self._print_turn_summary(result, state)
 
         result["home_lineup"] = serialize_lineup(self.game.home_team.lineup)

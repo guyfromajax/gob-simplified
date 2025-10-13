@@ -27,7 +27,7 @@ class TeamManager:
         # Use provided settings or fall back to random initialization
         if strategy_settings:
             self.strategy_settings = strategy_settings
-            print(f"✅ {name}: Using provided strategy_settings: {strategy_settings}")
+            # print(f"✅ {name}: Using provided strategy_settings: {strategy_settings}")
         else:
             self.strategy_settings = self._init_strategy_settings()
         
@@ -35,7 +35,7 @@ class TeamManager:
         
         if playcall_settings:
             self.playcall_settings = playcall_settings
-            print(f"✅ {name}: Using provided playcall_settings: {playcall_settings}")
+            # print(f"✅ {name}: Using provided playcall_settings: {playcall_settings}")
         else:
             self.playcall_settings = self._init_playcall_settings()
         
