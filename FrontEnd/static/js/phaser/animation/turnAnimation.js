@@ -305,31 +305,18 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
   const rebGridX = (rebounderSprite.x / width) * 100;
   const rebGridY = 50 - (rebounderSprite.y / height) * 50;
 
-  // Find the outlet pass receiver (PG for HCO, or outlet_receiver for Fast Break)
+  // Find the outlet pass receiver
+  // For fast breaks that came from a previous turn (not a separate fast break turn),
+  // we don't have outlet_receiver data, so we find the PG
   let outletReceiverId = null;
   let outletReceiverSprite = null;
   
-  if (nextPlayType === "FAST_BREAK") {
-    // For fast break, find the outlet receiver (usually PG, SG, or SF)
-    const outletPositions = ["PG", "SG", "SF"];
-    for (const pos of outletPositions) {
-      for (const [id, info] of Object.entries(scene.playerInfo || {})) {
-        if (info.pos === pos && info.team === rebounderSprite.team) {
-          outletReceiverId = id;
-          outletReceiverSprite = playerSprites[id];
-          break;
-        }
-      }
-      if (outletReceiverId) break;
-    }
-  } else {
-    // For HCO, find the PG
-    for (const [id, info] of Object.entries(scene.playerInfo || {})) {
-      if (info.pos === "PG" && info.team === rebounderSprite.team) {
-        outletReceiverId = id;
-        outletReceiverSprite = playerSprites[id];
-        break;
-      }
+  // For HCO, always find the PG
+  for (const [id, info] of Object.entries(scene.playerInfo || {})) {
+    if (info.pos === "PG" && info.team === rebounderSprite.team) {
+      outletReceiverId = id;
+      outletReceiverSprite = playerSprites[id];
+      break;
     }
   }
   
@@ -518,7 +505,9 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
 
   await Promise.all(promises);
 
-  if (outletReceiverId && outletReceiverId !== rebounderId) {
+  // Only do outlet pass for HCO
+  // For FAST_BREAK, the outlet pass will be handled in the next turn (the actual fast break turn)
+  if (nextPlayType === "HCO" && outletReceiverId && outletReceiverId !== rebounderId) {
     const outletLog = {
       event: 'OUTLET_PASS',
       from: rebounderId,
@@ -551,11 +540,12 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
     });
   } else {
     if (DebugFlags?.OUTLET) {
-      animationDebugLog('Outlet pass not executed:', { 
+      animationDebugLog('Outlet pass skipped:', { 
         outletReceiverId, 
-        rebounderId, 
-        samePerson: outletReceiverId === rebounderId,
-        reason: !outletReceiverId ? 'No outlet receiver found' : 'Outlet receiver is rebounder'
+        rebounderId,
+        nextPlayType,
+        reason: nextPlayType === "FAST_BREAK" ? 'Fast break - outlet handled in next turn' : 
+                !outletReceiverId ? 'No outlet receiver found' : 'Outlet receiver is rebounder'
       });
     }
   }
