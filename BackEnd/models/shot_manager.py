@@ -159,9 +159,9 @@ class ShotManager:
                 text += f"...{get_name_safe(rebounder)} grabs the rebound."
                 result["rebounderId"] = getattr(rebounder, "player_id", None)
                 result["rebound_type"] = stat
-                possession_flips = rebound_team != off_team
-
+                
                 if stat == "OREB":
+                    possession_flips = False
                     events.append({"event_type": "offReb", "rebounderId": getattr(rebounder, "player_id", None)})
                     self.game.turn_manager.logger.log("offReb")
                     rebound_event = resolve_offensive_rebound(self.game, rebounder)
@@ -198,8 +198,7 @@ class ShotManager:
                     else:
                         self.game.turn_manager.logger.log("kickoutStart")
                         text += f" {get_name_safe(rebounder)} kicks it out to reset." 
-                        possession_flips = rebound_event.get("possession_flips", possession_flips)
-                else:
+                        self.game_state["offensive_state"] = pressure_type
                     events.append({
                         "event_type": "defReb",
                         "rebounderId": getattr(rebounder, "player_id", None),
