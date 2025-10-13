@@ -200,6 +200,7 @@ class ShotManager:
                         text += f" {get_name_safe(rebounder)} kicks it out to reset." 
                         self.game_state["offensive_state"] = "HCO"
                 else:
+                    possession_flips = True
                     events.append({
                         "event_type": "defReb",
                         "rebounderId": getattr(rebounder, "player_id", None),
