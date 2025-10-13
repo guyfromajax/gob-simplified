@@ -373,7 +373,7 @@ def resolve_free_throw_logic(game):
             from BackEnd.models.turn_manager import TurnManager
             pressure_type = TurnManager(game).determine_defensive_pressure_type()
             game_state["offensive_state"] = pressure_type
-            print(f"🏀 Last FT made - setting offensive_state to: {pressure_type}")
+            # print(f"🏀 Last FT made - setting offensive_state to: {pressure_type}")
         else:
             game_state["offensive_state"] = "HCO"
 
@@ -431,7 +431,7 @@ def resolve_free_throw_logic(game):
                         pressure_type = TurnManager(game).determine_defensive_pressure_type()
                         game_state["offensive_state"] = pressure_type
                         result["next_defensive_setup"] = pressure_type
-                        print(f"🏀 FT putback made - setting offensive_state to: {pressure_type}")
+                        # print(f"🏀 FT putback made - setting offensive_state to: {pressure_type}")
                     return result
                 else:
                     text += f" {get_name_safe(rebounder)} kicks it out to reset."
@@ -552,7 +552,6 @@ def resolve_half_court_offense_logic(game):
     # 1. Tactical Setup
     off_call = game_state["current_playcall"]
     def_call = game_state["defense_playcall"]
-    print(f"🏀 HCO Playcall Selected: {off_call}")
     roles = game.turn_manager.assign_roles(off_call, def_call)
     # print("inside resolve_half_court_offense_logic")
     # print("[DEBUG] roles:", roles.keys())
@@ -972,8 +971,6 @@ def get_hco_skeleton(result_type, game_context):
     # Get the current playcall from game context
     playcall = game_context.game_state.get("current_playcall", "Inside") if game_context else "Inside"
     
-    print(f"📋 get_hco_skeleton called - Playcall: {playcall}, Result Type: {result_type}")
-    
     # Map playcall to skeleton scenes
     playcall_map = {
         "Inside": INSIDE_SCENES,
@@ -985,18 +982,18 @@ def get_hco_skeleton(result_type, game_context):
     }
     
     # Get the skeleton scenes for this playcall
-    print(f"📋 Available playcalls in map: {list(playcall_map.keys())}")
-    print(f"📋 Looking for playcall: '{playcall}' (type: {type(playcall)})")
+    # print(f"📋 Available playcalls in map: {list(playcall_map.keys())}")
+    # print(f"📋 Looking for playcall: '{playcall}' (type: {type(playcall)})")
     
     scenes = playcall_map.get(playcall, INSIDE_SCENES)
     
     actual_key = playcall if playcall in playcall_map else "FALLBACK TO INSIDE"
-    print(f"📋 Found {len(scenes)} scenes for playcall '{actual_key}'")
+    # print(f"📋 Found {len(scenes)} scenes for playcall '{actual_key}'")
     
     # Randomly select one scene from the available scenes
     if scenes and len(scenes) > 0:
         selected_scene = random.choice(scenes)
-        print(f"📋 Selected scene has {len(selected_scene.get('steps', []))} steps")
+        # print(f"📋 Selected scene has {len(selected_scene.get('steps', []))} steps")
         return selected_scene
     
     # Fallback to basic skeleton if no scenes available
@@ -1054,10 +1051,6 @@ def apply_opposite_side_logic(skeleton_data, is_away_offense):
             
             # Check if this offensive player should be on opposite side
             if action_data.get("opp", False):
-                print("Inside apply_opposite_side_logic, opp=True")
-                print(f"spot for {position}: {spot}")
-                print(f"spot_coords 1 for {position}: {spot_coords}")
-                print(f"is_away_offense for {position}: {is_away_offense}")
                 # Offensive player with opp=True should be on opposite side (defensive side)
                 if is_away_offense:
                     # Away team offense - ball handlers go to home side (defensive side)
@@ -1067,7 +1060,6 @@ def apply_opposite_side_logic(skeleton_data, is_away_offense):
                     # Home team offense - ball handlers go to away side (defensive side)
                     # Flip coordinates to away side
                     spot_coords = get_away_player_coords(spot_coords)
-                print(f"spot_coords 2 for {position}: {spot_coords}")
             else:
                 # Offensive player without opp field stays on same side as normal offense
                 if is_away_offense:
