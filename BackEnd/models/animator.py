@@ -580,7 +580,21 @@ class Animator:
                 timeline = action_timeline.get(off_player, [])
                 for t, _, spot in timeline:
                     o_coords = HCO_STRING_SPOTS.get(spot, HCO_STRING_SPOTS["key"])
-                    d_coords = assign_non_bh_defender_coords(o_coords, ball_handler_end_coords, aggression_call, is_away_offense)
+                    
+                    # Find who has the ball at this timestamp
+                    current_bh_coords = ball_handler_end_coords  # Default fallback
+                    for step in steps:
+                        if step["timestamp"] == t:
+                            # Check each position to see who has ball at this step
+                            for check_pos, pos_action in step.get("pos_actions", {}).items():
+                                action = pos_action.get("action", "")
+                                if action in ["handle_ball", "receive", "shoot", "pass"]:
+                                    bh_spot = pos_action.get("spot", "key")
+                                    current_bh_coords = HCO_STRING_SPOTS.get(bh_spot, HCO_STRING_SPOTS["key"])
+                                    break
+                            break
+                    
+                    d_coords = assign_non_bh_defender_coords(o_coords, current_bh_coords, aggression_call, is_away_offense)
                     if is_away_offense:
                         d_coords = get_away_player_coords(d_coords)
                     movement.append({
