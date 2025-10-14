@@ -69,7 +69,10 @@ function positionPlayersAtStart(scene, playerSprites, animations, ballSprite) {
     ballSprite.y = (50 - ballStartCoords.y) * 4;
     ballSprite.setVisible(true);
     
-    console.log("✅ All players positioned for opening tip");
+    console.log("✅ All players positioned for opening tip", {
+        totalPlayers: animations.length,
+        ballPosition: { x: ballSprite.x, y: ballSprite.y }
+    });
 }
 
 /**
@@ -160,14 +163,22 @@ function animateConvergence(scene, playerSprites, animations, ballSprite, ballLa
     });
     
     // Ball tweens to landing spot
+    const ballPixelX = ballLandingCoords.x * 4;
+    const ballPixelY = (50 - ballLandingCoords.y) * 4;
+    
+    console.log("🏀 Ball converging to:", {
+        gridCoords: ballLandingCoords,
+        pixelCoords: { x: ballPixelX, y: ballPixelY }
+    });
+    
     const ballTween = scene.tweens.add({
         targets: ballSprite,
-        x: ballLandingCoords.x * 4,
-        y: (50 - ballLandingCoords.y) * 4,
+        x: ballPixelX,
+        y: ballPixelY,
         duration: CONVERGE_DURATION,
         ease: 'Quad.easeOut',
         onComplete: () => {
-            console.log("🏀 Ball landed at", ballLandingCoords);
+            console.log("🏀 Ball landed at grid:", ballLandingCoords, "pixel:", { x: ballSprite.x, y: ballSprite.y });
             
             // Wait a moment before continuing
             scene.time.delayedCall(300, () => {
