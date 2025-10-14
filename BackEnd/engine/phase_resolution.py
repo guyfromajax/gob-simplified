@@ -804,6 +804,11 @@ def resolve_full_court_press_logic(game: "GameManager"):
         # Use shot manager to resolve the shot
         shot_result = game.shot_manager.resolve_shot(shot_roles)
         
+        # FCP/HCT is over once shot is taken - reset to HCO
+        # (Unless it's a made shot, in which case pressure might apply on the inbound)
+        if shot_result.get("result_type") == "MISS":
+            game_state["offensive_state"] = "HCO"
+        
         # Add FCP-specific data
         shot_result["fcp_shot"] = True
         shot_result["text"] = "PRESS! " + shot_result.get("text", "")
@@ -1148,6 +1153,11 @@ def resolve_half_court_trap_logic(game: "GameManager"):
         
         # Use shot manager to resolve the shot
         shot_result = game.shot_manager.resolve_shot(shot_roles)
+        
+        # HCT/FCP is over once shot is taken - reset to HCO
+        # (Unless it's a made shot, in which case pressure might apply on the inbound)
+        if shot_result.get("result_type") == "MISS":
+            game_state["offensive_state"] = "HCO"
         
         # Add HCT-specific data
         shot_result["hct_shot"] = True
