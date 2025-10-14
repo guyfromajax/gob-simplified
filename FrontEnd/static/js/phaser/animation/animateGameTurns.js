@@ -25,10 +25,113 @@ const NON_STANDARD_RESULTS = new Set([
   "TURNOVER",
   "FAST_BREAK",
   "SIDE_INBOUND",
+  "PUTBACK_MAKE",
+  "PUTBACK_MISS",
+  "OREB_KICKOUT",
+  "DEFENSIVE_STOP",
 ]);
 
 let normalizeTurnModulePromise = null;
 let possessionRunnerModulePromise = null;
+
+/**
+ * Handle offensive rebound turns (putbacks and kickouts)
+ */
+async function handleOrebTurn(scene, { playerSprites, ballSprite, turnData, onUpdate }) {
+  const { animatePutbackAttempt } = await import('./ballManager.js');
+  const { animateKickoutReset } = await import('./ballManager.js');
+  const { runInboundSetup } = await import('./turnAnimation.js');
+  const { HOME_RIM_COORDS, AWAY_RIM_COORDS } = await import('./courtConstants.js');
+  
+  appendToTextScroll(turnData.text);
+  
+  const rebounderId = turnData.rebounderId || turnData.ball_handler?.player_id;
+  const rebounderSprite = playerSprites[rebounderId];
+  
+  if (!rebounderSprite) return;
+  
+  if (turnData.result_type === "PUTBACK_MAKE" || turnData.result_type === "PUTBACK_MISS") {
+    // Animate putback attempt
+    const rimCoords = rebounderSprite.team === "home" ? HOME_RIM_COORDS : AWAY_RIM_COORDS;
+    const result = turnData.result_type === "PUTBACK_MAKE" ? "MAKE" : "MISS";
+    
+    await animatePutbackAttempt(
+      scene,
+      ballSprite,
+      rebounderId,
+      rimCoords,
+      500,
+      result
+    );
+    
+    // Handle putback make - run inbound setup
+    if (turnData.result_type === "PUTBACK_MAKE") {
+      const shooterTeamId = rebounderSprite.team_id;
+      const homeTeamId = scene.simData?.home_team_id;
+      const awayTeamId = scene.simData?.away_team_id;
+      const shooterTeamIsHome = String(shooterTeamId) === String(homeTeamId);
+      const newOffenseSide = shooterTeamIsHome ? "away" : "home";
+      
+      // Check for defensive pressure
+      const skipRetreat = turnData.next_defensive_setup === "FCP" || turnData.next_defensive_setup === "HCT";
+      const pressureType = skipRetreat ? turnData.next_defensive_setup : null;
+      
+      await runInboundSetup({
+        scene,
+        ballSprite,
+        playerSprites,
+        newOffenseSide,
+        homeTeamId,
+        awayTeamId,
+        skipRetreat,
+        pressureType,
+      });
+    }
+    // Handle putback miss with rebound
+    else if (turnData.rebound_type) {
+      const { animateRebound } = await import('./ballManager.js');
+      const { bounceFromRim } = await import('./ballManager.js');
+      
+      const isHomeOffense = rebounderSprite.team === "home";
+      const basket = isHomeOffense ? HOME_RIM_COORDS : AWAY_RIM_COORDS;
+      const miss = await bounceFromRim(scene, ballSprite, basket, isHomeOffense, 300);
+      
+      await animateRebound({
+        scene,
+        ballSprite,
+        playerSprites,
+        animations: [],
+        rebounderId: turnData.rebounderId,
+        ballSpot: miss.grid,
+        shooterId: rebounderId
+      });
+      
+      // If DREB, set up next play
+      if (turnData.rebound_type === "DREB" && turnData.next_play_type !== "FAST_BREAK") {
+        const { runDefensiveReboundSetup } = await import('./turnAnimation.js');
+        await runDefensiveReboundSetup({
+          scene,
+          ballSprite,
+          playerSprites,
+          rebounderId: turnData.rebounderId,
+          nextPlayType: turnData.next_play_type || "HCO"
+        });
+      }
+      // If another OREB, it will be handled by the next OREB turn
+    }
+  } else if (turnData.result_type === "OREB_KICKOUT") {
+    // Animate kickout pass to PG
+    const pgId = turnData.pgId;
+    await animateKickoutReset(
+      scene,
+      ballSprite,
+      rebounderId,
+      pgId,
+      turnData.pass || {},
+      500
+    );
+  }
+}
 
 function getResultType(turn = {}) {
   return turn?.result_type ?? turn?.resultType ?? null;
@@ -409,6 +512,20 @@ export async function animateGameTurns({ //hasBallAtStep
     if (turn.result_type === "DEFENSIVE_STOP") {
       // Fast break was stopped by defense - just display text and continue to next turn (HCO)
       appendToTextScroll(turn.text || "Defense stops the break!");
+      if (onUpdate) {
+        try {
+          onUpdate(turn);
+        } catch (err) {
+          console.error('Scoreboard update failed:', err);
+        }
+      }
+      updateDebugScore(turn, { turnIndex: i, possessionId });
+      continue;
+    }
+
+    // Handle OREB turns (putback attempts and kickouts)
+    if (turn.result_type === "PUTBACK_MAKE" || turn.result_type === "PUTBACK_MISS" || turn.result_type === "OREB_KICKOUT") {
+      await handleOrebTurn(scene, { playerSprites, ballSprite, turnData: turn, onUpdate });
       if (onUpdate) {
         try {
           onUpdate(turn);

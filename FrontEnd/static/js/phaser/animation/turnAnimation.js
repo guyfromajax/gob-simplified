@@ -1188,7 +1188,9 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
       const ballSpot = shotResult?.grid;
       console.log("result_type", turnData.result_type);
       
-      // Check if this MAKE is from a putback (already handled in events)
+      // Check if this MAKE is from a putback
+      // With new OREB turn architecture, putbacks are separate turns, not events
+      // But keep this check for backward compatibility
       const hasPutbackMake = turnData.events?.some(evt => 
         evt.event_type === "PUTBACK_ATTEMPT" && evt.result === "MAKE"
       );
