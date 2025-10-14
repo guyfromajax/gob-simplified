@@ -583,6 +583,7 @@ class Animator:
                     
                     # Find who has the ball at this timestamp
                     current_bh_coords = ball_handler_end_coords  # Default fallback
+                    current_bh_pos = None
                     for step in steps:
                         if step["timestamp"] == t:
                             # Check each position to see who has ball at this step
@@ -591,8 +592,11 @@ class Animator:
                                 if action in ["handle_ball", "receive", "shoot", "pass"]:
                                     bh_spot = pos_action.get("spot", "key")
                                     current_bh_coords = HCO_STRING_SPOTS.get(bh_spot, HCO_STRING_SPOTS["key"])
+                                    current_bh_pos = check_pos
                                     break
                             break
+                    
+                    print(f"🛡️ Defender {pos} at t={t}: Guarding {get_player_position(off_lineup, off_player)} at {spot}, Ball with {current_bh_pos} at {current_bh_coords}")
                     
                     d_coords = assign_non_bh_defender_coords(o_coords, current_bh_coords, aggression_call, is_away_offense)
                     if is_away_offense:

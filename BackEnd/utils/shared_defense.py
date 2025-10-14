@@ -29,14 +29,14 @@ def assign_bh_defender_coords(ball_coords, aggression_level: str, is_away_offens
         x_def = x  # No X spacing on baseline - defender matches ball handler's X
 
     # Edge case: top of key
-    elif 62 <= x <= 66 and 22 <= y <= 28:
+    elif (62 <= x <= 66 or 35 <= x <= 39) and 22 <= y <= 28:
         x_def = x + (x_direction * d_spacing)
         y_def = y
 
     # General case
     else:
         # y_shift = y_direction * random.randint(1, 3)
-        y_def = y_direction * d_spacing
+        y_def = y + (y_direction * d_spacing)
         # y_def = y + y_shift if y < 25 else y - y_shift
         x_def = x + (x_direction * d_spacing)
 
