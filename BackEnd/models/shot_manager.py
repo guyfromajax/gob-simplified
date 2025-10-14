@@ -1,6 +1,7 @@
 import random
 from BackEnd.constants import (
     THREE_POINT_PROBABILITY, 
+    THREE_POINT_SPOTS,
     PLAYCALL_ATTRIBUTE_WEIGHTS, 
     BLOCK_PROBABILITY,
     AGGRESSION_FOUL_MULTIPLIER
@@ -27,6 +28,55 @@ class ShotManager:
         self.game_state = game.game_state  # still accessible
         # Add defense score tracking
         self.defense_scores = []
+    
+    def is_three_point_shot(self, shooter, roles):
+        """
+        Determine if a shot is a three-pointer based on the shooter's spot.
+        
+        Args:
+            shooter: The player taking the shot
+            roles: The roles dict containing steps/skeleton data
+            
+        Returns:
+            bool: True if three-pointer, False if two-pointer
+        """
+        # Get the shooter's position
+        shooter_pos = None
+        for pos, player in self.game.offense_team.lineup.items():
+            if player == shooter:
+                shooter_pos = pos
+                break
+        
+        if not shooter_pos:
+            return False
+        
+        # Find the shooter's spot from the final step (where they shoot)
+        steps = roles.get("steps", [])
+        if not steps:
+            return False
+        
+        # Check the last step for the shooter's spot
+        for step in reversed(steps):
+            pos_actions = step.get("pos_actions", {})
+            shooter_action = pos_actions.get(shooter_pos)
+            if shooter_action and shooter_action.get("action") == "shoot":
+                spot = shooter_action.get("spot", "")
+                # Check if spot is a three-point spot
+                if spot in THREE_POINT_SPOTS:
+                    return True
+                # Check if shot is from backcourt (other half of court)
+                spot_coords = shooter_action.get("coords")
+                if spot_coords:
+                    # Home offense: backcourt is X < 50
+                    # Away offense: backcourt is X > 50
+                    is_home_offense = self.game.offense_team.team_id == self.game.home_team.team_id
+                    if is_home_offense and spot_coords.get("x", 50) < 50:
+                        return True  # Backcourt shot
+                    elif not is_home_offense and spot_coords.get("x", 50) > 50:
+                        return True  # Backcourt shot
+                return False
+        
+        return False
 
 
     def resolve_shot(self, roles):
@@ -44,7 +94,12 @@ class ShotManager:
 
         playcall = self.game_state["current_playcall"]
         defense_call = self.game_state["defense_playcall"]
-        is_three = random.random() < THREE_POINT_PROBABILITY.get(playcall, 0.0)
+        
+        # Determine if shot is three-pointer based on shooter's spot
+        is_three = self.is_three_point_shot(shooter, roles)
+        # Debug: print shooter spot and three-point determination
+        # print(f"Shot determination: is_three={is_three}, shooter={get_name_safe(shooter)}")
+        
         shot_threshold = off_team.team_attributes["shot_threshold"]
         if is_three:
             shot_threshold += 100
