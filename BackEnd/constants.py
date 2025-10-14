@@ -28,6 +28,24 @@ THREE_POINT_PROBABILITY = {
     # All others default to 0.0
 }
 
+# Spots that are three-point shots (outside the arc)
+THREE_POINT_SPOTS = {
+    "key",
+    "deep key",
+    "upper wing",
+    "deep upper wing",
+    "lower wing",
+    "deep lower wing",
+    "upper midWing",
+    "lower midWing",
+    "lower midCorner",
+    "upper midCorner",
+    "upper corner",
+    "lower corner",
+    "deep upper baseline",
+    "deep lower baseline",
+}
+
 BLOCK_PROBABILITY = {
     "Inside": 0.2,
     "Attack": 0.1,
