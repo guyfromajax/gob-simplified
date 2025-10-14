@@ -85,7 +85,7 @@ def assign_non_bh_defender_coords(o_coords, ball_coords, aggression_level, is_aw
     elif 62 <= bx <= 66 and 22 <= by <= 28:
         return {
             "x": ox + (x_direction * random.randint(2, 4)),
-            "y": oy + direction * (1 if oy < 25 else -1)
+            "y": oy + y_direction * (1 if oy < 25 else -1)
         }
 
     # General rule: mirror ball spacing, maintain triangle
