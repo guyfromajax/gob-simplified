@@ -6,8 +6,9 @@
 import { tweenPlayerTo } from "./ballTween.js";
 import { appendToTextScroll } from "../utils/textScroll.js";
 
-const JUMP_DURATION = 1500; // Hold for 1.5 seconds
-const CONVERGE_DURATION = 1500; // Hold for 1.5 seconds
+const INITIAL_HOLD_DURATION = 4000; // Hold starting positions for 4 seconds
+const JUMP_DURATION = 1500; // Jump animation duration (up and down)
+const CONVERGE_DURATION = 1500; // Convergence duration
 const BALL_JUMP_HEIGHT = 5; // Ball jumps higher than players
 
 /**
@@ -30,14 +31,45 @@ export function runOpeningTipSequence(scene, { playerSprites, ballSprite, turnDa
     const animations = turnData.animations || [];
     const ballLandingCoords = turnData.ball_landing_coords || { x: 50, y: 25 };
     
-    // Step 1: Jump ball animation
-    animateJumpBall(scene, playerSprites, animations, ballSprite, () => {
-        // Step 2: Ball and players converge
-        animateConvergence(scene, playerSprites, animations, ballSprite, ballLandingCoords, () => {
-            console.log("✅ Opening tip sequence complete");
-            if (onComplete) onComplete();
+    // Step 0: Position all players at their starting positions
+    positionPlayersAtStart(scene, playerSprites, animations, ballSprite);
+    
+    // Step 1: Hold for 4 seconds to show starting positions
+    scene.time.delayedCall(INITIAL_HOLD_DURATION, () => {
+        // Step 2: Jump ball animation
+        animateJumpBall(scene, playerSprites, animations, ballSprite, () => {
+            // Step 3: Ball and players converge
+            animateConvergence(scene, playerSprites, animations, ballSprite, ballLandingCoords, () => {
+                console.log("✅ Opening tip sequence complete");
+                if (onComplete) onComplete();
+            });
         });
     });
+}
+
+/**
+ * Step 0: Position all players at their starting positions
+ */
+function positionPlayersAtStart(scene, playerSprites, animations, ballSprite) {
+    console.log("🏀 Positioning players at opening tip starting positions");
+    
+    // Position all players at their starting spots
+    animations.forEach(anim => {
+        const playerSprite = playerSprites[anim.playerId];
+        if (!playerSprite || !anim.start) return;
+        
+        const startCoords = anim.start;
+        playerSprite.x = startCoords.x * 4;
+        playerSprite.y = (50 - startCoords.y) * 4;
+    });
+    
+    // Position ball at center court
+    const ballStartCoords = { x: 50, y: 25 };
+    ballSprite.x = ballStartCoords.x * 4;
+    ballSprite.y = (50 - ballStartCoords.y) * 4;
+    ballSprite.setVisible(true);
+    
+    console.log("✅ All players positioned for opening tip");
 }
 
 /**
