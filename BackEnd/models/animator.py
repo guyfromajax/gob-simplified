@@ -538,10 +538,6 @@ class Animator:
                 )
                 o_coords = HCO_STRING_SPOTS.get(last_spot, HCO_STRING_SPOTS["key"])
                 
-                # Flip offensive coords to actual orientation if away team is on offense
-                if is_away_offense:
-                    o_coords = get_away_player_coords(o_coords)
-                
                 # Override end position if FCP is next
                 if next_defensive_setup == "FCP":
                     # Position for full court press

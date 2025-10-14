@@ -69,10 +69,11 @@ def assign_non_bh_defender_coords(o_coords, ball_coords, aggression_level, is_aw
         flipped = get_away_player_coords(ball_coords)
         bx, by = flipped["x"], flipped["y"]
 
-    # Determine X-offset direction based on which team is on offense
-    # Home offense (attacking X=90): defenders closer to X=90 (x + spacing)
-    # Away offense (attacking X=10): defenders closer to X=10 (x - spacing)
-    x_direction = -1 if is_away_offense else 1
+    # X-offset direction in home orientation (always toward X=90)
+    # Offensive coords are always in home orientation (from HCO_STRING_SPOTS)
+    # Defender positions calculated in home orientation, then caller flips for away offense
+    # In home orientation: defender to the RIGHT of offensive player (toward X=90)
+    x_direction = 1
     
     # Edge case: defending someone on the block or in the lane (score threat)
     if 74 <= ox <= 88 and 15 <= oy <= 33:
