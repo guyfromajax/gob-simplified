@@ -186,6 +186,49 @@ def simulate_quarter(
     recharge_amount = 0.3 if q == 3 else 0.2
     recharge_lineups(gm, recharge_amount)
 
+    # Handle quarter start possession
+    if q == 1 or (q > 4):  # Q1 or any OT
+        # Opening tip for Q1 and all OT periods
+        from BackEnd.utils.opening_tip import execute_opening_tip
+        tip_turn = execute_opening_tip(gm)
+        gm.turns.append(tip_turn)
+        gm.text_log.append(tip_turn["text"])
+        # Update clock for tip time elapsed
+        gm.game_state["time_remaining"] -= tip_turn["time_elapsed"]
+        from BackEnd.utils.shared import format_time
+        gm.game_state["clock"] = format_time(gm.game_state["time_remaining"])
+        print(f"🏀 Opening tip: {tip_turn['winner']} wins for {gm.offense_team.name}")
+    elif q == 2 or q == 3:
+        # Q2/Q3: Losing team from opening tip gets possession via inbound pass
+        opening_tip_winner = gm.game_state.get("opening_tip_winner", "home")
+        if opening_tip_winner == "home":
+            gm.offense_team = gm.away_team
+            gm.defense_team = gm.home_team
+        else:
+            gm.offense_team = gm.home_team
+            gm.defense_team = gm.away_team
+        
+        # Check for defensive pressure on the inbound
+        from BackEnd.models.turn_manager import TurnManager
+        pressure_type = gm.turn_manager.determine_defensive_pressure_type()
+        gm.game_state["offensive_state"] = pressure_type
+        print(f"🏀 Q{q} start: {gm.offense_team.name} gets possession (lost opening tip) - Defense: {pressure_type}")
+    elif q == 4:
+        # Q4: Winning team from opening tip gets possession via inbound pass
+        opening_tip_winner = gm.game_state.get("opening_tip_winner", "home")
+        if opening_tip_winner == "home":
+            gm.offense_team = gm.home_team
+            gm.defense_team = gm.away_team
+        else:
+            gm.offense_team = gm.away_team
+            gm.defense_team = gm.home_team
+        
+        # Check for defensive pressure on the inbound
+        from BackEnd.models.turn_manager import TurnManager
+        pressure_type = gm.turn_manager.determine_defensive_pressure_type()
+        gm.game_state["offensive_state"] = pressure_type
+        print(f"🏀 Q{q} start: {gm.offense_team.name} gets possession (won opening tip) - Defense: {pressure_type}")
+
     while gm.game_state["time_remaining"] > 0:
         gm.simulate_macro_turn()
         gm.game_state["team_fouls"] = {
