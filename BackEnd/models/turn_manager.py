@@ -355,6 +355,133 @@ class TurnManager:
     
     def resolve_turnover(self):
         return resolve_turnover_logic(self.game)
+    
+    def resolve_offensive_rebound_turn(self):
+        """
+        Process an offensive rebound as a separate turn.
+        This is called after a MISS turn that had an OREB.
+        
+        Returns a turn result for: PUTBACK_MAKE, PUTBACK_MISS, or KICKOUT
+        """
+        from BackEnd.utils.shared import resolve_offensive_rebound, get_name_safe, unpack_game_context
+        from BackEnd.models.shot_manager import ShotManager
+        
+        pending_oreb = self.game.game_state.get("pending_oreb")
+        if not pending_oreb:
+            return None
+        
+        rebounder = pending_oreb["rebounder"]
+        game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(self.game)
+        
+        # Resolve what happens with the offensive rebound
+        oreb_event = resolve_offensive_rebound(self.game, rebounder)
+        
+        if oreb_event["event_type"] == "PUTBACK_ATTEMPT":
+            self.logger.log("putbackStart")
+            self.logger.log(oreb_event["result"].lower())
+            
+            # Build roles for the putback shot (for animation and three-point determination)
+            # Putback shots don't have a skeleton, so we'll use current coords
+            defender_pos = ["C", "PF", "SF"][0]  # Simplified - closest big
+            defender = def_lineup.get(defender_pos, list(def_lineup.values())[0])
+            
+            putback_roles = {
+                "shooter": rebounder,
+                "ball_handler": rebounder,
+                "defender": defender,
+                "passer": None,
+                "screener": None,
+                "steps": [],  # No skeleton for putbacks
+            }
+            
+            if oreb_event["result"] == "MAKE":
+                text = f"{get_name_safe(rebounder)} goes back up and puts it in!"
+                possession_flips = True
+                # Check for defensive pressure opportunity (FCP/HCT) after putback make
+                pressure_type = self.determine_defensive_pressure_type()
+                game_state["offensive_state"] = pressure_type
+                
+                return {
+                    "result_type": "PUTBACK_MAKE",
+                    "ball_handler": rebounder,
+                    "shooter": rebounder,
+                    "defender": defender,
+                    "text": text,
+                    "possession_flips": possession_flips,
+                    "time_elapsed": oreb_event.get("timeElapsed", 3),
+                    "points": oreb_event.get("points", 2),
+                    "scoring_team": off_team.name,
+                    "next_defensive_setup": pressure_type,
+                    "animations": [],  # Putbacks use simple animation, not skeleton
+                    "rebounderId": getattr(rebounder, "player_id", None),
+                }
+            else:
+                # Putback missed - check for rebound
+                text = f"{get_name_safe(rebounder)} goes back up but misses."
+                possession_flips = oreb_event.get("possession_flips", False)
+                
+                result = {
+                    "result_type": "PUTBACK_MISS",
+                    "ball_handler": rebounder,
+                    "shooter": rebounder,
+                    "defender": defender,
+                    "text": text,
+                    "possession_flips": possession_flips,
+                    "time_elapsed": oreb_event.get("timeElapsed", 3),
+                    "animations": [],
+                    "rebounderId": getattr(rebounder, "player_id", None),
+                }
+                
+                # Check if there's another rebound
+                if oreb_event.get("rebound"):
+                    rebound_data = oreb_event["rebound"]
+                    result["rebound_type"] = rebound_data.get("rebound_type", "DREB")
+                    result["rebounderId"] = rebound_data.get("rebounderId")
+                    
+                    rebounder_id = rebound_data.get("rebounderId")
+                    new_rebounder = None
+                    for player in (off_team.get_all_players() + def_team.get_all_players()):
+                        if getattr(player, "player_id", None) == rebounder_id:
+                            new_rebounder = player
+                            break
+                    
+                    if new_rebounder:
+                        text += f" {get_name_safe(new_rebounder)} grabs the rebound."
+                        result["text"] = text
+                    
+                    # If it's another OREB, set pending for next turn
+                    if rebound_data.get("rebound_type") == "OREB" and new_rebounder:
+                        game_state["pending_oreb"] = {
+                            "rebounder": new_rebounder,
+                            "rebounder_id": rebounder_id,
+                        }
+                    elif rebound_data.get("rebound_type") == "DREB":
+                        # Defensive rebound - check for fast break
+                        from BackEnd.utils.shared import get_fast_break_chance
+                        import random
+                        next_play_type = "FAST_BREAK" if random.random() < get_fast_break_chance(self.game) else "HCO"
+                        game_state["offensive_state"] = next_play_type
+                        result["next_play_type"] = next_play_type
+                
+                return result
+        
+        else:
+            # Kickout
+            self.logger.log("kickoutStart")
+            pg = off_team.lineup.get("PG")
+            text = f"{get_name_safe(rebounder)} kicks it out to reset."
+            game_state["offensive_state"] = "HCO"
+            
+            return {
+                "result_type": "OREB_KICKOUT",
+                "ball_handler": rebounder,
+                "text": text,
+                "possession_flips": False,
+                "time_elapsed": oreb_event.get("timeElapsed", 2),
+                "animations": [],
+                "rebounderId": getattr(rebounder, "player_id", None),
+                "pgId": getattr(pg, "player_id", None) if pg else None,
+            }
 
     def update_clock_and_possession(self, result):
         # 🕒 Reduce clock by time_elapsed

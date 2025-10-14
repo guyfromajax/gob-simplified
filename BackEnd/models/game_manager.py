@@ -133,6 +133,18 @@ class GameManager:
         self.turns.append(result)
         self.text_log.append(result["text"])
 
+        # If the turn ended with an offensive rebound, create a separate OREB turn
+        if self.game_state.get("pending_oreb"):
+            oreb_turn = self.turn_manager.resolve_offensive_rebound_turn()
+            if oreb_turn:
+                self.turns.append(oreb_turn)
+                self.text_log.append(oreb_turn["text"])
+                # Clear the pending OREB
+                self.game_state["pending_oreb"] = None
+                
+                # If OREB turn also resulted in another OREB, it will have set pending_oreb again
+                # The next simulate_macro_turn will handle it (recursive OREBs)
+
         # If the turn ended with a dead-ball turnover or a non-shooting foul
         # that does not result in free throws, prepare a sideline inbound
         # sequence and append its payload so the front end can animate it.

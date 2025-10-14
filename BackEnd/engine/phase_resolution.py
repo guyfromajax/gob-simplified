@@ -422,38 +422,13 @@ def resolve_free_throw_logic(game):
                 next_play_type = "FAST_BREAK" if random.random() < get_fast_break_chance(game) else "HCO"
                 game_state["offensive_state"] = next_play_type
             else:
-                # Offensive rebound handling
-                off_event = resolve_offensive_rebound(game, rebounder)
-                if off_event["event_type"] == "PUTBACK_ATTEMPT":
-                    text += f" {get_name_safe(rebounder)} goes back up."
-                    result = {
-                        "result_type": "MAKE" if off_event["result"] == "MAKE" else "MISS",
-                        "ball_handler": rebounder,
-                        "shooter": rebounder,
-                        "text": text,
-                        "time_elapsed": off_event["timeElapsed"],
-                        "possession_flips": off_event.get("possession_flips", False),
-                    }
-                    if off_event["result"] == "MAKE":
-                        result["points"] = off_event.get("points", 2)
-                        result["scoring_team"] = off_team.name
-                        # Check for defensive pressure after made putback from FT miss
-                        from BackEnd.models.turn_manager import TurnManager
-                        pressure_type = TurnManager(game).determine_defensive_pressure_type()
-                        game_state["offensive_state"] = pressure_type
-                        result["next_defensive_setup"] = pressure_type
-                        # print(f"🏀 FT putback made - setting offensive_state to: {pressure_type}")
-                    return result
-                else:
-                    text += f" {get_name_safe(rebounder)} kicks it out to reset."
-                    return {
-                        "result_type": "MISS",
-                        "ball_handler": rebounder,
-                        "shooter": shooter,
-                        "text": text,
-                        "time_elapsed": off_event["timeElapsed"],
-                        "possession_flips": False,
-                    }
+                # Offensive rebound - store for separate turn processing
+                game_state["pending_oreb"] = {
+                    "rebounder": rebounder,
+                    "rebounder_id": getattr(rebounder, "player_id", None),
+                }
+                text += f" {get_name_safe(rebounder)} grabs the offensive rebound."
+                # OREB will be processed as a separate turn
         else:
             if not game_state.get("no_lane", False):
                 possession_flips = True
