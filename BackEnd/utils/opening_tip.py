@@ -83,14 +83,16 @@ def execute_opening_tip(game):
     game.game_state["offensive_state"] = "HCO"
     
     # Determine ball landing spot (tighter range around center court)
+    # Home team attacks left (away basket), so ball goes left (x < 50) when home wins
+    # Away team attacks right (home basket), so ball goes right (x > 50) when away wins
     ball_spot_y = random.randint(20, 30)  # More centered vertically
     if home_wins:
-        ball_spot_x = random.randint(52, 58)  # Home side (right)
+        ball_spot_x = random.randint(42, 48)  # Home wins -> ball bounces left (toward home teammates)
     else:
-        ball_spot_x = random.randint(42, 48)  # Away side (left)
+        ball_spot_x = random.randint(52, 58)  # Away wins -> ball bounces right (toward away teammates)
     
     ball_landing_coords = {"x": ball_spot_x, "y": ball_spot_y}
-    print(f"🏀 Opening tip ball landing at: x={ball_spot_x}, y={ball_spot_y}")
+    print(f"🏀 Opening tip ball landing at: x={ball_spot_x}, y={ball_spot_y} ({'home' if home_wins else 'away'} wins)")
     
     # Build animations for all players
     animations = []
