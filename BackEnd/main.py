@@ -195,8 +195,9 @@ def simulate_quarter(
         gm.text_log.append(tip_turn["text"])
         # Update clock for tip time elapsed
         gm.game_state["time_remaining"] -= tip_turn["time_elapsed"]
-        from BackEnd.utils.shared import format_time
-        gm.game_state["clock"] = format_time(gm.game_state["time_remaining"])
+        minutes = gm.game_state["time_remaining"] // 60
+        seconds = gm.game_state["time_remaining"] % 60
+        gm.game_state["clock"] = f"{minutes}:{seconds:02d}"
         print(f"🏀 Opening tip: {tip_turn['winner']} wins for {gm.offense_team.name}")
     elif q == 2 or q == 3:
         # Q2/Q3: Losing team from opening tip gets possession via inbound pass
