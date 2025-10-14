@@ -5,6 +5,7 @@
 
 import { tweenPlayerTo } from "./ballTween.js";
 import { appendToTextScroll } from "../utils/textScroll.js";
+import { gridToPixels } from "../utils/gridToPixels.js";
 
 const INITIAL_HOLD_DURATION = 4000; // Hold starting positions for 4 seconds
 const JUMP_DURATION = 1500; // Jump animation duration (up and down)
@@ -53,25 +54,32 @@ export function runOpeningTipSequence(scene, { playerSprites, ballSprite, turnDa
 function positionPlayersAtStart(scene, playerSprites, animations, ballSprite) {
     console.log("🏀 Positioning players at opening tip starting positions");
     
+    const canvasWidth = scene.game.config.width;
+    const canvasHeight = scene.game.config.height;
+    
     // Position all players at their starting spots
     animations.forEach(anim => {
         const playerSprite = playerSprites[anim.playerId];
         if (!playerSprite || !anim.start) return;
         
         const startCoords = anim.start;
-        playerSprite.x = startCoords.x * 4;
-        playerSprite.y = (50 - startCoords.y) * 4;
+        const pixelCoords = gridToPixels(startCoords.x, startCoords.y, canvasWidth, canvasHeight);
+        playerSprite.x = pixelCoords.x;
+        playerSprite.y = pixelCoords.y;
     });
     
     // Position ball at center court
     const ballStartCoords = { x: 50, y: 25 };
-    ballSprite.x = ballStartCoords.x * 4;
-    ballSprite.y = (50 - ballStartCoords.y) * 4;
+    const ballPixelCoords = gridToPixels(ballStartCoords.x, ballStartCoords.y, canvasWidth, canvasHeight);
+    ballSprite.x = ballPixelCoords.x;
+    ballSprite.y = ballPixelCoords.y;
     ballSprite.setVisible(true);
     
     console.log("✅ All players positioned for opening tip", {
         totalPlayers: animations.length,
-        ballPosition: { x: ballSprite.x, y: ballSprite.y }
+        ballGridCoords: ballStartCoords,
+        ballPixelCoords: ballPixelCoords,
+        canvasSize: { width: canvasWidth, height: canvasHeight }
     });
 }
 
@@ -80,6 +88,8 @@ function positionPlayersAtStart(scene, playerSprites, animations, ballSprite) {
  */
 function animateJumpBall(scene, playerSprites, animations, ballSprite, onComplete) {
     const jumpTweens = [];
+    const canvasWidth = scene.game.config.width;
+    const canvasHeight = scene.game.config.height;
     
     // Find the two centers (they have action: "TIP_JUMP")
     const centerAnimations = animations.filter(anim => anim.action === "TIP_JUMP");
@@ -91,18 +101,21 @@ function animateJumpBall(scene, playerSprites, animations, ballSprite, onComplet
         const jumpCoords = anim.jumpCoords;
         const startCoords = anim.start;
         
+        const jumpPixels = gridToPixels(jumpCoords.x, jumpCoords.y, canvasWidth, canvasHeight);
+        const startPixels = gridToPixels(startCoords.x, startCoords.y, canvasWidth, canvasHeight);
+        
         // Player jumps up then returns
         const tween = scene.tweens.add({
             targets: playerSprite,
-            x: jumpCoords.x * 4,
-            y: (50 - jumpCoords.y) * 4,
+            x: jumpPixels.x,
+            y: jumpPixels.y,
             duration: JUMP_DURATION / 2,
             ease: 'Quad.easeOut',
             yoyo: true,
             onComplete: () => {
                 // Return to start position
-                playerSprite.x = startCoords.x * 4;
-                playerSprite.y = (50 - startCoords.y) * 4;
+                playerSprite.x = startPixels.x;
+                playerSprite.y = startPixels.y;
             }
         });
         
@@ -113,16 +126,19 @@ function animateJumpBall(scene, playerSprites, animations, ballSprite, onComplet
     const ballStartCoords = { x: 50, y: 25 }; // Center court
     const ballJumpCoords = { x: 50, y: 25 + BALL_JUMP_HEIGHT };
     
+    const ballStartPixels = gridToPixels(ballStartCoords.x, ballStartCoords.y, canvasWidth, canvasHeight);
+    const ballJumpPixels = gridToPixels(ballJumpCoords.x, ballJumpCoords.y, canvasWidth, canvasHeight);
+    
     const ballTween = scene.tweens.add({
         targets: ballSprite,
-        x: ballJumpCoords.x * 4,
-        y: (50 - ballJumpCoords.y) * 4,
+        x: ballJumpPixels.x,
+        y: ballJumpPixels.y,
         duration: JUMP_DURATION / 2,
         ease: 'Quad.easeOut',
         yoyo: true,
         onComplete: () => {
-            ballSprite.x = ballStartCoords.x * 4;
-            ballSprite.y = (50 - ballStartCoords.y) * 4;
+            ballSprite.x = ballStartPixels.x;
+            ballSprite.y = ballStartPixels.y;
             
             // Wait a moment, then continue
             scene.time.delayedCall(100, () => {
@@ -139,6 +155,8 @@ function animateJumpBall(scene, playerSprites, animations, ballSprite, onComplet
  */
 function animateConvergence(scene, playerSprites, animations, ballSprite, ballLandingCoords, onComplete) {
     const convergeTweens = [];
+    const canvasWidth = scene.game.config.width;
+    const canvasHeight = scene.game.config.height;
     
     // Find all non-center players (they have action: "CONVERGE_ON_BALL")
     const convergeAnimations = animations.filter(anim => anim.action === "CONVERGE_ON_BALL");
@@ -149,7 +167,7 @@ function animateConvergence(scene, playerSprites, animations, ballSprite, ballLa
         
         const endCoords = anim.end;
         
-        // Tween player to their convergence spot
+        // Tween player to their convergence spot (tweenPlayerTo handles grid-to-pixel conversion)
         const tween = tweenPlayerTo(
             scene,
             playerSprite,
@@ -163,18 +181,17 @@ function animateConvergence(scene, playerSprites, animations, ballSprite, ballLa
     });
     
     // Ball tweens to landing spot
-    const ballPixelX = ballLandingCoords.x * 4;
-    const ballPixelY = (50 - ballLandingCoords.y) * 4;
+    const ballPixelCoords = gridToPixels(ballLandingCoords.x, ballLandingCoords.y, canvasWidth, canvasHeight);
     
     console.log("🏀 Ball converging to:", {
         gridCoords: ballLandingCoords,
-        pixelCoords: { x: ballPixelX, y: ballPixelY }
+        pixelCoords: ballPixelCoords
     });
     
     const ballTween = scene.tweens.add({
         targets: ballSprite,
-        x: ballPixelX,
-        y: ballPixelY,
+        x: ballPixelCoords.x,
+        y: ballPixelCoords.y,
         duration: CONVERGE_DURATION,
         ease: 'Quad.easeOut',
         onComplete: () => {
