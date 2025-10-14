@@ -440,7 +440,7 @@ class TurnManager:
                     
                     rebounder_id = rebound_data.get("rebounderId")
                     new_rebounder = None
-                    for player in (off_team.get_all_players() + def_team.get_all_players()):
+                    for player in list(off_team.get_all_players()) + list(def_team.get_all_players()):
                         if getattr(player, "player_id", None) == rebounder_id:
                             new_rebounder = player
                             break
