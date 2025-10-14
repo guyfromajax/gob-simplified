@@ -191,17 +191,18 @@ class FranchiseManager:
             "session_type": "preseason"  # First training is always training camp
         }
 
+        # Generate initial recruits for the franchise
+        recruits = self.recruit_manager.generate_recruits_list()
+        
         self.save_season_state(
             extra_state={
                 "players": players_map, 
                 "applied_games": [],
                 "franchise_teams": franchise_teams,
-                "training_status": training_status
+                "training_status": training_status,
+                "recruits": recruits
             }
         )
-        
-        # Generate initial recruits for the franchise
-        self.recruit_manager.generate_recruits()
 
     def reset_stats(self):
         for team in self.teams:
@@ -337,7 +338,14 @@ class FranchiseManager:
         return {"Freshman": "Sophomore", "Sophomore": "Junior", "Junior": "Senior"}.get(year, year)
 
     def generate_recruits(self):
-        self.recruit_manager.generate_recruits()
+        """Generate recruits and save them to the franchise document."""
+        recruits = self.recruit_manager.generate_recruits_list()
+        if self.franchise_id:
+            self.db.franchises.update_one(
+                {"_id": self.franchise_id}, 
+                {"$set": {"recruits": recruits}}
+            )
+        return recruits
 
     def save_season_state(self, extra_state: dict | None = None):
         state = {"week": self.week, "schedule": self.schedule}
@@ -410,7 +418,8 @@ class RecruitManager:
             logger.error(f"❌ Failed to load franchise names, using fallback: {exc}")
             logger.error(f"Fallback names: {len(self.first_names)} first, {len(self.last_names)} last")
 
-    def generate_recruits(self, count=40):
+    def generate_recruits_list(self, count=40):
+        """Generate and return a list of recruits (does not save to DB)."""
         from BackEnd.utils.position_ratings import compute_position_ratings
         
         recruits = []
@@ -445,7 +454,14 @@ class RecruitManager:
                 "year": "Freshman", 
                 "created_at": datetime.utcnow()
             })
-
+        
+        return recruits
+    
+    def generate_recruits(self, count=40):
+        """Legacy method: Generate recruits and save to global recruits collection.
+        Deprecated - use generate_recruits_list() and store in franchise document instead.
+        """
+        recruits = self.generate_recruits_list(count)
         if recruits:
             self.db.recruits.delete_many({})
             self.db.recruits.insert_many(recruits)

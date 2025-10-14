@@ -291,7 +291,7 @@ async function init() {
     renderSchedule(scheduleData);
     renderLeaders(await fetchJSON(`/franchise/leaders?franchise_id=${franchiseId}`));
     renderTeamStats(await fetchJSON('/franchise/team-stats'));
-    renderRecruits(await fetchJSON('/franchise/recruits'));
+    renderRecruits(await fetchJSON(`/franchise/recruits?franchise_id=${franchiseId}`));
     renderTrainingResults(await fetchJSON(`/franchise/latest-training?franchise_id=${franchiseId}`));
   }
 

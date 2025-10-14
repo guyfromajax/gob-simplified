@@ -129,22 +129,16 @@ def test_generate_recruit_profile_three_and_d(recruit_manager):
 
 
 def test_generate_recruits_creates_correct_count(recruit_manager):
-    """Test that generate_recruits creates the specified number of recruits"""
-    recruit_manager.generate_recruits(count=25)
-    
-    # Should call insert_many once with 25 recruits
-    assert recruit_manager.db.recruits.insert_many.called
-    inserted_recruits = recruit_manager.db.recruits.insert_many.call_args[0][0]
-    assert len(inserted_recruits) == 25
+    """Test that generate_recruits_list creates the specified number of recruits"""
+    recruits = recruit_manager.generate_recruits_list(count=25)
+    assert len(recruits) == 25
 
 
 def test_recruit_structure_includes_all_fields(recruit_manager):
     """Test that each recruit has all required fields"""
-    recruit_manager.generate_recruits(count=5)
+    recruits = recruit_manager.generate_recruits_list(count=5)
     
-    inserted_recruits = recruit_manager.db.recruits.insert_many.call_args[0][0]
-    
-    for recruit in inserted_recruits:
+    for recruit in recruits:
         assert "name" in recruit
         assert "attributes" in recruit
         assert "position_ratings" in recruit
@@ -158,12 +152,10 @@ def test_recruit_structure_includes_all_fields(recruit_manager):
 
 def test_recruit_attributes_include_all_stats(recruit_manager):
     """Test that each recruit has all 13 attributes"""
-    recruit_manager.generate_recruits(count=5)
-    
-    inserted_recruits = recruit_manager.db.recruits.insert_many.call_args[0][0]
+    recruits = recruit_manager.generate_recruits_list(count=5)
     expected_attrs = ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "AG", "ST", "ND", "IQ", "FT", "CH"]
     
-    for recruit in inserted_recruits:
+    for recruit in recruits:
         for attr in expected_attrs:
             assert attr in recruit["attributes"], f"Missing {attr} in recruit attributes"
 
