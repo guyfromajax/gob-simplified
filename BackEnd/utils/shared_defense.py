@@ -61,17 +61,22 @@ def assign_non_bh_defender_coords(o_coords, ball_coords, aggression_level, is_aw
         flipped = get_away_player_coords(ball_coords)
         bx, by = flipped["x"], flipped["y"]
 
+    # Determine X-offset direction based on which team is on offense
+    # Home offense (attacking right, X=91): defenders on LEFT (x - spacing)
+    # Away offense (attacking left, X=9): defenders on RIGHT (x + spacing)
+    x_direction = 1 if is_away_offense else -1
+    
     # Edge case: defending someone on the block or in the lane (score threat)
     if 74 <= ox <= 88 and 15 <= oy <= 33:
         return {
-            "x": ox - d_spacing,
+            "x": ox + (x_direction * d_spacing),
             "y": oy + random.choice([-1, 1, 0])
         }
 
     # Edge case: defending someone on the baseline
     elif oy <= 6 or oy >= 44:
         return {
-            "x": ox - random.randint(1, 3),
+            "x": ox + (x_direction * random.randint(1, 3)),
             # Vertical offset shouldn't flip when court orientation changes
             "y": oy + (d_spacing if oy < 25 else -d_spacing)
         }
@@ -79,7 +84,7 @@ def assign_non_bh_defender_coords(o_coords, ball_coords, aggression_level, is_aw
     # Edge case: defending someone near the top or wings and ball is on the key
     elif 62 <= bx <= 66 and 22 <= by <= 28:
         return {
-            "x": ox - random.randint(2, 4),
+            "x": ox + (x_direction * random.randint(2, 4)),
             "y": oy + direction * (1 if oy < 25 else -1)
         }
 
@@ -88,7 +93,7 @@ def assign_non_bh_defender_coords(o_coords, ball_coords, aggression_level, is_aw
         delta_x = bx - ox
         delta_y = by - oy
 
-        x = ox + int(delta_x * 0.3) - d_spacing
+        x = ox + int(delta_x * 0.3) + (x_direction * d_spacing)
         y = oy + int(delta_y * 0.3) + direction * random.choice([-1, 0, 1])
 
         return {"x": x, "y": y}
