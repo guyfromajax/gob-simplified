@@ -82,14 +82,15 @@ def execute_opening_tip(game):
     game.defense_team = defense_team
     game.game_state["offensive_state"] = "HCO"
     
-    # Determine ball landing spot
-    ball_spot_y = random.randint(15, 35)
+    # Determine ball landing spot (tighter range around center court)
+    ball_spot_y = random.randint(20, 30)  # More centered vertically
     if home_wins:
-        ball_spot_x = random.randint(51, 60)
+        ball_spot_x = random.randint(52, 58)  # Home side (right)
     else:
-        ball_spot_x = random.randint(40, 49)
+        ball_spot_x = random.randint(42, 48)  # Away side (left)
     
     ball_landing_coords = {"x": ball_spot_x, "y": ball_spot_y}
+    print(f"🏀 Opening tip ball landing at: x={ball_spot_x}, y={ball_spot_y}")
     
     # Build animations for all players
     animations = []
