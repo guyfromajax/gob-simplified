@@ -217,43 +217,13 @@ class ShotManager:
                 
                 if stat == "OREB":
                     possession_flips = False
-                    events.append({"event_type": "offReb", "rebounderId": getattr(rebounder, "player_id", None)})
-                    self.game.turn_manager.logger.log("offReb")
-                    rebound_event = resolve_offensive_rebound(self.game, rebounder)
-                    events.append(rebound_event)
-                    time_elapsed += rebound_event.get("timeElapsed", 0)
-
-                    if rebound_event["event_type"] == "PUTBACK_ATTEMPT":
-                        self.game.turn_manager.logger.log("putbackStart")
-                        self.game.turn_manager.logger.log(rebound_event["result"].lower())
-                        if rebound_event["result"] == "MAKE":
-                            shooter = rebounder
-                            made = True
-                            points = rebound_event.get("points", 2)
-                            text += f" {get_name_safe(rebounder)} puts it back in."
-                            possession_flips = True
-                            # Check for defensive pressure opportunity (FCP/HCT) after putback make
-                            pressure_type = self.game.turn_manager.determine_defensive_pressure_type()
-                            self.game_state["offensive_state"] = pressure_type
-                            result["next_defensive_setup"] = pressure_type
-                        else:
-                            text += f" {get_name_safe(rebounder)} misses the putback."
-                            possession_flips = rebound_event.get("possession_flips", possession_flips)
-                            
-                            # Add defensive rebound text if possession flips
-                            if possession_flips and rebound_event.get("rebound"):
-                                def_rebounder_id = rebound_event["rebound"]["rebounderId"]
-                                def_rebounder = None
-                                for player in def_team.get_all_players():
-                                    if getattr(player, "player_id", None) == def_rebounder_id:
-                                        def_rebounder = player
-                                        break
-                                if def_rebounder:
-                                    text += f" {get_name_safe(def_rebounder)} grabs the defensive rebound."
-                    else:
-                        self.game.turn_manager.logger.log("kickoutStart")
-                        text += f" {get_name_safe(rebounder)} kicks it out to reset." 
-                        self.game_state["offensive_state"] = "HCO"
+                    # Store OREB info for game_manager to create a separate OREB turn
+                    self.game_state["pending_oreb"] = {
+                        "rebounder": rebounder,
+                        "rebounder_id": getattr(rebounder, "player_id", None),
+                    }
+                    # OREB will be handled as a separate turn
+                    # Don't process putback here - let next turn handle it
                 else:
                     possession_flips = True
                     events.append({
