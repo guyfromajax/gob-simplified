@@ -13,10 +13,13 @@ const BALL_JUMP_HEIGHT = 5; // Ball jumps higher than players
 /**
  * Animate the opening tip sequence
  * @param {Phaser.Scene} scene - The game scene
- * @param {Object} turnData - Turn data with animations and ball landing coords
- * @param {Function} onComplete - Callback when animation finishes
+ * @param {Object} params - Parameters object
+ * @param {Object} params.playerSprites - Dictionary of player sprites
+ * @param {Object} params.ballSprite - The ball sprite
+ * @param {Object} params.turnData - Turn data with animations and ball landing coords
+ * @param {Function} params.onComplete - Callback when animation finishes
  */
-export function runOpeningTipSequence(scene, turnData, onComplete) {
+export function runOpeningTipSequence(scene, { playerSprites, ballSprite, turnData, onComplete }) {
     console.log("🏀 Running opening tip sequence:", turnData);
     
     // Display the text
@@ -24,14 +27,13 @@ export function runOpeningTipSequence(scene, turnData, onComplete) {
         appendToTextScroll(turnData.text);
     }
     
-    const ballSprite = scene.ball;
     const animations = turnData.animations || [];
     const ballLandingCoords = turnData.ball_landing_coords || { x: 50, y: 25 };
     
     // Step 1: Jump ball animation
-    animateJumpBall(scene, animations, ballSprite, () => {
+    animateJumpBall(scene, playerSprites, animations, ballSprite, () => {
         // Step 2: Ball and players converge
-        animateConvergence(scene, animations, ballSprite, ballLandingCoords, () => {
+        animateConvergence(scene, playerSprites, animations, ballSprite, ballLandingCoords, () => {
             console.log("✅ Opening tip sequence complete");
             if (onComplete) onComplete();
         });
@@ -41,14 +43,14 @@ export function runOpeningTipSequence(scene, turnData, onComplete) {
 /**
  * Step 1: Animate both centers jumping and ball going up
  */
-function animateJumpBall(scene, animations, ballSprite, onComplete) {
+function animateJumpBall(scene, playerSprites, animations, ballSprite, onComplete) {
     const jumpTweens = [];
     
     // Find the two centers (they have action: "TIP_JUMP")
     const centerAnimations = animations.filter(anim => anim.action === "TIP_JUMP");
     
     centerAnimations.forEach(anim => {
-        const playerSprite = scene.playerSprites[anim.playerId];
+        const playerSprite = playerSprites[anim.playerId];
         if (!playerSprite) return;
         
         const jumpCoords = anim.jumpCoords;
@@ -100,14 +102,14 @@ function animateJumpBall(scene, animations, ballSprite, onComplete) {
 /**
  * Step 2: Ball goes to landing spot, players converge
  */
-function animateConvergence(scene, animations, ballSprite, ballLandingCoords, onComplete) {
+function animateConvergence(scene, playerSprites, animations, ballSprite, ballLandingCoords, onComplete) {
     const convergeTweens = [];
     
     // Find all non-center players (they have action: "CONVERGE_ON_BALL")
     const convergeAnimations = animations.filter(anim => anim.action === "CONVERGE_ON_BALL");
     
     convergeAnimations.forEach(anim => {
-        const playerSprite = scene.playerSprites[anim.playerId];
+        const playerSprite = playerSprites[anim.playerId];
         if (!playerSprite) return;
         
         const endCoords = anim.end;
