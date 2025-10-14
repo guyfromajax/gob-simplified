@@ -18,20 +18,14 @@ def assign_bh_defender_coords(ball_coords, aggression_level: str, is_away_offens
         flipped = get_away_player_coords(ball_coords)
         x, y = flipped["x"], flipped["y"]
 
-    direction = -1 if is_away_offense else 1  # direction toward basket
-    
-    # X-offset direction based on which basket the offense is attacking
-    # Home offense (attacking X=90): defender moves toward X=90 (add)
-    # Away offense (attacking X=10): defender moves toward X=10 (subtract)
-    # Working in home orientation coords, then caller flips result
-    # In home coords: home offense goes right (+), away offense goes left (-)
-    # But away coords get flipped, so we want: home=+1, away=-1
+    y_direction = -1 if y > 25 else 1  # direction toward basket
     x_direction = -1 if is_away_offense else 1
+    
 
     # Edge case: ball on baseline
     if y <= 4 or y >= 46:
         # Vertical positioning doesn't depend on court orientation
-        y_def = y + (d_spacing if y < 25 else -d_spacing)
+        y_def = y + (d_spacing if y < 26 else -d_spacing)
         x_def = x  # No X spacing on baseline - defender matches ball handler's X
 
     # Edge case: top of key
@@ -41,8 +35,9 @@ def assign_bh_defender_coords(ball_coords, aggression_level: str, is_away_offens
 
     # General case
     else:
-        y_shift = direction * random.randint(1, 3)
-        y_def = y + y_shift if y < 25 else y - y_shift
+        # y_shift = y_direction * random.randint(1, 3)
+        y_def = y_direction * d_spacing
+        # y_def = y + y_shift if y < 25 else y - y_shift
         x_def = x + (x_direction * d_spacing)
 
     return {"x": x_def, "y": y_def}
@@ -55,12 +50,13 @@ def assign_non_bh_defender_coords(o_coords, ball_coords, aggression_level, is_aw
     """
 
     d_spacing_map = {"aggressive": 1, "normal": 2, "passive": 3}
-    d_spacing = d_spacing_map.get(aggression_level.lower(), 2)
-
-    direction = -1 if is_away_offense else 1  # Determines whether we add or subtract spacing in y
+    d_spacing = d_spacing_map.get(aggression_level.lower(), 2)  
 
     ox, oy = o_coords["x"], o_coords["y"]
     bx, by = ball_coords["x"], ball_coords["y"]
+
+    y_direction = -1 if oy > 25 else 1
+    x_direction = -1 if is_away_offense else 1
 
     # When the away team has the ball the offensive coordinates are flipped
     # horizontally. Convert the ball handler's coordinates back to the home
@@ -69,11 +65,6 @@ def assign_non_bh_defender_coords(o_coords, ball_coords, aggression_level, is_aw
         flipped = get_away_player_coords(ball_coords)
         bx, by = flipped["x"], flipped["y"]
 
-    # X-offset direction in home orientation (always toward X=90)
-    # Offensive coords are always in home orientation (from HCO_STRING_SPOTS)
-    # Defender positions calculated in home orientation, then caller flips for away offense
-    # In home orientation: defender to the RIGHT of offensive player (toward X=90)
-    x_direction = 1
     
     # Edge case: defending someone on the block or in the lane (score threat)
     if 74 <= ox <= 88 and 15 <= oy <= 33:
@@ -103,6 +94,6 @@ def assign_non_bh_defender_coords(o_coords, ball_coords, aggression_level, is_aw
         delta_y = by - oy
 
         x = ox + int(delta_x * 0.3) + (x_direction * d_spacing)
-        y = oy + int(delta_y * 0.3) + direction * random.choice([-1, 0, 1])
+        y = oy + int(delta_y * 0.3) + (y_direction * d_spacing)
 
         return {"x": x, "y": y}
