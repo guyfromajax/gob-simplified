@@ -421,11 +421,13 @@ class RecruitManager:
             last_name_formatted = last_name.title()
             name = f"{first_name} {last_name_formatted}"
             
-            attributes = {k: random.randint(1, 30) for k in
-                          ["SC","SH","ID","OD","PS","BH","RB","AG","ST","ND","IQ","FT"]}
+            # Select archetype with weighted probabilities
+            archetype = self._select_archetype()
+            
+            # Generate attributes, height, and weight based on archetype
+            attributes, height, weight = self._generate_recruit_profile(archetype)
             
             # Calculate position ratings for the recruit
-            height = random.randint(66, 84)  # Random height between 5'6" and 7'0"
             recruit_for_ratings = {
                 "attributes": attributes,
                 "height": height,
@@ -438,6 +440,8 @@ class RecruitManager:
                 "attributes": attributes,
                 "position_ratings": position_ratings,
                 "height": height,
+                "weight": weight,
+                "archetype": archetype,
                 "year": "Freshman", 
                 "created_at": datetime.utcnow()
             })
@@ -445,4 +449,107 @@ class RecruitManager:
         if recruits:
             self.db.recruits.delete_many({})
             self.db.recruits.insert_many(recruits)
+    
+    def _select_archetype(self):
+        """Select a recruit archetype with weighted probabilities."""
+        # Define archetypes with their selection weights
+        # Five-Star and Four-Star are rare, others are equally common
+        archetypes_weights = [
+            ("Five-Star", 2),
+            ("Four-Star", 5),
+            ("Defensive Wizard", 4.6),
+            ("All-Around Scorer", 4.6),
+            ("Classic PG", 4.6),
+            ("Classic SG", 4.6),
+            ("Classic SF", 4.6),
+            ("Classic PF", 4.6),
+            ("Classic C", 4.6),
+            ("Pure Shooter", 4.6),
+            ("Intangibles", 4.6),
+            ("Athlete", 4.6),
+            ("Inside Defender", 4.6),
+            ("Outside Defender", 4.6),
+            ("Average", 4.6),
+            ("Below Average", 4.6),
+            ("Outside Dual Threat", 4.6),
+            ("Driver", 4.6),
+            ("Outside C", 4.6),
+            ("Three & D", 4.6),
+        ]
+        
+        archetypes = [a[0] for a in archetypes_weights]
+        weights = [a[1] for a in archetypes_weights]
+        
+        return random.choices(archetypes, weights=weights, k=1)[0]
+    
+    def _generate_recruit_profile(self, archetype):
+        """Generate attributes, height, and weight for a recruit based on archetype."""
+        # Define attribute ranges
+        STRONG = (20, 40)
+        SECONDARY = (10, 40)
+        STANDARD = (1, 40)
+        WEAK = (1, 20)
+        
+        # All attributes start as STANDARD
+        ALL_ATTRS = ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "AG", "ST", "ND", "IQ", "FT", "CH"]
+        
+        # Define archetype configurations: (strong_attrs, secondary_attrs, height_range)
+        archetype_configs = {
+            "Five-Star": (ALL_ATTRS, [], (69, 80)),
+            "Four-Star": ([], ALL_ATTRS, (66, 78)),
+            "Defensive Wizard": (["ID", "OD"], ["ST", "AG"], (66, 78)),
+            "All-Around Scorer": (["SH", "SC"], ["ST", "AG"], (66, 78)),
+            "Classic PG": (["BH", "PS"], ["OD", "IQ"], (66, 78)),
+            "Classic SG": (["SH"], ["OD"], (66, 78)),
+            "Classic SF": (["SC", "OD"], ["AG"], (66, 78)),
+            "Classic PF": (["RB"], ["ST"], (70, 80)),
+            "Classic C": (["ID", "ST"], ["RB", "SC"], (72, 82)),
+            "Pure Shooter": (["SH", "FT"], [], (66, 78)),
+            "Intangibles": (["IQ", "ND", "CH"], [], (66, 78)),
+            "Athlete": (["AG", "ST", "ND"], [], (66, 78)),
+            "Inside Defender": (["ST", "ID"], [], (71, 80)),
+            "Outside Defender": (["AG", "OD"], [], (66, 77)),
+            "Average": ([], [], (66, 78)),
+            "Below Average": ([], [], (66, 78)),  # All weak
+            "Outside Dual Threat": (["SH", "AG"], [], (66, 78)),
+            "Driver": (["SC", "AG"], [], (66, 78)),
+            "Outside C": (["ST", "SH"], [], (72, 82)),
+            "Three & D": (["SH"], ["ID", "OD"], (69, 77)),
+        }
+        
+        strong_attrs, secondary_attrs, height_range = archetype_configs[archetype]
+        
+        # Generate height first (needed for weight calculation)
+        height = random.randint(height_range[0], height_range[1])
+        
+        # Generate weight based on height
+        weight = self._generate_weight(height)
+        
+        # Generate attributes
+        attributes = {}
+        for attr in ALL_ATTRS:
+            if archetype == "Below Average":
+                # All attributes are weak for Below Average
+                value = random.randint(WEAK[0], WEAK[1])
+            elif attr in strong_attrs:
+                value = random.randint(STRONG[0], STRONG[1])
+            elif attr in secondary_attrs:
+                value = random.randint(SECONDARY[0], SECONDARY[1])
+            else:
+                value = random.randint(STANDARD[0], STANDARD[1])
+            
+            attributes[attr] = value
+        
+        return attributes, height, weight
+    
+    def _generate_weight(self, height):
+        """Generate weight based on height."""
+        if height < 72:
+            return random.randint(150, 190)
+        elif 72 <= height <= 75:
+            return random.randint(170, 210)
+        elif 76 <= height <= 80:
+            return random.randint(195, 240)
+        else:  # > 80
+            return random.randint(220, 270)
 
