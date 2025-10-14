@@ -3,7 +3,7 @@
  * Handles the jump ball animation at the start of Q1 and OT periods
  */
 
-import { tweenPlayerTo } from "./animateStep.js";
+import { tweenPlayerTo } from "./ballTween.js";
 import { appendToTextScroll } from "../utils/textScroll.js";
 
 const JUMP_DURATION = 1500; // Hold for 1.5 seconds
