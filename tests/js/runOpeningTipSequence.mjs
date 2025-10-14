@@ -157,8 +157,13 @@ const turnData1 = {
 };
 
 let completed1 = false;
-await runOpeningTipSequence(scene1, turnData1, () => {
-  completed1 = true;
+await runOpeningTipSequence(scene1, {
+  playerSprites: scene1.playerSprites,
+  ballSprite: scene1.ball,
+  turnData: turnData1,
+  onComplete: () => {
+    completed1 = true;
+  }
 });
 
 // Verify results
@@ -219,8 +224,13 @@ const turnData2 = {
 };
 
 let completed2 = false;
-await runOpeningTipSequence(scene2, turnData2, () => {
-  completed2 = true;
+await runOpeningTipSequence(scene2, {
+  playerSprites: scene2.playerSprites,
+  ballSprite: scene2.ball,
+  turnData: turnData2,
+  onComplete: () => {
+    completed2 = true;
+  }
 });
 
 const result2 = {

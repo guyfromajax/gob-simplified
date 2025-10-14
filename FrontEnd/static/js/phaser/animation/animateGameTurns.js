@@ -561,7 +561,12 @@ export async function animateGameTurns({ //hasBallAtStep
         turn_index: i
       });
       await new Promise(resolve => {
-        runOpeningTipSequence(scene, turn, resolve);
+        runOpeningTipSequence(scene, {
+          playerSprites,
+          ballSprite,
+          turnData: turn,
+          onComplete: resolve
+        });
       });
       if (onUpdate) {
         try {
