@@ -48,7 +48,7 @@ function animateJumpBall(scene, animations, ballSprite, onComplete) {
     const centerAnimations = animations.filter(anim => anim.action === "TIP_JUMP");
     
     centerAnimations.forEach(anim => {
-        const playerSprite = scene.playerSprites.get(anim.playerId);
+        const playerSprite = scene.playerSprites[anim.playerId];
         if (!playerSprite) return;
         
         const jumpCoords = anim.jumpCoords;
@@ -107,7 +107,7 @@ function animateConvergence(scene, animations, ballSprite, ballLandingCoords, on
     const convergeAnimations = animations.filter(anim => anim.action === "CONVERGE_ON_BALL");
     
     convergeAnimations.forEach(anim => {
-        const playerSprite = scene.playerSprites.get(anim.playerId);
+        const playerSprite = scene.playerSprites[anim.playerId];
         if (!playerSprite) return;
         
         const endCoords = anim.end;
