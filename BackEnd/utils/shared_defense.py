@@ -20,9 +20,13 @@ def assign_bh_defender_coords(ball_coords, aggression_level: str, is_away_offens
 
     direction = -1 if is_away_offense else 1  # direction toward basket
     
-    # X-offset is always -1 in home orientation (defender to the left of ball handler)
-    # The caller will flip the result for away offense, which will put defender on the right
-    x_direction = -1
+    # X-offset direction based on which basket the offense is attacking
+    # Home offense (attacking X=90): defender moves toward X=90 (add)
+    # Away offense (attacking X=10): defender moves toward X=10 (subtract)
+    # Working in home orientation coords, then caller flips result
+    # In home coords: home offense goes right (+), away offense goes left (-)
+    # But away coords get flipped, so we want: home=+1, away=-1
+    x_direction = -1 if is_away_offense else 1
 
     # Edge case: ball on baseline
     if y <= 4 or y >= 46:
@@ -66,9 +70,9 @@ def assign_non_bh_defender_coords(o_coords, ball_coords, aggression_level, is_aw
         bx, by = flipped["x"], flipped["y"]
 
     # Determine X-offset direction based on which team is on offense
-    # Home offense (attacking right, X=91): defenders on LEFT (x - spacing)
-    # Away offense (attacking left, X=9): defenders on RIGHT (x + spacing)
-    x_direction = 1 if is_away_offense else -1
+    # Home offense (attacking X=90): defenders closer to X=90 (x + spacing)
+    # Away offense (attacking X=10): defenders closer to X=10 (x - spacing)
+    x_direction = -1 if is_away_offense else 1
     
     # Edge case: defending someone on the block or in the lane (score threat)
     if 74 <= ox <= 88 and 15 <= oy <= 33:
@@ -80,7 +84,7 @@ def assign_non_bh_defender_coords(o_coords, ball_coords, aggression_level, is_aw
     # Edge case: defending someone on the baseline
     elif oy <= 6 or oy >= 44:
         return {
-            "x": ox + (x_direction * random.randint(1, 3)),
+            "x": ox,  # No X spacing on baseline - defender matches offensive player's X
             # Vertical offset shouldn't flip when court orientation changes
             "y": oy + (d_spacing if oy < 25 else -d_spacing)
         }
