@@ -19,23 +19,27 @@ def assign_bh_defender_coords(ball_coords, aggression_level: str, is_away_offens
         x, y = flipped["x"], flipped["y"]
 
     direction = -1 if is_away_offense else 1  # direction toward basket
+    
+    # X-offset is always -1 in home orientation (defender to the left of ball handler)
+    # The caller will flip the result for away offense, which will put defender on the right
+    x_direction = -1
 
     # Edge case: ball on baseline
     if y <= 4 or y >= 46:
         # Vertical positioning doesn't depend on court orientation
         y_def = y + (d_spacing if y < 25 else -d_spacing)
-        x_def = x
+        x_def = x + (x_direction * d_spacing)
 
     # Edge case: top of key
     elif 62 <= x <= 66 and 22 <= y <= 28:
-        x_def = x - d_spacing
+        x_def = x + (x_direction * d_spacing)
         y_def = y
 
     # General case
     else:
         y_shift = direction * random.randint(1, 3)
         y_def = y + y_shift if y < 25 else y - y_shift
-        x_def = x - d_spacing
+        x_def = x + (x_direction * d_spacing)
 
     return {"x": x_def, "y": y_def}
 
