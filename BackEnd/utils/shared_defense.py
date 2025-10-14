@@ -90,8 +90,8 @@ def assign_non_bh_defender_coords(o_coords, ball_coords, aggression_level, is_aw
 
     # General rule: mirror ball spacing, maintain triangle
     else:
-        delta_x = bx - ox
-        delta_y = by - oy
+        delta_x = abs(bx - ox)
+        delta_y = abs(by - oy)
 
         x = ox + int(delta_x * 0.3) + (x_direction * d_spacing)
         y = oy + int(delta_y * 0.3) + (y_direction * d_spacing)
