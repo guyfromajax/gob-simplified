@@ -338,7 +338,11 @@ class FranchiseManager:
         return {"Freshman": "Sophomore", "Sophomore": "Junior", "Junior": "Senior"}.get(year, year)
 
     def generate_recruits(self):
-        """Generate recruits and save them to the franchise document."""
+        """
+        Generate recruits and save them to the franchise document.
+        Each franchise gets its own unique recruit pool with 40 players.
+        Recruits are stored in the franchise.recruits field for isolation.
+        """
         recruits = self.recruit_manager.generate_recruits_list()
         if self.franchise_id:
             self.db.franchises.update_one(
