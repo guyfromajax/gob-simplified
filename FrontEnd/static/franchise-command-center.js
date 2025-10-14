@@ -125,6 +125,9 @@ function renderRecruits(data) {
     
     return {
       name: r.name,
+      archetype: r.archetype || '--',
+      height: formatHeight(r.height),
+      weight: r.weight ?? '--',
       pos: best.pos,
       rt: best.rating,
       attributes: a
@@ -138,7 +141,7 @@ function renderRecruits(data) {
   recruits.forEach(r => {
     const tr = document.createElement('tr');
     const a = r.attributes;
-    tr.innerHTML = `<td>${r.name}</td><td>${r.pos}</td><td>${a.SC}</td><td>${a.SH}</td><td>${a.ID}</td><td>${a.OD}</td><td>${a.PS}</td><td>${a.BH}</td><td>${a.RB}</td><td>${a.AG}</td><td>${a.ST}</td><td>${a.ND}</td><td>${a.IQ}</td><td>${a.FT}</td><td>${r.rt ?? '-'}</td>`;
+    tr.innerHTML = `<td>${r.name}</td><td>${r.archetype}</td><td>${r.height}</td><td>${r.weight}</td><td>${r.pos}</td><td>${a.SC}</td><td>${a.SH}</td><td>${a.ID}</td><td>${a.OD}</td><td>${a.PS}</td><td>${a.BH}</td><td>${a.RB}</td><td>${a.AG}</td><td>${a.ST}</td><td>${a.ND}</td><td>${a.IQ}</td><td>${a.FT}</td><td>${r.rt ?? '-'}</td>`;
     tbody.appendChild(tr);
   });
 }
