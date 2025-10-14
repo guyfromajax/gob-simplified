@@ -714,8 +714,20 @@ def user_team_player_stats_endpoint(
 
 
 @router.get("/franchise/recruits")
-def recruits():
-    recs = list(db.recruits.find({}, {"_id": 0}).limit(40))
+def recruits(franchise_id: str = Query(...)):
+    """Get recruits for a specific franchise."""
+    from bson import ObjectId
+    
+    # Get recruits from franchise document
+    franchise = db.franchises.find_one(
+        {"_id": ObjectId(franchise_id)}, 
+        {"recruits": 1}
+    )
+    
+    if not franchise:
+        return {"recruits": []}
+    
+    recs = franchise.get("recruits", [])
     return {"recruits": recs}
 
 
