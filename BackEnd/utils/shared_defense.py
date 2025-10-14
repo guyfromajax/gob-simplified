@@ -28,7 +28,7 @@ def assign_bh_defender_coords(ball_coords, aggression_level: str, is_away_offens
     if y <= 4 or y >= 46:
         # Vertical positioning doesn't depend on court orientation
         y_def = y + (d_spacing if y < 25 else -d_spacing)
-        x_def = x + (x_direction * d_spacing)
+        x_def = x  # No X spacing on baseline - defender matches ball handler's X
 
     # Edge case: top of key
     elif 62 <= x <= 66 and 22 <= y <= 28:
