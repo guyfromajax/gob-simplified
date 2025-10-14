@@ -209,7 +209,6 @@ def simulate_quarter(
             gm.defense_team = gm.away_team
         
         # Check for defensive pressure on the inbound
-        from BackEnd.models.turn_manager import TurnManager
         pressure_type = gm.turn_manager.determine_defensive_pressure_type()
         gm.game_state["offensive_state"] = pressure_type
         print(f"🏀 Q{q} start: {gm.offense_team.name} gets possession (lost opening tip) - Defense: {pressure_type}")
@@ -224,7 +223,6 @@ def simulate_quarter(
             gm.defense_team = gm.home_team
         
         # Check for defensive pressure on the inbound
-        from BackEnd.models.turn_manager import TurnManager
         pressure_type = gm.turn_manager.determine_defensive_pressure_type()
         gm.game_state["offensive_state"] = pressure_type
         print(f"🏀 Q{q} start: {gm.offense_team.name} gets possession (won opening tip) - Defense: {pressure_type}")
