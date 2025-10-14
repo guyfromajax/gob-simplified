@@ -4,6 +4,7 @@ import { runPass, REBOUND_DEBUG } from "./ballManager.js";
 import animationConfig from "./animation_config.js";
 import runFreeThrowSequence from "./freeThrow.js";
 import runFastBreakSequence from "./fastBreak.js";
+import { runOpeningTipSequence } from "./openingTip.js";
 import { handleTurnover } from "./turnoverAdapter.js";
 import { States } from "../state/gameStateMachine.js";
 import { appendToTextScroll } from "../utils/textScroll.js";
@@ -29,6 +30,7 @@ const NON_STANDARD_RESULTS = new Set([
   "PUTBACK_MISS",
   "OREB_KICKOUT",
   "DEFENSIVE_STOP",
+  "OPENING_TIP",
 ]);
 
 let normalizeTurnModulePromise = null;
@@ -539,6 +541,28 @@ export async function animateGameTurns({ //hasBallAtStep
 
     if (turn.result_type === "TURNOVER") {
       await handleTurnover(scene, { playerSprites, ballSprite, turnData: turn, onUpdate });
+      if (onUpdate) {
+        try {
+          onUpdate(turn);
+        } catch (err) {
+          console.error('Scoreboard update failed:', err);
+        }
+      }
+      updateDebugScore(turn, { turnIndex: i, possessionId });
+      continue;
+    }
+
+    // Opening tip at start of Q1 and OT
+    if (turn.result_type === "OPENING_TIP") {
+      animationDebugLog('OPENING TIP DETECTED - routing to runOpeningTipSequence:', {
+        result_type: turn.result_type,
+        winner: turn.winner,
+        home_wins: turn.home_wins,
+        turn_index: i
+      });
+      await new Promise(resolve => {
+        runOpeningTipSequence(scene, turn, resolve);
+      });
       if (onUpdate) {
         try {
           onUpdate(turn);
