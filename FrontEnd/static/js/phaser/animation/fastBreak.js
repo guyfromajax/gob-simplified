@@ -82,8 +82,30 @@ export async function runFastBreakSequence({
     
     if (!movements || movements.length === 0) continue;
     
-    // Animate all players simultaneously to next timestamp
-    await animateStep(scene, playerSprites, ballSprite, movements, duration, width, height);
+    // Create promises for all player movements at this timestamp
+    const promises = [];
+    const currentBallOwnerRef = { value: null };
+    
+    for (const movement of movements) {
+      const sprite = playerSprites[movement.playerId];
+      if (!sprite) continue;
+      
+      // Call animateStep for each player individually
+      const promise = animateStep({
+        scene,
+        sprite,
+        step: movement,  // Each movement has coords, action
+        duration,
+        ballSprite,
+        currentBallOwnerRef,
+        onAction: null
+      });
+      
+      promises.push(promise);
+    }
+    
+    // Wait for all players to complete movement simultaneously
+    await Promise.all(promises);
   }
   
   if (scene.skipToEnd) return;
