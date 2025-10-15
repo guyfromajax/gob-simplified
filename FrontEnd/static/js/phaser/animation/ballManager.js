@@ -317,6 +317,14 @@ export function shootBall({
 
   ballSprite.setPosition(start.x, start.y);
   ballSprite.setVisible(true);
+  
+  console.log('🏀 shootBall: Ball positioned and visible', {
+    position: { x: start.x, y: start.y },
+    visible: ballSprite.visible,
+    rimTarget: rim,
+    duration,
+    result
+  });
 
   if (SHOT_DEBUG) {
     const endTs = startTimestamp + duration;
@@ -330,15 +338,18 @@ export function shootBall({
         `ts=${startTimestamp}->${endTs} outcome=${result || "UNKNOWN"} source=${outcomeSource}`
     );
   }
+  
+  console.log('🏀 shootBall: Creating tween for ball flight');
 
   return new Promise((resolve) => {
-    scene.tweens.add({
+    const tween = scene.tweens.add({
       targets: ballSprite,
       x: rim.x,
       y: rim.y,
       duration,
       ease: "Sine.easeInOut",
       onComplete: () => {
+        console.log('🏀 shootBall: Tween completed, result:', result);
         if (result === "MAKE") {
           console.log("score");
           console.log("rimHoldStart");
