@@ -57,6 +57,9 @@ def assign_non_bh_defender_coords(o_coords, ball_coords, aggression_level, is_aw
 
     y_direction = -1 if oy > 25 else 1
     x_direction = -1 if is_away_offense else 1
+    print("Inside assign_non_bh_defender_coords")
+    print(f"is_away_offense: {is_away_offense}")
+    print(f"x_direction: {x_direction}")
 
     # When the away team has the ball the offensive coordinates are flipped
     # horizontally. Convert the ball handler's coordinates back to the home
@@ -85,7 +88,7 @@ def assign_non_bh_defender_coords(o_coords, ball_coords, aggression_level, is_aw
     elif 62 <= bx <= 66 and 22 <= by <= 28:
         return {
             "x": ox + (x_direction * random.randint(2, 4)),
-            "y": oy + y_direction * (1 if oy < 25 else -1)
+            "y": oy + y_direction * random.randint(1, 3)
         }
 
     # General rule: mirror ball spacing, maintain triangle
