@@ -141,6 +141,12 @@ class GameManager:
                 print(f"📦 OREB turn created: {oreb_turn.get('result_type')} - {oreb_turn.get('text')}")
                 self.turns.append(oreb_turn)
                 self.text_log.append(oreb_turn["text"])
+                
+                # Handle possession flip for OREB turn (doesn't go through run_micro_turn)
+                if oreb_turn.get("possession_flips"):
+                    print(f"📦 OREB turn flipping possession")
+                    self.switch_possession()
+                
                 # Clear the pending OREB
                 self.game_state["pending_oreb"] = None
                 
