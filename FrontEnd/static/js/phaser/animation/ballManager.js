@@ -249,8 +249,12 @@ export function shootBall({
   // CRITICAL: Stop BallController from following player during shot animation
   // Without this, the ball will be repositioned to player's position every frame,
   // overriding the tween and making the shot appear as a teleport
-  if (scene.ballController && typeof scene.ballController.stopFollowingPlayer === 'function') {
-    scene.ballController.stopFollowingPlayer();
+  if (scene.ballController) {
+    if (typeof scene.ballController.stopFollowingPlayer === 'function') {
+      scene.ballController.stopFollowingPlayer();
+    }
+    // Also set isAttached to false to prevent followCallback from running
+    scene.ballController.isAttached = false;
     
     // Set a flag to prevent re-attachment during shot
     scene._shotInProgress = true;
