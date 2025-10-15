@@ -245,6 +245,13 @@ export function shootBall({
   if (scene?.stateMachine?.is(States.FreeThrow)) return Promise.resolve();
   cancelBallTween(scene, ballSprite);
   clearCurrentOwner(scene);
+  
+  // CRITICAL: Stop BallController from following player during shot animation
+  // Without this, the ball will be repositioned to player's position every frame,
+  // overriding the tween and making the shot appear as a teleport
+  if (scene.ballController && typeof scene.ballController.stopFollowingPlayer === 'function') {
+    scene.ballController.stopFollowingPlayer();
+  }
   const stateMachine = scene.stateMachine;
   if (stateMachine) {
     const prevState = stateMachine.state;
