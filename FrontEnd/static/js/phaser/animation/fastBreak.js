@@ -216,16 +216,27 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
   
   // Move primary defender
   // Check top-level defender field first (from shot_manager), then roles.defense array
-  const defenderData = turnData.defender || (turnData.roles?.defense && turnData.roles.defense[0]);
-  const defenderId = defenderData?.player_id || defenderData;
+  let defenderData = turnData.defender || (turnData.roles?.defense && turnData.roles.defense[0]);
+  
+  // Extract player_id properly - backend sends Player object
+  let defenderId = null;
+  if (defenderData) {
+    if (typeof defenderData === 'string') {
+      defenderId = defenderData;
+    } else if (defenderData.player_id) {
+      defenderId = defenderData.player_id;
+    } else if (defenderData.playerId) {
+      defenderId = defenderData.playerId;
+    }
+  }
+  
   const defenderSprite = defenderId ? playerSprites[defenderId] : null;
   
   console.log("🏀 FB Shot - Defender lookup:", {
     defenderData,
     defenderId,
     hasSprite: !!defenderSprite,
-    turnDataDefender: turnData.defender,
-    rolesDefense: turnData.roles?.defense
+    defenderDataType: typeof defenderData
   });
   
   if (defenderSprite) {
