@@ -576,7 +576,7 @@ export async function animateGameTurns({ //hasBallAtStep
       // Transition to HalfCourt state after opening tip completes
       // This ensures the next turn (first possession) starts in correct state
       if (scene.stateMachine && !scene.stateMachine.is(States.HalfCourt)) {
-        const { safeTransition } = await import('./gameStateMachine.js');
+        const { safeTransition } = await import('../state/gameStateMachine.js');
         safeTransition(scene.stateMachine, States.HalfCourt, {
           reason: 'opening_tip_complete',
           currentOwnerId: getCurrentOwner(scene),
