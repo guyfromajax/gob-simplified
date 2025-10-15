@@ -372,6 +372,16 @@ def tournament_state(tournament_id: str):
     doc = tournaments_collection.find_one({"_id": tid})
     if not doc:
         raise HTTPException(status_code=404, detail="Tournament not found")
+    
+    # Add user team chemistry if user_team_id is present
+    user_team_id = doc.get("user_team_id")
+    if user_team_id:
+        team_doc = db.teams.find_one({"name": user_team_id}) or {}
+        doc["team_chemistry"] = team_doc.get("team_chemistry", 0)
+        doc["offense"] = team_doc.get("offense", "-")
+        doc["defense"] = team_doc.get("defense", "-")
+        doc["athleticism"] = team_doc.get("athleticism", "-")
+    
     return jsonable_encoder(doc, custom_encoder={ObjectId: str})
 
 

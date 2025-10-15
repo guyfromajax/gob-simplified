@@ -10,10 +10,11 @@ class MockPlayer:
         self.name = f"{self.first_name} {self.last_name}"
         self.attributes = {
             k: v for k, v in player_dict.items()
-            if k not in {"first_name", "last_name", "team"}
+            if k not in {"first_name", "last_name", "team", "height"}
         }
         self.stats = {"game": {}}
         self.team = player_dict["team"]
+        self.height = player_dict.get("height", 78)  # Default 6'6" (78 inches)
         
 
     def record_stat(self, stat, amount=1):

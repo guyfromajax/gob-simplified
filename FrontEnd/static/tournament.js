@@ -407,6 +407,31 @@ function updateCTA() {
   }
 }
 
+function updateTeamChemistry() {
+  if (!tournament) return;
+  
+  const chemistryBar = document.querySelector('.chemistry-bar');
+  if (chemistryBar) {
+    const chemistry = tournament.team_chemistry || 0;
+    chemistryBar.textContent = `${chemistry} / 25`;
+  }
+  
+  // Update other team stats if available
+  const offenseEl = document.querySelector('#top-center .team-stats > div:nth-child(1)');
+  const athleticismEl = document.querySelector('#top-center .team-stats > div:nth-child(2)');
+  const defenseEl = document.querySelector('#top-center .team-stats > div:nth-child(3)');
+  
+  if (offenseEl && tournament.offense) {
+    offenseEl.textContent = `Offense: ${tournament.offense}`;
+  }
+  if (athleticismEl && tournament.athleticism) {
+    athleticismEl.textContent = `Athleticism: ${tournament.athleticism}`;
+  }
+  if (defenseEl && tournament.defense) {
+    defenseEl.textContent = `Defense: ${tournament.defense}`;
+  }
+}
+
 function initTopAssets(teamName) {
   const formattedName = formatTeamName(teamName || userTeamId || "");
   const logoEl = document.getElementById("user-team-logo");
@@ -508,6 +533,7 @@ function handleTournamentUpdate(doc) {
     });
   tournament = doc;
   localStorage.setItem("activeTournament", JSON.stringify(doc));
+  updateTeamChemistry();
   renderBracket();
   renderRoster();
   renderStats();
@@ -523,6 +549,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     localStorage.setItem("userTeamId", tournament.user_team_id);
   }
   initTopAssets(userTeamId);
+  updateTeamChemistry();
   await loadRoster();
   renderBracket();
   renderRoster();

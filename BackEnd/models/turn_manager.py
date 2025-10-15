@@ -35,7 +35,9 @@ from BackEnd.engine.phase_resolution import (
     resolve_fast_break_logic, 
     resolve_free_throw_logic, 
     resolve_turnover_logic, 
-    calculate_foul_turnover
+    calculate_foul_turnover,
+    resolve_full_court_press_logic,
+    resolve_half_court_trap_logic
 )
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
@@ -76,17 +78,17 @@ class TurnManager:
 
         self.logger.log("sideInbound:start")
 
-        # Baseline spot for the inbounder (SF). These coordinates assume the
+        # Sideline spot for the inbounder (SF). These coordinates assume the
         # home team is on offense. They will be mirrored if the away team has
-        # the ball.
-        inbound_spot_home = {"x": 47, "y": 25}
+        # the ball. Y=51 is out of bounds at the top of the court.
+        inbound_spot_home = {"x": 47, "y": 48}
 
         # Destination ranges for other offensive players (home orientation).
         home_ranges = {
-            "PG": {"x": (50, 54), "y": (22, 28)},
-            "SG": {"x": (54, 58), "y": (18, 32)},
-            "PF": {"x": (54, 58), "y": (30, 36)},
-            "C":  {"x": (54, 58), "y": (14, 20)},
+            "PG": {"x": (50, 54), "y": (37, 43)},
+            "SG": {"x": (55, 64), "y": (18, 32)},
+            "PF": {"x": (65, 80), "y": (26, 36)},
+            "C":  {"x": (65, 80), "y": (14, 24)},
         }
 
         o_dest_home = {}
@@ -107,26 +109,18 @@ class TurnManager:
         bh_coords = o_dest["PG"]
 
         # --- Defensive positioning ---
+        # Fixed positions for home team defense (when home is defending)
         self.logger.log("defenseUpdate:start")
-        d_dest = {}
-        for pos, defender in defense_team.lineup.items():
-            if pos == "PG":
-                d_coords = assign_bh_defender_coords(
-                    bh_coords, aggression, is_away_offense
-                )
-                if is_away_offense:
-                    d_coords = getAwayTeamCoords({"tmp": d_coords})["tmp"]
-                d_dest[pos] = d_coords
-            elif pos in o_dest:
-                o_coords = o_dest[pos]
-                # Convert offensive coords back to home orientation for calc
-                o_calc = getAwayTeamCoords({"tmp": o_coords})["tmp"] if is_away_offense else o_coords
-                d_coords = assign_non_bh_defender_coords(
-                    o_calc, bh_coords, aggression, is_away_offense
-                )
-                if is_away_offense:
-                    d_coords = getAwayTeamCoords({"tmp": d_coords})["tmp"]
-                d_dest[pos] = d_coords
+        d_dest_home = {
+            "PG": {"x": 60, "y": 25},
+            "SG": {"x": 64, "y": 33},
+            "SF": {"x": 66, "y": 17},
+            "PF": {"x": 80, "y": 25},
+            "C": {"x": 85, "y": 28}
+        }
+        
+        # Flip defensive coordinates if away team is defending (home team has ball)
+        d_dest = getAwayTeamCoords(d_dest_home.copy()) if is_away_offense else d_dest_home
         self.logger.log("defenseUpdate:end")
 
         payload = {
@@ -243,12 +237,13 @@ class TurnManager:
         # STEP 1: Set strategy calls (tempo + aggression)
         self.set_strategy_calls()
 
-        print("*****RUN TURN*****")
         state = self.game.game_state.get("offensive_state", "HCO")
-        print(f"offensive state: {state}")
-        if state in ["HCO", "HALF_COURT"]:
-            print(f"{self.game.offense_team.name}: {self.game.game_state['current_playcall']}")
-            print(f"{self.game.defense_team.name}: {self.game.game_state['defense_playcall']}")
+        turn_num = self.game.micro_turn_count
+        time_remaining = self.game.game_state.get("clock", "N/A")
+        print(f"***** RUN TURN, turn number: {turn_num}, time remaining: {time_remaining}, offensive state: {state} *****")
+        # if state in ["HCO", "HALF_COURT"]:
+        #     print(f"{self.game.offense_team.name}: {self.game.game_state['current_playcall']}")
+        #     print(f"{self.game.defense_team.name}: {self.game.game_state['defense_playcall']}")
 
         # STEP 3: Route based on offensive state
         if state == "FREE_THROW":
@@ -257,15 +252,17 @@ class TurnManager:
             self.logger.log("fb:start")
             self.game.game_state["fastBreakInProgress"] = True
             result = resolve_fast_break_logic(self.game)
+        elif state == "FCP":
+            self.logger.log("fcp:start")
+            result = resolve_full_court_press_logic(self.game)
+        elif state == "HCT":
+            self.logger.log("hct:start")
+            result = resolve_half_court_trap_logic(self.game)
         else:
             calls = self.set_playcalls()
             self.game.game_state["current_playcall"] = calls["offense"]
             self.game.game_state["defense_playcall"] = calls["defense"]
             result = self.resolve_half_court_offense()
-
-        print("Inside run_micro_turn // coming out of resolve offensive state functions")
-        print(f"offense team id: {self.game.offense_team.team_id}")
-        print(f"defense team id: {self.game.defense_team.team_id}")
 
         # Record possession team before any potential flip
         result["starting_possession_team_id"] = self.game.offense_team.team_id
@@ -274,6 +271,12 @@ class TurnManager:
         try:
             self.update_clock_and_possession(result)
             self.logger.log_turn_result(result)
+            
+            # Update offensive_state based on next_play_type (e.g., after FCP/HCT)
+            next_play = result.get("next_play_type")
+            if next_play:
+                self.game.game_state["offensive_state"] = next_play
+                
         finally:
             if state == "FAST_BREAK":
                 self.logger.log("fb:end")
@@ -330,6 +333,18 @@ class TurnManager:
         result["turn_count"] = self.game.micro_turn_count
         # result["possession_team_id"] = self.game.offense_team.team_id
         update_player_coords_from_animations(self.game, result["animations"])
+        
+        # Print turn result summary for debugging
+        turn_num = self.game.micro_turn_count
+        result_type = result.get("result_type", "N/A")
+        next_play_type = result.get("next_play_type", "None")
+        next_defensive_setup = result.get("next_defensive_setup", "None")
+        text = result.get("text", "")
+        possession_flips = result.get("possession_flips", False)
+        print(f"Turn {turn_num} RESULT: {result_type} | Next: {next_play_type} | Defense Setup: {next_defensive_setup} | Possession Flips: {possession_flips}")
+        print(f"Turn {turn_num} TEXT: {text}")
+        
+        # self._print_turn_summary(result, state)
 
         result["home_lineup"] = serialize_lineup(self.game.home_team.lineup)
         result["away_lineup"] = serialize_lineup(self.game.away_team.lineup)
@@ -375,17 +390,20 @@ class TurnManager:
         if not result.get("text") or result.get("text").strip() == "":
             result["text"] = "No text in this turn"
 
-        print(f"inside run_micro_turn result: {result}")
-        # print(f"result: {result}")
+        # print(f"inside run_micro_turn result: {result}")
+        
         return result
 
 
     def set_playcalls(self):
+        # print(f"🎲 Playcall weights: {self.game.offense_team.playcall_weights}")
 
         chosen_playcall = weighted_random_from_dict(self.game.offense_team.playcall_weights)
         defense_setting = self.game.defense_team.strategy_settings["defense"]
         chosen_defense = random.choice(STRATEGY_CALL_DICTS["defense"][defense_setting])
 
+        # print(f"🎲 Chosen playcall: {chosen_playcall}")
+        
         # Track usage
         self.game.offense_team.playcall_tracker[chosen_playcall] += 1
         self.game.defense_team.defense_playcall_tracker[chosen_defense] += 1
@@ -419,6 +437,133 @@ class TurnManager:
     
     def resolve_turnover(self):
         return resolve_turnover_logic(self.game)
+    
+    def resolve_offensive_rebound_turn(self):
+        """
+        Process an offensive rebound as a separate turn.
+        This is called after a MISS turn that had an OREB.
+        
+        Returns a turn result for: PUTBACK_MAKE, PUTBACK_MISS, or KICKOUT
+        """
+        from BackEnd.utils.shared import resolve_offensive_rebound, get_name_safe, unpack_game_context
+        from BackEnd.models.shot_manager import ShotManager
+        
+        pending_oreb = self.game.game_state.get("pending_oreb")
+        if not pending_oreb:
+            return None
+        
+        rebounder = pending_oreb["rebounder"]
+        game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(self.game)
+        
+        # Resolve what happens with the offensive rebound
+        oreb_event = resolve_offensive_rebound(self.game, rebounder)
+        
+        if oreb_event["event_type"] == "PUTBACK_ATTEMPT":
+            self.logger.log("putbackStart")
+            self.logger.log(oreb_event["result"].lower())
+            
+            # Build roles for the putback shot (for animation and three-point determination)
+            # Putback shots don't have a skeleton, so we'll use current coords
+            defender_pos = ["C", "PF", "SF"][0]  # Simplified - closest big
+            defender = def_lineup.get(defender_pos, list(def_lineup.values())[0])
+            
+            putback_roles = {
+                "shooter": rebounder,
+                "ball_handler": rebounder,
+                "defender": defender,
+                "passer": None,
+                "screener": None,
+                "steps": [],  # No skeleton for putbacks
+            }
+            
+            if oreb_event["result"] == "MAKE":
+                text = f"{get_name_safe(rebounder)} goes back up and puts it in!"
+                possession_flips = True
+                # Check for defensive pressure opportunity (FCP/HCT) after putback make
+                pressure_type = self.determine_defensive_pressure_type()
+                game_state["offensive_state"] = pressure_type
+                
+                return {
+                    "result_type": "PUTBACK_MAKE",
+                    "ball_handler": rebounder,
+                    "shooter": rebounder,
+                    "defender": defender,
+                    "text": text,
+                    "possession_flips": possession_flips,
+                    "time_elapsed": oreb_event.get("timeElapsed", 3),
+                    "points": oreb_event.get("points", 2),
+                    "scoring_team": off_team.name,
+                    "next_defensive_setup": pressure_type,
+                    "animations": [],  # Putbacks use simple animation, not skeleton
+                    "rebounderId": getattr(rebounder, "player_id", None),
+                }
+            else:
+                # Putback missed - check for rebound
+                text = f"{get_name_safe(rebounder)} goes back up but misses."
+                possession_flips = oreb_event.get("possession_flips", False)
+                
+                result = {
+                    "result_type": "PUTBACK_MISS",
+                    "ball_handler": rebounder,
+                    "shooter": rebounder,
+                    "defender": defender,
+                    "text": text,
+                    "possession_flips": possession_flips,
+                    "time_elapsed": oreb_event.get("timeElapsed", 3),
+                    "animations": [],
+                    "rebounderId": getattr(rebounder, "player_id", None),
+                }
+                
+                # Check if there's another rebound
+                if oreb_event.get("rebound"):
+                    rebound_data = oreb_event["rebound"]
+                    result["rebound_type"] = rebound_data.get("rebound_type", "DREB")
+                    result["rebounderId"] = rebound_data.get("rebounderId")
+                    
+                    rebounder_id = rebound_data.get("rebounderId")
+                    new_rebounder = None
+                    for player in list(off_team.get_all_players()) + list(def_team.get_all_players()):
+                        if getattr(player, "player_id", None) == rebounder_id:
+                            new_rebounder = player
+                            break
+                    
+                    if new_rebounder:
+                        text += f" {get_name_safe(new_rebounder)} grabs the rebound."
+                        result["text"] = text
+                    
+                    # If it's another OREB, set pending for next turn
+                    if rebound_data.get("rebound_type") == "OREB" and new_rebounder:
+                        game_state["pending_oreb"] = {
+                            "rebounder": new_rebounder,
+                            "rebounder_id": rebounder_id,
+                        }
+                    elif rebound_data.get("rebound_type") == "DREB":
+                        # Defensive rebound - check for fast break
+                        from BackEnd.utils.shared import get_fast_break_chance
+                        import random
+                        next_play_type = "FAST_BREAK" if random.random() < get_fast_break_chance(self.game) else "HCO"
+                        game_state["offensive_state"] = next_play_type
+                        result["next_play_type"] = next_play_type
+                
+                return result
+        
+        else:
+            # Kickout
+            self.logger.log("kickoutStart")
+            pg = off_team.lineup.get("PG")
+            text = f"{get_name_safe(rebounder)} kicks it out to reset."
+            game_state["offensive_state"] = "HCO"
+            
+            return {
+                "result_type": "OREB_KICKOUT",
+                "ball_handler": rebounder,
+                "text": text,
+                "possession_flips": False,
+                "time_elapsed": oreb_event.get("timeElapsed", 2),
+                "animations": [],
+                "rebounderId": getattr(rebounder, "player_id", None),
+                "pgId": getattr(pg, "player_id", None) if pg else None,
+            }
 
     def update_clock_and_possession(self, result):
         # 🕒 Reduce clock by time_elapsed
@@ -488,8 +633,107 @@ class TurnManager:
         def_lineup = def_team.lineup
         tempo_call = off_team.strategy_calls["tempo_call"]
 
-        # --- Step 1: Pick scene and step count
-        scene = random.choice(INSIDE_SCENES)
+        # --- Step 1: Pick scene based on playcall
+        from BackEnd.playcall_skeletons.outside_skeletons import OUTSIDE_SCENES
+        from BackEnd.playcall_skeletons.attack_skeletons import ATTACK_SCENES
+        from BackEnd.playcall_skeletons.set_play_skeletons import SET_PLAY_SCENES
+        from BackEnd.playcall_skeletons.freelance_skeletons import FREELANCE_SCENES
+        from BackEnd.playcall_skeletons.base_skeletons import BASE_SCENES
+        
+        def derive_roles_from_steps(steps, off_lineup):
+            """
+            Derive shooter, screener, passer, pass_sequence, and ball handler tracking from step actions.
+            Eliminates need for pre-defined fields in skeletons.
+            """
+            from BackEnd.constants import HCO_STRING_SPOTS
+            
+            shooter_pos = None
+            screener_pos = None
+            pass_sequence = []
+            ball_owner_by_step = []
+            ball_handler_coords_by_step = []
+            
+            current_owner_pos = None
+            
+            for step in steps:
+                pos_actions = step.get("pos_actions", {})
+                step_owner = None
+                step_coords = None
+                
+                # Find who has ball at this step by checking actions
+                for pos, action_info in pos_actions.items():
+                    action = action_info.get("action", "")
+                    
+                    # Ball handler actions indicate possession
+                    if action in ["handle_ball", "receive", "shoot", "pass"]:
+                        step_owner = pos
+                        step_coords = HCO_STRING_SPOTS.get(action_info.get("spot", "key"), {"x": 64, "y": 25})
+                        
+                        # Track pass sequence transitions
+                        if action == "receive":
+                            # Ball is being received - add previous owner to sequence
+                            if current_owner_pos and current_owner_pos not in pass_sequence:
+                                pass_sequence.append(current_owner_pos)
+                            current_owner_pos = pos
+                        elif action == "shoot":
+                            # Shooting - this is the shooter
+                            shooter_pos = pos
+                            if current_owner_pos and current_owner_pos not in pass_sequence:
+                                pass_sequence.append(current_owner_pos)
+                        elif action == "handle_ball":
+                            # Initial ball handler
+                            if current_owner_pos is None:
+                                current_owner_pos = pos
+                        
+                        break  # Found ball handler for this step
+                    
+                    # Track screener
+                    if action == "screen" and screener_pos is None:
+                        screener_pos = pos
+                
+                # Store ball owner and coords for this step
+                ball_owner_by_step.append(step_owner or current_owner_pos)
+                ball_handler_coords_by_step.append(step_coords)
+            
+            # After processing all steps, finalize derived roles
+            # Add shooter to end of pass sequence
+            if shooter_pos and shooter_pos not in pass_sequence:
+                pass_sequence.append(shooter_pos)
+            
+            # Derive passer (second-to-last in sequence)
+            passer_pos = pass_sequence[-2] if len(pass_sequence) >= 2 else None
+            
+            # If no shooter found, use final ball handler
+            if not shooter_pos and ball_owner_by_step:
+                final_owner = ball_owner_by_step[-1]
+                shooter_pos = final_owner if isinstance(final_owner, str) else None
+            
+            # If no screener, default to PF
+            if not screener_pos:
+                screener_pos = "PF"
+            
+            return {
+                "shooter_pos": shooter_pos,
+                "screener_pos": screener_pos,
+                "passer_pos": passer_pos,
+                "pass_sequence": pass_sequence,
+                "ball_owner_by_step": ball_owner_by_step,
+                "ball_handler_coords_by_step": ball_handler_coords_by_step
+            }
+        
+        playcall_scenes_map = {
+            "Inside": INSIDE_SCENES,
+            "Outside": OUTSIDE_SCENES,
+            "Attack": ATTACK_SCENES,
+            "Set": SET_PLAY_SCENES,
+            "Freelance": FREELANCE_SCENES,
+            "Base": BASE_SCENES
+        }
+        
+        scenes_list = playcall_scenes_map.get(off_call, INSIDE_SCENES)
+        scene = random.choice(scenes_list)
+        # print(f"🎬 assign_roles using '{off_call}' skeleton with {len(scene['steps'])} steps")
+        
         tempo_to_steps = {"slow": 7, "normal": 5, "fast": 4}
         requested = tempo_to_steps.get(tempo_call.lower(), len(scene["steps"]))
 
@@ -527,14 +771,17 @@ class TurnManager:
                     shooter = off_lineup[event["by"]]
                     touch_counts[shooter] += 1
 
-        # --- Step 4: Determine primary roles
-        shooter_pos = scene["primary_shooter"]
-        screener_pos = scene["screener"]
-        pass_chain = scene["pass_sequence"]
-
-        passer_pos = pass_chain[-2] if len(pass_chain) >= 2 else ""
+        # --- Step 4: Derive primary roles from steps (replaces skeleton-defined fields)
+        derived_roles = derive_roles_from_steps(steps, off_lineup)
+        
+        shooter_pos = derived_roles["shooter_pos"]
+        screener_pos = derived_roles["screener_pos"]
+        passer_pos = derived_roles["passer_pos"]
+        pass_chain = derived_roles["pass_sequence"]
+        
+        # Override passer if it conflicts with shooter/screener
         if passer_pos in [shooter_pos, screener_pos]:
-            passer_pos = ""
+            passer_pos = None
 
         if game_state["defense_playcall"] == "Zone":
             defender_pos = random.choice(list(def_lineup))
@@ -542,10 +789,10 @@ class TurnManager:
             defender_pos = shooter_pos
 
         # --- Step 5: Lookup player objects
-        shooter = off_lineup[shooter_pos]
-        screener = off_lineup[screener_pos]
+        shooter = off_lineup.get(shooter_pos) if shooter_pos else off_lineup["PG"]  # Fallback to PG
+        screener = off_lineup.get(screener_pos) if screener_pos else off_lineup["PF"]  # Fallback to PF
         passer = off_lineup.get(passer_pos)
-        defender = def_lineup[defender_pos]
+        defender = def_lineup.get(defender_pos) if defender_pos else def_lineup["PG"]
 
         return {
             "shooter": shooter,
@@ -556,7 +803,9 @@ class TurnManager:
             "defender": defender,
             "steps": steps,
             "action_timeline": action_timeline,
-            "touch_counts": touch_counts
+            "touch_counts": touch_counts,
+            "ball_owner_by_step": derived_roles["ball_owner_by_step"],  # ← NEW!
+            "ball_handler_coords_by_step": derived_roles["ball_handler_coords_by_step"]  # ← NEW!
         }
     
     # def assign_roles(self):
@@ -719,4 +968,102 @@ class TurnManager:
 
         # No event = clean possession
         return "SHOT"
+
+    def determine_defensive_pressure_type(self):
+        """
+        Determine if defensive team should attempt FCP or HCT after a made shot.
+        Returns 'FCP', 'HCT', or 'HCO' based on strategy settings and random rolls.
+        """
+        def_team = self.game.defense_team
+        
+        # Get strategy settings
+        hct_value = def_team.strategy_settings.get("half_court_trap", 0)
+        fcp_value = def_team.strategy_settings.get("full_court_press", 0)
+        
+        # print(f"🛡️ Defense pressure check - {def_team.name}: HCT={hct_value}, FCP={fcp_value}")
+        
+        # If both are 0, default to HCO
+        if hct_value == 0 and fcp_value == 0:
+            return "HCO"
+        
+        # Remove any strategy with value 0 from consideration
+        strategies = {"HCO": 8}
+        if hct_value > 0:
+            strategies["HCT"] = hct_value
+            if hct_value == 4:
+                strategies["HCO"] = 0
+            else:
+                strategies["HCO"] -= hct_value
+        if fcp_value > 0:
+            strategies["FCP"] = fcp_value
+            if fcp_value == 4:
+                strategies["HCO"] = 0
+            else:
+                strategies["HCO"] -= fcp_value
+
+        # If only one strategy available, use it
+        if len(strategies) == 1:
+            selected_strategy = list(strategies.keys())[0]
+        else:
+            # Weighted random selection between available strategies
+            total_value = sum(strategies.values())
+            rand = random.randint(1, 100)
+            
+            hct_chance = (strategies["HCT"] / total_value) * 100 if "HCT" in strategies else 0
+            fcp_chance = (strategies["FCP"] / total_value) * 100 if "FCP" in strategies else 0
+            
+            if rand <= hct_chance:
+                selected_strategy = "HCT"
+            else:
+                selected_strategy = "FCP"
+        
+        # Second die roll to determine if the selected strategy actually executes
+        strategy_value = strategies[selected_strategy]
+        execution_roll = random.randint(1, 4)
+        
+        if strategy_value >= execution_roll:
+            # print(f"✅ Executing {selected_strategy} (value: {strategy_value}, roll: {execution_roll})")
+            return selected_strategy
+        else:
+            # print(f"❌ {selected_strategy} skipped (value: {strategy_value}, roll: {execution_roll}) -> HCO")
+            return "HCO"
+    
+    def _print_turn_summary(self, result, offensive_state):
+        """Print a clean summary of the turn for debugging."""
+        print("\n" + "="*80)
+        print(f"TURN #{result.get('turn_count', 0)} SUMMARY")
+        print("="*80)
+        print(f"Offensive State: {offensive_state}")
+        print(f"Result Type: {result.get('result_type', 'N/A')}")
+        print(f"Text: {result.get('text', 'N/A')}")
+        print(f"Possession Flips: {result.get('possession_flips', False)}")
+        
+        # Animation data summary
+        animations = result.get('animations', [])
+        skeleton = result.get('skeleton', {})
+        
+        print(f"\nAnimation Data for turn {result.get('turn_count', 0)} {offensive_state}:")
+        print(f"  - Animations array: {len(animations)} players")
+        if skeleton and 'steps' in skeleton:
+            print(f"  - Skeleton steps: {len(skeleton['steps'])} timestamps")
+        else:
+            print(f"  - Skeleton: None")
+        
+        # Roles summary
+        roles = result.get('roles', {})
+        if roles:
+            print(f"\nRoles:")
+            for role_name, role_value in roles.items():
+                if role_name in ['offense', 'defense']:
+                    print(f"  - {role_name}: {len(role_value) if isinstance(role_value, list) else role_value}")
+                else:
+                    print(f"  - {role_name}: {role_value}")
+        
+        # Key player info
+        print(f"\nKey Players:")
+        for key in ['ball_handler', 'shooter', 'passer', 'defender']:
+            if key in result and result[key]:
+                print(f"  - {key}: {result[key]}")
+        
+        print("="*80 + "\n")
 

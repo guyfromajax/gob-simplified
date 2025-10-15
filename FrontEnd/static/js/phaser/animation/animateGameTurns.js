@@ -4,8 +4,10 @@ import { runPass, REBOUND_DEBUG } from "./ballManager.js";
 import animationConfig from "./animation_config.js";
 import runFreeThrowSequence from "./freeThrow.js";
 import runFastBreakSequence from "./fastBreak.js";
+import { runOpeningTipSequence } from "./openingTip.js";
 import { handleTurnover } from "./turnoverAdapter.js";
 import { States } from "../state/gameStateMachine.js";
+import { appendToTextScroll } from "../utils/textScroll.js";
 import {
   animationDebugLog,
   animationDebugWarn,
@@ -24,10 +26,114 @@ const NON_STANDARD_RESULTS = new Set([
   "TURNOVER",
   "FAST_BREAK",
   "SIDE_INBOUND",
+  "PUTBACK_MAKE",
+  "PUTBACK_MISS",
+  "OREB_KICKOUT",
+  "DEFENSIVE_STOP",
+  "OPENING_TIP",
 ]);
 
 let normalizeTurnModulePromise = null;
 let possessionRunnerModulePromise = null;
+
+/**
+ * Handle offensive rebound turns (putbacks and kickouts)
+ */
+async function handleOrebTurn(scene, { playerSprites, ballSprite, turnData, onUpdate }) {
+  const { animatePutbackAttempt } = await import('./ballManager.js');
+  const { animateKickoutReset } = await import('./ballManager.js');
+  const { runInboundSetup } = await import('./turnAnimation.js');
+  const { HOME_RIM_COORDS, AWAY_RIM_COORDS } = await import('./courtConstants.js');
+  
+  appendToTextScroll(turnData.text);
+  
+  const rebounderId = turnData.rebounderId || turnData.ball_handler?.player_id;
+  const rebounderSprite = playerSprites[rebounderId];
+  
+  if (!rebounderSprite) return;
+  
+  if (turnData.result_type === "PUTBACK_MAKE" || turnData.result_type === "PUTBACK_MISS") {
+    // Animate putback attempt
+    const rimCoords = rebounderSprite.team === "home" ? HOME_RIM_COORDS : AWAY_RIM_COORDS;
+    const result = turnData.result_type === "PUTBACK_MAKE" ? "MAKE" : "MISS";
+    
+    await animatePutbackAttempt(
+      scene,
+      ballSprite,
+      rebounderId,
+      rimCoords,
+      500,
+      result
+    );
+    
+    // Handle putback make - run inbound setup
+    if (turnData.result_type === "PUTBACK_MAKE") {
+      const shooterTeamId = rebounderSprite.team_id;
+      const homeTeamId = scene.simData?.home_team_id;
+      const awayTeamId = scene.simData?.away_team_id;
+      const shooterTeamIsHome = String(shooterTeamId) === String(homeTeamId);
+      const newOffenseSide = shooterTeamIsHome ? "away" : "home";
+      
+      // Check for defensive pressure
+      const skipRetreat = turnData.next_defensive_setup === "FCP" || turnData.next_defensive_setup === "HCT";
+      const pressureType = skipRetreat ? turnData.next_defensive_setup : null;
+      
+      await runInboundSetup({
+        scene,
+        ballSprite,
+        playerSprites,
+        newOffenseSide,
+        homeTeamId,
+        awayTeamId,
+        skipRetreat,
+        pressureType,
+      });
+    }
+    // Handle putback miss with rebound
+    else if (turnData.rebound_type) {
+      const { animateRebound } = await import('./ballManager.js');
+      const { bounceFromRim } = await import('./ballManager.js');
+      
+      const isHomeOffense = rebounderSprite.team === "home";
+      const basket = isHomeOffense ? HOME_RIM_COORDS : AWAY_RIM_COORDS;
+      const miss = await bounceFromRim(scene, ballSprite, basket, isHomeOffense, 300);
+      
+      await animateRebound({
+        scene,
+        ballSprite,
+        playerSprites,
+        animations: [],
+        rebounderId: turnData.rebounderId,
+        ballSpot: miss.grid,
+        shooterId: rebounderId
+      });
+      
+      // If DREB, set up next play
+      if (turnData.rebound_type === "DREB" && turnData.next_play_type !== "FAST_BREAK") {
+        const { runDefensiveReboundSetup } = await import('./turnAnimation.js');
+        await runDefensiveReboundSetup({
+          scene,
+          ballSprite,
+          playerSprites,
+          rebounderId: turnData.rebounderId,
+          nextPlayType: turnData.next_play_type || "HCO"
+        });
+      }
+      // If another OREB, it will be handled by the next OREB turn
+    }
+  } else if (turnData.result_type === "OREB_KICKOUT") {
+    // Animate kickout pass to PG
+    const pgId = turnData.pgId;
+    await animateKickoutReset(
+      scene,
+      ballSprite,
+      rebounderId,
+      pgId,
+      turnData.pass || {},
+      500
+    );
+  }
+}
 
 function getResultType(turn = {}) {
   return turn?.result_type ?? turn?.resultType ?? null;
@@ -348,31 +454,41 @@ export async function animateGameTurns({ //hasBallAtStep
     if (DEBUG_FLOW || debugEnabled) logVerbose(`🔁 Turn ${i + 1}`, turn);
 
     if (turn.result_type === "FREE_THROW") {
-      console.log('🎬 Using new FreeThrowAnimationSystem for FREE_THROW');
-      try {
-        // Use the new FreeThrowAnimationSystem for free throw animations
-        await animationRouter.processTurn(turn);
-        console.log('✅ FreeThrowAnimationSystem completed for FREE_THROW');
-      } catch (error) {
-        console.error('❌ FreeThrowAnimationSystem failed for FREE_THROW:', error);
-        
-        // Fallback to old system if new system fails
-        console.log('🔄 Falling back to playTurnAnimation for FREE_THROW');
+      await runFreeThrowSequence(scene, { playerSprites, ballSprite, turnData: turn, onUpdate, ftContext: turn.ftContext });
+      if (onUpdate) {
         try {
-          const { playTurnAnimation } = await import('./turnAnimation.js');
-          await playTurnAnimation({
-            scene: scene,
-            simData: simData,
-            playerSprites: playerSprites,
-            turnData: turn,
-            ballSprite: ballSprite,
-            onAction: onUpdate
-          });
-          console.log('✅ playTurnAnimation fallback completed for FREE_THROW');
-        } catch (fallbackError) {
-          console.error('❌ Both animation systems failed for FREE_THROW:', fallbackError);
+          onUpdate(turn);
+        } catch (err) {
+          console.error('Scoreboard update failed:', err);
         }
       }
+      updateDebugScore(turn, { turnIndex: i, possessionId });
+      continue;
+    }
+
+    if (turn.result_type === "FOUL") {
+      // Check if this is an FCP or HCT foul with animations
+      if ((turn.fcp_foul === true || turn.hct_foul === true) && turn.animations && turn.animations.length > 0) {
+        // FCP/HCT foul with animations - animate it like a standard turn
+        await playTurnAnimation({
+          scene,
+          simData,
+          playerSprites,
+          turnData: turn,
+          ballSprite,
+          onUpdate,
+          turnIndex: i,
+          onAction: async (action, sprite, timestamp) => {
+            if (DEBUG_FLOW || debugEnabled)
+              logVerbose(
+                `🎬 Action "${action}" fired at ${timestamp}ms for sprite:`,
+                sprite
+              );
+            if (onAction) onAction(action, sprite, timestamp);
+          },
+        });
+      }
+      // Update scoreboard for all fouls (FCP or not)
       if (onUpdate) {
         try {
           onUpdate(turn);
@@ -388,7 +504,6 @@ export async function animateGameTurns({ //hasBallAtStep
       if (!scene.stateMachine?.is(States.FastBreak)) {
         await runSideInboundSetup({ scene, ballSprite, playerSprites, turnData: turn });
       }
-      
       if (onUpdate) {
         try {
           onUpdate(turn);
@@ -400,28 +515,23 @@ export async function animateGameTurns({ //hasBallAtStep
       continue;
     }
 
-    if (turn.result_type === "BASELINE_INBOUND") {
-      console.log('🎬 Using new PassAnimationSystem for BASELINE_INBOUND');
-      
-      try {
-        // Use the new PassAnimationSystem for baseline inbound passes
-        await animationRouter.processTurn(turn);
-        console.log('✅ PassAnimationSystem completed for BASELINE_INBOUND');
-      } catch (error) {
-        console.error('❌ PassAnimationSystem failed for BASELINE_INBOUND:', error);
-        
-        // Fallback to old system if new system fails
-        console.log('🔄 Falling back to runSideInboundSetup for BASELINE_INBOUND');
+    if (turn.result_type === "DEFENSIVE_STOP") {
+      // Fast break was stopped by defense - just display text and continue to next turn (HCO)
+      appendToTextScroll(turn.text || "Defense stops the break!");
+      if (onUpdate) {
         try {
-          if (!scene.stateMachine?.is(States.FastBreak)) {
-            await runSideInboundSetup({ scene, ballSprite, playerSprites, turnData: turn });
-          }
-          console.log('✅ runSideInboundSetup fallback completed for BASELINE_INBOUND');
-        } catch (fallbackError) {
-          console.error('❌ Both animation systems failed for BASELINE_INBOUND:', fallbackError);
+          onUpdate(turn);
+        } catch (err) {
+          console.error('Scoreboard update failed:', err);
         }
       }
-      
+      updateDebugScore(turn, { turnIndex: i, possessionId });
+      continue;
+    }
+
+    // Handle OREB turns (putback attempts and kickouts)
+    if (turn.result_type === "PUTBACK_MAKE" || turn.result_type === "PUTBACK_MISS" || turn.result_type === "OREB_KICKOUT") {
+      await handleOrebTurn(scene, { playerSprites, ballSprite, turnData: turn, onUpdate });
       if (onUpdate) {
         try {
           onUpdate(turn);
@@ -446,11 +556,41 @@ export async function animateGameTurns({ //hasBallAtStep
       continue;
     }
 
+    // Opening tip at start of Q1 and OT
+    if (turn.result_type === "OPENING_TIP") {
+      animationDebugLog('OPENING TIP DETECTED - routing to runOpeningTipSequence:', {
+        result_type: turn.result_type,
+        winner: turn.winner,
+        home_wins: turn.home_wins,
+        turn_index: i
+      });
+      await new Promise(resolve => {
+        runOpeningTipSequence(scene, {
+          playerSprites,
+          ballSprite,
+          turnData: turn,
+          onComplete: resolve
+        });
+      });
+      if (onUpdate) {
+        try {
+          onUpdate(turn);
+        } catch (err) {
+          console.error('Scoreboard update failed:', err);
+        }
+      }
+      updateDebugScore(turn, { turnIndex: i, possessionId });
+      continue;
+    }
+
     // Debug fast break routing
+    // NOTE: next_play_type indicates what the NEXT turn will be, not this turn
+    // Only route to fast break if THIS turn is actually a fast break
     if (turn.fast_break === true || turn.result_type === "FAST_BREAK") {
       animationDebugLog('FAST BREAK TURN DETECTED - routing to runFastBreakSequence:', {
         fast_break: turn.fast_break,
         result_type: turn.result_type,
+        next_play_type: turn.next_play_type,
         turn_index: i
       });
       await runFastBreakSequence(scene, { playerSprites, ballSprite, turnData: turn, onUpdate, turnIndex: i });
@@ -465,7 +605,42 @@ export async function animateGameTurns({ //hasBallAtStep
       continue;
     }
     
-    // Check for fast break shots
+    // Check for FCP/HCT shots - route to standard shot animation
+    if (turn.fcp_shot === true || turn.hct_shot === true) {
+      const pressureType = turn.fcp_shot ? 'FCP' : 'HCT';
+      animationDebugLog(`${pressureType} SHOT TURN - routing to standard shot animation:`, {
+        result_type: turn.result_type,
+        turn_index: i
+      });
+      await playTurnAnimation({
+        scene,
+        simData,
+        playerSprites,
+        turnData: turn,
+        ballSprite,
+        onUpdate,
+        turnIndex: i,
+        onAction: async (action, sprite, timestamp) => {
+          if (DEBUG_FLOW || debugEnabled)
+            logVerbose(
+              `🎬 Action "${action}" fired at ${timestamp}ms for sprite:`,
+              sprite
+            );
+          if (onAction) onAction(action, sprite, timestamp);
+        },
+      });
+      if (onUpdate) {
+        try {
+          onUpdate(turn);
+        } catch (err) {
+          console.error('Scoreboard update failed:', err);
+        }
+      }
+      updateDebugScore(turn, { turnIndex: i, possessionId });
+      continue;
+    }
+    
+    // Debug: Check if this should be a fast break but isn't being detected
     if (turn.result_type === "MAKE" || turn.result_type === "MISS") {
       animationDebugLog('SHOT TURN - checking for fast break indicators:', {
         result_type: turn.result_type,

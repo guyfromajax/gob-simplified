@@ -58,7 +58,18 @@ function showToast(msg) {
 
 async function loadRoster() {
   if (!teamName) return;
-  const res = await fetch(`/roster/${encodeURIComponent(teamName)}`);
+  
+  // Use franchise-specific roster endpoint if in franchise mode
+  let url;
+  if (franchiseId) {
+    url = `/franchise/roster?franchise_id=${franchiseId}&team_name=${encodeURIComponent(teamName)}`;
+    console.log("Loading franchise-specific roster for lineup");
+  } else {
+    url = `/roster/${encodeURIComponent(teamName)}`;
+    console.log("Loading standard roster for lineup");
+  }
+  
+  const res = await fetch(url);
   if (!res.ok) return;
   const data = await res.json();
   roster = (data.players || []).map((p, idx) => ({ ...p, _idx: idx }));
@@ -248,10 +259,10 @@ async function init() {
         // optional: params.set('debug_flow', '1');
       }
       if (DEBUG) {
-        console.debug('🔀 Redirecting to court.html', { home: homeTeam, away: awayTeam, gameId: currentGameId });
+        console.debug('🔀 Redirecting to game-plan.html', { home: homeTeam, away: awayTeam, gameId: currentGameId });
       }
       DEBUG && console.log('[lineup] launching quarter', quarter);
-      window.location.href = `/court.html?${params.toString()}`;
+      window.location.href = `/game-plan.html?${params.toString()}`;
     });
   }
 }
