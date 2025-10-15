@@ -572,6 +572,18 @@ export async function animateGameTurns({ //hasBallAtStep
           onComplete: resolve
         });
       });
+      
+      // Transition to HalfCourt state after opening tip completes
+      // This ensures the next turn (first possession) starts in correct state
+      if (scene.stateMachine && !scene.stateMachine.is(States.HalfCourt)) {
+        const { safeTransition } = await import('./gameStateMachine.js');
+        safeTransition(scene.stateMachine, States.HalfCourt, {
+          reason: 'opening_tip_complete',
+          currentOwnerId: getCurrentOwner(scene),
+          pendingOwnerId: getPendingOwner(scene)
+        });
+      }
+      
       if (onUpdate) {
         try {
           onUpdate(turn);
