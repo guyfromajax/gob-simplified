@@ -28,16 +28,20 @@ class Animator:
         fb_roles,
         hold_up=False,
         stopper_id=None,
-        in_play_defenders=None,
     ):
         """Build a fast break animation packet.
 
         Args:
             fb_roles (dict):
-                {"ball_handler": Player}
+                {
+                    "ball_handler": Player,
+                    "defense": list[Player],
+                    "offense": list[Player],
+                    "outlet_passer": str (player_id) or None,
+                    "outlet_receiver": str (player_id) or None
+                }
             hold_up (bool): Whether the break was stopped.
             stopper_id (str): Player ID of the defender who stopped it.
-            in_play_defenders (list[Player]): Defenders ahead of the ball.
 
         Returns:
             list[dict]: Animation payload for the frontend.
@@ -48,7 +52,7 @@ class Animator:
         is_away_offense = offense_team.team_id == self.game.away_team.team_id
 
         ball_handler = fb_roles.get("ball_handler")
-        defenders = in_play_defenders or []
+        defenders = fb_roles.get("defense", [])
 
         animations = []
         duration = 800
