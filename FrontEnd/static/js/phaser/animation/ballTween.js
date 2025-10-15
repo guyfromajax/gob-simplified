@@ -40,6 +40,12 @@ function resolveBallController(scene) {
  */
 export function attachBallToPlayer(scene, ballSprite, playerSprite, opts = {}) {
   if (!scene || !ballSprite || !playerSprite) return;
+  
+  // Don't attach ball during shot animation - it would override the tween
+  if (scene._shotInProgress) {
+    console.log('🏀 attachBallToPlayer: Blocked during shot animation');
+    return;
+  }
 
   let targetId = playerSprite.playerId;
   if (targetId == null && scene.playerSprites) {
