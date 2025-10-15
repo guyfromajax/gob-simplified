@@ -572,14 +572,14 @@ export function animateRebound({
       ? currentGridX >= 74 
       : currentGridX <= 25;
 
-    console.log('Player proximity check:', {
-      playerId: sprite.playerId,
-      currentGridX,
-      currentGridY,
-      meetsProximityCriteria,
-      isHomeTeamShot,
-      threshold: isHomeTeamShot ? '>=74' : '<=25'
-    });
+    // console.log('Player proximity check:', {
+    //   playerId: sprite.playerId,
+    //   currentGridX,
+    //   currentGridY,
+    //   meetsProximityCriteria,
+    //   isHomeTeamShot,
+    //   threshold: isHomeTeamShot ? '>=74' : '<=25'
+    // });
 
     if (!meetsProximityCriteria) continue;
 
