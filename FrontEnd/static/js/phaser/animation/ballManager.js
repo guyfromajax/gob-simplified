@@ -256,6 +256,9 @@ export function shootBall({
     shotInProgress: scene._shotInProgress
   });
   
+  // Stop BOTH old and new ball following systems
+  scene.ballDetached = true; // Stop old system (scene._ballFollowing callback checks this)
+  
   if (scene.ballController) {
     if (typeof scene.ballController.stopFollowingPlayer === 'function') {
       scene.ballController.stopFollowingPlayer();
