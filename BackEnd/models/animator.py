@@ -624,25 +624,21 @@ class Animator:
             elif pos in off_lineup:
                 off_player = off_lineup[pos]
                 timeline = action_timeline.get(off_player, [])
-                for t, _, spot in timeline:
+                
+                # Get pre-calculated ball handler coords by step
+                ball_handler_coords_by_step = roles.get("ball_handler_coords_by_step", [])
+                
+                for step_idx, (t, _, spot) in enumerate(timeline):
                     o_coords = HCO_STRING_SPOTS.get(spot, HCO_STRING_SPOTS["key"])
                     
-                    # Find who has the ball at this timestamp
-                    current_bh_coords = ball_handler_end_coords  # Default fallback
-                    current_bh_pos = None
-                    for step in steps:
-                        if step["timestamp"] == t:
-                            # Check each position to see who has ball at this step
-                            for check_pos, pos_action in step.get("pos_actions", {}).items():
-                                action = pos_action.get("action", "")
-                                if action in ["handle_ball", "receive", "shoot", "pass"]:
-                                    bh_spot = pos_action.get("spot", "key")
-                                    current_bh_coords = HCO_STRING_SPOTS.get(bh_spot, HCO_STRING_SPOTS["key"])
-                                    current_bh_pos = check_pos
-                                    break
-                            break
+                    # Use pre-calculated ball handler coords for this step index
+                    if step_idx < len(ball_handler_coords_by_step):
+                        current_bh_coords = ball_handler_coords_by_step[step_idx]
+                    else:
+                        # Fallback to final position if step index out of range
+                        current_bh_coords = ball_handler_end_coords or HCO_STRING_SPOTS["key"]
                     
-                    print(f"🛡️ Defender {pos} at t={t}: Guarding {get_player_position(off_lineup, off_player)} at {spot}, Ball with {current_bh_pos} at {current_bh_coords}")
+                    # print(f"🛡️ Defender {pos} at step {step_idx} (t={t}): Guarding player at {spot}, Ball at {current_bh_coords}")
                     
                     d_coords = assign_non_bh_defender_coords(o_coords, current_bh_coords, aggression_call, is_away_offense)
                     # d_coords already flipped by assign_non_bh_defender_coords, don't flip again
