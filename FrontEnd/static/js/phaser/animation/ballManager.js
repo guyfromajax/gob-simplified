@@ -342,12 +342,28 @@ export function shootBall({
   console.log('🏀 shootBall: Creating tween for ball flight');
 
   return new Promise((resolve) => {
+    console.log('🏀 shootBall: About to call scene.tweens.add', {
+      hasTweens: !!scene.tweens,
+      ballSpritePos: { x: ballSprite.x, y: ballSprite.y },
+      targetPos: { x: rim.x, y: rim.y },
+      distance: Phaser.Math.Distance.Between(ballSprite.x, ballSprite.y, rim.x, rim.y),
+      duration
+    });
+    
     const tween = scene.tweens.add({
       targets: ballSprite,
       x: rim.x,
       y: rim.y,
       duration,
       ease: "Sine.easeInOut",
+      onStart: () => {
+        console.log('🏀 shootBall: Tween STARTED!');
+      },
+      onUpdate: (tween) => {
+        if (tween.progress === 0 || tween.progress === 0.5 || tween.progress === 1) {
+          console.log(`🏀 shootBall: Tween progress: ${(tween.progress * 100).toFixed(0)}%`);
+        }
+      },
       onComplete: () => {
         console.log('🏀 shootBall: Tween completed, result:', result);
         if (result === "MAKE") {
