@@ -62,8 +62,8 @@ def assign_non_bh_defender_coords(o_coords, ball_coords, aggression_level, is_aw
         flipped_ball = get_away_player_coords(ball_coords)
         bx, by = flipped_ball["x"], flipped_ball["y"]
         
-        flipped_offense = get_away_player_coords(o_coords)
-        ox, oy = flipped_offense["x"], flipped_offense["y"]
+        # flipped_offense = get_away_player_coords(o_coords)
+        # ox, oy = flipped_offense["x"], flipped_offense["y"]
     
     # Calculate directions AFTER flipping (if applicable)
     # In home orientation, defenders are always to the right (toward home basket at x=90)
