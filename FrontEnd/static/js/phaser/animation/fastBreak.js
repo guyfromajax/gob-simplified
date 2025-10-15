@@ -132,18 +132,7 @@ async function animateOutletPhase(scene, turnData, playerSprites, ballSprite, wi
     })
   );
   
-  await Promise.all(promises);
-  
-  // Outlet pass
-  await runPass(scene, {
-    fromId: passerId,
-    toId: receiverId,
-    duration: 500,
-    easing: "Sine.easeInOut"
-  });
-  
-  // Now animate defenders chasing
-  const defenderPromises = [];
+  // SIMULTANEOUSLY animate defenders chasing
   const defendersList = turnData.roles?.defense || [];
   const defendersSet = new Set(defendersList.map(d => d.player_id || d));
   
@@ -157,7 +146,7 @@ async function animateOutletPhase(scene, turnData, playerSprites, ballSprite, wi
         y: Phaser.Math.Between(15, 35)
       };
       const defenderPx = gridToPixels(defenderTarget.x, defenderTarget.y, width, height);
-      defenderPromises.push(
+      promises.push(
         tweenPlayerTo(scene, sprite, defenderPx, {
           duration: 500,
           easing: "Sine.easeInOut"
@@ -167,7 +156,16 @@ async function animateOutletPhase(scene, turnData, playerSprites, ballSprite, wi
     // All other players hold position (no animation)
   }
   
-  await Promise.all(defenderPromises);
+  // Wait for ALL movements (receiver + defenders) to complete simultaneously
+  await Promise.all(promises);
+  
+  // THEN outlet pass
+  await runPass(scene, {
+    fromId: passerId,
+    toId: receiverId,
+    duration: 500,
+    easing: "Sine.easeInOut"
+  });
 }
 
 /**
