@@ -390,6 +390,8 @@ class ShotManager:
         shot_score = (attrs["SC"] * 0.6 + attrs["CH"] * 0.2 + attrs["IQ"] * 0.2) * random.randint(1, 6)
 
         defender = random.choice(fb_roles["defense"]) if fb_roles["defense"] else None
+        fb_roles["defender"] = defender  # Store for animation
+        
         defense_attrs = defender.attributes if defender else {"ID": 0, "IQ": 0, "CH": 0}
         defense_score = (
             defense_attrs.get("ID", 0) * 0.8 +
