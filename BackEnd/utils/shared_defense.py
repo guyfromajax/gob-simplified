@@ -95,7 +95,7 @@ def assign_non_bh_defender_coords(o_coords, ball_coords, aggression_level, is_aw
 
         # x = ox + int(delta_x * 0.3) + (x_direction * d_spacing)
         # y = oy + int(delta_y * 0.3) + (y_direction * d_spacing)
-        x = ox + int(delta_x * 0.3)
-        y = oy + int(delta_y * 0.3)
+        x = ox + (int(delta_x * 0.3) * x_direction)
+        y = oy + (int(delta_y * 0.3) * y_direction)
 
         return {"x": x, "y": y}
