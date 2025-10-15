@@ -603,7 +603,7 @@ class Animator:
                 start = assign_bh_defender_coords(first_coords, aggression_call, is_away_offense)
 
             if is_away_offense:
-                def_coords = get_away_player_coords(def_coords)
+                # def_coords already flipped by assign_non_bh_defender_coords, don't flip again
                 start = get_away_player_coords(start)
 
             movement = []
@@ -645,8 +645,7 @@ class Animator:
                     print(f"🛡️ Defender {pos} at t={t}: Guarding {get_player_position(off_lineup, off_player)} at {spot}, Ball with {current_bh_pos} at {current_bh_coords}")
                     
                     d_coords = assign_non_bh_defender_coords(o_coords, current_bh_coords, aggression_call, is_away_offense)
-                    if is_away_offense:
-                        d_coords = get_away_player_coords(d_coords)
+                    # d_coords already flipped by assign_non_bh_defender_coords, don't flip again
                     movement.append({
                         "timestamp": t,
                         "coords": d_coords,
