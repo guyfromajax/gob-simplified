@@ -68,6 +68,22 @@ body {
   pointer-events: none;
 }
 
+.autoset-button {
+  background: #4ecdc4;
+  color: #fff;
+  border: none;
+  padding: 10px 20px;
+  font-weight: bold;
+  border-radius: 4px;
+  cursor: pointer;
+  height: fit-content;
+  transition: background 0.2s ease;
+}
+
+.autoset-button:hover {
+  background: #3db8b0;
+}
+
 #roster-table-container {
   margin-top: 20px;
   overflow-x: auto;
