@@ -9,14 +9,12 @@ import { getCurrentOwner } from "../ball/ballController.js";
 import { runInboundSetup } from "./turnAnimation.js";
 import { animationDebugLog, isAnimationDebugEnabled } from "../utils/debugFlags.js";
 import { appendToTextScroll } from "../utils/textScroll.js";
+import { animateStep } from "./animateStep.js";
 
 /**
- * Simplified Fast Break Animation System
+ * Fast Break Animation System - Uses Backend Animation Data
  * 
- * Flow:
- * 1. Outlet Pass (if outlet_passer exists)
- * 2. Fast Break Resolution (shot, stop, foul, turnover, steal)
- * 3. Outcome handling and state transitions
+ * Uses turnData.animations array from backend with timestamps for simultaneous movement
  */
 
 export async function runFastBreakSequence({
@@ -32,56 +30,149 @@ export async function runFastBreakSequence({
   const width = scene.game.config.width;
   const height = scene.game.config.height;
   const debugEnabled = isAnimationDebugEnabled();
-  
+
   // Stop any existing timeline/tweens
   if (scene.__activeTimeline) {
     scene.__activeTimeline.stop();
     scene.__activeTimeline = null;
   }
+
+  // Transition to FastBreak state
+  safeTransition(scene.stateMachine, States.FastBreak);
+    scene.events?.emit("fb:start");
   
-  // Transition to FastBreakOutlet or FastBreak state
-  if (turnData.roles?.outlet_passer) {
-    safeTransition(scene.stateMachine, States.FastBreakOutlet);
-  } else {
-    safeTransition(scene.stateMachine, States.FastBreak);
+  // Use backend animation data with timestamps for simultaneous movement
+  const animations = turnData.animations || [];
+  
+  if (animations.length === 0) {
+    console.warn("No animations provided for fast break");
+    return;
   }
-  scene.events?.emit("fb:start");
   
-  // ============================================================================
-  // PHASE 1: OUTLET PASS (if applicable)
-  // ============================================================================
-  if (turnData.roles?.outlet_passer && turnData.roles?.outlet_receiver) {
-    await animateOutletPhase(scene, turnData, playerSprites, ballSprite, width, height);
+  // Group movements by timestamp for simultaneous animation
+  const timestampMap = new Map();
+  
+  for (const anim of animations) {
+    const movement = anim.movement || [];
+    for (const step of movement) {
+      const timestamp = step.timestamp;
+      if (!timestampMap.has(timestamp)) {
+        timestampMap.set(timestamp, []);
+      }
+      timestampMap.get(timestamp).push({
+        playerId: anim.playerId,
+        coords: step.coords,
+        action: step.action,
+        hasBall: anim.hasBallAtStep?.[movement.indexOf(step)] || false
+      });
+    }
+  }
+  
+  // Sort timestamps
+  const timestamps = Array.from(timestampMap.keys()).sort((a, b) => a - b);
+  
+  // Animate each timestamp group
+  for (let i = 0; i < timestamps.length - 1; i++) {
+    if (scene.skipToEnd) break;
     
-    // Transition to FastBreak state after outlet
-    safeTransition(scene.stateMachine, States.FastBreak);
+    const currentTime = timestamps[i];
+    const nextTime = timestamps[i + 1];
+    const duration = nextTime - currentTime;
+    const movements = timestampMap.get(nextTime);
+    
+    if (!movements || movements.length === 0) continue;
+    
+    // Animate all players simultaneously to next timestamp
+    await animateStep(scene, playerSprites, ballSprite, movements, duration, width, height);
   }
   
   if (scene.skipToEnd) return;
-  
-  // ============================================================================
-  // PHASE 2: FAST BREAK RESOLUTION
-  // ============================================================================
+
+  // Handle shot outcome
   const result = turnData.result_type;
-  const holdUp = turnData.hold_up;
-  
   if (result === "MAKE" || result === "MISS") {
-    // Shot attempt scenario
-    await animateFastBreakShot(scene, turnData, playerSprites, ballSprite, width, height);
-  } else {
-    // Defensive stop, foul, turnover, or steal - all use same defensive stop positioning
-    await animateDefensiveStop(scene, turnData, playerSprites, ballSprite, width, height);
+    await handleFastBreakShotOutcome(scene, turnData, playerSprites, ballSprite, width, height);
   }
   
-  if (scene.skipToEnd) return;
-  
-  // ============================================================================
-  // PHASE 3: CLEANUP & STATE TRANSITIONS
-  // ============================================================================
   scene.events?.emit("fb:end");
 }
 
 /**
+ * Handle shot outcome after animation completes
+ */
+async function handleFastBreakShotOutcome(scene, turnData, playerSprites, ballSprite, width, height) {
+  const result = turnData.result_type;
+  
+  // Determine basket being attacked
+  const shooterId = turnData.roles?.ball_handler?.player_id || turnData.ball_handler?.player_id;
+  const shooterSprite = playerSprites[shooterId];
+  const isHomeOffense = shooterSprite?.team === "home";
+  const basket = isHomeOffense ? AWAY_RIM_COORDS : HOME_RIM_COORDS;
+  const rimPx = gridToPixels(basket.x, basket.y, width, height);
+  
+  // Shoot the ball
+  safeTransition(scene.stateMachine, States.ShotAttempt);
+  
+  await tweenBallTo(scene, ballSprite, rimPx, {
+    duration: 400,
+    easing: "Sine.easeInOut",
+    arc: { height: 50 }
+  });
+  
+  // Handle outcome
+  if (result === "MAKE") {
+    appendToTextScroll("Good!");
+    await new Promise(resolve => scene.time.delayedCall(1000, resolve));
+    
+    // Inbound setup
+    const newOffenseSide = isHomeOffense ? "away" : "home";
+    const skipRetreat = turnData.next_defensive_setup === "FCP" || turnData.next_defensive_setup === "HCT";
+    const pressureType = skipRetreat ? turnData.next_defensive_setup : null;
+    
+    await runInboundSetup({ 
+      scene, 
+      ballSprite, 
+      playerSprites, 
+      newOffenseSide,
+      homeTeamId: scene.simData?.home_team_id,
+      awayTeamId: scene.simData?.away_team_id,
+      skipRetreat,
+      pressureType
+    });
+  } else {
+    // Miss - handle rebound
+    appendToTextScroll("Missed!");
+    safeTransition(scene.stateMachine, States.Rebound);
+    
+    const { bounceFromRim, animateRebound } = await import('./ballManager.js');
+    const miss = await bounceFromRim(scene, ballSprite, basket, isHomeOffense, 300);
+    
+    await animateRebound({
+      scene,
+      ballSprite,
+      playerSprites,
+      animations: [],
+      rebounderId: turnData.rebounderId || turnData.rebounder_player_id,
+      ballSpot: miss.grid,
+      shooterId
+    });
+    
+    // Defensive rebound setup if needed
+    if (turnData.rebound_type === "DREB") {
+      const { runDefensiveReboundSetup } = await import('./turnAnimation.js');
+      await runDefensiveReboundSetup({
+        scene,
+        ballSprite,
+        playerSprites,
+        rebounderId: turnData.rebounderId || turnData.rebounder_player_id,
+        nextPlayType: "HCO"
+      });
+    }
+  }
+}
+
+/**
+ * LEGACY FUNCTIONS BELOW - Kept for reference, can be removed after testing
  * Phase 1: Outlet Pass Animation
  * - Outlet receiver moves to target spot
  * - Defenders chase (move toward basket)
@@ -122,16 +213,16 @@ async function animateOutletPhase(scene, turnData, playerSprites, ballSprite, wi
   };
   const outletPx = gridToPixels(outletTarget.x, outletTarget.y, width, height);
   
-  const promises = [];
-  
+    const promises = [];
+
   // Move outlet receiver
-  promises.push(
+      promises.push(
     tweenPlayerTo(scene, receiverSprite, outletPx, {
       duration: 500,
-      easing: "Sine.easeInOut"
-    })
-  );
-  
+          easing: "Sine.easeInOut"
+        })
+      );
+
   // SIMULTANEOUSLY animate defenders chasing
   const defendersList = turnData.roles?.defense || [];
   const defendersSet = new Set(defendersList.map(d => d.player_id || d));
@@ -146,13 +237,13 @@ async function animateOutletPhase(scene, turnData, playerSprites, ballSprite, wi
         y: Phaser.Math.Between(15, 35)
       };
       const defenderPx = gridToPixels(defenderTarget.x, defenderTarget.y, width, height);
-      promises.push(
+        promises.push(
         tweenPlayerTo(scene, sprite, defenderPx, {
           duration: 500,
-          easing: "Sine.easeInOut"
-        })
-      );
-    }
+            easing: "Sine.easeInOut"
+          })
+        );
+      }
     // All other players hold position (no animation)
   }
   
@@ -164,7 +255,7 @@ async function animateOutletPhase(scene, turnData, playerSprites, ballSprite, wi
     fromId: passerId,
     toId: receiverId,
     duration: 500,
-    easing: "Sine.easeInOut"
+              easing: "Sine.easeInOut"
   });
 }
 
@@ -201,12 +292,12 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
   
   // Move shooter
   attachBallToPlayer(scene, ballSprite, shooterSprite);
-  promises.push(
+            promises.push(
     tweenPlayerTo(scene, shooterSprite, shotPx, {
       duration: 600,
-      easing: "Sine.easeInOut"
-    })
-  );
+                easing: "Sine.easeInOut"
+              })
+            );
   
   // Move primary defender
   // Check top-level defender field first (from shot_manager), then roles.defense array
@@ -226,13 +317,13 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
     defenderSpot.y = Phaser.Math.Clamp(defenderSpot.y, 1, 49);
     
     const defenderPx = gridToPixels(defenderSpot.x, defenderSpot.y, width, height);
-    promises.push(
+            promises.push(
       tweenPlayerTo(scene, defenderSprite, defenderPx, {
         duration: 600,
-        easing: "Sine.easeInOut"
-      })
-    );
-  }
+                easing: "Sine.easeInOut"
+              })
+            );
+          }
   
   // Move all other players to standard positions (same as defensive stop)
   await moveOtherPlayersToStandardPositions(
@@ -245,8 +336,8 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
     height,
     promises
   );
-  
-  await Promise.all(promises);
+
+    await Promise.all(promises);
   
   // Shoot the ball
   safeTransition(scene.stateMachine, States.ShotAttempt);
@@ -259,7 +350,7 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
   });
   
   // Handle outcome
-  if (turnData.result_type === "MAKE") {
+    if (turnData.result_type === "MAKE") {
     appendToTextScroll("Good!");
     await new Promise(resolve => scene.time.delayedCall(1000, resolve));
     
@@ -274,13 +365,13 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
       scene, 
       ballSprite, 
       playerSprites, 
-      newOffenseSide,
+        newOffenseSide,
       homeTeamId: scene.simData?.home_team_id,
       awayTeamId: scene.simData?.away_team_id,
       skipRetreat,
       pressureType
-    });
-  } else {
+      });
+    } else {
     // Miss - handle rebound
     appendToTextScroll("Missed!");
     safeTransition(scene.stateMachine, States.Rebound);
@@ -288,16 +379,16 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
     const { bounceFromRim, animateRebound } = await import('./ballManager.js');
     const miss = await bounceFromRim(scene, ballSprite, basket, isHomeOffense, 300);
     
-    await animateRebound({
-      scene,
-      ballSprite,
-      playerSprites,
-      animations: [],
-      rebounderId: turnData.rebounderId || turnData.rebounder_player_id,
-      ballSpot: miss.grid,
+      await animateRebound({
+        scene,
+        ballSprite,
+        playerSprites,
+        animations: [],
+        rebounderId: turnData.rebounderId || turnData.rebounder_player_id,
+        ballSpot: miss.grid,
       shooterId
-    });
-    
+      });
+      
     // Defensive rebound setup if needed
     if (turnData.rebound_type === "DREB") {
       const { runDefensiveReboundSetup } = await import('./turnAnimation.js');
