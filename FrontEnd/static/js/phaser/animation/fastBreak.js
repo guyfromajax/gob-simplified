@@ -134,10 +134,14 @@ async function animateOutletPhase(scene, turnData, playerSprites, ballSprite, wi
   
   // SIMULTANEOUSLY animate defenders chasing
   const defendersList = turnData.roles?.defense || [];
+  console.log("🏀 FB Outlet - Defenders list:", defendersList);
   const defendersSet = new Set(defendersList.map(d => d.player_id || d));
+  console.log("🏀 FB Outlet - Defenders Set:", Array.from(defendersSet));
   
+  let defenderCount = 0;
   for (const [id, sprite] of Object.entries(playerSprites)) {
     if (defendersSet.has(id)) {
+      defenderCount++;
       // Defenders chase: random Y (15-35), X toward basket (50 to basket-15)
       const defenderTarget = {
         x: isHomeOffense 
@@ -155,6 +159,8 @@ async function animateOutletPhase(scene, turnData, playerSprites, ballSprite, wi
     }
     // All other players hold position (no animation)
   }
+  
+  console.log(`🏀 FB Outlet - Animating ${defenderCount} defenders with receiver. Total promises: ${promises.length}`);
   
   // Wait for ALL movements (receiver + defenders) to complete simultaneously
   await Promise.all(promises);
