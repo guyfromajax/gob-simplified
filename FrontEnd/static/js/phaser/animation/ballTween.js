@@ -14,9 +14,21 @@ import {
   animationDebugWarn,
   isAnimationDebugEnabled,
 } from "../utils/debugFlags.js";
+import { getBallController } from "./BallControllerAdapter.js";
 
 const BALL_DEPTH = 1000;
 export const PASS_DEBUG = false;
+
+function resolveBallController(scene) {
+  if (scene?.ballController) {
+    return scene.ballController;
+  }
+  try {
+    return getBallController();
+  } catch (err) {
+    return null;
+  }
+}
 
 /**
  * Position the ball sprite on top of a player's sprite and optionally adjust depth.
@@ -156,6 +168,13 @@ export function tweenBallTo(scene, ballSprite, target, opts = {}) {
   ballSprite.setDepth(BALL_DEPTH);
   ballSprite.setVisible(true);
 
+  const ballController = resolveBallController(scene);
+  let controllerStartedFlight = false;
+  if (ballController && !ballController.isInFlight) {
+    const flightOpts = { duration, ease: easing };
+    controllerStartedFlight = ballController.startFlight(target, flightOpts) !== false;
+  }
+
   return new Promise((resolve, reject) => {
     const arcEnabled =
       !!arc &&
@@ -188,7 +207,12 @@ export function tweenBallTo(scene, ballSprite, target, opts = {}) {
           const p = curve.getPoint(progress.t);
           ballSprite.setPosition(p.x, p.y);
         },
-        onComplete: resolve
+        onComplete: () => {
+          if (controllerStartedFlight && ballController) {
+            ballController.endFlight(null, { keepVisible: true });
+          }
+          resolve();
+        }
       });
       tween?.once?.('stop', () => reject(new Error('tween stopped')));
     } else {
@@ -198,7 +222,12 @@ export function tweenBallTo(scene, ballSprite, target, opts = {}) {
         y: target.y,
         duration,
         ease: easing,
-        onComplete: resolve
+        onComplete: () => {
+          if (controllerStartedFlight && ballController) {
+            ballController.endFlight(null, { keepVisible: true });
+          }
+          resolve();
+        }
       });
       tween?.once?.('stop', () => reject(new Error('tween stopped')));
     }

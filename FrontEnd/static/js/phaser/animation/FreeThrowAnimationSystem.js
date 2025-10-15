@@ -232,7 +232,7 @@ export class FreeThrowAnimationSystem {
     }
 
     // 2. Detach ball from shooter
-    this.ballController.detachFromPlayer('free_throw_shot');
+    this.ballController.detachFromPlayer('free_throw_shot', { keepVisible: true });
 
     // 3. Get rim coordinates from animation data
     const rimCoords = this.getRimCoordinatesFromAnimation(turnData);

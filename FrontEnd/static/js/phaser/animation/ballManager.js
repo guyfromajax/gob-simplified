@@ -133,6 +133,15 @@ export function passBall({
   fromTimestamp,
   toTimestamp
 }) {
+  console.log("\n\n ******* INSIDE passBall ***************");
+  console.log("passBall payload:", {
+    fromCoords,
+    toCoords,
+    fromTimestamp,
+    toTimestamp,
+    hasScene: !!scene,
+    hasBallSprite: !!ballSprite
+  });
   if (scene?.stateMachine?.is(States.FreeThrow)) return;
   generateBallTween({
     scene,
@@ -154,6 +163,13 @@ export function animateInboundPass(
   startTs,
   endTs
 ) {
+  console.log("\n\n ******* INSIDE animateInboundPass ***************");
+  console.log("animateInboundPass payload:", {
+    fromCoords,
+    toCoords,
+    startTs,
+    endTs
+  });
   if (scene?.stateMachine?.is(States.FreeThrow)) return;
   generateBallTween({
     scene,
@@ -170,6 +186,8 @@ export function animateInboundPass(
  * Hide the ball (e.g. post-shot, end of play)
  */
 export function hideBall(ballSprite) {
+  console.log("\n\n ******* INSIDE hideBall ***************");
+  console.log("hideBall: ballSprite exists?", !!ballSprite);
   if (ballSprite) ballSprite.setVisible(false);
 }
 
@@ -184,6 +202,12 @@ export function bounceFromRim(
   isHomeTeam,
   duration
 ) {
+  console.log("\n\n ******* INSIDE bounceFromRim ***************");
+  console.log("bounceFromRim payload:", {
+    rimCoords,
+    isHomeTeam,
+    duration
+  });
   return new Promise((resolve) => {
     const rebCfg = animationConfig.rebound;
     
@@ -235,7 +259,9 @@ export function shootBall({
   stepIndex,
   turnIndex
 }) {
-  console.log('🎯 shootBall: Starting', {
+  console.log("\n\n ******* INSIDE shootBall ***************");
+  const newLocal = '🎯 shootBall:>>>>Starting';
+  console.log(newLocal, {
     shooterId,
     result,
     ballSpriteType: ballSprite?.constructor?.name
@@ -439,6 +465,13 @@ export function animateRebound({
   shooterId,
   upcomingFastBreak,
 }) {
+  console.log("\n\n ******* INSIDE animateRebound ***************");
+  console.log("animateRebound payload:", {
+    rebounderId,
+    ballSpot,
+    shooterId,
+    upcomingFastBreak
+  });
   if (!scene || !ballSprite || !ballSpot) return Promise.resolve();
   if (scene?.stateMachine?.is(States.FreeThrow)) return Promise.resolve();
   cancelBallTween(scene, ballSprite);
@@ -660,6 +693,13 @@ export function animateKickoutReset(
   pass = {},
   duration
 ) {
+  console.log("\n\n ******* INSIDE animateKickoutReset ***************");
+  console.log("animateKickoutReset payload:", {
+    rebounderId,
+    pgId,
+    duration,
+    pass
+  });
   if (!scene || !ballSprite) return Promise.resolve();
   if (scene?.stateMachine?.is(States.FreeThrow)) return Promise.resolve();
 
@@ -772,6 +812,11 @@ export function animateKickoutReset(
  * @param {number} currentTimestamp - The current animation timestamp (ms)
  */
 export function updateBallOwnership(scene, ballSprite, animations, playerSprites, currentTimestamp) {
+  console.log("\n\n ******* INSIDE updateBallOwnership ***************");
+  console.log("updateBallOwnership payload:", {
+    animationCount: animations?.length ?? 0,
+    currentTimestamp
+  });
   for (const anim of animations) {
     const { playerId, hasBallAtStep, movement } = anim;
     if (!hasBallAtStep || !movement || !movement.length) continue;
@@ -789,6 +834,7 @@ export function updateBallOwnership(scene, ballSprite, animations, playerSprites
       const playerSprite = playerSprites[playerId];
       if (playerSprite) {
         attachBallToPlayer(scene, ballSprite, playerSprite);
+        console.log("updateBallOwnership: attached to player", playerId, "at stepIndex", stepIndex);
       }
       break; // Only one player can have the ball
     }

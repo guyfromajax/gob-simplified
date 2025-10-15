@@ -318,7 +318,7 @@ export class ShotAnimationSystem {
       shooterId: shotInfo.playerId,
       ballControllerState: this.ballController.getState()
     });
-    this.ballController.detachFromPlayer('shot');
+    this.ballController.detachFromPlayer('shot', { keepVisible: true });
     console.log('🎯 ShotAnimationSystem: Ball detached, new state:', this.ballController.getState());
     
     // Animate ball flight
@@ -819,7 +819,7 @@ export class ShotAnimationSystem {
   async executeOutletPass(passerSprite, receiverSprite) {
     return new Promise((resolve) => {
       // Detach ball from passer
-      this.ballController.detachFromPlayer('outlet_pass');
+      this.ballController.detachFromPlayer('outlet_pass', { keepVisible: true });
       
       // Start ball flight
       this.ballController.startFlight({

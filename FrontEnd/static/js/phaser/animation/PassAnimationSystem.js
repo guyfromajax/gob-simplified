@@ -225,7 +225,7 @@ export class PassAnimationSystem {
       const passConfig = this.passConfig.passTypes[passType] || this.passConfig.passTypes.default;
       
       // Detach ball from passer
-      this.ballController.detachFromPlayer('pass');
+      this.ballController.detachFromPlayer('pass', { keepVisible: true });
       
       // Start ball flight
       const targetPosition = {
