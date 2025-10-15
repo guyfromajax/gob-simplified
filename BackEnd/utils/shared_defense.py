@@ -55,12 +55,6 @@ def assign_non_bh_defender_coords(o_coords, ball_coords, aggression_level, is_aw
     ox, oy = o_coords["x"], o_coords["y"]
     bx, by = ball_coords["x"], ball_coords["y"]
 
-    y_direction = -1 if oy > 25 else 1
-    x_direction = -1 if is_away_offense else 1
-    # print("Inside assign_non_bh_defender_coords")
-    # print(f"is_away_offense: {is_away_offense}")
-    # print(f"x_direction: {x_direction}")
-
     # When the away team has the ball, both offensive and ball coordinates are flipped
     # horizontally. Convert both back to the home orientation so the logic below
     # can remain consistent.
@@ -70,9 +64,15 @@ def assign_non_bh_defender_coords(o_coords, ball_coords, aggression_level, is_aw
         
         flipped_offense = get_away_player_coords(o_coords)
         ox, oy = flipped_offense["x"], flipped_offense["y"]
-        
-        # Recalculate y_direction based on flipped offensive Y
-        y_direction = -1 if oy > 25 else 1
+    
+    # Calculate directions AFTER flipping (if applicable)
+    # In home orientation, defenders are always to the right (toward home basket at x=90)
+    y_direction = -1 if oy > 25 else 1
+    x_direction = 1  # Always toward home basket in home orientation
+    
+    # print("Inside assign_non_bh_defender_coords")
+    # print(f"is_away_offense: {is_away_offense}")
+    # print(f"After flip - ox: {ox}, oy: {oy}, x_direction: {x_direction}")
 
     
     # Edge case: defending someone on the block or in the lane (score threat)
