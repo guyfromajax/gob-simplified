@@ -91,7 +91,7 @@ def assign_non_bh_defender_coords(o_coords, ball_coords, aggression_level, is_aw
         }
 
     # Edge case: defending someone near the top or wings and ball is on the key
-    elif 62 <= bx <= 66 and 22 <= by <= 28:
+    elif (62 <= bx <= 66 and 22 <= by <= 28) or (35 <= bx <= 39 and 22 <= by <= 28):
         return {
             "x": ox + (x_direction * random.randint(2, 4)),
             "y": oy + y_direction * random.randint(1, 3)
