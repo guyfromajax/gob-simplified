@@ -366,24 +366,13 @@ export function shootBall({
       },
       onUpdate: (tween) => {
         if (tween.progress === 0 || tween.progress === 0.5 || tween.progress === 1) {
-          console.log(`🏀 shootBall: Tween progress: ${(tween.progress * 100).toFixed(0)}%`, {
-            ballPos: { x: ballSprite.x, y: ballSprite.y },
-            ballVisible: ballSprite.visible,
-            ballDepth: ballSprite.depth,
-            screenWidth: scene.game.config.width,
-            screenHeight: scene.game.config.height,
-            elapsedMs: Date.now() - tweenStartTime,
-            expectedDuration: duration
-          });
+          const elapsed = Date.now() - tweenStartTime;
+          console.log(`🏀 shootBall: Tween ${(tween.progress * 100).toFixed(0)}% | Elapsed: ${elapsed}ms / ${duration}ms | Ball at (${ballSprite.x.toFixed(0)}, ${ballSprite.y.toFixed(0)}) | Visible: ${ballSprite.visible}`);
         }
       },
       onComplete: () => {
         const actualDuration = Date.now() - tweenStartTime;
-        console.log('🏀 shootBall: Tween completed, result:', result, {
-          actualDurationMs: actualDuration,
-          expectedDurationMs: duration,
-          ratioOfExpected: (actualDuration / duration).toFixed(2)
-        });
+        console.log(`🏀 shootBall: Tween COMPLETE | Result: ${result} | Actual: ${actualDuration}ms / Expected: ${duration}ms | Ratio: ${(actualDuration / duration).toFixed(2)}x`);
         if (result === "MAKE") {
           console.log("score");
           console.log("rimHoldStart");
