@@ -294,6 +294,13 @@ export function shootBall({
     scene.game.config.width,
     scene.game.config.height
   );
+  
+  console.log('🏀 shootBall: gridToPixels conversion', {
+    inputGridCoords: fromCoords,
+    outputPixelCoords: start,
+    canvasSize: { w: scene.game.config.width, h: scene.game.config.height }
+  });
+  
   const rimCoords = isHomeTeam ? HOME_RIM_COORDS : AWAY_RIM_COORDS;
   
   // Adjust rim position for made shots (grid units closer to shooter)
