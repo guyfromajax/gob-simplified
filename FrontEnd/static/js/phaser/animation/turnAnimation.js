@@ -338,61 +338,29 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
   let outletTarget = null;
   let outletContext = null;
 
-  if (outletReceiverId && outletReceiverId !== rebounderId && outletReceiverSprite) {
-    if (nextPlayType === "FAST_BREAK") {
-      // For fast break: move outlet receiver 15-25 grid spots toward the new offense basket
-      const fastBreakPlan = computeFastBreakOutletTarget({
-        rebounderGridX: rebGridX,
-        rebounderGridY: rebGridY,
-        newOffenseTeam,
-        newOffenseBasket,
-        randomDistance: () => Phaser.Math.Between(15, 25),
-        randomYOffset: () => Phaser.Math.Between(-8, 8),
-        clamp: Phaser.Math.Clamp,
-      });
-
-      const intendedX = rebGridX + fastBreakPlan.direction * fastBreakPlan.distance;
-
-      animationDebugLog('Fast break outlet receiver - moving toward attack rim:', {
-        outletReceiverId,
-        team: outletReceiverSprite.team,
-        bounds: fastBreakPlan.bounds,
-        intendedTarget: intendedX,
-        clampedTarget: fastBreakPlan.target.x,
-        newOffenseTeam,
-        rebounderTeam: rebounderSprite.team,
-        attackRim: newOffenseBasket,
-        purpose: 'Create separation from other players by moving toward transition lane'
-      });
-
-      outletTarget = fastBreakPlan.target;
-      outletContext = {
-        newOffenseTeam,
-        newOffenseBasket,
-        direction: fastBreakPlan.direction,
-        bounds: fastBreakPlan.bounds,
-      };
-    } else {
-      // For HCO: move PG near the rebounder (current behavior)
-      const sign = newOffenseBasket.x > rebGridX ? 1 : -1;
-      outletTarget = {
-        x: Phaser.Math.Clamp(
-          rebGridX + sign * Phaser.Math.Between(3, 6),
-          4,
-          97
-        ),
-        y: Phaser.Math.Clamp(
-          rebGridY + Phaser.Math.Between(-6, 6),
-          1,
-          50
-        ),
-      };
-      outletContext = {
-        newOffenseTeam,
-        newOffenseBasket,
-        direction: sign,
-      };
-    }
+  if (outletReceiverId && outletReceiverId !== rebounderId && outletReceiverSprite && nextPlayType === "HCO") {
+    // Only animate outlet receiver for HCO
+    // For FAST_BREAK, outlet pass is handled in the fast break turn itself
+    
+    // For HCO: move PG near the rebounder
+    const sign = newOffenseBasket.x > rebGridX ? 1 : -1;
+    outletTarget = {
+      x: Phaser.Math.Clamp(
+        rebGridX + sign * Phaser.Math.Between(3, 6),
+        4,
+        97
+      ),
+      y: Phaser.Math.Clamp(
+        rebGridY + Phaser.Math.Between(-6, 6),
+        1,
+        50
+      ),
+    };
+    outletContext = {
+      newOffenseTeam,
+      newOffenseBasket,
+      direction: sign,
+    };
 
     const outletPx = gridToPixels(outletTarget.x, outletTarget.y, width, height);
     promises.push(
