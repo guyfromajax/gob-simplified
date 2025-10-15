@@ -1242,14 +1242,26 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
                   });
                   const rimCoords =
                     rebounderSprite.team === "home" ? HOME_RIM_COORDS : AWAY_RIM_COORDS;
-                  const putbackResult = await animatePutbackAttempt(
+                  const width = scene.game.config.width;
+                  const height = scene.game.config.height;
+                  const fromCoords = {
+                    x: (rebounderSprite.x / width) * 100,
+                    y: 50 - (rebounderSprite.y / height) * 50
+                  };
+                  const shooterTeamId = rebounderSprite.team_id ?? rebounderSprite.teamId ?? null;
+                  const putbackResult = await shootBall({
                     scene,
                     ballSprite,
+                    fromCoords,
+                    startTimestamp: evt.timeElapsed ?? 0,
+                    result: evt.result || "MISS",
+                    shooterPos: scene.playerInfo?.[shooterId]?.pos ?? null,
                     shooterId,
-                    rimCoords,
-                    evt.duration || 500,
-                    evt.result
-                  );
+                    shooterTeamId,
+                    homeTeamId,
+                    stepIndex: 0,
+                    turnIndex: scene.currentTurn
+                  });
                   if (evt.result === "MISS" && evt.rebound) {
                     const reboundData = evt.rebound;
                     const rebounderId =

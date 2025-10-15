@@ -139,7 +139,7 @@ function attachBallToPlayer(scene, ballSprite, playerSprite, opts = {}) {
  * @param {Phaser.Scene} scene - The game scene
  * @param {Phaser.GameObjects.Image} ballSprite - The ball sprite
  */
-function detachBall(scene, ballSprite) {
+function detachBall(scene, ballSprite, options={}) {
   const ballController = getBallController();
   
   if (!ballController) {
@@ -148,7 +148,7 @@ function detachBall(scene, ballSprite) {
   }
 
   // Use BallController to detach
-  ballController.detachFromPlayer('detach');
+  ballController.detachFromPlayer('detach', options);
   
   // Update old system references
   scene.ballDetached = true;

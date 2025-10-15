@@ -1,5 +1,6 @@
 import { gridToPixels } from '../utils/gridToPixels.js';
 import animationConfig from './animation_config.js';
+import { getBallController } from './BallControllerAdapter.js';
 
 export function generateBallTween({
     scene,
@@ -27,6 +28,13 @@ export function generateBallTween({
     const cfg = animationConfig[type] || animationConfig.pass;
     const duration = Math.max(endTimestamp - startTimestamp, cfg.duration);
 
+    const ballController = getBallController();
+    let controllerStartedFlight = false;
+    if (ballController && !ballController.isInFlight) {
+      const flightOpts = { duration, ease: cfg.easing };
+      controllerStartedFlight = ballController.startFlight(endPixels, flightOpts) !== false;
+    }
+
     scene.tweens.add({
       targets: ballSprite,
       x: endPixels.x,
@@ -34,6 +42,9 @@ export function generateBallTween({
       duration,
       ease: cfg.easing,
       onComplete: () => {
+        if (controllerStartedFlight && ballController) {
+          ballController.endFlight(null, { keepVisible: true });
+        }
         // Optionally hide or lock ball to receiver after pass completes
       }
     });
