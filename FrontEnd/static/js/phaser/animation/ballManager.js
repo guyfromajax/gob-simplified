@@ -350,6 +350,8 @@ export function shootBall({
       duration
     });
     
+    const tweenStartTime = Date.now();
+    
     const tween = scene.tweens.add({
       targets: ballSprite,
       x: rim.x,
@@ -357,7 +359,10 @@ export function shootBall({
       duration,
       ease: "Sine.easeInOut",
       onStart: () => {
-        console.log('🏀 shootBall: Tween STARTED!');
+        console.log('🏀 shootBall: Tween STARTED!', {
+          timestamp: Date.now(),
+          elapsedSinceCreate: Date.now() - tweenStartTime
+        });
       },
       onUpdate: (tween) => {
         if (tween.progress === 0 || tween.progress === 0.5 || tween.progress === 1) {
@@ -366,12 +371,19 @@ export function shootBall({
             ballVisible: ballSprite.visible,
             ballDepth: ballSprite.depth,
             screenWidth: scene.game.config.width,
-            screenHeight: scene.game.config.height
+            screenHeight: scene.game.config.height,
+            elapsedMs: Date.now() - tweenStartTime,
+            expectedDuration: duration
           });
         }
       },
       onComplete: () => {
-        console.log('🏀 shootBall: Tween completed, result:', result);
+        const actualDuration = Date.now() - tweenStartTime;
+        console.log('🏀 shootBall: Tween completed, result:', result, {
+          actualDurationMs: actualDuration,
+          expectedDurationMs: duration,
+          ratioOfExpected: (actualDuration / duration).toFixed(2)
+        });
         if (result === "MAKE") {
           console.log("score");
           console.log("rimHoldStart");
