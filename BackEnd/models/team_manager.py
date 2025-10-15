@@ -5,7 +5,7 @@ from BackEnd.models.player import Player
 from BackEnd.constants import PLAYCALLS
 
 class TeamManager:
-    def __init__(self, name: str, is_home_team=False):
+    def __init__(self, name: str, is_home_team=False, playcall_settings=None, strategy_settings=None):
         self.name = name
         self.is_home_team = is_home_team
         self.players = self._load_roster()
@@ -24,9 +24,21 @@ class TeamManager:
         self.stats = {}
         self.scouting_data = self._init_scouting_data()
 
-        self.strategy_settings = self._init_strategy_settings()
+        # Use provided settings or fall back to random initialization
+        if strategy_settings:
+            self.strategy_settings = strategy_settings
+            # print(f"✅ {name}: Using provided strategy_settings: {strategy_settings}")
+        else:
+            self.strategy_settings = self._init_strategy_settings()
+        
         self.strategy_calls = {}
-        self.playcall_settings = self._init_playcall_settings()
+        
+        if playcall_settings:
+            self.playcall_settings = playcall_settings
+            # print(f"✅ {name}: Using provided playcall_settings: {playcall_settings}")
+        else:
+            self.playcall_settings = self._init_playcall_settings()
+        
         self.playcall_weights = self.playcall_settings.copy()
 
         self.playcall_tracker = {pc: 0 for pc in PLAYCALLS}
@@ -57,8 +69,8 @@ class TeamManager:
             "tempo": random.randint(0, 4),
             "aggression": random.randint(0, 4),
             "fast_break": random.randint(0, 4),
-            "half_court_trap": 0,
-            "full_court_press": 0,
+            "half_court_trap": random.randint(0, 4),
+            "full_court_press": random.randint(0, 4),
         }
 
     def _init_playcall_settings(self):

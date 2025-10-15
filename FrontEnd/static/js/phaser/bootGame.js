@@ -78,10 +78,74 @@ if (weekParam && !Number.isNaN(weekParam) && typeof localStorage !== 'undefined'
   localStorage.setItem('franchise_week', weekParam);
 }
 const mode = urlParams.get('mode') || getMode({ tournamentId, franchiseId });
+const userTeamSide = urlParams.get('my_team');  // "home" or "away"
 let quarter = parseInt(urlParams.get('quarter'), 10) || 1;
 let gameId =
   urlParams.get('game_id') ||
   (typeof localStorage !== 'undefined' ? localStorage.getItem('game_id') : null);
+
+// Load game plan settings (async function to be called before game starts)
+let gamePlanSettings = null;
+
+async function loadGamePlanSettings() {
+  if (!userTeamSide) {
+    console.log('⚠️ No user team side specified, skipping game plan load');
+    return;
+  }
+  
+  const teamName = userTeamSide === 'home' ? homeTeam : awayTeam;
+  const teamId = userTeamSide === 'home' ? urlParams.get('home_id') : urlParams.get('away_id');
+  
+  if (mode === 'single' && typeof localStorage !== 'undefined') {
+    // Single game mode: load from localStorage
+    const storageKey = `gameplan_${teamName}_${homeTeam}_${awayTeam}`;
+    const stored = localStorage.getItem(storageKey);
+    if (stored) {
+      try {
+        gamePlanSettings = JSON.parse(stored);
+        console.log('📋 Loaded game plan settings from localStorage (single mode):', gamePlanSettings);
+      } catch (e) {
+        console.error('Failed to parse game plan settings:', e);
+      }
+    }
+  } else if (mode === 'franchise' && franchiseId && teamId) {
+    // Franchise mode: load from database
+    try {
+      const params = new URLSearchParams();
+      params.set('mode', 'franchise');
+      params.set('franchise_id', franchiseId);
+      params.set('team_id', teamId);
+      
+      const res = await fetch(`/api/gameplan?${params.toString()}`);
+      if (res.ok) {
+        gamePlanSettings = await res.json();
+        console.log('📋 Loaded game plan settings from database (franchise mode):', gamePlanSettings);
+      } else {
+        console.error('Failed to load franchise game plan settings');
+      }
+    } catch (e) {
+      console.error('Error loading franchise game plan:', e);
+    }
+  } else if (mode === 'tournament' && tournamentId && teamId) {
+    // Tournament mode: load from database
+    try {
+      const params = new URLSearchParams();
+      params.set('mode', 'tournament');
+      params.set('tournament_id', tournamentId);
+      params.set('team_id', teamId);
+      
+      const res = await fetch(`/api/gameplan?${params.toString()}`);
+      if (res.ok) {
+        gamePlanSettings = await res.json();
+        console.log('📋 Loaded game plan settings from database (tournament mode):', gamePlanSettings);
+      } else {
+        console.error('Failed to load tournament game plan settings');
+      }
+    } catch (e) {
+      console.error('Error loading tournament game plan:', e);
+    }
+  }
+}
 let periodLabel = urlParams.get('period') || `Q${quarter}`;
 
 const homeLineup = {};
@@ -145,11 +209,21 @@ function resetGameContext() {
 
 
 async function fetchTeamRoster(teamName) {
-  const query = buildQuery({
-    tournament_id: mode === 'tournament' ? tournamentId : null,
-    franchise_id: mode === 'franchise' ? franchiseId : null,
-  });
-  const res = await fetch(`/roster/${encodeURIComponent(teamName)}${query}`);
+  // Use franchise-specific roster endpoint if in franchise mode
+  let url;
+  if (mode === 'franchise' && franchiseId) {
+    url = `/franchise/roster?franchise_id=${franchiseId}&team_name=${encodeURIComponent(teamName)}`;
+    console.log(`Loading franchise-specific roster for ${teamName}`);
+  } else {
+    const query = buildQuery({
+      tournament_id: mode === 'tournament' ? tournamentId : null,
+      franchise_id: mode === 'franchise' ? franchiseId : null,
+    });
+    url = `/roster/${encodeURIComponent(teamName)}${query}`;
+    console.log(`Loading standard roster for ${teamName}`);
+  }
+  
+  const res = await fetch(url);
   if (!res.ok) {
     throw new Error(`Failed to load roster for ${teamName}`);
   }
@@ -158,6 +232,10 @@ async function fetchTeamRoster(teamName) {
 
 async function startGame({ homeRoster, awayRoster, animate = true }) {
   DEBUG && console.log('[bootGame] startGame', { quarter, animate });
+  
+  // Load game plan settings before starting the game
+  await loadGamePlanSettings();
+  
   gameStore.reset();
   gameStore.setTeams({ home: homeTeam, away: awayTeam });
   gameStore.setRosters({ home: homeRoster, away: awayRoster });
@@ -193,6 +271,9 @@ async function startGame({ homeRoster, awayRoster, animate = true }) {
     awayLineup,
     periodLabel,
     quarter,
+    gamePlanSettings,
+    userTeamSide,
+    mode,
   };
 
   if (game.scene.isActive('GameScene')) {
@@ -324,6 +405,16 @@ async function handleSimToFourth() {
       if (currentQ === quarter) {
         if (Object.keys(homeLineup).length) payload.home_lineup = homeLineup;
         if (Object.keys(awayLineup).length) payload.away_lineup = awayLineup;
+        // Add game plan settings for ALL modes (Q1 only)
+        console.log('🔍 Game plan check:', { currentQ, quarter, hasSettings: !!gamePlanSettings, userTeamSide, mode });
+        if (currentQ === 1 && gamePlanSettings && userTeamSide) {
+          payload.user_team_side = userTeamSide;
+          payload.playcall_settings = gamePlanSettings.playcall_settings;
+          payload.strategy_settings = gamePlanSettings.strategy_settings;
+          console.log(`🎮 Sending game plan settings to backend (${mode} mode):`, { userTeamSide, playcall: gamePlanSettings.playcall_settings });
+        } else if (currentQ === 1) {
+          console.warn('⚠️ Not sending game plan settings:', { hasSettings: !!gamePlanSettings, userTeamSide });
+        }
       }
       if (DEBUG_TEAMS) {
         console.log('/api/simulate-quarter payload teams:', {
@@ -400,6 +491,16 @@ async function handleSimFullGame() {
       if (currentQ === quarter) {
         if (Object.keys(homeLineup).length) payload.home_lineup = homeLineup;
         if (Object.keys(awayLineup).length) payload.away_lineup = awayLineup;
+        // Add game plan settings for ALL modes (Q1 only)
+        console.log('🔍 Game plan check (sim full):', { currentQ, quarter, hasSettings: !!gamePlanSettings, userTeamSide, mode });
+        if (currentQ === 1 && gamePlanSettings && userTeamSide) {
+          payload.user_team_side = userTeamSide;
+          payload.playcall_settings = gamePlanSettings.playcall_settings;
+          payload.strategy_settings = gamePlanSettings.strategy_settings;
+          console.log(`🎮 Sending game plan settings to backend (${mode} mode, sim full):`, { userTeamSide, playcall: gamePlanSettings.playcall_settings });
+        } else if (currentQ === 1) {
+          console.warn('⚠️ Not sending game plan settings (sim full):', { hasSettings: !!gamePlanSettings, userTeamSide });
+        }
       }
       if (DEBUG_TEAMS) {
         console.log('/api/simulate-quarter payload teams:', {

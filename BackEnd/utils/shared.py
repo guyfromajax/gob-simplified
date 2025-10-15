@@ -96,9 +96,13 @@ def apply_help_defense_if_triggered(game, playcall, is_three, defender, shot_sco
     return shot_score - penalty, help_defender, penalty
 
 def get_fast_break_chance(game):
+    """
+    Determine fast break probability based on the OFFENSIVE team's fast_break setting.
+    Called after defensive rebounds when the rebounding team is now on offense.
+    """
     game_state = game.game_state
-    def_team = game.defense_team
-    level = def_team.strategy_settings["fast_break"]
+    off_team = game.offense_team  # Team that just got the rebound (now on offense)
+    level = off_team.strategy_settings["fast_break"]
     return [0.0, 0.25, 0.5, 0.75, 1.0][level]
 
 def get_time_elapsed(tempo_call):
@@ -461,10 +465,10 @@ def summarize_game_state(game):
             "secondary_color": game.away_team.secondary_color,
         },
     }
-    print(f"Home team primary color: {game.home_team.primary_color}")
-    print(f"Home team secondary color: {game.home_team.secondary_color}")
-    print(f"Away team primary color: {game.away_team.primary_color}")
-    print(f"Away team secondary color: {game.away_team.secondary_color}")
+    # print(f"Home team primary color: {game.home_team.primary_color}")
+    # print(f"Home team secondary color: {game.home_team.secondary_color}")
+    # print(f"Away team primary color: {game.away_team.primary_color}")
+    # print(f"Away team secondary color: {game.away_team.secondary_color}")
 
     home_team_obj = {
         "name": game.home_team.name,

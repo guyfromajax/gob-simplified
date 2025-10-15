@@ -28,6 +28,24 @@ THREE_POINT_PROBABILITY = {
     # All others default to 0.0
 }
 
+# Spots that are three-point shots (outside the arc)
+THREE_POINT_SPOTS = {
+    "key",
+    "deep key",
+    "upper wing",
+    "deep upper wing",
+    "lower wing",
+    "deep lower wing",
+    "upper midWing",
+    "lower midWing",
+    "lower midCorner",
+    "upper midCorner",
+    "upper corner",
+    "lower corner",
+    "deep upper baseline",
+    "deep lower baseline",
+}
+
 BLOCK_PROBABILITY = {
     "Inside": 0.2,
     "Attack": 0.1,
@@ -81,6 +99,9 @@ TURNOVER_CALC_DICT = {
 
 POSITION_LIST = ["PG", "SG", "SF", "PF", "C"]
 
+# Ball landing adjustment for made shots (grid units closer to shooter)
+MADE_SHOT_BALL_OFFSET = 1
+
 # constants/strategy_factors.py
 AGGRESSION_FOUL_MULTIPLIER = {
     0: 0.8,
@@ -112,6 +133,11 @@ HCO_STRING_SPOTS = {
     "lower apex": {"x": 80, "y": 15},
     "upper midBaseline": {"x": 89, "y": 36}, 
     "lower midBaseline": {"x": 89, "y": 15},
+    "deep key": {"x": 57, "y": 25},
+    "deep lower wing": {"x": 57, "y": 15},
+    "deep lower baseline": {"x": 57, "y": 5},
+    "deep upper wing": {"x": 57, "y": 35},
+    "deep upper baseline": {"x": 57, "y": 45}
 }
 
 # Shared court coordinates

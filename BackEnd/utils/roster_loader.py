@@ -12,7 +12,7 @@ def _load_from_db(team_name: str) -> Tuple[Dict | None, List[Dict]]:
     try:
         # Find the team document by name
         team_doc = teams_collection.find_one({"name": team_name})
-        print(f"🔍 Team doc: {team_doc}")
+        # print(f"🔍 Team doc: {team_doc}")
         if not team_doc:
             print(f"❌ No team found: {team_name}")
             return None, []

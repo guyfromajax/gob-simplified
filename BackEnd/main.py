@@ -89,7 +89,7 @@ def _initialize_game_stats(gm: GameManager, game_id: str | None = None) -> None:
             upsert=True,
         )
 
-    print(f"[DEV] Initialized game stats for players: {affected}")
+    # print(f"[DEV] Initialized game stats for players: {affected}")
 
 
 def _ensure_complete_lineup(team) -> None:
@@ -185,6 +185,48 @@ def simulate_quarter(
     # Recharge energy slightly between quarters
     recharge_amount = 0.3 if q == 3 else 0.2
     recharge_lineups(gm, recharge_amount)
+
+    # Handle quarter start possession
+    if q == 1 or (q > 4):  # Q1 or any OT
+        # Opening tip for Q1 and all OT periods
+        from BackEnd.utils.opening_tip import execute_opening_tip
+        tip_turn = execute_opening_tip(gm)
+        gm.turns.append(tip_turn)
+        gm.text_log.append(tip_turn["text"])
+        # Update clock for tip time elapsed
+        gm.game_state["time_remaining"] -= tip_turn["time_elapsed"]
+        minutes = gm.game_state["time_remaining"] // 60
+        seconds = gm.game_state["time_remaining"] % 60
+        gm.game_state["clock"] = f"{minutes}:{seconds:02d}"
+        print(f"🏀 Opening tip: {tip_turn['winner']} wins for {gm.offense_team.name}")
+    elif q == 2 or q == 3:
+        # Q2/Q3: Losing team from opening tip gets possession via inbound pass
+        opening_tip_winner = gm.game_state.get("opening_tip_winner", "home")
+        if opening_tip_winner == "home":
+            gm.offense_team = gm.away_team
+            gm.defense_team = gm.home_team
+        else:
+            gm.offense_team = gm.home_team
+            gm.defense_team = gm.away_team
+        
+        # Check for defensive pressure on the inbound
+        pressure_type = gm.turn_manager.determine_defensive_pressure_type()
+        gm.game_state["offensive_state"] = pressure_type
+        print(f"🏀 Q{q} start: {gm.offense_team.name} gets possession (lost opening tip) - Defense: {pressure_type}")
+    elif q == 4:
+        # Q4: Winning team from opening tip gets possession via inbound pass
+        opening_tip_winner = gm.game_state.get("opening_tip_winner", "home")
+        if opening_tip_winner == "home":
+            gm.offense_team = gm.home_team
+            gm.defense_team = gm.away_team
+        else:
+            gm.offense_team = gm.away_team
+            gm.defense_team = gm.home_team
+        
+        # Check for defensive pressure on the inbound
+        pressure_type = gm.turn_manager.determine_defensive_pressure_type()
+        gm.game_state["offensive_state"] = pressure_type
+        print(f"🏀 Q{q} start: {gm.offense_team.name} gets possession (won opening tip) - Defense: {pressure_type}")
 
     while gm.game_state["time_remaining"] > 0:
         gm.simulate_macro_turn()
@@ -439,7 +481,7 @@ def run_simulation(home_team_name, away_team_name, home_lineup_ids=None, away_li
             gm.home_team.points_by_quarter.append(0)
             gm.away_team.points_by_quarter.append(0)
 
-    print(f"*********gm:\n{gm}")
+    # print(f"*********gm:\n{gm}")
     return gm
 
 

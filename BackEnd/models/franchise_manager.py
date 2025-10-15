@@ -35,33 +35,62 @@ def load_franchise_names() -> tuple[list[str], list[str]]:
         ValueError: if the JSON is malformed or missing required keys.
     """
 
+    # Try multiple path resolution strategies
+    paths_to_try = []
+    
+    # 1. Environment variable
     env_path = os.environ.get("FRANCHISE_NAMES_FILE")
-    default_path = Path(__file__).resolve().parents[1] / "data" / "names" / "franchise_names.json"
-    path = Path(env_path).expanduser() if env_path else default_path
-    abs_path = path.resolve()
-    exists = abs_path.is_file()
-    logger.info("Loading franchise names from %s (exists=%s)", abs_path, exists)
-    if not exists:
-        msg = f"franchise names file not found: {abs_path}"
-        logger.warning(msg)
-        raise FileNotFoundError(msg)
-
+    if env_path:
+        paths_to_try.append(Path(env_path).expanduser())
+    
+    # 2. Relative to this file
+    paths_to_try.append(Path(__file__).resolve().parents[1] / "data" / "names" / "franchise_names.json")
+    
+    # 3. Relative to current working directory (for deployed environments)
+    paths_to_try.append(Path("BackEnd/data/names/franchise_names.json"))
+    
+    # 4. Try using importlib.resources for packaged data
     try:
-        with abs_path.open("r", encoding="utf-8") as f:
-            payload = json.load(f)
-    except Exception as exc:  # pragma: no cover - json errors
-        logger.warning("Failed to parse franchise names JSON %s: %s", abs_path, exc)
-        raise ValueError(f"invalid franchise names JSON: {exc}") from exc
-
-    fn = payload.get("first_names")
-    ln = payload.get("last_names")
-    if not isinstance(fn, list) or not isinstance(ln, list) or not fn or not ln:
-        msg = "Names JSON malformed: expected non-empty 'first_names' and 'last_names' lists"
-        logger.warning(msg)
-        raise ValueError(msg)
-
-    logger.info("Loaded %d first names and %d last names", len(fn), len(ln))
-    return fn, ln
+        import importlib.resources as pkg_resources
+        from BackEnd.data import names
+        if hasattr(pkg_resources, 'files'):
+            # Python 3.9+
+            names_path = pkg_resources.files(names) / "franchise_names.json"
+            paths_to_try.append(Path(str(names_path)))
+        elif hasattr(pkg_resources, 'path'):
+            # Python 3.7-3.8
+            with pkg_resources.path(names, "franchise_names.json") as p:
+                paths_to_try.append(p)
+    except Exception as e:
+        logger.debug("Could not use importlib.resources: %s", e)
+    
+    # Try each path
+    for path in paths_to_try:
+        abs_path = path.resolve() if hasattr(path, 'resolve') else Path(path)
+        exists = abs_path.is_file()
+        logger.info("Checking franchise names at %s (exists=%s)", abs_path, exists)
+        
+        if exists:
+            try:
+                with abs_path.open("r", encoding="utf-8") as f:
+                    payload = json.load(f)
+                
+                fn = payload.get("first_names")
+                ln = payload.get("last_names")
+                if not isinstance(fn, list) or not isinstance(ln, list) or not fn or not ln:
+                    logger.warning("Names JSON malformed at %s", abs_path)
+                    continue
+                
+                logger.info("✅ Loaded %d first names and %d last names from %s", len(fn), len(ln), abs_path)
+                return fn, ln
+            except Exception as exc:
+                logger.warning("Failed to parse franchise names JSON %s: %s", abs_path, exc)
+                continue
+    
+    # If we get here, none of the paths worked
+    msg = f"franchise names file not found. Tried paths: {[str(p) for p in paths_to_try]}"
+    logger.error(msg)
+    raise FileNotFoundError(msg)
 
 
 class FranchiseManager:
@@ -95,8 +124,10 @@ class FranchiseManager:
             )
         prev_stats = existing.get("players", {})
         players_map: dict[str, dict] = {}
+        
+        # Load all players with their full attributes for franchise-specific storage
         players = self.db.players.find(
-            {}, {"first_name": 1, "last_name": 1, "team": 1, "team_id": 1}
+            {}, {"first_name": 1, "last_name": 1, "team": 1, "team_id": 1, "attributes": 1, "position_ratings": 1}
         )
         for p in players:
             pid = str(p.get("_id"))
@@ -109,14 +140,68 @@ class FranchiseManager:
             tid = p.get("team_id")
             if tid is not None:
                 meta["team_id"] = str(tid)
+            
+            # Store franchise-specific player attributes and position ratings (cloned from core collection)
             players_map[pid] = {
                 "meta": meta,
                 "season": zero_stats.copy(),
                 "career": career,
+                "attributes": p.get("attributes", {}).copy(),  # Clone player attributes for this franchise
+                "position_ratings": p.get("position_ratings", {}).copy(),  # Clone position ratings for this franchise
             }
 
+        # Initialize franchise-specific team stats (clone from core teams)
+        franchise_teams = {}
+        for team in self.teams:
+            team_id = str(team["_id"])
+            franchise_teams[team_id] = {
+                "team_chemistry": team.get("team_chemistry", 0),
+                "offensive_efficiency": team.get("offensive_efficiency", 0),
+                "offensive_adjust": team.get("offensive_adjust", 0),
+                "defense_threshold": team.get("defense_threshold", 0),
+                "shot_threshold": team.get("shot_threshold", 0),
+                "turnover_threshold": team.get("turnover_threshold", 0),
+                "foul_threshold": team.get("foul_threshold", 0),
+                "rebound_modifier": team.get("rebound_modifier", 0),
+                "o_tendency_reads": team.get("o_tendency_reads", 0),
+                "d_tendency_reads": team.get("d_tendency_reads", 0),
+                # Game plan settings (all start at 2 = Normal)
+                "playcall_settings": {
+                    "Base": 2,
+                    "Freelance": 2,
+                    "Inside": 2,
+                    "Attack": 2,
+                    "Outside": 2,
+                    "Set": 2
+                },
+                "strategy_settings": {
+                    "defense": 2,
+                    "tempo": 2,
+                    "aggression": 2,
+                    "fast_break": 2,
+                    "half_court_trap": 2,
+                    "full_court_press": 2
+                }
+            }
+
+        # Initialize training status - needs training before week 1 (training camp)
+        training_status = {
+            "current_week": 0,
+            "training_completed": False,
+            "session_type": "preseason"  # First training is always training camp
+        }
+
+        # Generate initial recruits for the franchise
+        recruits = self.recruit_manager.generate_recruits_list()
+        
         self.save_season_state(
-            extra_state={"players": players_map, "applied_games": []}
+            extra_state={
+                "players": players_map, 
+                "applied_games": [],
+                "franchise_teams": franchise_teams,
+                "training_status": training_status,
+                "recruits": recruits
+            }
         )
 
     def reset_stats(self):
@@ -253,7 +338,18 @@ class FranchiseManager:
         return {"Freshman": "Sophomore", "Sophomore": "Junior", "Junior": "Senior"}.get(year, year)
 
     def generate_recruits(self):
-        self.recruit_manager.generate_recruits()
+        """
+        Generate recruits and save them to the franchise document.
+        Each franchise gets its own unique recruit pool with 40 players.
+        Recruits are stored in the franchise.recruits field for isolation.
+        """
+        recruits = self.recruit_manager.generate_recruits_list()
+        if self.franchise_id:
+            self.db.franchises.update_one(
+                {"_id": self.franchise_id}, 
+                {"$set": {"recruits": recruits}}
+            )
+        return recruits
 
     def save_season_state(self, extra_state: dict | None = None):
         state = {"week": self.week, "schedule": self.schedule}
@@ -318,20 +414,162 @@ class RecruitManager:
         self.diagnostics = None
 
         try:
-            self.first_names, self.last_names = load_franchise_names()
+            loaded_first, loaded_last = load_franchise_names()
+            self.first_names = loaded_first
+            self.last_names = loaded_last
+            logger.info(f"✅ Loaded {len(self.first_names)} first names and {len(self.last_names)} last names for recruits")
         except Exception as exc:
-            logger.warning("Using fallback recruit names: %s", exc)
+            logger.error(f"❌ Failed to load franchise names, using fallback: {exc}")
+            logger.error(f"Fallback names: {len(self.first_names)} first, {len(self.last_names)} last")
 
-    def generate_recruits(self, count=40):
+    def generate_recruits_list(self, count=40):
+        """Generate and return a list of recruits (does not save to DB)."""
+        from BackEnd.utils.position_ratings import compute_position_ratings
+        
         recruits = []
         for _ in range(count):
-            name = f"{random.choice(self.first_names)} {random.choice(self.last_names)}"
-            attributes = {k: random.randint(1, 30) for k in
-                          ["SC","SH","ID","OD","PS","BH","RB","AG","ST","ND","IQ","FT"]}
-            recruits.append({"name": name, "attributes": attributes,
-                             "year": "Freshman", "created_at": datetime.utcnow()})
-
+            first_name = random.choice(self.first_names)
+            last_name = random.choice(self.last_names)
+            # Format last name to title case (only first letter capitalized)
+            last_name_formatted = last_name.title()
+            name = f"{first_name} {last_name_formatted}"
+            
+            # Select archetype with weighted probabilities
+            archetype = self._select_archetype()
+            
+            # Generate attributes, height, and weight based on archetype
+            attributes, height, weight = self._generate_recruit_profile(archetype)
+            
+            # Calculate position ratings for the recruit
+            recruit_for_ratings = {
+                "attributes": attributes,
+                "height": height,
+                "name": name
+            }
+            position_ratings = compute_position_ratings(recruit_for_ratings)
+            
+            recruits.append({
+                "name": name, 
+                "attributes": attributes,
+                "position_ratings": position_ratings,
+                "height": height,
+                "weight": weight,
+                "archetype": archetype,
+                "year": "Freshman", 
+                "created_at": datetime.utcnow()
+            })
+        
+        return recruits
+    
+    def generate_recruits(self, count=40):
+        """Legacy method: Generate recruits and save to global recruits collection.
+        Deprecated - use generate_recruits_list() and store in franchise document instead.
+        """
+        recruits = self.generate_recruits_list(count)
         if recruits:
             self.db.recruits.delete_many({})
             self.db.recruits.insert_many(recruits)
+    
+    def _select_archetype(self):
+        """Select a recruit archetype with weighted probabilities."""
+        # Define archetypes with their selection weights
+        # Five-Star and Four-Star are rare, others are equally common
+        archetypes_weights = [
+            ("Five-Star", 1),
+            ("Four-Star", 4),
+            ("Defensive Wizard", 3.6),
+            ("All-Around Scorer", 3.6),
+            ("Classic PG", 3.6),
+            ("Classic SG", 3.6),
+            ("Classic SF", 3.6),
+            ("Classic PF", 3.6),
+            ("Classic C", 3.6),
+            ("Pure Shooter", 3.6),
+            ("Intangibles", 3.6),
+            ("Athlete", 3.6),
+            ("Inside Defender", 3.6),
+            ("Outside Defender", 3.6),
+            ("Average", 13.6),
+            ("Below Average", 13.6),
+            ("Outside Dual Threat", 3.6),
+            ("Driver", 3.6),
+            ("Outside C", 3.6),
+            ("Three & D", 3.6),
+        ]
+        
+        archetypes = [a[0] for a in archetypes_weights]
+        weights = [a[1] for a in archetypes_weights]
+        
+        return random.choices(archetypes, weights=weights, k=1)[0]
+    
+    def _generate_recruit_profile(self, archetype):
+        """Generate attributes, height, and weight for a recruit based on archetype."""
+        # Define attribute ranges
+        STRONG = (20, 40)
+        SECONDARY = (10, 40)
+        STANDARD = (1, 40)
+        WEAK = (1, 20)
+        
+        # All attributes start as STANDARD
+        ALL_ATTRS = ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "AG", "ST", "ND", "IQ", "FT", "CH"]
+        
+        # Define archetype configurations: (strong_attrs, secondary_attrs, height_range)
+        archetype_configs = {
+            "Five-Star": (ALL_ATTRS, [], (69, 80)),
+            "Four-Star": ([], ALL_ATTRS, (66, 78)),
+            "Defensive Wizard": (["ID", "OD"], ["ST", "AG"], (66, 78)),
+            "All-Around Scorer": (["SH", "SC"], ["ST", "AG"], (66, 78)),
+            "Classic PG": (["BH", "PS"], ["OD", "IQ"], (66, 78)),
+            "Classic SG": (["SH"], ["OD"], (66, 78)),
+            "Classic SF": (["SC", "OD"], ["AG"], (66, 78)),
+            "Classic PF": (["RB"], ["ST"], (70, 80)),
+            "Classic C": (["ID", "ST"], ["RB", "SC"], (72, 82)),
+            "Pure Shooter": (["SH", "FT"], [], (66, 78)),
+            "Intangibles": (["IQ", "ND", "CH"], [], (66, 78)),
+            "Athlete": (["AG", "ST", "ND"], [], (66, 78)),
+            "Inside Defender": (["ST", "ID"], [], (71, 80)),
+            "Outside Defender": (["AG", "OD"], [], (66, 77)),
+            "Average": ([], [], (66, 78)),
+            "Below Average": ([], [], (66, 78)),  # All weak
+            "Outside Dual Threat": (["SH", "AG"], [], (66, 78)),
+            "Driver": (["SC", "AG"], [], (66, 78)),
+            "Outside C": (["ST", "SH"], [], (72, 82)),
+            "Three & D": (["SH"], ["ID", "OD"], (69, 77)),
+        }
+        
+        strong_attrs, secondary_attrs, height_range = archetype_configs[archetype]
+        
+        # Generate height first (needed for weight calculation)
+        height = random.randint(height_range[0], height_range[1])
+        
+        # Generate weight based on height
+        weight = self._generate_weight(height)
+        
+        # Generate attributes
+        attributes = {}
+        for attr in ALL_ATTRS:
+            if archetype == "Below Average":
+                # All attributes are weak for Below Average
+                value = random.randint(WEAK[0], WEAK[1])
+            elif attr in strong_attrs:
+                value = random.randint(STRONG[0], STRONG[1])
+            elif attr in secondary_attrs:
+                value = random.randint(SECONDARY[0], SECONDARY[1])
+            else:
+                value = random.randint(STANDARD[0], STANDARD[1])
+            
+            attributes[attr] = value
+        
+        return attributes, height, weight
+    
+    def _generate_weight(self, height):
+        """Generate weight based on height."""
+        if height < 72:
+            return random.randint(150, 190)
+        elif 72 <= height <= 75:
+            return random.randint(170, 210)
+        elif 76 <= height <= 80:
+            return random.randint(195, 240)
+        else:  # > 80
+            return random.randint(220, 270)
 

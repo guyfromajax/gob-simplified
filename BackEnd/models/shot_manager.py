@@ -1,6 +1,7 @@
 import random
 from BackEnd.constants import (
     THREE_POINT_PROBABILITY, 
+    THREE_POINT_SPOTS,
     PLAYCALL_ATTRIBUTE_WEIGHTS, 
     BLOCK_PROBABILITY,
     AGGRESSION_FOUL_MULTIPLIER
@@ -27,6 +28,55 @@ class ShotManager:
         self.game_state = game.game_state  # still accessible
         # Add defense score tracking
         self.defense_scores = []
+    
+    def is_three_point_shot(self, shooter, roles):
+        """
+        Determine if a shot is a three-pointer based on the shooter's spot.
+        
+        Args:
+            shooter: The player taking the shot
+            roles: The roles dict containing steps/skeleton data
+            
+        Returns:
+            bool: True if three-pointer, False if two-pointer
+        """
+        # Get the shooter's position
+        shooter_pos = None
+        for pos, player in self.game.offense_team.lineup.items():
+            if player == shooter:
+                shooter_pos = pos
+                break
+        
+        if not shooter_pos:
+            return False
+        
+        # Find the shooter's spot from the final step (where they shoot)
+        steps = roles.get("steps", [])
+        if not steps:
+            return False
+        
+        # Check the last step for the shooter's spot
+        for step in reversed(steps):
+            pos_actions = step.get("pos_actions", {})
+            shooter_action = pos_actions.get(shooter_pos)
+            if shooter_action and shooter_action.get("action") == "shoot":
+                spot = shooter_action.get("spot", "")
+                # Check if spot is a three-point spot
+                if spot in THREE_POINT_SPOTS:
+                    return True
+                # Check if shot is from backcourt (other half of court)
+                spot_coords = shooter_action.get("coords")
+                if spot_coords:
+                    # Home offense: backcourt is X < 50
+                    # Away offense: backcourt is X > 50
+                    is_home_offense = self.game.offense_team.team_id == self.game.home_team.team_id
+                    if is_home_offense and spot_coords.get("x", 50) < 50:
+                        return True  # Backcourt shot
+                    elif not is_home_offense and spot_coords.get("x", 50) > 50:
+                        return True  # Backcourt shot
+                return False
+        
+        return False
 
 
     def resolve_shot(self, roles):
@@ -44,7 +94,12 @@ class ShotManager:
 
         playcall = self.game_state["current_playcall"]
         defense_call = self.game_state["defense_playcall"]
-        is_three = random.random() < THREE_POINT_PROBABILITY.get(playcall, 0.0)
+        
+        # Determine if shot is three-pointer based on shooter's spot
+        is_three = self.is_three_point_shot(shooter, roles)
+        # Debug: print shooter spot and three-point determination
+        # print(f"Shot determination: is_three={is_three}, shooter={get_name_safe(shooter)}")
+        
         shot_threshold = off_team.team_attributes["shot_threshold"]
         if is_three:
             shot_threshold += 100
@@ -88,6 +143,11 @@ class ShotManager:
                 self.game_state["free_throws_remaining"] = 1
                 text = f"{get_name_safe(shooter)} makes the shot. {get_name_safe(foul_player)} fouls him! AND-1 opportunity!"
             else:
+                # Check for defensive pressure opportunity (FCP/HCT)
+                pressure_type = self.game.turn_manager.determine_defensive_pressure_type()
+                self.game_state["offensive_state"] = pressure_type
+                # Store pressure type for animator to use
+                result["next_defensive_setup"] = pressure_type
                 text = f"{get_name_safe(shooter)} drains a 3!" if is_three else f"{get_name_safe(shooter)} makes the shot."
 
         # ------------------------
@@ -154,43 +214,18 @@ class ShotManager:
                 text += f"...{get_name_safe(rebounder)} grabs the rebound."
                 result["rebounderId"] = getattr(rebounder, "player_id", None)
                 result["rebound_type"] = stat
-                possession_flips = rebound_team != off_team
-
+                
                 if stat == "OREB":
-                    events.append({"event_type": "offReb", "rebounderId": getattr(rebounder, "player_id", None)})
-                    self.game.turn_manager.logger.log("offReb")
-                    rebound_event = resolve_offensive_rebound(self.game, rebounder)
-                    events.append(rebound_event)
-                    time_elapsed += rebound_event.get("timeElapsed", 0)
-
-                    if rebound_event["event_type"] == "PUTBACK_ATTEMPT":
-                        self.game.turn_manager.logger.log("putbackStart")
-                        self.game.turn_manager.logger.log(rebound_event["result"].lower())
-                        if rebound_event["result"] == "MAKE":
-                            shooter = rebounder
-                            made = True
-                            points = rebound_event.get("points", 2)
-                            text += f" {get_name_safe(rebounder)} puts it back in."
-                            possession_flips = True
-                        else:
-                            text += f" {get_name_safe(rebounder)} misses the putback."
-                            possession_flips = rebound_event.get("possession_flips", possession_flips)
-                            
-                            # Add defensive rebound text if possession flips
-                            if possession_flips and rebound_event.get("rebound"):
-                                def_rebounder_id = rebound_event["rebound"]["rebounderId"]
-                                def_rebounder = None
-                                for player in def_team.get_all_players():
-                                    if getattr(player, "player_id", None) == def_rebounder_id:
-                                        def_rebounder = player
-                                        break
-                                if def_rebounder:
-                                    text += f" {get_name_safe(def_rebounder)} grabs the defensive rebound."
-                    else:
-                        self.game.turn_manager.logger.log("kickoutStart")
-                        text += f" {get_name_safe(rebounder)} kicks it out to reset." 
-                        possession_flips = rebound_event.get("possession_flips", possession_flips)
+                    possession_flips = False
+                    # Store OREB info for game_manager to create a separate OREB turn
+                    self.game_state["pending_oreb"] = {
+                        "rebounder": rebounder,
+                        "rebounder_id": getattr(rebounder, "player_id", None),
+                    }
+                    # OREB will be handled as a separate turn
+                    # Don't process putback here - let next turn handle it
                 else:
+                    possession_flips = True
                     events.append({
                         "event_type": "defReb",
                         "rebounderId": getattr(rebounder, "player_id", None),
@@ -206,7 +241,6 @@ class ShotManager:
         time_elapsed += get_time_elapsed(tempo)
 
         shooter_pos = get_player_position(off_lineup, shooter)
-        print(f"end of resolve_shot, possession_flips: {possession_flips}")
 
         result.update({
             "result_type": "MAKE" if made else "MISS",
@@ -225,6 +259,7 @@ class ShotManager:
         if made:
             result["points"] = points
             result["scoring_team"] = off_team.name
+            # next_defensive_setup is already in result from line 95
 
         return result
 
@@ -310,10 +345,10 @@ class ShotManager:
         gravity_boost = total_gravity * 0.02
         shot_score += gravity_boost
 
-        print(f"Off-ball gravity boost: +{round(gravity_boost, 2)} from {gravity_contributors}")
-        print(f"offense call: {playcall} // defense call: {defense_call}")
-        print(f"shooter: {get_name_safe(shooter)} | passer: {get_name_safe(passer)}")
-        print(f"shot score = {round(shot_score, 2)} | (defense penalty: {round(defense_score * 0.2, 2)})")
+        # print(f"Off-ball gravity boost: +{round(gravity_boost, 2)} from {gravity_contributors}")
+        # print(f"offense call: {playcall} // defense call: {defense_call}")
+        # print(f"shooter: {get_name_safe(shooter)} | passer: {get_name_safe(passer)}")
+        # print(f"shot score = {round(shot_score, 2)} | (defense penalty: {round(defense_score * 0.2, 2)})")
 
         return shot_score, help_defender, d_foul, foul_player
 
@@ -334,8 +369,8 @@ class ShotManager:
         foul_threshold = defense_team.team_attributes.get("foul_threshold", 30)
 
         d_foul = defense_score < (foul_threshold * aggression_factor)
-        print("End of check_defensive_foul_on_shot")
-        print(f"defense_score: {defense_score} < foul_threshold: {foul_threshold} * aggression_factor: {aggression_factor}")
+        # print("End of check_defensive_foul_on_shot")
+        # print(f"defense_score: {defense_score} < foul_threshold: {foul_threshold} * aggression_factor: {aggression_factor}")
         return d_foul, defender if d_foul else None
 
 
@@ -356,6 +391,8 @@ class ShotManager:
         shot_score = (attrs["SC"] * 0.6 + attrs["CH"] * 0.2 + attrs["IQ"] * 0.2) * random.randint(1, 6)
 
         defender = random.choice(fb_roles["defense"]) if fb_roles["defense"] else None
+        fb_roles["defender"] = defender  # Store for animation
+        
         defense_attrs = defender.attributes if defender else {"ID": 0, "IQ": 0, "CH": 0}
         defense_score = (
             defense_attrs.get("ID", 0) * 0.8 +
@@ -371,7 +408,6 @@ class ShotManager:
 
         made = shot_score >= off_team.team_attributes["shot_threshold"]
         shooter.record_stat("FGA")
-        # print(f"{get_name_safe(shooter)} attempts a fast breakshot")
 
         if made:
             if passer:
@@ -380,7 +416,10 @@ class ShotManager:
             apply_scoring(self.game, off_team, shooter, points, ["FGM"])
             text = f"{shooter} converts the fast break shot!"
             possession_flips = True
-            self.game_state["offensive_state"] = "HCO"
+            # Check for defensive pressure opportunity (FCP/HCT) after fast break make
+            pressure_type = self.game.turn_manager.determine_defensive_pressure_type()
+            self.game_state["offensive_state"] = pressure_type
+            result["next_defensive_setup"] = pressure_type
         else:
             if defender:
                 defender.record_stat("DEF_S")

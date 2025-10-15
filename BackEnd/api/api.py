@@ -28,6 +28,7 @@ from BackEnd.models.animator import Animator
 from .tournament_routes import router as tournament_router
 from .training_routes import router as training_router
 from .franchise_routes import router as franchise_router
+from .gameplan_routes import router as gameplan_router
 import traceback
 from unidecode import unidecode
 from typing import Optional
@@ -40,6 +41,7 @@ app = FastAPI()
 app.include_router(tournament_router)
 app.include_router(training_router)
 app.include_router(franchise_router)
+app.include_router(gameplan_router)
 
 templates = Jinja2Templates(directory="FrontEnd/static")
 
@@ -72,6 +74,10 @@ class QuarterSimulationRequest(BaseModel):
     quarter: int = 1
     home_lineup: dict[str, str] | None = None
     away_lineup: dict[str, str] | None = None
+    # Game plan settings (for user's team in single game mode)
+    user_team_side: str | None = None  # "home" or "away"
+    playcall_settings: dict[str, int] | None = None
+    strategy_settings: dict[str, int] | None = None
 
 
 ongoing_games: dict[str, GameManager] = {}
@@ -252,7 +258,35 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                     logging.exception("Failed to load game state for %s", game_id)
             if gm is None:
                 if request.quarter == 1:
-                    gm = GameManager(request.home_team, request.away_team)
+                    # Determine which team gets the user's settings
+                    home_playcall = None
+                    home_strategy = None
+                    away_playcall = None
+                    away_strategy = None
+                    
+                    if request.user_team_side == "home" and request.playcall_settings and request.strategy_settings:
+                        home_playcall = request.playcall_settings
+                        home_strategy = request.strategy_settings
+                        # In single game mode, apply defensive strategy to BOTH teams for consistent pressure
+                        away_strategy = request.strategy_settings
+                        # print(f"🎮 Applying user's playcall settings to home team ({request.home_team})")
+                        # print(f"🎮 Applying user's strategy settings to BOTH teams for consistent defense")
+                    elif request.user_team_side == "away" and request.playcall_settings and request.strategy_settings:
+                        away_playcall = request.playcall_settings
+                        away_strategy = request.strategy_settings
+                        # In single game mode, apply defensive strategy to BOTH teams for consistent pressure
+                        home_strategy = request.strategy_settings
+                        # print(f"🎮 Applying user's playcall settings to away team ({request.away_team})")
+                        # print(f"🎮 Applying user's strategy settings to BOTH teams for consistent defense")
+                    
+                    gm = GameManager(
+                        request.home_team, 
+                        request.away_team,
+                        home_playcall_settings=home_playcall,
+                        home_strategy_settings=home_strategy,
+                        away_playcall_settings=away_playcall,
+                        away_strategy_settings=away_strategy
+                    )
                     game_id = str(uuid.uuid4())
                     ongoing_games[game_id] = gm
                     source = "new"
@@ -261,7 +295,35 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                         logging.debug("simulate_quarter_endpoint unknown game_id=%s", game_id)
                     raise HTTPException(status_code=400, detail="Unknown game_id")
     else:
-        gm = GameManager(request.home_team, request.away_team)
+        # Determine which team gets the user's settings
+        home_playcall = None
+        home_strategy = None
+        away_playcall = None
+        away_strategy = None
+        
+        if request.user_team_side == "home" and request.playcall_settings and request.strategy_settings:
+            home_playcall = request.playcall_settings
+            home_strategy = request.strategy_settings
+            # In single game mode, apply defensive strategy to BOTH teams for consistent pressure
+            away_strategy = request.strategy_settings
+            # print(f"🎮 Applying user's playcall settings to home team ({request.home_team})")
+            # print(f"🎮 Applying user's strategy settings to BOTH teams for consistent defense")
+        elif request.user_team_side == "away" and request.playcall_settings and request.strategy_settings:
+            away_playcall = request.playcall_settings
+            away_strategy = request.strategy_settings
+            # In single game mode, apply defensive strategy to BOTH teams for consistent pressure
+            home_strategy = request.strategy_settings
+            # print(f"🎮 Applying user's playcall settings to away team ({request.away_team})")
+            # print(f"🎮 Applying user's strategy settings to BOTH teams for consistent defense")
+        
+        gm = GameManager(
+            request.home_team, 
+            request.away_team,
+            home_playcall_settings=home_playcall,
+            home_strategy_settings=home_strategy,
+            away_playcall_settings=away_playcall,
+            away_strategy_settings=away_strategy
+        )
         game_id = str(uuid.uuid4())
         ongoing_games[game_id] = gm
         source = "new"
@@ -381,7 +443,7 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
 
 @app.get("/roster/{team_name}")
 def get_team_roster(team_name: str, tournament_id: str | None = None):
-    print(f"🔍 Endpoint hit: GET /roster/{team_name}")
+    # print(f"🔍 Endpoint hit: GET /roster/{team_name}")
     if tournament_id:
         print(f"🔍 Tournament ID provided but ignored: {tournament_id}")
 

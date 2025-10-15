@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import FileResponse, RedirectResponse
 from pydantic import BaseModel
 from pathlib import Path
@@ -330,9 +330,18 @@ def complete_week(req: CompleteWeekRequest):
 
     existing_results = franchise_doc.get("results", {})
     existing_results[str(req.week)] = results
+    
+    # Reset training status for next week
+    next_week = req.week + 1
     db.franchises.update_one(
         {"_id": franchise_id},
-        {"$set": {"results": existing_results, "week": req.week + 1}},
+        {"$set": {
+            "results": existing_results, 
+            "week": next_week,
+            "training_status.current_week": next_week,
+            "training_status.training_completed": False,
+            "training_status.session_type": "in-season"
+        }},
     )
 
     id_to_name = {str(t["_id"]): t.get("name", "") for t in db.teams.find({}, {"name": 1})}
@@ -349,10 +358,32 @@ def complete_week(req: CompleteWeekRequest):
 
 
 @router.get("/franchise/command-center/data")
-def command_center_data():
+def command_center_data(franchise_id: str = None):
     state = franchise_state_collection.find_one({"_id": "state"}) or {}
     team_name = state.get("team", "")
     team_doc = db.teams.find_one({"name": team_name}) or {}
+    
+    # Get training status from franchise if franchise_id provided
+    training_completed = False
+    session_type = "in-season"
+    if franchise_id:
+        try:
+            fid = ObjectId(franchise_id)
+            franchise_doc = db.franchises.find_one({"_id": fid})
+            if franchise_doc:
+                training_status = franchise_doc.get("training_status", {})
+                training_completed = training_status.get("training_completed", False)
+                session_type = training_status.get("session_type", "in-season")
+                
+                # Get franchise-specific team stats if available
+                team_id = str(team_doc.get("_id"))
+                franchise_teams = franchise_doc.get("franchise_teams", {})
+                franchise_team_stats = franchise_teams.get(team_id, {})
+                if franchise_team_stats:
+                    team_doc = franchise_team_stats  # Use franchise-specific stats
+        except Exception:
+            pass
+    
     return {
         "team": team_name,
         "username": state.get("username", "Coach"),
@@ -363,7 +394,9 @@ def command_center_data():
         "athleticism": team_doc.get("athleticism", "-"),
         "intangibles": team_doc.get("intangibles", "-"),
         "prestige": team_doc.get("prestige", "-"),
-        "rank": team_doc.get("rank", "-")
+        "rank": team_doc.get("rank", "-"),
+        "training_completed": training_completed,
+        "session_type": session_type
     }
 
 
@@ -681,6 +714,331 @@ def user_team_player_stats_endpoint(
 
 
 @router.get("/franchise/recruits")
-def recruits():
-    recs = list(db.recruits.find({}, {"_id": 0}).limit(40))
+def recruits(franchise_id: str = Query(...)):
+    """Get recruits for a specific franchise."""
+    from bson import ObjectId
+    
+    # Get recruits from franchise document
+    franchise = db.franchises.find_one(
+        {"_id": ObjectId(franchise_id)}, 
+        {"recruits": 1}
+    )
+    
+    if not franchise:
+        return {"recruits": []}
+    
+    recs = franchise.get("recruits", [])
     return {"recruits": recs}
+
+
+@router.get("/franchise/debug-names")
+def debug_names():
+    """Debug endpoint to check if franchise names are loading correctly."""
+    from BackEnd.models.franchise_manager import RecruitManager
+    rm = RecruitManager(db)
+    return {
+        "first_names_count": len(rm.first_names),
+        "last_names_count": len(rm.last_names),
+        "sample_first_names": rm.first_names[:10],
+        "sample_last_names": rm.last_names[:10],
+        "using_fallback": len(rm.first_names) == 5 and len(rm.last_names) == 5
+    }
+
+
+@router.get("/franchise/latest-training")
+def get_latest_training(franchise_id: str):
+    """
+    Get the latest training session results for display on Training tab.
+    """
+    try:
+        fid = ObjectId(franchise_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid franchise ID")
+    
+    franchise_doc = db.franchises.find_one({"_id": fid}, {"latest_training": 1})
+    if not franchise_doc:
+        raise HTTPException(status_code=404, detail="Franchise not found")
+    
+    latest_training = franchise_doc.get("latest_training", {})
+    return latest_training if latest_training else {
+        "player_logs": {},
+        "team_log": {},
+        "session_type": "in-season",
+        "week": 0
+    }
+
+
+@router.get("/franchise/roster")
+def get_franchise_roster(franchise_id: str, team_name: str = None):
+    """
+    Get roster with franchise-specific player attributes.
+    """
+    try:
+        fid = ObjectId(franchise_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid franchise ID")
+    
+    # Get team name from state if not provided
+    if not team_name:
+        state = franchise_state_collection.find_one({"_id": "state"}) or {}
+        team_name = state.get("team")
+    
+    if not team_name:
+        raise HTTPException(status_code=404, detail="Team not found")
+    
+    # Get team document
+    team_doc = db.teams.find_one({"name": team_name})
+    if not team_doc:
+        raise HTTPException(status_code=404, detail="Team not found")
+    
+    # Get franchise document
+    franchise_doc = db.franchises.find_one({"_id": fid})
+    if not franchise_doc:
+        raise HTTPException(status_code=404, detail="Franchise not found")
+    
+    franchise_players = franchise_doc.get("players", {})
+    team_player_ids = team_doc.get("player_ids", [])
+    
+    # Build player list with franchise-specific attributes
+    players = []
+    for pid in team_player_ids:
+        pid_str = str(pid)
+        franchise_player_data = franchise_players.get(pid_str, {})
+        if not franchise_player_data:
+            continue
+        
+        meta = franchise_player_data.get("meta", {})
+        attributes = franchise_player_data.get("attributes", {})
+        
+        # Get franchise-specific position ratings (if available), otherwise use core ratings
+        position_ratings = franchise_player_data.get("position_ratings", {})
+        
+        # Get additional data from core collection
+        core_player = db.players.find_one({"_id": pid}, {
+            "position_ratings": 1, "height": 1, "weight": 1, "jersey": 1, "year": 1
+        })
+        
+        # Use franchise position ratings if available, otherwise fall back to core
+        if not position_ratings and core_player:
+            position_ratings = core_player.get("position_ratings", {})
+        
+        first = meta.get("first_name", "")
+        last = meta.get("last_name", "")
+        
+        player = {
+            "_id": pid_str,  # Add _id for lineup tracking
+            "first_name": first,
+            "last_name": last,
+            "name": f"{first} {last}".strip(),  # Add combined name for display
+            "team": team_name,
+            "attributes": attributes,
+            "position_ratings": position_ratings,
+            "height": core_player.get("height") if core_player else None,
+            "weight": core_player.get("weight") if core_player else None,
+            "jersey": core_player.get("jersey") if core_player else None,
+            "year": core_player.get("year") if core_player else None
+        }
+        players.append(player)
+    
+    return {"players": players}
+
+
+class FranchiseTrainingRequest(BaseModel):
+    franchise_id: str
+    allocations: dict
+
+
+@router.post("/franchise/run-training")
+def run_franchise_training(req: FranchiseTrainingRequest):
+    """
+    Run training for a franchise team using franchise-specific player/team attributes.
+    Updates only the franchise document, not the core collections.
+    """
+    try:
+        franchise_id = ObjectId(req.franchise_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid franchise ID format")
+
+    # Load franchise document
+    franchise_doc = db.franchises.find_one({"_id": franchise_id})
+    if not franchise_doc:
+        raise HTTPException(status_code=404, detail="Franchise not found")
+
+    # Get training status
+    training_status = franchise_doc.get("training_status", {})
+    if training_status.get("training_completed", False):
+        raise HTTPException(status_code=400, detail="Training already completed for this week")
+
+    # Get user's team
+    state = franchise_state_collection.find_one({"_id": "state"}) or {}
+    team_name = state.get("team")
+    if not team_name:
+        raise HTTPException(status_code=404, detail="User team not found")
+    
+    team_doc = db.teams.find_one({"name": team_name})
+    if not team_doc:
+        raise HTTPException(status_code=404, detail="Team not found")
+    
+    team_id = str(team_doc["_id"])
+
+    # Get franchise-specific player data for the user's team
+    franchise_players = franchise_doc.get("players", {})
+    team_player_ids = team_doc.get("player_ids", [])
+    
+    # Build player list with franchise-specific attributes
+    players_for_training = []
+    for pid in team_player_ids:
+        pid_str = str(pid)
+        franchise_player_data = franchise_players.get(pid_str, {})
+        if not franchise_player_data:
+            continue
+        
+        # Build player dict for training
+        player = {
+            "_id": pid_str,
+            "first_name": franchise_player_data.get("meta", {}).get("first_name", ""),
+            "last_name": franchise_player_data.get("meta", {}).get("last_name", ""),
+            "team": team_name,
+            "attributes": franchise_player_data.get("attributes", {})
+        }
+        players_for_training.append(player)
+
+    if not players_for_training:
+        raise HTTPException(status_code=404, detail="No players found for training")
+
+    # Get franchise-specific team stats
+    franchise_teams = franchise_doc.get("franchise_teams", {})
+    team_stats = franchise_teams.get(team_id, {}).copy()
+
+    # Snapshot initial values for comparison
+    player_baselines = {
+        p["_id"]: {k: v for k, v in p.get("attributes", {}).items() if k.startswith("anchor_")}
+        for p in players_for_training
+    }
+    team_baseline = team_stats.copy()
+
+    # Create and run training session
+    from BackEnd.models.training_manager import TrainingSession
+    session_type = training_status.get("session_type", "in-season")
+    session = TrainingSession(session_type=session_type, date="", team_id=team_id)
+    
+    # Apply allocations
+    for category, allocation in req.allocations.items():
+        try:
+            session.assign_points(category, allocation)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
+    # Apply training
+    player_updates = session.apply_training(players_for_training, team_stats)
+
+    # Apply the attribute updates to the player objects first
+    for player in players_for_training:
+        pid = player["_id"]
+        if pid in player_updates:
+            for attr, val in player_updates[pid].items():
+                # Update the player object's attributes with new values
+                player["attributes"][attr] = val
+                # Also update base attribute if this is an anchor field
+                if attr.startswith("anchor_"):
+                    base_attr = attr.replace("anchor_", "")
+                    player["attributes"][base_attr] = val
+
+    # Recalculate position ratings for each player after training (with updated attributes)
+    from BackEnd.utils.position_ratings import compute_position_ratings
+    position_ratings_updates = {}
+    
+    for player in players_for_training:
+        pid = player["_id"]
+        # Get player's height (from core collection or franchise meta)
+        # Try as string first (UUID), fall back to ObjectId if that fails
+        core_player = db.players.find_one({"_id": pid}, {"height": 1})
+        if not core_player:
+            try:
+                core_player = db.players.find_one({"_id": ObjectId(pid)}, {"height": 1})
+            except:
+                pass
+        height = core_player.get("height") if core_player else None
+        
+        # Build player dict for position ratings calculation with updated attributes
+        player_for_ratings = {
+            "attributes": player.get("attributes", {}),  # Now contains updated values!
+            "height": height,
+            "name": f"{player.get('first_name', '')} {player.get('last_name', '')}"
+        }
+        
+        # Compute new position ratings
+        new_ratings = compute_position_ratings(player_for_ratings)
+        position_ratings_updates[pid] = new_ratings
+
+    # Compute player deltas for response
+    player_logs = {}
+    for player in players_for_training:
+        pid = player["_id"]
+        name = f"{player.get('first_name', '')} {player.get('last_name', '')}".strip()
+        deltas = {}
+        for anchor_field, new_val in player_updates.get(pid, {}).items():
+            old_val = player_baselines.get(pid, {}).get(anchor_field, 0)
+            delta = new_val - old_val
+            if delta != 0:
+                trait = anchor_field.replace("anchor_", "")
+                deltas[trait] = delta
+        if deltas:
+            player_logs[name] = deltas
+
+    # Compute team deltas (skip non-numeric fields like playcall_settings, strategy_settings)
+    team_log = {}
+    for field, old_val in team_baseline.items():
+        # Skip dict fields (playcall_settings, strategy_settings)
+        if isinstance(old_val, dict):
+            continue
+        new_val = team_stats.get(field, old_val)
+        # Skip if new value is also a dict
+        if isinstance(new_val, dict):
+            continue
+        delta = new_val - old_val
+        if delta != 0:
+            team_log[field] = delta
+
+    # Update franchise document with new attribute values and position ratings
+    franchise_update = {}
+    for player in players_for_training:
+        pid = player["_id"]
+        if pid in player_updates:
+            for attr, val in player_updates[pid].items():
+                # Save the anchor field
+                franchise_update[f"players.{pid}.attributes.{attr}"] = val
+                
+                # Also update the base attribute (without "anchor_" prefix)
+                # e.g., if attr is "anchor_SC", also update "SC"
+                if attr.startswith("anchor_"):
+                    base_attr = attr.replace("anchor_", "")
+                    franchise_update[f"players.{pid}.attributes.{base_attr}"] = val
+        
+        # Update position ratings for this player
+        if pid in position_ratings_updates:
+            franchise_update[f"players.{pid}.position_ratings"] = position_ratings_updates[pid]
+
+    # Update franchise team stats
+    for field, value in team_stats.items():
+        franchise_update[f"franchise_teams.{team_id}.{field}"] = value
+
+    # Mark training as completed
+    franchise_update["training_status.training_completed"] = True
+    
+    # Save the latest training results for display on Training tab
+    franchise_update["latest_training"] = {
+        "player_logs": player_logs,
+        "team_log": team_log,
+        "session_type": session_type,
+        "week": franchise_doc.get("week", 0)
+    }
+
+    # Save to franchise document
+    db.franchises.update_one({"_id": franchise_id}, {"$set": franchise_update})
+
+    return {
+        "player_logs": player_logs, 
+        "team_log": team_log,
+        "session_type": session_type
+    }

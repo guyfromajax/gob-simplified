@@ -150,6 +150,12 @@
     document.body.classList.toggle('dark-mode');
   });
 
+  // Get URL params for franchise mode
+  const urlParams = new URLSearchParams(window.location.search);
+  const franchiseId = urlParams.get('franchise_id');
+  const mode = urlParams.get('mode'); // 'franchise' or null
+  const sessionType = urlParams.get('session_type') || 'in-season';
+
   async function runTraining() {
     const allocations = {
       offensive_drills: {
@@ -177,16 +183,29 @@
       breaks: parseInt(document.getElementById('breaks').value)
     };
 
-    const payload = {
-      team_name: 'Four Corners',
-      session_type: 'preseason',
-      allocations
-    };
+    let payload, endpoint;
+    
+    if (mode === 'franchise' && franchiseId) {
+      // Franchise mode - use franchise training endpoint
+      payload = {
+        franchise_id: franchiseId,
+        allocations
+      };
+      endpoint = '/franchise/run-training';
+    } else {
+      // Standalone mode - use regular training endpoint
+      payload = {
+        team_name: 'Four Corners',
+        session_type: sessionType,
+        allocations
+      };
+      endpoint = '/api/run_training';
+    }
 
     try {
       runBtn.disabled = true;
       runBtn.textContent = 'Running...';
-      const res = await fetch('/api/run_training', {
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -275,12 +294,27 @@
       err.textContent = 'Team attribute data unavailable.';
       resultsDiv.appendChild(err);
     }
-
+    
+    // Add navigation button
     const btnWrap = document.createElement('div');
     btnWrap.style.textAlign = 'center';
     btnWrap.style.marginTop = '20px';
-    btnWrap.innerHTML = '<button id="locker-btn" class="main-button">Go To Locker Room</button>';
-    resultsDiv.appendChild(btnWrap);
+    
+    if (mode === 'franchise' && franchiseId) {
+      // Franchise mode - go back to command center
+      btnWrap.innerHTML = '<button id="locker-btn" class="main-button">Back to Command Center</button>';
+      resultsDiv.appendChild(btnWrap);
+      
+      document.addEventListener('click', (e) => {
+        if (e.target && e.target.id === 'locker-btn') {
+          window.location.href = `/static/franchise-command-center.html?franchise_id=${franchiseId}`;
+        }
+      });
+    } else {
+      // Standalone mode - original button
+      btnWrap.innerHTML = '<button id="locker-btn" class="main-button">Go To Locker Room</button>';
+      resultsDiv.appendChild(btnWrap);
+    }
   }
 
   runBtn.addEventListener('click', runTraining);
