@@ -253,7 +253,8 @@ export function shootBall({
       alreadyInShotAttempt ||
       stateMachine.is(States.HalfCourt) ||
       stateMachine.is(States.Rebound) ||
-      stateMachine.is(States.FastBreak);
+      stateMachine.is(States.FastBreak) ||
+      stateMachine.is(States.Inbound);
     if (alreadyInShotAttempt) {
       if (isAnimationDebugEnabled()) {
         animationDebugLog("shotBall: already in ShotAttempt", {
