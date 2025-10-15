@@ -251,6 +251,9 @@ export function shootBall({
   // overriding the tween and making the shot appear as a teleport
   if (scene.ballController && typeof scene.ballController.stopFollowingPlayer === 'function') {
     scene.ballController.stopFollowingPlayer();
+    
+    // Set a flag to prevent re-attachment during shot
+    scene._shotInProgress = true;
   }
   const stateMachine = scene.stateMachine;
   if (stateMachine) {
@@ -387,6 +390,9 @@ export function shootBall({
       onComplete: () => {
         const actualDuration = Date.now() - tweenStartTime;
         console.log(`🏀 shootBall: Tween COMPLETE | Result: ${result} | Actual: ${actualDuration}ms / Expected: ${duration}ms | Ratio: ${(actualDuration / duration).toFixed(2)}x`);
+        
+        // Clear shot in progress flag
+        scene._shotInProgress = false;
         if (result === "MAKE") {
           console.log("score");
           console.log("rimHoldStart");
