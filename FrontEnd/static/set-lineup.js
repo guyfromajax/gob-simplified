@@ -138,6 +138,61 @@ function updatePlayButton() {
   }
 }
 
+function autosetLineup() {
+  // Clear current lineup
+  document.querySelectorAll('.slot').forEach(slot => clearSlot(slot));
+  
+  // Randomize position order
+  const positions = ['PG', 'SG', 'SF', 'PF', 'C'];
+  const shuffledPositions = positions.sort(() => Math.random() - 0.5);
+  
+  // Track which players have been assigned
+  const assignedPlayers = new Set();
+  
+  // For each position in random order
+  shuffledPositions.forEach(pos => {
+    // Get available players (not already assigned)
+    const availablePlayers = roster.filter(p => !assignedPlayers.has(p._id));
+    
+    // Get players with ratings for this position, sorted by rating desc
+    const playersWithRating = availablePlayers
+      .map(p => ({
+        player: p,
+        rating: p.position_ratings?.[pos] ?? -Infinity
+      }))
+      .filter(({ rating }) => rating !== -Infinity)
+      .sort((a, b) => b.rating - a.rating);
+    
+    // Take top 3 (or all if fewer than 3)
+    const topCandidates = playersWithRating.slice(0, 3);
+    
+    // Randomly pick one from top candidates
+    if (topCandidates.length > 0) {
+      const randomIndex = Math.floor(Math.random() * topCandidates.length);
+      const { player, rating } = topCandidates[randomIndex];
+      
+      // Assign to lineup
+      lineup[pos] = player._id;
+      assignedPlayers.add(player._id);
+      
+      // Update UI
+      const slot = document.querySelector(`.slot[data-pos="${pos}"]`);
+      if (slot) {
+        slot.textContent = `${player.name} — ${rating}`;
+        const remove = document.createElement('button');
+        remove.className = 'remove';
+        remove.textContent = '✕';
+        remove.addEventListener('click', () => clearSlot(slot));
+        slot.appendChild(remove);
+        slot.classList.add('filled');
+      }
+    }
+  });
+  
+  updatePlayButton();
+  showToast('Lineup auto-generated!');
+}
+
 function clearSlot(slot) {
   const pos = slot.dataset.pos;
   delete lineup[pos];
@@ -230,6 +285,13 @@ async function init() {
   setHeader();
   await loadRoster();
   setupSlots();
+  
+  // Wire up autoset button
+  const autosetBtn = document.getElementById('autoset-lineup');
+  if (autosetBtn) {
+    autosetBtn.addEventListener('click', autosetLineup);
+  }
+  
   const btn = document.getElementById('play-now');
   if (btn) {
     btn.addEventListener('click', () => {
