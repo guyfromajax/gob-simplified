@@ -361,7 +361,13 @@ export function shootBall({
       },
       onUpdate: (tween) => {
         if (tween.progress === 0 || tween.progress === 0.5 || tween.progress === 1) {
-          console.log(`🏀 shootBall: Tween progress: ${(tween.progress * 100).toFixed(0)}%`);
+          console.log(`🏀 shootBall: Tween progress: ${(tween.progress * 100).toFixed(0)}%`, {
+            ballPos: { x: ballSprite.x, y: ballSprite.y },
+            ballVisible: ballSprite.visible,
+            ballDepth: ballSprite.depth,
+            screenWidth: scene.game.config.width,
+            screenHeight: scene.game.config.height
+          });
         }
       },
       onComplete: () => {
