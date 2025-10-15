@@ -180,6 +180,12 @@ def resolve_fast_break_logic(game: "GameManager"):
 
     target_is_away = off_team.team_id == game.away_team.team_id
     fb_roles["defense"] = get_in_play_defenders(ball_handler, def_lineup, target_is_away)
+    
+    # If no defenders are ahead (e.g., fast break from FT rebound), add defensive PG as chaser
+    if not fb_roles["defense"] and rebound:
+        defensive_pg = def_lineup.get("PG")
+        if defensive_pg:
+            fb_roles["defense"] = [defensive_pg]
 
     # Defensive pressure check
     die = random.randint(1, 6)

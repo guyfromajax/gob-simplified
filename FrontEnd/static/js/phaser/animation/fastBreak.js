@@ -220,6 +220,14 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
   const defenderId = defenderData?.player_id || defenderData;
   const defenderSprite = defenderId ? playerSprites[defenderId] : null;
   
+  console.log("🏀 FB Shot - Defender lookup:", {
+    defenderData,
+    defenderId,
+    hasSprite: !!defenderSprite,
+    turnDataDefender: turnData.defender,
+    rolesDefense: turnData.roles?.defense
+  });
+  
   if (defenderSprite) {
     // Defender position: 3 spots closer to basket, ±2 Y from shooter
     const defenderSpot = {
@@ -231,6 +239,13 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
     defenderSpot.x = Phaser.Math.Clamp(defenderSpot.x, 4, 97);
     defenderSpot.y = Phaser.Math.Clamp(defenderSpot.y, 1, 49);
     
+    console.log("🏀 FB Shot - Defender position:", {
+      defenderId,
+      shotSpot,
+      defenderSpot,
+      isHomeOffense
+    });
+    
     const defenderPx = gridToPixels(defenderSpot.x, defenderSpot.y, width, height);
     promises.push(
       tweenPlayerTo(scene, defenderSprite, defenderPx, {
@@ -238,6 +253,12 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
         easing: "Sine.easeInOut"
       })
     );
+  } else {
+    console.warn("🏀 FB Shot - No defender sprite found!", {
+      defenderId,
+      defenderData,
+      availableSprites: Object.keys(playerSprites)
+    });
   }
   
   // Move all other players to standard positions (same as defensive stop)
