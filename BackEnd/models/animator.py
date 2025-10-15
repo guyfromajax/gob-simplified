@@ -8,7 +8,7 @@ from BackEnd.utils.shared_defense import (
     assign_non_bh_defender_coords
 )
 from collections import defaultdict
-from BackEnd.constants import HCO_STRING_SPOTS, ACTIONS, RIM_COORDS, TOP_KEY_COORDS
+from BackEnd.constants import HCO_STRING_SPOTS, ACTIONS, RIM_COORDS, TOP_KEY_COORDS, HOME_RIM_COORDS, AWAY_RIM_COORDS
 import random
 import logging
 
@@ -95,7 +95,24 @@ class Animator:
 
         # Ball handler path
         if ball_handler:
-            bh_end = TOP_KEY_COORDS if hold_up else RIM_COORDS
+            if hold_up:
+                # Stopped at top of key
+                bh_end = TOP_KEY_COORDS
+            else:
+                # Shot attempt - position 4-6 grid spots from rim
+                rim_x = AWAY_RIM_COORDS["x"] if is_away_offense else HOME_RIM_COORDS["x"]
+                shot_distance = random.randint(4, 6)
+                
+                if is_away_offense:
+                    # Attacking left (away rim at x=10), so shooter at x=10+4 to x=10+6
+                    shooter_x = rim_x + shot_distance
+                else:
+                    # Attacking right (home rim at x=90), so shooter at x=90-4 to x=90-6
+                    shooter_x = rim_x - shot_distance
+                
+                shooter_y = random.randint(20, 30)  # Random Y near center
+                bh_end = {"x": shooter_x, "y": shooter_y}
+            
             build_movement(ball_handler, bh_end, has_ball=True)
             animated_player_ids.add(getattr(ball_handler, "player_id", None))
 
@@ -106,8 +123,9 @@ class Animator:
                 if getattr(d, "player_id", None) == stopper_id:
                     stopper = d
                     break
+        
         if hold_up:
-            # Stopping defender
+            # Stopping defender when break is stopped at top of key
             if stopper:
                 offset_x = 6 if not is_away_offense else -6
                 end = {
@@ -120,6 +138,30 @@ class Animator:
             # Other in-play defenders
             for d in defenders:
                 if d is stopper:
+                    continue
+                build_movement(d, between_key_and_rim(), action=ACTIONS["GUARD_OFFBALL"])
+                animated_player_ids.add(getattr(d, "player_id", None))
+        else:
+            # Shot attempt - position shot defender between shooter and rim
+            shot_defender = fb_roles.get("defender")
+            if shot_defender:
+                # Defender positioned 2 grid spots closer to basket than shooter
+                rim_x = AWAY_RIM_COORDS["x"] if is_away_offense else HOME_RIM_COORDS["x"]
+                
+                if is_away_offense:
+                    # Attacking left, defender is 2 spots closer (left) than shooter
+                    defender_x = bh_end["x"] - 2
+                else:
+                    # Attacking right, defender is 2 spots closer (right) than shooter
+                    defender_x = bh_end["x"] + 2
+                
+                defender_end = {"x": defender_x, "y": bh_end["y"]}  # Same Y as shooter
+                build_movement(shot_defender, defender_end, action=ACTIONS["GUARD_BALL"])
+                animated_player_ids.add(getattr(shot_defender, "player_id", None))
+            
+            # Other in-play defenders position between key and rim
+            for d in defenders:
+                if d is shot_defender:
                     continue
                 build_movement(d, between_key_and_rim(), action=ACTIONS["GUARD_OFFBALL"])
                 animated_player_ids.add(getattr(d, "player_id", None))
