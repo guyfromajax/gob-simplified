@@ -168,15 +168,13 @@ function animateConvergence(scene, playerSprites, animations, ballSprite, ballLa
         const endCoords = anim.end;
         
         // Tween player to their convergence spot (tweenPlayerTo handles grid-to-pixel conversion)
-        const endPixels = gridToPixels(endCoords.x, endCoords.y, scene.game.config.width, scene.game.config.height);
         const tween = tweenPlayerTo(
             scene,
             playerSprite,
-            endPixels,
-            {
-                duration: CONVERGE_DURATION,
-                easing: 'Linear'
-            }
+            endCoords.x,
+            endCoords.y,
+            CONVERGE_DURATION,
+            'Linear'
         );
         
         convergeTweens.push(tween);
