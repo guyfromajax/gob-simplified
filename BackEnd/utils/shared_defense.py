@@ -25,7 +25,7 @@ def assign_bh_defender_coords(ball_coords, aggression_level: str, is_away_offens
     # Edge case: ball on baseline
     if y <= 4 or y >= 46:
         # Vertical positioning doesn't depend on court orientation
-        y_def = y + (d_spacing if y < 26 else -d_spacing)
+        y_def = y + (y_direction * d_spacing)
         x_def = x  # No X spacing on baseline - defender matches ball handler's X
 
     # Edge case: top of key
@@ -93,7 +93,9 @@ def assign_non_bh_defender_coords(o_coords, ball_coords, aggression_level, is_aw
         delta_x = abs(bx - ox)
         delta_y = abs(by - oy)
 
-        x = ox + int(delta_x * 0.3) + (x_direction * d_spacing)
-        y = oy + int(delta_y * 0.3) + (y_direction * d_spacing)
+        # x = ox + int(delta_x * 0.3) + (x_direction * d_spacing)
+        # y = oy + int(delta_y * 0.3) + (y_direction * d_spacing)
+        x = ox + int(delta_x * 0.3)
+        y = oy + int(delta_y * 0.3)
 
         return {"x": x, "y": y}
