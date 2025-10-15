@@ -257,7 +257,7 @@ export class HCOAnimationSystem {
     console.log('🎬 Executing outlet pass from rebounder to PG');
     return new Promise((resolve) => {
       // Detach ball from passer
-      this.ballController.detachFromPlayer('outlet_pass');
+      this.ballController.detachFromPlayer('outlet_pass', { keepVisible: true });
       console.log('🎬 Ball detached from rebounder');
       
       // Start ball flight
