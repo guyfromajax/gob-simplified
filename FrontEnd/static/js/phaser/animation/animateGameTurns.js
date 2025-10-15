@@ -41,7 +41,7 @@ let possessionRunnerModulePromise = null;
  * Handle offensive rebound turns (putbacks and kickouts)
  */
 async function handleOrebTurn(scene, { playerSprites, ballSprite, turnData, onUpdate }) {
-  const { animatePutbackAttempt } = await import('./ballManager.js');
+  const { shootBall } = await import('./ballManager.js');
   const { animateKickoutReset } = await import('./ballManager.js');
   const { runInboundSetup } = await import('./turnAnimation.js');
   const { HOME_RIM_COORDS, AWAY_RIM_COORDS } = await import('./courtConstants.js');
@@ -54,18 +54,29 @@ async function handleOrebTurn(scene, { playerSprites, ballSprite, turnData, onUp
   if (!rebounderSprite) return;
   
   if (turnData.result_type === "PUTBACK_MAKE" || turnData.result_type === "PUTBACK_MISS") {
-    // Animate putback attempt
-    const rimCoords = rebounderSprite.team === "home" ? HOME_RIM_COORDS : AWAY_RIM_COORDS;
+    // Animate putback attempt using shootBall
+    const isHomeTeam = rebounderSprite.team === "home";
+    const rimCoords = isHomeTeam ? HOME_RIM_COORDS : AWAY_RIM_COORDS;
     const result = turnData.result_type === "PUTBACK_MAKE" ? "MAKE" : "MISS";
     
-    await animatePutbackAttempt(
+    // Get rebounder's current position for shot start
+    const fromCoords = {
+      x: (rebounderSprite.x / scene.game.config.width) * 100,
+      y: 50 - (rebounderSprite.y / scene.game.config.height) * 50
+    };
+    
+    await shootBall({
       scene,
       ballSprite,
-      rebounderId,
-      rimCoords,
-      500,
-      result
-    );
+      fromCoords,
+      startTimestamp: Date.now(),
+      result,
+      shooterId: rebounderId,
+      shooterTeamId: rebounderSprite.team_id,
+      homeTeamId: scene.simData?.home_team_id,
+      stepIndex: 0,
+      turnIndex: scene.currentTurn
+    });
     
     // Handle putback make - run inbound setup
     if (turnData.result_type === "PUTBACK_MAKE") {
