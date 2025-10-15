@@ -57,16 +57,22 @@ def assign_non_bh_defender_coords(o_coords, ball_coords, aggression_level, is_aw
 
     y_direction = -1 if oy > 25 else 1
     x_direction = -1 if is_away_offense else 1
-    print("Inside assign_non_bh_defender_coords")
-    print(f"is_away_offense: {is_away_offense}")
-    print(f"x_direction: {x_direction}")
+    # print("Inside assign_non_bh_defender_coords")
+    # print(f"is_away_offense: {is_away_offense}")
+    # print(f"x_direction: {x_direction}")
 
-    # When the away team has the ball the offensive coordinates are flipped
-    # horizontally. Convert the ball handler's coordinates back to the home
-    # orientation so the logic below can remain consistent.
+    # When the away team has the ball, both offensive and ball coordinates are flipped
+    # horizontally. Convert both back to the home orientation so the logic below
+    # can remain consistent.
     if is_away_offense:
-        flipped = get_away_player_coords(ball_coords)
-        bx, by = flipped["x"], flipped["y"]
+        flipped_ball = get_away_player_coords(ball_coords)
+        bx, by = flipped_ball["x"], flipped_ball["y"]
+        
+        flipped_offense = get_away_player_coords(o_coords)
+        ox, oy = flipped_offense["x"], flipped_offense["y"]
+        
+        # Recalculate y_direction based on flipped offensive Y
+        y_direction = -1 if oy > 25 else 1
 
     
     # Edge case: defending someone on the block or in the lane (score threat)
@@ -81,7 +87,7 @@ def assign_non_bh_defender_coords(o_coords, ball_coords, aggression_level, is_aw
         return {
             "x": ox,  # No X spacing on baseline - defender matches offensive player's X
             # Vertical offset shouldn't flip when court orientation changes
-            "y": oy + (d_spacing if oy < 25 else -d_spacing)
+            "y": oy + d_spacing * y_direction
         }
 
     # Edge case: defending someone near the top or wings and ball is on the key
