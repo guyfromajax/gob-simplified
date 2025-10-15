@@ -8,6 +8,7 @@ import { runOpeningTipSequence } from "./openingTip.js";
 import { handleTurnover } from "./turnoverAdapter.js";
 import { States } from "../state/gameStateMachine.js";
 import { appendToTextScroll } from "../utils/textScroll.js";
+import { getCurrentOwner, getPendingOwner } from "../ball/ballController.js";
 import {
   animationDebugLog,
   animationDebugWarn,
