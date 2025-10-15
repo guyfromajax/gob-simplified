@@ -249,12 +249,22 @@ export function shootBall({
   // CRITICAL: Stop BallController from following player during shot animation
   // Without this, the ball will be repositioned to player's position every frame,
   // overriding the tween and making the shot appear as a teleport
+  console.log('🏀 shootBall: Attempting to stop BallController', {
+    hasBallController: !!scene.ballController,
+    hasStopMethod: !!(scene.ballController && typeof scene.ballController.stopFollowingPlayer === 'function'),
+    currentIsAttached: scene.ballController?.isAttached,
+    shotInProgress: scene._shotInProgress
+  });
+  
   if (scene.ballController) {
     if (typeof scene.ballController.stopFollowingPlayer === 'function') {
       scene.ballController.stopFollowingPlayer();
+      console.log('🏀 shootBall: Called stopFollowingPlayer');
     }
     // Also set isAttached to false to prevent followCallback from running
+    const wasAttached = scene.ballController.isAttached;
     scene.ballController.isAttached = false;
+    console.log(`🏀 shootBall: Set isAttached false (was: ${wasAttached})`);
     
     // Set a flag to prevent re-attachment during shot
     scene._shotInProgress = true;
