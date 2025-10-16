@@ -394,7 +394,6 @@ class ShotManager:
         
         # Fallback: If no defender assigned, use defender at shooter's position for animation
         if not defender:
-            from BackEnd.utils.shared import get_player_position
             shooter_pos = get_player_position(off_lineup, shooter)
             defender = def_lineup.get(shooter_pos)
             if not defender:
