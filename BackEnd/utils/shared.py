@@ -170,7 +170,9 @@ def resolve_offensive_rebound(game, rebounder):
         else:
             new_rebounder, new_team, new_stat = determine_rebounder(game)
             new_rebounder.record_stat(new_stat)
-            event["possession_flips"] = new_team != off_team
+            # DON'T flip possession here - let turn_manager handle it after the rebound
+            # This ensures the shot animates to the correct basket before possession flips
+            event["possession_flips"] = False
             
             # Add rebound information for frontend animation
             event["rebound"] = {
