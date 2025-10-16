@@ -458,6 +458,7 @@ class ShotManager:
             "screener": None,
             "passer": passer,
             "defender": defender,
+            "defenderId": getattr(defender, "player_id", None) if defender else None,
             "text": text,
             "possession_flips": possession_flips,
             "time_elapsed": time_elapsed
