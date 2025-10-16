@@ -483,10 +483,14 @@ class TurnManager:
                 pressure_type = self.determine_defensive_pressure_type()
                 game_state["offensive_state"] = pressure_type
                 
+                shooter_team_id = getattr(rebounder, "team_id", None) or off_team.team_id
+                print(f"🏀 PUTBACK_MAKE: shooter={get_name_safe(rebounder)} team_id={shooter_team_id} off_team={off_team.name}")
+                
                 return {
                     "result_type": "PUTBACK_MAKE",
                     "ball_handler": rebounder,
                     "shooter": rebounder,
+                    "shooter_team_id": shooter_team_id,
                     "defender": defender,
                     "text": text,
                     "possession_flips": possession_flips,
@@ -504,10 +508,14 @@ class TurnManager:
                 # Initialize possession_flips based on rebound type
                 possession_flips = False
                 
+                shooter_team_id = getattr(rebounder, "team_id", None) or off_team.team_id
+                print(f"🏀 PUTBACK_MISS: shooter={get_name_safe(rebounder)} team_id={shooter_team_id} off_team={off_team.name}")
+                
                 result = {
                     "result_type": "PUTBACK_MISS",
                     "ball_handler": rebounder,
                     "shooter": rebounder,
+                    "shooter_team_id": shooter_team_id,
                     "defender": defender,
                     "text": text,
                     "possession_flips": possession_flips,  # Will be updated based on rebound type
