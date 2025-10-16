@@ -92,6 +92,14 @@ export function attachBallToPlayer(scene, ballSprite, playerSprite, opts = {}) {
  */
 function startBallFollowing(scene, ballSprite, playerSprite, opts = {}) {
   if (!scene || !ballSprite || !playerSprite) return;
+  
+  // Don't start following during shots
+  if (scene._shotInProgress) {
+    if (PASS_DEBUG) {
+      console.log('startBallFollowing: Blocked during shot');
+    }
+    return;
+  }
 
   // Stop any existing following
   stopBallFollowing(scene);
@@ -107,7 +115,8 @@ function startBallFollowing(scene, ballSprite, playerSprite, opts = {}) {
       if (scene._ballFollowing && 
           scene._ballFollowing.ballSprite && 
           scene._ballFollowing.playerSprite &&
-          !scene.ballDetached) {
+          !scene.ballDetached &&
+          !scene._shotInProgress) {  // Don't reposition during shots
         const x = scene._ballFollowing.playerSprite.x + scene._ballFollowing.offset.x;
         const y = scene._ballFollowing.playerSprite.y + scene._ballFollowing.offset.y;
         scene._ballFollowing.ballSprite.setPosition(x, y);

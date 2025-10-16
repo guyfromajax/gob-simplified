@@ -61,6 +61,12 @@ function attachBallToPlayer(scene, ballSprite, playerSprite, opts = {}) {
     console.error('BallControllerAdapter: Cannot attach ball - BallController not initialized');
     return;
   }
+  
+  // Don't attach during shot animations
+  if (scene._shotInProgress) {
+    console.log('BallControllerAdapter: Skipping attach - shot in progress');
+    return;
+  }
 
   // Handle possession flip in progress (old system behavior)
   if (scene.possessionFlipInProgress) {
