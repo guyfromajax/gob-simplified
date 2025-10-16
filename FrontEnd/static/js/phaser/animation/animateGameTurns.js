@@ -9,6 +9,7 @@ import { handleTurnover } from "./turnoverAdapter.js";
 import { States } from "../state/gameStateMachine.js";
 import { appendToTextScroll } from "../utils/textScroll.js";
 import { getCurrentOwner, getPendingOwner } from "../ball/ballController.js";
+import { updatePlaycallDisplay } from "../utils/playcallDisplay.js";
 import {
   animationDebugLog,
   animationDebugWarn,
@@ -420,6 +421,10 @@ export async function animateGameTurns({ //hasBallAtStep
     const turn = turns[i];
     turn.index = i;
     if (scene.skipToEnd) break;
+    
+    // Update playcall display before animating the turn
+    updatePlaycallDisplay(turn, scene.simData?.home_team_id);
+    
     const possessionId =
       turn.possession_id ?? turn.possessionId ?? turn.possessionID ?? null;
     const animations = turn.animations || [];
