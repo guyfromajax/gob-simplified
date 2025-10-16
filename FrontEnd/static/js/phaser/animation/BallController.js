@@ -73,6 +73,14 @@ export class BallController {
       console.warn('BallController: Cannot attach - ball is in flight');
       return false;
     }
+    
+    // Don't attach during shot animations
+    if (this.scene._shotInProgress) {
+      if (this.debug) {
+        console.log('BallController: Cannot attach - shot in progress');
+      }
+      return false;
+    }
 
     // Validate player sprite
     if (!this.isValidPlayerSprite(playerSprite)) {
