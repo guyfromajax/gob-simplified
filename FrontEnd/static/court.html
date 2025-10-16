@@ -13,6 +13,8 @@
       --court-bg: #1e1e1e;
       --side-padding: 10px;
       --scoreboard-gap: 20px;
+      --home-vibrant-color: #ff6200;
+      --away-vibrant-color: #ff6200;
     }
 
     * {
@@ -57,7 +59,7 @@
         var(--side-padding);
       align-items: center;
       z-index: 1000;
-      border-bottom: 2px solid #ff6200;
+      border-bottom: 2px solid var(--home-vibrant-color);
     }
 
     /* Grid layout breakdown:
@@ -129,7 +131,7 @@
     #scoreboard .center .quarter {
       font-size: 24px;
       line-height: 1;
-      color: #ff6200;
+      color: var(--home-vibrant-color);
     }
 
     /* Home TOL/F - Grid column 10 */
@@ -194,11 +196,11 @@
     }
 
     .player-stats-panel.away {
-      border-right: 2px solid #ff6200;
+      border-right: 2px solid var(--away-vibrant-color);
     }
 
     .player-stats-panel.home {
-      border-left: 2px solid #ff6200;
+      border-left: 2px solid var(--home-vibrant-color);
     }
 
     /* Player Box Score Section */
@@ -212,10 +214,17 @@
     .player-box-score h3 {
       font-size: 22px;
       margin-bottom: 10px;
-      color: #ff6200;
       text-align: center;
       border-bottom: 1px solid #444;
       padding-bottom: 6px;
+    }
+    
+    .player-stats-panel.home .player-box-score h3 {
+      color: var(--home-vibrant-color);
+    }
+    
+    .player-stats-panel.away .player-box-score h3 {
+      color: var(--away-vibrant-color);
     }
 
     .player-box-score table {
@@ -349,7 +358,7 @@
       right: calc(var(--player-stats-width) + var(--side-padding) * 2);
       height: var(--pbp-height);
       background: #0a0a0a;
-      border-top: 2px solid #ff6200;
+      border-top: 2px solid var(--home-vibrant-color);
       display: flex;
       flex-direction: column;
       z-index: 1000;
@@ -359,7 +368,7 @@
       background: #1a1a1a;
       padding: 4px 20px;
       font-size: 18px;
-      color: #ff6200;
+      color: var(--home-vibrant-color);
       border-bottom: 1px solid #333;
       line-height: 1.2;
     }
@@ -422,14 +431,14 @@
       padding: 40px;
       border-radius: 12px;
       text-align: center;
-      border: 2px solid #ff6200;
+      border: 2px solid var(--home-vibrant-color);
       min-width: 400px;
     }
 
     .popup-content h2 {
       font-size: 36px;
       margin-bottom: 20px;
-      color: #ff6200;
+      color: var(--home-vibrant-color);
     }
 
     .popup-content p {
@@ -450,7 +459,7 @@
       justify-content: center;
       gap: 15px;
       background: #0a0a0a;
-      border-top: 2px solid #ff6200;
+      border-top: 2px solid var(--home-vibrant-color);
       border-left: 1px solid #333;
       z-index: 1100;
     }
@@ -596,6 +605,20 @@
   <script>
     console.log('🚨 HTML: Basic JavaScript is working!');
     console.log('🚨 HTML: About to load bootGame.js');
+  </script>
+  <script type="module">
+    // Apply vibrant colors based on teams in URL
+    import { applyVibrantColors } from '/static/js/phaser/utils/vibrantColors.js';
+    
+    const urlParams = new URLSearchParams(window.location.search);
+    const homeTeam = urlParams.get('home');
+    const awayTeam = urlParams.get('away');
+    
+    if (homeTeam && awayTeam) {
+      applyVibrantColors(homeTeam, awayTeam);
+    } else {
+      console.warn('⚠️ No teams found in URL, using default vibrant colors');
+    }
   </script>
   <script type="module" src="/static/js/phaser/bootGame.js"></script>
   <script>
