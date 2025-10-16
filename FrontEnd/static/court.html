@@ -11,6 +11,8 @@
       --player-stats-width: 280px;
       --pbp-height: 200px;
       --court-bg: #1e1e1e;
+      --side-padding: 10px;
+      --scoreboard-gap: 20px;
     }
 
     * {
@@ -39,7 +41,7 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 0 20px;
+      padding: 0 var(--side-padding);
       z-index: 1000;
       border-bottom: 2px solid #ff6200;
     }
@@ -47,17 +49,19 @@
     #scoreboard .side {
       display: flex;
       align-items: center;
-      gap: 15px;
+      gap: var(--scoreboard-gap);
       flex: 1;
     }
 
     #scoreboard .side.away {
       justify-content: flex-start;
+      padding-left: var(--side-padding);
     }
 
     #scoreboard .side.home {
       justify-content: flex-end;
       flex-direction: row-reverse;
+      padding-right: var(--side-padding);
     }
 
     #scoreboard .logo-container {
@@ -126,6 +130,8 @@
       width: 100%;
       height: calc(100vh - var(--scoreboard-height) - var(--pbp-height));
       margin-top: var(--scoreboard-height);
+      padding: 0 var(--side-padding);
+      gap: 0;
     }
 
     /* ==================== PLAYER STATS PANELS (LEFT & RIGHT) ==================== */
@@ -212,6 +218,8 @@
       display: flex;
       align-items: center;
       justify-content: center;
+      padding: 20px 0;
+      overflow: visible;
     }
 
     /* Game control buttons */
@@ -277,7 +285,7 @@
       position: fixed;
       bottom: 0;
       left: 0;
-      width: 100%;
+      right: calc(var(--player-stats-width) + var(--side-padding) * 2);
       height: var(--pbp-height);
       background: #0a0a0a;
       border-top: 2px solid #ff6200;
@@ -308,7 +316,7 @@
     }
 
     .turn-line {
-      font-size: 15px;
+      font-size: 20px;
       line-height: 1.4;
       color: #ddd;
       margin-bottom: 6px;
@@ -370,10 +378,18 @@
     /* ==================== PAUSE/SKIP CONTROLS ==================== */
     .game-controls {
       position: fixed;
-      bottom: calc(var(--pbp-height) + 20px);
-      right: 20px;
+      bottom: 0;
+      right: var(--side-padding);
+      width: var(--player-stats-width);
+      height: var(--pbp-height);
       display: flex;
-      gap: 10px;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 15px;
+      background: #0a0a0a;
+      border-top: 2px solid #ff6200;
+      border-left: 1px solid #333;
       z-index: 1100;
     }
 
@@ -382,11 +398,12 @@
       background-color: #ff6200;
       color: #fff;
       border: none;
-      padding: 10px 20px;
+      padding: 12px 0;
+      width: 90%;
       border-radius: 6px;
       cursor: pointer;
       font-family: 'Bebas Neue', sans-serif;
-      font-size: 16px;
+      font-size: 18px;
       transition: background-color 0.2s;
     }
 
