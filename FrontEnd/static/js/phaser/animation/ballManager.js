@@ -408,8 +408,9 @@ export function shootBall({
         const actualDuration = Date.now() - tweenStartTime;
         console.log(`🏀 shootBall: Tween COMPLETE | Result: ${result} | Actual: ${actualDuration}ms / Expected: ${duration}ms | Ratio: ${(actualDuration / duration).toFixed(2)}x`);
         
-        // Clear shot in progress flag
+        // Clear shot in progress flags - re-enable ball following systems
         scene._shotInProgress = false;
+        scene.ballDetached = false;
         if (result === "MAKE") {
           console.log("score");
           console.log("rimHoldStart");
