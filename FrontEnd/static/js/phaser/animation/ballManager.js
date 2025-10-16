@@ -436,13 +436,15 @@ export function shootBall({
           const finish = () => {
             console.log("rimHoldEnd");
             console.log(`🏀 shootBall: Rim hold ending - ball at (${ballSprite.x.toFixed(0)}, ${ballSprite.y.toFixed(0)})`);
-            // Clean up position watcher
+            // Clean up position watcher BEFORE resetting flags
             scene.events.off('update', positionWatcher);
-            // Re-enable ball following AFTER rim hold
-            scene._shotInProgress = false;
-            scene.ballDetached = false;
-            console.log('🏀 shootBall: Flags reset, ball following re-enabled');
-            resolve();
+            // Small delay to ensure watcher is fully removed before re-enabling
+            scene.time.delayedCall(50, () => {
+              scene._shotInProgress = false;
+              scene.ballDetached = false;
+              console.log('🏀 shootBall: Flags reset, ball following re-enabled');
+              resolve();
+            });
           };
           if (scene.time?.delayedCall) {
             scene.time.delayedCall(1000, finish);
@@ -482,13 +484,15 @@ export function shootBall({
                 team: shooterTeamId,
               });
             }
-            // Clean up position watcher
+            // Clean up position watcher BEFORE resetting flags
             scene.events.off('update', positionWatcher);
-            // Re-enable ball following AFTER bounce completes
-            scene._shotInProgress = false;
-            scene.ballDetached = false;
-            console.log('🏀 shootBall: Flags reset after bounce, ball following re-enabled');
-            resolve(miss);
+            // Small delay to ensure watcher is fully removed before re-enabling
+            scene.time.delayedCall(50, () => {
+              scene._shotInProgress = false;
+              scene.ballDetached = false;
+              console.log('🏀 shootBall: Flags reset after bounce, ball following re-enabled');
+              resolve(miss);
+            });
           });
         } else {
           resolve();
