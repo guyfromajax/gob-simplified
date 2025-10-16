@@ -43,7 +43,10 @@ export function attachBallToPlayer(scene, ballSprite, playerSprite, opts = {}) {
   
   // Don't attach ball during shot animation - it would override the tween
   if (scene._shotInProgress) {
-    console.log('🏀 attachBallToPlayer: Blocked during shot animation');
+    console.log('🏀 attachBallToPlayer: Blocked during shot animation', {
+      targetPlayer: playerSprite?.playerId,
+      ballPos: { x: scene.ballSprite?.x, y: scene.ballSprite?.y }
+    });
     return;
   }
 

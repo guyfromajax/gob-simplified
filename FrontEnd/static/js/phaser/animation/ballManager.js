@@ -414,11 +414,14 @@ export function shootBall({
         if (result === "MAKE") {
           console.log("score");
           console.log("rimHoldStart");
+          console.log(`🏀 shootBall: Rim hold starting - ball at (${ballSprite.x.toFixed(0)}, ${ballSprite.y.toFixed(0)})`);
           const finish = () => {
             console.log("rimHoldEnd");
+            console.log(`🏀 shootBall: Rim hold ending - ball at (${ballSprite.x.toFixed(0)}, ${ballSprite.y.toFixed(0)})`);
             // Re-enable ball following AFTER rim hold
             scene._shotInProgress = false;
             scene.ballDetached = false;
+            console.log('🏀 shootBall: Flags reset, ball following re-enabled');
             resolve();
           };
           if (scene.time?.delayedCall) {
@@ -441,6 +444,7 @@ export function shootBall({
             );
           }
           scene.rebounderId = null;
+          console.log(`🏀 shootBall: Starting bounce - ball at (${ballSprite.x.toFixed(0)}, ${ballSprite.y.toFixed(0)})`);
           bounceFromRim(
             scene,
             ballSprite,
@@ -448,6 +452,7 @@ export function shootBall({
             isHomeTeam,
             duration / 3
           ).then((miss) => {
+            console.log(`🏀 shootBall: Bounce complete - ball at (${ballSprite.x.toFixed(0)}, ${ballSprite.y.toFixed(0)})`);
             if (SHOT_DEBUG) {
               console.log("shot:miss", {
                 type: "miss",
@@ -460,6 +465,7 @@ export function shootBall({
             // Re-enable ball following AFTER bounce completes
             scene._shotInProgress = false;
             scene.ballDetached = false;
+            console.log('🏀 shootBall: Flags reset after bounce, ball following re-enabled');
             resolve(miss);
           });
         } else {
