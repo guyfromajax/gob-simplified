@@ -245,10 +245,11 @@ export class BallController {
     // Attach to new owner if provided
     if (newOwner) {
       this.attachToPlayer(newOwner, options);
-    } else {
-      // Hide ball if no new owner
+    } else if (!options.keepVisible) {
+      // Hide ball if no new owner (unless keepVisible is set)
       this.ballSprite.setVisible(false);
     }
+    // If keepVisible is true, leave ball visible at current position
 
     if (this.debug) {
       console.log('BallController: Ball flight ended', {
