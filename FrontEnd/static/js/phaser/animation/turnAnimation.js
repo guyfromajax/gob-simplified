@@ -984,6 +984,12 @@ async function runInboundSetup({
  * Each stepIndex is animated across all players, then the next step begins.
  */
 export async function playTurnAnimation({ scene, simData, playerSprites, turnData, ballSprite, onAction }) {
+  // Guard: Skip if this is an opening tip or if animations is missing
+  if (turnData.result_type === "OPENING_TIP" || !turnData.animations) {
+    console.warn('⚠️ playTurnAnimation called for turn without animations:', turnData.result_type);
+    return;
+  }
+
   scene.passInFlight = false;
   scene.ballDetached = false;
   scene.rebounderId = null;
