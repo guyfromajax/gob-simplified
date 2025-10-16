@@ -352,15 +352,28 @@ export function shootBall({
   // Create a position tracker to catch any unexpected repositioning
   let lastLoggedX = start.x;
   let lastLoggedY = start.y;
+  let watcherRemoved = false;
   const positionWatcher = () => {
+    if (watcherRemoved) return;
     const deltaX = Math.abs(ballSprite.x - lastLoggedX);
     const deltaY = Math.abs(ballSprite.y - lastLoggedY);
-    if (deltaX > 50 || deltaY > 50) {  // Ball jumped more than 50 pixels
+    if (deltaX > 30 || deltaY > 30) {  // Lowered threshold to catch smaller jumps
       console.warn('🚨 BALL TELEPORT DETECTED!', {
         from: { x: lastLoggedX.toFixed(0), y: lastLoggedY.toFixed(0) },
         to: { x: ballSprite.x.toFixed(0), y: ballSprite.y.toFixed(0) },
-        delta: { x: deltaX.toFixed(0), y: deltaY.toFixed(0) }
+        delta: { x: deltaX.toFixed(0), y: deltaY.toFixed(0) },
+        timestamp: Date.now()
       });
+      // Log what player is at this position
+      const playersNearby = Object.values(playerSprites).filter(p => {
+        const dist = Math.hypot(p.x - ballSprite.x, p.y - ballSprite.y);
+        return dist < 50;
+      });
+      console.log('🔍 Players near ball teleport position:', playersNearby.map(p => ({
+        id: p.playerId,
+        pos: { x: p.x.toFixed(0), y: p.y.toFixed(0) },
+        distance: Math.hypot(p.x - ballSprite.x, p.y - ballSprite.y).toFixed(0)
+      })));
     }
     lastLoggedX = ballSprite.x;
     lastLoggedY = ballSprite.y;
@@ -436,8 +449,11 @@ export function shootBall({
           const finish = () => {
             console.log("rimHoldEnd");
             console.log(`🏀 shootBall: Rim hold ending - ball at (${ballSprite.x.toFixed(0)}, ${ballSprite.y.toFixed(0)})`);
-            // Clean up position watcher BEFORE resetting flags
-            scene.events.off('update', positionWatcher);
+            // Keep watcher running a bit longer to catch post-shot teleports
+            watcherRemoved = true;
+            scene.time.delayedCall(200, () => {
+              scene.events.off('update', positionWatcher);
+            });
             // Small delay to ensure watcher is fully removed before re-enabling
             scene.time.delayedCall(50, () => {
               scene._shotInProgress = false;
@@ -484,8 +500,11 @@ export function shootBall({
                 team: shooterTeamId,
               });
             }
-            // Clean up position watcher BEFORE resetting flags
-            scene.events.off('update', positionWatcher);
+            // Keep watcher running a bit longer to catch post-shot teleports
+            watcherRemoved = true;
+            scene.time.delayedCall(200, () => {
+              scene.events.off('update', positionWatcher);
+            });
             // Small delay to ensure watcher is fully removed before re-enabling
             scene.time.delayedCall(50, () => {
               scene._shotInProgress = false;
