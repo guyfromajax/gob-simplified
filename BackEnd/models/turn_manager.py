@@ -483,10 +483,14 @@ class TurnManager:
                 pressure_type = self.determine_defensive_pressure_type()
                 game_state["offensive_state"] = pressure_type
                 
+                shooter_team_id = getattr(rebounder, "team_id", None) or off_team.team_id
+                print(f"🏀 PUTBACK_MAKE: shooter={get_name_safe(rebounder)} team_id={shooter_team_id} off_team={off_team.name}")
+                
                 return {
                     "result_type": "PUTBACK_MAKE",
                     "ball_handler": rebounder,
                     "shooter": rebounder,
+                    "shooter_team_id": shooter_team_id,
                     "defender": defender,
                     "text": text,
                     "possession_flips": possession_flips,
@@ -500,15 +504,21 @@ class TurnManager:
             else:
                 # Putback missed - check for rebound
                 text = f"{get_name_safe(rebounder)} goes back up but misses."
-                possession_flips = oreb_event.get("possession_flips", False)
+                
+                # Initialize possession_flips based on rebound type
+                possession_flips = False
+                
+                shooter_team_id = getattr(rebounder, "team_id", None) or off_team.team_id
+                print(f"🏀 PUTBACK_MISS: shooter={get_name_safe(rebounder)} rebounder.team_id={getattr(rebounder, 'team_id', None)} off_team.team_id={off_team.team_id} off_team.name={off_team.name} final_shooter_team_id={shooter_team_id}")
                 
                 result = {
                     "result_type": "PUTBACK_MISS",
                     "ball_handler": rebounder,
                     "shooter": rebounder,
+                    "shooter_team_id": shooter_team_id,
                     "defender": defender,
                     "text": text,
-                    "possession_flips": possession_flips,
+                    "possession_flips": possession_flips,  # Will be updated based on rebound type
                     "time_elapsed": oreb_event.get("timeElapsed", 3),
                     "animations": [],
                     "rebounderId": getattr(rebounder, "player_id", None),
@@ -517,8 +527,13 @@ class TurnManager:
                 # Check if there's another rebound
                 if oreb_event.get("rebound"):
                     rebound_data = oreb_event["rebound"]
-                    result["rebound_type"] = rebound_data.get("rebound_type", "DREB")
+                    rebound_type = rebound_data.get("rebound_type", "DREB")
+                    result["rebound_type"] = rebound_type
                     result["rebounderId"] = rebound_data.get("rebounderId")
+                    
+                    # Set possession flip based on rebound type
+                    possession_flips = (rebound_type == "DREB")
+                    result["possession_flips"] = possession_flips
                     
                     rebounder_id = rebound_data.get("rebounderId")
                     new_rebounder = None

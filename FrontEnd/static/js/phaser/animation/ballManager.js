@@ -258,16 +258,12 @@ export function shootBall({
   
   // Stop BOTH old and new ball following systems
   scene.ballDetached = true; // Stop old system (scene._ballFollowing callback checks this)
-  
   if (scene.ballController) {
     if (typeof scene.ballController.stopFollowingPlayer === 'function') {
       scene.ballController.stopFollowingPlayer();
-      console.log('🏀 shootBall: Called stopFollowingPlayer');
     }
     // Also set isAttached to false to prevent followCallback from running
-    const wasAttached = scene.ballController.isAttached;
     scene.ballController.isAttached = false;
-    console.log(`🏀 shootBall: Set isAttached false (was: ${wasAttached})`);
     
     // Set a flag to prevent re-attachment during shot
     scene._shotInProgress = true;
@@ -416,7 +412,6 @@ export function shootBall({
     });
     
     const tweenStartTime = Date.now();
-    
     const tween = scene.tweens.add({
       targets: ballSprite,
       x: rim.x,
@@ -439,9 +434,8 @@ export function shootBall({
         const actualDuration = Date.now() - tweenStartTime;
         console.log(`🏀 shootBall: Tween COMPLETE | Result: ${result} | Actual: ${actualDuration}ms / Expected: ${duration}ms | Ratio: ${(actualDuration / duration).toFixed(2)}x`);
         
-        // DON'T re-enable ball following yet - wait until entire shot sequence is done
-        // (after rim hold for MAKE or bounce for MISS)
-        
+        // Clear shot in progress flag
+        scene._shotInProgress = false;
         if (result === "MAKE") {
           console.log("score");
           console.log("rimHoldStart");

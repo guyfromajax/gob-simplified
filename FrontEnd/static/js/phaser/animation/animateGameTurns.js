@@ -72,7 +72,7 @@ async function handleOrebTurn(scene, { playerSprites, ballSprite, turnData, onUp
       startTimestamp: Date.now(),
       result,
       shooterId: rebounderId,
-      shooterTeamId: rebounderSprite.team_id,
+      shooterTeamId: turnData.shooter_team_id || rebounderSprite.team_id,
       homeTeamId: scene.simData?.home_team_id,
       stepIndex: 0,
       turnIndex: scene.currentTurn
