@@ -51,11 +51,11 @@
       flex: 1;
     }
 
-    #scoreboard .side.home {
+    #scoreboard .side.away {
       justify-content: flex-start;
     }
 
-    #scoreboard .side.away {
+    #scoreboard .side.home {
       justify-content: flex-end;
       flex-direction: row-reverse;
     }
@@ -91,11 +91,11 @@
       min-width: 60px;
     }
 
-    #scoreboard .tol-fouls.home {
+    #scoreboard .tol-fouls.away {
       align-items: flex-start;
     }
 
-    #scoreboard .tol-fouls.away {
+    #scoreboard .tol-fouls.home {
       align-items: flex-end;
     }
 
@@ -137,11 +137,11 @@
       border: 1px solid #333;
     }
 
-    .player-stats-panel.home {
+    .player-stats-panel.away {
       border-right: 2px solid #ff6200;
     }
 
-    .player-stats-panel.away {
+    .player-stats-panel.home {
       border-left: 2px solid #ff6200;
     }
 
@@ -412,20 +412,6 @@
 <body>
   <!-- ==================== SCOREBOARD TOP BAR ==================== -->
   <div id="scoreboard">
-    <div class="side home">
-      <div class="logo-container">
-        <img id="home-logo" class="team-logo" alt="home logo" />
-      </div>
-      <div id="home-score" class="score">0</div>
-      <div class="tol-fouls home">
-        <div id="home-tol">TOL: 3</div>
-        <div id="home-fouls">F: 0</div>
-      </div>
-    </div>
-    <div class="center">
-      <div id="game-clock" class="clock">8:00</div>
-      <div id="quarter" class="quarter">Q1</div>
-    </div>
     <div class="side away">
       <div class="logo-container">
         <img id="away-logo" class="team-logo" alt="away logo" />
@@ -436,14 +422,28 @@
         <div id="away-fouls">F: 0</div>
       </div>
     </div>
+    <div class="center">
+      <div id="game-clock" class="clock">8:00</div>
+      <div id="quarter" class="quarter">Q1</div>
+    </div>
+    <div class="side home">
+      <div class="logo-container">
+        <img id="home-logo" class="team-logo" alt="home logo" />
+      </div>
+      <div id="home-score" class="score">0</div>
+      <div class="tol-fouls home">
+        <div id="home-tol">TOL: 3</div>
+        <div id="home-fouls">F: 0</div>
+      </div>
+    </div>
   </div>
 
   <!-- ==================== MAIN CONTAINER ==================== -->
   <div id="main-container">
-    <!-- HOME PLAYER STATS PANEL (LEFT) -->
-    <div class="player-stats-panel home">
+    <!-- AWAY PLAYER STATS PANEL (LEFT) -->
+    <div class="player-stats-panel away">
       <div class="player-box-score">
-        <h3>Home Players</h3>
+        <h3>Away Players</h3>
         <table>
           <thead>
             <tr>
@@ -453,7 +453,7 @@
               <th>AST</th>
             </tr>
           </thead>
-          <tbody id="home-stats-body"></tbody>
+          <tbody id="away-stats-body"></tbody>
         </table>
       </div>
       <div class="team-box-score">
@@ -468,10 +468,10 @@
       <button class="sim-to-fourth-button">Sim To 4th Quarter</button>
     </div>
 
-    <!-- AWAY PLAYER STATS PANEL (RIGHT) -->
-    <div class="player-stats-panel away">
+    <!-- HOME PLAYER STATS PANEL (RIGHT) -->
+    <div class="player-stats-panel home">
       <div class="player-box-score">
-        <h3>Away Players</h3>
+        <h3>Home Players</h3>
         <table>
           <thead>
             <tr>
@@ -481,7 +481,7 @@
               <th>AST</th>
             </tr>
           </thead>
-          <tbody id="away-stats-body"></tbody>
+          <tbody id="home-stats-body"></tbody>
         </table>
       </div>
       <div class="team-box-score">
