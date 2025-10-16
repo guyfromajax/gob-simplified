@@ -175,9 +175,8 @@ def resolve_offensive_rebound(game, rebounder):
             event["possession_flips"] = False
             
             # Determine ballSpot based on which basket the offense is attacking
-            # off_team is the team that took the putback shot (still has possession)
-            target_is_away_basket = off_team.team_id == game.away_team.team_id
-            ballSpot = {"x": 91, "y": 25} if target_is_away_basket else {"x": 9, "y": 25}
+            # Home team attacks away basket (x: 91), away team attacks home basket (x: 9)
+            ballSpot = {"x": 91, "y": 25} if off_team == game.home_team else {"x": 9, "y": 25}
             
             # Add rebound information for frontend animation
             event["rebound"] = {
