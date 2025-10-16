@@ -258,6 +258,12 @@ async function startGame({ homeRoster, awayRoster, animate = true }) {
       backgroundColor: '#1e1e1e',
       parent: 'phaser-container',
       audio: { noAudio: true },
+      scale: {
+        mode: Phaser.Scale.FIT,
+        autoCenter: Phaser.Scale.CENTER_BOTH,
+        width: 1229,
+        height: 768
+      },
       scene: [], // prevent auto-start
     });
     game.scene.add('GameScene', GameScene);

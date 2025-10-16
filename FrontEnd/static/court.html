@@ -176,15 +176,21 @@
       margin-top: var(--scoreboard-height);
       padding: 0 var(--side-padding);
       gap: 0;
+      overflow: hidden;
+      box-sizing: border-box;
     }
 
     /* ==================== PLAYER STATS PANELS (LEFT & RIGHT) ==================== */
     .player-stats-panel {
       width: var(--player-stats-width);
+      min-width: var(--player-stats-width);
+      max-width: var(--player-stats-width);
+      flex-shrink: 0;
       background: #1a1a1a;
       display: flex;
       flex-direction: column;
       border: 1px solid #333;
+      overflow: hidden;
     }
 
     .player-stats-panel.away {
@@ -263,7 +269,18 @@
       align-items: center;
       justify-content: center;
       padding: 10px 0;
-      overflow: visible;
+      overflow: hidden;
+      min-width: 0;
+      max-width: 100%;
+    }
+
+    /* Ensure Phaser canvas respects container bounds */
+    #phaser-container canvas {
+      max-width: 100% !important;
+      max-height: 100% !important;
+      width: auto !important;
+      height: auto !important;
+      object-fit: contain;
     }
 
     /* Game control buttons */
