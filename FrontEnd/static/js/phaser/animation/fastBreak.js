@@ -216,27 +216,29 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
   
   // Move primary defender
   // Check top-level defender field first (from shot_manager), then roles.defense array
-  let defenderData = turnData.defender || (turnData.roles?.defense && turnData.roles.defense[0]);
+  // Use defenderId directly if available, otherwise try to extract from defender object/string
+  let defenderId = turnData.defenderId;
   
-  // Extract player_id properly - backend sends Player object
-  let defenderId = null;
-  if (defenderData) {
-    if (typeof defenderData === 'string') {
-      defenderId = defenderData;
-    } else if (defenderData.player_id) {
-      defenderId = defenderData.player_id;
-    } else if (defenderData.playerId) {
-      defenderId = defenderData.playerId;
+  if (!defenderId) {
+    let defenderData = turnData.defender || (turnData.roles?.defense && turnData.roles.defense[0]);
+    if (defenderData) {
+      if (typeof defenderData === 'string') {
+        defenderId = defenderData;
+      } else if (defenderData.player_id) {
+        defenderId = defenderData.player_id;
+      } else if (defenderData.playerId) {
+        defenderId = defenderData.playerId;
+      }
     }
   }
   
   const defenderSprite = defenderId ? playerSprites[defenderId] : null;
   
   console.log("🏀 FB Shot - Defender lookup:", {
-    defenderData,
     defenderId,
     hasSprite: !!defenderSprite,
-    defenderDataType: typeof defenderData
+    turnDataDefenderId: turnData.defenderId,
+    turnDataDefender: turnData.defender
   });
   
   if (defenderSprite) {
@@ -267,7 +269,8 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
   } else {
     console.warn("🏀 FB Shot - No defender sprite found!", {
       defenderId,
-      defenderData,
+      turnDataDefenderId: turnData.defenderId,
+      turnDataDefender: turnData.defender,
       availableSprites: Object.keys(playerSprites)
     });
   }
