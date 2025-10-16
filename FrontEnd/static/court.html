@@ -1,25 +1,33 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <!-- <link rel="icon" type="image/x-icon" href="./images/favicon.ico" /> -->
     <link rel="icon" type="image/x-icon" href="/static/images/favicon.ico" />
   <meta charset="UTF-8" />
   <title>GOB Court</title>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap" rel="stylesheet" />
   <style>
     :root {
-      --scoreboard-height: 80px;
-      --sidebar-border: 1px solid #444;
-      --sidebar-bg: #111;
+      --scoreboard-height: 100px;
+      --player-stats-width: 280px;
+      --pbp-height: 200px;
+      --court-bg: #1e1e1e;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
     }
 
     body {
       margin: 0;
       overflow: hidden;
-      background-color: #111;
+      background-color: #000;
       font-family: 'Bebas Neue', sans-serif;
+      color: #fff;
     }
 
+    /* ==================== SCOREBOARD TOP BAR ==================== */
     #scoreboard {
       position: fixed;
       top: 0;
@@ -31,16 +39,16 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 0 32px;
-      box-sizing: border-box;
+      padding: 0 20px;
       z-index: 1000;
+      border-bottom: 2px solid #ff6200;
     }
 
     #scoreboard .side {
       display: flex;
       align-items: center;
-      height: 100%;
-      gap: 10px;
+      gap: 15px;
+      flex: 1;
     }
 
     #scoreboard .side.home {
@@ -48,13 +56,13 @@
     }
 
     #scoreboard .side.away {
-      justify-content: flex-start;
+      justify-content: flex-end;
       flex-direction: row-reverse;
     }
 
     #scoreboard .logo-container {
-      height: 100%;
-      width: var(--scoreboard-height);
+      height: 80px;
+      width: 80px;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -64,22 +72,31 @@
       width: 100%;
       height: 100%;
       object-fit: contain;
-      display: block;
     }
 
     #scoreboard .score {
-      font-size: 48px;
+      font-size: 56px;
       line-height: 1;
-      flex: 0 0 60px;
+      min-width: 70px;
       text-align: center;
+      font-weight: bold;
     }
 
-    #scoreboard .tol {
-      font-size: 24px;
+    #scoreboard .tol-fouls {
       display: flex;
       flex-direction: column;
-      align-items: center;
-      justify-content: center;
+      gap: 2px;
+      font-size: 20px;
+      line-height: 1.1;
+      min-width: 60px;
+    }
+
+    #scoreboard .tol-fouls.home {
+      align-items: flex-start;
+    }
+
+    #scoreboard .tol-fouls.away {
+      align-items: flex-end;
     }
 
     #scoreboard .center {
@@ -87,83 +104,277 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      height: 100%;
-      margin: 0 40px;
+      gap: 4px;
+      min-width: 180px;
     }
 
     #scoreboard .center .clock {
-      font-size: 48px;
+      font-size: 52px;
       line-height: 1;
+      font-weight: bold;
     }
 
     #scoreboard .center .quarter {
       font-size: 24px;
       line-height: 1;
+      color: #ff6200;
     }
 
+    /* ==================== MAIN CONTAINER ==================== */
     #main-container {
       display: flex;
       width: 100%;
-      height: calc(100vh - var(--scoreboard-height));
+      height: calc(100vh - var(--scoreboard-height) - var(--pbp-height));
       margin-top: var(--scoreboard-height);
     }
 
+    /* ==================== PLAYER STATS PANELS (LEFT & RIGHT) ==================== */
+    .player-stats-panel {
+      width: var(--player-stats-width);
+      background: #1a1a1a;
+      display: flex;
+      flex-direction: column;
+      border: 1px solid #333;
+    }
+
+    .player-stats-panel.home {
+      border-right: 2px solid #ff6200;
+    }
+
+    .player-stats-panel.away {
+      border-left: 2px solid #ff6200;
+    }
+
+    /* Player Box Score Section */
+    .player-box-score {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px;
+      border-bottom: 1px solid #333;
+    }
+
+    .player-box-score h3 {
+      font-size: 22px;
+      margin-bottom: 10px;
+      color: #ff6200;
+      text-align: center;
+      border-bottom: 1px solid #444;
+      padding-bottom: 6px;
+    }
+
+    .player-box-score table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 15px;
+    }
+
+    .player-box-score th {
+      background: #222;
+      padding: 6px 4px;
+      text-align: center;
+      font-size: 14px;
+      color: #aaa;
+      border-bottom: 1px solid #444;
+    }
+
+    .player-box-score td {
+      text-align: center;
+      padding: 5px 4px;
+      border-bottom: 1px solid #2a2a2a;
+    }
+
+    .player-box-score td:first-child {
+      text-align: left;
+      padding-left: 8px;
+    }
+
+    .player-box-score tbody tr:hover {
+      background: #252525;
+    }
+
+    /* Team Box Score Section (Placeholder) */
+    .team-box-score {
+      height: 120px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #151515;
+      border-top: 1px solid #444;
+      color: #888;
+      font-size: 18px;
+    }
+
+    /* ==================== COURT CONTAINER ==================== */
     #phaser-container {
       flex: 1;
       position: relative;
+      background: var(--court-bg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
 
-    #stats-sidebar {
-      width: 260px;
-      background: #222;
+    /* Game control buttons */
+    .play-button,
+    .sim-full-game-button,
+    .sim-to-fourth-button,
+    .back-button {
+      position: absolute;
+      background-color: #ff6200;
       color: #fff;
-      box-sizing: border-box;
-      padding: 10px;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 18px;
+      transition: background-color 0.2s;
+      z-index: 100;
+    }
+
+    .play-button:hover,
+    .back-button:hover {
+      background-color: #ff7a1a;
+    }
+
+    .sim-full-game-button,
+    .sim-to-fourth-button {
+      background-color: #007bff;
+    }
+
+    .sim-full-game-button:hover,
+    .sim-to-fourth-button:hover {
+      background-color: #0056b3;
+    }
+
+    .play-button {
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+
+    .sim-full-game-button {
+      top: 70px;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+
+    .sim-to-fourth-button {
+      top: 120px;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+
+    .play-button:disabled,
+    .sim-full-game-button:disabled,
+    .sim-to-fourth-button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    /* ==================== PLAY-BY-PLAY TEXT SCROLL ==================== */
+    #pbp-container {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: var(--pbp-height);
+      background: #0a0a0a;
+      border-top: 2px solid #ff6200;
       display: flex;
       flex-direction: column;
-      gap: 20px;
+      z-index: 1000;
     }
 
-    .stats-box {
-      width: 100%;
-    }
-
-    .stats-box table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 16px;
-    }
-
-    .stats-box th,
-    .stats-box td {
-      text-align: center;
-      padding: 2px;
+    #pbp-header {
+      background: #1a1a1a;
+      padding: 8px 20px;
+      font-size: 20px;
+      color: #ff6200;
+      border-bottom: 1px solid #333;
     }
 
     #text-scroll-panel {
-      height: 35%;
+      flex: 1;
       overflow-y: auto;
-      border: var(--sidebar-border);
-      background: var(--sidebar-bg);
-      padding: 4px;
+      padding: 12px 20px;
       scroll-behavior: smooth;
     }
 
     #text-scroll {
       display: flex;
       flex-direction: column;
-      gap: 2px;
+      gap: 4px;
     }
 
     .turn-line {
-      margin-bottom: var(--line-spacing, 1em);
+      font-size: 15px;
+      line-height: 1.4;
+      color: #ddd;
+      margin-bottom: 6px;
     }
 
-    .controls {
-      margin-top: auto;
+    /* Scrollbar styling */
+    #text-scroll-panel::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    #text-scroll-panel::-webkit-scrollbar-track {
+      background: #1a1a1a;
+    }
+
+    #text-scroll-panel::-webkit-scrollbar-thumb {
+      background: #ff6200;
+      border-radius: 4px;
+    }
+
+    #text-scroll-panel::-webkit-scrollbar-thumb:hover {
+      background: #ff7a1a;
+    }
+
+    /* ==================== RESULT POPUP ==================== */
+    .result-popup {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.9);
       display: flex;
-      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 2000;
+    }
+
+    .popup-content {
+      background: #222;
+      color: #fff;
+      padding: 40px;
+      border-radius: 12px;
+      text-align: center;
+      border: 2px solid #ff6200;
+      min-width: 400px;
+    }
+
+    .popup-content h2 {
+      font-size: 36px;
+      margin-bottom: 20px;
+      color: #ff6200;
+    }
+
+    .popup-content p {
+      font-size: 24px;
+      margin: 10px 0;
+    }
+
+    /* ==================== PAUSE/SKIP CONTROLS ==================== */
+    .game-controls {
+      position: fixed;
+      bottom: calc(var(--pbp-height) + 20px);
+      right: 20px;
+      display: flex;
       gap: 10px;
+      z-index: 1100;
     }
 
     #pause-btn,
@@ -172,123 +383,128 @@
       color: #fff;
       border: none;
       padding: 10px 20px;
-      border-radius: 4px;
+      border-radius: 6px;
       cursor: pointer;
       font-family: 'Bebas Neue', sans-serif;
+      font-size: 16px;
+      transition: background-color 0.2s;
     }
 
     #skip-btn {
       background-color: #007bff;
     }
 
-    .play-button,
-    .back-button {
-      background-color: #ff6200;
-      color: #fff;
-      border: none;
-      padding: 10px 20px;
-      border-radius: 4px;
-      cursor: pointer;
-      margin: 5px;
-      font-family: 'Bebas Neue', sans-serif;
+    #pause-btn:hover {
+      background-color: #ff7a1a;
     }
 
-    .sim-full-game-button,
-    .sim-to-fourth-button {
-      background-color: #007bff;
-      color: #fff;
-      border: none;
-      padding: 10px 20px;
-      border-radius: 4px;
-      cursor: pointer;
-      margin: 5px;
-      font-family: 'Bebas Neue', sans-serif;
+    #skip-btn:hover {
+      background-color: #0056b3;
     }
 
-    .result-popup {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0, 0, 0, 0.8);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .popup-content {
-      background: #222;
-      color: #fff;
-      padding: 20px;
-      border-radius: 8px;
-      text-align: center;
+    #pause-btn:disabled,
+    #skip-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
     }
   </style>
 </head>
 <body>
+  <!-- ==================== SCOREBOARD TOP BAR ==================== -->
   <div id="scoreboard">
     <div class="side home">
       <div class="logo-container">
         <img id="home-logo" class="team-logo" alt="home logo" />
       </div>
       <div id="home-score" class="score">0</div>
-      <div class="tol home">
-        <div>TOL: 3</div>
+      <div class="tol-fouls home">
+        <div id="home-tol">TOL: 3</div>
         <div id="home-fouls">F: 0</div>
       </div>
     </div>
     <div class="center">
       <div id="game-clock" class="clock">8:00</div>
-      <div id="quarter" class="quarter">Q:1</div>
+      <div id="quarter" class="quarter">Q1</div>
     </div>
     <div class="side away">
       <div class="logo-container">
         <img id="away-logo" class="team-logo" alt="away logo" />
       </div>
       <div id="away-score" class="score">0</div>
-      <div class="tol away">
-        <div>TOL: 3</div>
+      <div class="tol-fouls away">
+        <div id="away-tol">TOL: 3</div>
         <div id="away-fouls">F: 0</div>
       </div>
     </div>
   </div>
+
+  <!-- ==================== MAIN CONTAINER ==================== -->
   <div id="main-container">
+    <!-- HOME PLAYER STATS PANEL (LEFT) -->
+    <div class="player-stats-panel home">
+      <div class="player-box-score">
+        <h3>Home Players</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>PTS</th>
+              <th>REB</th>
+              <th>AST</th>
+            </tr>
+          </thead>
+          <tbody id="home-stats-body"></tbody>
+        </table>
+      </div>
+      <div class="team-box-score">
+        Team Stats
+      </div>
+    </div>
+
+    <!-- COURT CONTAINER (CENTER) -->
     <div id="phaser-container">
       <button class="play-button">Play Quarter</button>
       <button class="sim-full-game-button">Sim Full Game</button>
       <button class="sim-to-fourth-button">Sim To 4th Quarter</button>
     </div>
-    <div id="stats-sidebar">
-      <div class="stats-box" id="home-stats-box">
+
+    <!-- AWAY PLAYER STATS PANEL (RIGHT) -->
+    <div class="player-stats-panel away">
+      <div class="player-box-score">
+        <h3>Away Players</h3>
         <table>
           <thead>
-            <tr><th colspan="4">Home Team</th></tr>
-            <tr><th>Name</th><th>PTS</th><th>REB</th><th>AST</th></tr>
-          </thead>
-          <tbody id="home-stats-body"></tbody>
-        </table>
-      </div>
-      <div class="stats-box" id="away-stats-box">
-        <table>
-          <thead>
-            <tr><th colspan="4">Away Team</th></tr>
-            <tr><th>Name</th><th>PTS</th><th>REB</th><th>AST</th></tr>
+            <tr>
+              <th>Name</th>
+              <th>PTS</th>
+              <th>REB</th>
+              <th>AST</th>
+            </tr>
           </thead>
           <tbody id="away-stats-body"></tbody>
         </table>
       </div>
-      <div id="text-scroll-panel">
-        <div id="text-scroll"></div>
-      </div>
-      <div class="controls">
-        <button id="pause-btn">Pause</button>
-        <button id="skip-btn">Skip To End</button>
+      <div class="team-box-score">
+        Team Stats
       </div>
     </div>
   </div>
 
-  <!-- <script type="module" src="./js/phaser/bootGame.js"></script> -->
+  <!-- ==================== PLAY-BY-PLAY SCROLL (BOTTOM) ==================== -->
+  <div id="pbp-container">
+    <div id="pbp-header">Play-by-Play</div>
+    <div id="text-scroll-panel">
+      <div id="text-scroll"></div>
+    </div>
+  </div>
+
+  <!-- ==================== GAME CONTROLS ==================== -->
+  <div class="game-controls">
+    <button id="pause-btn">Pause</button>
+    <button id="skip-btn">Skip To End</button>
+  </div>
+
+  <!-- ==================== SCRIPTS ==================== -->
   <script>
     console.log('🚨 HTML: Basic JavaScript is working!');
     console.log('🚨 HTML: About to load bootGame.js');
