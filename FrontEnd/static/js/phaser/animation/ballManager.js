@@ -349,6 +349,24 @@ export function shootBall({
   const shotDistance = Phaser.Math.Distance.Between(start.x, start.y, rim.x, rim.y);
   const duration = Math.max(baseDuration, shotDistance * 3); // 3ms per pixel
 
+  // Create a position tracker to catch any unexpected repositioning
+  let lastLoggedX = start.x;
+  let lastLoggedY = start.y;
+  const positionWatcher = () => {
+    const deltaX = Math.abs(ballSprite.x - lastLoggedX);
+    const deltaY = Math.abs(ballSprite.y - lastLoggedY);
+    if (deltaX > 50 || deltaY > 50) {  // Ball jumped more than 50 pixels
+      console.warn('🚨 BALL TELEPORT DETECTED!', {
+        from: { x: lastLoggedX.toFixed(0), y: lastLoggedY.toFixed(0) },
+        to: { x: ballSprite.x.toFixed(0), y: ballSprite.y.toFixed(0) },
+        delta: { x: deltaX.toFixed(0), y: deltaY.toFixed(0) }
+      });
+    }
+    lastLoggedX = ballSprite.x;
+    lastLoggedY = ballSprite.y;
+  };
+  scene.events.on('update', positionWatcher);
+  
   ballSprite.setPosition(start.x, start.y);
   ballSprite.setVisible(true);
   
@@ -418,6 +436,8 @@ export function shootBall({
           const finish = () => {
             console.log("rimHoldEnd");
             console.log(`🏀 shootBall: Rim hold ending - ball at (${ballSprite.x.toFixed(0)}, ${ballSprite.y.toFixed(0)})`);
+            // Clean up position watcher
+            scene.events.off('update', positionWatcher);
             // Re-enable ball following AFTER rim hold
             scene._shotInProgress = false;
             scene.ballDetached = false;
@@ -462,6 +482,8 @@ export function shootBall({
                 team: shooterTeamId,
               });
             }
+            // Clean up position watcher
+            scene.events.off('update', positionWatcher);
             // Re-enable ball following AFTER bounce completes
             scene._shotInProgress = false;
             scene.ballDetached = false;
