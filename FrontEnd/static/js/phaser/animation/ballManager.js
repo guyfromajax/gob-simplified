@@ -408,14 +408,17 @@ export function shootBall({
         const actualDuration = Date.now() - tweenStartTime;
         console.log(`🏀 shootBall: Tween COMPLETE | Result: ${result} | Actual: ${actualDuration}ms / Expected: ${duration}ms | Ratio: ${(actualDuration / duration).toFixed(2)}x`);
         
-        // Clear shot in progress flags - re-enable ball following systems
-        scene._shotInProgress = false;
-        scene.ballDetached = false;
+        // DON'T re-enable ball following yet - wait until entire shot sequence is done
+        // (after rim hold for MAKE or bounce for MISS)
+        
         if (result === "MAKE") {
           console.log("score");
           console.log("rimHoldStart");
           const finish = () => {
             console.log("rimHoldEnd");
+            // Re-enable ball following AFTER rim hold
+            scene._shotInProgress = false;
+            scene.ballDetached = false;
             resolve();
           };
           if (scene.time?.delayedCall) {
@@ -454,6 +457,9 @@ export function shootBall({
                 team: shooterTeamId,
               });
             }
+            // Re-enable ball following AFTER bounce completes
+            scene._shotInProgress = false;
+            scene.ballDetached = false;
             resolve(miss);
           });
         } else {
