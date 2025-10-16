@@ -373,6 +373,7 @@ export function shootBall({
       duration
     });
     
+    const tweenStartTime = Date.now();
     const tween = scene.tweens.add({
       targets: ballSprite,
       x: rim.x,
