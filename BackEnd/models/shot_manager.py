@@ -391,6 +391,16 @@ class ShotManager:
         shot_score = (attrs["SC"] * 0.6 + attrs["CH"] * 0.2 + attrs["IQ"] * 0.2) * random.randint(1, 6)
 
         defender = random.choice(fb_roles["defense"]) if fb_roles["defense"] else None
+        
+        # Fallback: If no defender assigned, use defender at shooter's position for animation
+        if not defender:
+            shooter_pos = get_player_position(off_lineup, shooter)
+            defender = def_lineup.get(shooter_pos)
+            if not defender:
+                # Final fallback: use defensive PG
+                defender = def_lineup.get("PG", list(def_lineup.values())[0])
+            print(f"⚡ Fast Break Shot: No defender in defense list, using {get_name_safe(defender)} at {shooter_pos}")
+        
         fb_roles["defender"] = defender  # Store for animation
         
         defense_attrs = defender.attributes if defender else {"ID": 0, "IQ": 0, "CH": 0}

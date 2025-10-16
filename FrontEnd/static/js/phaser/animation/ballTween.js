@@ -43,10 +43,7 @@ export function attachBallToPlayer(scene, ballSprite, playerSprite, opts = {}) {
   
   // Don't attach ball during shot animation - it would override the tween
   if (scene._shotInProgress) {
-    console.log('🏀 attachBallToPlayer: Blocked during shot animation', {
-      targetPlayer: playerSprite?.playerId,
-      ballPos: { x: scene.ballSprite?.x, y: scene.ballSprite?.y }
-    });
+    console.log('🏀 attachBallToPlayer: Blocked during shot animation');
     return;
   }
 
@@ -95,14 +92,6 @@ export function attachBallToPlayer(scene, ballSprite, playerSprite, opts = {}) {
  */
 function startBallFollowing(scene, ballSprite, playerSprite, opts = {}) {
   if (!scene || !ballSprite || !playerSprite) return;
-  
-  // Don't start following during shots
-  if (scene._shotInProgress) {
-    if (PASS_DEBUG) {
-      console.log('startBallFollowing: Blocked during shot');
-    }
-    return;
-  }
 
   // Stop any existing following
   stopBallFollowing(scene);
