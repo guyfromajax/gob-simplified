@@ -83,20 +83,21 @@ export function announceFromTurnData(turnData, timing = 'start', homeTeamId = nu
     // Announcements at turn start
     if (turnData.fast_break) {
       showAnnouncement("Fast Break!", 'neutral');
-      return;
+      // Don't return - may have more announcements at end
     }
     
     // Check multiple ways FCP/HCT can be indicated
-    if (turnData.offensive_state === 'FCP' || turnData.fcp_foul || turnData.fcp_shot || 
+    // Note: Don't return after these - shots from Press/Trap should also announce results
+    if (turnData.offensive_state === 'FCP' || turnData.fcp_foul || 
         turnData.result_type === 'FCP' || turnData.text?.includes('PRESS!')) {
       showAnnouncement("Press!", 'defense');
-      return;
+      // Don't return - may have shot result to announce later
     }
     
-    if (turnData.offensive_state === 'HCT' || turnData.hct_foul || turnData.hct_shot || 
+    if (turnData.offensive_state === 'HCT' || turnData.hct_foul || 
         turnData.result_type === 'HCT' || turnData.text?.includes('TRAP!')) {
       showAnnouncement("Trap!", 'defense');
-      return;
+      // Don't return - may have shot result to announce later
     }
   } else if (timing === 'end') {
     // Announcements at turn end (after animation)
