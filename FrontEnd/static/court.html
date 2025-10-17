@@ -323,14 +323,19 @@
       display: flex;
       align-items: flex-start;
       justify-content: center;
+      padding-bottom: var(--pbp-height);
       overflow: visible;
       min-width: 0;
       max-width: 100%;
     }
 
-    /* Let Phaser handle canvas sizing naturally */
+    /* Ensure Phaser canvas respects container bounds */
     #phaser-container canvas {
-      display: block;
+      max-width: 100% !important;
+      max-height: 100% !important;
+      width: auto !important;
+      height: auto !important;
+      object-fit: contain;
     }
 
     /* Pre-game button container */
@@ -610,7 +615,7 @@
     /* ==================== PAUSE/SKIP CONTROLS ==================== */
     .game-controls {
       position: absolute;
-      bottom: 20px;
+      bottom: calc(var(--pbp-height) + 20px);
       left: 50%;
       transform: translateX(-50%);
       display: flex;
