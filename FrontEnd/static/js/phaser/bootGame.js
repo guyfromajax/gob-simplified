@@ -348,12 +348,12 @@ async function handleButtonClick(animate) {
   
   DEBUG && console.log('[handleButtonClick]', { startingFresh, quarter, gameId });
   isSimulating = true;
-  const playBtn = document.querySelector('.play-button');
-  const simFullBtn = document.querySelector('.sim-full-game-button');
-  const sim4Btn = document.querySelector('.sim-to-fourth-button');
-  if (playBtn) playBtn.style.display = 'none';
-  if (simFullBtn) simFullBtn.style.display = 'none';
-  if (sim4Btn) sim4Btn.style.display = 'none';
+  
+  // Hide the pre-game button container
+  const preGameContainer = document.querySelector('.pre-game-container');
+  if (preGameContainer) {
+    preGameContainer.classList.add('hidden');
+  }
 
   try {
     console.log('About to fetch rosters for teams:', { homeTeam, awayTeam });
@@ -477,6 +477,13 @@ async function handleSimFullGame() {
     resetGameContext();
   }
   isSimulating = true;
+  
+  // Hide the pre-game button container
+  const preGameContainer = document.querySelector('.pre-game-container');
+  if (preGameContainer) {
+    preGameContainer.classList.add('hidden');
+  }
+  
   const playBtn = document.querySelector('.play-button');
   const simFullBtn = document.querySelector('.sim-full-game-button');
   const sim4Btn = document.querySelector('.sim-to-fourth-button');

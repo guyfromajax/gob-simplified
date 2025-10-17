@@ -260,7 +260,16 @@
     }
     
     .player-stats-panel.away .player-box-score h3 {
-      color: var(--away-vibrant-color);
+      color: #fff;
+      text-shadow: 
+        -1px -1px 0 var(--away-vibrant-color),
+        1px -1px 0 var(--away-vibrant-color),
+        -1px 1px 0 var(--away-vibrant-color),
+        1px 1px 0 var(--away-vibrant-color),
+        -2px 0 0 var(--away-vibrant-color),
+        2px 0 0 var(--away-vibrant-color),
+        0 -2px 0 var(--away-vibrant-color),
+        0 2px 0 var(--away-vibrant-color);
     }
 
     .player-box-score table {
@@ -328,27 +337,50 @@
       object-fit: contain;
     }
 
+    /* Pre-game button container */
+    .pre-game-container {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: #fff;
+      border: 6px solid #c0c0c0;
+      border-radius: 12px;
+      padding: 40px 60px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      align-items: center;
+      z-index: 100;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+    }
+
+    .pre-game-container.hidden {
+      display: none;
+    }
+
     /* Game control buttons */
     .play-button,
     .sim-full-game-button,
     .sim-to-fourth-button,
     .back-button {
-      position: absolute;
       background-color: #ff6200;
       color: #fff;
       border: none;
-      padding: 12px 24px;
-      border-radius: 6px;
+      padding: 14px 40px;
+      border-radius: 8px;
       cursor: pointer;
       font-family: 'Bebas Neue', sans-serif;
-      font-size: 18px;
-      transition: background-color 0.2s;
-      z-index: 100;
+      font-size: 22px;
+      transition: background-color 0.2s, transform 0.1s;
+      min-width: 240px;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
     }
 
     .play-button:hover,
     .back-button:hover {
       background-color: #ff7a1a;
+      transform: translateY(-2px);
     }
 
     .sim-full-game-button,
@@ -359,24 +391,7 @@
     .sim-full-game-button:hover,
     .sim-to-fourth-button:hover {
       background-color: #0056b3;
-    }
-
-    .play-button {
-      top: 20px;
-      left: 50%;
-      transform: translateX(-50%);
-    }
-
-    .sim-full-game-button {
-      top: 70px;
-      left: 50%;
-      transform: translateX(-50%);
-    }
-
-    .sim-to-fourth-button {
-      top: 120px;
-      left: 50%;
-      transform: translateX(-50%);
+      transform: translateY(-2px);
     }
 
     .play-button:disabled,
@@ -384,6 +399,13 @@
     .sim-to-fourth-button:disabled {
       opacity: 0.5;
       cursor: not-allowed;
+      transform: none;
+    }
+
+    .play-button:disabled:hover,
+    .sim-full-game-button:disabled:hover,
+    .sim-to-fourth-button:disabled:hover {
+      transform: none;
     }
 
     /* ==================== PLAY-BY-PLAY TEXT SCROLL ==================== */
@@ -602,9 +624,11 @@
 
     <!-- COURT CONTAINER (CENTER) -->
     <div id="phaser-container">
-      <button class="play-button">Play Quarter</button>
-      <button class="sim-full-game-button">Sim Full Game</button>
-      <button class="sim-to-fourth-button">Sim To 4th Quarter</button>
+      <div class="pre-game-container">
+        <button class="play-button">Play Quarter</button>
+        <button class="sim-full-game-button">Sim Full Game</button>
+        <button class="sim-to-fourth-button">Sim To 4th Quarter</button>
+      </div>
     </div>
 
     <!-- HOME PLAYER STATS PANEL (RIGHT) -->
