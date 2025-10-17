@@ -260,7 +260,7 @@ async function startGame({ homeRoster, awayRoster, animate = true }) {
       audio: { noAudio: true },
       scale: {
         mode: Phaser.Scale.FIT,
-        autoCenter: Phaser.Scale.CENTER_BOTH,
+        autoCenter: Phaser.Scale.CENTER_HORIZONTALLY,
         width: 1229,
         height: 768
       },
