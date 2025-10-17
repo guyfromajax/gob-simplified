@@ -8,8 +8,9 @@ let currentAnnouncement = null;
 /**
  * Show an announcement with pop-to-center animation
  * @param {string} text - Text to display (e.g., "Fast Break!", "It's Good!")
+ * @param {string} team - 'home', 'away', 'defense', or 'neutral' for color styling
  */
-export function showAnnouncement(text) {
+export function showAnnouncement(text, team = 'home') {
   // Remove any existing announcement
   if (currentAnnouncement) {
     currentAnnouncement.remove();
@@ -19,6 +20,18 @@ export function showAnnouncement(text) {
   // Create announcement element
   const announcement = document.createElement('div');
   announcement.className = 'game-announcement';
+  
+  // Apply team-specific styling
+  if (team === 'home') {
+    announcement.classList.add('home-team');
+  } else if (team === 'away') {
+    announcement.classList.add('away-team');
+  } else if (team === 'defense') {
+    announcement.classList.add('defense-team');
+  } else {
+    announcement.classList.add('neutral');
+  }
+  
   announcement.textContent = text;
   
   // Add to body
@@ -40,53 +53,75 @@ export function showAnnouncement(text) {
     }
   }, 1000);
   
-  console.log('📢 Announcement:', text);
+  console.log('📢 Announcement:', text, 'Team:', team);
 }
 
 /**
  * Determine and show announcement based on turn data
  * @param {Object} turnData - Turn data from backend
  * @param {string} timing - 'start' or 'end' of turn
+ * @param {string} homeTeamId - Home team ID for determining team colors
  */
-export function announceFromTurnData(turnData, timing = 'start') {
+export function announceFromTurnData(turnData, timing = 'start', homeTeamId = null) {
+  // Determine which team triggered the event
+  const offenseTeamId = turnData.possession_team_id || turnData.starting_possession_team_id;
+  const isHomeTeamEvent = homeTeamId && String(offenseTeamId) === String(homeTeamId);
+  const offenseTeam = isHomeTeamEvent ? 'home' : 'away';
+  const defenseTeam = isHomeTeamEvent ? 'away' : 'home';
+  console.log('🔔 announceFromTurnData:', { 
+    timing, 
+    result_type: turnData.result_type,
+    offensive_state: turnData.offensive_state,
+    fast_break: turnData.fast_break,
+    fcp_foul: turnData.fcp_foul,
+    hct_foul: turnData.hct_foul,
+    fcp_shot: turnData.fcp_shot,
+    hct_shot: turnData.hct_shot
+  });
+  
   if (timing === 'start') {
     // Announcements at turn start
     if (turnData.fast_break) {
-      showAnnouncement("Fast Break!");
+      showAnnouncement("Fast Break!", 'neutral');
       return;
     }
     
-    if (turnData.offensive_state === 'FCP') {
-      showAnnouncement("Press!");
+    // Check multiple ways FCP/HCT can be indicated
+    if (turnData.offensive_state === 'FCP' || turnData.fcp_foul || turnData.fcp_shot || 
+        turnData.result_type === 'FCP' || turnData.text?.includes('PRESS!')) {
+      showAnnouncement("Press!", 'defense');
       return;
     }
     
-    if (turnData.offensive_state === 'HCT') {
-      showAnnouncement("Trap!");
+    if (turnData.offensive_state === 'HCT' || turnData.hct_foul || turnData.hct_shot || 
+        turnData.result_type === 'HCT' || turnData.text?.includes('TRAP!')) {
+      showAnnouncement("Trap!", 'defense');
       return;
     }
   } else if (timing === 'end') {
     // Announcements at turn end (after animation)
     if (turnData.result_type === 'MAKE' || turnData.result_type === 'PUTBACK_MAKE') {
-      showAnnouncement("It's Good!");
+      showAnnouncement("It's Good!", offenseTeam);
       return;
     }
     
     if (turnData.result_type === 'FOUL') {
-      showAnnouncement("Foul!");
+      showAnnouncement("Foul!", 'neutral');
       return;
     }
     
     // Check for rebound on misses (but don't announce the miss itself)
     if (turnData.result_type === 'MISS' || turnData.result_type === 'PUTBACK_MISS') {
       if (turnData.rebound_type) {
-        showAnnouncement("Rebound!");
+        // Determine who got the rebound
+        const reboundTeam = turnData.rebound_type === 'DREB' ? defenseTeam : offenseTeam;
+        showAnnouncement("Rebound!", reboundTeam);
       }
       return;
     }
     
     if (turnData.result_type === 'TURNOVER' && turnData.text?.toLowerCase().includes('steal')) {
-      showAnnouncement("Steal!");
+      showAnnouncement("Steal!", defenseTeam);
       return;
     }
   }
