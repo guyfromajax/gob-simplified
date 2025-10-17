@@ -352,7 +352,11 @@ async function handleButtonClick(animate) {
   // Hide the pre-game button container
   const preGameContainer = document.querySelector('.pre-game-container');
   if (preGameContainer) {
+    console.log('🎮 Hiding pre-game container (Play Quarter)');
     preGameContainer.classList.add('hidden');
+    console.log('🎮 Pre-game container classes:', preGameContainer.className);
+  } else {
+    console.warn('⚠️ Pre-game container not found');
   }
 
   try {
@@ -481,7 +485,11 @@ async function handleSimFullGame() {
   // Hide the pre-game button container
   const preGameContainer = document.querySelector('.pre-game-container');
   if (preGameContainer) {
+    console.log('🎮 Hiding pre-game container (Sim Full Game)');
     preGameContainer.classList.add('hidden');
+    console.log('🎮 Pre-game container classes:', preGameContainer.className);
+  } else {
+    console.warn('⚠️ Pre-game container not found');
   }
   
   const playBtn = document.querySelector('.play-button');
