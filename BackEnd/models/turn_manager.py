@@ -263,6 +263,9 @@ class TurnManager:
             self.game.game_state["current_playcall"] = calls["offense"]
             self.game.game_state["defense_playcall"] = calls["defense"]
             result = self.resolve_half_court_offense()
+            # Add playcalls to result for frontend display
+            result["offensive_playcall"] = calls["offense"]
+            result["defensive_playcall"] = calls["defense"]
 
         # Record possession team before any potential flip
         result["starting_possession_team_id"] = self.game.offense_team.team_id
