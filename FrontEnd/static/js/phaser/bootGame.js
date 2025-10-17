@@ -5,6 +5,7 @@ import { on, emit } from './utils/eventBus.js';
 import { finalizeGame } from './finalizeGame.js';
 import { DEBUG } from './utils/debug.js';
 import gameStore from '../state/gameStore.js';
+import { generateBothLineups } from './utils/autosetLineup.js';
 
 const DEBUG_GAME_ID =
   (typeof window !== 'undefined' && window.DEBUG_GAME_ID) ||
@@ -400,6 +401,17 @@ async function handleSimToFourth() {
   const sim4Btn = document.querySelector('.sim-to-fourth-button');
   [playBtn, simFullBtn, sim4Btn].forEach(btn => { if (btn) btn.disabled = true; });
 
+  // Fetch rosters for auto-set lineup generation
+  let homeRoster, awayRoster;
+  try {
+    const homeRes = await fetch(`/roster/${homeTeam}`);
+    const awayRes = await fetch(`/roster/${awayTeam}`);
+    if (homeRes.ok) homeRoster = await homeRes.json();
+    if (awayRes.ok) awayRoster = await awayRes.json();
+  } catch (err) {
+    console.error('Error fetching rosters for auto-set:', err);
+  }
+
   try {
     let currentQ = quarter;
     let gId = gameId;
@@ -412,10 +424,13 @@ async function handleSimToFourth() {
         quarter: currentQ,
       };
       if (gId) payload.game_id = gId;
+      
+      // Q1: Use user's set lineup
+      // Q2-Q3: Auto-set lineups for both teams
       if (currentQ === quarter) {
         if (Object.keys(homeLineup).length) payload.home_lineup = homeLineup;
         if (Object.keys(awayLineup).length) payload.away_lineup = awayLineup;
-        // Add game plan settings for ALL modes (Q1 only)
+        // Add game plan settings (Q1 only, will be reused for Q2-Q3)
         console.log('🔍 Game plan check:', { currentQ, quarter, hasSettings: !!gamePlanSettings, userTeamSide, mode });
         if (currentQ === 1 && gamePlanSettings && userTeamSide) {
           payload.user_team_side = userTeamSide;
@@ -424,6 +439,20 @@ async function handleSimToFourth() {
           console.log(`🎮 Sending game plan settings to backend (${mode} mode):`, { userTeamSide, playcall: gamePlanSettings.playcall_settings });
         } else if (currentQ === 1) {
           console.warn('⚠️ Not sending game plan settings:', { hasSettings: !!gamePlanSettings, userTeamSide });
+        }
+      } else {
+        // Q2-Q3: Auto-set lineups
+        if (homeRoster && awayRoster) {
+          const autoLineups = generateBothLineups(homeRoster, awayRoster);
+          payload.home_lineup = autoLineups.home_lineup;
+          payload.away_lineup = autoLineups.away_lineup;
+          console.log(`🤖 Q${currentQ}: Auto-set lineups generated for both teams`);
+        }
+        // Reuse game plan settings from Q1
+        if (gamePlanSettings && userTeamSide) {
+          payload.user_team_side = userTeamSide;
+          payload.playcall_settings = gamePlanSettings.playcall_settings;
+          payload.strategy_settings = gamePlanSettings.strategy_settings;
         }
       }
       if (DEBUG_TEAMS) {
@@ -444,23 +473,25 @@ async function handleSimToFourth() {
       currentQ += 1;
     }
 
+    // After Q1-Q3 simulated, redirect to set-lineup for Q4
     gameId = gId;
-    quarter = 4;
-    periodLabel = 'Q4';
-    const params = new URLSearchParams(window.location.search);
-    params.set('game_id', gameId);
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('game_id', gameId);
+    }
+    
+    // Build URL parameters for set-lineup screen
+    const params = new URLSearchParams();
+    params.set('home', homeTeam);
+    params.set('away', awayTeam);
+    params.set('mode', mode);
+    params.set('my_team', userTeamSide || 'home');
+    params.set('user_team_id', userTeamSide === 'home' ? homeTeam : awayTeam);
     params.set('quarter', 4);
     params.set('period', 'Q4');
-    ['home_pg','home_sg','home_sf','home_pf','home_c','away_pg','away_sg','away_sf','away_pf','away_c']
-      .forEach(p => params.delete(p));
-    window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`);
-    updateScoreboardScores({
-      home: lastSummary.score[homeTeam] || 0,
-      away: lastSummary.score[awayTeam] || 0,
-    });
-    const qEl = document.getElementById('quarter');
-    if (qEl) qEl.textContent = 'Q:4';
-    showStatus('Simulating Q1…Q2…Q3 complete. Ready for Q4. Press Play Quarter to proceed.');
+    params.set('game_id', gameId);
+    
+    console.log('🎮 Redirecting to set-lineup for Q4 after simming Q1-Q3');
+    window.location.href = `/static/set-lineup.html?${params.toString()}`;
   } catch (err) {
     console.error('Error simming to 4th quarter:', err);
     showStatus('Simulation failed. Please try again.');
@@ -497,6 +528,17 @@ async function handleSimFullGame() {
   const sim4Btn = document.querySelector('.sim-to-fourth-button');
   [playBtn, simFullBtn, sim4Btn].forEach(btn => { if (btn) btn.disabled = true; });
 
+  // Fetch rosters for auto-set lineup generation
+  let homeRoster, awayRoster;
+  try {
+    const homeRes = await fetch(`/roster/${homeTeam}`);
+    const awayRes = await fetch(`/roster/${awayTeam}`);
+    if (homeRes.ok) homeRoster = await homeRes.json();
+    if (awayRes.ok) awayRoster = await awayRes.json();
+  } catch (err) {
+    console.error('Error fetching rosters for auto-set:', err);
+  }
+
   try {
     let currentQ = quarter;
     let gId = gameId;
@@ -509,10 +551,13 @@ async function handleSimFullGame() {
         quarter: currentQ,
       };
       if (gId) payload.game_id = gId;
+      
+      // Q1: Use user's set lineup
+      // Q2-Q4: Auto-set lineups for both teams
       if (currentQ === quarter) {
         if (Object.keys(homeLineup).length) payload.home_lineup = homeLineup;
         if (Object.keys(awayLineup).length) payload.away_lineup = awayLineup;
-        // Add game plan settings for ALL modes (Q1 only)
+        // Add game plan settings (Q1 only, will be reused for all quarters)
         console.log('🔍 Game plan check (sim full):', { currentQ, quarter, hasSettings: !!gamePlanSettings, userTeamSide, mode });
         if (currentQ === 1 && gamePlanSettings && userTeamSide) {
           payload.user_team_side = userTeamSide;
@@ -521,6 +566,20 @@ async function handleSimFullGame() {
           console.log(`🎮 Sending game plan settings to backend (${mode} mode, sim full):`, { userTeamSide, playcall: gamePlanSettings.playcall_settings });
         } else if (currentQ === 1) {
           console.warn('⚠️ Not sending game plan settings (sim full):', { hasSettings: !!gamePlanSettings, userTeamSide });
+        }
+      } else {
+        // Q2-Q4: Auto-set lineups
+        if (homeRoster && awayRoster) {
+          const autoLineups = generateBothLineups(homeRoster, awayRoster);
+          payload.home_lineup = autoLineups.home_lineup;
+          payload.away_lineup = autoLineups.away_lineup;
+          console.log(`🤖 Q${currentQ}: Auto-set lineups generated for both teams`);
+        }
+        // Reuse game plan settings from Q1
+        if (gamePlanSettings && userTeamSide) {
+          payload.user_team_side = userTeamSide;
+          payload.playcall_settings = gamePlanSettings.playcall_settings;
+          payload.strategy_settings = gamePlanSettings.strategy_settings;
         }
       }
       if (DEBUG_TEAMS) {
