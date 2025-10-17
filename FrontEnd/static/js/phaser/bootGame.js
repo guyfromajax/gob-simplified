@@ -349,12 +349,12 @@ async function handleButtonClick(animate) {
   DEBUG && console.log('[handleButtonClick]', { startingFresh, quarter, gameId });
   isSimulating = true;
   
-  // Hide the pre-game button container
+  // Remove the pre-game button container from DOM
   const preGameContainer = document.querySelector('.pre-game-container');
   if (preGameContainer) {
-    console.log('🎮 Hiding pre-game container (Play Quarter)');
-    preGameContainer.classList.add('hidden');
-    console.log('🎮 Pre-game container classes:', preGameContainer.className);
+    console.log('🎮 Removing pre-game container (Play Quarter)');
+    preGameContainer.remove();
+    console.log('🎮 Pre-game container removed from DOM');
   } else {
     console.warn('⚠️ Pre-game container not found');
   }
@@ -482,12 +482,12 @@ async function handleSimFullGame() {
   }
   isSimulating = true;
   
-  // Hide the pre-game button container
+  // Remove the pre-game button container from DOM
   const preGameContainer = document.querySelector('.pre-game-container');
   if (preGameContainer) {
-    console.log('🎮 Hiding pre-game container (Sim Full Game)');
-    preGameContainer.classList.add('hidden');
-    console.log('🎮 Pre-game container classes:', preGameContainer.className);
+    console.log('🎮 Removing pre-game container (Sim Full Game)');
+    preGameContainer.remove();
+    console.log('🎮 Pre-game container removed from DOM');
   } else {
     console.warn('⚠️ Pre-game container not found');
   }
