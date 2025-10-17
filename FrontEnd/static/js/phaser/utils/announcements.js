@@ -101,23 +101,11 @@ export function announceFromTurnData(turnData, timing = 'start', homeTeamId = nu
     }
   } else if (timing === 'end') {
     // Announcements at turn end (after animation)
-    if (turnData.result_type === 'MAKE' || turnData.result_type === 'PUTBACK_MAKE') {
-      showAnnouncement("It's Good!", offenseTeam);
-      return;
-    }
+    // Note: "It's Good!" and "Rebound!" are now handled directly in ballManager.js
+    // for precise timing when ball reaches rim/rebounder
     
     if (turnData.result_type === 'FOUL') {
       showAnnouncement("Foul!", 'neutral');
-      return;
-    }
-    
-    // Check for rebound on misses (but don't announce the miss itself)
-    if (turnData.result_type === 'MISS' || turnData.result_type === 'PUTBACK_MISS') {
-      if (turnData.rebound_type) {
-        // Determine who got the rebound
-        const reboundTeam = turnData.rebound_type === 'DREB' ? defenseTeam : offenseTeam;
-        showAnnouncement("Rebound!", reboundTeam);
-      }
       return;
     }
     

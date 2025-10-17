@@ -430,9 +430,16 @@ export function shootBall({
           console.log(`🏀 shootBall: Tween ${(tween.progress * 100).toFixed(0)}% | Elapsed: ${elapsed}ms / ${duration}ms | Ball at (${ballSprite.x.toFixed(0)}, ${ballSprite.y.toFixed(0)}) | Visible: ${ballSprite.visible}`);
         }
       },
-      onComplete: () => {
+      onComplete: async () => {
         const actualDuration = Date.now() - tweenStartTime;
         console.log(`🏀 shootBall: Tween COMPLETE | Result: ${result} | Actual: ${actualDuration}ms / Expected: ${duration}ms | Ratio: ${(actualDuration / duration).toFixed(2)}x`);
+        
+        // Announce shot result when ball reaches rim
+        const { showAnnouncement } = await import('../utils/announcements.js');
+        const teamStyle = isHomeTeam ? 'home' : 'away';
+        if (result === "MAKE") {
+          showAnnouncement("It's Good!", teamStyle);
+        }
         
         // Clear shot in progress flag
         scene._shotInProgress = false;
@@ -617,7 +624,7 @@ export function animateRebound({
           y: spotPx.y,
           duration: rebCfg.playerMoveMs,
           ease: "Linear",
-          onComplete: () => {
+          onComplete: async () => {
             if (debugEnabled && REBOUND_DEBUG) {
               animationDebugLog("reb:moveEnd", {
                 playerId: rebounderId,
@@ -625,6 +632,12 @@ export function animateRebound({
                 y: spotPx.y
               });
             }
+            
+            // Announce rebound when rebounder reaches the ball
+            const { showAnnouncement } = await import('../utils/announcements.js');
+            const rebounderTeam = rebounderSprite.team; // "home" or "away"
+            showAnnouncement("Rebound!", rebounderTeam);
+            
             attachBallToPlayer(scene, ballSprite, rebounderSprite, {
               debugInfo: { shooterId, reboundSpot: ballSpot }
             });
