@@ -72,14 +72,16 @@ export function announceFromTurnData(turnData, timing = 'start') {
       return;
     }
     
+    if (turnData.result_type === 'FOUL') {
+      showAnnouncement("Foul!");
+      return;
+    }
+    
+    // Check for rebound on misses (but don't announce the miss itself)
     if (turnData.result_type === 'MISS' || turnData.result_type === 'PUTBACK_MISS') {
-      showAnnouncement("Miss!");
-      // Check for rebound announcement
-      setTimeout(() => {
-        if (turnData.rebound_type) {
-          showAnnouncement("Rebound!");
-        }
-      }, 200); // Small delay so it shows after "Miss!"
+      if (turnData.rebound_type) {
+        showAnnouncement("Rebound!");
+      }
       return;
     }
     
