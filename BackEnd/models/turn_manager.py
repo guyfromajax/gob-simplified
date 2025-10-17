@@ -491,10 +491,10 @@ class TurnManager:
                 
                 return {
                     "result_type": "PUTBACK_MAKE",
-                    "ball_handler": rebounder,
-                    "shooter": rebounder,
+                    "ball_handler": getattr(rebounder, "player_id", None),
+                    "shooter": getattr(rebounder, "player_id", None),
                     "shooter_team_id": shooter_team_id,
-                    "defender": defender,
+                    "defender": getattr(defender, "player_id", None),
                     "text": text,
                     "possession_flips": possession_flips,
                     "time_elapsed": oreb_event.get("timeElapsed", 3),
@@ -516,10 +516,10 @@ class TurnManager:
                 
                 result = {
                     "result_type": "PUTBACK_MISS",
-                    "ball_handler": rebounder,
-                    "shooter": rebounder,
+                    "ball_handler": getattr(rebounder, "player_id", None),
+                    "shooter": getattr(rebounder, "player_id", None),
                     "shooter_team_id": shooter_team_id,
-                    "defender": defender,
+                    "defender": getattr(defender, "player_id", None),
                     "text": text,
                     "possession_flips": possession_flips,  # Will be updated based on rebound type
                     "time_elapsed": oreb_event.get("timeElapsed", 3),
@@ -574,7 +574,7 @@ class TurnManager:
             
             return {
                 "result_type": "OREB_KICKOUT",
-                "ball_handler": rebounder,
+                "ball_handler": getattr(rebounder, "player_id", None),
                 "text": text,
                 "possession_flips": False,
                 "time_elapsed": oreb_event.get("timeElapsed", 2),
