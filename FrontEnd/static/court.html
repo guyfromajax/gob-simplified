@@ -10,6 +10,7 @@
       --scoreboard-height: 100px;
       --player-stats-width: 280px;
       --pbp-height: 120px;
+      --court-bottom-trim: 80px;
       --court-bg: #1e1e1e;
       --side-padding: 10px;
       --scoreboard-gap: 20px;
@@ -305,7 +306,7 @@
 
     /* Team Box Score Section (Placeholder) */
     .team-box-score {
-      flex: 1;
+      height: calc(var(--pbp-height) + var(--court-bottom-trim));
       display: flex;
       align-items: center;
       justify-content: center;
@@ -313,6 +314,10 @@
       border-top: 1px solid #444;
       color: #888;
       font-size: 18px;
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
     }
 
     /* ==================== COURT CONTAINER ==================== */
@@ -323,16 +328,17 @@
       display: flex;
       align-items: flex-start;
       justify-content: center;
-      padding-bottom: var(--pbp-height);
+      padding-bottom: calc(var(--pbp-height) + var(--court-bottom-trim));
       overflow: visible;
       min-width: 0;
       max-width: 100%;
+      max-height: calc(100vh - var(--scoreboard-height) - var(--court-bottom-trim));
     }
 
     /* Ensure Phaser canvas respects container bounds */
     #phaser-container canvas {
       max-width: 100%;
-      max-height: calc(100vh - var(--scoreboard-height) - var(--pbp-height));
+      max-height: 100%;
       display: block;
     }
 
@@ -416,7 +422,7 @@
       bottom: 0;
       left: calc(var(--player-stats-width) + var(--side-padding));
       right: calc(var(--player-stats-width) + var(--side-padding));
-      height: var(--pbp-height);
+      height: calc(var(--pbp-height) + var(--court-bottom-trim));
       border-top: 2px solid var(--home-vibrant-color);
       border-left: 2px solid var(--home-vibrant-color);
       border-right: 2px solid var(--home-vibrant-color);
