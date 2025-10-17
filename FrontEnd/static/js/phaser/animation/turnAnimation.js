@@ -1147,7 +1147,8 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
         shooterTeamId,
         homeTeamId,
         stepIndex: shotInfo.stepIndex,
-        turnIndex: scene.currentTurn
+        turnIndex: scene.currentTurn,
+        turnData: turnData
       };
       if (SHOT_DEBUG) {
         animationDebugLog("shootParams", {
