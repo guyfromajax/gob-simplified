@@ -780,6 +780,7 @@
   <script type="module">
     // Apply vibrant colors based on teams in URL
     import { applyVibrantColors } from '/static/js/phaser/utils/vibrantColors.js';
+    import { initializeGameStats } from '/static/js/phaser/utils/loadGameStats.js';
     
     const urlParams = new URLSearchParams(window.location.search);
     const homeTeam = urlParams.get('home');
@@ -790,6 +791,9 @@
     } else {
       console.warn('⚠️ No teams found in URL, using default vibrant colors');
     }
+    
+    // Load accumulated stats if this is a resumed game
+    await initializeGameStats();
   </script>
   <script type="module" src="/static/js/phaser/bootGame.js"></script>
   <script>

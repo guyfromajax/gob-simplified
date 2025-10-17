@@ -179,6 +179,38 @@ def simulate_game(request: SimulationRequest):
     return summary
 
 
+@app.get("/api/game/{game_id}")
+def get_game_state(game_id: str):
+    """Fetch current game state for displaying accumulated stats"""
+    try:
+        # Check ongoing games first
+        gm = ongoing_games.get(game_id)
+        if gm:
+            return {
+                "game_id": game_id,
+                "score": gm.score,
+                "box_score": gm.get_box_score(),
+                "quarter": gm.quarter,
+                "clock": gm.game_state.get("clock", "8:00")
+            }
+        
+        # Check database
+        if games_collection is not None:
+            saved = games_collection.find_one({"_id": game_id})
+            if saved:
+                return {
+                    "game_id": game_id,
+                    "score": saved.get("score", {}),
+                    "box_score": saved.get("box_score", {}),
+                    "quarter": saved.get("quarter", 1),
+                    "clock": saved.get("clock", "8:00")
+                }
+        
+        raise HTTPException(status_code=404, detail=f"Game {game_id} not found")
+    except Exception as e:
+        logging.exception(f"Error fetching game state for {game_id}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/api/simulate-quarter")
 def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = False):
     game_id = request.game_id

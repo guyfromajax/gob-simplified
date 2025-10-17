@@ -1,0 +1,120 @@
+/**
+ * Load and display accumulated game statistics for resumed games
+ * Used when loading Q4 after simming Q1-Q3
+ */
+
+/**
+ * Fetch game state from backend
+ * @param {string} gameId - Game ID
+ * @returns {Object} Game state with scores and stats
+ */
+export async function fetchGameState(gameId) {
+  if (!gameId) return null;
+  
+  try {
+    const res = await fetch(`/api/game/${gameId}`);
+    if (!res.ok) {
+      console.warn(`⚠️ Could not fetch game state for ${gameId}`);
+      return null;
+    }
+    const gameData = await res.json();
+    console.log('📊 Loaded game state:', gameData);
+    return gameData;
+  } catch (err) {
+    console.error('Error fetching game state:', err);
+    return null;
+  }
+}
+
+/**
+ * Update scoreboard with accumulated scores
+ * @param {Object} gameData - Game data from backend
+ * @param {string} homeTeam - Home team name
+ * @param {string} awayTeam - Away team name
+ */
+export function displayAccumulatedScores(gameData, homeTeam, awayTeam) {
+  if (!gameData || !gameData.score) return;
+  
+  const homeScore = gameData.score[homeTeam] || 0;
+  const awayScore = gameData.score[awayTeam] || 0;
+  
+  const homeScoreEl = document.getElementById('home-score');
+  const awayScoreEl = document.getElementById('away-score');
+  
+  if (homeScoreEl) homeScoreEl.textContent = homeScore;
+  if (awayScoreEl) awayScoreEl.textContent = awayScore;
+  
+  console.log('📊 Scoreboard updated with accumulated scores:', { homeScore, awayScore });
+}
+
+/**
+ * Update player stat tables with accumulated stats
+ * @param {Object} gameData - Game data from backend
+ * @param {string} homeTeam - Home team name
+ * @param {string} awayTeam - Away team name
+ */
+export function displayAccumulatedPlayerStats(gameData, homeTeam, awayTeam) {
+  if (!gameData || !gameData.box_score) return;
+  
+  const boxScore = gameData.box_score;
+  
+  // Update home stats
+  const homeStatsBody = document.getElementById('home-stats-body');
+  if (homeStatsBody && boxScore[homeTeam]) {
+    homeStatsBody.innerHTML = '';
+    Object.values(boxScore[homeTeam]).forEach(playerStats => {
+      const row = document.createElement('tr');
+      const pts = playerStats.PTS || 0;
+      const reb = playerStats.REB || ((playerStats.OREB || 0) + (playerStats.DREB || 0));
+      const ast = playerStats.AST || 0;
+      row.innerHTML = `
+        <td>${playerStats.name}</td>
+        <td>${pts}</td>
+        <td>${reb}</td>
+        <td>${ast}</td>
+      `;
+      homeStatsBody.appendChild(row);
+    });
+  }
+  
+  // Update away stats
+  const awayStatsBody = document.getElementById('away-stats-body');
+  if (awayStatsBody && boxScore[awayTeam]) {
+    awayStatsBody.innerHTML = '';
+    Object.values(boxScore[awayTeam]).forEach(playerStats => {
+      const row = document.createElement('tr');
+      const pts = playerStats.PTS || 0;
+      const reb = playerStats.REB || ((playerStats.OREB || 0) + (playerStats.DREB || 0));
+      const ast = playerStats.AST || 0;
+      row.innerHTML = `
+        <td>${playerStats.name}</td>
+        <td>${pts}</td>
+        <td>${reb}</td>
+        <td>${ast}</td>
+      `;
+      awayStatsBody.appendChild(row);
+    });
+  }
+  
+  console.log('📊 Player stats tables updated with accumulated stats');
+}
+
+/**
+ * Initialize court page with accumulated game stats
+ * Call this on page load if game_id exists
+ */
+export async function initializeGameStats() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const gameId = urlParams.get('game_id');
+  const homeTeam = urlParams.get('home');
+  const awayTeam = urlParams.get('away');
+  
+  if (!gameId || !homeTeam || !awayTeam) return;
+  
+  const gameData = await fetchGameState(gameId);
+  if (gameData) {
+    displayAccumulatedScores(gameData, homeTeam, awayTeam);
+    displayAccumulatedPlayerStats(gameData, homeTeam, awayTeam);
+  }
+}
+
