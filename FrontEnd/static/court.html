@@ -304,7 +304,7 @@
 
     /* Team Box Score Section (Placeholder) */
     .team-box-score {
-      height: 120px;
+      flex: 1;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -415,10 +415,10 @@
     #pbp-container {
       position: fixed;
       bottom: 0;
-      left: 0;
-      right: calc(var(--player-stats-width) + var(--side-padding) * 2);
+      left: calc(var(--player-stats-width) + var(--side-padding));
+      right: calc(var(--player-stats-width) + var(--side-padding));
       height: var(--pbp-height);
-      background: #0a0a0a;
+      background: #d3d3d3;
       border-top: 2px solid var(--home-vibrant-color);
       display: flex;
       flex-direction: column;
@@ -426,11 +426,12 @@
     }
 
     #pbp-header {
-      background: #1a1a1a;
+      background: #b8b8b8;
       padding: 4px 20px;
       font-size: 18px;
-      color: var(--home-vibrant-color);
-      border-bottom: 1px solid #333;
+      color: #000;
+      font-weight: bold;
+      border-bottom: 1px solid #999;
       line-height: 1.2;
     }
 
@@ -450,7 +451,7 @@
     .turn-line {
       font-size: 16px;
       line-height: 1.3;
-      color: #ddd;
+      color: #000;
       margin-bottom: 4px;
     }
 
@@ -460,16 +461,16 @@
     }
 
     #text-scroll-panel::-webkit-scrollbar-track {
-      background: #1a1a1a;
+      background: #b8b8b8;
     }
 
     #text-scroll-panel::-webkit-scrollbar-thumb {
-      background: #ff6200;
+      background: #666;
       border-radius: 4px;
     }
 
     #text-scroll-panel::-webkit-scrollbar-thumb:hover {
-      background: #ff7a1a;
+      background: #888;
     }
 
     /* ==================== RESULT POPUP ==================== */
@@ -609,19 +610,15 @@
 
     /* ==================== PAUSE/SKIP CONTROLS ==================== */
     .game-controls {
-      position: fixed;
-      bottom: 0;
-      right: var(--side-padding);
-      width: var(--player-stats-width);
-      height: var(--pbp-height);
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
       display: flex;
-      flex-direction: column;
+      flex-direction: row;
       align-items: center;
       justify-content: center;
-      gap: 15px;
-      background: #0a0a0a;
-      border-top: 2px solid var(--home-vibrant-color);
-      border-left: 1px solid #333;
+      gap: 20px;
       z-index: 1100;
     }
 
@@ -630,13 +627,13 @@
       background-color: #ff6200;
       color: #fff;
       border: none;
-      padding: 12px 0;
-      width: 90%;
+      padding: 8px 20px;
       border-radius: 6px;
       cursor: pointer;
       font-family: 'Bebas Neue', sans-serif;
-      font-size: 18px;
+      font-size: 16px;
       transition: background-color 0.2s;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
     }
 
     #skip-btn {
@@ -732,6 +729,12 @@
         <button class="sim-full-game-button">Sim Full Game</button>
         <button class="sim-to-fourth-button">Sim To 4th Quarter</button>
       </div>
+      
+      <!-- Game controls (pause/skip) at bottom of court -->
+      <div class="game-controls">
+        <button id="pause-btn">Pause</button>
+        <button id="skip-btn">Skip To End</button>
+      </div>
     </div>
 
     <!-- HOME PLAYER STATS PANEL (RIGHT) -->
@@ -762,12 +765,6 @@
     <div id="text-scroll-panel">
       <div id="text-scroll"></div>
     </div>
-  </div>
-
-  <!-- ==================== GAME CONTROLS ==================== -->
-  <div class="game-controls">
-    <button id="pause-btn">Pause</button>
-    <button id="skip-btn">Skip To End</button>
   </div>
 
   <!-- ==================== SCRIPTS ==================== -->
