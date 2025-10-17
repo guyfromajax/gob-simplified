@@ -401,6 +401,9 @@ async function handleSimToFourth() {
   const sim4Btn = document.querySelector('.sim-to-fourth-button');
   [playBtn, simFullBtn, sim4Btn].forEach(btn => { if (btn) btn.disabled = true; });
 
+  // Load game plan settings before simulating
+  await loadGamePlanSettings();
+
   // Fetch rosters for auto-set lineup generation
   let homeRoster, awayRoster;
   try {
@@ -534,6 +537,9 @@ async function handleSimFullGame() {
   const simFullBtn = document.querySelector('.sim-full-game-button');
   const sim4Btn = document.querySelector('.sim-to-fourth-button');
   [playBtn, simFullBtn, sim4Btn].forEach(btn => { if (btn) btn.disabled = true; });
+
+  // Load game plan settings before simulating
+  await loadGamePlanSettings();
 
   // Fetch rosters for auto-set lineup generation
   let homeRoster, awayRoster;
