@@ -126,6 +126,8 @@ def simulate_quarter(
     home_lineup_ids=None,
     away_lineup_ids=None,
     game_id: str | None = None,
+    start_with_inbound: bool = False,
+    starting_possession: str | None = None,
 ):
     """Simulate a single quarter on an existing ``GameManager``.
 
@@ -187,7 +189,20 @@ def simulate_quarter(
     recharge_lineups(gm, recharge_amount)
 
     # Handle quarter start possession
-    if q == 1 or (q > 4):  # Q1 or any OT
+    if start_with_inbound and starting_possession:
+        # Use specified starting possession (for sim buttons)
+        if starting_possession == "home":
+            gm.offense_team = gm.home_team
+            gm.defense_team = gm.away_team
+        else:
+            gm.offense_team = gm.away_team
+            gm.defense_team = gm.home_team
+        
+        # Check for defensive pressure on the inbound
+        pressure_type = gm.turn_manager.determine_defensive_pressure_type()
+        gm.game_state["offensive_state"] = pressure_type
+        print(f"🏀 Q{q} start: {gm.offense_team.name} gets possession (custom) - Defense: {pressure_type}")
+    elif q == 1 or (q > 4):  # Q1 or any OT
         # Opening tip for Q1 and all OT periods
         from BackEnd.utils.opening_tip import execute_opening_tip
         tip_turn = execute_opening_tip(gm)
