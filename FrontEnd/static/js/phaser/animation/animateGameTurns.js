@@ -509,6 +509,8 @@ export async function animateGameTurns({ //hasBallAtStep
           },
         });
       }
+      // Announce foul
+      announceFromTurnData(turn, 'end');
       // Update scoreboard for all fouls (FCP or not)
       if (onUpdate) {
         try {
