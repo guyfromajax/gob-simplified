@@ -77,7 +77,8 @@ async function handleOrebTurn(scene, { playerSprites, ballSprite, turnData, onUp
       shooterTeamId: turnData.shooter_team_id || rebounderSprite.team_id,
       homeTeamId: scene.simData?.home_team_id,
       stepIndex: 0,
-      turnIndex: scene.currentTurn
+      turnIndex: scene.currentTurn,
+      turnData: turnData
     });
     
     // Handle putback make - run inbound setup

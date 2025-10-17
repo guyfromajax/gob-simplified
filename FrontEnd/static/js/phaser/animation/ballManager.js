@@ -233,7 +233,8 @@ export function shootBall({
   shooterTeamId,
   homeTeamId,
   stepIndex,
-  turnIndex
+  turnIndex,
+  turnData = null
 }) {
   console.log('🎯 shootBall: Starting', {
     shooterId,
@@ -437,8 +438,19 @@ export function shootBall({
         // Announce shot result when ball reaches rim
         const { showAnnouncement } = await import('../utils/announcements.js');
         const teamStyle = isHomeTeam ? 'home' : 'away';
+        
+        // Check if this is a shooting foul (AND-1 or foul on shot)
+        const isShootingFoul = turnData?.text?.includes('AND-1') || 
+                              turnData?.text?.includes('fouls') && turnData?.text?.includes('on the shot');
+        
         if (result === "MAKE") {
-          showAnnouncement("It's Good!", teamStyle);
+          if (isShootingFoul) {
+            showAnnouncement("It's Good! And 1!", teamStyle);
+          } else {
+            showAnnouncement("It's Good!", teamStyle);
+          }
+        } else if (result === "MISS" && isShootingFoul) {
+          showAnnouncement("Shooting Foul!", 'neutral');
         }
         
         // Clear shot in progress flag
