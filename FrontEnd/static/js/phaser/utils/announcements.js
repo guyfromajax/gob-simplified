@@ -82,7 +82,7 @@ export function announceFromTurnData(turnData, timing = 'start', homeTeamId = nu
   if (timing === 'start') {
     // Announcements at turn start
     if (turnData.fast_break) {
-      showAnnouncement("Fast Break!", 'neutral');
+      showAnnouncement("Fast Break!", offenseTeam);
       // Don't return - may have more announcements at end
     }
     
