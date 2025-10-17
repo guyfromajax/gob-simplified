@@ -332,13 +332,10 @@
       overflow: visible;
       min-width: 0;
       max-width: 100%;
-      max-height: calc(100vh - var(--scoreboard-height) - var(--court-bottom-trim));
     }
 
-    /* Ensure Phaser canvas respects container bounds */
+    /* Let Phaser canvas render at original size */
     #phaser-container canvas {
-      max-width: 100%;
-      max-height: 100%;
       display: block;
     }
 
