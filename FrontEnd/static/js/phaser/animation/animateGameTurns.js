@@ -10,6 +10,7 @@ import { States } from "../state/gameStateMachine.js";
 import { appendToTextScroll } from "../utils/textScroll.js";
 import { getCurrentOwner, getPendingOwner } from "../ball/ballController.js";
 import { updatePlaycallDisplay } from "../utils/playcallDisplay.js";
+import { announceFromTurnData } from "../utils/announcements.js";
 import {
   animationDebugLog,
   animationDebugWarn,
@@ -425,6 +426,9 @@ export async function animateGameTurns({ //hasBallAtStep
     // Update playcall display before animating the turn
     updatePlaycallDisplay(turn, scene.simData?.home_team_id);
     
+    // Show announcement for turn start events (Fast Break, Press, Trap)
+    announceFromTurnData(turn, 'start');
+    
     const possessionId =
       turn.possession_id ?? turn.possessionId ?? turn.possessionID ?? null;
     const animations = turn.animations || [];
@@ -549,6 +553,7 @@ export async function animateGameTurns({ //hasBallAtStep
     // Handle OREB turns (putback attempts and kickouts)
     if (turn.result_type === "PUTBACK_MAKE" || turn.result_type === "PUTBACK_MISS" || turn.result_type === "OREB_KICKOUT") {
       await handleOrebTurn(scene, { playerSprites, ballSprite, turnData: turn, onUpdate });
+      announceFromTurnData(turn, 'end');
       if (onUpdate) {
         try {
           onUpdate(turn);
@@ -562,6 +567,7 @@ export async function animateGameTurns({ //hasBallAtStep
 
     if (turn.result_type === "TURNOVER") {
       await handleTurnover(scene, { playerSprites, ballSprite, turnData: turn, onUpdate });
+      announceFromTurnData(turn, 'end');
       if (onUpdate) {
         try {
           onUpdate(turn);
@@ -623,6 +629,7 @@ export async function animateGameTurns({ //hasBallAtStep
         turn_index: i
       });
       await runFastBreakSequence(scene, { playerSprites, ballSprite, turnData: turn, onUpdate, turnIndex: i });
+      announceFromTurnData(turn, 'end');
       if (onUpdate) {
         try {
           onUpdate(turn);
@@ -658,6 +665,7 @@ export async function animateGameTurns({ //hasBallAtStep
           if (onAction) onAction(action, sprite, timestamp);
         },
       });
+      announceFromTurnData(turn, 'end');
       if (onUpdate) {
         try {
           onUpdate(turn);
@@ -830,6 +838,9 @@ export async function animateGameTurns({ //hasBallAtStep
       }
     }
 
+    // Show announcements for shot results and rebounds (after animation)
+    announceFromTurnData(turn, 'end');
+    
     if (onUpdate) {
       try {
         onUpdate(turn);
