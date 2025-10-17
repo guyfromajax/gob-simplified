@@ -7,13 +7,27 @@ export function updatePlaycallDisplay(turnData, homeTeamId) {
   const offensivePlaycallEl = document.getElementById('offensive-playcall');
   const defensivePlaycallEl = document.getElementById('defensive-playcall');
   
+  console.log('🎯 updatePlaycallDisplay called:', {
+    hasOffensiveEl: !!offensivePlaycallEl,
+    hasDefensiveEl: !!defensivePlaycallEl,
+    turnData: turnData
+  });
+  
   if (!offensivePlaycallEl || !defensivePlaycallEl) {
+    console.warn('⚠️ Playcall elements not found in DOM');
     return;
   }
   
   // Only show playcalls for HCO turns
   const isHCO = turnData.offensive_state === 'HCO' || 
                 (!turnData.offensive_state && !turnData.fast_break && turnData.result_type !== 'OPENING_TIP');
+  
+  console.log('🎯 Playcall check:', {
+    isHCO,
+    offensive_state: turnData.offensive_state,
+    fast_break: turnData.fast_break,
+    result_type: turnData.result_type
+  });
   
   if (!isHCO) {
     offensivePlaycallEl.textContent = '-';
@@ -24,6 +38,12 @@ export function updatePlaycallDisplay(turnData, homeTeamId) {
   // Get playcalls from turn data
   const offensivePlaycall = turnData.offensive_playcall || turnData.current_playcall;
   const defensivePlaycall = turnData.defensive_playcall || turnData.defense_playcall;
+  
+  console.log('🎯 Playcall data:', {
+    offensivePlaycall,
+    defensivePlaycall,
+    turnDataKeys: Object.keys(turnData)
+  });
   
   // Determine which team is on offense
   const offenseTeamId = turnData.possession_team_id || turnData.starting_possession_team_id;
