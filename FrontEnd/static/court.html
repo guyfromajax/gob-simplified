@@ -229,6 +229,7 @@
       flex-direction: column;
       border: 1px solid #333;
       overflow: hidden;
+      position: relative;
       padding-bottom: var(--pbp-height);
     }
 
@@ -305,7 +306,12 @@
 
     /* Team Box Score Section (Placeholder) */
     .team-box-score {
-      flex: 1;
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      top: auto;
+      height: var(--pbp-height);
       display: flex;
       align-items: center;
       justify-content: center;
