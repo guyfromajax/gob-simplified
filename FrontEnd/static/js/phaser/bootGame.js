@@ -494,6 +494,9 @@ async function handleSimToFourth() {
     params.set('period', 'Q4');
     params.set('game_id', gameId);
     
+    // Mark this as a "Sim to 4th Quarter" flow so Q4 starts with random inbound
+    sessionStorage.setItem('sim_to_fourth_flow', 'true');
+    
     console.log('🎮 Redirecting to set-lineup for Q4 after simming Q1-Q3');
     window.location.href = `/static/set-lineup.html?${params.toString()}`;
   } catch (err) {

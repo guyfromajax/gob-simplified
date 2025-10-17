@@ -154,6 +154,18 @@ export function createGameScene(Phaser) {
           userTeamSide: this.userTeamSide 
         });
       }
+      
+      // Check if this is Q4 from "Sim to 4th Quarter" flow
+      if (this.quarter === 4 && typeof sessionStorage !== 'undefined') {
+        const isSimToFourthFlow = sessionStorage.getItem('sim_to_fourth_flow');
+        if (isSimToFourthFlow === 'true') {
+          payload.start_with_inbound = true;
+          payload.starting_possession = Math.random() < 0.5 ? 'home' : 'away';
+          console.log(`🎲 Q4 (Sim to 4th): Starting with random inbound, possession: ${payload.starting_possession}`);
+          // Clear the flag so it doesn't apply to future games
+          sessionStorage.removeItem('sim_to_fourth_flow');
+        }
+      }
       const url = this.gameId || this.quarter > 1 ? '/api/simulate-quarter' : '/api/simulate-quarter';
       const res = await fetch(url, {
       method: 'POST',
