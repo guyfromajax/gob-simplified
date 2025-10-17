@@ -78,6 +78,9 @@ class QuarterSimulationRequest(BaseModel):
     user_team_side: str | None = None  # "home" or "away"
     playcall_settings: dict[str, int] | None = None
     strategy_settings: dict[str, int] | None = None
+    # Starting possession control for quarters after Q1
+    start_with_inbound: bool | None = None
+    starting_possession: str | None = None  # "home" or "away"
 
 
 ongoing_games: dict[str, GameManager] = {}
@@ -384,6 +387,8 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
             request.home_lineup,
             request.away_lineup,
             game_id,
+            request.start_with_inbound,
+            request.starting_possession,
         )
     except ValueError as e:
         logging.error(

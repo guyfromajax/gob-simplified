@@ -454,6 +454,10 @@ async function handleSimToFourth() {
           payload.playcall_settings = gamePlanSettings.playcall_settings;
           payload.strategy_settings = gamePlanSettings.strategy_settings;
         }
+        // Randomize possession and start with inbound for Q2-Q3
+        payload.start_with_inbound = true;
+        payload.starting_possession = Math.random() < 0.5 ? 'home' : 'away';
+        console.log(`🎲 Q${currentQ}: Random possession assigned to ${payload.starting_possession}`);
       }
       if (DEBUG_TEAMS) {
         console.log('/api/simulate-quarter payload teams:', {
@@ -581,6 +585,10 @@ async function handleSimFullGame() {
           payload.playcall_settings = gamePlanSettings.playcall_settings;
           payload.strategy_settings = gamePlanSettings.strategy_settings;
         }
+        // Randomize possession and start with inbound for Q2-Q4
+        payload.start_with_inbound = true;
+        payload.starting_possession = Math.random() < 0.5 ? 'home' : 'away';
+        console.log(`🎲 Q${currentQ}: Random possession assigned to ${payload.starting_possession}`);
       }
       if (DEBUG_TEAMS) {
         console.log('/api/simulate-quarter payload teams:', {
