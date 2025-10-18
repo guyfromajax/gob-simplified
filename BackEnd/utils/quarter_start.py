@@ -61,22 +61,52 @@ def create_quarter_start_inbound(game):
                 d_coords = getAwayTeamCoords({"tmp": d_coords})["tmp"]
             d_dest[pos] = d_coords
     
-    # Update player coords
+    # Build animations array for frontend (like opening tip)
+    animations = []
+    
+    # Offensive players
     for pos, player in offense_team.lineup.items():
-        player.coords = o_dest[pos].copy()
+        player_id = getattr(player, "player_id", None)
+        if player_id:
+            start = getattr(player, "coords", {"x": 50, "y": 25})
+            end = o_dest[pos]
+            animations.append({
+                "playerId": player_id,
+                "movement": [
+                    {"timestamp": 0, "coords": start, "action": "STAND"},
+                    {"timestamp": 800, "coords": end, "action": "STAND"},
+                ],
+            })
+            # Update player coords
+            player.coords = end.copy()
+    
+    # Defensive players
     for pos, player in defense_team.lineup.items():
-        player.coords = d_dest[pos].copy()
+        player_id = getattr(player, "player_id", None)
+        if player_id:
+            start = getattr(player, "coords", {"x": 50, "y": 25})
+            end = d_dest[pos]
+            animations.append({
+                "playerId": player_id,
+                "movement": [
+                    {"timestamp": 0, "coords": start, "action": "STAND"},
+                    {"timestamp": 800, "coords": end, "action": "STAND"},
+                ],
+            })
+            # Update player coords
+            player.coords = end.copy()
     
     # Text
     quarter_num = game.quarter
     text = f"Start of Q{quarter_num}: {offense_team.name} inbounds the ball."
     
-    # Return in BASELINE_INBOUND format for frontend compatibility
+    # Return with animations array (like opening tip)
     turn_result = {
         "result_type": "BASELINE_INBOUND",
         "text": text,
         "time_elapsed": 4,
         "possession_flips": False,
+        "animations": animations,
         "ball_spot": bh_coords,
         "oDestinations": o_dest,
         "dDestinations": d_dest,
