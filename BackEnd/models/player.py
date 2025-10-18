@@ -25,6 +25,7 @@ class Player:
         self.attributes = self._extract_attributes(data)
         self.jersey = data.get("jersey", 0)
         self.year = data.get("year", "")
+        self.photo = data.get("photo", None)  # Player headshot image path
         self.stats = self._init_stats()
         self.metadata = {
             "fouls": 0,

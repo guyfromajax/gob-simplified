@@ -415,6 +415,7 @@ def summarize_game_state(game):
                 "team_id": team_obj.team_id,
                 "pos": pos,
                 "jersey": player.jersey,
+                "photo": getattr(player, "photo", None),  # Player headshot image
                 "primary_color": getattr(team_obj, "primary_color", "#000000"),
                 "secondary_color": getattr(team_obj, "secondary_color", "#ffffff"),
                 "x": coords.get("x", 0),
@@ -437,6 +438,7 @@ def summarize_game_state(game):
                 "team_id": team_obj.team_id,
                 "pos": getattr(player_obj, "position", None) or getattr(player_obj, "pos", None),
                 "jersey": player_obj.jersey,
+                "photo": getattr(player_obj, "photo", None),  # Player headshot image
                 "primary_color": getattr(team_obj, "primary_color", "#000000"),
                 "secondary_color": getattr(team_obj, "secondary_color", "#ffffff"),
                 "x": coords.get("x", 0),
