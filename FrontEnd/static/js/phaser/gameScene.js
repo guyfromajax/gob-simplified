@@ -277,11 +277,20 @@ export function createGameScene(Phaser) {
       const quarterEl = document.getElementById('quarter');
 
       const positions = ["PG","SG","SF","PF","C"];
-      // Filter out the ball from player data
+      // Filter out the ball and inactive players (those without a position)
       const actualPlayers = simData.players.filter(p => {
         const id = p.playerId ?? p.player_id;
-        return id !== "ball" && id !== "Ball" && p.name !== "ball" && p.name !== "Ball";
+        const isBall = id === "ball" || id === "Ball" || p.name === "ball" || p.name === "Ball";
+        const hasPosition = p.pos !== null && p.pos !== undefined; // Only include players in current lineup
+        
+        if (!isBall && !hasPosition) {
+          console.log(`🚫 Filtering out inactive player (no position): ${p.name} (${id})`);
+        }
+        
+        return !isBall && hasPosition;
       });
+      
+      console.log(`✅ Filtered to ${actualPlayers.length} active players (from ${simData.players.length} total)`);
       
       this.nameToId = Object.fromEntries(actualPlayers.map(p => [p.name, p.playerId ?? p.player_id]));
       this.playerInfo = Object.fromEntries(actualPlayers.map(p => [p.playerId ?? p.player_id, { name: p.name, team: p.team, pos: p.pos }]));
