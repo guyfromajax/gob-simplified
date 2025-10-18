@@ -41,16 +41,9 @@ function updateScoreboardScores({ home, away }) {
 
 if (typeof on === 'function' && typeof emit === 'function') {
   on('score:update', updateScoreboardScores);
-  // Only reset scores to 0-0 for fresh games (Q1 without game_id)
-  // For resumed games (Q2-Q4), loadGameStats.js will set the correct accumulated scores
-  if (quarter === 1 && !gameId) {
-    emit('score:update', { home: 0, away: 0 });
-  }
+  // Note: Score initialization moved to after variable declarations
 } else {
-  // Only reset scores to 0-0 for fresh games (Q1 without game_id)
-  if (quarter === 1 && !gameId) {
-    updateScoreboardScores({ home: 0, away: 0 });
-  }
+  // Note: Score initialization moved to after variable declarations
 }
 
 function getMode({ tournamentId, franchiseId }) {
@@ -91,6 +84,16 @@ let quarter = parseInt(urlParams.get('quarter'), 10) || 1;
 let gameId =
   urlParams.get('game_id') ||
   (typeof localStorage !== 'undefined' ? localStorage.getItem('game_id') : null);
+
+// Initialize scoreboard scores
+// Only reset to 0-0 for fresh Q1 games; for resumed games, loadGameStats.js sets accumulated scores
+if (quarter === 1 && !gameId) {
+  if (typeof emit === 'function') {
+    emit('score:update', { home: 0, away: 0 });
+  } else {
+    updateScoreboardScores({ home: 0, away: 0 });
+  }
+}
 
 // Load game plan settings (async function to be called before game starts)
 let gamePlanSettings = null;
