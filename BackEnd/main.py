@@ -255,15 +255,24 @@ def simulate_quarter(
         print(f"🏀 Q{q} start: {gm.offense_team.name} gets possession (won opening tip) - Defense: {pressure_type}")
         
         # Create quarter start inbound pass turn
-        from BackEnd.utils.quarter_start import create_quarter_start_inbound
-        inbound_turn = create_quarter_start_inbound(gm)
-        gm.turns.append(inbound_turn)
-        gm.text_log.append(inbound_turn["text"])
-        # Update clock
-        gm.game_state["time_remaining"] -= inbound_turn["time_elapsed"]
-        minutes = gm.game_state["time_remaining"] // 60
-        seconds = gm.game_state["time_remaining"] % 60
-        gm.game_state["clock"] = f"{minutes}:{seconds:02d}"
+        print(f"🔵 DEBUG: About to create Q{q} inbound turn")
+        try:
+            from BackEnd.utils.quarter_start import create_quarter_start_inbound
+            print(f"🔵 DEBUG: Import successful")
+            inbound_turn = create_quarter_start_inbound(gm)
+            print(f"🔵 DEBUG: Inbound turn created - {inbound_turn.get('text')}")
+            gm.turns.append(inbound_turn)
+            gm.text_log.append(inbound_turn["text"])
+            # Update clock
+            gm.game_state["time_remaining"] -= inbound_turn["time_elapsed"]
+            minutes = gm.game_state["time_remaining"] // 60
+            seconds = gm.game_state["time_remaining"] % 60
+            gm.game_state["clock"] = f"{minutes}:{seconds:02d}"
+            print(f"🔵 DEBUG: Q{q} inbound turn successfully added to game")
+        except Exception as e:
+            print(f"🔴 ERROR creating Q{q} inbound: {e}")
+            import traceback
+            traceback.print_exc()
 
     while gm.game_state["time_remaining"] > 0:
         gm.simulate_macro_turn()
