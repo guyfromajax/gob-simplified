@@ -282,6 +282,16 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                         gm.game_state = gm._init_game_state()
                         gm.game_state.update(saved.get("game_state", {}))
                         gm.quarter = saved.get("quarter", 1)
+                        
+                        # Restore opening_tip_winner for Q2-Q4 possession logic
+                        if "opening_tip_winner" in saved:
+                            gm.game_state["opening_tip_winner"] = saved["opening_tip_winner"]
+                            if debug:
+                                logging.debug(
+                                    "Restored opening_tip_winner: %s",
+                                    saved["opening_tip_winner"]
+                                )
+                        
                         ongoing_games[game_id] = gm
                         if debug:
                             logging.debug(
