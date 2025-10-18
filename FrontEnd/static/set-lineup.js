@@ -111,10 +111,20 @@ function renderRoster() {
       bestPos,
       formatHeight(p.height),
       p.weight ?? '--',
-      p.attributes.SC, p.attributes.SH, p.attributes.ID, p.attributes.OD,
-      p.attributes.PS, p.attributes.BH, p.attributes.RB, p.attributes.ST,
-      p.attributes.AG, p.attributes.ND, p.attributes.IQ, p.attributes.FT,
-      p.attributes.NG, rt
+      Math.floor((p.attributes.SC ?? 0) / 10), 
+      Math.floor((p.attributes.SH ?? 0) / 10), 
+      Math.floor((p.attributes.ID ?? 0) / 10), 
+      Math.floor((p.attributes.OD ?? 0) / 10),
+      Math.floor((p.attributes.PS ?? 0) / 10), 
+      Math.floor((p.attributes.BH ?? 0) / 10), 
+      Math.floor((p.attributes.RB ?? 0) / 10), 
+      Math.floor((p.attributes.ST ?? 0) / 10),
+      Math.floor((p.attributes.AG ?? 0) / 10), 
+      Math.floor((p.attributes.ND ?? 0) / 10), 
+      Math.floor((p.attributes.IQ ?? 0) / 10), 
+      Math.floor((p.attributes.FT ?? 0) / 10),
+      (p.attributes.NG ?? 0).toFixed(2),  // NG stays as decimal
+      rt
     ];
     const classes = ['', '', 'ht', 'wt', '', '', '', '', '', '', '', '', '', '', '', '', '', 'rt'];
     cells.forEach((val, idx) => {

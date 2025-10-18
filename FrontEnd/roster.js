@@ -22,7 +22,7 @@ async function loadRoster() {
           if (attr === "NG") {
             value = (value ?? 0).toFixed(2);  // show 2 decimal places
           } else {
-            value = Math.round(value ?? 0);   // round all other attributes
+            value = Math.floor((value ?? 0) / 10);  // Convert to 0-12 scale
           }
   
           html += `<td>${value}</td>`;

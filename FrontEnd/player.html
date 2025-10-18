@@ -65,7 +65,12 @@
 
         headers.forEach(attr => {
           headerRow.innerHTML += `<th>${attr}</th>`;
-          valueRow.innerHTML += `<td>${attrs[attr]}</td>`;
+          // Convert to 0-12 scale (divide by 10 and floor)
+          const rawValue = attrs[attr];
+          const displayValue = attr === 'NG' 
+            ? (rawValue ?? 0).toFixed(2)  // NG stays as decimal
+            : Math.floor((rawValue ?? 0) / 10);  // Others converted to 0-12 scale
+          valueRow.innerHTML += `<td>${displayValue}</td>`;
         });
       } catch (err) {
         document.body.innerHTML = "<h2>❌ Failed to load player data.</h2>";
