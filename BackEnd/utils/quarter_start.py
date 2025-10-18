@@ -1,0 +1,88 @@
+"""
+Quarter start inbound pass for Q2, Q3, Q4
+Uses BASELINE_INBOUND format for frontend compatibility
+"""
+import random
+from BackEnd.utils.shared import getAwayTeamCoords
+from BackEnd.utils.shared_defense import assign_bh_defender_coords, assign_non_bh_defender_coords
+
+
+def create_quarter_start_inbound(game):
+    """
+    Create an inbound pass turn for Q2/Q3/Q4 start.
+    Returns a turn in BASELINE_INBOUND format so frontend can reuse existing logic.
+    
+    Positions players at half court and shows PG inbounding to a teammate.
+    """
+    offense_team = game.offense_team
+    defense_team = game.defense_team
+    is_away_offense = offense_team.team_id == game.away_team.team_id
+    
+    # Sideline inbound spot at half court (home orientation)
+    inbound_spot_home = {"x": 50, "y": 15}
+    
+    # Offensive player destinations (half court positions, home orientation)
+    home_ranges = {
+        "SG": {"x": (48, 52), "y": (22, 28)},
+        "SF": {"x": (45, 49), "y": (30, 36)},
+        "PF": {"x": (51, 55), "y": (30, 36)},
+        "C":  {"x": (48, 52), "y": (38, 44)},
+    }
+    
+    o_dest_home = {}
+    for pos, ranges in home_ranges.items():
+        o_dest_home[pos] = {
+            "x": random.randint(*ranges["x"]),
+            "y": random.randint(*ranges["y"]),
+        }
+    
+    # PG stays at inbound spot
+    o_dest_home["PG"] = inbound_spot_home.copy()
+    
+    # Flip if away team has possession
+    o_dest = getAwayTeamCoords(o_dest_home.copy()) if is_away_offense else o_dest_home
+    bh_coords = o_dest["PG"]
+    
+    # Defensive positioning
+    aggression = defense_team.strategy_calls.get("aggression_call", "normal")
+    d_dest = {}
+    
+    for pos in defense_team.lineup.keys():
+        if pos == "PG":
+            d_coords = assign_bh_defender_coords(bh_coords, aggression, is_away_offense)
+            if is_away_offense:
+                d_coords = getAwayTeamCoords({"tmp": d_coords})["tmp"]
+            d_dest[pos] = d_coords
+        elif pos in o_dest:
+            o_coords = o_dest[pos]
+            o_calc = getAwayTeamCoords({"tmp": o_coords})["tmp"] if is_away_offense else o_coords
+            d_coords = assign_non_bh_defender_coords(o_calc, bh_coords, aggression, is_away_offense)
+            if is_away_offense:
+                d_coords = getAwayTeamCoords({"tmp": d_coords})["tmp"]
+            d_dest[pos] = d_coords
+    
+    # Update player coords
+    for pos, player in offense_team.lineup.items():
+        player.coords = o_dest[pos].copy()
+    for pos, player in defense_team.lineup.items():
+        player.coords = d_dest[pos].copy()
+    
+    # Text
+    quarter_num = game.quarter
+    text = f"Start of Q{quarter_num}: {offense_team.name} inbounds the ball."
+    
+    # Return in BASELINE_INBOUND format for frontend compatibility
+    turn_result = {
+        "result_type": "BASELINE_INBOUND",
+        "text": text,
+        "time_elapsed": 4,
+        "possession_flips": False,
+        "ball_spot": bh_coords,
+        "oDestinations": o_dest,
+        "dDestinations": d_dest,
+        "possession_team_id": offense_team.team_id,
+        "quarter": game.quarter,
+    }
+    
+    return turn_result
+
