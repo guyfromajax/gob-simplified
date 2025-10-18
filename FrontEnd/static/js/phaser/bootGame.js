@@ -84,8 +84,6 @@ let quarter = parseInt(urlParams.get('quarter'), 10) || 1;
 let gameId =
   urlParams.get('game_id') ||
   (typeof localStorage !== 'undefined' ? localStorage.getItem('game_id') : null);
-const startWithInbound = urlParams.get('start_with_inbound') === 'true';
-const startingPossession = urlParams.get('starting_possession');
 
 // Load game plan settings (async function to be called before game starts)
 let gamePlanSettings = null;
@@ -283,8 +281,6 @@ async function startGame({ homeRoster, awayRoster, animate = true }) {
     gamePlanSettings,
     userTeamSide,
     mode,
-    startWithInbound,
-    startingPossession,
   };
 
   if (game.scene.isActive('GameScene')) {
