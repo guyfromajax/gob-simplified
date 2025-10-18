@@ -57,15 +57,11 @@ export function createGameScene(Phaser) {
         this.quarter = data.quarter || 1;
         this.gamePlanSettings = data.gamePlanSettings;
         this.userTeamSide = data.userTeamSide;
-        this.startWithInbound = data.startWithInbound || false;
-        this.startingPossession = data.startingPossession || null;
         
         console.log('🎮 [gameScene.init] Received game plan data:', { 
           hasSettings: !!this.gamePlanSettings, 
           userTeamSide: this.userTeamSide,
-          quarter: this.quarter,
-          startWithInbound: this.startWithInbound,
-          startingPossession: this.startingPossession
+          quarter: this.quarter
         });
 
         if (DEBUG_FLOW) {
@@ -159,12 +155,8 @@ export function createGameScene(Phaser) {
         });
       }
       
-      // Check if this is Q4 from "Sim to 4th Quarter" flow (using URL params)
-      if (this.startWithInbound && this.startingPossession) {
-        payload.start_with_inbound = true;
-        payload.starting_possession = this.startingPossession;
-        console.log(`🎲 Q${this.quarter} (Sim to 4th): Starting with inbound, possession: ${this.startingPossession}`);
-      }
+      // Note: Q4 possession is handled by backend using opening_tip_winner from Q1
+      // No need to pass start_with_inbound for standard Q4 logic
       const url = this.gameId || this.quarter > 1 ? '/api/simulate-quarter' : '/api/simulate-quarter';
       const res = await fetch(url, {
       method: 'POST',
