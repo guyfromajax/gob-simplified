@@ -644,6 +644,15 @@ def team_roster_page(request: Request, team: str):
         year_raw = p.get("year", "--")
         year_abbr = year_map.get(str(year_raw).lower(), year_raw or "--")
 
+        # Convert attributes to 0-12 display scale
+        display_attrs = {}
+        for attr in display_attributes:
+            raw_val = attrs.get(attr)
+            if raw_val == "--" or raw_val is None:
+                display_attrs[attr] = "--"
+            else:
+                display_attrs[attr] = int(raw_val // 10)  # Convert to 0-12 scale
+
         players.append(
             {
                 "name": f"{p.get('first_name', '')} {p.get('last_name', '')}".strip(),
@@ -652,7 +661,7 @@ def team_roster_page(request: Request, team: str):
                 "height": format_height(raw_height),
                 "height_raw": height_raw,
                 "weight": p.get("weight", "--"),
-                "attributes": {attr: attrs.get(attr, "--") for attr in display_attributes},
+                "attributes": display_attrs,
                 "rt": rt,
                 "rt_value": rt_val if rt_val is not None else -1,
             }
