@@ -129,6 +129,7 @@ class TurnManager:
             "oDestinations": o_dest,
             "dDestinations": d_dest,
             "possession_team_id": offense_team.team_id,
+            "quarter": self.game.quarter,
         }
 
         return payload
@@ -210,6 +211,7 @@ class TurnManager:
             "oDestinations": o_dest,
             "dDestinations": d_dest,
             "possession_team_id": offense_team.team_id,
+            "quarter": self.game.quarter,
         }
 
         return payload
