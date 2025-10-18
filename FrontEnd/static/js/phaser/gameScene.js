@@ -619,6 +619,7 @@ export function createGameScene(Phaser) {
           if (DEBUG_FLOW) {
             console.log('🔢 quarterTurns length', quarterTurns.length);
           }
+          console.log('🔍 Q4 DEBUG: First turn type:', quarterTurns[0]?.result_type, 'Text:', quarterTurns[0]?.text);
           if (quarterTurns.length === 0) {
             const total = Array.isArray(simData.turns) ? simData.turns.length : 0;
             console.warn(`⚠️ No turns found for quarter ${this.quarter} (total turns: ${total}). Navigation halted.`);
