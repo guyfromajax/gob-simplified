@@ -5,6 +5,7 @@ import animationConfig from "./animation_config.js";
 import runFreeThrowSequence from "./freeThrow.js";
 import runFastBreakSequence from "./fastBreak.js";
 import { runOpeningTipSequence } from "./openingTip.js";
+import { animateQuarterStartInbound } from "./quarterStartInbound.js";
 import { handleTurnover } from "./turnoverAdapter.js";
 import { States } from "../state/gameStateMachine.js";
 import { appendToTextScroll } from "../utils/textScroll.js";
@@ -29,6 +30,7 @@ const NON_STANDARD_RESULTS = new Set([
   "TURNOVER",
   "FAST_BREAK",
   "SIDE_INBOUND",
+  "QUARTER_START_INBOUND",
   "PUTBACK_MAKE",
   "PUTBACK_MISS",
   "OREB_KICKOUT",
@@ -528,6 +530,25 @@ export async function animateGameTurns({ //hasBallAtStep
       if (!scene.stateMachine?.is(States.FastBreak)) {
         await runSideInboundSetup({ scene, ballSprite, playerSprites, turnData: turn });
       }
+      if (onUpdate) {
+        try {
+          onUpdate(turn);
+        } catch (err) {
+          console.error('Scoreboard update failed:', err);
+        }
+      }
+      updateDebugScore(turn, { turnIndex: i, possessionId });
+      continue;
+    }
+
+    if (turn.result_type === "QUARTER_START_INBOUND") {
+      console.log('🏀 Quarter start inbound detected');
+      await animateQuarterStartInbound(scene, { playerSprites, ballSprite, turnData: turn });
+      
+      // Transition to HalfCourt state
+      const { safeTransition } = await import('../state/gameStateMachine.js');
+      safeTransition(scene.stateMachine, States.HalfCourt, 'after quarter start inbound');
+      
       if (onUpdate) {
         try {
           onUpdate(turn);
