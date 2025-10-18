@@ -79,6 +79,33 @@ export function createGameScene(Phaser) {
       }
 
 
+    shutdown() {
+      if (DEBUG_FLOW) console.log("🧹 GameScene shutdown - cleaning up sprites");
+      
+      // Destroy all player sprites
+      if (this.playerSprites) {
+        Object.values(this.playerSprites).forEach(sprite => {
+          if (sprite && sprite.destroy) {
+            sprite.destroy();
+          }
+        });
+        this.playerSprites = {};
+      }
+      
+      // Destroy ball sprite if it exists
+      if (this.ballSprite && this.ballSprite.destroy) {
+        this.ballSprite.destroy();
+        this.ballSprite = null;
+      }
+      
+      // Clear other references
+      this.nameToId = {};
+      this.playerInfo = {};
+      this.playerStats = {};
+      
+      console.log("✅ GameScene cleanup complete");
+    }
+
     async preload() {
       if (DEBUG_FLOW) console.log("✅ GameScene preloaded");
       if (this.animate) {
@@ -102,6 +129,15 @@ export function createGameScene(Phaser) {
       if (homeStatsEl) homeStatsEl.innerHTML = '';
       if (awayStatsEl) awayStatsEl.innerHTML = '';
 
+      // Ensure clean slate - destroy any existing sprites before creating new ones
+      if (this.playerSprites) {
+        Object.values(this.playerSprites).forEach(sprite => {
+          if (sprite && sprite.destroy) {
+            sprite.destroy();
+          }
+        });
+      }
+      
       this.playerSprites = {};
       this.nameToId = {};
       this.playerInfo = {};
@@ -346,7 +382,24 @@ export function createGameScene(Phaser) {
       hydrateBoxScore();
 
       if (this.animate) {
+        // Count existing sprites in the scene BEFORE creating new ones
+        const existingContainers = this.children.list.filter(child => 
+          child.type === 'Container' && 
+          child.list && 
+          child.list.some(item => item.type === 'Circle')
+        );
+        console.log('🔍 PRE-CREATION: Existing containers in scene:', existingContainers.length);
+        
         this.playerSprites = loadPhaserPlayers(this, actualPlayers, Phaser);
+        
+        // Count sprites AFTER creation
+        const postCreationContainers = this.children.list.filter(child => 
+          child.type === 'Container' && 
+          child.list && 
+          child.list.some(item => item.type === 'Circle')
+        );
+        console.log('🔍 POST-CREATION: Total containers in scene:', postCreationContainers.length);
+        console.log('🔍 POST-CREATION: playerSprites object size:', Object.keys(this.playerSprites).length);
         
         // Clean up any extra sprites that don't have corresponding playerInfo
         const spriteKeys = Object.keys(this.playerSprites);
