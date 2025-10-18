@@ -288,7 +288,11 @@ function renderRoster() {
     let html = `<td>${p.name}</td><td>${p.pos}</td><td>${p.year}</td><td>${p.height}</td><td>${p.weight}</td>`;
     ATTR_HEADERS.forEach(h => {
       const val = p.attributes ? p.attributes[h] : undefined;
-      html += `<td>${val ?? '--'}</td>`;
+      // Convert to 0-12 scale, except NG which stays as decimal
+      const displayVal = h === 'NG' 
+        ? (val != null ? val.toFixed(2) : '--')
+        : (val != null ? Math.floor(val / 10) : '--');
+      html += `<td>${displayVal}</td>`;
     });
     html += `<td>${p.rt ?? '-'}</td>`;
     tr.innerHTML = html;
