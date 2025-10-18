@@ -541,12 +541,24 @@ export async function animateGameTurns({ //hasBallAtStep
     }
 
     if (turn.result_type === "BASELINE_INBOUND") {
-      console.log('🏀 Quarter start BASELINE_INBOUND detected, using animateStep for all players');
-      // Animate all players to their positions using the turn's animations
+      console.log('🏀 Quarter start BASELINE_INBOUND detected, animating all players');
+      
+      // Animate all players to their positions
+      const { tweenPlayerTo } = await import('./ballTween.js');
+      const { gridToPixels } = await import('../utils/gridToPixels.js');
+      
       await Promise.all(
-        (turn.animations || []).map(anim => 
-          animateStep(scene, playerSprites, anim, { ballSprite, hasBall: false })
-        )
+        (turn.animations || []).map(anim => {
+          const sprite = playerSprites[anim.playerId];
+          if (!sprite || !anim.movement || anim.movement.length < 2) return Promise.resolve();
+          
+          const endStep = anim.movement[anim.movement.length - 1];
+          const endPixels = gridToPixels(endStep.coords.x, endStep.coords.y, scene.game.config.width, scene.game.config.height);
+          
+          return new Promise(resolve => {
+            tweenPlayerTo(scene, sprite, endPixels, { duration: 800, onComplete: resolve });
+          });
+        })
       );
       
       // Transition to HalfCourt state
