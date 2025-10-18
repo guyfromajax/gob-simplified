@@ -526,6 +526,7 @@ def summarize_game_state(game):
         "players": players,
         "homeTeam": home_team_obj,
         "awayTeam": away_team_obj,
+        "opening_tip_winner": game.game_state.get("opening_tip_winner"),
     }
 
 def check_defensive_foul(self, defender, is_three):
