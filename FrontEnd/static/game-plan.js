@@ -286,6 +286,12 @@ function navigateToCourt() {
   if (pfId) params.set(`${myTeamSide}_pf`, pfId);
   if (cId) params.set(`${myTeamSide}_c`, cId);
   
+  // Carry forward start_with_inbound and starting_possession if present (from Sim to 4th Quarter)
+  const startWithInbound = urlParams.get('start_with_inbound');
+  const startingPossession = urlParams.get('starting_possession');
+  if (startWithInbound) params.set('start_with_inbound', startWithInbound);
+  if (startingPossession) params.set('starting_possession', startingPossession);
+  
   if (DEBUG) params.set('debug', '1');
   
   window.location.href = `/court.html?${params.toString()}`;

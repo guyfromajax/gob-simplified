@@ -84,6 +84,8 @@ let quarter = parseInt(urlParams.get('quarter'), 10) || 1;
 let gameId =
   urlParams.get('game_id') ||
   (typeof localStorage !== 'undefined' ? localStorage.getItem('game_id') : null);
+const startWithInbound = urlParams.get('start_with_inbound') === 'true';
+const startingPossession = urlParams.get('starting_possession');
 
 // Load game plan settings (async function to be called before game starts)
 let gamePlanSettings = null;
@@ -281,6 +283,8 @@ async function startGame({ homeRoster, awayRoster, animate = true }) {
     gamePlanSettings,
     userTeamSide,
     mode,
+    startWithInbound,
+    startingPossession,
   };
 
   if (game.scene.isActive('GameScene')) {
@@ -498,7 +502,10 @@ async function handleSimToFourth() {
     params.set('game_id', gameId);
     
     // Mark this as a "Sim to 4th Quarter" flow so Q4 starts with random inbound
-    sessionStorage.setItem('sim_to_fourth_flow', 'true');
+    const randomPossession = Math.random() < 0.5 ? 'home' : 'away';
+    params.set('start_with_inbound', 'true');
+    params.set('starting_possession', randomPossession);
+    console.log(`🎲 Q4 will start with inbound, possession: ${randomPossession}`);
     
     console.log('🎮 Redirecting to set-lineup for Q4 after simming Q1-Q3');
     window.location.href = `/static/set-lineup.html?${params.toString()}`;
