@@ -501,11 +501,9 @@ async function handleSimToFourth() {
     params.set('period', 'Q4');
     params.set('game_id', gameId);
     
-    // Mark this as a "Sim to 4th Quarter" flow so Q4 starts with random inbound
-    const randomPossession = Math.random() < 0.5 ? 'home' : 'away';
-    params.set('start_with_inbound', 'true');
-    params.set('starting_possession', randomPossession);
-    console.log(`🎲 Q4 will start with inbound, possession: ${randomPossession}`);
+    // Q4 should NOT use start_with_inbound - let backend handle standard Q4 logic (opening tip winner)
+    // The backend will automatically give possession to the opening tip winner for Q4
+    console.log(`🏀 Q4 will use standard possession logic (opening tip winner gets ball)`);
     
     console.log('🎮 Redirecting to set-lineup for Q4 after simming Q1-Q3');
     window.location.href = `/static/set-lineup.html?${params.toString()}`;
