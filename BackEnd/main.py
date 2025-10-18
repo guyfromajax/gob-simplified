@@ -228,17 +228,6 @@ def simulate_quarter(
         pressure_type = gm.turn_manager.determine_defensive_pressure_type()
         gm.game_state["offensive_state"] = pressure_type
         print(f"🏀 Q{q} start: {gm.offense_team.name} gets possession (lost opening tip) - Defense: {pressure_type}")
-        
-        # Create inbound pass turn
-        from BackEnd.utils.quarter_inbound import execute_quarter_start_inbound
-        inbound_turn = execute_quarter_start_inbound(gm)
-        gm.turns.append(inbound_turn)
-        gm.text_log.append(inbound_turn["text"])
-        # Update clock for inbound time elapsed
-        gm.game_state["time_remaining"] -= inbound_turn["time_elapsed"]
-        minutes = gm.game_state["time_remaining"] // 60
-        seconds = gm.game_state["time_remaining"] % 60
-        gm.game_state["clock"] = f"{minutes}:{seconds:02d}"
     elif q == 4:
         # Q4: Winning team from opening tip gets possession via inbound pass
         opening_tip_winner = gm.game_state.get("opening_tip_winner", "home")
@@ -253,17 +242,6 @@ def simulate_quarter(
         pressure_type = gm.turn_manager.determine_defensive_pressure_type()
         gm.game_state["offensive_state"] = pressure_type
         print(f"🏀 Q{q} start: {gm.offense_team.name} gets possession (won opening tip) - Defense: {pressure_type}")
-        
-        # Create inbound pass turn
-        from BackEnd.utils.quarter_inbound import execute_quarter_start_inbound
-        inbound_turn = execute_quarter_start_inbound(gm)
-        gm.turns.append(inbound_turn)
-        gm.text_log.append(inbound_turn["text"])
-        # Update clock for inbound time elapsed
-        gm.game_state["time_remaining"] -= inbound_turn["time_elapsed"]
-        minutes = gm.game_state["time_remaining"] // 60
-        seconds = gm.game_state["time_remaining"] % 60
-        gm.game_state["clock"] = f"{minutes}:{seconds:02d}"
 
     while gm.game_state["time_remaining"] > 0:
         gm.simulate_macro_turn()
