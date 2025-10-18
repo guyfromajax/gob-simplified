@@ -555,11 +555,12 @@ export async function animateGameTurns({ //hasBallAtStep
           const endStep = anim.movement[anim.movement.length - 1];
           const endPixels = gridToPixels(endStep.coords.x, endStep.coords.y, scene.game.config.width, scene.game.config.height);
           
-          return new Promise(resolve => {
-            tweenPlayerTo(scene, sprite, endPixels, { duration: 800, onComplete: resolve });
-          });
+          // tweenPlayerTo returns a Promise that resolves when complete
+          return tweenPlayerTo(scene, sprite, endPixels, { duration: 800 });
         })
       );
+      
+      console.log('✅ Quarter start inbound positioning complete');
       
       // Transition to HalfCourt state
       const { safeTransition } = await import('../state/gameStateMachine.js');
@@ -574,6 +575,7 @@ export async function animateGameTurns({ //hasBallAtStep
         }
       }
       updateDebugScore(turn, { turnIndex: i, possessionId });
+      console.log('🏀 Continuing to next turn after BASELINE_INBOUND');
       continue;
     }
 
