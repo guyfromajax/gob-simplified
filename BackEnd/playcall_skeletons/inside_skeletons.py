@@ -24,6 +24,8 @@ from BackEnd.constants import HCO_STRING_SPOTS, ACTIONS
 #     "lower midBaseline": {"x": 89, "y": 15},
 # }
 
+#adding random comment
+
 
 #frequencyoptions are strong offense, neutral, strong defense
 INSIDE_HIGHLOW_ENTRY = {
