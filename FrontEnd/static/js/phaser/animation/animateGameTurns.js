@@ -5,6 +5,7 @@ import animationConfig from "./animation_config.js";
 import runFreeThrowSequence from "./freeThrow.js";
 import runFastBreakSequence from "./fastBreak.js";
 import { runOpeningTipSequence } from "./openingTip.js";
+import { animateStep } from "./animateStep.js";
 import { handleTurnover } from "./turnoverAdapter.js";
 import { States } from "../state/gameStateMachine.js";
 import { appendToTextScroll } from "../utils/textScroll.js";
