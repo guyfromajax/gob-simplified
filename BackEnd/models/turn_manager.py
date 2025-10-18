@@ -503,6 +503,7 @@ class TurnManager:
                     "next_defensive_setup": pressure_type,
                     "animations": [],  # Putbacks use simple animation, not skeleton
                     "rebounderId": getattr(rebounder, "player_id", None),
+                    "quarter": self.game.quarter,
                 }
             else:
                 # Putback missed - check for rebound
@@ -525,6 +526,7 @@ class TurnManager:
                     "time_elapsed": oreb_event.get("timeElapsed", 3),
                     "animations": [],
                     "rebounderId": getattr(rebounder, "player_id", None),
+                    "quarter": self.game.quarter,
                 }
                 
                 # Check if there's another rebound
@@ -581,6 +583,7 @@ class TurnManager:
                 "animations": [],
                 "rebounderId": getattr(rebounder, "player_id", None),
                 "pgId": getattr(pg, "player_id", None) if pg else None,
+                "quarter": self.game.quarter,
             }
 
     def update_clock_and_possession(self, result):
