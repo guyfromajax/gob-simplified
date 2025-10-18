@@ -539,6 +539,31 @@ export async function animateGameTurns({ //hasBallAtStep
       continue;
     }
 
+    if (turn.result_type === "BASELINE_INBOUND") {
+      console.log('🏀 Quarter start BASELINE_INBOUND detected, using animateStep for all players');
+      // Animate all players to their positions using the turn's animations
+      await Promise.all(
+        (turn.animations || []).map(anim => 
+          animateStep(scene, playerSprites, anim, { ballSprite, hasBall: false })
+        )
+      );
+      
+      // Transition to HalfCourt state
+      const { safeTransition } = await import('../state/gameStateMachine.js');
+      safeTransition(scene.stateMachine, States.HalfCourt, 'after quarter start inbound');
+      
+      appendToTextScroll(turn.text || "Inbound pass");
+      if (onUpdate) {
+        try {
+          onUpdate(turn);
+        } catch (err) {
+          console.error('Scoreboard update failed:', err);
+        }
+      }
+      updateDebugScore(turn, { turnIndex: i, possessionId });
+      continue;
+    }
+
     if (turn.result_type === "DEFENSIVE_STOP") {
       // Fast break was stopped by defense - just display text and continue to next turn (HCO)
       appendToTextScroll(turn.text || "Defense stops the break!");
