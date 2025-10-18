@@ -41,9 +41,16 @@ function updateScoreboardScores({ home, away }) {
 
 if (typeof on === 'function' && typeof emit === 'function') {
   on('score:update', updateScoreboardScores);
-  emit('score:update', { home: 0, away: 0 });
+  // Only reset scores to 0-0 for fresh games (Q1 without game_id)
+  // For resumed games (Q2-Q4), loadGameStats.js will set the correct accumulated scores
+  if (quarter === 1 && !gameId) {
+    emit('score:update', { home: 0, away: 0 });
+  }
 } else {
-  updateScoreboardScores({ home: 0, away: 0 });
+  // Only reset scores to 0-0 for fresh games (Q1 without game_id)
+  if (quarter === 1 && !gameId) {
+    updateScoreboardScores({ home: 0, away: 0 });
+  }
 }
 
 function getMode({ tournamentId, franchiseId }) {
