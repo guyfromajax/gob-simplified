@@ -277,38 +277,10 @@ export function createGameScene(Phaser) {
       const quarterEl = document.getElementById('quarter');
 
       const positions = ["PG","SG","SF","PF","C"];
-      
-      // Get player IDs that are actually in this quarter's lineup
-      // Check first turn's animations to see who's actually playing
-      const activePlayerIds = new Set();
-      if (simData.turns && simData.turns.length > 0) {
-        const firstTurn = simData.turns[0];
-        if (firstTurn.animations) {
-          firstTurn.animations.forEach(anim => {
-            if (anim.playerId) {
-              activePlayerIds.add(anim.playerId);
-            }
-          });
-        }
-      }
-      
-      console.log('🔍 ACTIVE PLAYER FILTER:', {
-        totalPlayers: simData.players.length,
-        activePlayerIds: Array.from(activePlayerIds),
-        activeCount: activePlayerIds.size
-      });
-      
-      // Filter to only active players in this quarter's lineup (not all players from entire game)
+      // Filter out the ball from player data
       const actualPlayers = simData.players.filter(p => {
         const id = p.playerId ?? p.player_id;
-        const isBall = id === "ball" || id === "Ball" || p.name === "ball" || p.name === "Ball";
-        const isActive = activePlayerIds.size === 0 || activePlayerIds.has(id); // If no animations, include all (Q1)
-        
-        if (!isBall && !isActive) {
-          console.log(`🚫 Filtering out inactive player: ${p.name} (${id})`);
-        }
-        
-        return !isBall && isActive;
+        return id !== "ball" && id !== "Ball" && p.name !== "ball" && p.name !== "Ball";
       });
       
       this.nameToId = Object.fromEntries(actualPlayers.map(p => [p.name, p.playerId ?? p.player_id]));
