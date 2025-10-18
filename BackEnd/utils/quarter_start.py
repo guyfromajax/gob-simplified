@@ -36,12 +36,17 @@ def create_quarter_start_inbound(game):
             "y": random.randint(*ranges["y"]),
         }
     
-    # PG stays at inbound spot
-    o_dest_home["PG"] = inbound_spot_home.copy()
+    # SF inbounds from sideline, PG receives
+    # SF at inbound spot, PG at receive spot
+    inbound_spot = inbound_spot_home.copy()
+    pg_receive_spot_home = {"x": 50, "y": 25}  # PG receives at center
+    
+    o_dest_home["SF"] = inbound_spot  # SF inbounds
+    o_dest_home["PG"] = pg_receive_spot_home  # PG receives
     
     # Flip if away team has possession
     o_dest = getAwayTeamCoords(o_dest_home.copy()) if is_away_offense else o_dest_home
-    bh_coords = o_dest["PG"]
+    bh_coords = o_dest["PG"]  # Ball ends with PG
     
     # Defensive positioning
     aggression = defense_team.strategy_calls.get("aggression_call", "normal")
@@ -96,11 +101,20 @@ def create_quarter_start_inbound(game):
             # Update player coords
             player.coords = end.copy()
     
+    # Get passer (SF) and receiver (PG) player objects
+    sf_player = offense_team.lineup.get("SF")
+    pg_player = offense_team.lineup.get("PG")
+    
+    passer_id = getattr(sf_player, "player_id", None)
+    receiver_id = getattr(pg_player, "player_id", None)
+    passer_name = getattr(sf_player, "name", "SF")
+    receiver_name = getattr(pg_player, "name", "PG")
+    
     # Text
     quarter_num = game.quarter
-    text = f"Start of Q{quarter_num}: {offense_team.name} inbounds the ball."
+    text = f"Start of Q{quarter_num}: {passer_name} inbounds to {receiver_name}."
     
-    # Return with animations array (like opening tip)
+    # Return with animations array and pass data
     turn_result = {
         "result_type": "BASELINE_INBOUND",
         "text": text,
@@ -112,6 +126,13 @@ def create_quarter_start_inbound(game):
         "dDestinations": d_dest,
         "possession_team_id": offense_team.team_id,
         "quarter": game.quarter,
+        # Pass data for animation
+        "passerId": passer_id,
+        "receiverId": receiver_id,
+        "passer": passer_name,
+        "receiver": receiver_name,
+        "pass_origin": o_dest["SF"],  # SF inbound location
+        "pass_target": o_dest["PG"],  # PG receive location
     }
     
     return turn_result
