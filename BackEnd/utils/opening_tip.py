@@ -156,6 +156,7 @@ def execute_opening_tip(game):
         "home_wins": home_wins,
         "winner": winner_name,
         "next_play_type": "HCO",
+        "quarter": game.quarter,  # Add quarter field for frontend filtering
     }
     
     return turn_result
