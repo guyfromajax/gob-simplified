@@ -541,13 +541,12 @@ export async function animateGameTurns({ //hasBallAtStep
     }
 
     if (turn.result_type === "BASELINE_INBOUND") {
-      console.log('🏀 Quarter start BASELINE_INBOUND detected, animating players and pass');
+      console.log('🏀 Quarter start BASELINE_INBOUND detected, animating all players');
       
       // Animate all players to their positions
-      const { tweenPlayerTo, tweenBallTo } = await import('./ballTween.js');
+      const { tweenPlayerTo } = await import('./ballTween.js');
       const { gridToPixels } = await import('../utils/gridToPixels.js');
       
-      // First, animate all players moving to their positions
       await Promise.all(
         (turn.animations || []).map(anim => {
           const sprite = playerSprites[anim.playerId];
@@ -562,37 +561,6 @@ export async function animateGameTurns({ //hasBallAtStep
       );
       
       console.log('✅ Quarter start inbound positioning complete');
-      
-      // Now animate the inbound pass (SF to PG)
-      if (turn.passerId && turn.receiverId && turn.pass_origin && turn.pass_target) {
-        const passerSprite = playerSprites[turn.passerId];
-        const receiverSprite = playerSprites[turn.receiverId];
-        
-        if (passerSprite && receiverSprite) {
-          console.log('🏀 Animating inbound pass from SF to PG');
-          
-          // Position ball at passer (SF)
-          const passerPixels = gridToPixels(
-            turn.pass_origin.x, 
-            turn.pass_origin.y, 
-            scene.game.config.width, 
-            scene.game.config.height
-          );
-          ballSprite.setPosition(passerPixels.x, passerPixels.y);
-          ballSprite.setVisible(true);
-          
-          // Animate pass to receiver (PG)
-          const receiverPixels = gridToPixels(
-            turn.pass_target.x, 
-            turn.pass_target.y, 
-            scene.game.config.width, 
-            scene.game.config.height
-          );
-          
-          await tweenBallTo(scene, ballSprite, receiverPixels, { duration: 400 });
-          console.log('✅ Inbound pass animation complete');
-        }
-      }
       
       // Transition to HalfCourt state
       const { safeTransition } = await import('../state/gameStateMachine.js');
