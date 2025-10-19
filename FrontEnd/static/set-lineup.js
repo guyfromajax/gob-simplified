@@ -505,6 +505,12 @@ function createCardFront(player) {
   const headshotContainer = document.createElement('div');
   headshotContainer.className = 'player-headshot-container';
   
+  // Set team background image
+  const teamNameNormalized = teamName.toLowerCase().replace(/\s+/g, '-');
+  headshotContainer.style.backgroundImage = `url(/static/images/team-backgrounds/${teamNameNormalized}-background.png)`;
+  headshotContainer.style.backgroundSize = 'cover';
+  headshotContainer.style.backgroundPosition = 'center';
+  
   // Player image
   const img = document.createElement('img');
   img.className = 'player-headshot';
@@ -513,7 +519,6 @@ function createCardFront(player) {
   img.onerror = () => {
     // Fallback to white background if image fails
     img.style.display = 'none';
-    headshotContainer.style.background = '#fff';
   };
   headshotContainer.appendChild(img);
   
@@ -636,7 +641,15 @@ function createCardBack(player) {
       const value = document.createElement('span');
       value.className = 'attr-value';
       const rawVal = attrs[key];
-      value.textContent = rawVal != null ? Math.floor(rawVal / 10) : '--';
+      const displayVal = rawVal != null ? Math.floor(rawVal / 10) : '--';
+      value.textContent = displayVal;
+      
+      // Set gold bar fill percentage (0-10 scale, max at 100%)
+      if (displayVal !== '--') {
+        const fillPercentage = Math.min(displayVal * 10, 100);
+        row.style.setProperty('--attr-fill', `${fillPercentage}%`);
+      }
+      
       row.appendChild(value);
       
       section.appendChild(row);
