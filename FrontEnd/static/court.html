@@ -671,6 +671,56 @@
       opacity: 0.5;
       cursor: not-allowed;
     }
+
+    /* ==================== LOCKER ROOM POPUP ==================== */
+    .locker-room-popup {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10000;
+    }
+
+    .locker-room-content {
+      background: #fff;
+      border: 6px solid #c0c0c0;
+      border-radius: 12px;
+      padding: 40px 60px;
+      display: flex;
+      flex-direction: column;
+      gap: 30px;
+      align-items: center;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+      text-align: center;
+    }
+
+    .locker-room-content h2 {
+      font-size: 32px;
+      font-weight: bold;
+      color: #333;
+      margin: 0;
+    }
+
+    .locker-room-button {
+      background: #ff9800;
+      color: #fff;
+      border: none;
+      padding: 15px 40px;
+      font-weight: bold;
+      font-size: 18px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+
+    .locker-room-button:hover {
+      background: #f57c00;
+    }
   </style>
 </head>
 <body>
