@@ -538,6 +538,16 @@ function createCardFront(player) {
   headshotContainer.style.backgroundSize = 'cover';
   headshotContainer.style.backgroundPosition = 'center';
   
+  // Add energy-based border
+  const ng = player.attributes?.NG ?? 1.0;
+  let borderColor;
+  if (ng > 0.89) borderColor = '#00aa00';      // Green
+  else if (ng >= 0.8) borderColor = '#cccc00'; // Yellow
+  else if (ng >= 0.7) borderColor = '#ff8800'; // Orange
+  else borderColor = '#cc0000';                // Red
+  
+  headshotContainer.style.border = `4px solid ${borderColor}`;
+  
   // Player image
   const img = document.createElement('img');
   img.className = 'player-headshot';
@@ -570,15 +580,31 @@ function createCardFront(player) {
   const infoBar = document.createElement('div');
   infoBar.className = 'player-info-bar';
   
+  // Left side: name and physical stats
+  const leftInfo = document.createElement('div');
+  leftInfo.className = 'player-info-left';
+  
   const name = document.createElement('div');
   name.className = 'player-name';
   name.textContent = player.name;
-  infoBar.appendChild(name);
+  leftInfo.appendChild(name);
   
   const physical = document.createElement('div');
   physical.className = 'player-physical';
   physical.textContent = `${formatHeight(player.height)} ${player.weight || '--'} lbs`;
-  infoBar.appendChild(physical);
+  leftInfo.appendChild(physical);
+  
+  infoBar.appendChild(leftInfo);
+  
+  // Right side: energy percentage
+  const energyDisplay = document.createElement('div');
+  energyDisplay.className = 'player-energy-display';
+  const ngPercent = Math.round(ng * 100);
+  energyDisplay.textContent = `${ngPercent}%`;
+  energyDisplay.style.color = borderColor;  // Match border color
+  energyDisplay.style.fontWeight = 'bold';
+  energyDisplay.style.fontSize = '18px';
+  infoBar.appendChild(energyDisplay);
   
   front.appendChild(infoBar);
   
