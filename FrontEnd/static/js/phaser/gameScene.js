@@ -765,27 +765,37 @@ export function createGameScene(Phaser) {
           if (this.isFinal) {
             await finalize();
           } else {
-            console.log('🚨 GAMESCENE: Animation complete, about to navigate to next quarter - BLOCKING FOR DEBUG');
+            console.log('✅ Quarter complete - showing locker room popup');
             
-            // TEMPORARY DEBUG: Block navigation to see what's happening
-            if (window.DEBUG_BLOCK_NAVIGATION !== false) {
-              console.log('🚨 GAMESCENE: Navigation blocked for debugging. Set window.DEBUG_BLOCK_NAVIGATION = false to allow navigation.');
-              return; // Block navigation
+            // Show "Go To Locker Room" popup
+            const nextQ = this.quarter + 1;
+            const params = new URLSearchParams(window.location.search);
+            params.set('game_id', this.gameId);
+            params.set('quarter', nextQ);
+            params.set('period', `Q${nextQ}`);
+            if (this.gameId && typeof localStorage !== 'undefined') {
+              localStorage.setItem('game_id', this.gameId);
             }
             
-            const nextQ = this.quarter + 1;
-          const params = new URLSearchParams(window.location.search);
-          params.set('game_id', this.gameId);
-          params.set('quarter', nextQ);
-          params.set('period', `Q${nextQ}`);
-          if (this.gameId && typeof localStorage !== 'undefined') {
-            localStorage.setItem('game_id', this.gameId);
+            // Create locker room popup
+            const popup = document.createElement('div');
+            popup.className = 'locker-room-popup';
+            popup.innerHTML = `
+              <div class="locker-room-content">
+                <h2>Quarter ${this.quarter} Complete!</h2>
+                <button class="locker-room-button">Go To Locker Room</button>
+              </div>
+            `;
+            document.body.appendChild(popup);
+            
+            // Wire up button
+            const button = popup.querySelector('.locker-room-button');
+            button.addEventListener('click', () => {
+              window.location.href = `/static/set-lineup.html?${params.toString()}`;
+            });
+            
+            return;
           }
-          DEBUG_FLOW && console.log('➡️ Advancing to lineup', { nextQ, gameId: this.gameId });
-          DEBUG_FLOW && console.log('skipToEnd at navigation:', this.skipToEnd);
-          window.location.href = `/static/set-lineup.html?${params.toString()}`;
-          return;
-        }
       };
 
         const logAndStart = () => {
