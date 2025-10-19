@@ -534,8 +534,8 @@
     }
     
     .announcement-headshot {
-      width: 56px; /* Same as font size */
-      height: 75px; /* 3:4 aspect ratio (56 * 4/3) */
+      width: 98px; /* 75% larger: 56 * 1.75 = 98px */
+      height: 131px; /* 3:4 aspect ratio: 98 * 4/3 = 131px */
       border-radius: 6px;
       overflow: hidden;
       background: #fff;
@@ -600,7 +600,7 @@
     }
 
     .game-announcement.active {
-      animation: announcement-pop 1500ms ease-out forwards;
+      animation: announcement-pop 2500ms ease-out forwards;
     }
 
     @keyframes announcement-pop {
