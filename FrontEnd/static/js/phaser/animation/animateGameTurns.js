@@ -482,13 +482,9 @@ export async function animateGameTurns({ //hasBallAtStep
       // Display free throw result text
       appendToTextScroll(turn.text || "Free throw attempt");
       
-      if (onUpdate) {
-        try {
-          onUpdate(turn);
-        } catch (err) {
-          console.error('Scoreboard update failed:', err);
-        }
-      }
+      // NOTE: onUpdate is already called inside runFreeThrowSequence for each FT attempt
+      // Do NOT call it again here or stats will be double counted
+      
       updateDebugScore(turn, { turnIndex: i, possessionId });
       continue;
     }
