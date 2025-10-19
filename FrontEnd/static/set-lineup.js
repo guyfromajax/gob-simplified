@@ -156,21 +156,28 @@ function renderRoster() {
     ];
     const classes = ['', '', 'ht', 'wt', '', '', '', '', '', '', '', '', '', '', '', '', 'ng', 'rt'];
     
+    const ng = anchorAttrs.NG ?? 1.0;
+    let energyBgColor;
+    if (ng > 0.89) energyBgColor = '#00aa00';      // Green
+    else if (ng >= 0.8) energyBgColor = '#cccc00'; // Yellow
+    else if (ng >= 0.7) energyBgColor = '#ff8800'; // Orange
+    else energyBgColor = '#cc0000';                // Red
+    
     cells.forEach((val, idx) => {
       const td = document.createElement('td');
       td.textContent = val ?? '--';
       if (classes[idx]) td.classList.add(classes[idx]);
       
+      // Apply energy-based background color to player name cell (except green)
+      if (idx === 0 && ng <= 0.89) {  // First cell is player name
+        td.style.backgroundColor = energyBgColor;
+        td.style.color = '#fff';  // White text on colored background
+        td.style.fontWeight = 'bold';
+      }
+      
       // Apply energy-based background color to NG cell
       if (classes[idx] === 'ng') {
-        const ng = anchorAttrs.NG ?? 1.0;
-        let bgColor;
-        if (ng > 0.89) bgColor = '#00aa00';      // Green
-        else if (ng >= 0.8) bgColor = '#cccc00'; // Yellow
-        else if (ng >= 0.7) bgColor = '#ff8800'; // Orange
-        else bgColor = '#cc0000';                // Red
-        
-        td.style.backgroundColor = bgColor;
+        td.style.backgroundColor = energyBgColor;
         td.style.color = '#fff';  // White text on colored background
         td.style.fontWeight = 'bold';
         td.textContent = `${val}%`;  // Add % symbol
