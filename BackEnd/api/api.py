@@ -579,12 +579,22 @@ def get_games():
 @app.get("/player/{player_id}")
 def get_player(player_id: str):
     try:
+        print(f"🔍 Looking up player with ID: {player_id}")
         player = players_collection.find_one({"_id": player_id})
         if not player:
+            print(f"❌ Player not found with _id: {player_id}")
+            # Try a broader search to help debug
+            sample = players_collection.find_one({})
+            if sample:
+                print(f"📋 Sample player _id format: {sample.get('_id')} (type: {type(sample.get('_id'))})")
             raise HTTPException(status_code=404, detail="Player not found")
+        print(f"✅ Player found: {player.get('first_name')} {player.get('last_name')}")
         player["_id"] = str(player["_id"])  # ensure JSON serializable
         return player
+    except HTTPException:
+        raise
     except Exception as e:
+        print(f"❌ Error in get_player: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
