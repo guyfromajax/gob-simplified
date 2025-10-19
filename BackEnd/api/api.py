@@ -181,29 +181,55 @@ def simulate_game(request: SimulationRequest):
 
 @app.get("/api/game/{game_id}")
 def get_game_state(game_id: str):
-    """Fetch current game state for displaying accumulated stats"""
+    """Fetch current game state for displaying accumulated stats and player energy"""
     try:
         # Check ongoing games first
         gm = ongoing_games.get(game_id)
         if gm:
+            # Get players with current energy levels
+            players = []
+            for team in [gm.home_team, gm.away_team]:
+                for pos, player in team.lineup.items():
+                    players.append({
+                        "_id": player.player_id,
+                        "name": player.name,
+                        "NG": player.attributes.get("NG", 1.0),
+                        "team": team.name
+                    })
+            
             return {
                 "game_id": game_id,
                 "score": gm.score,
                 "box_score": gm.get_box_score(),
                 "quarter": gm.quarter,
-                "clock": gm.game_state.get("clock", "8:00")
+                "clock": gm.game_state.get("clock", "8:00"),
+                "players": players
             }
         
         # Check database
         if games_collection is not None:
             saved = games_collection.find_one({"_id": game_id})
             if saved:
+                # Extract player energy from saved game doc
+                players = saved.get("players", [])
+                # Map to include NG if available
+                players_with_energy = []
+                for p in players:
+                    player_data = {
+                        "_id": p.get("playerId") or p.get("player_id"),
+                        "name": p.get("name"),
+                        "NG": p.get("NG", 1.0),  # May be saved in game doc
+                        "team": p.get("team")
+                    }
+                    players_with_energy.append(player_data)
+                
                 return {
                     "game_id": game_id,
                     "score": saved.get("score", {}),
                     "box_score": saved.get("box_score", {}),
                     "quarter": saved.get("quarter", 1),
-                    "clock": saved.get("clock", "8:00")
+                    "clock": saved.get("clock", "8:00"),
+                    "players": players_with_energy
                 }
         
         raise HTTPException(status_code=404, detail=f"Game {game_id} not found")
