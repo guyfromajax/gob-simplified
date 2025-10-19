@@ -33,7 +33,12 @@ export function showAnnouncement(text, team = 'home', playerData = null) {
     announcement.classList.add('neutral');
   }
   
-  // Add player headshot if provided
+  // Add text first (so image appears on the right)
+  const textSpan = document.createElement('span');
+  textSpan.textContent = text;
+  announcement.appendChild(textSpan);
+  
+  // Add player headshot if provided (will appear after text)
   if (playerData && (playerData.photo || playerData.playerId)) {
     const headshotContainer = document.createElement('div');
     headshotContainer.className = 'announcement-headshot';
@@ -60,11 +65,6 @@ export function showAnnouncement(text, team = 'home', playerData = null) {
     announcement.appendChild(headshotContainer);
   }
   
-  // Add text
-  const textSpan = document.createElement('span');
-  textSpan.textContent = text;
-  announcement.appendChild(textSpan);
-  
   // Add to body
   document.body.appendChild(announcement);
   currentAnnouncement = announcement;
@@ -74,7 +74,7 @@ export function showAnnouncement(text, team = 'home', playerData = null) {
     announcement.classList.add('active');
   });
   
-  // Remove after animation completes (1500ms total - increased from 1000ms)
+  // Remove after animation completes (2500ms total)
   setTimeout(() => {
     if (announcement.parentElement) {
       announcement.remove();
@@ -82,7 +82,7 @@ export function showAnnouncement(text, team = 'home', playerData = null) {
     if (currentAnnouncement === announcement) {
       currentAnnouncement = null;
     }
-  }, 1500);
+  }, 2500);
   
   console.log('📢 Announcement:', text, 'Team:', team, 'Player:', playerData?.playerId || 'none');
 }
