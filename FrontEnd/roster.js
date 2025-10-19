@@ -15,7 +15,7 @@ async function loadRoster() {
       html += `</tr></thead><tbody>`;
   
       data.players.forEach(p => {
-        html += `<tr><td><a href="player.html?id=${p._id}">${p.name}</a></td>`;
+        html += `<tr><td><a href="/static/player-detail.html?id=${p._id}">${p.name}</a></td>`;
         headers.forEach(attr => {
           let value = p.attributes[attr];
   
