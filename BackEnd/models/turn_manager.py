@@ -686,73 +686,98 @@ class TurnManager:
         
         def derive_roles_from_steps(steps, off_lineup):
             """
-            Derive shooter, screener, passer, pass_sequence, and ball handler tracking from step actions.
-            Eliminates need for pre-defined fields in skeletons.
+            Derive shooter, passer, screener from the skeleton steps.
+            Optimized to focus on final steps for turn-level roles (backend logic).
+            Still tracks ball ownership per step for animation (frontend).
             """
             from BackEnd.constants import HCO_STRING_SPOTS
             
             shooter_pos = None
             screener_pos = None
-            pass_sequence = []
+            passer_pos = None
             ball_owner_by_step = []
             ball_handler_coords_by_step = []
             
+            # Track ball ownership through all steps (needed for frontend animation)
             current_owner_pos = None
-            
             for step in steps:
                 pos_actions = step.get("pos_actions", {})
                 step_owner = None
                 step_coords = None
                 
-                # Find who has ball at this step by checking actions
+                # Find who has ball at this step
                 for pos, action_info in pos_actions.items():
                     action = action_info.get("action", "")
                     
-                    # Ball handler actions indicate possession
                     if action in ["handle_ball", "receive", "shoot", "pass"]:
                         step_owner = pos
                         step_coords = HCO_STRING_SPOTS.get(action_info.get("spot", "key"), {"x": 64, "y": 25})
                         
-                        # Track pass sequence transitions
                         if action == "receive":
-                            # Ball is being received - add previous owner to sequence
-                            if current_owner_pos and current_owner_pos not in pass_sequence:
-                                pass_sequence.append(current_owner_pos)
                             current_owner_pos = pos
-                        elif action == "shoot":
-                            # Shooting - this is the shooter
-                            shooter_pos = pos
-                            if current_owner_pos and current_owner_pos not in pass_sequence:
-                                pass_sequence.append(current_owner_pos)
                         elif action == "handle_ball":
-                            # Initial ball handler
                             if current_owner_pos is None:
                                 current_owner_pos = pos
                         
-                        break  # Found ball handler for this step
-                    
-                    # Track screener
-                    if action == "screen" and screener_pos is None:
-                        screener_pos = pos
+                        break
                 
-                # Store ball owner and coords for this step
                 ball_owner_by_step.append(step_owner or current_owner_pos)
                 ball_handler_coords_by_step.append(step_coords)
             
-            # After processing all steps, finalize derived roles
-            # Add shooter to end of pass sequence
-            if shooter_pos and shooter_pos not in pass_sequence:
-                pass_sequence.append(shooter_pos)
+            # === TURN-LEVEL ROLES (for backend shot calculation) ===
+            # Extract from final steps only - much simpler and more accurate
             
-            # Derive passer (second-to-last in sequence)
-            passer_pos = pass_sequence[-2] if len(pass_sequence) >= 2 else None
+            if not steps:
+                return {
+                    "shooter_pos": None,
+                    "screener_pos": "PF",
+                    "passer_pos": None,
+                    "ball_owner_by_step": ball_owner_by_step,
+                    "ball_handler_coords_by_step": ball_handler_coords_by_step
+                }
             
-            # If no shooter found, use final ball handler
+            # 1. Get SHOOTER from final step
+            final_step = steps[-1]
+            for pos, action_info in final_step.get("pos_actions", {}).items():
+                if action_info.get("action") == "shoot":
+                    shooter_pos = pos
+                    break
+            
+            # Also check events in final step
+            if not shooter_pos:
+                for event in final_step.get("events", []):
+                    if event.get("type") == "shot":
+                        shooter_pos = event.get("by")
+                        break
+            
+            # Fallback: use final ball handler
             if not shooter_pos and ball_owner_by_step:
                 final_owner = ball_owner_by_step[-1]
                 shooter_pos = final_owner if isinstance(final_owner, str) else None
             
-            # If no screener, default to PF
+            # 2. Get PASSER from last pass event (check last 2 steps)
+            for step in reversed(steps[-2:]):
+                for event in step.get("events", []):
+                    if event.get("type") == "pass":
+                        potential_passer = event.get("from")
+                        # Only count as passer if they passed TO the shooter
+                        if event.get("to") == shooter_pos:
+                            passer_pos = potential_passer
+                            break
+                if passer_pos:
+                    break
+            
+            # 3. Get SCREENER - find last screen that helped the shooter
+            if shooter_pos:
+                for step in reversed(steps):
+                    for event in step.get("events", []):
+                        if event.get("type") == "screen" and event.get("for") == shooter_pos:
+                            screener_pos = event.get("by")
+                            break
+                    if screener_pos:
+                        break
+            
+            # Fallback screener
             if not screener_pos:
                 screener_pos = "PF"
             
@@ -760,7 +785,6 @@ class TurnManager:
                 "shooter_pos": shooter_pos,
                 "screener_pos": screener_pos,
                 "passer_pos": passer_pos,
-                "pass_sequence": pass_sequence,
                 "ball_owner_by_step": ball_owner_by_step,
                 "ball_handler_coords_by_step": ball_handler_coords_by_step
             }
@@ -815,13 +839,12 @@ class TurnManager:
                     shooter = off_lineup[event["by"]]
                     touch_counts[shooter] += 1
 
-        # --- Step 4: Derive primary roles from steps (replaces skeleton-defined fields)
+        # --- Step 4: Derive primary roles from steps (optimized - uses final steps only)
         derived_roles = derive_roles_from_steps(steps, off_lineup)
         
         shooter_pos = derived_roles["shooter_pos"]
         screener_pos = derived_roles["screener_pos"]
         passer_pos = derived_roles["passer_pos"]
-        pass_chain = derived_roles["pass_sequence"]
         
         # Override passer if it conflicts with shooter/screener
         if passer_pos in [shooter_pos, screener_pos]:
@@ -843,13 +866,12 @@ class TurnManager:
             "screener": screener,
             "ball_handler": shooter,
             "passer": passer,
-            "pass_chain": pass_chain,
             "defender": defender,
             "steps": steps,
             "action_timeline": action_timeline,
             "touch_counts": touch_counts,
-            "ball_owner_by_step": derived_roles["ball_owner_by_step"],  # ← NEW!
-            "ball_handler_coords_by_step": derived_roles["ball_handler_coords_by_step"]  # ← NEW!
+            "ball_owner_by_step": derived_roles["ball_owner_by_step"],
+            "ball_handler_coords_by_step": derived_roles["ball_handler_coords_by_step"]
         }
     
     # def assign_roles(self):
