@@ -11,7 +11,14 @@
   <div id="team-header">
     <img id="team-logo" alt="team logo" hidden>
     <h1 id="team-title" style="font-family: 'Bebas Neue', sans-serif;"></h1>
+    
+    <!-- View Toggle -->
+    <div class="view-toggle">
+      <button class="view-toggle-btn active" data-view="grid">Grid View</button>
+      <button class="view-toggle-btn" data-view="player">Player View</button>
+    </div>
   </div>
+  
   <div id="lineup-container">
     <ul id="slots">
       <li class="slot" data-pos="PG">PG<button class="remove" hidden>✕</button></li>
@@ -24,7 +31,8 @@
     <button id="autoset-lineup" class="autoset-button">AUTOSET LINEUP</button>
   </div>
 
-  <div id="roster-table-container">
+  <!-- Grid View -->
+  <div id="roster-table-container" class="view-content active">
     <table class="roster-table">
       <thead>
         <tr>
@@ -51,6 +59,30 @@
       <tbody id="roster-body"></tbody>
     </table>
     <p class="pos-note"><em>*Pos represents the player's highest rated position. Players can play any position.</em></p>
+  </div>
+
+  <!-- Player View -->
+  <div id="player-view-container" class="view-content">
+    <div class="position-row" data-position="PG">
+      <div class="position-label">PG</div>
+      <div class="players-scroll" data-position="PG"></div>
+    </div>
+    <div class="position-row" data-position="SG">
+      <div class="position-label">SG</div>
+      <div class="players-scroll" data-position="SG"></div>
+    </div>
+    <div class="position-row" data-position="SF">
+      <div class="position-label">SF</div>
+      <div class="players-scroll" data-position="SF"></div>
+    </div>
+    <div class="position-row" data-position="PF">
+      <div class="position-label">PF</div>
+      <div class="players-scroll" data-position="PF"></div>
+    </div>
+    <div class="position-row" data-position="C">
+      <div class="position-label">C</div>
+      <div class="players-scroll" data-position="C"></div>
+    </div>
   </div>
 
   <div id="toast" hidden></div>
