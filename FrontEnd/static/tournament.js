@@ -285,7 +285,25 @@ function renderRoster() {
   tbody.innerHTML = "";
   roster.forEach(p => {
     const tr = document.createElement("tr");
-    let html = `<td>${p.name}</td><td>${p.pos}</td><td>${p.year}</td><td>${p.height}</td><td>${p.weight}</td>`;
+    
+    // Create player name as clickable link
+    const nameTd = document.createElement("td");
+    const nameLink = document.createElement("a");
+    nameLink.href = `/static/player-detail.html?id=${p._id}`;
+    nameLink.textContent = p.name;
+    nameLink.style.color = 'inherit';
+    nameLink.style.textDecoration = 'none';
+    nameLink.addEventListener('mouseenter', () => {
+      nameLink.style.textDecoration = 'underline';
+    });
+    nameLink.addEventListener('mouseleave', () => {
+      nameLink.style.textDecoration = 'none';
+    });
+    nameTd.appendChild(nameLink);
+    tr.appendChild(nameTd);
+    
+    // Add other columns
+    let html = `<td>${p.pos}</td><td>${p.year}</td><td>${p.height}</td><td>${p.weight}</td>`;
     ATTR_HEADERS.forEach(h => {
       const val = p.attributes ? p.attributes[h] : undefined;
       // Convert to 0-12 scale, except NG which stays as decimal
@@ -295,7 +313,12 @@ function renderRoster() {
       html += `<td>${displayVal}</td>`;
     });
     html += `<td>${p.rt ?? '-'}</td>`;
-    tr.innerHTML = html;
+    
+    // Create a temporary element to parse the HTML
+    const temp = document.createElement('div');
+    temp.innerHTML = html;
+    Array.from(temp.children).forEach(child => tr.appendChild(child));
+    
     tbody.appendChild(tr);
   });
 }

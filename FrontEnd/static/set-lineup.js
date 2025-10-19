@@ -165,15 +165,32 @@ function renderRoster() {
     
     cells.forEach((val, idx) => {
       const td = document.createElement('td');
-      td.textContent = val ?? '--';
-      if (classes[idx]) td.classList.add(classes[idx]);
       
-      // Apply energy-based background color to player name cell (except green)
-      if (idx === 0 && ng <= 0.89) {  // First cell is player name
-        td.style.backgroundColor = energyBgColor;
-        td.style.color = '#fff';  // White text on colored background
-        td.style.fontWeight = 'bold';
+      // Make player name a clickable link
+      if (idx === 0) {  // First cell is player name
+        const link = document.createElement('a');
+        link.href = `/static/player-detail.html?id=${p._id}`;
+        link.textContent = val ?? '--';
+        link.style.color = ng <= 0.89 ? '#fff' : 'inherit';
+        link.style.textDecoration = 'none';
+        link.style.fontWeight = ng <= 0.89 ? 'bold' : 'normal';
+        link.addEventListener('mouseenter', () => {
+          link.style.textDecoration = 'underline';
+        });
+        link.addEventListener('mouseleave', () => {
+          link.style.textDecoration = 'none';
+        });
+        td.appendChild(link);
+        
+        // Apply energy-based background color to player name cell (except green)
+        if (ng <= 0.89) {
+          td.style.backgroundColor = energyBgColor;
+        }
+      } else {
+      td.textContent = val ?? '--';
       }
+      
+      if (classes[idx]) td.classList.add(classes[idx]);
       
       // Apply energy-based background color to NG cell
       if (classes[idx] === 'ng') {
@@ -533,8 +550,12 @@ function createPlayerCard(player) {
   
   // Click to fill next slot
   card.addEventListener('click', (e) => {
-    // Don't trigger on flip button or dropdown clicks
-    if (e.target.closest('.flip-btn') || e.target.closest('.ratings-dropdown')) return;
+    // Don't trigger on flip button, dropdown, or headshot clicks
+    if (e.target.closest('.flip-btn') || 
+        e.target.closest('.ratings-dropdown') || 
+        e.target.closest('.player-headshot-container')) {
+      return;
+    }
     if (!isSelected) {
       fillNextSlot(player._id);
     }
@@ -560,7 +581,12 @@ function createCardFront(player) {
   const front = document.createElement('div');
   front.className = 'player-card-front';
   
-  // Headshot container
+  // Headshot container (clickable link to player detail)
+  const headshotLink = document.createElement('a');
+  headshotLink.href = `/static/player-detail.html?id=${player._id}`;
+  headshotLink.style.display = 'block';
+  headshotLink.style.textDecoration = 'none';
+  
   const headshotContainer = document.createElement('div');
   headshotContainer.className = 'player-headshot-container';
   
@@ -579,6 +605,16 @@ function createCardFront(player) {
   else borderColor = '#cc0000';                // Red
   
   headshotContainer.style.border = `4px solid ${borderColor}`;
+  headshotContainer.style.cursor = 'pointer';
+  headshotContainer.style.transition = 'transform 0.2s ease';
+  
+  // Add hover effect
+  headshotContainer.addEventListener('mouseenter', () => {
+    headshotContainer.style.transform = 'scale(1.05)';
+  });
+  headshotContainer.addEventListener('mouseleave', () => {
+    headshotContainer.style.transform = 'scale(1)';
+  });
   
   // Player image
   const img = document.createElement('img');
@@ -591,7 +627,10 @@ function createCardFront(player) {
   };
   headshotContainer.appendChild(img);
   
-  // Flip button
+  headshotLink.appendChild(headshotContainer);
+  front.appendChild(headshotLink);
+  
+  // Flip button (outside the link so it doesn't navigate)
   const flipBtn = document.createElement('button');
   flipBtn.className = 'flip-btn';
   flipBtn.innerHTML = '🔁';
@@ -600,13 +639,11 @@ function createCardFront(player) {
     e.stopPropagation();
     toggleCardFlip(player._id);
   });
-  headshotContainer.appendChild(flipBtn);
+  front.appendChild(flipBtn);
   
-  // Ratings dropdown
+  // Ratings dropdown (outside the link)
   const dropdown = createRatingsDropdown(player);
-  headshotContainer.appendChild(dropdown);
-  
-  front.appendChild(headshotContainer);
+  front.appendChild(dropdown);
   
   // Info bar
   const infoBar = document.createElement('div');
