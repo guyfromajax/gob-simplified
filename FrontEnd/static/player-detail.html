@@ -214,11 +214,15 @@
       text-align: right;
     }
 
-    /* Bottom Panels */
-    .bottom-panels {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 30px;
+    /* Abilities Panel (inside attributes) */
+    .abilities-panel {
+      grid-column: 1 / -1; /* Span all columns */
+      margin-top: 20px;
+    }
+
+    /* Scouting Report Panel (full width) */
+    .scouting-report-panel {
+      margin-top: 30px;
     }
 
     .panel {
@@ -258,10 +262,6 @@
 
       .portrait-container {
         padding-top: 100%; /* Square on smaller screens */
-      }
-
-      .bottom-panels {
-        grid-template-columns: 1fr;
       }
 
       .player-name-header {
@@ -396,6 +396,7 @@
       const jersey = player.jersey || '';
       const photo = player.photo || '';
       const attributes = player.attributes || {};
+      const year = formatYear(player.year);
       
       // Get team info
       const teamId = getTeamId(team);
@@ -424,7 +425,7 @@
               ${photo ? `<img src="${photo}" alt="${fullName}" class="player-headshot">` : ''}
             </div>
             <div class="vitals-bar">
-              <div class="vitals-name">${fullName}</div>
+              <div class="vitals-name">${year}</div>
               <div class="vitals-physical">${height} • ${weight}</div>
             </div>
           </div>
@@ -433,15 +434,16 @@
             <div class="attributes-grid">
               ${renderAttributeGroups(attributes)}
             </div>
+            
+            <div class="panel abilities-panel">
+              <div class="panel-title">Abilities</div>
+            </div>
           </div>
         </div>
 
-        <div class="bottom-panels">
+        <div class="scouting-report-panel">
           <div class="panel">
             <div class="panel-title">Scouting Report</div>
-          </div>
-          <div class="panel">
-            <div class="panel-title">Abilities</div>
           </div>
         </div>
       `;
@@ -495,6 +497,22 @@
       const feet = Math.floor(inches / 12);
       const remainingInches = inches % 12;
       return `${feet}'${remainingInches}"`;
+    }
+
+    function formatYear(year) {
+      if (!year) return 'N/A';
+      const yearStr = String(year).toLowerCase();
+      const yearMap = {
+        'senior': 'Senior',
+        'junior': 'Junior',
+        'sophomore': 'Sophomore',
+        'freshman': 'Freshman',
+        'sr': 'Senior',
+        'jr': 'Junior',
+        'so': 'Sophomore',
+        'fr': 'Freshman'
+      };
+      return yearMap[yearStr] || year;
     }
 
     function getTeamId(teamName) {
