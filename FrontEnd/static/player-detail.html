@@ -466,10 +466,12 @@
       // Get anchor attribute for display (not affected by energy)
       const rawValue = attributes[`anchor_${code}`] ?? attributes[code] ?? 0;
       
-      // Convert to 1-10 scale (divide by 10, floor, clamp to 1-10)
-      const scaledValue = Math.max(1, Math.min(10, Math.floor(rawValue / 10)));
+      // Convert to display scale (divide by 10, floor, minimum 1)
+      // Allows 11, 12, etc. for attributes 110+, 120+
+      const scaledValue = Math.max(1, Math.floor(rawValue / 10));
       
-      const fillPercentage = scaledValue * 10;
+      // Cap fill percentage at 100% for visual consistency
+      const fillPercentage = Math.min(100, scaledValue * 10);
       
       return `
         <div class="attribute-row">
