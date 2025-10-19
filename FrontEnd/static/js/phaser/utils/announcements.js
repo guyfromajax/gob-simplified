@@ -9,8 +9,9 @@ let currentAnnouncement = null;
  * Show an announcement with pop-to-center animation
  * @param {string} text - Text to display (e.g., "Fast Break!", "It's Good!")
  * @param {string} team - 'home', 'away', 'defense', or 'neutral' for color styling
+ * @param {Object} playerData - Optional player data { playerId, photo, teamName } to show headshot
  */
-export function showAnnouncement(text, team = 'home') {
+export function showAnnouncement(text, team = 'home', playerData = null) {
   // Remove any existing announcement
   if (currentAnnouncement) {
     currentAnnouncement.remove();
@@ -32,7 +33,37 @@ export function showAnnouncement(text, team = 'home') {
     announcement.classList.add('neutral');
   }
   
-  announcement.textContent = text;
+  // Add player headshot if provided
+  if (playerData && (playerData.photo || playerData.playerId)) {
+    const headshotContainer = document.createElement('div');
+    headshotContainer.className = 'announcement-headshot';
+    
+    // Set team background
+    if (playerData.teamName) {
+      const teamNameNormalized = playerData.teamName.toLowerCase().replace(/\s+/g, '-');
+      headshotContainer.style.backgroundImage = `url(/static/images/team-backgrounds/${teamNameNormalized}-background.png)`;
+      headshotContainer.style.backgroundSize = 'cover';
+      headshotContainer.style.backgroundPosition = 'center';
+    }
+    
+    const img = document.createElement('img');
+    img.src = playerData.photo || `/static/images/players/${playerData.playerId}.png`;
+    img.alt = 'Player';
+    img.style.width = '100%';
+    img.style.height = '100%';
+    img.style.objectFit = 'cover';
+    img.onerror = () => {
+      img.style.display = 'none';
+    };
+    headshotContainer.appendChild(img);
+    
+    announcement.appendChild(headshotContainer);
+  }
+  
+  // Add text
+  const textSpan = document.createElement('span');
+  textSpan.textContent = text;
+  announcement.appendChild(textSpan);
   
   // Add to body
   document.body.appendChild(announcement);
@@ -43,7 +74,7 @@ export function showAnnouncement(text, team = 'home') {
     announcement.classList.add('active');
   });
   
-  // Remove after animation completes (1000ms total)
+  // Remove after animation completes (1500ms total - increased from 1000ms)
   setTimeout(() => {
     if (announcement.parentElement) {
       announcement.remove();
@@ -51,9 +82,9 @@ export function showAnnouncement(text, team = 'home') {
     if (currentAnnouncement === announcement) {
       currentAnnouncement = null;
     }
-  }, 1000);
+  }, 1500);
   
-  console.log('📢 Announcement:', text, 'Team:', team);
+  console.log('📢 Announcement:', text, 'Team:', team, 'Player:', playerData?.playerId || 'none');
 }
 
 /**
@@ -61,8 +92,9 @@ export function showAnnouncement(text, team = 'home') {
  * @param {Object} turnData - Turn data from backend
  * @param {string} timing - 'start' or 'end' of turn
  * @param {string} homeTeamId - Home team ID for determining team colors
+ * @param {Object} scene - Optional scene object for accessing player data
  */
-export function announceFromTurnData(turnData, timing = 'start', homeTeamId = null) {
+export function announceFromTurnData(turnData, timing = 'start', homeTeamId = null, scene = null) {
   // Determine which team triggered the event
   const offenseTeamId = turnData.possession_team_id || turnData.starting_possession_team_id;
   const isHomeTeamEvent = homeTeamId && String(offenseTeamId) === String(homeTeamId);
@@ -110,7 +142,23 @@ export function announceFromTurnData(turnData, timing = 'start', homeTeamId = nu
     }
     
     if (turnData.result_type === 'TURNOVER' && turnData.text?.toLowerCase().includes('steal')) {
-      showAnnouncement("Steal!", defenseTeam);
+      // Try to get stealer player data
+      let playerData = null;
+      
+      if (scene && turnData.defender_id) {
+        const stealerId = turnData.defender_id;
+        const stealerSprite = scene.playerSprites?.[stealerId];
+        const stealerTeamId = stealerSprite?.team_id;
+        const stealerTeamName = stealerTeamId === scene.homeTeamId ? scene.simData?.home_team : scene.simData?.away_team;
+        
+        playerData = {
+          playerId: stealerId,
+          photo: stealerSprite?.photo || null,
+          teamName: stealerTeamName
+        };
+      }
+      
+      showAnnouncement("Steal!", defenseTeam, playerData);
       return;
     }
   }

@@ -444,10 +444,21 @@ export function shootBall({
                               turnData?.text?.includes('fouls') && turnData?.text?.includes('on the shot');
         
         if (result === "MAKE") {
+          // Get shooter player data
+          const shooterSprite = scene.playerSprites?.[shooterId];
+          const shooterInfo = scene.playerInfo?.[shooterId];
+          const shooterTeamName = shooterTeamId === scene.homeTeamId ? scene.simData?.home_team : scene.simData?.away_team;
+          
+          const playerData = shooterInfo ? {
+            playerId: shooterId,
+            photo: shooterSprite?.photo || null,
+            teamName: shooterTeamName
+          } : null;
+          
           if (isShootingFoul) {
-            showAnnouncement("It's Good! And 1!", teamStyle);
+            showAnnouncement("It's Good! And 1!", teamStyle, playerData);
           } else {
-            showAnnouncement("It's Good!", teamStyle);
+            showAnnouncement("It's Good!", teamStyle, playerData);
           }
         } else if (result === "MISS" && isShootingFoul) {
           showAnnouncement("Shooting Foul!", 'neutral');
@@ -648,7 +659,16 @@ export function animateRebound({
             // Announce rebound when rebounder reaches the ball
             const { showAnnouncement } = await import('../utils/announcements.js');
             const rebounderTeam = rebounderSprite.team; // "home" or "away"
-            showAnnouncement("Rebound!", rebounderTeam);
+            const rebounderTeamId = rebounderSprite.team_id;
+            const rebounderTeamName = rebounderTeamId === scene.homeTeamId ? scene.simData?.home_team : scene.simData?.away_team;
+            
+            const playerData = {
+              playerId: rebounderId,
+              photo: rebounderSprite?.photo || null,
+              teamName: rebounderTeamName
+            };
+            
+            showAnnouncement("Rebound!", rebounderTeam, playerData);
             
             attachBallToPlayer(scene, ballSprite, rebounderSprite, {
               debugInfo: { shooterId, reboundSpot: ballSpot }
