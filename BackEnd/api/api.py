@@ -691,6 +691,7 @@ def team_roster_page(request: Request, team: str):
 
         players.append(
             {
+                "_id": str(p.get("_id")),  # Add player ID for linking
                 "name": f"{p.get('first_name', '')} {p.get('last_name', '')}".strip(),
                 "pos": pos,
                 "year": year_abbr,
