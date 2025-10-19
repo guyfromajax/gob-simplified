@@ -416,34 +416,42 @@ function switchView(view) {
 }
 
 function renderPlayerView() {
-  const positions = ['PG', 'SG', 'SF', 'PF', 'C'];
+  const container = document.querySelector('.players-grid');
+  if (!container) return;
   
-  positions.forEach(pos => {
-    const container = document.querySelector(`.players-scroll[data-position="${pos}"]`);
-    if (!container) return;
-    
-    container.innerHTML = '';
-    
-    // Get players for this position, sorted by rating
-    const playersForPos = roster
-      .map(p => {
-        const posRating = (p.position_ratings || {})[pos] || -1;
-        const overallRating = getRT(p);
-        return { ...p, posRating, overallRating };
-      })
-      .sort((a, b) => {
-        // Sort by position rating desc
-        if (b.posRating !== a.posRating) return b.posRating - a.posRating;
-        // Then by overall rating desc
-        if (b.overallRating !== a.overallRating) return b.overallRating - a.overallRating;
-        // Then by name asc
-        return (a.name || '').localeCompare(b.name || '');
-      });
-    
-    playersForPos.forEach(player => {
-      const card = createPlayerCard(player);
-      container.appendChild(card);
+  container.innerHTML = '';
+  
+  // Sort players by their HIGHEST position rating
+  const sortedPlayers = roster
+    .map(p => {
+      const posRatings = p.position_ratings || {};
+      const entries = Object.entries(posRatings);
+      
+      let highestPos = null;
+      let highestRating = -1;
+      
+      if (entries.length > 0) {
+        const sorted = entries.sort((a, b) => b[1] - a[1]);
+        highestPos = sorted[0][0];
+        highestRating = sorted[0][1];
+      }
+      
+      return { 
+        ...p, 
+        highestPos,
+        highestRating 
+      };
+    })
+    .sort((a, b) => {
+      // Sort by highest rating desc
+      if (b.highestRating !== a.highestRating) return b.highestRating - a.highestRating;
+      // Then by name asc
+      return (a.name || '').localeCompare(b.name || '');
     });
+  
+  sortedPlayers.forEach(player => {
+    const card = createPlayerCard(player);
+    container.appendChild(card);
   });
 }
 
@@ -555,9 +563,11 @@ function createRatingsDropdown(player) {
   
   if (entries.length === 0) return dropdown;
   
-  const [topPos, topRating] = entries[0];
+  // Use player's highest position (already calculated in renderPlayerView)
+  const topPos = player.highestPos || entries[0][0];
+  const topRating = player.highestRating || entries[0][1];
   
-  // Toggle button
+  // Toggle button - shows highest rated position
   const toggle = document.createElement('button');
   toggle.className = 'ratings-dropdown-toggle';
   toggle.innerHTML = `${topPos}: ${topRating} <span style="font-size: 10px;">▼</span>`;
@@ -568,7 +578,7 @@ function createRatingsDropdown(player) {
   });
   dropdown.appendChild(toggle);
   
-  // List
+  // List - all positions sorted by rating
   const list = document.createElement('div');
   list.className = 'ratings-dropdown-list';
   
