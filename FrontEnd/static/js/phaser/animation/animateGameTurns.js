@@ -478,6 +478,10 @@ export async function animateGameTurns({ //hasBallAtStep
 
     if (turn.result_type === "FREE_THROW") {
       await runFreeThrowSequence(scene, { playerSprites, ballSprite, turnData: turn, onUpdate, ftContext: turn.ftContext });
+      
+      // Display free throw result text
+      appendToTextScroll(turn.text || "Free throw attempt");
+      
       if (onUpdate) {
         try {
           onUpdate(turn);
