@@ -330,6 +330,7 @@ export function createGameScene(Phaser) {
           this.rowRefs[teamKey][pos] = { nameCell: nameTd, ptsCell: ptsTd, rebCell: rebTd, astCell: astTd };
           if (playerId) {
             this.playerStats[playerId].cells = { pts: ptsTd, reb: rebTd, ast: astTd };
+            this.playerStats[playerId].nameCell = nameTd; // Store name cell for energy color coding
             this.currentLineup[teamKey][pos] = playerId;
           }
         });
@@ -354,6 +355,7 @@ export function createGameScene(Phaser) {
             row.rebCell.textContent = stats.REB;
             row.astCell.textContent = stats.AST;
             stats.cells = { pts: row.ptsCell, reb: row.rebCell, ast: row.astCell };
+            stats.nameCell = row.nameCell; // Store name cell for energy color coding
           }
         });
       };
@@ -460,6 +462,13 @@ export function createGameScene(Phaser) {
         })));
       }
 
+      const getEnergyColor = (ng) => {
+        if (ng > 0.89) return '#00aa00';      // Green
+        if (ng >= 0.8) return '#cccc00';      // Yellow
+        if (ng >= 0.7) return '#ff8800';      // Orange
+        return '#cc0000';                      // Red
+      };
+
       const applyPlayerStats = (turn = {}) => {
         if (turn.home_lineup) updateLineup('home', turn.home_lineup);
         if (turn.away_lineup) updateLineup('away', turn.away_lineup);
@@ -474,6 +483,27 @@ export function createGameScene(Phaser) {
                   const key = stat.toLowerCase();
                   if (ps.cells[key]) ps.cells[key].textContent = ps[stat];
                 }
+              }
+            }
+          }
+        }
+        
+        // Apply energy-based color coding to player rows
+        if (turn.player_energy) {
+          for (const [playerId, energyData] of Object.entries(turn.player_energy)) {
+            const ps = this.playerStats[playerId];
+            if (ps && ps.cells) {
+              const ng = energyData.NG || 1.0;
+              const color = getEnergyColor(ng);
+              
+              // Apply color to all cells in the player's row
+              Object.values(ps.cells).forEach(cell => {
+                if (cell) cell.style.color = color;
+              });
+              
+              // Also apply to name cell if we have a reference to it
+              if (ps.nameCell) {
+                ps.nameCell.style.color = color;
               }
             }
           }
