@@ -20,6 +20,14 @@ export function updateStrategyBars(turnData, homeTeamId) {
   // Get tempo and aggression values from turn data
   // These come from the offensive and defensive teams' strategy settings
   
+  console.log('📊 updateStrategyBars called:', {
+    turnData_keys: Object.keys(turnData),
+    offense_tempo: turnData.offense_tempo,
+    offense_aggression: turnData.offense_aggression,
+    defense_tempo: turnData.defense_tempo,
+    defense_aggression: turnData.defense_aggression
+  });
+  
   const offenseTeamId = turnData.possession_team_id || turnData.starting_possession_team_id;
   const isHomeOnOffense = homeTeamId && String(offenseTeamId) === String(homeTeamId);
   
@@ -39,8 +47,11 @@ export function updateStrategyBars(turnData, homeTeamId) {
       homeTempo = turnData.defense_tempo || 2;
       homeAggression = turnData.defense_aggression;
     }
+    
+    console.log('✅ Using turn data strategy values');
   } else {
     // Fallback: use default values
+    console.warn('⚠️ No strategy data in turn, using defaults');
     homeTempo = 2;
     homeAggression = 2;
     awayTempo = 2;
