@@ -155,6 +155,26 @@ export async function runFreeThrowSequence(
     await tween(scene, ballSprite, rimPx, shotTweenOptions);
 
     scene.events?.emit(result === "MAKE" ? "ft:make" : "ft:miss");
+    
+    // Announce made free throw
+    if (result === "MAKE") {
+      const { showAnnouncement } = await import('../utils/announcements.js');
+      const shooterId = turnData.shooter_id;
+      const shooterSprite = playerSprites[shooterId];
+      const shooterTeamId = turnData.offense_team_id;
+      const isHomeTeam = shooterTeamId === scene.simData?.home_team_id;
+      const teamStyle = isHomeTeam ? 'home' : 'away';
+      const shooterTeamName = isHomeTeam ? scene.simData?.home_team : scene.simData?.away_team;
+      
+      const playerData = {
+        playerId: shooterId,
+        photo: shooterSprite?.photo || null,
+        teamName: shooterTeamName
+      };
+      
+      showAnnouncement("It's Good!", teamStyle, playerData);
+    }
+    
     await wait(scene, animationConfig.freeThrow.rimHoldMs);
     scene.events?.emit("ft:rimHoldEnd");
 
