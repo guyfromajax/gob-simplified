@@ -304,8 +304,16 @@ body {
   padding: 12px;
   background: #f8f8f8;
   display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.player-info-left {
+  display: flex;
   flex-direction: column;
   gap: 4px;
+  flex: 1;
 }
 
 .player-name {
@@ -318,6 +326,13 @@ body {
 .player-physical {
   font-size: 12px;
   color: #666;
+}
+
+.player-energy-display {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 50px;
 }
 
 /* ========== CARD BACK (ATTRIBUTES) ========== */
