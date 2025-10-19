@@ -42,7 +42,7 @@
       <tbody>
       {% for p in players %}
         <tr>
-          <td>{{ p.name }}</td>
+          <td><a href="/static/player-detail.html?id={{ p._id }}" style="color: inherit; text-decoration: none;">{{ p.name }}</a></td>
           <td>{{ p.pos }}</td>
           <td>{{ p.year }}</td>
           <td{% if p.height_raw is not none %} data-sort-value="{{ p.height_raw }}"{% endif %}>{{ p.height }}</td>
