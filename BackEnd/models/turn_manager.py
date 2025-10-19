@@ -385,6 +385,8 @@ class TurnManager:
         result["offense_aggression_call"] = self.game.offense_team.strategy_calls.get("aggression_call", "normal")
         result["defense_tempo_call"] = self.game.defense_team.strategy_calls.get("tempo_call", "normal")
         result["defense_aggression_call"] = self.game.defense_team.strategy_calls.get("aggression_call", "normal")
+        
+        print(f"📤 TURN RESULT - Sending to frontend: offense_tempo={result['offense_tempo_call']}, offense_aggr={result['offense_aggression_call']}, defense_tempo={result['defense_tempo_call']}, defense_aggr={result['defense_aggression_call']}")
 
         # Reconcile player point totals with the authoritative team score.
         # Clients should treat ``turn.score`` and ``turn.deltas`` as canonical
@@ -442,6 +444,8 @@ class TurnManager:
 
         self.game.offense_team.strategy_calls["tempo_call"] = random.choice(STRATEGY_CALL_DICTS["tempo"][tempo_setting])
         self.game.defense_team.strategy_calls["aggression_call"] = random.choice(STRATEGY_CALL_DICTS["aggression"][aggression_setting])
+        
+        print(f"🎯 STRATEGY CALLS SET - OFF: {self.game.offense_team.name} tempo={self.game.offense_team.strategy_calls['tempo_call']} | DEF: {self.game.defense_team.name} aggr={self.game.defense_team.strategy_calls['aggression_call']}")
 
 
     
