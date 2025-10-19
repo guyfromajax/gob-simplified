@@ -73,6 +73,31 @@ async function loadRoster() {
   if (!res.ok) return;
   const data = await res.json();
   roster = (data.players || []).map((p, idx) => ({ ...p, _idx: idx }));
+  
+  // If there's an active game, fetch current player energy levels
+  if (gameId) {
+    console.log("Loading current player energy from game:", gameId);
+    try {
+      const gameRes = await fetch(`/api/game/${gameId}`);
+      if (gameRes.ok) {
+        const gameData = await gameRes.json();
+        const gamePlayers = gameData.players || [];
+        
+        // Merge energy data into roster
+        gamePlayers.forEach(gp => {
+          const rosterPlayer = roster.find(p => p._id === gp._id);
+          if (rosterPlayer) {
+            rosterPlayer.attributes = rosterPlayer.attributes || {};
+            rosterPlayer.attributes.NG = gp.NG;
+            console.log(`Updated ${gp.name} energy to ${gp.NG}`);
+          }
+        });
+      }
+    } catch (err) {
+      console.warn("Could not load player energy from game:", err);
+    }
+  }
+  
   roster.sort((a, b) => {
     const diff = getRT(b) - getRT(a);
     return diff !== 0 ? diff : a._idx - b._idx;
