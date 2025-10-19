@@ -215,6 +215,13 @@ function clearSlot(slot) {
   slot.classList.remove('filled');
   remove.addEventListener('click', () => clearSlot(slot));
   updatePlayButton();
+  
+  // Re-render views to update selection state
+  if (currentView === 'player') {
+    renderPlayerView();
+  } else {
+    renderRoster();
+  }
 }
 
 function setupSlots() {
@@ -669,13 +676,63 @@ function toggleCardFlip(playerId) {
   cardFlipState[playerId] = card.classList.contains('flipped');
 }
 
+function assignToSlot(pos, playerId) {
+  // Check if slot is already filled
+  if (lineup[pos]) {
+    showToast('Slot already filled');
+    return false;
+  }
+  
+  // Check if player is already in lineup
+  if (Object.values(lineup).includes(playerId)) {
+    showToast('Player already in lineup');
+    return false;
+  }
+  
+  const player = playerMap[playerId];
+  if (!player) return false;
+  
+  // Update lineup data
+  lineup[pos] = playerId;
+  
+  // Update slot UI
+  const slot = document.querySelector(`.slot[data-pos="${pos}"]`);
+  if (slot) {
+    const rating = player.position_ratings?.[pos] ?? '--';
+    slot.textContent = `${player.name} — ${rating}`;
+    
+    const remove = document.createElement('button');
+    remove.className = 'remove';
+    remove.textContent = '✕';
+    remove.hidden = false;
+    remove.addEventListener('click', (e) => {
+      e.stopPropagation();
+      clearSlot(slot);
+    });
+    
+    slot.appendChild(remove);
+    slot.classList.add('filled');
+  }
+  
+  updatePlayButton();
+  
+  // Re-render views to update selection state
+  if (currentView === 'player') {
+    renderPlayerView();
+  } else {
+    renderRoster();
+  }
+  
+  return true;
+}
+
 function fillNextSlot(playerId) {
   const positions = ['PG', 'SG', 'SF', 'PF', 'C'];
   
   for (const pos of positions) {
     if (!lineup[pos]) {
-      assignToSlot(pos, playerId);
-      return;
+      const success = assignToSlot(pos, playerId);
+      if (success) return;
     }
   }
   
