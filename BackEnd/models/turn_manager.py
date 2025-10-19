@@ -369,6 +369,16 @@ class TurnManager:
                 if diff:
                     deltas[player.player_id] = {"team": team.name, "stats": diff}
         result["deltas"] = deltas
+        
+        # Include current energy levels for all active players (for frontend fatigue display)
+        player_energy = {}
+        for team in (self.game.home_team, self.game.away_team):
+            for pos, player in team.lineup.items():
+                player_energy[player.player_id] = {
+                    "NG": player.attributes.get("NG", 1.0),
+                    "team": team.name
+                }
+        result["player_energy"] = player_energy
 
         # Reconcile player point totals with the authoritative team score.
         # Clients should treat ``turn.score`` and ``turn.deltas`` as canonical
