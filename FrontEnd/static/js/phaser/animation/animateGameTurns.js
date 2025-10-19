@@ -12,6 +12,7 @@ import { appendToTextScroll } from "../utils/textScroll.js";
 import { getCurrentOwner, getPendingOwner } from "../ball/ballController.js";
 import { updatePlaycallDisplay } from "../utils/playcallDisplay.js";
 import { announceFromTurnData } from "../utils/announcements.js";
+import { updateStrategyBars } from "../utils/strategyBars.js";
 import {
   animationDebugLog,
   animationDebugWarn,
@@ -427,6 +428,9 @@ export async function animateGameTurns({ //hasBallAtStep
     
     // Update playcall display before animating the turn
     updatePlaycallDisplay(turn, scene.simData?.home_team_id);
+    
+    // Update strategy bars at start of turn
+    updateStrategyBars(turn, scene.simData?.home_team_id);
     
     // Show announcement for turn start events (Fast Break, Press, Trap)
     announceFromTurnData(turn, 'start', scene.simData?.home_team_id, scene);
