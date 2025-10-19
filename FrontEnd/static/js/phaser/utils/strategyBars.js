@@ -4,11 +4,23 @@
  */
 
 /**
- * Convert strategy setting (0-4) to bar fill percentage
- * 0 -> 20%, 1 -> 40%, 2 -> 60%, 3 -> 80%, 4 -> 100%
+ * Convert tempo call to bar fill percentage
+ * slow -> 20%, normal -> 60%, fast -> 100%
  */
-function settingToPercentage(value) {
-  return ((value + 1) * 20);
+function tempoToPercentage(tempoCall) {
+  if (tempoCall === 'slow') return 20;
+  if (tempoCall === 'fast') return 100;
+  return 60; // normal or default
+}
+
+/**
+ * Convert aggression call to bar fill percentage
+ * passive -> 20%, normal -> 60%, aggressive -> 100%
+ */
+function aggressionToPercentage(aggressionCall) {
+  if (aggressionCall === 'passive') return 20;
+  if (aggressionCall === 'aggressive') return 100;
+  return 60; // normal or default
 }
 
 /**
@@ -22,57 +34,57 @@ export function updateStrategyBars(turnData, homeTeamId) {
   
   console.log('📊 updateStrategyBars called:', {
     turnData_keys: Object.keys(turnData),
-    offense_tempo: turnData.offense_tempo,
-    offense_aggression: turnData.offense_aggression,
-    defense_tempo: turnData.defense_tempo,
-    defense_aggression: turnData.defense_aggression
+    offense_tempo_call: turnData.offense_tempo_call,
+    offense_aggression_call: turnData.offense_aggression_call,
+    defense_tempo_call: turnData.defense_tempo_call,
+    defense_aggression_call: turnData.defense_aggression_call
   });
   
   const offenseTeamId = turnData.possession_team_id || turnData.starting_possession_team_id;
   const isHomeOnOffense = homeTeamId && String(offenseTeamId) === String(homeTeamId);
   
-  // Determine which team is offense/defense
-  let homeTempo, homeAggression, awayTempo, awayAggression;
+  // Determine which team is offense/defense using actual calls (slow/normal/fast, passive/normal/aggressive)
+  let homeTempoCall, homeAggrCall, awayTempoCall, awayAggrCall;
   
-  if (turnData.offense_tempo !== undefined && turnData.defense_aggression !== undefined) {
-    // Use offense tempo and defense aggression from turn data
+  if (turnData.offense_tempo_call && turnData.defense_aggression_call) {
+    // Use actual tempo and aggression calls from turn data
     if (isHomeOnOffense) {
-      homeTempo = turnData.offense_tempo;
-      homeAggression = turnData.offense_aggression || 2; // Default to normal
-      awayTempo = turnData.defense_tempo || 2; // Default to normal
-      awayAggression = turnData.defense_aggression;
+      homeTempoCall = turnData.offense_tempo_call;
+      homeAggrCall = turnData.offense_aggression_call || 'normal';
+      awayTempoCall = turnData.defense_tempo_call || 'normal';
+      awayAggrCall = turnData.defense_aggression_call;
     } else {
-      awayTempo = turnData.offense_tempo;
-      awayAggression = turnData.offense_aggression || 2;
-      homeTempo = turnData.defense_tempo || 2;
-      homeAggression = turnData.defense_aggression;
+      awayTempoCall = turnData.offense_tempo_call;
+      awayAggrCall = turnData.offense_aggression_call || 'normal';
+      homeTempoCall = turnData.defense_tempo_call || 'normal';
+      homeAggrCall = turnData.defense_aggression_call;
     }
     
-    console.log('✅ Using turn data strategy values');
+    console.log('✅ Using turn data strategy calls');
   } else {
-    // Fallback: use default values
-    console.warn('⚠️ No strategy data in turn, using defaults');
-    homeTempo = 2;
-    homeAggression = 2;
-    awayTempo = 2;
-    awayAggression = 2;
+    // Fallback: use normal for everything
+    console.warn('⚠️ No strategy calls in turn, using defaults');
+    homeTempoCall = 'normal';
+    homeAggrCall = 'normal';
+    awayTempoCall = 'normal';
+    awayAggrCall = 'normal';
   }
   
   // Update home bars
   const homeTempBar = document.querySelector('#home-tempo-bar .strategy-bar-fill');
   const homeAggrBar = document.querySelector('#home-aggression-bar .strategy-bar-fill');
-  if (homeTempBar) homeTempBar.style.height = `${settingToPercentage(homeTempo)}%`;
-  if (homeAggrBar) homeAggrBar.style.height = `${settingToPercentage(homeAggression)}%`;
+  if (homeTempBar) homeTempBar.style.height = `${tempoToPercentage(homeTempoCall)}%`;
+  if (homeAggrBar) homeAggrBar.style.height = `${aggressionToPercentage(homeAggrCall)}%`;
   
   // Update away bars
   const awayTempoBar = document.querySelector('#away-tempo-bar .strategy-bar-fill');
   const awayAggrBar = document.querySelector('#away-aggression-bar .strategy-bar-fill');
-  if (awayTempoBar) awayTempoBar.style.height = `${settingToPercentage(awayTempo)}%`;
-  if (awayAggrBar) awayAggrBar.style.height = `${settingToPercentage(awayAggression)}%`;
+  if (awayTempoBar) awayTempoBar.style.height = `${tempoToPercentage(awayTempoCall)}%`;
+  if (awayAggrBar) awayAggrBar.style.height = `${aggressionToPercentage(awayAggrCall)}%`;
   
   console.log('📊 Strategy bars updated:', {
-    home: { tempo: homeTempo, aggression: homeAggression },
-    away: { tempo: awayTempo, aggression: awayAggression }
+    home: { tempo: homeTempoCall, aggression: homeAggrCall },
+    away: { tempo: awayTempoCall, aggression: awayAggrCall }
   });
 }
 

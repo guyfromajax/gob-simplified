@@ -188,6 +188,13 @@
     }
 
     /* Strategy Bars */
+    .strategy-bar-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+
     .strategy-bar {
       width: 25px;
       height: 70px;
@@ -207,23 +214,26 @@
     }
 
     .strategy-bar-label {
-      position: absolute;
-      width: 100%;
-      font-size: 8px;
+      font-size: 12px;
       text-align: center;
       color: #fff;
       font-weight: bold;
       text-transform: uppercase;
       letter-spacing: 0.5px;
       text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+      white-space: nowrap;
     }
 
     .strategy-bar-label.top {
+      position: absolute;
       top: 2px;
+      left: 50%;
+      transform: translateX(-50%);
     }
 
     .strategy-bar-label.bottom {
-      bottom: 2px;
+      /* Bottom label positioned outside the bar container via flexbox gap */
+      font-size: 10px;
     }
 
     /* Away Tempo Bar - Grid column 10 */
@@ -819,17 +829,21 @@
     <div id="defensive-playcall">-</div>
     
     <!-- Away Tempo Bar - Grid column 10 -->
-    <div id="away-tempo-bar" class="strategy-bar">
-      <div class="strategy-bar-label top">Fast</div>
-      <div class="strategy-bar-fill" style="height: 60%;"></div>
+    <div id="away-tempo-bar" class="strategy-bar-container">
+      <div class="strategy-bar">
+        <div class="strategy-bar-label top">Fast</div>
+        <div class="strategy-bar-fill" style="height: 60%;"></div>
+      </div>
       <div class="strategy-bar-label bottom">Slow</div>
     </div>
     
     <!-- Away Aggression Bar - Grid column 12 -->
-    <div id="away-aggression-bar" class="strategy-bar">
-      <div class="strategy-bar-label top">Aggr</div>
-      <div class="strategy-bar-fill" style="height: 60%;"></div>
-      <div class="strategy-bar-label bottom">Pass</div>
+    <div id="away-aggression-bar" class="strategy-bar-container">
+      <div class="strategy-bar">
+        <div class="strategy-bar-label top">Aggr</div>
+        <div class="strategy-bar-fill" style="height: 60%;"></div>
+      </div>
+      <div class="strategy-bar-label bottom">Passive</div>
     </div>
     
     <!-- Center Clock/Quarter - Grid column 14 -->
@@ -839,17 +853,21 @@
     </div>
     
     <!-- Home Tempo Bar - Grid column 16 -->
-    <div id="home-tempo-bar" class="strategy-bar">
-      <div class="strategy-bar-label top">Fast</div>
-      <div class="strategy-bar-fill" style="height: 60%;"></div>
+    <div id="home-tempo-bar" class="strategy-bar-container">
+      <div class="strategy-bar">
+        <div class="strategy-bar-label top">Fast</div>
+        <div class="strategy-bar-fill" style="height: 60%;"></div>
+      </div>
       <div class="strategy-bar-label bottom">Slow</div>
     </div>
     
     <!-- Home Aggression Bar - Grid column 18 -->
-    <div id="home-aggression-bar" class="strategy-bar">
-      <div class="strategy-bar-label top">Aggr</div>
-      <div class="strategy-bar-fill" style="height: 60%;"></div>
-      <div class="strategy-bar-label bottom">Pass</div>
+    <div id="home-aggression-bar" class="strategy-bar-container">
+      <div class="strategy-bar">
+        <div class="strategy-bar-label top">Aggr</div>
+        <div class="strategy-bar-fill" style="height: 60%;"></div>
+      </div>
+      <div class="strategy-bar-label bottom">Passive</div>
     </div>
     
     <!-- Offensive Playcall - Grid column 20 -->

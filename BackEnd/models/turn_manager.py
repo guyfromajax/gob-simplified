@@ -380,11 +380,11 @@ class TurnManager:
                 }
         result["player_energy"] = player_energy
         
-        # Include strategy settings for frontend strategy bars
-        result["offense_tempo"] = self.game.offense_team.strategy_settings.get("tempo", 2)
-        result["offense_aggression"] = self.game.offense_team.strategy_settings.get("aggression", 2)
-        result["defense_tempo"] = self.game.defense_team.strategy_settings.get("tempo", 2)
-        result["defense_aggression"] = self.game.defense_team.strategy_settings.get("aggression", 2)
+        # Include strategy calls for frontend strategy bars (actual calls, not settings)
+        result["offense_tempo_call"] = self.game.offense_team.strategy_calls.get("tempo_call", "normal")
+        result["offense_aggression_call"] = self.game.offense_team.strategy_calls.get("aggression_call", "normal")
+        result["defense_tempo_call"] = self.game.defense_team.strategy_calls.get("tempo_call", "normal")
+        result["defense_aggression_call"] = self.game.defense_team.strategy_calls.get("aggression_call", "normal")
 
         # Reconcile player point totals with the authoritative team score.
         # Clients should treat ``turn.score`` and ``turn.deltas`` as canonical
