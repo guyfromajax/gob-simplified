@@ -528,6 +528,18 @@
       opacity: 0;
       transform: translateX(-50%) scale(0.5);
       transition: none;
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+    
+    .announcement-headshot {
+      width: 56px; /* Same as font size */
+      height: 75px; /* 3:4 aspect ratio (56 * 4/3) */
+      border-radius: 6px;
+      overflow: hidden;
+      background: #fff;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
     }
     
     /* Home team announcements - use home vibrant color */
@@ -588,7 +600,7 @@
     }
 
     .game-announcement.active {
-      animation: announcement-pop 1000ms ease-out forwards;
+      animation: announcement-pop 1500ms ease-out forwards;
     }
 
     @keyframes announcement-pop {

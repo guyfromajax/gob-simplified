@@ -429,7 +429,7 @@ export async function animateGameTurns({ //hasBallAtStep
     updatePlaycallDisplay(turn, scene.simData?.home_team_id);
     
     // Show announcement for turn start events (Fast Break, Press, Trap)
-    announceFromTurnData(turn, 'start', scene.simData?.home_team_id);
+    announceFromTurnData(turn, 'start', scene.simData?.home_team_id, scene);
     
     const possessionId =
       turn.possession_id ?? turn.possessionId ?? turn.possessionID ?? null;
@@ -512,7 +512,7 @@ export async function animateGameTurns({ //hasBallAtStep
         });
       }
       // Announce foul
-      announceFromTurnData(turn, 'end', scene.simData?.home_team_id);
+      announceFromTurnData(turn, 'end', scene.simData?.home_team_id, scene);
       // Update scoreboard for all fouls (FCP or not)
       if (onUpdate) {
         try {
@@ -596,7 +596,7 @@ export async function animateGameTurns({ //hasBallAtStep
     // Handle OREB turns (putback attempts and kickouts)
     if (turn.result_type === "PUTBACK_MAKE" || turn.result_type === "PUTBACK_MISS" || turn.result_type === "OREB_KICKOUT") {
       await handleOrebTurn(scene, { playerSprites, ballSprite, turnData: turn, onUpdate });
-      announceFromTurnData(turn, 'end', scene.simData?.home_team_id);
+      announceFromTurnData(turn, 'end', scene.simData?.home_team_id, scene);
       if (onUpdate) {
         try {
           onUpdate(turn);
@@ -610,7 +610,7 @@ export async function animateGameTurns({ //hasBallAtStep
 
     if (turn.result_type === "TURNOVER") {
       await handleTurnover(scene, { playerSprites, ballSprite, turnData: turn, onUpdate });
-      announceFromTurnData(turn, 'end', scene.simData?.home_team_id);
+      announceFromTurnData(turn, 'end', scene.simData?.home_team_id, scene);
       if (onUpdate) {
         try {
           onUpdate(turn);
@@ -672,7 +672,7 @@ export async function animateGameTurns({ //hasBallAtStep
         turn_index: i
       });
       await runFastBreakSequence(scene, { playerSprites, ballSprite, turnData: turn, onUpdate, turnIndex: i });
-      announceFromTurnData(turn, 'end', scene.simData?.home_team_id);
+      announceFromTurnData(turn, 'end', scene.simData?.home_team_id, scene);
       if (onUpdate) {
         try {
           onUpdate(turn);
@@ -708,7 +708,7 @@ export async function animateGameTurns({ //hasBallAtStep
           if (onAction) onAction(action, sprite, timestamp);
         },
       });
-      announceFromTurnData(turn, 'end', scene.simData?.home_team_id);
+      announceFromTurnData(turn, 'end', scene.simData?.home_team_id, scene);
       if (onUpdate) {
         try {
           onUpdate(turn);
