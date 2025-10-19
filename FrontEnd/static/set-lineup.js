@@ -106,31 +106,51 @@ function renderRoster() {
       bestPos = pos;
       rt = rating;
     }
+    // Use anchor attributes (don't show energy-scaled values)
+    const anchorAttrs = p.attributes || {};
+    
     const cells = [
       p.name,
       bestPos,
       formatHeight(p.height),
       p.weight ?? '--',
-      Math.floor((p.attributes.SC ?? 0) / 10), 
-      Math.floor((p.attributes.SH ?? 0) / 10), 
-      Math.floor((p.attributes.ID ?? 0) / 10), 
-      Math.floor((p.attributes.OD ?? 0) / 10),
-      Math.floor((p.attributes.PS ?? 0) / 10), 
-      Math.floor((p.attributes.BH ?? 0) / 10), 
-      Math.floor((p.attributes.RB ?? 0) / 10), 
-      Math.floor((p.attributes.ST ?? 0) / 10),
-      Math.floor((p.attributes.AG ?? 0) / 10), 
-      Math.floor((p.attributes.ND ?? 0) / 10), 
-      Math.floor((p.attributes.IQ ?? 0) / 10), 
-      Math.floor((p.attributes.FT ?? 0) / 10),
-      (p.attributes.NG ?? 0).toFixed(2),  // NG stays as decimal
+      Math.floor((anchorAttrs.anchor_SC ?? anchorAttrs.SC ?? 0) / 10), 
+      Math.floor((anchorAttrs.anchor_SH ?? anchorAttrs.SH ?? 0) / 10), 
+      Math.floor((anchorAttrs.anchor_ID ?? anchorAttrs.ID ?? 0) / 10), 
+      Math.floor((anchorAttrs.anchor_OD ?? anchorAttrs.OD ?? 0) / 10),
+      Math.floor((anchorAttrs.anchor_PS ?? anchorAttrs.PS ?? 0) / 10), 
+      Math.floor((anchorAttrs.anchor_BH ?? anchorAttrs.BH ?? 0) / 10), 
+      Math.floor((anchorAttrs.anchor_RB ?? anchorAttrs.RB ?? 0) / 10), 
+      Math.floor((anchorAttrs.anchor_ST ?? anchorAttrs.ST ?? 0) / 10),
+      Math.floor((anchorAttrs.anchor_AG ?? anchorAttrs.AG ?? 0) / 10), 
+      Math.floor((anchorAttrs.anchor_ND ?? anchorAttrs.ND ?? 0) / 10), 
+      Math.floor((anchorAttrs.anchor_IQ ?? anchorAttrs.IQ ?? 0) / 10), 
+      Math.floor((anchorAttrs.anchor_FT ?? anchorAttrs.FT ?? 0) / 10),
+      Math.round((anchorAttrs.NG ?? 1.0) * 100),  // NG as percentage
       rt
     ];
-    const classes = ['', '', 'ht', 'wt', '', '', '', '', '', '', '', '', '', '', '', '', '', 'rt'];
+    const classes = ['', '', 'ht', 'wt', '', '', '', '', '', '', '', '', '', '', '', '', 'ng', 'rt'];
+    
     cells.forEach((val, idx) => {
       const td = document.createElement('td');
       td.textContent = val ?? '--';
       if (classes[idx]) td.classList.add(classes[idx]);
+      
+      // Apply energy-based background color to NG cell
+      if (classes[idx] === 'ng') {
+        const ng = anchorAttrs.NG ?? 1.0;
+        let bgColor;
+        if (ng > 0.89) bgColor = '#00aa00';      // Green
+        else if (ng >= 0.8) bgColor = '#cccc00'; // Yellow
+        else if (ng >= 0.7) bgColor = '#ff8800'; // Orange
+        else bgColor = '#cc0000';                // Red
+        
+        td.style.backgroundColor = bgColor;
+        td.style.color = '#fff';  // White text on colored background
+        td.style.fontWeight = 'bold';
+        td.textContent = `${val}%`;  // Add % symbol
+      }
+      
       tr.appendChild(td);
     });
     tbody.appendChild(tr);
@@ -624,7 +644,7 @@ function createCardBack(player) {
   });
   back.appendChild(flipBtn);
   
-  // Attribute sections
+  // Attribute sections - use anchor attributes (not energy-scaled)
   const attrs = player.attributes || {};
   
   Object.entries(ATTR_GROUPS).forEach(([sectionName, attrKeys]) => {
@@ -647,7 +667,8 @@ function createCardBack(player) {
       
       const value = document.createElement('span');
       value.className = 'attr-value';
-      const rawVal = attrs[key];
+      // Use anchor attribute (base value, not energy-scaled)
+      const rawVal = attrs[`anchor_${key}`] ?? attrs[key];
       const displayVal = rawVal != null ? Math.floor(rawVal / 10) : '--';
       value.textContent = displayVal;
       
@@ -664,6 +685,48 @@ function createCardBack(player) {
     
     back.appendChild(section);
   });
+  
+  // Add NG (Energy) section at the end
+  const ngSection = document.createElement('div');
+  ngSection.className = 'attr-section';
+  
+  const ngTitle = document.createElement('div');
+  ngTitle.className = 'attr-section-title';
+  ngTitle.textContent = 'ENERGY';
+  ngSection.appendChild(ngTitle);
+  
+  const ngRow = document.createElement('div');
+  ngRow.className = 'attr-row';
+  
+  const ngLabel = document.createElement('span');
+  ngLabel.className = 'attr-label';
+  ngLabel.textContent = 'NG';
+  ngRow.appendChild(ngLabel);
+  
+  const ngValue = document.createElement('span');
+  ngValue.className = 'attr-value';
+  const ng = attrs.NG ?? 1.0;
+  const ngPercent = Math.round(ng * 100);
+  ngValue.textContent = `${ngPercent}%`;
+  
+  // Set energy-based background color
+  let bgColor;
+  if (ng > 0.89) bgColor = '#00aa00';      // Green
+  else if (ng >= 0.8) bgColor = '#cccc00'; // Yellow
+  else if (ng >= 0.7) bgColor = '#ff8800'; // Orange
+  else bgColor = '#cc0000';                // Red
+  
+  ngRow.style.backgroundColor = bgColor;
+  ngValue.style.color = '#fff';  // White text on colored background
+  ngLabel.style.color = '#fff';  // White label too
+  ngValue.style.fontWeight = 'bold';
+  
+  // No gold bar for NG row - it has full colored background
+  ngRow.style.setProperty('--attr-fill', '0%');
+  
+  ngRow.appendChild(ngValue);
+  ngSection.appendChild(ngRow);
+  back.appendChild(ngSection);
   
   return back;
 }
