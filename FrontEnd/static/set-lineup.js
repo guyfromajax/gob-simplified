@@ -364,7 +364,7 @@ const ATTR_GROUPS = {
 
 function initViewToggle() {
   // Restore saved view from sessionStorage
-  const saved View = sessionStorage.getItem('lineupView');
+  const savedView = sessionStorage.getItem('lineupView');
   if (savedView === 'player') {
     currentView = 'player';
   }
