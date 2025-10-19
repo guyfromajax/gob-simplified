@@ -312,6 +312,13 @@ export function createGameScene(Phaser) {
         return `${parts[0][0]}. ${parts[parts.length - 1]}`;
       };
 
+      const getEnergyColor = (ng) => {
+        if (ng > 0.89) return '#00aa00';      // Green
+        if (ng >= 0.8) return '#cccc00';      // Yellow
+        if (ng >= 0.7) return '#ff8800';      // Orange
+        return '#cc0000';                      // Red
+      };
+
       const initTeamTable = (teamKey, bodyEl) => {
         positions.forEach(pos => {
           const player = simData.players.find(p => p.team === teamKey && p.pos === pos);
@@ -325,6 +332,15 @@ export function createGameScene(Phaser) {
           ptsTd.textContent = '0';
           rebTd.textContent = '0';
           astTd.textContent = '0';
+          
+          // Initialize energy color (defaults to green for fresh players at 1.0)
+          const initialNG = player?.NG ?? 1.0;
+          const initialColor = getEnergyColor(initialNG);
+          nameTd.style.color = initialColor;
+          ptsTd.style.color = initialColor;
+          rebTd.style.color = initialColor;
+          astTd.style.color = initialColor;
+          
           tr.append(nameTd, ptsTd, rebTd, astTd);
           bodyEl.appendChild(tr);
           this.rowRefs[teamKey][pos] = { nameCell: nameTd, ptsCell: ptsTd, rebCell: rebTd, astCell: astTd };
@@ -461,13 +477,6 @@ export function createGameScene(Phaser) {
           visible: sprite.visible
         })));
       }
-
-      const getEnergyColor = (ng) => {
-        if (ng > 0.89) return '#00aa00';      // Green
-        if (ng >= 0.8) return '#cccc00';      // Yellow
-        if (ng >= 0.7) return '#ff8800';      // Orange
-        return '#cc0000';                      // Red
-      };
 
       const applyPlayerStats = (turn = {}) => {
         if (turn.home_lineup) updateLineup('home', turn.home_lineup);
