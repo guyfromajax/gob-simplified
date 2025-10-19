@@ -107,13 +107,13 @@ def get_fast_break_chance(game):
 
 def get_time_elapsed(tempo_call):
     if tempo_call == "slow":
-        return int(max(5, min(35, random.gauss(22, 6))))
+        return int(max(5, min(35, random.gauss(24, 6))))
     elif tempo_call == "normal":
-        return int(max(5, min(35, random.gauss(15, 6))))
+        return int(max(5, min(35, random.gauss(20, 6))))
     elif tempo_call == "fast":
-        return int(max(4, min(15, random.gauss(8, 3))))
+        return int(max(4, min(15, random.gauss(12, 4))))
     else:
-        return int(max(5, min(35, random.gauss(12, 6))))  # Fallback
+        return int(max(5, min(35, random.gauss(22, 6))))  # Fallback
 
 def resolve_offensive_rebound(game, rebounder):
     """Resolve an offensive rebound by choosing a putback or a kick-out.
