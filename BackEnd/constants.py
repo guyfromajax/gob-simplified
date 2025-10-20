@@ -151,16 +151,15 @@ TOP_KEY_COORDS = HOME_TOP_KEY
 
 ACTIONS = {
     "HANDLE": "handle_ball",
-    "POST": "post_up",
-    "CUT": "cut",
-    "SCREEN": "screen",
-    "GET_OPEN": "get_open",
-    "RECEIVE": "receive",
-    "SHOOT": "shoot",
-    "DRIFT": "drift",
-    "STAY": "stationary",
     "PASS": "pass",
-    "REBOUND": "rebound",
+    "RECEIVE": "receive",
+    "POST_UP": "post_up",
+    "SHOOT": "shoot",
+    "SCREEN": "screen",
+    "CUT": "cut",
+    "GET_OPEN": "get_open",
+    "DRIFT": "drift",
+    "HOLD": "stationary",
     # 🛡️ Defensive actions
     "GUARD_BALL": "guard_ball",
     "GUARD_OFFBALL": "guard_offball"
