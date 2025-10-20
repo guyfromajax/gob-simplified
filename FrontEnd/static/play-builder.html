@@ -269,6 +269,28 @@
     .player-icon.PF { background: #f9ca24; }
     .player-icon.C { background: #6c5ce7; }
 
+    .player-icon {
+      transition: all 0.8s cubic-bezier(0.4, 0.0, 0.2, 1);
+    }
+
+    .ball-icon {
+      position: absolute;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #FF6500;
+      border: 2px solid #fff;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+      transform: translate(-50%, -50%);
+      transition: all 0.8s cubic-bezier(0.4, 0.0, 0.2, 1);
+      z-index: 10;
+    }
+
+    .action-select option:disabled {
+      color: rgba(255, 255, 255, 0.3);
+      font-style: italic;
+    }
+
     .hidden {
       display: none !important;
     }
@@ -509,16 +531,19 @@
     // Actions from constants.py ACTIONS
     const ACTIONS = {
       "handle_ball": "Handle Ball",
+      "get_open": "Get Open",
       "pass": "Pass",
       "receive": "Receive",
       "post_up": "Post Up",
       "shoot": "Shoot",
       "screen": "Screen",
       "cut": "Cut",
-      "get_open": "Get Open",
       "drift": "Drift",
       "stationary": "Stationary/Hold"
     };
+
+    // Ball-handling actions (only one player can have these per step)
+    const BALL_HANDLING_ACTIONS = ["handle_ball", "receive", "shoot"];
 
     // Play state
     let playState = {
@@ -532,6 +557,9 @@
 
     // Current step assignments (position -> {location, action})
     let currentStepAssignments = {};
+    
+    // Previous step assignments (for sprite animation)
+    let previousStepAssignments = {};
     
     // Currently selected position
     let selectedPosition = null;
@@ -570,14 +598,41 @@
         locationSelect.appendChild(option);
       });
 
-      // Action
+      // Action - will be populated dynamically
+      updateActionDropdown();
+    }
+
+    function updateActionDropdown() {
       const actionSelect = document.getElementById('action-select');
+      const currentValue = actionSelect.value;
+      actionSelect.innerHTML = '<option value="">-- Select Action --</option>';
+
+      // Check if any ball-handling actions are already assigned
+      const ballHandlerAssigned = Object.values(currentStepAssignments).some(assignment => 
+        assignment && assignment.action && BALL_HANDLING_ACTIONS.includes(assignment.action)
+      );
+
       Object.entries(ACTIONS).forEach(([value, label]) => {
         const option = document.createElement('option');
         option.value = value;
         option.textContent = label;
+        
+        // Disable ball-handling actions if one is already assigned
+        if (ballHandlerAssigned && BALL_HANDLING_ACTIONS.includes(value)) {
+          // Only disable if this position doesn't already have this action
+          const currentPositionAction = selectedPosition && currentStepAssignments[selectedPosition]?.action;
+          if (currentPositionAction !== value) {
+            option.disabled = true;
+          }
+        }
+        
         actionSelect.appendChild(option);
       });
+
+      // Restore previous value if it's still valid
+      if (currentValue && !actionSelect.querySelector(`option[value="${currentValue}"]`)?.disabled) {
+        actionSelect.value = currentValue;
+      }
     }
 
     function attachEventListeners() {
@@ -595,30 +650,101 @@
 
     function renderCourtVisualization() {
       const container = document.getElementById('player-icons-container');
-      container.innerHTML = '';
 
       // Only render if we're in step 2
       if (document.getElementById('step2').classList.contains('hidden')) {
+        container.innerHTML = '';
         return;
       }
 
-      Object.entries(currentStepAssignments).forEach(([pos, assignment]) => {
-        if (!assignment || !assignment.location) return;
-
-        const coords = HCO_STRING_SPOTS[assignment.location];
-        if (!coords) return;
-
-        const icon = document.createElement('div');
-        icon.className = `player-icon ${pos}`;
-        icon.textContent = pos;
-        
-        // Convert court coordinates (0-100 x, 0-50 y) to percentage
-        // Note: Y axis - higher values are at top of court (upper), lower values at bottom (lower)
-        icon.style.left = `${coords.x}%`;
-        icon.style.top = `${(50 - coords.y) * 2}%`; // Invert Y so higher y values go up
-        
-        container.appendChild(icon);
+      // Get existing icons to reuse for animation
+      const existingIcons = {};
+      container.querySelectorAll('.player-icon').forEach(icon => {
+        const pos = icon.textContent;
+        existingIcons[pos] = icon;
       });
+
+      // Find ball handler
+      let ballHandlerPos = null;
+      let ballHandlerCoords = null;
+
+      // Update or create player icons
+      POSITIONS.forEach(pos => {
+        const assignment = currentStepAssignments[pos];
+        const prevAssignment = previousStepAssignments[pos];
+        
+        if (assignment && assignment.location) {
+          const coords = HCO_STRING_SPOTS[assignment.location];
+          if (!coords) return;
+
+          const targetLeft = `${coords.x}%`;
+          const targetTop = `${(50 - coords.y) * 2}%`;
+
+          let icon = existingIcons[pos];
+          
+          if (!icon) {
+            // Create new icon
+            icon = document.createElement('div');
+            icon.className = `player-icon ${pos}`;
+            icon.textContent = pos;
+            
+            // If there was a previous position, start there for animation
+            if (prevAssignment && prevAssignment.location) {
+              const prevCoords = HCO_STRING_SPOTS[prevAssignment.location];
+              if (prevCoords) {
+                icon.style.left = `${prevCoords.x}%`;
+                icon.style.top = `${(50 - prevCoords.y) * 2}%`;
+              }
+            } else {
+              icon.style.left = targetLeft;
+              icon.style.top = targetTop;
+            }
+            
+            container.appendChild(icon);
+            
+            // Trigger animation on next frame
+            if (prevAssignment && prevAssignment.location) {
+              requestAnimationFrame(() => {
+                icon.style.left = targetLeft;
+                icon.style.top = targetTop;
+              });
+            }
+          } else {
+            // Update existing icon position (will animate via CSS transition)
+            icon.style.left = targetLeft;
+            icon.style.top = targetTop;
+            delete existingIcons[pos]; // Mark as handled
+          }
+
+          // Check if this player has the ball
+          if (assignment.action && BALL_HANDLING_ACTIONS.includes(assignment.action)) {
+            ballHandlerPos = pos;
+            ballHandlerCoords = { left: targetLeft, top: targetTop };
+          }
+        } else if (existingIcons[pos]) {
+          // Position no longer has assignment but icon exists from previous step
+          // Keep it visible but mark as handled
+          delete existingIcons[pos];
+        }
+      });
+
+      // Remove icons for positions that no longer exist
+      Object.values(existingIcons).forEach(icon => icon.remove());
+
+      // Handle ball sprite
+      let ballIcon = container.querySelector('.ball-icon');
+      
+      if (ballHandlerPos && ballHandlerCoords) {
+        if (!ballIcon) {
+          ballIcon = document.createElement('div');
+          ballIcon.className = 'ball-icon';
+          container.appendChild(ballIcon);
+        }
+        ballIcon.style.left = ballHandlerCoords.left;
+        ballIcon.style.top = ballHandlerCoords.top;
+      } else if (ballIcon) {
+        ballIcon.remove();
+      }
     }
 
     function validateStep1() {
@@ -658,7 +784,11 @@
 
       // Reset current step assignments
       currentStepAssignments = {};
+      previousStepAssignments = {};
       selectedPosition = null;
+      
+      // Initialize action dropdown
+      updateActionDropdown();
     }
 
     function renderPositionChips() {
@@ -699,6 +829,7 @@
 
       selectedPosition = pos;
       renderPositionChips();
+      updateActionDropdown();
       validateActionButton();
     }
 
@@ -774,7 +905,8 @@
       document.getElementById('location-select').value = '';
       document.getElementById('action-select').value = '';
 
-      // Update button state
+      // Update action dropdown and button state
+      updateActionDropdown();
       validateActionButton();
     }
 
@@ -809,10 +941,17 @@
 
       // Move to next step
       playState.currentStep++;
+      
+      // Save current assignments as previous for animation
+      previousStepAssignments = {...currentStepAssignments};
+      
+      // Reset current assignments
       currentStepAssignments = {};
       selectedPosition = null;
+      
       renderPositionChips();
       renderCourtVisualization();
+      updateActionDropdown();
       validateActionButton();
       updateStepCounter();
 
