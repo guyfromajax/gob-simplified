@@ -94,11 +94,16 @@
       grid-column: 1 / -1;
       display: flex;
       justify-content: center;
+      gap: 20px;
       margin-top: 10px;
     }
 
     .center-button-wrapper button {
       width: 36%;
+    }
+
+    .center-button-wrapper.with-end-step button {
+      width: 28%;
     }
 
     .form-group {
@@ -360,6 +365,15 @@
         width: 80%;
       }
 
+      .center-button-wrapper.with-end-step {
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .center-button-wrapper.with-end-step button {
+        width: 80%;
+      }
+
       .step2-header-row {
         flex-direction: column;
         gap: 10px;
@@ -458,8 +472,9 @@
           </div>
         </div>
 
-        <div class="center-button-wrapper">
+        <div class="center-button-wrapper" id="button-wrapper">
           <button id="action-btn" disabled>Add Assignment</button>
+          <button id="end-step-btn" class="hidden" onclick="endStep()">End Step</button>
         </div>
       </div>
     </div>
@@ -810,6 +825,22 @@
       
       // Initialize action dropdown
       updateActionDropdown();
+      
+      // Hide End Step button for step 1
+      updateEndStepButton();
+    }
+
+    function updateEndStepButton() {
+      const endStepBtn = document.getElementById('end-step-btn');
+      const buttonWrapper = document.getElementById('button-wrapper');
+      
+      if (playState.currentStep > 1) {
+        endStepBtn.classList.remove('hidden');
+        buttonWrapper.classList.add('with-end-step');
+      } else {
+        endStepBtn.classList.add('hidden');
+        buttonWrapper.classList.remove('with-end-step');
+      }
     }
 
     function renderPositionChips() {
@@ -959,6 +990,33 @@
       validateActionButton();
     }
 
+    function endStep() {
+      // Fill in remaining positions with previous step values
+      if (playState.currentStep > 1 && previousStepAssignments) {
+        POSITIONS.forEach(pos => {
+          // Only fill if position hasn't been assigned yet
+          const currentAssignment = currentStepAssignments[pos];
+          if (!currentAssignment || !currentAssignment.location || !currentAssignment.action) {
+            const prevAssignment = previousStepAssignments[pos];
+            if (prevAssignment && prevAssignment.location && prevAssignment.action) {
+              // Copy previous assignment
+              currentStepAssignments[pos] = {
+                location: prevAssignment.location,
+                action: prevAssignment.action
+              };
+            }
+          }
+        });
+      }
+
+      // Update visualization
+      renderPositionChips();
+      renderCourtVisualization();
+
+      // Submit the step
+      submitStep();
+    }
+
     function submitStep() {
       // Calculate timestamp (300ms increments, 0-indexed)
       const timestamp = (playState.currentStep - 1) * 300;
@@ -1003,6 +1061,7 @@
       updateActionDropdown();
       validateActionButton();
       updateStepCounter();
+      updateEndStepButton();
 
       // Reset dropdowns
       document.getElementById('location-select').value = '';
