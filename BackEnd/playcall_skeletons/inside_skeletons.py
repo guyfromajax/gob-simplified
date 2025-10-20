@@ -60,7 +60,7 @@ INSIDE_HIGHLOW_ENTRY = {
             "timestamp": 600,
             "pos_actions": {
                 "PG": {"action": ACTIONS["PASS"], "spot": "key"},
-                "SG": {"action": ACTIONS["STAY"], "spot": "upper wing"},
+                "SG": {"action": ACTIONS["HOLD"], "spot": "upper wing"},
                 "SF": {"action": ACTIONS["GET_OPEN"], "spot": "lower corner"},
                 "PF": {"action": ACTIONS["RECEIVE"], "spot": "upper highPost"},
                 "C": {"action": ACTIONS["POST_UP"], "spot": "lower lowPost"}
@@ -81,8 +81,8 @@ INSIDE_HIGHLOW_ENTRY = {
         {
             "timestamp": 1200,
             "pos_actions": {
-                "PG": {"action": ACTIONS["STAY"], "spot": "lower corner"},
-                "SG": {"action": ACTIONS["STAY"], "spot": "lower wing"},
+                "PG": {"action": ACTIONS["HOLD"], "spot": "lower corner"},
+                "SG": {"action": ACTIONS["HOLD"], "spot": "lower wing"},
                 "SF": {"action": ACTIONS["GET_OPEN"], "spot": "key"},
                 "PF": {"action": ACTIONS["PASS"], "spot": "upper highPost"},
                 "C": {"action": ACTIONS["RECEIVE"], "spot": "lower lowPost"}
@@ -92,8 +92,8 @@ INSIDE_HIGHLOW_ENTRY = {
         {
             "timestamp": 1500,
             "pos_actions": {
-                "PG": {"action": ACTIONS["STAY"], "spot": "upper corner"},
-                "SG": {"action": ACTIONS["STAY"], "spot": "lower corner"},
+                "PG": {"action": ACTIONS["HOLD"], "spot": "upper corner"},
+                "SG": {"action": ACTIONS["HOLD"], "spot": "lower corner"},
                 "SF": {"action": ACTIONS["DRIFT"], "spot": "key"},
                 "PF": {"action": ACTIONS["SCREEN"], "spot": "topLane"},
                 "C": {"action": ACTIONS["HANDLE"], "spot": "upper lowPost"}
@@ -103,9 +103,9 @@ INSIDE_HIGHLOW_ENTRY = {
         {
             "timestamp": 1800,
             "pos_actions": {
-                "PG": {"action": ACTIONS["STAY"], "spot": "upper wing"},
-                "SG": {"action": ACTIONS["STAY"], "spot": "lower wing"},
-                "SF": {"action": ACTIONS["STAY"], "spot": "key"},
+                "PG": {"action": ACTIONS["HOLD"], "spot": "upper wing"},
+                "SG": {"action": ACTIONS["HOLD"], "spot": "lower wing"},
+                "SF": {"action": ACTIONS["HOLD"], "spot": "key"},
                 "PF": {"action": ACTIONS["REBOUND"], "spot": "topLane"},
                 "C": {"action": ACTIONS["SHOOT"], "spot": "upper lowPost"}
             },
