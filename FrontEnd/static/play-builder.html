@@ -281,7 +281,7 @@
       background: #FF6500;
       border: 2px solid #fff;
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
-      transform: translate(-50%, -50%);
+      transform: translate(-50%, calc(-50% - 25px));
       transition: all 0.8s cubic-bezier(0.4, 0.0, 0.2, 1);
       z-index: 10;
     }
@@ -289,6 +289,11 @@
     .action-select option:disabled {
       color: rgba(255, 255, 255, 0.3);
       font-style: italic;
+    }
+
+    .location-group-a,
+    .location-group-b {
+      background: rgba(128, 128, 128, 0.2);
     }
 
     .hidden {
@@ -589,12 +594,28 @@
         tempoSelect.appendChild(option);
       });
 
-      // Location
+      // Location with grouped shading
       const locationSelect = document.getElementById('location-select');
-      LOCATIONS.forEach(loc => {
+      
+      // Group A: upper highPost through midLane (inclusive)
+      const groupAStart = LOCATIONS.indexOf("upper highPost");
+      const groupAEnd = LOCATIONS.indexOf("midLane");
+      
+      // Group B: deep key through end
+      const groupBStart = LOCATIONS.indexOf("deep key");
+      
+      LOCATIONS.forEach((loc, index) => {
         const option = document.createElement('option');
         option.value = loc;
         option.textContent = loc;
+        
+        // Add shading class for grouped locations
+        if (index >= groupAStart && index <= groupAEnd) {
+          option.className = 'location-group-a';
+        } else if (index >= groupBStart) {
+          option.className = 'location-group-b';
+        }
+        
         locationSelect.appendChild(option);
       });
 
@@ -828,6 +849,34 @@
       }
 
       selectedPosition = pos;
+      
+      // Pre-fill dropdowns with previous step values if available and not on first step
+      if (playState.currentStep > 1 && previousStepAssignments[pos]) {
+        const prevAssignment = previousStepAssignments[pos];
+        
+        // Set location if available
+        if (prevAssignment.location) {
+          document.getElementById('location-select').value = prevAssignment.location;
+        }
+        
+        // Set action if available
+        if (prevAssignment.action) {
+          // First update dropdown to ensure action is in list
+          updateActionDropdown();
+          
+          // Then set the value if it's not disabled
+          const actionSelect = document.getElementById('action-select');
+          const option = actionSelect.querySelector(`option[value="${prevAssignment.action}"]`);
+          if (option && !option.disabled) {
+            actionSelect.value = prevAssignment.action;
+          }
+        }
+      } else {
+        // Clear dropdowns if no previous assignment
+        document.getElementById('location-select').value = '';
+        document.getElementById('action-select').value = '';
+      }
+      
       renderPositionChips();
       updateActionDropdown();
       validateActionButton();
