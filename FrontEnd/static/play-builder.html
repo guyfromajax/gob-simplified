@@ -27,7 +27,7 @@
     h1 {
       text-align: center;
       color: #FFD700;
-      margin-bottom: 30px;
+      margin-bottom: 20px;
       font-size: 2.5rem;
       text-shadow: 0 0 20px rgba(255, 215, 0, 0.3);
     }
@@ -36,21 +36,25 @@
       background: rgba(255, 255, 255, 0.05);
       border-radius: 12px;
       padding: 30px;
-      margin-bottom: 20px;
+      margin-bottom: 15px;
       border: 1px solid rgba(255, 215, 0, 0.2);
+    }
+
+    #step2 {
+      padding: 20px 30px;
     }
 
     .step-header {
       font-size: 1.8rem;
       color: #FFD700;
-      margin-bottom: 20px;
+      margin-bottom: 15px;
       text-align: center;
     }
 
     .step-subheader {
       font-size: 1.2rem;
       color: #fff;
-      margin-bottom: 20px;
+      margin-bottom: 15px;
       text-align: center;
       opacity: 0.8;
     }
@@ -71,11 +75,6 @@
 
     .step1-button-wrapper button {
       width: 50%;
-      background: linear-gradient(135deg, #FF8C00, #FF6500);
-    }
-
-    .step1-button-wrapper button:hover:not(:disabled) {
-      background: linear-gradient(135deg, #FF7700, #FF5500);
     }
 
     .step2-header-row {
@@ -139,8 +138,8 @@
 
     button {
       padding: 14px 28px;
-      background: linear-gradient(135deg, #FFD700, #FFC700);
-      color: #000;
+      background: linear-gradient(135deg, #FF8C00, #FF6500);
+      color: #fff;
       border: none;
       border-radius: 8px;
       font-size: 1.1rem;
@@ -155,7 +154,8 @@
 
     button:hover:not(:disabled) {
       transform: translateY(-2px);
-      box-shadow: 0 4px 12px rgba(255, 215, 0, 0.4);
+      box-shadow: 0 4px 12px rgba(255, 140, 0, 0.4);
+      background: linear-gradient(135deg, #FF7700, #FF5500);
     }
 
     button:active:not(:disabled) {
@@ -185,11 +185,25 @@
       transition: all 0.3s ease;
       min-width: 60px;
       text-align: center;
+      cursor: pointer;
+      border: none;
+    }
+
+    .chip:hover:not(.completed) {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(255, 215, 0, 0.5);
     }
 
     .chip.completed {
       background: rgba(128, 128, 128, 0.4);
       color: rgba(255, 255, 255, 0.5);
+      cursor: not-allowed;
+    }
+
+    .chip.selected {
+      background: linear-gradient(135deg, #FF8C00, #FF6500);
+      color: #fff;
+      box-shadow: 0 0 15px rgba(255, 140, 0, 0.6);
     }
 
     .step-counter {
@@ -203,20 +217,49 @@
     .court-container {
       background: rgba(255, 255, 255, 0.05);
       border-radius: 12px;
-      padding: 20px;
+      padding: 15px;
       border: 1px solid rgba(255, 215, 0, 0.2);
       display: flex;
       justify-content: center;
       align-items: center;
       min-height: 200px;
+      position: relative;
+    }
+
+    .court-visualization {
+      position: relative;
+      max-width: 60%;
     }
 
     .court-image {
-      max-width: 60%;
+      width: 100%;
       height: auto;
       border-radius: 8px;
       opacity: 0.8;
+      display: block;
     }
+
+    .player-icon {
+      position: absolute;
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 0.75rem;
+      color: #fff;
+      transform: translate(-50%, -50%);
+      border: 2px solid #fff;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+    }
+
+    .player-icon.PG { background: #ff6b6b; }
+    .player-icon.SG { background: #4ecdc4; }
+    .player-icon.SF { background: #45b7d1; }
+    .player-icon.PF { background: #f9ca24; }
+    .player-icon.C { background: #6c5ce7; }
 
     .hidden {
       display: none !important;
@@ -311,7 +354,7 @@
 </head>
 <body>
   <div class="container">
-    <h1>🏀 Play Builder</h1>
+    <h1>Play Builder</h1>
 
     <!-- Step 1: Create Play -->
     <div id="step1" class="step-container">
@@ -354,12 +397,7 @@
 
       <div class="step2-controls-row">
         <div class="control-column">
-          <div class="form-group" style="margin-bottom: 0;">
-            <label for="position-select">Position</label>
-            <select id="position-select">
-              <option value="">-- Select Position --</option>
-            </select>
-          </div>
+          <label style="display: block; margin-bottom: 8px; color: #FFD700; font-weight: 600; font-size: 0.95rem; text-transform: uppercase; letter-spacing: 0.5px; text-align: center;">Select Position</label>
           <div class="position-chips" id="position-chips">
             <!-- Chips will be dynamically generated -->
           </div>
@@ -372,7 +410,7 @@
               <option value="">-- Select Location --</option>
             </select>
           </div>
-          <button id="add-assignment-btn">Add Assignment</button>
+          <button id="add-assignment-btn" disabled>Add Assignment</button>
         </div>
 
         <div class="control-column">
@@ -399,7 +437,10 @@
 
     <!-- Court Container (always visible below forms) -->
     <div class="court-container">
-      <img src="/static/images/courts/bentley_truman.jpg" alt="Basketball Court" class="court-image">
+      <div class="court-visualization" id="court-visualization">
+        <img src="/static/images/courts/bentley_truman.jpg" alt="Basketball Court" class="court-image">
+        <div id="player-icons-container"></div>
+      </div>
     </div>
   </div>
 
@@ -422,6 +463,36 @@
       "upper apex", "lower apex", "upper midBaseline", "lower midBaseline",
       "deep key", "deep lower wing", "deep lower baseline", "deep upper wing", "deep upper baseline"
     ];
+
+    // Court coordinates (from HCO_STRING_SPOTS in constants.py)
+    const HCO_STRING_SPOTS = {
+      "key": {"x": 64, "y": 25},
+      "upper midWing": {"x": 68, "y": 36},
+      "lower midWing": {"x": 68, "y": 14},
+      "upper wing": {"x": 73, "y": 40},
+      "lower wing": {"x": 73, "y": 10},
+      "upper midCorner": {"x": 81, "y": 43},
+      "lower midCorner": {"x": 81, "y": 7},
+      "upper corner": {"x": 88, "y": 44},
+      "lower corner": {"x": 88, "y": 6},
+      "upper highPost": {"x": 74, "y": 32},
+      "lower highPost": {"x": 74, "y": 19},
+      "upper midPost": {"x": 80, "y": 32},
+      "lower midPost": {"x": 80, "y": 19},
+      "upper lowPost": {"x": 86, "y": 32},
+      "lower lowPost": {"x": 86, "y": 19},
+      "topLane": {"x": 74, "y": 25},
+      "midLane": {"x": 80, "y": 25},
+      "upper apex": {"x": 80, "y": 36},
+      "lower apex": {"x": 80, "y": 15},
+      "upper midBaseline": {"x": 89, "y": 36},
+      "lower midBaseline": {"x": 89, "y": 15},
+      "deep key": {"x": 57, "y": 25},
+      "deep lower wing": {"x": 57, "y": 15},
+      "deep lower baseline": {"x": 57, "y": 5},
+      "deep upper wing": {"x": 57, "y": 35},
+      "deep upper baseline": {"x": 57, "y": 45}
+    };
 
     // Actions from constants.py ACTIONS
     const ACTIONS = {
@@ -449,6 +520,9 @@
 
     // Current step assignments (position -> {location, action})
     let currentStepAssignments = {};
+    
+    // Currently selected position
+    let selectedPosition = null;
 
     // Initialize
     function init() {
@@ -473,15 +547,6 @@
         option.value = tempo;
         option.textContent = `${tempo.charAt(0).toUpperCase() + tempo.slice(1)} (${steps} steps)`;
         tempoSelect.appendChild(option);
-      });
-
-      // Position
-      const positionSelect = document.getElementById('position-select');
-      POSITIONS.forEach(pos => {
-        const option = document.createElement('option');
-        option.value = pos;
-        option.textContent = pos;
-        positionSelect.appendChild(option);
       });
 
       // Location
@@ -511,8 +576,38 @@
       document.getElementById('submit-play-btn').addEventListener('click', submitPlay);
 
       // Step 2 controls
+      document.getElementById('location-select').addEventListener('change', validateAddAssignment);
+      document.getElementById('action-select').addEventListener('change', validateAddAssignment);
       document.getElementById('add-assignment-btn').addEventListener('click', addAssignment);
       document.getElementById('submit-step-btn').addEventListener('click', submitStep);
+    }
+
+    function renderCourtVisualization() {
+      const container = document.getElementById('player-icons-container');
+      container.innerHTML = '';
+
+      // Only render if we're in step 2
+      if (document.getElementById('step2').classList.contains('hidden')) {
+        return;
+      }
+
+      Object.entries(currentStepAssignments).forEach(([pos, assignment]) => {
+        if (!assignment || !assignment.location) return;
+
+        const coords = HCO_STRING_SPOTS[assignment.location];
+        if (!coords) return;
+
+        const icon = document.createElement('div');
+        icon.className = `player-icon ${pos}`;
+        icon.textContent = pos;
+        
+        // Convert court coordinates (0-100 x, 0-50 y) to percentage
+        // Note: Y axis - higher values are at top of court (upper), lower values at bottom (lower)
+        icon.style.left = `${coords.x}%`;
+        icon.style.top = `${(50 - coords.y) * 2}%`; // Invert Y so higher y values go up
+        
+        container.appendChild(icon);
+      });
     }
 
     function validateStep1() {
@@ -545,9 +640,11 @@
 
       // Initialize position chips
       renderPositionChips();
+      renderCourtVisualization();
 
       // Reset current step assignments
       currentStepAssignments = {};
+      selectedPosition = null;
     }
 
     function renderPositionChips() {
@@ -555,10 +652,11 @@
       container.innerHTML = '';
 
       POSITIONS.forEach(pos => {
-        const chip = document.createElement('div');
+        const chip = document.createElement('button');
         chip.className = 'chip';
         chip.id = `chip-${pos}`;
         chip.textContent = pos;
+        chip.type = 'button';
 
         // Check if this position has both location and action
         const assignment = currentStepAssignments[pos];
@@ -566,17 +664,44 @@
           chip.classList.add('completed');
         }
 
+        // Highlight selected position
+        if (selectedPosition === pos) {
+          chip.classList.add('selected');
+        }
+
+        // Click handler
+        chip.addEventListener('click', () => selectPosition(pos));
+
         container.appendChild(chip);
       });
     }
 
+    function selectPosition(pos) {
+      // Don't select completed positions
+      const assignment = currentStepAssignments[pos];
+      if (assignment && assignment.location && assignment.action) {
+        return;
+      }
+
+      selectedPosition = pos;
+      renderPositionChips();
+      validateAddAssignment();
+    }
+
+    function validateAddAssignment() {
+      const location = document.getElementById('location-select').value;
+      const action = document.getElementById('action-select').value;
+      const addBtn = document.getElementById('add-assignment-btn');
+      
+      addBtn.disabled = !(selectedPosition && location && action);
+    }
+
     function addAssignment() {
-      const position = document.getElementById('position-select').value;
       const location = document.getElementById('location-select').value;
       const action = document.getElementById('action-select').value;
 
-      if (!position) {
-        alert('Please select a position.');
+      if (!selectedPosition) {
+        alert('Please select a position chip.');
         return;
       }
 
@@ -591,22 +716,24 @@
       }
 
       // Store assignment
-      if (!currentStepAssignments[position]) {
-        currentStepAssignments[position] = {};
+      if (!currentStepAssignments[selectedPosition]) {
+        currentStepAssignments[selectedPosition] = {};
       }
-      currentStepAssignments[position].location = location;
-      currentStepAssignments[position].action = action;
+      currentStepAssignments[selectedPosition].location = location;
+      currentStepAssignments[selectedPosition].action = action;
 
-      // Update chips
+      // Update chips and court
       renderPositionChips();
+      renderCourtVisualization();
 
-      // Reset dropdowns
-      document.getElementById('position-select').value = '';
+      // Reset state
+      selectedPosition = null;
       document.getElementById('location-select').value = '';
       document.getElementById('action-select').value = '';
 
       // Check if all positions are assigned
       validateStep2();
+      validateAddAssignment();
     }
 
     function validateStep2() {
@@ -655,12 +782,14 @@
       // Move to next step
       playState.currentStep++;
       currentStepAssignments = {};
+      selectedPosition = null;
       renderPositionChips();
+      renderCourtVisualization();
       validateStep2();
+      validateAddAssignment();
       updateStepCounter();
 
       // Reset dropdowns
-      document.getElementById('position-select').value = '';
       document.getElementById('location-select').value = '';
       document.getElementById('action-select').value = '';
     }
