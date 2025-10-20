@@ -1281,12 +1281,19 @@
           const isOffset = positionOffsets[pos];
           let targetLeft, targetTop;
           
+          console.log(`Rendering ${pos}:`, {
+            location: assignment.location,
+            isOffset: isOffset,
+            positionOffsets: positionOffsets,
+            hasOffsetCoords: !!OFFSET_SPOTS[assignment.location]
+          });
+          
           if (isOffset) {
             const offsetCoords = OFFSET_SPOTS[assignment.location];
             if (offsetCoords) {
               targetLeft = `${offsetCoords.x}%`;
               targetTop = `${(50 - offsetCoords.y) * 2}%`;
-              console.log(`Applying offset to ${pos} at ${assignment.location}`, {
+              console.log(`✓ USING OFFSET COORDS for ${pos} at ${assignment.location}`, {
                 original: coords,
                 offset: offsetCoords,
                 targetLeft,
@@ -1296,6 +1303,7 @@
               // Fallback if offset coords don't exist
               targetLeft = `${coords.x}%`;
               targetTop = `${(50 - coords.y) * 2}%`;
+              console.log(`✗ NO OFFSET_SPOTS for ${assignment.location}, using original`);
             }
           } else {
             targetLeft = `${coords.x}%`;
