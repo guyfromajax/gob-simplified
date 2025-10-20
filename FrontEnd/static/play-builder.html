@@ -624,6 +624,49 @@
       "deep upper baseline": {"x": 57, "y": 45}
     };
 
+    // Offset positions for collision handling
+    const OFFSET_SPOTS = {
+      // Center spots: x + 3, y same
+      "deep key": {"x": 60, "y": 25},
+      "key": {"x": 67, "y": 25},
+      "topLane": {"x": 77, "y": 25},
+      "midLane": {"x": 83, "y": 25},
+      
+      // Upper wing/apex spots: x + 3, y - 3
+      "deep upper wing": {"x": 60, "y": 32},
+      "upper midWing": {"x": 71, "y": 33},
+      "upper wing": {"x": 76, "y": 37},
+      "upper apex": {"x": 83, "y": 33},
+      
+      // Upper corner/baseline spots: x same, y - 3
+      "upper corner": {"x": 88, "y": 41},
+      "upper midCorner": {"x": 81, "y": 40},
+      "deep upper baseline": {"x": 57, "y": 42},
+      "upper midBaseline": {"x": 89, "y": 33},
+      
+      // Lower wing/apex spots: x + 3, y + 3
+      "deep lower wing": {"x": 60, "y": 18},
+      "lower midWing": {"x": 71, "y": 17},
+      "lower wing": {"x": 76, "y": 13},
+      "lower apex": {"x": 83, "y": 18},
+      
+      // Lower corner/baseline spots: x same, y + 3
+      "lower corner": {"x": 88, "y": 9},
+      "lower midCorner": {"x": 81, "y": 10},
+      "deep lower baseline": {"x": 57, "y": 8},
+      "lower midBaseline": {"x": 89, "y": 18},
+      
+      // Upper post spots: x - 3, y + 3
+      "upper lowPost": {"x": 83, "y": 35},
+      "upper midPost": {"x": 77, "y": 35},
+      "upper highPost": {"x": 71, "y": 35},
+      
+      // Lower post spots: x + 3, y - 3
+      "lower lowPost": {"x": 89, "y": 16},
+      "lower midPost": {"x": 83, "y": 16},
+      "lower highPost": {"x": 77, "y": 16}
+    };
+
     // Actions from constants.py ACTIONS
     const ACTIONS = {
       "handle_ball": "Handle Ball",
@@ -700,7 +743,7 @@
     let draggedPlayerOriginalLocation = null;
     let nearestSnapPoint = null;
     
-    // Offset tracking (position -> offset amount)
+    // Offset tracking (position -> boolean)
     let positionOffsets = {};
 
     // Initialize
@@ -976,13 +1019,13 @@
       });
       
       if (occupyingPlayer && occupyingPlayer !== draggedPlayer) {
-        // Location occupied - set offset
-        positionOffsets[draggedPlayer] = 5; // 5 x-units to the right for visibility
-        console.log(`Setting offset for ${draggedPlayer}: 5 units (occupied by ${occupyingPlayer})`);
+        // Location occupied - mark for offset positioning
+        positionOffsets[draggedPlayer] = true;
+        console.log(`Setting offset for ${draggedPlayer} at ${newLocation} (occupied by ${occupyingPlayer})`);
       } else {
         // Clear offset for this player
         delete positionOffsets[draggedPlayer];
-        console.log(`Clearing offset for ${draggedPlayer} (location free)`);
+        console.log(`Clearing offset for ${draggedPlayer} (location free at ${newLocation})`);
       }
       
       // If dragged player was occupying a spot, check if anyone was waiting
@@ -1041,10 +1084,21 @@
       const dropdown = document.createElement('div');
       dropdown.className = 'inline-action-dropdown';
       
-      // Position near the player icon
-      const offset = positionOffsets[player] || 0;
-      dropdown.style.left = `${coords.x + offset + 5}%`;
-      dropdown.style.top = `${(50 - coords.y) * 2}%`;
+      // Position near the player icon (use offset coords if player is offset)
+      const isOffset = positionOffsets[player];
+      let dropdownX, dropdownY;
+      
+      if (isOffset) {
+        const offsetCoords = OFFSET_SPOTS[location];
+        dropdownX = offsetCoords ? offsetCoords.x + 5 : coords.x + 5;
+        dropdownY = offsetCoords ? offsetCoords.y : coords.y;
+      } else {
+        dropdownX = coords.x + 5;
+        dropdownY = coords.y;
+      }
+      
+      dropdown.style.left = `${dropdownX}%`;
+      dropdown.style.top = `${(50 - dropdownY) * 2}%`;
       
       // Build dropdown HTML
       dropdown.innerHTML = `
@@ -1156,17 +1210,29 @@
           const coords = HCO_STRING_SPOTS[assignment.location];
           if (!coords) return;
 
-          // Apply offset if exists
-          const offset = positionOffsets[pos] || 0;
-          const targetLeft = `${coords.x + offset}%`;
-          const targetTop = `${(50 - coords.y) * 2}%`;
+          // Apply offset if exists (use OFFSET_SPOTS coordinates)
+          const isOffset = positionOffsets[pos];
+          let targetLeft, targetTop;
           
-          if (offset > 0) {
-            console.log(`Applying offset to ${pos}: ${offset} units at ${assignment.location}`, {
-              originalX: coords.x,
-              offsetX: coords.x + offset,
-              targetLeft
-            });
+          if (isOffset) {
+            const offsetCoords = OFFSET_SPOTS[assignment.location];
+            if (offsetCoords) {
+              targetLeft = `${offsetCoords.x}%`;
+              targetTop = `${(50 - offsetCoords.y) * 2}%`;
+              console.log(`Applying offset to ${pos} at ${assignment.location}`, {
+                original: coords,
+                offset: offsetCoords,
+                targetLeft,
+                targetTop
+              });
+            } else {
+              // Fallback if offset coords don't exist
+              targetLeft = `${coords.x}%`;
+              targetTop = `${(50 - coords.y) * 2}%`;
+            }
+          } else {
+            targetLeft = `${coords.x}%`;
+            targetTop = `${(50 - coords.y) * 2}%`;
           }
 
           let icon = existingIcons[pos];
@@ -1209,13 +1275,17 @@
           }
 
           // Add offset indicator if offset exists
-          if (offset > 0) {
-            const indicator = document.createElement('div');
-            indicator.className = 'offset-indicator';
-            indicator.style.left = `${coords.x}%`;
-            indicator.style.top = `${(50 - coords.y) * 2}%`;
-            indicator.style.width = `${offset}%`;
-            container.appendChild(indicator);
+          if (isOffset) {
+            const offsetCoords = OFFSET_SPOTS[assignment.location];
+            if (offsetCoords) {
+              const indicator = document.createElement('div');
+              indicator.className = 'offset-indicator';
+              // Line from actual position to offset position
+              indicator.style.left = `${coords.x}%`;
+              indicator.style.top = `${(50 - coords.y) * 2}%`;
+              indicator.style.width = `${Math.abs(offsetCoords.x - coords.x)}%`;
+              container.appendChild(indicator);
+            }
           }
 
           // Check if this player has the ball
