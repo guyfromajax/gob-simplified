@@ -950,6 +950,7 @@
         console.log('draggedPlayer:', draggedPlayer);
         console.log('hoveredSprite:', hoveredSprite);
         console.log('nearestSnapPoint:', nearestSnapPoint);
+        console.log('currentStepAssignments:', currentStepAssignments);
         
         icon.classList.remove('dragging');
         hideSnapPoints();
@@ -959,14 +960,17 @@
         
         // Prefer hoveredSprite (collision) over nearestSnapPoint (empty space)
         if (hoveredSprite) {
-          const hoveredAssignment = currentStepAssignments[hoveredSprite];
-          console.log('hoveredAssignment:', hoveredAssignment);
+          // Get the location of the hovered sprite by finding its position on court
+          const hoveredIcon = document.querySelector(`.player-icon.${hoveredSprite}`);
+          const hoveredLocation = getLocationFromIcon(hoveredIcon);
           
-          if (hoveredAssignment && hoveredAssignment.location) {
-            console.log(`✓ Dropping on occupied sprite ${hoveredSprite} at ${hoveredAssignment.location}`);
-            handleDrop(hoveredAssignment.location);
+          console.log('hoveredLocation from icon:', hoveredLocation);
+          
+          if (hoveredLocation) {
+            console.log(`✓ Dropping on occupied sprite ${hoveredSprite} at ${hoveredLocation}`);
+            handleDrop(hoveredLocation);
           } else {
-            console.log('✗ No assignment found for hovered sprite');
+            console.log('✗ Could not determine hovered sprite location');
           }
         } else if (nearestSnapPoint) {
           console.log(`✓ Dropping on empty space at ${nearestSnapPoint}`);
@@ -996,6 +1000,15 @@
           hoveredSprite = null;
         }
       });
+
+      // Store location on icon for easy lookup
+      icon.dataset.position = pos;
+    }
+
+    function getLocationFromIcon(icon) {
+      if (!icon) return null;
+      // Get location directly from data attribute (always up to date)
+      return icon.dataset.location || null;
     }
 
     function setupCourtDropZone() {
@@ -1296,6 +1309,8 @@
             icon = document.createElement('div');
             icon.className = `player-icon ${pos}`;
             icon.textContent = pos;
+            icon.dataset.position = pos;
+            icon.dataset.location = assignment.location; // Store location on element
             
             // If there was a previous position, start there for animation
             if (prevAssignment && prevAssignment.location) {
@@ -1325,6 +1340,7 @@
             // Update existing icon position (will animate via CSS transition)
             icon.style.left = targetLeft;
             icon.style.top = targetTop;
+            icon.dataset.location = assignment.location; // Update location on element
             delete existingIcons[pos]; // Mark as handled
           }
 
