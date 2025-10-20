@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Play Builder</title>
+  <title>Play Builder - GOB</title>
   <style>
     * {
       margin: 0;
@@ -13,109 +13,109 @@
 
     body {
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
-      color: #ffffff;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      color: #fff;
+      min-height: 100vh;
       padding: 20px;
     }
 
     .container {
-      max-width: 1600px;
+      max-width: 1400px;
       margin: 0 auto;
     }
 
-    .header {
-      text-align: center;
-      margin-bottom: 30px;
-    }
-
     h1 {
-      font-size: 2.5rem;
+      text-align: center;
       color: #FFD700;
-      margin-bottom: 10px;
+      margin-bottom: 30px;
+      font-size: 2.5rem;
+      text-shadow: 0 0 20px rgba(255, 215, 0, 0.3);
     }
 
-    .main-grid {
-      display: grid;
-      grid-template-columns: 400px 1fr;
-      gap: 30px;
-    }
-
-    /* Left Panel - Controls */
-    .controls-panel {
+    .step-container {
       background: rgba(255, 255, 255, 0.05);
       border-radius: 12px;
-      padding: 25px;
-      backdrop-filter: blur(10px);
-      height: fit-content;
-      max-height: calc(100vh - 140px);
-      overflow-y: auto;
+      padding: 30px;
+      margin-bottom: 20px;
+      border: 1px solid rgba(255, 215, 0, 0.2);
     }
 
-    .section {
-      margin-bottom: 25px;
-      padding-bottom: 20px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-    }
-
-    .section:last-child {
-      border-bottom: none;
-    }
-
-    .section-title {
-      font-size: 1.1rem;
-      font-weight: bold;
+    .step-header {
+      font-size: 1.8rem;
       color: #FFD700;
-      margin-bottom: 15px;
-      text-transform: uppercase;
-      letter-spacing: 1px;
+      margin-bottom: 20px;
+      text-align: center;
+    }
+
+    .step-subheader {
+      font-size: 1.2rem;
+      color: #fff;
+      margin-bottom: 20px;
+      text-align: center;
+      opacity: 0.8;
     }
 
     .form-group {
-      margin-bottom: 15px;
+      margin-bottom: 20px;
     }
 
     label {
       display: block;
-      margin-bottom: 6px;
-      font-size: 0.9rem;
-      color: #ccc;
-    }
-
-    input, select {
-      width: 100%;
-      padding: 10px;
-      background: rgba(255, 255, 255, 0.1);
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      border-radius: 6px;
-      color: #fff;
+      margin-bottom: 8px;
+      color: #FFD700;
+      font-weight: 600;
       font-size: 0.95rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
     }
 
-    input:focus, select:focus {
+    input[type="text"],
+    select {
+      width: 100%;
+      padding: 12px 16px;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 215, 0, 0.3);
+      border-radius: 8px;
+      color: #fff;
+      font-size: 1rem;
+      transition: all 0.3s ease;
+    }
+
+    input[type="text"]:focus,
+    select:focus {
       outline: none;
       border-color: #FFD700;
       background: rgba(255, 255, 255, 0.15);
+      box-shadow: 0 0 15px rgba(255, 215, 0, 0.2);
+    }
+
+    select option {
+      background: #1a1a2e;
+      color: #fff;
     }
 
     button {
-      padding: 12px 24px;
-      background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+      padding: 14px 28px;
+      background: linear-gradient(135deg, #FFD700, #FFC700);
+      color: #000;
       border: none;
       border-radius: 8px;
-      color: #1a1a1a;
-      font-weight: bold;
-      font-size: 0.95rem;
+      font-size: 1.1rem;
+      font-weight: 700;
       cursor: pointer;
-      transition: transform 0.2s ease, box-shadow 0.2s ease;
+      transition: all 0.3s ease;
+      text-transform: uppercase;
+      letter-spacing: 1px;
       width: 100%;
+      margin-top: 10px;
     }
 
-    button:hover {
+    button:hover:not(:disabled) {
       transform: translateY(-2px);
       box-shadow: 0 4px 12px rgba(255, 215, 0, 0.4);
     }
 
-    button:active {
+    button:active:not(:disabled) {
       transform: translateY(0);
     }
 
@@ -125,432 +125,223 @@
       transform: none;
     }
 
-    button:disabled:hover {
-      transform: none;
-      box-shadow: none;
-    }
-
-    .button-secondary {
-      background: rgba(255, 255, 255, 0.1);
-      color: #fff;
-      border: 1px solid rgba(255, 255, 255, 0.2);
-    }
-
-    .button-secondary:hover {
-      background: rgba(255, 255, 255, 0.15);
-      box-shadow: 0 4px 12px rgba(255, 255, 255, 0.2);
-    }
-
-    .button-danger {
-      background: linear-gradient(135deg, #ff4444 0%, #cc0000 100%);
-      color: #fff;
-    }
-
-    .button-danger:hover {
-      box-shadow: 0 4px 12px rgba(255, 68, 68, 0.4);
-    }
-
-    .button-group {
+    .position-chips {
       display: flex;
       gap: 10px;
-      margin-top: 15px;
-    }
-
-    .button-group button {
-      flex: 1;
-    }
-
-    /* Right Panel - Court Display */
-    .court-panel {
-      background: rgba(255, 255, 255, 0.05);
-      border-radius: 12px;
-      padding: 25px;
-      backdrop-filter: blur(10px);
-    }
-
-    .court-container {
-      position: relative;
-      width: 100%;
-      max-width: 900px;
-      margin: 0 auto;
-      aspect-ratio: 100 / 50;
-      background-image: url('/static/images/courts/lancaster.jpg');
-      background-size: cover;
-      background-position: center;
-      border-radius: 8px;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-    }
-
-    .player-marker {
-      position: absolute;
-      width: 40px;
-      height: 40px;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
       justify-content: center;
-      font-weight: bold;
-      font-size: 0.9rem;
-      transform: translate(-50%, -50%);
-      transition: all 0.3s ease;
-      cursor: pointer;
-      border: 3px solid #fff;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
-    }
-
-    .player-marker.PG {
-      background: #ff6b6b;
-    }
-
-    .player-marker.SG {
-      background: #4ecdc4;
-    }
-
-    .player-marker.SF {
-      background: #45b7d1;
-    }
-
-    .player-marker.PF {
-      background: #f9ca24;
-    }
-
-    .player-marker.C {
-      background: #6c5ce7;
-    }
-
-    .player-marker:hover {
-      transform: translate(-50%, -50%) scale(1.2);
-      z-index: 10;
-    }
-
-    .player-marker.has-ball {
-      border-color: #FFD700;
-      border-width: 4px;
-      box-shadow: 0 0 20px rgba(255, 215, 0, 0.8);
-    }
-
-    .action-label {
-      position: absolute;
-      bottom: -25px;
-      left: 50%;
-      transform: translateX(-50%);
-      font-size: 0.7rem;
-      background: rgba(0, 0, 0, 0.8);
-      padding: 2px 6px;
-      border-radius: 4px;
-      white-space: nowrap;
-    }
-
-    /* Step Timeline */
-    .timeline {
-      margin-top: 20px;
-      padding: 20px;
-      background: rgba(0, 0, 0, 0.3);
-      border-radius: 8px;
-    }
-
-    .timeline-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 15px;
-    }
-
-    .timeline-title {
-      font-size: 1.1rem;
-      font-weight: bold;
-      color: #FFD700;
-    }
-
-    .step-list {
-      display: flex;
-      gap: 10px;
+      margin: 20px 0;
       flex-wrap: wrap;
     }
 
-    .step-pill {
-      padding: 8px 16px;
-      background: rgba(255, 255, 255, 0.1);
-      border: 2px solid rgba(255, 255, 255, 0.2);
+    .chip {
+      padding: 10px 20px;
+      background: linear-gradient(135deg, #FFD700, #FFC700);
+      color: #000;
       border-radius: 20px;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      font-size: 0.9rem;
-    }
-
-    .step-pill:hover {
-      background: rgba(255, 255, 255, 0.15);
-    }
-
-    .step-pill.active {
-      background: #FFD700;
-      color: #1a1a1a;
-      border-color: #FFD700;
-    }
-
-    /* Current Step Actions Display */
-    .current-step-actions {
-      margin-top: 20px;
-      padding: 15px;
-      background: rgba(0, 0, 0, 0.3);
-      border-radius: 8px;
-    }
-
-    .current-step-actions h4 {
-      color: #FFD700;
-      margin-bottom: 10px;
+      font-weight: 700;
       font-size: 0.95rem;
+      transition: all 0.3s ease;
+      min-width: 60px;
+      text-align: center;
     }
 
-    .action-item {
-      padding: 8px;
-      background: rgba(255, 255, 255, 0.05);
-      border-radius: 4px;
-      margin-bottom: 6px;
-      font-size: 0.85rem;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
+    .chip.completed {
+      background: rgba(128, 128, 128, 0.4);
+      color: rgba(255, 255, 255, 0.5);
     }
 
-    .action-item .player-badge {
-      display: inline-block;
-      padding: 2px 8px;
-      border-radius: 4px;
-      font-weight: bold;
-      font-size: 0.75rem;
-    }
-
-    .action-item button {
-      width: auto;
-      padding: 4px 12px;
-      font-size: 0.75rem;
-    }
-
-    /* JSON Output */
-    .json-output {
+    .step-counter {
+      text-align: right;
+      color: #FFD700;
+      font-size: 1.1rem;
+      font-weight: 700;
       margin-top: 20px;
-      padding: 15px;
-      background: rgba(0, 0, 0, 0.5);
+    }
+
+    .court-container {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 12px;
+      padding: 20px;
+      border: 1px solid rgba(255, 215, 0, 0.2);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 400px;
+    }
+
+    .court-image {
+      max-width: 100%;
+      height: auto;
       border-radius: 8px;
+      opacity: 0.8;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 20px;
+    }
+
+    .success-message {
+      background: rgba(76, 175, 80, 0.2);
+      border: 1px solid rgba(76, 175, 80, 0.5);
+      border-radius: 8px;
+      padding: 20px;
+      text-align: center;
+      margin-top: 20px;
+    }
+
+    .success-message h2 {
+      color: #4CAF50;
+      margin-bottom: 10px;
+    }
+
+    .json-output {
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid rgba(255, 215, 0, 0.3);
+      border-radius: 8px;
+      padding: 15px;
+      margin-top: 15px;
       max-height: 300px;
       overflow-y: auto;
-    }
-
-    .json-output pre {
-      margin: 0;
-      font-size: 0.8rem;
-      color: #4ecdc4;
+      font-family: 'Courier New', monospace;
+      font-size: 0.9rem;
       white-space: pre-wrap;
       word-break: break-all;
     }
 
-    /* Info Display */
-    .info-display {
-      background: rgba(255, 215, 0, 0.1);
-      border: 1px solid rgba(255, 215, 0, 0.3);
-      border-radius: 8px;
-      padding: 12px;
-      margin-bottom: 20px;
-    }
+    @media (max-width: 768px) {
+      h1 {
+        font-size: 1.8rem;
+      }
 
-    .info-row {
-      display: flex;
-      justify-content: space-between;
-      margin-bottom: 6px;
-      font-size: 0.9rem;
-    }
+      .step-container {
+        padding: 20px;
+      }
 
-    .info-label {
-      color: #FFD700;
-      font-weight: bold;
-    }
+      .position-chips {
+        gap: 8px;
+      }
 
-    .info-value {
-      color: #fff;
+      .chip {
+        padding: 8px 16px;
+        font-size: 0.85rem;
+        min-width: 50px;
+      }
     }
   </style>
 </head>
 <body>
   <div class="container">
-    <div class="header">
-      <h1>🏀 Play Builder</h1>
-      <p>Design offensive plays with step-by-step player movements</p>
+    <h1>🏀 Play Builder</h1>
+
+    <!-- Step 1: Create Play -->
+    <div id="step1" class="step-container">
+      <div class="step-header">Create Play</div>
+      
+      <div class="form-group">
+        <label for="play-name">Play Name</label>
+        <input type="text" id="play-name" placeholder="Enter play name...">
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label for="play-type">Play Type</label>
+          <select id="play-type">
+            <option value="">-- Select Play Type --</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="tempo-variant">Tempo Variation</label>
+          <select id="tempo-variant">
+            <option value="">-- Select Tempo --</option>
+          </select>
+        </div>
+      </div>
+
+      <button id="submit-play-btn" disabled>Create Play</button>
     </div>
 
-    <div class="main-grid">
-      <!-- Left Panel: Controls -->
-      <div class="controls-panel">
-        
-        <!-- Play Info Section -->
-        <div class="section">
-          <div class="section-title">Play Information</div>
-          
-          <div class="form-group">
-            <label for="play-name">Play Name</label>
-            <input type="text" id="play-name" placeholder="e.g., Pick and Roll">
-          </div>
+    <!-- Step 2: Build Steps -->
+    <div id="step2" class="step-container hidden">
+      <div class="step-header">Build Steps</div>
+      <div class="step-subheader" id="play-summary"></div>
 
-          <div class="form-group">
-            <label for="play-type">Play Type</label>
-            <select id="play-type">
-              <option value="Inside">Inside</option>
-              <option value="Attack">Attack</option>
-              <option value="Outside">Outside</option>
-              <option value="Base">Base</option>
-              <option value="Set">Set</option>
-              <option value="Freelance">Freelance</option>
-            </select>
-          </div>
-
-          <div class="form-group">
-            <label for="tempo-variant">Tempo Variant</label>
-            <select id="tempo-variant">
-              <option value="normal">Normal (6 steps)</option>
-              <option value="slow">Slow (9 steps)</option>
-              <option value="fast">Fast (3 steps)</option>
-            </select>
-          </div>
-        </div>
-
-        <!-- Current Step Info -->
-        <div class="section">
-          <div class="info-display">
-            <div class="info-row">
-              <span class="info-label">Current Step:</span>
-              <span class="info-value" id="current-step-number">1</span>
-            </div>
-            <div class="info-row">
-              <span class="info-label">Steps Required:</span>
-              <span class="info-value" id="steps-required">6</span>
-            </div>
-            <div class="info-row">
-              <span class="info-label">Steps Built:</span>
-              <span class="info-value" id="total-steps">1</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Add Player Action Section -->
-        <div class="section">
-          <div class="section-title">Add Player Action</div>
-          
-          <div class="form-group">
-            <label for="player-select">Player</label>
-            <select id="player-select">
-              <option value="PG">PG - Point Guard</option>
-              <option value="SG">SG - Shooting Guard</option>
-              <option value="SF">SF - Small Forward</option>
-              <option value="PF">PF - Power Forward</option>
-              <option value="C">C - Center</option>
-            </select>
-          </div>
-
-          <div class="form-group">
-            <label for="location-select">Location</label>
-            <select id="location-select">
-              <!-- Will be populated from HCO_STRING_SPOTS -->
-            </select>
-          </div>
-
-          <div class="form-group">
-            <label for="action-select">Action</label>
-            <select id="action-select">
-              <!-- Will be populated from ACTIONS (offensive only) -->
-            </select>
-          </div>
-
-          <button onclick="addPlayerAction()">+ Add Action to Current Step</button>
-        </div>
-
-        <!-- Step Controls -->
-        <div class="section">
-          <div class="section-title">Step Controls</div>
-
-          <div class="button-group">
-            <button class="button-secondary" onclick="prevStep()">← Prev</button>
-            <button class="button-secondary" onclick="nextStep()">Next →</button>
-          </div>
-
-          <div class="button-group">
-            <button onclick="addNewStep()" id="add-step-btn">+ New Step</button>
-            <button class="button-danger" onclick="deleteCurrentStep()">Delete Step</button>
-          </div>
-        </div>
-
-        <!-- Export Section -->
-        <div class="section">
-          <div class="section-title">Export</div>
-          <button onclick="exportPlay()" id="save-play-btn" disabled>💾 Save Play</button>
-          <button class="button-secondary" onclick="copyToClipboard()" style="margin-top: 10px;">📋 Copy to Clipboard</button>
-        </div>
-
+      <div class="position-chips" id="position-chips">
+        <!-- Chips will be dynamically generated -->
       </div>
 
-      <!-- Right Panel: Court Visualization -->
-      <div class="court-panel">
-        <div class="court-container" id="court">
-          <!-- Player markers will be added dynamically -->
+      <div class="form-row">
+        <div class="form-group">
+          <label for="position-select">Position</label>
+          <select id="position-select">
+            <option value="">-- Select Position --</option>
+          </select>
         </div>
 
-        <!-- Timeline -->
-        <div class="timeline">
-          <div class="timeline-header">
-            <div class="timeline-title">Step Timeline</div>
-            <span id="step-count-display">1 Step</span>
-          </div>
-          <div class="step-list" id="step-list">
-            <!-- Step pills will be added dynamically -->
-          </div>
+        <div class="form-group">
+          <label for="location-select">Location</label>
+          <select id="location-select">
+            <option value="">-- Select Location --</option>
+          </select>
         </div>
 
-        <!-- Current Step Actions Display -->
-        <div class="current-step-actions">
-          <h4>Current Step Actions</h4>
-          <div id="action-list">
-            <p style="color: #888; font-size: 0.85rem;">No actions yet. Add player actions using the controls.</p>
-          </div>
-        </div>
-
-        <!-- JSON Output -->
-        <div class="json-output" id="json-output">
-          <pre id="json-content">// Play JSON will appear here</pre>
+        <div class="form-group">
+          <label for="action-select">Action</label>
+          <select id="action-select">
+            <option value="">-- Select Action --</option>
+          </select>
         </div>
       </div>
+
+      <button id="add-assignment-btn">Add Assignment</button>
+      <button id="submit-step-btn" disabled>Submit Step</button>
+
+      <div class="step-counter" id="step-counter">Step 1/6</div>
+    </div>
+
+    <!-- Success Screen -->
+    <div id="success-screen" class="step-container hidden">
+      <div class="success-message">
+        <h2>✅ Play Created Successfully!</h2>
+        <p id="success-play-name"></p>
+        <div class="json-output" id="json-output"></div>
+        <button onclick="location.reload()">Create Another Play</button>
+      </div>
+    </div>
+
+    <!-- Court Container (always visible below forms) -->
+    <div class="court-container">
+      <img src="/static/images/courts/bentley_truman.jpg" alt="Basketball Court" class="court-image">
     </div>
   </div>
 
   <script>
     // Constants from backend
-    const HCO_STRING_SPOTS = {
-      "key": {"x": 64, "y": 25},
-      "upper midWing": {"x": 68, "y": 36}, 
-      "lower midWing": {"x": 68, "y": 14},
-      "upper wing": {"x": 73, "y": 40}, 
-      "lower wing": {"x": 73, "y": 10},
-      "upper midCorner": {"x": 81, "y": 43}, 
-      "lower midCorner": {"x": 81, "y": 7},
-      "upper corner": {"x": 88, "y": 44}, 
-      "lower corner": {"x": 88, "y": 6},
-      "upper highPost": {"x": 74, "y": 32}, 
-      "lower highPost": {"x": 74, "y": 19},
-      "upper midPost": {"x": 80, "y": 32}, 
-      "lower midPost": {"x": 80, "y": 19},
-      "upper lowPost": {"x": 86, "y": 32}, 
-      "lower lowPost": {"x": 86, "y": 19}, 
-      "topLane": {"x": 74, "y": 25},
-      "midLane": {"x": 80, "y": 25}, 
-      "upper apex": {"x": 80, "y": 36}, 
-      "lower apex": {"x": 80, "y": 15},
-      "upper midBaseline": {"x": 89, "y": 36}, 
-      "lower midBaseline": {"x": 89, "y": 15},
-      "deep key": {"x": 57, "y": 25},
-      "deep lower wing": {"x": 57, "y": 15},
-      "deep lower baseline": {"x": 57, "y": 5},
-      "deep upper wing": {"x": 57, "y": 35},
-      "deep upper baseline": {"x": 57, "y": 45}
+    const PLAYCALLS = ["Base", "Freelance", "Inside", "Attack", "Outside", "Set"];
+    const POSITIONS = ["PG", "SG", "SF", "PF", "C"];
+    const TEMPO_VARIANTS = {
+      "fast": 3,
+      "normal": 6,
+      "slow": 9
     };
 
+    // Court locations from constants.py HCO_STRING_SPOTS
+    const LOCATIONS = [
+      "key", "upper midWing", "lower midWing", "upper wing", "lower wing",
+      "upper midCorner", "lower midCorner", "upper corner", "lower corner",
+      "upper highPost", "lower highPost", "upper midPost", "lower midPost",
+      "upper lowPost", "lower lowPost", "topLane", "midLane",
+      "upper apex", "lower apex", "upper midBaseline", "lower midBaseline",
+      "deep key", "deep lower wing", "deep lower baseline", "deep upper wing", "deep upper baseline"
+    ];
+
+    // Actions from constants.py ACTIONS
     const ACTIONS = {
       "handle_ball": "Handle Ball",
       "pass": "Pass",
@@ -564,376 +355,264 @@
       "stationary": "Stationary/Hold"
     };
 
-    const PLAYER_COLORS = {
-      "PG": "#ff6b6b",
-      "SG": "#4ecdc4",
-      "SF": "#45b7d1",
-      "PF": "#f9ca24",
-      "C": "#6c5ce7"
-    };
-
-    const TEMPO_STEP_REQUIREMENTS = {
-      "fast": 3,
-      "normal": 6,
-      "slow": 9
-    };
-
-    // Play data structure
-    let playData = {
+    // Play state
+    let playState = {
       name: "",
-      type: "Inside",
-      tempo: "normal",
-      steps: [
-        {
-          timestamp: 0,
-          pos_actions: {},
-          events: []
-        }
-      ]
+      type: "",
+      tempo: "",
+      totalSteps: 0,
+      currentStep: 1,
+      steps: []
     };
 
-    let currentStepIndex = 0;
+    // Current step assignments (position -> {location, action})
+    let currentStepAssignments = {};
 
-    // Initialize UI
+    // Initialize
     function init() {
-      populateLocationDropdown();
-      populateActionDropdown();
-      renderCourt();
-      renderTimeline();
-      renderCurrentStepActions();
-      updateStepInfo();
-      updateStepRequirements();
-      updateJsonDisplay();
-      
-      // Add event listeners for play info
-      document.getElementById('play-name').addEventListener('input', (e) => {
-        playData.name = e.target.value;
-        updateSaveButtonState();
-        updateJsonDisplay();
-      });
-      
-      document.getElementById('play-type').addEventListener('change', (e) => {
-        playData.type = e.target.value;
-        updateJsonDisplay();
-      });
-      
-      document.getElementById('tempo-variant').addEventListener('change', (e) => {
-        playData.tempo = e.target.value;
-        updateStepRequirements();
-        updateJsonDisplay();
-      });
+      populateDropdowns();
+      attachEventListeners();
     }
 
-    function updateStepRequirements() {
-      const required = TEMPO_STEP_REQUIREMENTS[playData.tempo];
-      document.getElementById('steps-required').textContent = required;
-      updateSaveButtonState();
-    }
-
-    function populateLocationDropdown() {
-      const select = document.getElementById('location-select');
-      select.innerHTML = '';
-      
-      Object.keys(HCO_STRING_SPOTS).forEach(spot => {
+    function populateDropdowns() {
+      // Play Type
+      const playTypeSelect = document.getElementById('play-type');
+      PLAYCALLS.forEach(type => {
         const option = document.createElement('option');
-        option.value = spot;
-        option.textContent = spot;
-        select.appendChild(option);
+        option.value = type;
+        option.textContent = type;
+        playTypeSelect.appendChild(option);
       });
-    }
 
-    function populateActionDropdown() {
-      const select = document.getElementById('action-select');
-      select.innerHTML = '';
-      
+      // Tempo Variant
+      const tempoSelect = document.getElementById('tempo-variant');
+      Object.entries(TEMPO_VARIANTS).forEach(([tempo, steps]) => {
+        const option = document.createElement('option');
+        option.value = tempo;
+        option.textContent = `${tempo.charAt(0).toUpperCase() + tempo.slice(1)} (${steps} steps)`;
+        tempoSelect.appendChild(option);
+      });
+
+      // Position
+      const positionSelect = document.getElementById('position-select');
+      POSITIONS.forEach(pos => {
+        const option = document.createElement('option');
+        option.value = pos;
+        option.textContent = pos;
+        positionSelect.appendChild(option);
+      });
+
+      // Location
+      const locationSelect = document.getElementById('location-select');
+      LOCATIONS.forEach(loc => {
+        const option = document.createElement('option');
+        option.value = loc;
+        option.textContent = loc;
+        locationSelect.appendChild(option);
+      });
+
+      // Action
+      const actionSelect = document.getElementById('action-select');
       Object.entries(ACTIONS).forEach(([value, label]) => {
         const option = document.createElement('option');
         option.value = value;
         option.textContent = label;
-        select.appendChild(option);
+        actionSelect.appendChild(option);
       });
     }
 
-    function addPlayerAction() {
-      const player = document.getElementById('player-select').value;
+    function attachEventListeners() {
+      // Step 1 form inputs
+      document.getElementById('play-name').addEventListener('input', validateStep1);
+      document.getElementById('play-type').addEventListener('change', validateStep1);
+      document.getElementById('tempo-variant').addEventListener('change', validateStep1);
+      document.getElementById('submit-play-btn').addEventListener('click', submitPlay);
+
+      // Step 2 controls
+      document.getElementById('add-assignment-btn').addEventListener('click', addAssignment);
+      document.getElementById('submit-step-btn').addEventListener('click', submitStep);
+    }
+
+    function validateStep1() {
+      const name = document.getElementById('play-name').value.trim();
+      const type = document.getElementById('play-type').value;
+      const tempo = document.getElementById('tempo-variant').value;
+
+      const submitBtn = document.getElementById('submit-play-btn');
+      submitBtn.disabled = !(name && type && tempo);
+    }
+
+    function submitPlay() {
+      playState.name = document.getElementById('play-name').value.trim();
+      playState.type = document.getElementById('play-type').value;
+      playState.tempo = document.getElementById('tempo-variant').value;
+      playState.totalSteps = TEMPO_VARIANTS[playState.tempo];
+      playState.currentStep = 1;
+      playState.steps = [];
+
+      // Show step 2, hide step 1
+      document.getElementById('step1').classList.add('hidden');
+      document.getElementById('step2').classList.remove('hidden');
+
+      // Update summary
+      document.getElementById('play-summary').textContent = 
+        `${playState.name} | ${playState.type} | ${playState.tempo.charAt(0).toUpperCase() + playState.tempo.slice(1)}`;
+
+      // Update step counter
+      updateStepCounter();
+
+      // Initialize position chips
+      renderPositionChips();
+
+      // Reset current step assignments
+      currentStepAssignments = {};
+    }
+
+    function renderPositionChips() {
+      const container = document.getElementById('position-chips');
+      container.innerHTML = '';
+
+      POSITIONS.forEach(pos => {
+        const chip = document.createElement('div');
+        chip.className = 'chip';
+        chip.id = `chip-${pos}`;
+        chip.textContent = pos;
+
+        // Check if this position has both location and action
+        const assignment = currentStepAssignments[pos];
+        if (assignment && assignment.location && assignment.action) {
+          chip.classList.add('completed');
+        }
+
+        container.appendChild(chip);
+      });
+    }
+
+    function addAssignment() {
+      const position = document.getElementById('position-select').value;
       const location = document.getElementById('location-select').value;
       const action = document.getElementById('action-select').value;
-      
-      // Add action to current step
-      const currentStep = playData.steps[currentStepIndex];
-      currentStep.pos_actions[player] = {
-        action: action,
-        spot: location
-      };
-      
-      // Auto-add events for certain actions
-      if (action === 'pass') {
-        // Will need to specify receiver in future enhancement
-        console.log('Pass action added - you may want to add a pass event');
-      } else if (action === 'shoot') {
-        currentStep.events.push({
-          type: 'shot',
-          by: player
-        });
-      }
-      
-      renderCourt();
-      renderCurrentStepActions();
-      updateJsonDisplay();
-    }
 
-    function renderCourt() {
-      const court = document.getElementById('court');
-      
-      // Clear existing markers
-      court.innerHTML = '';
-      
-      const currentStep = playData.steps[currentStepIndex];
-      const posActions = currentStep.pos_actions;
-      
-      // Render each player
-      Object.entries(posActions).forEach(([pos, actionData]) => {
-        const spot = actionData.spot;
-        const coords = HCO_STRING_SPOTS[spot];
-        
-        if (!coords) return;
-        
-        // Convert grid coordinates to percentage (100x50 grid)
-        const xPercent = (coords.x / 100) * 100;
-        const yPercent = (coords.y / 50) * 100;
-        
-        const marker = document.createElement('div');
-        marker.className = `player-marker ${pos}`;
-        marker.style.left = `${xPercent}%`;
-        marker.style.top = `${yPercent}%`;
-        marker.textContent = pos;
-        
-        // Highlight if this player has the ball
-        const hasBall = ['handle_ball', 'receive', 'shoot', 'pass'].includes(actionData.action);
-        if (hasBall) {
-          marker.classList.add('has-ball');
-        }
-        
-        // Add action label
-        const label = document.createElement('div');
-        label.className = 'action-label';
-        label.textContent = ACTIONS[actionData.action] || actionData.action;
-        marker.appendChild(label);
-        
-        court.appendChild(marker);
-      });
-    }
-
-    function renderTimeline() {
-      const stepList = document.getElementById('step-list');
-      stepList.innerHTML = '';
-      
-      playData.steps.forEach((step, index) => {
-        const pill = document.createElement('div');
-        pill.className = 'step-pill';
-        if (index === currentStepIndex) {
-          pill.classList.add('active');
-        }
-        pill.textContent = `Step ${index + 1} (${step.timestamp}ms)`;
-        pill.onclick = () => goToStep(index);
-        stepList.appendChild(pill);
-      });
-      
-      document.getElementById('step-count-display').textContent = 
-        `${playData.steps.length} Step${playData.steps.length !== 1 ? 's' : ''}`;
-    }
-
-    function renderCurrentStepActions() {
-      const actionList = document.getElementById('action-list');
-      const currentStep = playData.steps[currentStepIndex];
-      
-      if (Object.keys(currentStep.pos_actions).length === 0) {
-        actionList.innerHTML = '<p style="color: #888; font-size: 0.85rem;">No actions yet. Add player actions using the controls.</p>';
+      if (!position) {
+        alert('Please select a position.');
         return;
       }
-      
-      actionList.innerHTML = '';
-      
-      Object.entries(currentStep.pos_actions).forEach(([pos, actionData]) => {
-        const item = document.createElement('div');
-        item.className = 'action-item';
-        
-        const badge = document.createElement('span');
-        badge.className = 'player-badge';
-        badge.style.background = PLAYER_COLORS[pos];
-        badge.textContent = pos;
-        
-        const info = document.createElement('span');
-        info.textContent = `${ACTIONS[actionData.action]} @ ${actionData.spot}`;
-        
-        const deleteBtn = document.createElement('button');
-        deleteBtn.textContent = '✕';
-        deleteBtn.className = 'button-danger';
-        deleteBtn.onclick = () => deletePlayerAction(pos);
-        
-        item.appendChild(badge);
-        item.appendChild(info);
-        item.appendChild(deleteBtn);
-        actionList.appendChild(item);
-      });
-    }
 
-    function deletePlayerAction(player) {
-      const currentStep = playData.steps[currentStepIndex];
-      delete currentStep.pos_actions[player];
-      
-      // Also remove related events
-      currentStep.events = currentStep.events.filter(e => e.by !== player);
-      
-      renderCourt();
-      renderCurrentStepActions();
-      updateJsonDisplay();
-    }
-
-    function updateStepInfo() {
-      document.getElementById('current-step-number').textContent = currentStepIndex + 1;
-      document.getElementById('total-steps').textContent = playData.steps.length;
-      updateSaveButtonState();
-      updateAddStepButtonState();
-    }
-
-    function updateSaveButtonState() {
-      const required = TEMPO_STEP_REQUIREMENTS[playData.tempo];
-      const built = playData.steps.length;
-      const saveBtn = document.getElementById('save-play-btn');
-      
-      if (built === required && playData.name.trim() !== '') {
-        saveBtn.disabled = false;
-        saveBtn.style.opacity = '1';
-      } else {
-        saveBtn.disabled = true;
-        saveBtn.style.opacity = '0.5';
-      }
-    }
-
-    function updateAddStepButtonState() {
-      const required = TEMPO_STEP_REQUIREMENTS[playData.tempo];
-      const built = playData.steps.length;
-      const addBtn = document.getElementById('add-step-btn');
-      
-      if (built >= required) {
-        addBtn.disabled = true;
-        addBtn.textContent = `✓ ${required} Steps Complete`;
-      } else {
-        addBtn.disabled = false;
-        addBtn.textContent = `+ New Step (${built}/${required})`;
-      }
-    }
-
-    function goToStep(index) {
-      currentStepIndex = index;
-      renderCourt();
-      renderTimeline();
-      renderCurrentStepActions();
-      updateStepInfo();
-    }
-
-    function prevStep() {
-      if (currentStepIndex > 0) {
-        goToStep(currentStepIndex - 1);
-      }
-    }
-
-    function nextStep() {
-      if (currentStepIndex < playData.steps.length - 1) {
-        goToStep(currentStepIndex + 1);
-      }
-    }
-
-    function addNewStep() {
-      const required = TEMPO_STEP_REQUIREMENTS[playData.tempo];
-      
-      // Don't allow more steps than required
-      if (playData.steps.length >= required) {
-        alert(`This tempo variant requires exactly ${required} steps.`);
+      if (!location) {
+        alert('Please select a location.');
         return;
       }
-      
-      // Auto-calculate timestamp (300ms increments)
-      const newTimestamp = playData.steps.length * 300;
-      
-      playData.steps.push({
-        timestamp: newTimestamp,
+
+      if (!action) {
+        alert('Please select an action.');
+        return;
+      }
+
+      // Store assignment
+      if (!currentStepAssignments[position]) {
+        currentStepAssignments[position] = {};
+      }
+      currentStepAssignments[position].location = location;
+      currentStepAssignments[position].action = action;
+
+      // Update chips
+      renderPositionChips();
+
+      // Reset dropdowns
+      document.getElementById('position-select').value = '';
+      document.getElementById('location-select').value = '';
+      document.getElementById('action-select').value = '';
+
+      // Check if all positions are assigned
+      validateStep2();
+    }
+
+    function validateStep2() {
+      let allAssigned = true;
+
+      for (const pos of POSITIONS) {
+        const assignment = currentStepAssignments[pos];
+        if (!assignment || !assignment.location || !assignment.action) {
+          allAssigned = false;
+          break;
+        }
+      }
+
+      document.getElementById('submit-step-btn').disabled = !allAssigned;
+    }
+
+    function submitStep() {
+      // Calculate timestamp (300ms increments, 0-indexed)
+      const timestamp = (playState.currentStep - 1) * 300;
+
+      // Build step data structure
+      const stepData = {
+        timestamp: timestamp,
         pos_actions: {},
         events: []
-      });
-      
-      goToStep(playData.steps.length - 1);
-      updateJsonDisplay();
-    }
+      };
 
-    function deleteCurrentStep() {
-      if (playData.steps.length <= 1) {
-        alert('Cannot delete the only step!');
+      // Populate pos_actions
+      POSITIONS.forEach(pos => {
+        const assignment = currentStepAssignments[pos];
+        stepData.pos_actions[pos] = {
+          location: assignment.location,
+          action: assignment.action
+        };
+      });
+
+      // Add to play steps
+      playState.steps.push(stepData);
+
+      // Check if we're done
+      if (playState.currentStep >= playState.totalSteps) {
+        showSuccess();
         return;
       }
-      
-      playData.steps.splice(currentStepIndex, 1);
-      
-      // Recalculate all timestamps (300ms increments)
-      playData.steps.forEach((step, index) => {
-        step.timestamp = index * 300;
-      });
-      
-      // Adjust current index if needed
-      if (currentStepIndex >= playData.steps.length) {
-        currentStepIndex = playData.steps.length - 1;
-      }
-      
-      goToStep(currentStepIndex);
-      updateJsonDisplay();
+
+      // Move to next step
+      playState.currentStep++;
+      currentStepAssignments = {};
+      renderPositionChips();
+      validateStep2();
+      updateStepCounter();
+
+      // Reset dropdowns
+      document.getElementById('position-select').value = '';
+      document.getElementById('location-select').value = '';
+      document.getElementById('action-select').value = '';
     }
 
-    function updateJsonDisplay() {
-      // Build the skeleton structure
-      const skeleton = {
-        steps: playData.steps
-      };
-      
-      // Build the full play object structure
-      const playObject = {
-        name: playData.name || "Unnamed Play",
-        type: playData.type,
+    function updateStepCounter() {
+      document.getElementById('step-counter').textContent = 
+        `Step ${playState.currentStep}/${playState.totalSteps}`;
+    }
+
+    function showSuccess() {
+      // Hide step 2
+      document.getElementById('step2').classList.add('hidden');
+
+      // Show success screen
+      document.getElementById('success-screen').classList.remove('hidden');
+      document.getElementById('success-play-name').textContent = 
+        `Play "${playState.name}" has been created successfully!`;
+
+      // Build final JSON structure
+      const playJSON = {
+        name: playState.name,
+        type: playState.type,
         skeletons: {
-          [playData.tempo]: skeleton
+          [playState.tempo]: {
+            steps: playState.steps
+          }
         }
       };
-      
-      const json = JSON.stringify(playObject, null, 2);
-      document.getElementById('json-content').textContent = json;
+
+      document.getElementById('json-output').textContent = JSON.stringify(playJSON, null, 2);
     }
 
-    function exportPlay() {
-      const json = document.getElementById('json-content').textContent;
-      const blob = new Blob([json], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${playData.name || 'play'}_${playData.tempo}.json`;
-      a.click();
-      
-      URL.revokeObjectURL(url);
-    }
-
-    function copyToClipboard() {
-      const json = document.getElementById('json-content').textContent;
-      navigator.clipboard.writeText(json).then(() => {
-        alert('Play JSON copied to clipboard!');
-      }).catch(err => {
-        console.error('Failed to copy:', err);
-        alert('Failed to copy to clipboard');
-      });
-    }
-
-    // Initialize on load
+    // Start
     window.addEventListener('DOMContentLoaded', init);
   </script>
 </body>
 </html>
-
