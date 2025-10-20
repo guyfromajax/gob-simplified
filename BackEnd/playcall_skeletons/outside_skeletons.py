@@ -38,8 +38,8 @@ OUTSIDE_CORNER_CROSS = {
                 "PG": {"action": ACTIONS["HANDLE"], "spot": "key"},
                 "SG": {"action": ACTIONS["DRIFT"], "spot": "upper wing"},
                 "SF": {"action": ACTIONS["CUT"], "spot": "lower wing"},
-                "PF": {"action": ACTIONS["POST"], "spot": "upper lowPost"},
-                "C": {"action": ACTIONS["POST"], "spot": "lower lowPost"}
+                "PF": {"action": ACTIONS["POST_UP"], "spot": "upper lowPost"},
+                "C": {"action": ACTIONS["POST_UP"], "spot": "lower lowPost"}
             },
             "events": []
         },
@@ -49,8 +49,8 @@ OUTSIDE_CORNER_CROSS = {
                 "PG": {"action": ACTIONS["HANDLE"], "spot": "upper wing"},
                 "SG": {"action": ACTIONS["DRIFT"], "spot": "upper corner"},
                 "SF": {"action": ACTIONS["DRIFT"], "spot": "key"},
-                "PF": {"action": ACTIONS["POST"], "spot": "upper lowPost"},
-                "C": {"action": ACTIONS["POST"], "spot": "lower lowPost"}
+                "PF": {"action": ACTIONS["POST_UP"], "spot": "upper lowPost"},
+                "C": {"action": ACTIONS["POST_UP"], "spot": "lower lowPost"}
             },
             "events": []
         },
