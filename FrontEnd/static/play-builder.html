@@ -119,6 +119,17 @@
       transform: translateY(0);
     }
 
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    button:disabled:hover {
+      transform: none;
+      box-shadow: none;
+    }
+
     .button-secondary {
       background: rgba(255, 255, 255, 0.1);
       color: #fff;
@@ -395,9 +406,9 @@
           <div class="form-group">
             <label for="tempo-variant">Tempo Variant</label>
             <select id="tempo-variant">
-              <option value="normal">Normal</option>
-              <option value="slow">Slow</option>
-              <option value="fast">Fast</option>
+              <option value="normal">Normal (6 steps)</option>
+              <option value="slow">Slow (9 steps)</option>
+              <option value="fast">Fast (3 steps)</option>
             </select>
           </div>
         </div>
@@ -410,12 +421,12 @@
               <span class="info-value" id="current-step-number">1</span>
             </div>
             <div class="info-row">
-              <span class="info-label">Total Steps:</span>
-              <span class="info-value" id="total-steps">1</span>
+              <span class="info-label">Steps Required:</span>
+              <span class="info-value" id="steps-required">6</span>
             </div>
             <div class="info-row">
-              <span class="info-label">Timestamp:</span>
-              <span class="info-value" id="step-timestamp">0ms</span>
+              <span class="info-label">Steps Built:</span>
+              <span class="info-value" id="total-steps">1</span>
             </div>
           </div>
         </div>
@@ -455,11 +466,6 @@
         <!-- Step Controls -->
         <div class="section">
           <div class="section-title">Step Controls</div>
-          
-          <div class="form-group">
-            <label for="step-timestamp">Step Timestamp (ms)</label>
-            <input type="number" id="step-timestamp" value="0" step="100" min="0">
-          </div>
 
           <div class="button-group">
             <button class="button-secondary" onclick="prevStep()">← Prev</button>
@@ -467,7 +473,7 @@
           </div>
 
           <div class="button-group">
-            <button onclick="addNewStep()">+ New Step</button>
+            <button onclick="addNewStep()" id="add-step-btn">+ New Step</button>
             <button class="button-danger" onclick="deleteCurrentStep()">Delete Step</button>
           </div>
         </div>
@@ -475,7 +481,7 @@
         <!-- Export Section -->
         <div class="section">
           <div class="section-title">Export</div>
-          <button onclick="exportPlay()">📥 Export Play JSON</button>
+          <button onclick="exportPlay()" id="save-play-btn" disabled>💾 Save Play</button>
           <button class="button-secondary" onclick="copyToClipboard()" style="margin-top: 10px;">📋 Copy to Clipboard</button>
         </div>
 
@@ -566,6 +572,12 @@
       "C": "#6c5ce7"
     };
 
+    const TEMPO_STEP_REQUIREMENTS = {
+      "fast": 3,
+      "normal": 6,
+      "slow": 9
+    };
+
     // Play data structure
     let playData = {
       name: "",
@@ -588,12 +600,15 @@
       populateActionDropdown();
       renderCourt();
       renderTimeline();
+      renderCurrentStepActions();
       updateStepInfo();
+      updateStepRequirements();
       updateJsonDisplay();
       
       // Add event listeners for play info
       document.getElementById('play-name').addEventListener('input', (e) => {
         playData.name = e.target.value;
+        updateSaveButtonState();
         updateJsonDisplay();
       });
       
@@ -604,15 +619,15 @@
       
       document.getElementById('tempo-variant').addEventListener('change', (e) => {
         playData.tempo = e.target.value;
+        updateStepRequirements();
         updateJsonDisplay();
       });
-      
-      document.getElementById('step-timestamp').addEventListener('input', (e) => {
-        const timestamp = parseInt(e.target.value) || 0;
-        playData.steps[currentStepIndex].timestamp = timestamp;
-        updateStepInfo();
-        updateJsonDisplay();
-      });
+    }
+
+    function updateStepRequirements() {
+      const required = TEMPO_STEP_REQUIREMENTS[playData.tempo];
+      document.getElementById('steps-required').textContent = required;
+      updateSaveButtonState();
     }
 
     function populateLocationDropdown() {
@@ -776,11 +791,38 @@
     }
 
     function updateStepInfo() {
-      const currentStep = playData.steps[currentStepIndex];
       document.getElementById('current-step-number').textContent = currentStepIndex + 1;
       document.getElementById('total-steps').textContent = playData.steps.length;
-      document.getElementById('step-timestamp').value = currentStep.timestamp;
-      document.getElementById('step-timestamp').nextElementSibling.textContent = `${currentStep.timestamp}ms`;
+      updateSaveButtonState();
+      updateAddStepButtonState();
+    }
+
+    function updateSaveButtonState() {
+      const required = TEMPO_STEP_REQUIREMENTS[playData.tempo];
+      const built = playData.steps.length;
+      const saveBtn = document.getElementById('save-play-btn');
+      
+      if (built === required && playData.name.trim() !== '') {
+        saveBtn.disabled = false;
+        saveBtn.style.opacity = '1';
+      } else {
+        saveBtn.disabled = true;
+        saveBtn.style.opacity = '0.5';
+      }
+    }
+
+    function updateAddStepButtonState() {
+      const required = TEMPO_STEP_REQUIREMENTS[playData.tempo];
+      const built = playData.steps.length;
+      const addBtn = document.getElementById('add-step-btn');
+      
+      if (built >= required) {
+        addBtn.disabled = true;
+        addBtn.textContent = `✓ ${required} Steps Complete`;
+      } else {
+        addBtn.disabled = false;
+        addBtn.textContent = `+ New Step (${built}/${required})`;
+      }
     }
 
     function goToStep(index) {
@@ -804,9 +846,16 @@
     }
 
     function addNewStep() {
-      // Calculate timestamp for new step (300ms after current)
-      const lastStep = playData.steps[playData.steps.length - 1];
-      const newTimestamp = lastStep.timestamp + 300;
+      const required = TEMPO_STEP_REQUIREMENTS[playData.tempo];
+      
+      // Don't allow more steps than required
+      if (playData.steps.length >= required) {
+        alert(`This tempo variant requires exactly ${required} steps.`);
+        return;
+      }
+      
+      // Auto-calculate timestamp (300ms increments)
+      const newTimestamp = playData.steps.length * 300;
       
       playData.steps.push({
         timestamp: newTimestamp,
@@ -825,6 +874,11 @@
       }
       
       playData.steps.splice(currentStepIndex, 1);
+      
+      // Recalculate all timestamps (300ms increments)
+      playData.steps.forEach((step, index) => {
+        step.timestamp = index * 300;
+      });
       
       // Adjust current index if needed
       if (currentStepIndex >= playData.steps.length) {
