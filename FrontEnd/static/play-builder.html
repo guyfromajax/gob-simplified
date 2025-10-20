@@ -55,6 +55,49 @@
       opacity: 0.8;
     }
 
+    .step1-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 20px;
+      align-items: end;
+      margin-bottom: 20px;
+    }
+
+    .step1-button-wrapper {
+      grid-column: 2;
+      display: flex;
+      justify-content: center;
+    }
+
+    .step1-button-wrapper button {
+      width: 50%;
+      background: linear-gradient(135deg, #FF8C00, #FF6500);
+    }
+
+    .step1-button-wrapper button:hover:not(:disabled) {
+      background: linear-gradient(135deg, #FF7700, #FF5500);
+    }
+
+    .step2-header-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+
+    .step2-controls-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 20px;
+      align-items: end;
+    }
+
+    .control-column {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+
     .form-group {
       margin-bottom: 20px;
     }
@@ -129,7 +172,6 @@
       display: flex;
       gap: 10px;
       justify-content: center;
-      margin: 20px 0;
       flex-wrap: wrap;
     }
 
@@ -155,7 +197,7 @@
       color: #FFD700;
       font-size: 1.1rem;
       font-weight: 700;
-      margin-top: 20px;
+      white-space: nowrap;
     }
 
     .court-container {
@@ -166,11 +208,11 @@
       display: flex;
       justify-content: center;
       align-items: center;
-      min-height: 400px;
+      min-height: 200px;
     }
 
     .court-image {
-      max-width: 100%;
+      max-width: 60%;
       height: auto;
       border-radius: 8px;
       opacity: 0.8;
@@ -223,6 +265,34 @@
         padding: 20px;
       }
 
+      .step1-row {
+        grid-template-columns: 1fr;
+        gap: 15px;
+      }
+
+      .step1-button-wrapper {
+        grid-column: 1;
+      }
+
+      .step1-button-wrapper button {
+        width: 100%;
+      }
+
+      .step2-header-row {
+        flex-direction: column;
+        gap: 10px;
+        align-items: center;
+      }
+
+      .step-counter {
+        text-align: center;
+      }
+
+      .step2-controls-row {
+        grid-template-columns: 1fr;
+        gap: 20px;
+      }
+
       .position-chips {
         gap: 8px;
       }
@@ -231,6 +301,10 @@
         padding: 8px 16px;
         font-size: 0.85rem;
         min-width: 50px;
+      }
+
+      .court-image {
+        max-width: 90%;
       }
     }
   </style>
@@ -243,12 +317,12 @@
     <div id="step1" class="step-container">
       <div class="step-header">Create Play</div>
       
-      <div class="form-group">
-        <label for="play-name">Play Name</label>
-        <input type="text" id="play-name" placeholder="Enter play name...">
-      </div>
+      <div class="step1-row">
+        <div class="form-group">
+          <label for="play-name">Play Name</label>
+          <input type="text" id="play-name" placeholder="Enter play name...">
+        </div>
 
-      <div class="form-row">
         <div class="form-group">
           <label for="play-type">Play Type</label>
           <select id="play-type">
@@ -264,45 +338,53 @@
         </div>
       </div>
 
-      <button id="submit-play-btn" disabled>Create Play</button>
+      <div class="step1-button-wrapper">
+        <button id="submit-play-btn" disabled>Create Play</button>
+      </div>
     </div>
 
     <!-- Step 2: Build Steps -->
     <div id="step2" class="step-container hidden">
       <div class="step-header">Build Steps</div>
-      <div class="step-subheader" id="play-summary"></div>
-
-      <div class="position-chips" id="position-chips">
-        <!-- Chips will be dynamically generated -->
+      
+      <div class="step2-header-row">
+        <div class="step-subheader" id="play-summary" style="margin: 0;"></div>
+        <div class="step-counter" id="step-counter">Step 1/6</div>
       </div>
 
-      <div class="form-row">
-        <div class="form-group">
-          <label for="position-select">Position</label>
-          <select id="position-select">
-            <option value="">-- Select Position --</option>
-          </select>
+      <div class="step2-controls-row">
+        <div class="control-column">
+          <div class="form-group" style="margin-bottom: 0;">
+            <label for="position-select">Position</label>
+            <select id="position-select">
+              <option value="">-- Select Position --</option>
+            </select>
+          </div>
+          <div class="position-chips" id="position-chips">
+            <!-- Chips will be dynamically generated -->
+          </div>
         </div>
 
-        <div class="form-group">
-          <label for="location-select">Location</label>
-          <select id="location-select">
-            <option value="">-- Select Location --</option>
-          </select>
+        <div class="control-column">
+          <div class="form-group" style="margin-bottom: 0;">
+            <label for="location-select">Location</label>
+            <select id="location-select">
+              <option value="">-- Select Location --</option>
+            </select>
+          </div>
+          <button id="add-assignment-btn">Add Assignment</button>
         </div>
 
-        <div class="form-group">
-          <label for="action-select">Action</label>
-          <select id="action-select">
-            <option value="">-- Select Action --</option>
-          </select>
+        <div class="control-column">
+          <div class="form-group" style="margin-bottom: 0;">
+            <label for="action-select">Action</label>
+            <select id="action-select">
+              <option value="">-- Select Action --</option>
+            </select>
+          </div>
+          <button id="submit-step-btn" disabled>Submit Step</button>
         </div>
       </div>
-
-      <button id="add-assignment-btn">Add Assignment</button>
-      <button id="submit-step-btn" disabled>Submit Step</button>
-
-      <div class="step-counter" id="step-counter">Step 1/6</div>
     </div>
 
     <!-- Success Screen -->
