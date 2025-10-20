@@ -44,17 +44,10 @@
       padding: 20px 30px;
     }
 
-    .step-header {
-      font-size: 1.8rem;
-      color: #FFD700;
-      margin-bottom: 15px;
-      text-align: center;
-    }
-
     .step-subheader {
       font-size: 1.2rem;
       color: #fff;
-      margin-bottom: 15px;
+      margin-bottom: 0;
       text-align: center;
       opacity: 0.8;
     }
@@ -358,11 +351,10 @@
 </head>
 <body>
   <div class="container">
-    <h1>Play Builder</h1>
+    <h1 id="page-title">Create Your Play</h1>
 
     <!-- Step 1: Create Play -->
     <div id="step1" class="step-container">
-      <div class="step-header">Create Play</div>
       
       <div class="step1-row">
         <div class="form-group">
@@ -392,8 +384,6 @@
 
     <!-- Step 2: Build Steps -->
     <div id="step2" class="step-container hidden">
-      <div class="step-header">Build Steps</div>
-      
       <div class="step2-header-row">
         <div class="step-subheader" id="play-summary" style="margin: 0;"></div>
         <div class="step-counter" id="step-counter">Step 1/6</div>
@@ -631,6 +621,9 @@
       playState.totalSteps = TEMPO_VARIANTS[playState.tempo];
       playState.currentStep = 1;
       playState.steps = [];
+
+      // Update page title
+      document.getElementById('page-title').textContent = 'Build Steps';
 
       // Show step 2, hide step 1
       document.getElementById('step1').classList.add('hidden');
