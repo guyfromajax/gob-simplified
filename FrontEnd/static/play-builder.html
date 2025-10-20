@@ -81,13 +81,24 @@
       display: grid;
       grid-template-columns: 1fr 1fr 1fr;
       gap: 20px;
-      align-items: end;
+      align-items: start;
     }
 
     .control-column {
       display: flex;
       flex-direction: column;
       gap: 15px;
+    }
+
+    .center-button-wrapper {
+      grid-column: 1 / -1;
+      display: flex;
+      justify-content: center;
+      margin-top: 10px;
+    }
+
+    .center-button-wrapper button {
+      width: 36%;
     }
 
     .form-group {
@@ -318,6 +329,10 @@
         width: 100%;
       }
 
+      .center-button-wrapper button {
+        width: 80%;
+      }
+
       .step2-header-row {
         flex-direction: column;
         gap: 10px;
@@ -396,7 +411,6 @@
               <!-- Chips will be dynamically generated -->
             </div>
           </div>
-          <button id="add-assignment-btn" disabled>Add Assignment</button>
         </div>
 
         <div class="control-column">
@@ -406,7 +420,6 @@
               <option value="">-- Select Location --</option>
             </select>
           </div>
-          <button id="submit-step-btn" disabled>Submit Step</button>
         </div>
 
         <div class="control-column">
@@ -416,6 +429,10 @@
               <option value="">-- Select Action --</option>
             </select>
           </div>
+        </div>
+
+        <div class="center-button-wrapper">
+          <button id="action-btn" disabled>Add Assignment</button>
         </div>
       </div>
     </div>
@@ -571,10 +588,9 @@
       document.getElementById('submit-play-btn').addEventListener('click', submitPlay);
 
       // Step 2 controls
-      document.getElementById('location-select').addEventListener('change', validateAddAssignment);
-      document.getElementById('action-select').addEventListener('change', validateAddAssignment);
-      document.getElementById('add-assignment-btn').addEventListener('click', addAssignment);
-      document.getElementById('submit-step-btn').addEventListener('click', submitStep);
+      document.getElementById('location-select').addEventListener('change', validateActionButton);
+      document.getElementById('action-select').addEventListener('change', validateActionButton);
+      document.getElementById('action-btn').addEventListener('click', handleActionButton);
     }
 
     function renderCourtVisualization() {
@@ -683,15 +699,44 @@
 
       selectedPosition = pos;
       renderPositionChips();
-      validateAddAssignment();
+      validateActionButton();
     }
 
-    function validateAddAssignment() {
+    function validateActionButton() {
       const location = document.getElementById('location-select').value;
       const action = document.getElementById('action-select').value;
-      const addBtn = document.getElementById('add-assignment-btn');
+      const actionBtn = document.getElementById('action-btn');
       
-      addBtn.disabled = !(selectedPosition && location && action);
+      // Check if all positions are complete
+      let allComplete = true;
+      for (const pos of POSITIONS) {
+        const assignment = currentStepAssignments[pos];
+        if (!assignment || !assignment.location || !assignment.action) {
+          allComplete = false;
+          break;
+        }
+      }
+
+      if (allComplete) {
+        // All positions complete - show Submit Step
+        actionBtn.textContent = 'Submit Step';
+        actionBtn.disabled = false;
+      } else {
+        // Still adding assignments
+        actionBtn.textContent = 'Add Assignment';
+        actionBtn.disabled = !(selectedPosition && location && action);
+      }
+    }
+
+    function handleActionButton() {
+      const actionBtn = document.getElementById('action-btn');
+      
+      // Check if button is in Submit Step mode
+      if (actionBtn.textContent === 'Submit Step') {
+        submitStep();
+      } else {
+        addAssignment();
+      }
     }
 
     function addAssignment() {
@@ -729,23 +774,8 @@
       document.getElementById('location-select').value = '';
       document.getElementById('action-select').value = '';
 
-      // Check if all positions are assigned
-      validateStep2();
-      validateAddAssignment();
-    }
-
-    function validateStep2() {
-      let allAssigned = true;
-
-      for (const pos of POSITIONS) {
-        const assignment = currentStepAssignments[pos];
-        if (!assignment || !assignment.location || !assignment.action) {
-          allAssigned = false;
-          break;
-        }
-      }
-
-      document.getElementById('submit-step-btn').disabled = !allAssigned;
+      // Update button state
+      validateActionButton();
     }
 
     function submitStep() {
@@ -783,8 +813,7 @@
       selectedPosition = null;
       renderPositionChips();
       renderCourtVisualization();
-      validateStep2();
-      validateAddAssignment();
+      validateActionButton();
       updateStepCounter();
 
       // Reset dropdowns
