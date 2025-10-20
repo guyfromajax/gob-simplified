@@ -106,7 +106,7 @@ INSIDE_HIGHLOW_ENTRY = {
                 "PG": {"action": ACTIONS["HOLD"], "spot": "upper wing"},
                 "SG": {"action": ACTIONS["HOLD"], "spot": "lower wing"},
                 "SF": {"action": ACTIONS["HOLD"], "spot": "key"},
-                "PF": {"action": ACTIONS["REBOUND"], "spot": "topLane"},
+                "PF": {"action": ACTIONS["GET_OPEN"], "spot": "topLane"},
                 "C": {"action": ACTIONS["SHOOT"], "spot": "upper lowPost"}
             },
             "events": [{"type": "shot", "by": "C"}]
