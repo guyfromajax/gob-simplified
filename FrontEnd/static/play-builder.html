@@ -946,24 +946,33 @@
       });
 
       icon.addEventListener('dragend', (e) => {
+        console.log('=== DRAGEND EVENT ===');
+        console.log('draggedPlayer:', draggedPlayer);
+        console.log('hoveredSprite:', hoveredSprite);
+        console.log('nearestSnapPoint:', nearestSnapPoint);
+        
         icon.classList.remove('dragging');
         hideSnapPoints();
         
         // Clear any hover effects
         document.querySelectorAll('.player-icon.drag-hover').forEach(i => i.classList.remove('drag-hover'));
         
-        console.log('dragend - hoveredSprite:', hoveredSprite, 'nearestSnapPoint:', nearestSnapPoint);
-        
         // Prefer hoveredSprite (collision) over nearestSnapPoint (empty space)
         if (hoveredSprite) {
           const hoveredAssignment = currentStepAssignments[hoveredSprite];
+          console.log('hoveredAssignment:', hoveredAssignment);
+          
           if (hoveredAssignment && hoveredAssignment.location) {
-            console.log(`Dropping on occupied sprite ${hoveredSprite} at ${hoveredAssignment.location}`);
+            console.log(`✓ Dropping on occupied sprite ${hoveredSprite} at ${hoveredAssignment.location}`);
             handleDrop(hoveredAssignment.location);
+          } else {
+            console.log('✗ No assignment found for hovered sprite');
           }
         } else if (nearestSnapPoint) {
-          console.log(`Dropping on empty space at ${nearestSnapPoint}`);
+          console.log(`✓ Dropping on empty space at ${nearestSnapPoint}`);
           handleDrop(nearestSnapPoint);
+        } else {
+          console.log('✗ No drop target found');
         }
         
         draggedPlayer = null;
