@@ -276,6 +276,68 @@
 
     .player-icon {
       transition: all 0.8s cubic-bezier(0.4, 0.0, 0.2, 1);
+      cursor: grab;
+      user-select: none;
+    }
+
+    .player-icon.dragging {
+      opacity: 0.7;
+      cursor: grabbing;
+      z-index: 20;
+    }
+
+    .player-icon.offset {
+      /* Marker for offset sprites */
+    }
+
+    .offset-indicator {
+      position: absolute;
+      border-top: 2px dashed rgba(255, 215, 0, 0.6);
+      height: 0;
+      pointer-events: none;
+      z-index: 5;
+    }
+
+    .snap-point {
+      position: absolute;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: rgba(255, 215, 0, 0.3);
+      border: 1px solid rgba(255, 215, 0, 0.6);
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+
+    .snap-point.active {
+      opacity: 1;
+      background: rgba(255, 215, 0, 0.6);
+      box-shadow: 0 0 10px rgba(255, 215, 0, 0.8);
+    }
+
+    .inline-action-dropdown {
+      position: absolute;
+      background: rgba(30, 30, 30, 0.95);
+      border: 2px solid #FFD700;
+      border-radius: 8px;
+      padding: 10px;
+      z-index: 30;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
+      min-width: 200px;
+    }
+
+    .inline-action-dropdown select {
+      width: 100%;
+      margin-bottom: 8px;
+    }
+
+    .inline-action-dropdown button {
+      width: 100%;
+      margin-top: 0;
+      padding: 8px 16px;
+      font-size: 0.9rem;
     }
 
     .ball-icon {
@@ -632,11 +694,20 @@
     
     // Current formation selection (for Step 1)
     let currentFormation = null;
+    
+    // Drag-and-drop state
+    let draggedPlayer = null;
+    let draggedPlayerOriginalLocation = null;
+    let nearestSnapPoint = null;
+    
+    // Offset tracking (position -> offset amount)
+    let positionOffsets = {};
 
     // Initialize
     function init() {
       populateDropdowns();
       attachEventListeners();
+      setupCourtDropZone();
     }
 
     function populateDropdowns() {
@@ -802,6 +873,244 @@
       validateActionButton();
     }
 
+    // Drag-and-Drop Functions
+    function setupDragHandlers(icon, pos) {
+      icon.draggable = true;
+      
+      icon.addEventListener('dragstart', (e) => {
+        draggedPlayer = pos;
+        draggedPlayerOriginalLocation = currentStepAssignments[pos]?.location;
+        icon.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+        
+        // Show snap points
+        showSnapPoints();
+      });
+
+      icon.addEventListener('dragend', (e) => {
+        icon.classList.remove('dragging');
+        hideSnapPoints();
+        
+        if (nearestSnapPoint) {
+          handleDrop(nearestSnapPoint);
+        }
+        
+        draggedPlayer = null;
+        draggedPlayerOriginalLocation = null;
+        nearestSnapPoint = null;
+      });
+    }
+
+    function setupCourtDropZone() {
+      const court = document.getElementById('court-visualization');
+      
+      court.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        
+        // Calculate nearest snap point
+        const courtRect = court.getBoundingClientRect();
+        const x = ((e.clientX - courtRect.left) / courtRect.width) * 100;
+        const y = ((e.clientY - courtRect.top) / courtRect.height) * 50;
+        
+        nearestSnapPoint = findNearestLocation(x, y);
+        highlightSnapPoint(nearestSnapPoint);
+      });
+    }
+
+    function findNearestLocation(mouseX, mouseY) {
+      let nearestLoc = null;
+      let minDist = Infinity;
+      
+      Object.entries(HCO_STRING_SPOTS).forEach(([loc, coords]) => {
+        const courtY = (50 - coords.y) * 2;
+        const dist = Math.sqrt(Math.pow(mouseX - coords.x, 2) + Math.pow(courtY - mouseY, 2));
+        
+        if (dist < minDist) {
+          minDist = dist;
+          nearestLoc = loc;
+        }
+      });
+      
+      return nearestLoc;
+    }
+
+    function showSnapPoints() {
+      const container = document.getElementById('player-icons-container');
+      
+      Object.entries(HCO_STRING_SPOTS).forEach(([loc, coords]) => {
+        const snapPoint = document.createElement('div');
+        snapPoint.className = 'snap-point';
+        snapPoint.dataset.location = loc;
+        snapPoint.style.left = `${coords.x}%`;
+        snapPoint.style.top = `${(50 - coords.y) * 2}%`;
+        container.appendChild(snapPoint);
+      });
+    }
+
+    function hideSnapPoints() {
+      document.querySelectorAll('.snap-point').forEach(point => point.remove());
+    }
+
+    function highlightSnapPoint(location) {
+      document.querySelectorAll('.snap-point').forEach(point => {
+        if (point.dataset.location === location) {
+          point.classList.add('active');
+        } else {
+          point.classList.remove('active');
+        }
+      });
+    }
+
+    function handleDrop(newLocation) {
+      if (!draggedPlayer || !newLocation) return;
+      
+      // Check if location is occupied
+      const occupyingPlayer = findPlayerAtLocation(newLocation);
+      
+      if (occupyingPlayer && occupyingPlayer !== draggedPlayer) {
+        // Location occupied - set offset
+        positionOffsets[draggedPlayer] = 3; // 3 x-units to the right
+      } else {
+        // Clear offset for this player
+        delete positionOffsets[draggedPlayer];
+      }
+      
+      // If dragged player was occupying a spot, check if anyone was waiting
+      if (draggedPlayerOriginalLocation) {
+        checkAndResolveOffsets(draggedPlayerOriginalLocation);
+      }
+      
+      // Update assignment (but don't set action yet)
+      if (!currentStepAssignments[draggedPlayer]) {
+        currentStepAssignments[draggedPlayer] = {};
+      }
+      currentStepAssignments[draggedPlayer].location = newLocation;
+      // Action will be set via inline dropdown
+      
+      // Update visualization
+      renderCourtVisualization();
+      
+      // Show inline action dropdown
+      showInlineActionDropdown(draggedPlayer, newLocation);
+    }
+
+    function findPlayerAtLocation(location) {
+      for (const [pos, assignment] of Object.entries(currentStepAssignments)) {
+        if (assignment && assignment.location === location && assignment.action) {
+          return pos;
+        }
+      }
+      return null;
+    }
+
+    function checkAndResolveOffsets(location) {
+      // Find first non-screen player with offset at this location
+      for (const [pos, assignment] of Object.entries(currentStepAssignments)) {
+        if (assignment && assignment.location === location && 
+            positionOffsets[pos] && assignment.action !== 'screen') {
+          // Move this player to actual position
+          delete positionOffsets[pos];
+          renderCourtVisualization();
+          return; // Only move first one
+        }
+      }
+    }
+
+    function showInlineActionDropdown(player, location) {
+      // Remove any existing dropdown
+      document.querySelectorAll('.inline-action-dropdown').forEach(d => d.remove());
+      
+      const container = document.getElementById('player-icons-container');
+      const coords = HCO_STRING_SPOTS[location];
+      if (!coords) return;
+      
+      const dropdown = document.createElement('div');
+      dropdown.className = 'inline-action-dropdown';
+      
+      // Position near the player icon
+      const offset = positionOffsets[player] || 0;
+      dropdown.style.left = `${coords.x + offset + 5}%`;
+      dropdown.style.top = `${(50 - coords.y) * 2}%`;
+      
+      // Build dropdown HTML
+      dropdown.innerHTML = `
+        <select id="inline-action-${player}">
+          <option value="">-- Select Action --</option>
+        </select>
+        <button onclick="applyInlineAction('${player}')">Confirm</button>
+        <button onclick="cancelInlineAction('${player}')" style="background: rgba(255,255,255,0.2); margin-top: 5px;">Cancel</button>
+      `;
+      
+      container.appendChild(dropdown);
+      
+      // Populate actions
+      const select = dropdown.querySelector('select');
+      updateInlineActionOptions(select, player);
+    }
+
+    function updateInlineActionOptions(select, player) {
+      const ballHandlerAssigned = Object.entries(currentStepAssignments).some(([pos, assignment]) => 
+        pos !== player && assignment && assignment.action && BALL_HANDLING_ACTIONS.includes(assignment.action)
+      );
+      
+      Object.entries(ACTIONS).forEach(([value, label]) => {
+        const option = document.createElement('option');
+        option.value = value;
+        option.textContent = label;
+        
+        if (ballHandlerAssigned && BALL_HANDLING_ACTIONS.includes(value)) {
+          option.disabled = true;
+        }
+        
+        select.appendChild(option);
+      });
+    }
+
+    function applyInlineAction(player) {
+      const select = document.getElementById(`inline-action-${player}`);
+      const action = select.value;
+      
+      if (!action) {
+        alert('Please select an action');
+        return;
+      }
+      
+      // Apply action
+      currentStepAssignments[player].action = action;
+      
+      // Remove dropdown
+      document.querySelectorAll('.inline-action-dropdown').forEach(d => d.remove());
+      
+      // Update visualization
+      renderPositionChips();
+      renderCourtVisualization();
+      updateActionDropdown();
+      validateActionButton();
+    }
+
+    function cancelInlineAction(player) {
+      // Remove assignment
+      if (currentStepAssignments[player]) {
+        delete currentStepAssignments[player].location;
+        delete currentStepAssignments[player].action;
+        if (Object.keys(currentStepAssignments[player]).length === 0) {
+          delete currentStepAssignments[player];
+        }
+      }
+      
+      // Clear offset
+      delete positionOffsets[player];
+      
+      // Remove dropdown
+      document.querySelectorAll('.inline-action-dropdown').forEach(d => d.remove());
+      
+      // Update visualization
+      renderPositionChips();
+      renderCourtVisualization();
+      validateActionButton();
+    }
+
     function renderCourtVisualization() {
       const container = document.getElementById('player-icons-container');
 
@@ -810,6 +1119,9 @@
         container.innerHTML = '';
         return;
       }
+
+      // Remove old offset indicators
+      container.querySelectorAll('.offset-indicator').forEach(ind => ind.remove());
 
       // Get existing icons to reuse for animation
       const existingIcons = {};
@@ -831,7 +1143,9 @@
           const coords = HCO_STRING_SPOTS[assignment.location];
           if (!coords) return;
 
-          const targetLeft = `${coords.x}%`;
+          // Apply offset if exists
+          const offset = positionOffsets[pos] || 0;
+          const targetLeft = `${coords.x + offset}%`;
           const targetTop = `${(50 - coords.y) * 2}%`;
 
           let icon = existingIcons[pos];
@@ -856,6 +1170,9 @@
             
             container.appendChild(icon);
             
+            // Setup drag handlers
+            setupDragHandlers(icon, pos);
+            
             // Trigger animation on next frame
             if (prevAssignment && prevAssignment.location) {
               requestAnimationFrame(() => {
@@ -868,6 +1185,16 @@
             icon.style.left = targetLeft;
             icon.style.top = targetTop;
             delete existingIcons[pos]; // Mark as handled
+          }
+
+          // Add offset indicator if offset exists
+          if (offset > 0) {
+            const indicator = document.createElement('div');
+            indicator.className = 'offset-indicator';
+            indicator.style.left = `${coords.x}%`;
+            indicator.style.top = `${(50 - coords.y) * 2}%`;
+            indicator.style.width = `${offset}%`;
+            container.appendChild(indicator);
           }
 
           // Check if this player has the ball
@@ -947,6 +1274,7 @@
       previousStepAssignments = {};
       selectedPosition = null;
       currentFormation = null;
+      positionOffsets = {};
       
       // Reset formation dropdown
       document.getElementById('formation-select').value = '';
@@ -1180,9 +1508,10 @@
       // Save current assignments as previous for animation
       previousStepAssignments = {...currentStepAssignments};
       
-      // Reset current assignments
+      // Reset current assignments and offsets
       currentStepAssignments = {};
       selectedPosition = null;
+      positionOffsets = {}; // Clear all offsets for new step
       
       // Switch from formation dropdown to position chips for step 2+
       if (playState.currentStep === 2) {
