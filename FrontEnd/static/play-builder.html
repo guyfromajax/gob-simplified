@@ -977,8 +977,8 @@
       
       if (occupyingPlayer && occupyingPlayer !== draggedPlayer) {
         // Location occupied - set offset
-        positionOffsets[draggedPlayer] = 3; // 3 x-units to the right
-        console.log(`Setting offset for ${draggedPlayer}: 3 units (occupied by ${occupyingPlayer})`);
+        positionOffsets[draggedPlayer] = 5; // 5 x-units to the right for visibility
+        console.log(`Setting offset for ${draggedPlayer}: 5 units (occupied by ${occupyingPlayer})`);
       } else {
         // Clear offset for this player
         delete positionOffsets[draggedPlayer];
