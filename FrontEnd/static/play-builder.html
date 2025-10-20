@@ -968,12 +968,21 @@
       // Check if location is occupied
       const occupyingPlayer = findPlayerAtLocation(newLocation);
       
+      console.log('handleDrop:', {
+        draggedPlayer,
+        newLocation,
+        occupyingPlayer,
+        currentAssignments: currentStepAssignments
+      });
+      
       if (occupyingPlayer && occupyingPlayer !== draggedPlayer) {
         // Location occupied - set offset
         positionOffsets[draggedPlayer] = 3; // 3 x-units to the right
+        console.log(`Setting offset for ${draggedPlayer}: 3 units (occupied by ${occupyingPlayer})`);
       } else {
         // Clear offset for this player
         delete positionOffsets[draggedPlayer];
+        console.log(`Clearing offset for ${draggedPlayer} (location free)`);
       }
       
       // If dragged player was occupying a spot, check if anyone was waiting
@@ -988,6 +997,8 @@
       currentStepAssignments[draggedPlayer].location = newLocation;
       // Action will be set via inline dropdown
       
+      console.log('Position offsets:', positionOffsets);
+      
       // Update visualization
       renderCourtVisualization();
       
@@ -996,8 +1007,10 @@
     }
 
     function findPlayerAtLocation(location) {
+      // Find any player currently at this location (even without action assigned yet)
       for (const [pos, assignment] of Object.entries(currentStepAssignments)) {
-        if (assignment && assignment.location === location && assignment.action) {
+        if (pos === draggedPlayer) continue; // Skip the player being dragged
+        if (assignment && assignment.location === location) {
           return pos;
         }
       }
@@ -1147,6 +1160,14 @@
           const offset = positionOffsets[pos] || 0;
           const targetLeft = `${coords.x + offset}%`;
           const targetTop = `${(50 - coords.y) * 2}%`;
+          
+          if (offset > 0) {
+            console.log(`Applying offset to ${pos}: ${offset} units at ${assignment.location}`, {
+              originalX: coords.x,
+              offsetX: coords.x + offset,
+              targetLeft
+            });
+          }
 
           let icon = existingIcons[pos];
           
