@@ -170,27 +170,30 @@
 
     .position-chips {
       display: flex;
-      gap: 10px;
+      gap: 12px;
       justify-content: center;
-      flex-wrap: wrap;
+      align-items: center;
     }
 
     .chip {
-      padding: 10px 20px;
+      width: 50px;
+      height: 50px;
       background: linear-gradient(135deg, #FFD700, #FFC700);
       color: #000;
-      border-radius: 20px;
+      border-radius: 50%;
       font-weight: 700;
-      font-size: 0.95rem;
+      font-size: 0.85rem;
       transition: all 0.3s ease;
-      min-width: 60px;
-      text-align: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       cursor: pointer;
       border: none;
+      padding: 0;
     }
 
     .chip:hover:not(.completed) {
-      transform: translateY(-2px);
+      transform: scale(1.1);
       box-shadow: 0 4px 12px rgba(255, 215, 0, 0.5);
     }
 
@@ -204,6 +207,7 @@
       background: linear-gradient(135deg, #FF8C00, #FF6500);
       color: #fff;
       box-shadow: 0 0 15px rgba(255, 140, 0, 0.6);
+      transform: scale(1.1);
     }
 
     .step-counter {
@@ -341,9 +345,9 @@
       }
 
       .chip {
-        padding: 8px 16px;
-        font-size: 0.85rem;
-        min-width: 50px;
+        width: 45px;
+        height: 45px;
+        font-size: 0.75rem;
       }
 
       .court-image {
@@ -397,10 +401,12 @@
 
       <div class="step2-controls-row">
         <div class="control-column">
-          <label style="display: block; margin-bottom: 8px; color: #FFD700; font-weight: 600; font-size: 0.95rem; text-transform: uppercase; letter-spacing: 0.5px; text-align: center;">Select Position</label>
-          <div class="position-chips" id="position-chips">
-            <!-- Chips will be dynamically generated -->
+          <div style="height: 44px; display: flex; align-items: center; justify-content: center;">
+            <div class="position-chips" id="position-chips">
+              <!-- Chips will be dynamically generated -->
+            </div>
           </div>
+          <button id="add-assignment-btn" disabled>Add Assignment</button>
         </div>
 
         <div class="control-column">
@@ -410,7 +416,7 @@
               <option value="">-- Select Location --</option>
             </select>
           </div>
-          <button id="add-assignment-btn" disabled>Add Assignment</button>
+          <button id="submit-step-btn" disabled>Submit Step</button>
         </div>
 
         <div class="control-column">
@@ -420,7 +426,6 @@
               <option value="">-- Select Action --</option>
             </select>
           </div>
-          <button id="submit-step-btn" disabled>Submit Step</button>
         </div>
       </div>
     </div>
