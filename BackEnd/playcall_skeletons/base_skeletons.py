@@ -94,8 +94,8 @@ COLORADO = {
                 "PG": {"action": ACTIONS["RECEIVE"], "spot": "upper wing"},
                 "SG": {"action": ACTIONS["PASS"], "spot": "key"},
                 "SF": {"action": ACTIONS["DRIFT"], "spot": "lower wing"},
-                "PF": {"action": ACTIONS["POST"], "spot": "lower lowPost"},
-                "C": {"action": ACTIONS["POST"], "spot": "upper lowPost"}
+                "PF": {"action": ACTIONS["POST_UP"], "spot": "lower lowPost"},
+                "C": {"action": ACTIONS["POST_UP"], "spot": "upper lowPost"}
             },
             "events": [{"type": "pass", "from": "SG", "to": "PG"}]
         },
@@ -105,7 +105,7 @@ COLORADO = {
                 "PG": {"action": ACTIONS["PASS"], "spot": "upper wing"},
                 "SG": {"action": ACTIONS["DRIFT"], "spot": "key"},
                 "SF": {"action": ACTIONS["DRIFT"], "spot": "lower wing"},
-                "PF": {"action": ACTIONS["POST"], "spot": "lower lowPost"},
+                "PF": {"action": ACTIONS["POST_UP"], "spot": "lower lowPost"},
                 "C": {"action": ACTIONS["RECEIVE"], "spot": "upper lowPost"}
             },
             "events": [{"type": "pass", "from": "PG", "to": "C"}]

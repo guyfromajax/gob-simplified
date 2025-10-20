@@ -40,8 +40,8 @@ INSIDE_HIGHLOW_ENTRY = {
                 "PG": {"action": ACTIONS["HANDLE"], "spot": "key"},
                 "SG": {"action": ACTIONS["DRIFT"], "spot": "upper wing"},
                 "SF": {"action": ACTIONS["CUT"], "spot": "lower wing"},
-                "PF": {"action": ACTIONS["POST"], "spot": "upper highPost"},
-                "C": {"action": ACTIONS["POST"], "spot": "lower lowPost"}
+                "PF": {"action": ACTIONS["POST_UP"], "spot": "upper highPost"},
+                "C": {"action": ACTIONS["POST_UP"], "spot": "lower lowPost"}
             },
             "events": []
         },
@@ -51,8 +51,8 @@ INSIDE_HIGHLOW_ENTRY = {
                 "PG": {"action": ACTIONS["HANDLE"], "spot": "key"},
                 "SG": {"action": ACTIONS["DRIFT"], "spot": "upper wing"},
                 "SF": {"action": ACTIONS["CUT"], "spot": "lower wing"},
-                "PF": {"action": ACTIONS["POST"], "spot": "upper highPost"},
-                "C": {"action": ACTIONS["POST"], "spot": "lower lowPost"}
+                "PF": {"action": ACTIONS["POST_UP"], "spot": "upper highPost"},
+                "C": {"action": ACTIONS["POST_UP"], "spot": "lower lowPost"}
             },
             "events": []
         },
@@ -63,7 +63,7 @@ INSIDE_HIGHLOW_ENTRY = {
                 "SG": {"action": ACTIONS["STAY"], "spot": "upper wing"},
                 "SF": {"action": ACTIONS["GET_OPEN"], "spot": "lower corner"},
                 "PF": {"action": ACTIONS["RECEIVE"], "spot": "upper highPost"},
-                "C": {"action": ACTIONS["POST"], "spot": "lower lowPost"}
+                "C": {"action": ACTIONS["POST_UP"], "spot": "lower lowPost"}
             },
             "events": [{"type": "pass", "from": "PG", "to": "PF"}]
         },
@@ -74,7 +74,7 @@ INSIDE_HIGHLOW_ENTRY = {
                 "SG": {"action": ACTIONS["SCREEN"], "spot": "key"},
                 "SF": {"action": ACTIONS["CUT"], "spot": "upper corner"},
                 "PF": {"action": ACTIONS["HANDLE"], "spot": "upper highPost"},
-                "C": {"action": ACTIONS["POST"], "spot": "lower lowPost"}
+                "C": {"action": ACTIONS["POST_UP"], "spot": "lower lowPost"}
             },
             "events": []
         },
