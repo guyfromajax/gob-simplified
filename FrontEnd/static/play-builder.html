@@ -446,8 +446,22 @@
       </div>
 
       <div class="step2-controls-row">
-        <div class="control-column">
-          <div style="height: 44px; display: flex; align-items: center; justify-content: center;">
+        <div class="control-column" id="position-column">
+          <!-- Step 1: Formation dropdown -->
+          <div class="form-group" style="margin-bottom: 0;" id="formation-group">
+            <label for="formation-select">Formation</label>
+            <select id="formation-select">
+              <option value="">-- Select Formation --</option>
+              <option value="3-2">3-2</option>
+              <option value="4-1">4-1</option>
+              <option value="5-0">5-0</option>
+              <option value="Screen Entry">Screen Entry</option>
+              <option value="Custom">Custom</option>
+            </select>
+          </div>
+          
+          <!-- Steps 2+: Position chips -->
+          <div style="height: 44px; display: flex; align-items: center; justify-content: center; display: none;" id="position-chips-wrapper">
             <div class="position-chips" id="position-chips">
               <!-- Chips will be dynamically generated -->
             </div>
@@ -565,6 +579,38 @@
     // Ball-handling actions (only one player can have these per step)
     const BALL_HANDLING_ACTIONS = ["handle_ball", "receive", "shoot"];
 
+    // Formation presets for Step 1
+    const FORMATIONS = {
+      "3-2": {
+        "PG": {"location": "key", "action": "handle_ball"},
+        "SG": {"location": "upper wing", "action": "get_open"},
+        "SF": {"location": "lower wing", "action": "get_open"},
+        "PF": {"location": "lower lowPost", "action": "get_open"},
+        "C": {"location": "upper lowPost", "action": "get_open"}
+      },
+      "4-1": {
+        "PG": {"location": "upper midWing", "action": "handle_ball"},
+        "SG": {"location": "lower midWing", "action": "get_open"},
+        "SF": {"location": "upper midCorner", "action": "get_open"},
+        "PF": {"location": "lower midCorner", "action": "get_open"},
+        "C": {"location": "upper lowPost", "action": "get_open"}
+      },
+      "5-0": {
+        "PG": {"location": "key", "action": "handle_ball"},
+        "SG": {"location": "upper wing", "action": "get_open"},
+        "SF": {"location": "lower wing", "action": "get_open"},
+        "PF": {"location": "lower corner", "action": "get_open"},
+        "C": {"location": "upper corner", "action": "get_open"}
+      },
+      "Screen Entry": {
+        "PG": {"location": "key", "action": "handle_ball"},
+        "SG": {"location": "upper lowPost", "action": "get_open"},
+        "SF": {"location": "lower lowPost", "action": "get_open"},
+        "PF": {"location": "lower apex", "action": "get_open"},
+        "C": {"location": "upper apex", "action": "get_open"}
+      }
+    };
+
     // Play state
     let playState = {
       name: "",
@@ -583,6 +629,9 @@
     
     // Currently selected position
     let selectedPosition = null;
+    
+    // Current formation selection (for Step 1)
+    let currentFormation = null;
 
     // Initialize
     function init() {
@@ -679,9 +728,78 @@
       document.getElementById('submit-play-btn').addEventListener('click', submitPlay);
 
       // Step 2 controls
+      document.getElementById('formation-select').addEventListener('change', handleFormationChange);
       document.getElementById('location-select').addEventListener('change', validateActionButton);
       document.getElementById('action-select').addEventListener('change', validateActionButton);
       document.getElementById('action-btn').addEventListener('click', handleActionButton);
+    }
+
+    function handleFormationChange() {
+      const formation = document.getElementById('formation-select').value;
+      currentFormation = formation;
+
+      if (!formation) {
+        // No formation selected, clear everything
+        currentStepAssignments = {};
+        renderPositionChips();
+        renderCourtVisualization();
+        validateActionButton();
+        toggleCustomMode(false);
+        return;
+      }
+
+      if (formation === "Custom") {
+        // Enable custom mode - show position chips
+        toggleCustomMode(true);
+        currentStepAssignments = {};
+        renderPositionChips();
+        renderCourtVisualization();
+        validateActionButton();
+      } else {
+        // Apply preset formation
+        toggleCustomMode(false);
+        applyFormation(formation);
+      }
+    }
+
+    function toggleCustomMode(isCustom) {
+      const formationGroup = document.getElementById('formation-group');
+      const positionChipsWrapper = document.getElementById('position-chips-wrapper');
+      const locationSelect = document.getElementById('location-select');
+      const actionSelect = document.getElementById('action-select');
+
+      if (isCustom) {
+        // Hide formation label, show position chips
+        formationGroup.style.display = 'none';
+        positionChipsWrapper.style.display = 'flex';
+        locationSelect.disabled = false;
+        actionSelect.disabled = false;
+      } else {
+        // Show formation dropdown, hide chips
+        formationGroup.style.display = 'block';
+        positionChipsWrapper.style.display = 'none';
+        locationSelect.disabled = true;
+        actionSelect.disabled = true;
+      }
+    }
+
+    function applyFormation(formationName) {
+      const formation = FORMATIONS[formationName];
+      if (!formation) return;
+
+      // Apply all position assignments from formation
+      currentStepAssignments = {};
+      Object.entries(formation).forEach(([pos, assignment]) => {
+        currentStepAssignments[pos] = {
+          location: assignment.location,
+          action: assignment.action
+        };
+      });
+
+      // Update visualization
+      renderPositionChips();
+      renderCourtVisualization();
+      validateActionButton();
     }
 
     function renderCourtVisualization() {
@@ -814,6 +932,12 @@
       // Update step counter
       updateStepCounter();
 
+      // Show formation dropdown for step 1
+      document.getElementById('formation-group').style.display = 'block';
+      document.getElementById('position-chips-wrapper').style.display = 'none';
+      document.getElementById('location-select').disabled = true;
+      document.getElementById('action-select').disabled = true;
+
       // Initialize position chips
       renderPositionChips();
       renderCourtVisualization();
@@ -822,6 +946,10 @@
       currentStepAssignments = {};
       previousStepAssignments = {};
       selectedPosition = null;
+      currentFormation = null;
+      
+      // Reset formation dropdown
+      document.getElementById('formation-select').value = '';
       
       // Initialize action dropdown
       updateActionDropdown();
@@ -1055,6 +1183,14 @@
       // Reset current assignments
       currentStepAssignments = {};
       selectedPosition = null;
+      
+      // Switch from formation dropdown to position chips for step 2+
+      if (playState.currentStep === 2) {
+        document.getElementById('formation-group').style.display = 'none';
+        document.getElementById('position-chips-wrapper').style.display = 'flex';
+        document.getElementById('location-select').disabled = false;
+        document.getElementById('action-select').disabled = false;
+      }
       
       renderPositionChips();
       renderCourtVisualization();
