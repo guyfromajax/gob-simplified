@@ -140,6 +140,49 @@ HCO_STRING_SPOTS = {
     "deep upper baseline": {"x": 57, "y": 45}
 }
 
+# Offset positions for collision handling (when two players at same spot)
+OFFSET_SPOTS = {
+    # Center spots: x + 3, y same
+    "deep key": {"x": 60, "y": 25},
+    "key": {"x": 67, "y": 25},
+    "topLane": {"x": 77, "y": 25},
+    "midLane": {"x": 83, "y": 25},
+    
+    # Upper wing/apex spots: x + 3, y - 3
+    "deep upper wing": {"x": 60, "y": 32},
+    "upper midWing": {"x": 71, "y": 33},
+    "upper wing": {"x": 76, "y": 37},
+    "upper apex": {"x": 83, "y": 33},
+    
+    # Upper corner/baseline spots: x same, y - 3
+    "upper corner": {"x": 88, "y": 41},
+    "upper midCorner": {"x": 81, "y": 40},
+    "deep upper baseline": {"x": 57, "y": 42},
+    "upper midBaseline": {"x": 89, "y": 33},
+    
+    # Lower wing/apex spots: x + 3, y + 3
+    "deep lower wing": {"x": 60, "y": 18},
+    "lower midWing": {"x": 71, "y": 17},
+    "lower wing": {"x": 76, "y": 13},
+    "lower apex": {"x": 83, "y": 18},
+    
+    # Lower corner/baseline spots: x same, y + 3
+    "lower corner": {"x": 88, "y": 9},
+    "lower midCorner": {"x": 81, "y": 10},
+    "deep lower baseline": {"x": 57, "y": 8},
+    "lower midBaseline": {"x": 89, "y": 18},
+    
+    # Upper post spots: x - 3, y + 3
+    "upper lowPost": {"x": 83, "y": 35},
+    "upper midPost": {"x": 77, "y": 35},
+    "upper highPost": {"x": 71, "y": 35},
+    
+    # Lower post spots: x + 3, y - 3
+    "lower lowPost": {"x": 89, "y": 16},
+    "lower midPost": {"x": 83, "y": 16},
+    "lower highPost": {"x": 77, "y": 16}
+}
+
 # Shared court coordinates
 HOME_RIM_COORDS = {"x": 90, "y": 25}
 AWAY_RIM_COORDS = {"x": 10, "y": 25}
