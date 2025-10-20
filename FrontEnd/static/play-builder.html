@@ -286,6 +286,20 @@
       z-index: 20;
     }
 
+    .player-icon.drag-hover {
+      box-shadow: 0 0 20px rgba(255, 215, 0, 1), 0 0 30px rgba(255, 215, 0, 0.6);
+      animation: pulse-glow 0.5s ease-in-out infinite alternate;
+    }
+
+    @keyframes pulse-glow {
+      from {
+        box-shadow: 0 0 20px rgba(255, 215, 0, 1), 0 0 30px rgba(255, 215, 0, 0.6);
+      }
+      to {
+        box-shadow: 0 0 25px rgba(255, 215, 0, 1), 0 0 40px rgba(255, 215, 0, 0.8);
+      }
+    }
+
     .player-icon.offset {
       /* Marker for offset sprites */
     }
@@ -742,6 +756,7 @@
     let draggedPlayer = null;
     let draggedPlayerOriginalLocation = null;
     let nearestSnapPoint = null;
+    let hoveredSprite = null; // The sprite currently being hovered over during drag
     
     // Offset tracking (position -> boolean)
     let positionOffsets = {};
@@ -934,13 +949,43 @@
         icon.classList.remove('dragging');
         hideSnapPoints();
         
-        if (nearestSnapPoint) {
+        // Clear any hover effects
+        document.querySelectorAll('.player-icon.drag-hover').forEach(i => i.classList.remove('drag-hover'));
+        
+        console.log('dragend - hoveredSprite:', hoveredSprite, 'nearestSnapPoint:', nearestSnapPoint);
+        
+        // Prefer hoveredSprite (collision) over nearestSnapPoint (empty space)
+        if (hoveredSprite) {
+          const hoveredAssignment = currentStepAssignments[hoveredSprite];
+          if (hoveredAssignment && hoveredAssignment.location) {
+            console.log(`Dropping on occupied sprite ${hoveredSprite} at ${hoveredAssignment.location}`);
+            handleDrop(hoveredAssignment.location);
+          }
+        } else if (nearestSnapPoint) {
+          console.log(`Dropping on empty space at ${nearestSnapPoint}`);
           handleDrop(nearestSnapPoint);
         }
         
         draggedPlayer = null;
         draggedPlayerOriginalLocation = null;
         nearestSnapPoint = null;
+        hoveredSprite = null;
+      });
+
+      // Detect when dragging over this sprite
+      icon.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        if (pos !== draggedPlayer) {
+          hoveredSprite = pos;
+          icon.classList.add('drag-hover');
+        }
+      });
+
+      icon.addEventListener('dragleave', (e) => {
+        icon.classList.remove('drag-hover');
+        if (hoveredSprite === pos) {
+          hoveredSprite = null;
+        }
       });
     }
 
