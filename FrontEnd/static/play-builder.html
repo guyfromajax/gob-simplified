@@ -1025,10 +1025,39 @@
         const imgRect = courtImg.getBoundingClientRect();
         
         // Calculate position relative to the actual image (not the container)
-        const x = ((e.clientX - imgRect.left) / imgRect.width) * 100;
-        const y = ((e.clientY - imgRect.top) / imgRect.height) * 50;
+        const relX = (e.clientX - imgRect.left) / imgRect.width;
+        const relY = (e.clientY - imgRect.top) / imgRect.height;
         
-        console.log('Drag position:', { mouseX: e.clientX, mouseY: e.clientY, courtX: x, courtY: y });
+        // Convert to court grid coordinates
+        // X: 0-100 (straightforward)
+        const x = relX * 100;
+        
+        // Y: Court grid is 0-50, but we need to account for image aspect ratio
+        // If image is 2:1 (width:height), then relY maps directly to 0-50
+        // But actual court images might be different
+        const imageAspect = imgRect.width / imgRect.height;
+        const gridAspect = 100 / 50; // 2:1
+        
+        // Adjust Y coordinate based on aspect ratio difference
+        let y;
+        if (Math.abs(imageAspect - gridAspect) < 0.1) {
+          // Image is close to 2:1, use direct mapping
+          y = relY * 50;
+        } else {
+          // Image has different aspect ratio - need to adjust
+          // The grid assumes 2:1, so scale Y accordingly
+          y = relY * 50 * (imageAspect / gridAspect);
+        }
+        
+        console.log('Drag position:', { 
+          mouseX: e.clientX, 
+          mouseY: e.clientY, 
+          relX: relX.toFixed(3),
+          relY: relY.toFixed(3),
+          imgAspect: imageAspect.toFixed(3),
+          courtX: x.toFixed(1), 
+          courtY: y.toFixed(1)
+        });
         
         nearestSnapPoint = findNearestLocation(x, y);
         highlightSnapPoint(nearestSnapPoint);
@@ -1039,9 +1068,16 @@
       let nearestLoc = null;
       let minDist = Infinity;
       
+      console.log('Finding nearest to:', { mouseX, mouseY });
+      
       Object.entries(HCO_STRING_SPOTS).forEach(([loc, coords]) => {
+        // Convert grid Y (0-50) to percentage Y (0-100)
         const courtY = (50 - coords.y) * 2;
         const dist = Math.sqrt(Math.pow(mouseX - coords.x, 2) + Math.pow(courtY - mouseY, 2));
+        
+        if (dist < 10) { // Only log nearby locations
+          console.log(`  ${loc}: grid(${coords.x}, ${coords.y}) → pct(${coords.x}, ${courtY}) → dist: ${dist.toFixed(1)}`);
+        }
         
         if (dist < minDist) {
           minDist = dist;
@@ -1049,6 +1085,7 @@
         }
       });
       
+      console.log(`Nearest: ${nearestLoc} (dist: ${minDist.toFixed(1)})`);
       return nearestLoc;
     }
 
