@@ -1020,10 +1020,15 @@
         e.preventDefault();
         e.dataTransfer.dropEffect = 'move';
         
-        // Calculate nearest snap point
-        const courtRect = court.getBoundingClientRect();
-        const x = ((e.clientX - courtRect.left) / courtRect.width) * 100;
-        const y = ((e.clientY - courtRect.top) / courtRect.height) * 50;
+        // Calculate nearest snap point using the actual court image dimensions
+        const courtImg = court.querySelector('.court-image');
+        const imgRect = courtImg.getBoundingClientRect();
+        
+        // Calculate position relative to the actual image (not the container)
+        const x = ((e.clientX - imgRect.left) / imgRect.width) * 100;
+        const y = ((e.clientY - imgRect.top) / imgRect.height) * 50;
+        
+        console.log('Drag position:', { mouseX: e.clientX, mouseY: e.clientY, courtX: x, courtY: y });
         
         nearestSnapPoint = findNearestLocation(x, y);
         highlightSnapPoint(nearestSnapPoint);
