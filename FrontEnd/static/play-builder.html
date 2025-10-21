@@ -1020,43 +1020,30 @@
         e.preventDefault();
         e.dataTransfer.dropEffect = 'move';
         
-        // Calculate nearest snap point using the actual court image dimensions
-        const courtImg = court.querySelector('.court-image');
-        const imgRect = courtImg.getBoundingClientRect();
+        // Calculate position relative to court-visualization container
+        // (same coordinate system used for positioning sprites)
+        const courtRect = court.getBoundingClientRect();
         
-        // Calculate position relative to the actual image (not the container)
-        const relX = (e.clientX - imgRect.left) / imgRect.width;
-        const relY = (e.clientY - imgRect.top) / imgRect.height;
+        const relX = (e.clientX - courtRect.left) / courtRect.width;
+        const relY = (e.clientY - courtRect.top) / courtRect.height;
         
-        // Convert to court grid coordinates
-        // X: 0-100 (straightforward)
+        // Convert to court grid coordinates (0-100, 0-100 percentage)
         const x = relX * 100;
+        const yPct = relY * 100;
         
-        // Y: Court grid is 0-50, but we need to account for image aspect ratio
-        // If image is 2:1 (width:height), then relY maps directly to 0-50
-        // But actual court images might be different
-        const imageAspect = imgRect.width / imgRect.height;
-        const gridAspect = 100 / 50; // 2:1
-        
-        // Adjust Y coordinate based on aspect ratio difference
-        let y;
-        if (Math.abs(imageAspect - gridAspect) < 0.1) {
-          // Image is close to 2:1, use direct mapping
-          y = relY * 50;
-        } else {
-          // Image has different aspect ratio - need to adjust
-          // The grid assumes 2:1, so scale Y accordingly
-          y = relY * 50 * (imageAspect / gridAspect);
-        }
+        // Convert percentage back to grid Y (0-50)
+        // Since our sprites use: top = (50 - gridY) * 2%
+        // We need to reverse this: gridY = 50 - (yPct / 2)
+        const y = 50 - (yPct / 2);
         
         console.log('Drag position:', { 
           mouseX: e.clientX, 
           mouseY: e.clientY, 
           relX: relX.toFixed(3),
           relY: relY.toFixed(3),
-          imgAspect: imageAspect.toFixed(3),
           courtX: x.toFixed(1), 
-          courtY: y.toFixed(1)
+          courtY_pct: yPct.toFixed(1),
+          courtY_grid: y.toFixed(1)
         });
         
         nearestSnapPoint = findNearestLocation(x, y);
