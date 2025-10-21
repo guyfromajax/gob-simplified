@@ -1055,15 +1055,14 @@
       let nearestLoc = null;
       let minDist = Infinity;
       
-      console.log('Finding nearest to:', { mouseX, mouseY });
+      console.log('Finding nearest to:', { mouseX: mouseX.toFixed(1), mouseY: mouseY.toFixed(1) });
       
       Object.entries(HCO_STRING_SPOTS).forEach(([loc, coords]) => {
-        // Convert grid Y (0-50) to percentage Y (0-100)
-        const courtY = (50 - coords.y) * 2;
-        const dist = Math.sqrt(Math.pow(mouseX - coords.x, 2) + Math.pow(courtY - mouseY, 2));
+        // Mouse is already in grid coordinates, compare directly
+        const dist = Math.sqrt(Math.pow(mouseX - coords.x, 2) + Math.pow(mouseY - coords.y, 2));
         
         if (dist < 10) { // Only log nearby locations
-          console.log(`  ${loc}: grid(${coords.x}, ${coords.y}) → pct(${coords.x}, ${courtY}) → dist: ${dist.toFixed(1)}`);
+          console.log(`  ${loc}: grid(${coords.x}, ${coords.y}) → dist: ${dist.toFixed(1)}`);
         }
         
         if (dist < minDist) {
