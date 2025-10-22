@@ -1759,7 +1759,7 @@
         `Building Step ${playState.currentStep}`;
     }
 
-    function completePlay() {
+    async function completePlay() {
       // Check if current step has all positions assigned
       let allComplete = true;
       for (const pos of POSITIONS) {
@@ -1777,31 +1777,58 @@
           '• Click Cancel to continue building'
         );
         
-        if (confirm) {
-          // Auto-fill and submit current step, then show success
-          endStep(true);
+        if (!confirm) return;
+        
+        // Auto-fill remaining positions
+        if (playState.currentStep > 1 && previousStepAssignments) {
+          POSITIONS.forEach(pos => {
+            const currentAssignment = currentStepAssignments[pos];
+            if (!currentAssignment || !currentAssignment.location || !currentAssignment.action) {
+              const prevAssignment = previousStepAssignments[pos];
+              if (prevAssignment && prevAssignment.location && prevAssignment.action) {
+                currentStepAssignments[pos] = {
+                  location: prevAssignment.location,
+                  action: prevAssignment.action
+                };
+              }
+            }
+          });
         }
-      } else {
-        // Current step is complete, submit it and show success
-        submitStep();
-        showSuccess();
       }
+      
+      // Submit final step if not already submitted
+      if (Object.keys(currentStepAssignments).length > 0) {
+        // Build final step data
+        const timestamp = (playState.currentStep - 1) * 300;
+        const stepData = {
+          timestamp: timestamp,
+          pos_actions: {},
+          events: []
+        };
+        
+        POSITIONS.forEach(pos => {
+          const assignment = currentStepAssignments[pos];
+          if (assignment) {
+            stepData.pos_actions[pos] = {
+              location: assignment.location,
+              action: assignment.action
+            };
+          }
+        });
+        
+        playState.steps.push(stepData);
+      }
+      
+      // Save to MongoDB
+      await savePlayToDatabase();
     }
 
-    function showSuccess() {
-      // Hide step 2
-      document.getElementById('step2').classList.add('hidden');
-
-      // Show success screen
-      document.getElementById('success-screen').classList.remove('hidden');
-      document.getElementById('success-play-name').textContent = 
-        `Play "${playState.name}" has been created successfully!`;
-
-      // Build final JSON structure matching Play class schema
-      const playJSON = {
+    async function savePlayToDatabase() {
+      // Build play data
+      const playData = {
         name: playState.name,
-        play_type: playState.type.toLowerCase().replace(' ', '_'), // "Set Play" → "set_play"
-        play_focus: playState.focus ? playState.focus.toLowerCase() : "balanced",
+        play_type: playState.type.toLowerCase().replace(' ', '_'),
+        play_focus: playState.focus ? playState.focus.toLowerCase() : 'balanced',
         skeletons: {
           standard: {
             steps: playState.steps
@@ -1825,7 +1852,41 @@
         }
       };
 
-      document.getElementById('json-output').textContent = JSON.stringify(playJSON, null, 2);
+      try {
+        const response = await fetch('/api/plays', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(playData)
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const result = await response.json();
+        console.log('Play saved:', result);
+        
+        // Show success screen with saved data
+        showSuccess(playData);
+        
+      } catch (error) {
+        console.error('Error saving play:', error);
+        alert('Failed to save play to database. Please check console for details.');
+      }
+    }
+
+    function showSuccess(playData) {
+      // Hide step 2
+      document.getElementById('step2').classList.add('hidden');
+
+      // Show success screen
+      document.getElementById('success-screen').classList.remove('hidden');
+      document.getElementById('success-play-name').textContent = 
+        `Play "${playData.name}" has been saved to the database!`;
+
+      document.getElementById('json-output').textContent = JSON.stringify(playData, null, 2);
     }
 
     // Start
