@@ -884,17 +884,20 @@
         return;
       }
 
+      // Hide formation dropdown, show buttons for all selections
+      document.getElementById('formation-selection').classList.add('hidden');
+      document.getElementById('build-buttons').classList.remove('hidden');
+
       if (formation === "Custom") {
         // Show build buttons for manual step building
-        document.getElementById('build-buttons').classList.remove('hidden');
         currentStepAssignments = {};
         renderPositionDashboard();
         renderCourtVisualization();
         validateActionButton();
       } else {
-        // Apply preset formation and auto-advance to Step 2
+        // Apply preset formation
         applyFormation(formation);
-        autoSubmitStep1();
+        validateActionButton();
       }
     }
 
@@ -922,15 +925,6 @@
       // Update visualization
       renderPositionDashboard();
       renderCourtVisualization();
-    }
-
-    function autoSubmitStep1() {
-      // Automatically submit Step 1 and advance to Step 2
-      submitStep();
-      
-      // Show build buttons for Step 2+
-      document.getElementById('formation-selection').classList.add('hidden');
-      document.getElementById('build-buttons').classList.remove('hidden');
     }
 
 
