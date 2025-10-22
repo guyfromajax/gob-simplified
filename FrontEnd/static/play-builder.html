@@ -500,13 +500,19 @@
           <label for="play-type">Play Type</label>
           <select id="play-type">
             <option value="">-- Select Play Type --</option>
+            <option value="Motion">Motion</option>
+            <option value="Set Play">Set Play</option>
           </select>
         </div>
 
         <div class="form-group">
-          <label for="tempo-variant">Tempo Variation</label>
-          <select id="tempo-variant">
-            <option value="">-- Select Tempo --</option>
+          <label for="play-focus">Play Focus</label>
+          <select id="play-focus" disabled>
+            <option value="">-- Select Focus --</option>
+            <option value="Inside">Inside</option>
+            <option value="Attack">Attack</option>
+            <option value="Outside">Outside</option>
+            <option value="Balanced">Balanced</option>
           </select>
         </div>
       </div>
@@ -520,7 +526,7 @@
     <div id="step2" class="step-container hidden">
       <div class="step2-header-row">
         <div class="step-subheader" id="play-summary" style="margin: 0;"></div>
-        <div class="step-counter" id="step-counter">Step 1/6</div>
+        <div class="step-counter" id="step-counter">Building Step 1/1</div>
       </div>
 
       <div class="step2-controls-row">
@@ -592,12 +598,14 @@
 
   <script>
     // Constants from backend
-    const PLAYCALLS = ["Base", "Freelance", "Inside", "Attack", "Outside", "Set"];
+    const PLAY_TYPES = ["Motion", "Set Play"];
+    const PLAY_FOCUS = ["Inside", "Attack", "Outside", "Balanced"];
     const POSITIONS = ["PG", "SG", "SF", "PF", "C"];
-    const TEMPO_VARIANTS = {
-      "fast": 3,
-      "normal": 6,
-      "slow": 9
+    
+    // Set Play always has 1 step, Motion has variable steps based on focus
+    const STEP_COUNTS = {
+      "Set Play": 1,
+      "Motion": 1  // Default, can be adjusted
     };
 
     // Court locations from constants.py HCO_STRING_SPOTS
@@ -736,7 +744,7 @@
     let playState = {
       name: "",
       type: "",
-      tempo: "",
+      focus: "",
       totalSteps: 0,
       currentStep: 1,
       steps: []
@@ -772,23 +780,8 @@
     }
 
     function populateDropdowns() {
-      // Play Type
-      const playTypeSelect = document.getElementById('play-type');
-      PLAYCALLS.forEach(type => {
-        const option = document.createElement('option');
-        option.value = type;
-        option.textContent = type;
-        playTypeSelect.appendChild(option);
-      });
-
-      // Tempo Variant
-      const tempoSelect = document.getElementById('tempo-variant');
-      Object.entries(TEMPO_VARIANTS).forEach(([tempo, steps]) => {
-        const option = document.createElement('option');
-        option.value = tempo;
-        option.textContent = `${tempo.charAt(0).toUpperCase() + tempo.slice(1)} (${steps} steps)`;
-        tempoSelect.appendChild(option);
-      });
+      // Play Type and Play Focus are already in HTML
+      // Just need to populate Location dropdown
 
       // Location with grouped shading
       const locationSelect = document.getElementById('location-select');
@@ -855,8 +848,8 @@
     function attachEventListeners() {
       // Step 1 form inputs
       document.getElementById('play-name').addEventListener('input', validateStep1);
-      document.getElementById('play-type').addEventListener('change', validateStep1);
-      document.getElementById('tempo-variant').addEventListener('change', validateStep1);
+      document.getElementById('play-type').addEventListener('change', handlePlayTypeChange);
+      document.getElementById('play-focus').addEventListener('change', validateStep1);
       document.getElementById('submit-play-btn').addEventListener('click', submitPlay);
 
       // Step 2 controls
@@ -864,6 +857,21 @@
       document.getElementById('location-select').addEventListener('change', validateActionButton);
       document.getElementById('action-select').addEventListener('change', validateActionButton);
       document.getElementById('action-btn').addEventListener('click', handleActionButton);
+    }
+
+    function handlePlayTypeChange() {
+      const playType = document.getElementById('play-type').value;
+      const playFocusSelect = document.getElementById('play-focus');
+      
+      // Enable Play Focus only for Set Play
+      if (playType === 'Set Play') {
+        playFocusSelect.disabled = false;
+      } else {
+        playFocusSelect.disabled = true;
+        playFocusSelect.value = ''; // Clear selection
+      }
+      
+      validateStep1();
     }
 
     function handleFormationChange() {
@@ -1437,17 +1445,23 @@
     function validateStep1() {
       const name = document.getElementById('play-name').value.trim();
       const type = document.getElementById('play-type').value;
-      const tempo = document.getElementById('tempo-variant').value;
+      const focus = document.getElementById('play-focus').value;
 
       const submitBtn = document.getElementById('submit-play-btn');
-      submitBtn.disabled = !(name && type && tempo);
+      
+      // For Set Play, require focus. For Motion, don't require focus
+      if (type === 'Set Play') {
+        submitBtn.disabled = !(name && type && focus);
+      } else {
+        submitBtn.disabled = !(name && type);
+      }
     }
 
     function submitPlay() {
       playState.name = document.getElementById('play-name').value.trim();
       playState.type = document.getElementById('play-type').value;
-      playState.tempo = document.getElementById('tempo-variant').value;
-      playState.totalSteps = TEMPO_VARIANTS[playState.tempo];
+      playState.focus = document.getElementById('play-focus').value;
+      playState.totalSteps = STEP_COUNTS[playState.type] || 1;
       playState.currentStep = 1;
       playState.steps = [];
 
@@ -1459,8 +1473,11 @@
       document.getElementById('step2').classList.remove('hidden');
 
       // Update summary
-      document.getElementById('play-summary').textContent = 
-        `${playState.name} | ${playState.type} | ${playState.tempo.charAt(0).toUpperCase() + playState.tempo.slice(1)}`;
+      let summaryText = `${playState.name} | ${playState.type}`;
+      if (playState.focus) {
+        summaryText += ` | ${playState.focus}`;
+      }
+      document.getElementById('play-summary').textContent = summaryText;
 
       // Update step counter
       updateStepCounter();
@@ -1741,7 +1758,7 @@
 
     function updateStepCounter() {
       document.getElementById('step-counter').textContent = 
-        `Step ${playState.currentStep}/${playState.totalSteps}`;
+        `Building Step ${playState.currentStep}/${playState.totalSteps}`;
     }
 
     function showSuccess() {
@@ -1757,11 +1774,8 @@
       const playJSON = {
         name: playState.name,
         type: playState.type,
-        skeletons: {
-          [playState.tempo]: {
-            steps: playState.steps
-          }
-        }
+        focus: playState.focus || null,
+        steps: playState.steps
       };
 
       document.getElementById('json-output').textContent = JSON.stringify(playJSON, null, 2);
