@@ -27,6 +27,7 @@ if client:
     training_log_collection = db["training_sessions"]
     franchise_state_collection = db["franchise_state"]
     franchises_collection = db["franchises"]
+    plays_collection = db["plays"]
 else:
     import mongomock
     client = mongomock.MongoClient()
@@ -38,5 +39,6 @@ else:
     training_log_collection = db["training_sessions"]
     franchise_state_collection = db["franchise_state"]
     franchises_collection = db["franchises"]
+    plays_collection = db["plays"]
 
 
