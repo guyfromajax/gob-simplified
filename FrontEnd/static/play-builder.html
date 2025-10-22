@@ -856,10 +856,18 @@
         assignment && assignment.action && BALL_HANDLING_ACTIONS.includes(assignment.action)
       );
 
+      // Check if selected position is at offset (collision)
+      const isAtOffset = selectedPosition && positionOffsets[selectedPosition];
+
       Object.entries(ACTIONS).forEach(([value, label]) => {
         const option = document.createElement('option');
         option.value = value;
         option.textContent = label;
+        
+        // Rule 1: If at offset position, only allow screen or cut
+        if (isAtOffset && value !== 'screen' && value !== 'cut') {
+          option.disabled = true;
+        }
         
         // Disable ball-handling actions if one is already assigned
         if (ballHandlerAssigned && BALL_HANDLING_ACTIONS.includes(value)) {
@@ -1187,20 +1195,36 @@
         checkAndResolveOffsets(draggedPlayerOriginalLocation);
       }
       
-      // Update assignment (but don't set action yet)
+      // Update assignment
       if (!currentStepAssignments[draggedPlayer]) {
         currentStepAssignments[draggedPlayer] = {};
       }
       currentStepAssignments[draggedPlayer].location = newLocation;
-      // Action will be set via inline dropdown
       
-      console.log('Position offsets:', positionOffsets);
+      // Rule 4: Auto-assign cut if player moved (not offset, not ball handler)
+      const isOffset = positionOffsets[draggedPlayer];
+      const prevLocation = draggedPlayerOriginalLocation;
+      const movedLocation = newLocation !== prevLocation;
       
-      // Update visualization
-      renderCourtVisualization();
-      
-      // Show inline action dropdown
-      showInlineActionDropdown(draggedPlayer, newLocation);
+      if (movedLocation && !isOffset && draggedPlayer !== currentBallHandler) {
+        currentStepAssignments[draggedPlayer].action = 'cut';
+        console.log(`Auto-assigned ${draggedPlayer}: cut (dragged to ${newLocation})`);
+        
+        // Update visualization without inline dropdown
+        renderPositionChips();
+        renderCourtVisualization();
+        updateActionDropdown();
+        validateActionButton();
+      } else {
+        // Show inline action dropdown for manual selection
+        console.log('Position offsets:', positionOffsets);
+        
+        // Update visualization
+        renderCourtVisualization();
+        
+        // Show inline action dropdown
+        showInlineActionDropdown(draggedPlayer, newLocation);
+      }
     }
 
     function findPlayerAtLocation(location) {
@@ -1819,16 +1843,28 @@
           document.getElementById('location-select').value = prevAssignment.location;
         }
         
+        // Determine auto action based on rules
+        let suggestedAction = prevAssignment.action;
+        
+        // Rule 3: Previous ball handler defaults to handle_ball
+        if (BALL_HANDLING_ACTIONS.includes(prevAssignment.action)) {
+          suggestedAction = 'handle_ball';
+        }
+        // Rule 2: Post positions default to post_up
+        else if (prevAssignment.location === 'lower lowPost' || prevAssignment.location === 'upper lowPost') {
+          suggestedAction = 'post_up';
+        }
+        
         // Set action if available
-        if (prevAssignment.action) {
+        if (suggestedAction) {
           // First update dropdown to ensure action is in list
           updateActionDropdown();
           
           // Then set the value if it's not disabled
           const actionSelect = document.getElementById('action-select');
-          const option = actionSelect.querySelector(`option[value="${prevAssignment.action}"]`);
+          const option = actionSelect.querySelector(`option[value="${suggestedAction}"]`);
           if (option && !option.disabled) {
-            actionSelect.value = prevAssignment.action;
+            actionSelect.value = suggestedAction;
           }
         }
       } else {
@@ -1947,7 +1983,62 @@
       validateActionButton();
     }
 
+    function autoAssignActions() {
+      // Auto-assign actions for players based on rules
+      if (playState.currentStep <= 1) return; // Only for step 2+
+      
+      POSITIONS.forEach(pos => {
+        const currentAssignment = currentStepAssignments[pos];
+        const prevAssignment = previousStepAssignments[pos];
+        
+        // Skip if already has action assigned
+        if (currentAssignment && currentAssignment.action) return;
+        
+        // Player hasn't been updated this step
+        if (!currentAssignment || !currentAssignment.location) {
+          if (prevAssignment && prevAssignment.location) {
+            // Rule 2: Player not updated
+            let autoAction = 'stationary';
+            
+            // Exception: Previous ball handler keeps ball
+            if (BALL_HANDLING_ACTIONS.includes(prevAssignment.action)) {
+              autoAction = 'handle_ball';
+            }
+            // Exception: Post positions auto post up
+            else if (prevAssignment.location === 'lower lowPost' || prevAssignment.location === 'upper lowPost') {
+              autoAction = 'post_up';
+            }
+            
+            currentStepAssignments[pos] = {
+              location: prevAssignment.location,
+              action: autoAction
+            };
+            
+            console.log(`Auto-assigned ${pos}: ${autoAction} (no movement)`);
+          }
+        } else if (currentAssignment.location && !currentAssignment.action) {
+          // Player moved but no action yet
+          const movedLocation = currentAssignment.location !== (prevAssignment?.location);
+          const isOffset = positionOffsets[pos];
+          
+          // Rule 4: Player moved to new spot (not offset, not ball handler)
+          if (movedLocation && !isOffset && pos !== currentBallHandler) {
+            currentAssignment.action = 'cut';
+            console.log(`Auto-assigned ${pos}: cut (moved to ${currentAssignment.location})`);
+          }
+          // Rule 3: Previous ball handler moved
+          else if (prevAssignment && BALL_HANDLING_ACTIONS.includes(prevAssignment.action)) {
+            currentAssignment.action = 'handle_ball';
+            console.log(`Auto-assigned ${pos}: handle_ball (previous ball handler)`);
+          }
+        }
+      });
+    }
+
     function endStep(andComplete = false) {
+      // Auto-assign actions before filling
+      autoAssignActions();
+      
       // Fill in remaining positions with previous step values
       if (playState.currentStep > 1 && previousStepAssignments) {
         POSITIONS.forEach(pos => {
