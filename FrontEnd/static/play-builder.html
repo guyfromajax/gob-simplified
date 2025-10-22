@@ -376,6 +376,27 @@
       z-index: 25;
     }
 
+    .basket-target {
+      position: absolute;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: rgba(255, 101, 0, 0.5);
+      border: 3px solid rgba(255, 101, 0, 0.9);
+      transform: translate(-50%, -50%);
+      pointer-events: all;
+      z-index: 8;
+      transition: all 0.2s;
+    }
+
+    .basket-target.drag-hover {
+      background: rgba(255, 101, 0, 0.9);
+      border-color: #FF6500;
+      box-shadow: 0 0 20px rgba(255, 101, 0, 1);
+      width: 28px;
+      height: 28px;
+    }
+
     .action-select option:disabled {
       color: rgba(255, 255, 255, 0.3);
       font-style: italic;
@@ -782,6 +803,7 @@
     let currentBallHandler = null; // Which position has the ball
     let ballDragActive = false;
     let ballDragTarget = null; // Player being dragged to
+    let ballDragToBasket = false; // Ball being dragged to basket
 
     // Initialize
     function init() {
@@ -1109,6 +1131,9 @@
 
     function showSnapPoints() {
       const container = document.getElementById('player-icons-container');
+      
+      // Only show snap points for player drags (not ball drags)
+      if (ballDragActive) return;
       
       Object.entries(HCO_STRING_SPOTS).forEach(([loc, coords]) => {
         const snapPoint = document.createElement('div');
@@ -1527,6 +1552,71 @@
       } else if (ballIcon) {
         ballIcon.remove();
       }
+      
+      // Render basket target (always visible when in step 2)
+      let basketTarget = container.querySelector('.basket-target');
+      if (!basketTarget) {
+        basketTarget = document.createElement('div');
+        basketTarget.className = 'basket-target';
+        basketTarget.style.left = '90%'; // HOME_RIM_COORDS x = 90
+        basketTarget.style.top = '50%'; // HOME_RIM_COORDS y = 25 → (50-25)*2 = 50%
+        container.appendChild(basketTarget);
+        
+        // Setup basket drop handlers
+        setupBasketDropHandlers(basketTarget);
+      }
+    }
+
+    function setupBasketDropHandlers(basketTarget) {
+      basketTarget.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        
+        // Only accept ball drags, not player drags
+        if (ballDragActive) {
+          e.dataTransfer.dropEffect = 'move';
+          ballDragToBasket = true;
+          basketTarget.classList.add('drag-hover');
+        } else {
+          e.dataTransfer.dropEffect = 'none';
+        }
+      });
+
+      basketTarget.addEventListener('dragleave', (e) => {
+        basketTarget.classList.remove('drag-hover');
+        ballDragToBasket = false;
+      });
+
+      basketTarget.addEventListener('drop', (e) => {
+        e.preventDefault();
+        basketTarget.classList.remove('drag-hover');
+        
+        if (ballDragActive && currentBallHandler) {
+          handleBallShoot(currentBallHandler);
+        }
+      });
+    }
+
+    function handleBallShoot(shooter) {
+      console.log(`Ball shoot by: ${shooter}`);
+      
+      // Assign Shoot action to shooter
+      if (currentStepAssignments[shooter] && currentStepAssignments[shooter].location) {
+        currentStepAssignments[shooter].action = 'shoot';
+      } else if (previousStepAssignments[shooter] && previousStepAssignments[shooter].location) {
+        // Shooter hasn't been moved yet, use previous location
+        currentStepAssignments[shooter] = {
+          location: previousStepAssignments[shooter].location,
+          action: 'shoot'
+        };
+      }
+      
+      // Ball goes to basket (will be rendered at rim)
+      
+      // Update visualization
+      renderPositionChips();
+      renderCourtVisualization();
+      updateActionDropdown();
+      validateActionButton();
     }
 
     function setupBallDragHandlers(ballIcon) {
@@ -1544,16 +1634,21 @@
         
         // Clear any hover effects
         document.querySelectorAll('.player-icon.drag-hover').forEach(i => i.classList.remove('drag-hover'));
+        document.querySelectorAll('.basket-target.drag-hover').forEach(b => b.classList.remove('drag-hover'));
         
-        console.log('Ball drag ended - target:', ballDragTarget);
+        console.log('Ball drag ended - target:', ballDragTarget, 'toBasket:', ballDragToBasket);
         
-        if (ballDragTarget && currentBallHandler && ballDragTarget !== currentBallHandler) {
-          // Assign pass to current handler and receive to target
+        if (ballDragToBasket && currentBallHandler) {
+          // Ball dragged to basket - assign shoot
+          handleBallShoot(currentBallHandler);
+        } else if (ballDragTarget && currentBallHandler && ballDragTarget !== currentBallHandler) {
+          // Ball dragged to player - assign pass/receive
           handleBallPass(currentBallHandler, ballDragTarget);
         }
         
         ballDragActive = false;
         ballDragTarget = null;
+        ballDragToBasket = false;
       });
     }
 
