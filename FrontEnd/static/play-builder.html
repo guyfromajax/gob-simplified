@@ -821,76 +821,12 @@
 
     function populateDropdowns() {
       // Play Type and Play Focus are already in HTML
-      // Just need to populate Location dropdown
-
-      // Location with grouped shading
-      const locationSelect = document.getElementById('location-select');
-      
-      // Group A: upper highPost through midLane (inclusive)
-      const groupAStart = LOCATIONS.indexOf("upper highPost");
-      const groupAEnd = LOCATIONS.indexOf("midLane");
-      
-      // Group B: deep key through end
-      const groupBStart = LOCATIONS.indexOf("deep key");
-      
-      LOCATIONS.forEach((loc, index) => {
-        const option = document.createElement('option');
-        option.value = loc;
-        option.textContent = loc;
-        
-        // Add shading class for grouped locations
-        if (index >= groupAStart && index <= groupAEnd) {
-          option.className = 'location-group-a';
-        } else if (index >= groupBStart) {
-          option.className = 'location-group-b';
-        }
-        
-        locationSelect.appendChild(option);
-      });
-
-      // Action - will be populated dynamically
-      updateActionDropdown();
+      // Location and Action dropdowns are now created dynamically in renderPositionDashboard()
     }
 
     function updateActionDropdown() {
-      const actionSelect = document.getElementById('action-select');
-      const currentValue = actionSelect.value;
-      actionSelect.innerHTML = '<option value="">-- Select Action --</option>';
-
-      // Check if any ball-handling actions are already assigned
-      const ballHandlerAssigned = Object.values(currentStepAssignments).some(assignment => 
-        assignment && assignment.action && BALL_HANDLING_ACTIONS.includes(assignment.action)
-      );
-
-      // Check if selected position is at offset (collision)
-      const isAtOffset = selectedPosition && positionOffsets[selectedPosition];
-
-      Object.entries(ACTIONS).forEach(([value, label]) => {
-        const option = document.createElement('option');
-        option.value = value;
-        option.textContent = label;
-        
-        // Rule 1: If at offset position, only allow screen or cut
-        if (isAtOffset && value !== 'screen' && value !== 'cut') {
-          option.disabled = true;
-        }
-        
-        // Disable ball-handling actions if one is already assigned
-        if (ballHandlerAssigned && BALL_HANDLING_ACTIONS.includes(value)) {
-          // Only disable if this position doesn't already have this action
-          const currentPositionAction = selectedPosition && currentStepAssignments[selectedPosition]?.action;
-          if (currentPositionAction !== value) {
-            option.disabled = true;
-          }
-        }
-        
-        actionSelect.appendChild(option);
-      });
-
-      // Restore previous value if it's still valid
-      if (currentValue && !actionSelect.querySelector(`option[value="${currentValue}"]`)?.disabled) {
-        actionSelect.value = currentValue;
-      }
+      // Action dropdowns are now created dynamically in renderPositionDashboard()
+      // This function is kept as a stub for compatibility
     }
 
     function attachEventListeners() {
