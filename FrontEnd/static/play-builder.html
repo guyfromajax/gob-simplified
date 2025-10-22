@@ -770,6 +770,9 @@
     
     // Offset tracking (position -> boolean)
     let positionOffsets = {};
+    
+    // Ball tracking
+    let currentBallHandler = null; // Which position has the ball
 
     // Initialize
     function init() {
@@ -1309,9 +1312,10 @@
         existingIcons[pos] = icon;
       });
 
-      // Find ball handler
+      // Find ball handler for current step
       let ballHandlerPos = null;
       let ballHandlerCoords = null;
+      let ballLocation = null; // Could be player location or basket
 
       // Update or create player icons
       POSITIONS.forEach(pos => {
@@ -1411,10 +1415,20 @@
             }
           }
 
-          // Check if this player has the ball
-          if (assignment.action && BALL_HANDLING_ACTIONS.includes(assignment.action)) {
-            ballHandlerPos = pos;
-            ballHandlerCoords = { left: targetLeft, top: targetTop };
+          // Check if this player has the ball or is shooting/passing
+          if (assignment.action) {
+            if (BALL_HANDLING_ACTIONS.includes(assignment.action)) {
+              ballHandlerPos = pos;
+              ballHandlerCoords = { left: targetLeft, top: targetTop };
+              currentBallHandler = pos;
+              ballLocation = 'player';
+            } else if (assignment.action === 'pass') {
+              // Ball should go to receiver (will be found later)
+              ballLocation = 'in_transit_pass';
+            } else if (assignment.action === 'shoot') {
+              // Ball should go to basket
+              ballLocation = 'basket';
+            }
           }
         } else if (existingIcons[pos]) {
           // Position no longer has assignment but icon exists from previous step
@@ -1426,17 +1440,65 @@
       // Remove icons for positions that no longer exist
       Object.values(existingIcons).forEach(icon => icon.remove());
 
-      // Handle ball sprite
+      // Handle ball sprite positioning
       let ballIcon = container.querySelector('.ball-icon');
       
-      if (ballHandlerPos && ballHandlerCoords) {
+      // Determine ball position
+      let finalBallLeft = null;
+      let finalBallTop = null;
+      
+      if (ballLocation === 'player' && ballHandlerPos && ballHandlerCoords) {
+        // Ball with current ball handler
+        finalBallLeft = ballHandlerCoords.left;
+        finalBallTop = ballHandlerCoords.top;
+      } else if (ballLocation === 'in_transit_pass') {
+        // Find receiver
+        const receiver = Object.entries(currentStepAssignments).find(([pos, assignment]) => 
+          assignment && assignment.action === 'receive'
+        );
+        if (receiver) {
+          const [receiverPos, receiverAssignment] = receiver;
+          const receiverCoords = HCO_STRING_SPOTS[receiverAssignment.location];
+          const receiverOffset = positionOffsets[receiverPos];
+          const receiverActualCoords = receiverOffset ? OFFSET_SPOTS[receiverAssignment.location] : receiverCoords;
+          
+          if (receiverActualCoords) {
+            finalBallLeft = `${receiverActualCoords.x}%`;
+            finalBallTop = `${(50 - receiverActualCoords.y) * 2}%`;
+            currentBallHandler = receiverPos;
+          }
+        }
+      } else if (ballLocation === 'basket') {
+        // Ball at basket (rim coordinates from constants)
+        const rimCoords = HCO_STRING_SPOTS['key']; // Using key as approximate rim location
+        if (rimCoords) {
+          finalBallLeft = '90%'; // HOME_RIM_COORDS x = 90
+          finalBallTop = '50%'; // HOME_RIM_COORDS y = 25 → (50-25)*2 = 50%
+        }
+      } else if (currentBallHandler && !ballHandlerPos) {
+        // No ball-handling action this step, keep ball with previous handler
+        const prevHandlerAssignment = currentStepAssignments[currentBallHandler];
+        if (prevHandlerAssignment && prevHandlerAssignment.location) {
+          const handlerCoords = HCO_STRING_SPOTS[prevHandlerAssignment.location];
+          const handlerOffset = positionOffsets[currentBallHandler];
+          const handlerActualCoords = handlerOffset ? OFFSET_SPOTS[prevHandlerAssignment.location] : handlerCoords;
+          
+          if (handlerActualCoords) {
+            finalBallLeft = `${handlerActualCoords.x}%`;
+            finalBallTop = `${(50 - handlerActualCoords.y) * 2}%`;
+          }
+        }
+      }
+      
+      // Render or remove ball
+      if (finalBallLeft && finalBallTop) {
         if (!ballIcon) {
           ballIcon = document.createElement('div');
           ballIcon.className = 'ball-icon';
           container.appendChild(ballIcon);
         }
-        ballIcon.style.left = ballHandlerCoords.left;
-        ballIcon.style.top = ballHandlerCoords.top;
+        ballIcon.style.left = finalBallLeft;
+        ballIcon.style.top = finalBallTop;
       } else if (ballIcon) {
         ballIcon.remove();
       }
@@ -1497,6 +1559,7 @@
       selectedPosition = null;
       currentFormation = null;
       positionOffsets = {};
+      currentBallHandler = null; // Reset ball handler for new play
       
       // Reset formation dropdown
       document.getElementById('formation-select').value = '';
@@ -1728,6 +1791,8 @@
       
       // Save current assignments as previous for animation
       previousStepAssignments = {...currentStepAssignments};
+      
+      // Ball handler carries over to next step (don't reset currentBallHandler)
       
       // Reset current assignments and offsets
       currentStepAssignments = {};
