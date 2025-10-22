@@ -64,13 +64,22 @@ class TeamManager:
         return self.players.values()
 
     def _init_strategy_settings(self):
+        """
+        Initialize strategy settings with defaults (0-4 scale).
+        If team document has strategy_settings, those will be used instead via constructor.
+        """
         return {
-            "defense": random.randint(0, 4),
-            "tempo": random.randint(0, 4),
-            "aggression": random.randint(0, 4),
-            "fast_break": random.randint(0, 4),
-            "half_court_trap": random.randint(0, 4),
-            "full_court_press": random.randint(0, 4),
+            "offense": 2,
+            "inside": 2,
+            "attack": 2,
+            "outside": 2,
+            "tempo": 2,
+            "play_calling": 2,
+            "defense": 2,
+            "aggression": 2,
+            "hc_trap": 2,
+            "fc_press": 2,
+            "rebounding": 2
         }
 
     def _init_playcall_settings(self):
