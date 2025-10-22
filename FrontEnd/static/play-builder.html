@@ -606,7 +606,23 @@
         <div class="step-subheader" id="play-summary" style="margin: 0;"></div>
       </div>
 
-      <div class="step2-controls-row">
+      <!-- Step 1: Formation Selection -->
+      <div id="formation-selection" class="step2-controls-row">
+        <div class="form-group" style="margin: 0; min-width: 300px;">
+          <label for="formation-select">Starting Formation</label>
+          <select id="formation-select">
+            <option value="">-- Select Formation --</option>
+            <option value="3-2">3-2</option>
+            <option value="4-1">4-1</option>
+            <option value="5-0">5-0</option>
+            <option value="Screen Entry">Screen Entry</option>
+            <option value="Custom">Custom</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Step 1 Custom & Step 2+: Build Buttons -->
+      <div id="build-buttons" class="step2-controls-row hidden">
         <button id="action-btn" disabled>Add Step</button>
         <button id="end-step-btn" class="hidden" onclick="endStep()">End Step</button>
         <button id="complete-play-btn" onclick="completePlay()">Play Complete</button>
@@ -837,6 +853,7 @@
       document.getElementById('submit-play-btn').addEventListener('click', submitPlay);
 
       // Step 2 controls
+      document.getElementById('formation-select').addEventListener('change', handleFormationSelect);
       document.getElementById('action-btn').addEventListener('click', handleActionButton);
     }
 
@@ -853,6 +870,67 @@
       }
       
       validateStep1();
+    }
+
+    function handleFormationSelect() {
+      const formation = document.getElementById('formation-select').value;
+      
+      if (!formation) {
+        // No formation selected, clear everything
+        currentStepAssignments = {};
+        renderPositionDashboard();
+        renderCourtVisualization();
+        document.getElementById('build-buttons').classList.add('hidden');
+        return;
+      }
+
+      if (formation === "Custom") {
+        // Show build buttons for manual step building
+        document.getElementById('build-buttons').classList.remove('hidden');
+        currentStepAssignments = {};
+        renderPositionDashboard();
+        renderCourtVisualization();
+        validateActionButton();
+      } else {
+        // Apply preset formation and auto-advance to Step 2
+        applyFormation(formation);
+        autoSubmitStep1();
+      }
+    }
+
+    function applyFormation(formationName) {
+      const formation = FORMATIONS[formationName];
+      if (!formation) return;
+
+      // Apply all position assignments from formation
+      currentStepAssignments = {};
+      Object.entries(formation).forEach(([pos, assignment]) => {
+        currentStepAssignments[pos] = {
+          location: assignment.location,
+          action: assignment.action
+        };
+      });
+
+      // Update ball handler
+      const ballHandlerPos = Object.keys(formation).find(pos => 
+        BALL_HANDLING_ACTIONS.includes(formation[pos].action)
+      );
+      if (ballHandlerPos) {
+        currentBallHandler = ballHandlerPos;
+      }
+
+      // Update visualization
+      renderPositionDashboard();
+      renderCourtVisualization();
+    }
+
+    function autoSubmitStep1() {
+      // Automatically submit Step 1 and advance to Step 2
+      submitStep();
+      
+      // Show build buttons for Step 2+
+      document.getElementById('formation-selection').classList.add('hidden');
+      document.getElementById('build-buttons').classList.remove('hidden');
     }
 
 
@@ -1770,13 +1848,17 @@
       positionOffsets = {};
       currentBallHandler = null; // Reset ball handler for new play
       
+      // Show formation selection, hide build buttons
+      document.getElementById('formation-selection').classList.remove('hidden');
+      document.getElementById('build-buttons').classList.add('hidden');
+      document.getElementById('formation-select').value = '';
+      
       // Initialize dashboard and court
       renderPositionDashboard();
       renderCourtVisualization();
       
-      // Hide End Step button for step 1 and validate buttons
+      // Hide End Step button for step 1
       updateEndStepButton();
-      validateActionButton();
     }
 
     function updateEndStepButton() {
