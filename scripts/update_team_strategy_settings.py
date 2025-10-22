@@ -15,11 +15,10 @@ import sys
 import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from BackEnd.db import get_db
+from BackEnd.db import teams_collection
 
 def update_team_strategy_settings():
     """Add new strategy_settings fields to all team documents."""
-    db = get_db()
     
     new_fields = {
         "strategy_settings.offense": 2,
@@ -38,7 +37,7 @@ def update_team_strategy_settings():
     print("Updating team documents with new strategy_settings...")
     
     # Update all team documents
-    result = db.teams.update_many(
+    result = teams_collection.update_many(
         {},  # All teams
         {"$set": new_fields}
     )
@@ -46,7 +45,7 @@ def update_team_strategy_settings():
     print(f"✓ Updated {result.modified_count} team documents")
     
     # Verify
-    teams = list(db.teams.find({}, {"name": 1, "strategy_settings": 1}))
+    teams = list(teams_collection.find({}, {"name": 1, "strategy_settings": 1}))
     print(f"\nVerification - Found {len(teams)} teams:")
     for team in teams:
         settings = team.get("strategy_settings", {})
