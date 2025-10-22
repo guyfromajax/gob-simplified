@@ -1570,24 +1570,29 @@
     function setupBasketDropHandlers(basketTarget) {
       basketTarget.addEventListener('dragover', (e) => {
         e.preventDefault();
+        e.stopPropagation();
         
         // Only accept ball drags, not player drags
         if (ballDragActive) {
           e.dataTransfer.dropEffect = 'move';
           ballDragToBasket = true;
           basketTarget.classList.add('drag-hover');
+          console.log('Ball over basket - ballDragToBasket set to true');
         } else {
           e.dataTransfer.dropEffect = 'none';
         }
       });
 
       basketTarget.addEventListener('dragleave', (e) => {
+        console.log('Ball left basket area');
         basketTarget.classList.remove('drag-hover');
         ballDragToBasket = false;
       });
 
       basketTarget.addEventListener('drop', (e) => {
         e.preventDefault();
+        e.stopPropagation();
+        console.log('Drop event on basket');
         basketTarget.classList.remove('drag-hover');
         
         if (ballDragActive && currentBallHandler) {
