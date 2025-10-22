@@ -7,45 +7,39 @@ with variations for different tempo settings (slow/normal/fast).
 
 class Play:
     """
-    Represents a single offensive play with tempo-specific animation skeletons.
+    Represents a single offensive play with animation skeletons.
     
     Attributes:
         name (str): Display name of the play (e.g., "Pick and Roll")
-        type (str): Play category - "Inside", "Attack", "Outside", "Base", "Set", "Freelance"
-        skeletons (dict): Tempo-specific animation skeletons
-            - "slow": More steps, longer duration, more clock burn
-            - "normal": Standard execution
-            - "fast": Fewer steps, shorter duration, less clock burn
+        play_type (str): Play category - "motion" or "set_play"
+        play_focus (str): Play focus - "inside", "attack", "outside", "balanced"
+        skeletons (dict): Animation skeletons (currently just "standard", expandable in future)
         game_stats (dict): Per-game statistics
         season_stats (dict): Cross-game statistics (franchise/tournament mode)
     """
     
-    def __init__(self, name, play_type, skeletons=None):
+    def __init__(self, name, play_type, play_focus="balanced", skeletons=None):
         """
         Initialize a Play object.
         
         Args:
             name (str): Play name (e.g., "Pick and Roll")
-            play_type (str): One of ["Inside", "Attack", "Outside", "Base", "Set", "Freelance"]
-            skeletons (dict, optional): Pre-defined skeletons for each tempo
-                Expected structure: {"slow": {...}, "normal": {...}, "fast": {...}}
+            play_type (str): One of ["motion", "set_play"]
+            play_focus (str): One of ["inside", "attack", "outside", "balanced"]
+            skeletons (dict, optional): Pre-defined skeletons
+                Expected structure: {"standard": {...}} (expandable in future)
         """
         self.name = name
-        self.type = play_type
+        self.play_type = play_type
+        self.play_focus = play_focus
         
         # Initialize skeletons dict
         if skeletons:
-            self.skeletons = {
-                "slow": skeletons.get("slow"),
-                "normal": skeletons.get("normal"),
-                "fast": skeletons.get("fast")
-            }
+            self.skeletons = skeletons
         else:
             # Empty skeletons - will be populated later
             self.skeletons = {
-                "slow": None,
-                "normal": None,
-                "fast": None
+                "standard": None
             }
         
         # Game-level stats (reset at start of each game)
@@ -68,24 +62,17 @@ class Play:
             "defensive_fouls": 0
         }
     
-    def get_skeleton(self, tempo_call):
+    def get_skeleton(self, variant="standard"):
         """
-        Get the appropriate skeleton based on tempo call.
+        Get the appropriate skeleton based on variant.
         
         Args:
-            tempo_call (str): One of ["slow", "normal", "fast"]
+            variant (str): Skeleton variant (currently only "standard", expandable in future)
             
         Returns:
             dict: The skeleton with steps, or None if not defined
         """
-        tempo = tempo_call.lower() if tempo_call else "normal"
-        skeleton = self.skeletons.get(tempo)
-        
-        # Fallback to normal if requested tempo not available
-        if skeleton is None and tempo != "normal":
-            skeleton = self.skeletons.get("normal")
-        
-        return skeleton
+        return self.skeletons.get(variant) or self.skeletons.get("standard")
     
     def record_execution(self, result_type, season_mode=False):
         """
@@ -160,7 +147,8 @@ class Play:
         """
         return {
             "name": self.name,
-            "type": self.type,
+            "play_type": self.play_type,
+            "play_focus": self.play_focus,
             "skeletons": self.skeletons,
             "game_stats": self.game_stats,
             "season_stats": self.season_stats
@@ -172,14 +160,15 @@ class Play:
         Create Play instance from dictionary data.
         
         Args:
-            data (dict): Play data with name, type, skeletons, stats
+            data (dict): Play data with name, play_type, play_focus, skeletons, stats
             
         Returns:
             Play: Initialized Play instance
         """
         play = cls(
             name=data.get("name", "Unnamed Play"),
-            play_type=data.get("type", "Base"),
+            play_type=data.get("play_type", "motion"),
+            play_focus=data.get("play_focus", "balanced"),
             skeletons=data.get("skeletons")
         )
         
@@ -192,7 +181,7 @@ class Play:
         return play
     
     def __repr__(self):
-        return f"Play(name='{self.name}', type='{self.type}', game_runs={self.game_stats['times_run']})"
+        return f"Play(name='{self.name}', type='{self.play_type}', focus='{self.play_focus}', game_runs={self.game_stats['times_run']})"
 
 
 class PlayManager:
@@ -226,18 +215,22 @@ class PlayManager:
         """Build lookup indices for plays by name and type."""
         self.plays_by_name = {}
         self.plays_by_type = {
-            "Inside": [],
-            "Attack": [],
-            "Outside": [],
-            "Base": [],
-            "Set": [],
-            "Freelance": []
+            "motion": [],
+            "set_play": []
+        }
+        self.plays_by_focus = {
+            "inside": [],
+            "attack": [],
+            "outside": [],
+            "balanced": []
         }
         
         for play in self.plays:
             self.plays_by_name[play.name] = play
-            if play.type in self.plays_by_type:
-                self.plays_by_type[play.type].append(play)
+            if play.play_type in self.plays_by_type:
+                self.plays_by_type[play.play_type].append(play)
+            if play.play_focus in self.plays_by_focus:
+                self.plays_by_focus[play.play_focus].append(play)
     
     def add_play(self, play):
         """
@@ -266,12 +259,24 @@ class PlayManager:
         Get all plays of a specific type.
         
         Args:
-            play_type (str): One of ["Inside", "Attack", "Outside", "Base", "Set", "Freelance"]
+            play_type (str): One of ["motion", "set_play"]
             
         Returns:
             list[Play]: List of plays of that type
         """
         return self.plays_by_type.get(play_type, [])
+    
+    def get_plays_by_focus(self, play_focus):
+        """
+        Get all plays of a specific focus.
+        
+        Args:
+            play_focus (str): One of ["inside", "attack", "outside", "balanced"]
+            
+        Returns:
+            list[Play]: List of plays matching the focus
+        """
+        return self.plays_by_focus.get(play_focus, [])
     
     def select_play(self, play_type):
         """
