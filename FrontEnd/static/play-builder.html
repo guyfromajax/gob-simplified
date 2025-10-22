@@ -1475,13 +1475,15 @@
           finalBallLeft = '90%'; // HOME_RIM_COORDS x = 90
           finalBallTop = '50%'; // HOME_RIM_COORDS y = 25 → (50-25)*2 = 50%
         }
-      } else if (currentBallHandler && !ballHandlerPos) {
+      } else if (currentBallHandler) {
         // No ball-handling action this step, keep ball with previous handler
-        const prevHandlerAssignment = currentStepAssignments[currentBallHandler];
-        if (prevHandlerAssignment && prevHandlerAssignment.location) {
-          const handlerCoords = HCO_STRING_SPOTS[prevHandlerAssignment.location];
+        // Check current step first, then fall back to previous step
+        const handlerAssignment = currentStepAssignments[currentBallHandler] || previousStepAssignments[currentBallHandler];
+        
+        if (handlerAssignment && handlerAssignment.location) {
+          const handlerCoords = HCO_STRING_SPOTS[handlerAssignment.location];
           const handlerOffset = positionOffsets[currentBallHandler];
-          const handlerActualCoords = handlerOffset ? OFFSET_SPOTS[prevHandlerAssignment.location] : handlerCoords;
+          const handlerActualCoords = handlerOffset ? OFFSET_SPOTS[handlerAssignment.location] : handlerCoords;
           
           if (handlerActualCoords) {
             finalBallLeft = `${handlerActualCoords.x}%`;
