@@ -32,6 +32,10 @@
       text-shadow: 0 0 20px rgba(255, 215, 0, 0.3);
     }
 
+    h1#page-title.step2-title {
+      font-size: 2rem;
+    }
+
     .step-container {
       background: rgba(255, 255, 255, 0.05);
       border-radius: 12px;
@@ -72,16 +76,16 @@
 
     .step2-header-row {
       display: flex;
-      justify-content: space-between;
+      justify-content: center;
       align-items: center;
       margin-bottom: 20px;
     }
 
     .step2-controls-row {
-      display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
-      gap: 20px;
-      align-items: start;
+      display: flex;
+      justify-content: center;
+      gap: 15px;
+      margin-bottom: 20px;
     }
 
     .control-column {
@@ -91,7 +95,6 @@
     }
 
     .center-button-wrapper {
-      grid-column: 1 / -1;
       display: flex;
       justify-content: center;
       gap: 20px;
@@ -99,11 +102,9 @@
     }
 
     .center-button-wrapper button {
-      width: 30%;
-    }
-
-    .center-button-wrapper.with-end-step button {
-      width: 24%;
+      padding: 12px 24px;
+      width: auto;
+      min-width: 180px;
     }
 
     .form-group {
@@ -232,16 +233,61 @@
       border-radius: 12px;
       padding: 15px;
       border: 1px solid rgba(255, 215, 0, 0.2);
-      display: flex;
-      justify-content: center;
-      align-items: center;
+      display: grid;
+      grid-template-columns: 1fr 1.2fr;
+      gap: 30px;
+      align-items: start;
       min-height: 200px;
       position: relative;
     }
 
+    .position-dashboard {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding: 15px;
+    }
+
+    .dashboard-row {
+      display: grid;
+      grid-template-columns: 60px 1fr 1fr;
+      gap: 10px;
+      align-items: center;
+      padding: 8px;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .dashboard-row.header {
+      background: rgba(255, 215, 0, 0.1);
+      font-weight: 700;
+      color: #FFD700;
+      text-transform: uppercase;
+      font-size: 0.85rem;
+      letter-spacing: 0.5px;
+    }
+
+    .dashboard-row .pos-label {
+      font-weight: 700;
+      color: #FFD700;
+    }
+
+    .dashboard-row select {
+      padding: 6px 10px;
+      font-size: 0.85rem;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 215, 0, 0.2);
+    }
+
+    .dashboard-row select:focus {
+      border-color: #FFD700;
+      background: rgba(255, 255, 255, 0.12);
+    }
+
     .court-visualization {
       position: relative;
-      max-width: 60%;
+      max-width: 100%;
+      justify-self: end;
     }
 
     .court-image {
@@ -558,55 +604,12 @@
     <div id="step2" class="step-container hidden">
       <div class="step2-header-row">
         <div class="step-subheader" id="play-summary" style="margin: 0;"></div>
-        <div class="step-counter" id="step-counter">Building Step 1</div>
       </div>
 
       <div class="step2-controls-row">
-        <div class="control-column" id="position-column">
-          <!-- Step 1: Formation dropdown -->
-          <div class="form-group" style="margin-bottom: 0;" id="formation-group">
-            <label for="formation-select">Formation</label>
-            <select id="formation-select">
-              <option value="">-- Select Formation --</option>
-              <option value="3-2">3-2</option>
-              <option value="4-1">4-1</option>
-              <option value="5-0">5-0</option>
-              <option value="Screen Entry">Screen Entry</option>
-              <option value="Custom">Custom</option>
-            </select>
-          </div>
-          
-          <!-- Steps 2+: Position chips -->
-          <div style="height: 44px; display: flex; align-items: center; justify-content: center; display: none;" id="position-chips-wrapper">
-            <div class="position-chips" id="position-chips">
-              <!-- Chips will be dynamically generated -->
-            </div>
-          </div>
-        </div>
-
-        <div class="control-column">
-          <div class="form-group" style="margin-bottom: 0;">
-            <label for="location-select">Location</label>
-            <select id="location-select">
-              <option value="">-- Select Location --</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="control-column">
-          <div class="form-group" style="margin-bottom: 0;">
-            <label for="action-select">Action</label>
-            <select id="action-select">
-              <option value="">-- Select Action --</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="center-button-wrapper" id="button-wrapper">
-          <button id="action-btn" disabled>Add Step</button>
-          <button id="end-step-btn" class="hidden" onclick="endStep()">End Step</button>
-          <button id="complete-play-btn" onclick="completePlay()">Play Complete</button>
-        </div>
+        <button id="action-btn" disabled>Add Step</button>
+        <button id="end-step-btn" class="hidden" onclick="endStep()">End Step</button>
+        <button id="complete-play-btn" onclick="completePlay()">Play Complete</button>
       </div>
     </div>
 
@@ -622,6 +625,9 @@
 
     <!-- Court Container (always visible below forms) -->
     <div class="court-container">
+      <div class="position-dashboard" id="position-dashboard">
+        <!-- Dashboard will be populated dynamically -->
+      </div>
       <div class="court-visualization" id="court-visualization">
         <img src="/static/images/courts/bentley_truman.jpg" alt="Basketball Court" class="court-image">
         <div id="player-icons-container"></div>
@@ -895,9 +901,6 @@
       document.getElementById('submit-play-btn').addEventListener('click', submitPlay);
 
       // Step 2 controls
-      document.getElementById('formation-select').addEventListener('change', handleFormationChange);
-      document.getElementById('location-select').addEventListener('change', validateActionButton);
-      document.getElementById('action-select').addEventListener('change', validateActionButton);
       document.getElementById('action-btn').addEventListener('click', handleActionButton);
     }
 
@@ -916,73 +919,6 @@
       validateStep1();
     }
 
-    function handleFormationChange() {
-      const formation = document.getElementById('formation-select').value;
-      currentFormation = formation;
-
-      if (!formation) {
-        // No formation selected, clear everything
-        currentStepAssignments = {};
-        renderPositionChips();
-        renderCourtVisualization();
-        validateActionButton();
-        toggleCustomMode(false);
-        return;
-      }
-
-      if (formation === "Custom") {
-        // Enable custom mode - show position chips
-        toggleCustomMode(true);
-        currentStepAssignments = {};
-        renderPositionChips();
-        renderCourtVisualization();
-        validateActionButton();
-      } else {
-        // Apply preset formation
-        toggleCustomMode(false);
-        applyFormation(formation);
-      }
-    }
-
-    function toggleCustomMode(isCustom) {
-      const formationGroup = document.getElementById('formation-group');
-      const positionChipsWrapper = document.getElementById('position-chips-wrapper');
-      const locationSelect = document.getElementById('location-select');
-      const actionSelect = document.getElementById('action-select');
-
-      if (isCustom) {
-        // Hide formation label, show position chips
-        formationGroup.style.display = 'none';
-        positionChipsWrapper.style.display = 'flex';
-        locationSelect.disabled = false;
-        actionSelect.disabled = false;
-      } else {
-        // Show formation dropdown, hide chips
-        formationGroup.style.display = 'block';
-        positionChipsWrapper.style.display = 'none';
-        locationSelect.disabled = true;
-        actionSelect.disabled = true;
-      }
-    }
-
-    function applyFormation(formationName) {
-      const formation = FORMATIONS[formationName];
-      if (!formation) return;
-
-      // Apply all position assignments from formation
-      currentStepAssignments = {};
-      Object.entries(formation).forEach(([pos, assignment]) => {
-        currentStepAssignments[pos] = {
-          location: assignment.location,
-          action: assignment.action
-        };
-      });
-
-      // Update visualization
-      renderPositionChips();
-      renderCourtVisualization();
-      validateActionButton();
-    }
 
     // Drag-and-Drop Functions
     function setupDragHandlers(icon, pos) {
@@ -1211,9 +1147,8 @@
         console.log(`Auto-assigned ${draggedPlayer}: cut (dragged to ${newLocation})`);
         
         // Update visualization without inline dropdown
-        renderPositionChips();
+        renderPositionDashboard();
         renderCourtVisualization();
-        updateActionDropdown();
         validateActionButton();
       } else {
         // Show inline action dropdown for manual selection
@@ -1334,9 +1269,8 @@
       document.querySelectorAll('.inline-action-dropdown').forEach(d => d.remove());
       
       // Update visualization
-      renderPositionChips();
+      renderPositionDashboard();
       renderCourtVisualization();
-      updateActionDropdown();
       validateActionButton();
     }
 
@@ -1357,7 +1291,133 @@
       document.querySelectorAll('.inline-action-dropdown').forEach(d => d.remove());
       
       // Update visualization
-      renderPositionChips();
+      renderPositionDashboard();
+      renderCourtVisualization();
+      validateActionButton();
+    }
+
+    function renderPositionDashboard() {
+      const dashboard = document.getElementById('position-dashboard');
+      
+      // Only render if we're in step 2
+      if (document.getElementById('step2').classList.contains('hidden')) {
+        dashboard.innerHTML = '';
+        return;
+      }
+
+      dashboard.innerHTML = '';
+
+      // Header row
+      const headerRow = document.createElement('div');
+      headerRow.className = 'dashboard-row header';
+      headerRow.innerHTML = `
+        <div>Pos</div>
+        <div>Location</div>
+        <div>Action</div>
+      `;
+      dashboard.appendChild(headerRow);
+
+      // Position rows
+      POSITIONS.forEach(pos => {
+        const row = document.createElement('div');
+        row.className = 'dashboard-row';
+        row.id = `dashboard-${pos}`;
+
+        // Position label
+        const posLabel = document.createElement('div');
+        posLabel.className = 'pos-label';
+        posLabel.textContent = pos;
+        row.appendChild(posLabel);
+
+        // Location dropdown
+        const locationSelect = document.createElement('select');
+        locationSelect.id = `dashboard-location-${pos}`;
+        locationSelect.innerHTML = '<option value="">--</option>';
+        LOCATIONS.forEach(loc => {
+          const option = document.createElement('option');
+          option.value = loc;
+          option.textContent = loc;
+          locationSelect.appendChild(option);
+        });
+        
+        // Set current value if exists
+        const assignment = currentStepAssignments[pos];
+        if (assignment && assignment.location) {
+          locationSelect.value = assignment.location;
+        }
+        
+        // Handle location change
+        locationSelect.addEventListener('change', (e) => {
+          handleDashboardLocationChange(pos, e.target.value);
+        });
+        row.appendChild(locationSelect);
+
+        // Action dropdown
+        const actionSelect = document.createElement('select');
+        actionSelect.id = `dashboard-action-${pos}`;
+        actionSelect.innerHTML = '<option value="">--</option>';
+        Object.entries(ACTIONS).forEach(([value, label]) => {
+          const option = document.createElement('option');
+          option.value = value;
+          option.textContent = label;
+          actionSelect.appendChild(option);
+        });
+        
+        // Set current value if exists
+        if (assignment && assignment.action) {
+          actionSelect.value = assignment.action;
+        }
+        
+        // Handle action change
+        actionSelect.addEventListener('change', (e) => {
+          handleDashboardActionChange(pos, e.target.value);
+        });
+        row.appendChild(actionSelect);
+
+        dashboard.appendChild(row);
+      });
+    }
+
+    function handleDashboardLocationChange(pos, newLocation) {
+      if (!newLocation) return;
+
+      // Check if location is occupied
+      const occupyingPlayer = findPlayerAtLocation(newLocation);
+      
+      if (occupyingPlayer && occupyingPlayer !== pos) {
+        // Location occupied - mark for offset positioning
+        positionOffsets[pos] = true;
+      } else {
+        // Clear offset for this player
+        delete positionOffsets[pos];
+      }
+      
+      // Update assignment
+      if (!currentStepAssignments[pos]) {
+        currentStepAssignments[pos] = {};
+      }
+      currentStepAssignments[pos].location = newLocation;
+      
+      // Update court visualization
+      renderCourtVisualization();
+      validateActionButton();
+    }
+
+    function handleDashboardActionChange(pos, newAction) {
+      if (!newAction) return;
+
+      // Update assignment
+      if (!currentStepAssignments[pos]) {
+        currentStepAssignments[pos] = {};
+      }
+      currentStepAssignments[pos].action = newAction;
+      
+      // Update ball handler if ball-handling action
+      if (BALL_HANDLING_ACTIONS.includes(newAction)) {
+        currentBallHandler = pos;
+      }
+      
+      // Update court visualization
       renderCourtVisualization();
       validateActionButton();
     }
@@ -1370,6 +1430,20 @@
         container.innerHTML = '';
         return;
       }
+      
+      // Update dashboard to reflect current state
+      POSITIONS.forEach(pos => {
+        const locationSelect = document.getElementById(`dashboard-location-${pos}`);
+        const actionSelect = document.getElementById(`dashboard-action-${pos}`);
+        const assignment = currentStepAssignments[pos];
+        
+        if (locationSelect && assignment) {
+          locationSelect.value = assignment.location || '';
+        }
+        if (actionSelect && assignment) {
+          actionSelect.value = assignment.action || '';
+        }
+      });
 
       // Remove old offset indicators
       container.querySelectorAll('.offset-indicator').forEach(ind => ind.remove());
@@ -1642,9 +1716,8 @@
       console.log('Shoot assigned to', shooter, currentStepAssignments[shooter]);
       
       // Update visualization (this will move ball to basket)
-      renderPositionChips();
+      renderPositionDashboard();
       renderCourtVisualization();
-      updateActionDropdown();
       validateActionButton();
     }
 
@@ -1710,9 +1783,8 @@
       currentBallHandler = receiver;
       
       // Update visualization
-      renderPositionChips();
+      renderPositionDashboard();
       renderCourtVisualization();
-      updateActionDropdown();
       validateActionButton();
     }
 
@@ -1739,7 +1811,9 @@
       playState.steps = [];
 
       // Update page title
-      document.getElementById('page-title').textContent = 'Build Steps';
+      const pageTitle = document.getElementById('page-title');
+      pageTitle.textContent = 'Building Step 1';
+      pageTitle.classList.add('step2-title');
 
       // Show step 2, hide step 1
       document.getElementById('step1').classList.add('hidden');
@@ -1752,17 +1826,8 @@
       }
       document.getElementById('play-summary').textContent = summaryText;
 
-      // Update step counter
-      updateStepCounter();
-
-      // Show formation dropdown for step 1
-      document.getElementById('formation-group').style.display = 'block';
-      document.getElementById('position-chips-wrapper').style.display = 'none';
-      document.getElementById('location-select').disabled = true;
-      document.getElementById('action-select').disabled = true;
-
-      // Initialize position chips
-      renderPositionChips();
+      // Initialize dashboard and court
+      renderPositionDashboard();
       renderCourtVisualization();
 
       // Reset current step assignments
@@ -1772,12 +1837,6 @@
       currentFormation = null;
       positionOffsets = {};
       currentBallHandler = null; // Reset ball handler for new play
-      
-      // Reset formation dropdown
-      document.getElementById('formation-select').value = '';
-      
-      // Initialize action dropdown
-      updateActionDropdown();
       
       // Hide End Step button for step 1
       updateEndStepButton();
@@ -1796,91 +1855,8 @@
       }
     }
 
-    function renderPositionChips() {
-      const container = document.getElementById('position-chips');
-      container.innerHTML = '';
-
-      POSITIONS.forEach(pos => {
-        const chip = document.createElement('button');
-        chip.className = 'chip';
-        chip.id = `chip-${pos}`;
-        chip.textContent = pos;
-        chip.type = 'button';
-
-        // Check if this position has both location and action
-        const assignment = currentStepAssignments[pos];
-        if (assignment && assignment.location && assignment.action) {
-          chip.classList.add('completed');
-        }
-
-        // Highlight selected position
-        if (selectedPosition === pos) {
-          chip.classList.add('selected');
-        }
-
-        // Click handler
-        chip.addEventListener('click', () => selectPosition(pos));
-
-        container.appendChild(chip);
-      });
-    }
-
-    function selectPosition(pos) {
-      // Don't select completed positions
-      const assignment = currentStepAssignments[pos];
-      if (assignment && assignment.location && assignment.action) {
-        return;
-      }
-
-      selectedPosition = pos;
-      
-      // Pre-fill dropdowns with previous step values if available and not on first step
-      if (playState.currentStep > 1 && previousStepAssignments[pos]) {
-        const prevAssignment = previousStepAssignments[pos];
-        
-        // Set location if available
-        if (prevAssignment.location) {
-          document.getElementById('location-select').value = prevAssignment.location;
-        }
-        
-        // Determine auto action based on rules
-        let suggestedAction = prevAssignment.action;
-        
-        // Rule 3: Previous ball handler defaults to handle_ball
-        if (BALL_HANDLING_ACTIONS.includes(prevAssignment.action)) {
-          suggestedAction = 'handle_ball';
-        }
-        // Rule 2: Post positions default to post_up
-        else if (prevAssignment.location === 'lower lowPost' || prevAssignment.location === 'upper lowPost') {
-          suggestedAction = 'post_up';
-        }
-        
-        // Set action if available
-        if (suggestedAction) {
-          // First update dropdown to ensure action is in list
-          updateActionDropdown();
-          
-          // Then set the value if it's not disabled
-          const actionSelect = document.getElementById('action-select');
-          const option = actionSelect.querySelector(`option[value="${suggestedAction}"]`);
-          if (option && !option.disabled) {
-            actionSelect.value = suggestedAction;
-          }
-        }
-      } else {
-        // Clear dropdowns if no previous assignment
-        document.getElementById('location-select').value = '';
-        document.getElementById('action-select').value = '';
-      }
-      
-      renderPositionChips();
-      updateActionDropdown();
-      validateActionButton();
-    }
 
     function validateActionButton() {
-      const location = document.getElementById('location-select').value;
-      const action = document.getElementById('action-select').value;
       const actionBtn = document.getElementById('action-btn');
       const endStepBtn = document.getElementById('end-step-btn');
       const completePlayBtn = document.getElementById('complete-play-btn');
@@ -1922,9 +1898,9 @@
         completePlayBtn.style.opacity = '1';
         completePlayBtn.style.boxShadow = 'none';
       } else {
-        // Still adding assignments
-        actionBtn.textContent = 'Add Assignment';
-        actionBtn.disabled = !(selectedPosition && location && action);
+        // Still building step
+        actionBtn.textContent = 'Add Step (Incomplete)';
+        actionBtn.disabled = true;
         endStepBtn.disabled = false;
         completePlayBtn.disabled = false;
         completePlayBtn.style.opacity = '1';
@@ -1935,52 +1911,10 @@
     function handleActionButton() {
       const actionBtn = document.getElementById('action-btn');
       
-      // Check if button is in Add Step mode (all positions complete)
+      // Only submit step if all positions are complete
       if (actionBtn.textContent === 'Add Step') {
         submitStep();
-      } else {
-        addAssignment();
       }
-    }
-
-    function addAssignment() {
-      const location = document.getElementById('location-select').value;
-      const action = document.getElementById('action-select').value;
-
-      if (!selectedPosition) {
-        alert('Please select a position chip.');
-        return;
-      }
-
-      if (!location) {
-        alert('Please select a location.');
-        return;
-      }
-
-      if (!action) {
-        alert('Please select an action.');
-        return;
-      }
-
-      // Store assignment
-      if (!currentStepAssignments[selectedPosition]) {
-        currentStepAssignments[selectedPosition] = {};
-      }
-      currentStepAssignments[selectedPosition].location = location;
-      currentStepAssignments[selectedPosition].action = action;
-
-      // Update chips and court
-      renderPositionChips();
-      renderCourtVisualization();
-
-      // Reset state
-      selectedPosition = null;
-      document.getElementById('location-select').value = '';
-      document.getElementById('action-select').value = '';
-
-      // Update action dropdown and button state
-      updateActionDropdown();
-      validateActionButton();
     }
 
     function autoAssignActions() {
@@ -2106,28 +2040,16 @@
       selectedPosition = null;
       positionOffsets = {}; // Clear all offsets for new step
       
-      // Switch from formation dropdown to position chips for step 2+
-      if (playState.currentStep === 2) {
-        document.getElementById('formation-group').style.display = 'none';
-        document.getElementById('position-chips-wrapper').style.display = 'flex';
-        document.getElementById('location-select').disabled = false;
-        document.getElementById('action-select').disabled = false;
-      }
-      
-      renderPositionChips();
+      // Update dashboard and visualization
+      renderPositionDashboard();
       renderCourtVisualization();
-      updateActionDropdown();
       validateActionButton();
       updateStepCounter();
       updateEndStepButton();
-
-      // Reset dropdowns
-      document.getElementById('location-select').value = '';
-      document.getElementById('action-select').value = '';
     }
 
     function updateStepCounter() {
-      document.getElementById('step-counter').textContent = 
+      document.getElementById('page-title').textContent = 
         `Building Step ${playState.currentStep}`;
     }
 
