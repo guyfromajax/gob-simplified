@@ -1935,8 +1935,8 @@
         const result = await response.json();
         console.log('Play saved:', result);
         
-        // Show success screen with saved data
-        showSuccess(playData);
+        // Show success screen with saved data and update status
+        showSuccess(playData, result.was_update);
         
       } catch (error) {
         console.error('Error saving play:', error);
@@ -1944,14 +1944,18 @@
       }
     }
 
-    function showSuccess(playData) {
+    function showSuccess(playData, wasUpdate = false) {
       // Hide step 2
       document.getElementById('step2').classList.add('hidden');
 
       // Show success screen
       document.getElementById('success-screen').classList.remove('hidden');
+      
+      const action = wasUpdate ? 'updated in' : 'saved to';
+      const emoji = wasUpdate ? '🔄' : '✅';
+      
       document.getElementById('success-play-name').textContent = 
-        `Play "${playData.name}" has been saved to the database!`;
+        `${emoji} Play "${playData.name}" has been ${action} the database!`;
 
       document.getElementById('json-output').textContent = JSON.stringify(playData, null, 2);
     }

@@ -23,13 +23,16 @@ class PlayCreate(BaseModel):
 @router.post("/api/plays")
 async def create_play(play_data: PlayCreate):
     """
-    Create a new play and save to MongoDB.
+    Create or update a play in MongoDB.
+    
+    DEVELOPMENT MODE: If a play with the same name exists, it will be overwritten.
+    This allows iterating on universal plays during development.
     
     Args:
         play_data: Play data from Play Builder
         
     Returns:
-        dict: Created play document with _id
+        dict: Created/updated play document with _id
     """
     # Convert to dict
     play_dict = play_data.dict()
@@ -55,15 +58,24 @@ async def create_play(play_data: PlayCreate):
             "defensive_fouls": 0
         }
     
-    # Insert into MongoDB
-    result = plays_collection.insert_one(play_dict)
+    # UPSERT: Update if exists (by name), insert if new
+    # This allows overwriting plays during development
+    result = plays_collection.update_one(
+        {"name": play_dict["name"]},  # Find by name
+        {"$set": play_dict},           # Update all fields
+        upsert=True                    # Insert if doesn't exist
+    )
     
-    # Return created document
-    play_dict["_id"] = str(result.inserted_id)
+    # Get the document (either newly inserted or existing one)
+    saved_play = plays_collection.find_one({"name": play_dict["name"]})
+    saved_play["_id"] = str(saved_play["_id"])
+    
+    action = "updated" if result.matched_count > 0 else "created"
     
     return {
-        "message": "Play created successfully",
-        "play": play_dict
+        "message": f"Play {action} successfully",
+        "play": saved_play,
+        "was_update": result.matched_count > 0
     }
 
 
