@@ -99,11 +99,11 @@
     }
 
     .center-button-wrapper button {
-      width: 36%;
+      width: 30%;
     }
 
     .center-button-wrapper.with-end-step button {
-      width: 28%;
+      width: 24%;
     }
 
     .form-group {
@@ -448,8 +448,12 @@
         gap: 10px;
       }
 
+      .center-button-wrapper button {
+        width: 100%;
+      }
+      
       .center-button-wrapper.with-end-step button {
-        width: 80%;
+        width: 100%;
       }
 
       .step2-header-row {
@@ -526,7 +530,7 @@
     <div id="step2" class="step-container hidden">
       <div class="step2-header-row">
         <div class="step-subheader" id="play-summary" style="margin: 0;"></div>
-        <div class="step-counter" id="step-counter">Building Step 1/1</div>
+        <div class="step-counter" id="step-counter">Building Step 1</div>
       </div>
 
       <div class="step2-controls-row">
@@ -571,8 +575,9 @@
         </div>
 
         <div class="center-button-wrapper" id="button-wrapper">
-          <button id="action-btn" disabled>Add Assignment</button>
+          <button id="action-btn" disabled>Add Step</button>
           <button id="end-step-btn" class="hidden" onclick="endStep()">End Step</button>
+          <button id="complete-play-btn" onclick="completePlay()">Play Complete</button>
         </div>
       </div>
     </div>
@@ -602,11 +607,7 @@
     const PLAY_FOCUS = ["Inside", "Attack", "Outside", "Balanced"];
     const POSITIONS = ["PG", "SG", "SF", "PF", "C"];
     
-    // Set Play always has 1 step, Motion has variable steps based on focus
-    const STEP_COUNTS = {
-      "Set Play": 1,
-      "Motion": 1  // Default, can be adjusted
-    };
+    // No step limits - user decides when play is complete
 
     // Court locations from constants.py HCO_STRING_SPOTS
     const LOCATIONS = [
@@ -745,7 +746,6 @@
       name: "",
       type: "",
       focus: "",
-      totalSteps: 0,
       currentStep: 1,
       steps: []
     };
@@ -1461,7 +1461,6 @@
       playState.name = document.getElementById('play-name').value.trim();
       playState.type = document.getElementById('play-type').value;
       playState.focus = document.getElementById('play-focus').value;
-      playState.totalSteps = STEP_COUNTS[playState.type] || 1;
       playState.currentStep = 1;
       playState.steps = [];
 
@@ -1608,8 +1607,8 @@
       }
 
       if (allComplete) {
-        // All positions complete - show Submit Step
-        actionBtn.textContent = 'Submit Step';
+        // All positions complete - ready to add step
+        actionBtn.textContent = 'Add Step';
         actionBtn.disabled = false;
       } else {
         // Still adding assignments
@@ -1621,8 +1620,8 @@
     function handleActionButton() {
       const actionBtn = document.getElementById('action-btn');
       
-      // Check if button is in Submit Step mode
-      if (actionBtn.textContent === 'Submit Step') {
+      // Check if button is in Add Step mode (all positions complete)
+      if (actionBtn.textContent === 'Add Step') {
         submitStep();
       } else {
         addAssignment();
@@ -1669,7 +1668,7 @@
       validateActionButton();
     }
 
-    function endStep() {
+    function endStep(andComplete = false) {
       // Fill in remaining positions with previous step values
       if (playState.currentStep > 1 && previousStepAssignments) {
         POSITIONS.forEach(pos => {
@@ -1694,6 +1693,11 @@
 
       // Submit the step
       submitStep();
+      
+      // If completing play, show success
+      if (andComplete) {
+        showSuccess();
+      }
     }
 
     function submitStep() {
@@ -1719,13 +1723,7 @@
       // Add to play steps
       playState.steps.push(stepData);
 
-      // Check if we're done
-      if (playState.currentStep >= playState.totalSteps) {
-        showSuccess();
-        return;
-      }
-
-      // Move to next step
+      // Move to next step (no limit check - user decides when done)
       playState.currentStep++;
       
       // Save current assignments as previous for animation
@@ -1758,7 +1756,36 @@
 
     function updateStepCounter() {
       document.getElementById('step-counter').textContent = 
-        `Building Step ${playState.currentStep}/${playState.totalSteps}`;
+        `Building Step ${playState.currentStep}`;
+    }
+
+    function completePlay() {
+      // Check if current step has all positions assigned
+      let allComplete = true;
+      for (const pos of POSITIONS) {
+        const assignment = currentStepAssignments[pos];
+        if (!assignment || !assignment.location || !assignment.action) {
+          allComplete = false;
+          break;
+        }
+      }
+
+      if (!allComplete) {
+        const confirm = window.confirm(
+          'Current step is incomplete. Do you want to:\n\n' +
+          '• Click OK to auto-fill remaining positions and complete the play\n' +
+          '• Click Cancel to continue building'
+        );
+        
+        if (confirm) {
+          // Auto-fill and submit current step, then show success
+          endStep(true);
+        }
+      } else {
+        // Current step is complete, submit it and show success
+        submitStep();
+        showSuccess();
+      }
     }
 
     function showSuccess() {
