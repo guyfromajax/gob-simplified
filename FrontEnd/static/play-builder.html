@@ -367,6 +367,13 @@
       transform: translate(-50%, calc(-50% - 25px));
       transition: all 0.8s cubic-bezier(0.4, 0.0, 0.2, 1);
       z-index: 10;
+      cursor: grab;
+    }
+
+    .ball-icon.dragging {
+      cursor: grabbing;
+      opacity: 0.8;
+      z-index: 25;
     }
 
     .action-select option:disabled {
@@ -773,6 +780,8 @@
     
     // Ball tracking
     let currentBallHandler = null; // Which position has the ball
+    let ballDragActive = false;
+    let ballDragTarget = null; // Player being dragged to
 
     // Initialize
     function init() {
@@ -1002,7 +1011,15 @@
       // Detect when dragging over this sprite
       icon.addEventListener('dragover', (e) => {
         e.preventDefault();
-        if (pos !== draggedPlayer) {
+        
+        if (ballDragActive) {
+          // Ball being dragged - highlight potential receiver
+          if (pos !== currentBallHandler) {
+            ballDragTarget = pos;
+            icon.classList.add('drag-hover');
+          }
+        } else if (pos !== draggedPlayer) {
+          // Player being dragged - highlight collision
           hoveredSprite = pos;
           icon.classList.add('drag-hover');
         }
@@ -1010,7 +1027,10 @@
 
       icon.addEventListener('dragleave', (e) => {
         icon.classList.remove('drag-hover');
-        if (hoveredSprite === pos) {
+        
+        if (ballDragActive && ballDragTarget === pos) {
+          ballDragTarget = null;
+        } else if (hoveredSprite === pos) {
           hoveredSprite = null;
         }
       });
@@ -1498,12 +1518,78 @@
           ballIcon = document.createElement('div');
           ballIcon.className = 'ball-icon';
           container.appendChild(ballIcon);
+          
+          // Setup ball drag handlers
+          setupBallDragHandlers(ballIcon);
         }
         ballIcon.style.left = finalBallLeft;
         ballIcon.style.top = finalBallTop;
       } else if (ballIcon) {
         ballIcon.remove();
       }
+    }
+
+    function setupBallDragHandlers(ballIcon) {
+      ballIcon.draggable = true;
+      
+      ballIcon.addEventListener('dragstart', (e) => {
+        ballDragActive = true;
+        ballIcon.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+        console.log('Ball drag started from:', currentBallHandler);
+      });
+
+      ballIcon.addEventListener('dragend', (e) => {
+        ballIcon.classList.remove('dragging');
+        
+        // Clear any hover effects
+        document.querySelectorAll('.player-icon.drag-hover').forEach(i => i.classList.remove('drag-hover'));
+        
+        console.log('Ball drag ended - target:', ballDragTarget);
+        
+        if (ballDragTarget && currentBallHandler && ballDragTarget !== currentBallHandler) {
+          // Assign pass to current handler and receive to target
+          handleBallPass(currentBallHandler, ballDragTarget);
+        }
+        
+        ballDragActive = false;
+        ballDragTarget = null;
+      });
+    }
+
+    function handleBallPass(passer, receiver) {
+      console.log(`Ball pass: ${passer} → ${receiver}`);
+      
+      // Assign Pass action to passer (if they have a location)
+      if (currentStepAssignments[passer] && currentStepAssignments[passer].location) {
+        currentStepAssignments[passer].action = 'pass';
+      } else if (previousStepAssignments[passer] && previousStepAssignments[passer].location) {
+        // Passer hasn't been moved yet, use previous location
+        currentStepAssignments[passer] = {
+          location: previousStepAssignments[passer].location,
+          action: 'pass'
+        };
+      }
+      
+      // Assign Receive action to receiver (if they have a location)
+      if (currentStepAssignments[receiver] && currentStepAssignments[receiver].location) {
+        currentStepAssignments[receiver].action = 'receive';
+      } else if (previousStepAssignments[receiver] && previousStepAssignments[receiver].location) {
+        // Receiver hasn't been moved yet, use previous location
+        currentStepAssignments[receiver] = {
+          location: previousStepAssignments[receiver].location,
+          action: 'receive'
+        };
+      }
+      
+      // Update ball handler
+      currentBallHandler = receiver;
+      
+      // Update visualization
+      renderPositionChips();
+      renderCourtVisualization();
+      updateActionDropdown();
+      validateActionButton();
     }
 
     function validateStep1() {
