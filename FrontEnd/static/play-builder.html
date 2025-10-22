@@ -1354,10 +1354,20 @@
           locationSelect.appendChild(option);
         });
         
-        // Set current value if exists
+        // Pre-populate location from current or previous step
         const assignment = currentStepAssignments[pos];
+        const prevAssignment = previousStepAssignments[pos];
+        
         if (assignment && assignment.location) {
           locationSelect.value = assignment.location;
+        } else if (playState.currentStep > 1 && prevAssignment && prevAssignment.location) {
+          // Step 2+: Pre-populate with previous step's location
+          locationSelect.value = prevAssignment.location;
+          // Auto-assign to currentStepAssignments
+          if (!currentStepAssignments[pos]) {
+            currentStepAssignments[pos] = {};
+          }
+          currentStepAssignments[pos].location = prevAssignment.location;
         }
         
         // Handle location change
@@ -1377,9 +1387,24 @@
           actionSelect.appendChild(option);
         });
         
-        // Set current value if exists
+        // Pre-populate action from current step or default for Step 2+
         if (assignment && assignment.action) {
           actionSelect.value = assignment.action;
+        } else if (playState.currentStep > 1 && prevAssignment) {
+          // Step 2+: Pre-populate with smart defaults
+          let defaultAction = 'stationary';
+          
+          // Ball handler gets "handle_ball"
+          if (pos === currentBallHandler) {
+            defaultAction = 'handle_ball';
+          }
+          
+          actionSelect.value = defaultAction;
+          // Auto-assign to currentStepAssignments
+          if (!currentStepAssignments[pos]) {
+            currentStepAssignments[pos] = {};
+          }
+          currentStepAssignments[pos].action = defaultAction;
         }
         
         // Handle action change
@@ -1390,6 +1415,11 @@
 
         dashboard.appendChild(row);
       });
+      
+      // After pre-populating, validate button state
+      if (playState.currentStep > 1) {
+        validateActionButton();
+      }
     }
 
     function handleDashboardLocationChange(pos, newLocation) {
