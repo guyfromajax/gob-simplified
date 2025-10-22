@@ -1826,10 +1826,6 @@
       }
       document.getElementById('play-summary').textContent = summaryText;
 
-      // Initialize dashboard and court
-      renderPositionDashboard();
-      renderCourtVisualization();
-
       // Reset current step assignments
       currentStepAssignments = {};
       previousStepAssignments = {};
@@ -1838,8 +1834,13 @@
       positionOffsets = {};
       currentBallHandler = null; // Reset ball handler for new play
       
-      // Hide End Step button for step 1
+      // Initialize dashboard and court
+      renderPositionDashboard();
+      renderCourtVisualization();
+      
+      // Hide End Step button for step 1 and validate buttons
       updateEndStepButton();
+      validateActionButton();
     }
 
     function updateEndStepButton() {
