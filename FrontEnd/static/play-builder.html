@@ -1198,16 +1198,19 @@
     }
 
     function checkAndResolveOffsets(location) {
+      console.log(`checkAndResolveOffsets(${location}), positionOffsets:`, positionOffsets);
       // Find first non-screen player with offset at this location
       for (const [pos, assignment] of Object.entries(currentStepAssignments)) {
         if (assignment && assignment.location === location && 
             positionOffsets[pos] && assignment.action !== 'screen') {
           // Move this player to actual position
+          console.log(`Clearing offset for ${pos} at ${location}`);
           delete positionOffsets[pos];
           renderCourtVisualization();
           return; // Only move first one
         }
       }
+      console.log(`No offsets to resolve at ${location}`);
     }
 
     function showInlineActionDropdown(player, location) {
