@@ -1354,13 +1354,8 @@
         if (assignment && assignment.location) {
           locationSelect.value = assignment.location;
         } else if (playState.currentStep > 1 && prevAssignment && prevAssignment.location) {
-          // Step 2+: Pre-populate with previous step's location
+          // Step 2+: Pre-populate with previous step's location (just UI, don't modify data)
           locationSelect.value = prevAssignment.location;
-          // Auto-assign to currentStepAssignments
-          if (!currentStepAssignments[pos]) {
-            currentStepAssignments[pos] = {};
-          }
-          currentStepAssignments[pos].location = prevAssignment.location;
         }
         
         // Handle location change
@@ -1384,7 +1379,7 @@
         if (assignment && assignment.action) {
           actionSelect.value = assignment.action;
         } else if (playState.currentStep > 1 && prevAssignment) {
-          // Step 2+: Pre-populate with smart defaults
+          // Step 2+: Pre-populate with smart defaults (just UI, don't modify data)
           let defaultAction = 'stationary';
           
           // Ball handler gets "handle_ball"
@@ -1393,11 +1388,6 @@
           }
           
           actionSelect.value = defaultAction;
-          // Auto-assign to currentStepAssignments
-          if (!currentStepAssignments[pos]) {
-            currentStepAssignments[pos] = {};
-          }
-          currentStepAssignments[pos].action = defaultAction;
         }
         
         // Handle action change
@@ -1408,11 +1398,6 @@
 
         dashboard.appendChild(row);
       });
-      
-      // After pre-populating, validate button state
-      if (playState.currentStep > 1) {
-        validateActionButton();
-      }
     }
 
     function handleDashboardLocationChange(pos, newLocation) {
@@ -2082,12 +2067,30 @@
       selectedPosition = null;
       positionOffsets = {}; // Clear all offsets for new step
       
+      // Pre-populate Step 2+ with previous positions
+      prePopulateStep();
+      
       // Update dashboard and visualization
       renderPositionDashboard();
       renderCourtVisualization();
       validateActionButton();
       updateStepCounter();
       updateEndStepButton();
+    }
+
+    function prePopulateStep() {
+      // Pre-populate currentStepAssignments with previous step's data for Step 2+
+      if (playState.currentStep > 1 && previousStepAssignments) {
+        POSITIONS.forEach(pos => {
+          const prevAssignment = previousStepAssignments[pos];
+          if (prevAssignment && prevAssignment.location) {
+            currentStepAssignments[pos] = {
+              location: prevAssignment.location,
+              action: pos === currentBallHandler ? 'handle_ball' : 'stationary'
+            };
+          }
+        });
+      }
     }
 
     function updateStepCounter() {
