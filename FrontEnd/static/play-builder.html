@@ -1179,17 +1179,21 @@
 
     function findPlayerAtLocation(location) {
       // Find any player currently at this location by checking currentStepAssignments
+      console.log(`findPlayerAtLocation(${location}), currentStepAssignments:`, currentStepAssignments);
+      
       for (const pos of POSITIONS) {
         if (pos === draggedPlayer) continue; // Skip the player being dragged
         
         const assignment = currentStepAssignments[pos];
+        console.log(`  Checking ${pos}:`, assignment);
+        
         if (assignment && assignment.location === location) {
-          console.log(`Found player ${pos} at ${location} (via assignments)`);
+          console.log(`✓ Found player ${pos} at ${location}`);
           return pos;
         }
       }
       
-      console.log(`No player found at ${location}`);
+      console.log(`✗ No player found at ${location}`);
       return null;
     }
 
