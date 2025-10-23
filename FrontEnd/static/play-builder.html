@@ -1126,11 +1126,11 @@
       if (occupyingPlayer && occupyingPlayer !== draggedPlayer) {
         // Location occupied - mark for offset positioning
         positionOffsets[draggedPlayer] = true;
-        console.log(`Setting offset for ${draggedPlayer} at ${newLocation} (occupied by ${occupyingPlayer})`);
+        console.log(`✓ Setting offset for ${draggedPlayer} at ${newLocation} (occupied by ${occupyingPlayer})`, positionOffsets);
       } else {
         // Clear offset for this player
         delete positionOffsets[draggedPlayer];
-        console.log(`Clearing offset for ${draggedPlayer} (location free at ${newLocation})`);
+        console.log(`✗ Clearing offset for ${draggedPlayer} (location free at ${newLocation})`);
       }
       
       // If dragged player was occupying a spot, check if anyone was waiting
@@ -1149,6 +1149,14 @@
       const prevLocation = draggedPlayerOriginalLocation;
       const movedLocation = newLocation !== prevLocation;
       
+      console.log(`Rule 4 check:`, { 
+        draggedPlayer, 
+        movedLocation, 
+        isOffset, 
+        currentBallHandler, 
+        positionOffsets 
+      });
+      
       if (movedLocation && !isOffset && draggedPlayer !== currentBallHandler) {
         currentStepAssignments[draggedPlayer].action = 'cut';
         console.log(`Auto-assigned ${draggedPlayer}: cut (dragged to ${newLocation})`);
@@ -1159,7 +1167,7 @@
         validateActionButton();
       } else {
         // Show inline action dropdown for manual selection
-        console.log('Position offsets:', positionOffsets);
+        console.log('Showing inline dropdown, position offsets:', positionOffsets);
         
         // Update visualization
         renderCourtVisualization();
