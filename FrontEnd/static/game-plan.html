@@ -19,35 +19,22 @@
         <h2 class="column-title">Offense</h2>
         
         <div class="slider-group">
-          <label for="slider-base">Base</label>
+          <label for="slider-offense">Offense</label>
           <div class="slider-wrapper">
-            <input type="range" id="slider-base" class="offense-slider" min="0" max="4" step="1" value="2" />
-            <span class="slider-value" id="value-base">2</span>
+            <input type="range" id="slider-offense" class="strategy-slider" min="0" max="4" step="1" value="2" />
+            <span class="slider-value" id="value-offense">2</span>
           </div>
           <div class="slider-labels">
-            <span>Never</span>
-            <span>Normal</span>
-            <span>Most</span>
-          </div>
-        </div>
-
-        <div class="slider-group">
-          <label for="slider-freelance">Freelance</label>
-          <div class="slider-wrapper">
-            <input type="range" id="slider-freelance" class="offense-slider" min="0" max="4" step="1" value="2" />
-            <span class="slider-value" id="value-freelance">2</span>
-          </div>
-          <div class="slider-labels">
-            <span>Never</span>
-            <span>Normal</span>
-            <span>Most</span>
+            <span>100% Motion</span>
+            <span>50/50</span>
+            <span>100% Set Plays</span>
           </div>
         </div>
 
         <div class="slider-group">
           <label for="slider-inside">Inside</label>
           <div class="slider-wrapper">
-            <input type="range" id="slider-inside" class="offense-slider" min="0" max="4" step="1" value="2" />
+            <input type="range" id="slider-inside" class="strategy-slider" min="0" max="4" step="1" value="2" />
             <span class="slider-value" id="value-inside">2</span>
           </div>
           <div class="slider-labels">
@@ -60,7 +47,7 @@
         <div class="slider-group">
           <label for="slider-attack">Attack</label>
           <div class="slider-wrapper">
-            <input type="range" id="slider-attack" class="offense-slider" min="0" max="4" step="1" value="2" />
+            <input type="range" id="slider-attack" class="strategy-slider" min="0" max="4" step="1" value="2" />
             <span class="slider-value" id="value-attack">2</span>
           </div>
           <div class="slider-labels">
@@ -73,7 +60,7 @@
         <div class="slider-group">
           <label for="slider-outside">Outside</label>
           <div class="slider-wrapper">
-            <input type="range" id="slider-outside" class="offense-slider" min="0" max="4" step="1" value="2" />
+            <input type="range" id="slider-outside" class="strategy-slider" min="0" max="4" step="1" value="2" />
             <span class="slider-value" id="value-outside">2</span>
           </div>
           <div class="slider-labels">
@@ -84,15 +71,15 @@
         </div>
 
         <div class="slider-group">
-          <label for="slider-set">Set</label>
+          <label for="slider-tempo">Tempo</label>
           <div class="slider-wrapper">
-            <input type="range" id="slider-set" class="offense-slider" min="0" max="4" step="1" value="2" />
-            <span class="slider-value" id="value-set">2</span>
+            <input type="range" id="slider-tempo" class="strategy-slider" min="0" max="4" step="1" value="2" />
+            <span class="slider-value" id="value-tempo">2</span>
           </div>
           <div class="slider-labels">
-            <span>Never</span>
-            <span>Normal</span>
-            <span>Most</span>
+            <span>100% Half-Court Sets</span>
+            <span>50/50</span>
+            <span>100% Fast Breaks</span>
           </div>
         </div>
       </div>
@@ -115,19 +102,6 @@
         </div>
 
         <div class="slider-group">
-          <label for="slider-tempo">Tempo</label>
-          <div class="slider-wrapper">
-            <input type="range" id="slider-tempo" class="strategy-slider" min="0" max="4" step="1" value="2" />
-            <span class="slider-value" id="value-tempo">2</span>
-          </div>
-          <div class="slider-labels">
-            <span>Slow</span>
-            <span>Normal</span>
-            <span>Fast</span>
-          </div>
-        </div>
-
-        <div class="slider-group">
           <label for="slider-aggression">Aggression</label>
           <div class="slider-wrapper">
             <input type="range" id="slider-aggression" class="strategy-slider" min="0" max="4" step="1" value="2" />
@@ -141,33 +115,7 @@
         </div>
 
         <div class="slider-group">
-          <label for="slider-fast-break">Fast Breaks</label>
-          <div class="slider-wrapper">
-            <input type="range" id="slider-fast-break" class="strategy-slider" min="0" max="4" step="1" value="2" />
-            <span class="slider-value" id="value-fast-break">2</span>
-          </div>
-          <div class="slider-labels">
-            <span>Never</span>
-            <span>Normal</span>
-            <span>Always</span>
-          </div>
-        </div>
-
-        <div class="slider-group">
-          <label for="slider-fc-press">FC Press</label>
-          <div class="slider-wrapper">
-            <input type="range" id="slider-fc-press" class="strategy-slider" min="0" max="4" step="1" value="2" />
-            <span class="slider-value" id="value-fc-press">2</span>
-          </div>
-          <div class="slider-labels">
-            <span>Never</span>
-            <span>Normal</span>
-            <span>Always</span>
-          </div>
-        </div>
-
-        <div class="slider-group">
-          <label for="slider-hc-trap">HC Trap</label>
+          <label for="slider-hc-trap">Half-Court Trap</label>
           <div class="slider-wrapper">
             <input type="range" id="slider-hc-trap" class="strategy-slider" min="0" max="4" step="1" value="2" />
             <span class="slider-value" id="value-hc-trap">2</span>
@@ -175,7 +123,33 @@
           <div class="slider-labels">
             <span>Never</span>
             <span>Normal</span>
-            <span>Always</span>
+            <span>Most</span>
+          </div>
+        </div>
+
+        <div class="slider-group">
+          <label for="slider-fc-press">Full-Court Press</label>
+          <div class="slider-wrapper">
+            <input type="range" id="slider-fc-press" class="strategy-slider" min="0" max="4" step="1" value="2" />
+            <span class="slider-value" id="value-fc-press">2</span>
+          </div>
+          <div class="slider-labels">
+            <span>Never</span>
+            <span>Normal</span>
+            <span>Most</span>
+          </div>
+        </div>
+
+        <div class="slider-group">
+          <label for="slider-rebounding">Rebounding</label>
+          <div class="slider-wrapper">
+            <input type="range" id="slider-rebounding" class="strategy-slider" min="0" max="4" step="1" value="2" />
+            <span class="slider-value" id="value-rebounding">2</span>
+          </div>
+          <div class="slider-labels">
+            <span>100% Crash the Boards</span>
+            <span>50/50</span>
+            <span>100% Get Back on D</span>
           </div>
         </div>
       </div>
