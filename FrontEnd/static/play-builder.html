@@ -624,7 +624,6 @@
       <!-- Step 1 Custom & Step 2+: Build Buttons -->
       <div id="build-buttons" class="step2-controls-row hidden">
         <button id="action-btn" disabled>Add Step</button>
-        <button id="end-step-btn" class="hidden" onclick="endStep()">End Step</button>
         <button id="complete-play-btn" onclick="completePlay()">Play Complete</button>
       </div>
     </div>
@@ -1864,28 +1863,12 @@
       // Initialize dashboard and court
       renderPositionDashboard();
       renderCourtVisualization();
-      
-      // Hide End Step button for step 1
-      updateEndStepButton();
     }
 
-    function updateEndStepButton() {
-      const endStepBtn = document.getElementById('end-step-btn');
-      const buttonWrapper = document.getElementById('button-wrapper');
-      
-      if (playState.currentStep > 1) {
-        endStepBtn.classList.remove('hidden');
-        buttonWrapper.classList.add('with-end-step');
-      } else {
-        endStepBtn.classList.add('hidden');
-        buttonWrapper.classList.remove('with-end-step');
-      }
-    }
 
 
     function validateActionButton() {
       const actionBtn = document.getElementById('action-btn');
-      const endStepBtn = document.getElementById('end-step-btn');
       const completePlayBtn = document.getElementById('complete-play-btn');
       
       // Check if any player has shoot action (final step)
@@ -1912,7 +1895,6 @@
         // Shot assigned - this is the final step
         actionBtn.disabled = true;
         actionBtn.textContent = 'Shot = Final Step';
-        endStepBtn.disabled = true;
         completePlayBtn.disabled = false;
         completePlayBtn.style.opacity = '1';
         completePlayBtn.style.boxShadow = '0 0 20px rgba(255, 140, 0, 0.6)';
@@ -1920,7 +1902,6 @@
         // All positions complete - ready to add step
         actionBtn.textContent = 'Add Step';
         actionBtn.disabled = false;
-        endStepBtn.disabled = false;
         completePlayBtn.disabled = false;
         completePlayBtn.style.opacity = '1';
         completePlayBtn.style.boxShadow = 'none';
@@ -1928,7 +1909,6 @@
         // Still building step
         actionBtn.textContent = 'Add Step (Incomplete)';
         actionBtn.disabled = true;
-        endStepBtn.disabled = false;
         completePlayBtn.disabled = false;
         completePlayBtn.style.opacity = '1';
         completePlayBtn.style.boxShadow = 'none';
@@ -1996,40 +1976,6 @@
       });
     }
 
-    function endStep(andComplete = false) {
-      // Auto-assign actions before filling
-      autoAssignActions();
-      
-      // Fill in remaining positions with previous step values
-      if (playState.currentStep > 1 && previousStepAssignments) {
-        POSITIONS.forEach(pos => {
-          // Only fill if position hasn't been assigned yet
-          const currentAssignment = currentStepAssignments[pos];
-          if (!currentAssignment || !currentAssignment.location || !currentAssignment.action) {
-            const prevAssignment = previousStepAssignments[pos];
-            if (prevAssignment && prevAssignment.location && prevAssignment.action) {
-              // Copy previous assignment
-              currentStepAssignments[pos] = {
-                location: prevAssignment.location,
-                action: prevAssignment.action
-              };
-            }
-          }
-        });
-      }
-
-      // Update visualization
-      renderPositionChips();
-      renderCourtVisualization();
-
-      // Submit the step
-      submitStep();
-      
-      // If completing play, show success
-      if (andComplete) {
-        showSuccess();
-      }
-    }
 
     function submitStep() {
       // Calculate timestamp (300ms increments, 0-indexed)
@@ -2075,7 +2021,6 @@
       renderCourtVisualization();
       validateActionButton();
       updateStepCounter();
-      updateEndStepButton();
     }
 
     function prePopulateStep() {
