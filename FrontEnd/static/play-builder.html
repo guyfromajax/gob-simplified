@@ -2094,6 +2094,7 @@
     }
 
     function updateStepCounter() {
+      console.log('updateStepCounter called, currentStep:', playState.currentStep);
       document.getElementById('page-title').textContent = 
         `Building Step ${playState.currentStep}`;
     }
