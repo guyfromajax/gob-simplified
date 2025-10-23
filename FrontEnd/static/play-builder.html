@@ -820,6 +820,9 @@
     // Offset tracking (position -> boolean)
     let positionOffsets = {};
     
+    // New offsets tracking (position -> boolean) - only for offsets created THIS step
+    let newOffsets = {};
+    
     // Ball tracking
     let currentBallHandler = null; // Which position has the ball
     let ballDragActive = false;
@@ -877,6 +880,7 @@
       if (!formation) {
         // No formation selected, clear everything
         currentStepAssignments = {};
+        newOffsets = {};
         renderPositionDashboard();
         renderCourtVisualization();
         document.getElementById('build-buttons').classList.add('hidden');
@@ -1132,10 +1136,12 @@
       if (occupyingPlayer && occupyingPlayer !== draggedPlayer) {
         // Location occupied - mark for offset positioning
         positionOffsets[draggedPlayer] = true;
+        newOffsets[draggedPlayer] = true; // Mark as NEW offset (created this step)
         console.log(`✓ Setting offset for ${draggedPlayer} at ${newLocation} (occupied by ${occupyingPlayer})`, positionOffsets);
       } else {
         // Clear offset for this player
         delete positionOffsets[draggedPlayer];
+        delete newOffsets[draggedPlayer];
         console.log(`✗ Clearing offset for ${draggedPlayer} (location free at ${newLocation})`);
       }
       
@@ -1262,16 +1268,16 @@
         pos !== player && assignment && assignment.action && BALL_HANDLING_ACTIONS.includes(assignment.action)
       );
       
-      // Check if player is at an offset position (Rule 1)
-      const isAtOffset = positionOffsets[player];
+      // Check if player is at a NEW offset position (Rule 1)
+      const isNewOffset = newOffsets[player];
       
       Object.entries(ACTIONS).forEach(([value, label]) => {
         const option = document.createElement('option');
         option.value = value;
         option.textContent = label;
         
-        // Rule 1: If at offset position, only allow screen or cut
-        if (isAtOffset && value !== 'screen' && value !== 'cut') {
+        // Rule 1: If at NEW offset position (created this step), only allow screen or cut
+        if (isNewOffset && value !== 'screen' && value !== 'cut') {
           option.disabled = true;
         }
         // Disable ball-handling actions if one is already assigned
@@ -1392,16 +1398,16 @@
         actionSelect.id = `dashboard-action-${pos}`;
         actionSelect.innerHTML = '<option value="">--</option>';
         
-        // Check if this position is at an offset (Rule 1: only screen or cut allowed)
-        const isAtOffset = positionOffsets[pos];
+        // Check if this position is at a NEW offset (Rule 1: only screen or cut allowed)
+        const isNewOffset = newOffsets[pos];
         
         Object.entries(ACTIONS).forEach(([value, label]) => {
           const option = document.createElement('option');
           option.value = value;
           option.textContent = label;
           
-          // Rule 1: If at offset position, only allow screen or cut
-          if (isAtOffset && value !== 'screen' && value !== 'cut') {
+          // Rule 1: If at NEW offset position (created this step), only allow screen or cut
+          if (isNewOffset && value !== 'screen' && value !== 'cut') {
             option.disabled = true;
             option.style.color = 'rgba(255, 255, 255, 0.3)';
           }
@@ -1443,9 +1449,11 @@
       if (occupyingPlayer && occupyingPlayer !== pos) {
         // Location occupied - mark for offset positioning
         positionOffsets[pos] = true;
+        newOffsets[pos] = true; // Mark as NEW offset
       } else {
         // Clear offset for this player
         delete positionOffsets[pos];
+        delete newOffsets[pos];
       }
       
       // Update assignment
@@ -1454,7 +1462,8 @@
       }
       currentStepAssignments[pos].location = newLocation;
       
-      // Update court visualization
+      // Update dashboard and court visualization
+      renderPositionDashboard();
       renderCourtVisualization();
       validateActionButton();
     }
@@ -1888,6 +1897,7 @@
       selectedPosition = null;
       currentFormation = null;
       positionOffsets = {};
+      newOffsets = {};
       currentBallHandler = null; // Reset ball handler for new play
       
       // Show formation selection, hide build buttons
@@ -2048,6 +2058,7 @@
       currentStepAssignments = {};
       selectedPosition = null;
       positionOffsets = {}; // Clear for new step, will restore preserved ones
+      newOffsets = {}; // Clear new offsets - old offsets become unrestricted
       
       // Pre-populate Step 2+ with previous positions and offsets
       prePopulateStep(previousOffsets);
