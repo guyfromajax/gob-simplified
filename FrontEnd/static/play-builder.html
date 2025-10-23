@@ -1171,18 +1171,17 @@
     }
 
     function findPlayerAtLocation(location) {
-      // Find any player currently at this location by checking icon positions
-      const icons = document.querySelectorAll('.player-icon');
-      for (const icon of icons) {
-        const pos = icon.dataset.position;
-        const iconLocation = icon.dataset.location;
-        
+      // Find any player currently at this location by checking currentStepAssignments
+      for (const pos of POSITIONS) {
         if (pos === draggedPlayer) continue; // Skip the player being dragged
-        if (iconLocation === location) {
-          console.log(`Found player ${pos} at ${location}`);
+        
+        const assignment = currentStepAssignments[pos];
+        if (assignment && assignment.location === location) {
+          console.log(`Found player ${pos} at ${location} (via assignments)`);
           return pos;
         }
       }
+      
       console.log(`No player found at ${location}`);
       return null;
     }
