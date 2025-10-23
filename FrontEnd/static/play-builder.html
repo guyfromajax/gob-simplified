@@ -1123,6 +1123,12 @@
         currentAssignments: currentStepAssignments
       });
       
+      // Update assignment FIRST (before checking offsets)
+      if (!currentStepAssignments[draggedPlayer]) {
+        currentStepAssignments[draggedPlayer] = {};
+      }
+      currentStepAssignments[draggedPlayer].location = newLocation;
+      
       if (occupyingPlayer && occupyingPlayer !== draggedPlayer) {
         // Location occupied - mark for offset positioning
         positionOffsets[draggedPlayer] = true;
@@ -1134,15 +1140,10 @@
       }
       
       // If dragged player was occupying a spot, check if anyone was waiting
+      // (Now that location is updated, checkAndResolveOffsets won't find this player at the old location)
       if (draggedPlayerOriginalLocation) {
         checkAndResolveOffsets(draggedPlayerOriginalLocation);
       }
-      
-      // Update assignment
-      if (!currentStepAssignments[draggedPlayer]) {
-        currentStepAssignments[draggedPlayer] = {};
-      }
-      currentStepAssignments[draggedPlayer].location = newLocation;
       
       // Rule 4: Auto-assign cut if player moved (not offset, not ball handler)
       const isOffset = positionOffsets[draggedPlayer];
