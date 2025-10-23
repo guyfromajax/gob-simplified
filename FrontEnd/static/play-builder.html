@@ -1418,13 +1418,17 @@
         // Pre-populate action from current step or default for Step 2+
         if (assignment && assignment.action) {
           actionSelect.value = assignment.action;
-        } else if (playState.currentStep > 1 && prevAssignment) {
+        } else if (playState.currentStep > 1 && prevAssignment && prevAssignment.location) {
           // Step 2+: Pre-populate with smart defaults (just UI, don't modify data)
           let defaultAction = 'stationary';
           
           // Ball handler gets "handle_ball"
           if (pos === currentBallHandler) {
             defaultAction = 'handle_ball';
+          }
+          // Players at post positions get "post_up"
+          else if (prevAssignment.location === 'upper lowPost' || prevAssignment.location === 'lower lowPost') {
+            defaultAction = 'post_up';
           }
           
           actionSelect.value = defaultAction;
@@ -2076,9 +2080,21 @@
         POSITIONS.forEach(pos => {
           const prevAssignment = previousStepAssignments[pos];
           if (prevAssignment && prevAssignment.location) {
+            // Determine default action
+            let defaultAction = 'stationary';
+            
+            // Ball handler gets "handle_ball"
+            if (pos === currentBallHandler) {
+              defaultAction = 'handle_ball';
+            }
+            // Players at post positions get "post_up"
+            else if (prevAssignment.location === 'upper lowPost' || prevAssignment.location === 'lower lowPost') {
+              defaultAction = 'post_up';
+            }
+            
             currentStepAssignments[pos] = {
               location: prevAssignment.location,
-              action: pos === currentBallHandler ? 'handle_ball' : 'stationary'
+              action: defaultAction
             };
             
             // Preserve offset status from previous step
