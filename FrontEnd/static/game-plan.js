@@ -32,23 +32,18 @@ let currentSettings = {
   strategy_settings: {}
 };
 
-// Slider mappings
-const offenseSliders = {
-  'Base': 'slider-base',
-  'Freelance': 'slider-freelance',
-  'Inside': 'slider-inside',
-  'Attack': 'slider-attack',
-  'Outside': 'slider-outside',
-  'Set': 'slider-set'
-};
-
+// Slider mappings (note: all go to strategy_settings now for unified backend handling)
 const strategySliders = {
-  'defense': 'slider-defense',
+  'offense': 'slider-offense',
+  'inside': 'slider-inside',
+  'attack': 'slider-attack',
+  'outside': 'slider-outside',
   'tempo': 'slider-tempo',
+  'defense': 'slider-defense',
   'aggression': 'slider-aggression',
-  'fast_break': 'slider-fast-break',
-  'half_court_trap': 'slider-hc-trap',
-  'full_court_press': 'slider-fc-press'
+  'hc_trap': 'slider-hc-trap',
+  'fc_press': 'slider-fc-press',
+  'rebounding': 'slider-rebounding'
 };
 
 function showToast(msg) {
@@ -91,21 +86,7 @@ function setHeader() {
 }
 
 function setupSliders() {
-  // Setup offense sliders
-  for (const [key, sliderId] of Object.entries(offenseSliders)) {
-    const slider = document.getElementById(sliderId);
-    const valueDisplay = document.getElementById(`value-${sliderId.replace('slider-', '')}`);
-    
-    if (slider && valueDisplay) {
-      slider.addEventListener('input', (e) => {
-        const value = parseInt(e.target.value, 10);
-        valueDisplay.textContent = value;
-        currentSettings.playcall_settings[key] = value;
-      });
-    }
-  }
-  
-  // Setup strategy sliders
+  // Setup all sliders (all save to strategy_settings)
   for (const [key, sliderId] of Object.entries(strategySliders)) {
     const slider = document.getElementById(sliderId);
     const valueDisplay = document.getElementById(`value-${sliderId.replace('slider-', '')}`);
@@ -121,8 +102,11 @@ function setupSliders() {
 }
 
 function validateOffenseSettings() {
-  const values = Object.values(currentSettings.playcall_settings);
-  if (values.every(v => v === 0)) {
+  // Check offense-related settings (offense, inside, attack, outside)
+  const offenseValues = ['offense', 'inside', 'attack', 'outside'].map(
+    key => currentSettings.strategy_settings[key] || 0
+  );
+  if (offenseValues.every(v => v === 0)) {
     return false;
   }
   return true;
@@ -142,13 +126,10 @@ async function loadSettings() {
       } else {
         // Use defaults
         const defaults = {
-          playcall_settings: {
-            'Base': 2, 'Freelance': 2, 'Inside': 2,
-            'Attack': 2, 'Outside': 2, 'Set': 2
-          },
+          playcall_settings: {},
           strategy_settings: {
-            'defense': 2, 'tempo': 2, 'aggression': 2,
-            'fast_break': 2, 'half_court_trap': 2, 'full_court_press': 2
+            'offense': 2, 'inside': 2, 'attack': 2, 'outside': 2, 'tempo': 2,
+            'defense': 2, 'aggression': 2, 'hc_trap': 2, 'fc_press': 2, 'rebounding': 2
           }
         };
         currentSettings = defaults;
@@ -176,18 +157,6 @@ async function loadSettings() {
     }
     
     // Update UI with loaded values AND ensure currentSettings is fully populated
-    for (const [key, sliderId] of Object.entries(offenseSliders)) {
-      const slider = document.getElementById(sliderId);
-      const valueDisplay = document.getElementById(`value-${sliderId.replace('slider-', '')}`);
-      const value = currentSettings.playcall_settings[key] || 2;
-      
-      // Ensure value is in currentSettings (in case it wasn't loaded)
-      currentSettings.playcall_settings[key] = value;
-      
-      if (slider) slider.value = value;
-      if (valueDisplay) valueDisplay.textContent = value;
-    }
-    
     for (const [key, sliderId] of Object.entries(strategySliders)) {
       const slider = document.getElementById(sliderId);
       const valueDisplay = document.getElementById(`value-${sliderId.replace('slider-', '')}`);

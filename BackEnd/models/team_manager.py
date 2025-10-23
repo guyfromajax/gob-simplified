@@ -65,21 +65,25 @@ class TeamManager:
 
     def _init_strategy_settings(self):
         """
-        Initialize strategy settings with defaults (0-4 scale).
+        Initialize strategy settings with randomization for CPU teams (0-4 scale).
         If team document has strategy_settings, those will be used instead via constructor.
+        
+        Randomization:
+        - inside, attack, outside: 1-4 (never zero)
+        - all others: 0-4
         """
         return {
-            "offense": 2,
-            "inside": 2,
-            "attack": 2,
-            "outside": 2,
-            "tempo": 2,
-            "play_calling": 2,
-            "defense": 2,
-            "aggression": 2,
-            "hc_trap": 2,
-            "fc_press": 2,
-            "rebounding": 2
+            "offense": random.randint(0, 4),
+            "inside": random.randint(1, 4),
+            "attack": random.randint(1, 4),
+            "outside": random.randint(1, 4),
+            "tempo": random.randint(0, 4),
+            "play_calling": random.randint(0, 4),
+            "defense": random.randint(0, 4),
+            "aggression": random.randint(0, 4),
+            "hc_trap": random.randint(0, 4),
+            "fc_press": random.randint(0, 4),
+            "rebounding": random.randint(0, 4)
         }
 
     def _init_playcall_settings(self):
