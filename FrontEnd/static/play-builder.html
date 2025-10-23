@@ -2019,18 +2019,19 @@
       // Move to next step (no limit check - user decides when done)
       playState.currentStep++;
       
-      // Save current assignments as previous for animation
+      // Save current assignments and offsets as previous for animation
       previousStepAssignments = {...currentStepAssignments};
+      const previousOffsets = {...positionOffsets}; // Save offset state
       
       // Ball handler carries over to next step (don't reset currentBallHandler)
       
       // Reset current assignments and offsets
       currentStepAssignments = {};
       selectedPosition = null;
-      positionOffsets = {}; // Clear all offsets for new step
+      positionOffsets = {}; // Clear for new step, will restore preserved ones
       
-      // Pre-populate Step 2+ with previous positions
-      prePopulateStep();
+      // Pre-populate Step 2+ with previous positions and offsets
+      prePopulateStep(previousOffsets);
       
       // Update dashboard and visualization
       renderPositionDashboard();
@@ -2039,7 +2040,7 @@
       updateStepCounter();
     }
 
-    function prePopulateStep() {
+    function prePopulateStep(previousOffsets = {}) {
       // Pre-populate currentStepAssignments with previous step's data for Step 2+
       if (playState.currentStep > 1 && previousStepAssignments) {
         POSITIONS.forEach(pos => {
@@ -2049,6 +2050,12 @@
               location: prevAssignment.location,
               action: pos === currentBallHandler ? 'handle_ball' : 'stationary'
             };
+            
+            // Preserve offset status from previous step
+            if (previousOffsets[pos]) {
+              positionOffsets[pos] = true;
+              console.log(`Preserving offset for ${pos} at ${prevAssignment.location}`);
+            }
           }
         });
       }
