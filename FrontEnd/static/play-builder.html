@@ -1262,12 +1262,20 @@
         pos !== player && assignment && assignment.action && BALL_HANDLING_ACTIONS.includes(assignment.action)
       );
       
+      // Check if player is at an offset position (Rule 1)
+      const isAtOffset = positionOffsets[player];
+      
       Object.entries(ACTIONS).forEach(([value, label]) => {
         const option = document.createElement('option');
         option.value = value;
         option.textContent = label;
         
-        if (ballHandlerAssigned && BALL_HANDLING_ACTIONS.includes(value)) {
+        // Rule 1: If at offset position, only allow screen or cut
+        if (isAtOffset && value !== 'screen' && value !== 'cut') {
+          option.disabled = true;
+        }
+        // Disable ball-handling actions if one is already assigned
+        else if (ballHandlerAssigned && BALL_HANDLING_ACTIONS.includes(value)) {
           option.disabled = true;
         }
         
@@ -1383,10 +1391,21 @@
         const actionSelect = document.createElement('select');
         actionSelect.id = `dashboard-action-${pos}`;
         actionSelect.innerHTML = '<option value="">--</option>';
+        
+        // Check if this position is at an offset (Rule 1: only screen or cut allowed)
+        const isAtOffset = positionOffsets[pos];
+        
         Object.entries(ACTIONS).forEach(([value, label]) => {
           const option = document.createElement('option');
           option.value = value;
           option.textContent = label;
+          
+          // Rule 1: If at offset position, only allow screen or cut
+          if (isAtOffset && value !== 'screen' && value !== 'cut') {
+            option.disabled = true;
+            option.style.color = 'rgba(255, 255, 255, 0.3)';
+          }
+          
           actionSelect.appendChild(option);
         });
         
