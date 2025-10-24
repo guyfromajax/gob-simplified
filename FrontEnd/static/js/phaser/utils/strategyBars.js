@@ -46,7 +46,7 @@ export function updateStrategyBars(turnData, homeTeamId) {
   // Determine which team is offense/defense using actual calls (slow/normal/fast, passive/normal/aggressive)
   let homeTempoCall, homeAggrCall, awayTempoCall, awayAggrCall;
   
-  if (turnData.offense_tempo_call && turnData.defense_aggression_call) {
+  if (turnData.offense_tempo_call && turnData.offense_aggression_call && turnData.defense_tempo_call && turnData.defense_aggression_call) {
     // Use actual tempo and aggression calls from turn data
     if (isHomeOnOffense) {
       homeTempoCall = turnData.offense_tempo_call;
