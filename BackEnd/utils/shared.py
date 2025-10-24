@@ -504,6 +504,9 @@ def summarize_game_state(game):
     from BackEnd.api.gameplan_routes import populate_team_plays
     populated_plays = populate_team_plays()
     
+    print(f"🔍 DEBUG: Populated {len(populated_plays)} plays for teams")
+    print(f"🔍 DEBUG: Play keys: {list(populated_plays.keys())}")
+    
     # Create team objects with plays for skeleton lookup
     teams_obj = {
         game.home_team.team_id: {
@@ -517,6 +520,10 @@ def summarize_game_state(game):
             "plays": populated_plays.copy()
         }
     }
+    
+    print(f"🔍 DEBUG: Created teams object with keys: {list(teams_obj.keys())}")
+    print(f"🔍 DEBUG: Home team plays: {len(teams_obj[game.home_team.team_id]['plays'])}")
+    print(f"🔍 DEBUG: Away team plays: {len(teams_obj[game.away_team.team_id]['plays'])}")
 
     return {
         "final_score": game.score,
