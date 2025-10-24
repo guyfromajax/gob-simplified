@@ -361,6 +361,7 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                         away_strategy_settings=away_strategy
                     )
                     game_id = str(uuid.uuid4())
+                    gm.game_id = game_id  # Store game_id on the GameManager object
                     ongoing_games[game_id] = gm
                     source = "new"
                     
@@ -440,6 +441,7 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
             away_strategy_settings=away_strategy
         )
         game_id = str(uuid.uuid4())
+        gm.game_id = game_id  # Store game_id on the GameManager object
         ongoing_games[game_id] = gm
         source = "new"
         
