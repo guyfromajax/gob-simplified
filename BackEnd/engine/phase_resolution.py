@@ -1048,7 +1048,8 @@ def _get_skeleton_from_team_plays(playcall, team_id, game_context):
     
     if game_id:
         # Single game mode - check games collection
-        game_doc = games_collection.find_one({"_id": ObjectId(game_id)})
+        # Note: game_id is a UUID string, not a MongoDB ObjectId
+        game_doc = games_collection.find_one({"_id": game_id})
         if game_doc and "teams" in game_doc:
             team_obj = game_doc["teams"].get(team_id, {})
             plays = team_obj.get("plays", {})

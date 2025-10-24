@@ -5,6 +5,9 @@
  * Usage: Import and call validateInboundPassStructure()
  */
 
+import { AnimationEngine } from './AnimationEngine.js';
+import PassAnimationSystem from './PassAnimationSystem.js';
+
 export function validateInboundPassStructure() {
   const issues = [];
   
