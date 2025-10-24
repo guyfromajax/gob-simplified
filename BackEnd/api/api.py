@@ -351,7 +351,7 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                         home_strategy = request.strategy_settings
                         # print(f"🎮 Applying user's playcall settings to away team ({request.away_team})")
                         # print(f"🎮 Applying user's strategy settings to BOTH teams for consistent defense")
-                    
+                    #temp comment
                     gm = GameManager(
                         request.home_team, 
                         request.away_team,
