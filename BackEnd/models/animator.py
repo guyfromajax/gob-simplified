@@ -757,14 +757,20 @@ class Animator:
         # Build animation for OFFENSIVE players from skeleton
         offensive_animations = {}  # Store by position for defensive matching
         
+        print(f"🔍 Skeleton has {len(steps)} steps with positions: {all_positions}")
+        
         for position in all_positions:
             player = off_lineup.get(position)
             if not player:
+                print(f"⚠️ No player found for position {position}")
                 continue
             
             player_id = getattr(player, "player_id", None)
             if not player_id:
+                print(f"⚠️ No player_id for position {position}")
                 continue
+            
+            print(f"🔍 Building animation for {position} (player_id: {player_id})")
             
             # Build movement array from steps
             movement = []
@@ -778,7 +784,27 @@ class Animator:
                     continue
                 
                 timestamp = step.get("timestamp", 0)
-                coords = pos_action.get("coords", {"x": 50, "y": 25})
+                
+                # Handle both coords and location formats
+                if "coords" in pos_action:
+                    coords = pos_action.get("coords", {"x": 50, "y": 25})
+                    print(f"  📍 Using coords: {coords}")
+                elif "location" in pos_action:
+                    # Convert location string to coordinates using HCO_STRING_SPOTS
+                    location = pos_action.get("location", "key")
+                    coords = HCO_STRING_SPOTS.get(location, {"x": 50, "y": 25})
+                    print(f"  📍 Converted location '{location}' to coords: {coords}")
+                else:
+                    coords = {"x": 50, "y": 25}
+                    print(f"  📍 Using default coords: {coords}")
+                
+                # Apply away team coordinate flipping if needed
+                is_away_offense = self.game.offense_team.team_id == self.game.away_team.team_id
+                if is_away_offense:
+                    original_coords = coords.copy()
+                    coords = get_away_player_coords(coords)
+                    print(f"  🔄 Flipped coords for away offense: {original_coords} -> {coords}")
+                
                 action = pos_action.get("action", "drift")
                 
                 if start_coords is None:
