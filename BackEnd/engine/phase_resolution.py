@@ -1043,25 +1043,52 @@ def _get_skeleton_from_team_plays(playcall, team_id, game_context):
     from BackEnd.db import games_collection, tournaments_collection, franchises_collection
     from bson import ObjectId
     
+    print(f"🔍 DEBUG: Looking for playcall '{playcall}' for team '{team_id}'")
+    
     # Try to determine mode and access appropriate document
     game_id = getattr(game_context, 'game_id', None)
+    print(f"🔍 DEBUG: game_id = {game_id}")
     
     if game_id:
         # Single game mode - check games collection
         # Note: game_id is a UUID string, not a MongoDB ObjectId
         game_doc = games_collection.find_one({"_id": game_id})
+        print(f"🔍 DEBUG: game_doc found = {game_doc is not None}")
+        
         if game_doc and "teams" in game_doc:
+            print(f"🔍 DEBUG: game_doc has teams = {'teams' in game_doc}")
             team_obj = game_doc["teams"].get(team_id, {})
+            print(f"🔍 DEBUG: team_obj = {team_obj}")
+            
             plays = team_obj.get("plays", {})
+            print(f"🔍 DEBUG: plays keys = {list(plays.keys())}")
+            print(f"🔍 DEBUG: plays object = {plays}")
+            
             if playcall in plays:
+                print(f"🔍 DEBUG: Found playcall '{playcall}' in plays")
                 play_obj = plays[playcall]
+                print(f"🔍 DEBUG: play_obj = {play_obj}")
+                
                 if "skeletons" in play_obj and "standard" in play_obj["skeletons"]:
+                    print(f"🔍 DEBUG: Found skeleton for '{playcall}'")
                     return play_obj["skeletons"]["standard"]
+                else:
+                    print(f"🔍 DEBUG: Play '{playcall}' missing skeletons.standard structure")
+                    print(f"🔍 DEBUG: Available keys in play_obj: {list(play_obj.keys())}")
+                    if "skeletons" in play_obj:
+                        print(f"🔍 DEBUG: Available skeleton keys: {list(play_obj['skeletons'].keys())}")
+            else:
+                print(f"🔍 DEBUG: Playcall '{playcall}' not found in plays")
+        else:
+            print(f"🔍 DEBUG: game_doc missing or no teams key")
+    else:
+        print(f"🔍 DEBUG: No game_id found in game_context")
     
     # Check if we're in tournament mode (look for tournament_id in game context)
     # This is a simplified check - in practice, you might need to pass tournament_id explicitly
     # For now, we'll try the universal plays collection as fallback
     
+    print(f"🔍 DEBUG: Returning None - no team-specific skeleton found")
     return None
 
 
