@@ -4,7 +4,7 @@ from BackEnd.models.playbook_manager import PlaybookManager
 from BackEnd.models.animator import Animator
 import random
 import json
-from BackEnd.db import players_collection, teams_collection
+from BackEnd.db import players_collection, teams_collection, plays_collection
 from BackEnd.models.player import Player, player_to_dict
 from collections import defaultdict
 from BackEnd.playcall_skeletons.inside_skeletons import INSIDE_SCENES
@@ -419,16 +419,75 @@ class TurnManager:
 
 
     def set_playcalls(self):
-        # print(f"🎲 Playcall weights: {self.game.offense_team.playcall_weights}")
-
-        chosen_playcall = weighted_random_from_dict(self.game.offense_team.playcall_weights)
+        """
+        Two-level play selection system:
+        Level 1: Determine motion vs set play based on offense setting
+        Level 2: Determine play focus (inside/attack/outside) based on weighted settings
+        """
+        
+        # Level 1: Determine play type (motion vs set_play)
+        offense_setting = self.game.offense_team.strategy_settings.get("offense", 2)
+        
+        play_type_weights = {
+            0: {"motion": 100, "set_play": 0},
+            1: {"motion": 75, "set_play": 25},
+            2: {"motion": 50, "set_play": 50},
+            3: {"motion": 25, "set_play": 75},
+            4: {"motion": 0, "set_play": 100}
+        }
+        
+        weights = play_type_weights.get(offense_setting, {"motion": 50, "set_play": 50})
+        chosen_play_type = weighted_random_from_dict(weights)
+        
+        # Level 2: Determine play focus (inside/attack/outside)
+        inside_val = self.game.offense_team.strategy_settings.get("inside", 2)
+        attack_val = self.game.offense_team.strategy_settings.get("attack", 2)
+        outside_val = self.game.offense_team.strategy_settings.get("outside", 2)
+        
+        total = inside_val + attack_val + outside_val
+        
+        if total == 0:
+            # Fallback if all are zero (shouldn't happen but safe)
+            chosen_focus = "inside"
+        else:
+            # Roll random number from 1 to total
+            roll = random.randint(1, total)
+            
+            if roll <= inside_val:
+                chosen_focus = "inside"
+            elif roll <= inside_val + attack_val:
+                chosen_focus = "attack"
+            else:
+                chosen_focus = "outside"
+        
+        # Query plays collection for matching play
+        query = {
+            "play_type": chosen_play_type,
+            "play_focus": chosen_focus
+        }
+        
+        matching_plays = list(plays_collection.find(query))
+        
+        if not matching_plays:
+            # Fallback: if no plays match, log warning and use a default
+            print(f"⚠️ No plays found for {chosen_play_type}/{chosen_focus}, using fallback")
+            chosen_playcall = "Inside"  # Fallback to old system
+        else:
+            # Randomly select one play from matches
+            selected_play = random.choice(matching_plays)
+            chosen_playcall = selected_play["name"]
+            print(f"🎯 Selected play: {chosen_playcall} (type={chosen_play_type}, focus={chosen_focus})")
+        
+        # Defense setting (unchanged)
         defense_setting = self.game.defense_team.strategy_settings["defense"]
         chosen_defense = random.choice(STRATEGY_CALL_DICTS["defense"][defense_setting])
-
-        # print(f"🎲 Chosen playcall: {chosen_playcall}")
         
-        # Track usage
-        self.game.offense_team.playcall_tracker[chosen_playcall] += 1
+        # Track usage (using play name now instead of PLAYCALL category)
+        if chosen_playcall in self.game.offense_team.playcall_tracker:
+            self.game.offense_team.playcall_tracker[chosen_playcall] += 1
+        else:
+            self.game.offense_team.playcall_tracker[chosen_playcall] = 1
+            
         self.game.defense_team.defense_playcall_tracker[chosen_defense] += 1
 
         return {
