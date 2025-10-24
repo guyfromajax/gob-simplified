@@ -591,7 +591,25 @@ def resolve_half_court_offense_logic(game):
     shot_result["animations"] = animator.capture_halfcourt_animation(roles)
     
     # Add skeleton data for unified animation system
-    shot_result["skeleton"] = get_skeleton_for_turn(shot_result.get("result_type", "HCO"), "HCO", game) or {}
+    skeleton = get_skeleton_for_turn(shot_result.get("result_type", "HCO"), "HCO", game) or {}
+    shot_result["skeleton"] = skeleton
+    
+    # Convert skeleton to animations if skeleton exists
+    if skeleton and "steps" in skeleton:
+        print(f"🔄 Converting skeleton to animations with {len(skeleton.get('steps', []))} steps")
+        skeleton_animations = animator.skeleton_to_animations(
+            skeleton, 
+            off_lineup, 
+            def_lineup, 
+            add_defenders=True
+        )
+        if skeleton_animations:
+            print(f"✅ Generated {len(skeleton_animations)} skeleton-based animations")
+            shot_result["animations"] = skeleton_animations
+        else:
+            print(f"⚠️ Skeleton conversion failed, using fallback animations")
+    else:
+        print(f"⚠️ No skeleton found, using fallback animations")
 
     # 4. scouting report update
     if shot_result["result_type"] == "MAKE":
@@ -825,16 +843,26 @@ def resolve_full_court_press_logic(game: "GameManager"):
         from BackEnd.models.animator import Animator
         animator = Animator(game)
         skeleton = get_skeleton_for_turn("SHOT", "FCP", game) or {}
-        animations = animator.skeleton_to_animations(
-            skeleton, 
-            off_lineup, 
-            def_lineup, 
-            add_defenders=True,
-            is_fcp=True
-        ) if skeleton else []
+        
+        if skeleton and "steps" in skeleton:
+            print(f"🔄 FCP: Converting skeleton to animations with {len(skeleton.get('steps', []))} steps")
+            animations = animator.skeleton_to_animations(
+                skeleton, 
+                off_lineup, 
+                def_lineup, 
+                add_defenders=True,
+                is_fcp=True
+            )
+            if animations:
+                print(f"✅ FCP: Generated {len(animations)} skeleton-based animations")
+                shot_result["animations"] = animations
+            else:
+                print(f"⚠️ FCP: Skeleton conversion failed, using fallback animations")
+        else:
+            print(f"⚠️ FCP: No skeleton found, using fallback animations")
+            animations = []
         
         shot_result["skeleton"] = skeleton
-        shot_result["animations"] = animations
         shot_result["roles"] = shot_roles
         
         return shot_result
@@ -870,13 +898,23 @@ def resolve_full_court_press_logic(game: "GameManager"):
         # text = "PRESS! Turnover"
     # elif result_type == "STEAL":
     #     text = "PRESS! Steal!"
-    animations = animator.skeleton_to_animations(
-        skeleton, 
-        off_lineup, 
-        def_lineup, 
-        add_defenders=True,
-        is_fcp=True
-    ) if skeleton else []
+    
+    if skeleton and "steps" in skeleton:
+        print(f"🔄 FCP: Converting skeleton to animations with {len(skeleton.get('steps', []))} steps")
+        animations = animator.skeleton_to_animations(
+            skeleton, 
+            off_lineup, 
+            def_lineup, 
+            add_defenders=True,
+            is_fcp=True
+        )
+        if animations:
+            print(f"✅ FCP: Generated {len(animations)} skeleton-based animations")
+        else:
+            print(f"⚠️ FCP: Skeleton conversion failed, using fallback animations")
+    else:
+        print(f"⚠️ FCP: No skeleton found, using fallback animations")
+        animations = []
     
     # Determine possession flip
     possession_flips = False
@@ -1238,17 +1276,27 @@ def resolve_half_court_trap_logic(game: "GameManager"):
         from BackEnd.models.animator import Animator
         animator = Animator(game)
         skeleton = get_skeleton_for_turn("SHOT", "HCT", game) or {}
-        animations = animator.skeleton_to_animations(
-            skeleton, 
-            off_lineup, 
-            def_lineup, 
-            add_defenders=True,
-            is_fcp=False,
-            is_hct=True
-        ) if skeleton else []
+        
+        if skeleton and "steps" in skeleton:
+            print(f"🔄 HCT: Converting skeleton to animations with {len(skeleton.get('steps', []))} steps")
+            animations = animator.skeleton_to_animations(
+                skeleton, 
+                off_lineup, 
+                def_lineup, 
+                add_defenders=True,
+                is_fcp=False,
+                is_hct=True
+            )
+            if animations:
+                print(f"✅ HCT: Generated {len(animations)} skeleton-based animations")
+                shot_result["animations"] = animations
+            else:
+                print(f"⚠️ HCT: Skeleton conversion failed, using fallback animations")
+        else:
+            print(f"⚠️ HCT: No skeleton found, using fallback animations")
+            animations = []
         
         shot_result["skeleton"] = skeleton
-        shot_result["animations"] = animations
         shot_result["roles"] = shot_roles
         
         return shot_result
@@ -1277,14 +1325,23 @@ def resolve_half_court_trap_logic(game: "GameManager"):
     elif result_type == "DEAD_BALL_TURNOVER":
         result_type = "DEAD BALL"
     
-    animations = animator.skeleton_to_animations(
-        skeleton, 
-        off_lineup, 
-        def_lineup, 
-        add_defenders=True,
-        is_fcp=False,
-        is_hct=True
-    ) if skeleton else []
+    if skeleton and "steps" in skeleton:
+        print(f"🔄 HCT: Converting skeleton to animations with {len(skeleton.get('steps', []))} steps")
+        animations = animator.skeleton_to_animations(
+            skeleton, 
+            off_lineup, 
+            def_lineup, 
+            add_defenders=True,
+            is_fcp=False,
+            is_hct=True
+        )
+        if animations:
+            print(f"✅ HCT: Generated {len(animations)} skeleton-based animations")
+        else:
+            print(f"⚠️ HCT: Skeleton conversion failed, using fallback animations")
+    else:
+        print(f"⚠️ HCT: No skeleton found, using fallback animations")
+        animations = []
     
     # Determine possession flip (same logic as FCP)
     possession_flips = False
