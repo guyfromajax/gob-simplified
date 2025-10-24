@@ -858,8 +858,13 @@ class Animator:
                 )
                 animations.extend(defensive_anims)
             else:
-                # Use standard defensive positioning (future implementation)
-                pass
+                # Use standard defensive positioning for HCO
+                defensive_anims = self._position_standard_defenders(
+                    offensive_animations, 
+                    def_lineup, 
+                    steps
+                )
+                animations.extend(defensive_anims)
         
         return animations
     
@@ -1086,6 +1091,148 @@ class Animator:
                 "duration": def_movement[-1]["timestamp"] if def_movement else 0
             })
         
+        return defensive_animations
+
+    def _position_standard_defenders(self, offensive_animations, def_lineup, skeleton_steps):
+        """
+        Position defensive players for standard HCO scenarios.
+        
+        Strategy:
+        - Each defender guards the offensive player at their position
+        - Use standard defensive positioning logic from shared_defense
+        - Track offensive players dynamically through the play
+        
+        Args:
+            offensive_animations: Dict mapping position → offensive player animation
+            def_lineup: Dict of defensive players by position
+            skeleton_steps: List of skeleton steps for timing
+            
+        Returns:
+            List of defensive player animations
+        """
+        from BackEnd.utils.shared_defense import assign_bh_defender_coords, assign_non_bh_defender_coords
+        from BackEnd.utils.shared import get_away_player_coords
+        
+        defensive_animations = []
+        
+        # Determine court orientation
+        is_away_offense = self.game.offense_team.team_id == self.game.away_team.team_id
+        aggression = self.game.defense_team.strategy_calls.get("aggression_call", "normal")
+        
+        print(f"🔍 Positioning standard defenders for HCO (away_offense: {is_away_offense}, aggression: {aggression})")
+        
+        # Build offensive player positions by step for tracking
+        offensive_positions_by_step = {}
+        for pos, off_anim in offensive_animations.items():
+            offensive_positions_by_step[pos] = []
+            for step in off_anim.get("movement", []):
+                offensive_positions_by_step[pos].append(step.get("coords", {"x": 50, "y": 25}))
+        
+        # Find ball handler position (player with ball at step 0)
+        ball_handler_pos = None
+        for pos, off_anim in offensive_animations.items():
+            if off_anim.get("hasBallAtStep", [False])[0]:  # Has ball at first step
+                ball_handler_pos = pos
+                break
+        
+        if not ball_handler_pos:
+            # Fallback: assume PG is ball handler
+            ball_handler_pos = "PG"
+        
+        print(f"🔍 Ball handler position: {ball_handler_pos}")
+        
+        # Create defensive animations for each position
+        for def_pos in ['PG', 'SG', 'SF', 'PF', 'C']:
+            def_player = def_lineup.get(def_pos)
+            if not def_player:
+                continue
+            
+            def_player_id = getattr(def_player, "player_id", None)
+            if not def_player_id:
+                continue
+            
+            print(f"🔍 Creating defensive animation for {def_pos} (player_id: {def_player_id})")
+            
+            # Get the offensive player this defender is guarding
+            off_pos_to_guard = def_pos  # Man-to-man by position
+            off_coords_list = offensive_positions_by_step.get(off_pos_to_guard, [])
+            
+            def_movement = []
+            def_start = None
+            def_end = None
+            
+            # Step 0: Initial defensive position
+            if off_coords_list:
+                off_coords = off_coords_list[0]
+                
+                # Calculate initial defensive position
+                if off_pos_to_guard == ball_handler_pos:
+                    # Ball handler defender
+                    def_coords = assign_bh_defender_coords(off_coords, aggression, is_away_offense)
+                else:
+                    # Non-ball handler defender
+                    bh_coords = offensive_positions_by_step.get(ball_handler_pos, [{}])[0] if ball_handler_pos in offensive_positions_by_step else {"x": 50, "y": 25}
+                    def_coords = assign_non_bh_defender_coords(off_coords, bh_coords, aggression, is_away_offense)
+                
+                def_start = def_coords
+                def_movement.append({
+                    "timestamp": 0,
+                    "coords": def_coords,
+                    "action": "guard_ball" if off_pos_to_guard == ball_handler_pos else "guard_offball"
+                })
+            
+            # Subsequent steps: Track offensive player
+            for step_idx, skeleton_step in enumerate(skeleton_steps[1:], start=1):
+                timestamp = skeleton_step.get("timestamp", step_idx * 800)
+                
+                if step_idx < len(off_coords_list):
+                    off_coords = off_coords_list[step_idx]
+                    
+                    # Calculate defensive position for this step
+                    if off_pos_to_guard == ball_handler_pos:
+                        # Ball handler defender
+                        def_coords = assign_bh_defender_coords(off_coords, aggression, is_away_offense)
+                    else:
+                        # Non-ball handler defender - need ball handler position for this step
+                        bh_coords_list = offensive_positions_by_step.get(ball_handler_pos, [])
+                        bh_coords = bh_coords_list[step_idx] if step_idx < len(bh_coords_list) else {"x": 50, "y": 25}
+                        def_coords = assign_non_bh_defender_coords(off_coords, bh_coords, aggression, is_away_offense)
+                    
+                    def_end = def_coords
+                    def_movement.append({
+                        "timestamp": timestamp,
+                        "coords": def_coords,
+                        "action": "guard_ball" if off_pos_to_guard == ball_handler_pos else "guard_offball"
+                    })
+                else:
+                    # No more offensive movement - stay at last position
+                    if def_movement:
+                        last_coords = def_movement[-1]["coords"]
+                        def_movement.append({
+                            "timestamp": timestamp,
+                            "coords": last_coords,
+                            "action": "guard_offball"
+                        })
+            
+            if not def_movement:
+                continue
+            
+            # All defenders have ball at no steps
+            has_ball_steps = [False] * len(def_movement)
+            duration = def_movement[-1]["timestamp"] if def_movement else 0
+            
+            defensive_animations.append({
+                "playerId": def_player_id,
+                "start": def_start or {"x": 50, "y": 25},
+                "end": def_end or {"x": 50, "y": 25},
+                "movement": def_movement,
+                "hasBallAtStep": has_ball_steps,
+                "duration": duration
+            })
+            
+            print(f"✅ Created defensive animation for {def_pos} with {len(def_movement)} steps")
+        
+        print(f"✅ Generated {len(defensive_animations)} standard defensive animations")
         return defensive_animations
 
     def get_latest_animation_packet(self):
