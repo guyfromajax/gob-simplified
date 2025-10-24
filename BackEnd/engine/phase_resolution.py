@@ -981,21 +981,26 @@ def get_hco_skeleton(result_type, game_context):
     
     # Get the current playcall from game context
     playcall = game_context.game_state.get("current_playcall", "Inside") if game_context else "Inside"
+    print(f"📋 Looking for skeleton for play: '{playcall}'")
     
-    # Query plays collection for the specific play
+    # Query plays collection for the specific play by name
     play_doc = plays_collection.find_one({"name": playcall})
     
     if play_doc and "skeletons" in play_doc:
-        # Access skeleton using the nested structure: skeletons.skeletons.standard
+        # Access skeleton using the structure: skeletons.standard
         skeletons = play_doc.get("skeletons", {})
-        if "skeletons" in skeletons and "standard" in skeletons["skeletons"]:
-            skeleton = skeletons["skeletons"]["standard"]
+        if "standard" in skeletons:
+            skeleton = skeletons["standard"]
             print(f"📋 Found skeleton for play '{playcall}' with {len(skeleton.get('steps', []))} steps")
             return skeleton
         else:
-            print(f"⚠️ Play '{playcall}' found but missing skeletons.skeletons.standard structure")
+            print(f"⚠️ Play '{playcall}' found but missing skeletons.standard structure")
+            print(f"   Available skeleton keys: {list(skeletons.keys())}")
     else:
         print(f"⚠️ Play '{playcall}' not found in plays collection")
+        # List available plays for debugging
+        available_plays = list(plays_collection.find({}, {"name": 1}))
+        print(f"   Available plays: {[p['name'] for p in available_plays]}")
     
     # Fallback to old skeleton system if database lookup fails
     print(f"🔄 Falling back to old skeleton system for '{playcall}'")
