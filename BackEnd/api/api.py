@@ -498,7 +498,13 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
     )
 
     try:
+        print(f"🔍 DEBUG: Saving game document with teams object")
+        print(f"🔍 DEBUG: Teams object keys: {list(summary.get('teams', {}).keys())}")
+        print(f"🔍 DEBUG: Home team plays: {len(summary.get('teams', {}).get(gm.home_team.team_id, {}).get('plays', {}))}")
+        print(f"🔍 DEBUG: Away team plays: {len(summary.get('teams', {}).get(gm.away_team.team_id, {}).get('plays', {}))}")
+        
         games_collection.update_one({"_id": game_id}, {"$set": summary}, upsert=True)
+        print(f"🔍 DEBUG: Game document saved successfully")
     except Exception as e:
         print("🚨 Mongo upsert failed:", e)
         traceback.print_exc()
