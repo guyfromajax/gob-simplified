@@ -976,14 +976,25 @@ def get_hct_skeleton(result_type, game_context=None):
 
 
 def get_hco_skeleton(result_type, game_context):
-    """Get HCO skeleton based on the current playcall from database plays collection"""
-    from BackEnd.db import plays_collection
+    """Get HCO skeleton based on the current playcall from team-specific play objects"""
+    from BackEnd.db import plays_collection, games_collection, tournaments_collection, franchises_collection
     
     # Get the current playcall from game context
     playcall = game_context.game_state.get("current_playcall", "Inside") if game_context else "Inside"
     print(f"📋 Looking for skeleton for play: '{playcall}'")
     
-    # Query plays collection for the specific play by name
+    # Get the offensive team
+    offense_team = game_context.offense_team
+    offense_team_id = offense_team.team_id
+    
+    # Try to get skeleton from team-specific play objects first
+    skeleton = _get_skeleton_from_team_plays(playcall, offense_team_id, game_context)
+    if skeleton:
+        print(f"📋 Found skeleton in team-specific plays for '{playcall}' with {len(skeleton.get('steps', []))} steps")
+        return skeleton
+    
+    # Fallback to universal plays collection
+    print(f"🔄 Team-specific play not found, checking universal plays collection for '{playcall}'")
     play_doc = plays_collection.find_one({"name": playcall})
     
     if play_doc and "skeletons" in play_doc:
@@ -991,18 +1002,15 @@ def get_hco_skeleton(result_type, game_context):
         skeletons = play_doc.get("skeletons", {})
         if "standard" in skeletons:
             skeleton = skeletons["standard"]
-            print(f"📋 Found skeleton for play '{playcall}' with {len(skeleton.get('steps', []))} steps")
+            print(f"📋 Found skeleton in universal plays for '{playcall}' with {len(skeleton.get('steps', []))} steps")
             return skeleton
         else:
             print(f"⚠️ Play '{playcall}' found but missing skeletons.standard structure")
             print(f"   Available skeleton keys: {list(skeletons.keys())}")
     else:
-        print(f"⚠️ Play '{playcall}' not found in plays collection")
-        # List available plays for debugging
-        available_plays = list(plays_collection.find({}, {"name": 1}))
-        print(f"   Available plays: {[p['name'] for p in available_plays]}")
+        print(f"⚠️ Play '{playcall}' not found in universal plays collection")
     
-    # Fallback to old skeleton system if database lookup fails
+    # Final fallback to old skeleton system
     print(f"🔄 Falling back to old skeleton system for '{playcall}'")
     from BackEnd.playcall_skeletons.inside_skeletons import INSIDE_SCENES
     from BackEnd.playcall_skeletons.outside_skeletons import OUTSIDE_SCENES
@@ -1028,23 +1036,32 @@ def get_hco_skeleton(result_type, game_context):
         selected_scene = random.choice(scenes)
         print(f"📋 Using fallback skeleton with {len(selected_scene.get('steps', []))} steps")
         return selected_scene
+
+
+def _get_skeleton_from_team_plays(playcall, team_id, game_context):
+    """Get skeleton from team-specific play objects in the appropriate document"""
+    from BackEnd.db import games_collection, tournaments_collection, franchises_collection
+    from bson import ObjectId
     
-    # Fallback to basic skeleton if no scenes available
-    return {
-        "steps": [
-            {
-                "timestamp": 0,
-                "pos_actions": {
-                    "PG": {"action": "HANDLE", "spot": "key"},
-                    "SG": {"action": "DRIFT", "spot": "upper wing"},
-                    "SF": {"action": "DRIFT", "spot": "lower wing"},
-                    "PF": {"action": "DRIFT", "spot": "upper highPost"},
-                    "C": {"action": "DRIFT", "spot": "lower highPost"}
-                },
-                "events": []
-            }
-        ]
-    }
+    # Try to determine mode and access appropriate document
+    game_id = getattr(game_context, 'game_id', None)
+    
+    if game_id:
+        # Single game mode - check games collection
+        game_doc = games_collection.find_one({"_id": ObjectId(game_id)})
+        if game_doc and "teams" in game_doc:
+            team_obj = game_doc["teams"].get(team_id, {})
+            plays = team_obj.get("plays", {})
+            if playcall in plays:
+                play_obj = plays[playcall]
+                if "skeletons" in play_obj and "standard" in play_obj["skeletons"]:
+                    return play_obj["skeletons"]["standard"]
+    
+    # Check if we're in tournament mode (look for tournament_id in game context)
+    # This is a simplified check - in practice, you might need to pass tournament_id explicitly
+    # For now, we'll try the universal plays collection as fallback
+    
+    return None
 
 
 def apply_opposite_side_logic(skeleton_data, is_away_offense):
