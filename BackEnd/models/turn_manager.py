@@ -466,7 +466,14 @@ class TurnManager:
             "play_focus": chosen_focus
         }
         
+        # Debug: Check what plays exist in the collection
+        all_plays = list(plays_collection.find({}))
+        print(f"🔍 DEBUG: Total plays in collection: {len(all_plays)}")
+        for play in all_plays:
+            print(f"🔍 DEBUG: Play '{play.get('name', 'NO_NAME')}' - type: {play.get('play_type', 'NO_TYPE')}, focus: {play.get('play_focus', 'NO_FOCUS')}")
+        
         matching_plays = list(plays_collection.find(query))
+        print(f"🔍 DEBUG: Query {query} returned {len(matching_plays)} matches")
         
         if not matching_plays:
             # Fallback: if no plays match, log warning and use a default
