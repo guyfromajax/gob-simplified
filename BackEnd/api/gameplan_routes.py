@@ -87,6 +87,27 @@ def get_default_settings():
     }
 
 
+def populate_team_plays():
+    """Populate team plays object with all plays from universal plays collection"""
+    from BackEnd.db import plays_collection
+    
+    # Get all plays from universal collection
+    all_plays = list(plays_collection.find({}))
+    
+    # Convert to dictionary format for team storage
+    plays_dict = {}
+    for play in all_plays:
+        play_name = play["name"]
+        plays_dict[play_name] = {
+            "name": play["name"],
+            "play_type": play["play_type"], 
+            "play_focus": play["play_focus"],
+            "skeletons": play["skeletons"]
+        }
+    
+    return plays_dict
+
+
 def ensure_team_objects_exist(mode: str, doc_id: str, team_id: str):
     """Ensure team objects exist in the mode document. Create with defaults if missing."""
     collection = None
@@ -111,6 +132,9 @@ def ensure_team_objects_exist(mode: str, doc_id: str, team_id: str):
         defaults = get_default_settings()
         updated = False
         
+        # Get populated plays for all teams
+        populated_plays = populate_team_plays()
+        
         for team in teams:
             tid = str(team["_id"])
             if tid not in franchise_teams:
@@ -127,15 +151,17 @@ def ensure_team_objects_exist(mode: str, doc_id: str, team_id: str):
                     "d_tendency_reads": team.get("d_tendency_reads", 0),
                     "playcall_settings": defaults["playcall_settings"].copy(),
                     "strategy_settings": defaults["strategy_settings"].copy(),
-                    "plays": {}
+                    "plays": populated_plays.copy()
                 }
                 updated = True
-            elif "playcall_settings" not in franchise_teams[tid] or "strategy_settings" not in franchise_teams[tid]:
+            elif "playcall_settings" not in franchise_teams[tid] or "strategy_settings" not in franchise_teams[tid] or not franchise_teams[tid].get("plays"):
                 # Add missing settings to existing team object
                 if "playcall_settings" not in franchise_teams[tid]:
                     franchise_teams[tid]["playcall_settings"] = defaults["playcall_settings"].copy()
                 if "strategy_settings" not in franchise_teams[tid]:
                     franchise_teams[tid]["strategy_settings"] = defaults["strategy_settings"].copy()
+                if not franchise_teams[tid].get("plays"):
+                    franchise_teams[tid]["plays"] = populated_plays.copy()
                 updated = True
         
         if updated:
@@ -159,24 +185,28 @@ def ensure_team_objects_exist(mode: str, doc_id: str, team_id: str):
                 raise HTTPException(status_code=404, detail="Team not found")
             
             defaults = get_default_settings()
+            populated_plays = populate_team_plays()
             team_obj = {
                 "playcall_settings": defaults["playcall_settings"].copy(),
                 "strategy_settings": defaults["strategy_settings"].copy(),
-                "plays": {}
+                "plays": populated_plays.copy()
             }
             
             collection.update_one(
                 {"_id": ObjectId(doc_id)},
                 {"$set": {f"{team_key}": team_obj}}
             )
-        elif "playcall_settings" not in team_obj or "strategy_settings" not in team_obj:
+        elif "playcall_settings" not in team_obj or "strategy_settings" not in team_obj or not team_obj.get("plays"):
             # Add missing settings
             defaults = get_default_settings()
+            populated_plays = populate_team_plays()
             updates = {}
             if "playcall_settings" not in team_obj:
                 updates[f"{team_key}.playcall_settings"] = defaults["playcall_settings"].copy()
             if "strategy_settings" not in team_obj:
                 updates[f"{team_key}.strategy_settings"] = defaults["strategy_settings"].copy()
+            if not team_obj.get("plays"):
+                updates[f"{team_key}.plays"] = populated_plays.copy()
             
             collection.update_one(
                 {"_id": ObjectId(doc_id)},
