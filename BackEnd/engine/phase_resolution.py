@@ -991,6 +991,7 @@ def get_hco_skeleton(result_type, game_context):
     skeleton = _get_skeleton_from_team_plays(playcall, offense_team_id, game_context)
     if skeleton:
         print(f"📋 Found skeleton in team-specific plays for '{playcall}' with {len(skeleton.get('steps', []))} steps")
+        print(f"📋 Skeleton: {skeleton}")
         return skeleton
     
     # Fallback to universal plays collection
@@ -1003,6 +1004,7 @@ def get_hco_skeleton(result_type, game_context):
         if "standard" in skeletons:
             skeleton = skeletons["standard"]
             print(f"📋 Found skeleton in universal plays for '{playcall}' with {len(skeleton.get('steps', []))} steps")
+            print(f"📋 Skeleton: {skeleton}")
             return skeleton
         else:
             print(f"⚠️ Play '{playcall}' found but missing skeletons.standard structure")
