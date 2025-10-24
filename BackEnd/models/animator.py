@@ -1174,6 +1174,12 @@ class Animator:
                     bh_coords = offensive_positions_by_step.get(ball_handler_pos, [{}])[0] if ball_handler_pos in offensive_positions_by_step else {"x": 50, "y": 25}
                     def_coords = assign_non_bh_defender_coords(off_coords, bh_coords, aggression, is_away_offense)
                 
+                # Apply away team coordinate flipping to defensive positions if needed
+                if is_away_offense:
+                    original_def_coords = def_coords.copy()
+                    def_coords = get_away_player_coords(def_coords)
+                    print(f"  🔄 Flipped defensive coords for away offense: {original_def_coords} -> {def_coords}")
+                
                 def_start = def_coords
                 def_movement.append({
                     "timestamp": 0,
@@ -1197,6 +1203,12 @@ class Animator:
                         bh_coords_list = offensive_positions_by_step.get(ball_handler_pos, [])
                         bh_coords = bh_coords_list[step_idx] if step_idx < len(bh_coords_list) else {"x": 50, "y": 25}
                         def_coords = assign_non_bh_defender_coords(off_coords, bh_coords, aggression, is_away_offense)
+                    
+                    # Apply away team coordinate flipping to defensive positions if needed
+                    if is_away_offense:
+                        original_def_coords = def_coords.copy()
+                        def_coords = get_away_player_coords(def_coords)
+                        print(f"  🔄 Flipped defensive coords for away offense (step {step_idx}): {original_def_coords} -> {def_coords}")
                     
                     def_end = def_coords
                     def_movement.append({
