@@ -363,6 +363,48 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                     game_id = str(uuid.uuid4())
                     ongoing_games[game_id] = gm
                     source = "new"
+                    
+                    # Save teams object to database for skeleton lookup during simulation
+                    try:
+                        from BackEnd.api.gameplan_routes import populate_team_plays
+                        from BackEnd.utils.shared import summarize_game_state
+                        
+                        # Get populated plays for team objects
+                        populated_plays = populate_team_plays()
+                        
+                        print(f"🔍 DEBUG: Populated {len(populated_plays)} plays for teams in simulate_quarter_endpoint (Q1)")
+                        print(f"🔍 DEBUG: Play keys: {list(populated_plays.keys())}")
+                        
+                        # Create team objects with plays for skeleton lookup
+                        teams_obj = {
+                            gm.home_team.team_id: {
+                                "playcall_settings": getattr(gm.home_team, 'playcall_settings', {}),
+                                "strategy_settings": getattr(gm.home_team, 'strategy_settings', {}),
+                                "plays": populated_plays.copy()
+                            },
+                            gm.away_team.team_id: {
+                                "playcall_settings": getattr(gm.away_team, 'playcall_settings', {}),
+                                "strategy_settings": getattr(gm.away_team, 'strategy_settings', {}),
+                                "plays": populated_plays.copy()
+                            }
+                        }
+                        
+                        print(f"🔍 DEBUG: Created teams object with keys: {list(teams_obj.keys())}")
+                        print(f"🔍 DEBUG: Home team plays: {len(teams_obj[gm.home_team.team_id]['plays'])}")
+                        print(f"🔍 DEBUG: Away team plays: {len(teams_obj[gm.away_team.team_id]['plays'])}")
+                        
+                        # Create a summary with teams object
+                        summary = summarize_game_state(gm)
+                        summary["teams"] = teams_obj
+                        
+                        # Save to database
+                        games_collection.update_one({"_id": game_id}, {"$set": summary}, upsert=True)
+                        print(f"🔍 DEBUG: Saved teams object to database with game_id: {game_id}")
+                        
+                    except Exception as e:
+                        print(f"🚨 Failed to save teams object in simulate_quarter_endpoint (Q1): {e}")
+                        import traceback
+                        traceback.print_exc()
                 else:
                     if debug:
                         logging.debug("simulate_quarter_endpoint unknown game_id=%s", game_id)
@@ -400,6 +442,48 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
         game_id = str(uuid.uuid4())
         ongoing_games[game_id] = gm
         source = "new"
+        
+        # Save teams object to database for skeleton lookup during simulation
+        try:
+            from BackEnd.api.gameplan_routes import populate_team_plays
+            from BackEnd.utils.shared import summarize_game_state
+            
+            # Get populated plays for team objects
+            populated_plays = populate_team_plays()
+            
+            print(f"🔍 DEBUG: Populated {len(populated_plays)} plays for teams in simulate_quarter_endpoint (no game_id)")
+            print(f"🔍 DEBUG: Play keys: {list(populated_plays.keys())}")
+            
+            # Create team objects with plays for skeleton lookup
+            teams_obj = {
+                gm.home_team.team_id: {
+                    "playcall_settings": getattr(gm.home_team, 'playcall_settings', {}),
+                    "strategy_settings": getattr(gm.home_team, 'strategy_settings', {}),
+                    "plays": populated_plays.copy()
+                },
+                gm.away_team.team_id: {
+                    "playcall_settings": getattr(gm.away_team, 'playcall_settings', {}),
+                    "strategy_settings": getattr(gm.away_team, 'strategy_settings', {}),
+                    "plays": populated_plays.copy()
+                }
+            }
+            
+            print(f"🔍 DEBUG: Created teams object with keys: {list(teams_obj.keys())}")
+            print(f"🔍 DEBUG: Home team plays: {len(teams_obj[gm.home_team.team_id]['plays'])}")
+            print(f"🔍 DEBUG: Away team plays: {len(teams_obj[gm.away_team.team_id]['plays'])}")
+            
+            # Create a summary with teams object
+            summary = summarize_game_state(gm)
+            summary["teams"] = teams_obj
+            
+            # Save to database
+            games_collection.update_one({"_id": game_id}, {"$set": summary}, upsert=True)
+            print(f"🔍 DEBUG: Saved teams object to database with game_id: {game_id}")
+            
+        except Exception as e:
+            print(f"🚨 Failed to save teams object in simulate_quarter_endpoint (no game_id): {e}")
+            import traceback
+            traceback.print_exc()
     if debug and gm is not None:
         logging.debug(
             "simulate_quarter_endpoint using matchup: %s vs %s (quarter=%s)",
