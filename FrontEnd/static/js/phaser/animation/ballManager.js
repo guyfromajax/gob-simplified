@@ -251,11 +251,11 @@ export function shootBall({
   // Without this, the ball will be repositioned to player's position every frame,
   // overriding the tween and making the shot appear as a teleport
   // console.log('🏀 shootBall: Attempting to stop BallController', {
-    hasBallController: !!scene.ballController,
-    hasStopMethod: !!(scene.ballController && typeof scene.ballController.stopFollowingPlayer === 'function'),
-    currentIsAttached: scene.ballController?.isAttached,
-    shotInProgress: scene._shotInProgress
-  });
+  //   hasBallController: !!scene.ballController,
+  //   hasStopMethod: !!(scene.ballController && typeof scene.ballController.stopFollowingPlayer === 'function'),
+  //   currentIsAttached: scene.ballController?.isAttached,
+  //   shotInProgress: scene._shotInProgress
+  // });
   
   // Stop BOTH old and new ball following systems
   scene.ballDetached = true; // Stop old system (scene._ballFollowing callback checks this)
@@ -320,10 +320,10 @@ export function shootBall({
   );
   
   // console.log('🏀 shootBall: gridToPixels conversion', {
-    inputGridCoords: fromCoords,
-    outputPixelCoords: start,
-    canvasSize: { w: scene.game.config.width, h: scene.game.config.height }
-  });
+  //   inputGridCoords: fromCoords,
+  //   outputPixelCoords: start,
+  //   canvasSize: { w: scene.game.config.width, h: scene.game.config.height }
+  // });
   
   const rimCoords = isHomeTeam ? HOME_RIM_COORDS : AWAY_RIM_COORDS;
   
@@ -381,11 +381,11 @@ export function shootBall({
   ballSprite.setVisible(true);
   
   // console.log('🏀 shootBall: Ball positioned and visible', {
-    position: { x: start.x, y: start.y },
-    visible: ballSprite.visible,
-    rimTarget: rim,
-    duration,
-    result
+  //   position: { x: start.x, y: start.y },
+  //   visible: ballSprite.visible,
+  //   rimTarget: rim,
+  //   duration,
+  //   result
   });
 
   if (SHOT_DEBUG) {
@@ -405,11 +405,11 @@ export function shootBall({
 
   return new Promise((resolve) => {
     // console.log('🏀 shootBall: About to call scene.tweens.add', {
-      hasTweens: !!scene.tweens,
-      ballSpritePos: { x: ballSprite.x, y: ballSprite.y },
-      targetPos: { x: rim.x, y: rim.y },
-      distance: Phaser.Math.Distance.Between(ballSprite.x, ballSprite.y, rim.x, rim.y),
-      duration
+    //   hasTweens: !!scene.tweens,
+    //   ballSpritePos: { x: ballSprite.x, y: ballSprite.y },
+    //   targetPos: { x: rim.x, y: rim.y },
+    //   distance: Phaser.Math.Distance.Between(ballSprite.x, ballSprite.y, rim.x, rim.y),
+    //   duration
     });
     
     const tweenStartTime = Date.now();
@@ -421,9 +421,9 @@ export function shootBall({
       ease: "Sine.easeInOut",
       onStart: () => {
         // console.log('🏀 shootBall: Tween STARTED!', {
-          timestamp: Date.now(),
-          elapsedSinceCreate: Date.now() - tweenStartTime
-        });
+        //   timestamp: Date.now(),
+        //   elapsedSinceCreate: Date.now() - tweenStartTime
+        // });
       },
       onUpdate: (tween) => {
         if (tween.progress === 0 || tween.progress === 0.5 || tween.progress === 1) {
