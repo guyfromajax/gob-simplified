@@ -250,7 +250,7 @@ export function shootBall({
   // CRITICAL: Stop BallController from following player during shot animation
   // Without this, the ball will be repositioned to player's position every frame,
   // overriding the tween and making the shot appear as a teleport
-  console.log('🏀 shootBall: Attempting to stop BallController', {
+  // console.log('🏀 shootBall: Attempting to stop BallController', {
     hasBallController: !!scene.ballController,
     hasStopMethod: !!(scene.ballController && typeof scene.ballController.stopFollowingPlayer === 'function'),
     currentIsAttached: scene.ballController?.isAttached,
@@ -319,7 +319,7 @@ export function shootBall({
     scene.game.config.height
   );
   
-  console.log('🏀 shootBall: gridToPixels conversion', {
+  // console.log('🏀 shootBall: gridToPixels conversion', {
     inputGridCoords: fromCoords,
     outputPixelCoords: start,
     canvasSize: { w: scene.game.config.width, h: scene.game.config.height }
@@ -380,7 +380,7 @@ export function shootBall({
   ballSprite.setPosition(start.x, start.y);
   ballSprite.setVisible(true);
   
-  console.log('🏀 shootBall: Ball positioned and visible', {
+  // console.log('🏀 shootBall: Ball positioned and visible', {
     position: { x: start.x, y: start.y },
     visible: ballSprite.visible,
     rimTarget: rim,
@@ -401,10 +401,10 @@ export function shootBall({
     );
   }
   
-  console.log('🏀 shootBall: Creating tween for ball flight');
+  // console.log('🏀 shootBall: Creating tween for ball flight');
 
   return new Promise((resolve) => {
-    console.log('🏀 shootBall: About to call scene.tweens.add', {
+    // console.log('🏀 shootBall: About to call scene.tweens.add', {
       hasTweens: !!scene.tweens,
       ballSpritePos: { x: ballSprite.x, y: ballSprite.y },
       targetPos: { x: rim.x, y: rim.y },
@@ -420,7 +420,7 @@ export function shootBall({
       duration,
       ease: "Sine.easeInOut",
       onStart: () => {
-        console.log('🏀 shootBall: Tween STARTED!', {
+        // console.log('🏀 shootBall: Tween STARTED!', {
           timestamp: Date.now(),
           elapsedSinceCreate: Date.now() - tweenStartTime
         });
@@ -428,12 +428,12 @@ export function shootBall({
       onUpdate: (tween) => {
         if (tween.progress === 0 || tween.progress === 0.5 || tween.progress === 1) {
           const elapsed = Date.now() - tweenStartTime;
-          console.log(`🏀 shootBall: Tween ${(tween.progress * 100).toFixed(0)}% | Elapsed: ${elapsed}ms / ${duration}ms | Ball at (${ballSprite.x.toFixed(0)}, ${ballSprite.y.toFixed(0)}) | Visible: ${ballSprite.visible}`);
+          // console.log(`🏀 shootBall: Tween ${(tween.progress * 100).toFixed(0)}% | Elapsed: ${elapsed}ms / ${duration}ms | Ball at (${ballSprite.x.toFixed(0)}, ${ballSprite.y.toFixed(0)}) | Visible: ${ballSprite.visible}`);
         }
       },
       onComplete: async () => {
         const actualDuration = Date.now() - tweenStartTime;
-        console.log(`🏀 shootBall: Tween COMPLETE | Result: ${result} | Actual: ${actualDuration}ms / Expected: ${duration}ms | Ratio: ${(actualDuration / duration).toFixed(2)}x`);
+        // console.log(`🏀 shootBall: Tween COMPLETE | Result: ${result} | Actual: ${actualDuration}ms / Expected: ${duration}ms | Ratio: ${(actualDuration / duration).toFixed(2)}x`);
         
         // Announce shot result when ball reaches rim
         const { showAnnouncement } = await import('../utils/announcements.js');
@@ -469,10 +469,10 @@ export function shootBall({
         if (result === "MAKE") {
           console.log("score");
           console.log("rimHoldStart");
-          console.log(`🏀 shootBall: Rim hold starting - ball at (${ballSprite.x.toFixed(0)}, ${ballSprite.y.toFixed(0)})`);
+          // console.log(`🏀 shootBall: Rim hold starting - ball at (${ballSprite.x.toFixed(0)}, ${ballSprite.y.toFixed(0)})`);
           const finish = () => {
             console.log("rimHoldEnd");
-            console.log(`🏀 shootBall: Rim hold ending - ball at (${ballSprite.x.toFixed(0)}, ${ballSprite.y.toFixed(0)})`);
+            // console.log(`🏀 shootBall: Rim hold ending - ball at (${ballSprite.x.toFixed(0)}, ${ballSprite.y.toFixed(0)})`);
             // Keep watcher running a bit longer to catch post-shot teleports
             watcherRemoved = true;
             scene.time.delayedCall(200, () => {
@@ -482,7 +482,7 @@ export function shootBall({
             scene.time.delayedCall(50, () => {
               scene._shotInProgress = false;
               scene.ballDetached = false;
-              console.log('🏀 shootBall: Flags reset, ball following re-enabled');
+              // console.log('🏀 shootBall: Flags reset, ball following re-enabled');
               resolve();
             });
           };
@@ -506,7 +506,7 @@ export function shootBall({
             );
           }
           scene.rebounderId = null;
-          console.log(`🏀 shootBall: Starting bounce - ball at (${ballSprite.x.toFixed(0)}, ${ballSprite.y.toFixed(0)})`);
+          // console.log(`🏀 shootBall: Starting bounce - ball at (${ballSprite.x.toFixed(0)}, ${ballSprite.y.toFixed(0)})`);
           bounceFromRim(
             scene,
             ballSprite,
@@ -514,7 +514,7 @@ export function shootBall({
             isHomeTeam,
             duration / 3
           ).then((miss) => {
-            console.log(`🏀 shootBall: Bounce complete - ball at (${ballSprite.x.toFixed(0)}, ${ballSprite.y.toFixed(0)})`);
+            // console.log(`🏀 shootBall: Bounce complete - ball at (${ballSprite.x.toFixed(0)}, ${ballSprite.y.toFixed(0)})`);
             if (SHOT_DEBUG) {
               console.log("shot:miss", {
                 type: "miss",

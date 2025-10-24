@@ -500,6 +500,24 @@ def summarize_game_state(game):
 
     cumulative_box = game.get_box_score()
 
+    # Get populated plays for team objects
+    from BackEnd.api.gameplan_routes import populate_team_plays
+    populated_plays = populate_team_plays()
+    
+    # Create team objects with plays for skeleton lookup
+    teams_obj = {
+        game.home_team.team_id: {
+            "playcall_settings": getattr(game.home_team, 'playcall_settings', {}),
+            "strategy_settings": getattr(game.home_team, 'strategy_settings', {}),
+            "plays": populated_plays.copy()
+        },
+        game.away_team.team_id: {
+            "playcall_settings": getattr(game.away_team, 'playcall_settings', {}),
+            "strategy_settings": getattr(game.away_team, 'strategy_settings', {}),
+            "plays": populated_plays.copy()
+        }
+    }
+
     return {
         "final_score": game.score,
         "points_by_quarter": game.game_state["points_by_quarter"],
@@ -529,6 +547,7 @@ def summarize_game_state(game):
         "homeTeam": home_team_obj,
         "awayTeam": away_team_obj,
         "opening_tip_winner": game.game_state.get("opening_tip_winner"),
+        "teams": teams_obj,  # Add team objects with plays for skeleton lookup
     }
 
 def check_defensive_foul(self, defender, is_three):
