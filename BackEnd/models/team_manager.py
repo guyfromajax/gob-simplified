@@ -43,6 +43,7 @@ class TeamManager:
 
         self.playcall_tracker = {pc: 0 for pc in PLAYCALLS}
         self.defense_playcall_tracker = {"Man": 0, "Zone": 0}
+        self.plays = {}  # Track play usage and stats
         self.team_attributes = self._init_team_attributes()
 
     def _load_roster(self):

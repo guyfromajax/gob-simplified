@@ -181,7 +181,8 @@ class FranchiseManager:
                     "fast_break": 2,
                     "half_court_trap": 2,
                     "full_court_press": 2
-                }
+                },
+                "plays": {}
             }
 
         # Initialize training status - needs training before week 1 (training camp)
