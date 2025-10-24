@@ -976,8 +976,29 @@ def get_hct_skeleton(result_type, game_context=None):
 
 
 def get_hco_skeleton(result_type, game_context):
-    """Get HCO skeleton based on the current playcall"""
-    # Import all playcall skeletons
+    """Get HCO skeleton based on the current playcall from database plays collection"""
+    from BackEnd.db import plays_collection
+    
+    # Get the current playcall from game context
+    playcall = game_context.game_state.get("current_playcall", "Inside") if game_context else "Inside"
+    
+    # Query plays collection for the specific play
+    play_doc = plays_collection.find_one({"name": playcall})
+    
+    if play_doc and "skeletons" in play_doc:
+        # Access skeleton using the nested structure: skeletons.skeletons.standard
+        skeletons = play_doc.get("skeletons", {})
+        if "skeletons" in skeletons and "standard" in skeletons["skeletons"]:
+            skeleton = skeletons["skeletons"]["standard"]
+            print(f"📋 Found skeleton for play '{playcall}' with {len(skeleton.get('steps', []))} steps")
+            return skeleton
+        else:
+            print(f"⚠️ Play '{playcall}' found but missing skeletons.skeletons.standard structure")
+    else:
+        print(f"⚠️ Play '{playcall}' not found in plays collection")
+    
+    # Fallback to old skeleton system if database lookup fails
+    print(f"🔄 Falling back to old skeleton system for '{playcall}'")
     from BackEnd.playcall_skeletons.inside_skeletons import INSIDE_SCENES
     from BackEnd.playcall_skeletons.outside_skeletons import OUTSIDE_SCENES
     from BackEnd.playcall_skeletons.attack_skeletons import ATTACK_SCENES
@@ -985,10 +1006,7 @@ def get_hco_skeleton(result_type, game_context):
     from BackEnd.playcall_skeletons.freelance_skeletons import FREELANCE_SCENES
     from BackEnd.playcall_skeletons.base_skeletons import BASE_SCENES
     
-    # Get the current playcall from game context
-    playcall = game_context.game_state.get("current_playcall", "Inside") if game_context else "Inside"
-    
-    # Map playcall to skeleton scenes
+    # Map playcall to skeleton scenes (old system)
     playcall_map = {
         "Inside": INSIDE_SCENES,
         "Outside": OUTSIDE_SCENES,
@@ -998,19 +1016,12 @@ def get_hco_skeleton(result_type, game_context):
         "Base": BASE_SCENES
     }
     
-    # Get the skeleton scenes for this playcall
-    # print(f"📋 Available playcalls in map: {list(playcall_map.keys())}")
-    # print(f"📋 Looking for playcall: '{playcall}' (type: {type(playcall)})")
-    
     scenes = playcall_map.get(playcall, INSIDE_SCENES)
-    
-    actual_key = playcall if playcall in playcall_map else "FALLBACK TO INSIDE"
-    # print(f"📋 Found {len(scenes)} scenes for playcall '{actual_key}'")
     
     # Randomly select one scene from the available scenes
     if scenes and len(scenes) > 0:
         selected_scene = random.choice(scenes)
-        # print(f"📋 Selected scene has {len(selected_scene.get('steps', []))} steps")
+        print(f"📋 Using fallback skeleton with {len(selected_scene.get('steps', []))} steps")
         return selected_scene
     
     # Fallback to basic skeleton if no scenes available
