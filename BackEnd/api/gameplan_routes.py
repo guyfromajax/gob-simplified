@@ -126,7 +126,8 @@ def ensure_team_objects_exist(mode: str, doc_id: str, team_id: str):
                     "o_tendency_reads": team.get("o_tendency_reads", 0),
                     "d_tendency_reads": team.get("d_tendency_reads", 0),
                     "playcall_settings": defaults["playcall_settings"].copy(),
-                    "strategy_settings": defaults["strategy_settings"].copy()
+                    "strategy_settings": defaults["strategy_settings"].copy(),
+                    "plays": {}
                 }
                 updated = True
             elif "playcall_settings" not in franchise_teams[tid] or "strategy_settings" not in franchise_teams[tid]:
@@ -160,7 +161,8 @@ def ensure_team_objects_exist(mode: str, doc_id: str, team_id: str):
             defaults = get_default_settings()
             team_obj = {
                 "playcall_settings": defaults["playcall_settings"].copy(),
-                "strategy_settings": defaults["strategy_settings"].copy()
+                "strategy_settings": defaults["strategy_settings"].copy(),
+                "plays": {}
             }
             
             collection.update_one(
