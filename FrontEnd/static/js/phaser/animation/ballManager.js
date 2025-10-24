@@ -386,7 +386,7 @@ export function shootBall({
   //   rimTarget: rim,
   //   duration,
   //   result
-  });
+  // });
 
   if (SHOT_DEBUG) {
     const endTs = startTimestamp + duration;
@@ -410,7 +410,7 @@ export function shootBall({
     //   targetPos: { x: rim.x, y: rim.y },
     //   distance: Phaser.Math.Distance.Between(ballSprite.x, ballSprite.y, rim.x, rim.y),
     //   duration
-    });
+    // });
     
     const tweenStartTime = Date.now();
     const tween = scene.tweens.add({
