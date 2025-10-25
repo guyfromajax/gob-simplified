@@ -1122,11 +1122,22 @@ class Animator:
         print(f"🔍 Positioning standard defenders for HCO (away_offense: {is_away_offense}, aggression: {aggression})")
         
         # Build offensive player positions by step for tracking
+        # Note: We need the original (unflipped) coordinates for defensive positioning
         offensive_positions_by_step = {}
         for pos, off_anim in offensive_animations.items():
             offensive_positions_by_step[pos] = []
             for step in off_anim.get("movement", []):
-                offensive_positions_by_step[pos].append(step.get("coords", {"x": 50, "y": 25}))
+                coords = step.get("coords", {"x": 50, "y": 25})
+                # If away team is on offense, we need to unflip the coordinates for defensive positioning
+                if is_away_offense:
+                    # The coordinates in the animation are already flipped, so we need to unflip them
+                    # for the defensive positioning functions to work correctly
+                    from BackEnd.utils.shared import get_away_player_coords
+                    original_coords = coords.copy()
+                    # get_away_player_coords is its own inverse, so we can use it to unflip
+                    coords = get_away_player_coords(coords)
+                    print(f"  🔄 Unflipped offensive coords for defensive positioning: {original_coords} -> {coords}")
+                offensive_positions_by_step[pos].append(coords)
         
         # Find ball handler position (player with ball at step 0)
         ball_handler_pos = None
