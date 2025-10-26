@@ -327,8 +327,8 @@ def resolve_free_throw_logic(game):
     attrs = shooter.attributes
 
     # FT outcome calculation
-    ft_shot_score = ((attrs["FT"] * 0.8) + (attrs["CH"] * 0.2)) * random.randint(1, 6)
-    text = f"ft_shot_score: {ft_shot_score}, threshold: {off_team.team_attributes['ft_shot_threshold']}"
+    ft_shot_score = ((attrs["FT"] * 0.8) + (attrs["IQ"] * 0.2)) * random.randint(1, 6) #temp changed CH to IQ
+    text = f"ft_shot_score: {ft_shot_score}, threshold: {off_team.team_attributes['ft_shot_threshold']}  "
     makes_shot = ft_shot_score >= off_team.team_attributes["ft_shot_threshold"]
 
     shooter.record_stat("FTA")
