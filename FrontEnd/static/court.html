@@ -137,7 +137,6 @@
 
     /* Defensive Playcall (away side) - Grid column 8 */
     #defensive-playcall {
-      grid-column: 8;
       font-size: 28px;
       line-height: 1;
       color: #fff;
@@ -147,6 +146,19 @@
       border-radius: 6px;
       min-width: 120px;
       font-weight: bold;
+    }
+
+    /* Focus Dots Display */
+    .focus-dot {
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.3);
+      transition: color 0.3s ease;
+      cursor: default;
+    }
+
+    .focus-dot.active {
+      color: #FFD700;
+      text-shadow: 0 0 4px rgba(255, 215, 0, 0.8);
     }
 
     /* Center (Clock/Quarter) - Grid column 14 */
@@ -813,8 +825,24 @@
       <div id="away-fouls">F: 0</div>
     </div>
     
-    <!-- Defensive Playcall - Grid column 8 -->
-    <div id="defensive-playcall">-</div>
+    <!-- Defensive Playcall with Focus Dots - Grid column 8 -->
+    <div style="grid-column: 8; display: flex; align-items: center; gap: 8px;">
+      <div id="defensive-playcall-focus-dots" style="display: flex; flex-direction: column; gap: 2px; font-size: 10px; color: rgba(255, 255, 255, 0.6);">
+        <div style="display: flex; align-items: center; gap: 4px;">
+          <div class="focus-dot" data-focus="inside">●</div>
+          <span>Inside</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 4px;">
+          <div class="focus-dot" data-focus="attack">●</div>
+          <span>Attack</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 4px;">
+          <div class="focus-dot" data-focus="outside">●</div>
+          <span>Outside</span>
+        </div>
+      </div>
+      <div id="defensive-playcall">-</div>
+    </div>
     
     <!-- Away Tempo Bar - Grid column 10 -->
     <div id="away-tempo-bar" class="strategy-bar-container">
@@ -854,8 +882,24 @@
       <div class="strategy-bar-label bottom">Aggr</div>
     </div>
     
-    <!-- Offensive Playcall - Grid column 20 -->
-    <div id="offensive-playcall">-</div>
+    <!-- Offensive Playcall with Focus Dots - Grid column 20 -->
+    <div style="grid-column: 20; display: flex; align-items: center; gap: 8px;">
+      <div id="offensive-playcall">-</div>
+      <div id="offensive-playcall-focus-dots" style="display: flex; flex-direction: column; gap: 2px; font-size: 10px; color: rgba(255, 255, 255, 0.6);">
+        <div style="display: flex; align-items: center; gap: 4px;">
+          <div class="focus-dot" data-focus="inside">●</div>
+          <span>Inside</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 4px;">
+          <div class="focus-dot" data-focus="attack">●</div>
+          <span>Attack</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 4px;">
+          <div class="focus-dot" data-focus="outside">●</div>
+          <span>Outside</span>
+        </div>
+      </div>
+    </div>
     
     <!-- Home TOL/F - Grid column 22 -->
     <div class="tol-fouls home">

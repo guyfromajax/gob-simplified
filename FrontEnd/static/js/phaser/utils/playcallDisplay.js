@@ -6,6 +6,8 @@
 export function updatePlaycallDisplay(turnData, homeTeamId) {
   const offensivePlaycallEl = document.getElementById('offensive-playcall');
   const defensivePlaycallEl = document.getElementById('defensive-playcall');
+  const offensiveFocusDotsEl = document.getElementById('offensive-playcall-focus-dots');
+  const defensiveFocusDotsEl = document.getElementById('defensive-playcall-focus-dots');
   
   console.log('🎯 updatePlaycallDisplay called:', {
     hasOffensiveEl: !!offensivePlaycallEl,
@@ -32,6 +34,9 @@ export function updatePlaycallDisplay(turnData, homeTeamId) {
   if (!isHCO) {
     offensivePlaycallEl.textContent = '-';
     defensivePlaycallEl.textContent = '-';
+    // Clear focus dots
+    if (offensiveFocusDotsEl) clearFocusDots(offensiveFocusDotsEl);
+    if (defensiveFocusDotsEl) clearFocusDots(defensiveFocusDotsEl);
     return;
   }
   
@@ -39,9 +44,19 @@ export function updatePlaycallDisplay(turnData, homeTeamId) {
   const offensivePlaycall = turnData.offensive_playcall || turnData.current_playcall;
   const defensivePlaycall = turnData.defensive_playcall || turnData.defense_playcall;
   
+  // Get play type and focus from playcall data
+  const offensivePlayType = getPlayType(offensivePlaycall);
+  const offensivePlayFocus = getPlayFocus(offensivePlaycall);
+  const defensivePlayType = getPlayType(defensivePlaycall);
+  const defensivePlayFocus = getPlayFocus(defensivePlaycall);
+  
   console.log('🎯 Playcall data:', {
     offensivePlaycall,
     defensivePlaycall,
+    offensivePlayType,
+    offensivePlayFocus,
+    defensivePlayType,
+    defensivePlayFocus,
     turnDataKeys: Object.keys(turnData)
   });
   
@@ -52,12 +67,20 @@ export function updatePlaycallDisplay(turnData, homeTeamId) {
   // Display playcalls based on possession
   if (isHomeOnOffense) {
     // Home on offense - offensive playcall on home side (right), defensive on away side (left)
-    offensivePlaycallEl.textContent = formatPlaycall(offensivePlaycall);
-    defensivePlaycallEl.textContent = formatPlaycall(defensivePlaycall);
+    offensivePlaycallEl.textContent = offensivePlayType;
+    defensivePlaycallEl.textContent = defensivePlayType;
+    
+    // Update focus dots
+    if (offensiveFocusDotsEl) updateFocusDots(offensiveFocusDotsEl, offensivePlayFocus);
+    if (defensiveFocusDotsEl) updateFocusDots(defensiveFocusDotsEl, defensivePlayFocus);
   } else {
     // Away on offense - offensive playcall on away side (left), defensive on home side (right)
-    defensivePlaycallEl.textContent = formatPlaycall(offensivePlaycall);
-    offensivePlaycallEl.textContent = formatPlaycall(defensivePlaycall);
+    defensivePlaycallEl.textContent = offensivePlayType;
+    offensivePlaycallEl.textContent = defensivePlayType;
+    
+    // Update focus dots (flipped)
+    if (defensiveFocusDotsEl) updateFocusDots(defensiveFocusDotsEl, offensivePlayFocus);
+    if (offensiveFocusDotsEl) updateFocusDots(offensiveFocusDotsEl, defensivePlayFocus);
   }
   
   console.log('🎯 Playcalls updated:', {
@@ -65,6 +88,81 @@ export function updatePlaycallDisplay(turnData, homeTeamId) {
     defense: defensivePlaycall,
     isHomeOnOffense,
     turnType: turnData.result_type
+  });
+}
+
+/**
+ * Get play type (motion or set) from playcall name
+ * @param {string} playcall - Raw playcall name
+ * @returns {string} Play type
+ */
+function getPlayType(playcall) {
+  if (!playcall) return '-';
+  
+  // Check if playcall contains "motion" or "set"
+  const lowerPlaycall = playcall.toLowerCase();
+  if (lowerPlaycall.includes('motion')) {
+    return 'Motion';
+  } else if (lowerPlaycall.includes('set') || lowerPlaycall.includes('pick') || lowerPlaycall.includes('screen') || lowerPlaycall.includes('post')) {
+    return 'Set';
+  }
+  
+  return '-';
+}
+
+/**
+ * Get play focus (inside, attack, outside) from playcall name
+ * @param {string} playcall - Raw playcall name
+ * @returns {string} Play focus
+ */
+function getPlayFocus(playcall) {
+  if (!playcall) return null;
+  
+  // Check if playcall contains focus keywords
+  const lowerPlaycall = playcall.toLowerCase();
+  if (lowerPlaycall.includes('inside') || lowerPlaycall.includes('post') || lowerPlaycall.includes('low post')) {
+    return 'inside';
+  } else if (lowerPlaycall.includes('attack') || lowerPlaycall.includes('pick') || lowerPlaycall.includes('roll')) {
+    return 'attack';
+  } else if (lowerPlaycall.includes('outside') || lowerPlaycall.includes('wing') || lowerPlaycall.includes('corner')) {
+    return 'outside';
+  }
+  
+  return null;
+}
+
+/**
+ * Update focus dots to highlight the active focus
+ * @param {HTMLElement} container - Container element with focus dots
+ * @param {string} focus - Active focus (inside, attack, outside)
+ */
+function updateFocusDots(container, focus) {
+  if (!container || !focus) {
+    clearFocusDots(container);
+    return;
+  }
+  
+  const dots = container.querySelectorAll('.focus-dot');
+  dots.forEach(dot => {
+    const dotFocus = dot.getAttribute('data-focus');
+    if (dotFocus === focus) {
+      dot.classList.add('active');
+    } else {
+      dot.classList.remove('active');
+    }
+  });
+}
+
+/**
+ * Clear all focus dots
+ * @param {HTMLElement} container - Container element with focus dots
+ */
+function clearFocusDots(container) {
+  if (!container) return;
+  
+  const dots = container.querySelectorAll('.focus-dot');
+  dots.forEach(dot => {
+    dot.classList.remove('active');
   });
 }
 
@@ -90,8 +188,12 @@ function formatPlaycall(playcall) {
 export function clearPlaycallDisplay() {
   const offensivePlaycallEl = document.getElementById('offensive-playcall');
   const defensivePlaycallEl = document.getElementById('defensive-playcall');
+  const offensiveFocusDotsEl = document.getElementById('offensive-playcall-focus-dots');
+  const defensiveFocusDotsEl = document.getElementById('defensive-playcall-focus-dots');
   
   if (offensivePlaycallEl) offensivePlaycallEl.textContent = '-';
   if (defensivePlaycallEl) defensivePlaycallEl.textContent = '-';
+  if (offensiveFocusDotsEl) clearFocusDots(offensiveFocusDotsEl);
+  if (defensiveFocusDotsEl) clearFocusDots(defensiveFocusDotsEl);
 }
 
