@@ -68,19 +68,19 @@ export function updatePlaycallDisplay(turnData, homeTeamId) {
   if (isHomeOnOffense) {
     // Home on offense - offensive playcall on home side (right), defensive on away side (left)
     offensivePlaycallEl.textContent = offensivePlayType;
-    defensivePlaycallEl.textContent = defensivePlayType;
+    defensivePlaycallEl.textContent = defensivePlayType || "-"; // Show Man/Zone for defense
     
-    // Update focus dots
+    // Update focus dots (only for offense)
     if (offensiveFocusDotsEl) updateFocusDots(offensiveFocusDotsEl, offensivePlayFocus);
-    if (defensiveFocusDotsEl) updateFocusDots(defensiveFocusDotsEl, defensivePlayFocus);
+    if (defensiveFocusDotsEl) clearFocusDots(defensiveFocusDotsEl); // Clear defense dots
   } else {
     // Away on offense - offensive playcall on away side (left), defensive on home side (right)
     defensivePlaycallEl.textContent = offensivePlayType;
-    offensivePlaycallEl.textContent = defensivePlayType;
+    offensivePlaycallEl.textContent = defensivePlayType || "-"; // Show Man/Zone for defense
     
-    // Update focus dots (flipped)
+    // Update focus dots (flipped - only for offense)
     if (defensiveFocusDotsEl) updateFocusDots(defensiveFocusDotsEl, offensivePlayFocus);
-    if (offensiveFocusDotsEl) updateFocusDots(offensiveFocusDotsEl, defensivePlayFocus);
+    if (offensiveFocusDotsEl) clearFocusDots(offensiveFocusDotsEl); // Clear defense dots
   }
   
   console.log('🎯 Playcalls updated:', {

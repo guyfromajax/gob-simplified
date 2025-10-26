@@ -508,7 +508,7 @@ class TurnManager:
             "defense": chosen_defense,
             "offense_type": chosen_play_type.title() if chosen_play_type else "-",
             "offense_focus": chosen_focus if chosen_focus else None,
-            "defense_type": "-",  # Defense doesn't have type/focus
+            "defense_type": chosen_defense.title() if chosen_defense else "-",  # Man or Zone
             "defense_focus": None
         }
 
