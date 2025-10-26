@@ -388,8 +388,8 @@ class ShotManager:
         
         attrs = shooter.attributes
         
-        shot_score = (attrs["SC"] * 0.6 + attrs["CH"] * 0.2 + attrs["IQ"] * 0.2) * random.randint(1, 6)
-
+        shot_score = (attrs["SC"] * 0.6 + attrs["AG"] * 0.2 + attrs["IQ"] * 0.2) * random.randint(1, 6)
+        text = f"fast break shot_score: {shot_score}"
         defender = random.choice(fb_roles["defense"]) if fb_roles["defense"] else None
         
         # Fallback: If no defender assigned, use defender at shooter's position for animation
@@ -411,12 +411,14 @@ class ShotManager:
         ) * random.randint(1, 6)
         # Track defense score for statistics (fast break)
         self.defense_scores.append(defense_score)
-        shot_score -= defense_score * 0.2
+        shot_score -= (defense_score * 0.2)
+        text += f" - defense score: {defense_score}"
         if defender:
             defender.record_stat("DEF_A")
         
 
         made = shot_score >= off_team.team_attributes["shot_threshold"]
+        text += f"shot threshold: {off_team.team_attributes['shot_threshold']}"
         shooter.record_stat("FGA")
 
         if made:
@@ -446,7 +448,7 @@ class ShotManager:
             self.game_state["last_rebounder"] = rebounder
             self.game_state["last_rebound"] = "DREB"
 
-        time_elapsed = random.randint(5, 15)
+        time_elapsed = random.randint(5, 10)
 
         shooter_pos = get_player_position(off_lineup, shooter)
 
