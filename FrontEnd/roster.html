@@ -3,16 +3,33 @@
 <head>
   <meta charset="UTF-8" />
   <title>Team Roster</title>
-  <style>
-    body { font-family: sans-serif; padding: 20px; }
-    table { border-collapse: collapse; width: 100%; margin-top: 20px; }
-    th, td { border: 1px solid #ccc; padding: 6px; text-align: center; }
-    th { background-color: #f0f0f0; }
-  </style>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/tournament.css" />
+  <link rel="stylesheet" href="/static/set-lineup.css" />
 </head>
 <body>
+  <div id="team-header">
+    <h1 id="team-title" style="font-family: 'Bebas Neue', sans-serif;">Team Roster</h1>
+    
+    <!-- View Toggle -->
+    <div class="view-toggle">
+      <button class="view-toggle-btn active" data-view="grid">Grid View</button>
+      <button class="view-toggle-btn" data-view="player">Player View</button>
+    </div>
+  </div>
 
-    <select id="teamSelect"></select>
+  <select id="teamSelect" style="margin: 20px; padding: 8px; font-size: 16px;"></select>
+  <button onclick="loadRoster()" style="margin: 20px; padding: 8px 16px; font-size: 16px;">View Roster</button>
+
+  <!-- Grid View -->
+  <div id="roster-table-container" class="view-content active">
+    <div id="rosterContainer"></div>
+  </div>
+
+  <!-- Player View -->
+  <div id="player-view-container" class="view-content">
+    <div class="players-grid"></div>
+  </div>
 
   <script>
     async function loadTeams() {
@@ -23,21 +40,13 @@
 
       if (teams.length > 0) {
         loadRoster();
-    }}
+      }
+    }
     window.onload = loadTeams;
-    
   </script>
-      
-  <button onclick="loadRoster()">View Roster</button>
-
-  <div id="rosterContainer"></div>
-
-  <!-- ✅ This line is required -->
-  <!-- <script src="roster.js" defer></script> -->
-  <script src="/static/roster.js"></script>
-  <link rel="stylesheet" href="/static/style.css">
   
-
+  <script src="/static/common.js"></script>
+  <script src="/static/roster.js"></script>
 </body>
 </html>
 
