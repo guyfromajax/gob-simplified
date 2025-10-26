@@ -80,7 +80,6 @@ def get_default_settings():
             "defense": 2,
             "tempo": 2,
             "aggression": 2,
-            "fast_break": 2,
             "half_court_trap": 2,
             "full_court_press": 2
         }
