@@ -426,7 +426,7 @@ class ShotManager:
                 passer.record_stat("AST")
             points = 2
             apply_scoring(self.game, off_team, shooter, points, ["FGM"])
-            text = f"{shooter} converts the fast break shot!"
+            text += f"{shooter} converts the fast break shot!"
             possession_flips = True
             # Check for defensive pressure opportunity (FCP/HCT) after fast break make
             pressure_type = self.game.turn_manager.determine_defensive_pressure_type()
@@ -436,11 +436,10 @@ class ShotManager:
             if defender:
                 defender.record_stat("DEF_S")
             rebounder = random.choice(fb_roles["defense"]) if fb_roles["defense"] else self.game.defense_team.lineup["PG"]
-            text = f"{shooter} misses the fast break shot -- {rebounder} grabs the rebound."
+            text += f"{shooter} misses the fast break shot -- {rebounder} grabs the rebound."
             rebounder.record_stat("DREB")
             result["rebounderId"] = getattr(rebounder, "player_id", None)
             result["rebound_type"] = "DREB"
-            # print(f"+1 rebound for {get_name_safe(rebounder)} / shot manager - resolve_fast_break_shot")
             possession_flips = True
             # Force HCO after defensive rebound from missed fast break shot
             text += " -- entering half court."
