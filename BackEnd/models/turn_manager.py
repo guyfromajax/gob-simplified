@@ -268,6 +268,12 @@ class TurnManager:
             # Add playcalls to result for frontend display
             result["offensive_playcall"] = calls["offense"]
             result["defensive_playcall"] = calls["defense"]
+            
+            # Add play type and focus for frontend display
+            result["offensive_play_type"] = calls.get("offense_type", "-")
+            result["offensive_play_focus"] = calls.get("offense_focus", None)
+            result["defensive_play_type"] = calls.get("defense_type", "-")
+            result["defensive_play_focus"] = calls.get("defense_focus", None)
 
         # Record possession team before any potential flip
         result["starting_possession_team_id"] = self.game.offense_team.team_id
@@ -499,7 +505,11 @@ class TurnManager:
 
         return {
             "offense": chosen_playcall,
-            "defense": chosen_defense
+            "defense": chosen_defense,
+            "offense_type": chosen_play_type.title() if chosen_play_type else "-",
+            "offense_focus": chosen_focus if chosen_focus else None,
+            "defense_type": "-",  # Defense doesn't have type/focus
+            "defense_focus": None
         }
 
 
