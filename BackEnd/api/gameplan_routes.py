@@ -223,6 +223,7 @@ def ensure_team_objects_exist(mode: str, doc_id: str, team_id: str):
 def get_gameplan(mode: str, team_id: str, franchise_id: str = None, tournament_id: str = None, game_id: str = None):
     """Get game plan settings for a team in the specified mode."""
     try:
+        print(f"🔍 Gameplan API called with: mode={mode}, team_id={team_id}, franchise_id={franchise_id}, tournament_id={tournament_id}, game_id={game_id}")
         # Determine which collection to use
         if mode == "franchise":
             if not franchise_id:
@@ -263,6 +264,9 @@ def get_gameplan(mode: str, team_id: str, franchise_id: str = None, tournament_i
     except HTTPException:
         raise
     except Exception as e:
+        print(f"🚨 Error in get_gameplan: {e}")
+        import traceback
+        traceback.print_exc()
         logger.error(f"Error getting game plan: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
