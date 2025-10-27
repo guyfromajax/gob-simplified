@@ -501,11 +501,14 @@ def summarize_game_state(game):
     cumulative_box = game.get_box_score()
 
     # Get populated plays for team objects
-    from BackEnd.api.gameplan_routes import populate_team_plays
-    populated_plays = populate_team_plays()
-    
-    print(f"🔍 DEBUG: Populated {len(populated_plays)} plays for teams")
-    print(f"🔍 DEBUG: Play keys: {list(populated_plays.keys())}")
+    try:
+        from BackEnd.api.gameplan_routes import populate_team_plays
+        populated_plays = populate_team_plays()
+        print(f"🔍 DEBUG: Populated {len(populated_plays)} plays for teams")
+        print(f"🔍 DEBUG: Play keys: {list(populated_plays.keys())}")
+    except Exception as e:
+        print(f"🚨 Error in populate_team_plays: {e}")
+        populated_plays = {}
     
     # Create team objects with plays for skeleton lookup
     teams_obj = {
