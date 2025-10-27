@@ -230,21 +230,31 @@ function renderTeam(data) {
   tbody.innerHTML = '';
   console.log('Players data:', data.players);
   let players = (data.players || []).map(p => {
-    const best = getBestPosition(p.position_ratings || {});
-    const fullName = `${p.first_name || ''} ${p.last_name || ''}`.trim() || p.name || '';
-    return {
-      _id: p._id, // Add missing _id field for player detail links
-      name: fullName,
-      pos: best.pos,
-      year: yearMap[p.year?.toLowerCase()] || p.year || '--',
-      height: formatHeight(p.height),
-      weight: p.weight ?? '--',
-      attributes: p.attributes || {},
-      rt: best.rating,
-    };
-  });
+    try {
+      const best = getBestPosition(p.position_ratings || {});
+      const fullName = `${p.first_name || ''} ${p.last_name || ''}`.trim() || p.name || '';
+      const player = {
+        _id: p._id, // Add missing _id field for player detail links
+        name: fullName,
+        pos: best.pos,
+        year: yearMap[p.year?.toLowerCase()] || p.year || '--',
+        height: formatHeight(p.height),
+        weight: p.weight ?? '--',
+        attributes: p.attributes || {},
+        rt: best.rating,
+      };
+      console.log('Mapped player:', player);
+      return player;
+    } catch (error) {
+      console.error('Error mapping player:', p, error);
+      return null;
+    }
+  }).filter(p => p !== null);
   players.sort((a, b) => (b.rt ?? -1) - (a.rt ?? -1));
-  players.forEach(p => {
+  console.log('Sorted players:', players);
+  console.log('About to render', players.length, 'players');
+  players.forEach((p, index) => {
+    console.log(`Rendering player ${index + 1}:`, p.name);
     const tr = document.createElement('tr');
     
     // Create player name as clickable link
@@ -281,7 +291,9 @@ function renderTeam(data) {
     Array.from(temp.children).forEach(child => tr.appendChild(child));
     
     tbody.appendChild(tr);
+    console.log(`Added row for ${p.name} to table`);
   });
+  console.log('Finished rendering all players. Table now has', tbody.children.length, 'rows');
 }
 
 function renderSchedule(data) {
