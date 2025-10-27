@@ -376,7 +376,7 @@ def tournament_state(tournament_id: str):
     # Add user team chemistry if user_team_id is present
     user_team_id = doc.get("user_team_id")
     if user_team_id:
-        team_doc = db.teams.find_one({"name": user_team_id}) or {}
+        team_doc = teams_collection.find_one({"name": user_team_id}) or {}
         doc["team_chemistry"] = team_doc.get("team_chemistry", 0)
         doc["offense"] = team_doc.get("offense", "-")
         doc["defense"] = team_doc.get("defense", "-")
