@@ -205,7 +205,7 @@ def simulate_quarter(
     elif q == 1 or (q > 4):  # Q1 or any OT
         # Opening tip for Q1 and all OT periods
         from BackEnd.utils.opening_tip import execute_opening_tip
-        tip_turn = execute_opening_tip(gm)
+        _, _, tip_turn = execute_opening_tip(gm)
         gm.turns.append(tip_turn)
         gm.text_log.append(tip_turn["text"])
         # Update clock for tip time elapsed

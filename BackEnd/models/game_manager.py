@@ -69,7 +69,7 @@ class GameManager:
         """Execute opening tip logic and update offense/defense teams."""
         from BackEnd.utils.opening_tip import execute_opening_tip
         
-        offense_team, defense_team = execute_opening_tip(self)
+        offense_team, defense_team, turn_result = execute_opening_tip(self)
         
         # Update offense/defense teams
         self.offense_team = offense_team
