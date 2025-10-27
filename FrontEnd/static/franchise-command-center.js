@@ -225,6 +225,7 @@ function renderTeam(data) {
     const best = getBestPosition(p.position_ratings || {});
     const fullName = `${p.first_name || ''} ${p.last_name || ''}`.trim() || p.name || '';
     return {
+      _id: p._id, // Add missing _id field for player detail links
       name: fullName,
       pos: best.pos,
       year: yearMap[p.year?.toLowerCase()] || p.year || '--',

@@ -503,7 +503,8 @@ async function loadRoster() {
       const best = getBestPosition(p.position_ratings || {});
       const fullName = `${p.first_name || ''} ${p.last_name || ''}`.trim() || p.name || '';
       return {
-        id: p._id,
+        _id: p._id, // Use _id consistently for player detail links
+        id: p._id, // Keep id for stats mapping
         name: fullName,
         pos: best.pos,
         year: yearMap[p.year?.toLowerCase()] || p.year || '--',
