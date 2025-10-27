@@ -1,6 +1,15 @@
 let rosterData = null;
 let currentView = sessionStorage.getItem('rosterView') || 'grid';
 
+// Convert a numeric height (in inches) to feet-inches format
+function formatHeight(raw) {
+  const inches = parseInt(raw, 10);
+  if (isNaN(inches)) return raw ?? '--';
+  const ft = Math.floor(inches / 12);
+  const inch = inches % 12;
+  return `${ft}'${inch}"`;
+}
+
 async function loadRoster() {
     const team = document.getElementById("teamSelect").value;
     const container = document.getElementById("rosterContainer");
@@ -132,51 +141,114 @@ function createPlayerCard(player) {
     return Math.floor((attrs[attr] ?? 0) / 10);
   };
   
-  card.innerHTML = `
-    <div class="player-card-header">
-      <h3>${player.name || 'Unknown'}</h3>
-      <span class="player-position">${highestPos}</span>
-    </div>
-    <div class="player-card-attributes">
-      <div class="attr-row">
-        <span class="attr-label">SC:</span>
-        <span class="attr-value">${formatAttr('SC')}</span>
-        <span class="attr-label">SH:</span>
-        <span class="attr-value">${formatAttr('SH')}</span>
-        <span class="attr-label">ID:</span>
-        <span class="attr-value">${formatAttr('ID')}</span>
-      </div>
-      <div class="attr-row">
-        <span class="attr-label">OD:</span>
-        <span class="attr-value">${formatAttr('OD')}</span>
-        <span class="attr-label">PS:</span>
-        <span class="attr-value">${formatAttr('PS')}</span>
-        <span class="attr-label">BH:</span>
-        <span class="attr-value">${formatAttr('BH')}</span>
-      </div>
-      <div class="attr-row">
-        <span class="attr-label">RB:</span>
-        <span class="attr-value">${formatAttr('RB')}</span>
-        <span class="attr-label">ST:</span>
-        <span class="attr-value">${formatAttr('ST')}</span>
-        <span class="attr-label">AG:</span>
-        <span class="attr-value">${formatAttr('AG')}</span>
-      </div>
-      <div class="attr-row">
-        <span class="attr-label">ND:</span>
-        <span class="attr-value">${formatAttr('ND')}</span>
-        <span class="attr-label">IQ:</span>
-        <span class="attr-value">${formatAttr('IQ')}</span>
-        <span class="attr-label">FT:</span>
-        <span class="attr-value">${formatAttr('FT')}</span>
-      </div>
-    </div>
-  `;
+  // Create the card inner structure
+  const cardInner = document.createElement('div');
+  cardInner.className = 'player-card-inner';
   
-  // Make card clickable to view player details
-  card.style.cursor = 'pointer';
-  card.addEventListener('click', () => {
-    window.location.href = `/static/player-detail.html?id=${player._id}`;
+  // Create front side (simple info)
+  const cardFront = document.createElement('div');
+  cardFront.className = 'player-card-front';
+  
+  // Player headshot container
+  const headshotContainer = document.createElement('div');
+  headshotContainer.className = 'player-headshot-container';
+  
+  const headshot = document.createElement('img');
+  headshot.className = 'player-headshot';
+  headshot.src = `/static/images/players/${player._id}.png`;
+  headshot.alt = player.name || 'Unknown';
+  headshot.onerror = function() {
+    this.style.display = 'none';
+  };
+  
+  headshotContainer.appendChild(headshot);
+  
+  // Player info bar
+  const infoBar = document.createElement('div');
+  infoBar.className = 'player-info-bar';
+  
+  const infoLeft = document.createElement('div');
+  infoLeft.className = 'player-info-left';
+  
+  const playerName = document.createElement('div');
+  playerName.className = 'player-name';
+  playerName.textContent = player.name || 'Unknown';
+  
+  const playerPhysical = document.createElement('div');
+  playerPhysical.className = 'player-physical';
+  const height = formatHeight(player.height);
+  const weight = player.weight ? `${player.weight} lbs` : '--';
+  playerPhysical.textContent = `${height} • ${weight}`;
+  
+  infoLeft.appendChild(playerName);
+  infoLeft.appendChild(playerPhysical);
+  
+  const energyDisplay = document.createElement('div');
+  energyDisplay.className = 'player-energy-display';
+  energyDisplay.textContent = highestPos;
+  
+  infoBar.appendChild(infoLeft);
+  infoBar.appendChild(energyDisplay);
+  
+  cardFront.appendChild(headshotContainer);
+  cardFront.appendChild(infoBar);
+  
+  // Create back side (attributes)
+  const cardBack = document.createElement('div');
+  cardBack.className = 'player-card-back';
+  
+  // Create attribute sections
+  const sections = [
+    { title: 'Offensive', attrs: ['SC', 'SH', 'OD', 'PS'] },
+    { title: 'Defensive', attrs: ['ID', 'BH', 'RB', 'ST'] },
+    { title: 'Physical', attrs: ['AG', 'ND', 'IQ', 'FT'] },
+    { title: 'Mental', attrs: ['NG'] }
+  ];
+  
+  sections.forEach(section => {
+    const sectionDiv = document.createElement('div');
+    sectionDiv.className = 'attr-section';
+    
+    const title = document.createElement('div');
+    title.className = 'attr-section-title';
+    title.textContent = section.title;
+    sectionDiv.appendChild(title);
+    
+    section.attrs.forEach(attr => {
+      const attrRow = document.createElement('div');
+      attrRow.className = 'attr-row';
+      
+      const value = formatAttr(attr);
+      const percentage = attr === 'NG' ? 
+        Math.min(100, Math.max(0, (attrs[attr] ?? 0) * 10)) : 
+        Math.min(100, Math.max(0, (attrs[attr] ?? 0) * 8.33));
+      
+      attrRow.style.setProperty('--attr-fill', `${percentage}%`);
+      
+      const label = document.createElement('span');
+      label.className = 'attr-label';
+      label.textContent = attr;
+      
+      const valueSpan = document.createElement('span');
+      valueSpan.className = 'attr-value';
+      valueSpan.textContent = value;
+      
+      attrRow.appendChild(label);
+      attrRow.appendChild(valueSpan);
+      sectionDiv.appendChild(attrRow);
+    });
+    
+    cardBack.appendChild(sectionDiv);
+  });
+  
+  cardInner.appendChild(cardFront);
+  cardInner.appendChild(cardBack);
+  card.appendChild(cardInner);
+  
+  // Add click handler for flipping
+  card.addEventListener('click', (e) => {
+    e.preventDefault();
+    card.classList.toggle('flipped');
   });
   
   return card;
