@@ -288,9 +288,12 @@ function renderTeam(data) {
     });
     html += `<td>${p.rt ?? '-'}</td>`;
     
+    console.log(`Generated HTML for ${p.name}:`, html);
+    
     // Create a temporary element to parse the HTML
     const temp = document.createElement('div');
     temp.innerHTML = html;
+    console.log(`Parsed HTML children:`, Array.from(temp.children).map(c => c.outerHTML));
     Array.from(temp.children).forEach(child => tr.appendChild(child));
     
     tbody.appendChild(tr);
