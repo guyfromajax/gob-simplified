@@ -803,6 +803,7 @@ def team_roster_page(request: Request, team: str):
                 "height_raw": height_raw,
                 "weight": p.get("weight", "--"),
                 "attributes": display_attrs,
+                "position_ratings": p.get("position_ratings", {}),
                 "rt": rt,
                 "rt_value": rt_val if rt_val is not None else -1,
             }
