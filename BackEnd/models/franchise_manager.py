@@ -517,24 +517,24 @@ class RecruitManager:
         archetype_configs = {
             "Five-Star": (ALL_ATTRS, [], (69, 80)),
             "Four-Star": ([], ALL_ATTRS, (66, 78)),
-            "Defensive Wizard": (["ID", "OD"], ["ST", "AG"], (66, 78)),
-            "All-Around Scorer": (["SH", "SC"], ["ST", "AG"], (66, 78)),
-            "Classic PG": (["BH", "PS"], ["OD", "IQ"], (66, 78)),
-            "Classic SG": (["SH"], ["OD"], (66, 78)),
-            "Classic SF": (["SC", "OD"], ["AG"], (66, 78)),
-            "Classic PF": (["RB"], ["ST"], (70, 80)),
-            "Classic C": (["ID", "ST"], ["RB", "SC"], (72, 82)),
-            "Pure Shooter": (["SH", "FT"], [], (66, 78)),
-            "Intangibles": (["IQ", "ND", "CH"], [], (66, 78)),
-            "Athlete": (["AG", "ST", "ND"], [], (66, 78)),
+            "Defensive Wizard": (["ID", "OD"], ["ST", "AG"], (66, 75)),
+            "All-Around Scorer": (["SH", "SC"], ["ST", "AG"], (66, 75)),
+            "Classic PG": (["BH", "PS"], ["OD", "IQ"], (66, 72)),
+            "Classic SG": (["SH"], ["OD"], (66, 74)),
+            "Classic SF": (["SC", "OD"], ["AG"], (69, 75)),
+            "Classic PF": (["RB"], ["ST"], (70, 76)),
+            "Classic C": (["ID", "ST"], ["RB", "SC"], (72, 78)),
+            "Pure Shooter": (["SH", "FT"], [], (66, 73)),
+            "Intangibles": (["IQ", "ND", "CH"], [], (66, 75)),
+            "Athlete": (["AG", "ST", "ND"], [], (66, 75)),
             "Inside Defender": (["ST", "ID"], [], (71, 80)),
-            "Outside Defender": (["AG", "OD"], [], (66, 77)),
-            "Average": ([], [], (66, 78)),
-            "Below Average": ([], [], (66, 78)),  # All weak
-            "Outside Dual Threat": (["SH", "AG"], [], (66, 78)),
-            "Driver": (["SC", "AG"], [], (66, 78)),
-            "Outside C": (["ST", "SH"], [], (72, 82)),
-            "Three & D": (["SH"], ["ID", "OD"], (69, 77)),
+            "Outside Defender": (["AG", "OD"], [], (66, 74)),
+            "Average": ([], [], (66, 75)),
+            "Below Average": ([], [], (66, 74)),  # All weak
+            "Outside Dual Threat": (["SH", "AG"], [], (66, 75)),
+            "Driver": (["SC", "AG"], [], (66, 75)),
+            "Outside C": (["ST", "SH"], [], (72, 77)),
+            "Three & D": (["SH"], ["ID", "OD"], (69, 75)),
         }
         
         strong_attrs, secondary_attrs, height_range = archetype_configs[archetype]
@@ -565,11 +565,11 @@ class RecruitManager:
     def _generate_weight(self, height):
         """Generate weight based on height."""
         if height < 72:
-            return random.randint(150, 190)
+            return random.randint(150, 181)
         elif 72 <= height <= 75:
-            return random.randint(170, 210)
+            return random.randint(170, 194)
         elif 76 <= height <= 80:
-            return random.randint(195, 240)
+            return random.randint(195, 231)
         else:  # > 80
-            return random.randint(220, 270)
+            return random.randint(209, 260)
 
