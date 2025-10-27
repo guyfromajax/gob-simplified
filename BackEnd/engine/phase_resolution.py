@@ -593,16 +593,16 @@ def resolve_half_court_offense_logic(game):
     skeleton = get_skeleton_for_turn(shot_result.get("result_type", "HCO"), "HCO", game) or {}
     shot_result["skeleton"] = skeleton
     
-        # Convert skeleton to animations if skeleton exists
-        if skeleton and "steps" in skeleton:
-            skeleton_animations = animator.skeleton_to_animations(
-                skeleton, 
-                off_lineup, 
-                def_lineup, 
-                add_defenders=True
-            )
-            if skeleton_animations:
-                shot_result["animations"] = skeleton_animations
+    # Convert skeleton to animations if skeleton exists
+    if skeleton and "steps" in skeleton:
+        skeleton_animations = animator.skeleton_to_animations(
+            skeleton, 
+            off_lineup, 
+            def_lineup, 
+            add_defenders=True
+        )
+        if skeleton_animations:
+            shot_result["animations"] = skeleton_animations
 
     # 4. scouting report update
     if shot_result["result_type"] == "MAKE":
