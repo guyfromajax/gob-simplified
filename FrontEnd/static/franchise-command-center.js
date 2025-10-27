@@ -279,6 +279,7 @@ function renderTeam(data) {
       const attrs = p.attributes || {};
       // Use anchor attribute (base value) as fallback, same as lineup screen
       const rawVal = attrs[`anchor_${h}`] ?? attrs[h];
+      console.log(`  ${h}: anchor_${h}=${attrs[`anchor_${h}`]}, ${h}=${attrs[h]}, rawVal=${rawVal}`);
       // Convert to 0-12 scale, except NG which stays as decimal
       const displayVal = h === 'NG' 
         ? (rawVal != null ? rawVal.toFixed(2) : '--')
@@ -348,6 +349,9 @@ async function init() {
     try {
       const rosterData = await fetchJSON(`/franchise/roster?franchise_id=${franchiseId}&team_name=${encodeURIComponent(topData.team)}`);
       console.log('Franchise roster data:', rosterData);
+      if (rosterData.players && rosterData.players.length > 0) {
+        console.log('First player attributes:', rosterData.players[0].attributes);
+      }
       renderTeam(rosterData);
     } catch (error) {
       console.error('Failed to load franchise roster:', error);
