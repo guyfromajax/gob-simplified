@@ -826,6 +826,11 @@ def get_franchise_roster(franchise_id: str, team_name: str = None):
         core_attributes = core_player.get("attributes", {}) if core_player else {}
         merged_attributes = {**core_attributes, **attributes}
         
+        # Create anchor_ prefixed attributes (like Player class does)
+        for attr_key in ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "AG", "ST", "ND", "IQ", "FT"]:
+            if attr_key in merged_attributes:
+                merged_attributes[f"anchor_{attr_key}"] = merged_attributes[attr_key]
+        
         first = meta.get("first_name", "")
         last = meta.get("last_name", "")
         

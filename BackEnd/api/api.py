@@ -648,6 +648,12 @@ def get_team_roster(team_name: str, tournament_id: str | None = None):
     players = []
     for p in player_objects:
         attributes = p.get("attributes", {})  # safely get nested attributes dict
+        
+        # Create anchor_ prefixed attributes (like Player class does)
+        for attr_key in ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "AG", "ST", "ND", "IQ", "FT"]:
+            if attr_key in attributes:
+                attributes[f"anchor_{attr_key}"] = attributes[attr_key]
+        
         players.append({
             "_id": str(p.get("_id")),
             "first_name": p.get("first_name", ""),
