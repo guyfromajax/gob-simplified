@@ -805,6 +805,15 @@ def resolve_full_court_press_logic(game: "GameManager"):
     
     text += "\n" + result_text_dict[result_type]
 
+    # Initialize shot_result for all cases
+    shot_result = {}
+    
+    # Initialize animator and skeleton for all cases
+    from BackEnd.models.animator import Animator
+    animator = Animator(game)
+    skeleton = get_skeleton_for_turn(result_type, "FCP", game) or {}
+    animations = []
+    
     # Handle SHOT result - execute actual shot resolution
     if result_type == "SHOT":
         # Build roles for shot
@@ -833,8 +842,6 @@ def resolve_full_court_press_logic(game: "GameManager"):
         shot_result["text"] = "PRESS! " + shot_result.get("text", "")
         
         # Generate animations from skeleton for the pass, then rely on standard shot animation
-        from BackEnd.models.animator import Animator
-        animator = Animator(game)
         skeleton = get_skeleton_for_turn("SHOT", "FCP", game) or {}
         
         if skeleton and "steps" in skeleton:
