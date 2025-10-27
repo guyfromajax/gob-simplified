@@ -368,7 +368,6 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                     # Save teams object to database for skeleton lookup during simulation
                     try:
                         from BackEnd.api.gameplan_routes import populate_team_plays
-                        from BackEnd.utils.shared import summarize_game_state
                         
                         # Get populated plays for team objects
                         populated_plays = populate_team_plays()
@@ -448,7 +447,6 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
         # Save teams object to database for skeleton lookup during simulation
         try:
             from BackEnd.api.gameplan_routes import populate_team_plays
-            from BackEnd.utils.shared import summarize_game_state
             
             # Get populated plays for team objects
             populated_plays = populate_team_plays()
