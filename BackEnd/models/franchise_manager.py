@@ -505,8 +505,8 @@ class RecruitManager:
     def _generate_recruit_profile(self, archetype):
         """Generate attributes, height, and weight for a recruit based on archetype."""
         # Define attribute ranges
-        STRONG = (20, 40)
-        SECONDARY = (10, 40)
+        STRONG = (20, 80)
+        SECONDARY = (10, 60)
         STANDARD = (1, 40)
         WEAK = (1, 20)
         
