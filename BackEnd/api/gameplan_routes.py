@@ -88,23 +88,27 @@ def get_default_settings():
 
 def populate_team_plays():
     """Populate team plays object with all plays from universal plays collection"""
-    from BackEnd.db import plays_collection
-    
-    # Get all plays from universal collection
-    all_plays = list(plays_collection.find({}))
-    
-    # Convert to dictionary format for team storage
-    plays_dict = {}
-    for play in all_plays:
-        play_name = play["name"]
-        plays_dict[play_name] = {
-            "name": play["name"],
-            "play_type": play["play_type"], 
-            "play_focus": play["play_focus"],
-            "skeletons": play["skeletons"]
-        }
-    
-    return plays_dict
+    try:
+        from BackEnd.db import plays_collection
+        
+        # Get all plays from universal collection
+        all_plays = list(plays_collection.find({}))
+        
+        # Convert to dictionary format for team storage
+        plays_dict = {}
+        for play in all_plays:
+            play_name = play["name"]
+            plays_dict[play_name] = {
+                "name": play["name"],
+                "play_type": play["play_type"], 
+                "play_focus": play["play_focus"],
+                "skeletons": play["skeletons"]
+            }
+        
+        return plays_dict
+    except Exception as e:
+        print(f"🚨 Error in populate_team_plays: {e}")
+        return {}
 
 
 def ensure_team_objects_exist(mode: str, doc_id: str, team_id: str):
