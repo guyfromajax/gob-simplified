@@ -144,6 +144,8 @@ async function loadSettings() {
         params.set('franchise_id', franchiseId);
       } else if (mode === 'tournament' && tournamentId) {
         params.set('tournament_id', tournamentId);
+      } else if (mode === 'single' && gameId) {
+        params.set('game_id', gameId);
       }
       
       const res = await fetch(`/api/gameplan?${params.toString()}`);
