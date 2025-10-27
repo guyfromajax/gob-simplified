@@ -815,12 +815,16 @@ def get_franchise_roster(franchise_id: str, team_name: str = None):
         
         # Get additional data from core collection
         core_player = db.players.find_one({"_id": pid}, {
-            "position_ratings": 1, "height": 1, "weight": 1, "jersey": 1, "year": 1
+            "position_ratings": 1, "height": 1, "weight": 1, "jersey": 1, "year": 1, "attributes": 1
         })
         
         # Use franchise position ratings if available, otherwise fall back to core
         if not position_ratings and core_player:
             position_ratings = core_player.get("position_ratings", {})
+        
+        # Merge core attributes with franchise attributes (franchise overrides core)
+        core_attributes = core_player.get("attributes", {}) if core_player else {}
+        merged_attributes = {**core_attributes, **attributes}
         
         first = meta.get("first_name", "")
         last = meta.get("last_name", "")
@@ -831,7 +835,7 @@ def get_franchise_roster(franchise_id: str, team_name: str = None):
             "last_name": last,
             "name": f"{first} {last}".strip(),  # Add combined name for display
             "team": team_name,
-            "attributes": attributes,
+            "attributes": merged_attributes,
             "position_ratings": position_ratings,
             "height": core_player.get("height") if core_player else None,
             "weight": core_player.get("weight") if core_player else None,
