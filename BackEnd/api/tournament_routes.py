@@ -125,8 +125,11 @@ def simulate_round(request: SimulateRequest):
             if matchup.get("game_id"):
                 continue
 
+            print(f"🔍 About to run simulation: {matchup['home_team']} vs {matchup['away_team']}")
             game = run_simulation(matchup["home_team"], matchup["away_team"])
+            print(f"🔍 Simulation completed, game type: {type(game)}")
             summary = summarize_game_state(game)
+            print(f"🔍 Summary created, type: {type(summary)}")
             game_id = games_collection.insert_one(summary).inserted_id
             #add a print statement here to show team name and score for each team after the game is simulated
             print(f"Home team: {matchup['home_team']} - Score: {summary['score'][matchup['home_team']]}")
@@ -137,9 +140,11 @@ def simulate_round(request: SimulateRequest):
                 else matchup["away_team"]
             )
             manager.save_game_result(round_name, i, str(game_id), winner)
+            print(f"🔍 About to finalize game stats for game_id: {str(game_id)}")
             stat_updater.finalize_game(
                 str(game_id), mode="tournament", tournament_id=request.tournament_id
             )
+            print(f"🔍 Game stats finalized successfully")
             result_doc = {
                 "home_team": matchup["home_team"],
                 "away_team": matchup["away_team"],
@@ -186,7 +191,10 @@ def simulate_round(request: SimulateRequest):
     except HTTPException:
         raise
     except Exception as e:
+        import traceback
         print("🚨 Error in simulate_round:", str(e))
+        print("🚨 Full traceback:")
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 
