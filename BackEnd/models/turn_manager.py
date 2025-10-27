@@ -514,6 +514,17 @@ class TurnManager:
 
 
     def set_strategy_calls(self):
+        # Ensure strategy_settings are initialized for both teams
+        if not hasattr(self.game.offense_team, 'strategy_settings') or not self.game.offense_team.strategy_settings:
+            self.game.offense_team.strategy_settings = self.game.offense_team._init_strategy_settings()
+        if not hasattr(self.game.defense_team, 'strategy_settings') or not self.game.defense_team.strategy_settings:
+            self.game.defense_team.strategy_settings = self.game.defense_team._init_strategy_settings()
+        
+        # Ensure strategy_calls dictionaries exist
+        if not hasattr(self.game.offense_team, 'strategy_calls') or not self.game.offense_team.strategy_calls:
+            self.game.offense_team.strategy_calls = {}
+        if not hasattr(self.game.defense_team, 'strategy_calls') or not self.game.defense_team.strategy_calls:
+            self.game.defense_team.strategy_calls = {}
 
         tempo_setting = self.game.offense_team.strategy_settings["tempo"]
         aggression_setting = self.game.defense_team.strategy_settings["aggression"]
@@ -1117,6 +1128,10 @@ class TurnManager:
         Returns 'FCP', 'HCT', or 'HCO' based on strategy settings and random rolls.
         """
         def_team = self.game.defense_team
+        
+        # Ensure strategy_settings is initialized
+        if not hasattr(def_team, 'strategy_settings') or not def_team.strategy_settings:
+            def_team.strategy_settings = def_team._init_strategy_settings()
         
         # Get strategy settings
         hct_value = def_team.strategy_settings.get("half_court_trap", 0)

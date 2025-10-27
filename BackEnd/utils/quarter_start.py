@@ -44,6 +44,9 @@ def create_quarter_start_inbound(game):
     bh_coords = o_dest["PG"]
     
     # Defensive positioning
+    # Ensure strategy_calls is initialized
+    if not hasattr(defense_team, 'strategy_calls') or not defense_team.strategy_calls:
+        defense_team.strategy_calls = {}
     aggression = defense_team.strategy_calls.get("aggression_call", "normal")
     d_dest = {}
     
