@@ -148,9 +148,10 @@ async function loadSettings() {
         params.set('game_id', gameId);
       }
       
+      console.log('🔍 Gameplan API call params:', params.toString());
       const res = await fetch(`/api/gameplan?${params.toString()}`);
       if (!res.ok) {
-        console.error('Failed to load game plan settings');
+        console.error('Failed to load game plan settings, status:', res.status);
         return;
       }
       
