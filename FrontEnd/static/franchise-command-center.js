@@ -217,10 +217,18 @@ function renderTrainingResults(data) {
 }
 
 function renderTeam(data) {
-  if (!data) return;
+  console.log('renderTeam called with data:', data);
+  if (!data) {
+    console.log('No data provided to renderTeam');
+    return;
+  }
   const tbody = document.getElementById('team-body');
-  if (!tbody) return;
+  if (!tbody) {
+    console.log('team-body element not found');
+    return;
+  }
   tbody.innerHTML = '';
+  console.log('Players data:', data.players);
   let players = (data.players || []).map(p => {
     const best = getBestPosition(p.position_ratings || {});
     const fullName = `${p.first_name || ''} ${p.last_name || ''}`.trim() || p.name || '';
@@ -318,7 +326,18 @@ async function init() {
   
   if (topData && topData.team) {
     // Use franchise-specific roster endpoint to get updated player attributes
-    renderTeam(await fetchJSON(`/franchise/roster?franchise_id=${franchiseId}&team_name=${encodeURIComponent(topData.team)}`));
+    console.log('Loading franchise roster for team:', topData.team, 'franchiseId:', franchiseId);
+    if (!franchiseId) {
+      console.error('No franchiseId found - cannot load roster');
+      return;
+    }
+    try {
+      const rosterData = await fetchJSON(`/franchise/roster?franchise_id=${franchiseId}&team_name=${encodeURIComponent(topData.team)}`);
+      console.log('Franchise roster data:', rosterData);
+      renderTeam(rosterData);
+    } catch (error) {
+      console.error('Failed to load franchise roster:', error);
+    }
   }
   const standingsData = await fetchJSON(`/franchise/standings?franchise_id=${franchiseId}`);
   renderStandings(standingsData);
