@@ -249,6 +249,9 @@ def simulate_quarter(
             gm.offense_team = gm.away_team
             gm.defense_team = gm.home_team
         
+        # Ensure strategy calls are set before creating inbound turn
+        gm.turn_manager.set_strategy_calls()
+        
         # Check for defensive pressure on the inbound
         pressure_type = gm.turn_manager.determine_defensive_pressure_type()
         gm.game_state["offensive_state"] = pressure_type
