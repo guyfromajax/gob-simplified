@@ -276,11 +276,13 @@ function renderTeam(data) {
     // Add other columns
     let html = `<td>${p.pos}</td><td>${p.year}</td><td>${p.height}</td><td>${p.weight}</td>`;
     ATTR_HEADERS.forEach(h => {
-      const val = p.attributes ? p.attributes[h] : undefined;
+      const attrs = p.attributes || {};
+      // Use anchor attribute (base value) as fallback, same as lineup screen
+      const rawVal = attrs[`anchor_${h}`] ?? attrs[h];
       // Convert to 0-12 scale, except NG which stays as decimal
       const displayVal = h === 'NG' 
-        ? (val != null ? val.toFixed(2) : '--')
-        : (val != null ? Math.floor(val / 10) : '--');
+        ? (rawVal != null ? rawVal.toFixed(2) : '--')
+        : (rawVal != null ? Math.floor(rawVal / 10) : '--');
       html += `<td>${displayVal}</td>`;
     });
     html += `<td>${p.rt ?? '-'}</td>`;

@@ -657,7 +657,7 @@ def get_team_roster(team_name: str, tournament_id: str | None = None):
             "height": p.get("height"),
             "weight": p.get("weight"),
             "position_ratings": p.get("position_ratings", {}),
-            "attributes": {attr: attributes.get(attr, "--") for attr in display_attributes},
+            "attributes": attributes,  # Return full attributes object (not filtered)
         })
 
     return {
