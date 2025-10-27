@@ -593,22 +593,16 @@ def resolve_half_court_offense_logic(game):
     skeleton = get_skeleton_for_turn(shot_result.get("result_type", "HCO"), "HCO", game) or {}
     shot_result["skeleton"] = skeleton
     
-    # Convert skeleton to animations if skeleton exists
-    if skeleton and "steps" in skeleton:
-        print(f"🔄 Converting skeleton to animations with {len(skeleton.get('steps', []))} steps")
-        skeleton_animations = animator.skeleton_to_animations(
-            skeleton, 
-            off_lineup, 
-            def_lineup, 
-            add_defenders=True
-        )
-        if skeleton_animations:
-            print(f"✅ Generated {len(skeleton_animations)} skeleton-based animations")
-            shot_result["animations"] = skeleton_animations
-        else:
-            print(f"⚠️ Skeleton conversion failed, using fallback animations")
-    else:
-        print(f"⚠️ No skeleton found, using fallback animations")
+        # Convert skeleton to animations if skeleton exists
+        if skeleton and "steps" in skeleton:
+            skeleton_animations = animator.skeleton_to_animations(
+                skeleton, 
+                off_lineup, 
+                def_lineup, 
+                add_defenders=True
+            )
+            if skeleton_animations:
+                shot_result["animations"] = skeleton_animations
 
     # 4. scouting report update
     if shot_result["result_type"] == "MAKE":
@@ -844,7 +838,6 @@ def resolve_full_court_press_logic(game: "GameManager"):
         skeleton = get_skeleton_for_turn("SHOT", "FCP", game) or {}
         
         if skeleton and "steps" in skeleton:
-            print(f"🔄 FCP: Converting skeleton to animations with {len(skeleton.get('steps', []))} steps")
             animations = animator.skeleton_to_animations(
                 skeleton, 
                 off_lineup, 
@@ -853,13 +846,7 @@ def resolve_full_court_press_logic(game: "GameManager"):
                 is_fcp=True
             )
             if animations:
-                print(f"✅ FCP: Generated {len(animations)} skeleton-based animations")
                 shot_result["animations"] = animations
-            else:
-                print(f"⚠️ FCP: Skeleton conversion failed, using fallback animations")
-        else:
-            print(f"⚠️ FCP: No skeleton found, using fallback animations")
-            animations = []
         
         shot_result["skeleton"] = skeleton
         shot_result["roles"] = shot_roles
@@ -899,7 +886,6 @@ def resolve_full_court_press_logic(game: "GameManager"):
     #     text = "PRESS! Steal!"
     
     if skeleton and "steps" in skeleton:
-        print(f"🔄 FCP: Converting skeleton to animations with {len(skeleton.get('steps', []))} steps")
         animations = animator.skeleton_to_animations(
             skeleton, 
             off_lineup, 
@@ -908,11 +894,8 @@ def resolve_full_court_press_logic(game: "GameManager"):
             is_fcp=True
         )
         if animations:
-            print(f"✅ FCP: Generated {len(animations)} skeleton-based animations")
-        else:
-            print(f"⚠️ FCP: Skeleton conversion failed, using fallback animations")
+            shot_result["animations"] = animations
     else:
-        print(f"⚠️ FCP: No skeleton found, using fallback animations")
         animations = []
     
     # Determine possession flip
@@ -928,11 +911,9 @@ def resolve_full_court_press_logic(game: "GameManager"):
         if random.random() < get_fast_break_chance(game):
             next_play_type = "FAST_BREAK"
             game_state["offensive_state"] = "FAST_BREAK"
-            print(f"🏃 FCP Steal → Fast break triggered")
         else:
             next_play_type = "HCO"
             game_state["offensive_state"] = "HCO"
-            print(f"🏃 FCP Steal → HCO (no fast break)")
     elif result_type == "HCO":
         next_play_type = "HCO"
     # For DEAD BALL, O_FOUL, D_FOUL: next_play_type stays None (will use side inbound → HCO)
@@ -1018,7 +999,6 @@ def get_hco_skeleton(result_type, game_context):
     
     # Get the current playcall from game context
     playcall = game_context.game_state.get("current_playcall", "Inside") if game_context else "Inside"
-    print(f"📋 Looking for skeleton for play: '{playcall}'")
     
     # Get the offensive team
     offense_team = game_context.offense_team
@@ -1027,12 +1007,9 @@ def get_hco_skeleton(result_type, game_context):
     # Try to get skeleton from team-specific play objects first
     skeleton = _get_skeleton_from_team_plays(playcall, offense_team_id, game_context)
     if skeleton:
-        print(f"📋 Found skeleton in team-specific plays for '{playcall}' with {len(skeleton.get('steps', []))} steps")
-        print(f"📋 Skeleton: {skeleton}")
         return skeleton
     
     # Fallback to universal plays collection
-    print(f"🔄 Team-specific play not found, checking universal plays collection for '{playcall}'")
     play_doc = plays_collection.find_one({"name": playcall})
     
     if play_doc and "skeletons" in play_doc:
@@ -1040,17 +1017,9 @@ def get_hco_skeleton(result_type, game_context):
         skeletons = play_doc.get("skeletons", {})
         if "standard" in skeletons:
             skeleton = skeletons["standard"]
-            print(f"📋 Found skeleton in universal plays for '{playcall}' with {len(skeleton.get('steps', []))} steps")
-            print(f"📋 Skeleton: {skeleton}")
             return skeleton
-        else:
-            print(f"⚠️ Play '{playcall}' found but missing skeletons.standard structure")
-            print(f"   Available skeleton keys: {list(skeletons.keys())}")
-    else:
-        print(f"⚠️ Play '{playcall}' not found in universal plays collection")
     
     # Final fallback to old skeleton system
-    print(f"🔄 Falling back to old skeleton system for '{playcall}'")
     from BackEnd.playcall_skeletons.inside_skeletons import INSIDE_SCENES
     from BackEnd.playcall_skeletons.outside_skeletons import OUTSIDE_SCENES
     from BackEnd.playcall_skeletons.attack_skeletons import ATTACK_SCENES
@@ -1082,52 +1051,27 @@ def _get_skeleton_from_team_plays(playcall, team_id, game_context):
     from BackEnd.db import games_collection, tournaments_collection, franchises_collection
     from bson import ObjectId
     
-    print(f"🔍 DEBUG: Looking for playcall '{playcall}' for team '{team_id}'")
-    
     # Try to determine mode and access appropriate document
     game_id = getattr(game_context, 'game_id', None)
-    print(f"🔍 DEBUG: game_id = {game_id}")
     
     if game_id:
         # Single game mode - check games collection
         # Note: game_id is a UUID string, not a MongoDB ObjectId
         game_doc = games_collection.find_one({"_id": game_id})
-        print(f"🔍 DEBUG: game_doc found = {game_doc is not None}")
         
         if game_doc and "teams" in game_doc:
-            print(f"🔍 DEBUG: game_doc has teams = {'teams' in game_doc}")
             team_obj = game_doc["teams"].get(team_id, {})
-            print(f"🔍 DEBUG: team_obj = {team_obj}")
-            
             plays = team_obj.get("plays", {})
-            print(f"🔍 DEBUG: plays keys = {list(plays.keys())}")
-            print(f"🔍 DEBUG: plays object = {plays}")
             
             if playcall in plays:
-                print(f"🔍 DEBUG: Found playcall '{playcall}' in plays")
                 play_obj = plays[playcall]
-                print(f"🔍 DEBUG: play_obj = {play_obj}")
-                
                 if "skeletons" in play_obj and "standard" in play_obj["skeletons"]:
-                    print(f"🔍 DEBUG: Found skeleton for '{playcall}'")
                     return play_obj["skeletons"]["standard"]
-                else:
-                    print(f"🔍 DEBUG: Play '{playcall}' missing skeletons.standard structure")
-                    print(f"🔍 DEBUG: Available keys in play_obj: {list(play_obj.keys())}")
-                    if "skeletons" in play_obj:
-                        print(f"🔍 DEBUG: Available skeleton keys: {list(play_obj['skeletons'].keys())}")
-            else:
-                print(f"🔍 DEBUG: Playcall '{playcall}' not found in plays")
-        else:
-            print(f"🔍 DEBUG: game_doc missing or no teams key")
-    else:
-        print(f"🔍 DEBUG: No game_id found in game_context")
     
     # Check if we're in tournament mode (look for tournament_id in game context)
     # This is a simplified check - in practice, you might need to pass tournament_id explicitly
     # For now, we'll try the universal plays collection as fallback
     
-    print(f"🔍 DEBUG: Returning None - no team-specific skeleton found")
     return None
 
 
@@ -1277,7 +1221,6 @@ def resolve_half_court_trap_logic(game: "GameManager"):
         skeleton = get_skeleton_for_turn("SHOT", "HCT", game) or {}
         
         if skeleton and "steps" in skeleton:
-            print(f"🔄 HCT: Converting skeleton to animations with {len(skeleton.get('steps', []))} steps")
             animations = animator.skeleton_to_animations(
                 skeleton, 
                 off_lineup, 
@@ -1287,12 +1230,8 @@ def resolve_half_court_trap_logic(game: "GameManager"):
                 is_hct=True
             )
             if animations:
-                print(f"✅ HCT: Generated {len(animations)} skeleton-based animations")
                 shot_result["animations"] = animations
-            else:
-                print(f"⚠️ HCT: Skeleton conversion failed, using fallback animations")
         else:
-            print(f"⚠️ HCT: No skeleton found, using fallback animations")
             animations = []
         
         shot_result["skeleton"] = skeleton
@@ -1325,7 +1264,6 @@ def resolve_half_court_trap_logic(game: "GameManager"):
         result_type = "DEAD BALL"
     
     if skeleton and "steps" in skeleton:
-        print(f"🔄 HCT: Converting skeleton to animations with {len(skeleton.get('steps', []))} steps")
         animations = animator.skeleton_to_animations(
             skeleton, 
             off_lineup, 
@@ -1335,11 +1273,8 @@ def resolve_half_court_trap_logic(game: "GameManager"):
             is_hct=True
         )
         if animations:
-            print(f"✅ HCT: Generated {len(animations)} skeleton-based animations")
-        else:
-            print(f"⚠️ HCT: Skeleton conversion failed, using fallback animations")
+            shot_result["animations"] = animations
     else:
-        print(f"⚠️ HCT: No skeleton found, using fallback animations")
         animations = []
     
     # Determine possession flip (same logic as FCP)
@@ -1355,11 +1290,9 @@ def resolve_half_court_trap_logic(game: "GameManager"):
         if random.random() < get_fast_break_chance(game):
             next_play_type = "FAST_BREAK"
             game_state["offensive_state"] = "FAST_BREAK"
-            print(f"🏃 HCT Steal → Fast break triggered")
         else:
             next_play_type = "HCO"
             game_state["offensive_state"] = "HCO"
-            print(f"🏃 HCT Steal → HCO (no fast break)")
     elif result_type == "HCO":
         next_play_type = "HCO"
     # For DEAD BALL, O_FOUL, D_FOUL: next_play_type stays None (will use side inbound → HCO)

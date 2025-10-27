@@ -757,20 +757,15 @@ class Animator:
         # Build animation for OFFENSIVE players from skeleton
         offensive_animations = {}  # Store by position for defensive matching
         
-        print(f"🔍 Skeleton has {len(steps)} steps with positions: {all_positions}")
-        
+        # Build animation for OFFENSIVE players from skeleton
         for position in all_positions:
             player = off_lineup.get(position)
             if not player:
-                print(f"⚠️ No player found for position {position}")
                 continue
             
             player_id = getattr(player, "player_id", None)
             if not player_id:
-                print(f"⚠️ No player_id for position {position}")
                 continue
-            
-            print(f"🔍 Building animation for {position} (player_id: {player_id})")
             
             # Build movement array from steps
             movement = []
@@ -788,22 +783,17 @@ class Animator:
                 # Handle both coords and location formats
                 if "coords" in pos_action:
                     coords = pos_action.get("coords", {"x": 50, "y": 25})
-                    print(f"  📍 Using coords: {coords}")
                 elif "location" in pos_action:
                     # Convert location string to coordinates using HCO_STRING_SPOTS
                     location = pos_action.get("location", "key")
                     coords = HCO_STRING_SPOTS.get(location, {"x": 50, "y": 25})
-                    print(f"  📍 Converted location '{location}' to coords: {coords}")
                 else:
                     coords = {"x": 50, "y": 25}
-                    print(f"  📍 Using default coords: {coords}")
                 
                 # Apply away team coordinate flipping if needed
                 is_away_offense = self.game.offense_team.team_id == self.game.away_team.team_id
                 if is_away_offense:
-                    original_coords = coords.copy()
                     coords = get_away_player_coords(coords)
-                    print(f"  🔄 Flipped coords for away offense: {original_coords} -> {coords}")
                 
                 action = pos_action.get("action", "drift")
                 
@@ -1136,7 +1126,6 @@ class Animator:
                     original_coords = coords.copy()
                     # get_away_player_coords is its own inverse, so we can use it to unflip
                     coords = get_away_player_coords(coords)
-                    print(f"  🔄 Unflipped offensive coords for defensive positioning: {original_coords} -> {coords}")
                 offensive_positions_by_step[pos].append(coords)
         
         # Find ball handler position (player with ball at step 0)
@@ -1150,7 +1139,6 @@ class Animator:
             # Fallback: assume PG is ball handler
             ball_handler_pos = "PG"
         
-        print(f"🔍 Ball handler position: {ball_handler_pos}")
         
         # Create defensive animations for each position
         for def_pos in ['PG', 'SG', 'SF', 'PF', 'C']:
@@ -1162,7 +1150,6 @@ class Animator:
             if not def_player_id:
                 continue
             
-            print(f"🔍 Creating defensive animation for {def_pos} (player_id: {def_player_id})")
             
             # Get the offensive player this defender is guarding
             off_pos_to_guard = def_pos  # Man-to-man by position
@@ -1241,9 +1228,7 @@ class Animator:
                 "duration": duration
             })
             
-            print(f"✅ Created defensive animation for {def_pos} with {len(def_movement)} steps")
         
-        print(f"✅ Generated {len(defensive_animations)} standard defensive animations")
         return defensive_animations
 
     def get_latest_animation_packet(self):
