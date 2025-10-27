@@ -310,8 +310,18 @@ function renderRoster() {
     nameTd.appendChild(nameLink);
     tr.appendChild(nameTd);
     
-    // Add other columns
-    let html = `<td>${p.pos}</td><td>${p.year}</td><td>${p.height}</td><td>${p.weight}</td>`;
+    // Add other columns directly as DOM elements
+    const addCell = (content) => {
+      const td = document.createElement('td');
+      td.textContent = content;
+      tr.appendChild(td);
+    };
+    
+    addCell(p.pos);
+    addCell(p.year);
+    addCell(p.height);
+    addCell(p.weight);
+    
     ATTR_HEADERS.forEach(h => {
       const attrs = p.attributes || {};
       // Use anchor attribute (base value) as fallback, same as lineup screen
@@ -320,14 +330,9 @@ function renderRoster() {
       const displayVal = h === 'NG' 
         ? (rawVal != null ? rawVal.toFixed(2) : '--')
         : (rawVal != null ? Math.floor(rawVal / 10) : '--');
-      html += `<td>${displayVal}</td>`;
+      addCell(displayVal);
     });
-    html += `<td>${p.rt ?? '-'}</td>`;
-    
-    // Create a temporary element to parse the HTML
-    const temp = document.createElement('div');
-    temp.innerHTML = html;
-    Array.from(temp.children).forEach(child => tr.appendChild(child));
+    addCell(p.rt ?? '-');
     
     tbody.appendChild(tr);
   });
