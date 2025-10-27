@@ -281,8 +281,16 @@ function renderBracket() {
 
 function renderRoster() {
   const tbody = document.getElementById("roster-body");
-  console.log("Inside renderRoster");
+  console.log("Inside renderRoster, roster data:", roster);
+  if (!tbody) {
+    console.log("roster-body element not found");
+    return;
+  }
   tbody.innerHTML = "";
+  if (!roster || roster.length === 0) {
+    console.log("No roster data to render");
+    return;
+  }
   roster.forEach(p => {
     const tr = document.createElement("tr");
     
@@ -496,9 +504,14 @@ async function loadTournament() {
 
 async function loadRoster() {
   try {
+    console.log('Loading tournament roster for userTeamId:', userTeamId);
+    if (!userTeamId) {
+      console.error('No userTeamId found - cannot load roster');
+      return;
+    }
     const res = await fetch(`/teams/${encodeURIComponent(formatTeamName(userTeamId))}/players`);
     const data = await res.json();
-    console.log("Team player data loads", data);
+    console.log("Tournament team player data:", data);
     roster = (data.players || []).map(p => {
       const best = getBestPosition(p.position_ratings || {});
       const fullName = `${p.first_name || ''} ${p.last_name || ''}`.trim() || p.name || '';
