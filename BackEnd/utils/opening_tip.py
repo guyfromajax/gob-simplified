@@ -159,7 +159,10 @@ def execute_opening_tip(game):
         "quarter": game.quarter,  # Add quarter field for frontend filtering
     }
     
-    return turn_result
+    # Add the turn result to the game's turns
+    game.turns.append(turn_result)
+    
+    return offense_team, defense_team
 
 def is_closest_to_ball(pos, ball_coords, lineup, team):
     """Determine if this position is closest to the ball landing spot (excluding C)"""
