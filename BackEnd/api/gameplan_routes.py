@@ -124,7 +124,14 @@ def ensure_team_objects_exist(mode: str, doc_id: str, team_id: str):
     else:
         raise HTTPException(status_code=400, detail=f"Invalid mode: {mode}")
     
-    doc = collection.find_one({"_id": ObjectId(doc_id)})
+    # Handle different ID formats for different modes
+    if mode == "single":
+        # For single game mode, game_id is a UUID string, not ObjectId
+        doc = collection.find_one({"_id": doc_id})
+    else:
+        # For franchise/tournament modes, use ObjectId
+        doc = collection.find_one({"_id": ObjectId(doc_id)})
+    
     if not doc:
         raise HTTPException(status_code=404, detail=f"{mode.capitalize()} not found")
     
@@ -168,10 +175,16 @@ def ensure_team_objects_exist(mode: str, doc_id: str, team_id: str):
                 updated = True
         
         if updated:
-            collection.update_one(
-                {"_id": ObjectId(doc_id)},
-                {"$set": {"franchise_teams": franchise_teams}}
-            )
+            if mode == "single":
+                collection.update_one(
+                    {"_id": doc_id},
+                    {"$set": {"franchise_teams": franchise_teams}}
+                )
+            else:
+                collection.update_one(
+                    {"_id": ObjectId(doc_id)},
+                    {"$set": {"franchise_teams": franchise_teams}}
+                )
         
         return franchise_teams
     
@@ -201,10 +214,16 @@ def ensure_team_objects_exist(mode: str, doc_id: str, team_id: str):
                 "plays": populated_plays.copy()
             }
             
-            collection.update_one(
-                {"_id": ObjectId(doc_id)},
-                {"$set": {f"{team_key}": team_obj}}
-            )
+            if mode == "single":
+                collection.update_one(
+                    {"_id": doc_id},
+                    {"$set": {f"{team_key}": team_obj}}
+                )
+            else:
+                collection.update_one(
+                    {"_id": ObjectId(doc_id)},
+                    {"$set": {f"{team_key}": team_obj}}
+                )
         elif "playcall_settings" not in team_obj or "strategy_settings" not in team_obj or not team_obj.get("plays"):
             # Add missing settings
             defaults = get_default_settings()
@@ -217,10 +236,16 @@ def ensure_team_objects_exist(mode: str, doc_id: str, team_id: str):
             if not team_obj.get("plays"):
                 updates[f"{team_key}.plays"] = populated_plays.copy()
             
-            collection.update_one(
-                {"_id": ObjectId(doc_id)},
-                {"$set": updates}
-            )
+            if mode == "single":
+                collection.update_one(
+                    {"_id": doc_id},
+                    {"$set": updates}
+                )
+            else:
+                collection.update_one(
+                    {"_id": ObjectId(doc_id)},
+                    {"$set": updates}
+                )
         
         return doc.get("teams", {})
 
@@ -326,10 +351,17 @@ def update_gameplan(request: GamePlanUpdateRequest):
                 f"teams.{request.team_id}.strategy_settings": request.strategy_settings
             }
         
-        result = collection.update_one(
-            {"_id": ObjectId(doc_id)},
-            {"$set": update_fields}
-        )
+        # Handle different ID formats for different modes
+        if request.mode == "single":
+            result = collection.update_one(
+                {"_id": doc_id},
+                {"$set": update_fields}
+            )
+        else:
+            result = collection.update_one(
+                {"_id": ObjectId(doc_id)},
+                {"$set": update_fields}
+            )
         
         if result.matched_count == 0:
             raise HTTPException(status_code=404, detail=f"{request.mode.capitalize()} not found")
