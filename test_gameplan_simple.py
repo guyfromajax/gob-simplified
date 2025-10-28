@@ -106,7 +106,7 @@ def test_tournament_gameplan():
     try:
         # Start a tournament
         start_response = requests.post("http://localhost:8000/start-tournament", json={
-            "user_team": "Bentley-Truman"
+            "user_team_id": "Bentley-Truman"
         })
         
         if start_response.status_code != 200:
@@ -114,7 +114,7 @@ def test_tournament_gameplan():
             return False
         
         tournament_data = start_response.json()
-        tournament_id = tournament_data["tournament_id"]
+        tournament_id = tournament_data["_id"]
         print(f"   ✅ Tournament started: {tournament_id}")
         
         # Test gameplan API access (this was the critical bug)
