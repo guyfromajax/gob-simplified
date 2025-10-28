@@ -107,11 +107,21 @@ class TeamManager:
         }
 
     def _init_scouting_data(self):
+        # Get actual play names from database
+        play_names = []
+        try:
+            from BackEnd.db import plays_collection
+            plays = list(plays_collection.find({}, {"name": 1}))
+            play_names = [play["name"] for play in plays]
+        except Exception as e:
+            print(f"⚠️ Could not load play names for scouting data: {e}")
+            play_names = PLAYCALLS  # Fallback to constants
+        
         return {
             "offense": {
                 "Fast_Break_Entries": 0,
                 "Fast_Break_Success": 0,
-                "Playcalls": {pc: {"used": 0, "success": 0} for pc in PLAYCALLS}
+                "Playcalls": {pc: {"used": 0, "success": 0} for pc in play_names}
             },
             "defense": {
                 "Man": {"used": 0, "success": 0},
