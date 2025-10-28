@@ -1155,6 +1155,12 @@ def resolve_half_court_trap_logic(game: "GameManager"):
     """
     game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
 
+    # Initialize variables to prevent UnboundLocalError
+    shot_result = {}
+    animator = None
+    skeleton = {}
+    animations = []
+
     text = "TRAP!"
     offenseScore = 0
     defenseScore = 0
@@ -1257,7 +1263,8 @@ def resolve_half_court_trap_logic(game: "GameManager"):
     
     # Generate animations from skeleton BEFORE changing result_type
     from BackEnd.models.animator import Animator
-    animator = Animator(game)
+    if animator is None:
+        animator = Animator(game)
     skeleton = get_skeleton_for_turn(result_type, "HCT", game) or {}
     
     # Handle foul results - use standard foul types for frontend (same as FCP)
