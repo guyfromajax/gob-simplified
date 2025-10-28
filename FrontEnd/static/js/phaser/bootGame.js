@@ -52,6 +52,23 @@ function getMode({ tournamentId, franchiseId }) {
   return 'standalone';
 }
 
+// Utility function to generate MongoDB ObjectId format game IDs
+function generateMongoObjectId() {
+  // 8-byte timestamp (seconds since epoch)
+  const timestamp = Math.floor(Date.now() / 1000).toString(16).padStart(8, '0');
+  
+  // 6-byte random value
+  const randomPart = Math.floor(Math.random() * 0xffffff).toString(16).padStart(6, '0');
+  
+  // 4-byte counter (additional randomness)
+  const counter = Math.floor(Math.random() * 0xffff).toString(16).padStart(4, '0');
+  
+  // Additional 6 bytes for full 24-character ObjectId format
+  const extraRandom = Math.floor(Math.random() * 0xffffff).toString(16).padStart(6, '0');
+  
+  return timestamp + randomPart + counter + extraRandom;
+}
+
 function buildQuery(params = {}) {
   const search = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => {
@@ -403,16 +420,12 @@ async function handleSimToFourth() {
     gameId = localStorage.getItem('game_id');
   }
   if (!gameId) {
-    // Generate a new gameId for tournament games using MongoDB ObjectId format (24 characters)
-    const timestamp = Math.floor(Date.now() / 1000).toString(16).padStart(8, '0');
-    const randomPart = Math.random().toString(16).substr(2, 6);
-    const counter = Math.floor(Math.random() * 16777216).toString(16).padStart(6, '0');
-    const extraRandom = Math.random().toString(16).substr(2, 4);
-    gameId = timestamp + randomPart + counter + extraRandom;
+    // Generate a new gameId using standardized MongoDB ObjectId format
+    gameId = generateMongoObjectId();
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem('game_id', gameId);
     }
-    console.log('🎮 Generated new gameId for tournament:', gameId);
+    console.log('🎮 Generated new gameId:', gameId);
   }
   isSimulating = true;
   const playBtn = document.querySelector('.play-button');

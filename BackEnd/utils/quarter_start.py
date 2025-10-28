@@ -12,10 +12,46 @@ def create_quarter_start_inbound(game):
     Create an inbound pass turn for Q2/Q3/Q4 start.
     Returns a turn in BASELINE_INBOUND format so frontend can reuse existing logic.
     
-    Positions players at half court and shows PG inbounding to a teammate.
+    Uses the opening tip winner to determine possession for consistent quarter starts.
     """
-    offense_team = game.offense_team
-    defense_team = game.defense_team
+    # Determine possession based on opening tip winner
+    opening_tip_winner = game.game_state.get("opening_tip_winner", "home")
+    
+    # Alternate possession each quarter (Q1: opening tip winner, Q2: other team, Q3: opening tip winner, Q4: other team)
+    if game.quarter == 1:
+        # Q1 uses opening tip winner (already set)
+        offense_team = game.offense_team
+        defense_team = game.defense_team
+    elif game.quarter == 2:
+        # Q2 goes to the team that didn't win opening tip
+        if opening_tip_winner == "home":
+            offense_team = game.away_team
+            defense_team = game.home_team
+        else:
+            offense_team = game.home_team
+            defense_team = game.away_team
+    elif game.quarter == 3:
+        # Q3 goes back to opening tip winner
+        if opening_tip_winner == "home":
+            offense_team = game.home_team
+            defense_team = game.away_team
+        else:
+            offense_team = game.away_team
+            defense_team = game.home_team
+    else:  # Q4
+        # Q4 goes to the team that didn't win opening tip
+        if opening_tip_winner == "home":
+            offense_team = game.away_team
+            defense_team = game.home_team
+        else:
+            offense_team = game.home_team
+            defense_team = game.away_team
+    
+    # Update game state with new possession
+    game.offense_team = offense_team
+    game.defense_team = defense_team
+    game.game_state["offensive_state"] = "HCO"
+    
     is_away_offense = offense_team.team_id == game.away_team.team_id
     
     # Sideline inbound spot at half court (home orientation)
