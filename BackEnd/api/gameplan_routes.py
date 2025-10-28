@@ -284,7 +284,11 @@ def get_gameplan(mode: str, team_id: str, franchise_id: str = None, tournament_i
             actual_team_id = None
             for tid in teams.keys():
                 # Find the team that matches our input team_id (could be name or ObjectId)
-                team_doc = db.teams.find_one({"_id": ObjectId(tid)})
+                try:
+                    team_doc = db.teams.find_one({"_id": ObjectId(tid)})
+                except:
+                    # If tid is not a valid ObjectId, skip this iteration
+                    continue
                 if team_doc and (team_doc["name"] == team_id or str(team_doc["_id"]) == team_id):
                     actual_team_id = tid
                     break
