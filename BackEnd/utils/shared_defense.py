@@ -61,6 +61,8 @@ def assign_non_bh_defender_coords(o_coords, ball_coords, aggression_level, is_aw
     if is_away_offense:
         flipped_ball = get_away_player_coords(ball_coords)
         bx, by = flipped_ball["x"], flipped_ball["y"]
+        flipped_offense = get_away_player_coords(o_coords)
+        ox, oy = flipped_offense["x"], flipped_offense["y"]
         
         # flipped_offense = get_away_player_coords(o_coords)
         # ox, oy = flipped_offense["x"], flipped_offense["y"]
