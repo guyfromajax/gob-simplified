@@ -344,7 +344,7 @@ export function createGameScene(Phaser) {
           rebTd.style.color = initialColor;
           astTd.style.color = initialColor;
           
-          tr.append(nameTd, ptsTd, foulsTd, rebTd, astTd);
+          tr.append(nameTd, ptsTd, rebTd, astTd, foulsTd);
           bodyEl.appendChild(tr);
           this.rowRefs[teamKey][pos] = { nameCell: nameTd, ptsCell: ptsTd, foulsCell: foulsTd, rebCell: rebTd, astCell: astTd };
           if (playerId) {

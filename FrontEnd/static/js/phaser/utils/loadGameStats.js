@@ -71,9 +71,9 @@ export function displayAccumulatedPlayerStats(gameData, homeTeam, awayTeam) {
       row.innerHTML = `
         <td>${playerStats.name}</td>
         <td>${pts}</td>
-        <td>${fouls}</td>
         <td>${reb}</td>
         <td>${ast}</td>
+        <td>${fouls}</td>
       `;
       homeStatsBody.appendChild(row);
     });
@@ -92,9 +92,9 @@ export function displayAccumulatedPlayerStats(gameData, homeTeam, awayTeam) {
       row.innerHTML = `
         <td>${playerStats.name}</td>
         <td>${pts}</td>
-        <td>${fouls}</td>
         <td>${reb}</td>
         <td>${ast}</td>
+        <td>${fouls}</td>
       `;
       awayStatsBody.appendChild(row);
     });
