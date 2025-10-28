@@ -559,9 +559,9 @@ def run_simulation(home_team_name, away_team_name, home_lineup_ids=None, away_li
         print(f"🔍 DEBUG: Home team plays: {len(teams_obj[gm.home_team.team_id]['plays'])}")
         print(f"🔍 DEBUG: Away team plays: {len(teams_obj[gm.away_team.team_id]['plays'])}")
         
-        # Generate a game_id for this simulation
-        import uuid
-        game_id = str(uuid.uuid4())
+        # Generate a game_id for this simulation using standardized format
+        from BackEnd.utils.game_id_utils import generate_game_id
+        game_id = generate_game_id()
         gm.game_id = game_id
         
         # Create a summary with teams object

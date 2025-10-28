@@ -444,10 +444,12 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
             away_strategy_settings=away_strategy
         )
         # Use the game_id from the request if provided, otherwise generate a new one
+        from BackEnd.utils.game_id_utils import generate_game_id, normalize_game_id
+        
         if request.game_id:
-            game_id = request.game_id
+            game_id = normalize_game_id(request.game_id)
         else:
-            game_id = str(uuid.uuid4())
+            game_id = generate_game_id()
         gm.game_id = game_id  # Store game_id on the GameManager object
         ongoing_games[game_id] = gm
         source = "new"
