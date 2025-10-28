@@ -332,6 +332,7 @@ export function createGameScene(Phaser) {
           const stlTd = document.createElement('td');
           const blkTd = document.createElement('td');
           const toTd = document.createElement('td');
+          const defAttemptsTd = document.createElement('td');
           const defTd = document.createElement('td');
           
           nameTd.textContent = formatName(player?.name) || '';
@@ -342,6 +343,7 @@ export function createGameScene(Phaser) {
           stlTd.textContent = '0';
           blkTd.textContent = '0';
           toTd.textContent = '0';
+          defAttemptsTd.textContent = '0';
           defTd.textContent = '0%';
           
           // Initialize energy color (defaults to green for fresh players at 1.0)
@@ -355,24 +357,26 @@ export function createGameScene(Phaser) {
           stlTd.style.color = initialColor;
           blkTd.style.color = initialColor;
           toTd.style.color = initialColor;
+          defAttemptsTd.style.color = initialColor;
           defTd.style.color = initialColor;
           
           // Hide S2 and S3 columns by default (S1 is visible)
           stlTd.style.display = 'none';
           blkTd.style.display = 'none';
           toTd.style.display = 'none';
+          defAttemptsTd.style.display = 'none';
           defTd.style.display = 'none';
           
-          tr.append(nameTd, ptsTd, rebTd, astTd, foulsTd, stlTd, blkTd, toTd, defTd);
+          tr.append(nameTd, ptsTd, rebTd, astTd, foulsTd, stlTd, blkTd, toTd, defAttemptsTd, defTd);
           bodyEl.appendChild(tr);
           this.rowRefs[teamKey][pos] = { 
             nameCell: nameTd, ptsCell: ptsTd, rebCell: rebTd, astCell: astTd, foulsCell: foulsTd,
-            stlCell: stlTd, blkCell: blkTd, toCell: toTd, defCell: defTd
+            stlCell: stlTd, blkCell: blkTd, toCell: toTd, defAttemptsCell: defAttemptsTd, defCell: defTd
           };
           if (playerId) {
             this.playerStats[playerId].cells = { 
               pts: ptsTd, reb: rebTd, ast: astTd, fouls: foulsTd,
-              stl: stlTd, blk: blkTd, to: toTd, def: defTd
+              stl: stlTd, blk: blkTd, to: toTd, defAttempts: defAttemptsTd, def: defTd
             };
             this.playerStats[playerId].nameCell = nameTd; // Store name cell for energy color coding
             this.currentLineup[teamKey][pos] = playerId;
@@ -404,6 +408,7 @@ export function createGameScene(Phaser) {
             row.stlCell.textContent = stats.STL;
             row.blkCell.textContent = stats.BLK;
             row.toCell.textContent = stats.TO;
+            row.defAttemptsCell.textContent = stats.DEF_A;
             
             // Calculate defensive success rate
             const defRate = stats.DEF_A > 0 ? Math.round((stats.DEF_S / stats.DEF_A) * 100) : 0;
@@ -411,7 +416,7 @@ export function createGameScene(Phaser) {
             
             stats.cells = { 
               pts: row.ptsCell, fouls: row.foulsCell, reb: row.rebCell, ast: row.astCell,
-              stl: row.stlCell, blk: row.blkCell, to: row.toCell, def: row.defCell
+              stl: row.stlCell, blk: row.blkCell, to: row.toCell, defAttempts: row.defAttemptsCell, def: row.defCell
             };
             stats.nameCell = row.nameCell; // Store name cell for energy color coding
           }
@@ -549,7 +554,8 @@ export function createGameScene(Phaser) {
                   const key = stat.toLowerCase();
                   if (ps.cells[key]) {
                     if (stat === 'DEF_A' || stat === 'DEF_S') {
-                      // Update defensive success rate when defensive stats change
+                      // Update defensive attempts and success rate when defensive stats change
+                      if (ps.cells.defAttempts) ps.cells.defAttempts.textContent = ps.DEF_A;
                       const defRate = ps.DEF_A > 0 ? Math.round((ps.DEF_S / ps.DEF_A) * 100) : 0;
                       ps.cells.def.textContent = `${defRate}%`;
                     } else {

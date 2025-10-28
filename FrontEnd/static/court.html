@@ -1049,7 +1049,7 @@
       const statConfigs = {
         S1: { headers: ['Name', 'PTS', 'REB', 'AST', 'F'], stats: ['name', 'PTS', 'REB', 'AST', 'F'] },
         S2: { headers: ['Name', 'STL', 'BLK', 'TO'], stats: ['name', 'STL', 'BLK', 'TO'] },
-        S3: { headers: ['Name', 'DEF'], stats: ['name', 'DEF'] }
+        S3: { headers: ['Name', 'ATT', 'DEF'], stats: ['name', 'DEF_A', 'DEF'] }
       };
       
       // Add click handlers to all toggle buttons
@@ -1086,7 +1086,7 @@
         switch(statType) {
           case 'S1':
             // Show: Name, PTS, REB, AST, F
-            if (cells.length >= 9) {
+            if (cells.length >= 10) {
               cells[0].style.display = ''; // Name
               cells[1].style.display = ''; // PTS
               cells[2].style.display = ''; // REB
@@ -1095,12 +1095,13 @@
               cells[5].style.display = 'none'; // STL
               cells[6].style.display = 'none'; // BLK
               cells[7].style.display = 'none'; // TO
-              cells[8].style.display = 'none'; // DEF
+              cells[8].style.display = 'none'; // DEF_A
+              cells[9].style.display = 'none'; // DEF
             }
             break;
           case 'S2':
             // Show: Name, STL, BLK, TO
-            if (cells.length >= 9) {
+            if (cells.length >= 10) {
               cells[0].style.display = ''; // Name
               cells[1].style.display = 'none'; // PTS
               cells[2].style.display = 'none'; // REB
@@ -1109,12 +1110,13 @@
               cells[5].style.display = ''; // STL
               cells[6].style.display = ''; // BLK
               cells[7].style.display = ''; // TO
-              cells[8].style.display = 'none'; // DEF
+              cells[8].style.display = 'none'; // DEF_A
+              cells[9].style.display = 'none'; // DEF
             }
             break;
           case 'S3':
-            // Show: Name, DEF
-            if (cells.length >= 9) {
+            // Show: Name, ATT (DEF_A), DEF (success rate)
+            if (cells.length >= 10) {
               cells[0].style.display = ''; // Name
               cells[1].style.display = 'none'; // PTS
               cells[2].style.display = 'none'; // REB
@@ -1123,7 +1125,8 @@
               cells[5].style.display = 'none'; // STL
               cells[6].style.display = 'none'; // BLK
               cells[7].style.display = 'none'; // TO
-              cells[8].style.display = ''; // DEF
+              cells[8].style.display = ''; // DEF_A (ATT)
+              cells[9].style.display = ''; // DEF (success rate)
             }
             break;
         }
