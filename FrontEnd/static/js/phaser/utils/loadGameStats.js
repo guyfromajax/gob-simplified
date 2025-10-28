@@ -67,9 +67,11 @@ export function displayAccumulatedPlayerStats(gameData, homeTeam, awayTeam) {
       const pts = playerStats.PTS || 0;
       const reb = playerStats.REB || ((playerStats.OREB || 0) + (playerStats.DREB || 0));
       const ast = playerStats.AST || 0;
+      const fouls = playerStats.F || 0;
       row.innerHTML = `
         <td>${playerStats.name}</td>
         <td>${pts}</td>
+        <td>${fouls}</td>
         <td>${reb}</td>
         <td>${ast}</td>
       `;
@@ -86,9 +88,11 @@ export function displayAccumulatedPlayerStats(gameData, homeTeam, awayTeam) {
       const pts = playerStats.PTS || 0;
       const reb = playerStats.REB || ((playerStats.OREB || 0) + (playerStats.DREB || 0));
       const ast = playerStats.AST || 0;
+      const fouls = playerStats.F || 0;
       row.innerHTML = `
         <td>${playerStats.name}</td>
         <td>${pts}</td>
+        <td>${fouls}</td>
         <td>${reb}</td>
         <td>${ast}</td>
       `;
