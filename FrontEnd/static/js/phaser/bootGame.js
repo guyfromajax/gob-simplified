@@ -403,7 +403,15 @@ async function handleSimToFourth() {
     gameId = localStorage.getItem('game_id');
   }
   if (!gameId) {
-    resetGameContext();
+    // Generate a new gameId for tournament games using MongoDB ObjectId format
+    const timestamp = Math.floor(Date.now() / 1000).toString(16);
+    const randomPart = Math.random().toString(16).substr(2, 6);
+    const counter = Math.floor(Math.random() * 16777216).toString(16).padStart(6, '0');
+    gameId = timestamp + randomPart + counter;
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('game_id', gameId);
+    }
+    console.log('🎮 Generated new gameId for tournament:', gameId);
   }
   isSimulating = true;
   const playBtn = document.querySelector('.play-button');
@@ -435,8 +443,8 @@ async function handleSimToFourth() {
         home_team: homeTeam,
         away_team: awayTeam,
         quarter: currentQ,
+        game_id: gameId, // Always pass gameId for tournament games
       };
-      if (gId) payload.game_id = gId;
       
       // Q1: Use user's set lineup
       // Q2-Q3: Auto-set lineups for both teams
