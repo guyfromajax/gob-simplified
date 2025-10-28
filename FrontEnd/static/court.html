@@ -334,12 +334,51 @@
       border-bottom: 1px solid #333;
     }
 
-    .player-box-score h3 {
-      font-size: 22px;
+    .stats-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
       margin-bottom: 10px;
-      text-align: center;
       border-bottom: 1px solid #444;
       padding-bottom: 6px;
+    }
+
+    .stats-header h3 {
+      font-size: 22px;
+      margin: 0;
+    }
+
+    .stats-toggle {
+      display: flex;
+      gap: 4px;
+    }
+
+    .toggle-btn {
+      background: #333;
+      color: #aaa;
+      border: 1px solid #555;
+      padding: 4px 8px;
+      font-size: 12px;
+      cursor: pointer;
+      border-radius: 3px;
+      transition: all 0.2s ease;
+      font-family: 'Bebas Neue', sans-serif;
+    }
+
+    .toggle-btn:hover {
+      background: #444;
+      color: #fff;
+    }
+
+    .toggle-btn.active {
+      background: var(--home-vibrant-color);
+      color: #fff;
+      border-color: var(--home-vibrant-color);
+    }
+
+    .player-stats-panel.away .toggle-btn.active {
+      background: var(--away-vibrant-color);
+      border-color: var(--away-vibrant-color);
     }
     
     .player-stats-panel.home .player-box-score h3 {
@@ -921,9 +960,16 @@
     <!-- AWAY PLAYER STATS PANEL (LEFT) -->
     <div class="player-stats-panel away">
       <div class="player-box-score">
-        <h3>Away Players</h3>
+        <div class="stats-header">
+          <h3>Away Players</h3>
+          <div class="stats-toggle">
+            <button class="toggle-btn active" data-stat="S1">S1</button>
+            <button class="toggle-btn" data-stat="S2">S2</button>
+            <button class="toggle-btn" data-stat="S3">S3</button>
+          </div>
+        </div>
         <table>
-          <thead>
+          <thead id="away-stats-header">
             <tr>
               <th>Name</th>
               <th>PTS</th>
@@ -958,9 +1004,16 @@
     <!-- HOME PLAYER STATS PANEL (RIGHT) -->
     <div class="player-stats-panel home">
       <div class="player-box-score">
-        <h3>Home Players</h3>
+        <div class="stats-header">
+          <h3>Home Players</h3>
+          <div class="stats-toggle">
+            <button class="toggle-btn active" data-stat="S1">S1</button>
+            <button class="toggle-btn" data-stat="S2">S2</button>
+            <button class="toggle-btn" data-stat="S3">S3</button>
+          </div>
+        </div>
         <table>
-          <thead>
+          <thead id="home-stats-header">
             <tr>
               <th>Name</th>
               <th>PTS</th>
@@ -990,6 +1043,95 @@
   <script>
     console.log('🚨 HTML: Basic JavaScript is working!');
     console.log('🚨 HTML: About to load bootGame.js');
+    
+    // Stats toggle functionality
+    function initializeStatsToggle() {
+      const statConfigs = {
+        S1: { headers: ['Name', 'PTS', 'REB', 'AST', 'F'], stats: ['name', 'PTS', 'REB', 'AST', 'F'] },
+        S2: { headers: ['Name', 'STL', 'BLK', 'TO'], stats: ['name', 'STL', 'BLK', 'TO'] },
+        S3: { headers: ['Name', 'DEF'], stats: ['name', 'DEF'] }
+      };
+      
+      // Add click handlers to all toggle buttons
+      document.querySelectorAll('.toggle-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+          const statType = this.dataset.stat;
+          const team = this.closest('.player-stats-panel').classList.contains('away') ? 'away' : 'home';
+          
+          // Update active button
+          this.closest('.stats-toggle').querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('active'));
+          this.classList.add('active');
+          
+          // Update table headers
+          const headerRow = document.getElementById(`${team}-stats-header`);
+          const config = statConfigs[statType];
+          headerRow.innerHTML = config.headers.map(h => `<th>${h}</th>`).join('');
+          
+          // Update table body (this will be handled by the existing stats update functions)
+          updateStatsDisplay(team, statType);
+        });
+      });
+    }
+    
+    function updateStatsDisplay(team, statType) {
+      // This function will be called by the existing stats update system
+      // to refresh the display with the correct columns
+      const body = document.getElementById(`${team}-stats-body`);
+      const rows = body.querySelectorAll('tr');
+      
+      rows.forEach(row => {
+        const cells = row.querySelectorAll('td');
+        
+        // Show/hide columns based on stat type
+        switch(statType) {
+          case 'S1':
+            // Show: Name, PTS, REB, AST, F
+            if (cells.length >= 9) {
+              cells[0].style.display = ''; // Name
+              cells[1].style.display = ''; // PTS
+              cells[2].style.display = ''; // REB
+              cells[3].style.display = ''; // AST
+              cells[4].style.display = ''; // F
+              cells[5].style.display = 'none'; // STL
+              cells[6].style.display = 'none'; // BLK
+              cells[7].style.display = 'none'; // TO
+              cells[8].style.display = 'none'; // DEF
+            }
+            break;
+          case 'S2':
+            // Show: Name, STL, BLK, TO
+            if (cells.length >= 9) {
+              cells[0].style.display = ''; // Name
+              cells[1].style.display = 'none'; // PTS
+              cells[2].style.display = 'none'; // REB
+              cells[3].style.display = 'none'; // AST
+              cells[4].style.display = 'none'; // F
+              cells[5].style.display = ''; // STL
+              cells[6].style.display = ''; // BLK
+              cells[7].style.display = ''; // TO
+              cells[8].style.display = 'none'; // DEF
+            }
+            break;
+          case 'S3':
+            // Show: Name, DEF
+            if (cells.length >= 9) {
+              cells[0].style.display = ''; // Name
+              cells[1].style.display = 'none'; // PTS
+              cells[2].style.display = 'none'; // REB
+              cells[3].style.display = 'none'; // AST
+              cells[4].style.display = 'none'; // F
+              cells[5].style.display = 'none'; // STL
+              cells[6].style.display = 'none'; // BLK
+              cells[7].style.display = 'none'; // TO
+              cells[8].style.display = ''; // DEF
+            }
+            break;
+        }
+      });
+    }
+    
+    // Make functions globally available
+    window.updateStatsDisplay = updateStatsDisplay;
   </script>
   <script type="module">
     // Apply vibrant colors based on teams in URL
@@ -1008,6 +1150,9 @@
     
     // Load accumulated stats if this is a resumed game
     await initializeGameStats();
+    
+    // Initialize stats toggle functionality
+    initializeStatsToggle();
   </script>
   <script type="module" src="/static/js/phaser/bootGame.js"></script>
   <script>

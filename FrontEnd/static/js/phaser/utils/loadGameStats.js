@@ -58,6 +58,12 @@ export function displayAccumulatedPlayerStats(gameData, homeTeam, awayTeam) {
   
   const boxScore = gameData.box_score;
   
+  // Store player data globally for toggle system
+  window.currentPlayerStats = {
+    home: boxScore[homeTeam] || {},
+    away: boxScore[awayTeam] || {}
+  };
+  
   // Update home stats
   const homeStatsBody = document.getElementById('home-stats-body');
   if (homeStatsBody && boxScore[homeTeam]) {
@@ -68,12 +74,23 @@ export function displayAccumulatedPlayerStats(gameData, homeTeam, awayTeam) {
       const reb = playerStats.REB || ((playerStats.OREB || 0) + (playerStats.DREB || 0));
       const ast = playerStats.AST || 0;
       const fouls = playerStats.F || 0;
+      const stl = playerStats.STL || 0;
+      const blk = playerStats.BLK || 0;
+      const to = playerStats.TO || 0;
+      const defAttempts = playerStats.DEF_A || 0;
+      const defSuccesses = playerStats.DEF_S || 0;
+      const defRate = defAttempts > 0 ? Math.round((defSuccesses / defAttempts) * 100) : 0;
+      
       row.innerHTML = `
         <td>${playerStats.name}</td>
         <td>${pts}</td>
         <td>${reb}</td>
         <td>${ast}</td>
         <td>${fouls}</td>
+        <td style="display: none;">${stl}</td>
+        <td style="display: none;">${blk}</td>
+        <td style="display: none;">${to}</td>
+        <td style="display: none;">${defRate}%</td>
       `;
       homeStatsBody.appendChild(row);
     });
@@ -89,12 +106,23 @@ export function displayAccumulatedPlayerStats(gameData, homeTeam, awayTeam) {
       const reb = playerStats.REB || ((playerStats.OREB || 0) + (playerStats.DREB || 0));
       const ast = playerStats.AST || 0;
       const fouls = playerStats.F || 0;
+      const stl = playerStats.STL || 0;
+      const blk = playerStats.BLK || 0;
+      const to = playerStats.TO || 0;
+      const defAttempts = playerStats.DEF_A || 0;
+      const defSuccesses = playerStats.DEF_S || 0;
+      const defRate = defAttempts > 0 ? Math.round((defSuccesses / defAttempts) * 100) : 0;
+      
       row.innerHTML = `
         <td>${playerStats.name}</td>
         <td>${pts}</td>
         <td>${reb}</td>
         <td>${ast}</td>
         <td>${fouls}</td>
+        <td style="display: none;">${stl}</td>
+        <td style="display: none;">${blk}</td>
+        <td style="display: none;">${to}</td>
+        <td style="display: none;">${defRate}%</td>
       `;
       awayStatsBody.appendChild(row);
     });
