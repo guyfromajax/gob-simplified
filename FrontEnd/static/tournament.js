@@ -640,6 +640,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (!home || !away) throw new Error('Matchup not found');
         const mySide = home === userTeamId ? 'home' : (away === userTeamId ? 'away' : '');
         let url = `/static/set-lineup.html?tournament_id=${encodeURIComponent(tournament._id)}&home=${encodeURIComponent(home)}&away=${encodeURIComponent(away)}`;
+        // Add team IDs for gameplan API compatibility
+        url += `&home_id=${encodeURIComponent(home)}&away_id=${encodeURIComponent(away)}`;
         if (userTeamId) url += `&user_team_id=${encodeURIComponent(userTeamId)}`;
         if (mySide) url += `&my_team=${mySide}`;
         window.location.href = url;
