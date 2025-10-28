@@ -152,6 +152,9 @@ def resolve_offensive_rebound(game, rebounder):
         ) * random.randint(1, 6)
         shot_score -= defense_penalty * 0.2
 
+        # Track defensive attempt for putback
+        defender.record_stat("DEF_A")
+
         made = shot_score >= off_team.team_attributes["shot_threshold"]
         rebounder.record_stat("FGA")
 
@@ -168,6 +171,8 @@ def resolve_offensive_rebound(game, rebounder):
             event["points"] = 2
             event["possession_flips"] = True
         else:
+            # Track defensive success for missed putback
+            defender.record_stat("DEF_S")
             new_rebounder, new_team, new_stat = determine_rebounder(game)
             new_rebounder.record_stat(new_stat)
             # DON'T flip possession here - let turn_manager handle it after the rebound
