@@ -68,7 +68,8 @@ def assign_non_bh_defender_coords(o_coords, ball_coords, aggression_level, is_aw
     # Calculate directions AFTER flipping (if applicable)
     # In home orientation, defenders are always to the right (toward home basket at x=90)
     y_direction = -1 if oy > 25 else 1
-    x_direction = -1 if is_away_offense else 1  # Always toward home basket in home orientation
+    x_direction = 1
+    # x_direction = -1 if is_away_offense else 1  # Always toward home basket in home orientation
     
     # print("Inside assign_non_bh_defender_coords")
     # print(f"is_away_offense: {is_away_offense}")
