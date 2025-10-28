@@ -92,8 +92,8 @@ class TeamManager:
 
     def _init_team_attributes(self):
         return {
-            "shot_threshold": random.randint(150, 250),
-            "ft_shot_threshold": random.randint(150, 250),
+            "shot_threshold": random.randint(-100, 100),
+            "ft_shot_threshold": random.randint(100, 200),
             "turnover_threshold": random.randint(-250, -150),
             "foul_threshold": random.randint(40, 90),
             "rebound_modifier": random.choice([0.8, 0.9, 1.0, 1.1, 1.2]),
