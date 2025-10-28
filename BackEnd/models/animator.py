@@ -1042,19 +1042,31 @@ class Animator:
                 if step_idx < len(off_coords_list):
                     off_coords = off_coords_list[step_idx]
                     
-                    # Use shared defense logic to calculate defender position
-                    if off_pos_to_guard == ball_handler_pos:
-                        # Ball handler defender
-                        def_coords = assign_bh_defender_coords(off_coords, aggression, is_away_offense)
-                    else:
-                        # Non-ball handler defender
-                        bh_coords_list = offensive_positions_by_step.get(ball_handler_pos, [])
-                        bh_coords = bh_coords_list[step_idx] if step_idx < len(bh_coords_list) else {"x": 50, "y": 25}
-                        def_coords = assign_non_bh_defender_coords(off_coords, bh_coords, aggression, is_away_offense)
+                    # For HCT, maintain trap positioning with slight adjustments
+                    # Start with initial HCT position and make minor adjustments based on ball movement
+                    def_coords = initial_hct_positions[def_pos].copy()
+                    
+                    # Get ball handler position for trap adjustments
+                    bh_coords_list = offensive_positions_by_step.get(ball_handler_pos, [])
+                    bh_coords = bh_coords_list[step_idx] if step_idx < len(bh_coords_list) else {"x": 50, "y": 25}
+                    
+                    # Make small adjustments based on ball handler movement
+                    if def_pos == "PG":  # Primary trap defender
+                        # Follow ball handler more closely
+                        if is_away_offense:
+                            def_coords["x"] = min(53, max(44, bh_coords["x"] - 2))
+                        else:
+                            def_coords["x"] = max(47, min(57, bh_coords["x"] + 2))
+                        def_coords["y"] = bh_coords["y"]
+                    elif def_pos in ["SG", "SF"]:  # Secondary trap defenders
+                        # Stay in trap formation with slight adjustments
+                        if is_away_offense:
+                            def_coords["x"] = min(53, max(44, def_coords["x"] - 1))
+                        else:
+                            def_coords["x"] = max(47, min(57, def_coords["x"] + 1))
+                    # PF and C maintain their deep positions
                     
                     # Enforce half-court boundary
-                    # Home offense (attacks right): defenders can't go left of x=47
-                    # Away offense (attacks left): defenders can't go right of x=53
                     if not is_away_offense:  # Home on offense, away defending
                         def_coords["x"] = max(47, def_coords["x"])
                     else:  # Away on offense, home defending
