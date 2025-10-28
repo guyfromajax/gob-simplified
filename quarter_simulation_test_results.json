@@ -1,0 +1,362 @@
+{
+  "total_tests": 9,
+  "passed": 9,
+  "failed": 0,
+  "success_rate": 1.0,
+  "results": {
+    "single_Play Quarter": {
+      "success": true,
+      "test_name": "Play Quarter",
+      "status_code": 200,
+      "game_id": "182facb2-7cfa-4df9-a694-bc8eb66d366e",
+      "quarter": 1,
+      "score": {
+        "Bentley-Truman": 13,
+        "Lancaster": 23
+      },
+      "message": "\u2705 Success"
+    },
+    "single_Sim To 4th Quarter": {
+      "success": true,
+      "details": [
+        {
+          "success": true,
+          "test_name": "Sim To 4th Quarter Q1",
+          "status_code": 200,
+          "game_id": "65562e87-d2a0-4878-ac44-4df550cf9fca",
+          "quarter": 1,
+          "score": {
+            "Bentley-Truman": 28,
+            "Lancaster": 22
+          },
+          "message": "\u2705 Success"
+        },
+        {
+          "success": true,
+          "test_name": "Sim To 4th Quarter Q2",
+          "status_code": 200,
+          "game_id": "65562e87-d2a0-4878-ac44-4df550cf9fca",
+          "quarter": 2,
+          "score": {
+            "Bentley-Truman": 55,
+            "Lancaster": 46
+          },
+          "message": "\u2705 Success"
+        },
+        {
+          "success": true,
+          "test_name": "Sim To 4th Quarter Q3",
+          "status_code": 200,
+          "game_id": "65562e87-d2a0-4878-ac44-4df550cf9fca",
+          "quarter": 3,
+          "score": {
+            "Bentley-Truman": 82,
+            "Lancaster": 67
+          },
+          "message": "\u2705 Success"
+        },
+        {
+          "success": true,
+          "test_name": "Sim To 4th Quarter Q4",
+          "status_code": 200,
+          "game_id": "65562e87-d2a0-4878-ac44-4df550cf9fca",
+          "quarter": 4,
+          "score": {
+            "Bentley-Truman": 116,
+            "Lancaster": 89
+          },
+          "message": "\u2705 Success"
+        }
+      ]
+    },
+    "single_Sim Full Game": {
+      "success": true,
+      "details": [
+        {
+          "success": true,
+          "test_name": "Sim Full Game Q1",
+          "status_code": 200,
+          "game_id": "97d41548-a406-4da5-99b9-902074e16165",
+          "quarter": 1,
+          "score": {
+            "Bentley-Truman": 43,
+            "Lancaster": 34
+          },
+          "message": "\u2705 Success"
+        },
+        {
+          "success": true,
+          "test_name": "Sim Full Game Q2",
+          "status_code": 200,
+          "game_id": "97d41548-a406-4da5-99b9-902074e16165",
+          "quarter": 2,
+          "score": {
+            "Bentley-Truman": 80,
+            "Lancaster": 71
+          },
+          "message": "\u2705 Success"
+        },
+        {
+          "success": true,
+          "test_name": "Sim Full Game Q3",
+          "status_code": 200,
+          "game_id": "97d41548-a406-4da5-99b9-902074e16165",
+          "quarter": 3,
+          "score": {
+            "Bentley-Truman": 117,
+            "Lancaster": 102
+          },
+          "message": "\u2705 Success"
+        },
+        {
+          "success": true,
+          "test_name": "Sim Full Game Q4",
+          "status_code": 200,
+          "game_id": "97d41548-a406-4da5-99b9-902074e16165",
+          "quarter": 4,
+          "score": {
+            "Bentley-Truman": 157,
+            "Lancaster": 139
+          },
+          "message": "\u2705 Success"
+        }
+      ]
+    },
+    "franchise_Play Quarter": {
+      "success": true,
+      "test_name": "Franchise Play Quarter",
+      "status_code": 200,
+      "game_id": "b4647466-a7ef-45bd-9bc0-482f4de22e89",
+      "quarter": 1,
+      "score": {
+        "Bentley-Truman": 22,
+        "Lancaster": 17
+      },
+      "message": "\u2705 Success"
+    },
+    "franchise_Sim To 4th Quarter": {
+      "success": true,
+      "details": [
+        {
+          "success": true,
+          "test_name": "Franchise Sim To 4th Quarter Q1",
+          "status_code": 200,
+          "game_id": "1c2fe50b-1576-44c9-8006-dde911cf3bc0",
+          "quarter": 1,
+          "score": {
+            "Bentley-Truman": 20,
+            "Lancaster": 6
+          },
+          "message": "\u2705 Success"
+        },
+        {
+          "success": true,
+          "test_name": "Franchise Sim To 4th Quarter Q2",
+          "status_code": 200,
+          "game_id": "1c2fe50b-1576-44c9-8006-dde911cf3bc0",
+          "quarter": 2,
+          "score": {
+            "Bentley-Truman": 42,
+            "Lancaster": 12
+          },
+          "message": "\u2705 Success"
+        },
+        {
+          "success": true,
+          "test_name": "Franchise Sim To 4th Quarter Q3",
+          "status_code": 200,
+          "game_id": "1c2fe50b-1576-44c9-8006-dde911cf3bc0",
+          "quarter": 3,
+          "score": {
+            "Bentley-Truman": 65,
+            "Lancaster": 13
+          },
+          "message": "\u2705 Success"
+        },
+        {
+          "success": true,
+          "test_name": "Franchise Sim To 4th Quarter Q4",
+          "status_code": 200,
+          "game_id": "1c2fe50b-1576-44c9-8006-dde911cf3bc0",
+          "quarter": 4,
+          "score": {
+            "Bentley-Truman": 88,
+            "Lancaster": 19
+          },
+          "message": "\u2705 Success"
+        }
+      ]
+    },
+    "franchise_Sim Full Game": {
+      "success": true,
+      "details": [
+        {
+          "success": true,
+          "test_name": "Franchise Sim Full Game Q1",
+          "status_code": 200,
+          "game_id": "de13904d-883f-41c9-a52c-e2327cb9f107",
+          "quarter": 1,
+          "score": {
+            "Bentley-Truman": 7,
+            "Lancaster": 20
+          },
+          "message": "\u2705 Success"
+        },
+        {
+          "success": true,
+          "test_name": "Franchise Sim Full Game Q2",
+          "status_code": 200,
+          "game_id": "de13904d-883f-41c9-a52c-e2327cb9f107",
+          "quarter": 2,
+          "score": {
+            "Bentley-Truman": 17,
+            "Lancaster": 31
+          },
+          "message": "\u2705 Success"
+        },
+        {
+          "success": true,
+          "test_name": "Franchise Sim Full Game Q3",
+          "status_code": 200,
+          "game_id": "de13904d-883f-41c9-a52c-e2327cb9f107",
+          "quarter": 3,
+          "score": {
+            "Bentley-Truman": 37,
+            "Lancaster": 39
+          },
+          "message": "\u2705 Success"
+        },
+        {
+          "success": true,
+          "test_name": "Franchise Sim Full Game Q4",
+          "status_code": 200,
+          "game_id": "de13904d-883f-41c9-a52c-e2327cb9f107",
+          "quarter": 4,
+          "score": {
+            "Bentley-Truman": 53,
+            "Lancaster": 42
+          },
+          "message": "\u2705 Success"
+        }
+      ]
+    },
+    "tournament_Play Quarter": {
+      "success": true,
+      "test_name": "Tournament Play Quarter",
+      "status_code": 200,
+      "game_id": "ff043712-5d1a-45d9-ae3f-31983edc928a",
+      "quarter": 1,
+      "score": {
+        "Bentley-Truman": 22,
+        "Lancaster": 23
+      },
+      "message": "\u2705 Success"
+    },
+    "tournament_Sim To 4th Quarter": {
+      "success": true,
+      "details": [
+        {
+          "success": true,
+          "test_name": "Tournament Sim To 4th Quarter Q1",
+          "status_code": 200,
+          "game_id": "047f001b-5184-4d61-906a-766310b363bc",
+          "quarter": 1,
+          "score": {
+            "Bentley-Truman": 41,
+            "Lancaster": 36
+          },
+          "message": "\u2705 Success"
+        },
+        {
+          "success": true,
+          "test_name": "Tournament Sim To 4th Quarter Q2",
+          "status_code": 200,
+          "game_id": "047f001b-5184-4d61-906a-766310b363bc",
+          "quarter": 2,
+          "score": {
+            "Bentley-Truman": 78,
+            "Lancaster": 73
+          },
+          "message": "\u2705 Success"
+        },
+        {
+          "success": true,
+          "test_name": "Tournament Sim To 4th Quarter Q3",
+          "status_code": 200,
+          "game_id": "047f001b-5184-4d61-906a-766310b363bc",
+          "quarter": 3,
+          "score": {
+            "Bentley-Truman": 125,
+            "Lancaster": 101
+          },
+          "message": "\u2705 Success"
+        },
+        {
+          "success": true,
+          "test_name": "Tournament Sim To 4th Quarter Q4",
+          "status_code": 200,
+          "game_id": "047f001b-5184-4d61-906a-766310b363bc",
+          "quarter": 4,
+          "score": {
+            "Bentley-Truman": 166,
+            "Lancaster": 129
+          },
+          "message": "\u2705 Success"
+        }
+      ]
+    },
+    "tournament_Sim Full Game": {
+      "success": true,
+      "details": [
+        {
+          "success": true,
+          "test_name": "Tournament Sim Full Game Q1",
+          "status_code": 200,
+          "game_id": "131b0c7c-3974-4466-a019-dbfeea2cdecb",
+          "quarter": 1,
+          "score": {
+            "Bentley-Truman": 13,
+            "Lancaster": 18
+          },
+          "message": "\u2705 Success"
+        },
+        {
+          "success": true,
+          "test_name": "Tournament Sim Full Game Q2",
+          "status_code": 200,
+          "game_id": "131b0c7c-3974-4466-a019-dbfeea2cdecb",
+          "quarter": 2,
+          "score": {
+            "Bentley-Truman": 18,
+            "Lancaster": 37
+          },
+          "message": "\u2705 Success"
+        },
+        {
+          "success": true,
+          "test_name": "Tournament Sim Full Game Q3",
+          "status_code": 200,
+          "game_id": "131b0c7c-3974-4466-a019-dbfeea2cdecb",
+          "quarter": 3,
+          "score": {
+            "Bentley-Truman": 30,
+            "Lancaster": 58
+          },
+          "message": "\u2705 Success"
+        },
+        {
+          "success": true,
+          "test_name": "Tournament Sim Full Game Q4",
+          "status_code": 200,
+          "game_id": "131b0c7c-3974-4466-a019-dbfeea2cdecb",
+          "quarter": 4,
+          "score": {
+            "Bentley-Truman": 38,
+            "Lancaster": 79
+          },
+          "message": "\u2705 Success"
+        }
+      ]
+    }
+  }
+}
