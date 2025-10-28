@@ -948,6 +948,9 @@ class TurnManager:
         passer = off_lineup.get(passer_pos)
         defender = def_lineup.get(defender_pos) if defender_pos else def_lineup["PG"]
 
+        # Debug: Print role assignments
+        print(f"🎭 ROLES DEBUG: shooter_pos={shooter_pos}, shooter={get_name_safe(shooter)}, shooter_position={get_player_position(off_lineup, shooter)}")
+
         return {
             "shooter": shooter,
             "screener": screener,
