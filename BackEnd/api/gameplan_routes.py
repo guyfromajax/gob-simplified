@@ -190,10 +190,13 @@ def ensure_team_objects_exist(mode: str, doc_id: str, team_id: str):
     
     # For tournament and single game modes
     else:
-        # Normalize team_id to ObjectId
-        team = db.teams.find_one({"_id": ObjectId(team_id)})
+        # Normalize team_id to ObjectId - try name first, then ObjectId
+        team = db.teams.find_one({"name": team_id})
         if not team:
-            team = db.teams.find_one({"name": team_id})
+            try:
+                team = db.teams.find_one({"_id": ObjectId(team_id)})
+            except:
+                pass
         if not team:
             raise HTTPException(status_code=404, detail="Team not found")
         
