@@ -326,29 +326,54 @@ export function createGameScene(Phaser) {
           const tr = document.createElement('tr');
           const nameTd = document.createElement('td');
           const ptsTd = document.createElement('td');
-          const foulsTd = document.createElement('td');
           const rebTd = document.createElement('td');
           const astTd = document.createElement('td');
+          const foulsTd = document.createElement('td');
+          const stlTd = document.createElement('td');
+          const blkTd = document.createElement('td');
+          const toTd = document.createElement('td');
+          const defTd = document.createElement('td');
+          
           nameTd.textContent = formatName(player?.name) || '';
           ptsTd.textContent = '0';
-          foulsTd.textContent = '0';
           rebTd.textContent = '0';
           astTd.textContent = '0';
+          foulsTd.textContent = '0';
+          stlTd.textContent = '0';
+          blkTd.textContent = '0';
+          toTd.textContent = '0';
+          defTd.textContent = '0%';
           
           // Initialize energy color (defaults to green for fresh players at 1.0)
           const initialNG = player?.NG ?? 1.0;
           const initialColor = getEnergyColor(initialNG);
           nameTd.style.color = initialColor;
           ptsTd.style.color = initialColor;
-          foulsTd.style.color = initialColor;
           rebTd.style.color = initialColor;
           astTd.style.color = initialColor;
+          foulsTd.style.color = initialColor;
+          stlTd.style.color = initialColor;
+          blkTd.style.color = initialColor;
+          toTd.style.color = initialColor;
+          defTd.style.color = initialColor;
           
-          tr.append(nameTd, ptsTd, rebTd, astTd, foulsTd);
+          // Hide S2 and S3 columns by default (S1 is visible)
+          stlTd.style.display = 'none';
+          blkTd.style.display = 'none';
+          toTd.style.display = 'none';
+          defTd.style.display = 'none';
+          
+          tr.append(nameTd, ptsTd, rebTd, astTd, foulsTd, stlTd, blkTd, toTd, defTd);
           bodyEl.appendChild(tr);
-          this.rowRefs[teamKey][pos] = { nameCell: nameTd, ptsCell: ptsTd, foulsCell: foulsTd, rebCell: rebTd, astCell: astTd };
+          this.rowRefs[teamKey][pos] = { 
+            nameCell: nameTd, ptsCell: ptsTd, rebCell: rebTd, astCell: astTd, foulsCell: foulsTd,
+            stlCell: stlTd, blkCell: blkTd, toCell: toTd, defCell: defTd
+          };
           if (playerId) {
-            this.playerStats[playerId].cells = { pts: ptsTd, fouls: foulsTd, reb: rebTd, ast: astTd };
+            this.playerStats[playerId].cells = { 
+              pts: ptsTd, reb: rebTd, ast: astTd, fouls: foulsTd,
+              stl: stlTd, blk: blkTd, to: toTd, def: defTd
+            };
             this.playerStats[playerId].nameCell = nameTd; // Store name cell for energy color coding
             this.currentLineup[teamKey][pos] = playerId;
           }
@@ -368,13 +393,26 @@ export function createGameScene(Phaser) {
           const row = this.rowRefs[teamKey][pos];
           if (info && row) {
             row.nameCell.textContent = formatName(info.name);
-            const stats = this.playerStats[playerId] || { PTS: 0, F: 0, REB: 0, AST: 0 };
+            const stats = this.playerStats[playerId] || { 
+              PTS: 0, F: 0, REB: 0, AST: 0, STL: 0, BLK: 0, TO: 0, DEF_A: 0, DEF_S: 0 
+            };
             this.playerStats[playerId] = stats;
             row.ptsCell.textContent = stats.PTS;
             row.foulsCell.textContent = stats.F;
             row.rebCell.textContent = stats.REB;
             row.astCell.textContent = stats.AST;
-            stats.cells = { pts: row.ptsCell, fouls: row.foulsCell, reb: row.rebCell, ast: row.astCell };
+            row.stlCell.textContent = stats.STL;
+            row.blkCell.textContent = stats.BLK;
+            row.toCell.textContent = stats.TO;
+            
+            // Calculate defensive success rate
+            const defRate = stats.DEF_A > 0 ? Math.round((stats.DEF_S / stats.DEF_A) * 100) : 0;
+            row.defCell.textContent = `${defRate}%`;
+            
+            stats.cells = { 
+              pts: row.ptsCell, fouls: row.foulsCell, reb: row.rebCell, ast: row.astCell,
+              stl: row.stlCell, blk: row.blkCell, to: row.toCell, def: row.defCell
+            };
             stats.nameCell = row.nameCell; // Store name cell for energy color coding
           }
         });
@@ -400,11 +438,24 @@ export function createGameScene(Phaser) {
             const reb = statBlock.REB ?? ((statBlock.OREB || 0) + (statBlock.DREB || 0));
             const ast = statBlock.AST ?? 0;
             const fouls = statBlock.F ?? 0;
-            const ps = this.playerStats[playerId] || { PTS: 0, F: 0, REB: 0, AST: 0 };
+            const stl = statBlock.STL ?? 0;
+            const blk = statBlock.BLK ?? 0;
+            const to = statBlock.TO ?? 0;
+            const defA = statBlock.DEF_A ?? 0;
+            const defS = statBlock.DEF_S ?? 0;
+            
+            const ps = this.playerStats[playerId] || { 
+              PTS: 0, F: 0, REB: 0, AST: 0, STL: 0, BLK: 0, TO: 0, DEF_A: 0, DEF_S: 0 
+            };
             ps.PTS = pts;
             ps.F = fouls;
             ps.REB = reb;
             ps.AST = ast;
+            ps.STL = stl;
+            ps.BLK = blk;
+            ps.TO = to;
+            ps.DEF_A = defA;
+            ps.DEF_S = defS;
             this.playerStats[playerId] = ps;
             lineup[pos] = playerId;
           });
@@ -496,7 +547,15 @@ export function createGameScene(Phaser) {
                 ps[stat] = (ps[stat] || 0) + value;
                 if (ps.cells) {
                   const key = stat.toLowerCase();
-                  if (ps.cells[key]) ps.cells[key].textContent = ps[stat];
+                  if (ps.cells[key]) {
+                    if (stat === 'DEF_A' || stat === 'DEF_S') {
+                      // Update defensive success rate when defensive stats change
+                      const defRate = ps.DEF_A > 0 ? Math.round((ps.DEF_S / ps.DEF_A) * 100) : 0;
+                      ps.cells.def.textContent = `${defRate}%`;
+                    } else {
+                      ps.cells[key].textContent = ps[stat];
+                    }
+                  }
                 }
               }
             }
