@@ -177,15 +177,21 @@ def ensure_team_objects_exist(mode: str, doc_id: str, team_id: str):
     
     # For tournament and single game modes
     else:
+        # Normalize team_id to ObjectId
+        team = db.teams.find_one({"_id": ObjectId(team_id)})
+        if not team:
+            team = db.teams.find_one({"name": team_id})
+        if not team:
+            raise HTTPException(status_code=404, detail="Team not found")
+        
+        actual_team_id = str(team["_id"])
+        
         # Check if team object exists
-        team_key = f"teams.{team_id}"
-        team_obj = doc.get("teams", {}).get(team_id)
+        team_key = f"teams.{actual_team_id}"
+        team_obj = doc.get("teams", {}).get(actual_team_id)
         
         if not team_obj:
             # Create team object with defaults
-            team = db.teams.find_one({"_id": ObjectId(team_id)})
-            if not team:
-                raise HTTPException(status_code=404, detail="Team not found")
             
             defaults = get_default_settings()
             populated_plays = populate_team_plays()
@@ -249,7 +255,15 @@ def get_gameplan(mode: str, team_id: str, franchise_id: str = None, tournament_i
             team_obj = franchise_teams.get(team_id, {})
         else:
             teams = ensure_team_objects_exist(mode, doc_id, team_id)
-            team_obj = teams.get(team_id, {})
+            # For tournament/single mode, get the actual team ID from the teams dict
+            actual_team_id = None
+            for tid in teams.keys():
+                # Find the team that matches our input team_id (could be name or ObjectId)
+                team_doc = db.teams.find_one({"_id": ObjectId(tid)})
+                if team_doc and (team_doc["name"] == team_id or str(team_doc["_id"]) == team_id):
+                    actual_team_id = tid
+                    break
+            team_obj = teams.get(actual_team_id, {}) if actual_team_id else {}
         
         # Get settings or return defaults
         defaults = get_default_settings()
