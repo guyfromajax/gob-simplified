@@ -326,10 +326,12 @@ export function createGameScene(Phaser) {
           const tr = document.createElement('tr');
           const nameTd = document.createElement('td');
           const ptsTd = document.createElement('td');
+          const foulsTd = document.createElement('td');
           const rebTd = document.createElement('td');
           const astTd = document.createElement('td');
           nameTd.textContent = formatName(player?.name) || '';
           ptsTd.textContent = '0';
+          foulsTd.textContent = '0';
           rebTd.textContent = '0';
           astTd.textContent = '0';
           
@@ -338,14 +340,15 @@ export function createGameScene(Phaser) {
           const initialColor = getEnergyColor(initialNG);
           nameTd.style.color = initialColor;
           ptsTd.style.color = initialColor;
+          foulsTd.style.color = initialColor;
           rebTd.style.color = initialColor;
           astTd.style.color = initialColor;
           
-          tr.append(nameTd, ptsTd, rebTd, astTd);
+          tr.append(nameTd, ptsTd, foulsTd, rebTd, astTd);
           bodyEl.appendChild(tr);
-          this.rowRefs[teamKey][pos] = { nameCell: nameTd, ptsCell: ptsTd, rebCell: rebTd, astCell: astTd };
+          this.rowRefs[teamKey][pos] = { nameCell: nameTd, ptsCell: ptsTd, foulsCell: foulsTd, rebCell: rebTd, astCell: astTd };
           if (playerId) {
-            this.playerStats[playerId].cells = { pts: ptsTd, reb: rebTd, ast: astTd };
+            this.playerStats[playerId].cells = { pts: ptsTd, fouls: foulsTd, reb: rebTd, ast: astTd };
             this.playerStats[playerId].nameCell = nameTd; // Store name cell for energy color coding
             this.currentLineup[teamKey][pos] = playerId;
           }
@@ -365,12 +368,13 @@ export function createGameScene(Phaser) {
           const row = this.rowRefs[teamKey][pos];
           if (info && row) {
             row.nameCell.textContent = formatName(info.name);
-            const stats = this.playerStats[playerId] || { PTS: 0, REB: 0, AST: 0 };
+            const stats = this.playerStats[playerId] || { PTS: 0, F: 0, REB: 0, AST: 0 };
             this.playerStats[playerId] = stats;
             row.ptsCell.textContent = stats.PTS;
+            row.foulsCell.textContent = stats.F;
             row.rebCell.textContent = stats.REB;
             row.astCell.textContent = stats.AST;
-            stats.cells = { pts: row.ptsCell, reb: row.rebCell, ast: row.astCell };
+            stats.cells = { pts: row.ptsCell, fouls: row.foulsCell, reb: row.rebCell, ast: row.astCell };
             stats.nameCell = row.nameCell; // Store name cell for energy color coding
           }
         });
@@ -395,8 +399,10 @@ export function createGameScene(Phaser) {
             const pts = statBlock.PTS ?? 0;
             const reb = statBlock.REB ?? ((statBlock.OREB || 0) + (statBlock.DREB || 0));
             const ast = statBlock.AST ?? 0;
-            const ps = this.playerStats[playerId] || { PTS: 0, REB: 0, AST: 0 };
+            const fouls = statBlock.F ?? 0;
+            const ps = this.playerStats[playerId] || { PTS: 0, F: 0, REB: 0, AST: 0 };
             ps.PTS = pts;
+            ps.F = fouls;
             ps.REB = reb;
             ps.AST = ast;
             this.playerStats[playerId] = ps;
