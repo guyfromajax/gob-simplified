@@ -439,7 +439,11 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
             away_playcall_settings=away_playcall,
             away_strategy_settings=away_strategy
         )
-        game_id = str(uuid.uuid4())
+        # Use the game_id from the request if provided, otherwise generate a new one
+        if request.game_id:
+            game_id = request.game_id
+        else:
+            game_id = str(uuid.uuid4())
         gm.game_id = game_id  # Store game_id on the GameManager object
         ongoing_games[game_id] = gm
         source = "new"
@@ -521,18 +525,30 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
         )
         return summary
 
-    # Prevent skipping ahead or repeating quarters unintentionally
-    if request.quarter != gm.quarter:
+    # Allow quarter progression: only prevent going backwards or skipping too far ahead
+    if request.quarter < gm.quarter:
         if debug:
             logging.debug(
-                "simulate_quarter_endpoint quarter mismatch: game_id=%s expected=%s got=%s",
+                "simulate_quarter_endpoint quarter regression: game_id=%s current=%s requested=%s",
                 game_id,
                 gm.quarter,
                 request.quarter,
             )
         raise HTTPException(
             status_code=400,
-            detail=f"Quarter mismatch. Expected {gm.quarter}, got {request.quarter}",
+            detail=f"Cannot simulate previous quarter. Current quarter is {gm.quarter}, requested {request.quarter}",
+        )
+    elif request.quarter > gm.quarter + 1:
+        if debug:
+            logging.debug(
+                "simulate_quarter_endpoint quarter skip: game_id=%s current=%s requested=%s",
+                game_id,
+                gm.quarter,
+                request.quarter,
+            )
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot skip quarters. Current quarter is {gm.quarter}, requested {request.quarter}",
         )
 
     try:
