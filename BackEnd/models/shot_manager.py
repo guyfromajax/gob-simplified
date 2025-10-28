@@ -92,6 +92,9 @@ class ShotManager:
         screener = roles.get("screener", "")
         defender = roles.get("defender", "")
 
+        # Debug: Print shooter information
+        print(f"🎯 SHOT DEBUG: shooter={get_name_safe(shooter)}, shooter_pos={get_player_position(off_lineup, shooter)}")
+
         playcall = self.game_state["current_playcall"]
         defense_call = self.game_state["defense_playcall"]
         
@@ -127,6 +130,7 @@ class ShotManager:
             stats = ["FGM", "3PTM"] if is_three else ["FGM"]
             points = 3 if is_three else 2
             apply_scoring(self.game, off_team, shooter, points, stats)
+            print(f"🎯 SCORING DEBUG: Awarded {points} points to {get_name_safe(shooter)} (position: {get_player_position(off_lineup, shooter)})")
 
             possession_flips = True
             if screener:
