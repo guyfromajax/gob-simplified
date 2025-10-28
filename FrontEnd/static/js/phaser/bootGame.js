@@ -509,6 +509,8 @@ async function handleSimToFourth() {
     const params = new URLSearchParams();
     params.set('home', homeTeam);
     params.set('away', awayTeam);
+    params.set('home_id', urlParams.get('home_id') || homeTeam);
+    params.set('away_id', urlParams.get('away_id') || awayTeam);
     params.set('mode', mode);
     params.set('my_team', userTeamSide || 'home');
     params.set('user_team_id', userTeamSide === 'home' ? homeTeam : awayTeam);
