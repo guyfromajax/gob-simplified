@@ -973,22 +973,25 @@ class Animator:
         is_away_offense = self.game.offense_team.team_id == self.game.away_team.team_id
         aggression = self.game.defense_team.strategy_calls.get("aggression_call", "normal")
         
-        # Define initial HCT positions for away team defending (home on offense)
-        initial_hct_positions = {
-            "PG": {"x": 57, "y": 25},   # Deep Key
-            "SG": {"x": 57, "y": 35},   # Deep Upper Wing
-            "SF": {"x": 57, "y": 15},   # Deep Lower Wing
-            "PF": {"x": 64, "y": 25},   # Key
-            "C": {"x": 80, "y": 25}     # Mid Lane
-        }
-        
-        # Flip for home team defending
+        # Define initial HCT positions based on court orientation
         if is_away_offense:
-            for pos in initial_hct_positions:
-                initial_hct_positions[pos] = {
-                    "x": 101 - initial_hct_positions[pos]["x"],
-                    "y": initial_hct_positions[pos]["y"]
-                }
+            # Home team defending (away team on offense)
+            initial_hct_positions = {
+                "PG": {"x": 44, "y": 25},   # Deep Key (flipped)
+                "SG": {"x": 44, "y": 35},   # Deep Upper Wing (flipped)
+                "SF": {"x": 44, "y": 15},   # Deep Lower Wing (flipped)
+                "PF": {"x": 50, "y": 25},   # Half-court line
+                "C": {"x": 55, "y": 25}     # Slightly forward of half-court
+            }
+        else:
+            # Away team defending (home team on offense)
+            initial_hct_positions = {
+                "PG": {"x": 57, "y": 25},   # Deep Key
+                "SG": {"x": 57, "y": 35},   # Deep Upper Wing
+                "SF": {"x": 57, "y": 15},   # Deep Lower Wing
+                "PF": {"x": 64, "y": 25},   # Key
+                "C": {"x": 80, "y": 25}     # Mid Lane
+            }
         
         # Build offensive player positions by step
         offensive_positions_by_step = {}
