@@ -55,13 +55,19 @@ class Player:
         }
 
     def record_stat(self, stat, amount=1):
+        # Debug: Print stat recording info
+        print(f"🎯 RECORD_STAT DEBUG: {self.get_name()} recording {stat} (amount={amount})")
+        print(f"🎯 RECORD_STAT DEBUG: player_id={id(self)}, player object: {self}")
+        
         self.stats["game"][stat] += amount
         if stat in {"FGM", "3PTM", "FTM"}:
             s = self.stats["game"]
             s["PTS"] = (2 * s["FGM"]) + s["3PTM"] + s["FTM"]
+            print(f"🎯 RECORD_STAT DEBUG: Updated PTS to {s['PTS']} for {self.get_name()}")
         elif stat in {"OREB", "DREB"}:
             s = self.stats["game"]
             s["REB"] = s["OREB"] + s["DREB"]
+            print(f"🎯 RECORD_STAT DEBUG: Updated REB to {s['REB']} for {self.get_name()}")
 
     def get_fatigue_decay_amount(self):
         nd = self.attributes.get("ND", 50)  # Default to 50 if not set
