@@ -157,6 +157,7 @@ def resolve_offensive_rebound(game, rebounder):
 
         made = shot_score >= off_team.team_attributes["shot_threshold"]
         rebounder.record_stat("FGA")
+        print(f"📦 PUTBACK FGA: Recorded FGA for {get_name_safe(rebounder)}")
 
         event = {
             "event_type": "PUTBACK_ATTEMPT",
@@ -168,6 +169,7 @@ def resolve_offensive_rebound(game, rebounder):
 
         if made:
             apply_scoring(game, off_team, rebounder, 2, ["FGM"])
+            print(f"📦 PUTBACK FGM: Recorded FGM for {get_name_safe(rebounder)}")
             event["points"] = 2
             event["possession_flips"] = True
         else:
