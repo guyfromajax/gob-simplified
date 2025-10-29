@@ -104,25 +104,23 @@ function animateJumpBall(scene, playerSprites, animations, ballSprite, onComplet
         const jumpPixels = gridToPixels(jumpCoords.x, jumpCoords.y, canvasWidth, canvasHeight);
         const startPixels = gridToPixels(startCoords.x, startCoords.y, canvasWidth, canvasHeight);
         
-        // Player jumps up then returns
+        // Player jumps up and stays at peak (no coming down)
         const tween = scene.tweens.add({
             targets: playerSprite,
             x: jumpPixels.x,
             y: jumpPixels.y,
             duration: JUMP_DURATION / 2,
             ease: 'Quad.easeOut',
-            yoyo: true,
             onComplete: () => {
-                // Return to start position
-                playerSprite.x = startPixels.x;
-                playerSprite.y = startPixels.y;
+                // Stay at peak position
+                console.log(`🏀 Center ${anim.playerId} stays at peak`);
             }
         });
         
         jumpTweens.push(tween);
     });
     
-    // Ball jumps even higher
+    // Ball jumps up and stays at peak (no coming down)
     const ballStartCoords = { x: 50, y: 25 }; // Center court
     const ballJumpCoords = { x: 50, y: 25 + BALL_JUMP_HEIGHT };
     
@@ -135,10 +133,9 @@ function animateJumpBall(scene, playerSprites, animations, ballSprite, onComplet
         y: ballJumpPixels.y,
         duration: JUMP_DURATION / 2,
         ease: 'Quad.easeOut',
-        yoyo: true,
         onComplete: () => {
-            ballSprite.x = ballStartPixels.x;
-            ballSprite.y = ballStartPixels.y;
+            // Stay at peak position
+            console.log("🏀 Ball stays at peak");
             
             // Wait a moment, then continue
             scene.time.delayedCall(100, () => {
