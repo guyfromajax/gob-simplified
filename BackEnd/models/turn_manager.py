@@ -784,6 +784,9 @@ class TurnManager:
             passer_pos = None
             ball_owner_by_step = []
             ball_handler_coords_by_step = []
+
+            print("Inside derive_roles_from_steps")
+            print(f"steps: {steps}")
             
             # Track ball ownership through all steps (needed for frontend animation)
             current_owner_pos = None
