@@ -1144,8 +1144,8 @@ class TurnManager:
             def_team.strategy_settings = def_team._init_strategy_settings()
         
         # Get strategy settings
-        hct_value = def_team.strategy_settings.get("half_court_trap", 0)
-        fcp_value = def_team.strategy_settings.get("full_court_press", 0)
+        hct_value = def_team.strategy_settings.get("hc_trap", 0)
+        fcp_value = def_team.strategy_settings.get("fc_press", 0)
         
         print(f"🛡️ DEFENSIVE PRESSURE: {def_team.name} - HCT={hct_value}, FCP={fcp_value}")
         
