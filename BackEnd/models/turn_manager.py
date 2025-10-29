@@ -748,7 +748,7 @@ class TurnManager:
             entry = deltas.setdefault(player.player_id, {"team": team.name, "stats": {}})
             entry["stats"]["PTS"] = entry["stats"].get("PTS", 0) + diff
 
-    def assign_roles(self, off_call="INSIDE", def_call="MAN"):
+    def assign_roles(self, off_call="INSIDE", def_call="MAN", skeleton=None):
         game = self.game
         game_state = game.game_state
         off_team = game.offense_team
@@ -879,27 +879,42 @@ class TurnManager:
                 "ball_handler_coords_by_step": ball_handler_coords_by_step
             }
         
-        playcall_scenes_map = {
-            "Inside": INSIDE_SCENES,
-            "Outside": OUTSIDE_SCENES,
-            "Attack": ATTACK_SCENES,
-            "Set": SET_PLAY_SCENES,
-            "Freelance": FREELANCE_SCENES,
-            "Base": BASE_SCENES
-        }
-        
-        scenes_list = playcall_scenes_map.get(off_call, INSIDE_SCENES)
-        scene = random.choice(scenes_list)
-        # print(f"🎬 assign_roles using '{off_call}' skeleton with {len(scene['steps'])} steps")
-        
-        tempo_to_steps = {"slow": 7, "normal": 5, "fast": 4}
-        requested = tempo_to_steps.get(tempo_call.lower(), len(scene["steps"]))
-
-        # Always include the final shot step
-        if requested >= len(scene["steps"]):
-            steps = scene["steps"]
+        # Use provided skeleton from MongoDB if available, otherwise fall back to old system
+        if skeleton and "steps" in skeleton:
+            # Use the MongoDB skeleton
+            scene_steps = skeleton["steps"]
+            tempo_to_steps = {"slow": 7, "normal": 5, "fast": 4}
+            requested = tempo_to_steps.get(tempo_call.lower(), len(scene_steps))
+            
+            # Always include the final shot step
+            if requested >= len(scene_steps):
+                steps = scene_steps
+            else:
+                steps = scene_steps[:requested - 1] + [scene_steps[-1]]
+            print(f"🎬 assign_roles using MongoDB skeleton '{off_call}' with {len(steps)} steps (from {len(scene_steps)} total)")
         else:
-            steps = scene["steps"][:requested - 1] + [scene["steps"][-1]]
+            # Fallback to old hardcoded skeleton system
+            playcall_scenes_map = {
+                "Inside": INSIDE_SCENES,
+                "Outside": OUTSIDE_SCENES,
+                "Attack": ATTACK_SCENES,
+                "Set": SET_PLAY_SCENES,
+                "Freelance": FREELANCE_SCENES,
+                "Base": BASE_SCENES
+            }
+            
+            scenes_list = playcall_scenes_map.get(off_call, INSIDE_SCENES)
+            scene = random.choice(scenes_list)
+            # print(f"🎬 assign_roles using '{off_call}' skeleton with {len(scene['steps'])} steps")
+            
+            tempo_to_steps = {"slow": 7, "normal": 5, "fast": 4}
+            requested = tempo_to_steps.get(tempo_call.lower(), len(scene["steps"]))
+
+            # Always include the final shot step
+            if requested >= len(scene["steps"]):
+                steps = scene["steps"]
+            else:
+                steps = scene["steps"][:requested - 1] + [scene["steps"][-1]]
 
         # --- Step 2: Initialize outputs
         action_timeline = defaultdict(list)
