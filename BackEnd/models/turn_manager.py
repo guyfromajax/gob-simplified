@@ -1158,31 +1158,37 @@ class TurnManager:
         if hct_value > 0:
             strategies["HCT"] = hct_value
             if hct_value == 4:
-                strategies["HCO"] = 0
+                strategies.pop("HCO", None)  # Remove HCO entirely, don't set to 0
             else:
-                strategies["HCO"] -= hct_value
+                strategies["HCO"] = max(0, strategies["HCO"] - hct_value)
         if fcp_value > 0:
             strategies["FCP"] = fcp_value
             if fcp_value == 4:
-                strategies["HCO"] = 0
+                strategies.pop("HCO", None)  # Remove HCO entirely, don't set to 0
             else:
-                strategies["HCO"] -= fcp_value
+                strategies["HCO"] = max(0, strategies.get("HCO", 8) - fcp_value)
+        
+        # Remove any strategies with value 0 from consideration
+        strategies = {k: v for k, v in strategies.items() if v > 0}
 
         # If only one strategy available, use it
         if len(strategies) == 1:
             selected_strategy = list(strategies.keys())[0]
         else:
-            # Weighted random selection between available strategies
+            # Weighted random selection between all available strategies
             total_value = sum(strategies.values())
             rand = random.randint(1, 100)
             
-            hct_chance = (strategies["HCT"] / total_value) * 100 if "HCT" in strategies else 0
-            fcp_chance = (strategies["FCP"] / total_value) * 100 if "FCP" in strategies else 0
-            
-            if rand <= hct_chance:
-                selected_strategy = "HCT"
+            cumulative = 0
+            for strategy, value in strategies.items():
+                chance = (value / total_value) * 100
+                cumulative += chance
+                if rand <= cumulative:
+                    selected_strategy = strategy
+                    break
             else:
-                selected_strategy = "FCP"
+                # Fallback to last strategy (shouldn't happen, but safety)
+                selected_strategy = list(strategies.keys())[-1]
         
         # Second die roll to determine if the selected strategy actually executes
         strategy_value = strategies[selected_strategy]
