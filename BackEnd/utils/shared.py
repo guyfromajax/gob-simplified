@@ -158,6 +158,7 @@ def resolve_offensive_rebound(game, rebounder):
         made = shot_score >= off_team.team_attributes["shot_threshold"]
         rebounder.record_stat("FGA")
         print(f"📦 PUTBACK FGA: Recorded FGA for {get_name_safe(rebounder)}")
+        print(f"📦 PUTBACK DEBUG: shot_score={shot_score}, threshold={off_team.team_attributes['shot_threshold']}, made={made}")
 
         event = {
             "event_type": "PUTBACK_ATTEMPT",
@@ -611,8 +612,9 @@ def get_away_player_coords(playerCoords):
 
         ySpot = playerCoords["y"]    
         coordsX = playerCoords["x"]
-        baseValue = coordsX - 50  # Fixed: center of court is x=50, not x=51
-        xSpot = coordsX - (baseValue * 2)  # Simplified formula: flip around center
+        # Flip around center: if x=30 (home side), flip to x=70 (away side)
+        # Formula: new_x = 100 - old_x
+        xSpot = 100 - coordsX
         playerCoords = {"x": xSpot, "y": ySpot}
 
         return playerCoords
@@ -621,8 +623,9 @@ def getAwayTeamCoords(coordsDict):
        for position, coords in coordsDict.items():
            ySpot = coords["y"]
            coordsX = coords["x"]
-           baseValue = coordsX - 50  # Fixed: center of court is x=50, not x=51
-           xSpot = coordsX - (baseValue * 2)  # Simplified formula: flip around center
+           # Flip around center: if x=30 (home side), flip to x=70 (away side)
+           # Formula: new_x = 100 - old_x
+           xSpot = 100 - coordsX
            coordsDict[position] = {"x": xSpot, "y": ySpot}
        return coordsDict
 
