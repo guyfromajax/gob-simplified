@@ -82,10 +82,16 @@ def execute_opening_tip(game):
     game.defense_team = defense_team
     game.game_state["offensive_state"] = "HCO"
     
-    # Determine ball landing spot (at the peak of center jump - around center court)
-    # Ball bounces at the peak of both centers jumping up
-    ball_spot_x = 50  # Center court
-    ball_spot_y = 25  # Peak height (same as center jumpCoords y)
+    # Determine ball landing spot (more pronounced bounce toward winning team)
+    # Home team wins: ball goes left (-7 to -10 x spots)
+    # Away team wins: ball goes right (+7 to +10 x spots)
+    # Y range: -6 to +6 spots from center
+    ball_spot_y = 25 + random.randint(-6, 6)  # Peak height with variation
+    
+    if home_wins:
+        ball_spot_x = 50 + random.randint(-10, -7)  # Home wins -> ball bounces left
+    else:
+        ball_spot_x = 50 + random.randint(7, 10)   # Away wins -> ball bounces right
     
     ball_landing_coords = {"x": ball_spot_x, "y": ball_spot_y}
     print(f"🏀 Opening tip ball landing at: x={ball_spot_x}, y={ball_spot_y} ({'home' if home_wins else 'away'} wins)")
