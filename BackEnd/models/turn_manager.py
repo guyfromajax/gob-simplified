@@ -1155,17 +1155,22 @@ class TurnManager:
         
         # Remove any strategy with value 0 from consideration
         strategies = {"HCO": 8}
+        hco_removed = False
+        
         if hct_value > 0:
             strategies["HCT"] = hct_value
             if hct_value == 4:
                 strategies.pop("HCO", None)  # Remove HCO entirely, don't set to 0
-            else:
+                hco_removed = True
+            elif not hco_removed:
                 strategies["HCO"] = max(0, strategies["HCO"] - hct_value)
+        
         if fcp_value > 0:
             strategies["FCP"] = fcp_value
             if fcp_value == 4:
                 strategies.pop("HCO", None)  # Remove HCO entirely, don't set to 0
-            else:
+                hco_removed = True
+            elif not hco_removed:
                 strategies["HCO"] = max(0, strategies.get("HCO", 8) - fcp_value)
         
         # Remove any strategies with value 0 from consideration
@@ -1190,16 +1195,8 @@ class TurnManager:
                 # Fallback to last strategy (shouldn't happen, but safety)
                 selected_strategy = list(strategies.keys())[-1]
         
-        # Second die roll to determine if the selected strategy actually executes
-        strategy_value = strategies[selected_strategy]
-        execution_roll = random.randint(1, 4)
-        
-        if strategy_value >= execution_roll:
-            # print(f"✅ Executing {selected_strategy} (value: {strategy_value}, roll: {execution_roll})")
-            return selected_strategy
-        else:
-            # print(f"❌ {selected_strategy} skipped (value: {strategy_value}, roll: {execution_roll}) -> HCO")
-            return "HCO"
+        # Return the selected strategy (no execution roll - weighted selection is the final decision)
+        return selected_strategy
     
     def _print_turn_summary(self, result, offensive_state):
         """Print a clean summary of the turn for debugging."""
