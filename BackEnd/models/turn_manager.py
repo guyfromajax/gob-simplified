@@ -1147,6 +1147,8 @@ class TurnManager:
         hct_value = def_team.strategy_settings.get("half_court_trap", 0)
         fcp_value = def_team.strategy_settings.get("full_court_press", 0)
         
+        print(f"🛡️ DEFENSIVE PRESSURE: {def_team.name} - HCT={hct_value}, FCP={fcp_value}")
+        
         # print(f"🛡️ Defense pressure check - {def_team.name}: HCT={hct_value}, FCP={fcp_value}")
         
         # If both are 0, default to HCO
@@ -1196,6 +1198,7 @@ class TurnManager:
                 selected_strategy = list(strategies.keys())[-1]
         
         # Return the selected strategy (no execution roll - weighted selection is the final decision)
+        print(f"🛡️ DEFENSIVE PRESSURE RESULT: Selected {selected_strategy} (strategies={strategies})")
         return selected_strategy
     
     def _print_turn_summary(self, result, offensive_state):
