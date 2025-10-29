@@ -792,10 +792,11 @@ class Animator:
                 
                 # Apply away team coordinate flipping if needed
                 is_away_offense = self.game.offense_team.team_id == self.game.away_team.team_id
-                if is_away_offense:
-                    original_coords = coords.copy()
-                    coords = get_away_player_coords(coords)
-                    print(f"🔄 HCT COORD FLIP: {position} {original_coords} -> {coords} (away_offense={is_away_offense})")
+                # REMOVED: Frontend handles coordinate flipping, backend should not flip
+                # if is_away_offense:
+                #     original_coords = coords.copy()
+                #     coords = get_away_player_coords(coords)
+                #     print(f"🔄 HCT COORD FLIP: {position} {original_coords} -> {coords} (away_offense={is_away_offense})")
                 
                 action = pos_action.get("action", "drift")
                 
