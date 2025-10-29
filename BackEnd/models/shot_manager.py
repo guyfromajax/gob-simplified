@@ -60,7 +60,9 @@ class ShotManager:
             pos_actions = step.get("pos_actions", {})
             shooter_action = pos_actions.get(shooter_pos)
             if shooter_action and shooter_action.get("action") == "shoot":
-                spot = shooter_action.get("spot", "").lower()
+                # MongoDB skeletons use "location", old skeletons use "spot"
+                location_key = shooter_action.get("location") or shooter_action.get("spot", "")
+                spot = location_key.lower() if location_key else ""
                 print(f"🎯 THREE_POINT DEBUG: shooter={get_name_safe(shooter)}, spot='{spot}', in_three_point_spots={spot in THREE_POINT_SPOTS}")
                 # Check if spot is a three-point spot (case insensitive)
                 if spot in THREE_POINT_SPOTS:

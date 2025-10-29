@@ -786,7 +786,7 @@ class TurnManager:
             for step in steps:
                 pos_actions = step.get("pos_actions", {})
                 step_owner = None
-                step_coords = None
+                step_coords = {"x": 50, "y": 25}  # Default center court
                 
                 # Find who has ball at this step
                 for pos, action_info in pos_actions.items():
@@ -794,7 +794,9 @@ class TurnManager:
                     
                     if action in ["handle_ball", "receive", "shoot", "pass"]:
                         step_owner = pos
-                        step_coords = HCO_STRING_SPOTS.get(action_info.get("spot", "key"), {"x": 64, "y": 25})
+                        # MongoDB skeletons use "location", old skeletons use "spot"
+                        location_key = action_info.get("location") or action_info.get("spot", "key")
+                        step_coords = HCO_STRING_SPOTS.get(location_key, {"x": 50, "y": 25})
                         
                         if action == "receive":
                             current_owner_pos = pos
@@ -928,7 +930,9 @@ class TurnManager:
             for pos, action_info in pos_actions.items():
                 player = off_lineup[pos]
                 action = action_info["action"]
-                action_timeline[player].append((step["timestamp"], action, action_info.get("spot")))
+                # MongoDB skeletons use "location", old skeletons use "spot"
+                location_key = action_info.get("location") or action_info.get("spot")
+                action_timeline[player].append((step["timestamp"], action, location_key))
 
                 # Count touch if action involves ball
                 if action in [ACTIONS["HANDLE"], ACTIONS["PASS"], ACTIONS["RECEIVE"], ACTIONS["SHOOT"]]:

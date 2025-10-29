@@ -1159,9 +1159,9 @@ def apply_opposite_side_logic(skeleton_data, is_away_offense):
         for position, action_data in step["pos_actions"].items():
             modified_action = action_data.copy()
             
-            # Get the spot coordinates
-            spot = action_data.get("spot", "key")
-            spot_coords = HCO_STRING_SPOTS.get(spot, {"x": 64, "y": 25})
+            # Get the spot coordinates (MongoDB skeletons use "location", old skeletons use "spot")
+            location_key = action_data.get("location") or action_data.get("spot", "key")
+            spot_coords = HCO_STRING_SPOTS.get(location_key, {"x": 64, "y": 25})
             
             # Check if this offensive player should be on opposite side
             if action_data.get("opp", False):
