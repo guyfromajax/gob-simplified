@@ -61,8 +61,10 @@ class ShotManager:
             shooter_action = pos_actions.get(shooter_pos)
             if shooter_action and shooter_action.get("action") == "shoot":
                 spot = shooter_action.get("spot", "")
+                print(f"🎯 THREE_POINT DEBUG: shooter={get_name_safe(shooter)}, spot='{spot}', in_three_point_spots={spot in THREE_POINT_SPOTS}")
                 # Check if spot is a three-point spot
                 if spot in THREE_POINT_SPOTS:
+                    print(f"🎯 THREE_POINT DEBUG: {get_name_safe(shooter)} shooting from 3-point spot: {spot}")
                     return True
                 # Check if shot is from backcourt (other half of court)
                 spot_coords = shooter_action.get("coords")
@@ -102,7 +104,7 @@ class ShotManager:
         # Determine if shot is three-pointer based on shooter's spot
         is_three = self.is_three_point_shot(shooter, roles)
         # Debug: print shooter spot and three-point determination
-        # print(f"Shot determination: is_three={is_three}, shooter={get_name_safe(shooter)}")
+        print(f"🎯 THREE_POINT DEBUG: is_three={is_three}, shooter={get_name_safe(shooter)}")
         
         shot_threshold = off_team.team_attributes["shot_threshold"]
         if is_three:
