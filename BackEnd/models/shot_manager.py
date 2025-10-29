@@ -157,6 +157,7 @@ class ShotManager:
             else:
                 # Check for defensive pressure opportunity (FCP/HCT)
                 pressure_type = self.game.turn_manager.determine_defensive_pressure_type()
+                print(f"🏀 MADE SHOT: Setting offensive_state to {pressure_type} (defense team: {self.game.defense_team.name})")
                 self.game_state["offensive_state"] = pressure_type
                 # Store pressure type for animator to use
                 result["next_defensive_setup"] = pressure_type
