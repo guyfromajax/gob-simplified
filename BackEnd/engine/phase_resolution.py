@@ -549,6 +549,10 @@ def resolve_half_court_offense_logic(game):
     off_call = game_state["current_playcall"]
     def_call = game_state["defense_playcall"]
     roles = game.turn_manager.assign_roles(off_call, def_call)
+    
+    # Debug: Print roles from assign_roles
+    print(f"🎭 HCO ROLES: shooter={get_name_safe(roles.get('shooter'))}, shooter_pos={get_player_position(off_lineup, roles.get('shooter'))}")
+    
     # print("inside resolve_half_court_offense_logic")
     # print("[DEBUG] roles:", roles.keys())
     # print("[DEBUG] event_step:", roles.get("event_step"))
@@ -576,6 +580,7 @@ def resolve_half_court_offense_logic(game):
             return resolve_non_shooting_foul(roles, game)
 
     # 3. Shot Result
+    print(f"🎯 HCO BEFORE SHOT: shooter={get_name_safe(roles.get('shooter'))}, shooter_pos={get_player_position(off_lineup, roles.get('shooter'))}")
     shot_result = game.shot_manager.resolve_shot(roles)
     
     # Add playcall to the text
