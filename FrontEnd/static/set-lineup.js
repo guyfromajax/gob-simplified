@@ -248,41 +248,60 @@ function autosetLineup() {
     // Randomly pick one from top candidates
     if (topCandidates.length > 0) {
       const randomIndex = Math.floor(Math.random() * topCandidates.length);
-      const { player, rating } = topCandidates[randomIndex];
+      const { player } = topCandidates[randomIndex];
       
       // Assign to lineup
       lineup[pos] = player._id;
       assignedPlayers.add(player._id);
-      
-      // Update UI
-      const slot = document.querySelector(`.slot[data-pos="${pos}"]`);
-      if (slot) {
-        slot.textContent = `${player.name} — ${rating}`;
-        const remove = document.createElement('button');
-        remove.className = 'remove';
-        remove.textContent = '✕';
-        remove.addEventListener('click', () => clearSlot(slot));
-        slot.appendChild(remove);
-        slot.classList.add('filled');
-      }
     }
   });
   
+  // Update all slot displays with correct position ratings
+  updateAllSlotDisplays();
   updatePlayButton();
   showToast('Lineup auto-generated!');
+}
+
+function updateSlotDisplay(slot) {
+  const pos = slot.dataset.pos;
+  const playerId = lineup[pos];
+  const remove = slot.querySelector('.remove');
+  
+  if (playerId && playerMap[playerId]) {
+    const player = playerMap[playerId];
+    const rating = player.position_ratings?.[pos] ?? '--';
+    slot.textContent = `${player.name} — ${rating}`;
+    if (!remove) {
+      const newRemove = document.createElement('button');
+      newRemove.className = 'remove';
+      newRemove.textContent = '✕';
+      newRemove.addEventListener('click', () => clearSlot(slot));
+      slot.appendChild(newRemove);
+    } else {
+      remove.hidden = false;
+    }
+    slot.classList.add('filled');
+    slot.draggable = true;
+  } else {
+    slot.textContent = pos;
+    if (remove) {
+      remove.hidden = true;
+    }
+    slot.classList.remove('filled');
+    slot.draggable = false;
+  }
+}
+
+function updateAllSlotDisplays() {
+  document.querySelectorAll('.slot').forEach(slot => {
+    updateSlotDisplay(slot);
+  });
 }
 
 function clearSlot(slot) {
   const pos = slot.dataset.pos;
   delete lineup[pos];
-  slot.textContent = pos;
-  const remove = document.createElement('button');
-  remove.className = 'remove';
-  remove.textContent = '✕';
-  remove.hidden = true;
-  slot.appendChild(remove);
-  slot.classList.remove('filled');
-  remove.addEventListener('click', () => clearSlot(slot));
+  updateSlotDisplay(slot);
   updatePlayButton();
   
   // Re-render views to update selection state
@@ -296,31 +315,81 @@ function clearSlot(slot) {
 function setupSlots() {
   document.querySelectorAll('.slot').forEach(slot => {
     clearSlot(slot);
-    slot.addEventListener('dragover', e => e.preventDefault());
+    
+    // Make slots draggable when filled
+    slot.addEventListener('dragstart', e => {
+      const pos = slot.dataset.pos;
+      const playerId = lineup[pos];
+      if (playerId) {
+        e.dataTransfer.setData('text/plain', playerId);
+        e.dataTransfer.setData('application/x-slot-pos', pos);
+        e.dataTransfer.effectAllowed = 'move';
+      } else {
+        e.preventDefault();
+      }
+    });
+    
+    slot.addEventListener('dragover', e => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+    });
+    
     slot.addEventListener('drop', e => {
       e.preventDefault();
-      const playerId = e.dataTransfer.getData('text/plain');
-      const pos = slot.dataset.pos;
-      if (lineup[pos]) {
-        showToast('Slot already filled');
-        return;
+      const draggedPlayerId = e.dataTransfer.getData('text/plain');
+      const draggedFromPos = e.dataTransfer.getData('application/x-slot-pos');
+      const dropPos = slot.dataset.pos;
+      
+      if (!draggedPlayerId) return;
+      
+      const draggedPlayer = playerMap[draggedPlayerId];
+      if (!draggedPlayer) return;
+      
+      // Check if dropping on same slot
+      if (draggedFromPos === dropPos) return;
+      
+      // Handle swap: if target slot has a player, swap them
+      if (lineup[dropPos]) {
+        const existingPlayerId = lineup[dropPos];
+        
+        // Swap players
+        if (draggedFromPos) {
+          // Dragging from one slot to another slot (swap)
+          lineup[draggedFromPos] = existingPlayerId;
+          lineup[dropPos] = draggedPlayerId;
+        } else {
+          // Dragging from roster to filled slot - replace the player
+          // Find where the existing player should go (if anywhere)
+          // For now, just replace (or could clear the existing player)
+          lineup[dropPos] = draggedPlayerId;
+          delete lineup[draggedFromPos]; // If dragging from roster, this does nothing
+        }
+      } else {
+        // Target slot is empty
+        if (draggedFromPos) {
+          // Moving from one slot to empty slot
+          delete lineup[draggedFromPos];
+          lineup[dropPos] = draggedPlayerId;
+        } else {
+          // Adding from roster to empty slot
+          if (Object.values(lineup).includes(draggedPlayerId)) {
+            showToast('Player already used');
+            return;
+          }
+          lineup[dropPos] = draggedPlayerId;
+        }
       }
-      if (Object.values(lineup).includes(playerId)) {
-        showToast('Player already used');
-        return;
-      }
-      const player = playerMap[playerId];
-      if (!player) return;
-      const rating = player.position_ratings?.[pos] ?? '--';
-      slot.textContent = `${player.name} — ${rating}`;
-      const remove = document.createElement('button');
-      remove.className = 'remove';
-      remove.textContent = '✕';
-      remove.addEventListener('click', () => clearSlot(slot));
-      slot.appendChild(remove);
-      slot.classList.add('filled');
-      lineup[pos] = playerId;
+      
+      // Update all slot displays with correct position ratings
+      updateAllSlotDisplays();
       updatePlayButton();
+      
+      // Re-render views to update selection state
+      if (currentView === 'player') {
+        renderPlayerView();
+      } else {
+        renderRoster();
+      }
     });
   });
 }
@@ -853,24 +922,8 @@ function assignToSlot(pos, playerId) {
   // Update lineup data
   lineup[pos] = playerId;
   
-  // Update slot UI
-  const slot = document.querySelector(`.slot[data-pos="${pos}"]`);
-  if (slot) {
-    const rating = player.position_ratings?.[pos] ?? '--';
-    slot.textContent = `${player.name} — ${rating}`;
-    
-    const remove = document.createElement('button');
-    remove.className = 'remove';
-    remove.textContent = '✕';
-    remove.hidden = false;
-    remove.addEventListener('click', (e) => {
-      e.stopPropagation();
-      clearSlot(slot);
-    });
-    
-    slot.appendChild(remove);
-    slot.classList.add('filled');
-  }
+  // Update all slot displays to ensure position ratings are shown correctly
+  updateAllSlotDisplays();
   
   updatePlayButton();
   
