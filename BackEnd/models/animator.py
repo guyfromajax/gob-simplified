@@ -798,9 +798,7 @@ class Animator:
                 # Apply away team coordinate flipping if needed (only if not already flipped by apply_opposite_side_logic)
                 is_away_offense = self.game.offense_team.team_id == self.game.away_team.team_id
                 if is_away_offense and not coords_already_flipped:
-                    original_coords = coords.copy()
                     coords = get_away_player_coords(coords)
-                    print(f"🔄 COORD FLIP: {position} {original_coords} -> {coords} (away_offense={is_away_offense}, is_fcp={is_fcp}, is_hct={is_hct})")
                 
                 action = pos_action.get("action", "drift")
                 
