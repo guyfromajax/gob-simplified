@@ -548,7 +548,11 @@ def resolve_half_court_offense_logic(game):
     # 1. Tactical Setup
     off_call = game_state["current_playcall"]
     def_call = game_state["defense_playcall"]
-    roles = game.turn_manager.assign_roles(off_call, def_call)
+    
+    # Get skeleton from MongoDB BEFORE assigning roles, so assign_roles can use the correct skeleton
+    skeleton = get_hco_skeleton(None, game)
+    
+    roles = game.turn_manager.assign_roles(off_call, def_call, skeleton=skeleton)
     
     # Debug: Print roles from assign_roles
     print(f"🎭 HCO ROLES: shooter={get_name_safe(roles.get('shooter'))}, shooter_pos={get_player_position(off_lineup, roles.get('shooter'))}")
