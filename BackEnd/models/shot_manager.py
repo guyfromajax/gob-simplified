@@ -63,21 +63,9 @@ class ShotManager:
                 # MongoDB skeletons use "location", old skeletons use "spot"
                 location_key = shooter_action.get("location") or shooter_action.get("spot", "")
                 spot = location_key.lower() if location_key else ""
-                print(f"🎯 THREE_POINT DEBUG: shooter={get_name_safe(shooter)}, spot='{spot}', in_three_point_spots={spot in THREE_POINT_SPOTS}")
                 # Check if spot is a three-point spot (case insensitive)
                 if spot in THREE_POINT_SPOTS:
-                    print(f"🎯 THREE_POINT DEBUG: {get_name_safe(shooter)} shooting from 3-point spot: {spot}")
                     return True
-                # Check if shot is from backcourt (other half of court)
-                spot_coords = shooter_action.get("coords")
-                if spot_coords:
-                    # Home offense: backcourt is X < 50
-                    # Away offense: backcourt is X > 50
-                    is_home_offense = self.game.offense_team.team_id == self.game.home_team.team_id
-                    if is_home_offense and spot_coords.get("x", 50) < 50:
-                        return True  # Backcourt shot
-                    elif not is_home_offense and spot_coords.get("x", 50) > 50:
-                        return True  # Backcourt shot
                 return False
         
         return False
@@ -105,8 +93,6 @@ class ShotManager:
         
         # Determine if shot is three-pointer based on shooter's spot
         is_three = self.is_three_point_shot(shooter, roles)
-        # Debug: print shooter spot and three-point determination
-        print(f"🎯 THREE_POINT DEBUG: is_three={is_three}, shooter={get_name_safe(shooter)}")
         
         shot_threshold = off_team.team_attributes["shot_threshold"]
         if is_three:
