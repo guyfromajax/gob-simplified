@@ -600,12 +600,13 @@ def get_away_player_coords(playerCoords):
         
         """
         Gets individual player coordinates if the away team has the ball.
+        Flips coordinates around the center of the court (x=50).
         """
 
         ySpot = playerCoords["y"]    
         coordsX = playerCoords["x"]
-        baseValue = coordsX - 51
-        xSpot = coordsX - (1 + (baseValue * 2))   
+        baseValue = coordsX - 50  # Fixed: center of court is x=50, not x=51
+        xSpot = coordsX - (baseValue * 2)  # Simplified formula: flip around center
         playerCoords = {"x": xSpot, "y": ySpot}
 
         return playerCoords
@@ -614,8 +615,8 @@ def getAwayTeamCoords(coordsDict):
        for position, coords in coordsDict.items():
            ySpot = coords["y"]
            coordsX = coords["x"]
-           baseValue = coordsX - 51
-           xSpot = coordsX - (1 + (baseValue * 2))
+           baseValue = coordsX - 50  # Fixed: center of court is x=50, not x=51
+           xSpot = coordsX - (baseValue * 2)  # Simplified formula: flip around center
            coordsDict[position] = {"x": xSpot, "y": ySpot}
        return coordsDict
 
