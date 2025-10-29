@@ -997,7 +997,7 @@ def get_hct_skeleton(result_type, game_context=None):
         "steps": [step for step in selected_scene["steps"] if step["timestamp"] <= end_timestamp]
     }
     
-    # Apply opposite side logic if game context is provided
+    # Apply opposite side logic if game context is provided (same as FCP - HCT also uses opp field)
     if game_context:
         is_away_offense = game_context.offense_team.team_id == game_context.away_team.team_id
         skeleton_data = apply_opposite_side_logic(skeleton_data, is_away_offense)
