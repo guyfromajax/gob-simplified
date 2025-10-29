@@ -82,14 +82,10 @@ def execute_opening_tip(game):
     game.defense_team = defense_team
     game.game_state["offensive_state"] = "HCO"
     
-    # Determine ball landing spot (tighter range around center court)
-    # Home team attacks left (away basket), so ball goes left (x < 50) when home wins
-    # Away team attacks right (home basket), so ball goes right (x > 50) when away wins
-    ball_spot_y = random.randint(20, 30)  # More centered vertically
-    if home_wins:
-        ball_spot_x = random.randint(42, 48)  # Home wins -> ball bounces left (toward home teammates)
-    else:
-        ball_spot_x = random.randint(52, 58)  # Away wins -> ball bounces right (toward away teammates)
+    # Determine ball landing spot (at the peak of center jump - around center court)
+    # Ball bounces at the peak of both centers jumping up
+    ball_spot_x = 50  # Center court
+    ball_spot_y = 25  # Peak height (same as center jumpCoords y)
     
     ball_landing_coords = {"x": ball_spot_x, "y": ball_spot_y}
     print(f"🏀 Opening tip ball landing at: x={ball_spot_x}, y={ball_spot_y} ({'home' if home_wins else 'away'} wins)")
@@ -102,20 +98,26 @@ def execute_opening_tip(game):
         start_coords = OPENING_TIP_POSITIONS["home"][pos].copy()
         
         if pos == "C":
-            # Center jumps up
+            # Center jumps up - ball bounces at peak, no coming down
             animations.append({
                 "playerId": getattr(player, "player_id", str(id(player))),
                 "start": start_coords,
                 "jumpCoords": {"x": start_coords["x"], "y": start_coords["y"] + 4},
-                "end": start_coords,  # Returns to starting position after jump
                 "action": "TIP_JUMP"
             })
         else:
-            # Other players move toward ball spot
+            # Other players move slightly toward ball spot (1-3 spots)
+            if home_wins and is_closest_to_ball(pos, ball_landing_coords, home_lineup, "home"):
+                # Tip winner goes to ball location
+                end_coords = ball_landing_coords
+            else:
+                # Other players move slightly toward ball (1-3 spots)
+                end_coords = get_slight_movement_toward_ball(start_coords, ball_landing_coords)
+            
             animations.append({
                 "playerId": getattr(player, "player_id", str(id(player))),
                 "start": start_coords,
-                "end": ball_landing_coords if home_wins and is_closest_to_ball(pos, ball_landing_coords, home_lineup, "home") else get_nearby_spot(ball_landing_coords),
+                "end": end_coords,
                 "action": "CONVERGE_ON_BALL"
             })
     
@@ -124,20 +126,26 @@ def execute_opening_tip(game):
         start_coords = OPENING_TIP_POSITIONS["away"][pos].copy()
         
         if pos == "C":
-            # Center jumps up
+            # Center jumps up - ball bounces at peak, no coming down
             animations.append({
                 "playerId": getattr(player, "player_id", str(id(player))),
                 "start": start_coords,
                 "jumpCoords": {"x": start_coords["x"], "y": start_coords["y"] + 4},
-                "end": start_coords,  # Returns to starting position after jump
                 "action": "TIP_JUMP"
             })
         else:
-            # Other players move toward ball spot
+            # Other players move slightly toward ball spot (1-3 spots)
+            if not home_wins and is_closest_to_ball(pos, ball_landing_coords, away_lineup, "away"):
+                # Tip winner goes to ball location
+                end_coords = ball_landing_coords
+            else:
+                # Other players move slightly toward ball (1-3 spots)
+                end_coords = get_slight_movement_toward_ball(start_coords, ball_landing_coords)
+            
             animations.append({
                 "playerId": getattr(player, "player_id", str(id(player))),
                 "start": start_coords,
-                "end": ball_landing_coords if not home_wins and is_closest_to_ball(pos, ball_landing_coords, away_lineup, "away") else get_nearby_spot(ball_landing_coords),
+                "end": end_coords,
                 "action": "CONVERGE_ON_BALL"
             })
     
@@ -178,12 +186,29 @@ def is_closest_to_ball(pos, ball_coords, lineup, team):
     
     return pos == closest_pos
 
-def get_nearby_spot(ball_coords):
-    """Get a spot near the ball for players converging"""
-    return {
-        "x": ball_coords["x"] + random.randint(-3, 3),
-        "y": ball_coords["y"] + random.randint(-3, 3)
-    }
+def get_slight_movement_toward_ball(start_coords, ball_coords):
+    """Get a spot 1-3 positions toward the ball from starting position"""
+    # Calculate direction toward ball
+    dx = ball_coords["x"] - start_coords["x"]
+    dy = ball_coords["y"] - start_coords["y"]
+    
+    # Normalize direction (but don't go all the way to ball)
+    distance = (dx**2 + dy**2)**0.5
+    if distance > 0:
+        # Move 1-3 spots toward ball
+        move_distance = random.randint(1, 3)
+        ratio = min(move_distance / distance, 1.0)  # Don't overshoot
+        
+        return {
+            "x": start_coords["x"] + int(dx * ratio),
+            "y": start_coords["y"] + int(dy * ratio)
+        }
+    else:
+        # Already at ball spot, move slightly randomly
+        return {
+            "x": start_coords["x"] + random.randint(-1, 1),
+            "y": start_coords["y"] + random.randint(-1, 1)
+        }
 
 def player_tip_score(player):
     """Legacy function - kept for compatibility"""
