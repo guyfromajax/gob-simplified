@@ -60,9 +60,9 @@ class ShotManager:
             pos_actions = step.get("pos_actions", {})
             shooter_action = pos_actions.get(shooter_pos)
             if shooter_action and shooter_action.get("action") == "shoot":
-                spot = shooter_action.get("spot", "")
+                spot = shooter_action.get("spot", "").lower()
                 print(f"🎯 THREE_POINT DEBUG: shooter={get_name_safe(shooter)}, spot='{spot}', in_three_point_spots={spot in THREE_POINT_SPOTS}")
-                # Check if spot is a three-point spot
+                # Check if spot is a three-point spot (case insensitive)
                 if spot in THREE_POINT_SPOTS:
                     print(f"🎯 THREE_POINT DEBUG: {get_name_safe(shooter)} shooting from 3-point spot: {spot}")
                     return True

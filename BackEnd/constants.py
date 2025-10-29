@@ -28,7 +28,7 @@ THREE_POINT_PROBABILITY = {
     # All others default to 0.0
 }
 
-# Spots that are three-point shots (outside the arc)
+# Spots that are three-point shots (outside the arc) - case insensitive
 THREE_POINT_SPOTS = {
     "key",
     "deep key",
@@ -36,10 +36,10 @@ THREE_POINT_SPOTS = {
     "deep upper wing",
     "lower wing",
     "deep lower wing",
-    "upper midWing",
-    "lower midWing",
-    "lower midCorner",
-    "upper midCorner",
+    "upper midwing",
+    "lower midwing",
+    "lower midcorner",
+    "upper midcorner",
     "upper corner",
     "lower corner",
     "deep upper baseline",
