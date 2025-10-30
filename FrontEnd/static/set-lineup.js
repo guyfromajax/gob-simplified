@@ -1,5 +1,14 @@
 const urlParams = new URLSearchParams(window.location.search);
 console.log('✅ set-lineup.js loaded at', new Date().toISOString());
+// Append cache buster to any dynamic loads if present
+(function(){
+  const s = document.querySelector('script[src*="set-lineup.js"]');
+  if (s && s.src.includes('__BUILD_TS__')) {
+    const now = Date.now().toString();
+    s.src = s.src.replace('__BUILD_TS__', now);
+    console.log('🔄 Updated script src with cache buster', s.src);
+  }
+})();
 const homeTeam = urlParams.get('home');
 const awayTeam = urlParams.get('away');
 const homeId = urlParams.get('home_id');
