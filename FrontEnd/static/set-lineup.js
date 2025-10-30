@@ -348,37 +348,34 @@ function setupSlots() {
       // Check if dropping on same slot
       if (draggedFromPos === dropPos) return;
       
-      // Handle swap: if target slot has a player, swap them
-      if (lineup[dropPos]) {
-        const existingPlayerId = lineup[dropPos];
-        
-        // Swap players
-        if (draggedFromPos) {
-          // Dragging from one slot to another slot (swap)
-          lineup[draggedFromPos] = existingPlayerId;
-          lineup[dropPos] = draggedPlayerId;
-        } else {
-          // Dragging from roster to filled slot - replace the player
-          // Find where the existing player should go (if anywhere)
-          // For now, just replace (or could clear the existing player)
-          lineup[dropPos] = draggedPlayerId;
-          delete lineup[draggedFromPos]; // If dragging from roster, this does nothing
-        }
-      } else {
-        // Target slot is empty
-        if (draggedFromPos) {
-          // Moving from one slot to empty slot
-          delete lineup[draggedFromPos];
-          lineup[dropPos] = draggedPlayerId;
-        } else {
-          // Adding from roster to empty slot
-          if (Object.values(lineup).includes(draggedPlayerId)) {
-            showToast('Player already used');
-            return;
+      // Infer source slot if not provided (e.g., some browsers drop custom data inconsistently)
+      if (!draggedFromPos) {
+        for (const [p, id] of Object.entries(lineup)) {
+          if (id === draggedPlayerId) {
+            draggedFromPos = p;
+            break;
           }
-          lineup[dropPos] = draggedPlayerId;
         }
       }
+      
+      // Ensure uniqueness: remove dragged player from any existing position
+      for (const p of Object.keys(lineup)) {
+        if (lineup[p] === draggedPlayerId) {
+          delete lineup[p];
+        }
+      }
+      
+      const existingAtDrop = lineup[dropPos] || null;
+      
+      if (draggedFromPos && draggedFromPos !== dropPos) {
+        // If target has a player, move them to the source slot (swap)
+        if (existingAtDrop) {
+          lineup[draggedFromPos] = existingAtDrop;
+        }
+      }
+      
+      // Place dragged player into drop slot
+      lineup[dropPos] = draggedPlayerId;
       
       // Update all slot displays with correct position ratings
       updateAllSlotDisplays();
