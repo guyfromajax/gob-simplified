@@ -431,8 +431,8 @@
 
     /* Team Box Score Section (Placeholder) */
     .team-box-score {
-      /* Remove fixed height so we can let it fill from measured top to bottom */
-      /* height: calc(var(--pbp-height) + var(--court-bottom-trim)); */
+      /* Use flex to fill remaining space below player box */
+      flex: 1 1 auto;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -440,11 +440,11 @@
       border-top: 1px solid #444;
       color: #888;
       font-size: 18px;
-      position: absolute;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      /* 'top' will be set dynamically based on player box content height */
+      /* remove absolute positioning to avoid overlap */
+      /* position: absolute; */
+      /* bottom: 0; */
+      /* left: 0; */
+      /* right: 0; */
     }
 
     /* ==================== COURT CONTAINER ==================== */
@@ -1047,19 +1047,6 @@
     console.log('🚨 HTML: Basic JavaScript is working!');
     console.log('🚨 HTML: About to load bootGame.js');
     
-    // Helper: adjust team box score top to start where player box score ends
-    function adjustTeamBoxScoreHeights() {
-      document.querySelectorAll('.player-stats-panel').forEach(panel => {
-        const playerBox = panel.querySelector('.player-box-score');
-        const teamBox = panel.querySelector('.team-box-score');
-        if (!playerBox || !teamBox) return;
-        // Compute the content height of the player box (including padding)
-        const playerHeight = playerBox.getBoundingClientRect().height;
-        // Set team box top relative to panel (panel is position:relative)
-        teamBox.style.top = playerHeight + 'px';
-      });
-    }
-
     // Stats toggle functionality
     function initializeStatsToggle() {
       const statConfigs = {
@@ -1081,16 +1068,12 @@
           
           // Update headers and body visibility
           updateStatsDisplay(team, statType, statConfigs);
-          // After updating table, adjust team box top to meet bottom of player list
-          setTimeout(adjustTeamBoxScoreHeights, 0);
         });
       });
       
       // Initialize default (S1)
       updateStatsDisplay('away', 'S1', statConfigs);
       updateStatsDisplay('home', 'S1', statConfigs);
-      // Ensure initial layout is correct
-      setTimeout(adjustTeamBoxScoreHeights, 0);
     }
     
     function updateStatsDisplay(team, statType) {
