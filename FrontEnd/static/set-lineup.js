@@ -1082,7 +1082,7 @@ function updateAllSlots() {
 }
 
 // D&D on-screen debug overlay
-const DND_DEBUG = true;
+const DND_DEBUG = false;
 function ensureDndOverlay() {
   if (!DND_DEBUG) return null;
   let box = document.getElementById('dnd-overlay');
