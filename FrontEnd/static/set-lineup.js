@@ -282,6 +282,7 @@ function updateSlotDisplay(slot) {
     }
     slot.classList.add('filled');
     slot.draggable = true;
+    slot.setAttribute('draggable', 'true');
   } else {
     slot.textContent = pos;
     if (remove) {
@@ -289,6 +290,7 @@ function updateSlotDisplay(slot) {
     }
     slot.classList.remove('filled');
     slot.draggable = false;
+    slot.setAttribute('draggable', 'false');
   }
 }
 
@@ -315,83 +317,81 @@ function clearSlot(slot) {
 function setupSlots() {
   document.querySelectorAll('.slot').forEach(slot => {
     clearSlot(slot);
-    
-    // Make slots draggable when filled
-    slot.addEventListener('dragstart', e => {
-      const pos = slot.dataset.pos;
-      const playerId = lineup[pos];
-      if (playerId) {
-        console.log('[DND] dragstart', { pos, playerId });
-        e.dataTransfer.setData('text/plain', playerId);
-        e.dataTransfer.setData('application/x-slot-pos', pos);
-        e.dataTransfer.effectAllowed = 'move';
-      } else {
-        e.preventDefault();
-      }
-    });
-    
-    slot.addEventListener('dragover', e => {
+  });
+  
+  const slotsContainer = document.getElementById('slots');
+  if (!slotsContainer) return;
+
+  // Delegated dragstart on container
+  slotsContainer.addEventListener('dragstart', (e) => {
+    const slot = e.target.closest('.slot');
+    if (!slot) return;
+    const pos = slot.dataset.pos;
+    const playerId = lineup[pos];
+    if (playerId) {
+      console.log('[DND] dragstart', { pos, playerId });
+      dndLog('[DND] dragstart', { pos, playerId });
+      e.dataTransfer.setData('text/plain', playerId);
+      e.dataTransfer.setData('application/x-slot-pos', pos);
+      e.dataTransfer.effectAllowed = 'move';
+    } else {
+      e.preventDefault();
+    }
+  });
+
+  // Allow drops on slots
+  slotsContainer.addEventListener('dragover', (e) => {
+    if (e.target.closest('.slot')) {
       e.preventDefault();
       e.dataTransfer.dropEffect = 'move';
-    });
-    
-    slot.addEventListener('drop', e => {
-      e.preventDefault();
-      const draggedPlayerId = e.dataTransfer.getData('text/plain');
-      let draggedFromPos = e.dataTransfer.getData('application/x-slot-pos');
-      const dropPos = slot.dataset.pos;
+    }
+  });
 
-      console.log('[DND] drop start', { draggedPlayerId, draggedFromPos, dropPos, lineup: { ...lineup } });
-      
-      if (!draggedPlayerId) return;
-      
-      const draggedPlayer = playerMap[draggedPlayerId];
-      if (!draggedPlayer) return;
-      
-      // Check if dropping on same slot
-      if (draggedFromPos === dropPos) return;
-      
-      // Infer source slot from current lineup (robust across browsers)
-      let sourcePos = null;
-      for (const [p, id] of Object.entries(lineup)) {
-        if (id === draggedPlayerId) {
-          sourcePos = p;
-          break;
-        }
-      }
-      
-      const existingAtDrop = lineup[dropPos] || null;
-      console.log('[DND] resolved', { draggedFromPos, inferredSourcePos: sourcePos, existingAtDrop });
-      
-      // If dragging from another slot and target has a player, swap them
-      if (sourcePos && existingAtDrop) {
-        lineup[sourcePos] = existingAtDrop;
-      } else if (sourcePos && !existingAtDrop) {
-        // Moving from a filled slot to an empty slot
-        delete lineup[sourcePos];
-      } else if (!sourcePos) {
-        // Dragging from roster: remove any existing occurrence of this player
-        for (const p of Object.keys(lineup)) {
-          if (lineup[p] === draggedPlayerId) delete lineup[p];
-        }
-      }
-      
-      // Place dragged player into drop slot
-      lineup[dropPos] = draggedPlayerId;
+  slotsContainer.addEventListener('drop', (e) => {
+    const slot = e.target.closest('.slot');
+    if (!slot) return;
+    e.preventDefault();
 
-      console.log('[DND] drop end', { lineup: { ...lineup } });
-      
-      // Update all slot displays with correct position ratings
-      updateAllSlotDisplays();
-      updatePlayButton();
-      
-      // Re-render views to update selection state
-      if (currentView === 'player') {
-        renderPlayerView();
-      } else {
-        renderRoster();
+    const draggedPlayerId = e.dataTransfer.getData('text/plain');
+    const dropPos = slot.dataset.pos;
+    console.log('[DND] drop start', { draggedPlayerId, dropPos, lineup: { ...lineup } });
+    dndLog('[DND] drop start', { draggedPlayerId, dropPos, lineup: { ...lineup } });
+    if (!draggedPlayerId) return;
+
+    // Infer source slot from lineup
+    let sourcePos = null;
+    for (const [p, id] of Object.entries(lineup)) {
+      if (id === draggedPlayerId) { sourcePos = p; break; }
+    }
+
+    const existingAtDrop = lineup[dropPos] || null;
+    console.log('[DND] resolved', { sourcePos, existingAtDrop });
+    dndLog('[DND] resolved', { sourcePos, existingAtDrop });
+
+    // Swap/move logic
+    if (sourcePos && existingAtDrop) {
+      lineup[sourcePos] = existingAtDrop;
+    } else if (sourcePos && !existingAtDrop) {
+      delete lineup[sourcePos];
+    } else if (!sourcePos) {
+      // Ensure uniqueness if dragged from roster
+      for (const p of Object.keys(lineup)) {
+        if (lineup[p] === draggedPlayerId) delete lineup[p];
       }
-    });
+    }
+
+    lineup[dropPos] = draggedPlayerId;
+    console.log('[DND] drop end', { lineup: { ...lineup } });
+    dndLog('[DND] drop end', { lineup: { ...lineup } });
+
+    updateAllSlotDisplays();
+    updatePlayButton();
+
+    if (currentView === 'player') {
+      renderPlayerView();
+    } else {
+      renderRoster();
+    }
   });
 }
 
@@ -1068,6 +1068,55 @@ function updateAllSlots() {
   updatePlayButton();
   if (currentView === 'player') renderPlayerView();
   if (currentView === 'grid') renderRoster();
+}
+
+// D&D on-screen debug overlay
+const DND_DEBUG = true;
+function ensureDndOverlay() {
+  if (!DND_DEBUG) return null;
+  let box = document.getElementById('dnd-overlay');
+  if (!box) {
+    box = document.createElement('div');
+    box.id = 'dnd-overlay';
+    box.style.position = 'fixed';
+    box.style.right = '8px';
+    box.style.bottom = '8px';
+    box.style.width = '360px';
+    box.style.maxHeight = '40vh';
+    box.style.overflowY = 'auto';
+    box.style.background = 'rgba(0,0,0,0.75)';
+    box.style.color = '#fff';
+    box.style.font = '12px/1.4 Inter, system-ui, sans-serif';
+    box.style.padding = '8px';
+    box.style.borderRadius = '6px';
+    box.style.zIndex = '99999';
+    box.style.boxShadow = '0 2px 10px rgba(0,0,0,0.4)';
+    const title = document.createElement('div');
+    title.textContent = 'D&D Debug';
+    title.style.fontWeight = '700';
+    title.style.marginBottom = '6px';
+    box.appendChild(title);
+    const list = document.createElement('div');
+    list.id = 'dnd-overlay-list';
+    box.appendChild(list);
+    document.body.appendChild(box);
+  }
+  return box;
+}
+function dndLog(label, data) {
+  if (!DND_DEBUG) return;
+  const box = ensureDndOverlay();
+  if (!box) return;
+  const list = document.getElementById('dnd-overlay-list');
+  if (!list) return;
+  const row = document.createElement('div');
+  row.style.whiteSpace = 'pre-wrap';
+  row.style.margin = '2px 0';
+  const payload = data ? ` ${JSON.stringify(data)}` : '';
+  row.textContent = `${label}:${payload}`;
+  list.appendChild(row);
+  // Keep last 20 entries
+  while (list.childNodes.length > 20) list.removeChild(list.firstChild);
 }
 
 document.addEventListener('DOMContentLoaded', () => {
