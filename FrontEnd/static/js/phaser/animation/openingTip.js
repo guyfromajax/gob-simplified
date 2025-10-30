@@ -24,10 +24,10 @@ const BALL_JUMP_HEIGHT = 5; // Ball jumps higher than players
 export function runOpeningTipSequence(scene, { playerSprites, ballSprite, turnData, onComplete }) {
     console.log("🏀 Running opening tip sequence:", turnData);
     
-    // Display the text
-    if (turnData.text) {
-        appendToTextScroll(turnData.text);
-    }
+    // Removed pre-animation text append to avoid duplicate message
+    // if (turnData.text) {
+    //     appendToTextScroll(turnData.text);
+    // }
     
     const animations = turnData.animations || [];
     const ballLandingCoords = turnData.ball_landing_coords || { x: 50, y: 25 };
