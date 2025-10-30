@@ -982,6 +982,20 @@ function setupSlotDragAndDrop() {
   const slots = document.querySelectorAll('.slot');
   
   slots.forEach(slot => {
+    const pos = slot.dataset.pos;
+    // Ensure draggable state reflects whether slot is filled
+    const filled = !!lineup[pos];
+    slot.draggable = filled;
+    slot.setAttribute('draggable', filled ? 'true' : 'false');
+
+    // Provide drag data when dragging a filled slot
+    slot.addEventListener('dragstart', (e) => {
+      const playerId = lineup[pos];
+      if (!playerId) { e.preventDefault(); return; }
+      e.dataTransfer.setData('text/plain', playerId);
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    
     slot.addEventListener('dragover', (e) => {
       e.preventDefault();
       slot.classList.add('drag-over');
@@ -996,43 +1010,24 @@ function setupSlotDragAndDrop() {
       slot.classList.remove('drag-over');
       
       const draggedId = e.dataTransfer.getData('text/plain');
-      const targetPos = slot.dataset.pos;
+      const targetPos = pos;
+      if (!draggedId) return;
       
-      // If slot is filled, swap
+      // If slot is filled, swap; else assign
       if (lineup[targetPos]) {
         const currentId = lineup[targetPos];
-        
-        // Find position of dragged player
-        const draggedPos = Object.keys(lineup).find(pos => lineup[pos] === draggedId);
-        
+        const draggedPos = Object.keys(lineup).find(p => lineup[p] === draggedId);
         if (draggedPos) {
-          // Swap
           lineup[draggedPos] = currentId;
           lineup[targetPos] = draggedId;
           updateAllSlots();
         } else {
-          // New assignment
           assignToSlot(targetPos, draggedId);
         }
       } else {
         assignToSlot(targetPos, draggedId);
       }
     });
-    
-    // Make filled slots draggable
-    const observer = new MutationObserver(() => {
-      if (slot.classList.contains('filled')) {
-        slot.draggable = true;
-        slot.addEventListener('dragstart', (e) => {
-          const pos = slot.dataset.pos;
-          e.dataTransfer.setData('text/plain', lineup[pos]);
-        });
-      } else {
-        slot.draggable = false;
-      }
-    });
-    
-    observer.observe(slot, { attributes: true, attributeFilter: ['class'] });
   });
 }
 
@@ -1043,8 +1038,12 @@ function updateAllSlots() {
     
     const playerId = lineup[pos];
     if (playerId && playerMap[playerId]) {
-      slot.textContent = playerMap[playerId].name;
+      const player = playerMap[playerId];
+      const rating = player.position_ratings?.[pos] ?? '--';
+      slot.textContent = `${player.name} — ${rating}`;
       slot.classList.add('filled');
+      slot.draggable = true;
+      slot.setAttribute('draggable', 'true');
       const removeBtn = slot.querySelector('.remove') || document.createElement('button');
       removeBtn.className = 'remove';
       removeBtn.textContent = '✕';
@@ -1060,6 +1059,8 @@ function updateAllSlots() {
     } else {
       slot.textContent = pos;
       slot.classList.remove('filled');
+      slot.draggable = false;
+      slot.setAttribute('draggable', 'false');
       const removeBtn = slot.querySelector('.remove');
       if (removeBtn) removeBtn.hidden = true;
     }
