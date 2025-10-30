@@ -328,7 +328,8 @@
 
     /* Player Box Score Section */
     .player-box-score {
-      flex: 1;
+      /* Previously flex: 1; — stop flex-growing so it fits content height */
+      flex: 0 0 auto;
       overflow-y: auto;
       padding: 12px;
       border-bottom: 1px solid #333;
@@ -430,7 +431,8 @@
 
     /* Team Box Score Section (Placeholder) */
     .team-box-score {
-      height: calc(var(--pbp-height) + var(--court-bottom-trim));
+      /* Remove fixed height so we can let it fill from measured top to bottom */
+      /* height: calc(var(--pbp-height) + var(--court-bottom-trim)); */
       display: flex;
       align-items: center;
       justify-content: center;
@@ -442,6 +444,7 @@
       bottom: 0;
       left: 0;
       right: 0;
+      /* 'top' will be set dynamically based on player box content height */
     }
 
     /* ==================== COURT CONTAINER ==================== */
@@ -1044,6 +1047,19 @@
     console.log('🚨 HTML: Basic JavaScript is working!');
     console.log('🚨 HTML: About to load bootGame.js');
     
+    // Helper: adjust team box score top to start where player box score ends
+    function adjustTeamBoxScoreHeights() {
+      document.querySelectorAll('.player-stats-panel').forEach(panel => {
+        const playerBox = panel.querySelector('.player-box-score');
+        const teamBox = panel.querySelector('.team-box-score');
+        if (!playerBox || !teamBox) return;
+        // Compute the content height of the player box (including padding)
+        const playerHeight = playerBox.getBoundingClientRect().height;
+        // Set team box top relative to panel (panel is position:relative)
+        teamBox.style.top = playerHeight + 'px';
+      });
+    }
+
     // Stats toggle functionality
     function initializeStatsToggle() {
       const statConfigs = {
@@ -1058,19 +1074,23 @@
           const statType = this.dataset.stat;
           const team = this.closest('.player-stats-panel').classList.contains('away') ? 'away' : 'home';
           
-          // Update active button
-          this.closest('.stats-toggle').querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('active'));
+          // Update active state
+          const group = this.parentElement.querySelectorAll('.toggle-btn');
+          group.forEach(b => b.classList.remove('active'));
           this.classList.add('active');
           
-          // Update table headers
-          const headerRow = document.getElementById(`${team}-stats-header`);
-          const config = statConfigs[statType];
-          headerRow.innerHTML = config.headers.map(h => `<th>${h}</th>`).join('');
-          
-          // Update table body (this will be handled by the existing stats update functions)
-          updateStatsDisplay(team, statType);
+          // Update headers and body visibility
+          updateStatsDisplay(team, statType, statConfigs);
+          // After updating table, adjust team box top to meet bottom of player list
+          setTimeout(adjustTeamBoxScoreHeights, 0);
         });
       });
+      
+      // Initialize default (S1)
+      updateStatsDisplay('away', 'S1', statConfigs);
+      updateStatsDisplay('home', 'S1', statConfigs);
+      // Ensure initial layout is correct
+      setTimeout(adjustTeamBoxScoreHeights, 0);
     }
     
     function updateStatsDisplay(team, statType) {
