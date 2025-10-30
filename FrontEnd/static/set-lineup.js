@@ -275,7 +275,7 @@ function updateSlotDisplay(slot) {
       const newRemove = document.createElement('button');
       newRemove.className = 'remove';
       newRemove.textContent = '✕';
-      newRemove.addEventListener('click', () => clearSlot(slot));
+      newRemove.addEventListener('click', (e) => { e.stopPropagation(); clearSlot(slot); });
       slot.appendChild(newRemove);
     } else {
       remove.hidden = false;
@@ -321,6 +321,7 @@ function setupSlots() {
       const pos = slot.dataset.pos;
       const playerId = lineup[pos];
       if (playerId) {
+        console.debug('[DND] dragstart', { pos, playerId });
         e.dataTransfer.setData('text/plain', playerId);
         e.dataTransfer.setData('application/x-slot-pos', pos);
         e.dataTransfer.effectAllowed = 'move';
@@ -337,8 +338,10 @@ function setupSlots() {
     slot.addEventListener('drop', e => {
       e.preventDefault();
       const draggedPlayerId = e.dataTransfer.getData('text/plain');
-      const draggedFromPos = e.dataTransfer.getData('application/x-slot-pos');
+      let draggedFromPos = e.dataTransfer.getData('application/x-slot-pos');
       const dropPos = slot.dataset.pos;
+
+      console.debug('[DND] drop start', { draggedPlayerId, draggedFromPos, dropPos, lineup: { ...lineup } });
       
       if (!draggedPlayerId) return;
       
@@ -348,34 +351,35 @@ function setupSlots() {
       // Check if dropping on same slot
       if (draggedFromPos === dropPos) return;
       
-      // Infer source slot if not provided (e.g., some browsers drop custom data inconsistently)
-      if (!draggedFromPos) {
-        for (const [p, id] of Object.entries(lineup)) {
-          if (id === draggedPlayerId) {
-            draggedFromPos = p;
-            break;
-          }
-        }
-      }
-      
-      // Ensure uniqueness: remove dragged player from any existing position
-      for (const p of Object.keys(lineup)) {
-        if (lineup[p] === draggedPlayerId) {
-          delete lineup[p];
+      // Infer source slot from current lineup (robust across browsers)
+      let sourcePos = null;
+      for (const [p, id] of Object.entries(lineup)) {
+        if (id === draggedPlayerId) {
+          sourcePos = p;
+          break;
         }
       }
       
       const existingAtDrop = lineup[dropPos] || null;
+      console.debug('[DND] resolved', { draggedFromPos, inferredSourcePos: sourcePos, existingAtDrop });
       
-      if (draggedFromPos && draggedFromPos !== dropPos) {
-        // If target has a player, move them to the source slot (swap)
-        if (existingAtDrop) {
-          lineup[draggedFromPos] = existingAtDrop;
+      // If dragging from another slot and target has a player, swap them
+      if (sourcePos && existingAtDrop) {
+        lineup[sourcePos] = existingAtDrop;
+      } else if (sourcePos && !existingAtDrop) {
+        // Moving from a filled slot to an empty slot
+        delete lineup[sourcePos];
+      } else if (!sourcePos) {
+        // Dragging from roster: remove any existing occurrence of this player
+        for (const p of Object.keys(lineup)) {
+          if (lineup[p] === draggedPlayerId) delete lineup[p];
         }
       }
       
       // Place dragged player into drop slot
       lineup[dropPos] = draggedPlayerId;
+
+      console.debug('[DND] drop end', { lineup: { ...lineup } });
       
       // Update all slot displays with correct position ratings
       updateAllSlotDisplays();
