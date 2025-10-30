@@ -321,7 +321,7 @@ function setupSlots() {
       const pos = slot.dataset.pos;
       const playerId = lineup[pos];
       if (playerId) {
-        console.debug('[DND] dragstart', { pos, playerId });
+        console.log('[DND] dragstart', { pos, playerId });
         e.dataTransfer.setData('text/plain', playerId);
         e.dataTransfer.setData('application/x-slot-pos', pos);
         e.dataTransfer.effectAllowed = 'move';
@@ -341,7 +341,7 @@ function setupSlots() {
       let draggedFromPos = e.dataTransfer.getData('application/x-slot-pos');
       const dropPos = slot.dataset.pos;
 
-      console.debug('[DND] drop start', { draggedPlayerId, draggedFromPos, dropPos, lineup: { ...lineup } });
+      console.log('[DND] drop start', { draggedPlayerId, draggedFromPos, dropPos, lineup: { ...lineup } });
       
       if (!draggedPlayerId) return;
       
@@ -361,7 +361,7 @@ function setupSlots() {
       }
       
       const existingAtDrop = lineup[dropPos] || null;
-      console.debug('[DND] resolved', { draggedFromPos, inferredSourcePos: sourcePos, existingAtDrop });
+      console.log('[DND] resolved', { draggedFromPos, inferredSourcePos: sourcePos, existingAtDrop });
       
       // If dragging from another slot and target has a player, swap them
       if (sourcePos && existingAtDrop) {
@@ -379,7 +379,7 @@ function setupSlots() {
       // Place dragged player into drop slot
       lineup[dropPos] = draggedPlayerId;
 
-      console.debug('[DND] drop end', { lineup: { ...lineup } });
+      console.log('[DND] drop end', { lineup: { ...lineup } });
       
       // Update all slot displays with correct position ratings
       updateAllSlotDisplays();
