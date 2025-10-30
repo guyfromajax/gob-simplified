@@ -5,7 +5,7 @@ from BackEnd.models.player import Player
 from BackEnd.constants import PLAYCALLS
 
 class TeamManager:
-    def __init__(self, name: str, is_home_team=False, playcall_settings=None, strategy_settings=None):
+    def __init__(self, name: str, is_home_team=False, playcall_settings=None, strategy_settings=None, team_attributes=None, scouting_data=None):
         self.name = name
         self.is_home_team = is_home_team
         self.players = self._load_roster()
@@ -22,7 +22,12 @@ class TeamManager:
         self.points_by_quarter = [0, 0, 0, 0]
         self.team_fouls = 0
         self.stats = {}
-        self.scouting_data = self._init_scouting_data()
+        
+        # Use provided scouting_data or initialize fresh
+        if scouting_data:
+            self.scouting_data = scouting_data
+        else:
+            self.scouting_data = self._init_scouting_data()
 
         # Use provided settings or fall back to random initialization
         if strategy_settings:
@@ -44,7 +49,30 @@ class TeamManager:
         self.playcall_tracker = {pc: 0 for pc in PLAYCALLS}
         self.defense_playcall_tracker = {"Man": 0, "Zone": 0}
         self.plays = {}  # Track play usage and stats
-        self.team_attributes = self._init_team_attributes()
+        
+        # Use provided team_attributes or fall back to random (which loads from core teams doc if available)
+        if team_attributes:
+            self.team_attributes = team_attributes
+        else:
+            # Try to load from core teams document first, then fall back to random
+            if team_doc:
+                attrs = {}
+                for key in ["shot_threshold", "ft_shot_threshold", "turnover_threshold", "foul_threshold",
+                           "rebound_modifier", "momentum_score", "momentum_delta", "offensive_efficiency",
+                           "offensive_adjust", "o_tendency_reads", "d_tendency_reads", "team_chemistry"]:
+                    if key in team_doc:
+                        attrs[key] = team_doc[key]
+                if attrs:
+                    # Fill in any missing attributes with defaults
+                    default_attrs = self._init_team_attributes()
+                    for key, default_value in default_attrs.items():
+                        if key not in attrs:
+                            attrs[key] = default_value
+                    self.team_attributes = attrs
+                else:
+                    self.team_attributes = self._init_team_attributes()
+            else:
+                self.team_attributes = self._init_team_attributes()
 
     def _load_roster(self):
         _, players = load_roster(self.name)

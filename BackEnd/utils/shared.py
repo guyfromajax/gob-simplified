@@ -404,8 +404,14 @@ def unpack_game_context(game):
         game.defense_team.lineup,
     )
 
-def summarize_game_state(game):
-
+def summarize_game_state(game, exclude_animations=False):
+    """
+    Summarize game state for persistence/API responses.
+    
+    Args:
+        game: GameManager instance
+        exclude_animations: If True, remove animations from turns (for database persistence)
+    """
     
     def _collect_player_ids(obj, acc):
         if isinstance(obj, dict):
@@ -548,6 +554,16 @@ def summarize_game_state(game):
     print(f"🔍 DEBUG: Home team plays: {len(teams_obj[game.home_team.team_id]['plays'])}")
     print(f"🔍 DEBUG: Away team plays: {len(teams_obj[game.away_team.team_id]['plays'])}")
 
+    # Process turns: exclude animations if requested (for database persistence)
+    turns = game.turns
+    if exclude_animations:
+        # Deep copy turns and remove animations from each turn
+        from copy import deepcopy
+        turns = deepcopy(game.turns)
+        for turn in turns:
+            if "animations" in turn:
+                del turn["animations"]
+
     return {
         "final_score": game.score,
         "points_by_quarter": game.game_state["points_by_quarter"],
@@ -557,9 +573,13 @@ def summarize_game_state(game):
             game.home_team.name: game.home_team.scouting_data,
             game.away_team.name: game.away_team.scouting_data,
         },
+        "team_attributes": {
+            game.home_team.name: game.home_team.team_attributes,
+            game.away_team.name: game.away_team.team_attributes,
+        },
         "team_totals": game.team_totals,
         "text_log": game.text_log,
-        "turns": game.turns,
+        "turns": turns,
         "home_team": game.home_team.name,
         "away_team": game.away_team.name,
         "home_team_colors": {
