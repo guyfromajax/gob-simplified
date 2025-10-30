@@ -484,17 +484,30 @@ class TurnManager:
             chosen_playcall = selected_play["name"]
             print(f"🎯 Selected play: {chosen_playcall} (type={chosen_play_type}, focus={chosen_focus})")
         
+        # Record playcall attempt under new buckets
+        try:
+            # Normalize type/focus labels
+            play_type_label = "Motion" if chosen_play_type == "motion" else ("Set" if chosen_play_type == "set_play" else None)
+            focus_label = chosen_focus if chosen_focus in ["inside", "attack", "outside"] else None
+            if play_type_label and focus_label:
+                pc = self.game.offense_team.scouting_data["offense"]["Playcalls"]
+                # Motion/Set overall + focus
+                pc[play_type_label]["overall"]["attempts"] += 1
+                pc[play_type_label][focus_label]["attempts"] += 1
+                # Cumulative by focus
+                pc["Cumulative"][focus_label]["attempts"] += 1
+        except Exception:
+            pass
+
+        # Persist play type/focus to game_state for later success attribution
+        self.game.game_state["offense_play_type"] = chosen_play_type
+        self.game.game_state["offense_play_focus"] = chosen_focus
+
         # Defense setting (unchanged)
         defense_setting = self.game.defense_team.strategy_settings["defense"]
         chosen_defense = random.choice(STRATEGY_CALL_DICTS["defense"][defense_setting])
         
-        # Track usage (using play name now instead of PLAYCALL category)
-        if chosen_playcall in self.game.offense_team.playcall_tracker:
-            self.game.offense_team.playcall_tracker[chosen_playcall] += 1
-        else:
-            self.game.offense_team.playcall_tracker[chosen_playcall] = 1
-            
-        self.game.defense_team.defense_playcall_tracker[chosen_defense] += 1
+        # Legacy trackers removed from incrementing to avoid serving old structure
 
         return {
             "offense": chosen_playcall,

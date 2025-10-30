@@ -613,11 +613,28 @@ def resolve_half_court_offense_logic(game):
         if skeleton_animations:
             shot_result["animations"] = skeleton_animations
 
-    # 4. scouting report update
-    if shot_result["result_type"] == "MAKE":
-        off_team.scouting_data["offense"]["Playcalls"][off_call]["success"] += 1
-    elif shot_result["result_type"] in ["MISS", "TURNOVER"]:
-        def_team.scouting_data["defense"][def_call]["success"] += 1
+    # 4. scouting report update (new buckets)
+    try:
+        play_type = game.game_state.get("offense_play_type")  # 'motion' or 'set_play'
+        focus = game.game_state.get("offense_play_focus")     # 'inside' | 'attack' | 'outside'
+        type_label = "Motion" if play_type == "motion" else ("Set" if play_type == "set_play" else None)
+        if type_label and focus in ["inside", "attack", "outside"]:
+            pc = off_team.scouting_data["offense"]["Playcalls"]
+            rt = shot_result.get("result_type")
+            foul_team = game.game_state.get("foul_team")
+            # Offense success conditions
+            offense_success = (rt == "MAKE") or (rt == "FOUL" and foul_team == "DEFENSE")
+            # Defense success conditions
+            offense_failure = (rt == "MISS" and not (foul_team == "DEFENSE")) or (rt == "TURNOVER") or (rt == "O_FOUL")
+            if offense_success:
+                pc[type_label]["overall"]["success"] += 1
+                pc[type_label][focus]["success"] += 1
+                pc["Cumulative"][focus]["success"] += 1
+            elif offense_failure:
+                # We don't increment offense success; defensive success can be tracked separately if needed
+                pass
+    except Exception:
+        pass
 
     return shot_result
 

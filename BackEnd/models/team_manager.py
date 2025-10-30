@@ -117,11 +117,31 @@ class TeamManager:
             print(f"⚠️ Could not load play names for scouting data: {e}")
             play_names = PLAYCALLS  # Fallback to constants
         
+        # New playcall tracking structure
         return {
             "offense": {
                 "Fast_Break_Entries": 0,
                 "Fast_Break_Success": 0,
-                "Playcalls": {pc: {"used": 0, "success": 0} for pc in play_names}
+                # Motion / Set buckets and cumulative (attempts/success)
+                "Playcalls": {
+                    "Motion": {
+                        "overall": {"attempts": 0, "success": 0},
+                        "inside": {"attempts": 0, "success": 0},
+                        "attack": {"attempts": 0, "success": 0},
+                        "outside": {"attempts": 0, "success": 0},
+                    },
+                    "Set": {
+                        "overall": {"attempts": 0, "success": 0},
+                        "inside": {"attempts": 0, "success": 0},
+                        "attack": {"attempts": 0, "success": 0},
+                        "outside": {"attempts": 0, "success": 0},
+                    },
+                    "Cumulative": {
+                        "inside": {"attempts": 0, "success": 0},
+                        "attack": {"attempts": 0, "success": 0},
+                        "outside": {"attempts": 0, "success": 0},
+                    }
+                }
             },
             "defense": {
                 "Man": {"used": 0, "success": 0},
