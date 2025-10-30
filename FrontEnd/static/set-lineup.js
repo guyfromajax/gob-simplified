@@ -1,4 +1,5 @@
 const urlParams = new URLSearchParams(window.location.search);
+console.log('✅ set-lineup.js loaded at', new Date().toISOString());
 const homeTeam = urlParams.get('home');
 const awayTeam = urlParams.get('away');
 const homeId = urlParams.get('home_id');
