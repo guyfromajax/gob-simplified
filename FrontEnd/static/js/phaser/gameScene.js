@@ -470,6 +470,25 @@ export function createGameScene(Phaser) {
 
       hydrateBoxScore();
 
+      // Populate Team Box Score tabs (S1: playcall stats, S2: team attributes)
+      if (typeof window.setTeamBoxData === 'function' && simData.scouting && simData.team_attributes) {
+        const homeScouting = simData.scouting[homeTeam] || {};
+        const awayScouting = simData.scouting[awayTeam] || {};
+        const homeAttrs = simData.team_attributes[homeTeam] || {};
+        const awayAttrs = simData.team_attributes[awayTeam] || {};
+        
+        window.setTeamBoxData({
+          home: {
+            offense: homeScouting.offense || {},
+            attributes: homeAttrs
+          },
+          away: {
+            offense: awayScouting.offense || {},
+            attributes: awayAttrs
+          }
+        });
+      }
+
       if (this.animate) {
         // Count existing sprites in the scene BEFORE creating new ones
         const existingContainers = this.children.list.filter(child => 

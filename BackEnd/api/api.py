@@ -83,9 +83,124 @@ class QuarterSimulationRequest(BaseModel):
     # Starting possession control for quarters after Q1
     start_with_inbound: bool | None = None
     starting_possession: str | None = None  # "home" or "away"
+    # Mode context for tournament/franchise games
+    mode: str | None = None  # "single", "tournament", or "franchise"
+    tournament_id: str | None = None
+    franchise_id: str | None = None
 
 
 ongoing_games: dict[str, GameManager] = {}
+
+# Helper functions for tournament/franchise mode
+def load_team_attributes_from_doc(mode: str, doc_id: str, team_id: str, team_name: str):
+    """Load team_attributes from tournament/franchise doc, fallback to core teams doc."""
+    from BackEnd.db import franchises_collection
+    
+    attrs = None
+    
+    if mode == "tournament":
+        try:
+            doc = tournaments_collection.find_one({"_id": ObjectId(doc_id)})
+            if doc:
+                team_obj = doc.get("teams", {}).get(team_id, {})
+                # Extract team_attributes from team_obj (may include other fields)
+                attrs = {}
+                for key in ["shot_threshold", "ft_shot_threshold", "turnover_threshold", "foul_threshold",
+                           "rebound_modifier", "momentum_score", "momentum_delta", "offensive_efficiency",
+                           "offensive_adjust", "o_tendency_reads", "d_tendency_reads", "team_chemistry"]:
+                    if key in team_obj:
+                        attrs[key] = team_obj[key]
+        except Exception as e:
+            print(f"⚠️ Error loading team_attributes from tournament doc: {e}")
+    elif mode == "franchise":
+        try:
+            doc = franchises_collection.find_one({"_id": ObjectId(doc_id)})
+            if doc:
+                team_obj = doc.get("franchise_teams", {}).get(team_id, {})
+                # Extract team_attributes from team_obj
+                attrs = {}
+                for key in ["shot_threshold", "ft_shot_threshold", "turnover_threshold", "foul_threshold",
+                           "rebound_modifier", "momentum_score", "momentum_delta", "offensive_efficiency",
+                           "offensive_adjust", "o_tendency_reads", "d_tendency_reads", "team_chemistry"]:
+                    if key in team_obj:
+                        attrs[key] = team_obj[key]
+        except Exception as e:
+            print(f"⚠️ Error loading team_attributes from franchise doc: {e}")
+    
+    # If no attributes found, try core teams doc as fallback
+    if not attrs:
+        team_doc = teams_collection.find_one({"name": team_name})
+        if team_doc:
+            attrs = {}
+            for key in ["shot_threshold", "ft_shot_threshold", "turnover_threshold", "foul_threshold",
+                       "rebound_modifier", "momentum_score", "momentum_delta", "offensive_efficiency",
+                       "offensive_adjust", "o_tendency_reads", "d_tendency_reads", "team_chemistry"]:
+                if key in team_doc:
+                    attrs[key] = team_doc[key]
+    
+    return attrs if attrs else None
+
+def load_game_from_nested_structure(mode: str, doc_id: str, game_id: str, round_key: str = None, week: int = None):
+    """Load game data from tournament/franchise nested structure."""
+    from BackEnd.db import franchises_collection
+    
+    game_data = None
+    
+    if mode == "tournament":
+        try:
+            doc = tournaments_collection.find_one({"_id": ObjectId(doc_id)})
+            if doc and round_key:
+                games = doc.get("games", {})
+                round_games = games.get(round_key, {})
+                game_data = round_games.get(str(game_id)) or round_games.get(ObjectId(game_id))
+        except Exception as e:
+            print(f"⚠️ Error loading game from tournament doc: {e}")
+    elif mode == "franchise":
+        try:
+            doc = franchises_collection.find_one({"_id": ObjectId(doc_id)})
+            if doc and week is not None:
+                games = doc.get("games", {})
+                week_games = games.get(f"week_{week}", {})
+                game_data = week_games.get(str(game_id)) or week_games.get(ObjectId(game_id))
+        except Exception as e:
+            print(f"⚠️ Error loading game from franchise doc: {e}")
+    
+    return game_data
+
+def save_game_to_nested_structure(mode: str, doc_id: str, game_id: str, game_data: dict, round_key: str = None, week: int = None):
+    """Save game data to tournament/franchise nested structure."""
+    from BackEnd.db import franchises_collection
+    
+    if mode == "tournament":
+        try:
+            if not round_key:
+                raise ValueError("round_key required for tournament mode")
+            
+            update_path = f"games.{round_key}.{game_id}"
+            tournaments_collection.update_one(
+                {"_id": ObjectId(doc_id)},
+                {"$set": {update_path: game_data}},
+                upsert=True
+            )
+            print(f"✅ Saved game {game_id} to tournament.{update_path}")
+        except Exception as e:
+            print(f"❌ Error saving game to tournament doc: {e}")
+            traceback.print_exc()
+    elif mode == "franchise":
+        try:
+            if week is None:
+                raise ValueError("week required for franchise mode")
+            
+            update_path = f"games.week_{week}.{game_id}"
+            franchises_collection.update_one(
+                {"_id": ObjectId(doc_id)},
+                {"$set": {update_path: game_data}},
+                upsert=True
+            )
+            print(f"✅ Saved game {game_id} to franchise.{update_path}")
+        except Exception as e:
+            print(f"❌ Error saving game to franchise doc: {e}")
+            traceback.print_exc()
 
 # 4. Routes
 @app.get("/")
