@@ -207,7 +207,6 @@ def simulate_quarter(
         from BackEnd.utils.opening_tip import execute_opening_tip
         _, _, tip_turn = execute_opening_tip(gm)
         gm.turns.append(tip_turn)
-        gm.text_log.append(tip_turn["text"])
         # Update clock for tip time elapsed
         gm.game_state["time_remaining"] -= tip_turn["time_elapsed"]
         minutes = gm.game_state["time_remaining"] // 60
