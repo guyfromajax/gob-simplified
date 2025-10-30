@@ -434,6 +434,7 @@
       /* Use flex to fill remaining space below player box */
       flex: 1 1 auto;
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
       background: #151515;
@@ -446,6 +447,40 @@
       /* left: 0; */
       /* right: 0; */
     }
+
+    .team-stats-header {
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 12px;
+      border-bottom: 1px solid #333;
+    }
+    .team-stats-header h3 {
+      margin: 0;
+      font-size: 18px;
+      color: #bbb;
+    }
+    .team-stats-toggle { display: flex; gap: 6px; }
+    .team-toggle-btn {
+      background: #333;
+      color: #aaa;
+      border: 1px solid #555;
+      padding: 3px 8px;
+      font-size: 12px;
+      cursor: pointer;
+      border-radius: 3px;
+      transition: all 0.2s ease;
+      font-family: 'Bebas Neue', sans-serif;
+    }
+    .team-toggle-btn.active { background: var(--home-vibrant-color); color: #fff; border-color: var(--home-vibrant-color); }
+    .player-stats-panel.away .team-toggle-btn.active { background: var(--away-vibrant-color); border-color: var(--away-vibrant-color); }
+    .team-stats-content { width: 100%; padding: 8px 12px; overflow-y: auto; }
+    .team-tab { display: none; }
+    .team-tab.active { display: block; }
+    .team-stats-table, .team-attrs-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    .team-stats-table th { text-align: left; color: #aaa; padding: 6px 4px; border-bottom: 1px solid #333; }
+    .team-stats-table td, .team-attrs-table td { padding: 6px 4px; border-bottom: 1px solid #222; }
 
     /* ==================== COURT CONTAINER ==================== */
     #phaser-container {
@@ -985,7 +1020,54 @@
         </table>
       </div>
       <div class="team-box-score">
-        Team Stats
+        <div class="team-stats-header">
+          <h3>Away Team</h3>
+          <div class="team-stats-toggle">
+            <button class="team-toggle-btn active" data-team="away" data-tab="S1">S1</button>
+            <button class="team-toggle-btn" data-team="away" data-tab="S2">S2</button>
+          </div>
+        </div>
+        <div class="team-stats-content" data-team="away">
+          <div class="team-tab team-tab-S1 active">
+            <table class="team-stats-table">
+              <tbody>
+                <tr><th colspan="3">Motion</th></tr>
+                <tr><td>Motion (Overall)</td><td data-key="motion_overall_attempts">0</td><td data-key="motion_overall_rate">0%</td></tr>
+                <tr><td>- Motion Inside</td><td data-key="motion_inside_attempts">0</td><td data-key="motion_inside_rate">0%</td></tr>
+                <tr><td>- Motion Attack</td><td data-key="motion_attack_attempts">0</td><td data-key="motion_attack_rate">0%</td></tr>
+                <tr><td>- Motion Outside</td><td data-key="motion_outside_attempts">0</td><td data-key="motion_outside_rate">0%</td></tr>
+                <tr><th colspan="3">Set</th></tr>
+                <tr><td>Set (Overall)</td><td data-key="set_overall_attempts">0</td><td data-key="set_overall_rate">0%</td></tr>
+                <tr><td>- Set Inside</td><td data-key="set_inside_attempts">0</td><td data-key="set_inside_rate">0%</td></tr>
+                <tr><td>- Set Attack</td><td data-key="set_attack_attempts">0</td><td data-key="set_attack_rate">0%</td></tr>
+                <tr><td>- Set Outside</td><td data-key="set_outside_attempts">0</td><td data-key="set_outside_rate">0%</td></tr>
+                <tr><th colspan="3">Cumulative</th></tr>
+                <tr><td>Cum Inside</td><td data-key="cum_inside_attempts">0</td><td data-key="cum_inside_rate">0%</td></tr>
+                <tr><td>Cum Attack</td><td data-key="cum_attack_attempts">0</td><td data-key="cum_attack_rate">0%</td></tr>
+                <tr><td>Cum Outside</td><td data-key="cum_outside_attempts">0</td><td data-key="cum_outside_rate">0%</td></tr>
+                <tr><th colspan="3">Fast Break</th></tr>
+                <tr><td>Fast Break</td><td data-key="fb_attempts">0</td><td data-key="fb_rate">0%</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="team-tab team-tab-S2">
+            <table class="team-attrs-table">
+              <tbody>
+                <tr><td>D Reads</td><td data-attr="d_tendency_reads">--</td></tr>
+                <tr><td>O Reads</td><td data-attr="o_tendency_reads">--</td></tr>
+                <tr><td>Foul Threshold</td><td data-attr="foul_threshold">--</td></tr>
+                <tr><td>Free Throws</td><td data-attr="ft_shot_threshold">--</td></tr>
+                <tr><td>Shots</td><td data-attr="shot_threshold">--</td></tr>
+                <tr><td>Mo Delta</td><td data-attr="momentum_delta">--</td></tr>
+                <tr><td>Mo Score</td><td data-attr="momentum_score">--</td></tr>
+                <tr><td>O Efficiency</td><td data-attr="offensive_efficiency">--</td></tr>
+                <tr><td>Rebounds</td><td data-attr="rebound_modifier">--</td></tr>
+                <tr><td>Turnovers</td><td data-attr="turnover_threshold">--</td></tr>
+                <tr><td>Chemistry</td><td data-attr="team_chemistry">--</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -1029,7 +1111,54 @@
         </table>
       </div>
       <div class="team-box-score">
-        Team Stats
+        <div class="team-stats-header">
+          <h3>Home Team</h3>
+          <div class="team-stats-toggle">
+            <button class="team-toggle-btn active" data-team="home" data-tab="S1">S1</button>
+            <button class="team-toggle-btn" data-team="home" data-tab="S2">S2</button>
+          </div>
+        </div>
+        <div class="team-stats-content" data-team="home">
+          <div class="team-tab team-tab-S1 active">
+            <table class="team-stats-table">
+              <tbody>
+                <tr><th colspan="3">Motion</th></tr>
+                <tr><td>Motion (Overall)</td><td data-key="motion_overall_attempts">0</td><td data-key="motion_overall_rate">0%</td></tr>
+                <tr><td>- Motion Inside</td><td data-key="motion_inside_attempts">0</td><td data-key="motion_inside_rate">0%</td></tr>
+                <tr><td>- Motion Attack</td><td data-key="motion_attack_attempts">0</td><td data-key="motion_attack_rate">0%</td></tr>
+                <tr><td>- Motion Outside</td><td data-key="motion_outside_attempts">0</td><td data-key="motion_outside_rate">0%</td></tr>
+                <tr><th colspan="3">Set</th></tr>
+                <tr><td>Set (Overall)</td><td data-key="set_overall_attempts">0</td><td data-key="set_overall_rate">0%</td></tr>
+                <tr><td>- Set Inside</td><td data-key="set_inside_attempts">0</td><td data-key="set_inside_rate">0%</td></tr>
+                <tr><td>- Set Attack</td><td data-key="set_attack_attempts">0</td><td data-key="set_attack_rate">0%</td></tr>
+                <tr><td>- Set Outside</td><td data-key="set_outside_attempts">0</td><td data-key="set_outside_rate">0%</td></tr>
+                <tr><th colspan="3">Cumulative</th></tr>
+                <tr><td>Cum Inside</td><td data-key="cum_inside_attempts">0</td><td data-key="cum_inside_rate">0%</td></tr>
+                <tr><td>Cum Attack</td><td data-key="cum_attack_attempts">0</td><td data-key="cum_attack_rate">0%</td></tr>
+                <tr><td>Cum Outside</td><td data-key="cum_outside_attempts">0</td><td data-key="cum_outside_rate">0%</td></tr>
+                <tr><th colspan="3">Fast Break</th></tr>
+                <tr><td>Fast Break</td><td data-key="fb_attempts">0</td><td data-key="fb_rate">0%</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="team-tab team-tab-S2">
+            <table class="team-attrs-table">
+              <tbody>
+                <tr><td>D Reads</td><td data-attr="d_tendency_reads">--</td></tr>
+                <tr><td>O Reads</td><td data-attr="o_tendency_reads">--</td></tr>
+                <tr><td>Foul Threshold</td><td data-attr="foul_threshold">--</td></tr>
+                <tr><td>Free Throws</td><td data-attr="ft_shot_threshold">--</td></tr>
+                <tr><td>Shots</td><td data-attr="shot_threshold">--</td></tr>
+                <tr><td>Mo Delta</td><td data-attr="momentum_delta">--</td></tr>
+                <tr><td>Mo Score</td><td data-attr="momentum_score">--</td></tr>
+                <tr><td>O Efficiency</td><td data-attr="offensive_efficiency">--</td></tr>
+                <tr><td>Rebounds</td><td data-attr="rebound_modifier">--</td></tr>
+                <tr><td>Turnovers</td><td data-attr="turnover_threshold">--</td></tr>
+                <tr><td>Chemistry</td><td data-attr="team_chemistry">--</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -1138,6 +1267,85 @@
     
     // Make functions globally available
     window.updateStatsDisplay = updateStatsDisplay;
+    
+    // Team boxscore tabs and data population
+    function initializeTeamBoxscoreTabs() {
+      document.querySelectorAll('.team-toggle-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+          const team = this.dataset.team;
+          const tab = this.dataset.tab;
+          this.parentElement.querySelectorAll('.team-toggle-btn').forEach(b => b.classList.remove('active'));
+          this.classList.add('active');
+          const content = document.querySelector(`.team-stats-content[data-team="${team}"]`);
+          content.querySelectorAll('.team-tab').forEach(t => t.classList.remove('active'));
+          content.querySelector(`.team-tab-${tab}`).classList.add('active');
+        });
+      });
+    }
+    
+    function rate(success, attempts) {
+      if (!attempts || attempts <= 0) return '0%';
+      return Math.round((success / attempts) * 100) + '%';
+    }
+    
+    window.setTeamBoxData = function({ home, away }) {
+      const apply = (side, data) => {
+        const root = document.querySelector(`.team-stats-content[data-team="${side}"]`);
+        if (!root || !data) return;
+        const pc = (((data || {}).offense || {}).Playcalls) || {};
+        const motion = pc.Motion || { overall:{attempts:0,success:0}, inside:{attempts:0,success:0}, attack:{attempts:0,success:0}, outside:{attempts:0,success:0} };
+        const setb = pc.Set || { overall:{attempts:0,success:0}, inside:{attempts:0,success:0}, attack:{attempts:0,success:0}, outside:{attempts:0,success:0} };
+        const cum = pc.Cumulative || { inside:{attempts:0,success:0}, attack:{attempts:0,success:0}, outside:{attempts:0,success:0} };
+        const fbA = (data.offense && data.offense.Fast_Break_Entries) || 0;
+        const fbS = (data.offense && data.offense.Fast_Break_Success) || 0;
+        const setCell = (key, val) => {
+          const cell = root.querySelector(`[data-key="${key}"]`);
+          if (cell) cell.textContent = val;
+        };
+        setCell('motion_overall_attempts', motion.overall.attempts||0);
+        setCell('motion_inside_attempts', motion.inside.attempts||0);
+        setCell('motion_attack_attempts', motion.attack.attempts||0);
+        setCell('motion_outside_attempts', motion.outside.attempts||0);
+        setCell('set_overall_attempts', setb.overall.attempts||0);
+        setCell('set_inside_attempts', setb.inside.attempts||0);
+        setCell('set_attack_attempts', setb.attack.attempts||0);
+        setCell('set_outside_attempts', setb.outside.attempts||0);
+        setCell('cum_inside_attempts', cum.inside.attempts||0);
+        setCell('cum_attack_attempts', cum.attack.attempts||0);
+        setCell('cum_outside_attempts', cum.outside.attempts||0);
+        setCell('fb_attempts', fbA);
+        setCell('motion_overall_rate', rate(motion.overall.success||0, motion.overall.attempts||0));
+        setCell('motion_inside_rate', rate(motion.inside.success||0, motion.inside.attempts||0));
+        setCell('motion_attack_rate', rate(motion.attack.success||0, motion.attack.attempts||0));
+        setCell('motion_outside_rate', rate(motion.outside.success||0, motion.outside.attempts||0));
+        setCell('set_overall_rate', rate(setb.overall.success||0, setb.overall.attempts||0));
+        setCell('set_inside_rate', rate(setb.inside.success||0, setb.inside.attempts||0));
+        setCell('set_attack_rate', rate(setb.attack.success||0, setb.attack.attempts||0));
+        setCell('set_outside_rate', rate(setb.outside.success||0, setb.outside.attempts||0));
+        setCell('cum_inside_rate', rate(cum.inside.success||0, cum.inside.attempts||0));
+        setCell('cum_attack_rate', rate(cum.attack.success||0, cum.attack.attempts||0));
+        setCell('cum_outside_rate', rate(cum.outside.success||0, cum.outside.attempts||0));
+        setCell('fb_rate', rate(fbS, fbA));
+        const attrs = data.attributes || {};
+        const setAttr = (name, val) => {
+          const cell = root.querySelector(`[data-attr="${name}"]`);
+          if (cell) cell.textContent = val == null ? '--' : String(val);
+        };
+        setAttr('d_tendency_reads', attrs.d_tendency_reads);
+        setAttr('o_tendency_reads', attrs.o_tendency_reads);
+        setAttr('foul_threshold', attrs.foul_threshold);
+        setAttr('ft_shot_threshold', attrs.ft_shot_threshold);
+        setAttr('shot_threshold', attrs.shot_threshold);
+        setAttr('momentum_delta', attrs.momentum_delta);
+        setAttr('momentum_score', attrs.momentum_score);
+        setAttr('offensive_efficiency', attrs.offensive_efficiency);
+        setAttr('rebound_modifier', attrs.rebound_modifier);
+        setAttr('turnover_threshold', attrs.turnover_threshold);
+        setAttr('team_chemistry', attrs.team_chemistry);
+      };
+      apply('home', home);
+      apply('away', away);
+    }
   </script>
   <script type="module">
     // Apply vibrant colors based on teams in URL
@@ -1159,6 +1367,8 @@
     
     // Initialize stats toggle functionality
     initializeStatsToggle();
+    // Initialize team box score tabs
+    initializeTeamBoxscoreTabs();
   </script>
   <script type="module" src="/static/js/phaser/bootGame.js"></script>
   <script>
