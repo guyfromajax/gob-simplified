@@ -362,6 +362,16 @@ class TurnManager:
 
         result["score"] = dict(self.game.score)
 
+        # Include current team stats for frontend updates (from scouting_data)
+        result["team_stats"] = {
+            self.game.home_team.name: {
+                "offense": self.game.home_team.scouting_data.get("offense", {})
+            },
+            self.game.away_team.name: {
+                "offense": self.game.away_team.scouting_data.get("offense", {})
+            }
+        }
+
         # Compute stat deltas for each player
         deltas = {}
         for team in (self.game.home_team, self.game.away_team):

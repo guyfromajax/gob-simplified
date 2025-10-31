@@ -470,44 +470,20 @@ export function createGameScene(Phaser) {
 
       hydrateBoxScore();
 
-      // Initialize Team Box Score with zeros - will update in real-time as turns play
-      // Only set team attributes (S2 tab) since those don't change during the game
+      // Initialize Team Box Score with team attributes (S2 tab) only
+      // Stats will be updated in real-time from turn data via applyTeamStats
       if (typeof window.setTeamBoxData === 'function' && simData.team_attributes) {
         const homeAttrs = simData.team_attributes[homeTeam] || {};
         const awayAttrs = simData.team_attributes[awayTeam] || {};
         
-        // Initialize with zeros for stats, but include team attributes
-        const initEmptyStats = () => ({
-          Playcalls: {
-            Motion: {
-              overall: { attempts: 0, success: 0 },
-              inside: { attempts: 0, success: 0 },
-              attack: { attempts: 0, success: 0 },
-              outside: { attempts: 0, success: 0 }
-            },
-            Set: {
-              overall: { attempts: 0, success: 0 },
-              inside: { attempts: 0, success: 0 },
-              attack: { attempts: 0, success: 0 },
-              outside: { attempts: 0, success: 0 }
-            },
-            Cumulative: {
-              inside: { attempts: 0, success: 0 },
-              attack: { attempts: 0, success: 0 },
-              outside: { attempts: 0, success: 0 }
-            }
-          },
-          Fast_Break_Entries: 0,
-          Fast_Break_Success: 0
-        });
-        
+        // Initialize with empty offense (will be populated from turn data)
         window.setTeamBoxData({
           home: {
-            offense: initEmptyStats(),
+            offense: {},
             attributes: homeAttrs
           },
           away: {
-            offense: initEmptyStats(),
+            offense: {},
             attributes: awayAttrs
           }
         });
@@ -633,149 +609,28 @@ export function createGameScene(Phaser) {
         }
       };
 
-      // Initialize team stats state - always start fresh at 0 for real-time updates
-      const initTeamStats = () => {
-        const initEmpty = () => ({
-          Motion: {
-            overall: { attempts: 0, success: 0 },
-            inside: { attempts: 0, success: 0 },
-            attack: { attempts: 0, success: 0 },
-            outside: { attempts: 0, success: 0 }
-          },
-          Set: {
-            overall: { attempts: 0, success: 0 },
-            inside: { attempts: 0, success: 0 },
-            attack: { attempts: 0, success: 0 },
-            outside: { attempts: 0, success: 0 }
-          },
-          Cumulative: {
-            inside: { attempts: 0, success: 0 },
-            attack: { attempts: 0, success: 0 },
-            outside: { attempts: 0, success: 0 }
-          },
-          Fast_Break_Entries: 0,
-          Fast_Break_Success: 0
-        });
-        
-        // Always start fresh at 0 - stats will update in real-time as turns play
-        return {
-          home: initEmpty(),
-          away: initEmpty()
-        };
-      };
-
-      let teamStats = initTeamStats();
-
       const applyTeamStats = (turn = {}) => {
-        // Determine which team is on offense (possession_team_id matches homeTeamId or awayTeamId)
-        const isHomeTeam = turn.possession_team_id === this.homeTeamId || 
-                          (turn.starting_possession_team_id && turn.starting_possession_team_id === this.homeTeamId);
-        const teamKey = isHomeTeam ? 'home' : 'away';
-        const stats = teamStats[teamKey];
-        
-        if (!stats) {
-          console.warn('⚠️ applyTeamStats: No stats found for teamKey:', teamKey);
-          return; // Safety check
+        // Simple approach: read team stats directly from turn data (like turn.score)
+        if (!turn.team_stats || typeof window.setTeamBoxData !== 'function') {
+          return;
         }
 
-        let shouldUpdate = false;
+        const homeOffense = turn.team_stats[homeTeam]?.offense || {};
+        const awayOffense = turn.team_stats[awayTeam]?.offense || {};
+        const homeAttrs = simData.team_attributes?.[homeTeam] || {};
+        const awayAttrs = simData.team_attributes?.[awayTeam] || {};
 
-        // Handle Fast Break separately (may not have play_type/focus)
-        // Fast Break entries are tracked when fast_break flag is true
-        if (turn.fast_break === true) {
-          stats.Fast_Break_Entries++;
-          shouldUpdate = true;
-          console.log('📊 Fast Break Entry tracked for', teamKey, 'Total:', stats.Fast_Break_Entries);
-        }
-        
-        // Track success if this is a fast break shot result
-        if ((turn.fast_break === true || turn.result_type === "FAST_BREAK") && 
-            (turn.result_type === "MAKE" || turn.is_and_one || 
-             (turn.result_type && turn.result_type.includes("FOUL")))) {
-          stats.Fast_Break_Success++;
-          shouldUpdate = true;
-          console.log('📊 Fast Break Success tracked for', teamKey, 'Total:', stats.Fast_Break_Success);
-        }
-        
-        // Handle playcalls (Motion/Set) if we have play_type and focus
-        // Note: Not all turns have these (only HCO turns do)
-        // Check for valid play_type (not "-" or None) and valid focus
-        if (turn.offensive_play_type && 
-            turn.offensive_play_type !== "-" && 
-            turn.offensive_play_focus &&
-            turn.offensive_play_focus !== "-") {
-          const playType = turn.offensive_play_type.toLowerCase(); // "motion" or "set_play"
-          const focus = turn.offensive_play_focus.toLowerCase(); // "inside", "attack", "outside"
-
-          // Normalize playType: "set_play" -> "set", "motion" -> "motion"
-          const normalizedPlayType = playType === 'set_play' ? 'set' : playType;
-
-          if (normalizedPlayType === 'motion' || normalizedPlayType === 'set') {
-            // Increment attempts
-            stats[normalizedPlayType].overall.attempts++;
-            if (focus && (focus === 'inside' || focus === 'attack' || focus === 'outside')) {
-              stats[normalizedPlayType][focus].attempts++;
-              stats.Cumulative[focus].attempts++;
-            }
-
-            // Determine success: MAKE or any defensive foul = success
-            const isSuccess = turn.result_type === "MAKE" || turn.is_and_one || 
-                             (turn.result_type && turn.result_type.includes("FOUL"));
-
-            if (isSuccess) {
-              stats[normalizedPlayType].overall.success++;
-              if (focus && (focus === 'inside' || focus === 'attack' || focus === 'outside')) {
-                stats[normalizedPlayType][focus].success++;
-                stats.Cumulative[focus].success++;
-              }
-            }
-            
-            shouldUpdate = true;
-            console.log(`📊 ${normalizedPlayType} ${focus} tracked for ${teamKey}: attempts=${stats[normalizedPlayType][focus].attempts}, success=${stats[normalizedPlayType][focus].success}`);
+        // Update UI directly from turn data (like scoreboard updates)
+        window.setTeamBoxData({
+          home: {
+            offense: homeOffense,
+            attributes: homeAttrs
+          },
+          away: {
+            offense: awayOffense,
+            attributes: awayAttrs
           }
-        }
-
-        // Update UI only if stats changed
-        if (shouldUpdate && typeof window.setTeamBoxData === 'function') {
-          const homeAttrs = simData.team_attributes?.[homeTeam] || {};
-          const awayAttrs = simData.team_attributes?.[awayTeam] || {};
-          
-          window.setTeamBoxData({
-            home: {
-              offense: {
-                Playcalls: {
-                  Motion: teamStats.home.Motion,
-                  Set: teamStats.home.Set,
-                  Cumulative: teamStats.home.Cumulative
-                },
-                Fast_Break_Entries: teamStats.home.Fast_Break_Entries,
-                Fast_Break_Success: teamStats.home.Fast_Break_Success
-              },
-              attributes: homeAttrs
-            },
-            away: {
-              offense: {
-                Playcalls: {
-                  Motion: teamStats.away.Motion,
-                  Set: teamStats.away.Set,
-                  Cumulative: teamStats.away.Cumulative
-                },
-                Fast_Break_Entries: teamStats.away.Fast_Break_Entries,
-                Fast_Break_Success: teamStats.away.Fast_Break_Success
-              },
-              attributes: awayAttrs
-            }
-          });
-          console.log('✅ Team stats UI updated');
-        } else if (!shouldUpdate) {
-          // Debug: log when we don't update
-          console.log('⚠️ applyTeamStats: No update needed for turn:', {
-            fast_break: turn.fast_break,
-            offensive_play_type: turn.offensive_play_type,
-            offensive_play_focus: turn.offensive_play_focus,
-            result_type: turn.result_type
-          });
-        }
+        });
       };
 
       const formatTurnText = (turn = {}) => {
