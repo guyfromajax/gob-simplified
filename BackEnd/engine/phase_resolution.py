@@ -618,18 +618,27 @@ def resolve_half_court_offense_logic(game):
         play_type = game.game_state.get("offense_play_type")  # 'motion' or 'set_play'
         focus = game.game_state.get("offense_play_focus")     # 'inside' | 'attack' | 'outside'
         type_label = "Motion" if play_type == "motion" else ("Set" if play_type == "set_play" else None)
+        print(f"type_label: {type_label}")
+        print(f"focus: {focus}")
+        print(f"shot_result, i.e. rt = {shot_result.get('result_type')}")    
         if type_label and focus in ["inside", "attack", "outside"]:
             pc = off_team.scouting_data["offense"]["Playcalls"]
             rt = shot_result.get("result_type")
             foul_team = game.game_state.get("foul_team")
+            print(f"🎯 SUCCESS DEBUG: rt={rt}, foul_team={foul_team}")
             # Offense success conditions
             offense_success = (rt == "MAKE") or (rt == "FOUL" and foul_team == "DEFENSE")
+            print(f"🎯 SUCCESS DEBUG: offense_success={offense_success}, rt=='MAKE'={rt == 'MAKE'}, rt=='FOUL' and foul_team=='DEFENSE'={rt == 'FOUL' and foul_team == 'DEFENSE'}")
             # Defense success conditions
             offense_failure = (rt == "MISS" and not (foul_team == "DEFENSE")) or (rt == "TURNOVER") or (rt == "O_FOUL")
+            print(f"🎯 SUCCESS DEBUG: offense_failure={offense_failure}")
             if offense_success:
+                print(f"🎯 SUCCESS DEBUG: Incrementing success for {type_label}/{focus}")
+                print(f"🎯 SUCCESS DEBUG: Before - overall: {pc[type_label]['overall']['success']}, {focus}: {pc[type_label][focus]['success']}, Cumulative: {pc['Cumulative'][focus]['success']}")
                 pc[type_label]["overall"]["success"] += 1
                 pc[type_label][focus]["success"] += 1
                 pc["Cumulative"][focus]["success"] += 1
+                print(f"🎯 SUCCESS DEBUG: After - overall: {pc[type_label]['overall']['success']}, {focus}: {pc[type_label][focus]['success']}, Cumulative: {pc['Cumulative'][focus]['success']}")
             elif offense_failure:
                 # We don't increment offense success; defensive success can be tracked separately if needed
                 pass
