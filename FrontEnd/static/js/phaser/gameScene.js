@@ -325,7 +325,7 @@ export function createGameScene(Phaser) {
         const image = document.getElementById('tooltip-player-image');
         const energyEl = document.getElementById('tooltip-player-energy');
         const momentumEl = document.getElementById('tooltip-player-momentum');
-        const foulsEl = document.getElementById('tooltip-player-fouls');
+        const emotionEl = document.getElementById('tooltip-player-emotion');
         
         if (!tooltip) return;
         
@@ -338,7 +338,6 @@ export function createGameScene(Phaser) {
         
         // Get current player stats (including current energy)
         const stats = this.playerStats[playerId] || {};
-        const fouls = stats.F || 0;
         
         // Get current energy from playerStats (updated each turn from player_energy)
         const ng = stats.NG ?? 1.0;
@@ -346,6 +345,17 @@ export function createGameScene(Phaser) {
         
         // Get momentum from player attributes
         const momentum = player.attributes?.MO ?? player.MO ?? '--';
+        
+        // Get emotion score (EM) from player attributes
+        const em = player.attributes?.EM ?? player.EM ?? 50;
+        
+        // Determine emoji based on EM score
+        let emoji = '😐'; // Default straight face
+        if (em >= 80) emoji = '😎';        // Sunglasses
+        else if (em >= 60) emoji = '😊';   // Big smile
+        else if (em >= 40) emoji = '😐';   // Straight face
+        else if (em >= 20) emoji = '🙁';   // Frown
+        else emoji = '🤢';                  // Sick green face
         
         // Update tooltip content
         energyEl.textContent = `${ngPercent}%`;
@@ -356,7 +366,7 @@ export function createGameScene(Phaser) {
         else energyEl.classList.add('energy-critical');
         
         momentumEl.textContent = momentum;
-        foulsEl.textContent = fouls;
+        emotionEl.textContent = emoji;
         
         // Position and show tooltip
         updateTooltipPosition(event);
