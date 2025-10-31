@@ -622,9 +622,10 @@ def resolve_half_court_offense_logic(game):
             rt = shot_result.get("result_type")
             foul_team = game.game_state.get("foul_team")
             print(f"🎯 SUCCESS DEBUG: rt={rt}, foul_team={foul_team}")
-            # Offense success conditions
-            offense_success = (rt == "MAKE") or (rt == "FOUL" and foul_team == "DEFENSE")
-            print(f"🎯 SUCCESS DEBUG: offense_success={offense_success}, rt=='MAKE'={rt == 'MAKE'}, rt=='FOUL' and foul_team=='DEFENSE'={rt == 'FOUL' and foul_team == 'DEFENSE'}")
+            # Offense success conditions: made shot OR any defensive foul (shooting or non-shooting)
+            # Note: When defensive foul occurs on a missed shot, rt is still "MISS" but foul_team is "DEFENSE"
+            offense_success = (rt == "MAKE") or (foul_team == "DEFENSE")
+            print(f"🎯 SUCCESS DEBUG: offense_success={offense_success}, rt=='MAKE'={rt == 'MAKE'}, foul_team=='DEFENSE'={foul_team == 'DEFENSE'}")
             # Defense success conditions
             offense_failure = (rt == "MISS" and not (foul_team == "DEFENSE")) or (rt == "TURNOVER") or (rt == "O_FOUL")
             print(f"🎯 SUCCESS DEBUG: offense_failure={offense_failure}")
