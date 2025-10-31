@@ -476,21 +476,17 @@ export function createGameScene(Phaser) {
         const homeAttrs = simData.team_attributes[homeTeam] || {};
         const awayAttrs = simData.team_attributes[awayTeam] || {};
         
-        // Get initial team totals from simData if available
-        const homeTotals = simData.team_totals?.[homeTeam] || {};
-        const awayTotals = simData.team_totals?.[awayTeam] || {};
-        
-        // Initialize with empty offense (will be populated from turn data)
+        // Initialize with empty offense and empty totals (will be populated from turn data in real-time)
         window.setTeamBoxData({
           home: {
             offense: {},
             attributes: homeAttrs,
-            totals: homeTotals
+            totals: {} // Start empty - will update from turn.team_totals in real-time
           },
           away: {
             offense: {},
             attributes: awayAttrs,
-            totals: awayTotals
+            totals: {} // Start empty - will update from turn.team_totals in real-time
           }
         });
       }
@@ -617,12 +613,13 @@ export function createGameScene(Phaser) {
 
       const applyTeamStats = (turn = {}) => {
         // Simple approach: read team stats directly from turn data (like turn.score)
-        if (!turn.team_stats || typeof window.setTeamBoxData !== 'function') {
+        // Update if we have team_stats (S2 tab) or team_totals (S1 tab)
+        if ((!turn.team_stats && !turn.team_totals) || typeof window.setTeamBoxData !== 'function') {
           return;
         }
 
-        const homeOffense = turn.team_stats[homeTeam]?.offense || {};
-        const awayOffense = turn.team_stats[awayTeam]?.offense || {};
+        const homeOffense = turn.team_stats?.[homeTeam]?.offense || {};
+        const awayOffense = turn.team_stats?.[awayTeam]?.offense || {};
         const homeAttrs = simData.team_attributes?.[homeTeam] || {};
         const awayAttrs = simData.team_attributes?.[awayTeam] || {};
         
