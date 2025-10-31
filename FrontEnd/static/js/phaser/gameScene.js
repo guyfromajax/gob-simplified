@@ -470,20 +470,44 @@ export function createGameScene(Phaser) {
 
       hydrateBoxScore();
 
-      // Populate Team Box Score tabs (S1: playcall stats, S2: team attributes)
-      if (typeof window.setTeamBoxData === 'function' && simData.scouting && simData.team_attributes) {
-        const homeScouting = simData.scouting[homeTeam] || {};
-        const awayScouting = simData.scouting[awayTeam] || {};
+      // Initialize Team Box Score with zeros - will update in real-time as turns play
+      // Only set team attributes (S2 tab) since those don't change during the game
+      if (typeof window.setTeamBoxData === 'function' && simData.team_attributes) {
         const homeAttrs = simData.team_attributes[homeTeam] || {};
         const awayAttrs = simData.team_attributes[awayTeam] || {};
         
+        // Initialize with zeros for stats, but include team attributes
+        const initEmptyStats = () => ({
+          Playcalls: {
+            Motion: {
+              overall: { attempts: 0, success: 0 },
+              inside: { attempts: 0, success: 0 },
+              attack: { attempts: 0, success: 0 },
+              outside: { attempts: 0, success: 0 }
+            },
+            Set: {
+              overall: { attempts: 0, success: 0 },
+              inside: { attempts: 0, success: 0 },
+              attack: { attempts: 0, success: 0 },
+              outside: { attempts: 0, success: 0 }
+            },
+            Cumulative: {
+              inside: { attempts: 0, success: 0 },
+              attack: { attempts: 0, success: 0 },
+              outside: { attempts: 0, success: 0 }
+            }
+          },
+          Fast_Break_Entries: 0,
+          Fast_Break_Success: 0
+        });
+        
         window.setTeamBoxData({
           home: {
-            offense: homeScouting.offense || {},
+            offense: initEmptyStats(),
             attributes: homeAttrs
           },
           away: {
-            offense: awayScouting.offense || {},
+            offense: initEmptyStats(),
             attributes: awayAttrs
           }
         });
@@ -609,11 +633,8 @@ export function createGameScene(Phaser) {
         }
       };
 
-      // Initialize team stats state from simData or start fresh
+      // Initialize team stats state - always start fresh at 0 for real-time updates
       const initTeamStats = () => {
-        const homeScouting = simData.scouting?.[homeTeam]?.offense || {};
-        const awayScouting = simData.scouting?.[awayTeam]?.offense || {};
-        
         const initEmpty = () => ({
           Motion: {
             overall: { attempts: 0, success: 0 },
@@ -636,21 +657,10 @@ export function createGameScene(Phaser) {
           Fast_Break_Success: 0
         });
         
+        // Always start fresh at 0 - stats will update in real-time as turns play
         return {
-          home: homeScouting.Playcalls ? {
-            Motion: homeScouting.Playcalls.Motion || initEmpty().Motion,
-            Set: homeScouting.Playcalls.Set || initEmpty().Set,
-            Cumulative: homeScouting.Playcalls.Cumulative || initEmpty().Cumulative,
-            Fast_Break_Entries: homeScouting.Fast_Break_Entries || 0,
-            Fast_Break_Success: homeScouting.Fast_Break_Success || 0
-          } : initEmpty(),
-          away: awayScouting.Playcalls ? {
-            Motion: awayScouting.Playcalls.Motion || initEmpty().Motion,
-            Set: awayScouting.Playcalls.Set || initEmpty().Set,
-            Cumulative: awayScouting.Playcalls.Cumulative || initEmpty().Cumulative,
-            Fast_Break_Entries: awayScouting.Fast_Break_Entries || 0,
-            Fast_Break_Success: awayScouting.Fast_Break_Success || 0
-          } : initEmpty()
+          home: initEmpty(),
+          away: initEmpty()
         };
       };
 
