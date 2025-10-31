@@ -447,32 +447,22 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
             if gm is None:
                 if request.quarter == 1:
                     # Determine which team gets the user's settings
-                    home_playcall = None
                     home_strategy = None
-                    away_playcall = None
                     away_strategy = None
                     
-                    if request.user_team_side == "home" and request.playcall_settings and request.strategy_settings:
-                        home_playcall = request.playcall_settings
+                    if request.user_team_side == "home" and request.strategy_settings:
                         home_strategy = request.strategy_settings
                         # In single game mode, apply defensive strategy to BOTH teams for consistent pressure
                         away_strategy = request.strategy_settings
-                        # print(f"🎮 Applying user's playcall settings to home team ({request.home_team})")
-                        # print(f"🎮 Applying user's strategy settings to BOTH teams for consistent defense")
-                    elif request.user_team_side == "away" and request.playcall_settings and request.strategy_settings:
-                        away_playcall = request.playcall_settings
+                    elif request.user_team_side == "away" and request.strategy_settings:
                         away_strategy = request.strategy_settings
                         # In single game mode, apply defensive strategy to BOTH teams for consistent pressure
                         home_strategy = request.strategy_settings
-                        # print(f"🎮 Applying user's playcall settings to away team ({request.away_team})")
-                        # print(f"🎮 Applying user's strategy settings to BOTH teams for consistent defense")
                     #temp comment
                     gm = GameManager(
                         request.home_team, 
                         request.away_team,
-                        home_playcall_settings=home_playcall,
                         home_strategy_settings=home_strategy,
-                        away_playcall_settings=away_playcall,
                         away_strategy_settings=away_strategy
                     )
                     # Use the game_id from the request if provided, otherwise generate a new one
@@ -497,12 +487,10 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                         # Create team objects with plays for skeleton lookup
                         teams_obj = {
                             gm.home_team.team_id: {
-                                "playcall_settings": getattr(gm.home_team, 'playcall_settings', {}),
                                 "strategy_settings": getattr(gm.home_team, 'strategy_settings', {}),
                                 "plays": populated_plays.copy()
                             },
                             gm.away_team.team_id: {
-                                "playcall_settings": getattr(gm.away_team, 'playcall_settings', {}),
                                 "strategy_settings": getattr(gm.away_team, 'strategy_settings', {}),
                                 "plays": populated_plays.copy()
                             }
@@ -530,32 +518,22 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                     raise HTTPException(status_code=400, detail="Unknown game_id")
     else:
         # Determine which team gets the user's settings
-        home_playcall = None
         home_strategy = None
-        away_playcall = None
         away_strategy = None
         
-        if request.user_team_side == "home" and request.playcall_settings and request.strategy_settings:
-            home_playcall = request.playcall_settings
+        if request.user_team_side == "home" and request.strategy_settings:
             home_strategy = request.strategy_settings
             # In single game mode, apply defensive strategy to BOTH teams for consistent pressure
             away_strategy = request.strategy_settings
-            # print(f"🎮 Applying user's playcall settings to home team ({request.home_team})")
-            # print(f"🎮 Applying user's strategy settings to BOTH teams for consistent defense")
-        elif request.user_team_side == "away" and request.playcall_settings and request.strategy_settings:
-            away_playcall = request.playcall_settings
+        elif request.user_team_side == "away" and request.strategy_settings:
             away_strategy = request.strategy_settings
             # In single game mode, apply defensive strategy to BOTH teams for consistent pressure
             home_strategy = request.strategy_settings
-            # print(f"🎮 Applying user's playcall settings to away team ({request.away_team})")
-            # print(f"🎮 Applying user's strategy settings to BOTH teams for consistent defense")
         
         gm = GameManager(
             request.home_team, 
             request.away_team,
-            home_playcall_settings=home_playcall,
             home_strategy_settings=home_strategy,
-            away_playcall_settings=away_playcall,
             away_strategy_settings=away_strategy
         )
         # Use the game_id from the request if provided, otherwise generate a new one
@@ -582,12 +560,10 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
             # Create team objects with plays for skeleton lookup
             teams_obj = {
                 gm.home_team.team_id: {
-                    "playcall_settings": getattr(gm.home_team, 'playcall_settings', {}),
                     "strategy_settings": getattr(gm.home_team, 'strategy_settings', {}),
                     "plays": populated_plays.copy()
                 },
                 gm.away_team.team_id: {
-                    "playcall_settings": getattr(gm.away_team, 'playcall_settings', {}),
                     "strategy_settings": getattr(gm.away_team, 'strategy_settings', {}),
                     "plays": populated_plays.copy()
                 }

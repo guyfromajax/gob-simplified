@@ -544,12 +544,10 @@ def summarize_game_state(game, exclude_animations=False):
     # Create team objects with plays for skeleton lookup
     teams_obj = {
         game.home_team.team_id: {
-            "playcall_settings": getattr(game.home_team, 'playcall_settings', {}),
             "strategy_settings": getattr(game.home_team, 'strategy_settings', {}),
             "plays": populated_plays.copy()
         },
         game.away_team.team_id: {
-            "playcall_settings": getattr(game.away_team, 'playcall_settings', {}),
             "strategy_settings": getattr(game.away_team, 'strategy_settings', {}),
             "plays": populated_plays.copy()
         }
