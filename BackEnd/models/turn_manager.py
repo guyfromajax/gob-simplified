@@ -365,10 +365,12 @@ class TurnManager:
         # Include current team stats for frontend updates (from scouting_data)
         result["team_stats"] = {
             self.game.home_team.name: {
-                "offense": self.game.home_team.scouting_data.get("offense", {})
+                "offense": self.game.home_team.scouting_data.get("offense", {}),
+                "defense": self.game.home_team.scouting_data.get("defense", {})
             },
             self.game.away_team.name: {
-                "offense": self.game.away_team.scouting_data.get("offense", {})
+                "offense": self.game.away_team.scouting_data.get("offense", {}),
+                "defense": self.game.away_team.scouting_data.get("defense", {})
             }
         }
         # Debug: Verify success values are in the data

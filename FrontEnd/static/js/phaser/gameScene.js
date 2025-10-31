@@ -476,15 +476,17 @@ export function createGameScene(Phaser) {
         const homeAttrs = simData.team_attributes[homeTeam] || {};
         const awayAttrs = simData.team_attributes[awayTeam] || {};
         
-        // Initialize with empty offense and empty totals (will be populated from turn data in real-time)
+        // Initialize with empty offense, defense, and empty totals (will be populated from turn data in real-time)
         window.setTeamBoxData({
           home: {
             offense: {},
+            defense: {},
             attributes: homeAttrs,
             totals: {} // Start empty - will update from turn.team_totals in real-time
           },
           away: {
             offense: {},
+            defense: {},
             attributes: awayAttrs,
             totals: {} // Start empty - will update from turn.team_totals in real-time
           }
@@ -620,6 +622,8 @@ export function createGameScene(Phaser) {
 
         const homeOffense = turn.team_stats?.[homeTeam]?.offense || {};
         const awayOffense = turn.team_stats?.[awayTeam]?.offense || {};
+        const homeDefense = turn.team_stats?.[homeTeam]?.defense || {};
+        const awayDefense = turn.team_stats?.[awayTeam]?.defense || {};
         const homeAttrs = simData.team_attributes?.[homeTeam] || {};
         const awayAttrs = simData.team_attributes?.[awayTeam] || {};
         
@@ -631,11 +635,13 @@ export function createGameScene(Phaser) {
         window.setTeamBoxData({
           home: {
             offense: homeOffense,
+            defense: homeDefense,
             attributes: homeAttrs,
             totals: homeTotals
           },
           away: {
             offense: awayOffense,
+            defense: awayDefense,
             attributes: awayAttrs,
             totals: awayTotals
           }

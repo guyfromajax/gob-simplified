@@ -1066,8 +1066,10 @@
                 <tr><td>Inside</td><td data-key="cum_inside_attempts">0</td><td data-key="cum_inside_rate">0%</td></tr>
                 <tr><td>Attack</td><td data-key="cum_attack_attempts">0</td><td data-key="cum_attack_rate">0%</td></tr>
                 <tr><td>Outside</td><td data-key="cum_outside_attempts">0</td><td data-key="cum_outside_rate">0%</td></tr>
-                <tr><th colspan="3">Fast Break</th></tr>
-                <tr><td>Att / Success Rate</td><td data-key="fb_attempts">0</td><td data-key="fb_rate">0%</td></tr>
+                <tr><th colspan="3">Special Situations</th></tr>
+                <tr><td>Fast Breaks</td><td data-key="fb_attempts">0</td><td data-key="fb_rate">0%</td></tr>
+                <tr><td>HC Traps</td><td data-key="hct_attempts">0</td><td data-key="hct_rate">0%</td></tr>
+                <tr><td>FC Presses</td><td data-key="fcp_attempts">0</td><td data-key="fcp_rate">0%</td></tr>
               </tbody>
             </table>
           </div>
@@ -1178,8 +1180,10 @@
                 <tr><td>Inside</td><td data-key="cum_inside_attempts">0</td><td data-key="cum_inside_rate">0%</td></tr>
                 <tr><td>Attack</td><td data-key="cum_attack_attempts">0</td><td data-key="cum_attack_rate">0%</td></tr>
                 <tr><td>Outside</td><td data-key="cum_outside_attempts">0</td><td data-key="cum_outside_rate">0%</td></tr>
-                <tr><th colspan="3">Fast Break</th></tr>
-                <tr><td>Att / Success Rate</td><td data-key="fb_attempts">0</td><td data-key="fb_rate">0%</td></tr>
+                <tr><th colspan="3">Special Situations</th></tr>
+                <tr><td>Fast Breaks</td><td data-key="fb_attempts">0</td><td data-key="fb_rate">0%</td></tr>
+                <tr><td>HC Traps</td><td data-key="hct_attempts">0</td><td data-key="hct_rate">0%</td></tr>
+                <tr><td>FC Presses</td><td data-key="fcp_attempts">0</td><td data-key="fcp_rate">0%</td></tr>
               </tbody>
             </table>
           </div>
@@ -1435,6 +1439,19 @@
         setCell('cum_attack_rate', rate(cum.attack.success||0, cum.attack.attempts||0));
         setCell('cum_outside_rate', rate(cum.outside.success||0, cum.outside.attempts||0));
         setCell('fb_rate', rate(fbS, fbA));
+        
+        // Special Situations: Fast Breaks (offense), HC Traps (defense), FC Presses (defense)
+        const defense = data.defense || {};
+        const hct = defense.HCT || { used: 0, success: 0 };
+        const fcp = defense.FCP || { used: 0, success: 0 };
+        const hctA = hct.used || 0;
+        const hctS = hct.success || 0;
+        const fcpA = fcp.used || 0;
+        const fcpS = fcp.success || 0;
+        setCell('hct_attempts', hctA);
+        setCell('hct_rate', rate(hctS, hctA));
+        setCell('fcp_attempts', fcpA);
+        setCell('fcp_rate', rate(fcpS, fcpA));
         const attrs = data.attributes || {};
         const setAttr = (name, val) => {
           const cell = root.querySelector(`[data-attr="${name}"]`);
