@@ -626,6 +626,8 @@ def resolve_half_court_offense_logic(game):
             # Note: When defensive foul occurs on a missed shot, rt is still "MISS" but foul_team is "DEFENSE"
             offense_success = (rt == "MAKE") or (foul_team == "DEFENSE")
             print(f"🎯 SUCCESS DEBUG: offense_success={offense_success}, rt=='MAKE'={rt == 'MAKE'}, foul_team=='DEFENSE'={foul_team == 'DEFENSE'}")
+            if rt == "MAKE":
+                print(f"🎯 MADE SHOT SUCCESS: Play type={type_label}, focus={focus} - should increment success")
             # Defense success conditions
             offense_failure = (rt == "MISS" and not (foul_team == "DEFENSE")) or (rt == "TURNOVER") or (rt == "O_FOUL")
             print(f"🎯 SUCCESS DEBUG: offense_failure={offense_failure}")
@@ -639,6 +641,11 @@ def resolve_half_court_offense_logic(game):
             elif offense_failure:
                 # We don't increment offense success; defensive success can be tracked separately if needed
                 pass
+            # Clear foul_team after success tracking to prevent it from affecting subsequent actions (like putbacks)
+            # Note: Only clear if this is the original HCO play, not a putback (putbacks have result_type PUTBACK_MAKE/PUTBACK_MISS)
+            if rt in ["MAKE", "MISS"]:
+                game.game_state["foul_team"] = None
+                print(f"🎯 SUCCESS DEBUG: Cleared foul_team after HCO play (rt={rt})")
         else:
             print(f"🎯 SUCCESS DEBUG: Skipping - type_label={type_label}, focus={focus}")
     except Exception as e:
