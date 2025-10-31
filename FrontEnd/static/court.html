@@ -834,6 +834,76 @@
       cursor: not-allowed;
     }
 
+    /* ==================== PLAYER TOOLTIP ==================== */
+    #player-tooltip {
+      position: fixed;
+      display: none;
+      background: linear-gradient(135deg, #2a2a2a 0%, #1a1a1a 100%);
+      border: 2px solid #ff6200;
+      border-radius: 8px;
+      padding: 12px;
+      z-index: 10001;
+      pointer-events: none;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
+      min-width: 220px;
+    }
+
+    #player-tooltip.visible {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .tooltip-image {
+      width: 60px;
+      height: 60px;
+      border-radius: 6px;
+      object-fit: cover;
+      border: 1px solid #444;
+      background: #333;
+    }
+
+    .tooltip-stats {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      flex: 1;
+    }
+
+    .tooltip-stat-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 14px;
+      font-family: 'Bebas Neue', sans-serif;
+    }
+
+    .tooltip-stat-label {
+      color: #aaa;
+      margin-right: 8px;
+    }
+
+    .tooltip-stat-value {
+      color: #fff;
+      font-weight: bold;
+    }
+
+    .tooltip-stat-value.energy-high {
+      color: #00ff00;
+    }
+
+    .tooltip-stat-value.energy-medium {
+      color: #ffff00;
+    }
+
+    .tooltip-stat-value.energy-low {
+      color: #ff8800;
+    }
+
+    .tooltip-stat-value.energy-critical {
+      color: #ff0000;
+    }
+
     /* ==================== LOCKER ROOM POPUP ==================== */
     .locker-room-popup {
       position: fixed;
@@ -886,6 +956,25 @@
   </style>
 </head>
 <body>
+  <!-- Player Tooltip -->
+  <div id="player-tooltip">
+    <img class="tooltip-image" id="tooltip-player-image" src="" alt="Player" />
+    <div class="tooltip-stats">
+      <div class="tooltip-stat-row">
+        <span class="tooltip-stat-label">Energy:</span>
+        <span class="tooltip-stat-value" id="tooltip-player-energy">--%</span>
+      </div>
+      <div class="tooltip-stat-row">
+        <span class="tooltip-stat-label">Momentum:</span>
+        <span class="tooltip-stat-value" id="tooltip-player-momentum">--</span>
+      </div>
+      <div class="tooltip-stat-row">
+        <span class="tooltip-stat-label">Fouls:</span>
+        <span class="tooltip-stat-value" id="tooltip-player-fouls">0</span>
+      </div>
+    </div>
+  </div>
+
   <!-- ==================== SCOREBOARD TOP BAR ==================== -->
   <div id="scoreboard">
     <!-- Away Logo - Grid column 2 -->
