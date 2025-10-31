@@ -147,7 +147,9 @@ class TeamManager:
             "defense": {
                 "Man": {"used": 0, "success": 0},
                 "Zone": {"used": 0, "success": 0},
-                "vs_Fast_Break": {"used": 0, "success": 0}
+                "vs_Fast_Break": {"used": 0, "success": 0},
+                "FCP": {"used": 0, "success": 0},
+                "HCT": {"used": 0, "success": 0}
             }
         }
 

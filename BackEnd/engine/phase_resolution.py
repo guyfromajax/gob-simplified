@@ -806,6 +806,10 @@ def resolve_full_court_press_logic(game: "GameManager"):
     Returns turn data with FCP result and potential progression to HCO.
     """
     game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
+    
+    # Track FCP attempt (defensive team)
+    def_scouting = def_team.scouting_data
+    def_scouting["defense"]["FCP"]["used"] += 1
 
     text = "PRESS!"
     offenseScore = 0
@@ -929,11 +933,16 @@ def resolve_full_court_press_logic(game: "GameManager"):
         game_state["foul_team"] = "OFFENSE"
         result_type = "FOUL"
         # text = "PRESS! Offensive foul"
+        # Track FCP success: offensive foul = defensive success
+        def_scouting["defense"]["FCP"]["success"] += 1
     elif result_type == "DEAD_BALL_TURNOVER":
         result_type = "DEAD BALL"
         # text = "PRESS! Turnover"
-    # elif result_type == "STEAL":
-    #     text = "PRESS! Steal!"
+        # Track FCP success: turnover = defensive success
+        def_scouting["defense"]["FCP"]["success"] += 1
+    elif result_type == "STEAL":
+        # Track FCP success: steal = defensive success
+        def_scouting["defense"]["FCP"]["success"] += 1
     
     if skeleton and "steps" in skeleton:
         animations = animator.skeleton_to_animations(
@@ -1234,6 +1243,10 @@ def resolve_half_court_trap_logic(game: "GameManager"):
     Returns turn data with HCT result and potential progression to HCO.
     """
     game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
+    
+    # Track HCT attempt (defensive team)
+    def_scouting = def_team.scouting_data
+    def_scouting["defense"]["HCT"]["used"] += 1
 
     # Initialize variables to prevent UnboundLocalError
     shot_result = {}
@@ -1354,8 +1367,15 @@ def resolve_half_court_trap_logic(game: "GameManager"):
     elif result_type == "O_FOUL":
         game_state["foul_team"] = "OFFENSE"
         result_type = "FOUL"
+        # Track HCT success: offensive foul = defensive success
+        def_scouting["defense"]["HCT"]["success"] += 1
     elif result_type == "DEAD_BALL_TURNOVER":
         result_type = "DEAD BALL"
+        # Track HCT success: turnover = defensive success
+        def_scouting["defense"]["HCT"]["success"] += 1
+    elif result_type == "STEAL":
+        # Track HCT success: steal = defensive success
+        def_scouting["defense"]["HCT"]["success"] += 1
     
     if skeleton and "steps" in skeleton:
         animations = animator.skeleton_to_animations(
