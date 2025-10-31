@@ -371,6 +371,13 @@ class TurnManager:
                 "offense": self.game.away_team.scouting_data.get("offense", {})
             }
         }
+        # Debug: Verify success values are in the data
+        home_pc = result["team_stats"][self.game.home_team.name]["offense"].get("Playcalls", {})
+        away_pc = result["team_stats"][self.game.away_team.name]["offense"].get("Playcalls", {})
+        if home_pc.get("Motion"):
+            print(f"📊 FRONTEND DEBUG: Home Motion/Outside - attempts: {home_pc['Motion']['outside']['attempts']}, success: {home_pc['Motion']['outside']['success']}")
+        if away_pc.get("Motion"):
+            print(f"📊 FRONTEND DEBUG: Away Motion/Outside - attempts: {away_pc['Motion']['outside']['attempts']}, success: {away_pc['Motion']['outside']['success']}")
         
         # Include cumulative team stats (from all players) for S1 tab
         # Update team stats before sending
