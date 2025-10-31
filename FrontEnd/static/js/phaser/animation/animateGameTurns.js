@@ -115,13 +115,17 @@ async function handleOrebTurn(scene, { playerSprites, ballSprite, turnData, onUp
       const basket = isHomeOffense ? HOME_RIM_COORDS : AWAY_RIM_COORDS;
       const miss = await bounceFromRim(scene, ballSprite, basket, isHomeOffense, 300);
       
+      // Use backend's ballSpot if provided (ensures DREB animates at correct basket)
+      // Otherwise fall back to frontend's calculated bounce spot
+      const reboundBallSpot = turnData.ballSpot || miss.grid;
+      
       await animateRebound({
         scene,
         ballSprite,
         playerSprites,
         animations: [],
         rebounderId: turnData.rebounderId,
-        ballSpot: miss.grid,
+        ballSpot: reboundBallSpot,
         shooterId: rebounderId
       });
       
