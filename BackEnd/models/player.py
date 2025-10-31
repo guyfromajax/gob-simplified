@@ -55,9 +55,11 @@ class Player:
         }
 
     def record_stat(self, stat, amount=1):
-        # Debug: Print stat recording info
-        print(f"🎯 RECORD_STAT DEBUG: {self.get_name()} recording {stat} (amount={amount})")
-        print(f"🎯 RECORD_STAT DEBUG: player_id={id(self)}, player object: {self}")
+        # Debug: Print stat recording info (only if DEBUG enabled)
+        from BackEnd.constants import DEBUG
+        if DEBUG:
+            print(f"🎯 RECORD_STAT DEBUG: {self.get_name()} recording {stat} (amount={amount})")
+            print(f"🎯 RECORD_STAT DEBUG: player_id={id(self)}, player object: {self}")
         
         self.stats["game"][stat] += amount
         if stat in {"FGM", "3PTM", "FTM"}:

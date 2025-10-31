@@ -1,4 +1,9 @@
 import random
+import os
+
+# Debug flag - set DISABLE_DEBUG=1 environment variable to suppress verbose output
+# Defaults to True (debug enabled) unless DISABLE_DEBUG is set
+DEBUG = os.environ.get("DISABLE_DEBUG", "").lower() not in ["1", "true", "yes"]
 
 ALL_ATTRS = [
     "SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "FT",  # malleable
