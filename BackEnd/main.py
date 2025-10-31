@@ -50,14 +50,29 @@ def _initialize_game_stats(gm: GameManager, game_id: str | None = None) -> None:
     if game_id:
         doc = games_collection.find_one({"_id": game_id})
         if doc and doc.get("game_stats_initialized"):
+            # Build maps for stats and attributes
             stats_map = {
                 p.get("playerId"): p.get("stats", {}) for p in doc.get("players", [])
             }
+            attrs_map = {
+                p.get("playerId"): p.get("attributes", {}) for p in doc.get("players", [])
+            }
             for team in (gm.home_team, gm.away_team):
                 for player in team.get_all_players():
+                    # Restore stats
                     stats = stats_map.get(player.player_id)
                     if stats:
                         player.stats["game"].update(stats)
+                    # Restore EM, CH, MO from saved game
+                    saved_attrs = attrs_map.get(player.player_id)
+                    if saved_attrs:
+                        player.attributes["EM"] = saved_attrs.get("EM", player.attributes.get("EM", 0))
+                        player.attributes["CH"] = saved_attrs.get("CH", player.attributes.get("CH", 0))
+                        player.attributes["MO"] = saved_attrs.get("MO", player.attributes.get("MO", 0))
+                        # Update anchors
+                        player.attributes["anchor_EM"] = player.attributes["EM"]
+                        player.attributes["anchor_CH"] = player.attributes["CH"]
+                        player.attributes["anchor_MO"] = player.attributes["MO"]
             gm.game_state["game_stats_initialized"] = True
             return
 
@@ -65,6 +80,8 @@ def _initialize_game_stats(gm: GameManager, game_id: str | None = None) -> None:
     for team in (gm.home_team, gm.away_team):
         for player in team.get_all_players():
             player.reset_stats()
+            # Randomize EM, CH, MO for new game instance
+            player.attributes = Player.randomize_game_attributes(player.attributes)
             affected.append(player.player_id)
 
     gm.game_state["game_stats_initialized"] = True
@@ -80,6 +97,11 @@ def _initialize_game_stats(gm: GameManager, game_id: str | None = None) -> None:
                         "team_id": team.team_id,
                         "pos": pos,
                         "stats": {k: 0 for k in BOX_SCORE_KEYS},
+                        "attributes": {
+                            "EM": player.attributes.get("EM", 0),
+                            "CH": player.attributes.get("CH", 0),
+                            "MO": player.attributes.get("MO", 0)
+                        }
                     }
                 )
 
