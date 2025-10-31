@@ -336,12 +336,12 @@ export function createGameScene(Phaser) {
           image.src = '/static/images/players/default.png'; // Fallback image
         };
         
-        // Get current player stats
+        // Get current player stats (including current energy)
         const stats = this.playerStats[playerId] || {};
         const fouls = stats.F || 0;
         
-        // Get current energy from player_energy tracking or player object
-        const ng = player.NG ?? player.attributes?.NG ?? 1.0;
+        // Get current energy from playerStats (updated each turn from player_energy)
+        const ng = stats.NG ?? 1.0;
         const ngPercent = Math.round(ng * 100);
         
         // Get momentum from player attributes
@@ -675,6 +675,10 @@ export function createGameScene(Phaser) {
             const ps = this.playerStats[playerId];
             if (ps && ps.cells) {
               const ng = energyData.NG || 1.0;
+              
+              // Store current NG in playerStats for tooltip access
+              ps.NG = ng;
+              
               const color = getEnergyColor(ng);
               
               // Apply color to all cells in the player's row
