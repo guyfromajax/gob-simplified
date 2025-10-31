@@ -10,9 +10,9 @@ import random
 from BackEnd.utils.stat_updater import update_game_stats
 
 class GameManager:
-    def __init__(self, home_team_name, away_team_name, home_playcall_settings=None, home_strategy_settings=None, away_playcall_settings=None, away_strategy_settings=None, home_team_attributes=None, away_team_attributes=None, home_scouting_data=None, away_scouting_data=None):
-        self.home_team = TeamManager(home_team_name, is_home_team=True, playcall_settings=home_playcall_settings, strategy_settings=home_strategy_settings, team_attributes=home_team_attributes, scouting_data=home_scouting_data)
-        self.away_team = TeamManager(away_team_name, is_home_team=False, playcall_settings=away_playcall_settings, strategy_settings=away_strategy_settings, team_attributes=away_team_attributes, scouting_data=away_scouting_data)
+    def __init__(self, home_team_name, away_team_name, home_strategy_settings=None, away_strategy_settings=None, home_team_attributes=None, away_team_attributes=None, home_scouting_data=None, away_scouting_data=None):
+        self.home_team = TeamManager(home_team_name, is_home_team=True, strategy_settings=home_strategy_settings, team_attributes=home_team_attributes, scouting_data=home_scouting_data)
+        self.away_team = TeamManager(away_team_name, is_home_team=False, strategy_settings=away_strategy_settings, team_attributes=away_team_attributes, scouting_data=away_scouting_data)
 
         # Recalculate position ratings for all players (attributes may have changed)
         self._update_position_ratings()

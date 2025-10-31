@@ -1,26 +1,17 @@
 from BackEnd.db import teams_collection
 
-DEFAULT_ATTRS = {
-    "shot_threshold": 200,
-    "ft_shot_threshold": 200,
-    "turnover_threshold": -200,
-    "foul_threshold": 60,
-    "rebound_modifier": 1.0,
-    "momentum_score": 10,
-    "momentum_delta": 2,
-    "offensive_efficiency": 5,
-    "offensive_adjust": 5,
-    "o_tendency_reads": 5,
-    "d_tendency_reads": 5,
-    "team_chemistry": 15
+# Note: Team attributes (shot_threshold, etc.) are now MALLEABLE per game instance
+# They should NOT be stored in the universal teams collection.
+# This script only handles BASE attributes (colors, mascot, etc.)
+
+BASE_ATTRS = {
+    # Only base attributes that don't change per game instance
+    # Colors, mascot, etc. - but NOT malleable attributes like shot_threshold
 }
 
-def backfill_team_attributes():
-    for team in teams_collection.find():
-        updates = {}
-        for attr, default in DEFAULT_ATTRS.items():
-            if attr not in team:
-                updates[attr] = default
-        if updates:
-            teams_collection.update_one({"_id": team["_id"]}, {"$set": updates})
-            print(f"✅ Added missing attributes to team {team['name']}")
+def backfill_base_attributes():
+    """Backfill only BASE team attributes (not malleable game-specific ones)."""
+    # This script is kept for future base attribute backfilling if needed
+    # Malleable attributes (shot_threshold, team_attributes, strategy_settings) 
+    # should be generated per game instance and stored in game mode docs
+    pass
