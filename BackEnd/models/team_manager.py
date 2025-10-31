@@ -5,18 +5,20 @@ from BackEnd.models.player import Player
 from BackEnd.constants import PLAYCALLS
 
 class TeamManager:
-    def __init__(self, name: str, is_home_team=False, playcall_settings=None, strategy_settings=None, team_attributes=None, scouting_data=None):
+    def __init__(self, name: str, is_home_team=False, strategy_settings=None, team_attributes=None, scouting_data=None):
         self.name = name
         self.is_home_team = is_home_team
         self.players = self._load_roster()
         self.lineup = self._load_lineup()
         
+        # Load BASE team data from universal teams collection (name, team_id, colors, mascot)
         team_doc = teams_collection.find_one({"name": name})
         if not team_doc:
             print(f"⚠️ No team document found for team: {name}")
         self.team_id = team_doc.get("team_id") if team_doc else None
         self.primary_color = team_doc.get("primary_color", "#000000") if team_doc else "#000000"
         self.secondary_color = team_doc.get("secondary_color", "#ffffff") if team_doc else "#ffffff"
+        self.mascot = team_doc.get("mascot", "") if team_doc else ""
 
         self.points = 0
         self.points_by_quarter = [0, 0, 0, 0]
@@ -29,50 +31,24 @@ class TeamManager:
         else:
             self.scouting_data = self._init_scouting_data()
 
-        # Use provided settings or fall back to random initialization
+        # Use provided strategy_settings or fall back to random initialization
+        # MALLEABLE: Generated per game instance (not loaded from universal teams collection)
         if strategy_settings:
             self.strategy_settings = strategy_settings
-            # print(f"✅ {name}: Using provided strategy_settings: {strategy_settings}")
         else:
             self.strategy_settings = self._init_strategy_settings()
         
         self.strategy_calls = {}
-        
-        if playcall_settings:
-            self.playcall_settings = playcall_settings
-            # print(f"✅ {name}: Using provided playcall_settings: {playcall_settings}")
-        else:
-            self.playcall_settings = self._init_playcall_settings()
-        
-        self.playcall_weights = self.playcall_settings.copy()
-
         self.playcall_tracker = {pc: 0 for pc in PLAYCALLS}
         self.defense_playcall_tracker = {"Man": 0, "Zone": 0}
         self.plays = {}  # Track play usage and stats
         
-        # Use provided team_attributes or fall back to random (which loads from core teams doc if available)
+        # Use provided team_attributes or generate random values
+        # MALLEABLE: Generated per game instance (not loaded from universal teams collection)
         if team_attributes:
             self.team_attributes = team_attributes
         else:
-            # Try to load from core teams document first, then fall back to random
-            if team_doc:
-                attrs = {}
-                for key in ["shot_threshold", "ft_shot_threshold", "turnover_threshold", "foul_threshold",
-                           "rebound_modifier", "momentum_score", "momentum_delta", "offensive_efficiency",
-                           "offensive_adjust", "o_tendency_reads", "d_tendency_reads", "team_chemistry"]:
-                    if key in team_doc:
-                        attrs[key] = team_doc[key]
-                if attrs:
-                    # Fill in any missing attributes with defaults
-                    default_attrs = self._init_team_attributes()
-                    for key, default_value in default_attrs.items():
-                        if key not in attrs:
-                            attrs[key] = default_value
-                    self.team_attributes = attrs
-                else:
-                    self.team_attributes = self._init_team_attributes()
-            else:
-                self.team_attributes = self._init_team_attributes()
+            self.team_attributes = self._init_team_attributes()
 
     def _load_roster(self):
         _, players = load_roster(self.name)
@@ -114,9 +90,6 @@ class TeamManager:
             "fc_press": random.randint(0, 4),
             "rebounding": random.randint(0, 4)
         }
-
-    def _init_playcall_settings(self):
-        return {pc: random.randint(1, 4) for pc in PLAYCALLS}
 
     def _init_team_attributes(self):
         return {
