@@ -1344,47 +1344,45 @@
           if (cell) cell.textContent = val;
         };
         
-        // S1 Tab: Cumulative Team Stats
+        // S1 Tab: Cumulative Team Stats (always update, even if totals is empty - will show 0)
         const totals = data.totals || {};
-        if (totals.FGM !== undefined) {
-          const fgm = totals.FGM || 0;
-          const fga = totals.FGA || 0;
-          const fg3m = totals['3PTM'] || 0;
-          const fg3a = totals['3PTA'] || 0;
-          const ftm = totals.FTM || 0;
-          const fta = totals.FTA || 0;
-          const oreb = totals.OREB || 0;
-          const dreb = totals.DREB || 0;
-          const reb = totals.REB || 0;
-          const ast = totals.AST || 0;
-          const stl = totals.STL || 0;
-          const blk = totals.BLK || 0;
-          const to = totals.TO || 0;
-          const pip = totals.PIP || 0;
-          const fouls = totals.F || 0;
-          
-          // Calculate percentages
-          const fgPct = fga > 0 ? Math.round((fgm / fga) * 100) : 0;
-          const fg3Pct = fg3a > 0 ? Math.round((fg3m / fg3a) * 100) : 0;
-          const ftPct = fta > 0 ? Math.round((ftm / fta) * 100) : 0;
-          
-          setCell('fg_made_att', `${fgm}-${fga}`);
-          setCell('fg_pct', `${fgPct}%`);
-          setCell('3pt_made_att', `${fg3m}-${fg3a}`);
-          setCell('3pt_pct', `${fg3Pct}%`);
-          setCell('ft_made_att', `${ftm}-${fta}`);
-          setCell('ft_pct', `${ftPct}%`);
-          setCell('reb_total', reb);
-          setCell('oreb_total', oreb);
-          setCell('dreb_total', dreb);
-          setCell('ast_total', ast);
-          setCell('stl_total', stl);
-          setCell('blk_total', blk);
-          setCell('to_total', to);
-          setCell('fb_pts_total', 0); // TODO: Track Fast Break Points
-          setCell('pip_total', pip);
-          setCell('fouls_total', fouls);
-        }
+        const fgm = totals.FGM || 0;
+        const fga = totals.FGA || 0;
+        const fg3m = totals['3PTM'] || 0;
+        const fg3a = totals['3PTA'] || 0;
+        const ftm = totals.FTM || 0;
+        const fta = totals.FTA || 0;
+        const oreb = totals.OREB || 0;
+        const dreb = totals.DREB || 0;
+        const reb = totals.REB || (oreb + dreb); // Calculate if not provided
+        const ast = totals.AST || 0;
+        const stl = totals.STL || 0;
+        const blk = totals.BLK || 0;
+        const to = totals.TO || 0;
+        const pip = totals.PIP || 0;
+        const fouls = totals.F || 0;
+        
+        // Calculate percentages
+        const fgPct = fga > 0 ? Math.round((fgm / fga) * 100) : 0;
+        const fg3Pct = fg3a > 0 ? Math.round((fg3m / fg3a) * 100) : 0;
+        const ftPct = fta > 0 ? Math.round((ftm / fta) * 100) : 0;
+        
+        setCell('fg_made_att', `${fgm}-${fga}`);
+        setCell('fg_pct', `${fgPct}%`);
+        setCell('3pt_made_att', `${fg3m}-${fg3a}`);
+        setCell('3pt_pct', `${fg3Pct}%`);
+        setCell('ft_made_att', `${ftm}-${fta}`);
+        setCell('ft_pct', `${ftPct}%`);
+        setCell('reb_total', reb);
+        setCell('oreb_total', oreb);
+        setCell('dreb_total', dreb);
+        setCell('ast_total', ast);
+        setCell('stl_total', stl);
+        setCell('blk_total', blk);
+        setCell('to_total', to);
+        setCell('fb_pts_total', 0); // TODO: Track Fast Break Points
+        setCell('pip_total', pip);
+        setCell('fouls_total', fouls);
         
         // S2 Tab: Playcall Stats (existing logic)
         const pc = (((data || {}).offense || {}).Playcalls) || {};
