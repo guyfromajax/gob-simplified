@@ -107,11 +107,11 @@ def get_fast_break_chance(game):
 
 def get_time_elapsed(tempo_call):
     if tempo_call == "slow":
-        return int(max(5, min(35, random.gauss(24, 6))))
+        return int(max(5, min(35, random.gauss(28, 6))))
     elif tempo_call == "normal":
-        return int(max(5, min(35, random.gauss(20, 6))))
+        return int(max(5, min(35, random.gauss(22, 6))))
     elif tempo_call == "fast":
-        return int(max(4, min(15, random.gauss(12, 4))))
+        return int(max(4, min(15, random.gauss(16, 4))))
     else:
         return int(max(5, min(35, random.gauss(22, 6))))  # Fallback
 

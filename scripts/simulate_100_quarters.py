@@ -30,8 +30,8 @@ from BackEnd.db import teams_collection
 from BackEnd.models.game_manager import GameManager
 from BackEnd.main import simulate_quarter
 
-def simulate_100_quarters():
-    """Simulate 100 quarters and track turn statistics."""
+def simulate_quarters(num_quarters=20):
+    """Simulate specified number of quarters and track turn statistics."""
     
     # Get two random teams
     all_teams = list(teams_collection.find({}))
@@ -43,15 +43,15 @@ def simulate_100_quarters():
     home_team_name = selected_teams[0]["name"]
     away_team_name = selected_teams[1]["name"]
     
-    print(f"🏀 Simulating 100 quarters with:")
+    print(f"🏀 Simulating {num_quarters} quarters with:")
     print(f"   Home: {home_team_name}")
     print(f"   Away: {away_team_name}")
     print(f"   Starting simulation...\n")
     
     turns_per_quarter = []
     
-    # Simulate 100 quarters
-    for q_num in range(1, 101):
+    # Simulate quarters
+    for q_num in range(1, num_quarters + 1):
         # Create a new game manager for each quarter (fresh state)
         gm = GameManager(home_team_name, away_team_name)
         gm.quarter = 1  # Always simulate as Q1 to get consistent behavior
@@ -62,14 +62,15 @@ def simulate_100_quarters():
         # Simulate the quarter (suppress verbose output)
         try:
             with SuppressOutput():
-                turns = simulate_quarter(gm)
+                simulate_quarter(gm)
             
             # Calculate number of turns in this quarter
-            turns_in_quarter = len(turns) - initial_turns
+            # simulate_quarter modifies gm.turns in place, so check the length after
+            turns_in_quarter = len(gm.turns) - initial_turns
             turns_per_quarter.append(turns_in_quarter)
             
-            if q_num % 10 == 0:
-                print(f"   ✅ Completed {q_num}/100 quarters... (avg turns: {statistics.mean(turns_per_quarter):.1f})")
+            if q_num % 5 == 0 or q_num == num_quarters:
+                print(f"   ✅ Completed {q_num}/{num_quarters} quarters... (avg turns: {statistics.mean(turns_per_quarter):.1f})")
         except Exception as e:
             print(f"   ⚠️ Error in quarter {q_num}: {e}")
             # Continue with next quarter
@@ -87,7 +88,7 @@ def simulate_100_quarters():
     
     # Print results
     print(f"\n{'='*60}")
-    print(f"📊 RESULTS: 100 Quarter Simulation")
+    print(f"📊 RESULTS: {num_quarters} Quarter Simulation")
     print(f"{'='*60}")
     print(f"Teams: {home_team_name} vs {away_team_name}")
     print(f"")
@@ -106,5 +107,7 @@ def simulate_100_quarters():
     }
 
 if __name__ == "__main__":
-    simulate_100_quarters()
+    import sys
+    num_quarters = int(sys.argv[1]) if len(sys.argv) > 1 else 20
+    simulate_quarters(num_quarters)
 
