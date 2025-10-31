@@ -377,12 +377,16 @@ def apply_scoring(game, team, player, points, stats):
         stats: iterable of stat strings to record on the player
     """
     # Debug: Print player info in apply_scoring
-    print(f"🎯 APPLY_SCORING DEBUG: player={get_name_safe(player)}, player_id={id(player)}")
-    print(f"🎯 APPLY_SCORING DEBUG: player object: {player}")
+    from BackEnd.constants import DEBUG
+    if DEBUG:
+        print(f"🎯 APPLY_SCORING DEBUG: player={get_name_safe(player)}, player_id={id(player)}")
+        print(f"🎯 APPLY_SCORING DEBUG: player object: {player}")
     
     for stat in stats:
         player.record_stat(stat)
-        print(f"🎯 APPLY_SCORING DEBUG: Recorded {stat} for {get_name_safe(player)}")
+        from BackEnd.constants import DEBUG
+        if DEBUG:
+            print(f"🎯 APPLY_SCORING DEBUG: Recorded {stat} for {get_name_safe(player)}")
     
     record_team_points(game, team, points)
 

@@ -241,8 +241,10 @@ class TurnManager:
 
         state = self.game.game_state.get("offensive_state", "HCO")
         turn_num = self.game.micro_turn_count
+        from BackEnd.constants import DEBUG
         time_remaining = self.game.game_state.get("clock", "N/A")
-        print(f"***** RUN TURN, turn number: {turn_num}, time remaining: {time_remaining}, offensive state: {state} *****")
+        if DEBUG:
+            print(f"***** RUN TURN, turn number: {turn_num}, time remaining: {time_remaining}, offensive state: {state} *****")
         # if state in ["HCO", "HALF_COURT"]:
         #     print(f"{self.game.offense_team.name}: {self.game.game_state['current_playcall']}")
         #     print(f"{self.game.defense_team.name}: {self.game.game_state['defense_playcall']}")
@@ -352,8 +354,10 @@ class TurnManager:
         next_defensive_setup = result.get("next_defensive_setup", "None")
         text = result.get("text", "")
         possession_flips = result.get("possession_flips", False)
-        print(f"Turn {turn_num} RESULT: {result_type} | Next: {next_play_type} | Defense Setup: {next_defensive_setup} | Possession Flips: {possession_flips}")
-        print(f"Turn {turn_num} TEXT: {text}")
+        from BackEnd.constants import DEBUG
+        if DEBUG:
+            print(f"Turn {turn_num} RESULT: {result_type} | Next: {next_play_type} | Defense Setup: {next_defensive_setup} | Possession Flips: {possession_flips}")
+            print(f"Turn {turn_num} TEXT: {text}")
         
         # self._print_turn_summary(result, state)
 
@@ -419,7 +423,9 @@ class TurnManager:
         result["defense_tempo_call"] = self.game.defense_team.strategy_calls.get("tempo_call", "normal")
         result["defense_aggression_call"] = self.game.defense_team.strategy_calls.get("aggression_call", "normal")
         
-        print(f"📤 TURN RESULT - Sending to frontend: offense_tempo={result['offense_tempo_call']}, offense_aggr={result['offense_aggression_call']}, defense_tempo={result['defense_tempo_call']}, defense_aggr={result['defense_aggression_call']}")
+        from BackEnd.constants import DEBUG
+        if DEBUG:
+            print(f"📤 TURN RESULT - Sending to frontend: offense_tempo={result['offense_tempo_call']}, offense_aggr={result['offense_aggression_call']}, defense_tempo={result['defense_tempo_call']}, defense_aggr={result['defense_aggression_call']}")
 
         # Reconcile player point totals with the authoritative team score.
         # Clients should treat ``turn.score`` and ``turn.deltas`` as canonical
@@ -509,7 +515,9 @@ class TurnManager:
             # Randomly select one play from matches
             selected_play = random.choice(matching_plays)
             chosen_playcall = selected_play["name"]
-            print(f"🎯 Selected play: {chosen_playcall} (type={chosen_play_type}, focus={chosen_focus})")
+            from BackEnd.constants import DEBUG
+            if DEBUG:
+                print(f"🎯 Selected play: {chosen_playcall} (type={chosen_play_type}, focus={chosen_focus})")
         
         # Record playcall attempt under new buckets
         try:
@@ -565,7 +573,9 @@ class TurnManager:
         self.game.offense_team.strategy_calls["tempo_call"] = random.choice(STRATEGY_CALL_DICTS["tempo"][tempo_setting])
         self.game.defense_team.strategy_calls["aggression_call"] = random.choice(STRATEGY_CALL_DICTS["aggression"][aggression_setting])
         
-        print(f"🎯 STRATEGY CALLS SET - OFF: {self.game.offense_team.name} tempo={self.game.offense_team.strategy_calls['tempo_call']} | DEF: {self.game.defense_team.name} aggr={self.game.defense_team.strategy_calls['aggression_call']}")
+        from BackEnd.constants import DEBUG
+        if DEBUG:
+            print(f"🎯 STRATEGY CALLS SET - OFF: {self.game.offense_team.name} tempo={self.game.offense_team.strategy_calls['tempo_call']} | DEF: {self.game.defense_team.name} aggr={self.game.defense_team.strategy_calls['aggression_call']}")
 
 
     
