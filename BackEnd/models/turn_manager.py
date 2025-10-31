@@ -371,6 +371,14 @@ class TurnManager:
                 "offense": self.game.away_team.scouting_data.get("offense", {})
             }
         }
+        
+        # Include cumulative team stats (from all players) for S1 tab
+        # Update team stats before sending
+        self.game.update_team_stats()
+        result["team_totals"] = {
+            self.game.home_team.name: self.game.home_team.get_team_game_stats(),
+            self.game.away_team.name: self.game.away_team.get_team_game_stats()
+        }
 
         # Compute stat deltas for each player
         deltas = {}

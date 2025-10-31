@@ -2,6 +2,7 @@ import random
 from BackEnd.constants import (
     THREE_POINT_PROBABILITY, 
     THREE_POINT_SPOTS,
+    PAINT_SPOTS,
     PLAYCALL_ATTRIBUTE_WEIGHTS, 
     BLOCK_PROBABILITY,
     AGGRESSION_FOUL_MULTIPLIER
@@ -70,6 +71,46 @@ class ShotManager:
         
         return False
 
+    def is_paint_shot(self, shooter, roles):
+        """
+        Determine if a shot is from the paint (PIP) based on the shooter's spot.
+        
+        Args:
+            shooter: The player taking the shot
+            roles: The roles dict containing steps/skeleton data
+            
+        Returns:
+            bool: True if paint shot, False otherwise
+        """
+        # Get the shooter's position
+        shooter_pos = None
+        for pos, player in self.game.offense_team.lineup.items():
+            if player == shooter:
+                shooter_pos = pos
+                break
+        
+        if not shooter_pos:
+            return False
+
+        steps = roles.get("steps", [])
+        if not steps:
+            return False
+        
+        # Check the last step for the shooter's spot
+        for step in reversed(steps):
+            pos_actions = step.get("pos_actions", {})
+            shooter_action = pos_actions.get(shooter_pos)
+            if shooter_action and shooter_action.get("action") == "shoot":
+                # MongoDB skeletons use "location", old skeletons use "spot"
+                location_key = shooter_action.get("location") or shooter_action.get("spot", "")
+                spot = location_key.lower() if location_key else ""
+                # Check if spot is a paint spot (case insensitive)
+                if spot in PAINT_SPOTS:
+                    return True
+                return False
+        
+        return False
+
 
     def resolve_shot(self, roles):
         
@@ -93,6 +134,9 @@ class ShotManager:
         
         # Determine if shot is three-pointer based on shooter's spot
         is_three = self.is_three_point_shot(shooter, roles)
+        
+        # Determine if shot is from the paint (PIP)
+        is_paint = self.is_paint_shot(shooter, roles)
         
         shot_threshold = off_team.team_attributes["shot_threshold"]
         if is_three:
@@ -126,6 +170,12 @@ class ShotManager:
             print(f"🎯 PRE-SCORING DEBUG: shooter object: {shooter}")
             
             apply_scoring(self.game, off_team, shooter, points, stats)
+            
+            # Track PIP if shot was from the paint
+            if is_paint:
+                shooter.record_stat("PIP", amount=points)
+                print(f"🎯 PIP DEBUG: Recorded {points} PIP for {get_name_safe(shooter)}")
+            
             print(f"🎯 SCORING DEBUG: Awarded {points} points to {get_name_safe(shooter)} (position: {get_player_position(off_lineup, shooter)})")
 
             possession_flips = True
