@@ -319,6 +319,68 @@ export function createGameScene(Phaser) {
         return '#cc0000';                      // Red
       };
 
+      // Player tooltip functions
+      const showPlayerTooltip = (event, playerId, player) => {
+        const tooltip = document.getElementById('player-tooltip');
+        const image = document.getElementById('tooltip-player-image');
+        const energyEl = document.getElementById('tooltip-player-energy');
+        const momentumEl = document.getElementById('tooltip-player-momentum');
+        const foulsEl = document.getElementById('tooltip-player-fouls');
+        
+        if (!tooltip) return;
+        
+        // Set player image
+        const playerPhoto = player.photo || `/static/images/players/${playerId}.png`;
+        image.src = playerPhoto;
+        image.onerror = () => {
+          image.src = '/static/images/players/default.png'; // Fallback image
+        };
+        
+        // Get current player stats
+        const stats = this.playerStats[playerId] || {};
+        const fouls = stats.F || 0;
+        
+        // Get current energy from player_energy tracking or player object
+        const ng = player.NG ?? player.attributes?.NG ?? 1.0;
+        const ngPercent = Math.round(ng * 100);
+        
+        // Get momentum from player attributes
+        const momentum = player.attributes?.MO ?? player.MO ?? '--';
+        
+        // Update tooltip content
+        energyEl.textContent = `${ngPercent}%`;
+        energyEl.className = 'tooltip-stat-value';
+        if (ng > 0.89) energyEl.classList.add('energy-high');
+        else if (ng >= 0.8) energyEl.classList.add('energy-medium');
+        else if (ng >= 0.7) energyEl.classList.add('energy-low');
+        else energyEl.classList.add('energy-critical');
+        
+        momentumEl.textContent = momentum;
+        foulsEl.textContent = fouls;
+        
+        // Position and show tooltip
+        updateTooltipPosition(event);
+        tooltip.classList.add('visible');
+      };
+
+      const updateTooltipPosition = (event) => {
+        const tooltip = document.getElementById('player-tooltip');
+        if (!tooltip || !tooltip.classList.contains('visible')) return;
+        
+        // Position tooltip near mouse, offset to avoid cursor overlap
+        const offsetX = 15;
+        const offsetY = 15;
+        tooltip.style.left = `${event.clientX + offsetX}px`;
+        tooltip.style.top = `${event.clientY + offsetY}px`;
+      };
+
+      const hidePlayerTooltip = () => {
+        const tooltip = document.getElementById('player-tooltip');
+        if (tooltip) {
+          tooltip.classList.remove('visible');
+        }
+      };
+
       const initTeamTable = (teamKey, bodyEl) => {
         positions.forEach(pos => {
           const player = simData.players.find(p => p.team === teamKey && p.pos === pos);
@@ -336,6 +398,22 @@ export function createGameScene(Phaser) {
           const defTd = document.createElement('td');
           
           nameTd.textContent = formatName(player?.name) || '';
+          nameTd.style.cursor = 'pointer';
+          nameTd.dataset.playerId = playerId;
+          
+          // Add tooltip functionality for player names
+          nameTd.addEventListener('mouseenter', (e) => {
+            if (playerId && player) {
+              showPlayerTooltip(e, playerId, player);
+            }
+          });
+          nameTd.addEventListener('mousemove', (e) => {
+            updateTooltipPosition(e);
+          });
+          nameTd.addEventListener('mouseleave', () => {
+            hidePlayerTooltip();
+          });
+          
           ptsTd.textContent = '0';
           rebTd.textContent = '0';
           astTd.textContent = '0';
