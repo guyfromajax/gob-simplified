@@ -609,6 +609,143 @@ export function createGameScene(Phaser) {
         }
       };
 
+      // Initialize team stats state from simData or start fresh
+      const initTeamStats = () => {
+        const homeScouting = simData.scouting?.[homeTeam]?.offense || {};
+        const awayScouting = simData.scouting?.[awayTeam]?.offense || {};
+        
+        const initEmpty = () => ({
+          Motion: {
+            overall: { attempts: 0, success: 0 },
+            inside: { attempts: 0, success: 0 },
+            attack: { attempts: 0, success: 0 },
+            outside: { attempts: 0, success: 0 }
+          },
+          Set: {
+            overall: { attempts: 0, success: 0 },
+            inside: { attempts: 0, success: 0 },
+            attack: { attempts: 0, success: 0 },
+            outside: { attempts: 0, success: 0 }
+          },
+          Cumulative: {
+            inside: { attempts: 0, success: 0 },
+            attack: { attempts: 0, success: 0 },
+            outside: { attempts: 0, success: 0 }
+          },
+          Fast_Break_Entries: 0,
+          Fast_Break_Success: 0
+        });
+        
+        return {
+          home: homeScouting.Playcalls ? {
+            Motion: homeScouting.Playcalls.Motion || initEmpty().Motion,
+            Set: homeScouting.Playcalls.Set || initEmpty().Set,
+            Cumulative: homeScouting.Playcalls.Cumulative || initEmpty().Cumulative,
+            Fast_Break_Entries: homeScouting.Fast_Break_Entries || 0,
+            Fast_Break_Success: homeScouting.Fast_Break_Success || 0
+          } : initEmpty(),
+          away: awayScouting.Playcalls ? {
+            Motion: awayScouting.Playcalls.Motion || initEmpty().Motion,
+            Set: awayScouting.Playcalls.Set || initEmpty().Set,
+            Cumulative: awayScouting.Playcalls.Cumulative || initEmpty().Cumulative,
+            Fast_Break_Entries: awayScouting.Fast_Break_Entries || 0,
+            Fast_Break_Success: awayScouting.Fast_Break_Success || 0
+          } : initEmpty()
+        };
+      };
+
+      let teamStats = initTeamStats();
+
+      const applyTeamStats = (turn = {}) => {
+        // Determine which team is on offense (possession_team_id matches homeTeamId or awayTeamId)
+        const isHomeTeam = turn.possession_team_id === this.homeTeamId || 
+                          (turn.starting_possession_team_id && turn.starting_possession_team_id === this.homeTeamId);
+        const teamKey = isHomeTeam ? 'home' : 'away';
+        const stats = teamStats[teamKey];
+        
+        if (!stats) return; // Safety check
+
+        let shouldUpdate = false;
+
+        // Handle Fast Break separately (may not have play_type/focus)
+        // Fast Break entries are tracked when fast_break flag is true
+        // Success is determined by the shot result (MAKE or defensive foul)
+        // Note: Fast break might span multiple turns, so track entry when fast_break=true
+        // and success when result_type=MAKE or defensive foul occurs
+        if (turn.fast_break === true) {
+          stats.Fast_Break_Entries++;
+          shouldUpdate = true;
+        }
+        // Track success if this is a fast break shot result
+        if ((turn.fast_break === true || turn.result_type === "FAST_BREAK") && 
+            (turn.result_type === "MAKE" || turn.is_and_one || 
+             (turn.result_type && turn.result_type.includes("FOUL")))) {
+          stats.Fast_Break_Success++;
+          shouldUpdate = true;
+        }
+        // Handle playcalls (Motion/Set) if we have play_type and focus
+        else if (turn.offensive_play_type && turn.offensive_play_focus) {
+          const playType = turn.offensive_play_type.toLowerCase(); // "motion" or "set"
+          const focus = turn.offensive_play_focus.toLowerCase(); // "inside", "attack", "outside"
+
+          if (playType === 'motion' || playType === 'set') {
+            // Increment attempts
+            stats[playType].overall.attempts++;
+            if (focus && (focus === 'inside' || focus === 'attack' || focus === 'outside')) {
+              stats[playType][focus].attempts++;
+              stats.Cumulative[focus].attempts++;
+            }
+
+            // Determine success: MAKE or any defensive foul = success
+            const isSuccess = turn.result_type === "MAKE" || turn.is_and_one || 
+                             (turn.result_type && turn.result_type.includes("FOUL"));
+
+            if (isSuccess) {
+              stats[playType].overall.success++;
+              if (focus && (focus === 'inside' || focus === 'attack' || focus === 'outside')) {
+                stats[playType][focus].success++;
+                stats.Cumulative[focus].success++;
+              }
+            }
+            
+            shouldUpdate = true;
+          }
+        }
+
+        // Update UI only if stats changed
+        if (shouldUpdate && typeof window.setTeamBoxData === 'function') {
+          const homeAttrs = simData.team_attributes?.[homeTeam] || {};
+          const awayAttrs = simData.team_attributes?.[awayTeam] || {};
+          
+          window.setTeamBoxData({
+            home: {
+              offense: {
+                Playcalls: {
+                  Motion: teamStats.home.Motion,
+                  Set: teamStats.home.Set,
+                  Cumulative: teamStats.home.Cumulative
+                },
+                Fast_Break_Entries: teamStats.home.Fast_Break_Entries,
+                Fast_Break_Success: teamStats.home.Fast_Break_Success
+              },
+              attributes: homeAttrs
+            },
+            away: {
+              offense: {
+                Playcalls: {
+                  Motion: teamStats.away.Motion,
+                  Set: teamStats.away.Set,
+                  Cumulative: teamStats.away.Cumulative
+                },
+                Fast_Break_Entries: teamStats.away.Fast_Break_Entries,
+                Fast_Break_Success: teamStats.away.Fast_Break_Success
+              },
+              attributes: awayAttrs
+            }
+          });
+        }
+      };
+
       const formatTurnText = (turn = {}) => {
         const parts = [];
         const q =
@@ -678,6 +815,7 @@ export function createGameScene(Phaser) {
         if (quarterEl) quarterEl.textContent = livePeriodLabel;
 
         applyPlayerStats(turn);
+        applyTeamStats(turn);
 
         if (liveScore[homeTeam] !== prevHome || liveScore[awayTeam] !== prevAway) {
           emit('score:update', {
