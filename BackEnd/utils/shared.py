@@ -170,7 +170,10 @@ def resolve_offensive_rebound(game, rebounder):
 
         if made:
             apply_scoring(game, off_team, rebounder, 2, ["FGM"])
+            # Putbacks are always from the paint
+            rebounder.record_stat("PIP", amount=2)
             print(f"📦 PUTBACK FGM: Recorded FGM for {get_name_safe(rebounder)}")
+            print(f"📦 PUTBACK PIP: Recorded 2 PIP for {get_name_safe(rebounder)}")
             event["points"] = 2
             event["possession_flips"] = True
         else:

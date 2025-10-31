@@ -7,7 +7,7 @@ ALL_ATTRS = [
 
 BOX_SCORE_KEYS = [
     "FGA", "FGM", "3PTA", "3PTM", "FTA", "FTM",
-    "OREB", "DREB", "REB", "AST", "STL", "BLK", "TO", "F", "MIN", "PTS",
+    "OREB", "DREB", "REB", "AST", "STL", "BLK", "TO", "F", "MIN", "PTS", "PIP",
     "DEF_A", "DEF_S", "HELP_D", "SCR_A", "SCR_S"
 ]
 
@@ -44,6 +44,15 @@ THREE_POINT_SPOTS = {
     "lower corner",
     "deep upper baseline",
     "deep lower baseline",
+}
+
+# Spots that are points in the paint (PIP) - case insensitive
+PAINT_SPOTS = {
+    "lower lowpost",
+    "lower midpost",
+    "upper lowpost",
+    "upper midpost",
+    "midlane",
 }
 
 BLOCK_PROBABILITY = {

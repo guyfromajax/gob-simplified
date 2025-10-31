@@ -470,21 +470,27 @@ export function createGameScene(Phaser) {
 
       hydrateBoxScore();
 
-      // Initialize Team Box Score with team attributes (S2 tab) only
+      // Initialize Team Box Score with team attributes (S3 tab) only
       // Stats will be updated in real-time from turn data via applyTeamStats
       if (typeof window.setTeamBoxData === 'function' && simData.team_attributes) {
         const homeAttrs = simData.team_attributes[homeTeam] || {};
         const awayAttrs = simData.team_attributes[awayTeam] || {};
         
+        // Get initial team totals from simData if available
+        const homeTotals = simData.team_totals?.[homeTeam] || {};
+        const awayTotals = simData.team_totals?.[awayTeam] || {};
+        
         // Initialize with empty offense (will be populated from turn data)
         window.setTeamBoxData({
           home: {
             offense: {},
-            attributes: homeAttrs
+            attributes: homeAttrs,
+            totals: homeTotals
           },
           away: {
             offense: {},
-            attributes: awayAttrs
+            attributes: awayAttrs,
+            totals: awayTotals
           }
         });
       }
@@ -619,16 +625,22 @@ export function createGameScene(Phaser) {
         const awayOffense = turn.team_stats[awayTeam]?.offense || {};
         const homeAttrs = simData.team_attributes?.[homeTeam] || {};
         const awayAttrs = simData.team_attributes?.[awayTeam] || {};
+        
+        // Get cumulative team stats for S1 tab
+        const homeTotals = turn.team_totals?.[homeTeam] || {};
+        const awayTotals = turn.team_totals?.[awayTeam] || {};
 
         // Update UI directly from turn data (like scoreboard updates)
         window.setTeamBoxData({
           home: {
             offense: homeOffense,
-            attributes: homeAttrs
+            attributes: homeAttrs,
+            totals: homeTotals
           },
           away: {
             offense: awayOffense,
-            attributes: awayAttrs
+            attributes: awayAttrs,
+            totals: awayTotals
           }
         });
       };
