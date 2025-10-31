@@ -673,36 +673,48 @@ export function createGameScene(Phaser) {
         const teamKey = isHomeTeam ? 'home' : 'away';
         const stats = teamStats[teamKey];
         
-        if (!stats) return; // Safety check
+        if (!stats) {
+          console.warn('⚠️ applyTeamStats: No stats found for teamKey:', teamKey);
+          return; // Safety check
+        }
 
         let shouldUpdate = false;
 
         // Handle Fast Break separately (may not have play_type/focus)
         // Fast Break entries are tracked when fast_break flag is true
-        // Success is determined by the shot result (MAKE or defensive foul)
-        // Note: Fast break might span multiple turns, so track entry when fast_break=true
-        // and success when result_type=MAKE or defensive foul occurs
         if (turn.fast_break === true) {
           stats.Fast_Break_Entries++;
           shouldUpdate = true;
+          console.log('📊 Fast Break Entry tracked for', teamKey, 'Total:', stats.Fast_Break_Entries);
         }
+        
         // Track success if this is a fast break shot result
         if ((turn.fast_break === true || turn.result_type === "FAST_BREAK") && 
             (turn.result_type === "MAKE" || turn.is_and_one || 
              (turn.result_type && turn.result_type.includes("FOUL")))) {
           stats.Fast_Break_Success++;
           shouldUpdate = true;
+          console.log('📊 Fast Break Success tracked for', teamKey, 'Total:', stats.Fast_Break_Success);
         }
+        
         // Handle playcalls (Motion/Set) if we have play_type and focus
-        else if (turn.offensive_play_type && turn.offensive_play_focus) {
-          const playType = turn.offensive_play_type.toLowerCase(); // "motion" or "set"
+        // Note: Not all turns have these (only HCO turns do)
+        // Check for valid play_type (not "-" or None) and valid focus
+        if (turn.offensive_play_type && 
+            turn.offensive_play_type !== "-" && 
+            turn.offensive_play_focus &&
+            turn.offensive_play_focus !== "-") {
+          const playType = turn.offensive_play_type.toLowerCase(); // "motion" or "set_play"
           const focus = turn.offensive_play_focus.toLowerCase(); // "inside", "attack", "outside"
 
-          if (playType === 'motion' || playType === 'set') {
+          // Normalize playType: "set_play" -> "set", "motion" -> "motion"
+          const normalizedPlayType = playType === 'set_play' ? 'set' : playType;
+
+          if (normalizedPlayType === 'motion' || normalizedPlayType === 'set') {
             // Increment attempts
-            stats[playType].overall.attempts++;
+            stats[normalizedPlayType].overall.attempts++;
             if (focus && (focus === 'inside' || focus === 'attack' || focus === 'outside')) {
-              stats[playType][focus].attempts++;
+              stats[normalizedPlayType][focus].attempts++;
               stats.Cumulative[focus].attempts++;
             }
 
@@ -711,14 +723,15 @@ export function createGameScene(Phaser) {
                              (turn.result_type && turn.result_type.includes("FOUL"));
 
             if (isSuccess) {
-              stats[playType].overall.success++;
+              stats[normalizedPlayType].overall.success++;
               if (focus && (focus === 'inside' || focus === 'attack' || focus === 'outside')) {
-                stats[playType][focus].success++;
+                stats[normalizedPlayType][focus].success++;
                 stats.Cumulative[focus].success++;
               }
             }
             
             shouldUpdate = true;
+            console.log(`📊 ${normalizedPlayType} ${focus} tracked for ${teamKey}: attempts=${stats[normalizedPlayType][focus].attempts}, success=${stats[normalizedPlayType][focus].success}`);
           }
         }
 
@@ -752,6 +765,15 @@ export function createGameScene(Phaser) {
               },
               attributes: awayAttrs
             }
+          });
+          console.log('✅ Team stats UI updated');
+        } else if (!shouldUpdate) {
+          // Debug: log when we don't update
+          console.log('⚠️ applyTeamStats: No update needed for turn:', {
+            fast_break: turn.fast_break,
+            offensive_play_type: turn.offensive_play_type,
+            offensive_play_focus: turn.offensive_play_focus,
+            result_type: turn.result_type
           });
         }
       };
