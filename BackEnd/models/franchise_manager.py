@@ -130,6 +130,7 @@ class FranchiseManager:
             {}, {"first_name": 1, "last_name": 1, "team": 1, "team_id": 1, "attributes": 1, "position_ratings": 1}
         )
         for p in players:
+            from BackEnd.models.player import Player
             pid = str(p.get("_id"))
             career = prev_stats.get(pid, {}).get("career", zero_stats.copy())
             meta = {
@@ -141,12 +142,16 @@ class FranchiseManager:
             if tid is not None:
                 meta["team_id"] = str(tid)
             
+            # Clone player attributes and randomize EM, CH, MO for this franchise instance
+            attrs = p.get("attributes", {}).copy()
+            attrs = Player.randomize_game_attributes(attrs)
+            
             # Store franchise-specific player attributes and position ratings (cloned from core collection)
             players_map[pid] = {
                 "meta": meta,
                 "season": zero_stats.copy(),
                 "career": career,
-                "attributes": p.get("attributes", {}).copy(),  # Clone player attributes for this franchise
+                "attributes": attrs,  # Franchise-specific attributes with randomized EM/CH/MO
                 "position_ratings": p.get("position_ratings", {}).copy(),  # Clone position ratings for this franchise
             }
 
@@ -439,6 +444,10 @@ class RecruitManager:
             
             # Generate attributes, height, and weight based on archetype
             attributes, height, weight = self._generate_recruit_profile(archetype)
+            
+            # Randomize EM, CH, MO for recruits
+            from BackEnd.models.player import Player
+            attributes = Player.randomize_game_attributes(attributes)
             
             # Calculate position ratings for the recruit
             recruit_for_ratings = {

@@ -55,6 +55,8 @@ class TeamManager:
         roster = {}
         for pdata in players:
             player = Player(pdata)
+            # Randomize EM, CH, MO for new game instance (happens for every new Single Game)
+            player.attributes = Player.randomize_game_attributes(player.attributes)
             roster[player.player_id] = player
         return roster
 

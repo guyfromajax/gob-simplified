@@ -47,6 +47,27 @@ class Player:
         attrs["NG"] = attr_data.get("NG", data.get("NG", 1.0))
 
         return attrs
+    
+    @staticmethod
+    def randomize_game_attributes(attributes: dict) -> dict:
+        """
+        Randomize EM, CH, and MO for a new game instance.
+        Should be called when initializing players for a new Single Game, Tournament, or Franchise.
+        
+        Args:
+            attributes: Player attributes dict
+            
+        Returns:
+            Modified attributes dict with randomized EM, CH, MO
+        """
+        attributes["EM"] = random.randint(1, 100)
+        attributes["CH"] = random.randint(1, 100)
+        attributes["MO"] = random.randint(1, 10)
+        # Update anchors as well
+        attributes["anchor_EM"] = attributes["EM"]
+        attributes["anchor_CH"] = attributes["CH"]
+        attributes["anchor_MO"] = attributes["MO"]
+        return attributes
 
     def _init_stats(self):
         return {

@@ -39,15 +39,24 @@ class TournamentManager:
         player_stats: dict[str, dict] = {}
         players = players_collection.find(
             {"team": {"$in": teams}},
-            {"first_name": 1, "last_name": 1, "team": 1},
+            {"first_name": 1, "last_name": 1, "team": 1, "attributes": 1},
         )
         for p in players:
+            from BackEnd.models.player import Player
             pid = str(p.get("_id"))
+            # Clone attributes and randomize EM, CH, MO for this tournament instance
+            attrs = p.get("attributes", {}).copy()
+            attrs = Player.randomize_game_attributes(attrs)
             player_stats[pid] = {
                 "first_name": p.get("first_name", ""),
                 "last_name": p.get("last_name", ""),
                 "team": p.get("team", ""),
                 "season": zero_stats.copy(),
+                "attributes": {
+                    "EM": attrs.get("EM", 0),
+                    "CH": attrs.get("CH", 0),
+                    "MO": attrs.get("MO", 0)
+                }
             }
 
         tournament_doc = {
