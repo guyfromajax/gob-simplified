@@ -30,18 +30,30 @@ from BackEnd.db import teams_collection
 from BackEnd.models.game_manager import GameManager
 from BackEnd.main import simulate_quarter
 
-def simulate_quarters(num_quarters=20):
+def simulate_quarters(num_quarters=20, home_team_name=None, away_team_name=None):
     """Simulate specified number of quarters and track turn statistics."""
     
-    # Get two random teams
-    all_teams = list(teams_collection.find({}))
-    if len(all_teams) < 2:
-        print("❌ Error: Need at least 2 teams in the database")
-        return
-    
-    selected_teams = random.sample(all_teams, 2)
-    home_team_name = selected_teams[0]["name"]
-    away_team_name = selected_teams[1]["name"]
+    # Use provided teams or select random ones
+    if home_team_name and away_team_name:
+        # Verify teams exist in database
+        home_team = teams_collection.find_one({"name": home_team_name})
+        away_team = teams_collection.find_one({"name": away_team_name})
+        if not home_team:
+            print(f"❌ Error: Team '{home_team_name}' not found in database")
+            return
+        if not away_team:
+            print(f"❌ Error: Team '{away_team_name}' not found in database")
+            return
+    else:
+        # Get two random teams
+        all_teams = list(teams_collection.find({}))
+        if len(all_teams) < 2:
+            print("❌ Error: Need at least 2 teams in the database")
+            return
+        
+        selected_teams = random.sample(all_teams, 2)
+        home_team_name = selected_teams[0]["name"]
+        away_team_name = selected_teams[1]["name"]
     
     print(f"🏀 Simulating {num_quarters} quarters with:")
     print(f"   Home: {home_team_name}")
@@ -109,5 +121,7 @@ def simulate_quarters(num_quarters=20):
 if __name__ == "__main__":
     import sys
     num_quarters = int(sys.argv[1]) if len(sys.argv) > 1 else 20
-    simulate_quarters(num_quarters)
+    home_team = sys.argv[2] if len(sys.argv) > 2 else None
+    away_team = sys.argv[3] if len(sys.argv) > 3 else None
+    simulate_quarters(num_quarters, home_team, away_team)
 
