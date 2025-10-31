@@ -999,7 +999,7 @@
     <div class="player-stats-panel away">
       <div class="player-box-score">
         <div class="stats-header">
-          <h3>Away Players</h3>
+          <h3 id="away-players-header">Away Players</h3>
           <div class="stats-toggle">
             <button class="toggle-btn active" data-stat="S1">S1</button>
             <button class="toggle-btn" data-stat="S2">S2</button>
@@ -1021,7 +1021,7 @@
       </div>
       <div class="team-box-score">
         <div class="team-stats-header">
-          <h3>Away Team</h3>
+          <h3 id="away-team-header">Away Team</h3>
           <div class="team-stats-toggle">
             <button class="team-toggle-btn active" data-team="away" data-tab="S1">S1</button>
             <button class="team-toggle-btn" data-team="away" data-tab="S2">S2</button>
@@ -1113,7 +1113,7 @@
     <div class="player-stats-panel home">
       <div class="player-box-score">
         <div class="stats-header">
-          <h3>Home Players</h3>
+          <h3 id="home-players-header">Home Players</h3>
           <div class="stats-toggle">
             <button class="toggle-btn active" data-stat="S1">S1</button>
             <button class="toggle-btn" data-stat="S2">S2</button>
@@ -1135,7 +1135,7 @@
       </div>
       <div class="team-box-score">
         <div class="team-stats-header">
-          <h3>Home Team</h3>
+          <h3 id="home-team-header">Home Team</h3>
           <div class="team-stats-toggle">
             <button class="team-toggle-btn active" data-team="home" data-tab="S1">S1</button>
             <button class="team-toggle-btn" data-team="home" data-tab="S2">S2</button>
@@ -1316,6 +1316,24 @@
     
     // Team boxscore tabs and data population
     function initializeTeamBoxscoreTabs() {
+      // Tab header labels based on tab
+      const tabLabels = {
+        'S1': 'Team Stats',
+        'S2': 'Play Stats',
+        'S3': 'Team Measures'
+      };
+      
+      function updateTeamHeader(team) {
+        const activeTab = document.querySelector(`.team-stats-content[data-team="${team}"] .team-tab.active`);
+        if (activeTab) {
+          const tab = activeTab.classList.value.match(/team-tab-(S[123])/)?.[1];
+          const header = document.querySelector(`#${team}-team-header`);
+          if (header && tab) {
+            header.textContent = tabLabels[tab] || 'Team Stats';
+          }
+        }
+      }
+      
       document.querySelectorAll('.team-toggle-btn').forEach(btn => {
         btn.addEventListener('click', function() {
           const team = this.dataset.team;
@@ -1325,8 +1343,14 @@
           const content = document.querySelector(`.team-stats-content[data-team="${team}"]`);
           content.querySelectorAll('.team-tab').forEach(t => t.classList.remove('active'));
           content.querySelector(`.team-tab-${tab}`).classList.add('active');
+          // Update header based on active tab
+          updateTeamHeader(team);
         });
       });
+      
+      // Initialize headers on page load
+      updateTeamHeader('away');
+      updateTeamHeader('home');
     }
     
     function rate(success, attempts) {
@@ -1444,6 +1468,16 @@
     const urlParams = new URLSearchParams(window.location.search);
     const homeTeam = urlParams.get('home');
     const awayTeam = urlParams.get('away');
+    
+    // Update Player Box Score headers with actual team names
+    if (homeTeam) {
+      const homePlayersHeader = document.getElementById('home-players-header');
+      if (homePlayersHeader) homePlayersHeader.textContent = homeTeam;
+    }
+    if (awayTeam) {
+      const awayPlayersHeader = document.getElementById('away-players-header');
+      if (awayPlayersHeader) awayPlayersHeader.textContent = awayTeam;
+    }
     
     if (homeTeam && awayTeam) {
       applyVibrantColors(homeTeam, awayTeam);
