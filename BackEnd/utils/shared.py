@@ -182,12 +182,14 @@ def resolve_offensive_rebound(game, rebounder):
             # This ensures the shot animates to the correct basket before possession flips
             event["possession_flips"] = False
             
-            # Determine ballSpot based on which basket the REBOUNDING team will attack
-            # If it's a defensive rebound, the defensive team becomes the new offensive team
+            # Determine ballSpot based on where the rebound HAPPENS, not where they'll attack next
+            # For a putback, the rebound happens at the SAME basket as the putback attempt
+            # The putback happened at the basket the original offensive team was attacking
             # Home team attacks away basket (x: 91), away team attacks home basket (x: 9)
             if new_stat == "DREB":
-                # Defensive rebound - defensive team becomes new offensive team
-                ballSpot = {"x": 91, "y": 25} if new_team == game.home_team else {"x": 9, "y": 25}
+                # Defensive rebound - happens at the SAME basket where putback occurred
+                # Putback happened at the basket off_team was attacking
+                ballSpot = {"x": 91, "y": 25} if off_team == game.home_team else {"x": 9, "y": 25}
             else:
                 # Offensive rebound - same team continues attacking same basket
                 ballSpot = {"x": 91, "y": 25} if off_team == game.home_team else {"x": 9, "y": 25}
