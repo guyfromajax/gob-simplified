@@ -816,9 +816,6 @@ class TurnManager:
             ball_owner_by_step = []
             ball_handler_coords_by_step = []
 
-            print("Inside derive_roles_from_steps")
-            print(f"steps: {steps}")
-            
             # Track ball ownership through all steps (needed for frontend animation)
             current_owner_pos = None
             for step in steps:
@@ -861,29 +858,23 @@ class TurnManager:
             
             # 1. Get SHOOTER from final step
             final_step = steps[-1]
-            print(f"🎭 DERIVE ROLES: Final step pos_actions: {final_step.get('pos_actions', {})}")
             for pos, action_info in final_step.get("pos_actions", {}).items():
                 action = action_info.get("action", "").lower()
-                print(f"🎭 DERIVE ROLES: {pos} action: {action}")
                 if action == "shoot":
                     shooter_pos = pos
-                    print(f"🎭 DERIVE ROLES: Found shooter in pos_actions: {pos}")
                     break
             
             # Also check events in final step
             if not shooter_pos:
-                print(f"🎭 DERIVE ROLES: No shooter in pos_actions, checking events: {final_step.get('events', [])}")
                 for event in final_step.get("events", []):
                     if event.get("type") == "shot":
                         shooter_pos = event.get("by")
-                        print(f"🎭 DERIVE ROLES: Found shooter in events: {shooter_pos}")
                         break
             
             # Fallback: use final ball handler
             if not shooter_pos and ball_owner_by_step:
                 final_owner = ball_owner_by_step[-1]
                 shooter_pos = final_owner if isinstance(final_owner, str) else None
-                print(f"🎭 DERIVE ROLES: Using fallback shooter (final ball handler): {shooter_pos}")
             
             # 2. Get PASSER from last pass event (check last 2 steps)
             for step in reversed(steps[-2:]):
@@ -931,7 +922,6 @@ class TurnManager:
                 steps = scene_steps
             else:
                 steps = scene_steps[:requested - 1] + [scene_steps[-1]]
-            print(f"🎬 assign_roles using MongoDB skeleton '{off_call}' with {len(steps)} steps (from {len(scene_steps)} total)")
         else:
             # Fallback to old hardcoded skeleton system
             playcall_scenes_map = {
@@ -1007,9 +997,6 @@ class TurnManager:
         screener = off_lineup.get(screener_pos) if screener_pos else off_lineup["PF"]  # Fallback to PF
         passer = off_lineup.get(passer_pos)
         defender = def_lineup.get(defender_pos) if defender_pos else def_lineup["PG"]
-
-        # Debug: Print role assignments
-        print(f"🎭 ROLES DEBUG: shooter_pos={shooter_pos}, shooter={get_name_safe(shooter)}, shooter_position={get_player_position(off_lineup, shooter)}")
 
         return {
             "shooter": shooter,

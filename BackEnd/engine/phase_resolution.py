@@ -554,9 +554,6 @@ def resolve_half_court_offense_logic(game):
     
     roles = game.turn_manager.assign_roles(off_call, def_call, skeleton=skeleton)
     
-    # Debug: Print roles from assign_roles
-    print(f"🎭 HCO ROLES: shooter={get_name_safe(roles.get('shooter'))}, shooter_pos={get_player_position(off_lineup, roles.get('shooter'))}")
-    
     # print("inside resolve_half_court_offense_logic")
     # print("[DEBUG] roles:", roles.keys())
     # print("[DEBUG] event_step:", roles.get("event_step"))
@@ -584,7 +581,6 @@ def resolve_half_court_offense_logic(game):
             return resolve_non_shooting_foul(roles, game)
 
     # 3. Shot Result
-    print(f"🎯 HCO BEFORE SHOT: shooter={get_name_safe(roles.get('shooter'))}, shooter_pos={get_player_position(off_lineup, roles.get('shooter'))}")
     shot_result = game.shot_manager.resolve_shot(roles)
     
     # Add playcall to the text
@@ -642,8 +638,12 @@ def resolve_half_court_offense_logic(game):
             elif offense_failure:
                 # We don't increment offense success; defensive success can be tracked separately if needed
                 pass
-    except Exception:
-        pass
+        else:
+            print(f"🎯 SUCCESS DEBUG: Skipping - type_label={type_label}, focus={focus}")
+    except Exception as e:
+        print(f"🎯 SUCCESS DEBUG ERROR: {type(e).__name__}: {e}")
+        import traceback
+        traceback.print_exc()
 
     return shot_result
 
