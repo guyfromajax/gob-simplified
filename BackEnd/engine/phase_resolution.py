@@ -548,6 +548,9 @@ def resolve_half_court_offense_logic(game):
     # 1. Tactical Setup
     off_call = game_state["current_playcall"]
     def_call = game_state["defense_playcall"]
+    print("Entering resolve_half_court_offense_logic")
+    print(f"off_call: {off_call}")
+    print(f"def_call: {def_call}")
     
     # Get skeleton from MongoDB BEFORE assigning roles, so assign_roles can use the correct skeleton
     skeleton = get_hco_skeleton(None, game)
@@ -614,6 +617,7 @@ def resolve_half_court_offense_logic(game):
         play_type = game.game_state.get("offense_play_type")  # 'motion' or 'set_play'
         focus = game.game_state.get("offense_play_focus")     # 'inside' | 'attack' | 'outside'
         type_label = "Motion" if play_type == "motion" else ("Set" if play_type == "set_play" else None)
+        print("Inside try statement")
         print(f"type_label: {type_label}")
         print(f"focus: {focus}")
         print(f"shot_result, i.e. rt = {shot_result.get('result_type')}")    
@@ -654,58 +658,6 @@ def resolve_half_court_offense_logic(game):
         traceback.print_exc()
 
     return shot_result
-
-
-# def resolve_half_court_offense_logic(game: "GameManager") -> dict:
-
-#     game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
-#     off_call = game_state["current_playcall"]
-#     def_call = game_state["defense_playcall"]
-
-#     # Track usage
-#     off_scouting = off_team.scouting_data
-#     def_scouting = def_team.scouting_data
-#     off_scouting["offense"]["Playcalls"][off_call]["used"] += 1
-#     def_scouting["defense"][def_call]["used"] += 1
-
-#     roles = game.turn_manager.assign_roles()
-    
-#     # 🧠 Determine event type (SHOT / TURNOVER / O_FOUL / D_FOUL)
-#     from BackEnd.models.turn_manager import TurnManager
-#     event_type = game.turn_manager.determine_event_type(roles)
-#     if event_type == "TURNOVER":
-#         return resolve_turnover_logic(roles, game, turnover_type="DEAD BALL")
-
-#     elif event_type == "O_FOUL":
-#         game_state["foul_team"] = "OFFENSE"
-#         return resolve_non_shooting_foul(roles, game)
-
-#     elif event_type == "D_FOUL":
-#         game_state["foul_team"] = "DEFENSE"
-#         return resolve_non_shooting_foul(roles, game)
-    
-#     shot_result = game.shot_manager.resolve_shot(roles)
-#     # shot_result = {
-#     #         "result_type": "MAKE" if made else "MISS",
-#     #         "ball_handler": shooter,
-#     #         "shooter": shooter,
-#     #         "shot_score": shot_score,
-#     #         "screener": screener,
-#     #         "passer": passer,
-#     #         "defender": defender,
-#     #         "text": text,
-#     #         "possession_flips": possession_flips,
-#     #         "time_elapsed": time_elapsed
-#     #     }
-
-#     # Track success
-#     if shot_result["result_type"] == "MAKE":
-#         off_scouting["offense"]["Playcalls"][off_call]["success"] += 1
-#     elif shot_result["result_type"] in ["MISS", "TURNOVER"]:
-#         def_scouting["defense"][def_call]["success"] += 1
-
-
-#     return shot_result
 
 
 def calculate_foul_turnover(game, positions, roles):
@@ -1058,6 +1010,8 @@ def get_hco_skeleton(result_type, game_context):
     
     # Get the current playcall from game context
     playcall = game_context.game_state.get("current_playcall", "Inside") if game_context else "Inside"
+    print("Entering get_hco_skeleton")
+    print(f"playcall: {playcall}")
     
     # Get the offensive team
     offense_team = game_context.offense_team
