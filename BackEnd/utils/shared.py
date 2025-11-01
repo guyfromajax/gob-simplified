@@ -477,7 +477,13 @@ def summarize_game_state(game, exclude_animations=False):
                 "primary_color": getattr(team_obj, "primary_color", "#000000"),
                 "secondary_color": getattr(team_obj, "secondary_color", "#ffffff"),
                 "x": coords.get("x", 0),
-                "y": coords.get("y", 0)
+                "y": coords.get("y", 0),
+                "attributes": {
+                    "EM": player_obj.attributes.get("EM", 0),
+                    "CH": player_obj.attributes.get("CH", 0),
+                    "MO": player_obj.attributes.get("MO", 0),
+                    "NG": player_obj.attributes.get("NG", 1.0)
+                }
             })
         else:
             players.append({
