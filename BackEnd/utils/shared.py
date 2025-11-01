@@ -384,9 +384,6 @@ def apply_scoring(game, team, player, points, stats):
     
     for stat in stats:
         player.record_stat(stat)
-        from BackEnd.constants import DEBUG
-        if DEBUG:
-            print(f"🎯 APPLY_SCORING DEBUG: Recorded {stat} for {get_name_safe(player)}")
     
     record_team_points(game, team, points)
 

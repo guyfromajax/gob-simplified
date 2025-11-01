@@ -357,7 +357,6 @@ class TurnManager:
         from BackEnd.constants import DEBUG
         if DEBUG:
             print(f"Turn {turn_num} RESULT: {result_type} | Next: {next_play_type} | Defense Setup: {next_defensive_setup} | Possession Flips: {possession_flips}")
-            print(f"Turn {turn_num} TEXT: {text}")
         
         # self._print_turn_summary(result, state)
 
@@ -377,13 +376,6 @@ class TurnManager:
                 "defense": self.game.away_team.scouting_data.get("defense", {})
             }
         }
-        # Debug: Verify success values are in the data
-        home_pc = result["team_stats"][self.game.home_team.name]["offense"].get("Playcalls", {})
-        away_pc = result["team_stats"][self.game.away_team.name]["offense"].get("Playcalls", {})
-        if home_pc.get("Motion"):
-            print(f"📊 FRONTEND DEBUG: Home Motion/Outside - attempts: {home_pc['Motion']['outside']['attempts']}, success: {home_pc['Motion']['outside']['success']}")
-        if away_pc.get("Motion"):
-            print(f"📊 FRONTEND DEBUG: Away Motion/Outside - attempts: {away_pc['Motion']['outside']['attempts']}, success: {away_pc['Motion']['outside']['success']}")
         
         # Include cumulative team stats (from all players) for S1 tab
         # Update team stats before sending
@@ -573,9 +565,6 @@ class TurnManager:
         self.game.offense_team.strategy_calls["tempo_call"] = random.choice(STRATEGY_CALL_DICTS["tempo"][tempo_setting])
         self.game.defense_team.strategy_calls["aggression_call"] = random.choice(STRATEGY_CALL_DICTS["aggression"][aggression_setting])
         
-        from BackEnd.constants import DEBUG
-        if DEBUG:
-            print(f"🎯 STRATEGY CALLS SET - OFF: {self.game.offense_team.name} tempo={self.game.offense_team.strategy_calls['tempo_call']} | DEF: {self.game.defense_team.name} aggr={self.game.defense_team.strategy_calls['aggression_call']}")
 
 
     
