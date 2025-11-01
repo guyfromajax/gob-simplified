@@ -948,6 +948,13 @@ def resolve_full_court_press_logic(game: "GameManager"):
         next_play_type = "HCO"
     # For DEAD BALL, O_FOUL, D_FOUL: next_play_type stays None (will use side inbound → HCO)
     
+    # Calculate time elapsed for FCP phase
+    fcp_time_elapsed = random.randint(5, 9)
+    
+    # If transitioning to HCO, store the FCP time for HCO to add to its time
+    if result_type == "HCO":
+        game_state["pressure_phase_time"] = fcp_time_elapsed
+    
     result = {
         "result_type": result_type,
         "text": text,
@@ -958,6 +965,7 @@ def resolve_full_court_press_logic(game: "GameManager"):
         "passer": "",
         "screener": "",
         "possession_flips": possession_flips,
+        "time_elapsed": fcp_time_elapsed,  # Time spent in FCP phase
         "events": [],
         "skeleton": skeleton,
         "animations": animations,
@@ -1030,7 +1038,7 @@ def get_hco_skeleton(result_type, game_context):
     # Get the current playcall from game context
     playcall = game_context.game_state.get("current_playcall", "Inside") if game_context else "Inside"
     print("Entering get_hco_skeleton")
-    print(f"playcall: {playcall}")
+    # print(f"playcall: {playcall}")
     
     # Get the offensive team
     offense_team = game_context.offense_team
@@ -1358,6 +1366,13 @@ def resolve_half_court_trap_logic(game: "GameManager"):
         next_play_type = "HCO"
     # For DEAD BALL, O_FOUL, D_FOUL: next_play_type stays None (will use side inbound → HCO)
     
+    # Calculate time elapsed for HCT phase
+    hct_time_elapsed = random.randint(5, 9)
+    
+    # If transitioning to HCO, store the HCT time for HCO to add to its time
+    if result_type == "HCO":
+        game_state["pressure_phase_time"] = hct_time_elapsed
+    
     result = {
         "result_type": result_type,
         "text": text,
@@ -1368,6 +1383,7 @@ def resolve_half_court_trap_logic(game: "GameManager"):
         "passer": "",
         "screener": "",
         "possession_flips": possession_flips,
+        "time_elapsed": hct_time_elapsed,  # Time spent in HCT phase
         "events": [],
         "skeleton": skeleton,
         "animations": animations,
