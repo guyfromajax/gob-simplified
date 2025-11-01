@@ -292,8 +292,21 @@ class ShotManager:
                     result["next_play_type"] = next_play_type
 
         # ⏱️ Add tempo-based time to turn
-        tempo = off_team.strategy_calls["tempo_call"]
-        time_elapsed += get_time_elapsed(tempo)
+        # If HCO came after FCP/HCT, adjust time based on pressure phase time
+        pressure_phase_time = game_state.get("pressure_phase_time", 0)
+        
+        if pressure_phase_time > 0:
+            # Adjust HCO time: random.randint(15 - pressure_phase_time, min(35, 35 - pressure_phase_time))
+            min_time = max(1, 15 - pressure_phase_time)  # Ensure min_time doesn't go below 1
+            max_time = min(35, 35 - pressure_phase_time)
+            hco_time = random.randint(min_time, max_time)
+            time_elapsed += hco_time + pressure_phase_time  # Total = FCP/HCT time + HCO time
+            # Clear pressure_phase_time after use
+            game_state["pressure_phase_time"] = 0
+        else:
+            # Normal HCO without pressure phase
+            tempo = off_team.strategy_calls["tempo_call"]
+            time_elapsed += get_time_elapsed(tempo)
 
         shooter_pos = get_player_position(off_lineup, shooter)
 
