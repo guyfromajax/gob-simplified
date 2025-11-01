@@ -327,16 +327,10 @@ export function shootBall({
   
   const rimCoords = isHomeTeam ? HOME_RIM_COORDS : AWAY_RIM_COORDS;
   
-  // Adjust rim position for made shots (grid units closer to shooter)
-  const MADE_SHOT_BALL_OFFSET = 1;  // Should match BackEnd/constants.py
-  const adjustedRimCoords = { ...rimCoords };
-  if (result === "MAKE") {
-    adjustedRimCoords.x = isHomeTeam ? rimCoords.x - MADE_SHOT_BALL_OFFSET : rimCoords.x + MADE_SHOT_BALL_OFFSET;
-  }
-  
+  // All made shots land at the exact rim position (same as free throws)
   const rim = gridToPixels(
-    adjustedRimCoords.x,
-    adjustedRimCoords.y,
+    rimCoords.x,
+    rimCoords.y,
     scene.game.config.width,
     scene.game.config.height
   );
