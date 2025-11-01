@@ -137,7 +137,22 @@ export function announceFromTurnData(turnData, timing = 'start', homeTeamId = nu
     // for precise timing when ball reaches rim/rebounder
     
     if (turnData.result_type === 'FOUL') {
-      showAnnouncement("Foul!", 'neutral');
+      // Skip shooting fouls - they're already announced in ballManager.js with "And 1!" or "Shooting Foul!"
+      const isShootingFoul = turnData?.text?.includes('AND-1') || 
+                            (turnData?.text?.includes('fouls') && turnData?.text?.includes('on the shot'));
+      
+      if (!isShootingFoul) {
+        // Non-shooting fouls: announce as "OFFENSIVE FOUL!" or "DEFENSIVE FOUL!"
+        const foulTeam = turnData.foul_team || 'OFFENSE'; // Default to offense if not specified
+        
+        if (foulTeam === 'OFFENSE') {
+          // Offensive foul - show in defense team color (they benefited)
+          showAnnouncement("OFFENSIVE FOUL!", defenseTeam);
+        } else {
+          // Defensive foul - show in offense team color (they benefited)
+          showAnnouncement("DEFENSIVE FOUL!", offenseTeam);
+        }
+      }
       return;
     }
     
@@ -158,7 +173,7 @@ export function announceFromTurnData(turnData, timing = 'start', homeTeamId = nu
         };
       }
       
-      showAnnouncement("Steal!", defenseTeam, playerData);
+      showAnnouncement("STEAL!", defenseTeam, playerData);
       return;
     }
   }
