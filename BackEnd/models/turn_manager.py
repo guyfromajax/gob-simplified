@@ -634,7 +634,7 @@ class TurnManager:
                 game_state["offensive_state"] = pressure_type
                 
                 shooter_team_id = getattr(rebounder, "team_id", None) or off_team.team_id
-                print(f"🏀 PUTBACK_MAKE: shooter={get_name_safe(rebounder)} team_id={shooter_team_id} off_team={off_team.name}")
+                # print(f"🏀 PUTBACK_MAKE: shooter={get_name_safe(rebounder)} team_id={shooter_team_id} off_team={off_team.name}")
                 
                 # Compute stat deltas (same as run_micro_turn)
                 deltas = {}
@@ -705,7 +705,7 @@ class TurnManager:
                 possession_flips = False
                 
                 shooter_team_id = getattr(rebounder, "team_id", None) or off_team.team_id
-                print(f"🏀 PUTBACK_MISS: shooter={get_name_safe(rebounder)} rebounder.team_id={getattr(rebounder, 'team_id', None)} off_team.team_id={off_team.team_id} off_team.name={off_team.name} final_shooter_team_id={shooter_team_id}")
+                # print(f"🏀 PUTBACK_MISS: shooter={get_name_safe(rebounder)} rebounder.team_id={getattr(rebounder, 'team_id', None)} off_team.team_id={off_team.team_id} off_team.name={off_team.name} final_shooter_team_id={shooter_team_id}")
                 
                 result = {
                     "result_type": "PUTBACK_MISS",
