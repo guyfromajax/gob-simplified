@@ -597,9 +597,8 @@ def resolve_half_court_offense_logic(game):
     animator = Animator(game)
     shot_result["animations"] = animator.capture_halfcourt_animation(roles)
     
-    # Add skeleton data for unified animation system
-    skeleton = get_skeleton_for_turn(shot_result.get("result_type", "HCO"), "HCO", game) or {}
-    shot_result["skeleton"] = skeleton
+    # Add skeleton data for unified animation system (reuse skeleton from line 556)
+    shot_result["skeleton"] = skeleton or {}
     
     # Convert skeleton to animations if skeleton exists
     if skeleton and "steps" in skeleton:
