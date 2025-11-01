@@ -135,16 +135,16 @@ class GameManager:
 
         # If the turn ended with an offensive rebound, create a separate OREB turn
         if self.game_state.get("pending_oreb"):
-            print(f"📦 OREB detected - creating separate OREB turn")
+            # print(f"📦 OREB detected - creating separate OREB turn")
             oreb_turn = self.turn_manager.resolve_offensive_rebound_turn()
             if oreb_turn:
-                print(f"📦 OREB turn created: {oreb_turn.get('result_type')} - {oreb_turn.get('text')}")
+                # print(f"📦 OREB turn created: {oreb_turn.get('result_type')} - {oreb_turn.get('text')}")
                 self.turns.append(oreb_turn)
                 self.text_log.append(oreb_turn["text"])
                 
                 # Handle possession flip for OREB turn (doesn't go through run_micro_turn)
                 if oreb_turn.get("possession_flips"):
-                    print(f"📦 OREB turn flipping possession")
+                    # print(f"📦 OREB turn flipping possession")
                     self.switch_possession()
                 
                 # Clear the pending OREB
