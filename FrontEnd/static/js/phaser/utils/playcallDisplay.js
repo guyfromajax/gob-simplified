@@ -65,20 +65,22 @@ export function updatePlaycallDisplay(turnData, homeTeamId) {
   const isHomeOnOffense = String(offenseTeamId) === String(homeTeamId);
   
   // Display playcalls based on possession
+  // Note: offensive-playcall element is on HOME side, defensive-playcall element is on AWAY side
   if (isHomeOnOffense) {
-    // Home on offense - offensive playcall on home side (right), defensive on away side (left)
+    // Home on offense - show offensive playcall on home side (right), defensive on away side (left)
     offensivePlaycallEl.textContent = offensivePlayType;
     defensivePlaycallEl.textContent = defensivePlayType || "-"; // Show Man/Zone for defense
     
-    // Update focus dots (only for offense)
+    // Update focus dots (only for offense - home side)
     if (offensiveFocusDotsEl) updateFocusDots(offensiveFocusDotsEl, offensivePlayFocus);
     if (defensiveFocusDotsEl) clearFocusDots(defensiveFocusDotsEl); // Clear defense dots
   } else {
-    // Away on offense - offensive playcall on away side (left), defensive on home side (right)
+    // Away on offense - show offensive playcall on away side (left), defensive on home side (right)
+    // FIX: Swap these - away offensive playcall should be on away side
     defensivePlaycallEl.textContent = offensivePlayType;
     offensivePlaycallEl.textContent = defensivePlayType || "-"; // Show Man/Zone for defense
     
-    // Update focus dots (flipped - only for offense)
+    // Update focus dots (only for offense - away side)
     if (defensiveFocusDotsEl) updateFocusDots(defensiveFocusDotsEl, offensivePlayFocus);
     if (offensiveFocusDotsEl) clearFocusDots(offensiveFocusDotsEl); // Clear defense dots
   }
