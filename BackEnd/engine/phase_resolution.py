@@ -624,23 +624,23 @@ def resolve_half_court_offense_logic(game):
             pc = off_team.scouting_data["offense"]["Playcalls"]
             rt = shot_result.get("result_type")
             foul_team = game.game_state.get("foul_team")
-            print(f"🎯 SUCCESS DEBUG: rt={rt}, foul_team={foul_team}")
+            # print(f"🎯 SUCCESS DEBUG: rt={rt}, foul_team={foul_team}")
             # Offense success conditions: made shot OR any defensive foul (shooting or non-shooting)
             # Note: When defensive foul occurs on a missed shot, rt is still "MISS" but foul_team is "DEFENSE"
             offense_success = (rt == "MAKE") or (foul_team == "DEFENSE")
-            print(f"🎯 SUCCESS DEBUG: offense_success={offense_success}, rt=='MAKE'={rt == 'MAKE'}, foul_team=='DEFENSE'={foul_team == 'DEFENSE'}")
-            if rt == "MAKE":
-                print(f"🎯 MADE SHOT SUCCESS: Play type={type_label}, focus={focus} - should increment success")
+            # print(f"🎯 SUCCESS DEBUG: offense_success={offense_success}, rt=='MAKE'={rt == 'MAKE'}, foul_team=='DEFENSE'={foul_team == 'DEFENSE'}")
+            # if rt == "MAKE":
+            #     print(f"🎯 MADE SHOT SUCCESS: Play type={type_label}, focus={focus} - should increment success")
             # Defense success conditions
             offense_failure = (rt == "MISS" and not (foul_team == "DEFENSE")) or (rt == "TURNOVER") or (rt == "O_FOUL")
-            print(f"🎯 SUCCESS DEBUG: offense_failure={offense_failure}")
+            # print(f"🎯 SUCCESS DEBUG: offense_failure={offense_failure}")
             if offense_success:
-                print(f"🎯 SUCCESS DEBUG: Incrementing success for {type_label}/{focus}")
-                print(f"🎯 SUCCESS DEBUG: Before - overall: {pc[type_label]['overall']['success']}, {focus}: {pc[type_label][focus]['success']}, Cumulative: {pc['Cumulative'][focus]['success']}")
+                # print(f"🎯 SUCCESS DEBUG: Incrementing success for {type_label}/{focus}")
+                # print(f"🎯 SUCCESS DEBUG: Before - overall: {pc[type_label]['overall']['success']}, {focus}: {pc[type_label][focus]['success']}, Cumulative: {pc['Cumulative'][focus]['success']}")
                 pc[type_label]["overall"]["success"] += 1
                 pc[type_label][focus]["success"] += 1
                 pc["Cumulative"][focus]["success"] += 1
-                print(f"🎯 SUCCESS DEBUG: After - overall: {pc[type_label]['overall']['success']}, {focus}: {pc[type_label][focus]['success']}, Cumulative: {pc['Cumulative'][focus]['success']}")
+                # print(f"🎯 SUCCESS DEBUG: After - overall: {pc[type_label]['overall']['success']}, {focus}: {pc[type_label][focus]['success']}, Cumulative: {pc['Cumulative'][focus]['success']}")
             elif offense_failure:
                 # We don't increment offense success; defensive success can be tracked separately if needed
                 pass
@@ -648,9 +648,10 @@ def resolve_half_court_offense_logic(game):
             # Note: Only clear if this is the original HCO play, not a putback (putbacks have result_type PUTBACK_MAKE/PUTBACK_MISS)
             if rt in ["MAKE", "MISS"]:
                 game.game_state["foul_team"] = None
-                print(f"🎯 SUCCESS DEBUG: Cleared foul_team after HCO play (rt={rt})")
+                # print(f"🎯 SUCCESS DEBUG: Cleared foul_team after HCO play (rt={rt})")
         else:
-            print(f"🎯 SUCCESS DEBUG: Skipping - type_label={type_label}, focus={focus}")
+            pass
+            # print(f"🎯 SUCCESS DEBUG: Skipping - type_label={type_label}, focus={focus}")
     except Exception as e:
         print(f"🎯 SUCCESS DEBUG ERROR: {type(e).__name__}: {e}")
         import traceback

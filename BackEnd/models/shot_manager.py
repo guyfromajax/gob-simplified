@@ -126,10 +126,10 @@ class ShotManager:
         defender = roles.get("defender", "")
 
         # Debug: Print shooter information with object ID
-        from BackEnd.constants import DEBUG
-        if DEBUG:
-            print(f"🎯 SHOT DEBUG: shooter={get_name_safe(shooter)}, shooter_pos={get_player_position(off_lineup, shooter)}, shooter_id={id(shooter)}")
-            print(f"🎯 SHOT DEBUG: shooter object: {shooter}")
+        # from BackEnd.constants import DEBUG
+        # if DEBUG:
+        #     print(f"🎯 SHOT DEBUG: shooter={get_name_safe(shooter)}, shooter_pos={get_player_position(off_lineup, shooter)}, shooter_id={id(shooter)}")
+        #     print(f"🎯 SHOT DEBUG: shooter object: {shooter}")
 
         playcall = self.game_state["current_playcall"]
         defense_call = self.game_state["defense_playcall"]
@@ -168,17 +168,17 @@ class ShotManager:
             points = 3 if is_three else 2
             
             # Debug: Print shooter info right before scoring
-            from BackEnd.constants import DEBUG
-            if DEBUG:
-                print(f"🎯 PRE-SCORING DEBUG: shooter={get_name_safe(shooter)}, shooter_pos={get_player_position(off_lineup, shooter)}, shooter_id={id(shooter)}")
-                print(f"🎯 PRE-SCORING DEBUG: shooter object: {shooter}")
+            # from BackEnd.constants import DEBUG
+            # if DEBUG:
+            #     print(f"🎯 PRE-SCORING DEBUG: shooter={get_name_safe(shooter)}, shooter_pos={get_player_position(off_lineup, shooter)}, shooter_id={id(shooter)}")
+            #     print(f"🎯 PRE-SCORING DEBUG: shooter object: {shooter}")
             
             apply_scoring(self.game, off_team, shooter, points, stats)
             
             # Track PIP if shot was from the paint
             if is_paint:
                 shooter.record_stat("PIP", amount=points)
-                print(f"🎯 PIP DEBUG: Recorded {points} PIP for {get_name_safe(shooter)}")
+                # print(f"🎯 PIP DEBUG: Recorded {points} PIP for {get_name_safe(shooter)}")
             
             print(f"🎯 SCORING DEBUG: Awarded {points} points to {get_name_safe(shooter)} (position: {get_player_position(off_lineup, shooter)})")
 
