@@ -92,6 +92,41 @@ class QuarterSimulationRequest(BaseModel):
 ongoing_games: dict[str, GameManager] = {}
 
 # Helper functions for tournament/franchise mode
+def load_player_attributes_from_doc(mode: str, doc_id: str, player_id: str):
+    """Load player attributes (EM, CH, MO) from tournament/franchise doc."""
+    from BackEnd.db import franchises_collection
+    
+    if mode == "tournament":
+        try:
+            doc = tournaments_collection.find_one({"_id": ObjectId(doc_id)})
+            if doc:
+                player_stats = doc.get("player_stats", {}).get(player_id, {})
+                attrs = player_stats.get("attributes", {})
+                if attrs:
+                    return {
+                        "EM": attrs.get("EM"),
+                        "CH": attrs.get("CH"),
+                        "MO": attrs.get("MO")
+                    }
+        except Exception as e:
+            print(f"⚠️ Error loading player attributes from tournament doc: {e}")
+    elif mode == "franchise":
+        try:
+            doc = franchises_collection.find_one({"_id": ObjectId(doc_id)})
+            if doc:
+                players = doc.get("players", {}).get(player_id, {})
+                attrs = players.get("attributes", {})
+                if attrs:
+                    return {
+                        "EM": attrs.get("EM"),
+                        "CH": attrs.get("CH"),
+                        "MO": attrs.get("MO")
+                    }
+        except Exception as e:
+            print(f"⚠️ Error loading player attributes from franchise doc: {e}")
+    
+    return None
+
 def load_team_attributes_from_doc(mode: str, doc_id: str, team_id: str, team_name: str):
     """Load team_attributes from tournament/franchise doc, fallback to core teams doc."""
     from BackEnd.db import franchises_collection
