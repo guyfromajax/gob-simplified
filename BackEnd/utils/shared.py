@@ -169,7 +169,11 @@ def resolve_offensive_rebound(game, rebounder):
         }
 
         if made:
+            print(f"📦 PUTBACK MAKE DEBUG: About to call apply_scoring for {get_name_safe(rebounder)}")
+            print(f"📦 PUTBACK MAKE DEBUG: rebounder object={rebounder}, player_id={getattr(rebounder, 'player_id', None)}")
+            print(f"📦 PUTBACK MAKE DEBUG: rebounder current PTS before scoring={rebounder.stats['game'].get('PTS', 0)}")
             apply_scoring(game, off_team, rebounder, 2, ["FGM"])
+            print(f"📦 PUTBACK MAKE DEBUG: rebounder PTS after scoring={rebounder.stats['game'].get('PTS', 0)}")
             # Putbacks are always from the paint
             rebounder.record_stat("PIP", amount=2)
             print(f"📦 PUTBACK FGM: Recorded FGM for {get_name_safe(rebounder)}")
