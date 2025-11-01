@@ -327,10 +327,17 @@ export function shootBall({
   
   const rimCoords = isHomeTeam ? HOME_RIM_COORDS : AWAY_RIM_COORDS;
   
-  // All made shots land at the exact rim position (same as free throws)
+  // Adjust landing position for made shots
+  // Home team (attacks away basket x=91): reduce by 1 → 90
+  // Away team (attacks home basket x=9): increase by 1 → 10
+  const adjustedRimCoords = { ...rimCoords };
+  if (result === "MAKE") {
+    adjustedRimCoords.x = isHomeTeam ? rimCoords.x - 1 : rimCoords.x + 1;
+  }
+  
   const rim = gridToPixels(
-    rimCoords.x,
-    rimCoords.y,
+    adjustedRimCoords.x,
+    adjustedRimCoords.y,
     scene.game.config.width,
     scene.game.config.height
   );
