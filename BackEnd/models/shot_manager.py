@@ -180,7 +180,7 @@ class ShotManager:
                 shooter.record_stat("PIP", amount=points)
                 # print(f"🎯 PIP DEBUG: Recorded {points} PIP for {get_name_safe(shooter)}")
             
-            print(f"🎯 SCORING DEBUG: Awarded {points} points to {get_name_safe(shooter)} (position: {get_player_position(off_lineup, shooter)})")
+            # print(f"🎯 SCORING DEBUG: Awarded {points} points to {get_name_safe(shooter)} (position: {get_player_position(off_lineup, shooter)})")
 
             possession_flips = True
             if screener:
@@ -199,7 +199,7 @@ class ShotManager:
             else:
                 # Check for defensive pressure opportunity (FCP/HCT)
                 pressure_type = self.game.turn_manager.determine_defensive_pressure_type()
-                print(f"🏀 MADE SHOT: Setting offensive_state to {pressure_type} (defense team: {self.game.defense_team.name})")
+                # print(f"🏀 MADE SHOT: Setting offensive_state to {pressure_type} (defense team: {self.game.defense_team.name})")
                 self.game_state["offensive_state"] = pressure_type
                 # Store pressure type for animator to use
                 result["next_defensive_setup"] = pressure_type

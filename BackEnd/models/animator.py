@@ -1159,7 +1159,7 @@ class Animator:
         is_away_offense = self.game.offense_team.team_id == self.game.away_team.team_id
         aggression = self.game.defense_team.strategy_calls.get("aggression_call", "normal")
         
-        print(f"🔍 Positioning standard defenders for HCO (away_offense: {is_away_offense}, aggression: {aggression})")
+        # print(f"🔍 Positioning standard defenders for HCO (away_offense: {is_away_offense}, aggression: {aggression})")
         
         # Build offensive player positions by step for tracking
         # Note: We need the original (unflipped) coordinates for defensive positioning
