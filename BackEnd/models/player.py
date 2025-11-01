@@ -87,15 +87,9 @@ class Player:
         if stat in {"FGM", "3PTM", "FTM"}:
             s = self.stats["game"]
             s["PTS"] = (2 * s["FGM"]) + s["3PTM"] + s["FTM"]
-            from BackEnd.constants import DEBUG
-            if DEBUG:
-                print(f"🎯 RECORD_STAT DEBUG: Updated PTS to {s['PTS']} for {self.get_name()}")
         elif stat in {"OREB", "DREB"}:
             s = self.stats["game"]
             s["REB"] = s["OREB"] + s["DREB"]
-            from BackEnd.constants import DEBUG
-            if DEBUG:
-                print(f"🎯 RECORD_STAT DEBUG: Updated REB to {s['REB']} for {self.get_name()}")
 
     def get_fatigue_decay_amount(self):
         nd = self.attributes.get("ND", 50)  # Default to 50 if not set
