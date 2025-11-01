@@ -105,7 +105,7 @@ class Player:
         elif nd >= 19:
             return random.choice([0, 0.01, 0.02, 0.03, 0.03])
         elif nd >= 9:
-            return random.choice([0, 0.01, 0.02, 0.03, 0.03])
+            return random.choice([0, 0.01, 0.02, 0.02, 0.03, 0.03])
         else:
             return random.choice([0, 0.01, 0.02, 0.03, 0.03, 0.03])
     
