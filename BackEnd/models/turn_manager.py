@@ -589,12 +589,18 @@ class TurnManager:
         
         Returns a turn result for: PUTBACK_MAKE, PUTBACK_MISS, or KICKOUT
         """
-        from BackEnd.utils.shared import resolve_offensive_rebound, get_name_safe, unpack_game_context
+        from BackEnd.utils.shared import resolve_offensive_rebound, get_name_safe, unpack_game_context, serialize_lineup
         from BackEnd.models.shot_manager import ShotManager
         
         pending_oreb = self.game.game_state.get("pending_oreb")
         if not pending_oreb:
             return None
+        
+        # Capture player stats before OREB resolution (for deltas)
+        pre_stats = {}
+        for team in (self.game.home_team, self.game.away_team):
+            for player in team.get_all_players():
+                pre_stats[player.player_id] = dict(player.stats["game"])
         
         rebounder = pending_oreb["rebounder"]
         game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(self.game)
@@ -630,6 +636,31 @@ class TurnManager:
                 shooter_team_id = getattr(rebounder, "team_id", None) or off_team.team_id
                 print(f"🏀 PUTBACK_MAKE: shooter={get_name_safe(rebounder)} team_id={shooter_team_id} off_team={off_team.name}")
                 
+                # Compute stat deltas (same as run_micro_turn)
+                deltas = {}
+                for team in (self.game.home_team, self.game.away_team):
+                    for player in team.get_all_players():
+                        prev = pre_stats.get(player.player_id, {})
+                        diff = {
+                            stat: player.stats["game"].get(stat, 0) - prev.get(stat, 0)
+                            for stat in player.stats["game"]
+                            if player.stats["game"].get(stat, 0) - prev.get(stat, 0)
+                        }
+                        if diff:
+                            deltas[player.player_id] = {"team": team.name, "stats": diff}
+                
+                # Include current energy levels
+                player_energy = {}
+                for team in (self.game.home_team, self.game.away_team):
+                    for pos, player in team.lineup.items():
+                        player_energy[player.player_id] = {
+                            "NG": player.attributes.get("NG", 1.0),
+                            "team": team.name
+                        }
+                
+                # Update team stats before sending
+                self.game.update_team_stats()
+                
                 return {
                     "result_type": "PUTBACK_MAKE",
                     "ball_handler": getattr(rebounder, "player_id", None),
@@ -645,6 +676,26 @@ class TurnManager:
                     "animations": [],  # Putbacks use simple animation, not skeleton
                     "rebounderId": getattr(rebounder, "player_id", None),
                     "quarter": self.game.quarter,
+                    # Add fields needed by frontend for stat display
+                    "deltas": deltas,
+                    "player_energy": player_energy,
+                    "score": dict(self.game.score),
+                    "home_lineup": serialize_lineup(self.game.home_team.lineup),
+                    "away_lineup": serialize_lineup(self.game.away_team.lineup),
+                    "team_totals": {
+                        self.game.home_team.name: self.game.home_team.get_team_game_stats(),
+                        self.game.away_team.name: self.game.away_team.get_team_game_stats()
+                    },
+                    "team_stats": {
+                        self.game.home_team.name: {
+                            "offense": self.game.home_team.scouting_data.get("offense", {}),
+                            "defense": self.game.home_team.scouting_data.get("defense", {})
+                        },
+                        self.game.away_team.name: {
+                            "offense": self.game.away_team.scouting_data.get("offense", {}),
+                            "defense": self.game.away_team.scouting_data.get("defense", {})
+                        }
+                    },
                 }
             else:
                 # Putback missed - check for rebound
@@ -707,6 +758,52 @@ class TurnManager:
                         game_state["offensive_state"] = next_play_type
                         result["next_play_type"] = next_play_type
                 
+                # Compute stat deltas (same as run_micro_turn)
+                deltas = {}
+                for team in (self.game.home_team, self.game.away_team):
+                    for player in team.get_all_players():
+                        prev = pre_stats.get(player.player_id, {})
+                        diff = {
+                            stat: player.stats["game"].get(stat, 0) - prev.get(stat, 0)
+                            for stat in player.stats["game"]
+                            if player.stats["game"].get(stat, 0) - prev.get(stat, 0)
+                        }
+                        if diff:
+                            deltas[player.player_id] = {"team": team.name, "stats": diff}
+                
+                # Include current energy levels
+                player_energy = {}
+                for team in (self.game.home_team, self.game.away_team):
+                    for pos, player in team.lineup.items():
+                        player_energy[player.player_id] = {
+                            "NG": player.attributes.get("NG", 1.0),
+                            "team": team.name
+                        }
+                
+                # Update team stats before sending
+                self.game.update_team_stats()
+                
+                # Add fields needed by frontend for stat display
+                result["deltas"] = deltas
+                result["player_energy"] = player_energy
+                result["score"] = dict(self.game.score)
+                result["home_lineup"] = serialize_lineup(self.game.home_team.lineup)
+                result["away_lineup"] = serialize_lineup(self.game.away_team.lineup)
+                result["team_totals"] = {
+                    self.game.home_team.name: self.game.home_team.get_team_game_stats(),
+                    self.game.away_team.name: self.game.away_team.get_team_game_stats()
+                }
+                result["team_stats"] = {
+                    self.game.home_team.name: {
+                        "offense": self.game.home_team.scouting_data.get("offense", {}),
+                        "defense": self.game.home_team.scouting_data.get("defense", {})
+                    },
+                    self.game.away_team.name: {
+                        "offense": self.game.away_team.scouting_data.get("offense", {}),
+                        "defense": self.game.away_team.scouting_data.get("defense", {})
+                    }
+                }
+                
                 return result
         
         else:
@@ -715,6 +812,31 @@ class TurnManager:
             pg = off_team.lineup.get("PG")
             text = f"{get_name_safe(rebounder)} kicks it out to reset."
             game_state["offensive_state"] = "HCO"
+            
+            # Compute stat deltas (same as run_micro_turn)
+            deltas = {}
+            for team in (self.game.home_team, self.game.away_team):
+                for player in team.get_all_players():
+                    prev = pre_stats.get(player.player_id, {})
+                    diff = {
+                        stat: player.stats["game"].get(stat, 0) - prev.get(stat, 0)
+                        for stat in player.stats["game"]
+                        if player.stats["game"].get(stat, 0) - prev.get(stat, 0)
+                    }
+                    if diff:
+                        deltas[player.player_id] = {"team": team.name, "stats": diff}
+            
+            # Include current energy levels
+            player_energy = {}
+            for team in (self.game.home_team, self.game.away_team):
+                for pos, player in team.lineup.items():
+                    player_energy[player.player_id] = {
+                        "NG": player.attributes.get("NG", 1.0),
+                        "team": team.name
+                    }
+            
+            # Update team stats before sending
+            self.game.update_team_stats()
             
             return {
                 "result_type": "OREB_KICKOUT",
@@ -726,6 +848,26 @@ class TurnManager:
                 "rebounderId": getattr(rebounder, "player_id", None),
                 "pgId": getattr(pg, "player_id", None) if pg else None,
                 "quarter": self.game.quarter,
+                # Add fields needed by frontend for stat display
+                "deltas": deltas,
+                "player_energy": player_energy,
+                "score": dict(self.game.score),
+                "home_lineup": serialize_lineup(self.game.home_team.lineup),
+                "away_lineup": serialize_lineup(self.game.away_team.lineup),
+                "team_totals": {
+                    self.game.home_team.name: self.game.home_team.get_team_game_stats(),
+                    self.game.away_team.name: self.game.away_team.get_team_game_stats()
+                },
+                "team_stats": {
+                    self.game.home_team.name: {
+                        "offense": self.game.home_team.scouting_data.get("offense", {}),
+                        "defense": self.game.home_team.scouting_data.get("defense", {})
+                    },
+                    self.game.away_team.name: {
+                        "offense": self.game.away_team.scouting_data.get("offense", {}),
+                        "defense": self.game.away_team.scouting_data.get("defense", {})
+                    }
+                },
             }
 
     def update_clock_and_possession(self, result):
