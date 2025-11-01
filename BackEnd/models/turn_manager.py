@@ -858,6 +858,8 @@ class TurnManager:
             
             # === TURN-LEVEL ROLES (for backend shot calculation) ===
             # Extract from final steps only - much simpler and more accurate
+            if ball_owner_by_step:
+                print(f"ball_owner_by_step: {ball_owner_by_step}")
             
             if not steps:
                 return {
@@ -1022,74 +1024,6 @@ class TurnManager:
             "ball_owner_by_step": derived_roles["ball_owner_by_step"],
             "ball_handler_coords_by_step": derived_roles["ball_handler_coords_by_step"]
         }
-    
-    # def assign_roles(self):
-        
-    #     off_team = self.game.offense_team
-    #     def_team = self.game.defense_team
-    #     off_lineup = self.game.offense_team.lineup
-    #     def_lineup = self.game.defense_team.lineup
-    #     playcall = self.game.game_state["current_playcall"]
-    #     # print(f"playcall: {playcall}")
-
-    #     # Compute shot weights using attributes embedded in each player object
-    #     weights_dict = PLAYCALL_ATTRIBUTE_WEIGHTS.get("Attack" if playcall == "Set" else playcall, {})
-    #     # print(f"weights_dict: {weights_dict}")
-
-    #     # for pos, player in off_lineup.items():
-    #     #     print(f"{pos}: {player.attributes}")
-        
-    #     shot_weights = {
-    #         pos: sum(
-    #             off_lineup[pos].attributes[attr] * weight
-    #             for attr, weight in weights_dict.items()
-    #         )
-    #         for pos in off_lineup
-    #     }
-    #     # print(f"shot_weights: {shot_weights}")
-    #     shooter_pos = weighted_random_from_dict(shot_weights)
-
-    #     # Compute screener weights (excluding the shooter)
-    #     screen_weights = {
-    #         pos: (
-    #             off_lineup[pos].attributes["ST"] * 6 +
-    #             off_lineup[pos].attributes["AG"] * 2 +
-    #             off_lineup[pos].attributes["IQ"] * 1 +
-    #             off_lineup[pos].attributes["CH"] * 1
-    #         )
-    #         for pos in off_lineup if pos != shooter_pos
-    #     }
-
-    #     screener_pos = max(screen_weights, key=screen_weights.get)
-    #     if screener_pos == shooter_pos:
-    #         screener_pos = ""
-
-    #     # Pass chain and passer
-    #     pass_chain = generate_pass_chain(self.game, shooter_pos)
-
-    #     passer_pos = pass_chain[-2] if len(pass_chain) >= 2 else ""
-    #     if passer_pos == shooter_pos or passer_pos == screener_pos:
-    #         passer_pos = ""
-
-    #     if self.game.game_state["defense_playcall"] == "Zone":
-    #         defender_pos = random.choice(POSITION_LIST)
-    #     else:
-    #         defender_pos = shooter_pos
-
-    #     shooter = self.game.offense_team.lineup[shooter_pos]
-    #     screener = self.game.offense_team.lineup[screener_pos]
-    #     passer = self.game.offense_team.lineup[passer_pos] if passer_pos else None
-    #     defender = self.game.defense_team.lineup[defender_pos]
-
-        
-    #     return {
-    #         "shooter": shooter,
-    #         "screener": screener,
-    #         "ball_handler": shooter,
-    #         "passer": passer,
-    #         "pass_chain": pass_chain,
-    #         "defender": defender
-    #     }
     
     def determine_event_type(self, roles):
         game = self.game
