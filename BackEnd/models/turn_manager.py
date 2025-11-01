@@ -1021,8 +1021,10 @@ class TurnManager:
                 final_owner = ball_owner_by_step[-1]
                 shooter_pos = final_owner if isinstance(final_owner, str) else None
             
-            # 2. Get PASSER from last pass event (check last 2 steps)
-            for step in reversed(steps[-2:]):
+            # 2. Get PASSER from last pass event (check previous 2 steps before shot)
+            # If shot is in step 7, check steps 5 and 6 for passes to the shooter
+            steps_to_check = steps[-3:-1] if len(steps) >= 3 else steps[:-1]
+            for step in reversed(steps_to_check):
                 for event in step.get("events", []):
                     if event.get("type") == "pass":
                         potential_passer = event.get("from")

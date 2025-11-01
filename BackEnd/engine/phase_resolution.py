@@ -262,8 +262,27 @@ def resolve_fast_break_logic(game: "GameManager"):
     shooter = random.choice(offense_in_play)
 
     fb_roles["shooter"] = shooter
-    # If shooter is not the ball handler, then ball handler is the passer
-    fb_roles["passer"] = fb_roles["ball_handler"] if shooter != fb_roles["ball_handler"] else None
+    
+    # Determine passer for assist tracking
+    shooter_id = getattr(shooter, "player_id", None)
+    outlet_receiver_id = fb_roles.get("outlet_receiver")
+    outlet_passer_id = fb_roles.get("outlet_passer")
+    
+    # If shooter is the outlet receiver (who received the outlet pass after DREB), passer is the outlet passer (rebounder)
+    if outlet_receiver_id and outlet_passer_id and shooter_id == outlet_receiver_id:
+        # Find the outlet passer player object
+        passer = None
+        for player in off_team.get_all_players():
+            if getattr(player, "player_id", None) == outlet_passer_id:
+                passer = player
+                break
+        fb_roles["passer"] = passer
+    # Otherwise, if shooter is not the ball handler, then ball handler is the passer
+    elif shooter != fb_roles["ball_handler"]:
+        fb_roles["passer"] = fb_roles["ball_handler"]
+    else:
+        fb_roles["passer"] = None
+    
     fb_roles["screener"] = None
 
     # Foul or turnover possibilities
