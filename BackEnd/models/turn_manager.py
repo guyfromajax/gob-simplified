@@ -1057,16 +1057,8 @@ class TurnManager:
         
         # Use provided skeleton from MongoDB if available, otherwise fall back to old system
         if skeleton and "steps" in skeleton:
-            # Use the MongoDB skeleton
-            scene_steps = skeleton["steps"]
-            tempo_to_steps = {"slow": 7, "normal": 5, "fast": 4}
-            requested = tempo_to_steps.get(tempo_call.lower(), len(scene_steps))
-            
-            # Always include the final shot step
-            if requested >= len(scene_steps):
-                steps = scene_steps
-            else:
-                steps = scene_steps[:requested - 1] + [scene_steps[-1]]
+            # Use the MongoDB skeleton - animate all steps (tempo no longer affects HCO step count)
+            steps = skeleton["steps"]
         else:
             # Fallback to old hardcoded skeleton system
             playcall_scenes_map = {
