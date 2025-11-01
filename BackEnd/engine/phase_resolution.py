@@ -970,7 +970,8 @@ def resolve_full_court_press_logic(game: "GameManager"):
         "skeleton": skeleton,
         "animations": animations,
         "roles": roles,
-        "fcp_foul": True  # Flag to indicate this FOUL has FCP animations
+        "fcp_foul": True,  # Flag to indicate this FOUL has FCP animations
+        "foul_team": game_state.get("foul_team")  # Include foul_team for frontend announcement
     }
     
     return result
@@ -1388,7 +1389,8 @@ def resolve_half_court_trap_logic(game: "GameManager"):
         "skeleton": skeleton,
         "animations": animations,
         "roles": roles,
-        "hct_foul": True if result_type == "FOUL" else False  # Flag for HCT fouls with animations
+        "hct_foul": True if result_type == "FOUL" else False,  # Flag for HCT fouls with animations
+        "foul_team": game_state.get("foul_team")  # Include foul_team for frontend announcement
     }
     
     return result
