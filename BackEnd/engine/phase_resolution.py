@@ -1020,19 +1020,6 @@ def get_hco_skeleton(result_type, game_context):
     # Try to get skeleton from team-specific play objects first
     skeleton = _get_skeleton_from_team_plays(playcall, offense_team_id, game_context)
     if skeleton:
-        num_steps = len(skeleton.get("steps", []))
-        final_step_shooter = None
-        if skeleton.get("steps"):
-            final_step = skeleton["steps"][-1]
-            for pos, action_info in final_step.get("pos_actions", {}).items():
-                if action_info.get("action") == "shoot":
-                    final_step_shooter = pos
-            # Also check events
-            if not final_step_shooter:
-                for event in final_step.get("events", []):
-                    if event.get("type") == "shot":
-                        final_step_shooter = event.get("by")
-        print(f"🔍 SKELETON SOURCE: Using team plays skeleton for '{playcall}' - {num_steps} steps, final shooter: {final_step_shooter}")
         return skeleton
     
     # Fallback to universal plays collection
