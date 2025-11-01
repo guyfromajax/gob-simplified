@@ -240,8 +240,11 @@ function autosetLineup() {
   
   // For each position in random order
   shuffledPositions.forEach(pos => {
-    // Get available players (not already assigned)
-    const availablePlayers = roster.filter(p => !assignedPlayers.has(p._id));
+    // Get available players (not already assigned AND NG >= 0.8)
+    const availablePlayers = roster.filter(p => {
+      const ng = p.NG ?? p.attributes?.NG ?? 1.0;
+      return !assignedPlayers.has(p._id) && ng >= 0.8;
+    });
     
     // Get players with ratings for this position, sorted by rating desc
     const playersWithRating = availablePlayers
