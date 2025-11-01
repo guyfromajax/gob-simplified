@@ -292,7 +292,13 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
   // Shoot the ball
   safeTransition(scene.stateMachine, States.ShotAttempt);
   
-  const rimPx = gridToPixels(basket.x, basket.y, width, height);
+  // Adjust rim position for made shots (1 grid unit closer to shooter)
+  const adjustedBasket = { ...basket };
+  if (turnData.result_type === "MAKE") {
+    adjustedBasket.x = isHomeOffense ? basket.x - 1 : basket.x + 1;
+  }
+  
+  const rimPx = gridToPixels(adjustedBasket.x, adjustedBasket.y, width, height);
   await tweenBallTo(scene, ballSprite, rimPx, {
     duration: 400,
     easing: "Sine.easeInOut",
