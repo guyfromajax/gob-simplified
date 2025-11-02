@@ -239,16 +239,29 @@ export function createGameScene(Phaser) {
         console.log('🔄 Sim response arrived', { turns: turnsLen });
       }
       DEBUG_FLOW && console.log('[gameScene] quarters', { requested: this.quarter, sim: simData.quarter });
-      const logHome = simData.homeTeam?.name || simData.home_team;
-      const logAway = simData.awayTeam?.name || simData.away_team;
-      const homeId = simData.home_team_id || simData.homeTeam?.team_id;
-      const awayId = simData.away_team_id || simData.awayTeam?.team_id;
+      
+      // Handle both new (nested) and old (flat) structure
+      const homeTeamObj = typeof simData.home_team === 'object' ? simData.home_team : null;
+      const awayTeamObj = typeof simData.away_team === 'object' ? simData.away_team : null;
+      
+      // Extract team names (new nested structure or old flat structure)
+      const logHome = homeTeamObj?.name || simData.home_team || simData.homeTeam?.name;
+      const logAway = awayTeamObj?.name || simData.away_team || simData.awayTeam?.name;
+      
+      // Extract team IDs
+      const homeId = homeTeamObj?.team_id || simData.home_team_id || simData.homeTeam?.team_id;
+      const awayId = awayTeamObj?.team_id || simData.away_team_id || simData.awayTeam?.team_id;
+      
+      // Extract team colors
+      const homeColors = homeTeamObj?.colors || simData.home_team_colors;
+      const awayColors = awayTeamObj?.colors || simData.away_team_colors;
+      
       if (DEBUG_TEAMS) {
         console.log('Resolved team IDs:', { home_team_id: homeId, away_team_id: awayId });
         console.log('Team colors from simData:', {
           mode: this.mode,
-          home: simData.home_team_colors,
-          away: simData.away_team_colors,
+          home: homeColors,
+          away: awayColors,
         });
       }
       this.gameId = simData.game_id || this.gameId;
@@ -261,8 +274,8 @@ export function createGameScene(Phaser) {
       this.homeTeamId = homeId;
       this.awayTeamId = awayId;
       gameStore.setColors({
-        home: simData.home_team_colors,
-        away: simData.away_team_colors,
+        home: homeColors,
+        away: awayColors,
       });
       this.isFinal = simData.is_final;
       if (DEBUG_FLOW) {
@@ -633,9 +646,10 @@ export function createGameScene(Phaser) {
 
       // Initialize Team Box Score with team attributes (S3 tab) only
       // Stats will be updated in real-time from turn data via applyTeamStats
-      if (typeof window.setTeamBoxData === 'function' && simData.team_attributes) {
-        const homeAttrs = simData.team_attributes[homeTeam] || {};
-        const awayAttrs = simData.team_attributes[awayTeam] || {};
+      if (typeof window.setTeamBoxData === 'function') {
+        // Get team attributes from new nested structure or old flat structure
+        const homeAttrs = homeTeamObj?.attributes || simData.team_attributes?.[homeTeam] || {};
+        const awayAttrs = awayTeamObj?.attributes || simData.team_attributes?.[awayTeam] || {};
         
         // Initialize with empty offense, defense, and empty totals (will be populated from turn data in real-time)
         window.setTeamBoxData({
@@ -789,8 +803,12 @@ export function createGameScene(Phaser) {
         const awayOffense = turn.team_stats?.[awayTeam]?.offense || {};
         const homeDefense = turn.team_stats?.[homeTeam]?.defense || {};
         const awayDefense = turn.team_stats?.[awayTeam]?.defense || {};
-        const homeAttrs = simData.team_attributes?.[homeTeam] || {};
-        const awayAttrs = simData.team_attributes?.[awayTeam] || {};
+        
+        // Get team attributes from nested structure or old flat structure
+        const homeTeamObj = typeof simData.home_team === 'object' ? simData.home_team : null;
+        const awayTeamObj = typeof simData.away_team === 'object' ? simData.away_team : null;
+        const homeAttrs = homeTeamObj?.attributes || simData.team_attributes?.[homeTeam] || {};
+        const awayAttrs = awayTeamObj?.attributes || simData.team_attributes?.[awayTeam] || {};
         
         // Get cumulative team stats for S1 tab
         const homeTotals = turn.team_totals?.[homeTeam] || {};

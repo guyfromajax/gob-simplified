@@ -414,13 +414,14 @@ def unpack_game_context(game):
         game.defense_team.lineup,
     )
 
-def summarize_game_state(game, exclude_animations=False):
+def summarize_game_state(game, exclude_animations=True):
     """
     Summarize game state for persistence/API responses.
+    Uses nested team structure and always excludes animations from saves.
     
     Args:
         game: GameManager instance
-        exclude_animations: If True, remove animations from turns (for database persistence)
+        exclude_animations: Always True for saves (animations only for real-time frontend)
     """
     
     def _collect_player_ids(obj, acc):
@@ -574,54 +575,86 @@ def summarize_game_state(game, exclude_animations=False):
     print(f"🔍 DEBUG: Home team plays: {len(teams_obj[game.home_team.team_id]['plays'])}")
     print(f"🔍 DEBUG: Away team plays: {len(teams_obj[game.away_team.team_id]['plays'])}")
 
-    # Process turns: exclude animations if requested (for database persistence)
-    turns = game.turns
-    if exclude_animations:
-        # Deep copy turns and remove animations from each turn
-        from copy import deepcopy
-        turns = deepcopy(game.turns)
-        for turn in turns:
-            if "animations" in turn:
-                del turn["animations"]
+    # Process turns: always exclude animations for database persistence
+    # Animations are only needed for real-time frontend rendering
+    from copy import deepcopy
+    turns = deepcopy(game.turns)
+    for turn in turns:
+        if "animations" in turn:
+            del turn["animations"]
+    
+    # Get cumulative box scores
+    cumulative_box = game.get_box_score()
 
-    return {
-        "final_score": game.score,
-        "points_by_quarter": game.game_state["points_by_quarter"],
-        "box_score": cumulative_box,
-        "final_box_score": cumulative_box,
-        "scouting": {
-            game.home_team.name: game.home_team.scouting_data,
-            game.away_team.name: game.away_team.scouting_data,
-        },
-        "team_attributes": {
-            game.home_team.name: game.home_team.team_attributes,
-            game.away_team.name: game.away_team.team_attributes,
-        },
-        "team_plays": {
-            game.home_team.name: list(game.home_team.plays.values()),  # Convert dict to list for JSON
-            game.away_team.name: list(game.away_team.plays.values()),
-        },
-        "team_totals": game.team_totals,
-        "text_log": game.text_log,
-        "turns": turns,
-        "home_team": game.home_team.name,
-        "away_team": game.away_team.name,
-        "home_team_colors": {
+    # Build nested team objects with all team-related data
+    home_team_data = {
+        "name": game.home_team.name,
+        "team_id": game.home_team.team_id,
+        "mascot": game.home_team.mascot,
+        "colors": {
             "primary_color": game.home_team.primary_color,
             "secondary_color": game.home_team.secondary_color,
         },
-        "away_team_colors": {
+        "score": game.score.get(game.home_team.name, 0),
+        "points_by_quarter": game.game_state["points_by_quarter"].get(game.home_team.name, [0, 0, 0, 0]),
+        "team_fouls": game.home_team.team_fouls,
+        
+        # Malleable attributes (per game instance)
+        "attributes": game.home_team.team_attributes,
+        "strategy_settings": game.home_team.strategy_settings,
+        "scouting": game.home_team.scouting_data,
+        "plays": list(game.home_team.plays.values()),  # Convert dict to list for JSON
+        
+        # Player stats
+        "box_score": cumulative_box.get(game.home_team.name, {}),
+        
+        # Team totals (aggregated from players)
+        "totals": game.team_totals.get(game.home_team.name, {})
+    }
+    
+    away_team_data = {
+        "name": game.away_team.name,
+        "team_id": game.away_team.team_id,
+        "mascot": game.away_team.mascot,
+        "colors": {
             "primary_color": game.away_team.primary_color,
             "secondary_color": game.away_team.secondary_color,
         },
-        "score": game.score,
-        "home_team_id": game.home_team.team_id,
-        "teamInfo": team_info,
-        "players": players,
-        "homeTeam": home_team_obj,
-        "awayTeam": away_team_obj,
+        "score": game.score.get(game.away_team.name, 0),
+        "points_by_quarter": game.game_state["points_by_quarter"].get(game.away_team.name, [0, 0, 0, 0]),
+        "team_fouls": game.away_team.team_fouls,
+        
+        # Malleable attributes (per game instance)
+        "attributes": game.away_team.team_attributes,
+        "strategy_settings": game.away_team.strategy_settings,
+        "scouting": game.away_team.scouting_data,
+        "plays": list(game.away_team.plays.values()),  # Convert dict to list for JSON
+        
+        # Player stats
+        "box_score": cumulative_box.get(game.away_team.name, {}),
+        
+        # Team totals (aggregated from players)
+        "totals": game.team_totals.get(game.away_team.name, {})
+    }
+
+    # Streamlined structure with nested teams
+    return {
+        # Game metadata
+        "game_id": str(game.game_id) if hasattr(game, 'game_id') else None,
+        "quarter": game.quarter,
+        "is_final": game.quarter > 4 and game.score.get(game.home_team.name, 0) != game.score.get(game.away_team.name, 0),
         "opening_tip_winner": game.game_state.get("opening_tip_winner"),
-        "teams": teams_obj,  # Add team objects with plays for skeleton lookup
+        
+        # Nested team data (all team info in one place)
+        "home_team": home_team_data,
+        "away_team": away_team_data,
+        
+        # Game data
+        "turns": turns,  # Animations excluded for database saves
+        "text_log": game.text_log,
+        
+        # Players array (for frontend rendering)
+        "players": players,
     }
 
 def check_defensive_foul(self, defender, is_three):

@@ -482,20 +482,49 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
             )
             if saved:
                 try:
-                    home = saved.get("home_team") or saved.get("homeTeam", {}).get("name")
-                    away = saved.get("away_team") or saved.get("awayTeam", {}).get("name")
+                    # Handle both old (flat) and new (nested) structure
+                    home_team_field = saved.get("home_team")
+                    away_team_field = saved.get("away_team")
+                    
+                    # New structure: home_team is a dict
+                    if isinstance(home_team_field, dict):
+                        home = home_team_field.get("name")
+                        away = away_team_field.get("name") if isinstance(away_team_field, dict) else None
+                        home_team_doc = home_team_field
+                        away_team_doc = away_team_field
+                    # Old structure: home_team is a string
+                    else:
+                        home = home_team_field or saved.get("homeTeam", {}).get("name")
+                        away = away_team_field or saved.get("awayTeam", {}).get("name")
+                        home_team_doc = {}
+                        away_team_doc = {}
+                    
                     if home and away:
-                        # Load team data from saved game (includes plays, attributes, scouting)
-                        home_plays = saved.get("team_plays", {}).get(home)
-                        away_plays = saved.get("team_plays", {}).get(away)
-                        home_attrs = saved.get("team_attributes", {}).get(home)
-                        away_attrs = saved.get("team_attributes", {}).get(away)
-                        home_scouting = saved.get("scouting", {}).get(home)
-                        away_scouting = saved.get("scouting", {}).get(away)
+                        
+                        # Extract team data from nested structure
+                        home_plays = home_team_doc.get("plays")
+                        away_plays = away_team_doc.get("plays")
+                        home_attrs = home_team_doc.get("attributes")
+                        away_attrs = away_team_doc.get("attributes")
+                        home_scouting = home_team_doc.get("scouting")
+                        away_scouting = away_team_doc.get("scouting")
+                        home_strategy = home_team_doc.get("strategy_settings")
+                        away_strategy = away_team_doc.get("strategy_settings")
+                        
+                        # Fallback to old flat structure if nested doesn't exist (backwards compatibility)
+                        if not home_plays:
+                            home_plays = saved.get("team_plays", {}).get(home)
+                            away_plays = saved.get("team_plays", {}).get(away)
+                            home_attrs = saved.get("team_attributes", {}).get(home)
+                            away_attrs = saved.get("team_attributes", {}).get(away)
+                            home_scouting = saved.get("scouting", {}).get(home)
+                            away_scouting = saved.get("scouting", {}).get(away)
                         
                         gm = GameManager(
                             home, 
                             away,
+                            home_strategy_settings=home_strategy,
+                            away_strategy_settings=away_strategy,
                             home_team_attributes=home_attrs,
                             away_team_attributes=away_attrs,
                             home_scouting_data=home_scouting,
@@ -590,9 +619,8 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                         print(f"🔍 DEBUG: Home team plays: {len(teams_obj[gm.home_team.team_id]['plays'])}")
                         print(f"🔍 DEBUG: Away team plays: {len(teams_obj[gm.away_team.team_id]['plays'])}")
                         
-                        # Create a summary with teams object
+                        # Create a summary with new nested team structure
                         summary = summarize_game_state(gm)
-                        summary["teams"] = teams_obj
                         
                         # Save to database
                         games_collection.update_one({"_id": game_id}, {"$set": summary}, upsert=True)
@@ -670,9 +698,8 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
             print(f"🔍 DEBUG: Home team plays: {len(teams_obj[gm.home_team.team_id]['plays'])}")
             print(f"🔍 DEBUG: Away team plays: {len(teams_obj[gm.away_team.team_id]['plays'])}")
             
-            # Create a summary with teams object
+            # Create a summary with new nested team structure
             summary = summarize_game_state(gm)
-            summary["teams"] = teams_obj
             
             # Save to database
             games_collection.update_one({"_id": game_id}, {"$set": summary}, upsert=True)
@@ -777,38 +804,20 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
         raise HTTPException(status_code=500, detail=str(e))
 
     summary = summarize_game_state(gm)
+    
+    # Add start_box_score (only needed for Q2-Q4 frontend, not critical for saves)
     summary["start_box_score"] = gm.game_state.get("start_box_score")
-    is_final = (
-        gm.quarter > 4
-        and summary["score"][gm.home_team.name] != summary["score"][gm.away_team.name]
-    )
-    summary.update(
-        {
-            "game_id": game_id,
-            "quarter": request.quarter,
-            "is_final": is_final,
-            "next_lineup_needed": not is_final,
-        }
-    )
+    
+    # Get is_final status (already calculated in summarize_game_state)
+    is_final = summary.get("is_final", False)
 
     try:
-        print(f"🔍 DEBUG: Saving game document with teams object")
-        print(f"🔍 DEBUG: Teams object keys: {list(summary.get('teams', {}).keys())}")
-        print(f"🔍 DEBUG: Home team plays: {len(summary.get('teams', {}).get(gm.home_team.team_id, {}).get('plays', {}))}")
-        print(f"🔍 DEBUG: Away team plays: {len(summary.get('teams', {}).get(gm.away_team.team_id, {}).get('plays', {}))}")
+        print(f"🔍 DEBUG: Saving game with nested team structure")
+        print(f"🔍 DEBUG: Home team plays: {len(summary.get('home_team', {}).get('plays', []))}")
+        print(f"🔍 DEBUG: Away team plays: {len(summary.get('away_team', {}).get('plays', []))}")
         
         games_collection.update_one({"_id": game_id}, {"$set": summary}, upsert=True)
         print(f"🔍 DEBUG: Game document saved successfully")
-        
-        # Debug check: Verify teams object was actually saved
-        saved_doc = games_collection.find_one({"_id": game_id})
-        print(f"🔍 DEBUG: After save - teams key exists: {'teams' in saved_doc}")
-        if 'teams' in saved_doc:
-            print(f"🔍 DEBUG: Teams object keys: {list(saved_doc['teams'].keys())}")
-            print(f"🔍 DEBUG: Home team plays count: {len(saved_doc['teams'].get(gm.home_team.team_id, {}).get('plays', {}))}")
-            print(f"🔍 DEBUG: Away team plays count: {len(saved_doc['teams'].get(gm.away_team.team_id, {}).get('plays', {}))}")
-        else:
-            print(f"🔍 DEBUG: Teams object missing from saved document!")
     except Exception as e:
         print("🚨 Mongo upsert failed:", e)
         traceback.print_exc()
