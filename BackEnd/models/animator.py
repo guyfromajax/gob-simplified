@@ -801,14 +801,15 @@ class Animator:
                     coords = {"x": 50, "y": 25}
                     coords_already_flipped = False
                 
-                # Apply coordinate flipping for HOME team (HCO_STRING_SPOTS are in away orientation)
-                # Away team uses coords as-is, home team needs to flip to attack the home basket
+                # Apply coordinate flipping for AWAY team (HCO_STRING_SPOTS are in home orientation)
+                # Home team uses coords as-is to attack home basket (x=90)
+                # Away team needs to flip to attack away basket (x=10)
                 # is_away_offense calculated once at function start (line 755) for consistency
-                if not is_away_offense and not coords_already_flipped:
+                if is_away_offense and not coords_already_flipped:
                     original_coords = coords.copy()
                     coords = get_away_player_coords(coords)
                     if position == "PG" and timestamp == 0:  # Only log once per turn
-                        print(f"🎬 COORD DEBUG: Flipping coords for HOME team {position} - original={original_coords}, flipped={coords}")
+                        print(f"🎬 COORD DEBUG: Flipping coords for AWAY team {position} - original={original_coords}, flipped={coords}")
                 
                 action = pos_action.get("action", "drift")
                 
@@ -1172,18 +1173,18 @@ class Animator:
         # print(f"🔍 Positioning standard defenders for HCO (away_offense: {is_away_offense}, aggression: {aggression})")
         
         # Build offensive player positions by step for tracking
-        # Note: HCO_STRING_SPOTS are in away orientation, so:
-        # - Away team coords are NOT flipped (used as-is)
-        # - Home team coords ARE flipped
-        # For defensive positioning, we need to unflip HOME team coords, not away team coords
+        # Note: HCO_STRING_SPOTS are in home orientation, so:
+        # - Home team coords are NOT flipped (used as-is)
+        # - Away team coords ARE flipped
+        # For defensive positioning, we need to unflip AWAY team coords back to home orientation
         offensive_positions_by_step = {}
         for pos, off_anim in offensive_animations.items():
             offensive_positions_by_step[pos] = []
             for step in off_anim.get("movement", []):
                 coords = step.get("coords", {"x": 50, "y": 25})
-                # If HOME team is on offense, we need to unflip the coordinates for defensive positioning
-                # (because they were flipped for animation, but defensive functions expect unflipped coords)
-                if not is_away_offense:
+                # If AWAY team is on offense, we need to unflip the coordinates for defensive positioning
+                # (because they were flipped for animation, but defensive functions expect home orientation)
+                if is_away_offense:
                     # The coordinates in the animation are already flipped, so we need to unflip them
                     # for the defensive positioning functions to work correctly
                     from BackEnd.utils.shared import get_away_player_coords
