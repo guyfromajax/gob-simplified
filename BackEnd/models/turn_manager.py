@@ -1023,22 +1023,23 @@ class TurnManager:
                 final_owner = ball_owner_by_step[-1]
                 shooter_pos = final_owner if isinstance(final_owner, str) else None
             
-            # 2. Get PASSER from last pass event (check previous 2 steps before shot)
-            # If shot is in step 7, check steps 5 and 6 for passes to the shooter
-            steps_to_check = steps[-3:-1] if len(steps) >= 3 else steps[:-1]
-            print(f"🎯 ASSIST DEBUG: shooter_pos={shooter_pos}, checking {len(steps_to_check)} steps for passes")
-            for step in reversed(steps_to_check):
-                for event in step.get("events", []):
-                    print(f"🎯 ASSIST DEBUG: Found event type={event.get('type')}, from={event.get('from')}, to={event.get('to')}")
-                    if event.get("type") == "pass":
-                        potential_passer = event.get("from")
-                        # Only count as passer if they passed TO the shooter
-                        if event.get("to") == shooter_pos:
-                            passer_pos = potential_passer
-                            print(f"🎯 ASSIST DEBUG: Found passer! passer_pos={passer_pos}")
+            # 2. Get PASSER from ball ownership changes (check previous 2 steps before shot)
+            # Look at who had the ball in the 2 steps before the final shot step
+            print(f"🎯 ASSIST DEBUG: shooter_pos={shooter_pos}, ball_owner_by_step={ball_owner_by_step}")
+            
+            if ball_owner_by_step and len(ball_owner_by_step) >= 2:
+                # Check the last 2 non-shooter ball owners
+                # Example: ['PG', 'PG', 'SG', 'SG', 'PF'] -> shooter=PF, check indices -3 and -2 (SG, SG)
+                for i in range(len(ball_owner_by_step) - 2, max(len(ball_owner_by_step) - 4, -1), -1):
+                    if i >= 0:
+                        potential_passer_pos = ball_owner_by_step[i]
+                        print(f"🎯 ASSIST DEBUG: Checking index {i}: potential_passer={potential_passer_pos}")
+                        # Found a different player who had the ball before the shooter
+                        if potential_passer_pos and potential_passer_pos != shooter_pos:
+                            passer_pos = potential_passer_pos
+                            print(f"🎯 ASSIST DEBUG: Found passer via ball ownership! passer_pos={passer_pos}")
                             break
-                if passer_pos:
-                    break
+            
             print(f"🎯 ASSIST DEBUG: Final passer_pos={passer_pos}")
             
             # 3. Get SCREENER - find last screen that helped the shooter
