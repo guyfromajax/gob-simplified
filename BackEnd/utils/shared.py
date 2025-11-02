@@ -648,6 +648,10 @@ def summarize_game_state(game, exclude_animations=True):
         "is_final": game.quarter > 4 and game.score.get(game.home_team.name, 0) != game.score.get(game.away_team.name, 0),
         "opening_tip_winner": game.game_state.get("opening_tip_winner"),
         
+        # Top-level team IDs for frontend compatibility (used by animation system)
+        "home_team_id": game.home_team.team_id,
+        "away_team_id": game.away_team.team_id,
+        
         # Nested team data (all team info in one place)
         "home_team": home_team_data,
         "away_team": away_team_data,
