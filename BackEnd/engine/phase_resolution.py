@@ -1097,11 +1097,22 @@ def get_hco_skeleton(result_type, game_context):
 
 
 def _get_skeleton_from_team_plays(playcall, team_id, game_context):
-    """Get skeleton from team-specific play objects in the appropriate document"""
+    """Get skeleton from team-specific play objects - checks in-memory first, then database"""
     from BackEnd.db import games_collection, tournaments_collection, franchises_collection
     from bson import ObjectId
     
-    # Try to determine mode and access appropriate document
+    # PRIORITY 1: Check in-memory team plays (always available for active games)
+    offense_team = game_context.offense_team
+    if hasattr(offense_team, 'plays') and offense_team.plays:
+        if playcall in offense_team.plays:
+            play_obj = offense_team.plays[playcall]
+            if "skeletons" in play_obj and "standard" in play_obj["skeletons"]:
+                skeleton = play_obj["skeletons"]["standard"]
+                num_steps = len(skeleton.get("steps", []))
+                # print(f"🔍 FOUND in team plays (memory): '{playcall}' - {num_steps} steps")
+                return skeleton
+    
+    # PRIORITY 2: Check database (for loaded games where in-memory might be stale)
     game_id = getattr(game_context, 'game_id', None)
     
     if game_id:
@@ -1118,21 +1129,11 @@ def _get_skeleton_from_team_plays(playcall, team_id, game_context):
                 if "skeletons" in play_obj and "standard" in play_obj["skeletons"]:
                     skeleton = play_obj["skeletons"]["standard"]
                     num_steps = len(skeleton.get("steps", []))
-                    print(f"🔍 FOUND in team plays: '{playcall}' - {num_steps} steps in skeleton")
+                    # print(f"🔍 FOUND in team plays (db): '{playcall}' - {num_steps} steps")
                     return skeleton
-                else:
-                    print(f"🔍 NOT FOUND in team plays: '{playcall}' - skeleton structure missing or invalid")
-            else:
-                print(f"🔍 NOT FOUND in team plays: '{playcall}' - play not in team's plays dict")
-        else:
-            print(f"🔍 NOT FOUND in team plays: '{playcall}' - game_doc or teams structure missing")
-    else:
-        print(f"🔍 NOT FOUND in team plays: '{playcall}' - no game_id")
     
-    # Check if we're in tournament mode (look for tournament_id in game context)
-    # This is a simplified check - in practice, you might need to pass tournament_id explicitly
-    # For now, we'll try the universal plays collection as fallback
-    
+    # Not found in memory or database
+    # print(f"🔍 NOT FOUND in team plays: '{playcall}'")
     return None
 
 
