@@ -597,6 +597,10 @@ def summarize_game_state(game, exclude_animations=False):
             game.home_team.name: game.home_team.team_attributes,
             game.away_team.name: game.away_team.team_attributes,
         },
+        "team_plays": {
+            game.home_team.name: list(game.home_team.plays.values()),  # Convert dict to list for JSON
+            game.away_team.name: list(game.away_team.plays.values()),
+        },
         "team_totals": game.team_totals,
         "text_log": game.text_log,
         "turns": turns,
