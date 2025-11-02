@@ -148,6 +148,15 @@ class TeamManager:
                         "attack": {"attempts": 0, "success": 0},
                         "outside": {"attempts": 0, "success": 0},
                     }
+                },
+                # Track last play run for each category (for tooltips)
+                "last_play_by_category": {
+                    "motion_inside": None,
+                    "motion_attack": None,
+                    "motion_outside": None,
+                    "set_inside": None,
+                    "set_attack": None,
+                    "set_outside": None
                 }
             },
             "defense": {
@@ -176,10 +185,14 @@ class TeamManager:
         universal_plays = list(plays_collection.find({}))
         
         for play in universal_plays:
+            # Initialize with random effectiveness score (-10 to 10)
+            # In future, this will be determined by team training and in-game performance
+            initial_effectiveness = round(random.uniform(-10, 10), 1)
+            
             play_data = {
                 "play_id": str(play["_id"]),
                 "name": play["name"],
-                "play_type": play["play_type"],
+                "play_type": play["play_type"], 
                 "play_focus": play["play_focus"],
                 "skeletons": play["skeletons"],
                 "game_stats": {
@@ -189,7 +202,7 @@ class TeamManager:
                     "turnovers": 0,
                     "offensive_fouls": 0,
                     "defensive_fouls": 0,
-                    "effectiveness": 0.0
+                    "effectiveness": initial_effectiveness
                 }
             }
             
@@ -202,7 +215,7 @@ class TeamManager:
                     "turnovers": 0,
                     "offensive_fouls": 0,
                     "defensive_fouls": 0,
-                    "effectiveness": 0.0
+                    "effectiveness": initial_effectiveness  # Same initial value
                 }
             
             plays_dict[play["name"]] = play_data
