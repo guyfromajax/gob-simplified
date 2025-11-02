@@ -1158,16 +1158,16 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
           result: shootParams.result,
         });
       }
-      console.log("🏀 HCO SHOT - About to call shootBall", {
-        currentState: scene.stateMachine?.state,
-        shooterId: shootParams.shooterId,
-        result: shootParams.result,
-        fromCoords: shootParams.fromCoords
-      });
+      // console.log("🏀 HCO SHOT - About to call shootBall", {
+      //   currentState: scene.stateMachine?.state,
+      //   shooterId: shootParams.shooterId,
+      //   result: shootParams.result,
+      //   fromCoords: shootParams.fromCoords
+      // });
       const shotResult = await shootBall(shootParams);
-      console.log("🏀 HCO SHOT - shootBall returned", shotResult);
+      // console.log("🏀 HCO SHOT - shootBall returned", shotResult);
       const ballSpot = shotResult?.grid;
-      console.log("result_type", turnData.result_type);
+      // console.log("result_type", turnData.result_type);
       
       // Check if this MAKE is from a putback
       // With new OREB turn architecture, putbacks are separate turns, not events

@@ -730,14 +730,14 @@ export function animateRebound({
   const shootingTeam = shooterSprite?.team; // "home" or "away"
   const isHomeTeamShot = shootingTeam === "home";
 
-  console.log('REBOUND ANIMATION DEBUG:', {
-    shooterId,
-    shootingTeam,
-    isHomeTeamShot,
-    rebounderId,
-    ballSpot,
-    totalPlayers: Object.keys(playerSprites).length
-  });
+  // console.log('REBOUND ANIMATION DEBUG:', {
+  //   shooterId,
+  //   shootingTeam,
+  //   isHomeTeamShot,
+  //   rebounderId,
+  //   ballSpot,
+  //   totalPlayers: Object.keys(playerSprites).length
+  // });
 
   // Animate other players attempting to rebound
   for (const sprite of Object.values(playerSprites)) {
