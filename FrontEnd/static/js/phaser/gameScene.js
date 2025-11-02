@@ -418,8 +418,12 @@ export function createGameScene(Phaser) {
         
         if (!tooltip || !this.teamPlaysData) return;
         
-        // Get team name from simData
-        const teamName = teamKey === 'home' ? this.simData?.home_team : this.simData?.away_team;
+        // Get team name from simData (handle nested structure)
+        const homeTeamField = this.simData?.home_team;
+        const awayTeamField = this.simData?.away_team;
+        const homeTeamName = typeof homeTeamField === 'object' ? homeTeamField?.name : homeTeamField;
+        const awayTeamName = typeof awayTeamField === 'object' ? awayTeamField?.name : awayTeamField;
+        const teamName = teamKey === 'home' ? homeTeamName : awayTeamName;
         if (!teamName) return;
         
         // Get last play run for this category

@@ -164,7 +164,13 @@ export async function runFreeThrowSequence(
       const shooterTeamId = turnData.offense_team_id;
       const isHomeTeam = shooterTeamId === scene.simData?.home_team_id;
       const teamStyle = isHomeTeam ? 'home' : 'away';
-      const shooterTeamName = isHomeTeam ? scene.simData?.home_team : scene.simData?.away_team;
+      
+      // Handle both new nested structure (object) and old flat structure (string)
+      const homeTeamField = scene.simData?.home_team;
+      const awayTeamField = scene.simData?.away_team;
+      const homeTeamName = typeof homeTeamField === 'object' ? homeTeamField?.name : homeTeamField;
+      const awayTeamName = typeof awayTeamField === 'object' ? awayTeamField?.name : awayTeamField;
+      const shooterTeamName = isHomeTeam ? homeTeamName : awayTeamName;
       
       const playerData = {
         playerId: shooterId,
