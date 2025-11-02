@@ -904,6 +904,57 @@
       color: #ff0000;
     }
 
+    /* ==================== PLAY TOOLTIP ==================== */
+    #play-tooltip {
+      position: fixed;
+      display: none;
+      background: linear-gradient(135deg, #2a2a2a 0%, #1a1a1a 100%);
+      border: 2px solid #ff6200;
+      border-radius: 8px;
+      padding: 12px 16px;
+      z-index: 10001;
+      pointer-events: none;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
+      min-width: 200px;
+    }
+
+    #play-tooltip.visible {
+      display: block;
+    }
+
+    .play-tooltip-content {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .play-tooltip-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 14px;
+      font-family: 'Bebas Neue', sans-serif;
+    }
+
+    .play-tooltip-label {
+      color: #aaa;
+      margin-right: 12px;
+    }
+
+    .play-tooltip-value {
+      color: #fff;
+      font-weight: bold;
+    }
+
+    .play-stat-row {
+      cursor: pointer;
+      transition: background-color 0.2s ease;
+    }
+
+    .play-stat-row:hover {
+      background-color: rgba(255, 98, 0, 0.1);
+    }
+
     /* ==================== LOCKER ROOM POPUP ==================== */
     .locker-room-popup {
       position: fixed;
@@ -971,6 +1022,20 @@
       <div class="tooltip-stat-row">
         <span class="tooltip-stat-label">Emotion:</span>
         <span class="tooltip-stat-value" id="tooltip-player-emotion" style="font-size: 20px;">😐</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Play Tooltip (for S2 tab play categories) -->
+  <div id="play-tooltip">
+    <div class="play-tooltip-content">
+      <div class="play-tooltip-row">
+        <span class="play-tooltip-label">Last Play:</span>
+        <span class="play-tooltip-value" id="tooltip-play-name">--</span>
+      </div>
+      <div class="play-tooltip-row">
+        <span class="play-tooltip-label">Effectiveness:</span>
+        <span class="play-tooltip-value" id="tooltip-play-effectiveness">--</span>
       </div>
     </div>
   </div>
@@ -1144,13 +1209,13 @@
             <table class="team-stats-table">
               <tbody>
                 <tr><th>Motion</th><td data-key="motion_overall_attempts">0</td><td data-key="motion_overall_rate">0%</td></tr>
-                <tr><td>-Inside</td><td data-key="motion_inside_attempts">0</td><td data-key="motion_inside_rate">0%</td></tr>
-                <tr><td>-Attack</td><td data-key="motion_attack_attempts">0</td><td data-key="motion_attack_rate">0%</td></tr>
-                <tr><td>-Outside</td><td data-key="motion_outside_attempts">0</td><td data-key="motion_outside_rate">0%</td></tr>
+                <tr class="play-stat-row" data-play-category="motion_inside" data-team="away"><td>-Inside</td><td data-key="motion_inside_attempts">0</td><td data-key="motion_inside_rate">0%</td></tr>
+                <tr class="play-stat-row" data-play-category="motion_attack" data-team="away"><td>-Attack</td><td data-key="motion_attack_attempts">0</td><td data-key="motion_attack_rate">0%</td></tr>
+                <tr class="play-stat-row" data-play-category="motion_outside" data-team="away"><td>-Outside</td><td data-key="motion_outside_attempts">0</td><td data-key="motion_outside_rate">0%</td></tr>
                 <tr><th>Set Play</th><td data-key="set_overall_attempts">0</td><td data-key="set_overall_rate">0%</td></tr>
-                <tr><td>-Inside</td><td data-key="set_inside_attempts">0</td><td data-key="set_inside_rate">0%</td></tr>
-                <tr><td>-Attack</td><td data-key="set_attack_attempts">0</td><td data-key="set_attack_rate">0%</td></tr>
-                <tr><td>-Outside</td><td data-key="set_outside_attempts">0</td><td data-key="set_outside_rate">0%</td></tr>
+                <tr class="play-stat-row" data-play-category="set_inside" data-team="away"><td>-Inside</td><td data-key="set_inside_attempts">0</td><td data-key="set_inside_rate">0%</td></tr>
+                <tr class="play-stat-row" data-play-category="set_attack" data-team="away"><td>-Attack</td><td data-key="set_attack_attempts">0</td><td data-key="set_attack_rate">0%</td></tr>
+                <tr class="play-stat-row" data-play-category="set_outside" data-team="away"><td>-Outside</td><td data-key="set_outside_attempts">0</td><td data-key="set_outside_rate">0%</td></tr>
                 <tr><th colspan="3">Cumulative</th></tr>
                 <tr><td>Inside</td><td data-key="cum_inside_attempts">0</td><td data-key="cum_inside_rate">0%</td></tr>
                 <tr><td>Attack</td><td data-key="cum_attack_attempts">0</td><td data-key="cum_attack_rate">0%</td></tr>
@@ -1258,13 +1323,13 @@
             <table class="team-stats-table">
               <tbody>
                 <tr><th>Motion</th><td data-key="motion_overall_attempts">0</td><td data-key="motion_overall_rate">0%</td></tr>
-                <tr><td>-Inside</td><td data-key="motion_inside_attempts">0</td><td data-key="motion_inside_rate">0%</td></tr>
-                <tr><td>-Attack</td><td data-key="motion_attack_attempts">0</td><td data-key="motion_attack_rate">0%</td></tr>
-                <tr><td>-Outside</td><td data-key="motion_outside_attempts">0</td><td data-key="motion_outside_rate">0%</td></tr>
+                <tr class="play-stat-row" data-play-category="motion_inside" data-team="home"><td>-Inside</td><td data-key="motion_inside_attempts">0</td><td data-key="motion_inside_rate">0%</td></tr>
+                <tr class="play-stat-row" data-play-category="motion_attack" data-team="home"><td>-Attack</td><td data-key="motion_attack_attempts">0</td><td data-key="motion_attack_rate">0%</td></tr>
+                <tr class="play-stat-row" data-play-category="motion_outside" data-team="home"><td>-Outside</td><td data-key="motion_outside_attempts">0</td><td data-key="motion_outside_rate">0%</td></tr>
                 <tr><th>Set Play</th><td data-key="set_overall_attempts">0</td><td data-key="set_overall_rate">0%</td></tr>
-                <tr><td>-Inside</td><td data-key="set_inside_attempts">0</td><td data-key="set_inside_rate">0%</td></tr>
-                <tr><td>-Attack</td><td data-key="set_attack_attempts">0</td><td data-key="set_attack_rate">0%</td></tr>
-                <tr><td>-Outside</td><td data-key="set_outside_attempts">0</td><td data-key="set_outside_rate">0%</td></tr>
+                <tr class="play-stat-row" data-play-category="set_inside" data-team="home"><td>-Inside</td><td data-key="set_inside_attempts">0</td><td data-key="set_inside_rate">0%</td></tr>
+                <tr class="play-stat-row" data-play-category="set_attack" data-team="home"><td>-Attack</td><td data-key="set_attack_attempts">0</td><td data-key="set_attack_rate">0%</td></tr>
+                <tr class="play-stat-row" data-play-category="set_outside" data-team="home"><td>-Outside</td><td data-key="set_outside_attempts">0</td><td data-key="set_outside_rate">0%</td></tr>
                 <tr><th colspan="3">Cumulative</th></tr>
                 <tr><td>Inside</td><td data-key="cum_inside_attempts">0</td><td data-key="cum_inside_rate">0%</td></tr>
                 <tr><td>Attack</td><td data-key="cum_attack_attempts">0</td><td data-key="cum_attack_rate">0%</td></tr>

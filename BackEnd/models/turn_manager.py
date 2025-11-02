@@ -384,6 +384,12 @@ class TurnManager:
             self.game.home_team.name: self.game.home_team.get_team_game_stats(),
             self.game.away_team.name: self.game.away_team.get_team_game_stats()
         }
+        
+        # Include play data for tooltips (effectiveness and tracking)
+        result["team_plays"] = {
+            self.game.home_team.name: list(self.game.home_team.plays.values()),
+            self.game.away_team.name: list(self.game.away_team.plays.values())
+        }
 
         # Compute stat deltas for each player
         deltas = {}
@@ -523,6 +529,10 @@ class TurnManager:
                 pc[play_type_label][focus_label]["attempts"] += 1
                 # Cumulative by focus
                 pc["Cumulative"][focus_label]["attempts"] += 1
+                
+                # Track last play run for this category (for tooltips)
+                category_key = f"{play_type_label.lower()}_{focus_label}"
+                self.game.offense_team.scouting_data["offense"]["last_play_by_category"][category_key] = chosen_playcall
         except Exception:
             pass
 

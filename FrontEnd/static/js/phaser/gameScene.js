@@ -102,6 +102,10 @@ export function createGameScene(Phaser) {
       this.nameToId = {};
       this.playerInfo = {};
       this.playerStats = {};
+      this.teamPlaysData = {};  // Store team plays data for tooltips
+      this.teamStatsData = {};  // Store team stats data for tooltips
+      this.teamPlaysData = {};  // Store team plays data for tooltips
+      this.teamStatsData = {};  // Store team stats data for tooltips
       
       console.log("✅ GameScene cleanup complete");
     }
@@ -142,6 +146,8 @@ export function createGameScene(Phaser) {
       this.nameToId = {};
       this.playerInfo = {};
       this.playerStats = {};
+      this.teamPlaysData = {};  // Store team plays data for tooltips
+      this.teamStatsData = {};  // Store team stats data for tooltips
 
       const { home: homeTeam, away: awayTeam } = gameStore.getTeams();
 
@@ -391,6 +397,52 @@ export function createGameScene(Phaser) {
         }
       };
 
+      // Play tooltip functions (for S2 tab play categories)
+      const showPlayTooltip = (event, category, teamKey) => {
+        const tooltip = document.getElementById('play-tooltip');
+        const playNameEl = document.getElementById('tooltip-play-name');
+        const effectivenessEl = document.getElementById('tooltip-play-effectiveness');
+        
+        if (!tooltip || !this.teamPlaysData) return;
+        
+        // Get team name from simData
+        const teamName = teamKey === 'home' ? this.simData?.home_team : this.simData?.away_team;
+        if (!teamName) return;
+        
+        // Get last play run for this category
+        const lastPlayByCategory = this.teamStatsData?.[teamName]?.offense?.last_play_by_category || {};
+        const lastPlayName = lastPlayByCategory[category];
+        
+        // Get effectiveness from plays data
+        const teamPlays = this.teamPlaysData[teamName] || [];
+        const playData = teamPlays.find(p => p.name === lastPlayName);
+        const effectiveness = playData?.game_stats?.effectiveness ?? '--';
+        
+        // Update tooltip content
+        playNameEl.textContent = lastPlayName || 'None';
+        effectivenessEl.textContent = effectiveness !== '--' ? `${effectiveness}` : '--';
+        
+        // Position and show tooltip
+        updatePlayTooltipPosition(event);
+        tooltip.classList.add('visible');
+      };
+      
+      const updatePlayTooltipPosition = (event) => {
+        const tooltip = document.getElementById('play-tooltip');
+        if (!tooltip) return;
+        
+        const offset = 15;
+        tooltip.style.left = `${event.clientX + offset}px`;
+        tooltip.style.top = `${event.clientY + offset}px`;
+      };
+      
+      const hidePlayTooltip = () => {
+        const tooltip = document.getElementById('play-tooltip');
+        if (tooltip) {
+          tooltip.classList.remove('visible');
+        }
+      };
+
       const initTeamTable = (teamKey, bodyEl) => {
         positions.forEach(pos => {
           const player = simData.players.find(p => p.team === teamKey && p.pos === pos);
@@ -474,6 +526,27 @@ export function createGameScene(Phaser) {
 
       initTeamTable('home', homeBody);
       initTeamTable('away', awayBody);
+
+      // Add event listeners for play tooltip (S2 tab play categories)
+      const playStatRows = document.querySelectorAll('.play-stat-row');
+      playStatRows.forEach(row => {
+        const category = row.dataset.playCategory;
+        const teamKey = row.dataset.team;
+        
+        row.addEventListener('mouseenter', (e) => {
+          if (category && teamKey) {
+            showPlayTooltip(e, category, teamKey);
+          }
+        });
+        
+        row.addEventListener('mousemove', (e) => {
+          updatePlayTooltipPosition(e);
+        });
+        
+        row.addEventListener('mouseleave', () => {
+          hidePlayTooltip();
+        });
+      });
 
       const updateLineup = (teamKey, lineup) => {
         if (!lineup) return;
@@ -722,6 +795,14 @@ export function createGameScene(Phaser) {
         // Get cumulative team stats for S1 tab
         const homeTotals = turn.team_totals?.[homeTeam] || {};
         const awayTotals = turn.team_totals?.[awayTeam] || {};
+        
+        // Store team plays and stats data for tooltips
+        if (turn.team_plays) {
+          this.teamPlaysData = turn.team_plays;
+        }
+        if (turn.team_stats) {
+          this.teamStatsData = turn.team_stats;
+        }
 
         // Update UI directly from turn data (like scoreboard updates)
         window.setTeamBoxData({
