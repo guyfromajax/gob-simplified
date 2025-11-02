@@ -930,6 +930,8 @@ class TurnManager:
             entry["stats"]["PTS"] = entry["stats"].get("PTS", 0) + diff
 
     def assign_roles(self, off_call="INSIDE", def_call="MAN", skeleton=None):
+        from BackEnd.utils.shared import get_name_safe
+        
         game = self.game
         game_state = game.game_state
         off_team = game.offense_team
@@ -1141,7 +1143,6 @@ class TurnManager:
         passer = off_lineup.get(passer_pos)
         defender = def_lineup.get(defender_pos) if defender_pos else def_lineup["PG"]
         
-        from BackEnd.utils.shared import get_name_safe
         print(f"🎯 ASSIST DEBUG: passer_pos={passer_pos}, passer object={get_name_safe(passer) if passer else None}")
 
         return {
