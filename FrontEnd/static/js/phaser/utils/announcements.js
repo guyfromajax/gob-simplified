@@ -156,27 +156,29 @@ export function announceFromTurnData(turnData, timing = 'start', homeTeamId = nu
       return;
     }
     
-    if (turnData.result_type === 'TURNOVER') {
-      // STEAL turnovers - show stealer's photo in defense team color
-      if (turnData.text?.toLowerCase().includes('steal')) {
-        let playerData = null;
+    // Handle STEAL announcements (result_type can be 'STEAL' from FCP/HCT or 'TURNOVER' from regular play)
+    if (turnData.result_type === 'STEAL' || (turnData.result_type === 'TURNOVER' && turnData.text?.toLowerCase().includes('steal'))) {
+      let playerData = null;
+      
+      if (scene && turnData.defender_id) {
+        const stealerId = turnData.defender_id;
+        const stealerSprite = scene.playerSprites?.[stealerId];
+        const stealerTeamId = stealerSprite?.team_id;
+        const stealerTeamName = stealerTeamId === scene.homeTeamId ? scene.simData?.home_team : scene.simData?.away_team;
         
-        if (scene && turnData.defender_id) {
-          const stealerId = turnData.defender_id;
-          const stealerSprite = scene.playerSprites?.[stealerId];
-          const stealerTeamId = stealerSprite?.team_id;
-          const stealerTeamName = stealerTeamId === scene.homeTeamId ? scene.simData?.home_team : scene.simData?.away_team;
-          
-          playerData = {
-            playerId: stealerId,
-            photo: stealerSprite?.photo || null,
-            teamName: stealerTeamName
-          };
-        }
-        
-        showAnnouncement("STEAL!", defenseTeam, playerData);
-        return;
+        playerData = {
+          playerId: stealerId,
+          photo: stealerSprite?.photo || null,
+          teamName: stealerTeamName
+        };
       }
+      
+      showAnnouncement("STEAL!", defenseTeam, playerData);
+      return;
+    }
+    
+    if (turnData.result_type === 'TURNOVER') {
+      // Non-steal turnovers only from here on
       
       // Non-steal turnovers (TRAVEL, DOUBLE DRIBBLE, etc.) - show victim's photo in offense team color
       let playerData = null;
