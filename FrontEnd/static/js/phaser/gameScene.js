@@ -588,9 +588,10 @@ export function createGameScene(Phaser) {
             row.toCell.textContent = stats.TO;
             row.defAttemptsCell.textContent = stats.DEF_A;
             
-            // Calculate defensive success rate
+            // Calculate defensive win percentage (no decimals)
             const defRate = stats.DEF_A > 0 ? Math.round((stats.DEF_S / stats.DEF_A) * 100) : 0;
-            row.defCell.textContent = `${defRate}%`;
+            stats.DEF_PCT = `${defRate}%`;  // Store for S3 tab access
+            row.defCell.textContent = stats.DEF_PCT;
             
             stats.cells = { 
               pts: row.ptsCell, fouls: row.foulsCell, reb: row.rebCell, ast: row.astCell,
@@ -639,6 +640,9 @@ export function createGameScene(Phaser) {
             ps.TO = to;
             ps.DEF_A = defA;
             ps.DEF_S = defS;
+            // Calculate defensive win percentage (no decimals)
+            const defPct = ps.DEF_A > 0 ? Math.round((ps.DEF_S / ps.DEF_A) * 100) : 0;
+            ps.DEF_PCT = `${defPct}%`;
             this.playerStats[playerId] = ps;
             lineup[pos] = playerId;
           });
@@ -759,7 +763,8 @@ export function createGameScene(Phaser) {
                       // Update defensive attempts and success rate when defensive stats change
                       if (ps.cells.defAttempts) ps.cells.defAttempts.textContent = ps.DEF_A;
                       const defRate = ps.DEF_A > 0 ? Math.round((ps.DEF_S / ps.DEF_A) * 100) : 0;
-                      ps.cells.def.textContent = `${defRate}%`;
+                      ps.DEF_PCT = `${defRate}%`;  // Store for S3 tab access
+                      ps.cells.def.textContent = ps.DEF_PCT;
                     } else {
                       ps.cells[key].textContent = ps[stat];
                     }
