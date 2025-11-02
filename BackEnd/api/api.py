@@ -600,8 +600,8 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                         # Get populated plays for team objects (with game_stats and optionally season_stats)
                         populated_plays = populate_team_plays(mode=mode)
                         
-                        print(f"🔍 DEBUG: Populated {len(populated_plays)} plays for teams in simulate_quarter_endpoint (Q1, mode={mode})")
-                        print(f"🔍 DEBUG: Play keys: {list(populated_plays.keys())}")
+                        # print(f"🔍 DEBUG: Populated {len(populated_plays)} plays for teams in simulate_quarter_endpoint (Q1, mode={mode})")
+                        # print(f"🔍 DEBUG: Play keys: {list(populated_plays.keys())}")
                         
                         # Create team objects with plays for skeleton lookup
                         teams_obj = {
@@ -615,16 +615,16 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                             }
                         }
                         
-                        print(f"🔍 DEBUG: Created teams object with keys: {list(teams_obj.keys())}")
-                        print(f"🔍 DEBUG: Home team plays: {len(teams_obj[gm.home_team.team_id]['plays'])}")
-                        print(f"🔍 DEBUG: Away team plays: {len(teams_obj[gm.away_team.team_id]['plays'])}")
+                        # print(f"🔍 DEBUG: Created teams object with keys: {list(teams_obj.keys())}")
+                        # print(f"🔍 DEBUG: Home team plays: {len(teams_obj[gm.home_team.team_id]['plays'])}")
+                        # print(f"🔍 DEBUG: Away team plays: {len(teams_obj[gm.away_team.team_id]['plays'])}")
                         
                         # Create a summary with new nested team structure
                         summary = summarize_game_state(gm)
                         
                         # Save to database
                         games_collection.update_one({"_id": game_id}, {"$set": summary}, upsert=True)
-                        print(f"🔍 DEBUG: Saved teams object to database with game_id: {game_id}")
+                        # print(f"🔍 DEBUG: Saved teams object to database with game_id: {game_id}")
                         
                     except Exception as e:
                         print(f"🚨 Failed to save teams object in simulate_quarter_endpoint (Q1): {e}")
@@ -679,8 +679,8 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
             # Get populated plays for team objects (with game_stats and optionally season_stats)
             populated_plays = populate_team_plays(mode=mode)
             
-            print(f"🔍 DEBUG: Populated {len(populated_plays)} plays for teams in simulate_quarter_endpoint (no game_id, mode={mode})")
-            print(f"🔍 DEBUG: Play keys: {list(populated_plays.keys())}")
+            # print(f"🔍 DEBUG: Populated {len(populated_plays)} plays for teams in simulate_quarter_endpoint (no game_id, mode={mode})")
+            # print(f"🔍 DEBUG: Play keys: {list(populated_plays.keys())}")
             
             # Create team objects with plays for skeleton lookup
             teams_obj = {
@@ -694,16 +694,16 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                 }
             }
             
-            print(f"🔍 DEBUG: Created teams object with keys: {list(teams_obj.keys())}")
-            print(f"🔍 DEBUG: Home team plays: {len(teams_obj[gm.home_team.team_id]['plays'])}")
-            print(f"🔍 DEBUG: Away team plays: {len(teams_obj[gm.away_team.team_id]['plays'])}")
+            # print(f"🔍 DEBUG: Created teams object with keys: {list(teams_obj.keys())}")
+            # print(f"🔍 DEBUG: Home team plays: {len(teams_obj[gm.home_team.team_id]['plays'])}")
+            # print(f"🔍 DEBUG: Away team plays: {len(teams_obj[gm.away_team.team_id]['plays'])}")
             
             # Create a summary with new nested team structure
             summary = summarize_game_state(gm)
             
             # Save to database
             games_collection.update_one({"_id": game_id}, {"$set": summary}, upsert=True)
-            print(f"🔍 DEBUG: Saved teams object to database with game_id: {game_id}")
+            # print(f"🔍 DEBUG: Saved teams object to database with game_id: {game_id}")
             
         except Exception as e:
             print(f"🚨 Failed to save teams object in simulate_quarter_endpoint (no game_id): {e}")
@@ -817,12 +817,12 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
     # Save to database (WITHOUT animations to reduce document size)
     try:
         db_summary = summarize_game_state(gm, exclude_animations=True)
-        print(f"🔍 DEBUG: Saving game with nested team structure")
-        print(f"🔍 DEBUG: Home team plays: {len(db_summary.get('home_team', {}).get('plays', []))}")
-        print(f"🔍 DEBUG: Away team plays: {len(db_summary.get('away_team', {}).get('plays', []))}")
+        # print(f"🔍 DEBUG: Saving game with nested team structure")
+        # print(f"🔍 DEBUG: Home team plays: {len(db_summary.get('home_team', {}).get('plays', []))}")
+        # print(f"🔍 DEBUG: Away team plays: {len(db_summary.get('away_team', {}).get('plays', []))}")
         
         games_collection.update_one({"_id": game_id}, {"$set": db_summary}, upsert=True)
-        print(f"🔍 DEBUG: Game document saved successfully")
+        # print(f"🔍 DEBUG: Game document saved successfully")
     except Exception as e:
         print("🚨 Mongo upsert failed:", e)
         traceback.print_exc()

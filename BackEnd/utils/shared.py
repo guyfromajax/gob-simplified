@@ -553,8 +553,8 @@ def summarize_game_state(game, exclude_animations=True):
     try:
         from BackEnd.api.gameplan_routes import populate_team_plays
         populated_plays = populate_team_plays()
-        print(f"🔍 DEBUG: Populated {len(populated_plays)} plays for teams")
-        print(f"🔍 DEBUG: Play keys: {list(populated_plays.keys())}")
+        # print(f"🔍 DEBUG: Populated {len(populated_plays)} plays for teams")
+        # print(f"🔍 DEBUG: Play keys: {list(populated_plays.keys())}")
     except Exception as e:
         print(f"🚨 Error in populate_team_plays: {e}")
         populated_plays = {}
@@ -571,9 +571,9 @@ def summarize_game_state(game, exclude_animations=True):
         }
     }
     
-    print(f"🔍 DEBUG: Created teams object with keys: {list(teams_obj.keys())}")
-    print(f"🔍 DEBUG: Home team plays: {len(teams_obj[game.home_team.team_id]['plays'])}")
-    print(f"🔍 DEBUG: Away team plays: {len(teams_obj[game.away_team.team_id]['plays'])}")
+    # print(f"🔍 DEBUG: Created teams object with keys: {list(teams_obj.keys())}")
+    # print(f"🔍 DEBUG: Home team plays: {len(teams_obj[game.home_team.team_id]['plays'])}")
+    # print(f"🔍 DEBUG: Away team plays: {len(teams_obj[game.away_team.team_id]['plays'])}")
 
     # Process turns: exclude animations for database persistence, keep for real-time frontend
     from copy import deepcopy
