@@ -156,24 +156,60 @@ export function announceFromTurnData(turnData, timing = 'start', homeTeamId = nu
       return;
     }
     
-    if (turnData.result_type === 'TURNOVER' && turnData.text?.toLowerCase().includes('steal')) {
-      // Try to get stealer player data
+    if (turnData.result_type === 'TURNOVER') {
+      // STEAL turnovers - show stealer's photo in defense team color
+      if (turnData.text?.toLowerCase().includes('steal')) {
+        let playerData = null;
+        
+        if (scene && turnData.defender_id) {
+          const stealerId = turnData.defender_id;
+          const stealerSprite = scene.playerSprites?.[stealerId];
+          const stealerTeamId = stealerSprite?.team_id;
+          const stealerTeamName = stealerTeamId === scene.homeTeamId ? scene.simData?.home_team : scene.simData?.away_team;
+          
+          playerData = {
+            playerId: stealerId,
+            photo: stealerSprite?.photo || null,
+            teamName: stealerTeamName
+          };
+        }
+        
+        showAnnouncement("STEAL!", defenseTeam, playerData);
+        return;
+      }
+      
+      // Non-steal turnovers (TRAVEL, DOUBLE DRIBBLE, etc.) - show victim's photo in offense team color
       let playerData = null;
       
-      if (scene && turnData.defender_id) {
-        const stealerId = turnData.defender_id;
-        const stealerSprite = scene.playerSprites?.[stealerId];
-        const stealerTeamId = stealerSprite?.team_id;
-        const stealerTeamName = stealerTeamId === scene.homeTeamId ? scene.simData?.home_team : scene.simData?.away_team;
+      if (scene && turnData.victim_id) {
+        const victimId = turnData.victim_id;
+        const victimSprite = scene.playerSprites?.[victimId];
+        const victimTeamId = victimSprite?.team_id;
+        const victimTeamName = victimTeamId === scene.homeTeamId ? scene.simData?.home_team : scene.simData?.away_team;
         
         playerData = {
-          playerId: stealerId,
-          photo: stealerSprite?.photo || null,
-          teamName: stealerTeamName
+          playerId: victimId,
+          photo: victimSprite?.photo || null,
+          teamName: victimTeamName
         };
       }
       
-      showAnnouncement("STEAL!", defenseTeam, playerData);
+      // Determine turnover type from text
+      let turnoverText = "TURNOVER!";
+      const textLower = turnData.text?.toLowerCase() || '';
+      if (textLower.includes('travel')) {
+        turnoverText = "TRAVEL!";
+      } else if (textLower.includes('double dribble')) {
+        turnoverText = "DOUBLE DRIBBLE!";
+      } else if (textLower.includes('out of bounds')) {
+        turnoverText = "OUT OF BOUNDS!";
+      } else if (textLower.includes('errant pass') || textLower.includes('bad pass')) {
+        turnoverText = "BAD PASS!";
+      } else if (textLower.includes('dribbles it off his foot')) {
+        turnoverText = "TURNOVER!";
+      }
+      
+      showAnnouncement(turnoverText, offenseTeam, playerData);
       return;
     }
   }

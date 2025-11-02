@@ -162,8 +162,13 @@ class ShotManager:
         # 🎯 Shot is Made
         # ------------------------
         if made:
+            from BackEnd.utils.shared import get_name_safe
+            print(f"🎯 ASSIST DEBUG: Shot MADE! passer={get_name_safe(passer) if passer else None}")
             if passer:
                 passer.record_stat("AST")
+                print(f"🎯 ASSIST DEBUG: Recorded AST for {get_name_safe(passer)}")
+            else:
+                print(f"🎯 ASSIST DEBUG: No passer found, no assist awarded")
             stats = ["FGM", "3PTM"] if is_three else ["FGM"]
             points = 3 if is_three else 2
             
