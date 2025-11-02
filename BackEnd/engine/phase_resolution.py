@@ -614,12 +614,14 @@ def resolve_half_court_offense_logic(game):
         roles["next_defensive_setup"] = shot_result["next_defensive_setup"]
     
     animator = Animator(game)
-    shot_result["animations"] = animator.capture_halfcourt_animation(roles)
+    # OLD ANIMATION SYSTEM - REMOVED (conflicts with skeleton-based system)
+    # shot_result["animations"] = animator.capture_halfcourt_animation(roles)
     
     # Add skeleton data for unified animation system (reuse skeleton from line 556)
     shot_result["skeleton"] = skeleton or {}
     
     # Convert skeleton to animations if skeleton exists
+    print(f"🎬 PRE-ANIMATION DEBUG: skeleton exists: {skeleton is not None}, has steps: {skeleton and 'steps' in skeleton if skeleton else False}")
     if skeleton and "steps" in skeleton:
         skeleton_animations = animator.skeleton_to_animations(
             skeleton, 
