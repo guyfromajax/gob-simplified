@@ -909,9 +909,16 @@ def resolve_full_court_press_logic(game: "GameManager"):
     elif result_type == "DEAD_BALL_TURNOVER":
         result_type = "DEAD BALL"
         # text = "PRESS! Turnover"
+        # Record TO stat for the ball handler
+        roles["ball_handler"].record_stat("TO")
         # Track FCP success: turnover = defensive success
         def_scouting["defense"]["FCP"]["success"] += 1
     elif result_type == "STEAL":
+        # Record TO stat for the ball handler (victim of steal)
+        roles["ball_handler"].record_stat("TO")
+        # Record STL stat for the defender
+        if roles["defender"]:
+            roles["defender"].record_stat("STL")
         # Track FCP success: steal = defensive success
         def_scouting["defense"]["FCP"]["success"] += 1
     
@@ -971,7 +978,9 @@ def resolve_full_court_press_logic(game: "GameManager"):
         "animations": animations,
         "roles": roles,
         "fcp_foul": True,  # Flag to indicate this FOUL has FCP animations
-        "foul_team": game_state.get("foul_team")  # Include foul_team for frontend announcement
+        "foul_team": game_state.get("foul_team"),  # Include foul_team for frontend announcement
+        "victim_id": getattr(roles["ball_handler"], "player_id", None),  # For turnover announcements
+        "defender_id": getattr(roles["defender"], "player_id", None) if roles["defender"] else None  # For steal announcements
     }
     
     return result
@@ -1327,9 +1336,16 @@ def resolve_half_court_trap_logic(game: "GameManager"):
         def_scouting["defense"]["HCT"]["success"] += 1
     elif result_type == "DEAD_BALL_TURNOVER":
         result_type = "DEAD BALL"
+        # Record TO stat for the ball handler
+        roles["ball_handler"].record_stat("TO")
         # Track HCT success: turnover = defensive success
         def_scouting["defense"]["HCT"]["success"] += 1
     elif result_type == "STEAL":
+        # Record TO stat for the ball handler (victim of steal)
+        roles["ball_handler"].record_stat("TO")
+        # Record STL stat for the defender
+        if roles["defender"]:
+            roles["defender"].record_stat("STL")
         # Track HCT success: steal = defensive success
         def_scouting["defense"]["HCT"]["success"] += 1
     
@@ -1390,7 +1406,9 @@ def resolve_half_court_trap_logic(game: "GameManager"):
         "animations": animations,
         "roles": roles,
         "hct_foul": True if result_type == "FOUL" else False,  # Flag for HCT fouls with animations
-        "foul_team": game_state.get("foul_team")  # Include foul_team for frontend announcement
+        "foul_team": game_state.get("foul_team"),  # Include foul_team for frontend announcement
+        "victim_id": getattr(roles["ball_handler"], "player_id", None),  # For turnover announcements
+        "defender_id": getattr(roles["defender"], "player_id", None) if roles["defender"] else None  # For steal announcements
     }
     
     return result

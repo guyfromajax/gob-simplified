@@ -1024,16 +1024,20 @@ class TurnManager:
             # 2. Get PASSER from last pass event (check previous 2 steps before shot)
             # If shot is in step 7, check steps 5 and 6 for passes to the shooter
             steps_to_check = steps[-3:-1] if len(steps) >= 3 else steps[:-1]
+            print(f"🎯 ASSIST DEBUG: shooter_pos={shooter_pos}, checking {len(steps_to_check)} steps for passes")
             for step in reversed(steps_to_check):
                 for event in step.get("events", []):
+                    print(f"🎯 ASSIST DEBUG: Found event type={event.get('type')}, from={event.get('from')}, to={event.get('to')}")
                     if event.get("type") == "pass":
                         potential_passer = event.get("from")
                         # Only count as passer if they passed TO the shooter
                         if event.get("to") == shooter_pos:
                             passer_pos = potential_passer
+                            print(f"🎯 ASSIST DEBUG: Found passer! passer_pos={passer_pos}")
                             break
                 if passer_pos:
                     break
+            print(f"🎯 ASSIST DEBUG: Final passer_pos={passer_pos}")
             
             # 3. Get SCREENER - find last screen that helped the shooter
             if shooter_pos:
@@ -1136,6 +1140,9 @@ class TurnManager:
         screener = off_lineup.get(screener_pos) if screener_pos else off_lineup["PF"]  # Fallback to PF
         passer = off_lineup.get(passer_pos)
         defender = def_lineup.get(defender_pos) if defender_pos else def_lineup["PG"]
+        
+        from BackEnd.utils.shared import get_name_safe
+        print(f"🎯 ASSIST DEBUG: passer_pos={passer_pos}, passer object={get_name_safe(passer) if passer else None}")
 
         return {
             "shooter": shooter,
