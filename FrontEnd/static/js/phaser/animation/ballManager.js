@@ -311,6 +311,16 @@ export function shootBall({
     homeRoster?.team_id || homeRoster?.teamId || homeRoster?.team_name || homeRoster?.team;
   const effectiveHomeId = homeTeamId ?? storeHomeId;
   const isHomeTeam = String(shooterTeamId) === String(effectiveHomeId);
+  
+  console.log('🎯 SHOT BASKET DEBUG:', {
+    shooterId,
+    shooterTeamId,
+    homeTeamId,
+    storeHomeId,
+    effectiveHomeId,
+    isHomeTeam,
+    willShootAt: isHomeTeam ? 'HOME_RIM (x=91, RIGHT)' : 'AWAY_RIM (x=9, LEFT)'
+  });
 
   const start = gridToPixels(
     fromCoords.x,
