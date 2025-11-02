@@ -267,6 +267,7 @@ class TurnManager:
             self.game.game_state["current_playcall"] = calls["offense"]
             self.game.game_state["defense_playcall"] = calls["defense"]
             result = self.resolve_half_court_offense()
+            print(f"🎬 TURN DEBUG: After resolve_half_court_offense, animations present: {'animations' in result}, animations count: {len(result.get('animations', [])) if 'animations' in result else 'N/A'}")
             # Add playcalls to result for frontend display
             result["offensive_playcall"] = calls["offense"]
             result["defensive_playcall"] = calls["defense"]
