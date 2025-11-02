@@ -62,7 +62,7 @@ class Player:
         """
         attributes["EM"] = random.randint(1, 100)
         attributes["CH"] = random.randint(1, 100)
-        attributes["MO"] = random.randint(1, 10)
+        attributes["MO"] = random.randint(-10, 10)  # Range from -10 to +10
         # Update anchors as well
         attributes["anchor_EM"] = attributes["EM"]
         attributes["anchor_CH"] = attributes["CH"]

@@ -904,6 +904,47 @@
       color: #ff0000;
     }
 
+    /* Momentum Bar Styles */
+    .momentum-bar-container {
+      display: flex;
+      align-items: center;
+      width: 100px;
+      height: 16px;
+      background-color: #333;
+      border-radius: 10px;
+      overflow: hidden;
+      position: relative;
+      border: 1px solid #555;
+    }
+
+    .momentum-bar-left {
+      height: 100%;
+      background-color: #ff4444; /* Red for negative */
+      transition: width 0.3s ease;
+      position: absolute;
+      right: 50%;
+      width: 0%;
+    }
+
+    .momentum-bar-center {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 2px;
+      height: 100%;
+      background-color: #ffd700; /* Yellow center line */
+      z-index: 2;
+    }
+
+    .momentum-bar-right {
+      height: 100%;
+      background-color: #44ff44; /* Green for positive */
+      transition: width 0.3s ease;
+      position: absolute;
+      left: 50%;
+      width: 0%;
+    }
+
     /* ==================== PLAY TOOLTIP ==================== */
     #play-tooltip {
       position: fixed;
@@ -1017,7 +1058,11 @@
       </div>
       <div class="tooltip-stat-row">
         <span class="tooltip-stat-label">Momentum:</span>
-        <span class="tooltip-stat-value" id="tooltip-player-momentum">--</span>
+        <div class="momentum-bar-container">
+          <div class="momentum-bar-left" id="tooltip-momentum-left"></div>
+          <div class="momentum-bar-center"></div>
+          <div class="momentum-bar-right" id="tooltip-momentum-right"></div>
+        </div>
       </div>
       <div class="tooltip-stat-row">
         <span class="tooltip-stat-label">Emotion:</span>

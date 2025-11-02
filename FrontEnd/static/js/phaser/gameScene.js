@@ -384,7 +384,30 @@ export function createGameScene(Phaser) {
         else if (ng >= 0.7) energyEl.classList.add('energy-low');
         else energyEl.classList.add('energy-critical');
         
-        momentumEl.textContent = momentum;
+        // Update momentum bar (visual instead of text)
+        const leftBar = document.getElementById('tooltip-momentum-left');
+        const rightBar = document.getElementById('tooltip-momentum-right');
+        
+        if (leftBar && rightBar) {
+          const moValue = typeof momentum === 'number' ? momentum : 0;
+          
+          if (moValue < 0) {
+            // Negative momentum: fill left side with red
+            const fillPercent = Math.abs(moValue) / 10 * 100; // -10 = 100%, -5 = 50%
+            leftBar.style.width = `${fillPercent}%`;
+            rightBar.style.width = '0%';
+          } else if (moValue > 0) {
+            // Positive momentum: fill right side with green
+            const fillPercent = moValue / 10 * 100; // +10 = 100%, +5 = 50%
+            leftBar.style.width = '0%';
+            rightBar.style.width = `${fillPercent}%`;
+          } else {
+            // Zero momentum: no fill, just yellow line
+            leftBar.style.width = '0%';
+            rightBar.style.width = '0%';
+          }
+        }
+        
         emotionEl.textContent = emoji;
         
         // Position and show tooltip
