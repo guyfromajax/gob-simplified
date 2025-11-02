@@ -803,20 +803,25 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
         )
         raise HTTPException(status_code=500, detail=str(e))
 
-    summary = summarize_game_state(gm)
+    # Create TWO summaries:
+    # 1. WITH animations for frontend (exclude_animations=False)
+    # 2. WITHOUT animations for database save (exclude_animations=True)
+    frontend_summary = summarize_game_state(gm, exclude_animations=False)
     
     # Add start_box_score (only needed for Q2-Q4 frontend, not critical for saves)
-    summary["start_box_score"] = gm.game_state.get("start_box_score")
+    frontend_summary["start_box_score"] = gm.game_state.get("start_box_score")
     
-    # Get is_final status (already calculated in summarize_game_state)
-    is_final = summary.get("is_final", False)
+    # Get is_final status
+    is_final = frontend_summary.get("is_final", False)
 
+    # Save to database (WITHOUT animations to reduce document size)
     try:
+        db_summary = summarize_game_state(gm, exclude_animations=True)
         print(f"🔍 DEBUG: Saving game with nested team structure")
-        print(f"🔍 DEBUG: Home team plays: {len(summary.get('home_team', {}).get('plays', []))}")
-        print(f"🔍 DEBUG: Away team plays: {len(summary.get('away_team', {}).get('plays', []))}")
+        print(f"🔍 DEBUG: Home team plays: {len(db_summary.get('home_team', {}).get('plays', []))}")
+        print(f"🔍 DEBUG: Away team plays: {len(db_summary.get('away_team', {}).get('plays', []))}")
         
-        games_collection.update_one({"_id": game_id}, {"$set": summary}, upsert=True)
+        games_collection.update_one({"_id": game_id}, {"$set": db_summary}, upsert=True)
         print(f"🔍 DEBUG: Game document saved successfully")
     except Exception as e:
         print("🚨 Mongo upsert failed:", e)
@@ -826,13 +831,15 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
         # Scrimmage simulations should not generate aggregate stats.
         # Finalizing with ``mode="scrimmage"`` is a no-op but documents intent.
         stat_updater.finalize_game(game_id, mode="scrimmage")
-    turns = summary.get("turns", [])
+    
+    # Return frontend summary WITH animations for real-time play
+    turns = frontend_summary.get("turns", [])
     logger.debug(
         "simulate_quarter_endpoint turns len=%s first=%s",
         len(turns),
         turns[0] if turns else None,
     )
-    return summary
+    return frontend_summary
 
 
 @app.get("/roster/{team_name}")

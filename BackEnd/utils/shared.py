@@ -575,13 +575,16 @@ def summarize_game_state(game, exclude_animations=True):
     print(f"🔍 DEBUG: Home team plays: {len(teams_obj[game.home_team.team_id]['plays'])}")
     print(f"🔍 DEBUG: Away team plays: {len(teams_obj[game.away_team.team_id]['plays'])}")
 
-    # Process turns: always exclude animations for database persistence
-    # Animations are only needed for real-time frontend rendering
+    # Process turns: exclude animations for database persistence, keep for real-time frontend
     from copy import deepcopy
     turns = deepcopy(game.turns)
-    for turn in turns:
-        if "animations" in turn:
-            del turn["animations"]
+    
+    # Only exclude animations when saving to database (exclude_animations=True)
+    # For real-time frontend responses, keep animations (exclude_animations=False)
+    if exclude_animations:
+        for turn in turns:
+            if "animations" in turn:
+                del turn["animations"]
     
     # Get cumulative box scores
     cumulative_box = game.get_box_score()
