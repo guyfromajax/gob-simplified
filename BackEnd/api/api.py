@@ -127,6 +127,35 @@ def load_player_attributes_from_doc(mode: str, doc_id: str, player_id: str):
     
     return None
 
+def load_plays_from_doc(mode: str, doc_id: str, team_id: str):
+    """Load plays data from tournament/franchise doc."""
+    from BackEnd.db import franchises_collection
+    
+    if mode == "tournament":
+        try:
+            doc = tournaments_collection.find_one({"_id": ObjectId(doc_id)})
+            if doc:
+                team_obj = doc.get("teams", {}).get(team_id, {})
+                plays = team_obj.get("plays", [])
+                if plays:
+                    print(f"📋 Loaded {len(plays)} plays for team {team_id} from tournament doc")
+                    return plays
+        except Exception as e:
+            print(f"⚠️ Error loading plays from tournament doc: {e}")
+    elif mode == "franchise":
+        try:
+            doc = franchises_collection.find_one({"_id": ObjectId(doc_id)})
+            if doc:
+                team_obj = doc.get("teams", {}).get(team_id, {})
+                plays = team_obj.get("plays", [])
+                if plays:
+                    print(f"📋 Loaded {len(plays)} plays for team {team_id} from franchise doc")
+                    return plays
+        except Exception as e:
+            print(f"⚠️ Error loading plays from franchise doc: {e}")
+    
+    return None
+
 def load_team_attributes_from_doc(mode: str, doc_id: str, team_id: str, team_name: str):
     """Load team_attributes from tournament/franchise doc, fallback to core teams doc."""
     from BackEnd.db import franchises_collection
@@ -456,7 +485,25 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                     home = saved.get("home_team") or saved.get("homeTeam", {}).get("name")
                     away = saved.get("away_team") or saved.get("awayTeam", {}).get("name")
                     if home and away:
-                        gm = GameManager(home, away)
+                        # Load team data from saved game (includes plays, attributes, scouting)
+                        home_plays = saved.get("team_plays", {}).get(home)
+                        away_plays = saved.get("team_plays", {}).get(away)
+                        home_attrs = saved.get("team_attributes", {}).get(home)
+                        away_attrs = saved.get("team_attributes", {}).get(away)
+                        home_scouting = saved.get("scouting", {}).get(home)
+                        away_scouting = saved.get("scouting", {}).get(away)
+                        
+                        gm = GameManager(
+                            home, 
+                            away,
+                            home_team_attributes=home_attrs,
+                            away_team_attributes=away_attrs,
+                            home_scouting_data=home_scouting,
+                            away_scouting_data=away_scouting,
+                            home_plays_data=home_plays,
+                            away_plays_data=away_plays,
+                            mode="single"  # Loaded games are always single mode from games_collection
+                        )
                         gm.game_state = gm._init_game_state()
                         gm.game_state.update(saved.get("game_state", {}))
                         gm.quarter = saved.get("quarter", 1)
@@ -493,12 +540,17 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                         away_strategy = request.strategy_settings
                         # In single game mode, apply defensive strategy to BOTH teams for consistent pressure
                         home_strategy = request.strategy_settings
+                    
+                    # Get mode from request (default to "single")
+                    mode = request.mode or "single"
+                    
                     #temp comment
                     gm = GameManager(
                         request.home_team, 
                         request.away_team,
                         home_strategy_settings=home_strategy,
-                        away_strategy_settings=away_strategy
+                        away_strategy_settings=away_strategy,
+                        mode=mode  # Pass mode so teams can initialize plays with correct stats structure
                     )
                     # Use the game_id from the request if provided, otherwise generate a new one
                     if request.game_id:
@@ -513,10 +565,13 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                     try:
                         from BackEnd.api.gameplan_routes import populate_team_plays
                         
-                        # Get populated plays for team objects
-                        populated_plays = populate_team_plays()
+                        # Get mode from request (default to "single")
+                        mode = request.mode or "single"
                         
-                        print(f"🔍 DEBUG: Populated {len(populated_plays)} plays for teams in simulate_quarter_endpoint (Q1)")
+                        # Get populated plays for team objects (with game_stats and optionally season_stats)
+                        populated_plays = populate_team_plays(mode=mode)
+                        
+                        print(f"🔍 DEBUG: Populated {len(populated_plays)} plays for teams in simulate_quarter_endpoint (Q1, mode={mode})")
                         print(f"🔍 DEBUG: Play keys: {list(populated_plays.keys())}")
                         
                         # Create team objects with plays for skeleton lookup
@@ -565,11 +620,15 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
             # In single game mode, apply defensive strategy to BOTH teams for consistent pressure
             home_strategy = request.strategy_settings
         
+        # Get mode from request (default to "single")
+        mode = request.mode or "single"
+        
         gm = GameManager(
             request.home_team, 
             request.away_team,
             home_strategy_settings=home_strategy,
-            away_strategy_settings=away_strategy
+            away_strategy_settings=away_strategy,
+            mode=mode  # Pass mode so teams can initialize plays with correct stats structure
         )
         # Use the game_id from the request if provided, otherwise generate a new one
         from BackEnd.utils.game_id_utils import generate_game_id, normalize_game_id
@@ -586,10 +645,13 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
         try:
             from BackEnd.api.gameplan_routes import populate_team_plays
             
-            # Get populated plays for team objects
-            populated_plays = populate_team_plays()
+            # Get mode from request (default to "single")
+            mode = request.mode or "single"
             
-            print(f"🔍 DEBUG: Populated {len(populated_plays)} plays for teams in simulate_quarter_endpoint (no game_id)")
+            # Get populated plays for team objects (with game_stats and optionally season_stats)
+            populated_plays = populate_team_plays(mode=mode)
+            
+            print(f"🔍 DEBUG: Populated {len(populated_plays)} plays for teams in simulate_quarter_endpoint (no game_id, mode={mode})")
             print(f"🔍 DEBUG: Play keys: {list(populated_plays.keys())}")
             
             # Create team objects with plays for skeleton lookup

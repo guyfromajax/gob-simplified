@@ -86,8 +86,16 @@ def get_default_settings():
     }
 
 
-def populate_team_plays():
-    """Populate team plays object with all plays from universal plays collection"""
+def populate_team_plays(mode="single"):
+    """
+    Populate team plays from universal plays collection with tracking stats.
+    
+    Args:
+        mode: "single", "tournament", or "franchise"
+        
+    Returns:
+        dict: {play_name: play_data} with embedded game_stats and optionally season_stats
+    """
     try:
         from BackEnd.db import plays_collection
         
@@ -98,12 +106,36 @@ def populate_team_plays():
         plays_dict = {}
         for play in all_plays:
             play_name = play["name"]
-            plays_dict[play_name] = {
+            play_data = {
+                "play_id": str(play["_id"]),
                 "name": play["name"],
                 "play_type": play["play_type"], 
                 "play_focus": play["play_focus"],
-                "skeletons": play["skeletons"]
+                "skeletons": play["skeletons"],
+                "game_stats": {
+                    "times_run": 0,
+                    "shot_attempts": 0,
+                    "made_shots": 0,
+                    "turnovers": 0,
+                    "offensive_fouls": 0,
+                    "defensive_fouls": 0,
+                    "effectiveness": 0.0
+                }
             }
+            
+            # Add season_stats for tournament and franchise modes
+            if mode in ["tournament", "franchise"]:
+                play_data["season_stats"] = {
+                    "times_run": 0,
+                    "shot_attempts": 0,
+                    "made_shots": 0,
+                    "turnovers": 0,
+                    "offensive_fouls": 0,
+                    "defensive_fouls": 0,
+                    "effectiveness": 0.0
+                }
+            
+            plays_dict[play_name] = play_data
         
         return plays_dict
     except Exception as e:

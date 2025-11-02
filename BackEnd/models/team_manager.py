@@ -5,7 +5,7 @@ from BackEnd.models.player import Player
 from BackEnd.constants import PLAYCALLS
 
 class TeamManager:
-    def __init__(self, name: str, is_home_team=False, strategy_settings=None, team_attributes=None, scouting_data=None):
+    def __init__(self, name: str, is_home_team=False, strategy_settings=None, team_attributes=None, scouting_data=None, plays_data=None, mode="single"):
         self.name = name
         self.is_home_team = is_home_team
         self.players = self._load_roster()
@@ -41,7 +41,13 @@ class TeamManager:
         self.strategy_calls = {}
         self.playcall_tracker = {pc: 0 for pc in PLAYCALLS}
         self.defense_playcall_tracker = {"Man": 0, "Zone": 0}
-        self.plays = {}  # Track play usage and stats
+        
+        # Use provided plays_data (from saved game) or initialize fresh from universal collection
+        # MALLEABLE: Each game instance has its own copy with tracking stats
+        if plays_data:
+            self.plays = {play["name"]: play for play in plays_data}
+        else:
+            self.plays = self._init_plays_from_universal(mode)
         
         # Use provided team_attributes or generate random values
         # MALLEABLE: Generated per game instance (not loaded from universal teams collection)
@@ -152,6 +158,57 @@ class TeamManager:
                 "HCT": {"used": 0, "success": 0}
             }
         }
+    
+    def _init_plays_from_universal(self, mode="single"):
+        """
+        Initialize plays from universal plays collection.
+        Creates team-specific copy with tracking stats based on mode.
+        
+        Args:
+            mode: "single", "tournament", or "franchise"
+            
+        Returns:
+            dict: {play_name: play_data} with embedded stats
+        """
+        from BackEnd.db import plays_collection
+        
+        plays_dict = {}
+        universal_plays = list(plays_collection.find({}))
+        
+        for play in universal_plays:
+            play_data = {
+                "play_id": str(play["_id"]),
+                "name": play["name"],
+                "play_type": play["play_type"],
+                "play_focus": play["play_focus"],
+                "skeletons": play["skeletons"],
+                "game_stats": {
+                    "times_run": 0,
+                    "shot_attempts": 0,
+                    "made_shots": 0,
+                    "turnovers": 0,
+                    "offensive_fouls": 0,
+                    "defensive_fouls": 0,
+                    "effectiveness": 0.0
+                }
+            }
+            
+            # Add season_stats for tournament and franchise modes
+            if mode in ["tournament", "franchise"]:
+                play_data["season_stats"] = {
+                    "times_run": 0,
+                    "shot_attempts": 0,
+                    "made_shots": 0,
+                    "turnovers": 0,
+                    "offensive_fouls": 0,
+                    "defensive_fouls": 0,
+                    "effectiveness": 0.0
+                }
+            
+            plays_dict[play["name"]] = play_data
+        
+        print(f"📋 Initialized {len(plays_dict)} plays for {self.name} (mode: {mode})")
+        return plays_dict
 
     def record_team_foul(self):
         self.team_fouls += 1
