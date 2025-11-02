@@ -750,6 +750,11 @@ class Animator:
         animations = []
         steps = skeleton["steps"]
         
+        # Determine if away team is on offense ONCE at the start (not inside loops)
+        # This ensures consistency when loading saved games where game state may have changed
+        is_away_offense = self.game.offense_team.team_id == self.game.away_team.team_id
+        print(f"🎬 COORD DEBUG: skeleton_to_animations - offense_team={self.game.offense_team.name}, away_team={self.game.away_team.name}, is_away_offense={is_away_offense}")
+        
         # Group all positions that appear in any step
         all_positions = set()
         for step in steps:
@@ -797,9 +802,12 @@ class Animator:
                     coords_already_flipped = False
                 
                 # Apply away team coordinate flipping if needed (only if not already flipped by apply_opposite_side_logic)
-                is_away_offense = self.game.offense_team.team_id == self.game.away_team.team_id
+                # is_away_offense calculated once at function start (line 755) for consistency
                 if is_away_offense and not coords_already_flipped:
+                    original_coords = coords.copy()
                     coords = get_away_player_coords(coords)
+                    if position == "PG" and timestamp == 0:  # Only log once per turn
+                        print(f"🎬 COORD DEBUG: Flipping coords for {position} - original={original_coords}, flipped={coords}")
                 
                 action = pos_action.get("action", "drift")
                 
