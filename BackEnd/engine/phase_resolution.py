@@ -629,6 +629,11 @@ def resolve_half_court_offense_logic(game):
         )
         if skeleton_animations:
             shot_result["animations"] = skeleton_animations
+            print(f"🎬 ANIMATION DEBUG: Generated {len(skeleton_animations)} animation steps for HCO")
+        else:
+            print(f"🎬 ANIMATION DEBUG: skeleton_to_animations returned None/empty")
+    else:
+        print(f"🎬 ANIMATION DEBUG: No skeleton or steps - skeleton exists: {skeleton is not None}, has steps: {skeleton and 'steps' in skeleton}")
 
     # 4. scouting report update (new buckets)
     try:
