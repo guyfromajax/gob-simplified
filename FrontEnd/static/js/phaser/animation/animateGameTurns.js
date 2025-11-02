@@ -312,7 +312,7 @@ export async function animateGameTurns({ //hasBallAtStep
   ballSprite,
   onUpdate
 }) {
-  console.log('🎬 animateGameTurns: Starting animation system');
+  // console.log('🎬 animateGameTurns: Starting animation system');
   const turns = simData.turns || [];
   if (scene) scene.simData = simData;
   annotateFreeThrowTurns(turns);
@@ -422,7 +422,7 @@ export async function animateGameTurns({ //hasBallAtStep
   };
   scene.events?.on?.('possessionChange', handlePossessionFlip);
 
-  console.log('🎬 animateGameTurns: Starting turn processing loop', { totalTurns: turns.length });
+  // console.log('🎬 animateGameTurns: Starting turn processing loop', { totalTurns: turns.length });
   
   for (let i = 0; i < turns.length; i++) {
     scene.currentTurn = i;
@@ -549,7 +549,7 @@ export async function animateGameTurns({ //hasBallAtStep
     }
 
     if (turn.result_type === "BASELINE_INBOUND") {
-      console.log('🏀 Quarter start BASELINE_INBOUND detected, animating all players');
+      // console.log('🏀 Quarter start BASELINE_INBOUND detected, animating all players');
       
       // Animate all players to their positions
       const { tweenPlayerTo } = await import('./ballTween.js');
@@ -583,7 +583,7 @@ export async function animateGameTurns({ //hasBallAtStep
         }
       }
       updateDebugScore(turn, { turnIndex: i, possessionId });
-      console.log('🏀 Continuing to next turn after BASELINE_INBOUND');
+      // console.log('🏀 Continuing to next turn after BASELINE_INBOUND');
       continue;
     }
 

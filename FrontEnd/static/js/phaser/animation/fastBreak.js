@@ -134,9 +134,9 @@ async function animateOutletPhase(scene, turnData, playerSprites, ballSprite, wi
   
   // SIMULTANEOUSLY animate defenders chasing
   const defendersList = turnData.roles?.defense || [];
-  console.log("🏀 FB Outlet - Defenders list:", defendersList);
+  // console.log("🏀 FB Outlet - Defenders list:", defendersList);
   const defendersSet = new Set(defendersList.map(d => d.player_id || d));
-  console.log("🏀 FB Outlet - Defenders Set:", Array.from(defendersSet));
+  // console.log("🏀 FB Outlet - Defenders Set:", Array.from(defendersSet));
   
   let defenderCount = 0;
   for (const [id, sprite] of Object.entries(playerSprites)) {
@@ -160,7 +160,7 @@ async function animateOutletPhase(scene, turnData, playerSprites, ballSprite, wi
     // All other players hold position (no animation)
   }
   
-  console.log(`🏀 FB Outlet - Animating ${defenderCount} defenders with receiver. Total promises: ${promises.length}`);
+  // console.log(`🏀 FB Outlet - Animating ${defenderCount} defenders with receiver. Total promises: ${promises.length}`);
   
   // Wait for ALL movements (receiver + defenders) to complete simultaneously
   await Promise.all(promises);
@@ -234,12 +234,12 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
   
   const defenderSprite = defenderId ? playerSprites[defenderId] : null;
   
-  console.log("🏀 FB Shot - Defender lookup:", {
-    defenderId,
-    hasSprite: !!defenderSprite,
-    turnDataDefenderId: turnData.defenderId,
-    turnDataDefender: turnData.defender
-  });
+  // console.log("🏀 FB Shot - Defender lookup:", {
+  //   defenderId,
+  //   hasSprite: !!defenderSprite,
+  //   turnDataDefenderId: turnData.defenderId,
+  //   turnDataDefender: turnData.defender
+  // });
   
   if (defenderSprite) {
     // Defender position: 3 spots closer to basket, ±2 Y from shooter
@@ -252,12 +252,12 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
     defenderSpot.x = Phaser.Math.Clamp(defenderSpot.x, 4, 97);
     defenderSpot.y = Phaser.Math.Clamp(defenderSpot.y, 1, 49);
     
-    console.log("🏀 FB Shot - Defender position:", {
-      defenderId,
-      shotSpot,
-      defenderSpot,
-      isHomeOffense
-    });
+    // console.log("🏀 FB Shot - Defender position:", {
+    //   defenderId,
+    //   shotSpot,
+    //   defenderSpot,
+    //   isHomeOffense
+    // });
     
     const defenderPx = gridToPixels(defenderSpot.x, defenderSpot.y, width, height);
     promises.push(

@@ -704,9 +704,9 @@ function initGame() {
   }
 }
 
-console.log('🚨 BOOTGAME: JavaScript is loading and executing!');
+// console.log('🚨 BOOTGAME: JavaScript is loading and executing!');
 initGame();
 updateOffsets();
-console.log('🚨 BOOTGAME: Initialization complete!');
+// console.log('🚨 BOOTGAME: Initialization complete!');
 
 // new Phaser.Game(config);

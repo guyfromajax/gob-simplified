@@ -679,7 +679,7 @@ export function createGameScene(Phaser) {
           child.list && 
           child.list.some(item => item.type === 'Circle')
         );
-        console.log('🔍 PRE-CREATION: Existing containers in scene:', existingContainers.length);
+        // console.log('🔍 PRE-CREATION: Existing containers in scene:', existingContainers.length);
         
         this.playerSprites = loadPhaserPlayers(this, actualPlayers, Phaser);
         
@@ -689,21 +689,21 @@ export function createGameScene(Phaser) {
           child.list && 
           child.list.some(item => item.type === 'Circle')
         );
-        console.log('🔍 POST-CREATION: Total containers in scene:', postCreationContainers.length);
-        console.log('🔍 POST-CREATION: playerSprites object size:', Object.keys(this.playerSprites).length);
+        // console.log('🔍 POST-CREATION: Total containers in scene:', postCreationContainers.length);
+        // console.log('🔍 POST-CREATION: playerSprites object size:', Object.keys(this.playerSprites).length);
         
         // Clean up any extra sprites that don't have corresponding playerInfo
         const spriteKeys = Object.keys(this.playerSprites);
         const playerInfoKeys = Object.keys(this.playerInfo || {});
         const extraSprites = spriteKeys.filter(id => !this.playerInfo?.[id]);
         
-        console.log('SPRITE CLEANUP DEBUG:', {
-          totalSprites: spriteKeys.length,
-          totalPlayerInfo: playerInfoKeys.length,
-          spriteKeys,
-          playerInfoKeys,
-          extraSprites
-        });
+        // console.log('SPRITE CLEANUP DEBUG:', {
+        //   totalSprites: spriteKeys.length,
+        //   totalPlayerInfo: playerInfoKeys.length,
+        //   spriteKeys,
+        //   playerInfoKeys,
+        //   extraSprites
+        // });
         
         if (extraSprites.length > 0) {
           console.warn('EXTRA SPRITES DETECTED at game start (no playerInfo):', extraSprites);
@@ -725,7 +725,7 @@ export function createGameScene(Phaser) {
         }
         
         // Also check for any sprites that might have been created elsewhere
-        console.log('Final playerSprites after cleanup:', Object.keys(this.playerSprites));
+        // console.log('Final playerSprites after cleanup:', Object.keys(this.playerSprites));
         
         // Check all children in the scene to see if there are any extra sprites
         const allChildren = this.children.list;
@@ -734,12 +734,12 @@ export function createGameScene(Phaser) {
           child.list && 
           child.list.some(item => item.type === 'Circle')
         );
-        console.log('All container sprites in scene:', playerSprites.map(sprite => ({
-          id: sprite.playerId,
-          team: sprite.team,
-          position: { x: sprite.x, y: sprite.y },
-          visible: sprite.visible
-        })));
+        // console.log('All container sprites in scene:', playerSprites.map(sprite => ({
+        //   id: sprite.playerId,
+        //   team: sprite.team,
+        //   position: { x: sprite.x, y: sprite.y },
+        //   visible: sprite.visible
+        // })));
       }
 
       const applyPlayerStats = (turn = {}) => {
@@ -984,11 +984,11 @@ export function createGameScene(Phaser) {
         return finalScore;
       };
 
-      console.log('🚨 GAMESCENE: animate parameter:', this.animate);
-      console.log('🚨 GAMESCENE: typeof animate:', typeof this.animate);
+      // console.log('🚨 GAMESCENE: animate parameter:', this.animate);
+      // console.log('🚨 GAMESCENE: typeof animate:', typeof this.animate);
       
       if (this.animate) {
-        console.log('🚨 GAMESCENE: Taking animation path');
+        // console.log('🚨 GAMESCENE: Taking animation path');
         const courtKey = "court-bg";
 
         const startAnimation = async () => {
@@ -1045,7 +1045,7 @@ export function createGameScene(Phaser) {
           if (DEBUG_FLOW) {
             console.log('🔢 quarterTurns length', quarterTurns.length);
           }
-          console.log('🔍 Q4 DEBUG: First turn type:', quarterTurns[0]?.result_type, 'Text:', quarterTurns[0]?.text);
+          // console.log('🔍 Q4 DEBUG: First turn type:', quarterTurns[0]?.result_type, 'Text:', quarterTurns[0]?.text);
           if (quarterTurns.length === 0) {
             const total = Array.isArray(simData.turns) ? simData.turns.length : 0;
             console.warn(`⚠️ No turns found for quarter ${this.quarter} (total turns: ${total}). Navigation halted.`);
@@ -1053,11 +1053,11 @@ export function createGameScene(Phaser) {
           }
 
           let animStart;
-          console.log('🎬 GameScene: About to call animateGameTurns', { 
-            quarterTurnsLength: quarterTurns.length,
-            hasPlayerSprites: !!this.playerSprites,
-            hasBallSprite: !!this.ballSprite
-          });
+          // console.log('🎬 GameScene: About to call animateGameTurns', { 
+          //   quarterTurnsLength: quarterTurns.length,
+          //   hasPlayerSprites: !!this.playerSprites,
+          //   hasBallSprite: !!this.ballSprite
+          // });
           
           if (DEBUG_FLOW) {
             animStart = Date.now();
@@ -1145,16 +1145,16 @@ export function createGameScene(Phaser) {
           this.load.start();
         }
       } else {
-        console.log('🚨 GAMESCENE: Taking NO animation path - skipping to next quarter');
+        // console.log('🚨 GAMESCENE: Taking NO animation path - skipping to next quarter');
         if (this.isFinal) {
           await finalize();
         } else {
-          console.log('🚨 GAMESCENE: About to navigate to next quarter - BLOCKING FOR DEBUG');
-          console.log('🚨 GAMESCENE: If you see this, the animation was skipped!');
+          // console.log('🚨 GAMESCENE: About to navigate to next quarter - BLOCKING FOR DEBUG');
+          // console.log('🚨 GAMESCENE: If you see this, the animation was skipped!');
           
           // TEMPORARY DEBUG: Block navigation to see what's happening
           if (window.DEBUG_BLOCK_NAVIGATION !== false) {
-            console.log('🚨 GAMESCENE: Navigation blocked for debugging. Set window.DEBUG_BLOCK_NAVIGATION = false to allow navigation.');
+            // console.log('🚨 GAMESCENE: Navigation blocked for debugging. Set window.DEBUG_BLOCK_NAVIGATION = false to allow navigation.');
             return; // Block navigation
           }
           
