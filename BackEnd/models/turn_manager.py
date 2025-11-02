@@ -1036,7 +1036,7 @@ class TurnManager:
             
             # 2. Get PASSER from ball ownership changes (check previous 2 steps before shot)
             # Look at who had the ball in the 2 steps before the final shot step
-            print(f"🎯 ASSIST DEBUG: shooter_pos={shooter_pos}, ball_owner_by_step={ball_owner_by_step}")
+            # print(f"🎯 ASSIST DEBUG: shooter_pos={shooter_pos}, ball_owner_by_step={ball_owner_by_step}")
             
             if ball_owner_by_step and len(ball_owner_by_step) >= 2:
                 # Check the last 2 non-shooter ball owners
@@ -1044,14 +1044,14 @@ class TurnManager:
                 for i in range(len(ball_owner_by_step) - 2, max(len(ball_owner_by_step) - 4, -1), -1):
                     if i >= 0:
                         potential_passer_pos = ball_owner_by_step[i]
-                        print(f"🎯 ASSIST DEBUG: Checking index {i}: potential_passer={potential_passer_pos}")
+                        # print(f"🎯 ASSIST DEBUG: Checking index {i}: potential_passer={potential_passer_pos}")
                         # Found a different player who had the ball before the shooter
                         if potential_passer_pos and potential_passer_pos != shooter_pos:
                             passer_pos = potential_passer_pos
-                            print(f"🎯 ASSIST DEBUG: Found passer via ball ownership! passer_pos={passer_pos}")
+                            # print(f"🎯 ASSIST DEBUG: Found passer via ball ownership! passer_pos={passer_pos}")
                             break
             
-            print(f"🎯 ASSIST DEBUG: Final passer_pos={passer_pos}")
+            # print(f"🎯 ASSIST DEBUG: Final passer_pos={passer_pos}")
             
             # 3. Get SCREENER - find last screen that helped the shooter
             if shooter_pos:
@@ -1155,7 +1155,7 @@ class TurnManager:
         passer = off_lineup.get(passer_pos)
         defender = def_lineup.get(defender_pos) if defender_pos else def_lineup["PG"]
         
-        print(f"🎯 ASSIST DEBUG: passer_pos={passer_pos}, passer object={get_name_safe(passer) if passer else None}")
+        # print(f"🎯 ASSIST DEBUG: passer_pos={passer_pos}, passer object={get_name_safe(passer) if passer else None}")
 
         return {
             "shooter": shooter,
