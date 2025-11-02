@@ -448,7 +448,13 @@ export function shootBall({
           // Get shooter player data
           const shooterSprite = scene.playerSprites?.[shooterId];
           const shooterInfo = scene.playerInfo?.[shooterId];
-          const shooterTeamName = shooterTeamId === scene.homeTeamId ? scene.simData?.home_team : scene.simData?.away_team;
+          
+          // Handle both new nested structure (object) and old flat structure (string)
+          const homeTeamField = scene.simData?.home_team;
+          const awayTeamField = scene.simData?.away_team;
+          const homeTeamName = typeof homeTeamField === 'object' ? homeTeamField?.name : homeTeamField;
+          const awayTeamName = typeof awayTeamField === 'object' ? awayTeamField?.name : awayTeamField;
+          const shooterTeamName = shooterTeamId === scene.homeTeamId ? homeTeamName : awayTeamName;
           
           const playerData = shooterInfo ? {
             playerId: shooterId,
@@ -661,7 +667,13 @@ export function animateRebound({
             const { showAnnouncement } = await import('../utils/announcements.js');
             const rebounderTeam = rebounderSprite.team; // "home" or "away"
             const rebounderTeamId = rebounderSprite.team_id;
-            const rebounderTeamName = rebounderTeamId === scene.homeTeamId ? scene.simData?.home_team : scene.simData?.away_team;
+            
+            // Handle both new nested structure (object) and old flat structure (string)
+            const homeTeamField = scene.simData?.home_team;
+            const awayTeamField = scene.simData?.away_team;
+            const homeTeamName = typeof homeTeamField === 'object' ? homeTeamField?.name : homeTeamField;
+            const awayTeamName = typeof awayTeamField === 'object' ? awayTeamField?.name : awayTeamField;
+            const rebounderTeamName = rebounderTeamId === scene.homeTeamId ? homeTeamName : awayTeamName;
             
             const playerData = {
               playerId: rebounderId,

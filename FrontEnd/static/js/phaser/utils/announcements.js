@@ -164,7 +164,13 @@ export function announceFromTurnData(turnData, timing = 'start', homeTeamId = nu
         const stealerId = turnData.defender_id;
         const stealerSprite = scene.playerSprites?.[stealerId];
         const stealerTeamId = stealerSprite?.team_id;
-        const stealerTeamName = stealerTeamId === scene.homeTeamId ? scene.simData?.home_team : scene.simData?.away_team;
+        
+        // Handle both new nested structure (object) and old flat structure (string)
+        const homeTeamField = scene.simData?.home_team;
+        const awayTeamField = scene.simData?.away_team;
+        const homeTeamName = typeof homeTeamField === 'object' ? homeTeamField?.name : homeTeamField;
+        const awayTeamName = typeof awayTeamField === 'object' ? awayTeamField?.name : awayTeamField;
+        const stealerTeamName = stealerTeamId === scene.homeTeamId ? homeTeamName : awayTeamName;
         
         playerData = {
           playerId: stealerId,
@@ -187,7 +193,13 @@ export function announceFromTurnData(turnData, timing = 'start', homeTeamId = nu
         const victimId = turnData.victim_id;
         const victimSprite = scene.playerSprites?.[victimId];
         const victimTeamId = victimSprite?.team_id;
-        const victimTeamName = victimTeamId === scene.homeTeamId ? scene.simData?.home_team : scene.simData?.away_team;
+        
+        // Handle both new nested structure (object) and old flat structure (string)
+        const homeTeamField = scene.simData?.home_team;
+        const awayTeamField = scene.simData?.away_team;
+        const homeTeamName = typeof homeTeamField === 'object' ? homeTeamField?.name : homeTeamField;
+        const awayTeamName = typeof awayTeamField === 'object' ? awayTeamField?.name : awayTeamField;
+        const victimTeamName = victimTeamId === scene.homeTeamId ? homeTeamName : awayTeamName;
         
         playerData = {
           playerId: victimId,

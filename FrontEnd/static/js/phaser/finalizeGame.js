@@ -2,16 +2,21 @@ const DEBUG_BRACKET = window.DEBUG_BRACKET || false;
 const DEBUG_GAME_ID = window.DEBUG_GAME_ID || false;
 
 export async function finalizeGame({ simData, tournamentId, franchiseId, game }) {
-  // Extract score and winner
-  const homeTeamObj = simData.homeTeam || { name: simData.home_team };
-  const awayTeamObj = simData.awayTeam || { name: simData.away_team };
+  // Extract score and winner - handle both new nested and old flat structure
+  // New structure: simData.home_team is an object with {name, score, etc.}
+  // Old structure: simData.home_team is a string, simData.homeTeam is an object
+  const homeTeamField = simData.home_team;
+  const awayTeamField = simData.away_team;
+  
+  const homeTeamObj = typeof homeTeamField === 'object' ? homeTeamField : (simData.homeTeam || { name: homeTeamField });
+  const awayTeamObj = typeof awayTeamField === 'object' ? awayTeamField : (simData.awayTeam || { name: awayTeamField });
+  
+  const homeKey = homeTeamObj.name || homeTeamField;
+  const awayKey = awayTeamObj.name || awayTeamField;
+  
   const scoreMap = simData.final_score || simData.score || {};
-  const homeKey = simData.home_team || homeTeamObj.name;
-  const awayKey = simData.away_team || awayTeamObj.name;
-  const homeScore =
-    homeTeamObj.score ?? scoreMap[homeKey] ?? scoreMap[homeTeamObj.name] ?? 0;
-  const awayScore =
-    awayTeamObj.score ?? scoreMap[awayKey] ?? scoreMap[awayTeamObj.name] ?? 0;
+  const homeScore = homeTeamObj.score ?? scoreMap[homeKey] ?? 0;
+  const awayScore = awayTeamObj.score ?? scoreMap[awayKey] ?? 0;
   const winner = homeScore > awayScore ? homeKey : awayKey;
   const params = new URLSearchParams(window.location.search);
   let week = parseInt(params.get('week'), 10);
