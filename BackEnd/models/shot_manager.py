@@ -162,7 +162,6 @@ class ShotManager:
         # 🎯 Shot is Made
         # ------------------------
         if made:
-            from BackEnd.utils.shared import get_name_safe
             print(f"🎯 ASSIST DEBUG: Shot MADE! passer={get_name_safe(passer) if passer else None}")
             if passer:
                 passer.record_stat("AST")
