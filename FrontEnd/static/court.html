@@ -1378,12 +1378,6 @@
     
     // Stats toggle functionality
     function initializeStatsToggle() {
-      const statConfigs = {
-        S1: { headers: ['Name', 'PTS', 'REB', 'AST', 'F'], stats: ['name', 'PTS', 'REB', 'AST', 'F'] },
-        S2: { headers: ['Name', 'STL', 'BLK', 'TO'], stats: ['name', 'STL', 'BLK', 'TO'] },
-        S3: { headers: ['Defense', 'ATT', 'Win %'], stats: ['name', 'DEF_A', 'DEF_PCT'] }
-      };
-      
       // Add click handlers to all toggle buttons
       document.querySelectorAll('.toggle-btn').forEach(btn => {
         btn.addEventListener('click', function() {
@@ -1396,18 +1390,36 @@
           this.classList.add('active');
           
           // Update headers and body visibility
-          updateStatsDisplay(team, statType, statConfigs);
+          updateStatsDisplay(team, statType);
         });
       });
       
       // Initialize default (S1)
-      updateStatsDisplay('away', 'S1', statConfigs);
-      updateStatsDisplay('home', 'S1', statConfigs);
+      updateStatsDisplay('away', 'S1');
+      updateStatsDisplay('home', 'S1');
     }
     
     function updateStatsDisplay(team, statType) {
-      // This function will be called by the existing stats update system
-      // to refresh the display with the correct columns
+      // Get stat configuration
+      const statConfigs = {
+        S1: { headers: ['Name', 'PTS', 'REB', 'AST', 'F'], stats: ['name', 'PTS', 'REB', 'AST', 'F'] },
+        S2: { headers: ['Name', 'STL', 'BLK', 'TO'], stats: ['name', 'STL', 'BLK', 'TO'] },
+        S3: { headers: ['Defense', 'ATT', 'Win %'], stats: ['name', 'DEF_A', 'DEF_PCT'] }
+      };
+      
+      const config = statConfigs[statType];
+      if (!config) return;
+      
+      // Update header row
+      const header = document.getElementById(`${team}-stats-header`);
+      if (header) {
+        const headerRow = header.querySelector('tr');
+        if (headerRow) {
+          headerRow.innerHTML = config.headers.map(h => `<th>${h}</th>`).join('');
+        }
+      }
+      
+      // Update body rows
       const body = document.getElementById(`${team}-stats-body`);
       const rows = body.querySelectorAll('tr');
       
@@ -1447,9 +1459,9 @@
             }
             break;
           case 'S3':
-            // Show: Name, ATT (DEF_A), DEF (success rate)
+            // Show: Defense (Name), ATT (DEF_A), Win % (DEF_PCT)
             if (cells.length >= 10) {
-              cells[0].style.display = ''; // Name
+              cells[0].style.display = ''; // Name (labeled as "Defense")
               cells[1].style.display = 'none'; // PTS
               cells[2].style.display = 'none'; // REB
               cells[3].style.display = 'none'; // AST
@@ -1458,7 +1470,7 @@
               cells[6].style.display = 'none'; // BLK
               cells[7].style.display = 'none'; // TO
               cells[8].style.display = ''; // DEF_A (ATT)
-              cells[9].style.display = ''; // DEF (success rate)
+              cells[9].style.display = ''; // DEF (Win %)
             }
             break;
         }
