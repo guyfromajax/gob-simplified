@@ -1503,13 +1503,21 @@
     }
 
     function startAnimation() {
+      console.log('🎬 startAnimation called');
       const selectedVariant = document.getElementById('animate-variant-select').value;
+      console.log('Selected variant:', selectedVariant);
+      
       const variantData = playState.variants[selectedVariant];
+      console.log('Variant data:', variantData);
+      console.log('Steps count:', variantData ? variantData.steps.length : 'no variant data');
       
       if (!variantData || variantData.steps.length === 0) {
+        console.log('❌ No steps to animate');
         alert('This variant has no steps to animate!');
         return;
       }
+      
+      console.log('✅ Starting animation with', variantData.steps.length, 'steps');
       
       // Stop any existing animation
       stopAnimation();
@@ -1530,22 +1538,31 @@
       currentStepAssignments = {};
       previousStepAssignments = {};
       
+      console.log('🎬 Calling animateNextStep');
       // Start animation loop
       animateNextStep(selectedVariant);
     }
 
     function animateNextStep(selectedVariant) {
-      if (!isAnimating) return;
+      console.log(`📽️ animateNextStep called, step ${animationStepIndex}, isAnimating:`, isAnimating);
+      
+      if (!isAnimating) {
+        console.log('❌ Animation stopped');
+        return;
+      }
       
       const variantData = playState.variants[selectedVariant];
       
       if (animationStepIndex >= variantData.steps.length) {
         // Animation complete
+        console.log('✅ Animation complete');
         stopAnimation();
         return;
       }
       
       const step = variantData.steps[animationStepIndex];
+      console.log('Current step data:', step);
+      
       const statusDiv = document.getElementById('animation-status');
       statusDiv.textContent = `Animating Step ${animationStepIndex + 1} of ${variantData.steps.length}`;
       
@@ -1567,11 +1584,15 @@
         }
       });
       
+      console.log('Updated assignments:', currentStepAssignments);
+      console.log('Calling renderCourtVisualization');
+      
       // Render the step
       renderCourtVisualization();
       
       // Move to next step after delay
       animationStepIndex++;
+      console.log(`⏱️ Scheduling next step (${animationStepIndex}) in 1 second`);
       animationIntervalId = setTimeout(() => animateNextStep(selectedVariant), 1000);
     }
 
