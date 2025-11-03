@@ -919,10 +919,9 @@
         <button id="complete-variant-btn" onclick="completeVariant()">Variant Complete</button>
       </div>
 
-      <!-- Step Review Buttons (Keep/Edit) -->
+      <!-- Step Review Buttons (Keep Step) -->
       <div id="review-buttons" class="step2-controls-row hidden">
-        <button id="keep-step-btn" onclick="keepStep()" class="btn-success">✓ Keep Step</button>
-        <button id="edit-step-btn" onclick="editStep()" class="btn-secondary">✏️ Edit Step</button>
+        <button id="keep-step-btn" onclick="keepStep()" class="btn-success">✓ Keep Step (or modify to diverge)</button>
       </div>
 
       <!-- Save Options -->
@@ -1322,6 +1321,7 @@
       positionOffsets = {};
       newOffsets = {};
       currentBallHandler = null;
+      hasAlreadyDiverged = false; // Reset divergence tracking
       
       // If variant has no steps, auto-copy from successful
       if (variant !== 'successful' && variantData.steps.length === 0) {
@@ -1507,6 +1507,44 @@
 
     // ==================== STEP REVIEW FUNCTIONS ====================
     
+    let hasAlreadyDiverged = false; // Track if we've already cleared following steps
+
+    function checkForDivergence() {
+      const variantData = getCurrentVariantData();
+      
+      // Only trigger if we're reviewing an existing step (not building past the end)
+      if (variantData.currentStep <= variantData.steps.length && !hasAlreadyDiverged) {
+        console.log(`🔀 Divergence detected at Step ${variantData.currentStep} - clearing following steps`);
+        
+        // Clear all steps after current
+        const stepsCleared = variantData.steps.length - variantData.currentStep;
+        variantData.steps = variantData.steps.slice(0, variantData.currentStep);
+        
+        // Update current step to be past the end (build mode)
+        variantData.currentStep = variantData.steps.length + 1;
+        
+        // Mark as diverged so we don't trigger again
+        hasAlreadyDiverged = true;
+        
+        // Update UI
+        updateStepReviewButtons(); // Hide review buttons, show build buttons
+        updateStepCounter(); // Update header
+        
+        // Show brief notification
+        if (stepsCleared > 0) {
+          const statusDiv = document.getElementById('animation-status');
+          if (statusDiv) {
+            statusDiv.style.display = 'block';
+            statusDiv.textContent = `✏️ Edit mode: Cleared ${stepsCleared} following step${stepsCleared > 1 ? 's' : ''}`;
+            statusDiv.classList.remove('playing');
+            setTimeout(() => {
+              statusDiv.style.display = 'none';
+            }, 3000);
+          }
+        }
+      }
+    }
+    
     function updateStepReviewButtons() {
       const variantData = getCurrentVariantData();
       const reviewButtons = document.getElementById('review-buttons');
@@ -1529,6 +1567,9 @@
       
       // Move to next step
       variantData.currentStep++;
+      
+      // Reset divergence flag for next step
+      hasAlreadyDiverged = false;
       
       // If we've moved past last step, switch to build mode
       if (variantData.currentStep > variantData.steps.length) {
@@ -2107,6 +2148,9 @@
     function handleDrop(newLocation) {
       if (!draggedPlayer || !newLocation) return;
       
+      // Check if we're in review mode and user is making a change
+      checkForDivergence();
+      
       // Check if location is occupied
       const occupyingPlayer = findPlayerAtLocation(newLocation);
       
@@ -2437,6 +2481,9 @@
     function handleDashboardLocationChange(pos, newLocation) {
       if (!newLocation) return;
 
+      // Check if we're in review mode and user is making a change
+      checkForDivergence();
+
       // Check if location is occupied
       const occupyingPlayer = findPlayerAtLocation(newLocation);
       
@@ -2464,6 +2511,9 @@
 
     function handleDashboardActionChange(pos, newAction) {
       if (!newAction) return;
+
+      // Check if we're in review mode and user is making a change
+      checkForDivergence();
 
       // Update assignment
       if (!currentStepAssignments[pos]) {
