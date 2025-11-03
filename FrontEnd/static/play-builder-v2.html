@@ -1328,8 +1328,12 @@
       
       // Set currentStep for this variant
       if (variantData.steps.length > 0) {
+        // If variant is marked complete, always reset to Step 1 for review
+        if (variantData.complete) {
+          variantData.currentStep = 1;
+        }
         // If currentStep wasn't set above, default to last step + 1
-        if (!variantData.currentStep || variantData.currentStep > variantData.steps.length) {
+        else if (!variantData.currentStep || variantData.currentStep > variantData.steps.length) {
           variantData.currentStep = variantData.steps.length + 1;
         }
         
