@@ -213,6 +213,7 @@ ACTIONS = {
     "RECEIVE": "receive",
     "POST_UP": "post_up",
     "SHOOT": "shoot",
+    "DRIVE": "drive",
     "SCREEN": "screen",
     "CUT": "cut",
     "GET_OPEN": "get_open",
