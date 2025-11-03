@@ -623,6 +623,79 @@
       margin-top: 0;
     }
 
+    /* Animation Preview Controls */
+    .animation-preview-controls {
+      background: rgba(138, 43, 226, 0.1);
+      border: 1px solid rgba(138, 43, 226, 0.3);
+      border-radius: 8px;
+      padding: 15px;
+      margin-top: 15px;
+    }
+
+    .animation-preview-controls h4 {
+      color: #9370DB;
+      margin-bottom: 10px;
+      font-size: 0.95rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .animation-controls-row {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .animation-controls-row select {
+      flex: 1;
+      min-width: 150px;
+    }
+
+    .animation-controls-row button {
+      width: auto;
+      min-width: 120px;
+      padding: 10px 20px;
+      font-size: 0.9rem;
+      margin-top: 0;
+    }
+
+    .btn-animate {
+      background: linear-gradient(135deg, #9370DB, #8A2BE2);
+    }
+
+    .btn-animate:hover:not(:disabled) {
+      background: linear-gradient(135deg, #8A2BE2, #7B1FA2);
+    }
+
+    .btn-stop {
+      background: linear-gradient(135deg, #e74c3c, #c0392b);
+    }
+
+    .btn-stop:hover:not(:disabled) {
+      background: linear-gradient(135deg, #c0392b, #a93226);
+    }
+
+    .animation-status {
+      margin-top: 10px;
+      padding: 8px;
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 6px;
+      font-size: 0.9rem;
+      text-align: center;
+      color: #9370DB;
+      font-weight: 600;
+    }
+
+    .animation-status.playing {
+      color: #4CAF50;
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.6; }
+    }
+
     .form-row {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
@@ -867,6 +940,27 @@
     <div class="court-container">
       <div class="position-dashboard" id="position-dashboard">
         <!-- Dashboard will be populated dynamically -->
+        
+        <!-- Animation Preview Controls -->
+        <div class="animation-preview-controls" id="animation-preview-section" style="display: none;">
+          <h4>🎬 Animation Preview</h4>
+          <div class="animation-controls-row">
+            <div class="form-group" style="margin: 0; flex: 1;">
+              <label for="animate-variant-select" style="font-size: 0.85rem;">Select Variant</label>
+              <select id="animate-variant-select">
+                <option value="successful">Successful</option>
+                <option value="mid_play_change">Mid-Play Change</option>
+                <option value="contested">Contested</option>
+                <option value="broken">Broken</option>
+              </select>
+            </div>
+            <button id="animate-btn" onclick="startAnimation()" class="btn-animate">▶️ Animate</button>
+            <button id="stop-animate-btn" onclick="stopAnimation()" class="btn-stop" style="display: none;">⏹️ Stop</button>
+          </div>
+          <div id="animation-status" class="animation-status" style="display: none;">
+            Ready to animate
+          </div>
+        </div>
       </div>
       <div class="court-visualization" id="court-visualization">
         <img src="/static/images/courts/bentley_truman.jpg" alt="Basketball Court" class="court-image">
@@ -1164,6 +1258,13 @@
       // Show save options
       document.getElementById('save-options').classList.remove('hidden');
       
+      // Show animation preview section
+      const animSection = document.getElementById('animation-preview-section');
+      if (animSection) {
+        animSection.style.display = 'block';
+        updateAnimationVariantDropdown();
+      }
+      
       // Initialize for current variant
       loadVariantForEditing(currentVariant);
     }
@@ -1281,6 +1382,7 @@
       loadVariantForEditing(currentVariant);
       updateVariantTabs();
       updateVariantInfo();
+      updateAnimationVariantDropdown();
       
       alert(`Cloned ${successfulData.steps.length} steps from Successful variant!`);
     }
@@ -1356,6 +1458,142 @@
         completionBtn.classList.remove('btn-secondary');
         completionBtn.classList.add('btn-success');
       }
+    }
+
+    // ==================== ANIMATION PREVIEW FUNCTIONS ====================
+    
+    let animationIntervalId = null;
+    let isAnimating = false;
+    let animationStepIndex = 0;
+
+    function updateAnimationVariantDropdown() {
+      const select = document.getElementById('animate-variant-select');
+      if (!select) return;
+      
+      // Update all options based on variant data
+      ['successful', 'mid_play_change', 'contested', 'broken'].forEach(variant => {
+        const variantData = playState.variants[variant];
+        const option = select.querySelector(`option[value="${variant}"]`);
+        
+        if (option) {
+          if (variantData.steps.length === 0) {
+            // No steps - disable and grey out
+            option.disabled = true;
+            option.style.color = 'rgba(255, 255, 255, 0.3)';
+            option.textContent = option.textContent.split(' (')[0] + ' (Empty)';
+          } else {
+            // Has steps - enable
+            option.disabled = false;
+            option.style.color = '#fff';
+            const baseName = option.textContent.split(' (')[0];
+            option.textContent = `${baseName} (${variantData.steps.length} steps)`;
+          }
+        }
+      });
+      
+      // Select first available variant
+      const firstAvailable = ['successful', 'mid_play_change', 'contested', 'broken']
+        .find(v => playState.variants[v].steps.length > 0);
+      if (firstAvailable) {
+        select.value = firstAvailable;
+      }
+    }
+
+    function startAnimation() {
+      const selectedVariant = document.getElementById('animate-variant-select').value;
+      const variantData = playState.variants[selectedVariant];
+      
+      if (!variantData || variantData.steps.length === 0) {
+        alert('This variant has no steps to animate!');
+        return;
+      }
+      
+      // Stop any existing animation
+      stopAnimation();
+      
+      // Setup animation
+      isAnimating = true;
+      animationStepIndex = 0;
+      
+      // Update UI
+      document.getElementById('animate-btn').style.display = 'none';
+      document.getElementById('stop-animate-btn').style.display = 'block';
+      
+      const statusDiv = document.getElementById('animation-status');
+      statusDiv.style.display = 'block';
+      statusDiv.classList.add('playing');
+      
+      // Clear current court
+      currentStepAssignments = {};
+      previousStepAssignments = {};
+      
+      // Start animation loop
+      animateNextStep(selectedVariant);
+    }
+
+    function animateNextStep(selectedVariant) {
+      if (!isAnimating) return;
+      
+      const variantData = playState.variants[selectedVariant];
+      
+      if (animationStepIndex >= variantData.steps.length) {
+        // Animation complete
+        stopAnimation();
+        return;
+      }
+      
+      const step = variantData.steps[animationStepIndex];
+      const statusDiv = document.getElementById('animation-status');
+      statusDiv.textContent = `Animating Step ${animationStepIndex + 1} of ${variantData.steps.length}`;
+      
+      // Update positions
+      previousStepAssignments = {...currentStepAssignments};
+      currentStepAssignments = {};
+      
+      POSITIONS.forEach(pos => {
+        if (step.pos_actions && step.pos_actions[pos]) {
+          currentStepAssignments[pos] = {
+            location: step.pos_actions[pos].location,
+            action: step.pos_actions[pos].action
+          };
+          
+          // Track ball handler
+          if (BALL_HANDLING_ACTIONS.includes(step.pos_actions[pos].action)) {
+            currentBallHandler = pos;
+          }
+        }
+      });
+      
+      // Render the step
+      renderCourtVisualization();
+      
+      // Move to next step after delay
+      animationStepIndex++;
+      animationIntervalId = setTimeout(() => animateNextStep(selectedVariant), 1000);
+    }
+
+    function stopAnimation() {
+      isAnimating = false;
+      
+      if (animationIntervalId) {
+        clearTimeout(animationIntervalId);
+        animationIntervalId = null;
+      }
+      
+      // Update UI
+      document.getElementById('animate-btn').style.display = 'block';
+      document.getElementById('stop-animate-btn').style.display = 'none';
+      
+      const statusDiv = document.getElementById('animation-status');
+      statusDiv.classList.remove('playing');
+      statusDiv.textContent = 'Animation stopped';
+      
+      setTimeout(() => {
+        statusDiv.style.display = 'none';
+      }, 2000);
+      
+      // Reset to current variant's state
+      loadVariantForEditing(currentVariant);
     }
 
     // ==================== SAVE FUNCTIONS ====================
@@ -1441,6 +1679,7 @@
       variantData.complete = true;
       updateVariantTabs();
       updateVariantInfo();
+      updateAnimationVariantDropdown(); // Update animation dropdown
       
       // Show save options
       document.getElementById('save-options').classList.remove('hidden');
@@ -2557,6 +2796,13 @@
       // Hide clone button for successful variant
       document.getElementById('clone-btn').style.display = 'none';
       
+      // Show animation preview section (initially will be empty)
+      const animSection = document.getElementById('animation-preview-section');
+      if (animSection) {
+        animSection.style.display = 'block';
+        updateAnimationVariantDropdown();
+      }
+      
       // Initialize dashboard and court
       renderPositionDashboard();
       renderCourtVisualization();
@@ -2724,6 +2970,7 @@
       updateStepCounter();
       updateVariantInfo(); // Update variant step count
       updateVariantTabs(); // Update status if needed
+      updateAnimationVariantDropdown(); // Update animation dropdown with new step count
     }
 
     function prePopulateStep(previousOffsets = {}) {
