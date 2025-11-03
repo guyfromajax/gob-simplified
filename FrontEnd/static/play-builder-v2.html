@@ -1432,7 +1432,7 @@
       alert(`Cloned ${successfulData.steps.length} steps from Successful variant!`);
     }
 
-    function toggleCompletionStatus() {
+    async function toggleCompletionStatus() {
       const variantData = getCurrentVariantData();
       
       if (!variantData.complete) {
@@ -1449,13 +1449,21 @@
         }
         
         variantData.complete = true;
+        
+        // Auto-save to database
+        updateVariantTabs();
+        updateVariantInfo();
+        await saveDraft();
+        
       } else {
         // Marking as incomplete
         variantData.complete = false;
+        
+        // Auto-save to database
+        updateVariantTabs();
+        updateVariantInfo();
+        await saveDraft();
       }
-      
-      updateVariantTabs();
-      updateVariantInfo();
     }
 
     function updateVariantTabs() {
