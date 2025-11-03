@@ -2836,7 +2836,12 @@
 
     function validateActionButton() {
       const actionBtn = document.getElementById('action-btn');
-      const completePlayBtn = document.getElementById('complete-play-btn');
+      const completeVariantBtn = document.getElementById('complete-variant-btn');
+      
+      // If buttons don't exist (e.g., during animation or when variant is complete), skip validation
+      if (!actionBtn || !completeVariantBtn) {
+        return;
+      }
       
       // Check if any player has shoot action (final step)
       let hasShoot = false;
@@ -2862,23 +2867,23 @@
         // Shot assigned - this is the final step
         actionBtn.disabled = true;
         actionBtn.textContent = 'Shot = Final Step';
-        completePlayBtn.disabled = false;
-        completePlayBtn.style.opacity = '1';
-        completePlayBtn.style.boxShadow = '0 0 20px rgba(255, 140, 0, 0.6)';
+        completeVariantBtn.disabled = false;
+        completeVariantBtn.style.opacity = '1';
+        completeVariantBtn.style.boxShadow = '0 0 20px rgba(255, 140, 0, 0.6)';
       } else if (allComplete) {
         // All positions complete - ready to add step
         actionBtn.textContent = 'Add Step';
         actionBtn.disabled = false;
-        completePlayBtn.disabled = false;
-        completePlayBtn.style.opacity = '1';
-        completePlayBtn.style.boxShadow = 'none';
+        completeVariantBtn.disabled = false;
+        completeVariantBtn.style.opacity = '1';
+        completeVariantBtn.style.boxShadow = 'none';
       } else {
         // Still building step
         actionBtn.textContent = 'Add Step (Incomplete)';
         actionBtn.disabled = true;
-        completePlayBtn.disabled = false;
-        completePlayBtn.style.opacity = '1';
-        completePlayBtn.style.boxShadow = 'none';
+        completeVariantBtn.disabled = false;
+        completeVariantBtn.style.opacity = '1';
+        completeVariantBtn.style.boxShadow = 'none';
       }
     }
 
