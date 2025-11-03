@@ -919,6 +919,12 @@
         <button id="complete-variant-btn" onclick="completeVariant()">Variant Complete</button>
       </div>
 
+      <!-- Step Review Buttons (Keep/Edit) -->
+      <div id="review-buttons" class="step2-controls-row hidden">
+        <button id="keep-step-btn" onclick="keepStep()" class="btn-success">✓ Keep Step</button>
+        <button id="edit-step-btn" onclick="editStep()" class="btn-secondary">✏️ Edit Step</button>
+      </div>
+
       <!-- Save Options -->
       <div id="save-options" class="variant-controls hidden">
         <button onclick="saveDraft()" class="btn-secondary">💾 Save Draft</button>
@@ -1323,40 +1329,76 @@
         if (successfulSteps.length > 0) {
           // Auto-clone from successful as starting point
           variantData.steps = JSON.parse(JSON.stringify(successfulSteps));
-          variantData.currentStep = successfulSteps.length + 1;
+          variantData.currentStep = 1; // Start at Step 1 for review/edit
         }
       }
       
       // Set currentStep for this variant
       if (variantData.steps.length > 0) {
-        // Start from last step + 1
-        variantData.currentStep = variantData.steps.length + 1;
+        // If currentStep wasn't set above, default to last step + 1
+        if (!variantData.currentStep || variantData.currentStep > variantData.steps.length) {
+          variantData.currentStep = variantData.steps.length + 1;
+        }
         
-        // Load last step as previous for animation
-        const lastStep = variantData.steps[variantData.steps.length - 1];
-        if (lastStep && lastStep.pos_actions) {
-          POSITIONS.forEach(pos => {
-            if (lastStep.pos_actions[pos]) {
-              previousStepAssignments[pos] = {
-                location: lastStep.pos_actions[pos].location,
-                action: lastStep.pos_actions[pos].action
-              };
+        // Load current step's data
+        if (variantData.currentStep <= variantData.steps.length) {
+          const currentStep = variantData.steps[variantData.currentStep - 1];
+          if (currentStep && currentStep.pos_actions) {
+            POSITIONS.forEach(pos => {
+              if (currentStep.pos_actions[pos]) {
+                currentStepAssignments[pos] = {
+                  location: currentStep.pos_actions[pos].location,
+                  action: currentStep.pos_actions[pos].action
+                };
+                // Track ball handler
+                if (BALL_HANDLING_ACTIONS.includes(currentStep.pos_actions[pos].action)) {
+                  currentBallHandler = pos;
+                }
+              }
+            });
+          }
+          
+          // Load previous step if exists
+          if (variantData.currentStep > 1) {
+            const prevStep = variantData.steps[variantData.currentStep - 2];
+            if (prevStep && prevStep.pos_actions) {
+              POSITIONS.forEach(pos => {
+                if (prevStep.pos_actions[pos]) {
+                  previousStepAssignments[pos] = {
+                    location: prevStep.pos_actions[pos].location,
+                    action: prevStep.pos_actions[pos].action
+                  };
+                }
+              });
             }
-          });
+          }
+        } else {
+          // Past last step - load last step as previous
+          const lastStep = variantData.steps[variantData.steps.length - 1];
+          if (lastStep && lastStep.pos_actions) {
+            POSITIONS.forEach(pos => {
+              if (lastStep.pos_actions[pos]) {
+                previousStepAssignments[pos] = {
+                  location: lastStep.pos_actions[pos].location,
+                  action: lastStep.pos_actions[pos].action
+                };
+              }
+            });
+          }
         }
       } else {
         variantData.currentStep = 1;
       }
       
       // Show formation selection or build buttons
-      if (variantData.currentStep === 1) {
+      if (variantData.currentStep === 1 && variantData.steps.length === 0) {
         document.getElementById('formation-selection').classList.remove('hidden');
         document.getElementById('build-buttons').classList.add('hidden');
         document.getElementById('formation-select').value = '';
       } else {
         document.getElementById('formation-selection').classList.add('hidden');
         document.getElementById('build-buttons').classList.remove('hidden');
-        prePopulateStep({});
+        updateStepReviewButtons(); // Update button visibility
       }
       
       // Update UI
@@ -1461,6 +1503,60 @@
         completionBtn.classList.remove('btn-secondary');
         completionBtn.classList.add('btn-success');
       }
+    }
+
+    // ==================== STEP REVIEW FUNCTIONS ====================
+    
+    function updateStepReviewButtons() {
+      const variantData = getCurrentVariantData();
+      const reviewButtons = document.getElementById('review-buttons');
+      const buildButtons = document.getElementById('build-buttons');
+      
+      // Show review buttons if we're on an existing step (not past the end)
+      if (variantData.currentStep <= variantData.steps.length) {
+        reviewButtons.classList.remove('hidden');
+        buildButtons.classList.add('hidden');
+      } else {
+        reviewButtons.classList.add('hidden');
+        buildButtons.classList.remove('hidden');
+      }
+    }
+
+    function keepStep() {
+      const variantData = getCurrentVariantData();
+      
+      console.log(`✓ Keeping step ${variantData.currentStep}`);
+      
+      // Move to next step
+      variantData.currentStep++;
+      
+      // If we've moved past last step, switch to build mode
+      if (variantData.currentStep > variantData.steps.length) {
+        console.log('Reached end of copied steps, switching to build mode');
+        // Load last step as previous for building next step
+        loadVariantForEditing(currentVariant);
+      } else {
+        // Load next step for review
+        loadVariantForEditing(currentVariant);
+      }
+    }
+
+    function editStep() {
+      const variantData = getCurrentVariantData();
+      const editingStepNum = variantData.currentStep;
+      
+      console.log(`✏️ Editing step ${editingStepNum}, clearing steps ${editingStepNum + 1} onwards`);
+      
+      // Clear all steps after current step
+      variantData.steps = variantData.steps.slice(0, editingStepNum);
+      
+      // Switch to build mode (currentStep stays same, but now we're at the end)
+      variantData.currentStep = variantData.steps.length + 1;
+      
+      // Load the step we just kept as previous
+      loadVariantForEditing(currentVariant);
+      
+      alert(`Cleared ${variantData.steps.length - editingStepNum} steps. You can now edit from Step ${editingStepNum}.`);
     }
 
     // ==================== ANIMATION PREVIEW FUNCTIONS ====================
@@ -3045,8 +3141,17 @@
         contested: 'Contested',
         broken: 'Broken'
       };
-      document.getElementById('page-title').textContent = 
-        `Building Step ${variantData.currentStep} (${variantNames[currentVariant]})`;
+      
+      let titleText;
+      if (variantData.currentStep <= variantData.steps.length) {
+        // Reviewing existing step
+        titleText = `Reviewing Step ${variantData.currentStep} of ${variantData.steps.length} (${variantNames[currentVariant]})`;
+      } else {
+        // Building new step
+        titleText = `Building Step ${variantData.currentStep} (${variantNames[currentVariant]})`;
+      }
+      
+      document.getElementById('page-title').textContent = titleText;
     }
 
     async function completePlay() {
