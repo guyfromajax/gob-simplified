@@ -938,10 +938,12 @@
 
     <!-- Court Container (always visible below forms) -->
     <div class="court-container">
-      <div class="position-dashboard" id="position-dashboard">
-        <!-- Dashboard will be populated dynamically -->
+      <div style="display: flex; flex-direction: column; gap: 15px;">
+        <div class="position-dashboard" id="position-dashboard">
+          <!-- Dashboard will be populated dynamically -->
+        </div>
         
-        <!-- Animation Preview Controls -->
+        <!-- Animation Preview Controls (separate from dashboard) -->
         <div class="animation-preview-controls" id="animation-preview-section" style="display: none;">
           <h4>🎬 Animation Preview</h4>
           <div class="animation-controls-row">
@@ -962,6 +964,7 @@
           </div>
         </div>
       </div>
+      
       <div class="court-visualization" id="court-visualization">
         <img src="/static/images/courts/bentley_truman.jpg" alt="Basketball Court" class="court-image">
         <div id="player-icons-container"></div>
