@@ -2184,8 +2184,17 @@
         play_type: playState.type.toLowerCase().replace(' ', '_'),
         play_focus: playState.focus ? playState.focus.toLowerCase() : 'balanced',
         skeletons: {
-          standard: {
+          successful: {
             steps: playState.steps
+          },
+          mid_play_change: {
+            steps: []
+          },
+          contested: {
+            steps: []
+          },
+          broken: {
+            steps: []
           }
         },
         game_stats: {
