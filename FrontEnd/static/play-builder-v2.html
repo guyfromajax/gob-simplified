@@ -921,7 +921,10 @@
 
       <!-- Step Review Buttons (Keep Step) -->
       <div id="review-buttons" class="step2-controls-row hidden">
-        <button id="keep-step-btn" onclick="keepStep()" class="btn-success">✓ Keep Step (or modify to diverge)</button>
+        <button id="keep-step-btn" onclick="keepStep()" class="btn-success">✓ Keep Step</button>
+        <p style="text-align: center; font-size: 0.85rem; opacity: 0.7; margin-top: 5px; margin-bottom: 0;">
+          *Or modify below to diverge
+        </p>
       </div>
 
       <!-- Note: No separate save buttons needed - "Finish Variant & Save" auto-saves to DB -->
@@ -1267,7 +1270,7 @@
       }
       
       // Initialize for current variant
-      loadVariantForEditing(currentVariant);
+      loadVariantForEditing(currentVariant, true); // Reset to Step 1
     }
 
     function switchVariant(variant) {
@@ -1288,8 +1291,8 @@
         }
       });
       
-      // Load new variant
-      loadVariantForEditing(variant);
+      // Load new variant with reset to Step 1
+      loadVariantForEditing(variant, true);
       
       // Update variant info
       updateVariantInfo();
@@ -1305,7 +1308,7 @@
       // Store current work (if any) - this is handled by submitStep
     }
 
-    function loadVariantForEditing(variant) {
+    function loadVariantForEditing(variant, resetToStepOne = false) {
       const variantData = playState.variants[variant];
       
       // Reset current assignments
@@ -1328,14 +1331,16 @@
       
       // Set currentStep for this variant
       if (variantData.steps.length > 0) {
-        // If variant is marked complete, always reset to Step 1 for review
-        if (variantData.complete) {
+        // If resetToStepOne flag is true (switching to a different variant), reset to Step 1
+        if (resetToStepOne) {
           variantData.currentStep = 1;
         }
-        // If currentStep wasn't set above, default to last step + 1
+        // If currentStep wasn't set above, default appropriately
         else if (!variantData.currentStep || variantData.currentStep > variantData.steps.length) {
-          variantData.currentStep = variantData.steps.length + 1;
+          // If complete, go to Step 1 for review, otherwise go to end for building
+          variantData.currentStep = variantData.complete ? 1 : variantData.steps.length + 1;
         }
+        // Otherwise keep the current step (for keepStep() progression)
         
         // Load current step's data
         if (variantData.currentStep <= variantData.steps.length) {
@@ -1420,8 +1425,8 @@
       currentData.currentStep = successfulData.steps.length + 1;
       currentData.complete = false; // Reset completion status
       
-      // Reload variant
-      loadVariantForEditing(currentVariant);
+      // Reload variant, reset to Step 1
+      loadVariantForEditing(currentVariant, true);
       updateVariantTabs();
       updateVariantInfo();
       updateAnimationVariantDropdown();
@@ -1580,10 +1585,10 @@
       if (variantData.currentStep > variantData.steps.length) {
         console.log('Reached end of copied steps, switching to build mode');
         // Load last step as previous for building next step
-        loadVariantForEditing(currentVariant);
+        loadVariantForEditing(currentVariant, false); // Don't reset to Step 1
       } else {
-        // Load next step for review
-        loadVariantForEditing(currentVariant);
+        // Load next step for review (don't reset to Step 1)
+        loadVariantForEditing(currentVariant, false);
       }
     }
 
@@ -1599,8 +1604,8 @@
       // Switch to build mode (currentStep stays same, but now we're at the end)
       variantData.currentStep = variantData.steps.length + 1;
       
-      // Load the step we just kept as previous
-      loadVariantForEditing(currentVariant);
+      // Load the step we just kept as previous (don't reset to Step 1)
+      loadVariantForEditing(currentVariant, false);
       
       alert(`Cleared ${variantData.steps.length - editingStepNum} steps. You can now edit from Step ${editingStepNum}.`);
     }
@@ -1758,8 +1763,8 @@
         statusDiv.style.display = 'none';
       }, 2000);
       
-      // Reset to current variant's state
-      loadVariantForEditing(currentVariant);
+      // Reset to current variant's state (reset to Step 1 for clean slate)
+      loadVariantForEditing(currentVariant, true);
     }
 
     // ==================== SAVE FUNCTIONS ====================
