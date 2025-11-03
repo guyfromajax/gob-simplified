@@ -561,6 +561,46 @@ def resolve_turnover_logic(roles, game, turnover_type="DEAD BALL"):
 
     return result
 
+
+def generate_logic(off_call, def_call, off_team, def_team, off_lineup, def_lineup):
+    """
+    Calculate lean score based on offensive/defensive matchup.
+    
+    This function evaluates the effectiveness of the offensive play vs defensive setup
+    by considering team attributes, player attributes, and tactical matchups.
+    
+    Args:
+        off_call (str): Offensive playcall (e.g., "Motion - Inside Focus")
+        def_call (str): Defensive playcall (e.g., "Man Defense")
+        off_team: Offensive team object with attributes
+        def_team: Defensive team object with attributes
+        off_lineup (dict): Offensive lineup {pos: player}
+        def_lineup (dict): Defensive lineup {pos: player}
+    
+    Returns:
+        float: Lean score from -2 to 2
+            >= 1: successful - play works perfectly
+            0 to 0.99: mid_play_change - play adjusts mid-execution
+            -0.01 to -1: contested - defense engaged, tougher execution
+            < -1: broken - defense disrupts, offense forced to react
+    
+    TODO: Implement full logic based on:
+        - Team attributes (team speed, execution, discipline, etc.)
+        - Player attributes (relevant to play type/focus)
+        - Defensive matchup effectiveness
+        - Game situation (score, time, quarter)
+    """
+    import random
+    
+    # PLACEHOLDER: Return random lean score for now
+    # This allows the system to work while full logic is implemented
+    lean_score = random.uniform(-2, 2)
+    
+    print(f"[generate_logic] Lean score: {lean_score:.2f}")
+    
+    return lean_score
+
+
 def resolve_half_court_offense_logic(game):
     game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
 
@@ -570,9 +610,13 @@ def resolve_half_court_offense_logic(game):
     print("Entering resolve_half_court_offense_logic")
     print(f"off_call: {off_call}")
     print(f"def_call: {def_call}")
+
+    # Generate logic to determine lean score
+    lean_score = generate_logic(off_call, def_call, off_team, def_team, off_lineup, def_lineup)
     
     # Get skeleton from MongoDB BEFORE assigning roles, so assign_roles can use the correct skeleton
-    skeleton = get_hco_skeleton(None, game)
+    # Pass lean_score to select the appropriate skeleton variant
+    skeleton = get_hco_skeleton(None, game, lean_score=lean_score)
     
     roles = game.turn_manager.assign_roles(off_call, def_call, skeleton=skeleton)
     
@@ -1042,21 +1086,70 @@ def get_hct_skeleton(result_type, game_context=None):
     return skeleton_data
 
 
-def get_hco_skeleton(result_type, game_context):
-    """Get HCO skeleton based on the current playcall from team-specific play objects"""
+def get_skeleton_by_lean(play_doc, lean_score):
+    """
+    Map lean score to the appropriate skeleton variant.
+    
+    Args:
+        play_doc (dict): Play document from MongoDB with skeletons
+        lean_score (float): Lean score from generate_logic() function
+            >= 1: successful - play works perfectly
+            0 to 0.99: mid_play_change - play adjusts mid-execution
+            -0.01 to -1: contested - defense engaged, tougher execution
+            < -1: broken - defense disrupts, offense forced to react
+    
+    Returns:
+        dict: The skeleton matching the lean score, or successful as fallback
+    """
+    skeletons = play_doc.get("skeletons", {})
+    
+    # Map lean score to skeleton variant
+    if lean_score >= 1:
+        variant = "successful"
+    elif lean_score >= 0:
+        variant = "mid_play_change"
+    elif lean_score >= -1:
+        variant = "contested"
+    else:
+        variant = "broken"
+    
+    # Get the skeleton, fallback to successful if variant doesn't exist
+    skeleton = skeletons.get(variant)
+    
+    # If selected variant is empty or None, fallback to successful
+    if not skeleton or not skeleton.get("steps"):
+        skeleton = skeletons.get("successful")
+    
+    return skeleton
+
+
+def get_hco_skeleton(result_type, game_context, lean_score=None):
+    """
+    Get HCO skeleton based on the current playcall from team-specific play objects.
+    
+    Args:
+        result_type: Legacy parameter (kept for backward compatibility)
+        game_context: Game context object
+        lean_score (float, optional): Lean score to select skeleton variant
+            If provided, selects from: successful, mid_play_change, contested, broken
+            If None, defaults to successful
+    
+    Returns:
+        dict: Selected skeleton with steps
+    """
     from BackEnd.db import plays_collection, games_collection, tournaments_collection, franchises_collection
     
     # Get the current playcall from game context
     playcall = game_context.game_state.get("current_playcall", "Inside") if game_context else "Inside"
     print("Entering get_hco_skeleton")
-    # print(f"playcall: {playcall}")
+    print(f"playcall: {playcall}, lean_score: {lean_score}")
     
     # Get the offensive team
     offense_team = game_context.offense_team
     offense_team_id = offense_team.team_id
     
     # Try to get skeleton from team-specific play objects first
-    skeleton = _get_skeleton_from_team_plays(playcall, offense_team_id, game_context)
+    skeleton = _get_skeleton_from_team_plays(playcall, offense_team_id, game_context, lean_score=lean_score)
     if skeleton:
         return skeleton
     
@@ -1064,10 +1157,16 @@ def get_hco_skeleton(result_type, game_context):
     play_doc = plays_collection.find_one({"name": playcall})
     
     if play_doc and "skeletons" in play_doc:
-        # Access skeleton using the structure: skeletons.standard
+        # Use lean score to select skeleton variant if provided
+        if lean_score is not None:
+            skeleton = get_skeleton_by_lean(play_doc, lean_score)
+            if skeleton:
+                return skeleton
+        
+        # Default to successful skeleton
         skeletons = play_doc.get("skeletons", {})
-        if "standard" in skeletons:
-            skeleton = skeletons["standard"]
+        if "successful" in skeletons:
+            skeleton = skeletons["successful"]
             return skeleton
     
     # Final fallback to old skeleton system
@@ -1097,8 +1196,19 @@ def get_hco_skeleton(result_type, game_context):
         return selected_scene
 
 
-def _get_skeleton_from_team_plays(playcall, team_id, game_context):
-    """Get skeleton from team-specific play objects - checks in-memory first, then database"""
+def _get_skeleton_from_team_plays(playcall, team_id, game_context, lean_score=None):
+    """
+    Get skeleton from team-specific play objects - checks in-memory first, then database.
+    
+    Args:
+        playcall (str): Name of the play to find
+        team_id (str): Team ID
+        game_context: Game context object
+        lean_score (float, optional): Lean score to select skeleton variant
+    
+    Returns:
+        dict: Selected skeleton, or None if not found
+    """
     from BackEnd.db import games_collection, tournaments_collection, franchises_collection
     from bson import ObjectId
     
@@ -1107,11 +1217,21 @@ def _get_skeleton_from_team_plays(playcall, team_id, game_context):
     if hasattr(offense_team, 'plays') and offense_team.plays:
         if playcall in offense_team.plays:
             play_obj = offense_team.plays[playcall]
-            if "skeletons" in play_obj and "standard" in play_obj["skeletons"]:
-                skeleton = play_obj["skeletons"]["standard"]
-                num_steps = len(skeleton.get("steps", []))
-                # print(f"🔍 FOUND in team plays (memory): '{playcall}' - {num_steps} steps")
-                return skeleton
+            if "skeletons" in play_obj:
+                # Use lean score to select variant if provided
+                if lean_score is not None:
+                    skeleton = get_skeleton_by_lean(play_obj, lean_score)
+                    if skeleton and skeleton.get("steps"):
+                        num_steps = len(skeleton.get("steps", []))
+                        # print(f"🔍 FOUND in team plays (memory): '{playcall}' - {num_steps} steps")
+                        return skeleton
+                
+                # Default to successful
+                if "successful" in play_obj["skeletons"]:
+                    skeleton = play_obj["skeletons"]["successful"]
+                    num_steps = len(skeleton.get("steps", []))
+                    # print(f"🔍 FOUND in team plays (memory): '{playcall}' - {num_steps} steps")
+                    return skeleton
     
     # PRIORITY 2: Check database (for loaded games where in-memory might be stale)
     game_id = getattr(game_context, 'game_id', None)
@@ -1127,11 +1247,21 @@ def _get_skeleton_from_team_plays(playcall, team_id, game_context):
             
             if playcall in plays:
                 play_obj = plays[playcall]
-                if "skeletons" in play_obj and "standard" in play_obj["skeletons"]:
-                    skeleton = play_obj["skeletons"]["standard"]
-                    num_steps = len(skeleton.get("steps", []))
-                    # print(f"🔍 FOUND in team plays (db): '{playcall}' - {num_steps} steps")
-                    return skeleton
+                if "skeletons" in play_obj:
+                    # Use lean score to select variant if provided
+                    if lean_score is not None:
+                        skeleton = get_skeleton_by_lean(play_obj, lean_score)
+                        if skeleton and skeleton.get("steps"):
+                            num_steps = len(skeleton.get("steps", []))
+                            # print(f"🔍 FOUND in team plays (db): '{playcall}' - {num_steps} steps")
+                            return skeleton
+                    
+                    # Default to successful
+                    if "successful" in play_obj["skeletons"]:
+                        skeleton = play_obj["skeletons"]["successful"]
+                        num_steps = len(skeleton.get("steps", []))
+                        # print(f"🔍 FOUND in team plays (db): '{playcall}' - {num_steps} steps")
+                        return skeleton
     
     # Not found in memory or database
     # print(f"🔍 NOT FOUND in team plays: '{playcall}'")

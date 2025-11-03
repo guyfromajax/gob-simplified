@@ -13,7 +13,7 @@ class Play:
         name (str): Display name of the play (e.g., "Pick and Roll")
         play_type (str): Play category - "motion" or "set_play"
         play_focus (str): Play focus - "inside", "attack", "outside", "balanced"
-        skeletons (dict): Animation skeletons (currently just "standard", expandable in future)
+        skeletons (dict): Animation skeletons - "successful", "mid_play_change", "contested", "broken"
         game_stats (dict): Per-game statistics
         season_stats (dict): Cross-game statistics (franchise/tournament mode)
     """
@@ -39,7 +39,10 @@ class Play:
         else:
             # Empty skeletons - will be populated later
             self.skeletons = {
-                "standard": None
+                "successful": None,
+                "mid_play_change": None,
+                "contested": None,
+                "broken": None
             }
         
         # Game-level stats (reset at start of each game)
@@ -62,17 +65,17 @@ class Play:
             "defensive_fouls": 0
         }
     
-    def get_skeleton(self, variant="standard"):
+    def get_skeleton(self, variant="successful"):
         """
         Get the appropriate skeleton based on variant.
         
         Args:
-            variant (str): Skeleton variant (currently only "standard", expandable in future)
+            variant (str): Skeleton variant - "successful", "mid_play_change", "contested", or "broken"
             
         Returns:
             dict: The skeleton with steps, or None if not defined
         """
-        return self.skeletons.get(variant) or self.skeletons.get("standard")
+        return self.skeletons.get(variant) or self.skeletons.get("successful")
     
     def record_execution(self, result_type, season_mode=False):
         """
