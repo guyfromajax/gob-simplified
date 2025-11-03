@@ -1,0 +1,2935 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Play Builder V2 - GOB (Enhanced with Variants)</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      color: #fff;
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      text-align: center;
+      color: #FFD700;
+      margin-bottom: 20px;
+      font-size: 2.5rem;
+      text-shadow: 0 0 20px rgba(255, 215, 0, 0.3);
+    }
+
+    h1#page-title.step2-title {
+      font-size: 2rem;
+    }
+
+    .step-container {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 12px;
+      padding: 30px;
+      margin-bottom: 15px;
+      border: 1px solid rgba(255, 215, 0, 0.2);
+    }
+
+    #step2 {
+      padding: 20px 30px;
+    }
+
+    .step-subheader {
+      font-size: 1.2rem;
+      color: #fff;
+      margin-bottom: 0;
+      text-align: center;
+      opacity: 0.8;
+    }
+
+    .step1-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 20px;
+      align-items: end;
+      margin-bottom: 20px;
+    }
+
+    .step1-button-wrapper {
+      grid-column: 2;
+      display: flex;
+      justify-content: center;
+    }
+
+    .step1-button-wrapper button {
+      width: 50%;
+    }
+
+    .step2-header-row {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+
+    .step2-controls-row {
+      display: flex;
+      justify-content: center;
+      gap: 15px;
+      margin-bottom: 20px;
+    }
+
+    .control-column {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+
+    .center-button-wrapper {
+      display: flex;
+      justify-content: center;
+      gap: 20px;
+      margin-top: 10px;
+    }
+
+    .center-button-wrapper button {
+      padding: 12px 24px;
+      width: auto;
+      min-width: 180px;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 8px;
+      color: #FFD700;
+      font-weight: 600;
+      font-size: 0.95rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    input[type="text"],
+    select {
+      width: 100%;
+      padding: 12px 16px;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 215, 0, 0.3);
+      border-radius: 8px;
+      color: #fff;
+      font-size: 1rem;
+      transition: all 0.3s ease;
+    }
+
+    input[type="text"]:focus,
+    select:focus {
+      outline: none;
+      border-color: #FFD700;
+      background: rgba(255, 255, 255, 0.15);
+      box-shadow: 0 0 15px rgba(255, 215, 0, 0.2);
+    }
+
+    select option {
+      background: #1a1a2e;
+      color: #fff;
+    }
+
+    button {
+      padding: 14px 28px;
+      background: linear-gradient(135deg, #FF8C00, #FF6500);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 1.1rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      width: 100%;
+      margin-top: 10px;
+    }
+
+    button:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(255, 140, 0, 0.4);
+      background: linear-gradient(135deg, #FF7700, #FF5500);
+    }
+
+    button:active:not(:disabled) {
+      transform: translateY(0);
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .position-chips {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .chip {
+      width: 50px;
+      height: 50px;
+      background: linear-gradient(135deg, #FFD700, #FFC700);
+      color: #000;
+      border-radius: 50%;
+      font-weight: 700;
+      font-size: 0.85rem;
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      border: none;
+      padding: 0;
+    }
+
+    .chip:hover:not(.completed) {
+      transform: scale(1.1);
+      box-shadow: 0 4px 12px rgba(255, 215, 0, 0.5);
+    }
+
+    .chip.completed {
+      background: rgba(128, 128, 128, 0.4);
+      color: rgba(255, 255, 255, 0.5);
+      cursor: not-allowed;
+    }
+
+    .chip.selected {
+      background: linear-gradient(135deg, #FF8C00, #FF6500);
+      color: #fff;
+      box-shadow: 0 0 15px rgba(255, 140, 0, 0.6);
+      transform: scale(1.1);
+    }
+
+    .step-counter {
+      text-align: right;
+      color: #FFD700;
+      font-size: 1.1rem;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .court-container {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 12px;
+      padding: 15px;
+      border: 1px solid rgba(255, 215, 0, 0.2);
+      display: grid;
+      grid-template-columns: 1fr 1.2fr;
+      gap: 30px;
+      align-items: start;
+      min-height: 200px;
+      position: relative;
+    }
+
+    .position-dashboard {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding: 15px;
+    }
+
+    .dashboard-row {
+      display: grid;
+      grid-template-columns: 60px 1fr 1fr;
+      gap: 10px;
+      align-items: center;
+      padding: 8px;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .dashboard-row.header {
+      background: rgba(255, 215, 0, 0.1);
+      font-weight: 700;
+      color: #FFD700;
+      text-transform: uppercase;
+      font-size: 0.85rem;
+      letter-spacing: 0.5px;
+    }
+
+    .dashboard-row .pos-label {
+      font-weight: 700;
+      color: #FFD700;
+    }
+
+    .dashboard-row select {
+      padding: 6px 10px;
+      font-size: 0.85rem;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 215, 0, 0.2);
+    }
+
+    .dashboard-row select:focus {
+      border-color: #FFD700;
+      background: rgba(255, 255, 255, 0.12);
+    }
+
+    .court-visualization {
+      position: relative;
+      max-width: 100%;
+      justify-self: end;
+    }
+
+    .court-image {
+      width: 100%;
+      height: auto;
+      border-radius: 8px;
+      opacity: 0.8;
+      display: block;
+    }
+
+    .player-icon {
+      position: absolute;
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 0.75rem;
+      color: #fff;
+      transform: translate(-50%, -50%);
+      border: 2px solid #fff;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+    }
+
+    .player-icon.PG { background: #ff6b6b; }
+    .player-icon.SG { background: #4ecdc4; }
+    .player-icon.SF { background: #45b7d1; }
+    .player-icon.PF { background: #f9ca24; }
+    .player-icon.C { background: #6c5ce7; }
+
+    .player-icon {
+      transition: all 0.8s cubic-bezier(0.4, 0.0, 0.2, 1);
+      cursor: grab;
+      user-select: none;
+    }
+
+    .player-icon.dragging {
+      opacity: 0.7;
+      cursor: grabbing;
+      z-index: 20;
+    }
+
+    .player-icon.drag-hover {
+      box-shadow: 0 0 20px rgba(255, 215, 0, 1), 0 0 30px rgba(255, 215, 0, 0.6);
+      animation: pulse-glow 0.5s ease-in-out infinite alternate;
+    }
+
+    @keyframes pulse-glow {
+      from {
+        box-shadow: 0 0 20px rgba(255, 215, 0, 1), 0 0 30px rgba(255, 215, 0, 0.6);
+      }
+      to {
+        box-shadow: 0 0 25px rgba(255, 215, 0, 1), 0 0 40px rgba(255, 215, 0, 0.8);
+      }
+    }
+
+    .player-icon.offset {
+      /* Marker for offset sprites */
+    }
+
+    .offset-indicator {
+      position: absolute;
+      border-top: 2px dashed rgba(255, 215, 0, 0.6);
+      height: 0;
+      pointer-events: none;
+      z-index: 5;
+    }
+
+    .snap-point {
+      position: absolute;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: rgba(255, 215, 0, 0.4);
+      border: 2px solid rgba(255, 215, 0, 0.7);
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+      opacity: 1;
+      transition: all 0.2s;
+    }
+
+    .snap-point.active {
+      width: 18px;
+      height: 18px;
+      background: rgba(255, 215, 0, 0.8);
+      border-color: rgba(255, 215, 0, 1);
+      box-shadow: 0 0 15px rgba(255, 215, 0, 1);
+    }
+
+    .inline-action-dropdown {
+      position: absolute;
+      background: rgba(30, 30, 30, 0.95);
+      border: 2px solid #FFD700;
+      border-radius: 8px;
+      padding: 10px;
+      z-index: 30;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
+      min-width: 200px;
+    }
+
+    .inline-action-dropdown select {
+      width: 100%;
+      margin-bottom: 8px;
+    }
+
+    .inline-action-dropdown button {
+      width: 100%;
+      margin-top: 0;
+      padding: 8px 16px;
+      font-size: 0.9rem;
+    }
+
+    .ball-icon {
+      position: absolute;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #FF6500;
+      border: 2px solid #fff;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+      transform: translate(-50%, calc(-50% - 25px));
+      transition: all 0.8s cubic-bezier(0.4, 0.0, 0.2, 1);
+      z-index: 10;
+      cursor: grab;
+    }
+
+    .ball-icon.dragging {
+      cursor: grabbing;
+      opacity: 0.8;
+      z-index: 25;
+    }
+
+    .basket-target {
+      position: absolute;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: rgba(255, 101, 0, 0.5);
+      border: 3px solid rgba(255, 101, 0, 0.9);
+      transform: translate(-50%, -50%);
+      pointer-events: all;
+      z-index: 8;
+      transition: all 0.2s;
+    }
+
+    .basket-target.drag-hover {
+      background: rgba(255, 101, 0, 0.9);
+      border-color: #FF6500;
+      box-shadow: 0 0 20px rgba(255, 101, 0, 1);
+      width: 28px;
+      height: 28px;
+    }
+
+    .action-select option:disabled {
+      color: rgba(255, 255, 255, 0.3);
+      font-style: italic;
+    }
+
+    .location-group-a,
+    .location-group-b {
+      background: rgba(128, 128, 128, 0.2);
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    /* Variant Tabs System */
+    .variant-tabs-container {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 8px;
+      padding: 15px;
+      margin-bottom: 20px;
+      border: 1px solid rgba(255, 215, 0, 0.2);
+    }
+
+    .variant-tabs {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 15px;
+      flex-wrap: wrap;
+    }
+
+    .variant-tab {
+      flex: 1;
+      min-width: 150px;
+      padding: 12px 20px;
+      background: rgba(255, 255, 255, 0.1);
+      border: 2px solid rgba(255, 215, 0, 0.3);
+      border-radius: 8px;
+      color: #fff;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      text-align: center;
+      position: relative;
+    }
+
+    .variant-tab:hover:not(.active) {
+      background: rgba(255, 255, 255, 0.15);
+      border-color: rgba(255, 215, 0, 0.5);
+    }
+
+    .variant-tab.active {
+      background: linear-gradient(135deg, #FF8C00, #FF6500);
+      border-color: #FF8C00;
+      box-shadow: 0 0 15px rgba(255, 140, 0, 0.6);
+    }
+
+    .variant-tab .status-indicator {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      margin-right: 8px;
+      vertical-align: middle;
+    }
+
+    .variant-tab .status-indicator.complete {
+      background: #4CAF50;
+      box-shadow: 0 0 8px rgba(76, 175, 80, 0.8);
+    }
+
+    .variant-tab .status-indicator.in-progress {
+      background: #FFC107;
+      box-shadow: 0 0 8px rgba(255, 193, 7, 0.8);
+    }
+
+    .variant-tab .status-indicator.not-started {
+      background: rgba(255, 255, 255, 0.3);
+    }
+
+    .variant-info {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px;
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 6px;
+      font-size: 0.9rem;
+    }
+
+    .variant-controls {
+      display: flex;
+      gap: 10px;
+      margin-top: 10px;
+      flex-wrap: wrap;
+    }
+
+    .variant-controls button {
+      flex: 1;
+      min-width: 150px;
+      padding: 10px 20px;
+      font-size: 0.95rem;
+      margin-top: 0;
+    }
+
+    .btn-secondary {
+      background: linear-gradient(135deg, #6c5ce7, #5f4dcd);
+    }
+
+    .btn-secondary:hover:not(:disabled) {
+      background: linear-gradient(135deg, #5f4dcd, #4e3eb0);
+    }
+
+    .btn-success {
+      background: linear-gradient(135deg, #4CAF50, #45a049);
+    }
+
+    .btn-success:hover:not(:disabled) {
+      background: linear-gradient(135deg, #45a049, #3d8b40);
+    }
+
+    .completion-status-bar {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 6px;
+      padding: 15px;
+      margin-top: 15px;
+      border: 1px solid rgba(255, 215, 0, 0.2);
+    }
+
+    .completion-status-bar h3 {
+      color: #FFD700;
+      font-size: 1rem;
+      margin-bottom: 10px;
+    }
+
+    .step-diff-indicator {
+      position: absolute;
+      top: -5px;
+      right: -5px;
+      width: 20px;
+      height: 20px;
+      background: #FFC107;
+      border-radius: 50%;
+      border: 2px solid #1a1a2e;
+      font-size: 0.7rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+    }
+
+    .load-play-section {
+      background: rgba(76, 175, 80, 0.1);
+      border: 1px solid rgba(76, 175, 80, 0.3);
+      border-radius: 8px;
+      padding: 15px;
+      margin-bottom: 20px;
+    }
+
+    .load-play-section h3 {
+      color: #4CAF50;
+      margin-bottom: 10px;
+      font-size: 1.1rem;
+    }
+
+    .load-play-controls {
+      display: flex;
+      gap: 10px;
+      align-items: end;
+    }
+
+    .load-play-controls select {
+      flex: 1;
+    }
+
+    .load-play-controls button {
+      width: auto;
+      min-width: 150px;
+      margin-top: 0;
+    }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 20px;
+    }
+
+    .success-message {
+      background: rgba(76, 175, 80, 0.2);
+      border: 1px solid rgba(76, 175, 80, 0.5);
+      border-radius: 8px;
+      padding: 20px;
+      text-align: center;
+      margin-top: 20px;
+    }
+
+    .success-message h2 {
+      color: #4CAF50;
+      margin-bottom: 10px;
+    }
+
+    .json-output {
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid rgba(255, 215, 0, 0.3);
+      border-radius: 8px;
+      padding: 15px;
+      margin-top: 15px;
+      max-height: 300px;
+      overflow-y: auto;
+      font-family: 'Courier New', monospace;
+      font-size: 0.9rem;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+
+    @media (max-width: 768px) {
+      h1 {
+        font-size: 1.8rem;
+      }
+
+      .step-container {
+        padding: 20px;
+      }
+
+      .step1-row {
+        grid-template-columns: 1fr;
+        gap: 15px;
+      }
+
+      .step1-button-wrapper {
+        grid-column: 1;
+      }
+
+      .step1-button-wrapper button {
+        width: 100%;
+      }
+
+      .center-button-wrapper button {
+        width: 80%;
+      }
+
+      .center-button-wrapper.with-end-step {
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .center-button-wrapper button {
+        width: 100%;
+      }
+      
+      .center-button-wrapper.with-end-step button {
+        width: 100%;
+      }
+
+      .step2-header-row {
+        flex-direction: column;
+        gap: 10px;
+        align-items: center;
+      }
+
+      .step-counter {
+        text-align: center;
+      }
+
+      .step2-controls-row {
+        grid-template-columns: 1fr;
+        gap: 20px;
+      }
+
+      .position-chips {
+        gap: 8px;
+      }
+
+      .chip {
+        width: 45px;
+        height: 45px;
+        font-size: 0.75rem;
+      }
+
+      .court-image {
+        max-width: 90%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1 id="page-title">Play Builder V2 - Create or Edit Plays</h1>
+
+    <!-- Load Existing Play Section -->
+    <div id="load-play-section" class="step-container load-play-section">
+      <h3>📂 Load Existing Play</h3>
+      <div class="load-play-controls">
+        <div class="form-group" style="margin: 0; flex: 1;">
+          <label for="existing-play-select">Select Play to Edit</label>
+          <select id="existing-play-select">
+            <option value="">-- Select a Play --</option>
+          </select>
+        </div>
+        <button id="load-play-btn" onclick="loadExistingPlay()" disabled>Load Play</button>
+      </div>
+    </div>
+
+    <!-- Step 1: Create Play -->
+    <div id="step1" class="step-container">
+      
+      <div class="step1-row">
+        <div class="form-group">
+          <label for="play-name">Play Name</label>
+          <input type="text" id="play-name" placeholder="Enter play name...">
+        </div>
+
+        <div class="form-group">
+          <label for="play-type">Play Type</label>
+          <select id="play-type">
+            <option value="">-- Select Play Type --</option>
+            <option value="Motion">Motion</option>
+            <option value="Set Play">Set Play</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="play-focus">Play Focus</label>
+          <select id="play-focus" disabled>
+            <option value="">-- Select Focus --</option>
+            <option value="Inside">Inside</option>
+            <option value="Attack">Attack</option>
+            <option value="Outside">Outside</option>
+            <option value="Balanced">Balanced</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="step1-button-wrapper">
+        <button id="submit-play-btn" disabled>Create Play</button>
+      </div>
+    </div>
+
+    <!-- Step 2: Build Steps -->
+    <div id="step2" class="step-container hidden">
+      <div class="step2-header-row">
+        <div class="step-subheader" id="play-summary" style="margin: 0;"></div>
+      </div>
+
+      <!-- Variant Tabs -->
+      <div id="variant-tabs-container" class="variant-tabs-container">
+        <div class="variant-tabs">
+          <div class="variant-tab active" data-variant="successful" onclick="switchVariant('successful')">
+            <span class="status-indicator complete"></span>
+            Successful
+          </div>
+          <div class="variant-tab" data-variant="mid_play_change" onclick="switchVariant('mid_play_change')">
+            <span class="status-indicator not-started"></span>
+            Mid-Play Change
+          </div>
+          <div class="variant-tab" data-variant="contested" onclick="switchVariant('contested')">
+            <span class="status-indicator not-started"></span>
+            Contested
+          </div>
+          <div class="variant-tab" data-variant="broken" onclick="switchVariant('broken')">
+            <span class="status-indicator not-started"></span>
+            Broken
+          </div>
+        </div>
+
+        <div class="variant-info">
+          <div>
+            <strong>Current Variant:</strong> <span id="current-variant-name">Successful</span> |
+            <strong>Steps:</strong> <span id="current-variant-steps">0</span> |
+            <strong>Status:</strong> <span id="current-variant-status">Not Started</span>
+          </div>
+        </div>
+
+        <div class="variant-controls">
+          <button onclick="cloneFromSuccessful()" class="btn-secondary" id="clone-btn">
+            📋 Clone from Successful
+          </button>
+          <button onclick="toggleCompletionStatus()" class="btn-success" id="completion-btn">
+            ✓ Mark as Complete
+          </button>
+        </div>
+      </div>
+
+      <!-- Step 1: Formation Selection -->
+      <div id="formation-selection" class="step2-controls-row">
+        <div class="form-group" style="margin: 0; min-width: 300px;">
+          <label for="formation-select">Starting Formation</label>
+          <select id="formation-select">
+            <option value="">-- Select Formation --</option>
+            <option value="3-2">3-2</option>
+            <option value="4-1">4-1</option>
+            <option value="5-0">5-0</option>
+            <option value="Screen Entry">Screen Entry</option>
+            <option value="Custom">Custom</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Step 1 Custom & Step 2+: Build Buttons -->
+      <div id="build-buttons" class="step2-controls-row hidden">
+        <button id="action-btn" disabled>Add Step</button>
+        <button id="complete-variant-btn" onclick="completeVariant()">Variant Complete</button>
+      </div>
+
+      <!-- Save Options -->
+      <div id="save-options" class="variant-controls hidden">
+        <button onclick="saveDraft()" class="btn-secondary">💾 Save Draft</button>
+        <button onclick="saveAndClose()" class="btn-success">✅ Save & Close</button>
+      </div>
+    </div>
+
+    <!-- Success Screen -->
+    <div id="success-screen" class="step-container hidden">
+      <div class="success-message">
+        <h2>✅ Play Created Successfully!</h2>
+        <p id="success-play-name"></p>
+        <div class="json-output" id="json-output"></div>
+        <button onclick="location.reload()">Create Another Play</button>
+      </div>
+    </div>
+
+    <!-- Court Container (always visible below forms) -->
+    <div class="court-container">
+      <div class="position-dashboard" id="position-dashboard">
+        <!-- Dashboard will be populated dynamically -->
+      </div>
+      <div class="court-visualization" id="court-visualization">
+        <img src="/static/images/courts/bentley_truman.jpg" alt="Basketball Court" class="court-image">
+        <div id="player-icons-container"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Constants from backend
+    const PLAY_TYPES = ["Motion", "Set Play"];
+    const PLAY_FOCUS = ["Inside", "Attack", "Outside", "Balanced"];
+    const POSITIONS = ["PG", "SG", "SF", "PF", "C"];
+    
+    // No step limits - user decides when play is complete
+
+    // Court locations from constants.py HCO_STRING_SPOTS
+    const LOCATIONS = [
+      "key", "upper midWing", "lower midWing", "upper wing", "lower wing",
+      "upper midCorner", "lower midCorner", "upper corner", "lower corner",
+      "upper highPost", "lower highPost", "upper midPost", "lower midPost",
+      "upper lowPost", "lower lowPost", "topLane", "midLane",
+      "upper apex", "lower apex", "upper midBaseline", "lower midBaseline",
+      "deep key", "deep lower wing", "deep lower baseline", "deep upper wing", "deep upper baseline"
+    ];
+
+    // Court coordinates (from HCO_STRING_SPOTS in constants.py)
+    const HCO_STRING_SPOTS = {
+      "key": {"x": 64, "y": 25},
+      "upper midWing": {"x": 68, "y": 36},
+      "lower midWing": {"x": 68, "y": 14},
+      "upper wing": {"x": 73, "y": 40},
+      "lower wing": {"x": 73, "y": 10},
+      "upper midCorner": {"x": 81, "y": 43},
+      "lower midCorner": {"x": 81, "y": 7},
+      "upper corner": {"x": 88, "y": 44},
+      "lower corner": {"x": 88, "y": 6},
+      "upper highPost": {"x": 74, "y": 32},
+      "lower highPost": {"x": 74, "y": 19},
+      "upper midPost": {"x": 80, "y": 32},
+      "lower midPost": {"x": 80, "y": 19},
+      "upper lowPost": {"x": 86, "y": 32},
+      "lower lowPost": {"x": 86, "y": 19},
+      "topLane": {"x": 74, "y": 25},
+      "midLane": {"x": 80, "y": 25},
+      "upper apex": {"x": 80, "y": 36},
+      "lower apex": {"x": 80, "y": 15},
+      "upper midBaseline": {"x": 89, "y": 36},
+      "lower midBaseline": {"x": 89, "y": 15},
+      "deep key": {"x": 57, "y": 25},
+      "deep lower wing": {"x": 57, "y": 15},
+      "deep lower baseline": {"x": 57, "y": 5},
+      "deep upper wing": {"x": 57, "y": 35},
+      "deep upper baseline": {"x": 57, "y": 45}
+    };
+
+    // Offset positions for collision handling
+    const OFFSET_SPOTS = {
+      // Center spots: x + 3, y same
+      "deep key": {"x": 60, "y": 25},
+      "key": {"x": 67, "y": 25},
+      "topLane": {"x": 77, "y": 25},
+      "midLane": {"x": 83, "y": 25},
+      
+      // Upper wing/apex spots: x + 3, y - 3
+      "deep upper wing": {"x": 60, "y": 32},
+      "upper midWing": {"x": 71, "y": 33},
+      "upper wing": {"x": 76, "y": 37},
+      "upper apex": {"x": 83, "y": 33},
+      
+      // Upper corner/baseline spots: x same, y - 3
+      "upper corner": {"x": 88, "y": 41},
+      "upper midCorner": {"x": 81, "y": 40},
+      "deep upper baseline": {"x": 57, "y": 42},
+      "upper midBaseline": {"x": 89, "y": 33},
+      
+      // Lower wing/apex spots: x + 3, y + 3
+      "deep lower wing": {"x": 60, "y": 18},
+      "lower midWing": {"x": 71, "y": 17},
+      "lower wing": {"x": 76, "y": 13},
+      "lower apex": {"x": 83, "y": 18},
+      
+      // Lower corner/baseline spots: x same, y + 3
+      "lower corner": {"x": 88, "y": 9},
+      "lower midCorner": {"x": 81, "y": 10},
+      "deep lower baseline": {"x": 57, "y": 8},
+      "lower midBaseline": {"x": 89, "y": 18},
+      
+      // Upper post spots: x - 3, y + 3
+      "upper lowPost": {"x": 83, "y": 35},
+      "upper midPost": {"x": 77, "y": 35},
+      "upper highPost": {"x": 71, "y": 35},
+      
+      // Lower post spots: x + 3, y - 3
+      "lower lowPost": {"x": 89, "y": 16},
+      "lower midPost": {"x": 83, "y": 16},
+      "lower highPost": {"x": 77, "y": 16}
+    };
+
+    // Actions from constants.py ACTIONS
+    const ACTIONS = {
+      "handle_ball": "Handle Ball",
+      "get_open": "Get Open",
+      "pass": "Pass",
+      "receive": "Receive",
+      "post_up": "Post Up",
+      "shoot": "Shoot",
+      "screen": "Screen",
+      "cut": "Cut",
+      "drift": "Drift",
+      "stationary": "Stationary/Hold"
+    };
+
+    // Ball-handling actions (only one player can have these per step)
+    const BALL_HANDLING_ACTIONS = ["handle_ball", "receive", "shoot"];
+
+    // Formation presets for Step 1
+    const FORMATIONS = {
+      "3-2": {
+        "PG": {"location": "key", "action": "handle_ball"},
+        "SG": {"location": "upper wing", "action": "get_open"},
+        "SF": {"location": "lower wing", "action": "get_open"},
+        "PF": {"location": "lower lowPost", "action": "get_open"},
+        "C": {"location": "upper lowPost", "action": "get_open"}
+      },
+      "4-1": {
+        "PG": {"location": "upper midWing", "action": "handle_ball"},
+        "SG": {"location": "lower midWing", "action": "get_open"},
+        "SF": {"location": "upper midCorner", "action": "get_open"},
+        "PF": {"location": "lower midCorner", "action": "get_open"},
+        "C": {"location": "upper lowPost", "action": "get_open"}
+      },
+      "5-0": {
+        "PG": {"location": "key", "action": "handle_ball"},
+        "SG": {"location": "upper wing", "action": "get_open"},
+        "SF": {"location": "lower wing", "action": "get_open"},
+        "PF": {"location": "lower corner", "action": "get_open"},
+        "C": {"location": "upper corner", "action": "get_open"}
+      },
+      "Screen Entry": {
+        "PG": {"location": "key", "action": "handle_ball"},
+        "SG": {"location": "upper lowPost", "action": "get_open"},
+        "SF": {"location": "lower lowPost", "action": "get_open"},
+        "PF": {"location": "lower apex", "action": "get_open"},
+        "C": {"location": "upper apex", "action": "get_open"}
+      }
+    };
+
+    // Play state with variants support
+    let playState = {
+      name: "",
+      type: "",
+      focus: "",
+      playId: null, // For editing existing plays
+      variants: {
+        successful: {
+          steps: [],
+          complete: false,
+          currentStep: 1
+        },
+        mid_play_change: {
+          steps: [],
+          complete: false,
+          currentStep: 1
+        },
+        contested: {
+          steps: [],
+          complete: false,
+          currentStep: 1
+        },
+        broken: {
+          steps: [],
+          complete: false,
+          currentStep: 1
+        }
+      }
+    };
+
+    // Current variant being edited
+    let currentVariant = 'successful';
+    
+    // Helper to get current variant data
+    function getCurrentVariantData() {
+      return playState.variants[currentVariant];
+    }
+
+    // Current step assignments (position -> {location, action})
+    let currentStepAssignments = {};
+    
+    // Previous step assignments (for sprite animation)
+    let previousStepAssignments = {};
+    
+    // Currently selected position
+    let selectedPosition = null;
+    
+    // Current formation selection (for Step 1)
+    let currentFormation = null;
+    
+    // Drag-and-drop state
+    let draggedPlayer = null;
+    let draggedPlayerOriginalLocation = null;
+    let nearestSnapPoint = null;
+    let hoveredSprite = null; // The sprite currently being hovered over during drag
+    
+    // Offset tracking (position -> boolean)
+    let positionOffsets = {};
+    
+    // New offsets tracking (position -> boolean) - only for offsets created THIS step
+    let newOffsets = {};
+    
+    // Ball tracking
+    let currentBallHandler = null; // Which position has the ball
+    let ballDragActive = false;
+    let ballDragTarget = null; // Player being dragged to
+    let ballDragToBasket = false; // Ball being dragged to basket
+
+    // ==================== VARIANT MANAGEMENT FUNCTIONS ====================
+    
+    async function loadAvailablePlays() {
+      try {
+        const response = await fetch('/api/plays');
+        if (!response.ok) throw new Error('Failed to fetch plays');
+        
+        const result = await response.json();
+        const plays = result.plays || [];
+        
+        const select = document.getElementById('existing-play-select');
+        select.innerHTML = '<option value="">-- Select a Play --</option>';
+        
+        plays.forEach(play => {
+          const option = document.createElement('option');
+          option.value = play._id;
+          option.textContent = `${play.name} (${play.play_type})`;
+          option.dataset.playData = JSON.stringify(play);
+          select.appendChild(option);
+        });
+        
+        select.addEventListener('change', () => {
+          document.getElementById('load-play-btn').disabled = !select.value;
+        });
+        
+      } catch (error) {
+        console.error('Error loading plays:', error);
+      }
+    }
+
+    function loadExistingPlay() {
+      const select = document.getElementById('existing-play-select');
+      const option = select.options[select.selectedIndex];
+      if (!option || !option.dataset.playData) return;
+      
+      const playData = JSON.parse(option.dataset.playData);
+      
+      // Populate playState
+      playState.name = playData.name;
+      playState.type = playData.play_type === 'motion' ? 'Motion' : 'Set Play';
+      playState.focus = playData.play_focus ? playData.play_focus.charAt(0).toUpperCase() + playData.play_focus.slice(1) : '';
+      playState.playId = playData._id;
+      
+      // Load all variants
+      const skeletons = playData.skeletons || {};
+      ['successful', 'mid_play_change', 'contested', 'broken'].forEach(variant => {
+        if (skeletons[variant]) {
+          playState.variants[variant] = {
+            steps: skeletons[variant].steps || [],
+            complete: skeletons[variant].complete || false,
+            currentStep: (skeletons[variant].steps || []).length + 1
+          };
+        }
+      });
+      
+      // Start editing
+      currentVariant = 'successful';
+      
+      // Hide load section, show step 2
+      document.getElementById('load-play-section').classList.add('hidden');
+      document.getElementById('step1').classList.add('hidden');
+      document.getElementById('step2').classList.remove('hidden');
+      
+      // Update page title
+      document.getElementById('page-title').textContent = `Editing: ${playState.name}`;
+      document.getElementById('page-title').classList.add('step2-title');
+      
+      // Update summary
+      let summaryText = `${playState.name} | ${playState.type}`;
+      if (playState.focus) {
+        summaryText += ` | ${playState.focus}`;
+      }
+      document.getElementById('play-summary').textContent = summaryText;
+      
+      // Update variant tabs
+      updateVariantTabs();
+      updateVariantInfo();
+      
+      // Show save options
+      document.getElementById('save-options').classList.remove('hidden');
+      
+      // Initialize for current variant
+      loadVariantForEditing(currentVariant);
+    }
+
+    function switchVariant(variant) {
+      if (variant === currentVariant) return;
+      
+      // Save current variant's work in progress
+      saveVariantProgress();
+      
+      // Switch to new variant
+      currentVariant = variant;
+      
+      // Update tabs UI
+      document.querySelectorAll('.variant-tab').forEach(tab => {
+        if (tab.dataset.variant === variant) {
+          tab.classList.add('active');
+        } else {
+          tab.classList.remove('active');
+        }
+      });
+      
+      // Load new variant
+      loadVariantForEditing(variant);
+      
+      // Update variant info
+      updateVariantInfo();
+      
+      // Update clone button visibility
+      document.getElementById('clone-btn').style.display = 
+        (variant === 'successful') ? 'none' : 'block';
+    }
+
+    function saveVariantProgress() {
+      // Save current step assignments to variant
+      const variantData = getCurrentVariantData();
+      // Store current work (if any) - this is handled by submitStep
+    }
+
+    function loadVariantForEditing(variant) {
+      const variantData = playState.variants[variant];
+      
+      // Reset current assignments
+      currentStepAssignments = {};
+      previousStepAssignments = {};
+      positionOffsets = {};
+      newOffsets = {};
+      currentBallHandler = null;
+      
+      // If variant has no steps, auto-copy from successful
+      if (variant !== 'successful' && variantData.steps.length === 0) {
+        const successfulSteps = playState.variants.successful.steps;
+        if (successfulSteps.length > 0) {
+          // Auto-clone from successful as starting point
+          variantData.steps = JSON.parse(JSON.stringify(successfulSteps));
+          variantData.currentStep = successfulSteps.length + 1;
+        }
+      }
+      
+      // Set currentStep for this variant
+      if (variantData.steps.length > 0) {
+        // Start from last step + 1
+        variantData.currentStep = variantData.steps.length + 1;
+        
+        // Load last step as previous for animation
+        const lastStep = variantData.steps[variantData.steps.length - 1];
+        if (lastStep && lastStep.pos_actions) {
+          POSITIONS.forEach(pos => {
+            if (lastStep.pos_actions[pos]) {
+              previousStepAssignments[pos] = {
+                location: lastStep.pos_actions[pos].location,
+                action: lastStep.pos_actions[pos].action
+              };
+            }
+          });
+        }
+      } else {
+        variantData.currentStep = 1;
+      }
+      
+      // Show formation selection or build buttons
+      if (variantData.currentStep === 1) {
+        document.getElementById('formation-selection').classList.remove('hidden');
+        document.getElementById('build-buttons').classList.add('hidden');
+        document.getElementById('formation-select').value = '';
+      } else {
+        document.getElementById('formation-selection').classList.add('hidden');
+        document.getElementById('build-buttons').classList.remove('hidden');
+        prePopulateStep({});
+      }
+      
+      // Update UI
+      updateStepCounter();
+      renderPositionDashboard();
+      renderCourtVisualization();
+      validateActionButton();
+    }
+
+    function cloneFromSuccessful() {
+      if (currentVariant === 'successful') return;
+      
+      if (!confirm('This will replace all steps in this variant with the Successful variant. Continue?')) {
+        return;
+      }
+      
+      const successfulData = playState.variants.successful;
+      const currentData = getCurrentVariantData();
+      
+      // Deep clone successful steps
+      currentData.steps = JSON.parse(JSON.stringify(successfulData.steps));
+      currentData.currentStep = successfulData.steps.length + 1;
+      currentData.complete = false; // Reset completion status
+      
+      // Reload variant
+      loadVariantForEditing(currentVariant);
+      updateVariantTabs();
+      updateVariantInfo();
+      
+      alert(`Cloned ${successfulData.steps.length} steps from Successful variant!`);
+    }
+
+    function toggleCompletionStatus() {
+      const variantData = getCurrentVariantData();
+      
+      if (!variantData.complete) {
+        // Marking as complete
+        if (variantData.steps.length === 0) {
+          alert('Cannot mark as complete - variant has no steps!');
+          return;
+        }
+        
+        if (variantData.steps.length < 2) {
+          if (!confirm('This variant only has 1 step. Mark as complete anyway?')) {
+            return;
+          }
+        }
+        
+        variantData.complete = true;
+      } else {
+        // Marking as incomplete
+        variantData.complete = false;
+      }
+      
+      updateVariantTabs();
+      updateVariantInfo();
+    }
+
+    function updateVariantTabs() {
+      ['successful', 'mid_play_change', 'contested', 'broken'].forEach(variant => {
+        const tab = document.querySelector(`.variant-tab[data-variant="${variant}"]`);
+        const indicator = tab.querySelector('.status-indicator');
+        const variantData = playState.variants[variant];
+        
+        // Update status indicator
+        indicator.className = 'status-indicator';
+        if (variantData.complete) {
+          indicator.classList.add('complete');
+        } else if (variantData.steps.length > 0) {
+          indicator.classList.add('in-progress');
+        } else {
+          indicator.classList.add('not-started');
+        }
+      });
+    }
+
+    function updateVariantInfo() {
+      const variantData = getCurrentVariantData();
+      const variantNames = {
+        successful: 'Successful',
+        mid_play_change: 'Mid-Play Change',
+        contested: 'Contested',
+        broken: 'Broken'
+      };
+      
+      document.getElementById('current-variant-name').textContent = variantNames[currentVariant];
+      document.getElementById('current-variant-steps').textContent = variantData.steps.length;
+      
+      let statusText = variantData.complete ? 'Complete' : 
+                       variantData.steps.length > 0 ? 'In Progress' : 'Not Started';
+      document.getElementById('current-variant-status').textContent = statusText;
+      
+      // Update completion button
+      const completionBtn = document.getElementById('completion-btn');
+      if (variantData.complete) {
+        completionBtn.textContent = '↩️ Mark as Incomplete';
+        completionBtn.classList.remove('btn-success');
+        completionBtn.classList.add('btn-secondary');
+      } else {
+        completionBtn.textContent = '✓ Mark as Complete';
+        completionBtn.classList.remove('btn-secondary');
+        completionBtn.classList.add('btn-success');
+      }
+    }
+
+    // ==================== SAVE FUNCTIONS ====================
+
+    async function saveDraft() {
+      await savePlayToDatabase(false);
+    }
+
+    async function saveAndClose() {
+      // Validate: successful variant must be complete
+      if (!playState.variants.successful.complete) {
+        if (!confirm('Successful variant is not marked as complete. Save anyway?')) {
+          return;
+        }
+      }
+      
+      await savePlayToDatabase(true);
+    }
+
+    function completeVariant() {
+      // Save current variant
+      const variantData = getCurrentVariantData();
+      
+      // Check if current step has assignments
+      let allComplete = true;
+      for (const pos of POSITIONS) {
+        const assignment = currentStepAssignments[pos];
+        if (!assignment || !assignment.location || !assignment.action) {
+          allComplete = false;
+          break;
+        }
+      }
+
+      if (!allComplete) {
+        const confirm = window.confirm(
+          'Current step is incomplete. Do you want to:\n\n' +
+          '• Click OK to auto-fill remaining positions and complete\n' +
+          '• Click Cancel to continue building'
+        );
+        
+        if (!confirm) return;
+        
+        // Auto-fill remaining positions
+        if (variantData.currentStep > 1 && previousStepAssignments) {
+          POSITIONS.forEach(pos => {
+            const currentAssignment = currentStepAssignments[pos];
+            if (!currentAssignment || !currentAssignment.location || !currentAssignment.action) {
+              const prevAssignment = previousStepAssignments[pos];
+              if (prevAssignment && prevAssignment.location && prevAssignment.action) {
+                currentStepAssignments[pos] = {
+                  location: prevAssignment.location,
+                  action: prevAssignment.action
+                };
+              }
+            }
+          });
+        }
+      }
+      
+      // Submit final step if not already submitted
+      if (Object.keys(currentStepAssignments).length > 0) {
+        const timestamp = (variantData.currentStep - 1) * 300;
+        const stepData = {
+          timestamp: timestamp,
+          pos_actions: {},
+          events: []
+        };
+        
+        POSITIONS.forEach(pos => {
+          const assignment = currentStepAssignments[pos];
+          if (assignment) {
+            stepData.pos_actions[pos] = {
+              location: assignment.location,
+              action: assignment.action
+            };
+          }
+        });
+        
+        variantData.steps.push(stepData);
+      }
+      
+      // Mark as complete and show save options
+      variantData.complete = true;
+      updateVariantTabs();
+      updateVariantInfo();
+      
+      // Show save options
+      document.getElementById('save-options').classList.remove('hidden');
+      document.getElementById('build-buttons').classList.add('hidden');
+      
+      alert(`${variantData.steps.length} steps saved for this variant!`);
+    }
+
+    // Initialize
+    function init() {
+      console.log('🏀 Play Builder V2 - Enhanced with Variants');
+      populateDropdowns();
+      attachEventListeners();
+      setupCourtDropZone();
+      loadAvailablePlays();
+      
+      // Add keyboard shortcut for quick save (Ctrl+S)
+      document.addEventListener('keydown', (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+          e.preventDefault();
+          if (!document.getElementById('step2').classList.contains('hidden')) {
+            saveDraft();
+          }
+        }
+      });
+    }
+
+    function populateDropdowns() {
+      // Play Type and Play Focus are already in HTML
+      // Location and Action dropdowns are now created dynamically in renderPositionDashboard()
+    }
+
+    function updateActionDropdown() {
+      // Action dropdowns are now created dynamically in renderPositionDashboard()
+      // This function is kept as a stub for compatibility
+    }
+
+    function attachEventListeners() {
+      // Step 1 form inputs
+      document.getElementById('play-name').addEventListener('input', validateStep1);
+      document.getElementById('play-type').addEventListener('change', handlePlayTypeChange);
+      document.getElementById('play-focus').addEventListener('change', validateStep1);
+      document.getElementById('submit-play-btn').addEventListener('click', submitPlay);
+
+      // Step 2 controls
+      document.getElementById('formation-select').addEventListener('change', handleFormationSelect);
+      document.getElementById('action-btn').addEventListener('click', handleActionButton);
+    }
+
+    function handlePlayTypeChange() {
+      const playType = document.getElementById('play-type').value;
+      const playFocusSelect = document.getElementById('play-focus');
+      
+      // Enable Play Focus only for Set Play
+      if (playType === 'Set Play') {
+        playFocusSelect.disabled = false;
+      } else {
+        playFocusSelect.disabled = true;
+        playFocusSelect.value = ''; // Clear selection
+      }
+      
+      validateStep1();
+    }
+
+    function handleFormationSelect() {
+      const formation = document.getElementById('formation-select').value;
+      
+      if (!formation) {
+        // No formation selected, clear everything
+        currentStepAssignments = {};
+        newOffsets = {};
+        renderPositionDashboard();
+        renderCourtVisualization();
+        document.getElementById('build-buttons').classList.add('hidden');
+        return;
+      }
+
+      // Hide formation dropdown, show buttons for all selections
+      document.getElementById('formation-selection').classList.add('hidden');
+      document.getElementById('build-buttons').classList.remove('hidden');
+
+      if (formation === "Custom") {
+        // Show build buttons for manual step building
+        currentStepAssignments = {};
+        renderPositionDashboard();
+        renderCourtVisualization();
+        validateActionButton();
+      } else {
+        // Apply preset formation
+        applyFormation(formation);
+        validateActionButton();
+      }
+    }
+
+    function applyFormation(formationName) {
+      const formation = FORMATIONS[formationName];
+      if (!formation) return;
+
+      // Apply all position assignments from formation
+      currentStepAssignments = {};
+      Object.entries(formation).forEach(([pos, assignment]) => {
+        currentStepAssignments[pos] = {
+          location: assignment.location,
+          action: assignment.action
+        };
+      });
+
+      // Update ball handler
+      const ballHandlerPos = Object.keys(formation).find(pos => 
+        BALL_HANDLING_ACTIONS.includes(formation[pos].action)
+      );
+      if (ballHandlerPos) {
+        currentBallHandler = ballHandlerPos;
+      }
+
+      // Update visualization
+      renderPositionDashboard();
+      renderCourtVisualization();
+    }
+
+
+    // Drag-and-Drop Functions
+    function setupDragHandlers(icon, pos) {
+      icon.draggable = true;
+      
+      icon.addEventListener('dragstart', (e) => {
+        draggedPlayer = pos;
+        draggedPlayerOriginalLocation = currentStepAssignments[pos]?.location;
+        icon.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+        
+        // Show snap points
+        showSnapPoints();
+      });
+
+      icon.addEventListener('dragend', (e) => {
+        console.log('=== DRAGEND EVENT ===');
+        console.log('draggedPlayer:', draggedPlayer);
+        console.log('hoveredSprite:', hoveredSprite);
+        console.log('nearestSnapPoint:', nearestSnapPoint);
+        console.log('currentStepAssignments:', currentStepAssignments);
+        
+        icon.classList.remove('dragging');
+        hideSnapPoints();
+        
+        // Clear any hover effects
+        document.querySelectorAll('.player-icon.drag-hover').forEach(i => i.classList.remove('drag-hover'));
+        
+        // Prefer hoveredSprite (collision) over nearestSnapPoint (empty space)
+        if (hoveredSprite) {
+          // Get the location of the hovered sprite by finding its position on court
+          const hoveredIcon = document.querySelector(`.player-icon.${hoveredSprite}`);
+          const hoveredLocation = getLocationFromIcon(hoveredIcon);
+          
+          console.log('hoveredLocation from icon:', hoveredLocation);
+          
+          if (hoveredLocation) {
+            console.log(`✓ Dropping on occupied sprite ${hoveredSprite} at ${hoveredLocation}`);
+            handleDrop(hoveredLocation);
+          } else {
+            console.log('✗ Could not determine hovered sprite location');
+          }
+        } else if (nearestSnapPoint) {
+          console.log(`✓ Dropping on empty space at ${nearestSnapPoint}`);
+          handleDrop(nearestSnapPoint);
+        } else {
+          console.log('✗ No drop target found');
+        }
+        
+        draggedPlayer = null;
+        draggedPlayerOriginalLocation = null;
+        nearestSnapPoint = null;
+        hoveredSprite = null;
+      });
+
+      // Detect when dragging over this sprite
+      icon.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        
+        if (ballDragActive) {
+          // Ball being dragged - highlight potential receiver
+          if (pos !== currentBallHandler) {
+            ballDragTarget = pos;
+            icon.classList.add('drag-hover');
+          }
+        } else if (pos !== draggedPlayer) {
+          // Player being dragged - highlight collision
+          hoveredSprite = pos;
+          icon.classList.add('drag-hover');
+        }
+      });
+
+      icon.addEventListener('dragleave', (e) => {
+        icon.classList.remove('drag-hover');
+        
+        if (ballDragActive && ballDragTarget === pos) {
+          ballDragTarget = null;
+        } else if (hoveredSprite === pos) {
+          hoveredSprite = null;
+        }
+      });
+
+      // Store location on icon for easy lookup
+      icon.dataset.position = pos;
+    }
+
+    function getLocationFromIcon(icon) {
+      if (!icon) return null;
+      // Get location directly from data attribute (always up to date)
+      return icon.dataset.location || null;
+    }
+
+    function setupCourtDropZone() {
+      const court = document.getElementById('court-visualization');
+      
+      court.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        
+        // Calculate position relative to court-visualization container
+        // (same coordinate system used for positioning sprites)
+        const courtRect = court.getBoundingClientRect();
+        
+        const relX = (e.clientX - courtRect.left) / courtRect.width;
+        const relY = (e.clientY - courtRect.top) / courtRect.height;
+        
+        // Convert to court grid coordinates (0-100, 0-100 percentage)
+        const x = relX * 100;
+        const yPct = relY * 100;
+        
+        // Convert percentage back to grid Y (0-50)
+        // Since our sprites use: top = (50 - gridY) * 2%
+        // We need to reverse this: gridY = 50 - (yPct / 2)
+        const y = 50 - (yPct / 2);
+        
+        console.log('Drag position:', { 
+          mouseX: e.clientX, 
+          mouseY: e.clientY, 
+          relX: relX.toFixed(3),
+          relY: relY.toFixed(3),
+          courtX: x.toFixed(1), 
+          courtY_pct: yPct.toFixed(1),
+          courtY_grid: y.toFixed(1)
+        });
+        
+        nearestSnapPoint = findNearestLocation(x, y);
+        highlightSnapPoint(nearestSnapPoint);
+      });
+    }
+
+    function findNearestLocation(mouseX, mouseY) {
+      let nearestLoc = null;
+      let minDist = Infinity;
+      
+      console.log('Finding nearest to:', { mouseX: mouseX.toFixed(1), mouseY: mouseY.toFixed(1) });
+      
+      Object.entries(HCO_STRING_SPOTS).forEach(([loc, coords]) => {
+        // Mouse is already in grid coordinates, compare directly
+        const dist = Math.sqrt(Math.pow(mouseX - coords.x, 2) + Math.pow(mouseY - coords.y, 2));
+        
+        if (dist < 10) { // Only log nearby locations
+          console.log(`  ${loc}: grid(${coords.x}, ${coords.y}) → dist: ${dist.toFixed(1)}`);
+        }
+        
+        if (dist < minDist) {
+          minDist = dist;
+          nearestLoc = loc;
+        }
+      });
+      
+      console.log(`Nearest: ${nearestLoc} (dist: ${minDist.toFixed(1)})`);
+      return nearestLoc;
+    }
+
+    function showSnapPoints() {
+      const container = document.getElementById('player-icons-container');
+      
+      // Only show snap points for player drags (not ball drags)
+      if (ballDragActive) return;
+      
+      Object.entries(HCO_STRING_SPOTS).forEach(([loc, coords]) => {
+        const snapPoint = document.createElement('div');
+        snapPoint.className = 'snap-point';
+        snapPoint.dataset.location = loc;
+        snapPoint.style.left = `${coords.x}%`;
+        snapPoint.style.top = `${(50 - coords.y) * 2}%`;
+        container.appendChild(snapPoint);
+      });
+    }
+
+    function hideSnapPoints() {
+      document.querySelectorAll('.snap-point').forEach(point => point.remove());
+    }
+
+    function highlightSnapPoint(location) {
+      document.querySelectorAll('.snap-point').forEach(point => {
+        if (point.dataset.location === location) {
+          point.classList.add('active');
+        } else {
+          point.classList.remove('active');
+        }
+      });
+    }
+
+    function handleDrop(newLocation) {
+      if (!draggedPlayer || !newLocation) return;
+      
+      // Check if location is occupied
+      const occupyingPlayer = findPlayerAtLocation(newLocation);
+      
+      console.log('handleDrop:', {
+        draggedPlayer,
+        newLocation,
+        occupyingPlayer,
+        currentAssignments: currentStepAssignments
+      });
+      
+      // Update assignment FIRST (before checking offsets)
+      if (!currentStepAssignments[draggedPlayer]) {
+        currentStepAssignments[draggedPlayer] = {};
+      }
+      currentStepAssignments[draggedPlayer].location = newLocation;
+      
+      if (occupyingPlayer && occupyingPlayer !== draggedPlayer) {
+        // Location occupied - mark for offset positioning
+        positionOffsets[draggedPlayer] = true;
+        newOffsets[draggedPlayer] = true; // Mark as NEW offset (created this step)
+        console.log(`✓ Setting offset for ${draggedPlayer} at ${newLocation} (occupied by ${occupyingPlayer})`, positionOffsets);
+      } else {
+        // Clear offset for this player
+        delete positionOffsets[draggedPlayer];
+        delete newOffsets[draggedPlayer];
+        console.log(`✗ Clearing offset for ${draggedPlayer} (location free at ${newLocation})`);
+      }
+      
+      // If dragged player was occupying a spot, check if anyone was waiting
+      // (Now that location is updated, checkAndResolveOffsets won't find this player at the old location)
+      if (draggedPlayerOriginalLocation) {
+        checkAndResolveOffsets(draggedPlayerOriginalLocation);
+      }
+      
+      // Rule 4: Auto-assign cut if player moved (not offset, not ball handler)
+      const isOffset = positionOffsets[draggedPlayer];
+      const prevLocation = draggedPlayerOriginalLocation;
+      const movedLocation = newLocation !== prevLocation;
+      
+      console.log(`Rule 4 check:`, { 
+        draggedPlayer, 
+        movedLocation, 
+        isOffset, 
+        currentBallHandler, 
+        positionOffsets 
+      });
+      
+      if (movedLocation && !isOffset && draggedPlayer !== currentBallHandler) {
+        currentStepAssignments[draggedPlayer].action = 'cut';
+        console.log(`Auto-assigned ${draggedPlayer}: cut (dragged to ${newLocation})`);
+        
+        // Update visualization without inline dropdown
+        renderPositionDashboard();
+        renderCourtVisualization();
+        validateActionButton();
+      } else {
+        // Show inline action dropdown for manual selection
+        console.log('Showing inline dropdown, position offsets:', positionOffsets);
+        
+        // Update visualization
+        renderCourtVisualization();
+        
+        // Show inline action dropdown
+        showInlineActionDropdown(draggedPlayer, newLocation);
+      }
+    }
+
+    function findPlayerAtLocation(location) {
+      // Find any player currently at this location by checking currentStepAssignments
+      console.log(`findPlayerAtLocation(${location}), currentStepAssignments:`, currentStepAssignments);
+      
+      for (const pos of POSITIONS) {
+        if (pos === draggedPlayer) continue; // Skip the player being dragged
+        
+        const assignment = currentStepAssignments[pos];
+        console.log(`  Checking ${pos}:`, assignment);
+        
+        if (assignment && assignment.location === location) {
+          console.log(`✓ Found player ${pos} at ${location}`);
+          return pos;
+        }
+      }
+      
+      console.log(`✗ No player found at ${location}`);
+      return null;
+    }
+
+    function checkAndResolveOffsets(location) {
+      console.log(`checkAndResolveOffsets(${location}), positionOffsets:`, positionOffsets);
+      // Find first non-screen player with offset at this location
+      for (const [pos, assignment] of Object.entries(currentStepAssignments)) {
+        if (assignment && assignment.location === location && 
+            positionOffsets[pos] && assignment.action !== 'screen') {
+          // Move this player to actual position
+          console.log(`Clearing offset for ${pos} at ${location}`);
+          delete positionOffsets[pos];
+          renderCourtVisualization();
+          return; // Only move first one
+        }
+      }
+      console.log(`No offsets to resolve at ${location}`);
+    }
+
+    function showInlineActionDropdown(player, location) {
+      // Remove any existing dropdown
+      document.querySelectorAll('.inline-action-dropdown').forEach(d => d.remove());
+      
+      const container = document.getElementById('player-icons-container');
+      const coords = HCO_STRING_SPOTS[location];
+      if (!coords) return;
+      
+      const dropdown = document.createElement('div');
+      dropdown.className = 'inline-action-dropdown';
+      
+      // Position near the player icon (use offset coords if player is offset)
+      const isOffset = positionOffsets[player];
+      let dropdownX, dropdownY;
+      
+      if (isOffset) {
+        const offsetCoords = OFFSET_SPOTS[location];
+        dropdownX = offsetCoords ? offsetCoords.x + 5 : coords.x + 5;
+        dropdownY = offsetCoords ? offsetCoords.y : coords.y;
+      } else {
+        dropdownX = coords.x + 5;
+        dropdownY = coords.y;
+      }
+      
+      dropdown.style.left = `${dropdownX}%`;
+      dropdown.style.top = `${(50 - dropdownY) * 2}%`;
+      
+      // Build dropdown HTML
+      dropdown.innerHTML = `
+        <select id="inline-action-${player}">
+          <option value="">-- Select Action --</option>
+        </select>
+        <button onclick="applyInlineAction('${player}')">Confirm</button>
+        <button onclick="cancelInlineAction('${player}')" style="background: rgba(255,255,255,0.2); margin-top: 5px;">Cancel</button>
+      `;
+      
+      container.appendChild(dropdown);
+      
+      // Populate actions
+      const select = dropdown.querySelector('select');
+      updateInlineActionOptions(select, player);
+    }
+
+    function updateInlineActionOptions(select, player) {
+      const ballHandlerAssigned = Object.entries(currentStepAssignments).some(([pos, assignment]) => 
+        pos !== player && assignment && assignment.action && BALL_HANDLING_ACTIONS.includes(assignment.action)
+      );
+      
+      // Check if player is at a NEW offset position (Rule 1)
+      const isNewOffset = newOffsets[player];
+      
+      Object.entries(ACTIONS).forEach(([value, label]) => {
+        const option = document.createElement('option');
+        option.value = value;
+        option.textContent = label;
+        
+        // Rule 1: If at NEW offset position (created this step), only allow screen or cut
+        if (isNewOffset && value !== 'screen' && value !== 'cut') {
+          option.disabled = true;
+        }
+        // Disable ball-handling actions if one is already assigned
+        else if (ballHandlerAssigned && BALL_HANDLING_ACTIONS.includes(value)) {
+          option.disabled = true;
+        }
+        
+        select.appendChild(option);
+      });
+    }
+
+    function applyInlineAction(player) {
+      const select = document.getElementById(`inline-action-${player}`);
+      const action = select.value;
+      
+      if (!action) {
+        alert('Please select an action');
+        return;
+      }
+      
+      // Apply action
+      currentStepAssignments[player].action = action;
+      
+      // Remove dropdown
+      document.querySelectorAll('.inline-action-dropdown').forEach(d => d.remove());
+      
+      // Update visualization
+      renderPositionDashboard();
+      renderCourtVisualization();
+      validateActionButton();
+    }
+
+    function cancelInlineAction(player) {
+      // Remove assignment
+      if (currentStepAssignments[player]) {
+        delete currentStepAssignments[player].location;
+        delete currentStepAssignments[player].action;
+        if (Object.keys(currentStepAssignments[player]).length === 0) {
+          delete currentStepAssignments[player];
+        }
+      }
+      
+      // Clear offset
+      delete positionOffsets[player];
+      
+      // Remove dropdown
+      document.querySelectorAll('.inline-action-dropdown').forEach(d => d.remove());
+      
+      // Update visualization
+      renderPositionDashboard();
+      renderCourtVisualization();
+      validateActionButton();
+    }
+
+    function renderPositionDashboard() {
+      const dashboard = document.getElementById('position-dashboard');
+      
+      // Only render if we're in step 2
+      if (document.getElementById('step2').classList.contains('hidden')) {
+        dashboard.innerHTML = '';
+        return;
+      }
+
+      dashboard.innerHTML = '';
+
+      // Header row
+      const headerRow = document.createElement('div');
+      headerRow.className = 'dashboard-row header';
+      headerRow.innerHTML = `
+        <div>Pos</div>
+        <div>Location</div>
+        <div>Action</div>
+      `;
+      dashboard.appendChild(headerRow);
+
+      // Position rows
+      POSITIONS.forEach(pos => {
+        const row = document.createElement('div');
+        row.className = 'dashboard-row';
+        row.id = `dashboard-${pos}`;
+
+        // Position label
+        const posLabel = document.createElement('div');
+        posLabel.className = 'pos-label';
+        posLabel.textContent = pos;
+        row.appendChild(posLabel);
+
+        // Location dropdown
+        const locationSelect = document.createElement('select');
+        locationSelect.id = `dashboard-location-${pos}`;
+        locationSelect.innerHTML = '<option value="">--</option>';
+        LOCATIONS.forEach(loc => {
+          const option = document.createElement('option');
+          option.value = loc;
+          option.textContent = loc;
+          locationSelect.appendChild(option);
+        });
+        
+        // Pre-populate location from current or previous step
+        const assignment = currentStepAssignments[pos];
+        const prevAssignment = previousStepAssignments[pos];
+        
+        if (assignment && assignment.location) {
+          locationSelect.value = assignment.location;
+        } else if (playState.currentStep > 1 && prevAssignment && prevAssignment.location) {
+          // Step 2+: Pre-populate with previous step's location (just UI, don't modify data)
+          locationSelect.value = prevAssignment.location;
+        }
+        
+        // Handle location change
+        locationSelect.addEventListener('change', (e) => {
+          handleDashboardLocationChange(pos, e.target.value);
+        });
+        row.appendChild(locationSelect);
+
+        // Action dropdown
+        const actionSelect = document.createElement('select');
+        actionSelect.id = `dashboard-action-${pos}`;
+        actionSelect.innerHTML = '<option value="">--</option>';
+        
+        // Check if this position is at a NEW offset (Rule 1: only screen or cut allowed)
+        const isNewOffset = newOffsets[pos];
+        
+        Object.entries(ACTIONS).forEach(([value, label]) => {
+          const option = document.createElement('option');
+          option.value = value;
+          option.textContent = label;
+          
+          // Rule 1: If at NEW offset position (created this step), only allow screen or cut
+          if (isNewOffset && value !== 'screen' && value !== 'cut') {
+            option.disabled = true;
+            option.style.color = 'rgba(255, 255, 255, 0.3)';
+          }
+          
+          actionSelect.appendChild(option);
+        });
+        
+        // Pre-populate action from current step or default for Step 2+
+        if (assignment && assignment.action) {
+          actionSelect.value = assignment.action;
+        } else if (playState.currentStep > 1 && prevAssignment && prevAssignment.location) {
+          // Step 2+: Pre-populate with smart defaults (just UI, don't modify data)
+          let defaultAction = 'stationary';
+          
+          // Ball handler gets "handle_ball"
+          if (pos === currentBallHandler) {
+            defaultAction = 'handle_ball';
+          }
+          // Players at post positions get "post_up"
+          else if (prevAssignment.location === 'upper lowPost' || prevAssignment.location === 'lower lowPost') {
+            defaultAction = 'post_up';
+          }
+          
+          actionSelect.value = defaultAction;
+        }
+        
+        // Handle action change
+        actionSelect.addEventListener('change', (e) => {
+          handleDashboardActionChange(pos, e.target.value);
+        });
+        row.appendChild(actionSelect);
+
+        dashboard.appendChild(row);
+      });
+    }
+
+    function handleDashboardLocationChange(pos, newLocation) {
+      if (!newLocation) return;
+
+      // Check if location is occupied
+      const occupyingPlayer = findPlayerAtLocation(newLocation);
+      
+      if (occupyingPlayer && occupyingPlayer !== pos) {
+        // Location occupied - mark for offset positioning
+        positionOffsets[pos] = true;
+        newOffsets[pos] = true; // Mark as NEW offset
+      } else {
+        // Clear offset for this player
+        delete positionOffsets[pos];
+        delete newOffsets[pos];
+      }
+      
+      // Update assignment
+      if (!currentStepAssignments[pos]) {
+        currentStepAssignments[pos] = {};
+      }
+      currentStepAssignments[pos].location = newLocation;
+      
+      // Update dashboard and court visualization
+      renderPositionDashboard();
+      renderCourtVisualization();
+      validateActionButton();
+    }
+
+    function handleDashboardActionChange(pos, newAction) {
+      if (!newAction) return;
+
+      // Update assignment
+      if (!currentStepAssignments[pos]) {
+        currentStepAssignments[pos] = {};
+      }
+      currentStepAssignments[pos].action = newAction;
+      
+      // Update ball handler if ball-handling action
+      if (BALL_HANDLING_ACTIONS.includes(newAction)) {
+        currentBallHandler = pos;
+      }
+      
+      // Update court visualization
+      renderCourtVisualization();
+      validateActionButton();
+    }
+
+    function renderCourtVisualization() {
+      const container = document.getElementById('player-icons-container');
+
+      // Only render if we're in step 2
+      if (document.getElementById('step2').classList.contains('hidden')) {
+        container.innerHTML = '';
+        return;
+      }
+      
+      // Update dashboard to reflect current state
+      POSITIONS.forEach(pos => {
+        const locationSelect = document.getElementById(`dashboard-location-${pos}`);
+        const actionSelect = document.getElementById(`dashboard-action-${pos}`);
+        const assignment = currentStepAssignments[pos];
+        
+        if (locationSelect && assignment) {
+          locationSelect.value = assignment.location || '';
+        }
+        if (actionSelect && assignment) {
+          actionSelect.value = assignment.action || '';
+        }
+      });
+
+      // Remove old offset indicators
+      container.querySelectorAll('.offset-indicator').forEach(ind => ind.remove());
+
+      // Get existing icons to reuse for animation
+      const existingIcons = {};
+      container.querySelectorAll('.player-icon').forEach(icon => {
+        const pos = icon.textContent;
+        existingIcons[pos] = icon;
+      });
+
+      // Find ball handler for current step
+      let ballHandlerPos = null;
+      let ballHandlerCoords = null;
+      let ballLocation = null; // Could be player location or basket
+
+      // Update or create player icons
+      POSITIONS.forEach(pos => {
+        const assignment = currentStepAssignments[pos];
+        const prevAssignment = previousStepAssignments[pos];
+        
+        if (assignment && assignment.location) {
+          const coords = HCO_STRING_SPOTS[assignment.location];
+          if (!coords) return;
+
+          // Apply offset if exists (use OFFSET_SPOTS coordinates)
+          const isOffset = positionOffsets[pos];
+          let targetLeft, targetTop;
+          
+          console.log(`Rendering ${pos}:`, {
+            location: assignment.location,
+            isOffset: isOffset,
+            positionOffsets: positionOffsets,
+            hasOffsetCoords: !!OFFSET_SPOTS[assignment.location]
+          });
+          
+          if (isOffset) {
+            const offsetCoords = OFFSET_SPOTS[assignment.location];
+            if (offsetCoords) {
+              targetLeft = `${offsetCoords.x}%`;
+              targetTop = `${(50 - offsetCoords.y) * 2}%`;
+              console.log(`✓ USING OFFSET COORDS for ${pos} at ${assignment.location}`, {
+                original: coords,
+                offset: offsetCoords,
+                targetLeft,
+                targetTop
+              });
+            } else {
+              // Fallback if offset coords don't exist
+              targetLeft = `${coords.x}%`;
+              targetTop = `${(50 - coords.y) * 2}%`;
+              console.log(`✗ NO OFFSET_SPOTS for ${assignment.location}, using original`);
+            }
+          } else {
+            targetLeft = `${coords.x}%`;
+            targetTop = `${(50 - coords.y) * 2}%`;
+          }
+
+          let icon = existingIcons[pos];
+          
+          if (!icon) {
+            // Create new icon
+            icon = document.createElement('div');
+            icon.className = `player-icon ${pos}`;
+            icon.textContent = pos;
+            icon.dataset.position = pos;
+            icon.dataset.location = assignment.location; // Store location on element
+            
+            // If there was a previous position, start there for animation
+            if (prevAssignment && prevAssignment.location) {
+              const prevCoords = HCO_STRING_SPOTS[prevAssignment.location];
+              if (prevCoords) {
+                icon.style.left = `${prevCoords.x}%`;
+                icon.style.top = `${(50 - prevCoords.y) * 2}%`;
+              }
+            } else {
+              icon.style.left = targetLeft;
+              icon.style.top = targetTop;
+            }
+            
+            container.appendChild(icon);
+            
+            // Setup drag handlers
+            setupDragHandlers(icon, pos);
+            
+            // Trigger animation on next frame
+            if (prevAssignment && prevAssignment.location) {
+              requestAnimationFrame(() => {
+                icon.style.left = targetLeft;
+                icon.style.top = targetTop;
+              });
+            }
+          } else {
+            // Update existing icon position (will animate via CSS transition)
+            icon.style.left = targetLeft;
+            icon.style.top = targetTop;
+            icon.dataset.location = assignment.location; // Update location on element
+            delete existingIcons[pos]; // Mark as handled
+          }
+
+          // Add offset indicator if offset exists
+          if (isOffset) {
+            const offsetCoords = OFFSET_SPOTS[assignment.location];
+            if (offsetCoords) {
+              const indicator = document.createElement('div');
+              indicator.className = 'offset-indicator';
+              // Line from actual position to offset position
+              indicator.style.left = `${coords.x}%`;
+              indicator.style.top = `${(50 - coords.y) * 2}%`;
+              indicator.style.width = `${Math.abs(offsetCoords.x - coords.x)}%`;
+              container.appendChild(indicator);
+            }
+          }
+
+          // Check if this player has the ball or is shooting/passing
+          if (assignment.action) {
+            if (BALL_HANDLING_ACTIONS.includes(assignment.action)) {
+              ballHandlerPos = pos;
+              ballHandlerCoords = { left: targetLeft, top: targetTop };
+              currentBallHandler = pos;
+              ballLocation = 'player';
+            } else if (assignment.action === 'pass') {
+              // Ball should go to receiver (will be found later)
+              ballLocation = 'in_transit_pass';
+            } else if (assignment.action === 'shoot') {
+              // Ball should go to basket
+              ballLocation = 'basket';
+            }
+          }
+        } else if (existingIcons[pos]) {
+          // Position no longer has assignment but icon exists from previous step
+          // Keep it visible but mark as handled
+          delete existingIcons[pos];
+        }
+      });
+
+      // Remove icons for positions that no longer exist
+      Object.values(existingIcons).forEach(icon => icon.remove());
+
+      // Handle ball sprite positioning
+      let ballIcon = container.querySelector('.ball-icon');
+      
+      // Determine ball position
+      let finalBallLeft = null;
+      let finalBallTop = null;
+      
+      if (ballLocation === 'player' && ballHandlerPos && ballHandlerCoords) {
+        // Ball with current ball handler
+        finalBallLeft = ballHandlerCoords.left;
+        finalBallTop = ballHandlerCoords.top;
+      } else if (ballLocation === 'in_transit_pass') {
+        // Find receiver
+        const receiver = Object.entries(currentStepAssignments).find(([pos, assignment]) => 
+          assignment && assignment.action === 'receive'
+        );
+        if (receiver) {
+          const [receiverPos, receiverAssignment] = receiver;
+          const receiverCoords = HCO_STRING_SPOTS[receiverAssignment.location];
+          const receiverOffset = positionOffsets[receiverPos];
+          const receiverActualCoords = receiverOffset ? OFFSET_SPOTS[receiverAssignment.location] : receiverCoords;
+          
+          if (receiverActualCoords) {
+            finalBallLeft = `${receiverActualCoords.x}%`;
+            finalBallTop = `${(50 - receiverActualCoords.y) * 2}%`;
+            currentBallHandler = receiverPos;
+          }
+        }
+      } else if (ballLocation === 'basket') {
+        // Ball at basket (rim coordinates from constants)
+        const rimCoords = HCO_STRING_SPOTS['key']; // Using key as approximate rim location
+        if (rimCoords) {
+          finalBallLeft = '90%'; // HOME_RIM_COORDS x = 90
+          finalBallTop = '50%'; // HOME_RIM_COORDS y = 25 → (50-25)*2 = 50%
+        }
+      } else if (currentBallHandler) {
+        // No ball-handling action this step, keep ball with previous handler
+        // Check current step first, then fall back to previous step
+        const handlerAssignment = currentStepAssignments[currentBallHandler] || previousStepAssignments[currentBallHandler];
+        
+        if (handlerAssignment && handlerAssignment.location) {
+          const handlerCoords = HCO_STRING_SPOTS[handlerAssignment.location];
+          const handlerOffset = positionOffsets[currentBallHandler];
+          const handlerActualCoords = handlerOffset ? OFFSET_SPOTS[handlerAssignment.location] : handlerCoords;
+          
+          if (handlerActualCoords) {
+            finalBallLeft = `${handlerActualCoords.x}%`;
+            finalBallTop = `${(50 - handlerActualCoords.y) * 2}%`;
+          }
+        }
+      }
+      
+      // Render or remove ball
+      if (finalBallLeft && finalBallTop) {
+        if (!ballIcon) {
+          ballIcon = document.createElement('div');
+          ballIcon.className = 'ball-icon';
+          container.appendChild(ballIcon);
+          
+          // Setup ball drag handlers
+          setupBallDragHandlers(ballIcon);
+        }
+        ballIcon.style.left = finalBallLeft;
+        ballIcon.style.top = finalBallTop;
+      } else if (ballIcon) {
+        ballIcon.remove();
+      }
+      
+      // Render basket target (always visible when in step 2)
+      let basketTarget = container.querySelector('.basket-target');
+      if (!basketTarget) {
+        basketTarget = document.createElement('div');
+        basketTarget.className = 'basket-target';
+        basketTarget.style.left = '90%'; // HOME_RIM_COORDS x = 90
+        basketTarget.style.top = '50%'; // HOME_RIM_COORDS y = 25 → (50-25)*2 = 50%
+        container.appendChild(basketTarget);
+        
+        // Setup basket drop handlers
+        setupBasketDropHandlers(basketTarget);
+      }
+    }
+
+    function setupBasketDropHandlers(basketTarget) {
+      basketTarget.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        // Only accept ball drags, not player drags
+        if (ballDragActive) {
+          e.dataTransfer.dropEffect = 'move';
+          ballDragToBasket = true;
+          basketTarget.classList.add('drag-hover');
+          console.log('Ball over basket - ballDragToBasket set to true');
+        } else {
+          e.dataTransfer.dropEffect = 'none';
+        }
+      });
+
+      basketTarget.addEventListener('dragleave', (e) => {
+        console.log('Ball left basket area');
+        basketTarget.classList.remove('drag-hover');
+        ballDragToBasket = false;
+      });
+
+      basketTarget.addEventListener('drop', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log('Drop event on basket');
+        basketTarget.classList.remove('drag-hover');
+        
+        if (ballDragActive && currentBallHandler) {
+          handleBallShoot(currentBallHandler);
+        }
+      });
+    }
+
+    function handleBallShoot(shooter) {
+      console.log(`Ball shoot by: ${shooter}`);
+      
+      // Assign Shoot action to shooter
+      if (currentStepAssignments[shooter] && currentStepAssignments[shooter].location) {
+        currentStepAssignments[shooter].action = 'shoot';
+      } else if (previousStepAssignments[shooter] && previousStepAssignments[shooter].location) {
+        // Shooter hasn't been moved yet, use previous location
+        currentStepAssignments[shooter] = {
+          location: previousStepAssignments[shooter].location,
+          action: 'shoot'
+        };
+      }
+      
+      console.log('Shoot assigned to', shooter, currentStepAssignments[shooter]);
+      
+      // Update visualization (this will move ball to basket)
+      renderPositionDashboard();
+      renderCourtVisualization();
+      validateActionButton();
+    }
+
+    function setupBallDragHandlers(ballIcon) {
+      ballIcon.draggable = true;
+      
+      ballIcon.addEventListener('dragstart', (e) => {
+        ballDragActive = true;
+        ballIcon.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+        console.log('Ball drag started from:', currentBallHandler);
+      });
+
+      ballIcon.addEventListener('dragend', (e) => {
+        ballIcon.classList.remove('dragging');
+        
+        // Clear any hover effects
+        document.querySelectorAll('.player-icon.drag-hover').forEach(i => i.classList.remove('drag-hover'));
+        document.querySelectorAll('.basket-target.drag-hover').forEach(b => b.classList.remove('drag-hover'));
+        
+        console.log('Ball drag ended - target:', ballDragTarget, 'toBasket:', ballDragToBasket);
+        
+        if (ballDragToBasket && currentBallHandler) {
+          // Ball dragged to basket - assign shoot
+          handleBallShoot(currentBallHandler);
+        } else if (ballDragTarget && currentBallHandler && ballDragTarget !== currentBallHandler) {
+          // Ball dragged to player - assign pass/receive
+          handleBallPass(currentBallHandler, ballDragTarget);
+        }
+        
+        ballDragActive = false;
+        ballDragTarget = null;
+        ballDragToBasket = false;
+      });
+    }
+
+    function handleBallPass(passer, receiver) {
+      console.log(`Ball pass: ${passer} → ${receiver}`);
+      
+      // Assign Pass action to passer (if they have a location)
+      if (currentStepAssignments[passer] && currentStepAssignments[passer].location) {
+        currentStepAssignments[passer].action = 'pass';
+      } else if (previousStepAssignments[passer] && previousStepAssignments[passer].location) {
+        // Passer hasn't been moved yet, use previous location
+        currentStepAssignments[passer] = {
+          location: previousStepAssignments[passer].location,
+          action: 'pass'
+        };
+      }
+      
+      // Assign Receive action to receiver (if they have a location)
+      if (currentStepAssignments[receiver] && currentStepAssignments[receiver].location) {
+        currentStepAssignments[receiver].action = 'receive';
+      } else if (previousStepAssignments[receiver] && previousStepAssignments[receiver].location) {
+        // Receiver hasn't been moved yet, use previous location
+        currentStepAssignments[receiver] = {
+          location: previousStepAssignments[receiver].location,
+          action: 'receive'
+        };
+      }
+      
+      // Update ball handler
+      currentBallHandler = receiver;
+      
+      // Update visualization
+      renderPositionDashboard();
+      renderCourtVisualization();
+      validateActionButton();
+    }
+
+    function validateStep1() {
+      const name = document.getElementById('play-name').value.trim();
+      const type = document.getElementById('play-type').value;
+      const focus = document.getElementById('play-focus').value;
+
+      const submitBtn = document.getElementById('submit-play-btn');
+      
+      // For Set Play, require focus. For Motion, don't require focus
+      if (type === 'Set Play') {
+        submitBtn.disabled = !(name && type && focus);
+      } else {
+        submitBtn.disabled = !(name && type);
+      }
+    }
+
+    function submitPlay() {
+      playState.name = document.getElementById('play-name').value.trim();
+      playState.type = document.getElementById('play-type').value;
+      playState.focus = document.getElementById('play-focus').value;
+      playState.playId = null;
+      
+      // Initialize all variants
+      ['successful', 'mid_play_change', 'contested', 'broken'].forEach(variant => {
+        playState.variants[variant] = {
+          steps: [],
+          complete: false,
+          currentStep: 1
+        };
+      });
+      
+      currentVariant = 'successful';
+
+      // Update page title
+      const pageTitle = document.getElementById('page-title');
+      pageTitle.textContent = 'Building Step 1';
+      pageTitle.classList.add('step2-title');
+
+      // Show step 2, hide step 1
+      document.getElementById('step1').classList.add('hidden');
+      document.getElementById('step2').classList.remove('hidden');
+
+      // Update summary
+      let summaryText = `${playState.name} | ${playState.type}`;
+      if (playState.focus) {
+        summaryText += ` | ${playState.focus}`;
+      }
+      document.getElementById('play-summary').textContent = summaryText;
+
+      // Reset current step assignments
+      currentStepAssignments = {};
+      previousStepAssignments = {};
+      selectedPosition = null;
+      currentFormation = null;
+      positionOffsets = {};
+      newOffsets = {};
+      currentBallHandler = null; // Reset ball handler for new play
+      
+      // Show formation selection, hide build buttons
+      document.getElementById('formation-selection').classList.remove('hidden');
+      document.getElementById('build-buttons').classList.add('hidden');
+      document.getElementById('formation-select').value = '';
+      
+      // Update variant tabs
+      updateVariantTabs();
+      updateVariantInfo();
+      
+      // Hide clone button for successful variant
+      document.getElementById('clone-btn').style.display = 'none';
+      
+      // Initialize dashboard and court
+      renderPositionDashboard();
+      renderCourtVisualization();
+    }
+
+
+
+    function validateActionButton() {
+      const actionBtn = document.getElementById('action-btn');
+      const completePlayBtn = document.getElementById('complete-play-btn');
+      
+      // Check if any player has shoot action (final step)
+      let hasShoot = false;
+      for (const pos of POSITIONS) {
+        const assignment = currentStepAssignments[pos];
+        if (assignment && assignment.action === 'shoot') {
+          hasShoot = true;
+          break;
+        }
+      }
+      
+      // Check if all positions are complete
+      let allComplete = true;
+      for (const pos of POSITIONS) {
+        const assignment = currentStepAssignments[pos];
+        if (!assignment || !assignment.location || !assignment.action) {
+          allComplete = false;
+          break;
+        }
+      }
+
+      if (hasShoot) {
+        // Shot assigned - this is the final step
+        actionBtn.disabled = true;
+        actionBtn.textContent = 'Shot = Final Step';
+        completePlayBtn.disabled = false;
+        completePlayBtn.style.opacity = '1';
+        completePlayBtn.style.boxShadow = '0 0 20px rgba(255, 140, 0, 0.6)';
+      } else if (allComplete) {
+        // All positions complete - ready to add step
+        actionBtn.textContent = 'Add Step';
+        actionBtn.disabled = false;
+        completePlayBtn.disabled = false;
+        completePlayBtn.style.opacity = '1';
+        completePlayBtn.style.boxShadow = 'none';
+      } else {
+        // Still building step
+        actionBtn.textContent = 'Add Step (Incomplete)';
+        actionBtn.disabled = true;
+        completePlayBtn.disabled = false;
+        completePlayBtn.style.opacity = '1';
+        completePlayBtn.style.boxShadow = 'none';
+      }
+    }
+
+    function handleActionButton() {
+      const actionBtn = document.getElementById('action-btn');
+      
+      // Only submit step if all positions are complete
+      if (actionBtn.textContent === 'Add Step') {
+        submitStep();
+      }
+    }
+
+    function autoAssignActions() {
+      // Auto-assign actions for players based on rules
+      if (playState.currentStep <= 1) return; // Only for step 2+
+      
+      POSITIONS.forEach(pos => {
+        const currentAssignment = currentStepAssignments[pos];
+        const prevAssignment = previousStepAssignments[pos];
+        
+        // Skip if already has action assigned
+        if (currentAssignment && currentAssignment.action) return;
+        
+        // Player hasn't been updated this step
+        if (!currentAssignment || !currentAssignment.location) {
+          if (prevAssignment && prevAssignment.location) {
+            // Rule 2: Player not updated
+            let autoAction = 'stationary';
+            
+            // Exception: Previous ball handler keeps ball
+            if (BALL_HANDLING_ACTIONS.includes(prevAssignment.action)) {
+              autoAction = 'handle_ball';
+            }
+            // Exception: Post positions auto post up
+            else if (prevAssignment.location === 'lower lowPost' || prevAssignment.location === 'upper lowPost') {
+              autoAction = 'post_up';
+            }
+            
+            currentStepAssignments[pos] = {
+              location: prevAssignment.location,
+              action: autoAction
+            };
+            
+            console.log(`Auto-assigned ${pos}: ${autoAction} (no movement)`);
+          }
+        } else if (currentAssignment.location && !currentAssignment.action) {
+          // Player moved but no action yet
+          const movedLocation = currentAssignment.location !== (prevAssignment?.location);
+          const isOffset = positionOffsets[pos];
+          
+          // Rule 4: Player moved to new spot (not offset, not ball handler)
+          if (movedLocation && !isOffset && pos !== currentBallHandler) {
+            currentAssignment.action = 'cut';
+            console.log(`Auto-assigned ${pos}: cut (moved to ${currentAssignment.location})`);
+          }
+          // Rule 3: Previous ball handler moved
+          else if (prevAssignment && BALL_HANDLING_ACTIONS.includes(prevAssignment.action)) {
+            currentAssignment.action = 'handle_ball';
+            console.log(`Auto-assigned ${pos}: handle_ball (previous ball handler)`);
+          }
+        }
+      });
+    }
+
+
+    function submitStep() {
+      const variantData = getCurrentVariantData();
+      
+      // Calculate timestamp (300ms increments, 0-indexed)
+      const timestamp = (variantData.currentStep - 1) * 300;
+
+      // Build step data structure
+      const stepData = {
+        timestamp: timestamp,
+        pos_actions: {},
+        events: []
+      };
+
+      // Populate pos_actions
+      POSITIONS.forEach(pos => {
+        const assignment = currentStepAssignments[pos];
+        stepData.pos_actions[pos] = {
+          location: assignment.location,
+          action: assignment.action
+        };
+      });
+
+      // Add to current variant's steps
+      variantData.steps.push(stepData);
+
+      // Move to next step (no limit check - user decides when done)
+      variantData.currentStep++;
+      
+      // Save current assignments and offsets as previous for animation
+      previousStepAssignments = {...currentStepAssignments};
+      const previousOffsets = {...positionOffsets}; // Save offset state
+      
+      // Ball handler carries over to next step (don't reset currentBallHandler)
+      
+      // Reset current assignments and offsets
+      currentStepAssignments = {};
+      selectedPosition = null;
+      positionOffsets = {}; // Clear for new step, will restore preserved ones
+      newOffsets = {}; // Clear new offsets - old offsets become unrestricted
+      
+      // Pre-populate Step 2+ with previous positions and offsets
+      prePopulateStep(previousOffsets);
+      
+      // Update dashboard and visualization
+      renderPositionDashboard();
+      renderCourtVisualization();
+      validateActionButton();
+      updateStepCounter();
+      updateVariantInfo(); // Update variant step count
+      updateVariantTabs(); // Update status if needed
+    }
+
+    function prePopulateStep(previousOffsets = {}) {
+      const variantData = getCurrentVariantData();
+      // Pre-populate currentStepAssignments with previous step's data for Step 2+
+      if (variantData.currentStep > 1 && previousStepAssignments) {
+        POSITIONS.forEach(pos => {
+          const prevAssignment = previousStepAssignments[pos];
+          if (prevAssignment && prevAssignment.location) {
+            // Determine default action
+            let defaultAction = 'stationary';
+            
+            // Ball handler gets "handle_ball"
+            if (pos === currentBallHandler) {
+              defaultAction = 'handle_ball';
+            }
+            // Players at post positions get "post_up"
+            else if (prevAssignment.location === 'upper lowPost' || prevAssignment.location === 'lower lowPost') {
+              defaultAction = 'post_up';
+            }
+            
+            currentStepAssignments[pos] = {
+              location: prevAssignment.location,
+              action: defaultAction
+            };
+            
+            // Preserve offset status from previous step
+            if (previousOffsets[pos]) {
+              positionOffsets[pos] = true;
+              console.log(`Preserving offset for ${pos} at ${prevAssignment.location}`);
+            }
+          }
+        });
+      }
+    }
+
+    function updateStepCounter() {
+      const variantData = getCurrentVariantData();
+      console.log('updateStepCounter called, currentStep:', variantData.currentStep);
+      const variantNames = {
+        successful: 'Successful',
+        mid_play_change: 'Mid-Play Change',
+        contested: 'Contested',
+        broken: 'Broken'
+      };
+      document.getElementById('page-title').textContent = 
+        `Building Step ${variantData.currentStep} (${variantNames[currentVariant]})`;
+    }
+
+    async function completePlay() {
+      // Check if current step has all positions assigned
+      let allComplete = true;
+      for (const pos of POSITIONS) {
+        const assignment = currentStepAssignments[pos];
+        if (!assignment || !assignment.location || !assignment.action) {
+          allComplete = false;
+          break;
+        }
+      }
+
+      if (!allComplete) {
+        const confirm = window.confirm(
+          'Current step is incomplete. Do you want to:\n\n' +
+          '• Click OK to auto-fill remaining positions and complete the play\n' +
+          '• Click Cancel to continue building'
+        );
+        
+        if (!confirm) return;
+        
+        // Auto-fill remaining positions
+        if (playState.currentStep > 1 && previousStepAssignments) {
+          POSITIONS.forEach(pos => {
+            const currentAssignment = currentStepAssignments[pos];
+            if (!currentAssignment || !currentAssignment.location || !currentAssignment.action) {
+              const prevAssignment = previousStepAssignments[pos];
+              if (prevAssignment && prevAssignment.location && prevAssignment.action) {
+                currentStepAssignments[pos] = {
+                  location: prevAssignment.location,
+                  action: prevAssignment.action
+                };
+              }
+            }
+          });
+        }
+      }
+      
+      // Submit final step if not already submitted
+      if (Object.keys(currentStepAssignments).length > 0) {
+        // Build final step data
+        const timestamp = (playState.currentStep - 1) * 300;
+        const stepData = {
+          timestamp: timestamp,
+          pos_actions: {},
+          events: []
+        };
+        
+        POSITIONS.forEach(pos => {
+          const assignment = currentStepAssignments[pos];
+          if (assignment) {
+            stepData.pos_actions[pos] = {
+              location: assignment.location,
+              action: assignment.action
+            };
+          }
+        });
+        
+        playState.steps.push(stepData);
+      }
+      
+      // Save to MongoDB
+      await savePlayToDatabase();
+    }
+
+    async function savePlayToDatabase(shouldClose = false) {
+      // Build play data with all variants
+      const playData = {
+        name: playState.name,
+        play_type: playState.type.toLowerCase().replace(' ', '_'),
+        play_focus: playState.focus ? playState.focus.toLowerCase() : 'balanced',
+        skeletons: {
+          successful: {
+            steps: playState.variants.successful.steps,
+            complete: playState.variants.successful.complete
+          },
+          mid_play_change: {
+            steps: playState.variants.mid_play_change.steps,
+            complete: playState.variants.mid_play_change.complete
+          },
+          contested: {
+            steps: playState.variants.contested.steps,
+            complete: playState.variants.contested.complete
+          },
+          broken: {
+            steps: playState.variants.broken.steps,
+            complete: playState.variants.broken.complete
+          }
+        },
+        game_stats: {
+          times_run: 0,
+          shot_attempts: 0,
+          made_shots: 0,
+          turnovers: 0,
+          offensive_fouls: 0,
+          defensive_fouls: 0
+        },
+        season_stats: {
+          times_run: 0,
+          shot_attempts: 0,
+          made_shots: 0,
+          turnovers: 0,
+          offensive_fouls: 0,
+          defensive_fouls: 0
+        }
+      };
+
+      try {
+        const response = await fetch('/api/plays', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(playData)
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const result = await response.json();
+        console.log('Play saved:', result);
+        
+        if (shouldClose) {
+          // Show success screen and close
+          showSuccess(playData, result.was_update);
+        } else {
+          // Draft saved - show notification but stay in editor
+          alert(`✅ Draft saved successfully!\n\nPlay: ${playData.name}\nVariants saved: ${Object.keys(playData.skeletons).filter(v => playData.skeletons[v].steps.length > 0).length}/4`);
+          
+          // Reload plays list in case this was a new play
+          loadAvailablePlays();
+        }
+        
+      } catch (error) {
+        console.error('Error saving play:', error);
+        alert('Failed to save play to database. Please check console for details.');
+      }
+    }
+
+    function showSuccess(playData, wasUpdate = false) {
+      // Hide step 2
+      document.getElementById('step2').classList.add('hidden');
+
+      // Show success screen
+      document.getElementById('success-screen').classList.remove('hidden');
+      
+      const action = wasUpdate ? 'updated in' : 'saved to';
+      const emoji = wasUpdate ? '🔄' : '✅';
+      
+      document.getElementById('success-play-name').textContent = 
+        `${emoji} Play "${playData.name}" has been ${action} the database!`;
+
+      document.getElementById('json-output').textContent = JSON.stringify(playData, null, 2);
+    }
+
+    // Start
+    window.addEventListener('DOMContentLoaded', init);
+  </script>
+</body>
+</html>
