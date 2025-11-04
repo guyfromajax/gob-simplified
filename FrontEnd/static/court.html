@@ -670,10 +670,10 @@
       min-height: 100px;
       background: linear-gradient(to bottom, rgba(0, 0, 0, 0.95), rgba(0, 0, 0, 1));
       display: flex;
-      align-items: flex-start;  /* Push all content to TOP - empty space at bottom is OK */
+      align-items: flex-start !important;  /* Push all content to TOP - empty space at bottom is OK */
       justify-content: space-between;
-      padding: 4px 40px 0 40px;  /* Minimal top padding - push content close to canvas */
-      gap: 30px;
+      padding: 8px 40px 20px 40px !important;  /* Small top, allow bottom space */
+      gap: 20px;
       z-index: 900;
       /* Smooth transitions when JS updates positioning */
       transition: top 0.1s ease, height 0.1s ease;
@@ -683,8 +683,9 @@
       flex: 1;
       display: flex;
       flex-direction: column;
-      gap: 6px;  /* Reduced from 12px to 6px - tighter spacing between header and buttons */
+      gap: 4px;
       max-width: 280px;
+      margin: 0 !important;  /* Remove any default margins */
     }
 
     .panel-header {
@@ -694,7 +695,7 @@
       text-transform: uppercase;
       letter-spacing: 1.5px;
       text-align: center;
-      margin-bottom: 0;  /* Removed margin-bottom, let gap handle it */
+      margin: 0 !important;  /* Remove all margins */
     }
 
     .panel-section {
@@ -1947,6 +1948,10 @@
       if (playcall) {
         playcall.style.top = `${playcallTop}px`;
         playcall.style.height = `${window.innerHeight - playcallTop}px`;
+        // Force reflow for smooth transitions (Grok's trick)
+        playcall.style.transition = 'none';
+        void playcall.offsetHeight;  // Trigger reflow
+        playcall.style.transition = 'top 0.1s ease, height 0.1s ease';
       }
     }
 
