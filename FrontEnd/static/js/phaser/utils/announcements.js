@@ -183,10 +183,9 @@ export function announceFromTurnData(turnData, timing = 'start', homeTeamId = nu
       return;
     }
     
-    if (turnData.result_type === 'TURNOVER') {
-      // Non-steal turnovers only from here on
-      
-      // Non-steal turnovers (TRAVEL, DOUBLE DRIBBLE, etc.) - show victim's photo in offense team color
+    // Handle all turnover types: TURNOVER, DEAD BALL (from HCT/FCP), and non-steal STEAL results
+    if (turnData.result_type === 'TURNOVER' || turnData.result_type === 'DEAD BALL') {
+      // Non-steal turnovers - show victim's photo in offense team color
       let playerData = null;
       
       if (scene && turnData.victim_id) {
@@ -208,21 +207,41 @@ export function announceFromTurnData(turnData, timing = 'start', homeTeamId = nu
         };
       }
       
-      // Determine turnover type from text
+      // Determine turnover type from dedicated field or text parsing
       let turnoverText = "TURNOVER!";
-      const textLower = turnData.text?.toLowerCase() || '';
-      if (textLower.includes('travel')) {
-        turnoverText = "TRAVEL!";
-      } else if (textLower.includes('double dribble')) {
-        turnoverText = "DOUBLE DRIBBLE!";
-      } else if (textLower.includes('out of bounds')) {
-        turnoverText = "OUT OF BOUNDS!";
-      } else if (textLower.includes('errant pass') || textLower.includes('bad pass')) {
-        turnoverText = "BAD PASS!";
-      } else if (textLower.includes('dribbles it off his foot')) {
-        turnoverText = "TURNOVER!";
+      
+      // Check if backend provides specific turnover_type field
+      if (turnData.turnover_type) {
+        const typeMap = {
+          "TRAVEL": "TRAVEL!",
+          "DOUBLE_DRIBBLE": "DOUBLE DRIBBLE!",
+          "OUT_OF_BOUNDS": "OUT OF BOUNDS!",
+          "BAD_PASS": "BAD PASS!",
+          "PALMING": "PALMING!",
+          "ILLEGAL_DRIBBLE": "ILLEGAL DRIBBLE!",
+          "SHOT_CLOCK": "SHOT CLOCK VIOLATION!",
+          "BACKCOURT": "BACKCOURT VIOLATION!"
+        };
+        turnoverText = typeMap[turnData.turnover_type] || "TURNOVER!";
+      } else {
+        // Fallback: parse from text
+        const textLower = turnData.text?.toLowerCase() || '';
+        if (textLower.includes('travel')) {
+          turnoverText = "TRAVEL!";
+        } else if (textLower.includes('double dribble')) {
+          turnoverText = "DOUBLE DRIBBLE!";
+        } else if (textLower.includes('out of bounds')) {
+          turnoverText = "OUT OF BOUNDS!";
+        } else if (textLower.includes('errant pass') || textLower.includes('bad pass')) {
+          turnoverText = "BAD PASS!";
+        } else if (textLower.includes('dribbles it off his foot')) {
+          turnoverText = "TURNOVER!";
+        } else if (textLower.includes('shot clock')) {
+          turnoverText = "SHOT CLOCK VIOLATION!";
+        }
       }
       
+      console.log(`📢 Announcing turnover: ${turnoverText} (result_type: ${turnData.result_type}, source: ${turnData.offensive_state || 'HCO'})`);
       showAnnouncement(turnoverText, offenseTeam, playerData);
       return;
     }
