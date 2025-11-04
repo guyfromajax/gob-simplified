@@ -1234,7 +1234,8 @@
         plays.forEach(play => {
           const option = document.createElement('option');
           option.value = play._id;
-          option.textContent = `${play.name} (${play.play_type})`;
+          const playFocus = play.play_focus || 'balanced';
+          option.textContent = `${play.name} (${play.play_type} / ${playFocus})`;
           option.dataset.playData = JSON.stringify(play);
           select.appendChild(option);
         });
