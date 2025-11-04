@@ -576,7 +576,8 @@
       transform: none;
     }
 
-    /* ==================== PLAY-BY-PLAY TEXT SCROLL ==================== */
+    /* ==================== PLAY-BY-PLAY TEXT SCROLL (COMMENTED OUT) ==================== */
+    /* 
     #pbp-container {
       position: fixed;
       bottom: 0;
@@ -622,7 +623,6 @@
       margin-bottom: 4px;
     }
 
-    /* Scrollbar styling */
     #text-scroll-panel::-webkit-scrollbar {
       width: 10px;
     }
@@ -639,6 +639,147 @@
 
     #text-scroll-panel::-webkit-scrollbar-thumb:hover {
       background: #666;
+    }
+    */
+
+    /* ==================== PLAYCALL CENTER ==================== */
+    #playcall-center {
+      position: fixed;
+      bottom: 0;
+      left: calc(var(--player-stats-width) + var(--side-padding));
+      right: calc(var(--player-stats-width) + var(--side-padding));
+      height: 150px;
+      background: linear-gradient(to bottom, rgba(0, 0, 0, 0.85), rgba(0, 0, 0, 0.95));
+      border-top: 3px solid #FFD700;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 20px 40px;
+      gap: 30px;
+      z-index: 900;
+    }
+
+    .playcall-panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      max-width: 280px;
+    }
+
+    .panel-header {
+      font-size: 14px;
+      font-weight: 700;
+      color: #FFD700;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      text-align: center;
+      margin-bottom: 5px;
+    }
+
+    .panel-section {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .section-label {
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.6);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      font-weight: 600;
+    }
+
+    .button-group {
+      display: flex;
+      gap: 6px;
+    }
+
+    .playcall-option {
+      flex: 1;
+      padding: 8px 12px;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 6px;
+      color: rgba(255, 255, 255, 0.5);
+      font-size: 12px;
+      font-weight: 600;
+      text-align: center;
+      transition: all 0.3s ease;
+      cursor: default;
+    }
+
+    .playcall-option.active {
+      background: rgba(255, 215, 0, 0.3);
+      border-color: #FFD700;
+      color: #FFD700;
+      box-shadow: 0 0 15px rgba(255, 215, 0, 0.4);
+    }
+
+    /* Lean Meter */
+    #lean-meter-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+
+    #lean-meter {
+      width: 40px;
+      height: 200px;
+      background: rgba(255, 255, 255, 0.1);
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-radius: 20px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    #lean-center-line {
+      position: absolute;
+      top: 50%;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: #FFD700;
+      transform: translateY(-50%);
+      z-index: 2;
+      box-shadow: 0 0 10px rgba(255, 215, 0, 0.8);
+    }
+
+    .lean-fill {
+      position: absolute;
+      left: 0;
+      right: 0;
+      transition: height 0.8s ease-out;
+    }
+
+    .lean-fill-pos {
+      bottom: 50%;
+      height: 0%;
+      background: linear-gradient(to top, rgba(76, 175, 80, 0.7), rgba(76, 175, 80, 0.9));
+      border-radius: 20px 20px 0 0;
+    }
+
+    .lean-fill-neg {
+      top: 50%;
+      height: 0%;
+      background: linear-gradient(to bottom, rgba(244, 67, 54, 0.7), rgba(244, 67, 54, 0.9));
+      border-radius: 0 0 20px 20px;
+    }
+
+    .lean-label {
+      font-size: 12px;
+      font-weight: 700;
+      color: rgba(255, 255, 255, 0.6);
+    }
+
+    .lean-label-top {
+      color: rgba(76, 175, 80, 0.8);
+    }
+
+    .lean-label-bottom {
+      color: rgba(244, 67, 54, 0.8);
     }
 
     /* ==================== RESULT POPUP ==================== */
@@ -1408,11 +1549,67 @@
     </div>
   </div>
 
-  <!-- ==================== PLAY-BY-PLAY SCROLL (BOTTOM) ==================== -->
+  <!-- ==================== PLAY-BY-PLAY SCROLL (BOTTOM) - COMMENTED OUT ==================== -->
+  <!-- 
   <div id="pbp-container">
     <div id="pbp-header">Play-by-Play</div>
     <div id="text-scroll-panel">
       <div id="text-scroll"></div>
+    </div>
+  </div>
+  -->
+
+  <!-- ==================== PLAYCALL CENTER (BOTTOM) ==================== -->
+  <div id="playcall-center">
+    <!-- Offense Panel (switches sides based on possession) -->
+    <div id="offense-panel" class="playcall-panel">
+      <div class="panel-header">OFFENSE</div>
+      <div class="panel-section">
+        <div class="section-label">Play Type</div>
+        <div class="button-group">
+          <div class="playcall-option" data-type="motion">Motion</div>
+          <div class="playcall-option" data-type="set_play">Set Play</div>
+        </div>
+      </div>
+      <div class="panel-section">
+        <div class="section-label">Focus</div>
+        <div class="button-group">
+          <div class="playcall-option" data-focus="inside">Inside</div>
+          <div class="playcall-option" data-focus="attack">Attack</div>
+          <div class="playcall-option" data-focus="outside">Outside</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Lean Meter (Center) -->
+    <div id="lean-meter-container">
+      <div class="lean-label lean-label-top">+2</div>
+      <div id="lean-meter">
+        <div id="lean-fill-positive" class="lean-fill lean-fill-pos"></div>
+        <div id="lean-center-line"></div>
+        <div id="lean-fill-negative" class="lean-fill lean-fill-neg"></div>
+      </div>
+      <div class="lean-label lean-label-bottom">-2</div>
+    </div>
+
+    <!-- Defense Panel (switches sides based on possession) -->
+    <div id="defense-panel" class="playcall-panel">
+      <div class="panel-header">DEFENSE</div>
+      <div class="panel-section">
+        <div class="section-label">Defense Type</div>
+        <div class="button-group">
+          <div class="playcall-option" data-defense="man">Man</div>
+          <div class="playcall-option" data-defense="zone">Zone</div>
+        </div>
+      </div>
+      <div class="panel-section">
+        <div class="section-label">Aggression</div>
+        <div class="button-group">
+          <div class="playcall-option" data-aggression="passive">Passive</div>
+          <div class="playcall-option" data-aggression="normal">Normal</div>
+          <div class="playcall-option" data-aggression="aggressive">Aggressive</div>
+        </div>
+      </div>
     </div>
   </div>
 
