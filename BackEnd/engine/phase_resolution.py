@@ -1099,7 +1099,7 @@ def get_skeleton_by_lean(play_doc, lean_score):
             < -1: broken - defense disrupts, offense forced to react
     
     Returns:
-        dict: The skeleton matching the lean score, or successful as fallback
+        tuple: (skeleton dict, variant name string)
     """
     skeletons = play_doc.get("skeletons", {})
     
@@ -1119,8 +1119,9 @@ def get_skeleton_by_lean(play_doc, lean_score):
     # If selected variant is empty or None, fallback to successful
     if not skeleton or not skeleton.get("steps"):
         skeleton = skeletons.get("successful")
+        variant = "successful"  # Update variant to match fallback
     
-    return skeleton
+    return skeleton, variant
 
 
 def get_hco_skeleton(result_type, game_context, lean_score=None):
@@ -1159,8 +1160,10 @@ def get_hco_skeleton(result_type, game_context, lean_score=None):
     if play_doc and "skeletons" in play_doc:
         # Use lean score to select skeleton variant if provided
         if lean_score is not None:
-            skeleton = get_skeleton_by_lean(play_doc, lean_score)
+            skeleton, variant = get_skeleton_by_lean(play_doc, lean_score)
             if skeleton:
+                # Add variant name to skeleton metadata for shot modifier
+                skeleton["_variant"] = variant
                 return skeleton
         
         # Default to successful skeleton
@@ -1220,9 +1223,11 @@ def _get_skeleton_from_team_plays(playcall, team_id, game_context, lean_score=No
             if "skeletons" in play_obj:
                 # Use lean score to select variant if provided
                 if lean_score is not None:
-                    skeleton = get_skeleton_by_lean(play_obj, lean_score)
+                    skeleton, variant = get_skeleton_by_lean(play_obj, lean_score)
                     if skeleton and skeleton.get("steps"):
                         num_steps = len(skeleton.get("steps", []))
+                        # Add variant name to skeleton metadata
+                        skeleton["_variant"] = variant
                         # print(f"🔍 FOUND in team plays (memory): '{playcall}' - {num_steps} steps")
                         return skeleton
                 
@@ -1250,9 +1255,11 @@ def _get_skeleton_from_team_plays(playcall, team_id, game_context, lean_score=No
                 if "skeletons" in play_obj:
                     # Use lean score to select variant if provided
                     if lean_score is not None:
-                        skeleton = get_skeleton_by_lean(play_obj, lean_score)
+                        skeleton, variant = get_skeleton_by_lean(play_obj, lean_score)
                         if skeleton and skeleton.get("steps"):
                             num_steps = len(skeleton.get("steps", []))
+                            # Add variant name to skeleton metadata
+                            skeleton["_variant"] = variant
                             # print(f"🔍 FOUND in team plays (db): '{playcall}' - {num_steps} steps")
                             return skeleton
                     

@@ -1163,6 +1163,7 @@ class TurnManager:
             "passer": passer,
             "defender": defender,
             "steps": steps,
+            "skeleton": skeleton,  # Include skeleton for variant info
             "action_timeline": action_timeline,
             "touch_counts": touch_counts,
             "ball_owner_by_step": derived_roles["ball_owner_by_step"],
