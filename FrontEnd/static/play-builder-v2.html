@@ -2401,6 +2401,9 @@
         return;
       }
       
+      // Check for divergence before applying action
+      checkForDivergence();
+      
       // Apply action
       currentStepAssignments[player].action = action;
       
@@ -2880,6 +2883,9 @@
     function handleBallShoot(shooter) {
       console.log(`Ball shoot by: ${shooter}`);
       
+      // Check for divergence before assigning shoot
+      checkForDivergence();
+      
       // Assign Shoot action to shooter
       if (currentStepAssignments[shooter] && currentStepAssignments[shooter].location) {
         currentStepAssignments[shooter].action = 'shoot';
@@ -2934,6 +2940,9 @@
 
     function handleBallPass(passer, receiver) {
       console.log(`Ball pass: ${passer} → ${receiver}`);
+      
+      // Check for divergence before assigning pass
+      checkForDivergence();
       
       // Assign Pass action to passer (if they have a location)
       if (currentStepAssignments[passer] && currentStepAssignments[passer].location) {
