@@ -669,7 +669,7 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 5px 40px 10px 40px;
+      padding: 2px 40px 10px 40px;  /* Reduced top padding from 5px to 2px, pulled content up closer to top border */
       gap: 30px;
       z-index: 900;
     }
@@ -678,7 +678,7 @@
       flex: 1;
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      gap: 6px;  /* Reduced from 12px to 6px - tighter spacing between header and buttons */
       max-width: 280px;
     }
 
@@ -689,13 +689,13 @@
       text-transform: uppercase;
       letter-spacing: 1.5px;
       text-align: center;
-      margin-bottom: 5px;
+      margin-bottom: 0;  /* Removed margin-bottom, let gap handle it */
     }
 
     .panel-section {
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      gap: 4px;  /* Reduced from 6px to 4px - tighter spacing between buttons */
     }
 
     .section-label {
