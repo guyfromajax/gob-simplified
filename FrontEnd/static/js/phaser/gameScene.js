@@ -780,16 +780,35 @@ export function createGameScene(Phaser) {
               for (const [stat, value] of Object.entries(delta.stats)) {
                 ps[stat] = (ps[stat] || 0) + value;
                 if (ps.cells) {
-                  const key = stat.toLowerCase();
-                  if (ps.cells[key]) {
+                  // Map stat names to cell keys
+                  const statToCellKey = {
+                    'PTS': 'pts',
+                    'REB': 'reb',
+                    'OREB': 'reb',  // Both OREB and DREB update reb
+                    'DREB': 'reb',
+                    'AST': 'ast',
+                    'F': 'fouls',   // Fix: F maps to fouls, not f
+                    'STL': 'stl',
+                    'BLK': 'blk',
+                    'TO': 'to',
+                    'DEF_A': 'defAttempts',
+                    'DEF_S': 'def'
+                  };
+                  const cellKey = statToCellKey[stat];
+                  
+                  if (cellKey && ps.cells[cellKey]) {
                     if (stat === 'DEF_A' || stat === 'DEF_S') {
                       // Update defensive attempts and success rate when defensive stats change
                       if (ps.cells.defAttempts) ps.cells.defAttempts.textContent = ps.DEF_A;
                       const defRate = ps.DEF_A > 0 ? Math.round((ps.DEF_S / ps.DEF_A) * 100) : 0;
                       ps.DEF_PCT = `${defRate}%`;  // Store for S3 tab access
                       ps.cells.def.textContent = ps.DEF_PCT;
+                    } else if (stat === 'OREB' || stat === 'DREB') {
+                      // Update combined rebounds (OREB + DREB)
+                      ps.REB = (ps.OREB || 0) + (ps.DREB || 0);
+                      ps.cells.reb.textContent = ps.REB;
                     } else {
-                      ps.cells[key].textContent = ps[stat];
+                      ps.cells[cellKey].textContent = ps[stat];
                     }
                   }
                 }
