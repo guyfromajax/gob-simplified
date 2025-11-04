@@ -505,16 +505,16 @@
       margin: 0 auto !important;
       padding: 0;
       vertical-align: bottom;
-      /* Fit within container width (flex: 1 minus panel widths) */
+      /* Force explicit dimensions to override Phaser's 0px inline styles */
+      /* Aspect ratio: 1229/768 = 1.6 (16:10) */
+      width: 1229px !important;
+      height: 768px !important;
+      /* Scale down to fit container if needed */
       max-width: 100% !important;
-      /* Fit within container height (viewport - scoreboard - playcall center) */
       max-height: calc(100vh - var(--scoreboard-height) - 130px) !important;
-      /* Let canvas scale proportionally */
-      width: auto !important;
-      height: auto !important;
-      /* Maintain aspect ratio */
+      /* Maintain aspect ratio when scaling */
       object-fit: contain;
-      object-position: center;
+      object-position: center bottom;
     }
 
     /* Pre-game button container */
