@@ -146,6 +146,22 @@ class ShotManager:
         if playcall == "Set":
             playcall = "Attack"
 
+        # Apply variant-based modifier (temporary for this turn only)
+        variant_modifier = 0
+        skeleton = roles.get("skeleton", {})
+        variant = skeleton.get("_variant")
+        if variant:
+            # Variant modifiers based on defensive effectiveness
+            variant_modifiers = {
+                "successful": -50,      # Play worked perfectly, easier shot
+                "mid_play_change": 0,   # Play adjusted, neutral
+                "contested": 25,        # Defense engaged, harder shot
+                "broken": 100           # Defense disrupted, very difficult shot
+            }
+            variant_modifier = variant_modifiers.get(variant, 0)
+            shot_threshold += variant_modifier
+            print(f"🎯 Variant modifier: {variant} → {variant_modifier:+d} (threshold: {shot_threshold})")
+
         # ✅ New: returns shot_score, help defender, and foul info
         shot_score, help_defender, d_foul, foul_player = self.calculate_shot_score(
             shooter, passer, screener, defender, playcall, defense_call, is_three
