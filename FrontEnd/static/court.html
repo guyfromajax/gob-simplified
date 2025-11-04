@@ -503,7 +503,7 @@
     #phaser-container canvas {
       display: block !important;
       margin: 0 !important;
-      margin-top: 0 !important;  /* Force flush to container top */
+      margin-top: -2px !important;  /* Pull up 2px to overlap subpixel gap */
       margin-bottom: auto !important;  /* Push to top, not center */
       padding: 0;
       vertical-align: bottom;
@@ -517,6 +517,7 @@
       /* Maintain aspect ratio when scaling */
       object-fit: contain;
       object-position: top center !important;  /* Top-align for flush with scoreboard */
+      background: linear-gradient(to bottom, rgba(0,0,0,0.95), rgba(0,0,0,1)) !important;  /* Match Playcall gradient for seamless blend */
     }
 
     /* Pre-game button container */
@@ -1943,7 +1944,7 @@
       if (!canvas) return;  // Wait for Phaser to create canvas
 
       const canvasRect = canvas.getBoundingClientRect();
-      const playcallTop = canvasRect.top + canvasRect.height;  // Exact canvas bottom position
+      const playcallTop = canvasRect.bottom - 2;  // Overlap 2px for seamless (eliminates subpixel gap)
       const playcall = document.getElementById('playcall-center');
       if (playcall) {
         playcall.style.top = `${playcallTop}px`;
@@ -1953,6 +1954,10 @@
         void playcall.offsetHeight;  // Trigger reflow
         playcall.style.transition = 'top 0.1s ease, height 0.1s ease';
       }
+      // Trigger repaint post-Phaser resize
+      requestAnimationFrame(() => {
+        if (canvas) canvas.style.display = 'block';
+      });
     }
 
     // Listen to window resize and Phaser scale events
