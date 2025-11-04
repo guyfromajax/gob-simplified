@@ -645,16 +645,17 @@
     /* ==================== PLAYCALL CENTER ==================== */
     #playcall-center {
       position: fixed;
-      bottom: 0;
+      bottom: 10px;
       left: calc(var(--player-stats-width) + var(--side-padding));
       right: calc(var(--player-stats-width) + var(--side-padding));
-      height: 150px;
+      height: 130px;
       background: linear-gradient(to bottom, rgba(0, 0, 0, 0.85), rgba(0, 0, 0, 0.95));
       border-top: 3px solid #FFD700;
+      border-radius: 8px 8px 0 0;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 20px 40px;
+      padding: 15px 40px 15px 40px;
       gap: 30px;
       z-index: 900;
     }
@@ -684,11 +685,7 @@
     }
 
     .section-label {
-      font-size: 11px;
-      color: rgba(255, 255, 255, 0.6);
-      text-transform: uppercase;
-      letter-spacing: 0.8px;
-      font-weight: 600;
+      display: none;
     }
 
     .button-group {
@@ -727,7 +724,7 @@
 
     #lean-meter {
       width: 40px;
-      height: 200px;
+      height: 150px;
       background: rgba(255, 255, 255, 0.1);
       border: 2px solid rgba(255, 255, 255, 0.3);
       border-radius: 20px;
