@@ -488,33 +488,31 @@
       position: relative;
       background: var(--court-bg);
       display: flex;
-      align-items: flex-end;  /* Align canvas to bottom - eliminates gap with Playcall Center */
+      align-items: center;
       justify-content: center;
       overflow: hidden;
       /* Constrain width to match side panel boundaries (same as Playcall Center) */
       min-width: 0;
       max-width: calc(100vw - (2 * var(--player-stats-width)) - (2 * var(--side-padding)));
-      /* Reserve space at bottom for Playcall Center (130px) */
-      padding-bottom: 130px;
       box-sizing: border-box;
     }
 
     /* Let Phaser canvas scale to fit available space while maintaining aspect ratio */
     #phaser-container canvas {
       display: block !important;
-      margin: 0 auto !important;
+      margin: 0 !important;
       padding: 0;
       vertical-align: bottom;
       /* Force explicit dimensions to override Phaser's 0px inline styles */
       /* Aspect ratio: 1229/768 = 1.6 (16:10) */
       width: 1229px !important;
       height: 768px !important;
-      /* Scale down to fit container if needed */
+      /* Scale to fit available space - reserve room for playcall at bottom */
       max-width: 100% !important;
-      max-height: calc(100vh - var(--scoreboard-height) - 130px) !important;
+      max-height: calc(100% - 100px) !important;  /* Reserve 100px minimum for Playcall Center */
       /* Maintain aspect ratio when scaling */
       object-fit: contain;
-      object-position: center bottom;
+      object-position: top center !important;  /* Top-align for flush with scoreboard */
     }
 
     /* Pre-game button container */
@@ -664,14 +662,17 @@
       bottom: 0;
       left: calc(var(--player-stats-width) + var(--side-padding));
       right: calc(var(--player-stats-width) + var(--side-padding));
-      height: 130px;
+      /* Dynamic positioning - JS will set top and height based on canvas rendered size */
+      min-height: 100px;
       background: linear-gradient(to bottom, rgba(0, 0, 0, 0.95), rgba(0, 0, 0, 1));
       display: flex;
-      align-items: flex-start;  /* Changed from center - keeps content at top when container extends upward */
+      align-items: flex-start;  /* Content stays at top */
       justify-content: space-between;
-      padding: 2px 40px 10px 40px;  /* Reduced top padding from 5px to 2px, pulled content up closer to top border */
+      padding: 8px 40px 10px 40px;
       gap: 30px;
       z-index: 900;
+      /* Smooth transitions when JS updates positioning */
+      transition: top 0.1s ease, height 0.1s ease;
     }
 
     .playcall-panel {
@@ -1927,6 +1928,35 @@
   <script type="module" src="/static/js/phaser/bootGame.js"></script>
   <script>
     // console.log('🚨 HTML: bootGame.js should be loaded now');
+  </script>
+
+  <!-- Dynamic Playcall Center Positioning (Grok's solution) -->
+  <script>
+    // Dynamically position Playcall Center to hug canvas bottom exactly and fill to viewport bottom
+    function updatePlaycallPosition() {
+      const canvas = document.querySelector('#phaser-container canvas');
+      if (!canvas) return;  // Wait for Phaser to create canvas
+
+      const canvasRect = canvas.getBoundingClientRect();
+      const playcallTop = canvasRect.top + canvasRect.height;  // Exact canvas bottom position
+      const playcall = document.getElementById('playcall-center');
+      if (playcall) {
+        playcall.style.top = `${playcallTop}px`;
+        playcall.style.height = `${window.innerHeight - playcallTop}px`;
+      }
+    }
+
+    // Listen to window resize and Phaser scale events
+    window.addEventListener('resize', updatePlaycallPosition);
+    if (window.game) {  // If game is already created
+      window.game.scale.on('resize', updatePlaycallPosition);
+    }
+    
+    // Initial positioning (debounced to ensure canvas is rendered)
+    setTimeout(updatePlaycallPosition, 100);
+    
+    // Also try after a longer delay in case Phaser takes time to initialize
+    setTimeout(updatePlaycallPosition, 500);
   </script>
 
 </body>
