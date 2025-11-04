@@ -13,6 +13,7 @@ import { getCurrentOwner, getPendingOwner } from "../ball/ballController.js";
 import { updatePlaycallDisplay } from "../utils/playcallDisplay.js";
 import { announceFromTurnData } from "../utils/announcements.js";
 import { updateStrategyBars } from "../utils/strategyBars.js";
+import { updatePlaycallCenter, animateLeanMeter, parseLeanScoreFromText } from "../ui/playcallCenter.js";
 import {
   animationDebugLog,
   animationDebugWarn,
@@ -435,6 +436,16 @@ export async function animateGameTurns({ //hasBallAtStep
     
     // Update strategy bars at start of turn
     updateStrategyBars(turn, scene.simData?.home_team_id);
+    
+    // Update Playcall Center (panels and reset lean meter)
+    updatePlaycallCenter(turn, scene.simData?.home_team_id);
+    
+    // Parse and animate lean meter from turn data
+    const leanScore = parseLeanScoreFromText(turn);
+    if (leanScore !== null) {
+      // Small delay to show neutral state first, then animate
+      setTimeout(() => animateLeanMeter(leanScore), 100);
+    }
     
     // Show announcement for turn start events (Fast Break, Press, Trap)
     announceFromTurnData(turn, 'start', scene.simData?.home_team_id, scene);
