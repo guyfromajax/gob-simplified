@@ -670,9 +670,9 @@
       min-height: 100px;
       background: linear-gradient(to bottom, rgba(0, 0, 0, 0.95), rgba(0, 0, 0, 1));
       display: flex;
-      align-items: center;  /* Vertically center content - push up from large gap */
+      align-items: flex-start;  /* Push all content to TOP - empty space at bottom is OK */
       justify-content: space-between;
-      padding: 0 40px;  /* Remove vertical padding - let centering handle it */
+      padding: 4px 40px 0 40px;  /* Minimal top padding - push content close to canvas */
       gap: 30px;
       z-index: 900;
       /* Smooth transitions when JS updates positioning */
