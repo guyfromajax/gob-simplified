@@ -1109,6 +1109,7 @@
       "receive": "Receive",
       "post_up": "Post Up",
       "shoot": "Shoot",
+      "drive": "Drive",
       "screen": "Screen",
       "cut": "Cut",
       "drift": "Drift",
@@ -1117,6 +1118,9 @@
 
     // Ball-handling actions (only one player can have these per step)
     const BALL_HANDLING_ACTIONS = ["handle_ball", "receive", "shoot"];
+    
+    // Actions that can be chosen together (drive is like shoot but not turn-ending)
+    const SCORING_ACTIONS = ["shoot", "drive"];
 
     // Formation presets for Step 1
     const FORMATIONS = {
@@ -3058,6 +3062,7 @@
       }
       
       // Check if any player has shoot action (final step)
+      // NOTE: "drive" is NOT a turn-ender - only "shoot" is
       let hasShoot = false;
       for (const pos of POSITIONS) {
         const assignment = currentStepAssignments[pos];
