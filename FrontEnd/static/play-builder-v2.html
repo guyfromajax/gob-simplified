@@ -1557,6 +1557,89 @@
       }
     }
 
+    // ==================== VALIDATION FUNCTIONS ====================
+    
+    function validateCurrentStep(isFinalStep = false) {
+      """
+      Validate current step assignments against skeleton rules.
+      
+      Returns:
+        {valid: boolean, errors: string[]}
+      """
+      const errors = [];
+      
+      // Track actions
+      const ballHandlers = [];
+      const passers = [];
+      const receivers = [];
+      const shooters = [];
+      
+      POSITIONS.forEach(pos => {
+        const assignment = currentStepAssignments[pos];
+        if (!assignment) return;
+        
+        const action = assignment.action;
+        
+        if (action === "handle_ball") {
+          ballHandlers.push(pos);
+        } else if (action === "pass") {
+          ballHandlers.push(pos);
+          passers.push(pos);
+        } else if (action === "shoot") {
+          ballHandlers.push(pos);
+          shooters.push(pos);
+        } else if (action === "drive") {
+          ballHandlers.push(pos);
+        } else if (action === "receive") {
+          receivers.push(pos);
+        }
+      });
+      
+      // Rule 1: One and only one ball handler per step
+      if (ballHandlers.length === 0) {
+        errors.push("❌ No ball handler! One player must have: handle_ball, pass, shoot, or drive");
+      } else if (ballHandlers.length > 1) {
+        errors.push(`❌ Multiple ball handlers (${ballHandlers.join(', ')})! Only one player can handle the ball per step.`);
+      }
+      
+      // Rule 2: Every pass must have a receive
+      if (passers.length > 0) {
+        if (passers.length > 1) {
+          errors.push(`❌ Multiple passers (${passers.join(', ')})! Only one player can pass per step.`);
+        }
+        if (receivers.length === 0) {
+          errors.push(`❌ ${passers[0]} is passing but no one is receiving! Add 'receive' action to a player.`);
+        } else if (receivers.length > 1) {
+          errors.push(`❌ Multiple receivers (${receivers.join(', ')})! Only one player can receive per step.`);
+        }
+      }
+      
+      // Rule 3: No receives without a pass
+      if (receivers.length > 0 && passers.length === 0) {
+        errors.push(`❌ ${receivers[0]} is receiving but no one is passing!`);
+      }
+      
+      // Rule 4: Final step must have shoot
+      if (isFinalStep && shooters.length === 0) {
+        errors.push("❌ Final step must have a 'shoot' action!");
+      }
+      
+      // Rule 5: Shoot can only be in final step
+      if (!isFinalStep && shooters.length > 0) {
+        errors.push(`❌ ${shooters[0]} has 'shoot' action but this is not the final step! Shoot only allowed in final step.`);
+      }
+      
+      // Multiple shooters check
+      if (shooters.length > 1) {
+        errors.push(`❌ Multiple shooters (${shooters.join(', ')})! Only one player can shoot per step.`);
+      }
+      
+      return {
+        valid: errors.length === 0,
+        errors: errors
+      };
+    }
+
     // ==================== NAVIGATION FUNCTIONS ====================
     
     function backToMenu() {
@@ -1875,6 +1958,15 @@
       
       // Auto-submit current step if it has any assignments
       if (Object.keys(currentStepAssignments).length > 0) {
+        // Validate as final step
+        const validation = validateCurrentStep(true); // This IS the final step
+        if (!validation.valid) {
+          const errorMsg = "Cannot finish variant - please fix these errors:\n\n" + 
+                          validation.errors.join('\n');
+          alert(errorMsg);
+          return; // Don't submit invalid step
+        }
+        
         // Check if step is complete
         let allComplete = true;
         for (const pos of POSITIONS) {
@@ -1927,6 +2019,22 @@
         
         variantData.steps.push(stepData);
         console.log(`✅ Auto-submitted Step ${variantData.currentStep} before finishing`);
+      } else {
+        // No new step to submit, but validate existing variant
+        if (variantData.steps.length === 0) {
+          alert("Cannot finish variant - no steps have been added!");
+          return;
+        }
+        
+        // Check that last existing step has shoot
+        const lastStep = variantData.steps[variantData.steps.length - 1];
+        const lastStepActions = lastStep.pos_actions || {};
+        const hasShoot = Object.values(lastStepActions).some(action => action.action === "shoot");
+        
+        if (!hasShoot) {
+          alert("Cannot finish variant - final step must have a 'shoot' action!");
+          return;
+        }
       }
       
       // Mark as complete
@@ -3208,6 +3316,15 @@
 
     function submitStep() {
       const variantData = getCurrentVariantData();
+      
+      // Validate step before submitting
+      const validation = validateCurrentStep(false); // Not final step
+      if (!validation.valid) {
+        const errorMsg = "Cannot add step - please fix these errors:\n\n" + 
+                        validation.errors.join('\n');
+        alert(errorMsg);
+        return; // Don't submit invalid step
+      }
       
       // Calculate timestamp (300ms increments, 0-indexed)
       const timestamp = (variantData.currentStep - 1) * 300;
