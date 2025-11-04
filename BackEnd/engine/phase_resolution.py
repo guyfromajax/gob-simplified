@@ -997,7 +997,9 @@ def resolve_full_court_press_logic(game: "GameManager"):
         game_state["foul_team"] = "DEFENSE"
         # Select the foul player and increment their fouls
         foul_player = select_foul_player("DEFENSE", roles["ball_handler"], off_lineup, def_lineup)
+        print(f"🚨 FCP D_FOUL: {get_name_safe(foul_player)} (ID: {foul_player.player_id}) fouls before: {foul_player.stats['game'].get('F', 0)}")
         foul_player.record_stat("F")
+        print(f"🚨 FCP D_FOUL: {get_name_safe(foul_player)} (ID: {foul_player.player_id}) fouls after: {foul_player.stats['game'].get('F', 0)}")
         roles["foul_player"] = foul_player
         # For now, treat as non-shooting foul (FCP happens before shot attempt)
         # This will trigger side inbound or bonus free throws via existing logic
@@ -1007,7 +1009,9 @@ def resolve_full_court_press_logic(game: "GameManager"):
         game_state["foul_team"] = "OFFENSE"
         # Select the foul player and increment their fouls
         foul_player = select_foul_player("OFFENSE", roles["ball_handler"], off_lineup, def_lineup)
+        print(f"🚨 FCP O_FOUL: {get_name_safe(foul_player)} (ID: {foul_player.player_id}) fouls before: {foul_player.stats['game'].get('F', 0)}")
         foul_player.record_stat("F")
+        print(f"🚨 FCP O_FOUL: {get_name_safe(foul_player)} (ID: {foul_player.player_id}) fouls after: {foul_player.stats['game'].get('F', 0)}")
         roles["foul_player"] = foul_player
         result_type = "FOUL"
         # text = "PRESS! Offensive foul"
@@ -1532,14 +1536,18 @@ def resolve_half_court_trap_logic(game: "GameManager"):
         game_state["foul_team"] = "DEFENSE"
         # Select the foul player and increment their fouls
         foul_player = select_foul_player("DEFENSE", roles["ball_handler"], off_lineup, def_lineup)
+        print(f"🚨 HCT D_FOUL: {get_name_safe(foul_player)} (ID: {foul_player.player_id}) fouls before: {foul_player.stats['game'].get('F', 0)}")
         foul_player.record_stat("F")
+        print(f"🚨 HCT D_FOUL: {get_name_safe(foul_player)} (ID: {foul_player.player_id}) fouls after: {foul_player.stats['game'].get('F', 0)}")
         roles["foul_player"] = foul_player
         result_type = "FOUL"
     elif result_type == "O_FOUL":
         game_state["foul_team"] = "OFFENSE"
         # Select the foul player and increment their fouls
         foul_player = select_foul_player("OFFENSE", roles["ball_handler"], off_lineup, def_lineup)
+        print(f"🚨 HCT O_FOUL: {get_name_safe(foul_player)} (ID: {foul_player.player_id}) fouls before: {foul_player.stats['game'].get('F', 0)}")
         foul_player.record_stat("F")
+        print(f"🚨 HCT O_FOUL: {get_name_safe(foul_player)} (ID: {foul_player.player_id}) fouls after: {foul_player.stats['game'].get('F', 0)}")
         roles["foul_player"] = foul_player
         result_type = "FOUL"
         # Track HCT success: offensive foul = defensive success
