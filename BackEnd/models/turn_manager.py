@@ -403,8 +403,6 @@ class TurnManager:
                 }
                 if diff:
                     deltas[player.player_id] = {"team": team.name, "stats": diff}
-                    if "F" in diff:
-                        print(f"🚨 DELTA: {player.get_name()} (ID: {player.player_id}) F delta: {diff['F']} (prev: {prev.get('F', 0)}, current: {player.stats['game'].get('F', 0)})")
         result["deltas"] = deltas
         
         # Include current energy levels for all active players (for frontend fatigue display)
