@@ -491,8 +491,9 @@
       align-items: center;
       justify-content: center;
       overflow: hidden;
+      /* Constrain width to match side panel boundaries (same as Playcall Center) */
       min-width: 0;
-      max-width: 100%;
+      max-width: calc(100vw - (2 * var(--player-stats-width)) - (2 * var(--side-padding)));
       /* Reserve space at bottom for Playcall Center (130px) */
       padding-bottom: 130px;
       box-sizing: border-box;
