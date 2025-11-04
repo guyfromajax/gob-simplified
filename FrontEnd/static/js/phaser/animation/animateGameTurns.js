@@ -442,9 +442,9 @@ export async function animateGameTurns({ //hasBallAtStep
     
     // Parse lean score for later animation (at middle step)
     const leanScore = parseLeanScoreFromText(turn);
+    const animations = turn.animations || [];
     
     // Calculate middle step for lean meter animation
-    const animations = turn.animations || [];
     if (leanScore !== null && animations.length > 0) {
       // Find the max number of steps across all player animations
       const maxSteps = Math.max(
@@ -469,7 +469,6 @@ export async function animateGameTurns({ //hasBallAtStep
     
     const possessionId =
       turn.possession_id ?? turn.possessionId ?? turn.possessionID ?? null;
-    const animations = turn.animations || [];
     const shouldLogLegacySteps =
       debugEnabled &&
       stepLogger &&
