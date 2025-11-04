@@ -440,11 +440,28 @@ export async function animateGameTurns({ //hasBallAtStep
     // Update Playcall Center (panels and reset lean meter)
     updatePlaycallCenter(turn, scene.simData?.home_team_id);
     
-    // Parse and animate lean meter from turn data
+    // Parse lean score for later animation (at middle step)
     const leanScore = parseLeanScoreFromText(turn);
-    if (leanScore !== null) {
-      // Small delay to show neutral state first, then animate
-      setTimeout(() => animateLeanMeter(leanScore), 100);
+    
+    // Calculate middle step for lean meter animation
+    const animations = turn.animations || [];
+    if (leanScore !== null && animations.length > 0) {
+      // Find the max number of steps across all player animations
+      const maxSteps = Math.max(
+        0,
+        ...animations.map(anim => anim.movement?.length || 0)
+      );
+      
+      // Calculate middle step (round up for even numbers)
+      const middleStep = Math.ceil(maxSteps / 2);
+      console.log(`📊 Lean meter will animate at step ${middleStep} of ${maxSteps}`);
+      
+      // Store for use during animation
+      scene._leanScoreToAnimate = leanScore;
+      scene._leanAnimationStep = middleStep;
+      scene._leanAnimationTriggered = false;
+    } else {
+      scene._leanScoreToAnimate = null;
     }
     
     // Show announcement for turn start events (Fast Break, Press, Trap)

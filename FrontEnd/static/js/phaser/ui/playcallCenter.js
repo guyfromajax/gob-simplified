@@ -34,7 +34,9 @@ export function updatePlaycallCenter(turnData, homeTeamId) {
   }
 
   // Switch panel sides based on possession
-  playcallCenter.style.flexDirection = isHomeOffense ? 'row' : 'row-reverse';
+  // Away offense = offense on LEFT, defense on RIGHT
+  // Home offense = offense on RIGHT, defense on LEFT
+  playcallCenter.style.flexDirection = isHomeOffense ? 'row-reverse' : 'row';
 
   // Clear all active states
   document.querySelectorAll('.playcall-option').forEach(opt => {
@@ -42,12 +44,24 @@ export function updatePlaycallCenter(turnData, homeTeamId) {
   });
 
   // Highlight offense play type
-  const playType = turnData.offensive_play_type?.toLowerCase();
-  if (playType === 'motion' || playType === 'set play') {
-    const typeSelector = playType === 'set play' ? 'set_play' : 'motion';
-    const typeElement = offensePanel.querySelector(`.playcall-option[data-type="${typeSelector}"]`);
-    if (typeElement) {
-      typeElement.classList.add('active');
+  // Backend sends "Motion" or "Set_Play" (title case)
+  const playType = turnData.offensive_play_type;
+  if (playType) {
+    const typeNormalized = playType.toLowerCase().replace('_', ' '); // "set_play" → "set play"
+    let typeSelector = null;
+    
+    if (typeNormalized === 'motion') {
+      typeSelector = 'motion';
+    } else if (typeNormalized === 'set play' || typeNormalized.includes('set')) {
+      typeSelector = 'set_play';
+    }
+    
+    if (typeSelector) {
+      const typeElement = offensePanel.querySelector(`.playcall-option[data-type="${typeSelector}"]`);
+      if (typeElement) {
+        typeElement.classList.add('active');
+        console.log(`✅ Highlighted play type: ${typeSelector}`);
+      }
     }
   }
 

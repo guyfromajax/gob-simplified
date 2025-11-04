@@ -1072,6 +1072,16 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   for (let stepIndex = 1; stepIndex < maxSteps; stepIndex++) {
     if (scene.skipToEnd || scene.stateMachine?.is(States.FastBreak)) break;
 
+    // Trigger lean meter animation at middle step
+    if (scene._leanScoreToAnimate !== null && 
+        scene._leanAnimationStep === stepIndex && 
+        !scene._leanAnimationTriggered) {
+      const { animateLeanMeter } = await import('../ui/playcallCenter.js');
+      animateLeanMeter(scene._leanScoreToAnimate);
+      scene._leanAnimationTriggered = true;
+      console.log(`📊 Lean meter animated at step ${stepIndex}`);
+    }
+
     updateBallOwnership({
       scene,
       ballSprite,
