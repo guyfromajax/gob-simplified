@@ -917,7 +917,7 @@ export async function animateGameTurns({ //hasBallAtStep
     }
 
     // Show announcements for shot results and rebounds (after animation)
-    announceFromTurnData(turn, 'end');
+    announceFromTurnData(turn, 'end', scene.simData?.home_team_id, scene);
     
     if (onUpdate) {
       try {
