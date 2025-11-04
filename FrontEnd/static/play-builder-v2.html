@@ -623,6 +623,35 @@
       margin-top: 0;
     }
 
+    /* Back to Menu Button */
+    .back-to-menu-btn {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      padding: 12px 24px;
+      background: linear-gradient(135deg, #6c5ce7, #5f4dcd);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      z-index: 1000;
+      box-shadow: 0 4px 12px rgba(108, 92, 231, 0.4);
+      display: none;
+    }
+
+    .back-to-menu-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(108, 92, 231, 0.6);
+      background: linear-gradient(135deg, #5f4dcd, #4e3eb0);
+    }
+
+    .back-to-menu-btn:active {
+      transform: translateY(0);
+    }
+
     /* Animation Preview Controls */
     .animation-preview-controls {
       background: rgba(138, 43, 226, 0.1);
@@ -801,6 +830,11 @@
   </style>
 </head>
 <body>
+  <!-- Back to Menu Button (appears after starting to build) -->
+  <button id="back-to-menu-btn" class="back-to-menu-btn" onclick="backToMenu()">
+    ← Back to Menu
+  </button>
+
   <div class="container">
     <h1 id="page-title">Play Builder V2 - Create or Edit Plays</h1>
 
@@ -1247,6 +1281,9 @@
       document.getElementById('step1').classList.add('hidden');
       document.getElementById('step2').classList.remove('hidden');
       
+      // Show back button
+      showBackButton();
+      
       // Update page title
       document.getElementById('page-title').textContent = `Editing: ${playState.name}`;
       document.getElementById('page-title').classList.add('step2-title');
@@ -1512,6 +1549,31 @@
         completionBtn.textContent = '✓ Mark as Complete';
         completionBtn.classList.remove('btn-secondary');
         completionBtn.classList.add('btn-success');
+      }
+    }
+
+    // ==================== NAVIGATION FUNCTIONS ====================
+    
+    function backToMenu() {
+      if (!confirm('Return to menu? Any unsaved changes will be lost.')) {
+        return;
+      }
+      
+      // Reset everything
+      location.reload();
+    }
+
+    function showBackButton() {
+      const backBtn = document.getElementById('back-to-menu-btn');
+      if (backBtn) {
+        backBtn.style.display = 'block';
+      }
+    }
+
+    function hideBackButton() {
+      const backBtn = document.getElementById('back-to-menu-btn');
+      if (backBtn) {
+        backBtn.style.display = 'none';
       }
     }
 
@@ -2939,6 +3001,9 @@
       // Show step 2, hide step 1
       document.getElementById('step1').classList.add('hidden');
       document.getElementById('step2').classList.remove('hidden');
+      
+      // Show back button
+      showBackButton();
 
       // Update summary
       let summaryText = `${playState.name} | ${playState.type}`;
