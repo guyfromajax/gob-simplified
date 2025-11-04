@@ -302,6 +302,7 @@
       gap: 0;
       overflow: hidden;
       box-sizing: border-box;
+      background: #000 !important;  /* Match body background - hide any gaps */
     }
 
     /* ==================== PLAYER STATS PANELS (LEFT & RIGHT) ==================== */
@@ -486,21 +487,24 @@
     #phaser-container {
       flex: 1;
       position: relative;
-      background: var(--court-bg);
+      background: #000 !important;  /* Match body background - hide any gaps */
       display: flex;
-      align-items: center;
+      align-items: flex-start !important;  /* Top-align canvas - flush with scoreboard */
       justify-content: center;
       overflow: hidden;
       /* Constrain width to match side panel boundaries (same as Playcall Center) */
       min-width: 0;
       max-width: calc(100vw - (2 * var(--player-stats-width)) - (2 * var(--side-padding)));
       box-sizing: border-box;
+      padding-top: 0 !important;
     }
 
     /* Let Phaser canvas scale to fit available space while maintaining aspect ratio */
     #phaser-container canvas {
       display: block !important;
       margin: 0 !important;
+      margin-top: 0 !important;  /* Force flush to container top */
+      margin-bottom: auto !important;  /* Push to top, not center */
       padding: 0;
       vertical-align: bottom;
       /* Force explicit dimensions to override Phaser's 0px inline styles */
