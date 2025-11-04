@@ -559,15 +559,19 @@ def summarize_game_state(game, exclude_animations=True):
         print(f"🚨 Error in populate_team_plays: {e}")
         populated_plays = {}
     
-    # Create team objects with plays for skeleton lookup
+    # Create team objects with all necessary data for game state persistence
     teams_obj = {
         game.home_team.team_id: {
             "strategy_settings": getattr(game.home_team, 'strategy_settings', {}),
-            "plays": populated_plays.copy()
+            "plays": populated_plays.copy(),
+            "attributes": getattr(game.home_team, 'team_attributes', {}),
+            "scouting": getattr(game.home_team, 'scouting_data', {})
         },
         game.away_team.team_id: {
             "strategy_settings": getattr(game.away_team, 'strategy_settings', {}),
-            "plays": populated_plays.copy()
+            "plays": populated_plays.copy(),
+            "attributes": getattr(game.away_team, 'team_attributes', {}),
+            "scouting": getattr(game.away_team, 'scouting_data', {})
         }
     }
     
@@ -655,6 +659,9 @@ def summarize_game_state(game, exclude_animations=True):
         # Nested team data (all team info in one place)
         "home_team": home_team_data,
         "away_team": away_team_data,
+        
+        # Teams object (by team_id) for game state persistence with strategy, plays, attributes, scouting
+        "teams": teams_obj,
         
         # Game data
         "turns": turns,  # Animations excluded for database saves

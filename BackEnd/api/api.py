@@ -482,37 +482,41 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
             )
             if saved:
                 try:
-                    # Handle both old (flat) and new (nested) structure
+                    # Handle both old (flat) and new (teams object) structure
                     home_team_field = saved.get("home_team")
                     away_team_field = saved.get("away_team")
                     
-                    # New structure: home_team is a dict
+                    # New structure: home_team is a dict with name and team_id
                     if isinstance(home_team_field, dict):
                         home = home_team_field.get("name")
                         away = away_team_field.get("name") if isinstance(away_team_field, dict) else None
-                        home_team_doc = home_team_field
-                        away_team_doc = away_team_field
+                        home_team_id = home_team_field.get("team_id")
+                        away_team_id = away_team_field.get("team_id") if isinstance(away_team_field, dict) else None
                     # Old structure: home_team is a string
                     else:
                         home = home_team_field or saved.get("homeTeam", {}).get("name")
                         away = away_team_field or saved.get("awayTeam", {}).get("name")
-                        home_team_doc = {}
-                        away_team_doc = {}
+                        home_team_id = None
+                        away_team_id = None
                     
                     if home and away:
+                        # Try to load from new 'teams' object structure (by team_id)
+                        teams_obj = saved.get("teams", {})
+                        home_team_data = teams_obj.get(home_team_id, {}) if home_team_id else {}
+                        away_team_data = teams_obj.get(away_team_id, {}) if away_team_id else {}
                         
-                        # Extract team data from nested structure
-                        home_plays = home_team_doc.get("plays")
-                        away_plays = away_team_doc.get("plays")
-                        home_attrs = home_team_doc.get("attributes")
-                        away_attrs = away_team_doc.get("attributes")
-                        home_scouting = home_team_doc.get("scouting")
-                        away_scouting = away_team_doc.get("scouting")
-                        home_strategy = home_team_doc.get("strategy_settings")
-                        away_strategy = away_team_doc.get("strategy_settings")
+                        # Extract team data from teams object
+                        home_plays = home_team_data.get("plays")
+                        away_plays = away_team_data.get("plays")
+                        home_attrs = home_team_data.get("attributes")
+                        away_attrs = away_team_data.get("attributes")
+                        home_scouting = home_team_data.get("scouting")
+                        away_scouting = away_team_data.get("scouting")
+                        home_strategy = home_team_data.get("strategy_settings")
+                        away_strategy = away_team_data.get("strategy_settings")
                         
-                        # Fallback to old flat structure if nested doesn't exist (backwards compatibility)
-                        if not home_plays:
+                        # Fallback to old flat structure if teams object doesn't exist (backwards compatibility)
+                        if not home_plays and not teams_obj:
                             home_plays = saved.get("team_plays", {}).get(home)
                             away_plays = saved.get("team_plays", {}).get(away)
                             home_attrs = saved.get("team_attributes", {}).get(home)
