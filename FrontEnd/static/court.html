@@ -501,13 +501,14 @@
 
     /* Let Phaser canvas scale to fit available space while maintaining aspect ratio */
     #phaser-container canvas {
-      display: block;
-      margin: 0;
+      display: block !important;
+      margin: 0 auto !important;
       padding: 0;
+      vertical-align: bottom;
       /* Fit within container width (flex: 1 minus panel widths) */
-      max-width: 100%;
+      max-width: 100% !important;
       /* Fit within container height (viewport - scoreboard - playcall center) */
-      max-height: calc(100vh - var(--scoreboard-height) - 130px);
+      max-height: calc(100vh - var(--scoreboard-height) - 130px) !important;
       /* Let canvas scale proportionally */
       width: auto !important;
       height: auto !important;
