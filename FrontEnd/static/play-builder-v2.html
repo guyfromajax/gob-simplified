@@ -1225,12 +1225,22 @@
     // ==================== VARIANT MANAGEMENT FUNCTIONS ====================
     
     async function loadAvailablePlays() {
+      console.log('📂 loadAvailablePlays called');
       try {
+        console.log('📂 Fetching /api/plays...');
         const response = await fetch('/api/plays');
-        if (!response.ok) throw new Error('Failed to fetch plays');
+        console.log('📂 Response status:', response.status);
+        
+        if (!response.ok) {
+          console.error('📂 Response not OK:', response.status, response.statusText);
+          throw new Error(`Failed to fetch plays: ${response.status}`);
+        }
         
         const result = await response.json();
+        console.log('📂 Response data:', result);
+        
         const plays = result.plays || [];
+        console.log('📂 Number of plays:', plays.length);
         
         const select = document.getElementById('existing-play-select');
         select.innerHTML = '<option value="">-- Select a Play --</option>';
@@ -1242,14 +1252,18 @@
           option.textContent = `${play.name} (${play.play_type} / ${playFocus})`;
           option.dataset.playData = JSON.stringify(play);
           select.appendChild(option);
+          console.log(`📂 Added option: ${play.name}`);
         });
+        
+        console.log('📂 Dropdown populated successfully');
         
         select.addEventListener('change', () => {
           document.getElementById('load-play-btn').disabled = !select.value;
         });
         
       } catch (error) {
-        console.error('Error loading plays:', error);
+        console.error('📂 Error loading plays:', error);
+        alert(`Failed to load plays: ${error.message}\n\nMake sure the Flask server is running on http://localhost:5001`);
       }
     }
 
