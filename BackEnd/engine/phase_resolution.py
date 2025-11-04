@@ -649,9 +649,18 @@ def resolve_half_court_offense_logic(game):
     # 3. Shot Result
     shot_result = game.shot_manager.resolve_shot(roles)
     
-    # Add playcall to the text
-    playcall_text = f"[{off_call}] "
-    shot_result["text"] = playcall_text + shot_result.get("text", "")
+    # Add playcall and variant debug info to the text
+    variant = skeleton.get("_variant", "unknown") if skeleton else "unknown"
+    variant_modifiers = {
+        "successful": -50,
+        "mid_play_change": 0,
+        "contested": 25,
+        "broken": 100
+    }
+    modifier = variant_modifiers.get(variant, 0)
+    
+    debug_info = f"[{off_call}] {variant}, lean:{lean_score:.2f}, modifier:{modifier:+d} | "
+    shot_result["text"] = debug_info + shot_result.get("text", "")
     
     # Pass next_defensive_setup to animator via roles
     if "next_defensive_setup" in shot_result:
