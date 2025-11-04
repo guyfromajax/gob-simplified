@@ -670,9 +670,9 @@
       min-height: 100px;
       background: linear-gradient(to bottom, rgba(0, 0, 0, 0.95), rgba(0, 0, 0, 1));
       display: flex;
-      align-items: flex-start;  /* Content stays at top */
+      align-items: center;  /* Vertically center content - push up from large gap */
       justify-content: space-between;
-      padding: 8px 40px 10px 40px;
+      padding: 0 40px;  /* Remove vertical padding - let centering handle it */
       gap: 30px;
       z-index: 900;
       /* Smooth transitions when JS updates positioning */
