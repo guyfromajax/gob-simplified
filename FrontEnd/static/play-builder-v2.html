@@ -1783,6 +1783,7 @@
       // Update positions
       previousStepAssignments = {...currentStepAssignments};
       currentStepAssignments = {};
+      positionOffsets = {}; // Reset offsets for this step
       
       POSITIONS.forEach(pos => {
         if (step.pos_actions && step.pos_actions[pos]) {
@@ -1798,7 +1799,35 @@
         }
       });
       
+      // Check for position collisions and apply offsets (same logic as building)
+      POSITIONS.forEach(pos => {
+        const assignment = currentStepAssignments[pos];
+        if (!assignment) return;
+        
+        // Check if this location is occupied by another player
+        let isOccupied = false;
+        for (const otherPos of POSITIONS) {
+          if (otherPos === pos) continue;
+          const otherAssignment = currentStepAssignments[otherPos];
+          if (otherAssignment && otherAssignment.location === assignment.location) {
+            // Collision detected
+            // If this player is screening, put them at offset
+            if (assignment.action === 'screen') {
+              positionOffsets[pos] = true;
+              console.log(`🎬 Animation: ${pos} set to offset at ${assignment.location} (screening)`);
+            }
+            // If other player is screening, put them at offset
+            else if (otherAssignment.action === 'screen') {
+              positionOffsets[otherPos] = true;
+              console.log(`🎬 Animation: ${otherPos} set to offset at ${assignment.location} (screening)`);
+            }
+            break;
+          }
+        }
+      });
+      
       console.log('Updated assignments:', currentStepAssignments);
+      console.log('Position offsets:', positionOffsets);
       console.log('Calling renderCourtVisualization');
       
       // Render the step
