@@ -991,8 +991,8 @@ class Animator:
                 "PG": {"x": 44, "y": 25},   # Deep Key
                 "SG": {"x": 44, "y": 35},   # Deep Upper Wing
                 "SF": {"x": 44, "y": 15},   # Deep Lower Wing
-                "PF": {"x": 50, "y": 25},   # Half-court line
-                "C": {"x": 55, "y": 25}     # Slightly forward of half-court
+                "PF": {"x": 45, "y": 30},   # Opposite side upper (matches frontend)
+                "C": {"x": 45, "y": 20}     # Opposite side lower (matches frontend)
             }
             # Half-court boundary for away offense (home defending)
             halfcourt_boundary = 53  # Max x coordinate defenders can reach
@@ -1003,8 +1003,8 @@ class Animator:
                 "PG": {"x": 57, "y": 25},   # Deep Key
                 "SG": {"x": 57, "y": 35},   # Deep Upper Wing
                 "SF": {"x": 57, "y": 15},   # Deep Lower Wing
-                "PF": {"x": 64, "y": 25},   # Key
-                "C": {"x": 80, "y": 25}     # Mid Lane
+                "PF": {"x": 56, "y": 30},   # Opposite side upper (matches frontend flip: 101-45=56)
+                "C": {"x": 56, "y": 20}     # Opposite side lower (matches frontend flip: 101-45=56)
             }
             # Half-court boundary for home offense (away defending)
             halfcourt_boundary = 47  # Min x coordinate defenders can reach
