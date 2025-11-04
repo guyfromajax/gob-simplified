@@ -51,6 +51,51 @@ def get_in_play_defenders(ball_handler, defense_lineup, target_is_away):
             if d_x > bh_x:
                 in_play.append(defender)
     return in_play
+
+
+def select_foul_player(foul_team_type, ball_handler, off_lineup, def_lineup):
+    """
+    Select which player committed the foul based on probabilistic logic.
+    
+    Args:
+        foul_team_type: "OFFENSE" or "DEFENSE"
+        ball_handler: The current ball handler
+        off_lineup: Dictionary of offensive players by position
+        def_lineup: Dictionary of defensive players by position
+    
+    Returns:
+        Player object who committed the foul
+    """
+    if foul_team_type == "OFFENSE":
+        # 60% chance it's the ball handler, 40% distributed among other 4 players (10% each)
+        players = list(off_lineup.values())
+        weights = []
+        for player in players:
+            if player == ball_handler:
+                weights.append(0.6)
+            else:
+                weights.append(0.1)
+        
+        foul_player = random.choices(players, weights=weights)[0]
+    
+    else:  # DEFENSE
+        # 60% chance it's the defender matched to ball handler's position
+        # 40% distributed among other 4 defenders (10% each)
+        ball_handler_pos = getattr(ball_handler, 'position', None)
+        matched_defender = def_lineup.get(ball_handler_pos) if ball_handler_pos else None
+        
+        players = list(def_lineup.values())
+        weights = []
+        for player in players:
+            if matched_defender and player == matched_defender:
+                weights.append(0.6)
+            else:
+                weights.append(0.1)
+        
+        foul_player = random.choices(players, weights=weights)[0]
+    
+    return foul_player
+
     
 def resolve_non_shooting_foul(roles, game):
     
@@ -950,12 +995,20 @@ def resolve_full_court_press_logic(game: "GameManager"):
     # Handle foul results - use standard foul types for frontend
     if result_type == "D_FOUL":
         game_state["foul_team"] = "DEFENSE"
+        # Select the foul player and increment their fouls
+        foul_player = select_foul_player("DEFENSE", roles["ball_handler"], off_lineup, def_lineup)
+        foul_player.record_stat("F")
+        roles["foul_player"] = foul_player
         # For now, treat as non-shooting foul (FCP happens before shot attempt)
         # This will trigger side inbound or bonus free throws via existing logic
         result_type = "FOUL"
         # text = "PRESS! Defensive foul"
     elif result_type == "O_FOUL":
         game_state["foul_team"] = "OFFENSE"
+        # Select the foul player and increment their fouls
+        foul_player = select_foul_player("OFFENSE", roles["ball_handler"], off_lineup, def_lineup)
+        foul_player.record_stat("F")
+        roles["foul_player"] = foul_player
         result_type = "FOUL"
         # text = "PRESS! Offensive foul"
         # Track FCP success: offensive foul = defensive success
@@ -1033,6 +1086,7 @@ def resolve_full_court_press_logic(game: "GameManager"):
         "roles": roles,
         "fcp_foul": True,  # Flag to indicate this FOUL has FCP animations
         "foul_team": game_state.get("foul_team"),  # Include foul_team for frontend announcement
+        "foul_player_id": getattr(roles.get("foul_player"), "player_id", None) if roles.get("foul_player") else None,  # For foul announcements
         "victim_id": getattr(roles["ball_handler"], "player_id", None),  # For turnover announcements
         "defender_id": getattr(roles["defender"], "player_id", None) if roles["defender"] else None  # For steal announcements
     }
@@ -1476,9 +1530,17 @@ def resolve_half_court_trap_logic(game: "GameManager"):
     # Handle foul results - use standard foul types for frontend (same as FCP)
     if result_type == "D_FOUL":
         game_state["foul_team"] = "DEFENSE"
+        # Select the foul player and increment their fouls
+        foul_player = select_foul_player("DEFENSE", roles["ball_handler"], off_lineup, def_lineup)
+        foul_player.record_stat("F")
+        roles["foul_player"] = foul_player
         result_type = "FOUL"
     elif result_type == "O_FOUL":
         game_state["foul_team"] = "OFFENSE"
+        # Select the foul player and increment their fouls
+        foul_player = select_foul_player("OFFENSE", roles["ball_handler"], off_lineup, def_lineup)
+        foul_player.record_stat("F")
+        roles["foul_player"] = foul_player
         result_type = "FOUL"
         # Track HCT success: offensive foul = defensive success
         def_scouting["defense"]["HCT"]["success"] += 1
@@ -1555,6 +1617,7 @@ def resolve_half_court_trap_logic(game: "GameManager"):
         "roles": roles,
         "hct_foul": True if result_type == "FOUL" else False,  # Flag for HCT fouls with animations
         "foul_team": game_state.get("foul_team"),  # Include foul_team for frontend announcement
+        "foul_player_id": getattr(roles.get("foul_player"), "player_id", None) if roles.get("foul_player") else None,  # For foul announcements
         "victim_id": getattr(roles["ball_handler"], "player_id", None),  # For turnover announcements
         "defender_id": getattr(roles["defender"], "player_id", None) if roles["defender"] else None  # For steal announcements
     }

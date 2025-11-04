@@ -145,12 +145,33 @@ export function announceFromTurnData(turnData, timing = 'start', homeTeamId = nu
         // Non-shooting fouls: announce as "OFFENSIVE FOUL!" or "DEFENSIVE FOUL!"
         const foulTeam = turnData.foul_team || 'OFFENSE'; // Default to offense if not specified
         
+        // Extract foul player data for headshot display
+        let playerData = null;
+        if (scene && turnData.foul_player_id) {
+          const foulPlayerId = turnData.foul_player_id;
+          const foulPlayerSprite = scene.playerSprites?.[foulPlayerId];
+          const foulPlayerTeamId = foulPlayerSprite?.team_id;
+          
+          // Handle both new nested structure (object) and old flat structure (string)
+          const homeTeamField = scene.simData?.home_team;
+          const awayTeamField = scene.simData?.away_team;
+          const homeTeamName = typeof homeTeamField === 'object' ? homeTeamField?.name : homeTeamField;
+          const awayTeamName = typeof awayTeamField === 'object' ? awayTeamField?.name : awayTeamField;
+          const foulPlayerTeamName = foulPlayerTeamId === scene.homeTeamId ? homeTeamName : awayTeamName;
+          
+          playerData = {
+            playerId: foulPlayerId,
+            photo: foulPlayerSprite?.photo || null,
+            teamName: foulPlayerTeamName
+          };
+        }
+        
         if (foulTeam === 'OFFENSE') {
           // Offensive foul - show in defense team color (they benefited)
-          showAnnouncement("OFFENSIVE FOUL!", defenseTeam);
+          showAnnouncement("OFFENSIVE FOUL!", defenseTeam, playerData);
         } else {
           // Defensive foul - show in offense team color (they benefited)
-          showAnnouncement("DEFENSIVE FOUL!", offenseTeam);
+          showAnnouncement("DEFENSIVE FOUL!", offenseTeam, playerData);
         }
       }
       return;
