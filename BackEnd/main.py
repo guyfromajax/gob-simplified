@@ -206,8 +206,12 @@ def simulate_quarter(
     gm.away_team.team_fouls = 0
     gm.game_state["team_fouls"] = {gm.home_team.name: 0, gm.away_team.name: 0}
 
-    # Recharge energy slightly between quarters
-    recharge_amount = 0.3 if q == 3 else 0.2
+    # Recharge energy between quarters
+    # After Q1, Q3, Q4: +10% | After Q2 (halftime): +20%
+    if q == 3:
+        recharge_amount = 0.2  # After Q2 (halftime)
+    else:
+        recharge_amount = 0.1  # After Q1, Q3, Q4
     recharge_lineups(gm, recharge_amount)
 
     # Handle quarter start possession
