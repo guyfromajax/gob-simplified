@@ -333,6 +333,9 @@ def save_result(request: TournamentResultRequest):
         try:
             game = run_simulation(match["home_team"], match["away_team"])
             summary = summarize_game_state(game)
+            summary["tournament_id"] = str(request.tournament_id)
+            summary["round"] = round_key
+            summary["match_index"] = i
             insert_result = games_collection.insert_one(summary)
             game_id = insert_result.inserted_id
             stat_updater.finalize_game(
