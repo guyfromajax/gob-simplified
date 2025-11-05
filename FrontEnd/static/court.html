@@ -513,8 +513,7 @@
       height: 768px !important;
       /* Scale to fit available space - reserve room for playcall at bottom */
       max-width: 100% !important;
-      max-height: 100% !important;  /* ← CHANGE THIS */
-      /* max-height: calc(100% - 100px) !important;  /* Reserve 100px minimum for Playcall Center */
+      max-height: calc(100% - 100px) !important;  /* Reserve 100px minimum for Playcall Center
       /* Maintain aspect ratio when scaling */
       object-fit: contain;
       object-position: top center !important;  /* Top-align for flush with scoreboard */
@@ -1938,7 +1937,7 @@
   </script>
 
   <!-- Dynamic Playcall Center Positioning (Grok's solution) -->
-  <!-- <script>
+  <script>
     // Dynamically position Playcall Center to hug canvas bottom exactly and fill to viewport bottom
     function updatePlaycallPosition() {
       const canvas = document.querySelector('#phaser-container canvas');
@@ -1968,51 +1967,8 @@
     
     // Also try after a longer delay in case Phaser takes time to initialize
     setTimeout(updatePlaycallPosition, 500);
-  </script> -->
-
-  <script>
-    function updatePlaycallPosition() {
-      const canvas = document.querySelector('#phaser-container canvas');
-      if (!canvas) return;
-  
-      const rect = canvas.getBoundingClientRect();
-      const playcall = document.getElementById('playcall-center');
-      if (!playcall) return;
-  
-      const top = rect.bottom;
-      const height = window.innerHeight - top;
-  
-      playcall.style.top = `${top}px`;
-      playcall.style.height = `${height}px`;
-      playcall.style.bottom = 'auto';  // Override CSS
-    }
-  
-    // Run when Phaser is ready
-    const observer = new MutationObserver((mutations, obs) => {
-      const canvas = document.querySelector('#phaser-container canvas');
-      if (canvas) {
-        updatePlaycallPosition();
-        obs.disconnect();
-      }
-    });
-  
-    observer.observe(document.body, {
-      childList: true,
-      subtree: true
-    });
-  
-    // Also on resize
-    window.addEventListener('resize', () => {
-      requestAnimationFrame(updatePlaycallPosition);
-    });
-  
-    // Fallback: try every 100ms for 3 seconds
-    let attempts = 0;
-    const interval = setInterval(() => {
-      updatePlaycallPosition();
-      if (attempts++ > 30) clearInterval(interval);
-    }, 100);
   </script>
+
   
 </body>
 </html>
