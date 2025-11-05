@@ -934,8 +934,16 @@ def run_franchise_training(req: FranchiseTrainingRequest):
 
     # Create and run training session
     from BackEnd.models.training_manager import TrainingSession
+    from datetime import datetime
     session_type = training_status.get("session_type", "in-season")
-    session = TrainingSession(session_type=session_type, date="", team_id=team_id)
+    current_week = franchise_doc.get("week", 0)
+    session = TrainingSession(
+        session_type=session_type, 
+        date=datetime.now().strftime("%Y-%m-%d"),
+        team_id=team_id,
+        franchise_id=str(franchise_id),
+        week=current_week
+    )
     
     # Apply allocations
     for category, allocation in req.allocations.items():
@@ -1051,6 +1059,9 @@ def run_franchise_training(req: FranchiseTrainingRequest):
 
     # Save to franchise document
     db.franchises.update_one({"_id": franchise_id}, {"$set": franchise_update})
+    
+    # Save training session to training_sessions collection (for analytics/history)
+    db.training_sessions.insert_one(session.to_dict())
 
     return {
         "player_logs": player_logs, 
