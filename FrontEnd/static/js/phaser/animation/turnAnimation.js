@@ -1193,7 +1193,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
           text: shooterMO >= 7 ? 'HOT READ!' : 'AUDIBLE!'
         });
         
-        // Show popup and wait for it to complete (0.8s)
+        // Show popup and wait for it to complete (1.2s)
         await window.showShooterAudible({
           shooterId: shotInfo.playerId,
           shooterPhoto: shooterSprite?.photo || null,
