@@ -332,6 +332,8 @@ class ShotManager:
         
         # Get intended shooter (from successful variant) for audible/hot read popup
         intended_shooter_pos = roles.get("intended_shooter_pos")
+        intended_shooter = off_lineup.get(intended_shooter_pos) if intended_shooter_pos else None
+        intended_shooter_id = intended_shooter.player_id if intended_shooter else None
 
         result.update({
             "result_type": "MAKE" if made else "MISS",
@@ -340,6 +342,7 @@ class ShotManager:
             "shooter_id": shooter.player_id,
             "shooter_pos": shooter_pos,
             "intended_shooter_pos": intended_shooter_pos,  # For audible/hot read popup
+            "intended_shooter_id": intended_shooter_id,    # For playcall HUD headshot
             "screener": screener,
             "passer": passer,
             "defender": defender,

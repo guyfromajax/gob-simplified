@@ -100,6 +100,9 @@ export function updatePlaycallCenter(turnData, homeTeamId) {
     // Calculate random EV placeholder from -2 to +2 (will be replaced with real logic later)
     const ev = (Math.random() * 4) - 2; // -2.0 to +2.0
     
+    // Get intended shooter info (from turnData if available)
+    const intendedShooterId = turnData.intended_shooter_id || null;
+    
     window.showPlaycallReveal({
       offense: {
         type: playType,
@@ -110,6 +113,7 @@ export function updatePlaycallCenter(turnData, homeTeamId) {
         aggression: aggression
       },
       ev: ev.toFixed(1),
+      intendedShooterId: intendedShooterId,  // For headshot display
       // hotPlayer can be added later if available in turnData
       hotPlayer: null
     });
