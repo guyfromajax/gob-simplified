@@ -513,7 +513,8 @@
       height: 768px !important;
       /* Scale to fit available space - reserve room for playcall at bottom */
       max-width: 100% !important;
-      max-height: calc(100% - 100px) !important;  /* Reserve 100px minimum for Playcall Center */
+      max-height: 100% !important;  /* ← CHANGE THIS */
+      /* max-height: calc(100% - 100px) !important;  /* Reserve 100px minimum for Playcall Center */
       /* Maintain aspect ratio when scaling */
       object-fit: contain;
       object-position: top center !important;  /* Top-align for flush with scoreboard */
