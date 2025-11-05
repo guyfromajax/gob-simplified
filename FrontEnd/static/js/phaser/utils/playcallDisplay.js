@@ -9,12 +9,6 @@ export function updatePlaycallDisplay(turnData, homeTeamId) {
   const offensiveFocusDotsEl = document.getElementById('offensive-playcall-focus-dots');
   const defensiveFocusDotsEl = document.getElementById('defensive-playcall-focus-dots');
   
-  console.log('🎯 updatePlaycallDisplay called:', {
-    hasOffensiveEl: !!offensivePlaycallEl,
-    hasDefensiveEl: !!defensivePlaycallEl,
-    turnData: turnData
-  });
-  
   if (!offensivePlaycallEl || !defensivePlaycallEl) {
     console.warn('⚠️ Playcall elements not found in DOM');
     return;
@@ -23,13 +17,6 @@ export function updatePlaycallDisplay(turnData, homeTeamId) {
   // Only show playcalls for HCO turns
   const isHCO = turnData.offensive_state === 'HCO' || 
                 (!turnData.offensive_state && !turnData.fast_break && turnData.result_type !== 'OPENING_TIP');
-  
-  console.log('🎯 Playcall check:', {
-    isHCO,
-    offensive_state: turnData.offensive_state,
-    fast_break: turnData.fast_break,
-    result_type: turnData.result_type
-  });
   
   if (!isHCO) {
     offensivePlaycallEl.textContent = '-';
@@ -49,16 +36,6 @@ export function updatePlaycallDisplay(turnData, homeTeamId) {
   const offensivePlayFocus = turnData.offensive_play_focus || getPlayFocus(offensivePlaycall);
   const defensivePlayType = turnData.defensive_play_type || getPlayType(defensivePlaycall);
   const defensivePlayFocus = turnData.defensive_play_focus || getPlayFocus(defensivePlaycall);
-  
-  console.log('🎯 Playcall data:', {
-    offensivePlaycall,
-    defensivePlaycall,
-    offensivePlayType,
-    offensivePlayFocus,
-    defensivePlayType,
-    defensivePlayFocus,
-    turnDataKeys: Object.keys(turnData)
-  });
   
   // Determine which team is on offense
   const offenseTeamId = turnData.possession_team_id || turnData.starting_possession_team_id;
@@ -83,13 +60,6 @@ export function updatePlaycallDisplay(turnData, homeTeamId) {
     if (defensiveFocusDotsEl) clearFocusDots(defensiveFocusDotsEl); // Clear defense dots
     if (offensiveFocusDotsEl) updateFocusDots(offensiveFocusDotsEl, offensivePlayFocus);
   }
-  
-  console.log('🎯 Playcalls updated:', {
-    offense: offensivePlaycall,
-    defense: defensivePlaycall,
-    isHomeOnOffense,
-    turnType: turnData.result_type
-  });
 }
 
 /**

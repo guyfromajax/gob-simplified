@@ -11,13 +11,6 @@
  * @param {string} homeTeamId - Home team ID for determining sides
  */
 export function updatePlaycallCenter(turnData, homeTeamId) {
-  console.log('📊 updatePlaycallCenter called:', { 
-    offensive_play_type: turnData.offensive_play_type,
-    offensive_play_focus: turnData.offensive_play_focus,
-    defensive_play_type: turnData.defensive_play_type,
-    possession_team_id: turnData.possession_team_id 
-  });
-
   if (!turnData) return;
 
   const offenseTeamId = turnData.possession_team_id || turnData.starting_possession_team_id;
@@ -60,7 +53,6 @@ export function updatePlaycallCenter(turnData, homeTeamId) {
       const typeElement = offensePanel.querySelector(`.playcall-option[data-type="${typeSelector}"]`);
       if (typeElement) {
         typeElement.classList.add('active');
-        console.log(`✅ Highlighted play type: ${typeSelector}`);
       }
     }
   }
@@ -136,7 +128,6 @@ export function resetLeanMeter() {
  * @param {number} leanScore - Score from -2.0 to 2.0
  */
 export function animateLeanMeter(leanScore) {
-  console.log('📈 animateLeanMeter called:', leanScore);
 
   if (leanScore == null || isNaN(leanScore)) {
     console.warn('⚠️ Invalid lean score, keeping meter neutral');
@@ -159,18 +150,15 @@ export function animateLeanMeter(leanScore) {
     const percentage = (clampedScore / 2) * 100; // 0-100%
     posFill.style.height = `${percentage}%`;
     negFill.style.height = '0%';
-    console.log(`📈 Lean meter: +${clampedScore.toFixed(2)} → ${percentage.toFixed(1)}% top fill`);
   } else if (clampedScore < 0) {
     // Negative score: fill downward (red)
     const percentage = (Math.abs(clampedScore) / 2) * 100; // 0-100%
     posFill.style.height = '0%';
     negFill.style.height = `${percentage}%`;
-    console.log(`📈 Lean meter: ${clampedScore.toFixed(2)} → ${percentage.toFixed(1)}% bottom fill`);
   } else {
     // Exactly 0: neutral (just yellow line)
     posFill.style.height = '0%';
     negFill.style.height = '0%';
-    console.log('📈 Lean meter: 0.00 → neutral');
   }
 }
 
@@ -188,7 +176,6 @@ export function parseLeanScoreFromText(turnData) {
   
   if (leanMatch && leanMatch[1]) {
     const leanScore = parseFloat(leanMatch[1]);
-    console.log(`📊 Parsed lean score from text: ${leanScore}`);
     return leanScore;
   }
 

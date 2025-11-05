@@ -454,7 +454,6 @@ export async function animateGameTurns({ //hasBallAtStep
       
       // Calculate middle step (round up for even numbers)
       const middleStep = Math.ceil(maxSteps / 2);
-      console.log(`📊 Lean meter will animate at step ${middleStep} of ${maxSteps}`);
       
       // Store for use during animation
       scene._leanScoreToAnimate = leanScore;
@@ -595,7 +594,6 @@ export async function animateGameTurns({ //hasBallAtStep
         })
       );
       
-      console.log('✅ Quarter start inbound positioning complete');
       
       // Transition to HalfCourt state
       const { safeTransition } = await import('../state/gameStateMachine.js');
@@ -956,5 +954,4 @@ export async function animateGameTurns({ //hasBallAtStep
   }
 
   scene.events?.off?.('possessionChange', handlePossessionFlip);
-  console.log('🎬 animateGameTurns: Animation system completed');
 }
