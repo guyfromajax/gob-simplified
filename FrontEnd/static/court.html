@@ -1949,10 +1949,6 @@
       if (playcall) {
         playcall.style.top = `${playcallTop}px`;
         playcall.style.height = `${window.innerHeight - playcallTop}px`;
-        // Force reflow for smooth transitions (Grok's trick)
-        playcall.style.transition = 'none';
-        void playcall.offsetHeight;  // Trigger reflow
-        playcall.style.transition = 'top 0.1s ease, height 0.1s ease';
       }
       // Trigger repaint post-Phaser resize
       requestAnimationFrame(() => {

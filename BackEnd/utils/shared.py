@@ -581,14 +581,13 @@ def summarize_game_state(game, exclude_animations=True):
 
     # Process turns: exclude animations for database persistence, keep for real-time frontend
     from copy import deepcopy
-    turns = deepcopy(game.turns)
     
-    # Only exclude animations when saving to database (exclude_animations=True)
-    # For real-time frontend responses, keep animations (exclude_animations=False)
+    # For database saves, don't store turns at all (only need game state metadata)
+    # Turns are only needed for real-time frontend display, not for persistence
     if exclude_animations:
-        for turn in turns:
-            if "animations" in turn:
-                del turn["animations"]
+        turns = []  # Empty array - don't save turns to database (prevents document size issues)
+    else:
+        turns = deepcopy(game.turns)  # Keep full turns with animations for real-time frontend
     
     # Get cumulative box scores
     cumulative_box = game.get_box_score()
