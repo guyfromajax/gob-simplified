@@ -257,6 +257,70 @@
     }
     */
 
+    /* Active Player Display - Grid columns 8 and 20 */
+    .active-player-display {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 4px 8px;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    .active-player-display.visible {
+      opacity: 1;
+    }
+
+    #away-active-player {
+      grid-column: 8;
+    }
+
+    #home-active-player {
+      grid-column: 20;
+      flex-direction: row-reverse; /* Icon on left, headshot on right */
+    }
+
+    .active-player-headshot {
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 3px solid rgba(255, 255, 255, 0.3);
+      background: rgba(0, 0, 0, 0.5);
+      transition: border-color 0.3s ease, transform 0.3s ease;
+    }
+
+    .active-player-headshot.has-ball {
+      border-color: #FFD700;
+      box-shadow: 0 0 12px rgba(255, 215, 0, 0.6);
+      transform: scale(1.05);
+    }
+
+    .active-player-headshot.defender {
+      border-color: #FF4444;
+      box-shadow: 0 0 12px rgba(255, 68, 68, 0.6);
+    }
+
+    .player-role-icon {
+      font-size: 32px;
+      font-weight: bold;
+      line-height: 1;
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+      min-width: 32px;
+      text-align: center;
+    }
+
+    .player-role-icon.ball {
+      /* Ball emoji will be displayed */
+    }
+
+    .player-role-icon.defense {
+      color: #FF4444;
+      font-family: 'Arial Black', sans-serif;
+      font-size: 36px;
+    }
+
     /* Home TOL/F - Grid column 22 */
     .tol-fouls.home {
       grid-column: 22;
@@ -1455,6 +1519,12 @@
       <div id="away-fouls">F: 0</div>
     </div>
     
+    <!-- Away Active Player - Grid column 8 -->
+    <div id="away-active-player" class="active-player-display">
+      <img id="away-active-headshot" class="active-player-headshot" src="" alt="" />
+      <div id="away-player-role" class="player-role-icon">🏀</div>
+    </div>
+    
     <!-- COMMENTED OUT: Now shown in Playcall Center below court -->
     <!-- Defensive Playcall with Focus Dots - Grid column 8 -->
     <!--
@@ -1526,6 +1596,12 @@
       <div class="strategy-bar-label bottom">Aggr</div>
     </div>
     -->
+    
+    <!-- Home Active Player - Grid column 20 -->
+    <div id="home-active-player" class="active-player-display">
+      <div id="home-player-role" class="player-role-icon">D</div>
+      <img id="home-active-headshot" class="active-player-headshot" src="" alt="" />
+    </div>
     
     <!-- COMMENTED OUT: Now shown in Playcall Center below court -->
     <!-- Offensive Playcall with Focus Dots - Grid column 20 -->
@@ -2317,6 +2393,86 @@
 
       // Return promise that resolves after animation completes
       return new Promise(resolve => setTimeout(resolve, 1200));
+    };
+
+    /**
+     * Update active player displays in scoreboard
+     * Shows ball handler and defender with headshots
+     * @param {string} ballHandlerId - Player ID of current ball handler
+     * @param {string} defenderId - Player ID of current defender
+     * @param {string} homeTeamId - Home team ID for determining sides
+     * @param {Object} playerSprites - Phaser player sprites (for photo URLs)
+     */
+    window.updateActivePlayersDisplay = function(ballHandlerId, defenderId, homeTeamId, playerSprites = {}) {
+      const awayDisplay = document.getElementById('away-active-player');
+      const homeDisplay = document.getElementById('home-active-player');
+      const awayHeadshot = document.getElementById('away-active-headshot');
+      const homeHeadshot = document.getElementById('home-active-headshot');
+      const awayRole = document.getElementById('away-player-role');
+      const homeRole = document.getElementById('home-player-role');
+
+      if (!awayDisplay || !homeDisplay) return;
+
+      // Determine which team has the ball
+      const ballHandlerSprite = playerSprites[ballHandlerId];
+      const defenderSprite = defenderId ? playerSprites[defenderId] : null;
+      
+      if (!ballHandlerSprite) {
+        // No ball handler (e.g., opening tip, dead ball)
+        awayDisplay.classList.remove('visible');
+        homeDisplay.classList.remove('visible');
+        return;
+      }
+
+      const ballHandlerTeamId = ballHandlerSprite.team_id;
+      const isBallHandlerHome = String(ballHandlerTeamId) === String(homeTeamId);
+
+      // Set ball handler display
+      if (isBallHandlerHome) {
+        // Home team has ball - show on home side (right)
+        homeHeadshot.src = ballHandlerSprite.photo || `/static/images/players/${ballHandlerId}.png`;
+        homeHeadshot.className = 'active-player-headshot has-ball';
+        homeRole.textContent = '🏀';
+        homeRole.className = 'player-role-icon ball';
+        homeDisplay.classList.add('visible');
+        
+        // Show defender on away side (left) if available
+        if (defenderSprite) {
+          awayHeadshot.src = defenderSprite.photo || `/static/images/players/${defenderId}.png`;
+          awayHeadshot.className = 'active-player-headshot defender';
+          awayRole.textContent = 'D';
+          awayRole.className = 'player-role-icon defense';
+          awayDisplay.classList.add('visible');
+        } else {
+          awayDisplay.classList.remove('visible');
+        }
+      } else {
+        // Away team has ball - show on away side (left)
+        awayHeadshot.src = ballHandlerSprite.photo || `/static/images/players/${ballHandlerId}.png`;
+        awayHeadshot.className = 'active-player-headshot has-ball';
+        awayRole.textContent = '🏀';
+        awayRole.className = 'player-role-icon ball';
+        awayDisplay.classList.add('visible');
+        
+        // Show defender on home side (right) if available
+        if (defenderSprite) {
+          homeHeadshot.src = defenderSprite.photo || `/static/images/players/${defenderId}.png`;
+          homeHeadshot.className = 'active-player-headshot defender';
+          homeRole.textContent = 'D';
+          homeRole.className = 'player-role-icon defense';
+          homeDisplay.classList.add('visible');
+        } else {
+          homeDisplay.classList.remove('visible');
+        }
+      }
+
+      // Image error handling
+      awayHeadshot.onerror = () => {
+        awayHeadshot.src = '/static/images/players/default.png';
+      };
+      homeHeadshot.onerror = () => {
+        homeHeadshot.src = '/static/images/players/default.png';
+      };
     };
   </script>
 

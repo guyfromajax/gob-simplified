@@ -1067,6 +1067,22 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
     currentBallOwnerRef
   });
 
+  // Initial active player display update
+  if (typeof window.updateActivePlayersDisplay === 'function' && !scene.skipToEnd) {
+    let ballHandlerId = null;
+    for (const anim of turnData.animations || []) {
+      if (anim.hasBallAtStep?.[0]) {
+        ballHandlerId = anim.playerId;
+        break;
+      }
+    }
+    const defenderId = turnData.defender_id || null;
+    const homeTeamId = scene.simData?.home_team_id || null;
+    if (ballHandlerId && homeTeamId) {
+      window.updateActivePlayersDisplay(ballHandlerId, defenderId, homeTeamId, playerSprites);
+    }
+  }
+
   let eventsProcessed = false;
 
   for (let stepIndex = 1; stepIndex < maxSteps; stepIndex++) {
@@ -1090,6 +1106,26 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
       offenseTeamId: scene.currentOffenseTeamId ?? turnData.possession_team_id,
       currentBallOwnerRef
     });
+
+    // Update active player displays in scoreboard
+    if (typeof window.updateActivePlayersDisplay === 'function' && !scene.skipToEnd) {
+      // Find current ball handler
+      let ballHandlerId = null;
+      for (const anim of turnData.animations || []) {
+        if (anim.hasBallAtStep?.[stepIndex]) {
+          ballHandlerId = anim.playerId;
+          break;
+        }
+      }
+      
+      // Get defender info from turnData
+      const defenderId = turnData.defender_id || null;
+      const homeTeamId = scene.simData?.home_team_id || null;
+      
+      if (ballHandlerId && homeTeamId) {
+        window.updateActivePlayersDisplay(ballHandlerId, defenderId, homeTeamId, playerSprites);
+      }
+    }
 
     const promises = [];
     let shotInfo = null;
