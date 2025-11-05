@@ -87,7 +87,7 @@ def _apply_team_result(team1_id, team2_id, team1_score, team2_score, sign=1):
         db.teams.update_one({"_id": team1_id}, {"$inc": {"record.L": sign}})
 
 
-def _save_game_result(team1_id, team2_id, team1_score, team2_score, week):
+def _save_game_result(team1_id, team2_id, team1_score, team2_score, week, franchise_id=None):
     existing = db.games.find_one({
         "week": week,
         "$or": [
@@ -104,17 +104,20 @@ def _save_game_result(team1_id, team2_id, team1_score, team2_score, week):
 
     _apply_team_result(team1_id, team2_id, team1_score, team2_score, sign=1)
 
+    update_fields = {
+        "team1_id": team1_id,
+        "team2_id": team2_id,
+        "team1_score": team1_score,
+        "team2_score": team2_score,
+        "week": week,
+    }
+    
+    if franchise_id:
+        update_fields["franchise_id"] = str(franchise_id)
+
     db.games.update_one(
         filter_doc,
-        {
-            "$set": {
-                "team1_id": team1_id,
-                "team2_id": team2_id,
-                "team1_score": team1_score,
-                "team2_score": team2_score,
-                "week": week,
-            }
-        },
+        {"$set": update_fields},
         upsert=True,
     )
 
@@ -238,6 +241,7 @@ def save_result(req: FranchiseResultRequest):
         {"_id": game_id},
         {
             "$set": {
+                "franchise_id": str(franchise_id),
                 "team1_id": away_id,
                 "team2_id": home_id,
                 "team1_score": away_score,
@@ -313,6 +317,8 @@ def complete_week(req: CompleteWeekRequest):
             summary = summarize_game_state(gm)
             token = f"{req.week}-{away_id}-{home_id}"
             summary["_id"] = token
+            summary["franchise_id"] = str(req.franchise_id)
+            summary["week"] = req.week
             db.games.update_one({"_id": token}, {"$set": summary}, upsert=True)
             stat_updater.finalize_game(
                 token, mode="franchise", franchise_id=req.franchise_id
@@ -320,7 +326,7 @@ def complete_week(req: CompleteWeekRequest):
         except Exception:
             away_score = random.randint(50, 90)
             home_score = random.randint(50, 90)
-        sim_res = _save_game_result(away_id, home_id, away_score, home_score, req.week)
+        sim_res = _save_game_result(away_id, home_id, away_score, home_score, req.week, franchise_id=req.franchise_id)
         results.append({
             "away_id": sim_res["team1_id"],
             "home_id": sim_res["team2_id"],
