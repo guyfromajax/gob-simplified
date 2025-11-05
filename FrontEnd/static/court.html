@@ -135,7 +135,8 @@
       align-items: flex-start;
     }
 
-    /* Defensive Playcall (away side) - Grid column 8 */
+    /* COMMENTED OUT: Playcall and focus dots now in Playcall Center */
+    /*
     #defensive-playcall {
       font-size: 28px;
       line-height: 1;
@@ -148,7 +149,6 @@
       font-weight: bold;
     }
 
-    /* Focus Dots Display */
     .focus-dot {
       font-size: 12px;
       color: rgba(255, 255, 255, 0.3);
@@ -160,6 +160,7 @@
       color: #FFD700;
       text-shadow: 0 0 4px rgba(255, 215, 0, 0.8);
     }
+    */
 
     /* Center (Clock/Quarter) - Grid column 14 */
     #scoreboard .center {
@@ -172,7 +173,8 @@
       padding: 0 20px;
     }
 
-    /* Offensive Playcall (home side) - Grid column 20 */
+    /* COMMENTED OUT: Now in Playcall Center */
+    /*
     #offensive-playcall {
       grid-column: 20;
       font-size: 28px;
@@ -185,6 +187,7 @@
       min-width: 120px;
       font-weight: bold;
     }
+    */
 
     #scoreboard .center .clock {
       font-size: 52px;
@@ -199,7 +202,8 @@
       color: var(--home-vibrant-color);
     }
 
-    /* Strategy Bars */
+    /* COMMENTED OUT: Strategy bars now in Playcall Center */
+    /*
     .strategy-bar-container {
       display: flex;
       flex-direction: column;
@@ -236,25 +240,22 @@
       white-space: nowrap;
     }
 
-    /* Away Tempo Bar - Grid column 10 */
     #away-tempo-bar {
       grid-column: 10;
     }
 
-    /* Away Aggression Bar - Grid column 12 */
     #away-aggression-bar {
       grid-column: 12;
     }
 
-    /* Home Tempo Bar - Grid column 16 */
     #home-tempo-bar {
       grid-column: 16;
     }
 
-    /* Home Aggression Bar - Grid column 18 */
     #home-aggression-bar {
       grid-column: 18;
     }
+    */
 
     /* Home TOL/F - Grid column 22 */
     .tol-fouls.home {
@@ -1454,7 +1455,9 @@
       <div id="away-fouls">F: 0</div>
     </div>
     
+    <!-- COMMENTED OUT: Now shown in Playcall Center below court -->
     <!-- Defensive Playcall with Focus Dots - Grid column 8 -->
+    <!--
     <div style="grid-column: 8; display: flex; align-items: center; gap: 8px;">
       <div id="defensive-playcall-focus-dots" style="display: flex; flex-direction: column; gap: 2px; font-size: 10px; color: rgba(255, 255, 255, 0.6);">
         <div style="display: flex; align-items: center; gap: 4px;">
@@ -1472,22 +1475,29 @@
       </div>
       <div id="defensive-playcall">-</div>
     </div>
+    -->
     
+    <!-- COMMENTED OUT: Now shown in Playcall Center below court -->
     <!-- Away Tempo Bar - Grid column 10 -->
+    <!--
     <div id="away-tempo-bar" class="strategy-bar-container">
       <div class="strategy-bar">
         <div class="strategy-bar-fill" style="height: 60%;"></div>
       </div>
       <div class="strategy-bar-label bottom">Tempo</div>
     </div>
+    -->
     
+    <!-- COMMENTED OUT: Now shown in Playcall Center below court -->
     <!-- Away Aggression Bar - Grid column 12 -->
+    <!--
     <div id="away-aggression-bar" class="strategy-bar-container">
       <div class="strategy-bar">
         <div class="strategy-bar-fill" style="height: 60%;"></div>
       </div>
       <div class="strategy-bar-label bottom">Aggr</div>
     </div>
+    -->
     
     <!-- Center Clock/Quarter - Grid column 14 -->
     <div class="center">
@@ -1495,23 +1505,31 @@
       <div id="quarter" class="quarter">Q1</div>
     </div>
     
+    <!-- COMMENTED OUT: Now shown in Playcall Center below court -->
     <!-- Home Tempo Bar - Grid column 16 -->
+    <!--
     <div id="home-tempo-bar" class="strategy-bar-container">
       <div class="strategy-bar">
         <div class="strategy-bar-fill" style="height: 60%;"></div>
       </div>
       <div class="strategy-bar-label bottom">Tempo</div>
     </div>
+    -->
     
+    <!-- COMMENTED OUT: Now shown in Playcall Center below court -->
     <!-- Home Aggression Bar - Grid column 18 -->
+    <!--
     <div id="home-aggression-bar" class="strategy-bar-container">
       <div class="strategy-bar">
         <div class="strategy-bar-fill" style="height: 60%;"></div>
       </div>
       <div class="strategy-bar-label bottom">Aggr</div>
     </div>
+    -->
     
+    <!-- COMMENTED OUT: Now shown in Playcall Center below court -->
     <!-- Offensive Playcall with Focus Dots - Grid column 20 -->
+    <!--
     <div style="grid-column: 20; display: flex; align-items: center; gap: 8px;">
       <div id="offensive-playcall">-</div>
       <div id="offensive-playcall-focus-dots" style="display: flex; flex-direction: column; gap: 2px; font-size: 10px; color: rgba(255, 255, 255, 0.6);">
@@ -1529,6 +1547,7 @@
         </div>
       </div>
     </div>
+    -->
     
     <!-- Home TOL/F - Grid column 22 -->
     <div class="tol-fouls home">
