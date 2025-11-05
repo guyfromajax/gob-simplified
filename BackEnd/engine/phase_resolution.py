@@ -1264,7 +1264,9 @@ def get_hco_skeleton(result_type, game_context, lean_score=None):
 
 def _get_skeleton_from_team_plays(playcall, team_id, game_context, lean_score=None):
     """
-    Get skeleton from team-specific play objects - checks in-memory first, then database.
+    Get skeleton using reference-based architecture.
+    Looks up play_id from team plays, then fetches skeleton from universal plays collection.
+    Uses in-memory cache to avoid repeated DB queries.
     
     Args:
         playcall (str): Name of the play to find
@@ -1275,66 +1277,75 @@ def _get_skeleton_from_team_plays(playcall, team_id, game_context, lean_score=No
     Returns:
         dict: Selected skeleton, or None if not found
     """
-    from BackEnd.db import games_collection, tournaments_collection, franchises_collection
+    from BackEnd.db import games_collection, tournaments_collection, franchises_collection, plays_collection
     from bson import ObjectId
     
-    # PRIORITY 1: Check in-memory team plays (always available for active games)
+    # Initialize skeleton cache on game_context if it doesn't exist
+    if not hasattr(game_context, '_skeleton_cache'):
+        game_context._skeleton_cache = {}
+    
+    play_id = None
+    
+    # STEP 1: Get play_id from team plays (in-memory or database)
     offense_team = game_context.offense_team
     if hasattr(offense_team, 'plays') and offense_team.plays:
         if playcall in offense_team.plays:
             play_obj = offense_team.plays[playcall]
-            if "skeletons" in play_obj:
-                # Use lean score to select variant if provided
-                if lean_score is not None:
-                    skeleton, variant = get_skeleton_by_lean(play_obj, lean_score)
-                    if skeleton and skeleton.get("steps"):
-                        num_steps = len(skeleton.get("steps", []))
-                        # Add variant name to skeleton metadata
-                        skeleton["_variant"] = variant
-                        # print(f"🔍 FOUND in team plays (memory): '{playcall}' - {num_steps} steps")
-                        return skeleton
-                
-                # Default to successful
-                if "successful" in play_obj["skeletons"]:
-                    skeleton = play_obj["skeletons"]["successful"]
-                    num_steps = len(skeleton.get("steps", []))
-                    # print(f"🔍 FOUND in team plays (memory): '{playcall}' - {num_steps} steps")
-                    return skeleton
+            play_id = play_obj.get("play_id")
     
-    # PRIORITY 2: Check database (for loaded games where in-memory might be stale)
-    game_id = getattr(game_context, 'game_id', None)
+    # If not found in memory, check database
+    if not play_id:
+        game_id = getattr(game_context, 'game_id', None)
+        if game_id:
+            game_doc = games_collection.find_one({"_id": game_id})
+            if game_doc and "teams" in game_doc:
+                team_obj = game_doc["teams"].get(team_id, {})
+                plays = team_obj.get("plays", {})
+                if playcall in plays:
+                    play_obj = plays[playcall]
+                    play_id = play_obj.get("play_id")
     
-    if game_id:
-        # Single game mode - check games collection
-        # Note: game_id is a UUID string, not a MongoDB ObjectId
-        game_doc = games_collection.find_one({"_id": game_id})
-        
-        if game_doc and "teams" in game_doc:
-            team_obj = game_doc["teams"].get(team_id, {})
-            plays = team_obj.get("plays", {})
+    if not play_id:
+        # print(f"🔍 NOT FOUND: No play_id for '{playcall}'")
+        return None
+    
+    # STEP 2: Check cache first (avoid repeated DB queries)
+    cache_key = f"{play_id}"
+    if cache_key in game_context._skeleton_cache:
+        play_doc = game_context._skeleton_cache[cache_key]
+        # print(f"🔍 CACHE HIT: '{playcall}' (play_id: {play_id})")
+    else:
+        # STEP 3: Fetch full play document from universal collection
+        try:
+            play_doc = plays_collection.find_one({"_id": ObjectId(play_id)})
+            if not play_doc:
+                # print(f"🔍 NOT FOUND: No play document for play_id '{play_id}'")
+                return None
             
-            if playcall in plays:
-                play_obj = plays[playcall]
-                if "skeletons" in play_obj:
-                    # Use lean score to select variant if provided
-                    if lean_score is not None:
-                        skeleton, variant = get_skeleton_by_lean(play_obj, lean_score)
-                        if skeleton and skeleton.get("steps"):
-                            num_steps = len(skeleton.get("steps", []))
-                            # Add variant name to skeleton metadata
-                            skeleton["_variant"] = variant
-                            # print(f"🔍 FOUND in team plays (db): '{playcall}' - {num_steps} steps")
-                            return skeleton
-                    
-                    # Default to successful
-                    if "successful" in play_obj["skeletons"]:
-                        skeleton = play_obj["skeletons"]["successful"]
-                        num_steps = len(skeleton.get("steps", []))
-                        # print(f"🔍 FOUND in team plays (db): '{playcall}' - {num_steps} steps")
-                        return skeleton
+            # Cache it for future use
+            game_context._skeleton_cache[cache_key] = play_doc
+            # print(f"🔍 FETCHED from universal: '{playcall}' (play_id: {play_id})")
+        except Exception as e:
+            print(f"🚨 Error fetching play from universal collection: {e}")
+            return None
     
-    # Not found in memory or database
-    # print(f"🔍 NOT FOUND in team plays: '{playcall}'")
+    # STEP 4: Select skeleton variant based on lean score
+    if "skeletons" not in play_doc:
+        return None
+    
+    if lean_score is not None:
+        skeleton, variant = get_skeleton_by_lean(play_doc, lean_score)
+        if skeleton and skeleton.get("steps"):
+            skeleton["_variant"] = variant
+            return skeleton
+    
+    # Default to successful variant
+    skeletons = play_doc.get("skeletons", {})
+    if "successful" in skeletons:
+        skeleton = skeletons["successful"]
+        if skeleton and skeleton.get("steps"):
+            return skeleton
+    
     return None
 
 
