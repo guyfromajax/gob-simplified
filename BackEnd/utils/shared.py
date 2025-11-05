@@ -605,13 +605,14 @@ def summarize_game_state(game, exclude_animations=True):
         "points_by_quarter": game.game_state["points_by_quarter"].get(game.home_team.name, [0, 0, 0, 0]),
         "team_fouls": game.home_team.team_fouls,
         
-        # Malleable attributes (per game instance)
-        "attributes": game.home_team.team_attributes,
-        "strategy_settings": game.home_team.strategy_settings,
-        "scouting": game.home_team.scouting_data,
-        "plays": list(game.home_team.plays.values()),  # Convert dict to list for JSON
+        # ✅ Removed redundant fields (already in teams object):
+        # - plays (was 75KB with embedded skeletons!)
+        # - strategy_settings
+        # - attributes  
+        # - scouting
+        # Frontend should read from teams object instead
         
-        # Player stats
+        # Player stats (for frontend display)
         "box_score": cumulative_box.get(game.home_team.name, {}),
         
         # Team totals (aggregated from players)
@@ -630,13 +631,14 @@ def summarize_game_state(game, exclude_animations=True):
         "points_by_quarter": game.game_state["points_by_quarter"].get(game.away_team.name, [0, 0, 0, 0]),
         "team_fouls": game.away_team.team_fouls,
         
-        # Malleable attributes (per game instance)
-        "attributes": game.away_team.team_attributes,
-        "strategy_settings": game.away_team.strategy_settings,
-        "scouting": game.away_team.scouting_data,
-        "plays": list(game.away_team.plays.values()),  # Convert dict to list for JSON
+        # ✅ Removed redundant fields (already in teams object):
+        # - plays (was 75KB with embedded skeletons!)
+        # - strategy_settings
+        # - attributes
+        # - scouting
+        # Frontend should read from teams object instead
         
-        # Player stats
+        # Player stats (for frontend display)
         "box_score": cumulative_box.get(game.away_team.name, {}),
         
         # Team totals (aggregated from players)
