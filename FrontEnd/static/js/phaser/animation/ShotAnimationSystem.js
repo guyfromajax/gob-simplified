@@ -636,9 +636,10 @@ export class ShotAnimationSystem {
       rebound_type: turnData.rebound_type
     });
     
-    // Use the same defensive rebound setup as free throws
-    if (turnData.next_play_type === 'HCO') {
-      console.log('🎬 ShotAnimationSystem: Defensive rebound leads to HCO - using runDefensiveReboundSetup');
+    // Use the same defensive rebound setup for HCO, HCT, and FCP
+    // Fast breaks handle outlet in their own turn
+    if (turnData.next_play_type === 'HCO' || turnData.next_play_type === 'HCT' || turnData.next_play_type === 'FCP') {
+      console.log(`🎬 ShotAnimationSystem: Defensive rebound leads to ${turnData.next_play_type} - using runDefensiveReboundSetup`);
       
       try {
         // Import and use the same function that works for free throws

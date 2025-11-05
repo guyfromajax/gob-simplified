@@ -472,9 +472,9 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
 
   await Promise.all(promises);
 
-  // Only do outlet pass for HCO
+  // Do outlet pass for HCO, HCT, and FCP
   // For FAST_BREAK, the outlet pass will be handled in the next turn (the actual fast break turn)
-  if (nextPlayType === "HCO" && outletReceiverId && outletReceiverId !== rebounderId) {
+  if ((nextPlayType === "HCO" || nextPlayType === "HCT" || nextPlayType === "FCP") && outletReceiverId && outletReceiverId !== rebounderId) {
     const outletLog = {
       event: 'OUTLET_PASS',
       from: rebounderId,
