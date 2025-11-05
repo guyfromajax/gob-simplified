@@ -942,15 +942,8 @@ export function createGameScene(Phaser) {
 
         const homeF = turn.homeFouls ?? turn.home_team_fouls ?? turn.fouls?.home;
         const awayF = turn.awayFouls ?? turn.away_team_fouls ?? turn.fouls?.away;
-        
-        // Debug: Log what we received from backend
-        console.log(`🔍 TURN DATA - homeFouls: ${turn.homeFouls}, awayFouls: ${turn.awayFouls}, homeF: ${homeF}, awayF: ${awayF}`);
-        
         if (typeof homeF === 'number') liveHomeFouls = homeF;
         if (typeof awayF === 'number') liveAwayFouls = awayF;
-
-        // Debug: Log current state after update
-        console.log(`🟨 SCOREBOARD STATE - Home: ${liveHomeFouls}, Away: ${liveAwayFouls}`);
 
         if (turn.clock || turn.game_clock) liveClock = turn.clock || turn.game_clock;
         if (turn.quarter != null) liveQuarter = turn.quarter;
