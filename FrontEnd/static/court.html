@@ -807,11 +807,10 @@
       left: 50%;
       transform: translateX(-50%);
       background: rgba(0, 0, 0, 0.85);
-      padding: 20px 40px;
+      padding: 20px 30px;
       border-radius: 12px;
       border: 3px solid #FFD700;
       font-family: 'Bebas Neue', sans-serif;
-      text-align: center;
       pointer-events: none;
       z-index: 1000;
       opacity: 0;
@@ -819,8 +818,33 @@
     }
 
     #playcall-hud.show {
-      display: block;
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      gap: 20px;
       animation: hudReveal 2.5s ease-out forwards;
+    }
+
+    .hud-headshot-container {
+      width: 70px;
+      height: 70px;
+      border-radius: 50%;
+      overflow: hidden;
+      border: 3px solid #FFD700;
+      background: #1a1a1a;
+      flex-shrink: 0;
+    }
+
+    .hud-headshot {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .hud-content {
+      display: flex;
+      flex-direction: column;
+      text-align: center;
     }
 
     #playcall-hud .hud-defense {
@@ -1802,9 +1826,14 @@
 
   <!-- ==================== PLAYCALL REVEAL HUD ==================== -->
   <div id="playcall-hud">
-    <div class="hud-defense"></div>
-    <div class="hud-offense"></div>
-    <div class="hud-ev"></div>
+    <div class="hud-headshot-container">
+      <img class="hud-headshot" src="" alt="Intended Shooter">
+    </div>
+    <div class="hud-content">
+      <div class="hud-defense"></div>
+      <div class="hud-offense"></div>
+      <div class="hud-ev"></div>
+    </div>
   </div>
 
   <!-- ==================== HOT READ / AUDIBLE POPUP ==================== -->
@@ -2162,9 +2191,24 @@
       const hud = document.getElementById('playcall-hud');
       if (!hud) return;
 
+      const headshotEl = hud.querySelector('.hud-headshot');
       const defenseEl = hud.querySelector('.hud-defense');
       const offenseEl = hud.querySelector('.hud-offense');
       const evEl = hud.querySelector('.hud-ev');
+      
+      // Set intended shooter headshot
+      if (data.intendedShooterId) {
+        const photoUrl = `/static/images/players/${data.intendedShooterId}.png`;
+        headshotEl.src = photoUrl;
+        headshotEl.style.display = 'block';
+        
+        // Fallback to default if image fails to load
+        headshotEl.onerror = () => {
+          headshotEl.src = '/static/images/players/default.png';
+        };
+      } else {
+        headshotEl.style.display = 'none';
+      }
 
       // Defense type (Man or Zone)
       const defenseType = data.defense.type || 'MAN';
@@ -2228,13 +2272,15 @@
       const headshotEl = popup.querySelector('.audible-headshot');
       const textEl = popup.querySelector('.audible-text');
 
-      // Set player headshot
-      if (data.shooterPhoto) {
-        headshotEl.src = data.shooterPhoto;
-        headshotEl.style.display = 'block';
-      } else {
-        headshotEl.style.display = 'none';
-      }
+      // Set player headshot (with fallback)
+      const photoUrl = data.shooterPhoto || `/static/images/players/${data.shooterId}.png`;
+      headshotEl.src = photoUrl;
+      headshotEl.style.display = 'block';
+      
+      // Fallback to default if image fails to load
+      headshotEl.onerror = () => {
+        headshotEl.src = '/static/images/players/default.png';
+      };
 
       // Determine text based on MO attribute
       const mo = data.shooterMO || 5;
