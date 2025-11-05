@@ -45,7 +45,16 @@ class TeamManager:
         # Use provided plays_data (from saved game) or initialize fresh from universal collection
         # MALLEABLE: Each game instance has its own copy with tracking stats
         if plays_data:
-            self.plays = {play["name"]: play for play in plays_data}
+            # Handle both dict (saved games) and list (new games) formats
+            if isinstance(plays_data, dict):
+                # Already in correct format (keyed by play name)
+                self.plays = plays_data
+            elif isinstance(plays_data, list):
+                # Convert list to dict keyed by play name
+                self.plays = {play["name"]: play for play in plays_data}
+            else:
+                # Invalid format, initialize fresh
+                self.plays = self._init_plays_from_universal(mode)
         else:
             self.plays = self._init_plays_from_universal(mode)
         
