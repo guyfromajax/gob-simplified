@@ -820,7 +820,7 @@
 
     #playcall-hud.show {
       display: block;
-      animation: hudReveal 1.2s ease-out forwards;
+      animation: hudReveal 2.5s ease-out forwards;
     }
 
     #playcall-hud .hud-defense {
@@ -1072,7 +1072,7 @@
       align-items: center;
       justify-content: center;
       gap: 20px;
-      z-index: 1100;
+      z-index: 950; /* Below HUD (1000) but above Playcall Center (900) */
     }
 
     #pause-btn,
@@ -2132,10 +2132,10 @@
       hud.classList.add('show');
       void hud.offsetWidth; // Force reflow for animation
 
-      // Hide after 1.2s
+      // Hide after 2.5s
       setTimeout(() => {
         hud.classList.remove('show');
-      }, 1200);
+      }, 2500);
     };
   </script>
 
