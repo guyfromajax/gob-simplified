@@ -1307,7 +1307,8 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
                         scene,
                         ballSprite,
                         playerSprites,
-                        rebounderId
+                        rebounderId,
+                        nextPlayType: turnData.next_play_type || "HCO"
                       });
                     }
                   }
