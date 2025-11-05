@@ -202,9 +202,12 @@ def simulate_quarter(
     # Reset clock and fouls for the upcoming quarter
     gm.game_state["time_remaining"] = 480 if q <= 4 else 240
     gm.game_state["clock"] = "8:00" if q <= 4 else "4:00"
-    gm.home_team.team_fouls = 0
-    gm.away_team.team_fouls = 0
-    gm.game_state["team_fouls"] = {gm.home_team.name: 0, gm.away_team.name: 0}
+    
+    # Team fouls reset at start of each HALF (Q1, Q3) and OT periods, not every quarter
+    if q == 1 or q == 3 or q > 4:
+        gm.home_team.team_fouls = 0
+        gm.away_team.team_fouls = 0
+        gm.game_state["team_fouls"] = {gm.home_team.name: 0, gm.away_team.name: 0}
 
     # Recharge energy slightly between quarters
     recharge_amount = 0.3 if q == 3 else 0.2
