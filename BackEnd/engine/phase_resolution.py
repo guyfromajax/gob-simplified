@@ -1014,6 +1014,7 @@ def resolve_full_court_press_logic(game: "GameManager"):
         # Select the foul player and increment their fouls
         foul_player = select_foul_player("DEFENSE", roles["ball_handler"], off_lineup, def_lineup)
         foul_player.record_stat("F")
+        def_team.team_fouls += 1  # Increment team fouls
         roles["foul_player"] = foul_player
         # For now, treat as non-shooting foul (FCP happens before shot attempt)
         # This will trigger side inbound or bonus free throws via existing logic
@@ -1024,6 +1025,7 @@ def resolve_full_court_press_logic(game: "GameManager"):
         # Select the foul player and increment their fouls
         foul_player = select_foul_player("OFFENSE", roles["ball_handler"], off_lineup, def_lineup)
         foul_player.record_stat("F")
+        off_team.team_fouls += 1  # Increment team fouls
         roles["foul_player"] = foul_player
         result_type = "FOUL"
         # text = "PRESS! Offensive foul"
@@ -1560,6 +1562,7 @@ def resolve_half_court_trap_logic(game: "GameManager"):
         # Select the foul player and increment their fouls
         foul_player = select_foul_player("DEFENSE", roles["ball_handler"], off_lineup, def_lineup)
         foul_player.record_stat("F")
+        def_team.team_fouls += 1  # Increment team fouls
         roles["foul_player"] = foul_player
         result_type = "FOUL"
     elif result_type == "O_FOUL":
@@ -1567,6 +1570,7 @@ def resolve_half_court_trap_logic(game: "GameManager"):
         # Select the foul player and increment their fouls
         foul_player = select_foul_player("OFFENSE", roles["ball_handler"], off_lineup, def_lineup)
         foul_player.record_stat("F")
+        off_team.team_fouls += 1  # Increment team fouls
         roles["foul_player"] = foul_player
         result_type = "FOUL"
         # Track HCT success: offensive foul = defensive success
