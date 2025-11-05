@@ -69,10 +69,14 @@ class Allocation:
         }
 
 class TrainingSession:
-    def __init__(self, session_type: str, date: str, team_id: str):
+    def __init__(self, session_type: str, date: str, team_id: str, franchise_id: str = None, tournament_id: str = None, week: int = None, round: str = None):
         self.session_type = session_type  # 'preseason' or 'in-season'
         self.date = date
         self.team_id = team_id
+        self.franchise_id = franchise_id  # Which franchise (if franchise mode)
+        self.tournament_id = tournament_id  # Which tournament (if tournament mode)
+        self.week = week  # Which week (franchise mode)
+        self.round = round  # Which round (tournament mode)
         self.practice_points = 24
         self.allocations = {}  # category: Allocation object
         self.log = []
@@ -90,13 +94,25 @@ class TrainingSession:
 
     def to_dict(self) -> dict:
         """Serialize the session for database logging."""
-        return {
+        session_dict = {
             "session_type": self.session_type,
             "date": self.date,
             "team_id": self.team_id,
             "allocations": {cat: alloc.to_dict() for cat, alloc in self.allocations.items()},
             "log": self.log,
         }
+        
+        # Add mode identifiers if present
+        if self.franchise_id:
+            session_dict["franchise_id"] = self.franchise_id
+        if self.tournament_id:
+            session_dict["tournament_id"] = self.tournament_id
+        if self.week is not None:
+            session_dict["week"] = self.week
+        if self.round:
+            session_dict["round"] = self.round
+        
+        return session_dict
 
     
     def apply_training(self, players: List[dict], team: dict) -> List[dict]:
