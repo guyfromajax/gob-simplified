@@ -97,8 +97,8 @@ export function updatePlaycallCenter(turnData, homeTeamId) {
   // ==================== TRIGGER PLAYCALL REVEAL HUD ====================
   // Show transient HUD overlay with playcall info
   if (typeof window.showPlaycallReveal === 'function' && playType && playFocus && defenseType) {
-    // Calculate simple EV placeholder (can be replaced with real data)
-    const ev = Math.random() * 2; // 0.0 to 2.0
+    // Calculate random EV placeholder from -2 to +2 (will be replaced with real logic later)
+    const ev = (Math.random() * 4) - 2; // -2.0 to +2.0
     
     window.showPlaycallReveal({
       offense: {

@@ -836,7 +836,7 @@
     #playcall-hud .hud-ev {
       font-size: 24px;
       margin-top: 8px;
-      color: #00FF88;
+      /* Color set dynamically in JS based on EV value */
     }
 
     @keyframes hudReveal {
@@ -2125,8 +2125,21 @@
 
       // EV + Hot Player (optional)
       const hot = data.hotPlayer ? `${data.hotPlayer.pos} #${data.hotPlayer.jersey} ` : '';
-      const evValue = data.ev !== undefined ? `+${data.ev}` : '+0.0';
+      const evNum = parseFloat(data.ev);
+      const evValue = evNum >= 0 ? `+${data.ev}` : data.ev;
+      
+      // Color-code EV: Red (negative), Yellow (zero), Green (positive)
+      let evColor;
+      if (evNum < 0) {
+        evColor = '#FF3B30'; // Red for negative
+      } else if (evNum === 0) {
+        evColor = '#FFD700'; // Yellow/Gold for zero
+      } else {
+        evColor = '#00FF88'; // Green for positive
+      }
+      
       evEl.textContent = `${hot}${evValue} EV`;
+      evEl.style.color = evColor;
 
       // Show HUD
       hud.classList.add('show');
