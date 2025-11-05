@@ -307,7 +307,27 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
   
   // Handle outcome
   if (turnData.result_type === "MAKE") {
-    appendToTextScroll("Good!");
+    // Show announcement with shooter headshot
+    const { showAnnouncement } = await import('../utils/announcements.js');
+    const shooterInfo = scene.playerInfo?.[shooterId];
+    const shooterTeamId = shooterSprite?.team_id;
+    
+    // Handle both new nested structure (object) and old flat structure (string)
+    const homeTeamField = scene.simData?.home_team;
+    const awayTeamField = scene.simData?.away_team;
+    const homeTeamName = typeof homeTeamField === 'object' ? homeTeamField?.name : homeTeamField;
+    const awayTeamName = typeof awayTeamField === 'object' ? awayTeamField?.name : awayTeamField;
+    const shooterTeamName = shooterTeamId === scene.homeTeamId ? homeTeamName : awayTeamName;
+    
+    const shooterPlayerData = shooterInfo ? {
+      playerId: shooterId,
+      photo: shooterSprite?.photo || null,
+      teamName: shooterTeamName
+    } : null;
+    
+    const teamStyle = isHomeOffense ? 'home' : 'away';
+    showAnnouncement("It's Good!", teamStyle, shooterPlayerData);
+    
     await new Promise(resolve => scene.time.delayedCall(1000, resolve));
     
     // Inbound setup

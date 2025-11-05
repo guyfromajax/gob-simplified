@@ -444,31 +444,46 @@ export function shootBall({
         const isShootingFoul = turnData?.text?.includes('AND-1') || 
                               turnData?.text?.includes('fouls') && turnData?.text?.includes('on the shot');
         
+        // Get shooter/foul player data for announcements
+        const shooterSprite = scene.playerSprites?.[shooterId];
+        const shooterInfo = scene.playerInfo?.[shooterId];
+        
+        // Handle both new nested structure (object) and old flat structure (string)
+        const homeTeamField = scene.simData?.home_team;
+        const awayTeamField = scene.simData?.away_team;
+        const homeTeamName = typeof homeTeamField === 'object' ? homeTeamField?.name : homeTeamField;
+        const awayTeamName = typeof awayTeamField === 'object' ? awayTeamField?.name : awayTeamField;
+        const shooterTeamName = shooterTeamId === scene.homeTeamId ? homeTeamName : awayTeamName;
+        
+        const shooterPlayerData = shooterInfo ? {
+          playerId: shooterId,
+          photo: shooterSprite?.photo || null,
+          teamName: shooterTeamName
+        } : null;
+        
         if (result === "MAKE") {
-          // Get shooter player data
-          const shooterSprite = scene.playerSprites?.[shooterId];
-          const shooterInfo = scene.playerInfo?.[shooterId];
-          
-          // Handle both new nested structure (object) and old flat structure (string)
-          const homeTeamField = scene.simData?.home_team;
-          const awayTeamField = scene.simData?.away_team;
-          const homeTeamName = typeof homeTeamField === 'object' ? homeTeamField?.name : homeTeamField;
-          const awayTeamName = typeof awayTeamField === 'object' ? awayTeamField?.name : awayTeamField;
-          const shooterTeamName = shooterTeamId === scene.homeTeamId ? homeTeamName : awayTeamName;
-          
-          const playerData = shooterInfo ? {
-            playerId: shooterId,
-            photo: shooterSprite?.photo || null,
-            teamName: shooterTeamName
-          } : null;
-          
           if (isShootingFoul) {
-            showAnnouncement("It's Good! And 1!", teamStyle, playerData);
+            showAnnouncement("It's Good! And 1!", teamStyle, shooterPlayerData);
           } else {
-            showAnnouncement("It's Good!", teamStyle, playerData);
+            showAnnouncement("It's Good!", teamStyle, shooterPlayerData);
           }
         } else if (result === "MISS" && isShootingFoul) {
-          showAnnouncement("Shooting Foul!", 'neutral');
+          // Get foul player data from turnData
+          let foulPlayerData = null;
+          if (turnData?.foul_player_id) {
+            const foulPlayerId = turnData.foul_player_id;
+            const foulPlayerSprite = scene.playerSprites?.[foulPlayerId];
+            const foulPlayerTeamId = foulPlayerSprite?.team_id;
+            const foulPlayerTeamName = foulPlayerTeamId === scene.homeTeamId ? homeTeamName : awayTeamName;
+            
+            foulPlayerData = {
+              playerId: foulPlayerId,
+              photo: foulPlayerSprite?.photo || null,
+              teamName: foulPlayerTeamName
+            };
+          }
+          
+          showAnnouncement("Shooting Foul!", 'neutral', foulPlayerData);
         }
         
         // Clear shot in progress flag
