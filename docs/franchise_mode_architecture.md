@@ -116,9 +116,53 @@ franchises_collection.update_one(
 
 ---
 
-## 2. RECRUITS (Franchise Doc)
+## 2. RECRUITS (Hybrid: Template Pool + Nested)
 
-### **Storage:**
+### **Architecture: Template Pool Pattern**
+
+**Two Storage Locations:**
+
+1. **`recruits_collection`** (Standalone) → Universal template pool
+2. **`franchise_document.recruits`** (Nested) → Franchise-specific pool
+
+---
+
+### **A. Template Collection (recruits_collection)**
+
+**Purpose:** Universal template pool / seed data
+
+**Structure:**
+```javascript
+// recruits_collection
+{
+  "_id": ObjectId("..."),  // Has MongoDB _id
+  "name": "Henry Buchanan",
+  "attributes": {
+    "SC": 37,
+    "SH": 40,
+    // ... all attributes
+  },
+  "position_ratings": { "PG": 18, "SG": 20, ... },
+  "height": 73,
+  "weight": 197,
+  "archetype": "Three & D",
+  "year": "Freshman",
+  "created_at": "2025-10-14 23:32:31"
+}
+// ... 40 template recruits
+```
+
+**Usage:**
+- Created once (seed data)
+- Read **only** when franchise is created
+- Cloned into `franchise.recruits`
+- **Never modified** during gameplay
+
+**Size:** ~20KB (40 recruits × ~500 bytes)
+
+---
+
+### **B. Nested in Franchise (franchise.recruits)**
 
 **Where:** `franchise_document.recruits` (array)
 
@@ -152,26 +196,73 @@ franchises_collection.update_one(
 }
 ```
 
+**Purpose:** Franchise-specific recruit pool (mutable)
+
 **Characteristics:**
-- Generated at franchise creation
+- Cloned from `recruits_collection` at franchise creation
+- **No `_id` field** (plain objects, not documents)
 - 40 recruits in the pool
 - Have baseline attributes (lower than veterans)
 - Assigned archetype (Pure Shooter, Floor General, etc.)
 - Start as Freshmen
+- **Modified** as recruits are signed
 
-**Size:** ~17KB for 40 recruits
+**Usage:**
+- Always loaded WITH franchise (single query)
+- Accessed during recruiting screen
+- Updated when recruit is signed (removed from array)
+
+**Size:** ~17KB for 40 recruits (2.3% of franchise doc)
 
 ---
 
-### **Recruiting Process (Inferred):**
+### **C. Recruiting Flow:**
 
-1. Franchise starts with 40 recruits in pool
-2. User reviews recruits each off-season
-3. User selects recruits to join their team
-4. Selected recruits move from `franchise.recruits` → `franchise.players`
-5. Recruits gain proper player_id (UUID) and join roster
+**Franchise Creation:**
+```
+1. Query recruits_collection (40 templates)
+2. Clone/randomize for this franchise
+3. Store in franchise.recruits array (strip _id)
+```
 
-**Note:** Recruiting system implementation TBD
+**During Season:**
+```
+1. Load franchise → recruits already in doc ✅
+2. No extra query needed ✅
+```
+
+**Recruit Signing (Inferred - May Not Be Implemented):**
+```
+1. User selects recruit from franchise.recruits
+2. Remove from franchise.recruits array
+3. Add to franchise.players with new UUID
+4. Recruit joins roster with baseline attributes
+```
+
+---
+
+### **D. Why Template Pool Pattern?**
+
+**Benefits:**
+
+✅ **Variety:** Each franchise can get different/randomized recruits  
+✅ **Performance:** No extra queries during gameplay (nested storage)  
+✅ **Maintainability:** Easy to add more templates to collection  
+✅ **Clean separation:** Collection = immutable, nested = mutable
+
+**Comparison to Alternatives:**
+
+❌ **Only standalone with franchise_id:** Extra queries, slower  
+❌ **Only nested, no templates:** Hard-coded recruits, no variety  
+✅ **Hybrid (current):** Templates + nested = best of both worlds
+
+**Analogy:**
+- `players_collection` → Universal baseline (104 players)
+- `franchise.players` → Evolved/franchise-specific stats
+
+Similarly:
+- `recruits_collection` → Universal templates (40 recruits)
+- `franchise.recruits` → Franchise-specific pool
 
 ---
 
