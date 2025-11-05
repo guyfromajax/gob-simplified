@@ -170,14 +170,14 @@ class TeamManager:
     
     def _init_plays_from_universal(self, mode="single"):
         """
-        Initialize plays from universal plays collection.
+        Initialize plays with REFERENCES to universal plays collection (not full skeletons).
         Creates team-specific copy with tracking stats based on mode.
         
         Args:
             mode: "single", "tournament", or "franchise"
             
         Returns:
-            dict: {play_name: play_data} with embedded stats
+            dict: {play_name: play_data} with play_id reference and stats (NO skeletons)
         """
         from BackEnd.db import plays_collection
         
@@ -190,11 +190,11 @@ class TeamManager:
             initial_effectiveness = round(random.uniform(-10, 10), 1)
             
             play_data = {
-                "play_id": str(play["_id"]),
+                "play_id": str(play["_id"]),  # Reference to universal play (the "library card")
                 "name": play["name"],
                 "play_type": play["play_type"], 
                 "play_focus": play["play_focus"],
-                "skeletons": play["skeletons"],
+                # NO SKELETONS - fetched from universal collection when needed
                 "game_stats": {
                     "times_run": 0,
                     "shot_attempts": 0,
@@ -220,7 +220,7 @@ class TeamManager:
             
             plays_dict[play["name"]] = play_data
         
-        print(f"📋 Initialized {len(plays_dict)} plays for {self.name} (mode: {mode})")
+        print(f"📋 Initialized {len(plays_dict)} plays (reference-based) for {self.name} (mode: {mode})")
         return plays_dict
 
     def record_team_foul(self):

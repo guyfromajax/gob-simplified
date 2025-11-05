@@ -88,13 +88,14 @@ def get_default_settings():
 
 def populate_team_plays(mode="single"):
     """
-    Populate team plays from universal plays collection with tracking stats.
+    Populate team plays with REFERENCES to universal plays collection (not full skeletons).
+    This reference-based approach dramatically reduces document size.
     
     Args:
         mode: "single", "tournament", or "franchise"
         
     Returns:
-        dict: {play_name: play_data} with embedded game_stats and optionally season_stats
+        dict: {play_name: play_data} with play_id reference and stats (NO skeletons)
     """
     try:
         from BackEnd.db import plays_collection
@@ -107,11 +108,11 @@ def populate_team_plays(mode="single"):
         for play in all_plays:
             play_name = play["name"]
             play_data = {
-                "play_id": str(play["_id"]),
+                "play_id": str(play["_id"]),  # Reference to universal play (the "library card")
                 "name": play["name"],
                 "play_type": play["play_type"], 
                 "play_focus": play["play_focus"],
-                "skeletons": play["skeletons"],
+                # NO SKELETONS - fetched from universal collection when needed
                 "game_stats": {
                     "times_run": 0,
                     "shot_attempts": 0,
