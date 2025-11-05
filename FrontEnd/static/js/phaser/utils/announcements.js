@@ -84,7 +84,6 @@ export function showAnnouncement(text, team = 'home', playerData = null) {
     }
   }, 2500);
   
-  console.log('📢 Announcement:', text, 'Team:', team, 'Player:', playerData?.playerId || 'none');
 }
 
 /**
@@ -100,16 +99,6 @@ export function announceFromTurnData(turnData, timing = 'start', homeTeamId = nu
   const isHomeTeamEvent = homeTeamId && String(offenseTeamId) === String(homeTeamId);
   const offenseTeam = isHomeTeamEvent ? 'home' : 'away';
   const defenseTeam = isHomeTeamEvent ? 'away' : 'home';
-  console.log('🔔 announceFromTurnData:', { 
-    timing, 
-    result_type: turnData.result_type,
-    offensive_state: turnData.offensive_state,
-    fast_break: turnData.fast_break,
-    fcp_foul: turnData.fcp_foul,
-    hct_foul: turnData.hct_foul,
-    fcp_shot: turnData.fcp_shot,
-    hct_shot: turnData.hct_shot
-  });
   
   if (timing === 'start') {
     // Announcements at turn start

@@ -1079,7 +1079,6 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
       const { animateLeanMeter } = await import('../ui/playcallCenter.js');
       animateLeanMeter(scene._leanScoreToAnimate);
       scene._leanAnimationTriggered = true;
-      console.log(`📊 Lean meter animated at step ${stepIndex}`);
     }
 
     updateBallOwnership({
@@ -1186,13 +1185,6 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
         const shooterInfo = scene.playerInfo?.[shotInfo.playerId];
         const shooterMO = shooterInfo?.attributes?.MO || 5;
         
-        console.log('🔥 AUDIBLE/HOT READ DETECTED:', {
-          intended: turnData.intended_shooter_pos,
-          actual: turnData.shooter_pos,
-          shooterMO: shooterMO,
-          text: shooterMO >= 7 ? 'HOT READ!' : 'AUDIBLE!'
-        });
-        
         // Show popup and wait for it to complete (1.2s)
         await window.showShooterAudible({
           shooterId: shotInfo.playerId,
@@ -1228,7 +1220,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
           const skipRetreat = turnData.next_defensive_setup === "FCP" || turnData.next_defensive_setup === "HCT";
           const pressureType = skipRetreat ? turnData.next_defensive_setup : null;
           if (skipRetreat) {
-            console.log(`${turnData.next_defensive_setup} detected - skipping defensive retreat to midcourt`);
+            // Skip defensive retreat for FCP/HCT
           }
           
           const releaseGuard = createTransitionGuard(scene.stateMachine, [States.Rebound]);
@@ -1385,7 +1377,6 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
                   
                   // Handle made putbacks
                   if (evt.result === "MAKE") {
-                    console.log("Putback made - setting up inbound pass");
                     // Possession flips after made putback
                     const shooterTeamId = rebounderSprite.team_id;
                     const shooterTeamIsHome = String(shooterTeamId) === String(homeTeamId);
@@ -1395,7 +1386,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
                     const skipRetreat = turnData.next_defensive_setup === "FCP" || turnData.next_defensive_setup === "HCT";
                     const pressureType = skipRetreat ? turnData.next_defensive_setup : null;
                     if (skipRetreat) {
-                      console.log(`${turnData.next_defensive_setup} detected after putback - skipping defensive retreat`);
+                      // Skip defensive retreat for FCP/HCT after putback
                     }
                     
                     await runInboundSetup({

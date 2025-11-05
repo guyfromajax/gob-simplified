@@ -236,12 +236,6 @@ export function shootBall({
   turnIndex,
   turnData = null
 }) {
-  console.log('🎯 shootBall: Starting', {
-    shooterId,
-    result,
-    ballSpriteType: ballSprite?.constructor?.name
-  });
-  
   if (!scene || !ballSprite) return Promise.resolve();
   if (scene?.stateMachine?.is(States.FreeThrow)) return Promise.resolve();
   cancelBallTween(scene, ballSprite);
@@ -555,7 +549,6 @@ export function shootBall({
             scene.time.delayedCall(50, () => {
               scene._shotInProgress = false;
               scene.ballDetached = false;
-              console.log('🏀 shootBall: Flags reset after bounce, ball following re-enabled');
               resolve(miss);
             });
           });
