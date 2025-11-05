@@ -441,9 +441,6 @@ class TurnManager:
         result["homeFouls"] = self.game.home_team.team_fouls
         result["awayFouls"] = self.game.away_team.team_fouls
         
-        # Debug: Log team fouls
-        if self.game.home_team.team_fouls > 0 or self.game.away_team.team_fouls > 0:
-            print(f"🟨 TEAM FOULS - Home: {self.game.home_team.team_fouls}, Away: {self.game.away_team.team_fouls}")
         result["clock"] = self.game.game_state["clock"]
         result["quarter"] = self.game.game_state["quarter"]
         result["period_label"] = self.game.game_state.get("period_label")
