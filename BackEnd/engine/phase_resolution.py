@@ -663,7 +663,23 @@ def resolve_half_court_offense_logic(game):
     # Pass lean_score to select the appropriate skeleton variant
     skeleton = get_hco_skeleton(None, game, lean_score=lean_score)
     
+    # Get the successful variant to determine intended shooter
+    successful_skeleton = get_hco_skeleton(None, game, lean_score=1.0)  # Force successful variant
+    
     roles = game.turn_manager.assign_roles(off_call, def_call, skeleton=skeleton)
+    
+    # Extract intended shooter from successful variant
+    intended_shooter_pos = None
+    if successful_skeleton and "steps" in successful_skeleton and successful_skeleton["steps"]:
+        final_step = successful_skeleton["steps"][-1]
+        for pos, action_info in final_step.get("pos_actions", {}).items():
+            action = action_info.get("action", "").lower()
+            if action == "shoot":
+                intended_shooter_pos = pos
+                break
+    
+    # Store intended shooter in roles for later comparison
+    roles["intended_shooter_pos"] = intended_shooter_pos
     
     # print("inside resolve_half_court_offense_logic")
     # print("[DEBUG] roles:", roles.keys())

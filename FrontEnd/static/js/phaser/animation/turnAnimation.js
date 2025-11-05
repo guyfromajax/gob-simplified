@@ -1174,6 +1174,35 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
       //   result: shootParams.result,
       //   fromCoords: shootParams.fromCoords
       // });
+      
+      // Check if this is an audible/hot read (shooter different from intended)
+      if (typeof window.showShooterAudible === 'function' && 
+          turnData.shooter_pos && 
+          turnData.intended_shooter_pos && 
+          turnData.shooter_pos !== turnData.intended_shooter_pos) {
+        
+        // Get shooter info
+        const shooterSprite = playerSprites[shotInfo.playerId];
+        const shooterInfo = scene.playerInfo?.[shotInfo.playerId];
+        const shooterMO = shooterInfo?.attributes?.MO || 5;
+        
+        console.log('🔥 AUDIBLE/HOT READ DETECTED:', {
+          intended: turnData.intended_shooter_pos,
+          actual: turnData.shooter_pos,
+          shooterMO: shooterMO,
+          text: shooterMO >= 7 ? 'HOT READ!' : 'AUDIBLE!'
+        });
+        
+        // Show popup and wait for it to complete (0.8s)
+        await window.showShooterAudible({
+          shooterId: shotInfo.playerId,
+          shooterPhoto: shooterSprite?.photo || null,
+          shooterMO: shooterMO,
+          shooterPos: turnData.shooter_pos,
+          intendedPos: turnData.intended_shooter_pos
+        });
+      }
+      
       const shotResult = await shootBall(shootParams);
       // console.log("🏀 HCO SHOT - shootBall returned", shotResult);
       const ballSpot = shotResult?.grid;
