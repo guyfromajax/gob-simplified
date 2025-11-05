@@ -1068,18 +1068,13 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   });
 
   // Initial active player display update
-  if (typeof window.updateActivePlayersDisplay === 'function' && !scene.skipToEnd) {
-    let ballHandlerId = null;
-    for (const anim of turnData.animations || []) {
-      if (anim.hasBallAtStep?.[0]) {
-        ballHandlerId = anim.playerId;
-        break;
-      }
-    }
-    const defenderId = turnData.defender_id || null;
+  if (!scene.skipToEnd) {
+    const { getBallHandlerIdFromTurn, getDefenderIdFromTurn, updateActivePlayers } = await import('../utils/activePlayerDisplay.js');
+    const ballHandlerId = getBallHandlerIdFromTurn(turnData, 0);
+    const defenderId = getDefenderIdFromTurn(turnData);
     const homeTeamId = scene.simData?.home_team_id || null;
     if (ballHandlerId && homeTeamId) {
-      window.updateActivePlayersDisplay(ballHandlerId, defenderId, homeTeamId, playerSprites);
+      updateActivePlayers(ballHandlerId, defenderId, homeTeamId, playerSprites);
     }
   }
 
@@ -1108,22 +1103,13 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
     });
 
     // Update active player displays in scoreboard
-    if (typeof window.updateActivePlayersDisplay === 'function' && !scene.skipToEnd) {
-      // Find current ball handler
-      let ballHandlerId = null;
-      for (const anim of turnData.animations || []) {
-        if (anim.hasBallAtStep?.[stepIndex]) {
-          ballHandlerId = anim.playerId;
-          break;
-        }
-      }
-      
-      // Get defender info from turnData
-      const defenderId = turnData.defender_id || null;
+    if (!scene.skipToEnd) {
+      const { getBallHandlerIdFromTurn, getDefenderIdFromTurn, updateActivePlayers } = await import('../utils/activePlayerDisplay.js');
+      const ballHandlerId = getBallHandlerIdFromTurn(turnData, stepIndex);
+      const defenderId = getDefenderIdFromTurn(turnData);
       const homeTeamId = scene.simData?.home_team_id || null;
-      
       if (ballHandlerId && homeTeamId) {
-        window.updateActivePlayersDisplay(ballHandlerId, defenderId, homeTeamId, playerSprites);
+        updateActivePlayers(ballHandlerId, defenderId, homeTeamId, playerSprites);
       }
     }
 
