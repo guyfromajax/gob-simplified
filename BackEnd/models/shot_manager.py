@@ -329,12 +329,17 @@ class ShotManager:
             time_elapsed += get_time_elapsed(tempo)
 
         shooter_pos = get_player_position(off_lineup, shooter)
+        
+        # Get intended shooter (from successful variant) for audible/hot read popup
+        intended_shooter_pos = roles.get("intended_shooter_pos")
 
         result.update({
             "result_type": "MAKE" if made else "MISS",
             "ball_handler": shooter,
             "shooter": shooter,
             "shooter_id": shooter.player_id,
+            "shooter_pos": shooter_pos,
+            "intended_shooter_pos": intended_shooter_pos,  # For audible/hot read popup
             "screener": screener,
             "passer": passer,
             "defender": defender,

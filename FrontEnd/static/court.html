@@ -914,6 +914,62 @@
       50% { box-shadow: 0 0 30px #E74C3C, 0 0 40px #E74C3C; }
     }
 
+    /* ==================== HOT READ / AUDIBLE POPUP ==================== */
+    #shooter-audible-popup {
+      position: fixed;
+      bottom: 140px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.9);
+      padding: 20px 40px;
+      border-radius: 12px;
+      border: 3px solid #FF6200;
+      font-family: 'Bebas Neue', sans-serif;
+      text-align: center;
+      pointer-events: none;
+      z-index: 1050; /* Above HUD (1000) and controls (950) */
+      opacity: 0;
+      display: none;
+    }
+
+    #shooter-audible-popup.show {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      animation: audibleReveal 0.8s ease-out forwards;
+    }
+
+    .audible-headshot-container {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      overflow: hidden;
+      border: 3px solid #FF6200;
+      background: #1a1a1a;
+    }
+
+    .audible-headshot {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .audible-text {
+      font-size: 48px;
+      font-weight: bold;
+      color: #FF6200;
+      text-shadow: 0 0 20px rgba(255, 98, 0, 0.8);
+      letter-spacing: 2px;
+    }
+
+    @keyframes audibleReveal {
+      0%   { opacity: 0; transform: translateX(-50%) scale(0.7); }
+      25%  { opacity: 1; transform: translateX(-50%) scale(1.1); }
+      75%  { opacity: 1; transform: translateX(-50%) scale(1); }
+      100% { opacity: 0; transform: translateX(-50%) scale(0.9); }
+    }
+
     /* ==================== RESULT POPUP ==================== */
     .result-popup {
       position: fixed;
@@ -1751,6 +1807,14 @@
     <div class="hud-ev"></div>
   </div>
 
+  <!-- ==================== HOT READ / AUDIBLE POPUP ==================== -->
+  <div id="shooter-audible-popup">
+    <div class="audible-headshot-container">
+      <img class="audible-headshot" src="" alt="Player">
+    </div>
+    <div class="audible-text"></div>
+  </div>
+
   <!-- ==================== SCRIPTS ==================== -->
   <script>
     // console.log('🚨 HTML: Basic JavaScript is working!');
@@ -2149,6 +2213,45 @@
       setTimeout(() => {
         hud.classList.remove('show');
       }, 2500);
+    };
+
+    // ==================== HOT READ / AUDIBLE POPUP FUNCTION ====================
+    /**
+     * Show popup when actual shooter differs from intended shooter
+     * Called before shot animation in turnAnimation.js
+     * @param {Object} data - { shooterId, shooterPhoto, shooterMO, shooterPos, intendedPos }
+     */
+    window.showShooterAudible = function(data) {
+      const popup = document.getElementById('shooter-audible-popup');
+      if (!popup) return;
+
+      const headshotEl = popup.querySelector('.audible-headshot');
+      const textEl = popup.querySelector('.audible-text');
+
+      // Set player headshot
+      if (data.shooterPhoto) {
+        headshotEl.src = data.shooterPhoto;
+        headshotEl.style.display = 'block';
+      } else {
+        headshotEl.style.display = 'none';
+      }
+
+      // Determine text based on MO attribute
+      const mo = data.shooterMO || 5;
+      const text = mo >= 7 ? "HOT READ!" : "AUDIBLE!";
+      textEl.textContent = text;
+
+      // Show popup
+      popup.classList.add('show');
+      void popup.offsetWidth; // Force reflow
+
+      // Hide after 0.8s
+      setTimeout(() => {
+        popup.classList.remove('show');
+      }, 800);
+
+      // Return promise that resolves after animation completes
+      return new Promise(resolve => setTimeout(resolve, 800));
     };
   </script>
 
