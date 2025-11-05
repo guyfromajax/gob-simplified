@@ -93,6 +93,27 @@ export function updatePlaycallCenter(turnData, homeTeamId) {
 
   // Reset lean meter to neutral
   resetLeanMeter();
+
+  // ==================== TRIGGER PLAYCALL REVEAL HUD ====================
+  // Show transient HUD overlay with playcall info
+  if (typeof window.showPlaycallReveal === 'function' && playType && playFocus && defenseType) {
+    // Calculate simple EV placeholder (can be replaced with real data)
+    const ev = Math.random() * 2; // 0.0 to 2.0
+    
+    window.showPlaycallReveal({
+      offense: {
+        type: playType,
+        focus: playFocus
+      },
+      defense: {
+        type: defenseType,
+        aggression: aggression
+      },
+      ev: ev.toFixed(1),
+      // hotPlayer can be added later if available in turnData
+      hotPlayer: null
+    });
+  }
 }
 
 /**

@@ -800,6 +800,120 @@
       color: rgba(244, 67, 54, 0.8);
     }
 
+    /* ==================== PLAYCALL REVEAL HUD ==================== */
+    #playcall-hud {
+      position: fixed;
+      bottom: 140px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.85);
+      padding: 20px 40px;
+      border-radius: 12px;
+      border: 3px solid #FFD700;
+      font-family: 'Bebas Neue', sans-serif;
+      text-align: center;
+      pointer-events: none;
+      z-index: 1000;
+      opacity: 0;
+      display: none;
+    }
+
+    #playcall-hud.show {
+      display: block;
+      animation: hudReveal 1.2s ease-out forwards;
+    }
+
+    #playcall-hud .hud-defense {
+      font-size: 36px;
+      margin-bottom: 8px;
+    }
+
+    #playcall-hud .hud-offense {
+      font-size: 42px;
+      font-weight: bold;
+    }
+
+    #playcall-hud .hud-ev {
+      font-size: 24px;
+      margin-top: 8px;
+      color: #00FF88;
+    }
+
+    @keyframes hudReveal {
+      0%   { opacity: 0; transform: translateX(-50%) translateY(50px) scale(0.8); }
+      30%  { opacity: 1; transform: translateX(-50%) translateY(0) scale(1.1); }
+      70%  { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+      100% { opacity: 0; transform: translateX(-50%) translateY(-30px) scale(0.9); }
+    }
+
+    /* ==================== COLOR-CODED ACTIVE BUTTON STATES ==================== */
+    .playcall-option {
+      transition: all 0.2s ease;
+    }
+
+    /* Offense Type */
+    .playcall-option.active[data-type="motion"] {
+      background: linear-gradient(45deg, #FFD700, #FFAA00) !important;
+      box-shadow: 0 0 20px #FFD700 !important;
+      border-color: #FFD700 !important;
+      color: #000 !important;
+    }
+
+    .playcall-option.active[data-type="set_play"] {
+      border: 3px solid #FF6200 !important;
+      box-shadow: 0 0 15px #FF6200 !important;
+    }
+
+    /* Offense Focus */
+    .playcall-option.active[data-focus="inside"] {
+      background: linear-gradient(45deg, #00FF88, #00CC66) !important;
+      box-shadow: 0 0 25px #00FF88 !important;
+      color: #000 !important;
+    }
+
+    .playcall-option.active[data-focus="attack"] {
+      background: linear-gradient(45deg, #007BFF, #0056b3) !important;
+      box-shadow: 0 0 25px #007BFF !important;
+    }
+
+    .playcall-option.active[data-focus="outside"] {
+      background: linear-gradient(45deg, #FF3B30, #cc2a22) !important;
+      box-shadow: 0 0 25px #FF3B30 !important;
+    }
+
+    /* Defense Type */
+    .playcall-option.active[data-defense="man"] {
+      background: linear-gradient(45deg, #A0A0A0, #D0D0D0) !important;
+      color: #000 !important;
+    }
+
+    .playcall-option.active[data-defense="zone"] {
+      background: linear-gradient(45deg, #8E44AD, #BB86FC) !important;
+      color: #fff !important;
+    }
+
+    /* Defense Aggression */
+    .playcall-option.active[data-aggression="passive"] {
+      border: 2px solid #666666 !important;
+      box-shadow: 0 0 10px #666666 !important;
+    }
+
+    .playcall-option.active[data-aggression="normal"] {
+      border: 2px solid #999999 !important;
+      box-shadow: 0 0 10px #999999 !important;
+    }
+
+    .playcall-option.active[data-aggression="aggressive"] {
+      border: 3px solid #E74C3C !important;
+      box-shadow: 0 0 20px #E74C3C !important;
+      animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { box-shadow: 0 0 20px #E74C3C; }
+      50% { box-shadow: 0 0 30px #E74C3C, 0 0 40px #E74C3C; }
+    }
+
     /* ==================== RESULT POPUP ==================== */
     .result-popup {
       position: fixed;
@@ -1630,6 +1744,13 @@
     </div>
   </div>
 
+  <!-- ==================== PLAYCALL REVEAL HUD ==================== -->
+  <div id="playcall-hud">
+    <div class="hud-defense"></div>
+    <div class="hud-offense"></div>
+    <div class="hud-ev"></div>
+  </div>
+
   <!-- ==================== SCRIPTS ==================== -->
   <script>
     // console.log('🚨 HTML: Basic JavaScript is working!');
@@ -1967,6 +2088,55 @@
     
     // Also try after a longer delay in case Phaser takes time to initialize
     setTimeout(updatePlaycallPosition, 500);
+
+    // ==================== PLAYCALL REVEAL HUD FUNCTION ====================
+    /**
+     * Show the transient HUD overlay revealing the playcalls
+     * Called at turn start from updatePlaycallCenter
+     */
+    window.showPlaycallReveal = function(data) {
+      const hud = document.getElementById('playcall-hud');
+      if (!hud) return;
+
+      const defenseEl = hud.querySelector('.hud-defense');
+      const offenseEl = hud.querySelector('.hud-offense');
+      const evEl = hud.querySelector('.hud-ev');
+
+      // Defense type (Man or Zone)
+      const defenseType = data.defense.type || 'MAN';
+      defenseEl.textContent = defenseType.toUpperCase();
+      defenseEl.style.color = {
+        'man': '#D0D0D0',
+        'zone': '#BB86FC'
+      }[defenseType.toLowerCase()] || '#999';
+
+      // Offense (Type → Focus)
+      const offenseType = data.offense.type || 'MOTION';
+      const offenseFocus = data.offense.focus || 'INSIDE';
+      const focusColors = {
+        'inside': '#00FF88',
+        'attack': '#007BFF',
+        'outside': '#FF3B30'
+      };
+      offenseEl.innerHTML = `
+        <span style="color: #FFD700">${offenseType.toUpperCase()}</span> → 
+        <span style="color: ${focusColors[offenseFocus.toLowerCase()] || '#FFD700'}">${offenseFocus.toUpperCase()}</span>
+      `;
+
+      // EV + Hot Player (optional)
+      const hot = data.hotPlayer ? `${data.hotPlayer.pos} #${data.hotPlayer.jersey} ` : '';
+      const evValue = data.ev !== undefined ? `+${data.ev}` : '+0.0';
+      evEl.textContent = `${hot}${evValue} EV`;
+
+      // Show HUD
+      hud.classList.add('show');
+      void hud.offsetWidth; // Force reflow for animation
+
+      // Hide after 1.2s
+      setTimeout(() => {
+        hud.classList.remove('show');
+      }, 1200);
+    };
   </script>
 
   
