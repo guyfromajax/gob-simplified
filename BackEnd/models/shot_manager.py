@@ -211,6 +211,7 @@ class ShotManager:
                 # AND-1 situation
                 self.game_state["shooter"] = shooter 
                 foul_player.record_stat("F")
+                def_team.team_fouls += 1  # Increment team fouls for shooting foul
                 self.game_state["foul_team"] = "DEFENSE"
                 self.game_state["offensive_state"] = "FREE_THROW"
                 self.game_state["free_throws"] = 1
@@ -237,6 +238,7 @@ class ShotManager:
                 # Shooting foul → free throws
                 self.game_state["shooter"] = shooter 
                 foul_player.record_stat("F")
+                def_team.team_fouls += 1  # Increment team fouls for shooting foul
                 self.game_state["foul_team"] = "DEFENSE"
                 self.game_state["offensive_state"] = "FREE_THROW"
                 self.game_state["free_throws"] = 3 if is_three else 2
