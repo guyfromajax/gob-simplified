@@ -120,31 +120,33 @@ def resolve_non_shooting_foul(roles, game):
         off_team.team_fouls += 1
         text = f"{get_name_safe(foul_player)} commits an offensive foul!"
 
-    # foul_type = random.choice(["SHOOTING", "NON_SHOOTING"]) if foul_team == "DEFENSE" else "NON_SHOOTING" # Future logic: determine if this was shooting or not
-    # foul_type = "NON_SHOOTING"
-
-    # if foul_type == "SHOOTING":
-    #     game_state["offensive_state"] = "FREE_THROW"
-    #     game_state["free_throws"] = 2  # Future: support 3 FT on 3PT attempt
-    #     game_state["free_throws_remaining"] = 2
-    #     game_state["last_ball_handler"] = ball_handler
-    #     ball_handler = shooter
-    
-    if def_team.team_fouls >= 10:
-        game_state["offensive_state"] = "FREE_THROW"
-        game_state["free_throws"] = 2
-        game_state["free_throws_remaining"] = 2
-        game_state["one_and_one"] = False
-        game_state["last_ball_handler"] = ball_handler
-        game_state["shooter"] = ball_handler
-    elif def_team.team_fouls >= 5:
-        game_state["offensive_state"] = "FREE_THROW"
-        game_state["free_throws"] = 2
-        game_state["free_throws_remaining"] = 2
-        game_state["one_and_one"] = True
-        game_state["last_ball_handler"] = ball_handler
-        game_state["shooter"] = ball_handler
+    # Bonus free throw logic - ONLY for defensive fouls
+    # Offensive fouls NEVER award free throws (always possession change)
+    if foul_team == def_team:
+        # Defensive foul - check for bonus free throws
+        if def_team.team_fouls >= 10:
+            # Double bonus (10+ fouls): 2 free throws, no 1 & 1
+            game_state["offensive_state"] = "FREE_THROW"
+            game_state["free_throws"] = 2
+            game_state["free_throws_remaining"] = 2
+            game_state["one_and_one"] = False
+            game_state["last_ball_handler"] = ball_handler
+            game_state["shooter"] = ball_handler
+        elif def_team.team_fouls >= 5:
+            # Bonus (5-9 fouls): 1 & 1 free throws
+            game_state["offensive_state"] = "FREE_THROW"
+            game_state["free_throws"] = 2  # Maximum possible (if front end is made)
+            game_state["free_throws_remaining"] = 1  # Start with 1 (front end)
+            game_state["one_and_one"] = True
+            game_state["last_ball_handler"] = ball_handler
+            game_state["shooter"] = ball_handler
+        else:
+            # Less than 5 fouls: possession change, side inbound
+            game_state["offensive_state"] = "HCO"
+            game_state["free_throws"] = 0
+            game_state["free_throws_remaining"] = 0
     else:
+        # Offensive foul - ALWAYS possession change, no free throws
         game_state["offensive_state"] = "HCO"
         game_state["free_throws"] = 0
         game_state["free_throws_remaining"] = 0
