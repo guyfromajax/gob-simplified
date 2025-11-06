@@ -913,17 +913,20 @@
 
     /* ==================== QUICK ADJUST WINDOW ==================== */
     #quick-adjust-window {
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      background: linear-gradient(135deg, rgba(0, 0, 0, 0.95), rgba(20, 20, 20, 0.95));
-      border: 3px solid #FFD700;
+      position: fixed !important;
+      top: 50% !important;
+      left: 50% !important;
+      transform: translate(-50%, -50%) !important;
+      background: rgba(255, 0, 0, 0.95) !important; /* TEMP: Bright red for debugging */
+      border: 10px solid #00FF00 !important; /* TEMP: Bright green border */
       border-radius: 16px;
       padding: 30px 40px;
-      z-index: 1100;
+      z-index: 99999 !important; /* TEMP: Maximum z-index */
       box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8);
       min-width: 500px;
+      opacity: 1 !important;
+      visibility: visible !important;
+      pointer-events: auto !important;
     }
 
     .quick-adjust-header {
