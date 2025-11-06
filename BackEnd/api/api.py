@@ -91,6 +91,16 @@ class QuarterSimulationRequest(BaseModel):
 
 ongoing_games: dict[str, GameManager] = {}
 
+
+class TurnSimulationRequest(BaseModel):
+    game_id: str
+    # Optional user overrides for this specific turn
+    offense_override: str | None = None  # e.g., "Inside", "Attack", "Outside"
+    defense_override: str | None = None  # e.g., "Zone", "Man"
+    # Mode context
+    mode: str | None = None  # "single", "tournament", or "franchise"
+
+
 # Helper functions for tournament/franchise mode
 def load_player_attributes_from_doc(mode: str, doc_id: str, player_id: str):
     """Load player attributes (EM, CH, MO) from tournament/franchise doc."""
@@ -844,6 +854,102 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
         turns[0] if turns else None,
     )
     return frontend_summary
+
+
+@app.post("/api/simulate-turn")
+def simulate_turn_endpoint(request: TurnSimulationRequest):
+    """
+    Simulate a single turn for turn-by-turn gameplay.
+    
+    This endpoint:
+    1. Retrieves the GameManager from ongoing_games
+    2. Applies user overrides (if any) for this turn
+    3. Simulates ONE turn (one call to gm.simulate_macro_turn())
+    4. Returns the turn data + game state metadata
+    5. Saves game state periodically
+    """
+    game_id = request.game_id
+    
+    # Get the GameManager from memory
+    gm = ongoing_games.get(game_id)
+    if gm is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Game {game_id} not found. Start a quarter first with /api/simulate-quarter"
+        )
+    
+    # Apply user overrides for THIS turn only
+    if request.offense_override:
+        gm.game_state["user_offense_override"] = request.offense_override
+        logging.info(f"🎮 User offense override: {request.offense_override}")
+    
+    if request.defense_override:
+        gm.game_state["user_defense_override"] = request.defense_override
+        logging.info(f"🎮 User defense override: {request.defense_override}")
+    
+    # Check if quarter is already over
+    if gm.game_state["time_remaining"] <= 0:
+        return {
+            "quarter_complete": True,
+            "game_id": game_id,
+            "quarter": gm.quarter,
+            "time_remaining": 0,
+            "home_score": gm.score.get(gm.home_team.name, 0),
+            "away_score": gm.score.get(gm.away_team.name, 0),
+            "turn": None
+        }
+    
+    # Simulate ONE turn
+    try:
+        gm.simulate_macro_turn()
+        
+        # Update team fouls in game state
+        gm.game_state["team_fouls"] = {
+            gm.home_team.name: gm.home_team.team_fouls,
+            gm.away_team.name: gm.away_team.team_fouls,
+        }
+        
+        # Get the most recent turn
+        latest_turn = gm.turns[-1] if gm.turns else None
+        
+        # Check if quarter is now complete
+        quarter_complete = gm.game_state["time_remaining"] <= 0
+        
+        # Save game state to database every 10 turns (for crash recovery)
+        if len(gm.turns) % 10 == 0 or quarter_complete:
+            try:
+                db_summary = summarize_game_state(gm, exclude_animations=True)
+                games_collection.update_one({"_id": game_id}, {"$set": db_summary}, upsert=True)
+                logging.info(f"💾 Saved game state at turn {len(gm.turns)}")
+            except Exception as e:
+                logging.error(f"Failed to save game state: {e}")
+        
+        # Return turn data + metadata
+        return {
+            "turn": latest_turn,
+            "next_offensive_state": gm.game_state.get("offensive_state", "HCO"),
+            "time_remaining": gm.game_state["time_remaining"],
+            "clock": gm.game_state.get("clock", "8:00"),
+            "quarter_complete": quarter_complete,
+            "quarter": gm.quarter,
+            "home_score": gm.score.get(gm.home_team.name, 0),
+            "away_score": gm.score.get(gm.away_team.name, 0),
+            "home_team_fouls": gm.home_team.team_fouls,
+            "away_team_fouls": gm.away_team.team_fouls,
+            "offense_team": gm.offense_team.name,
+            "defense_team": gm.defense_team.name,
+            "game_id": game_id,
+            # Box score for real-time updates
+            "box_score": gm.get_box_score(),
+            "team_totals": {
+                gm.home_team.name: gm.home_team.get_team_game_stats(),
+                gm.away_team.name: gm.away_team.get_team_game_stats()
+            }
+        }
+        
+    except Exception as e:
+        logging.exception(f"Failed to simulate turn for game {game_id}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/roster/{team_name}")
