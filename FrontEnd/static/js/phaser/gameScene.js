@@ -1308,6 +1308,11 @@ export function createGameScene(Phaser) {
           window.nextOffenseOverride = null;
           window.nextDefenseOverride = null;
           
+          // Clear visual selections on clipboard
+          if (window.clearClipboardSelections) {
+            window.clearClipboardSelections();
+          }
+          
           const response = await fetch('/api/simulate-turn', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
