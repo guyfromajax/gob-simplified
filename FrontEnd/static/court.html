@@ -291,6 +291,13 @@
       justify-content: flex-start; /* Push content toward center */
     }
 
+    .active-player-info {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+
     .active-player-headshot {
       width: 60px;
       height: 60px;
@@ -347,6 +354,19 @@
 
     .audible-label.show {
       opacity: 1;
+    }
+
+    .player-name-label {
+      font-size: 10px;
+      font-weight: bold;
+      color: rgba(255, 255, 255, 0.9);
+      text-align: center;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+      white-space: nowrap;
+      line-height: 1.2;
+      max-width: 80px;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     /* Home TOL/F - Grid column 22 */
@@ -1552,7 +1572,10 @@
     
     <!-- Away Active Player - Grid column 8 -->
     <div id="away-active-player" class="active-player-display away-side">
-      <img id="away-active-headshot" class="active-player-headshot" src="" alt="" />
+      <div class="active-player-info">
+        <img id="away-active-headshot" class="active-player-headshot" src="" alt="" />
+        <div id="away-player-name" class="player-name-label"></div>
+      </div>
       <div id="away-player-role" class="player-role-icon">🏀</div>
       <div id="away-audible-text" class="audible-label"></div>
     </div>
@@ -1631,9 +1654,12 @@
     
     <!-- Home Active Player - Grid column 20 -->
     <div id="home-active-player" class="active-player-display home-side">
-      <img id="home-active-headshot" class="active-player-headshot" src="" alt="" />
-      <div id="home-player-role" class="player-role-icon">D</div>
       <div id="home-audible-text" class="audible-label"></div>
+      <div id="home-player-role" class="player-role-icon">D</div>
+      <div class="active-player-info">
+        <img id="home-active-headshot" class="active-player-headshot" src="" alt="" />
+        <div id="home-player-name" class="player-name-label"></div>
+      </div>
     </div>
     
     <!-- COMMENTED OUT: Now shown in Playcall Center below court -->
@@ -2441,6 +2467,8 @@
       const homeRole = document.getElementById('home-player-role');
       const awayAudible = document.getElementById('away-audible-text');
       const homeAudible = document.getElementById('home-audible-text');
+      const awayName = document.getElementById('away-player-name');
+      const homeName = document.getElementById('home-player-name');
 
       if (!awayDisplay || !homeDisplay) return;
 
@@ -2458,6 +2486,14 @@
       const ballHandlerTeamId = ballHandlerSprite.team_id;
       const isBallHandlerHome = String(ballHandlerTeamId) === String(homeTeamId);
 
+      // Helper to format player name display
+      const formatPlayerName = (sprite) => {
+        if (!sprite) return '';
+        const jersey = sprite.jersey || '';
+        const lastName = sprite.name ? sprite.name.split(' ').pop() : '';
+        return jersey && lastName ? `#${jersey} ${lastName}` : (lastName || `#${jersey}` || '');
+      };
+
       // Set ball handler display
       if (isBallHandlerHome) {
         // Home team has ball - show on home side (right)
@@ -2465,6 +2501,7 @@
         homeHeadshot.className = 'active-player-headshot has-ball';
         homeRole.textContent = '🏀';
         homeRole.className = 'player-role-icon ball';
+        if (homeName) homeName.textContent = formatPlayerName(ballHandlerSprite);
         homeDisplay.classList.add('visible');
         
         // Show defender on away side (left) if available
@@ -2473,6 +2510,7 @@
           awayHeadshot.className = 'active-player-headshot defender';
           awayRole.textContent = 'D';
           awayRole.className = 'player-role-icon defense';
+          if (awayName) awayName.textContent = formatPlayerName(defenderSprite);
           awayDisplay.classList.add('visible');
         } else {
           awayDisplay.classList.remove('visible');
@@ -2483,6 +2521,7 @@
         awayHeadshot.className = 'active-player-headshot has-ball';
         awayRole.textContent = '🏀';
         awayRole.className = 'player-role-icon ball';
+        if (awayName) awayName.textContent = formatPlayerName(ballHandlerSprite);
         awayDisplay.classList.add('visible');
         
         // Show defender on home side (right) if available
@@ -2491,6 +2530,7 @@
           homeHeadshot.className = 'active-player-headshot defender';
           homeRole.textContent = 'D';
           homeRole.className = 'player-role-icon defense';
+          if (homeName) homeName.textContent = formatPlayerName(defenderSprite);
           homeDisplay.classList.add('visible');
         } else {
           homeDisplay.classList.remove('visible');
