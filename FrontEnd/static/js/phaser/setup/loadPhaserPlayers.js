@@ -86,6 +86,8 @@ export function loadPhaserPlayers(
     sprite.team_id = player.team_id; // e.g., "MORRISTOWN"
     sprite.team = player.team;       // e.g., "home" or "away"
     sprite.playerId = id;
+    sprite.jersey = player.jersey;   // Jersey number
+    sprite.name = player.name;       // Full name
 
     playerSprites[id] = sprite;
   }
