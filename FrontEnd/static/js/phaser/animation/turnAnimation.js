@@ -989,16 +989,6 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
     console.warn('⚠️ playTurnAnimation called for turn without animations:', turnData.result_type);
     return;
   }
-  
-  // DEBUG: Log turn data structure for override debugging
-  console.log('🔍 playTurnAnimation DEBUG:', {
-    result_type: turnData.result_type,
-    play_name: turnData.play_name,
-    animations_count: turnData.animations?.length,
-    animations_sample: turnData.animations?.[0],
-    has_skeleton: !!turnData.skeleton,
-    maxSteps: turnData.animations ? Math.max(...turnData.animations.map(anim => anim.movement?.length || 0)) : 0
-  });
 
   scene.passInFlight = false;
   scene.ballDetached = false;
