@@ -911,6 +911,135 @@
     }
     */
 
+    /* ==================== QUICK ADJUST WINDOW ==================== */
+    #quick-adjust-window {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: linear-gradient(135deg, rgba(0, 0, 0, 0.95), rgba(20, 20, 20, 0.95));
+      border: 3px solid #FFD700;
+      border-radius: 16px;
+      padding: 30px 40px;
+      z-index: 1100;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8);
+      min-width: 500px;
+    }
+
+    .quick-adjust-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+
+    .quick-adjust-header h3 {
+      color: #FFD700;
+      font-size: 24px;
+      font-weight: 700;
+      margin: 0;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+    }
+
+    .adjust-timer {
+      font-size: 32px;
+      font-weight: 700;
+      color: #4CAF50;
+      font-family: 'Courier New', monospace;
+    }
+
+    .adjust-timer.warning {
+      color: #FFC107;
+    }
+
+    .adjust-timer.critical {
+      color: #F44336;
+    }
+
+    .progress-bar-container {
+      width: 100%;
+      height: 12px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 6px;
+      overflow: hidden;
+      margin-bottom: 25px;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #4CAF50, #8BC34A);
+      width: 100%;
+      transition: width 0.1s linear, background 0.3s ease;
+    }
+
+    .progress-bar-fill.warning {
+      background: linear-gradient(90deg, #FFC107, #FFD54F);
+    }
+
+    .progress-bar-fill.critical {
+      background: linear-gradient(90deg, #F44336, #EF5350);
+    }
+
+    .quick-adjust-options {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .quick-adjust-btn {
+      padding: 16px 20px;
+      background: rgba(255, 255, 255, 0.1);
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-radius: 8px;
+      color: rgba(255, 255, 255, 0.7);
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .quick-adjust-btn:hover {
+      background: rgba(255, 215, 0, 0.2);
+      border-color: #FFD700;
+      color: #FFD700;
+      transform: scale(1.05);
+    }
+
+    .quick-adjust-btn.selected {
+      background: rgba(255, 215, 0, 0.4);
+      border-color: #FFD700;
+      color: #FFD700;
+      box-shadow: 0 0 20px rgba(255, 215, 0, 0.6);
+      font-weight: 700;
+    }
+
+    .quick-adjust-actions {
+      display: flex;
+      justify-content: center;
+    }
+
+    .skip-adjust-btn {
+      padding: 12px 30px;
+      background: rgba(255, 255, 255, 0.1);
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-radius: 8px;
+      color: rgba(255, 255, 255, 0.6);
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .skip-adjust-btn:hover {
+      background: rgba(255, 255, 255, 0.2);
+      border-color: rgba(255, 255, 255, 0.5);
+      color: rgba(255, 255, 255, 0.9);
+    }
+
     /* ==================== PLAYCALL REVEAL HUD ==================== */
     #playcall-hud {
       position: fixed;
@@ -1999,6 +2128,26 @@
   </div>
   -->
 
+  <!-- ==================== QUICK ADJUST WINDOW ==================== -->
+  <div id="quick-adjust-window" style="display: none;">
+    <div class="quick-adjust-header">
+      <h3>Quick Adjustment</h3>
+      <div id="quick-adjust-timer" class="adjust-timer">5.0s</div>
+    </div>
+    <div id="quick-adjust-progress-bar" class="progress-bar-container">
+      <div id="quick-adjust-progress-fill" class="progress-bar-fill"></div>
+    </div>
+    <div class="quick-adjust-options">
+      <button class="quick-adjust-btn" data-playcall="Inside">Inside</button>
+      <button class="quick-adjust-btn" data-playcall="Attack">Attack</button>
+      <button class="quick-adjust-btn" data-playcall="Outside">Outside</button>
+      <button class="quick-adjust-btn" data-playcall="Freelance">Freelance</button>
+    </div>
+    <div class="quick-adjust-actions">
+      <button id="quick-adjust-skip" class="skip-adjust-btn">Continue (Auto)</button>
+    </div>
+  </div>
+
   <!-- ==================== SCRIPTS ==================== -->
   <script>
     // console.log('🚨 HTML: Basic JavaScript is working!');
@@ -2107,6 +2256,84 @@
     
     // Make functions globally available
     window.updateStatsDisplay = updateStatsDisplay;
+    
+    // ==================== QUICK ADJUST WINDOW LOGIC ====================
+    /**
+     * Show the quick adjust window and return user's playcall override (or null)
+     * @param {number} duration - Duration in milliseconds (default 5000)
+     * @returns {Promise<string|null>} - Selected playcall or null if no selection
+     */
+    window.showQuickAdjustWindow = function(duration = 5000) {
+      return new Promise((resolve) => {
+        const window_el = document.getElementById('quick-adjust-window');
+        const timerEl = document.getElementById('quick-adjust-timer');
+        const progressFill = document.getElementById('quick-adjust-progress-fill');
+        const skipBtn = document.getElementById('quick-adjust-skip');
+        const playcallBtns = document.querySelectorAll('.quick-adjust-btn');
+        
+        let selectedPlaycall = null;
+        let interval = null;
+        const startTime = Date.now();
+        
+        // Show window
+        window_el.style.display = 'block';
+        
+        // Handle playcall selection
+        playcallBtns.forEach(btn => {
+          btn.classList.remove('selected');
+          btn.onclick = () => {
+            playcallBtns.forEach(b => b.classList.remove('selected'));
+            btn.classList.add('selected');
+            selectedPlaycall = btn.dataset.playcall;
+          };
+        });
+        
+        // Handle skip button
+        skipBtn.onclick = () => {
+          cleanup();
+          resolve(selectedPlaycall);
+        };
+        
+        // Countdown timer
+        interval = setInterval(() => {
+          const elapsed = Date.now() - startTime;
+          const remaining = duration - elapsed;
+          const remainingSeconds = Math.max(0, remaining / 1000);
+          const percentage = Math.max(0, (remaining / duration) * 100);
+          
+          // Update timer display
+          timerEl.textContent = remainingSeconds.toFixed(1) + 's';
+          
+          // Update progress bar
+          progressFill.style.width = percentage + '%';
+          
+          // Color coding
+          if (remainingSeconds <= 2) {
+            timerEl.className = 'adjust-timer critical';
+            progressFill.className = 'progress-bar-fill critical';
+          } else if (remainingSeconds <= 3) {
+            timerEl.className = 'adjust-timer warning';
+            progressFill.className = 'progress-bar-fill warning';
+          }
+          
+          // Time's up
+          if (remaining <= 0) {
+            cleanup();
+            resolve(selectedPlaycall);
+          }
+        }, 100);
+        
+        function cleanup() {
+          clearInterval(interval);
+          window_el.style.display = 'none';
+          playcallBtns.forEach(btn => {
+            btn.classList.remove('selected');
+            btn.onclick = null;
+          });
+          skipBtn.onclick = null;
+        }
+      });
+    };
     
     // Team boxscore tabs and data population
     function initializeTeamBoxscoreTabs() {
