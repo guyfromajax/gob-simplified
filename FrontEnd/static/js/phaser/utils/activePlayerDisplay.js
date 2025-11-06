@@ -77,10 +77,11 @@ export function getBallHandlerIdFromTurn(turnData, stepIndex = 0) {
  * @param {string} defenderId - Defender player ID
  * @param {string} homeTeamId - Home team ID
  * @param {Object} playerSprites - Phaser player sprites
+ * @param {string} audibleText - Optional "AUDIBLE!" or "HOT READ!" text
  */
-export function updateActivePlayers(ballHandlerId, defenderId, homeTeamId, playerSprites) {
+export function updateActivePlayers(ballHandlerId, defenderId, homeTeamId, playerSprites, audibleText = null) {
   if (typeof window.updateActivePlayersDisplay === 'function') {
-    window.updateActivePlayersDisplay(ballHandlerId, defenderId, homeTeamId, playerSprites);
+    window.updateActivePlayersDisplay(ballHandlerId, defenderId, homeTeamId, playerSprites, audibleText);
   }
 }
 

@@ -1197,24 +1197,28 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
       // });
       
       // Check if this is an audible/hot read (shooter different from intended)
-      if (typeof window.showShooterAudible === 'function' && 
-          turnData.shooter_pos && 
+      if (turnData.shooter_pos && 
           turnData.intended_shooter_pos && 
           turnData.shooter_pos !== turnData.intended_shooter_pos) {
         
         // Get shooter info
-        const shooterSprite = playerSprites[shotInfo.playerId];
         const shooterInfo = scene.playerInfo?.[shotInfo.playerId];
         const shooterMO = shooterInfo?.attributes?.MO || 5;
         
-        // Show popup and wait for it to complete (1.2s)
-        await window.showShooterAudible({
-          shooterId: shotInfo.playerId,
-          shooterPhoto: shooterSprite?.photo || null,
-          shooterMO: shooterMO,
-          shooterPos: turnData.shooter_pos,
-          intendedPos: turnData.intended_shooter_pos
-        });
+        // Determine audible text based on MO attribute
+        const audibleText = shooterMO >= 7 ? "HOT READ!" : "AUDIBLE!";
+        
+        // Update scoreboard with audible text next to ball icon (shows for 1.2s)
+        const { getBallHandlerIdFromTurn, getDefenderIdFromTurn } = await import('../utils/activePlayerDisplay.js');
+        const defenderId = getDefenderIdFromTurn(turnData);
+        const homeTeamId = scene.simData?.home_team_id || null;
+        
+        if (typeof window.updateActivePlayersDisplay === 'function') {
+          window.updateActivePlayersDisplay(shotInfo.playerId, defenderId, homeTeamId, playerSprites, audibleText);
+        }
+        
+        // Wait 1.2s before showing shot animation
+        await new Promise(resolve => setTimeout(resolve, 1200));
       }
       
       const shotResult = await shootBall(shootParams);
