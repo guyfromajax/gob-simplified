@@ -1263,6 +1263,13 @@ export function createGameScene(Phaser) {
       // Animate initial turns first (opening tip, quarter start inbound, etc.)
       if (initialTurns.length > 0) {
         console.log(`🎬 Animating ${initialTurns.length} initial turns (opening tip/inbound)`);
+        
+        // Add indices to initial turns for text scroll
+        initialTurns.forEach((turn, idx) => {
+          turn.index = idx;
+          turnCount++;
+        });
+        
         await animateGameTurns({
           scene: this,
           simData: { ...initialSimData, turns: initialTurns },
@@ -1270,7 +1277,6 @@ export function createGameScene(Phaser) {
           ballSprite: this.ballSprite,
           onUpdate: updateScoreboard
         });
-        turnCount += initialTurns.length;
       }
       
       // Main turn-by-turn loop
@@ -1322,6 +1328,9 @@ export function createGameScene(Phaser) {
           // Animate this single turn
           const turn = turnData.turn;
           turnCount++;
+          
+          // Add index to turn for text scroll display
+          turn.index = turnCount;
           
           console.log(`🎬 Turn ${turnCount}: ${turn.result_type} - ${turn.text?.substring(0, 50)}...`);
           
