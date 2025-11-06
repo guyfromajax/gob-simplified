@@ -1351,6 +1351,7 @@ export function createGameScene(Phaser) {
           
           // Animate this single turn (or batch of turns)
           const turn = turnData.turn;
+          let finalTurn = turn; // Track the final turn for Quick Adjust logic
           
           // Handle BATCH turns (e.g., HCO miss → OREB)
           if (turn.result_type === 'BATCH' && turn.batch_turns) {
@@ -1386,6 +1387,9 @@ export function createGameScene(Phaser) {
                 ballSprite: this.ballSprite,
                 onUpdate: updateScoreboard
               });
+              
+              // Update finalTurn to be the last sub-turn in the batch
+              finalTurn = subTurn;
             }
           } else {
             // Normal single turn
@@ -1430,35 +1434,27 @@ export function createGameScene(Phaser) {
           });
           
           // Check if next turn is HCO (eligible for quick adjust window)
+          // Use finalTurn (last sub-turn in batch, or the single turn)
           const nextIsHCO = turnData.next_offensive_state === 'HCO';
-          const currentIsFastBreak = turn.fast_break || turn.result_type === 'FAST_BREAK';
-          const currentIsFreethrow = turn.result_type === 'FREE_THROW';
-          const currentIsFCP = turn.fcp_foul || turn.result_type === 'FCP';
-          const currentIsHCT = turn.hct_foul || turn.result_type === 'HCT';
+          const currentIsFastBreak = finalTurn.fast_break || finalTurn.result_type === 'FAST_BREAK';
+          const currentIsFreethrow = finalTurn.result_type === 'FREE_THROW';
+          const currentIsFCP = finalTurn.fcp_foul || finalTurn.result_type === 'FCP';
+          const currentIsHCT = finalTurn.hct_foul || finalTurn.result_type === 'HCT';
           
-          // Determine who has offense next
-          // If possession flips, it's the opposite team
-          // If no flip, same team keeps possession
-          let nextOffenseTeam;
-          if (turn.possession_flips) {
-            // Possession changed - opposite team has offense
-            nextOffenseTeam = turnData.offense_team === homeTeam ? awayTeam : homeTeam;
-          } else {
-            // No possession change - same team keeps offense
-            nextOffenseTeam = turnData.offense_team;
-          }
-          
+          // SIMPLIFIED: turnData.offense_team is ALREADY who has offense next
+          // (API returns this AFTER possession flips have been processed)
+          const nextOffenseTeam = turnData.offense_team;
           const userTeamName = this.userTeamSide === 'home' ? homeTeam : awayTeam;
           const userHasOffenseNext = nextOffenseTeam === userTeamName;
           
-          console.log('🔍 Quick Adjust Check:', {
+          console.log('🔍 Quick Adjust Check (SIMPLIFIED):', {
+            nextOffenseTeam_from_API: turnData.offense_team,
+            userTeamName,
+            userHasOffenseNext,
             nextIsHCO,
             currentIsFastBreak,
             currentIsFreethrow,
-            nextOffenseTeam,
-            userTeamName,
-            userHasOffenseNext,
-            possession_flips: turn.possession_flips
+            userTeamSide: this.userTeamSide
           });
           
           // Show quick adjust window if:
