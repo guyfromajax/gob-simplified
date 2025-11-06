@@ -262,7 +262,7 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 8px;
+      gap: 12px;
       padding: 4px 8px;
       opacity: 0;
       transition: opacity 0.3s ease;
@@ -272,13 +272,16 @@
       opacity: 1;
     }
 
-    #away-active-player {
+    /* Away side: [Image] 🏀/D AUDIBLE! */
+    .active-player-display.away-side {
       grid-column: 8;
+      flex-direction: row;
     }
 
-    #home-active-player {
+    /* Home side: AUDIBLE! 🏀/D [Image] */
+    .active-player-display.home-side {
       grid-column: 20;
-      flex-direction: row-reverse; /* Icon on left, headshot on right */
+      flex-direction: row-reverse;
     }
 
     .active-player-headshot {
@@ -298,15 +301,8 @@
     }
 
     .active-player-headshot.defender {
-      border-color: #FF4444;
-      box-shadow: 0 0 12px rgba(255, 68, 68, 0.6);
-    }
-
-    .player-role-container {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 4px;
+      border-color: #FFD700;
+      box-shadow: 0 0 12px rgba(255, 215, 0, 0.6);
     }
 
     .player-role-icon {
@@ -323,21 +319,23 @@
     }
 
     .player-role-icon.defense {
-      color: #FF4444;
+      color: #FFD700;
       font-family: 'Arial Black', sans-serif;
       font-size: 36px;
+      text-shadow: 0 0 8px rgba(255, 215, 0, 0.6), 0 2px 4px rgba(0, 0, 0, 0.8);
     }
 
     .audible-label {
-      font-size: 12px;
+      font-size: 14px;
       font-weight: bold;
-      color: #FFD700;
-      text-shadow: 0 0 6px rgba(255, 215, 0, 0.8), 0 2px 4px rgba(0, 0, 0, 0.8);
+      color: #FF4444;
+      text-shadow: 0 0 8px rgba(255, 68, 68, 0.8), 0 2px 4px rgba(0, 0, 0, 0.8);
       text-transform: uppercase;
-      letter-spacing: 0.5px;
+      letter-spacing: 1px;
       white-space: nowrap;
       opacity: 0;
       transition: opacity 0.2s ease;
+      font-family: 'Arial Black', sans-serif;
     }
 
     .audible-label.show {
@@ -1546,12 +1544,10 @@
     </div>
     
     <!-- Away Active Player - Grid column 8 -->
-    <div id="away-active-player" class="active-player-display">
+    <div id="away-active-player" class="active-player-display away-side">
       <img id="away-active-headshot" class="active-player-headshot" src="" alt="" />
-      <div class="player-role-container">
-        <div id="away-player-role" class="player-role-icon">🏀</div>
-        <div id="away-audible-text" class="audible-label"></div>
-      </div>
+      <div id="away-player-role" class="player-role-icon">🏀</div>
+      <div id="away-audible-text" class="audible-label"></div>
     </div>
     
     <!-- COMMENTED OUT: Now shown in Playcall Center below court -->
@@ -1627,11 +1623,9 @@
     -->
     
     <!-- Home Active Player - Grid column 20 -->
-    <div id="home-active-player" class="active-player-display">
-      <div class="player-role-container">
-        <div id="home-audible-text" class="audible-label"></div>
-        <div id="home-player-role" class="player-role-icon">D</div>
-      </div>
+    <div id="home-active-player" class="active-player-display home-side">
+      <div id="home-audible-text" class="audible-label"></div>
+      <div id="home-player-role" class="player-role-icon">D</div>
       <img id="home-active-headshot" class="active-player-headshot" src="" alt="" />
     </div>
     
