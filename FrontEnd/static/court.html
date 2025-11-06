@@ -909,29 +909,6 @@
       color: rgba(244, 67, 54, 0.8);
     }
 
-    /* Override Indicator */
-    #override-indicator {
-      font-size: 12px;
-      font-weight: 900;
-      color: #FF0000;
-      text-align: center;
-      margin-top: 4px;
-      letter-spacing: 2px;
-      text-shadow: 0 0 8px rgba(255, 0, 0, 0.8);
-      animation: pulse-override 0.8s ease-in-out infinite;
-    }
-
-    @keyframes pulse-override {
-      0%, 100% {
-        opacity: 1;
-        transform: scale(1);
-      }
-      50% {
-        opacity: 0.7;
-        transform: scale(1.05);
-      }
-    }
-
     /* ==================== COACH'S CLIPBOARD ==================== */
     .clipboard-widget {
       position: fixed;
@@ -2124,10 +2101,7 @@
   <div id="playcall-center">
     <!-- Offense Panel (switches sides based on possession) -->
     <div id="offense-panel" class="playcall-panel">
-      <div class="panel-header">
-        OFFENSE
-        <div id="override-indicator" style="display: none;">OVERRIDE!</div>
-      </div>
+      <div class="panel-header">OFFENSE</div>
       <div class="panel-section">
         <div class="section-label">Play Type</div>
         <div class="button-group">
