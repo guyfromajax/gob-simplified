@@ -1103,33 +1103,16 @@ export function createGameScene(Phaser) {
             ease: 'Sine.easeInOut'
           });
 
-          const quarterTurns = (simData.turns || []).filter(t => {
-            const turnQ = t.quarter != null ? Number(t.quarter) : this.quarter;
-            return turnQ === this.quarter;
-          });
-          if (DEBUG_FLOW) {
-            console.log('🔢 quarterTurns length', quarterTurns.length);
-          }
-          // console.log('🔍 Q4 DEBUG: First turn type:', quarterTurns[0]?.result_type, 'Text:', quarterTurns[0]?.text);
-          if (quarterTurns.length === 0) {
-            const total = Array.isArray(simData.turns) ? simData.turns.length : 0;
-            console.warn(`⚠️ No turns found for quarter ${this.quarter} (total turns: ${total}). Navigation halted.`);
-            return;
-          }
-
           let animStart;
-          // console.log('🎬 GameScene: About to call animateGameTurns', { 
-          //   quarterTurnsLength: quarterTurns.length,
-          //   hasPlayerSprites: !!this.playerSprites,
-          //   hasBallSprite: !!this.ballSprite
-          // });
-          
           if (DEBUG_FLOW) {
             animStart = Date.now();
             console.log('🚀 animateGameTurns start', animStart);
           }
           
-          // NEW: Turn-by-turn simulation loop
+          // Turn-by-turn simulation loop
+          // Initial turns (opening tip for Q1, empty for Q2+) are passed in
+          // Turns are generated on-demand via /api/simulate-turn calls
+          console.log(`🎮 Starting quarter ${this.quarter} (initial turns: ${simData.turns?.length || 0})`);
           await this.simulateTurnByTurn(simData, updateScoreboard);
           
           console.log('🎬 GameScene: Turn-by-turn simulation completed');

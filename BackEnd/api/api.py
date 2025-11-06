@@ -548,8 +548,24 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                             mode="single"  # Loaded games are always single mode from games_collection
                         )
                         gm.game_state = gm._init_game_state()
-                        gm.game_state.update(saved.get("game_state", {}))
+                        saved_game_state = saved.get("game_state", {})
+                        gm.game_state.update(saved_game_state)
                         gm.quarter = saved.get("quarter", 1)
+                        
+                        # Restore player stats and NG (energy) from saved game state
+                        saved_players = saved_game_state.get("players", {})
+                        for team_name, team_players in saved_players.items():
+                            team = gm.home_team if team_name == "home" else gm.away_team
+                            for player_id, saved_player_data in team_players.items():
+                                if player_id in team.lineup:
+                                    player = team.lineup[player_id]
+                                    # Restore NG (energy)
+                                    if "attributes" in saved_player_data and "NG" in saved_player_data["attributes"]:
+                                        player.attributes["NG"] = saved_player_data["attributes"]["NG"]
+                                        player._rescale_attributes()  # Update scaled attributes based on NG
+                                    # Restore game stats
+                                    if "stats" in saved_player_data:
+                                        player.stats["game"] = saved_player_data["stats"]
                         
                         # Restore opening_tip_winner for Q2-Q4 possession logic
                         if "opening_tip_winner" in saved:
