@@ -794,6 +794,7 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
             game_id,
             request.start_with_inbound,
             request.starting_possession,
+            turn_by_turn_mode=True,  # NEW: Enable turn-by-turn mode
         )
     except ValueError as e:
         logging.error(
@@ -914,6 +915,11 @@ def simulate_turn_endpoint(request: TurnSimulationRequest):
         
         # Check if quarter is now complete
         quarter_complete = gm.game_state["time_remaining"] <= 0
+        
+        # If quarter is complete, increment quarter number
+        if quarter_complete:
+            gm.quarter += 1
+            logging.info(f"✅ Quarter complete! Advanced to quarter {gm.quarter}")
         
         # Save game state to database every 10 turns (for crash recovery)
         if len(gm.turns) % 10 == 0 or quarter_complete:

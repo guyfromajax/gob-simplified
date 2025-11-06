@@ -1111,15 +1111,10 @@ export function createGameScene(Phaser) {
             console.log('🚀 animateGameTurns start', animStart);
           }
           
-          await animateGameTurns({
-            scene: this,
-            simData: { ...simData, turns: quarterTurns },
-            playerSprites: this.playerSprites,
-            ballSprite: this.ballSprite,
-            onUpdate: updateScoreboard
-          });
+          // NEW: Turn-by-turn simulation loop
+          await this.simulateTurnByTurn(simData, updateScoreboard);
           
-          console.log('🎬 GameScene: animateGameTurns completed');
+          console.log('🎬 GameScene: Turn-by-turn simulation completed');
           if (DEBUG_FLOW) {
             const animEnd = Date.now();
             console.log('🏁 animateGameTurns finish', animEnd, 'duration', animEnd - animStart);
@@ -1247,6 +1242,122 @@ export function createGameScene(Phaser) {
       } catch (error) {
         console.log('⚠️ Structure validation error:', error.message);
       }
+    }
+    
+    /**
+     * NEW: Turn-by-turn simulation method
+     * Replaces the old batch simulation approach
+     */
+    async simulateTurnByTurn(initialSimData, updateScoreboard) {
+      console.log('🔄 Starting turn-by-turn simulation for quarter', this.quarter);
+      
+      const gameId = initialSimData.game_id;
+      const { home: homeTeam, away: awayTeam } = gameStore.getTeams();
+      
+      let quarterComplete = false;
+      let turnCount = 0;
+      
+      // Initialize with any turns from the initial simulation (e.g., opening tip, inbound)
+      const initialTurns = initialSimData.turns || [];
+      
+      // Animate initial turns first (opening tip, quarter start inbound, etc.)
+      if (initialTurns.length > 0) {
+        console.log(`🎬 Animating ${initialTurns.length} initial turns (opening tip/inbound)`);
+        await animateGameTurns({
+          scene: this,
+          simData: { ...initialSimData, turns: initialTurns },
+          playerSprites: this.playerSprites,
+          ballSprite: this.ballSprite,
+          onUpdate: updateScoreboard
+        });
+        turnCount += initialTurns.length;
+      }
+      
+      // Main turn-by-turn loop
+      while (!quarterComplete) {
+        try {
+          // Call /api/simulate-turn to get the next turn
+          const response = await fetch('/api/simulate-turn', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              game_id: gameId,
+              // User overrides would go here (Step 3+)
+              offense_override: null,
+              defense_override: null,
+              mode: this.mode || 'single'
+            })
+          });
+          
+          if (!response.ok) {
+            const errorData = await response.json();
+            console.error('❌ /api/simulate-turn failed:', errorData);
+            break;
+          }
+          
+          const turnData = await response.json();
+          
+          // Check if quarter is complete
+          if (turnData.quarter_complete || !turnData.turn) {
+            console.log('✅ Quarter complete!', {
+              time_remaining: turnData.time_remaining,
+              turnCount,
+              home_score: turnData.home_score,
+              away_score: turnData.away_score
+            });
+            quarterComplete = true;
+            
+            // Update final scores
+            updateScoreboard({
+              home_score: turnData.home_score,
+              away_score: turnData.away_score,
+              home_team_fouls: turnData.home_team_fouls,
+              away_team_fouls: turnData.away_team_fouls,
+              clock: turnData.clock
+            });
+            
+            break;
+          }
+          
+          // Animate this single turn
+          const turn = turnData.turn;
+          turnCount++;
+          
+          console.log(`🎬 Turn ${turnCount}: ${turn.result_type} - ${turn.text?.substring(0, 50)}...`);
+          
+          // Wrap single turn in array for animateGameTurns
+          await animateGameTurns({
+            scene: this,
+            simData: { 
+              ...initialSimData,
+              turns: [turn],
+              home_team: initialSimData.home_team,
+              away_team: initialSimData.away_team
+            },
+            playerSprites: this.playerSprites,
+            ballSprite: this.ballSprite,
+            onUpdate: updateScoreboard
+          });
+          
+          // Update scores and game state after each turn
+          updateScoreboard({
+            home_score: turnData.home_score,
+            away_score: turnData.away_score,
+            home_team_fouls: turnData.home_team_fouls,
+            away_team_fouls: turnData.away_team_fouls,
+            clock: turnData.clock
+          });
+          
+          // Small delay between turns for readability (optional)
+          await new Promise(resolve => setTimeout(resolve, 100));
+          
+        } catch (error) {
+          console.error('❌ Error in turn-by-turn loop:', error);
+          break;
+        }
+      }
+      
+      console.log(`🏁 Quarter ${this.quarter} finished! Total turns: ${turnCount}`);
     }
   };
 }
