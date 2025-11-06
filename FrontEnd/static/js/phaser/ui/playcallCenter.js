@@ -85,6 +85,18 @@ export function updatePlaycallCenter(turnData, homeTeamId) {
 
   // Reset lean meter to neutral
   resetLeanMeter();
+  
+  // ==================== SHOW OVERRIDE INDICATOR ====================
+  // Check if this turn used a user override
+  const overrideIndicator = document.getElementById('override-indicator');
+  if (overrideIndicator) {
+    if (turnData.offense_type === 'User') {
+      overrideIndicator.style.display = 'block';
+      console.log('🎮 OVERRIDE indicator displayed');
+    } else {
+      overrideIndicator.style.display = 'none';
+    }
+  }
 
   // ==================== TRIGGER PLAYCALL REVEAL HUD ====================
   // Show transient HUD overlay with playcall info
