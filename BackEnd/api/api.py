@@ -902,6 +902,9 @@ def simulate_turn_endpoint(request: TurnSimulationRequest):
     
     # Simulate ONE turn
     try:
+        # Track how many turns existed before this call
+        turns_before = len(gm.turns)
+        
         gm.simulate_macro_turn()
         
         # Update team fouls in game state
@@ -910,8 +913,24 @@ def simulate_turn_endpoint(request: TurnSimulationRequest):
             gm.away_team.name: gm.away_team.team_fouls,
         }
         
-        # Get the most recent turn
-        latest_turn = gm.turns[-1] if gm.turns else None
+        # Get all NEW turns created by this call
+        # (simulate_macro_turn can create multiple turns for OREBs, side inbounds, etc.)
+        new_turns = gm.turns[turns_before:] if len(gm.turns) > turns_before else []
+        
+        if not new_turns:
+            # No turns were created (shouldn't happen, but handle gracefully)
+            latest_turn = None
+        elif len(new_turns) == 1:
+            # Normal case: one turn created
+            latest_turn = new_turns[0]
+        else:
+            # Multiple turns created (e.g., HCO miss → OREB turn)
+            # Return them as a batch for the frontend to animate sequentially
+            latest_turn = {
+                "result_type": "BATCH",
+                "batch_turns": new_turns,
+                "text": " → ".join(t.get("text", "") for t in new_turns)
+            }
         
         # Check if quarter is now complete
         quarter_complete = gm.game_state["time_remaining"] <= 0
