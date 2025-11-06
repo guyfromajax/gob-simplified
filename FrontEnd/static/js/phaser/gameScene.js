@@ -1469,7 +1469,7 @@ export function createGameScene(Phaser) {
               ballSprite: this.ballSprite,
               transitionType: transitionType,
               offenseTeamId: nextOffenseTeam,
-              homeTeamId: simData.home_team_id,
+              homeTeamId: initialSimData.home_team_id,
               duration: 5000
             });
             
