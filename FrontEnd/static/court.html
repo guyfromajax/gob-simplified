@@ -779,16 +779,14 @@
       bottom: 0;
       left: calc(var(--player-stats-width) + var(--side-padding));
       right: calc(var(--player-stats-width) + var(--side-padding));
-      /* Dynamic positioning - JS will set top and height based on canvas rendered size */
       min-height: 100px;
       background: linear-gradient(to bottom, rgba(0, 0, 0, 0.95), rgba(0, 0, 0, 1));
       display: flex;
-      align-items: flex-start !important;  /* Push all content to TOP - empty space at bottom is OK */
+      align-items: flex-start !important;
       justify-content: space-between;
-      padding: 0 40px 20px 40px !important;  /* No top padding - content hugs top, allow bottom space */
+      padding: 0 40px 20px 40px !important;
       gap: 20px;
       z-index: 900;
-      /* Smooth transitions when JS updates positioning */
       transition: top 0.1s ease, height 0.1s ease;
     }
 
@@ -798,7 +796,7 @@
       flex-direction: column;
       gap: 4px;
       max-width: 280px;
-      margin: 0 !important;  /* Remove any default margins */
+      margin: 0 !important;
     }
 
     .panel-header {
@@ -808,13 +806,13 @@
       text-transform: uppercase;
       letter-spacing: 1.5px;
       text-align: center;
-      margin: 0 !important;  /* Remove all margins */
+      margin: 0 !important;
     }
 
     .panel-section {
       display: flex;
       flex-direction: column;
-      gap: 4px;  /* Reduced from 6px to 4px - tighter spacing between buttons */
+      gap: 4px;
     }
 
     .section-label {
