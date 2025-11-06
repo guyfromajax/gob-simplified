@@ -951,10 +951,14 @@ def simulate_turn_endpoint(request: TurnSimulationRequest):
         # Check if quarter is now complete
         quarter_complete = gm.game_state["time_remaining"] <= 0
         
+        # Debug logging for quarter completion check
+        if quarter_complete:
+            logging.info(f"✅ Quarter complete! time_remaining={gm.game_state['time_remaining']}, clock={gm.game_state.get('clock', 'N/A')}")
+        
         # If quarter is complete, increment quarter number
         if quarter_complete:
             gm.quarter += 1
-            logging.info(f"✅ Quarter complete! Advanced to quarter {gm.quarter}")
+            logging.info(f"✅ Advanced to quarter {gm.quarter}")
         
         # Save game state to database every 10 turns (for crash recovery)
         if len(gm.turns) % 10 == 0 or quarter_complete:
@@ -966,7 +970,7 @@ def simulate_turn_endpoint(request: TurnSimulationRequest):
                 logging.error(f"Failed to save game state: {e}")
         
         # Return turn data + metadata
-        return {
+        response_data = {
             "turn": latest_turn,
             "next_offensive_state": gm.game_state.get("offensive_state", "HCO"),
             "time_remaining": gm.game_state["time_remaining"],
@@ -987,6 +991,12 @@ def simulate_turn_endpoint(request: TurnSimulationRequest):
                 gm.away_team.name: gm.away_team.get_team_game_stats()
             }
         }
+        
+        # Debug log for unexpected quarter complete
+        if quarter_complete and gm.game_state["time_remaining"] != 0:
+            logging.warning(f"⚠️ Quarter complete but time_remaining != 0: {gm.game_state['time_remaining']}")
+        
+        return response_data
         
     except Exception as e:
         logging.exception(f"Failed to simulate turn for game {game_id}")
