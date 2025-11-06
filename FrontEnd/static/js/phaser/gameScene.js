@@ -1356,6 +1356,17 @@ export function createGameScene(Phaser) {
               
               console.log(`🎬 Turn ${turnCount}: ${subTurn.result_type} - ${subTurn.text?.substring(0, 50)}...`);
               
+              // Display debug info in text scroll
+              if (subTurn.debug_turn_start) {
+                appendToTextScroll(subTurn.debug_turn_start);
+              }
+              if (subTurn.text) {
+                appendToTextScroll(`Turn ${turnCount}: ${subTurn.text}`);
+              }
+              if (subTurn.debug_turn_result) {
+                appendToTextScroll(subTurn.debug_turn_result);
+              }
+              
               await animateGameTurns({
                 scene: this,
                 simData: { 
@@ -1375,6 +1386,17 @@ export function createGameScene(Phaser) {
             turn.index = turnCount;
             
             console.log(`🎬 Turn ${turnCount}: ${turn.result_type} - ${turn.text?.substring(0, 50)}...`);
+            
+            // Display debug info in text scroll
+            if (turn.debug_turn_start) {
+              appendToTextScroll(turn.debug_turn_start);
+            }
+            if (turn.text) {
+              appendToTextScroll(`Turn ${turnCount}: ${turn.text}`);
+            }
+            if (turn.debug_turn_result) {
+              appendToTextScroll(turn.debug_turn_result);
+            }
             
             // Wrap single turn in array for animateGameTurns
             await animateGameTurns({
