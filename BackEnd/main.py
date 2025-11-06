@@ -150,6 +150,7 @@ def simulate_quarter(
     game_id: str | None = None,
     start_with_inbound: bool = False,
     starting_possession: str | None = None,
+    turn_by_turn_mode: bool = False,
 ):
     """Simulate a single quarter on an existing ``GameManager``.
 
@@ -157,6 +158,11 @@ def simulate_quarter(
     player ids. When omitted the current lineup on the ``GameManager`` is used
     (or auto-generated if still empty). This function mutates ``gm`` in place
     and advances ``gm.quarter`` when finished.
+    
+    Args:
+        turn_by_turn_mode: If True, only initializes the quarter (opening tip/inbound)
+                          but does NOT run the full simulation loop. The frontend
+                          will call /api/simulate-turn repeatedly instead.
     """
 
     if game_id is not None:
@@ -302,14 +308,20 @@ def simulate_quarter(
             import traceback
             traceback.print_exc()
 
-    while gm.game_state["time_remaining"] > 0:
-        gm.simulate_macro_turn()
-        gm.game_state["team_fouls"] = {
-            gm.home_team.name: gm.home_team.team_fouls,
-            gm.away_team.name: gm.away_team.team_fouls,
-        }
+    # TURN-BY-TURN MODE: If enabled, skip the full simulation loop
+    # Frontend will call /api/simulate-turn repeatedly instead
+    if not turn_by_turn_mode:
+        while gm.game_state["time_remaining"] > 0:
+            gm.simulate_macro_turn()
+            gm.game_state["team_fouls"] = {
+                gm.home_team.name: gm.home_team.team_fouls,
+                gm.away_team.name: gm.away_team.team_fouls,
+            }
 
-    gm.quarter += 1
+        gm.quarter += 1
+    else:
+        # Turn-by-turn mode: Quarter is initialized, ready for turn-by-turn sim
+        print(f"🎮 Quarter {q} initialized for turn-by-turn simulation")
 
     return gm
 
