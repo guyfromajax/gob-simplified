@@ -911,22 +911,30 @@
     }
     */
 
+    /* ==================== QUICK ADJUST OVERLAY ==================== */
+    #quick-adjust-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.7);
+      z-index: 10000;
+    }
+
     /* ==================== QUICK ADJUST WINDOW ==================== */
     #quick-adjust-window {
-      position: fixed !important;
-      top: 50% !important;
-      left: 50% !important;
-      transform: translate(-50%, -50%) !important;
-      background: rgba(255, 0, 0, 0.95) !important; /* TEMP: Bright red for debugging */
-      border: 10px solid #00FF00 !important; /* TEMP: Bright green border */
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(255, 0, 0, 0.95); /* TEMP: Bright red for debugging */
+      border: 10px solid #00FF00; /* TEMP: Bright green border */
       border-radius: 16px;
       padding: 30px 40px;
-      z-index: 99999 !important; /* TEMP: Maximum z-index */
+      z-index: 10001;
       box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8);
       min-width: 500px;
-      opacity: 1 !important;
-      visibility: visible !important;
-      pointer-events: auto !important;
     }
 
     .quick-adjust-header {
@@ -2131,6 +2139,9 @@
   </div>
   -->
 
+  <!-- ==================== QUICK ADJUST OVERLAY ==================== -->
+  <div id="quick-adjust-overlay" style="display: none;"></div>
+  
   <!-- ==================== QUICK ADJUST WINDOW ==================== -->
   <div id="quick-adjust-window" style="display: none;">
     <div class="quick-adjust-header">
@@ -2268,6 +2279,7 @@
      */
     window.showQuickAdjustWindow = function(duration = 5000) {
       return new Promise((resolve) => {
+        const overlay = document.getElementById('quick-adjust-overlay');
         const window_el = document.getElementById('quick-adjust-window');
         const timerEl = document.getElementById('quick-adjust-timer');
         const progressFill = document.getElementById('quick-adjust-progress-fill');
@@ -2275,6 +2287,7 @@
         const playcallBtns = document.querySelectorAll('.quick-adjust-btn');
         
         console.log('🔍 Quick Adjust Window elements:', {
+          overlay: !!overlay,
           window_el: !!window_el,
           timerEl: !!timerEl,
           progressFill: !!progressFill,
@@ -2292,14 +2305,29 @@
         let interval = null;
         const startTime = Date.now();
         
-        // Show window
+        // Show overlay first (covers everything)
+        if (overlay) {
+          overlay.style.display = 'block';
+        }
+        
+        // Show window on top of overlay
         window_el.style.display = 'block';
+        window_el.style.position = 'fixed';
+        window_el.style.zIndex = '10001';
+        
         console.log('✅ Quick Adjust Window displayed:', {
           display: window_el.style.display,
           computed: window.getComputedStyle(window_el).display,
           zIndex: window.getComputedStyle(window_el).zIndex,
-          visibility: window.getComputedStyle(window_el).visibility
+          visibility: window.getComputedStyle(window_el).visibility,
+          position: window.getComputedStyle(window_el).position,
+          top: window.getComputedStyle(window_el).top,
+          left: window.getComputedStyle(window_el).left
         });
+        
+        // TEMP: Add visual confirmation
+        console.log('🚨🚨🚨 QUICK ADJUST WINDOW SHOULD BE VISIBLE NOW! 🚨🚨🚨');
+        console.log('Look for a BRIGHT RED BOX with GREEN BORDER in the center of your screen!');
         
         // Handle playcall selection
         playcallBtns.forEach(btn => {
@@ -2348,6 +2376,9 @@
         
         function cleanup() {
           clearInterval(interval);
+          if (overlay) {
+            overlay.style.display = 'none';
+          }
           window_el.style.display = 'none';
           playcallBtns.forEach(btn => {
             btn.classList.remove('selected');
