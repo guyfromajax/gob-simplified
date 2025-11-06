@@ -1197,6 +1197,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
       // });
       
       // Check if this is an audible/hot read (shooter different from intended)
+      let isAudible = false;
       if (turnData.shooter_pos && 
           turnData.intended_shooter_pos && 
           turnData.shooter_pos !== turnData.intended_shooter_pos) {
@@ -1208,7 +1209,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
         // Determine audible text based on MO attribute
         const audibleText = shooterMO >= 7 ? "HOT READ!" : "AUDIBLE!";
         
-        // Update scoreboard with audible text next to ball icon (shows for 1.2s)
+        // Update scoreboard with audible text next to ball icon (stays visible until shot completes)
         const { getBallHandlerIdFromTurn, getDefenderIdFromTurn } = await import('../utils/activePlayerDisplay.js');
         const defenderId = getDefenderIdFromTurn(turnData);
         const homeTeamId = scene.simData?.home_team_id || null;
@@ -1217,11 +1218,21 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
           window.updateActivePlayersDisplay(shotInfo.playerId, defenderId, homeTeamId, playerSprites, audibleText);
         }
         
-        // Wait 1.2s before showing shot animation
-        await new Promise(resolve => setTimeout(resolve, 1200));
+        isAudible = true;
       }
       
       const shotResult = await shootBall(shootParams);
+      
+      // Clear audible text after shot animation completes
+      if (isAudible && typeof window.updateActivePlayersDisplay === 'function') {
+        const { getBallHandlerIdFromTurn, getDefenderIdFromTurn } = await import('../utils/activePlayerDisplay.js');
+        const ballHandlerId = getBallHandlerIdFromTurn(turnData, 0);
+        const defenderId = getDefenderIdFromTurn(turnData);
+        const homeTeamId = scene.simData?.home_team_id || null;
+        // Call without audibleText to clear it
+        window.updateActivePlayersDisplay(ballHandlerId, defenderId, homeTeamId, playerSprites, null);
+      }
+      
       // console.log("🏀 HCO SHOT - shootBall returned", shotResult);
       const ballSpot = shotResult?.grid;
       // console.log("result_type", turnData.result_type);

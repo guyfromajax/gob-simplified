@@ -171,6 +171,9 @@
       justify-content: center;
       gap: 4px;
       padding: 0 20px;
+      position: relative;
+      z-index: 10; /* Above other elements to prevent overlap */
+      min-width: 120px; /* Fixed width to prevent shifting */
     }
 
     /* COMMENTED OUT: Now in Playcall Center */
@@ -261,7 +264,6 @@
     .active-player-display {
       display: flex;
       align-items: center;
-      justify-content: center;
       gap: 12px;
       padding: 4px 8px;
       opacity: 0;
@@ -272,16 +274,18 @@
       opacity: 1;
     }
 
-    /* Away side: [Image] 🏀/D AUDIBLE! */
+    /* Away side: [Image] 🏀/D AUDIBLE! → (reading left to right from center) */
     .active-player-display.away-side {
       grid-column: 8;
       flex-direction: row;
+      justify-content: flex-end; /* Push content toward center */
     }
 
-    /* Home side: AUDIBLE! 🏀/D [Image] */
+    /* Home side: AUDIBLE! 🏀/D [Image] ← (reading right to left from center) */
     .active-player-display.home-side {
       grid-column: 20;
       flex-direction: row-reverse;
+      justify-content: flex-start; /* Push content toward center */
     }
 
     .active-player-headshot {
@@ -2498,31 +2502,26 @@
         homeHeadshot.src = '/static/images/players/default.png';
       };
 
-      // Update audible text (show on ball handler's side)
+      // Update audible text (show on ball handler's side, keep visible until cleared)
       if (audibleText) {
         if (isBallHandlerHome && homeAudible) {
           homeAudible.textContent = audibleText;
           homeAudible.classList.add('show');
-          // Auto-hide after 1.2s
-          setTimeout(() => {
-            homeAudible.classList.remove('show');
-            setTimeout(() => {
-              homeAudible.textContent = '';
-            }, 200); // Clear text after fade out
-          }, 1200);
         } else if (!isBallHandlerHome && awayAudible) {
           awayAudible.textContent = audibleText;
           awayAudible.classList.add('show');
-          // Auto-hide after 1.2s
-          setTimeout(() => {
-            awayAudible.classList.remove('show');
-            setTimeout(() => {
-              awayAudible.textContent = '';
-            }, 200); // Clear text after fade out
-          }, 1200);
+        }
+        
+        // Clear the opposite side
+        if (isBallHandlerHome && awayAudible) {
+          awayAudible.classList.remove('show');
+          awayAudible.textContent = '';
+        } else if (!isBallHandlerHome && homeAudible) {
+          homeAudible.classList.remove('show');
+          homeAudible.textContent = '';
         }
       } else {
-        // Clear audible text if not provided
+        // Clear audible text on both sides if not provided
         if (homeAudible) {
           homeAudible.classList.remove('show');
           homeAudible.textContent = '';
