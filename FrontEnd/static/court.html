@@ -911,70 +911,112 @@
     }
     */
 
-    /* ==================== QUICK ADJUST OVERLAY ==================== */
-    #quick-adjust-overlay {
+    /* ==================== COACH'S CLIPBOARD ==================== */
+    .clipboard-widget {
       position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(0, 0, 0, 0.7);
-      z-index: 10000;
-    }
-
-    /* ==================== QUICK ADJUST WINDOW ==================== */
-    #quick-adjust-window {
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      background: linear-gradient(135deg, rgba(0, 0, 0, 0.97), rgba(30, 30, 30, 0.97));
+      top: 120px;
+      right: 20px;
+      width: 320px;
+      background: linear-gradient(135deg, rgba(20, 20, 20, 0.98), rgba(40, 40, 40, 0.98));
       border: 3px solid #FFD700;
-      border-radius: 16px;
-      padding: 30px 40px;
-      z-index: 10001;
-      box-shadow: 0 15px 50px rgba(0, 0, 0, 0.9), 0 0 30px rgba(255, 215, 0, 0.3);
-      min-width: 500px;
+      border-radius: 12px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8);
+      z-index: 10000;
+      cursor: move;
     }
 
-    .quick-adjust-header {
+    .clipboard-widget.minimized .clipboard-content {
+      display: none;
+    }
+
+    .clipboard-header {
+      background: linear-gradient(90deg, rgba(255, 215, 0, 0.2), rgba(255, 215, 0, 0.1));
+      padding: 12px 16px;
+      border-bottom: 2px solid rgba(255, 215, 0, 0.3);
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 20px;
+      cursor: move;
+      border-radius: 9px 9px 0 0;
     }
 
-    .quick-adjust-header h3 {
-      color: #FFD700;
-      font-size: 24px;
+    .clipboard-title {
+      font-size: 18px;
       font-weight: 700;
-      margin: 0;
-      text-transform: uppercase;
-      letter-spacing: 2px;
+      color: #FFD700;
+      letter-spacing: 1px;
     }
 
-    .adjust-timer {
-      font-size: 32px;
+    .clipboard-controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .clipboard-btn {
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      color: #FFD700;
+      font-size: 20px;
+      font-weight: 700;
+      width: 28px;
+      height: 28px;
+      border-radius: 4px;
+      cursor: pointer;
+      padding: 0;
+      line-height: 1;
+      transition: all 0.2s ease;
+    }
+
+    .clipboard-btn:hover {
+      background: rgba(255, 215, 0, 0.3);
+      border-color: #FFD700;
+    }
+
+    .clipboard-timer {
+      font-size: 24px;
       font-weight: 700;
       color: #4CAF50;
       font-family: 'Courier New', monospace;
+      min-width: 60px;
+      text-align: right;
     }
 
-    .adjust-timer.warning {
+    .clipboard-timer.warning {
       color: #FFC107;
     }
 
-    .adjust-timer.critical {
+    .clipboard-timer.critical {
       color: #F44336;
+    }
+
+    .clipboard-content {
+      padding: 16px;
+    }
+
+    .clipboard-section {
+      margin-bottom: 20px;
+    }
+
+    .clipboard-section:last-child {
+      margin-bottom: 0;
+    }
+
+    .clipboard-section h4 {
+      font-size: 14px;
+      color: #FFD700;
+      margin-bottom: 10px;
+      font-weight: 600;
+      letter-spacing: 1px;
     }
 
     .progress-bar-container {
       width: 100%;
-      height: 12px;
+      height: 10px;
       background: rgba(255, 255, 255, 0.1);
-      border-radius: 6px;
+      border-radius: 5px;
       overflow: hidden;
-      margin-bottom: 25px;
+      margin-bottom: 16px;
     }
 
     .progress-bar-fill {
@@ -992,63 +1034,57 @@
       background: linear-gradient(90deg, #F44336, #EF5350);
     }
 
-    .quick-adjust-options {
+    .preset-options {
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 12px;
-      margin-bottom: 20px;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+      margin-bottom: 8px;
     }
 
-    .quick-adjust-btn {
-      padding: 16px 20px;
-      background: rgba(255, 255, 255, 0.1);
-      border: 2px solid rgba(255, 255, 255, 0.3);
-      border-radius: 8px;
-      color: rgba(255, 255, 255, 0.7);
-      font-size: 16px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-    }
-
-    .quick-adjust-btn:hover {
-      background: rgba(255, 215, 0, 0.2);
-      border-color: #FFD700;
-      color: #FFD700;
-      transform: scale(1.05);
-    }
-
-    .quick-adjust-btn.selected {
-      background: rgba(255, 215, 0, 0.4);
-      border-color: #FFD700;
-      color: #FFD700;
-      box-shadow: 0 0 20px rgba(255, 215, 0, 0.6);
-      font-weight: 700;
-    }
-
-    .quick-adjust-actions {
-      display: flex;
-      justify-content: center;
-    }
-
-    .skip-adjust-btn {
-      padding: 12px 30px;
-      background: rgba(255, 255, 255, 0.1);
-      border: 2px solid rgba(255, 255, 255, 0.3);
-      border-radius: 8px;
+    .preset-btn {
+      padding: 12px 16px;
+      background: rgba(255, 255, 255, 0.08);
+      border: 2px solid rgba(255, 255, 255, 0.2);
+      border-radius: 6px;
       color: rgba(255, 255, 255, 0.6);
       font-size: 14px;
       font-weight: 600;
       cursor: pointer;
       transition: all 0.2s ease;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
     }
 
-    .skip-adjust-btn:hover {
-      background: rgba(255, 255, 255, 0.2);
-      border-color: rgba(255, 255, 255, 0.5);
-      color: rgba(255, 255, 255, 0.9);
+    .preset-btn:hover {
+      background: rgba(255, 215, 0, 0.15);
+      border-color: #FFD700;
+      color: #FFD700;
+    }
+
+    .preset-btn.selected {
+      background: rgba(255, 215, 0, 0.3);
+      border-color: #FFD700;
+      color: #FFD700;
+      box-shadow: 0 0 15px rgba(255, 215, 0, 0.4);
+      font-weight: 700;
+    }
+
+    .clear-preset-btn {
+      width: 100%;
+      padding: 8px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 4px;
+      color: rgba(255, 255, 255, 0.5);
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .clear-preset-btn:hover {
+      background: rgba(244, 67, 54, 0.2);
+      border-color: #F44336;
+      color: #F44336;
     }
 
     /* ==================== PLAYCALL REVEAL HUD ==================== */
@@ -2139,26 +2175,43 @@
   </div>
   -->
 
-  <!-- ==================== QUICK ADJUST OVERLAY ==================== -->
-  <div id="quick-adjust-overlay" style="display: none;"></div>
-  
-  <!-- ==================== QUICK ADJUST WINDOW ==================== -->
-  <div id="quick-adjust-window" style="display: none;">
-    <div class="quick-adjust-header">
-      <h3>Quick Adjustment</h3>
-      <div id="quick-adjust-timer" class="adjust-timer">5.0s</div>
+  <!-- ==================== COACH'S CLIPBOARD ==================== -->
+  <div id="coaches-clipboard" class="clipboard-widget">
+    <div class="clipboard-header" id="clipboard-header">
+      <span class="clipboard-title">📋 Coach's Clipboard</span>
+      <div class="clipboard-controls">
+        <button id="clipboard-minimize" class="clipboard-btn">−</button>
+        <div id="clipboard-timer" class="clipboard-timer" style="display: none;">5.0s</div>
+      </div>
     </div>
-    <div id="quick-adjust-progress-bar" class="progress-bar-container">
-      <div id="quick-adjust-progress-fill" class="progress-bar-fill"></div>
-    </div>
-    <div class="quick-adjust-options">
-      <button class="quick-adjust-btn" data-playcall="Inside">Inside</button>
-      <button class="quick-adjust-btn" data-playcall="Attack">Attack</button>
-      <button class="quick-adjust-btn" data-playcall="Outside">Outside</button>
-      <button class="quick-adjust-btn" data-playcall="Freelance">Freelance</button>
-    </div>
-    <div class="quick-adjust-actions">
-      <button id="quick-adjust-skip" class="skip-adjust-btn">Continue (Auto)</button>
+    
+    <div id="clipboard-content" class="clipboard-content">
+      <!-- Progress bar (only shows when HCO is locking) -->
+      <div id="clipboard-progress-bar" class="progress-bar-container" style="display: none;">
+        <div id="clipboard-progress-fill" class="progress-bar-fill"></div>
+      </div>
+      
+      <!-- Offense preset panel -->
+      <div class="clipboard-section">
+        <h4>Offense Preset</h4>
+        <div class="preset-options">
+          <button class="preset-btn" data-type="offense" data-value="Inside">Inside</button>
+          <button class="preset-btn" data-type="offense" data-value="Attack">Attack</button>
+          <button class="preset-btn" data-type="offense" data-value="Outside">Outside</button>
+          <button class="preset-btn" data-type="offense" data-value="Freelance">Freelance</button>
+        </div>
+        <button id="clear-offense-preset" class="clear-preset-btn">Clear</button>
+      </div>
+      
+      <!-- Defense preset panel -->
+      <div class="clipboard-section">
+        <h4>Defense Preset</h4>
+        <div class="preset-options">
+          <button class="preset-btn" data-type="defense" data-value="Man">Man</button>
+          <button class="preset-btn" data-type="defense" data-value="Zone">Zone</button>
+        </div>
+        <button id="clear-defense-preset" class="clear-preset-btn">Clear</button>
+      </div>
     </div>
   </div>
 
@@ -2271,100 +2324,178 @@
     // Make functions globally available
     window.updateStatsDisplay = updateStatsDisplay;
     
-    // ==================== QUICK ADJUST WINDOW LOGIC ====================
-    /**
-     * Show the quick adjust window and return user's playcall override (or null)
-     * @param {number} duration - Duration in milliseconds (default 5000)
-     * @returns {Promise<string|null>} - Selected playcall or null if no selection
-     */
-    window.showQuickAdjustWindow = function(duration = 5000) {
-      return new Promise((resolve) => {
-        const overlay = document.getElementById('quick-adjust-overlay');
-        const window_el = document.getElementById('quick-adjust-window');
-        const timerEl = document.getElementById('quick-adjust-timer');
-        const progressFill = document.getElementById('quick-adjust-progress-fill');
-        const skipBtn = document.getElementById('quick-adjust-skip');
-        const playcallBtns = document.querySelectorAll('.quick-adjust-btn');
-        
-        if (!window_el) {
-          console.error('❌ Quick Adjust Window element not found!');
-          resolve(null);
-          return;
-        }
-        
-        let selectedPlaycall = null;
-        let interval = null;
-        const startTime = Date.now();
-        
-        // Show overlay first (covers everything)
-        if (overlay) {
-          overlay.style.display = 'block';
-        }
-        
-        // Show window on top of overlay
-        window_el.style.display = 'block';
-        window_el.style.position = 'fixed';
-        window_el.style.zIndex = '10001';
-        
-        // Handle playcall selection
-        playcallBtns.forEach(btn => {
-          btn.classList.remove('selected');
-          btn.onclick = () => {
-            playcallBtns.forEach(b => b.classList.remove('selected'));
-            btn.classList.add('selected');
-            selectedPlaycall = btn.dataset.playcall;
-          };
+    // ==================== COACH'S CLIPBOARD LOGIC ====================
+    
+    // Initialize clipboard functionality
+    (function initCoachesClipboard() {
+      const clipboard = document.getElementById('coaches-clipboard');
+      const minimizeBtn = document.getElementById('clipboard-minimize');
+      const timerEl = document.getElementById('clipboard-timer');
+      const progressBar = document.getElementById('clipboard-progress-bar');
+      const progressFill = document.getElementById('clipboard-progress-fill');
+      const presetBtns = document.querySelectorAll('.preset-btn');
+      const clearOffenseBtn = document.getElementById('clear-offense-preset');
+      const clearDefenseBtn = document.getElementById('clear-defense-preset');
+      
+      if (!clipboard) {
+        console.error('❌ Coach\'s Clipboard not found!');
+        return;
+      }
+      
+      // State
+      let isMinimized = false;
+      let activeCountdown = null;
+      
+      // Minimize/Maximize toggle
+      if (minimizeBtn) {
+        minimizeBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          isMinimized = !isMinimized;
+          if (isMinimized) {
+            clipboard.classList.add('minimized');
+            minimizeBtn.textContent = '+';
+          } else {
+            clipboard.classList.remove('minimized');
+            minimizeBtn.textContent = '−';
+          }
         });
-        
-        // Handle skip button
-        skipBtn.onclick = () => {
-          cleanup();
-          resolve(selectedPlaycall);
-        };
-        
-        // Countdown timer
-        interval = setInterval(() => {
-          const elapsed = Date.now() - startTime;
-          const remaining = duration - elapsed;
-          const remainingSeconds = Math.max(0, remaining / 1000);
-          const percentage = Math.max(0, (remaining / duration) * 100);
+      }
+      
+      // Make draggable
+      makeDraggable(clipboard, document.getElementById('clipboard-header'));
+      
+      // Handle preset selections
+      presetBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+          const type = btn.dataset.type; // 'offense' or 'defense'
+          const value = btn.dataset.value;
           
-          // Update timer display
-          timerEl.textContent = remainingSeconds.toFixed(1) + 's';
-          
-          // Update progress bar
-          progressFill.style.width = percentage + '%';
-          
-          // Color coding
-          if (remainingSeconds <= 2) {
-            timerEl.className = 'adjust-timer critical';
-            progressFill.className = 'progress-bar-fill critical';
-          } else if (remainingSeconds <= 3) {
-            timerEl.className = 'adjust-timer warning';
-            progressFill.className = 'progress-bar-fill warning';
-          }
-          
-          // Time's up
-          if (remaining <= 0) {
-            cleanup();
-            resolve(selectedPlaycall);
-          }
-        }, 100);
-        
-        function cleanup() {
-          clearInterval(interval);
-          if (overlay) {
-            overlay.style.display = 'none';
-          }
-          window_el.style.display = 'none';
-          playcallBtns.forEach(btn => {
-            btn.classList.remove('selected');
-            btn.onclick = null;
+          // Deselect other buttons of same type
+          document.querySelectorAll(`.preset-btn[data-type="${type}"]`).forEach(b => {
+            b.classList.remove('selected');
           });
-          skipBtn.onclick = null;
-        }
+          
+          // Select this button
+          btn.classList.add('selected');
+          
+          // Store preset
+          if (type === 'offense') {
+            window.nextOffenseOverride = value;
+            console.log(`📋 Offense preset: ${value}`);
+          } else {
+            window.nextDefenseOverride = value;
+            console.log(`📋 Defense preset: ${value}`);
+          }
+        });
       });
-    };
+      
+      // Clear buttons
+      if (clearOffenseBtn) {
+        clearOffenseBtn.addEventListener('click', () => {
+          document.querySelectorAll('.preset-btn[data-type="offense"]').forEach(btn => {
+            btn.classList.remove('selected');
+          });
+          window.nextOffenseOverride = null;
+          console.log('📋 Offense preset cleared');
+        });
+      }
+      
+      if (clearDefenseBtn) {
+        clearDefenseBtn.addEventListener('click', () => {
+          document.querySelectorAll('.preset-btn[data-type="defense"]').forEach(btn => {
+            btn.classList.remove('selected');
+          });
+          window.nextDefenseOverride = null;
+          console.log('📋 Defense preset cleared');
+        });
+      }
+      
+      // Global function to show countdown when HCO is locking
+      window.showClipboardCountdown = function(duration = 5000) {
+        return new Promise((resolve) => {
+          if (!isMinimized && timerEl && progressBar && progressFill) {
+            timerEl.style.display = 'block';
+            progressBar.style.display = 'block';
+          }
+          
+          const startTime = Date.now();
+          
+          activeCountdown = setInterval(() => {
+            const elapsed = Date.now() - startTime;
+            const remaining = duration - elapsed;
+            const remainingSeconds = Math.max(0, remaining / 1000);
+            const percentage = Math.max(0, (remaining / duration) * 100);
+            
+            // Update timer
+            if (timerEl) timerEl.textContent = remainingSeconds.toFixed(1) + 's';
+            
+            // Update progress bar
+            if (progressFill) progressFill.style.width = percentage + '%';
+            
+            // Color coding
+            if (timerEl) {
+              timerEl.className = 'clipboard-timer';
+              if (remainingSeconds <= 2) {
+                timerEl.classList.add('critical');
+              } else if (remainingSeconds <= 3) {
+                timerEl.classList.add('warning');
+              }
+            }
+            
+            if (progressFill) {
+              progressFill.className = 'progress-bar-fill';
+              if (remainingSeconds <= 2) {
+                progressFill.classList.add('critical');
+              } else if (remainingSeconds <= 3) {
+                progressFill.classList.add('warning');
+              }
+            }
+            
+            // Time's up
+            if (remaining <= 0) {
+              clearInterval(activeCountdown);
+              if (timerEl) timerEl.style.display = 'none';
+              if (progressBar) progressBar.style.display = 'none';
+              resolve();
+            }
+          }, 100);
+        });
+      };
+      
+    })();
+    
+    // Simple draggable functionality
+    function makeDraggable(element, handle) {
+      if (!element || !handle) return;
+      
+      let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
+      
+      handle.onmousedown = dragMouseDown;
+      
+      function dragMouseDown(e) {
+        e.preventDefault();
+        pos3 = e.clientX;
+        pos4 = e.clientY;
+        document.onmouseup = closeDragElement;
+        document.onmousemove = elementDrag;
+      }
+      
+      function elementDrag(e) {
+        e.preventDefault();
+        pos1 = pos3 - e.clientX;
+        pos2 = pos4 - e.clientY;
+        pos3 = e.clientX;
+        pos4 = e.clientY;
+        element.style.top = (element.offsetTop - pos2) + 'px';
+        element.style.left = (element.offsetLeft - pos1) + 'px';
+        element.style.right = 'auto'; // Clear right positioning when dragging
+      }
+      
+      function closeDragElement() {
+        document.onmouseup = null;
+        document.onmousemove = null;
+      }
+    }
     
     // Team boxscore tabs and data population
     function initializeTeamBoxscoreTabs() {
