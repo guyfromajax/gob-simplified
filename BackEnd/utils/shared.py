@@ -457,6 +457,7 @@ def summarize_game_state(game, exclude_animations=True):
                 "secondary_color": getattr(team_obj, "secondary_color", "#ffffff"),
                 "x": coords.get("x", 0),
                 "y": coords.get("y", 0),
+                "stats": player.stats.get("game", {}),  # Include game stats for persistence
                 "attributes": {
                     "EM": player.attributes.get("EM", 0),
                     "CH": player.attributes.get("CH", 0),
@@ -486,6 +487,7 @@ def summarize_game_state(game, exclude_animations=True):
                 "secondary_color": getattr(team_obj, "secondary_color", "#ffffff"),
                 "x": coords.get("x", 0),
                 "y": coords.get("y", 0),
+                "stats": player_obj.stats.get("game", {}),  # Include game stats for persistence
                 "attributes": {
                     "EM": player_obj.attributes.get("EM", 0),
                     "CH": player_obj.attributes.get("CH", 0),
@@ -652,6 +654,7 @@ def summarize_game_state(game, exclude_animations=True):
         "quarter": game.quarter,
         "is_final": game.quarter > 4 and game.score.get(game.home_team.name, 0) != game.score.get(game.away_team.name, 0),
         "opening_tip_winner": game.game_state.get("opening_tip_winner"),
+        "game_stats_initialized": game.game_state.get("game_stats_initialized", False),  # Preserve stats initialization flag
         
         # Top-level team IDs for frontend compatibility (used by animation system)
         "home_team_id": game.home_team.team_id,
@@ -668,7 +671,7 @@ def summarize_game_state(game, exclude_animations=True):
         "turns": turns,  # Animations excluded for database saves
         "text_log": game.text_log,
         
-        # Players array (for frontend rendering)
+        # Players array (for frontend rendering and stats persistence)
         "players": players,
     }
 
