@@ -649,6 +649,10 @@ class TurnManager:
         if not pending_oreb:
             return None
         
+        # Clear the pending OREB immediately (before processing)
+        # If this OREB results in another OREB, it will be set again
+        self.game.game_state["pending_oreb"] = None
+        
         # Capture player stats before OREB resolution (for deltas)
         pre_stats = {}
         for team in (self.game.home_team, self.game.away_team):
