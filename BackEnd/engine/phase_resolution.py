@@ -520,6 +520,8 @@ def resolve_free_throw_logic(game):
         "shooter_pos": shooter_pos,
         "offense_team_id": off_team.team_id,
         "no_lane": game_state.get("no_lane", False),
+        "free_throws_remaining": game_state["free_throws_remaining"],  # For frontend to know if final FT
+        "one_and_one": game_state.get("one_and_one", False),  # For frontend 1&1 display
     }
 
     if makes_shot:

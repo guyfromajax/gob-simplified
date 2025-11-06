@@ -38,8 +38,22 @@ export async function runFreeThrowSequence(
   const rebound =
     helpers.animateRebound || (await import("./ballManager.js")).animateRebound;
 
-  const { ftIndex = 1, ftTotal = 1, bonusType } = ftContext || {};
-  const isFinalTurn = ftIndex >= ftTotal;
+  // Determine if this is the final free throw from turnData
+  // If free_throws_remaining is provided, use it (turn-by-turn mode)
+  // Otherwise fall back to ftContext (old batch mode)
+  let isFinalTurn;
+  let bonusType;
+  if (turnData.free_throws_remaining !== undefined) {
+    // Turn-by-turn mode: Check if no more FTs remain AFTER this shot
+    // free_throws_remaining is AFTER the shot, so if it's 0, this was the final FT
+    isFinalTurn = turnData.free_throws_remaining === 0;
+    bonusType = turnData.one_and_one ? 'ONE_AND_ONE' : null;
+  } else {
+    // Batch mode: Use ftContext
+    const { ftIndex = 1, ftTotal = 1 } = ftContext || {};
+    isFinalTurn = ftIndex >= ftTotal;
+    bonusType = ftContext?.bonusType;
+  }
 
   const releaseGuard =
     !isFinalTurn && scene.stateMachine
