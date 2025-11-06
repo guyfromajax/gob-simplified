@@ -244,8 +244,12 @@ class TurnManager:
         turn_num = self.game.micro_turn_count
         from BackEnd.constants import DEBUG
         time_remaining = self.game.game_state.get("clock", "N/A")
+        
+        # Create debug string for frontend display
+        debug_turn_start = f"***** RUN TURN, turn number: {turn_num}, time remaining: {time_remaining}, offensive state: {state} *****"
+        
         if DEBUG:
-            print(f"***** RUN TURN, turn number: {turn_num}, time remaining: {time_remaining}, offensive state: {state} *****")
+            print(debug_turn_start)
         # if state in ["HCO", "HALF_COURT"]:
         #     print(f"{self.game.offense_team.name}: {self.game.game_state['current_playcall']}")
         #     print(f"{self.game.defense_team.name}: {self.game.game_state['defense_playcall']}")
@@ -356,8 +360,16 @@ class TurnManager:
         text = result.get("text", "")
         possession_flips = result.get("possession_flips", False)
         from BackEnd.constants import DEBUG
+        
+        # Create debug string for frontend display
+        debug_turn_result = f"Turn {turn_num} RESULT: {result_type} | Next: {next_play_type} | Defense Setup: {next_defensive_setup} | Possession Flips: {possession_flips}"
+        
         if DEBUG:
-            print(f"Turn {turn_num} RESULT: {result_type} | Next: {next_play_type} | Defense Setup: {next_defensive_setup} | Possession Flips: {possession_flips}")
+            print(debug_turn_result)
+        
+        # Add debug info to result for frontend display
+        result["debug_turn_start"] = debug_turn_start
+        result["debug_turn_result"] = debug_turn_result
         
         # self._print_turn_summary(result, state)
 
