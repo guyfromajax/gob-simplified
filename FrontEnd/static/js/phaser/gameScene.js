@@ -892,6 +892,12 @@ export function createGameScene(Phaser) {
 
       const formatTurnText = (turn = {}) => {
         const parts = [];
+        
+        // Add turn number for debugging
+        if (turn.index !== undefined) {
+          parts.push(`Turn ${turn.index}:`);
+        }
+        
         const q =
           turn.period_label ||
           (turn.quarter != null
@@ -970,7 +976,18 @@ export function createGameScene(Phaser) {
 
         if (turn.text && turn.index !== this.lastTurnShown) {
           if (typeof window !== 'undefined' && window.TEXT_SCROLL_ENABLED) {
+            // Display debug info first (if available)
+            if (turn.debug_turn_start) {
+              appendToTextScroll(turn.debug_turn_start);
+            }
+            
+            // Display normal turn text
             appendToTextScroll(formatTurnText(turn));
+            
+            // Display debug result info (if available)
+            if (turn.debug_turn_result) {
+              appendToTextScroll(turn.debug_turn_result);
+            }
           }
           this.lastTurnShown = turn.index;
         }
