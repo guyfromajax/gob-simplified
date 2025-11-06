@@ -1436,13 +1436,35 @@ export function createGameScene(Phaser) {
           const currentIsFCP = turn.fcp_foul || turn.result_type === 'FCP';
           const currentIsHCT = turn.hct_foul || turn.result_type === 'HCT';
           
+          // Determine who has offense next
+          // If possession flips, it's the opposite team
+          // If no flip, same team keeps possession
+          let nextOffenseTeam;
+          if (turn.possession_flips) {
+            // Possession changed - opposite team has offense
+            nextOffenseTeam = turnData.offense_team === homeTeam ? awayTeam : homeTeam;
+          } else {
+            // No possession change - same team keeps offense
+            nextOffenseTeam = turnData.offense_team;
+          }
+          
+          const userTeamName = this.userTeamSide === 'home' ? homeTeam : awayTeam;
+          const userHasOffenseNext = nextOffenseTeam === userTeamName;
+          
+          console.log('🔍 Quick Adjust Check:', {
+            nextIsHCO,
+            currentIsFastBreak,
+            currentIsFreethrow,
+            nextOffenseTeam,
+            userTeamName,
+            userHasOffenseNext,
+            possession_flips: turn.possession_flips
+          });
+          
           // Show quick adjust window if:
           // 1. Next state is HCO
           // 2. Current turn is NOT Fast Break, Free Throw, FCP, or HCT
           // 3. User's team is on offense next
-          const userTeamId = this.userTeamSide === 'home' ? initialSimData.home_team_id : initialSimData.away_team_id;
-          const userHasOffenseNext = turnData.offense_team === (this.userTeamSide === 'home' ? homeTeam : awayTeam);
-          
           if (nextIsHCO && !currentIsFastBreak && !currentIsFreethrow && !currentIsFCP && !currentIsHCT && userHasOffenseNext) {
             console.log('🎮 Showing quick adjust window (5 seconds)');
             const userOverride = await window.showQuickAdjustWindow(5000);
@@ -1450,6 +1472,8 @@ export function createGameScene(Phaser) {
               console.log(`🎮 User selected override: ${userOverride}`);
               // Store override for next turn
               window.nextOffenseOverride = userOverride;
+            } else {
+              console.log('🎮 No override selected, using auto playcall');
             }
           }
           
