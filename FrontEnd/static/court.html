@@ -2179,15 +2179,16 @@
       <span class="clipboard-title">📋 Coach's Clipboard</span>
       <div class="clipboard-controls">
         <button id="clipboard-minimize" class="clipboard-btn">−</button>
-        <div id="clipboard-timer" class="clipboard-timer" style="display: none;">5.0s</div>
+        <!-- Timer hidden for now - preset calls work without countdown -->
+        <!-- <div id="clipboard-timer" class="clipboard-timer" style="display: none;">5.0s</div> -->
       </div>
     </div>
     
     <div id="clipboard-content" class="clipboard-content">
-      <!-- Progress bar (only shows when HCO is locking) -->
-      <div id="clipboard-progress-bar" class="progress-bar-container" style="display: none;">
+      <!-- Progress bar hidden for now - preset calls work without countdown -->
+      <!-- <div id="clipboard-progress-bar" class="progress-bar-container" style="display: none;">
         <div id="clipboard-progress-fill" class="progress-bar-fill"></div>
-      </div>
+      </div> -->
       
       <!-- Offense preset panel -->
       <div class="clipboard-section">
@@ -2434,6 +2435,9 @@
         console.log('📋 Visual selections cleared');
       };
       
+      // ==================== COUNTDOWN FUNCTION (DISABLED FOR NOW) ====================
+      // Future: Re-enable for "coaching moments" feature
+      /*
       // Global function to show countdown when HCO is locking
       window.showClipboardCountdown = function(duration = 5000) {
         return new Promise((resolve) => {
@@ -2485,6 +2489,7 @@
           }, 100);
         });
       };
+      */
       
     })();
     

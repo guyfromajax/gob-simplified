@@ -1446,6 +1446,10 @@ export function createGameScene(Phaser) {
             userTeamSide: this.userTeamSide
           });
           
+          // ==================== CLIPBOARD COUNTDOWN (DISABLED FOR NOW) ====================
+          // User can preset calls anytime; no forced decision window
+          // Future: Re-enable for "coaching moments" feature
+          /*
           // Show clipboard countdown if:
           // 1. Next state is HCO
           // 2. Current turn is NOT Fast Break, Free Throw, FCP, or HCT
@@ -1481,6 +1485,7 @@ export function createGameScene(Phaser) {
               defense: window.nextDefenseOverride || 'auto'
             });
           }
+          */
           
           // Small delay between turns for readability (optional)
           await new Promise(resolve => setTimeout(resolve, 100));
