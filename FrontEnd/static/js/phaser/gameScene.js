@@ -8,6 +8,7 @@ import { DEBUG } from './utils/debug.js';
 import { createGameStateMachine, States } from './state/gameStateMachine.js';
 import { initializePossessionManager } from './utils/possessionManager.js';
 import gameStore from '../state/gameStore.js';
+import { animateCountdownTransition } from './animation/countdownAnimation.js';
 
 const DEBUG_SIM_PAYLOAD =
   (typeof window !== 'undefined' && window.DEBUG_SIM_PAYLOAD) ||
@@ -1468,11 +1469,30 @@ export function createGameScene(Phaser) {
           // 3. User's team is on offense next
           if (nextIsHCO && !currentIsFastBreak && !currentIsFreethrow && !currentIsFCP && !currentIsHCT && userHasOffenseNext) {
             console.log('📋 Showing clipboard countdown (5 seconds)');
-            // Clipboard is persistent - user can preset calls anytime
-            // Countdown just shows urgency for this upcoming HCO
-            if (window.showClipboardCountdown) {
-              await window.showClipboardCountdown(5000);
+            
+            // Determine transition type for animation
+            let transitionType = 'INBOUND_PASS'; // Default
+            if (finalTurn.result_type === 'DREB') {
+              transitionType = 'DREB';
+            } else if (finalTurn.result_type === 'SIDE_INBOUND') {
+              transitionType = 'SIDE_INBOUND';
             }
+            
+            // Start clipboard countdown timer UI and player animation simultaneously
+            const countdownPromise = window.showClipboardCountdown ? window.showClipboardCountdown(5000) : Promise.resolve();
+            const animationPromise = animateCountdownTransition({
+              scene: this,
+              playerSprites: this.playerSprites,
+              ballSprite: this.ballSprite,
+              transitionType: transitionType,
+              offenseTeamId: nextOffenseTeam,
+              homeTeamId: simData.home_team_id,
+              duration: 5000
+            });
+            
+            // Wait for both to complete
+            await Promise.all([countdownPromise, animationPromise]);
+            
             console.log('📋 Countdown complete, using preset overrides:', {
               offense: window.nextOffenseOverride || 'auto',
               defense: window.nextDefenseOverride || 'auto'
