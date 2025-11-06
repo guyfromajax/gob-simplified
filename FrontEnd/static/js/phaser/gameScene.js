@@ -1300,14 +1300,21 @@ export function createGameScene(Phaser) {
       while (!quarterComplete) {
         try {
           // Call /api/simulate-turn to get the next turn
+          // Check for user overrides from quick adjust window
+          const offenseOverride = window.nextOffenseOverride || null;
+          const defenseOverride = window.nextDefenseOverride || null;
+          
+          // Clear overrides after reading (single-use)
+          window.nextOffenseOverride = null;
+          window.nextDefenseOverride = null;
+          
           const response = await fetch('/api/simulate-turn', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               game_id: gameId,
-              // User overrides would go here (Step 3+)
-              offense_override: null,
-              defense_override: null,
+              offense_override: offenseOverride,
+              defense_override: defenseOverride,
               mode: this.mode || 'single'
             })
           });
@@ -1421,6 +1428,30 @@ export function createGameScene(Phaser) {
             away_team_fouls: turnData.away_team_fouls,
             clock: turnData.clock
           });
+          
+          // Check if next turn is HCO (eligible for quick adjust window)
+          const nextIsHCO = turnData.next_offensive_state === 'HCO';
+          const currentIsFastBreak = turn.fast_break || turn.result_type === 'FAST_BREAK';
+          const currentIsFreethrow = turn.result_type === 'FREE_THROW';
+          const currentIsFCP = turn.fcp_foul || turn.result_type === 'FCP';
+          const currentIsHCT = turn.hct_foul || turn.result_type === 'HCT';
+          
+          // Show quick adjust window if:
+          // 1. Next state is HCO
+          // 2. Current turn is NOT Fast Break, Free Throw, FCP, or HCT
+          // 3. User's team is on offense next
+          const userTeamId = this.userTeamSide === 'home' ? initialSimData.home_team_id : initialSimData.away_team_id;
+          const userHasOffenseNext = turnData.offense_team === (this.userTeamSide === 'home' ? homeTeam : awayTeam);
+          
+          if (nextIsHCO && !currentIsFastBreak && !currentIsFreethrow && !currentIsFCP && !currentIsHCT && userHasOffenseNext) {
+            console.log('🎮 Showing quick adjust window (5 seconds)');
+            const userOverride = await window.showQuickAdjustWindow(5000);
+            if (userOverride) {
+              console.log(`🎮 User selected override: ${userOverride}`);
+              // Store override for next turn
+              window.nextOffenseOverride = userOverride;
+            }
+          }
           
           // Small delay between turns for readability (optional)
           await new Promise(resolve => setTimeout(resolve, 100));
