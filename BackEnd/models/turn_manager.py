@@ -534,6 +534,7 @@ class TurnManager:
                 "offense": chosen_playcall,
                 "defense": chosen_defense,
                 "offense_type": "User",  # Mark as user-selected
+                "offense_play_type": chosen_play_type,  # Include play type for Playcall Center highlighting
                 "offense_focus": user_focus,
                 "defense_type": chosen_defense.title() if chosen_defense else "-",
                 "defense_focus": None
