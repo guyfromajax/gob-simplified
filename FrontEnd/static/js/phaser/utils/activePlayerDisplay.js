@@ -13,6 +13,18 @@
 export function getDefenderIdFromTurn(turnData) {
   if (!turnData) return null;
   
+  // Debug: Log what we're receiving
+  if (turnData.defender_id || turnData.defender) {
+    console.log('🛡️ DEFENDER DATA:', {
+      defender_id: turnData.defender_id,
+      defender: turnData.defender,
+      defender_type: typeof turnData.defender,
+      has_player_id: turnData.defender?.player_id,
+      result_type: turnData.result_type,
+      offensive_state: turnData.offensive_state
+    });
+  }
+  
   // Try multiple formats:
   // 1. defender_id (FCP/HCT format)
   if (turnData.defender_id) return turnData.defender_id;
@@ -24,6 +36,11 @@ export function getDefenderIdFromTurn(turnData) {
   if (turnData.defender?.player_id) return turnData.defender.player_id;
   
   // 4. No defender found
+  console.log('⚠️ NO DEFENDER FOUND in turn:', {
+    result_type: turnData.result_type,
+    offensive_state: turnData.offensive_state,
+    turnData_keys: Object.keys(turnData)
+  });
   return null;
 }
 
