@@ -482,11 +482,43 @@ class TurnManager:
         user_offense = self.game.game_state.get("user_offense_override")
         user_defense = self.game.game_state.get("user_defense_override")
         
-        # If user provided an offense override, use it and clear it
+        # If user provided an offense override, convert focus to specific play
         if user_offense:
-            chosen_playcall = user_offense
             self.game.game_state["user_offense_override"] = None  # Clear after use
-            logging.info(f"🎮 Using user offense override: {chosen_playcall}")
+            
+            # User provides play_focus (e.g., "Attack", "Inside", "Outside")
+            # We need to convert this to a specific play name
+            user_focus = user_offense.lower()  # "Attack" → "attack"
+            logging.info(f"🎮 User offense override (focus): {user_focus}")
+            
+            # Determine play_type (motion vs set_play) based on team settings
+            offense_setting = self.game.offense_team.strategy_settings.get("offense", 2)
+            play_type_weights = {
+                0: {"motion": 100, "set_play": 0},
+                1: {"motion": 75, "set_play": 25},
+                2: {"motion": 50, "set_play": 50},
+                3: {"motion": 25, "set_play": 75},
+                4: {"motion": 0, "set_play": 100}
+            }
+            weights = play_type_weights.get(offense_setting, {"motion": 50, "set_play": 50})
+            chosen_play_type = weighted_random_from_dict(weights)
+            
+            # Query plays collection for matching play
+            query = {
+                "play_type": chosen_play_type,
+                "play_focus": user_focus
+            }
+            
+            matching_plays = list(plays_collection.find(query))
+            
+            if not matching_plays:
+                logging.warning(f"⚠️ No plays found for {chosen_play_type}/{user_focus}, using fallback")
+                chosen_playcall = "Inside"  # Fallback
+            else:
+                # Randomly select one play from matches
+                selected_play = random.choice(matching_plays)
+                chosen_playcall = selected_play["name"]
+                logging.info(f"🎯 User override selected play: {chosen_playcall} (type={chosen_play_type}, focus={user_focus})")
             
             # Still need to choose defense normally
             if user_defense:
@@ -502,7 +534,7 @@ class TurnManager:
                 "offense": chosen_playcall,
                 "defense": chosen_defense,
                 "offense_type": "User",  # Mark as user-selected
-                "offense_focus": None,
+                "offense_focus": user_focus,
                 "defense_type": chosen_defense.title() if chosen_defense else "-",
                 "defense_focus": None
             }
