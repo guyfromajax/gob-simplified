@@ -302,6 +302,13 @@
       box-shadow: 0 0 12px rgba(255, 68, 68, 0.6);
     }
 
+    .player-role-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+
     .player-role-icon {
       font-size: 32px;
       font-weight: bold;
@@ -319,6 +326,22 @@
       color: #FF4444;
       font-family: 'Arial Black', sans-serif;
       font-size: 36px;
+    }
+
+    .audible-label {
+      font-size: 12px;
+      font-weight: bold;
+      color: #FFD700;
+      text-shadow: 0 0 6px rgba(255, 215, 0, 0.8), 0 2px 4px rgba(0, 0, 0, 0.8);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      white-space: nowrap;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    }
+
+    .audible-label.show {
+      opacity: 1;
     }
 
     /* Home TOL/F - Grid column 22 */
@@ -1003,7 +1026,9 @@
       50% { box-shadow: 0 0 30px #E74C3C, 0 0 40px #E74C3C; }
     }
 
+    /* COMMENTED OUT: Audible popup replaced with scoreboard label */
     /* ==================== HOT READ / AUDIBLE POPUP ==================== */
+    /*
     #shooter-audible-popup {
       position: fixed;
       bottom: 140px;
@@ -1016,7 +1041,7 @@
       font-family: 'Bebas Neue', sans-serif;
       text-align: center;
       pointer-events: none;
-      z-index: 1050; /* Above HUD (1000) and controls (950) */
+      z-index: 1050;
       opacity: 0;
       display: none;
     }
@@ -1058,6 +1083,7 @@
       75%  { opacity: 1; transform: translateX(-50%) scale(1); }
       100% { opacity: 0; transform: translateX(-50%) scale(0.9); }
     }
+    */
 
     /* ==================== RESULT POPUP ==================== */
     .result-popup {
@@ -1522,7 +1548,10 @@
     <!-- Away Active Player - Grid column 8 -->
     <div id="away-active-player" class="active-player-display">
       <img id="away-active-headshot" class="active-player-headshot" src="" alt="" />
-      <div id="away-player-role" class="player-role-icon">🏀</div>
+      <div class="player-role-container">
+        <div id="away-player-role" class="player-role-icon">🏀</div>
+        <div id="away-audible-text" class="audible-label"></div>
+      </div>
     </div>
     
     <!-- COMMENTED OUT: Now shown in Playcall Center below court -->
@@ -1599,7 +1628,10 @@
     
     <!-- Home Active Player - Grid column 20 -->
     <div id="home-active-player" class="active-player-display">
-      <div id="home-player-role" class="player-role-icon">D</div>
+      <div class="player-role-container">
+        <div id="home-audible-text" class="audible-label"></div>
+        <div id="home-player-role" class="player-role-icon">D</div>
+      </div>
       <img id="home-active-headshot" class="active-player-headshot" src="" alt="" />
     </div>
     
@@ -1931,13 +1963,16 @@
     </div>
   </div>
 
+  <!-- COMMENTED OUT: Audible popup replaced with scoreboard label -->
   <!-- ==================== HOT READ / AUDIBLE POPUP ==================== -->
+  <!--
   <div id="shooter-audible-popup">
     <div class="audible-headshot-container">
       <img class="audible-headshot" src="" alt="Player">
     </div>
     <div class="audible-text"></div>
   </div>
+  -->
 
   <!-- ==================== SCRIPTS ==================== -->
   <script>
@@ -2354,12 +2389,9 @@
       }, 2500);
     };
 
+    // COMMENTED OUT: Audible popup function replaced with scoreboard label
     // ==================== HOT READ / AUDIBLE POPUP FUNCTION ====================
-    /**
-     * Show popup when actual shooter differs from intended shooter
-     * Called before shot animation in turnAnimation.js
-     * @param {Object} data - { shooterId, shooterPhoto, shooterMO, shooterPos, intendedPos }
-     */
+    /*
     window.showShooterAudible = function(data) {
       const popup = document.getElementById('shooter-audible-popup');
       if (!popup) return;
@@ -2367,33 +2399,28 @@
       const headshotEl = popup.querySelector('.audible-headshot');
       const textEl = popup.querySelector('.audible-text');
 
-      // Set player headshot (with fallback)
       const photoUrl = data.shooterPhoto || `/static/images/players/${data.shooterId}.png`;
       headshotEl.src = photoUrl;
       headshotEl.style.display = 'block';
       
-      // Fallback to default if image fails to load
       headshotEl.onerror = () => {
         headshotEl.src = '/static/images/players/default.png';
       };
 
-      // Determine text based on MO attribute
       const mo = data.shooterMO || 5;
       const text = mo >= 7 ? "HOT READ!" : "AUDIBLE!";
       textEl.textContent = text;
 
-      // Show popup
       popup.classList.add('show');
-      void popup.offsetWidth; // Force reflow
+      void popup.offsetWidth;
 
-      // Hide after 1.2s
       setTimeout(() => {
         popup.classList.remove('show');
       }, 1200);
 
-      // Return promise that resolves after animation completes
       return new Promise(resolve => setTimeout(resolve, 1200));
     };
+    */
 
     /**
      * Update active player displays in scoreboard
@@ -2402,14 +2429,17 @@
      * @param {string} defenderId - Player ID of current defender
      * @param {string} homeTeamId - Home team ID for determining sides
      * @param {Object} playerSprites - Phaser player sprites (for photo URLs)
+     * @param {string} audibleText - Optional "AUDIBLE!" or "HOT READ!" text
      */
-    window.updateActivePlayersDisplay = function(ballHandlerId, defenderId, homeTeamId, playerSprites = {}) {
+    window.updateActivePlayersDisplay = function(ballHandlerId, defenderId, homeTeamId, playerSprites = {}, audibleText = null) {
       const awayDisplay = document.getElementById('away-active-player');
       const homeDisplay = document.getElementById('home-active-player');
       const awayHeadshot = document.getElementById('away-active-headshot');
       const homeHeadshot = document.getElementById('home-active-headshot');
       const awayRole = document.getElementById('away-player-role');
       const homeRole = document.getElementById('home-player-role');
+      const awayAudible = document.getElementById('away-audible-text');
+      const homeAudible = document.getElementById('home-audible-text');
 
       if (!awayDisplay || !homeDisplay) return;
 
@@ -2473,6 +2503,41 @@
       homeHeadshot.onerror = () => {
         homeHeadshot.src = '/static/images/players/default.png';
       };
+
+      // Update audible text (show on ball handler's side)
+      if (audibleText) {
+        if (isBallHandlerHome && homeAudible) {
+          homeAudible.textContent = audibleText;
+          homeAudible.classList.add('show');
+          // Auto-hide after 1.2s
+          setTimeout(() => {
+            homeAudible.classList.remove('show');
+            setTimeout(() => {
+              homeAudible.textContent = '';
+            }, 200); // Clear text after fade out
+          }, 1200);
+        } else if (!isBallHandlerHome && awayAudible) {
+          awayAudible.textContent = audibleText;
+          awayAudible.classList.add('show');
+          // Auto-hide after 1.2s
+          setTimeout(() => {
+            awayAudible.classList.remove('show');
+            setTimeout(() => {
+              awayAudible.textContent = '';
+            }, 200); // Clear text after fade out
+          }, 1200);
+        }
+      } else {
+        // Clear audible text if not provided
+        if (homeAudible) {
+          homeAudible.classList.remove('show');
+          homeAudible.textContent = '';
+        }
+        if (awayAudible) {
+          awayAudible.classList.remove('show');
+          awayAudible.textContent = '';
+        }
+      }
     };
   </script>
 
