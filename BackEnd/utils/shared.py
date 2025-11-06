@@ -607,10 +607,12 @@ def summarize_game_state(game, exclude_animations=True):
         "points_by_quarter": game.game_state["points_by_quarter"].get(game.home_team.name, [0, 0, 0, 0]),
         "team_fouls": game.home_team.team_fouls,
         
+        # Team attributes (needed for S3 tab in Team Box Score)
+        "attributes": getattr(game.home_team, 'team_attributes', {}),
+        
         # ✅ Removed redundant fields (already in teams object):
         # - plays (was 75KB with embedded skeletons!)
         # - strategy_settings
-        # - attributes  
         # - scouting
         # Frontend should read from teams object instead
         
@@ -633,10 +635,12 @@ def summarize_game_state(game, exclude_animations=True):
         "points_by_quarter": game.game_state["points_by_quarter"].get(game.away_team.name, [0, 0, 0, 0]),
         "team_fouls": game.away_team.team_fouls,
         
+        # Team attributes (needed for S3 tab in Team Box Score)
+        "attributes": getattr(game.away_team, 'team_attributes', {}),
+        
         # ✅ Removed redundant fields (already in teams object):
         # - plays (was 75KB with embedded skeletons!)
         # - strategy_settings
-        # - attributes
         # - scouting
         # Frontend should read from teams object instead
         
