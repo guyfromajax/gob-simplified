@@ -928,12 +928,12 @@
       top: 50%;
       left: 50%;
       transform: translate(-50%, -50%);
-      background: rgba(255, 0, 0, 0.95); /* TEMP: Bright red for debugging */
-      border: 10px solid #00FF00; /* TEMP: Bright green border */
+      background: linear-gradient(135deg, rgba(0, 0, 0, 0.97), rgba(30, 30, 30, 0.97));
+      border: 3px solid #FFD700;
       border-radius: 16px;
       padding: 30px 40px;
       z-index: 10001;
-      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8);
+      box-shadow: 0 15px 50px rgba(0, 0, 0, 0.9), 0 0 30px rgba(255, 215, 0, 0.3);
       min-width: 500px;
     }
 
@@ -2286,15 +2286,6 @@
         const skipBtn = document.getElementById('quick-adjust-skip');
         const playcallBtns = document.querySelectorAll('.quick-adjust-btn');
         
-        console.log('🔍 Quick Adjust Window elements:', {
-          overlay: !!overlay,
-          window_el: !!window_el,
-          timerEl: !!timerEl,
-          progressFill: !!progressFill,
-          skipBtn: !!skipBtn,
-          playcallBtns: playcallBtns.length
-        });
-        
         if (!window_el) {
           console.error('❌ Quick Adjust Window element not found!');
           resolve(null);
@@ -2314,20 +2305,6 @@
         window_el.style.display = 'block';
         window_el.style.position = 'fixed';
         window_el.style.zIndex = '10001';
-        
-        console.log('✅ Quick Adjust Window displayed:', {
-          display: window_el.style.display,
-          computed: window.getComputedStyle(window_el).display,
-          zIndex: window.getComputedStyle(window_el).zIndex,
-          visibility: window.getComputedStyle(window_el).visibility,
-          position: window.getComputedStyle(window_el).position,
-          top: window.getComputedStyle(window_el).top,
-          left: window.getComputedStyle(window_el).left
-        });
-        
-        // TEMP: Add visual confirmation
-        console.log('🚨🚨🚨 QUICK ADJUST WINDOW SHOULD BE VISIBLE NOW! 🚨🚨🚨');
-        console.log('Look for a BRIGHT RED BOX with GREEN BORDER in the center of your screen!');
         
         // Handle playcall selection
         playcallBtns.forEach(btn => {
