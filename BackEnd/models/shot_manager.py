@@ -356,6 +356,11 @@ class ShotManager:
             result["points"] = points
             result["scoring_team"] = off_team.name
             # next_defensive_setup is already in result from line 95
+            
+            # For AND-1 situations, include free throw info so frontend knows not to inbound
+            if d_foul and self.game_state.get("free_throws_remaining", 0) > 0:
+                result["free_throws_remaining"] = self.game_state["free_throws_remaining"]
+                result["has_and_one"] = True
 
         return result
 

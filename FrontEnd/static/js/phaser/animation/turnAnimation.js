@@ -1245,9 +1245,14 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
       );
       
       if (turnData.result_type === "MAKE") {
+        // Check if there's a free throw coming (AND-1 or technical foul)
+        // In turn-by-turn mode, check turnData.free_throws_remaining
+        // In batch mode, check next turn in array
         const nextTurn = simData?.turns?.[scene.currentTurn + 1];
         const hasPendingFreeThrow =
-          nextTurn?.result_type === "FREE_THROW";
+          nextTurn?.result_type === "FREE_THROW" ||
+          (turnData.free_throws_remaining && turnData.free_throws_remaining > 0);
+        
         if (!hasPendingFreeThrow && !hasPutbackMake) {
           const shooterTeamIsHome =
             String(shooterTeamId) === String(homeTeamId);
