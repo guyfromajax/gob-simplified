@@ -2337,10 +2337,28 @@
       const clearOffenseBtn = document.getElementById('clear-offense-preset');
       const clearDefenseBtn = document.getElementById('clear-defense-preset');
       
+      console.log('🔍 Coach\'s Clipboard init:', {
+        clipboard: clipboard,
+        found: !!clipboard,
+        computedStyle: clipboard ? window.getComputedStyle(clipboard) : null
+      });
+      
       if (!clipboard) {
         console.error('❌ Coach\'s Clipboard not found!');
         return;
       }
+      
+      // Debug: Log position and visibility
+      const styles = window.getComputedStyle(clipboard);
+      console.log('📋 Clipboard styles:', {
+        display: styles.display,
+        position: styles.position,
+        top: styles.top,
+        right: styles.right,
+        zIndex: styles.zIndex,
+        visibility: styles.visibility,
+        opacity: styles.opacity
+      });
       
       // State
       let isMinimized = false;
