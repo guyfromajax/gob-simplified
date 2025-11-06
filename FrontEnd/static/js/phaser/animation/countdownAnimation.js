@@ -60,6 +60,10 @@ export async function animateCountdownTransition({
   const offenseSide = isHomeOffense ? 'home' : 'away';
   const defenseSide = isHomeOffense ? 'away' : 'home';
   
+  // Debug: Log basket positions
+  const targetBasket = isHomeOffense ? 9 : 91; // Home attacks X=9, Away attacks X=91
+  console.log(`🏀 Target basket: ${isHomeOffense ? 'Home' : 'Away'} offense attacks X=${targetBasket}, ${isHomeOffense ? 'Away' : 'Home'} defense protects X=${targetBasket}`);
+  
   // Get offensive and defensive players
   const offensivePlayers = Object.values(playerSprites).filter(p => p.team === offenseSide);
   const defensivePlayers = Object.values(playerSprites).filter(p => p.team === defenseSide);
@@ -188,11 +192,13 @@ async function animateAdvanceUpCourt({
     });
   });
   
-  // Defensive players move to spots near their basket
-  const defensiveTargets = Object.values(COURT_POSITIONS.defense);
+  // Defensive players move to spots near THEIR basket (the one they're protecting)
+  const defensiveTargetsList = ['rim', 'lowerLowPost', 'upperLowPost', 'lowerMidPost', 'upperMidPost', 'midLane'];
+  
   defensivePlayers.forEach((player, idx) => {
-    // Pick a random defensive target spot
-    const targetSpot = defensiveTargets[Math.floor(Math.random() * defensiveTargets.length)];
+    // Pick a random defensive spot name
+    const targetSpotName = defensiveTargetsList[Math.floor(Math.random() * defensiveTargetsList.length)];
+    const targetSpot = COURT_POSITIONS.defense[targetSpotName];
     
     // Move 1-10 X spots away from basket (toward center, to avoid out of bounds)
     const xOffset = 1 + Math.random() * 9;
@@ -200,14 +206,20 @@ async function animateAdvanceUpCourt({
     
     let endX, endY;
     if (isHomeOffense) {
-      // Home offense, so away defense (protecting X=9)
-      const mirroredTargetX = 100 - targetSpot.x;
-      endX = mirroredTargetX + xOffset; // Move away from X=9 (toward center)
+      // Home offense attacks X=9, so away defense protects X=9 (left side)
+      // Use MIRRORED defensive positions (flip from X=91 to X=9)
+      const awayBasketX = 9;
+      const mirroredTargetX = 100 - targetSpot.x; // 91→9, 88→12, 85→15, 78→22
+      endX = mirroredTargetX + xOffset; // Move away from X=9 toward center
       endY = targetSpot.y + yOffset;
+      console.log(`🛡️ Defender ${idx}: target=${targetSpotName}, mirroredX=${mirroredTargetX}, offset=${xOffset.toFixed(1)}, finalX=${endX.toFixed(1)} (protecting X=9)`);
     } else {
-      // Away offense, so home defense (protecting X=91)
-      endX = targetSpot.x - xOffset; // Move away from X=91 (toward center)
+      // Away offense attacks X=91, so home defense protects X=91 (right side)
+      // Use original defensive positions (already at X=91)
+      const homeBasketX = 91;
+      endX = targetSpot.x - xOffset; // Move away from X=91 toward center
       endY = targetSpot.y + yOffset;
+      console.log(`🛡️ Defender ${idx}: target=${targetSpotName}, targetX=${targetSpot.x}, offset=${xOffset.toFixed(1)}, finalX=${endX.toFixed(1)} (protecting X=91)`);
     }
     
     const endPixels = gridToPixels(endX, endY);
@@ -317,11 +329,13 @@ async function animateSideInboundMovement({
     });
   });
   
-  // Defensive players move to spots near their basket (same as DREB/IP)
-  const defensiveTargets = Object.values(COURT_POSITIONS.defense);
+  // Defensive players move to spots near THEIR basket (same as DREB/IP)
+  const defensiveTargetsList = ['rim', 'lowerLowPost', 'upperLowPost', 'lowerMidPost', 'upperMidPost', 'midLane'];
+  
   defensivePlayers.forEach((player, idx) => {
-    // Pick a random defensive target spot
-    const targetSpot = defensiveTargets[Math.floor(Math.random() * defensiveTargets.length)];
+    // Pick a random defensive spot name
+    const targetSpotName = defensiveTargetsList[Math.floor(Math.random() * defensiveTargetsList.length)];
+    const targetSpot = COURT_POSITIONS.defense[targetSpotName];
     
     // Move 1-10 X spots away from basket (toward center, to avoid out of bounds)
     const xOffset = 1 + Math.random() * 9;
@@ -329,14 +343,20 @@ async function animateSideInboundMovement({
     
     let endX, endY;
     if (isHomeOffense) {
-      // Home offense, so away defense (protecting X=9)
-      const mirroredTargetX = 100 - targetSpot.x;
-      endX = mirroredTargetX + xOffset; // Move away from X=9 (toward center)
+      // Home offense attacks X=9, so away defense protects X=9 (left side)
+      // Use MIRRORED defensive positions (flip from X=91 to X=9)
+      const awayBasketX = 9;
+      const mirroredTargetX = 100 - targetSpot.x; // 91→9, 88→12, 85→15, 78→22
+      endX = mirroredTargetX + xOffset; // Move away from X=9 toward center
       endY = targetSpot.y + yOffset;
+      console.log(`🛡️ SIP Defender ${idx}: target=${targetSpotName}, mirroredX=${mirroredTargetX}, offset=${xOffset.toFixed(1)}, finalX=${endX.toFixed(1)} (protecting X=9)`);
     } else {
-      // Away offense, so home defense (protecting X=91)
-      endX = targetSpot.x - xOffset; // Move away from X=91 (toward center)
+      // Away offense attacks X=91, so home defense protects X=91 (right side)
+      // Use original defensive positions (already at X=91)
+      const homeBasketX = 91;
+      endX = targetSpot.x - xOffset; // Move away from X=91 toward center
       endY = targetSpot.y + yOffset;
+      console.log(`🛡️ SIP Defender ${idx}: target=${targetSpotName}, targetX=${targetSpot.x}, offset=${xOffset.toFixed(1)}, finalX=${endX.toFixed(1)} (protecting X=91)`);
     }
     
     const endPixels = gridToPixels(endX, endY);
