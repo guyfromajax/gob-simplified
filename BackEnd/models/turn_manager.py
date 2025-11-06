@@ -4,6 +4,7 @@ from BackEnd.models.playbook_manager import PlaybookManager
 from BackEnd.models.animator import Animator
 import random
 import json
+import logging
 from BackEnd.db import players_collection, teams_collection, plays_collection
 from BackEnd.models.player import Player, player_to_dict
 from collections import defaultdict
@@ -461,7 +462,47 @@ class TurnManager:
         Two-level play selection system:
         Level 1: Determine motion vs set play based on offense setting
         Level 2: Determine play focus (inside/attack/outside) based on weighted settings
+        
+        User overrides take precedence for turn-by-turn gameplay.
         """
+        
+        # Check for user overrides FIRST (for turn-by-turn gameplay)
+        user_offense = self.game.game_state.get("user_offense_override")
+        user_defense = self.game.game_state.get("user_defense_override")
+        
+        # If user provided an offense override, use it and clear it
+        if user_offense:
+            chosen_playcall = user_offense
+            self.game.game_state["user_offense_override"] = None  # Clear after use
+            logging.info(f"🎮 Using user offense override: {chosen_playcall}")
+            
+            # Still need to choose defense normally
+            if user_defense:
+                chosen_defense = user_defense
+                self.game.game_state["user_defense_override"] = None  # Clear after use
+                logging.info(f"🎮 Using user defense override: {chosen_defense}")
+            else:
+                defense_setting = self.game.defense_team.strategy_settings["defense"]
+                chosen_defense = random.choice(STRATEGY_CALL_DICTS["defense"][defense_setting])
+            
+            # Return early with user's choices
+            return {
+                "offense": chosen_playcall,
+                "defense": chosen_defense,
+                "offense_type": "User",  # Mark as user-selected
+                "offense_focus": None,
+                "defense_type": chosen_defense.title() if chosen_defense else "-",
+                "defense_focus": None
+            }
+        
+        # If only defense override (user on offense, setting defense for next possession)
+        if user_defense:
+            chosen_defense = user_defense
+            self.game.game_state["user_defense_override"] = None  # Clear after use
+            logging.info(f"🎮 Using user defense override: {chosen_defense}")
+        else:
+            # No override, choose defense normally (will be set below)
+            chosen_defense = None
         
         # Level 1: Determine play type (motion vs set_play)
         offense_setting = self.game.offense_team.strategy_settings.get("offense", 2)
@@ -541,9 +582,10 @@ class TurnManager:
         self.game.game_state["offense_play_type"] = chosen_play_type
         self.game.game_state["offense_play_focus"] = chosen_focus
 
-        # Defense setting (unchanged)
-        defense_setting = self.game.defense_team.strategy_settings["defense"]
-        chosen_defense = random.choice(STRATEGY_CALL_DICTS["defense"][defense_setting])
+        # Defense setting - use override if set, otherwise choose normally
+        if chosen_defense is None:  # Not set by user override
+            defense_setting = self.game.defense_team.strategy_settings["defense"]
+            chosen_defense = random.choice(STRATEGY_CALL_DICTS["defense"][defense_setting])
         
         # Legacy trackers removed from incrementing to avoid serving old structure
 
