@@ -1325,28 +1325,54 @@ export function createGameScene(Phaser) {
             break;
           }
           
-          // Animate this single turn
+          // Animate this single turn (or batch of turns)
           const turn = turnData.turn;
-          turnCount++;
           
-          // Add index to turn for text scroll display
-          turn.index = turnCount;
-          
-          console.log(`🎬 Turn ${turnCount}: ${turn.result_type} - ${turn.text?.substring(0, 50)}...`);
-          
-          // Wrap single turn in array for animateGameTurns
-          await animateGameTurns({
-            scene: this,
-            simData: { 
-              ...initialSimData,
-              turns: [turn],
-              home_team: initialSimData.home_team,
-              away_team: initialSimData.away_team
-            },
-            playerSprites: this.playerSprites,
-            ballSprite: this.ballSprite,
-            onUpdate: updateScoreboard
-          });
+          // Handle BATCH turns (e.g., HCO miss → OREB)
+          if (turn.result_type === 'BATCH' && turn.batch_turns) {
+            console.log(`🎬 Batch turn with ${turn.batch_turns.length} sub-turns`);
+            
+            // Animate each turn in the batch
+            for (const subTurn of turn.batch_turns) {
+              turnCount++;
+              subTurn.index = turnCount;
+              
+              console.log(`🎬 Turn ${turnCount}: ${subTurn.result_type} - ${subTurn.text?.substring(0, 50)}...`);
+              
+              await animateGameTurns({
+                scene: this,
+                simData: { 
+                  ...initialSimData,
+                  turns: [subTurn],
+                  home_team: initialSimData.home_team,
+                  away_team: initialSimData.away_team
+                },
+                playerSprites: this.playerSprites,
+                ballSprite: this.ballSprite,
+                onUpdate: updateScoreboard
+              });
+            }
+          } else {
+            // Normal single turn
+            turnCount++;
+            turn.index = turnCount;
+            
+            console.log(`🎬 Turn ${turnCount}: ${turn.result_type} - ${turn.text?.substring(0, 50)}...`);
+            
+            // Wrap single turn in array for animateGameTurns
+            await animateGameTurns({
+              scene: this,
+              simData: { 
+                ...initialSimData,
+                turns: [turn],
+                home_team: initialSimData.home_team,
+                away_team: initialSimData.away_team
+              },
+              playerSprites: this.playerSprites,
+              ballSprite: this.ballSprite,
+              onUpdate: updateScoreboard
+            });
+          }
           
           // Update scores and game state after each turn
           updateScoreboard({
