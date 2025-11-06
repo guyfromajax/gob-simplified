@@ -278,6 +278,7 @@ class TeamManager:
             "TO": 0,
             "F": 0,
             "PIP": 0,  # Points in Paint
+            "FB_PTS": 0,  # Fast Break Points
         }
 
         # Include all players (not just current lineup) to capture bench contributions

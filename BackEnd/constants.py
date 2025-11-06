@@ -12,7 +12,7 @@ ALL_ATTRS = [
 
 BOX_SCORE_KEYS = [
     "FGA", "FGM", "3PTA", "3PTM", "FTA", "FTM",
-    "OREB", "DREB", "REB", "AST", "STL", "BLK", "TO", "F", "MIN", "PTS", "PIP",
+    "OREB", "DREB", "REB", "AST", "STL", "BLK", "TO", "F", "MIN", "PTS", "PIP", "FB_PTS",
     "DEF_A", "DEF_S", "HELP_D", "SCR_A", "SCR_S"
 ]
 
