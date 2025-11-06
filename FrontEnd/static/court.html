@@ -2271,12 +2271,32 @@
         const skipBtn = document.getElementById('quick-adjust-skip');
         const playcallBtns = document.querySelectorAll('.quick-adjust-btn');
         
+        console.log('🔍 Quick Adjust Window elements:', {
+          window_el: !!window_el,
+          timerEl: !!timerEl,
+          progressFill: !!progressFill,
+          skipBtn: !!skipBtn,
+          playcallBtns: playcallBtns.length
+        });
+        
+        if (!window_el) {
+          console.error('❌ Quick Adjust Window element not found!');
+          resolve(null);
+          return;
+        }
+        
         let selectedPlaycall = null;
         let interval = null;
         const startTime = Date.now();
         
         // Show window
         window_el.style.display = 'block';
+        console.log('✅ Quick Adjust Window displayed:', {
+          display: window_el.style.display,
+          computed: window.getComputedStyle(window_el).display,
+          zIndex: window.getComputedStyle(window_el).zIndex,
+          visibility: window.getComputedStyle(window_el).visibility
+        });
         
         // Handle playcall selection
         playcallBtns.forEach(btn => {
