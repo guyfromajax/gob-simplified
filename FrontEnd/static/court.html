@@ -2200,7 +2200,8 @@
         setCell('stl_total', stl);
         setCell('blk_total', blk);
         setCell('to_total', to);
-        setCell('fb_pts_total', 0); // TODO: Track Fast Break Points
+        const fbPts = totals.FB_PTS || 0;
+        setCell('fb_pts_total', fbPts);
         setCell('pip_total', pip);
         setCell('fouls_total', fouls);
         
