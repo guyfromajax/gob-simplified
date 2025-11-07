@@ -2698,6 +2698,28 @@
     // setTimeout(updatePlaycallPosition, 100);
     // setTimeout(updatePlaycallPosition, 500);
 
+    // ==================== DIAGNOSTIC LOGGING ====================
+    // Monitor Playcall Center visibility every 2 seconds
+    setInterval(() => {
+      const pc = document.getElementById('playcall-center');
+      if (pc) {
+        const computed = window.getComputedStyle(pc);
+        console.log('🔍 PLAYCALL CENTER DIAGNOSTIC:', {
+          display: computed.display,
+          visibility: computed.visibility,
+          opacity: computed.opacity,
+          height: computed.height,
+          width: computed.width,
+          position: computed.position,
+          top: computed.top,
+          zIndex: computed.zIndex,
+          parent: pc.parentElement?.id || pc.parentElement?.className
+        });
+      } else {
+        console.log('❌ PLAYCALL CENTER NOT FOUND IN DOM');
+      }
+    }, 2000);
+
     // ==================== PLAYCALL REVEAL HUD FUNCTION ====================
     /**
      * Show the transient HUD overlay revealing the playcalls
