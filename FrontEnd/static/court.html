@@ -2700,6 +2700,30 @@
     // setTimeout(updatePlaycallPosition, 500);
 
     // ==================== DIAGNOSTIC LOGGING ====================
+    // Monitor what's changing #main-container width
+    const mainContainer = document.getElementById('main-container');
+    if (mainContainer) {
+      const observer = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+          if (mutation.type === 'attributes' && mutation.attributeName === 'style') {
+            const computed = window.getComputedStyle(mainContainer);
+            console.error('🚨 MAIN-CONTAINER STYLE CHANGED!', {
+              inlineWidth: mainContainer.style.width,
+              computedWidth: computed.width,
+              stackTrace: new Error().stack
+            });
+          }
+        });
+      });
+      
+      observer.observe(mainContainer, {
+        attributes: true,
+        attributeFilter: ['style']
+      });
+      
+      console.log('👀 Watching #main-container for style changes...');
+    }
+    
     // Monitor Playcall Center visibility every 2 seconds
     setInterval(() => {
       const pc = document.getElementById('playcall-center');
