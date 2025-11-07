@@ -6,7 +6,7 @@
  */
 
 /**
- * Update playcall panels at the start of each turn
+ * Update playcall center at the start of each turn
  * @param {Object} turnData - Turn data from backend containing playcalls
  * @param {string} homeTeamId - Home team ID for determining sides
  */
@@ -16,71 +16,30 @@ export function updatePlaycallCenter(turnData, homeTeamId) {
   const offenseTeamId = turnData.possession_team_id || turnData.starting_possession_team_id;
   const isHomeOffense = homeTeamId && String(offenseTeamId) === String(homeTeamId);
 
-  // Get panels
-  const offensePanel = document.getElementById('offense-panel');
-  const defensePanel = document.getElementById('defense-panel');
+  // Get playcall center
   const playcallCenter = document.getElementById('playcall-center');
-
-  if (!offensePanel || !defensePanel || !playcallCenter) {
-    console.warn('⚠️ Playcall Center elements not found');
+  if (!playcallCenter) {
+    console.warn('⚠️ Playcall Center not found');
     return;
   }
 
-  // Switch panel sides based on possession
-  // Away offense = offense on LEFT, defense on RIGHT
-  // Home offense = offense on RIGHT, defense on LEFT
-  playcallCenter.style.flexDirection = isHomeOffense ? 'row-reverse' : 'row';
+  // Set data attribute for panel flipping
+  playcallCenter.setAttribute('data-home-offense', isHomeOffense);
 
-  // Clear all active states
-  document.querySelectorAll('.playcall-option').forEach(opt => {
-    opt.classList.remove('active');
-  });
-
-  // Highlight offense play type
-  // Backend sends "Motion" or "Set_Play" (title case)
-  const playType = turnData.offensive_play_type;
-  if (playType) {
-    const typeNormalized = playType.toLowerCase().replace('_', ' '); // "set_play" → "set play"
-    let typeSelector = null;
-    
-    if (typeNormalized === 'motion') {
-      typeSelector = 'motion';
-    } else if (typeNormalized === 'set play' || typeNormalized.includes('set')) {
-      typeSelector = 'set_play';
-    }
-    
-    if (typeSelector) {
-      const typeElement = offensePanel.querySelector(`.playcall-option[data-type="${typeSelector}"]`);
-      if (typeElement) {
-        typeElement.classList.add('active');
-      }
-    }
+  // Update top row status displays
+  const offenseStatusText = document.getElementById('offense-status-text');
+  const defenseStatusText = document.getElementById('defense-status-text');
+  
+  if (offenseStatusText && turnData.offensive_play_type && turnData.offensive_play_focus) {
+    const type = turnData.offensive_play_type === 'motion' ? 'Motion' : 'Set';
+    const focus = turnData.offensive_play_focus.charAt(0).toUpperCase() + turnData.offensive_play_focus.slice(1);
+    offenseStatusText.textContent = `${type} → ${focus}`;
   }
-
-  // Highlight offense focus
-  const playFocus = turnData.offensive_play_focus?.toLowerCase();
-  if (playFocus && ['inside', 'attack', 'outside'].includes(playFocus)) {
-    const focusElement = offensePanel.querySelector(`.playcall-option[data-focus="${playFocus}"]`);
-    if (focusElement) {
-      focusElement.classList.add('active');
-    }
-  }
-
-  // Highlight defense type
-  const defenseType = turnData.defensive_play_type?.toLowerCase();
-  if (defenseType === 'man' || defenseType === 'zone') {
-    const defElement = defensePanel.querySelector(`.playcall-option[data-defense="${defenseType}"]`);
-    if (defElement) {
-      defElement.classList.add('active');
-    }
-  }
-
-  // Highlight aggression (from turnData if available)
-  // For now, default to 'normal' - can be wired to actual aggression data later
-  const aggression = turnData.aggression?.toLowerCase() || 'normal';
-  const aggrElement = defensePanel.querySelector(`.playcall-option[data-aggression="${aggression}"]`);
-  if (aggrElement) {
-    aggrElement.classList.add('active');
+  
+  if (defenseStatusText && turnData.defensive_play_type) {
+    const defType = turnData.defensive_play_type.charAt(0).toUpperCase() + turnData.defensive_play_type.slice(1);
+    const aggr = turnData.aggression || 'Normal';
+    defenseStatusText.textContent = `${defType} ${aggr}`;
   }
 
   // Reset lean meter to neutral
@@ -88,6 +47,11 @@ export function updatePlaycallCenter(turnData, homeTeamId) {
 
   // ==================== TRIGGER PLAYCALL REVEAL HUD ====================
   // Show transient HUD overlay with playcall info
+  const playType = turnData.offensive_play_type;
+  const playFocus = turnData.offensive_play_focus;
+  const defenseType = turnData.defensive_play_type;
+  const aggression = turnData.aggression || 'normal';
+  
   if (typeof window.showPlaycallReveal === 'function' && playType && playFocus && defenseType) {
     // Calculate random EV placeholder from -2 to +2 (will be replaced with real logic later)
     const ev = (Math.random() * 4) - 2; // -2.0 to +2.0

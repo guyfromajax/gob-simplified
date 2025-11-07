@@ -482,43 +482,26 @@ class TurnManager:
         user_offense = self.game.game_state.get("user_offense_override")
         user_defense = self.game.game_state.get("user_defense_override")
         
-        # If user provided an offense override, convert focus to specific play
+        # If user provided an offense override, use the specific play name
         if user_offense:
             self.game.game_state["user_offense_override"] = None  # Clear after use
             
-            # User provides play_focus (e.g., "Attack", "Inside", "Outside")
-            # We need to convert this to a specific play name
-            user_focus = user_offense.lower()  # "Attack" → "attack"
-            logging.info(f"🎮 User offense override (focus): {user_focus}")
+            # User now provides specific play name (e.g., "3-2 Motion", "Base Post Play")
+            chosen_playcall = user_offense
+            logging.info(f"🎮 User offense override (play): {chosen_playcall}")
             
-            # Determine play_type (motion vs set_play) based on team settings
-            offense_setting = self.game.offense_team.strategy_settings.get("offense", 2)
-            play_type_weights = {
-                0: {"motion": 100, "set_play": 0},
-                1: {"motion": 75, "set_play": 25},
-                2: {"motion": 50, "set_play": 50},
-                3: {"motion": 25, "set_play": 75},
-                4: {"motion": 0, "set_play": 100}
-            }
-            weights = play_type_weights.get(offense_setting, {"motion": 50, "set_play": 50})
-            chosen_play_type = weighted_random_from_dict(weights)
+            # Lookup play details from database to get play_type and play_focus
+            play_doc = plays_collection.find_one({"name": chosen_playcall})
             
-            # Query plays collection for matching play
-            query = {
-                "play_type": chosen_play_type,
-                "play_focus": user_focus
-            }
-            
-            matching_plays = list(plays_collection.find(query))
-            
-            if not matching_plays:
-                logging.warning(f"⚠️ No plays found for {chosen_play_type}/{user_focus}, using fallback")
-                chosen_playcall = "Inside"  # Fallback
+            if play_doc:
+                chosen_play_type = play_doc.get("play_type", "motion")
+                user_focus = play_doc.get("play_focus", "inside")
+                logging.info(f"🎯 User override play details: {chosen_playcall} (type={chosen_play_type}, focus={user_focus})")
             else:
-                # Randomly select one play from matches
-                selected_play = random.choice(matching_plays)
-                chosen_playcall = selected_play["name"]
-                logging.info(f"🎯 User override selected play: {chosen_playcall} (type={chosen_play_type}, focus={user_focus})")
+                # Fallback if play not found
+                logging.warning(f"⚠️ Play '{chosen_playcall}' not found in database, using fallback")
+                chosen_play_type = "motion"
+                user_focus = "inside"
             
             # Still need to choose defense normally
             if user_defense:
