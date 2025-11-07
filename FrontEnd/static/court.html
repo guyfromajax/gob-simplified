@@ -391,24 +391,40 @@
 
     /* ==================== MAIN CONTAINER ==================== */
     #main-container {
-      display: grid;
-      grid-template-columns: 280px 1fr 280px;
-      grid-template-rows: minmax(0, 1fr) minmax(200px, auto);  /* CHANGE: court takes space, playcall has min 200px */
+      display: flex;
+      flex-direction: column;
       width: 100%;
       height: calc(100vh - var(--scoreboard-height));
       margin-top: var(--scoreboard-height);
       padding: 0 var(--side-padding);
       gap: 0;
-      align-items: stretch;  /* CHANGE: from 'start' to 'stretch' to eliminate gap */
       overflow: hidden;
       box-sizing: border-box;
-      background: #000 !important;  /* Match body background - hide any gaps */
+      background: #000 !important;
+    }
+
+    /* NEW: Court row wrapper */
+    .court-row {
+      display: grid;
+      grid-template-columns: 280px 1fr 280px;
+      width: 100%;
+      flex-shrink: 0;  /* Don't compress court */
+      gap: 0;
+    }
+
+    /* NEW: Playcall row wrapper */
+    .playcall-row {
+      display: grid;
+      grid-template-columns: 280px 1fr 280px;
+      width: 100%;
+      flex: 1;  /* Fill remaining space */
+      min-height: 0;  /* Allow shrinking */
+      gap: 0;
     }
 
     /* ==================== PLAYER STATS PANELS (LEFT & RIGHT) ==================== */
     .player-stats-panel {
       width: 280px;
-      grid-row: 1 / 2;
       background: #1a1a1a;
       display: flex;
       flex-direction: column;
@@ -418,12 +434,10 @@
     }
 
     .player-stats-panel.away {
-      grid-column: 1 / 2;
       border-right: 2px solid var(--home-vibrant-color);
     }
 
     .player-stats-panel.home {
-      grid-column: 3 / 4;
       border-left: 2px solid var(--home-vibrant-color);
     }
 
@@ -585,8 +599,6 @@
 
     /* ==================== COURT CONTAINER ==================== */
     #phaser-container {
-      grid-column: 2 / 3;
-      grid-row: 1 / 2;
       width: 100%;
       max-width: 100%;
       height: fit-content;  /* CHANGE: let container fit canvas size exactly */
@@ -750,13 +762,9 @@
 
     /* ==================== PLAYCALL CENTER - UNIFIED TACTICAL HUB ==================== */
     #playcall-center {
-      grid-column: 2 / 3;  /* CENTER COLUMN ONLY (not 1/4!) */
-      grid-row: 2 / 3;
       width: 100%;
-      height: 100%;  /* CHANGE: fill the grid cell completely */
-      min-height: 200px;  /* CHANGE: smaller minimum */
-      max-height: 100%;  /* CHANGE: never exceed grid cell */
-      overflow: hidden;  /* CHANGE: hide overflow on container */
+      height: 100%;
+      overflow: hidden;
       background: linear-gradient(to bottom, rgba(0, 0, 0, 0.95), rgba(0, 0, 0, 1));
       border-top: 2px solid var(--home-vibrant-color);
       padding: 15px 40px 20px 40px;
@@ -1832,6 +1840,8 @@
 
   <!-- ==================== MAIN CONTAINER ==================== -->
   <div id="main-container">
+    <!-- COURT ROW -->
+    <div class="court-row">
     <!-- AWAY PLAYER STATS PANEL (LEFT) -->
     <div class="player-stats-panel away">
       <div class="player-box-score">
@@ -2044,8 +2054,13 @@
         </div>
       </div>
     </div>
-    <!-- ==================== PLAYCALL CENTER (BOTTOM) - UNIFIED TACTICAL HUB ==================== -->
-    <div id="playcall-center">
+    </div>  <!-- Close .court-row -->
+
+    <!-- PLAYCALL ROW -->
+    <div class="playcall-row">
+      <div></div>  <!-- Empty left column -->
+      <!-- ==================== PLAYCALL CENTER (BOTTOM) - UNIFIED TACTICAL HUB ==================== -->
+      <div id="playcall-center">
     
     <!-- Top Row: Current Playcall Display -->
     <div id="playcall-status-row">
@@ -2138,8 +2153,10 @@
         <button id="clear-defense-override" class="clear-override-btn">Clear Override</button>
       </div>
       
-    </div>
-  </div>  <!-- Close #playcall-center -->
+      </div>
+    </div>  <!-- Close #playcall-center -->
+    <div></div>  <!-- Empty right column -->
+    </div>  <!-- Close .playcall-row -->
   </div>  <!-- Close #main-container -->
 
   <!-- ==================== PLAYCALL REVEAL HUD ==================== -->
