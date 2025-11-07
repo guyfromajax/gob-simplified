@@ -393,7 +393,7 @@
     #main-container {
       display: grid;
       grid-template-columns: 280px 1fr 280px;
-      grid-template-rows: auto 1fr;  /* CHANGED: court is auto, playcall fills remaining */
+      grid-template-rows: 1fr auto;  /* REVERT: back to original per v0.dev */
       width: 100%;
       height: calc(100vh - var(--scoreboard-height));
       margin-top: var(--scoreboard-height);
@@ -589,7 +589,7 @@
       grid-row: 1 / 2;
       width: 100%;
       max-width: 100%;
-      height: auto;
+      height: fit-content;  /* CHANGE: let container fit canvas size exactly */
       display: flex;
       justify-content: center;
       align-items: flex-start;
@@ -754,9 +754,10 @@
       grid-column: 2 / 3;  /* CENTER COLUMN ONLY (not 1/4!) */
       grid-row: 2 / 3;
       width: 100%;
-      height: 100%;  /* CHANGED: fill grid cell */
-      max-height: 100%;  /* ADDED: prevent overflow */
-      overflow: hidden;  /* ADDED: contain content */
+      height: calc(100vh - var(--scoreboard-height) - (100vw - 560px) * 0.6 * 0.55);  /* CHANGE: calculate exact remaining space */
+      min-height: 280px;  /* CHANGE: ensure minimum usable height */
+      max-height: calc(100vh - var(--scoreboard-height) - 400px);  /* CHANGE: prevent overflow */
+      overflow-y: auto;  /* CHANGE: scroll if needed */
       background: linear-gradient(to bottom, rgba(0, 0, 0, 0.95), rgba(0, 0, 0, 1));
       border-top: 2px solid var(--home-vibrant-color);
       padding: 15px 40px 20px 40px;
