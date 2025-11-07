@@ -393,7 +393,8 @@
     #main-container {
       display: flex;
       flex-direction: column;
-      width: 100%;
+      width: 100% !important;  /* FORCE: prevent collapse */
+      min-width: 100vw !important;  /* FORCE: ensure viewport width */
       height: calc(100vh - var(--scoreboard-height));
       margin-top: var(--scoreboard-height);
       padding: 0 var(--side-padding);
