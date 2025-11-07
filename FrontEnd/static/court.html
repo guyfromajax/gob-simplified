@@ -616,12 +616,9 @@
 
     /* Let Phaser canvas scale to fit available space while maintaining aspect ratio */
     #phaser-container canvas {
-      width: 1229px;
-      height: 768px;
-      max-width: 100%;
+      width: 100% !important;  /* Fill horizontal space in center column */
+      height: auto !important;  /* Maintain aspect ratio based on width */
       max-height: calc(100vh - var(--scoreboard-height));
-      object-fit: contain;
-      object-position: top center;
       display: block;
       margin: 0;
       margin-top: -2px;  /* Pull up 2px to overlap subpixel gap */
