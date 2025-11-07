@@ -407,12 +407,15 @@
 
     /* ==================== MAIN CONTAINER ==================== */
     #main-container {
-      display: flex;
+      display: grid;
+      grid-template-columns: 280px 1fr 280px;
+      grid-template-rows: 1fr auto;  /* Row 1: court | Row 2: playcall */
       width: 100%;
       height: calc(100vh - var(--scoreboard-height));
       margin-top: var(--scoreboard-height);
       padding: 0 var(--side-padding);
       gap: 0;
+      align-items: start;  /* Critical: prevents stretch */
       overflow: hidden;
       box-sizing: border-box;
       background: #000 !important;  /* Match body background - hide any gaps */
@@ -420,10 +423,8 @@
 
     /* ==================== PLAYER STATS PANELS (LEFT & RIGHT) ==================== */
     .player-stats-panel {
-      width: var(--player-stats-width);
-      min-width: var(--player-stats-width);
-      max-width: var(--player-stats-width);
-      flex-shrink: 0;
+      width: 280px;
+      grid-row: 1 / 2;
       background: #1a1a1a;
       display: flex;
       flex-direction: column;
@@ -433,10 +434,12 @@
     }
 
     .player-stats-panel.away {
+      grid-column: 1 / 2;
       border-right: 2px solid var(--home-vibrant-color);
     }
 
     .player-stats-panel.home {
+      grid-column: 3 / 4;
       border-left: 2px solid var(--home-vibrant-color);
     }
 
@@ -598,38 +601,31 @@
 
     /* ==================== COURT CONTAINER ==================== */
     #phaser-container {
-      flex: 1;
-      position: relative;
-      background: #000 !important;  /* Match body background - hide any gaps */
+      grid-column: 2 / 3;
+      grid-row: 1 / 2;
+      width: 100%;
+      max-width: 100%;
+      height: auto;
       display: flex;
-      align-items: flex-start !important;  /* Top-align canvas - flush with scoreboard */
       justify-content: center;
+      align-items: flex-start;
+      padding: 0;
       overflow: hidden;
-      /* Constrain width to match side panel boundaries (same as Playcall Center) */
-      min-width: 0;
-      max-width: calc(100vw - (2 * var(--player-stats-width)) - (2 * var(--side-padding)));
-      box-sizing: border-box;
-      padding-top: 0 !important;
+      background: #000 !important;  /* Match body background - hide any gaps */
     }
 
     /* Let Phaser canvas scale to fit available space while maintaining aspect ratio */
     #phaser-container canvas {
-      display: block !important;
-      margin: 0 !important;
-      margin-top: -2px !important;  /* Pull up 2px to overlap subpixel gap */
-      margin-bottom: auto !important;  /* Push to top, not center */
-      padding: 0;
-      vertical-align: bottom;
-      /* Force explicit dimensions to override Phaser's 0px inline styles */
-      /* Aspect ratio: 1229/768 = 1.6 (16:10) */
-      width: 1229px !important;
-      height: 768px !important;
-      /* Scale to fit available space - reserve room for playcall at bottom */
-      max-width: 100% !important;
-      max-height: calc(100% - 100px) !important;  /* Reserve 100px minimum for Playcall Center
-      /* Maintain aspect ratio when scaling */
+      width: 1229px;
+      height: 768px;
+      max-width: 100%;
+      max-height: calc(100vh - var(--scoreboard-height));
       object-fit: contain;
-      object-position: top center !important;  /* Top-align for flush with scoreboard */
+      object-position: top center;
+      display: block;
+      margin: 0;
+      margin-top: -2px;  /* Pull up 2px to overlap subpixel gap */
+      padding: 0;
       background: linear-gradient(to bottom, rgba(0,0,0,0.95), rgba(0,0,0,1)) !important;  /* Match Playcall gradient for seamless blend */
     }
 
@@ -774,12 +770,14 @@
 
     /* ==================== PLAYCALL CENTER - UNIFIED TACTICAL HUB ==================== */
     #playcall-center {
-      position: fixed;
-      bottom: 0;
-      left: calc(var(--player-stats-width) + var(--side-padding));
-      right: calc(var(--player-stats-width) + var(--side-padding));
+      grid-column: 2 / 3;  /* CENTER COLUMN ONLY (not 1/4!) */
+      grid-row: 2 / 3;
+      width: 100%;
+      min-height: 250px;
       background: linear-gradient(to bottom, rgba(0, 0, 0, 0.95), rgba(0, 0, 0, 1));
-      padding: 12px 40px 16px 40px;
+      border-top: 2px solid var(--home-vibrant-color);
+      padding: 15px;
+      box-sizing: border-box;
       z-index: 900;
       display: flex;
       flex-direction: column;
