@@ -393,7 +393,7 @@
     #main-container {
       display: grid;
       grid-template-columns: 280px 1fr 280px;
-      grid-template-rows: 1fr auto;  /* Row 1: court | Row 2: playcall */
+      grid-template-rows: auto 1fr;  /* CHANGED: court is auto, playcall fills remaining */
       width: 100%;
       height: calc(100vh - var(--scoreboard-height));
       margin-top: var(--scoreboard-height);
@@ -754,10 +754,12 @@
       grid-column: 2 / 3;  /* CENTER COLUMN ONLY (not 1/4!) */
       grid-row: 2 / 3;
       width: 100%;
-      min-height: 250px;
+      height: 100%;  /* CHANGED: fill grid cell */
+      max-height: 100%;  /* ADDED: prevent overflow */
+      overflow: hidden;  /* ADDED: contain content */
       background: linear-gradient(to bottom, rgba(0, 0, 0, 0.95), rgba(0, 0, 0, 1));
       border-top: 2px solid var(--home-vibrant-color);
-      padding: 15px;
+      padding: 15px 40px 20px 40px;
       box-sizing: border-box;
       z-index: 900;
       display: flex;
@@ -825,7 +827,7 @@
 
     /* Offense Play Scroller */
     .play-scroller {
-      max-height: 240px;
+      max-height: calc(100% - 100px);  /* CHANGED: dynamic based on container */
       overflow-y: auto;
       display: flex;
       flex-direction: column;
