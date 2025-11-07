@@ -2674,30 +2674,29 @@
       const canvas = document.querySelector('#phaser-container canvas');
       if (!canvas) return;  // Wait for Phaser to create canvas
 
-      const canvasRect = canvas.getBoundingClientRect();
-      const playcallTop = canvasRect.bottom - 2;  // Overlap 2px for seamless (eliminates subpixel gap)
-      const playcall = document.getElementById('playcall-center');
-      if (playcall) {
-        playcall.style.top = `${playcallTop}px`;
-        playcall.style.height = `${window.innerHeight - playcallTop}px`;
-      }
+      // DISABLED: Legacy absolute positioning - now using Flexbox + Grid hybrid
+      // const canvasRect = canvas.getBoundingClientRect();
+      // const playcallTop = canvasRect.bottom - 2;  // Overlap 2px for seamless (eliminates subpixel gap)
+      // const playcall = document.getElementById('playcall-center');
+      // if (playcall) {
+      //   playcall.style.top = `${playcallTop}px`;
+      //   playcall.style.height = `${window.innerHeight - playcallTop}px`;
+      // }
       // Trigger repaint post-Phaser resize
       requestAnimationFrame(() => {
         if (canvas) canvas.style.display = 'block';
       });
     }
 
-    // Listen to window resize and Phaser scale events
-    window.addEventListener('resize', updatePlaycallPosition);
-    if (window.game) {  // If game is already created
-      window.game.scale.on('resize', updatePlaycallPosition);
-    }
+    // DISABLED: Legacy positioning event listeners - now using CSS Grid/Flexbox
+    // window.addEventListener('resize', updatePlaycallPosition);
+    // if (window.game) {  // If game is already created
+    //   window.game.scale.on('resize', updatePlaycallPosition);
+    // }
     
-    // Initial positioning (debounced to ensure canvas is rendered)
-    setTimeout(updatePlaycallPosition, 100);
-    
-    // Also try after a longer delay in case Phaser takes time to initialize
-    setTimeout(updatePlaycallPosition, 500);
+    // DISABLED: Legacy initial positioning calls
+    // setTimeout(updatePlaycallPosition, 100);
+    // setTimeout(updatePlaycallPosition, 500);
 
     // ==================== PLAYCALL REVEAL HUD FUNCTION ====================
     /**
