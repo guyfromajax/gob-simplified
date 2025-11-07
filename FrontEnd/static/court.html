@@ -767,12 +767,12 @@
       overflow-y: auto;  /* Scroll if content exceeds available space */
       background: linear-gradient(to bottom, rgba(0, 0, 0, 0.95), rgba(0, 0, 0, 1));
       border-top: 2px solid var(--home-vibrant-color);
-      padding: 15px 40px 20px 40px;
+      padding: 8px 40px 12px 40px;  /* CHANGE: reduced padding for compactness */
       box-sizing: border-box;
       z-index: 900;
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      gap: 8px;  /* CHANGE: reduced gap */
     }
 
     /* Top Row: Current Playcall Status */
@@ -782,7 +782,8 @@
       align-items: center;
       padding: 0 20px;
       border-bottom: 1px solid rgba(255, 215, 0, 0.2);
-      padding-bottom: 8px;
+      padding-bottom: 6px;  /* CHANGE: reduced padding */
+      min-height: 24px;  /* CHANGE: ensure minimum height */
     }
 
     .status-display {
@@ -792,7 +793,7 @@
     }
 
     .status-label {
-      font-size: 11px;
+      font-size: 10px;  /* CHANGE: smaller font */
       font-weight: 600;
       color: rgba(255, 215, 0, 0.6);
       letter-spacing: 1px;
@@ -800,7 +801,7 @@
 
     #offense-status-text,
     #defense-status-text {
-      font-size: 13px;
+      font-size: 11px;  /* CHANGE: smaller font */
       font-weight: 700;
       color: #FFD700;
       letter-spacing: 0.5px;
@@ -811,7 +812,9 @@
       display: flex;
       align-items: stretch;
       justify-content: space-between;
-      gap: 20px;
+      gap: 16px;  /* CHANGE: reduced gap */
+      flex: 1;  /* CHANGE: fill available space */
+      min-height: 0;  /* CHANGE: allow shrinking */
     }
 
     /* Tactical Panels (Offense & Defense) */
@@ -819,28 +822,30 @@
       flex: 1;
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 6px;  /* CHANGE: reduced gap */
       max-width: 320px;
+      min-height: 0;  /* CHANGE: allow shrinking */
     }
 
     .panel-title {
-      font-size: 12px;
+      font-size: 10px;  /* CHANGE: smaller font */
       font-weight: 700;
       color: rgba(255, 215, 0, 0.7);
       text-transform: uppercase;
       letter-spacing: 1.5px;
       text-align: center;
-      margin-bottom: 4px;
+      margin-bottom: 2px;  /* CHANGE: reduced margin */
     }
 
     /* Offense Play Scroller */
     .play-scroller {
-      max-height: 150px;  /* CHANGE: show only 1-2 items initially */
+      max-height: 120px;  /* CHANGE: reduced height to show 1-2 plays */
       overflow-y: auto;
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      gap: 4px;  /* CHANGE: reduced gap */
       padding-right: 4px;
+      flex: 1;  /* CHANGE: fill available space */
     }
 
     .play-scroller::-webkit-scrollbar {
@@ -865,13 +870,13 @@
       display: flex;
       align-items: center;
       gap: 10px;
-      padding: 8px 12px;
+      padding: 6px 12px;  /* CHANGE: reduced padding */
       background: rgba(255, 255, 255, 0.05);
       border: 2px solid rgba(255, 255, 255, 0.15);
       border-radius: 6px;
       cursor: pointer;
       transition: all 0.2s ease;
-      min-height: 58px;
+      min-height: 44px;  /* CHANGE: reduced min-height */
     }
 
     .play-option:hover {
@@ -886,8 +891,8 @@
     }
 
     .play-headshot {
-      width: 42px;
-      height: 42px;
+      width: 32px;  /* CHANGE: smaller */
+      height: 32px;
       border-radius: 50%;
       border: 2px solid rgba(255, 255, 255, 0.3);
       object-fit: cover;
@@ -907,7 +912,7 @@
     }
 
     .play-name {
-      font-size: 13px;
+      font-size: 11px;  /* CHANGE: smaller font */
       font-weight: 700;
       color: rgba(255, 255, 255, 0.8);
       letter-spacing: 0.5px;
@@ -918,7 +923,7 @@
     }
 
     .play-focus {
-      font-size: 10px;
+      font-size: 9px;  /* CHANGE: smaller font */
       font-weight: 600;
       color: rgba(255, 255, 255, 0.4);
       text-transform: uppercase;
@@ -944,18 +949,18 @@
 
     .defense-override-btn {
       flex: 1;
-      padding: 14px 16px;
+      padding: 10px 12px;  /* CHANGE: reduced padding */
       background: rgba(255, 255, 255, 0.05);
       border: 2px solid rgba(255, 255, 255, 0.15);
       border-radius: 6px;
       color: rgba(255, 255, 255, 0.6);
-      font-size: 12px;
+      font-size: 10px;  /* CHANGE: smaller font */
       font-weight: 700;
       letter-spacing: 1px;
       cursor: pointer;
       transition: all 0.2s ease;
       text-transform: uppercase;
-      min-height: 48px;
+      min-height: 38px;  /* CHANGE: reduced min-height */
     }
 
     .defense-override-btn:hover {
@@ -974,16 +979,16 @@
     /* Clear Override Buttons */
     .clear-override-btn {
       width: 100%;
-      padding: 8px;
+      padding: 6px;  /* CHANGE: reduced padding */
       background: rgba(255, 255, 255, 0.03);
       border: 1px solid rgba(255, 255, 255, 0.15);
       border-radius: 4px;
       color: rgba(255, 255, 255, 0.4);
-      font-size: 11px;
+      font-size: 10px;  /* CHANGE: smaller font */
       font-weight: 600;
       cursor: pointer;
       transition: all 0.2s ease;
-      margin-top: 4px;
+      margin-top: 2px;  /* CHANGE: reduced margin */
     }
 
     .clear-override-btn:hover {
@@ -998,12 +1003,14 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      min-width: 60px;
+      min-width: 120px;  /* CHANGE: ensure minimum width */
+      max-width: 150px;
     }
 
     #lean-meter {
-      width: 50px;
-      height: 180px;
+      width: 80px;  /* CHANGE: reduced width if needed */
+      height: 100%;  /* CHANGE: fill available height */
+      min-height: 120px;  /* CHANGE: ensure minimum visibility */
       background: rgba(255, 255, 255, 0.1);
       border: 3px solid rgba(255, 215, 0, 0.4);
       border-radius: 25px;
