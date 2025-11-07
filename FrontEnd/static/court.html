@@ -339,22 +339,6 @@
       text-shadow: 0 0 8px rgba(255, 215, 0, 0.6), 0 2px 4px rgba(0, 0, 0, 0.8);
     }
 
-    .audible-label {
-      font-size: 14px;
-      font-weight: bold;
-      color: #FF4444;
-      text-shadow: 0 0 8px rgba(255, 68, 68, 0.8), 0 2px 4px rgba(0, 0, 0, 0.8);
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      white-space: nowrap;
-      opacity: 0;
-      transition: opacity 0.2s ease;
-      font-family: 'Arial Black', sans-serif;
-    }
-
-    .audible-label.show {
-      opacity: 1;
-    }
 
     .player-name-label {
       font-size: 14px;
@@ -1724,7 +1708,6 @@
         <div id="away-player-name" class="player-name-label"></div>
       </div>
       <div id="away-player-role" class="player-role-icon">🏀</div>
-      <div id="away-audible-text" class="audible-label"></div>
     </div>
     
     <!-- COMMENTED OUT: Now shown in Playcall Center below court -->
@@ -1806,7 +1789,6 @@
         <div id="home-player-name" class="player-name-label"></div>
       </div>
       <div id="home-player-role" class="player-role-icon">D</div>
-      <div id="home-audible-text" class="audible-label"></div>
     </div>
     
     <!-- COMMENTED OUT: Now shown in Playcall Center below court -->
@@ -2770,8 +2752,6 @@
       const homeHeadshot = document.getElementById('home-active-headshot');
       const awayRole = document.getElementById('away-player-role');
       const homeRole = document.getElementById('home-player-role');
-      const awayAudible = document.getElementById('away-audible-text');
-      const homeAudible = document.getElementById('home-audible-text');
       const awayName = document.getElementById('away-player-name');
       const homeName = document.getElementById('home-player-name');
 
@@ -2850,33 +2830,29 @@
         homeHeadshot.src = '/static/images/players/default.png';
       };
 
-      // Update audible text (show on ball handler's side, keep visible until cleared)
+      // Trigger announcement system if audible text provided
       if (audibleText) {
-        if (isBallHandlerHome && homeAudible) {
-          homeAudible.textContent = audibleText;
-          homeAudible.classList.add('show');
-        } else if (!isBallHandlerHome && awayAudible) {
-          awayAudible.textContent = audibleText;
-          awayAudible.classList.add('show');
+        const shooterTeam = isBallHandlerHome ? 'home' : 'away';
+        
+        // Get team name for background image (check if window.simData is available)
+        let shooterTeamName = null;
+        if (typeof window.simData !== 'undefined') {
+          const homeTeamField = window.simData?.home_team;
+          const awayTeamField = window.simData?.away_team;
+          const homeTeamName = typeof homeTeamField === 'object' ? homeTeamField?.name : homeTeamField;
+          const awayTeamName = typeof awayTeamField === 'object' ? awayTeamField?.name : awayTeamField;
+          shooterTeamName = ballHandlerTeamId === homeTeamId ? homeTeamName : awayTeamName;
         }
         
-        // Clear the opposite side
-        if (isBallHandlerHome && awayAudible) {
-          awayAudible.classList.remove('show');
-          awayAudible.textContent = '';
-        } else if (!isBallHandlerHome && homeAudible) {
-          homeAudible.classList.remove('show');
-          homeAudible.textContent = '';
-        }
-      } else {
-        // Clear audible text on both sides if not provided
-        if (homeAudible) {
-          homeAudible.classList.remove('show');
-          homeAudible.textContent = '';
-        }
-        if (awayAudible) {
-          awayAudible.classList.remove('show');
-          awayAudible.textContent = '';
+        const playerData = {
+          playerId: ballHandlerId,
+          photo: ballHandlerSprite.photo || `/static/images/players/${ballHandlerId}.png`,
+          teamName: shooterTeamName
+        };
+        
+        // Show announcement with shooter's headshot
+        if (typeof window.showAnnouncement === 'function') {
+          window.showAnnouncement(audibleText, shooterTeam, playerData);
         }
       }
     };
