@@ -2704,16 +2704,22 @@
       const pc = document.getElementById('playcall-center');
       if (pc) {
         const computed = window.getComputedStyle(pc);
+        const parent = pc.parentElement;
+        const parentComputed = parent ? window.getComputedStyle(parent) : null;
+        const grandparent = parent?.parentElement;
+        const grandparentComputed = grandparent ? window.getComputedStyle(grandparent) : null;
+        
         console.log('🔍 PLAYCALL CENTER DIAGNOSTIC:', {
+          element: '#playcall-center',
           display: computed.display,
-          visibility: computed.visibility,
-          opacity: computed.opacity,
-          height: computed.height,
           width: computed.width,
-          position: computed.position,
-          top: computed.top,
-          zIndex: computed.zIndex,
-          parent: pc.parentElement?.id || pc.parentElement?.className
+          height: computed.height,
+          parent: parent?.className || parent?.id,
+          parentWidth: parentComputed?.width,
+          parentDisplay: parentComputed?.display,
+          grandparent: grandparent?.id || grandparent?.className,
+          grandparentWidth: grandparentComputed?.width,
+          grandparentDisplay: grandparentComputed?.display
         });
       } else {
         console.log('❌ PLAYCALL CENTER NOT FOUND IN DOM');
