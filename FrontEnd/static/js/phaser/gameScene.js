@@ -1291,10 +1291,12 @@ export function createGameScene(Phaser) {
           // Clear overrides after reading (single-use)
           window.nextOffenseOverride = null;
           window.nextDefenseOverride = null;
+          window.nextDefenseTypeOverride = null;
+          window.nextDefenseAggressionOverride = null;
           
-          // Clear visual selections on clipboard
-          if (window.clearClipboardSelections) {
-            window.clearClipboardSelections();
+          // Clear visual selections in Playcall Center
+          if (window.clearPlaycallOverrides) {
+            window.clearPlaycallOverrides();
           }
           
           const response = await fetch('/api/simulate-turn', {
