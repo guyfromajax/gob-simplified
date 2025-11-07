@@ -2699,29 +2699,30 @@
     // setTimeout(updatePlaycallPosition, 100);
     // setTimeout(updatePlaycallPosition, 500);
 
-    // ==================== DIAGNOSTIC LOGGING ====================
-    // Monitor what's changing #main-container width
+    // ==================== FORCE WIDTH EVERY FRAME ====================
+    // Nuclear option: Force correct width constantly
     const mainContainer = document.getElementById('main-container');
     if (mainContainer) {
-      const observer = new MutationObserver((mutations) => {
-        mutations.forEach((mutation) => {
-          if (mutation.type === 'attributes' && mutation.attributeName === 'style') {
-            const computed = window.getComputedStyle(mainContainer);
-            console.error('🚨 MAIN-CONTAINER STYLE CHANGED!', {
-              inlineWidth: mainContainer.style.width,
-              computedWidth: computed.width,
-              stackTrace: new Error().stack
-            });
-          }
-        });
-      });
+      function forceCorrectWidth() {
+        // Remove any inline width that might be set
+        mainContainer.style.width = '';
+        mainContainer.style.minWidth = '';
+        
+        // Force via setAttribute to override everything
+        mainContainer.setAttribute('style', 
+          'display: flex !important; ' +
+          'flex-direction: column !important; ' +
+          'width: 100% !important; ' +
+          'min-width: 100vw !important; ' +
+          'height: calc(100vh - var(--scoreboard-height)) !important; ' +
+          'box-sizing: border-box !important;'
+        );
+        
+        requestAnimationFrame(forceCorrectWidth);
+      }
       
-      observer.observe(mainContainer, {
-        attributes: true,
-        attributeFilter: ['style']
-      });
-      
-      console.log('👀 Watching #main-container for style changes...');
+      forceCorrectWidth();
+      console.log('🔧 Forcing #main-container width every frame...');
     }
     
     // Monitor Playcall Center visibility every 2 seconds
