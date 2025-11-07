@@ -393,13 +393,13 @@
     #main-container {
       display: grid;
       grid-template-columns: 280px 1fr 280px;
-      grid-template-rows: 1fr auto;  /* REVERT: back to original per v0.dev */
+      grid-template-rows: minmax(0, 1fr) minmax(200px, auto);  /* CHANGE: court takes space, playcall has min 200px */
       width: 100%;
       height: calc(100vh - var(--scoreboard-height));
       margin-top: var(--scoreboard-height);
       padding: 0 var(--side-padding);
       gap: 0;
-      align-items: start;  /* Critical: prevents stretch */
+      align-items: start;
       overflow: hidden;
       box-sizing: border-box;
       background: #000 !important;  /* Match body background - hide any gaps */
@@ -754,10 +754,10 @@
       grid-column: 2 / 3;  /* CENTER COLUMN ONLY (not 1/4!) */
       grid-row: 2 / 3;
       width: 100%;
-      height: calc(100vh - var(--scoreboard-height) - (100vw - 560px) * 0.6 * 0.55);  /* CHANGE: calculate exact remaining space */
-      min-height: 280px;  /* CHANGE: ensure minimum usable height */
-      max-height: calc(100vh - var(--scoreboard-height) - 400px);  /* CHANGE: prevent overflow */
-      overflow-y: auto;  /* CHANGE: scroll if needed */
+      height: 100%;  /* CHANGE: fill the grid cell completely */
+      min-height: 200px;  /* CHANGE: smaller minimum */
+      max-height: 100%;  /* CHANGE: never exceed grid cell */
+      overflow: hidden;  /* CHANGE: hide overflow on container */
       background: linear-gradient(to bottom, rgba(0, 0, 0, 0.95), rgba(0, 0, 0, 1));
       border-top: 2px solid var(--home-vibrant-color);
       padding: 15px 40px 20px 40px;
@@ -828,7 +828,7 @@
 
     /* Offense Play Scroller */
     .play-scroller {
-      max-height: calc(100% - 100px);  /* CHANGED: dynamic based on container */
+      max-height: 150px;  /* CHANGE: show only 1-2 items initially */
       overflow-y: auto;
       display: flex;
       flex-direction: column;
