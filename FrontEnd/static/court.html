@@ -781,6 +781,16 @@
       background: red !important;
       border: 10px solid yellow !important;
       min-height: 300px !important;
+      
+      /* NUCLEAR OPTION: Fixed positioning to bypass grid collapse */
+      position: fixed !important;
+      bottom: 0 !important;
+      left: calc(280px + var(--side-padding)) !important;  /* After left panel */
+      right: calc(280px + var(--side-padding)) !important;  /* Before right panel */
+      width: auto !important;
+      height: auto !important;
+      max-height: 300px !important;
+      z-index: 10000 !important;
     }
 
     #playcall-status-row {
