@@ -776,62 +776,18 @@
       gap: 8px;  /* CHANGE: reduced gap */
     }
 
-    /* ===== TEMPORARY DEBUG STYLES - REMOVE AFTER DIAGNOSIS ===== */
+    /* FIXED POSITIONING - Bypass grid collapse */
     #playcall-center {
-      background: red !important;
-      border: 10px solid yellow !important;
-      min-height: 300px !important;
-      
-      /* NUCLEAR OPTION: Fixed positioning to bypass grid collapse */
       position: fixed !important;
       bottom: 0 !important;
       left: calc(280px + var(--side-padding)) !important;  /* After left panel */
       right: calc(280px + var(--side-padding)) !important;  /* Before right panel */
       width: auto !important;
       height: auto !important;
-      max-height: 300px !important;
-      z-index: 10000 !important;
-    }
-
-    #playcall-status-row {
-      background: blue !important;
-      color: white !important;
-      min-height: 40px !important;
-    }
-
-    #playcall-main-row {
-      background: green !important;
       min-height: 200px !important;
-      display: flex !important;
+      max-height: calc(100vh - var(--scoreboard-height) - 500px) !important;  /* Leave space for court */
+      z-index: 900 !important;
     }
-
-    .tactical-panel {
-      background: purple !important;
-      border: 5px solid white !important;
-      min-width: 200px !important;
-    }
-
-    .panel-title {
-      color: yellow !important;
-      font-size: 20px !important;
-      background: black !important;
-    }
-
-    .play-option {
-      background: orange !important;
-      color: black !important;
-      font-size: 16px !important;
-      font-weight: bold !important;
-      min-height: 50px !important;
-    }
-
-    .defense-override-btn {
-      background: cyan !important;
-      color: black !important;
-      font-size: 16px !important;
-      min-height: 50px !important;
-    }
-    /* ===== END DEBUG STYLES ===== */
 
     /* Top Row: Current Playcall Status */
     #playcall-status-row {
