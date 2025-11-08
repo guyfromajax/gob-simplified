@@ -2122,11 +2122,11 @@
       <div id="offense-status" class="status-display">
         <span class="status-label">OFFENSE:</span>
         <span id="offense-status-text">Motion → Inside</span>
-      </div>
+    </div>
       <div id="defense-status" class="status-display">
         <span class="status-label">DEFENSE:</span>
         <span id="defense-status-text">Man Normal</span>
-      </div>
+  </div>
     </div>
     
     <!-- Main Row: Offense Panel | Lean Meter | Defense Panel -->
@@ -2141,15 +2141,15 @@
             <div class="play-info">
               <div class="play-name">4-1 Motion</div>
               <div class="play-focus">Inside</div>
-            </div>
-          </div>
+        </div>
+      </div>
           <div class="play-option" data-play="3-2 Motion" data-focus="attack">
             <img class="play-headshot" src="" alt="Shooter">
             <div class="play-info">
               <div class="play-name">3-2 Motion</div>
               <div class="play-focus">Attack</div>
-            </div>
-          </div>
+        </div>
+      </div>
           <div class="play-option" data-play="5-0 Motion" data-focus="outside">
             <img class="play-headshot" src="" alt="Shooter">
             <div class="play-info">
@@ -2180,17 +2180,17 @@
           </div>
         </div>
         <button id="clear-offense-override" class="clear-override-btn">Clear Override</button>
-      </div>
-      
+    </div>
+
       <!-- Lean Meter (Center - Absolute Focal Point) -->
-      <div id="lean-meter-container">
-        <div id="lean-meter">
-          <div id="lean-fill-positive" class="lean-fill lean-fill-pos"></div>
-          <div id="lean-center-line"></div>
-          <div id="lean-fill-negative" class="lean-fill lean-fill-neg"></div>
-        </div>
+    <div id="lean-meter-container">
+      <div id="lean-meter">
+        <div id="lean-fill-positive" class="lean-fill lean-fill-pos"></div>
+        <div id="lean-center-line"></div>
+        <div id="lean-fill-negative" class="lean-fill lean-fill-neg"></div>
       </div>
-      
+    </div>
+
       <!-- Defense Panel (switches sides) -->
       <div id="defense-panel" class="tactical-panel">
         <div class="panel-title">DEFENSE OVERRIDE</div>
@@ -2198,12 +2198,12 @@
           <div class="defense-row">
             <button class="defense-override-btn" data-defense="Man">MAN</button>
             <button class="defense-override-btn" data-defense="Zone">ZONE</button>
-          </div>
+        </div>
           <div class="defense-row">
             <button class="defense-override-btn" data-aggression="Passive">PASSIVE</button>
             <button class="defense-override-btn" data-aggression="Normal">NORMAL</button>
             <button class="defense-override-btn" data-aggression="Aggressive">AGGRESSIVE</button>
-          </div>
+      </div>
         </div>
         <button id="clear-defense-override" class="clear-override-btn">Clear Override</button>
       </div>
@@ -2699,30 +2699,21 @@
     // setTimeout(updatePlaycallPosition, 100);
     // setTimeout(updatePlaycallPosition, 500);
 
-    // ==================== FORCE WIDTH EVERY FRAME ====================
-    // Nuclear option: Force correct width constantly
-    const mainContainer = document.getElementById('main-container');
-    if (mainContainer) {
-      function forceCorrectWidth() {
-        // Remove any inline width that might be set
-        mainContainer.style.width = '';
-        mainContainer.style.minWidth = '';
-        
-        // Force via setAttribute to override everything
-        mainContainer.setAttribute('style', 
-          'display: flex !important; ' +
-          'flex-direction: column !important; ' +
-          'width: 100% !important; ' +
-          'min-width: 100vw !important; ' +
-          'height: calc(100vh - var(--scoreboard-height)) !important; ' +
-          'box-sizing: border-box !important;'
-        );
-        
-        requestAnimationFrame(forceCorrectWidth);
-      }
+    // ==================== PRESERVE PLAYCALL CENTER HTML ====================
+    // Store the original Playcall Center HTML before anything can delete it
+    const playcallCenter = document.getElementById('playcall-center');
+    if (playcallCenter) {
+      const originalHTML = playcallCenter.innerHTML;
+      console.log('📦 Stored Playcall Center HTML:', originalHTML.length, 'characters');
       
-      forceCorrectWidth();
-      console.log('🔧 Forcing #main-container width every frame...');
+      // Check every 100ms if content was deleted and restore it
+      setInterval(() => {
+        if (playcallCenter.children.length === 0) {
+          console.error('🚨 PLAYCALL CENTER CONTENT DELETED! Restoring...');
+          playcallCenter.innerHTML = originalHTML;
+          console.log('✅ Playcall Center content restored');
+        }
+      }, 100);
     }
     
     // Monitor Playcall Center visibility every 2 seconds
@@ -2984,6 +2975,6 @@
     };
   </script>
 
-  
+
 </body>
 </html>
