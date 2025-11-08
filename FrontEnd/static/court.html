@@ -2731,6 +2731,9 @@
           display: computed.display,
           width: computed.width,
           height: computed.height,
+          childrenCount: pc.children.length,  // NEW: Count children
+          firstChild: pc.children[0]?.id || pc.children[0]?.className,  // NEW: First child
+          innerHTML_length: pc.innerHTML.length,  // NEW: HTML length
           parent: parent?.className || parent?.id,
           parentWidth: parentComputed?.width,
           parentDisplay: parentComputed?.display,
