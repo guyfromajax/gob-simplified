@@ -2665,52 +2665,7 @@
     // setTimeout(updatePlaycallPosition, 100);
     // setTimeout(updatePlaycallPosition, 500);
 
-    // ==================== PRESERVE PLAYCALL CENTER HTML ====================
-    // Store the original Playcall Center HTML before anything can delete it
-    const playcallCenter = document.getElementById('playcall-center');
-    if (playcallCenter) {
-      const originalHTML = playcallCenter.innerHTML;
-      console.log('📦 Stored Playcall Center HTML:', originalHTML.length, 'characters');
-      
-      // Check every 100ms if content was deleted and restore it
-      setInterval(() => {
-        if (playcallCenter.children.length === 0) {
-          console.error('🚨 PLAYCALL CENTER CONTENT DELETED! Restoring...');
-          playcallCenter.innerHTML = originalHTML;
-          console.log('✅ Playcall Center content restored');
-        }
-      }, 100);
-    }
-    
-    // Monitor Playcall Center visibility every 2 seconds
-    setInterval(() => {
-      const pc = document.getElementById('playcall-center');
-      if (pc) {
-        const computed = window.getComputedStyle(pc);
-        const parent = pc.parentElement;
-        const parentComputed = parent ? window.getComputedStyle(parent) : null;
-        const grandparent = parent?.parentElement;
-        const grandparentComputed = grandparent ? window.getComputedStyle(grandparent) : null;
-        
-        console.log('🔍 PLAYCALL CENTER DIAGNOSTIC:', {
-          element: '#playcall-center',
-          display: computed.display,
-          width: computed.width,
-          height: computed.height,
-          childrenCount: pc.children.length,  // NEW: Count children
-          firstChild: pc.children[0]?.id || pc.children[0]?.className,  // NEW: First child
-          innerHTML_length: pc.innerHTML.length,  // NEW: HTML length
-          parent: parent?.className || parent?.id,
-          parentWidth: parentComputed?.width,
-          parentDisplay: parentComputed?.display,
-          grandparent: grandparent?.id || grandparent?.className,
-          grandparentWidth: grandparentComputed?.width,
-          grandparentDisplay: grandparentComputed?.display
-        });
-      } else {
-        console.log('❌ PLAYCALL CENTER NOT FOUND IN DOM');
-      }
-    }, 2000);
+    // Diagnostics removed - issue resolved with position: fixed
 
     // ==================== PLAYCALL REVEAL HUD FUNCTION ====================
     /**
