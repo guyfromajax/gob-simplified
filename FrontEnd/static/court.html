@@ -779,13 +779,13 @@
     /* FIXED POSITIONING - Bypass grid collapse */
     #playcall-center {
       position: fixed !important;
+      top: calc(var(--scoreboard-height) + 600px) !important;  /* Below court (adjust as needed) */
       bottom: 0 !important;
       left: calc(280px + var(--side-padding)) !important;  /* After left panel */
       right: calc(280px + var(--side-padding)) !important;  /* Before right panel */
       width: auto !important;
       height: auto !important;
-      min-height: 200px !important;
-      max-height: calc(100vh - var(--scoreboard-height) - 500px) !important;  /* Leave space for court */
+      overflow-y: auto !important;
       z-index: 900 !important;
     }
 
