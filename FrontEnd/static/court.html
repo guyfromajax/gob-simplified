@@ -851,33 +851,51 @@
       margin-bottom: 2px;  /* CHANGE: reduced margin */
     }
 
-    /* Offense Play Scroller */
+    /* Offense Play Scroller Container */
+    .play-scroller-container {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex: 1;
+    }
+
+    /* Offense Play Scroller - Show only 1 play at a time */
     .play-scroller {
-      max-height: 120px;  /* CHANGE: reduced height to show 1-2 plays */
-      overflow-y: auto;
+      flex: 1;
       display: flex;
       flex-direction: column;
-      gap: 4px;  /* CHANGE: reduced gap */
-      padding-right: 4px;
-      flex: 1;  /* CHANGE: fill available space */
+      gap: 4px;
+      overflow: hidden;  /* Hide other plays */
     }
 
-    .play-scroller::-webkit-scrollbar {
-      width: 6px;
+    /* Navigation Buttons */
+    .play-nav-btn {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.1);
+      border: 2px solid rgba(255, 215, 0, 0.4);
+      color: rgba(255, 215, 0, 0.8);
+      font-size: 18px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
     }
 
-    .play-scroller::-webkit-scrollbar-track {
-      background: rgba(0, 0, 0, 0.3);
-      border-radius: 3px;
+    .play-nav-btn:hover {
+      background: rgba(255, 215, 0, 0.2);
+      border-color: #FFD700;
+      color: #FFD700;
     }
 
-    .play-scroller::-webkit-scrollbar-thumb {
-      background: rgba(255, 215, 0, 0.4);
-      border-radius: 3px;
-    }
-
-    .play-scroller::-webkit-scrollbar-thumb:hover {
-      background: rgba(255, 215, 0, 0.6);
+    .play-nav-buttons {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
     }
 
     .play-option {
@@ -1017,17 +1035,17 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      min-width: 120px;  /* CHANGE: ensure minimum width */
-      max-width: 150px;
+      min-width: 100px;
+      max-width: 120px;
     }
 
     #lean-meter {
-      width: 80px;  /* CHANGE: reduced width if needed */
-      height: 100%;  /* CHANGE: fill available height */
-      min-height: 120px;  /* CHANGE: ensure minimum visibility */
+      width: 64px;  /* CHANGE: 20% thinner (was 80px) */
+      height: 100%;
+      min-height: 120px;
       background: rgba(255, 255, 255, 0.1);
       border: 3px solid rgba(255, 215, 0, 0.4);
-      border-radius: 25px;
+      border-radius: 20px;
       position: relative;
       overflow: hidden;
       box-shadow: 0 0 20px rgba(255, 215, 0, 0.3);
@@ -2101,7 +2119,8 @@
       <!-- Offense Panel (switches sides) -->
       <div id="offense-panel" class="tactical-panel">
         <div class="panel-title">OFFENSE OVERRIDE</div>
-        <div id="offense-play-scroller" class="play-scroller">
+        <div class="play-scroller-container">
+          <div id="offense-play-scroller" class="play-scroller">
           <div class="play-option" data-play="4-1 Motion" data-focus="inside">
             <img class="play-headshot" src="" alt="Shooter">
             <div class="play-info">
@@ -2144,9 +2163,14 @@
               <div class="play-focus">Outside</div>
             </div>
           </div>
-        </div>
+          </div>  <!-- Close .play-scroller -->
+          <div class="play-nav-buttons">
+            <button class="play-nav-btn" id="play-nav-up">▲</button>
+            <button class="play-nav-btn" id="play-nav-down">▼</button>
+          </div>
+        </div>  <!-- Close .play-scroller-container -->
         <button id="clear-offense-override" class="clear-override-btn">Clear Override</button>
-    </div>
+      </div>
 
       <!-- Lean Meter (Center - Absolute Focal Point) -->
     <div id="lean-meter-container">
@@ -2666,6 +2690,80 @@
     // setTimeout(updatePlaycallPosition, 500);
 
     // Diagnostics removed - issue resolved with position: fixed
+
+    // ==================== CIRCULAR PLAY NAVIGATION ====================
+    let currentPlayIndex = 0;
+    const playOptions = document.querySelectorAll('#offense-play-scroller .play-option');
+    
+    function showPlay(index) {
+      playOptions.forEach((play, i) => {
+        play.style.display = (i === index) ? 'flex' : 'none';
+      });
+      currentPlayIndex = index;
+    }
+    
+    // Initialize - show first play
+    showPlay(0);
+    
+    // Up button - circular
+    document.getElementById('play-nav-up')?.addEventListener('click', () => {
+      const newIndex = (currentPlayIndex - 1 + playOptions.length) % playOptions.length;
+      showPlay(newIndex);
+    });
+    
+    // Down button - circular
+    document.getElementById('play-nav-down')?.addEventListener('click', () => {
+      const newIndex = (currentPlayIndex + 1) % playOptions.length;
+      showPlay(newIndex);
+    });
+
+    // ==================== POPULATE PLAY HEADSHOTS ====================
+    // Load headshots from roster data (user's team)
+    const urlParams = new URLSearchParams(window.location.search);
+    const userTeamId = urlParams.get('user_team_id');
+    
+    if (userTeamId) {
+      fetch(`/roster/${userTeamId}`)
+        .then(res => res.json())
+        .then(roster => {
+          if (!roster || !roster.players) return;
+          
+          // For each play, find the primary shooter and set headshot
+          playOptions.forEach(playOption => {
+            const playName = playOption.getAttribute('data-play');
+            const playFocus = playOption.getAttribute('data-focus');
+            
+            // Heuristic: Pick shooter based on play focus
+            let shooter = null;
+            if (playFocus === 'inside') {
+              // Find C or PF
+              shooter = roster.players.find(p => p.position === 'C') || 
+                       roster.players.find(p => p.position === 'PF');
+            } else if (playFocus === 'attack') {
+              // Find PG or SG
+              shooter = roster.players.find(p => p.position === 'PG') || 
+                       roster.players.find(p => p.position === 'SG');
+            } else if (playFocus === 'outside') {
+              // Find SG or SF
+              shooter = roster.players.find(p => p.position === 'SG') || 
+                       roster.players.find(p => p.position === 'SF');
+            }
+            
+            if (shooter && shooter.player_id) {
+              const headshotImg = playOption.querySelector('.play-headshot');
+              if (headshotImg) {
+                headshotImg.src = `/static/images/players/${shooter.player_id}.png`;
+                headshotImg.onerror = () => {
+                  headshotImg.src = '/static/images/players/default.png';
+                };
+              }
+            }
+          });
+          
+          console.log('✅ Play headshots populated from roster');
+        })
+        .catch(err => console.error('❌ Failed to load roster for headshots:', err));
+    }
 
     // ==================== PLAYCALL REVEAL HUD FUNCTION ====================
     /**
