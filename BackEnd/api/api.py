@@ -394,7 +394,18 @@ def get_game_state(game_id: str):
                 "box_score": gm.get_box_score(),
                 "quarter": gm.quarter,
                 "clock": gm.game_state.get("clock", "8:00"),
-                "players": players
+                "players": players,
+                # Team-level stats (for S1/S2 tabs and scoreboard)
+                "team_totals": gm.team_totals,
+                "points_by_quarter": gm.game_state.get("points_by_quarter", {}),
+                "home_team": {
+                    "name": gm.home_team.name,
+                    "team_fouls": gm.home_team.team_fouls
+                },
+                "away_team": {
+                    "name": gm.away_team.name,
+                    "team_fouls": gm.away_team.team_fouls
+                }
             }
         
         # Check database
@@ -414,13 +425,34 @@ def get_game_state(game_id: str):
                     }
                     players_with_energy.append(player_data)
                 
+                # Extract team data
+                home_team_data = saved.get("home_team", {})
+                away_team_data = saved.get("away_team", {})
+                
                 return {
                     "game_id": game_id,
                     "score": saved.get("score", {}),
                     "box_score": saved.get("box_score", {}),
                     "quarter": saved.get("quarter", 1),
                     "clock": saved.get("clock", "8:00"),
-                    "players": players_with_energy
+                    "players": players_with_energy,
+                    # Team-level stats (for S1/S2 tabs and scoreboard)
+                    "team_totals": {
+                        home_team_data.get("name"): home_team_data.get("totals", {}),
+                        away_team_data.get("name"): away_team_data.get("totals", {})
+                    },
+                    "points_by_quarter": {
+                        home_team_data.get("name"): home_team_data.get("points_by_quarter", [0, 0, 0, 0]),
+                        away_team_data.get("name"): away_team_data.get("points_by_quarter", [0, 0, 0, 0])
+                    },
+                    "home_team": {
+                        "name": home_team_data.get("name"),
+                        "team_fouls": home_team_data.get("team_fouls", 0)
+                    },
+                    "away_team": {
+                        "name": away_team_data.get("name"),
+                        "team_fouls": away_team_data.get("team_fouls", 0)
+                    }
                 }
         
         raise HTTPException(status_code=404, detail=f"Game {game_id} not found")
