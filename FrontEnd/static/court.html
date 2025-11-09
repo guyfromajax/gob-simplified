@@ -2804,6 +2804,19 @@
         return;
       }
       
+      if (!image) {
+        console.warn('⚠️ Tooltip image element not found');
+        return;
+      }
+      
+      if (!energyEl || !momentumEl) {
+        console.warn('⚠️ Energy or momentum element not found:', {
+          hasEnergy: !!energyEl,
+          hasMomentum: !!momentumEl
+        });
+        return;
+      }
+      
       // Get player data from gameScene if available
       const player = window.currentGameScene?.playerInfo?.[playerId];
       const stats = window.currentGameScene?.playerStats?.[playerId];
@@ -2828,7 +2841,9 @@
       const ng = stats.NG ?? stats.ng ?? 1.0;
       const energyPercent = Math.round(ng * 100);
       const energyColor = ng > 0.89 ? '#00aa00' : ng >= 0.8 ? '#cccc00' : ng >= 0.7 ? '#ff8800' : '#cc0000';
-      energyEl.innerHTML = `<strong>Energy:</strong> <span style="color: ${energyColor}">${energyPercent}%</span>`;
+      if (energyEl) {
+        energyEl.innerHTML = `<strong>Energy:</strong> <span style="color: ${energyColor}">${energyPercent}%</span>`;
+      }
       
       // Momentum bar
       const mo = stats.MO ?? stats.mo ?? 0;
@@ -2836,12 +2851,14 @@
       const barColor = mo > 0 ? '#44ff44' : '#ff4444';
       const barSide = mo > 0 ? 'right' : 'left';
       
-      momentumEl.innerHTML = `
-        <div style="position: relative; width: 100px; height: 10px; background: #333; border-radius: 5px; margin: 5px 0;">
-          <div style="position: absolute; ${barSide}: 50%; width: ${barWidth}%; height: 100%; background: ${barColor}; border-radius: 5px;"></div>
-          <div style="position: absolute; left: 50%; width: 2px; height: 100%; background: #ffd700;"></div>
-        </div>
-      `;
+      if (momentumEl) {
+        momentumEl.innerHTML = `
+          <div style="position: relative; width: 100px; height: 10px; background: #333; border-radius: 5px; margin: 5px 0;">
+            <div style="position: absolute; ${barSide}: 50%; width: ${barWidth}%; height: 100%; background: ${barColor}; border-radius: 5px;"></div>
+            <div style="position: absolute; left: 50%; width: 2px; height: 100%; background: #ffd700;"></div>
+          </div>
+        `;
+      }
       
       // Hide emotion line for Playcall Center tooltips
       if (emotionEl) emotionEl.style.display = 'none';
