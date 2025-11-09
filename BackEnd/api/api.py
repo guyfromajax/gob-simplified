@@ -554,18 +554,25 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                         
                         # Restore player stats and NG (energy) from saved game state
                         saved_players = saved_game_state.get("players", {})
+                        logging.info(f"🔄 Restoring stats for {len(saved_players)} teams")
                         for team_name, team_players in saved_players.items():
                             team = gm.home_team if team_name == "home" else gm.away_team
+                            logging.info(f"🔄 Restoring {len(team_players)} players for {team_name} team")
                             for player_id, saved_player_data in team_players.items():
                                 if player_id in team.lineup:
                                     player = team.lineup[player_id]
                                     # Restore NG (energy)
                                     if "attributes" in saved_player_data and "NG" in saved_player_data["attributes"]:
+                                        old_ng = player.attributes.get("NG", 1.0)
                                         player.attributes["NG"] = saved_player_data["attributes"]["NG"]
                                         player._rescale_attributes()  # Update scaled attributes based on NG
+                                        logging.info(f"🔄 Player {player_id}: NG {old_ng} → {player.attributes['NG']}")
                                     # Restore game stats
                                     if "stats" in saved_player_data:
+                                        old_pts = player.stats.get("game", {}).get("PTS", 0)
                                         player.stats["game"] = saved_player_data["stats"]
+                                        new_pts = player.stats["game"].get("PTS", 0)
+                                        logging.info(f"🔄 Player {player_id}: PTS restored {old_pts} → {new_pts}, stats: {saved_player_data['stats']}")
                         
                         # Restore opening_tip_winner for Q2-Q4 possession logic
                         if "opening_tip_winner" in saved:
