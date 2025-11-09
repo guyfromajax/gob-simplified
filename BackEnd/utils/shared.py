@@ -466,49 +466,52 @@ def summarize_game_state(game, exclude_animations=True):
                 }
             })
 
-    included_ids = {p["playerId"] for p in players}
-    for pid in referenced_ids:
-        if pid in included_ids:
-            continue
-        player_obj = game.home_team.get_player_by_id(pid) or game.away_team.get_player_by_id(pid)
-        if player_obj:
-            team_key = "home" if game.home_team.get_player_by_id(pid) else "away"
-            team_obj = game.home_team if team_key == "home" else game.away_team
-            coords = getattr(player_obj, "coords", None) or {"x": 0, "y": 0}
-            players.append({
-                "playerId": player_obj.player_id,
-                "name": getattr(player_obj, "name", None) or f"{getattr(player_obj, 'first_name', '')} {getattr(player_obj, 'last_name', '')}".strip(),
-                "team": team_key,
-                "team_id": team_obj.team_id,
-                "pos": getattr(player_obj, "position", None) or getattr(player_obj, "pos", None),
-                "jersey": player_obj.jersey,
-                "photo": getattr(player_obj, "photo", None),  # Player headshot image
-                "primary_color": getattr(team_obj, "primary_color", "#000000"),
-                "secondary_color": getattr(team_obj, "secondary_color", "#ffffff"),
-                "x": coords.get("x", 0),
-                "y": coords.get("y", 0),
-                "stats": player_obj.stats.get("game", {}),  # Include game stats for persistence
-                "attributes": {
-                    "EM": player_obj.attributes.get("EM", 0),
-                    "CH": player_obj.attributes.get("CH", 0),
-                    "MO": player_obj.attributes.get("MO", 0),
-                    "NG": player_obj.attributes.get("NG", 1.0)
-                }
-            })
-        else:
-            players.append({
-                "playerId": pid,
-                "name": "",
-                "team": None,
-                "team_id": None,
-                "pos": None,
-                "jersey": None,
-                "primary_color": "#000000",
-                "secondary_color": "#ffffff",
-                "x": 0,
-                "y": 0,
-            })
-        included_ids.add(pid)
+    # Only include non-lineup players if we're including animations (full turn data)
+    # For turn-by-turn mode (exclude_animations=True), only current lineup is needed
+    if not exclude_animations:
+        included_ids = {p["playerId"] for p in players}
+        for pid in referenced_ids:
+            if pid in included_ids:
+                continue
+            player_obj = game.home_team.get_player_by_id(pid) or game.away_team.get_player_by_id(pid)
+            if player_obj:
+                team_key = "home" if game.home_team.get_player_by_id(pid) else "away"
+                team_obj = game.home_team if team_key == "home" else game.away_team
+                coords = getattr(player_obj, "coords", None) or {"x": 0, "y": 0}
+                players.append({
+                    "playerId": player_obj.player_id,
+                    "name": getattr(player_obj, "name", None) or f"{getattr(player_obj, 'first_name', '')} {getattr(player_obj, 'last_name', '')}".strip(),
+                    "team": team_key,
+                    "team_id": team_obj.team_id,
+                    "pos": getattr(player_obj, "position", None) or getattr(player_obj, "pos", None),
+                    "jersey": player_obj.jersey,
+                    "photo": getattr(player_obj, "photo", None),  # Player headshot image
+                    "primary_color": getattr(team_obj, "primary_color", "#000000"),
+                    "secondary_color": getattr(team_obj, "secondary_color", "#ffffff"),
+                    "x": coords.get("x", 0),
+                    "y": coords.get("y", 0),
+                    "stats": player_obj.stats.get("game", {}),  # Include game stats for persistence
+                    "attributes": {
+                        "EM": player_obj.attributes.get("EM", 0),
+                        "CH": player_obj.attributes.get("CH", 0),
+                        "MO": player_obj.attributes.get("MO", 0),
+                        "NG": player_obj.attributes.get("NG", 1.0)
+                    }
+                })
+            else:
+                players.append({
+                    "playerId": pid,
+                    "name": "",
+                    "team": None,
+                    "team_id": None,
+                    "pos": None,
+                    "jersey": None,
+                    "primary_color": "#000000",
+                    "secondary_color": "#ffffff",
+                    "x": 0,
+                    "y": 0,
+                })
+            included_ids.add(pid)
 
     team_info = {
         "home": {
