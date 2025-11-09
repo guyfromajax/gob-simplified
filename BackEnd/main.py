@@ -44,7 +44,10 @@ def _initialize_game_stats(gm: GameManager, game_id: str | None = None) -> None:
     ``games`` collection.
     """
 
+    logging.info(f"🔍 initialize_game_stats called for Q{gm.quarter}, game_stats_initialized={gm.game_state.get('game_stats_initialized', False)}")
+
     if gm.game_state.get("game_stats_initialized"):
+        logging.info("✅ Game stats already initialized, skipping reset")
         return
 
     if game_id:
@@ -76,6 +79,7 @@ def _initialize_game_stats(gm: GameManager, game_id: str | None = None) -> None:
             gm.game_state["game_stats_initialized"] = True
             return
 
+    logging.info("🚨 RESETTING GAME STATS (should only happen in Q1!)")
     affected: list[str] = []
     for team in (gm.home_team, gm.away_team):
         for player in team.get_all_players():
@@ -85,6 +89,7 @@ def _initialize_game_stats(gm: GameManager, game_id: str | None = None) -> None:
             affected.append(player.player_id)
 
     gm.game_state["game_stats_initialized"] = True
+    logging.info(f"🚨 Reset {len(affected)} player stats, flag set to True")
 
     if game_id:
         players_payload = []
