@@ -2788,14 +2788,16 @@
       const tooltip = document.getElementById('player-tooltip');
       const image = document.getElementById('tooltip-player-image');
       const energyEl = document.getElementById('tooltip-player-energy');
-      const momentumEl = document.getElementById('tooltip-player-momentum');
+      const momentumLeft = document.getElementById('tooltip-momentum-left');
+      const momentumRight = document.getElementById('tooltip-momentum-right');
       const emotionEl = document.getElementById('tooltip-player-emotion');
       
       console.log('🎯 Tooltip elements found:', {
         tooltip: !!tooltip,
         image: !!image,
         energyEl: !!energyEl,
-        momentumEl: !!momentumEl,
+        momentumLeft: !!momentumLeft,
+        momentumRight: !!momentumRight,
         emotionEl: !!emotionEl
       });
       
@@ -2809,10 +2811,11 @@
         return;
       }
       
-      if (!energyEl || !momentumEl) {
-        console.warn('⚠️ Energy or momentum element not found:', {
+      if (!energyEl || !momentumLeft || !momentumRight) {
+        console.warn('⚠️ Energy or momentum elements not found:', {
           hasEnergy: !!energyEl,
-          hasMomentum: !!momentumEl
+          hasMomentumLeft: !!momentumLeft,
+          hasMomentumRight: !!momentumRight
         });
         return;
       }
@@ -2841,23 +2844,24 @@
       const ng = stats.NG ?? stats.ng ?? 1.0;
       const energyPercent = Math.round(ng * 100);
       const energyColor = ng > 0.89 ? '#00aa00' : ng >= 0.8 ? '#cccc00' : ng >= 0.7 ? '#ff8800' : '#cc0000';
-      if (energyEl) {
-        energyEl.innerHTML = `<strong>Energy:</strong> <span style="color: ${energyColor}">${energyPercent}%</span>`;
-      }
+      energyEl.innerHTML = `<span style="color: ${energyColor}">${energyPercent}%</span>`;
       
-      // Momentum bar
+      // Momentum bar (using existing tooltip structure)
       const mo = stats.MO ?? stats.mo ?? 0;
-      const barWidth = Math.abs(mo) * 50;
-      const barColor = mo > 0 ? '#44ff44' : '#ff4444';
-      const barSide = mo > 0 ? 'right' : 'left';
+      const barWidth = Math.abs(mo) * 50;  // 0-100% (MO ranges -2 to +2, so *50)
       
-      if (momentumEl) {
-        momentumEl.innerHTML = `
-          <div style="position: relative; width: 100px; height: 10px; background: #333; border-radius: 5px; margin: 5px 0;">
-            <div style="position: absolute; ${barSide}: 50%; width: ${barWidth}%; height: 100%; background: ${barColor}; border-radius: 5px;"></div>
-            <div style="position: absolute; left: 50%; width: 2px; height: 100%; background: #ffd700;"></div>
-          </div>
-        `;
+      if (mo > 0) {
+        // Positive momentum - extend right bar
+        momentumLeft.style.width = '0%';
+        momentumRight.style.width = `${barWidth}%`;
+      } else if (mo < 0) {
+        // Negative momentum - extend left bar
+        momentumLeft.style.width = `${barWidth}%`;
+        momentumRight.style.width = '0%';
+      } else {
+        // Neutral - no bars
+        momentumLeft.style.width = '0%';
+        momentumRight.style.width = '0%';
       }
       
       // Hide emotion line for Playcall Center tooltips
@@ -3094,6 +3098,8 @@
 
       // Trigger announcement system if audible text provided
       if (audibleText) {
+        console.log('🔥 [updateActivePlayersDisplay] Audible text received:', audibleText);
+        
         const shooterTeam = isBallHandlerHome ? 'home' : 'away';
         
         // Get team name for background image (check if window.simData is available)
@@ -3112,9 +3118,18 @@
           teamName: shooterTeamName
         };
         
+        console.log('🔥 [updateActivePlayersDisplay] Calling showAnnouncement:', {
+          text: audibleText,
+          team: shooterTeam,
+          playerData: playerData
+        });
+        
         // Show announcement with shooter's headshot
         if (typeof window.showAnnouncement === 'function') {
           window.showAnnouncement(audibleText, shooterTeam, playerData);
+          console.log('🔥 [updateActivePlayersDisplay] showAnnouncement called successfully');
+        } else {
+          console.warn('⚠️ window.showAnnouncement function not found');
         }
       }
     };
