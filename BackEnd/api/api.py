@@ -376,6 +376,8 @@ def get_game_state(game_id: str):
     try:
         # Check ongoing games first
         gm = ongoing_games.get(game_id)
+        logging.info(f"📊 /api/game/{game_id} - GameManager in memory: {gm is not None}")
+        logging.info(f"📊 Active games in memory: {list(ongoing_games.keys())}")
         if gm:
             # Get players with current energy levels
             players = []
