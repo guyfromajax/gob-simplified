@@ -548,31 +548,86 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                             mode="single"  # Loaded games are always single mode from games_collection
                         )
                         gm.game_state = gm._init_game_state()
-                        saved_game_state = saved.get("game_state", {})
-                        gm.game_state.update(saved_game_state)
                         gm.quarter = saved.get("quarter", 1)
                         
                         # Restore player stats and NG (energy) from saved game state
-                        saved_players = saved_game_state.get("players", {})
-                        logging.info(f"🔄 Restoring stats for {len(saved_players)} teams")
-                        for team_name, team_players in saved_players.items():
-                            team = gm.home_team if team_name == "home" else gm.away_team
-                            logging.info(f"🔄 Restoring {len(team_players)} players for {team_name} team")
-                            for player_id, saved_player_data in team_players.items():
-                                if player_id in team.lineup:
-                                    player = team.lineup[player_id]
-                                    # Restore NG (energy)
-                                    if "attributes" in saved_player_data and "NG" in saved_player_data["attributes"]:
-                                        old_ng = player.attributes.get("NG", 1.0)
-                                        player.attributes["NG"] = saved_player_data["attributes"]["NG"]
-                                        player._rescale_attributes()  # Update scaled attributes based on NG
-                                        logging.info(f"🔄 Player {player_id}: NG {old_ng} → {player.attributes['NG']}")
-                                    # Restore game stats
-                                    if "stats" in saved_player_data:
-                                        old_pts = player.stats.get("game", {}).get("PTS", 0)
-                                        player.stats["game"] = saved_player_data["stats"]
-                                        new_pts = player.stats["game"].get("PTS", 0)
-                                        logging.info(f"🔄 Player {player_id}: PTS restored {old_pts} → {new_pts}, stats: {saved_player_data['stats']}")
+                        # Players are stored as an array: [{"playerId": "...", "team": "home", "stats": {...}, "attributes": {...}}]
+                        saved_players_list = saved.get("players", [])
+                        logging.info(f"🔄 Restoring stats for {len(saved_players_list)} players")
+                        
+                        for saved_player_data in saved_players_list:
+                            player_id = saved_player_data.get("playerId")
+                            team_key = saved_player_data.get("team")  # "home" or "away"
+                            
+                            if not player_id or not team_key:
+                                continue
+                            
+                            team = gm.home_team if team_key == "home" else gm.away_team
+                            
+                            # Find player in lineup by position (players are stored by position, not ID)
+                            player = None
+                            for pos, lineup_player in team.lineup.items():
+                                if lineup_player.player_id == player_id:
+                                    player = lineup_player
+                                    break
+                            
+                            if not player:
+                                continue
+                            
+                            # Restore NG (energy)
+                            if "attributes" in saved_player_data and "NG" in saved_player_data["attributes"]:
+                                old_ng = player.attributes.get("NG", 1.0)
+                                player.attributes["NG"] = saved_player_data["attributes"]["NG"]
+                                player._rescale_attributes()  # Update scaled attributes based on NG
+                                logging.info(f"🔄 Player {player_id}: NG {old_ng} → {player.attributes['NG']}")
+                            
+                            # Restore game stats
+                            if "stats" in saved_player_data:
+                                old_pts = player.stats.get("game", {}).get("PTS", 0)
+                                player.stats["game"] = saved_player_data["stats"]
+                                new_pts = player.stats["game"].get("PTS", 0)
+                                logging.info(f"🔄 Player {player_id}: PTS restored {old_pts} → {new_pts}")
+                        
+                        # Restore team-level stats (score, fouls, totals, points by quarter)
+                        home_team_data = saved.get("home_team", {})
+                        away_team_data = saved.get("away_team", {})
+                        
+                        # Restore team scores
+                        if "score" in home_team_data:
+                            gm.score[gm.home_team.name] = home_team_data["score"]
+                            logging.info(f"🔄 Home team score restored: {home_team_data['score']}")
+                        if "score" in away_team_data:
+                            gm.score[gm.away_team.name] = away_team_data["score"]
+                            logging.info(f"🔄 Away team score restored: {away_team_data['score']}")
+                        
+                        # Restore team fouls
+                        if "team_fouls" in home_team_data:
+                            gm.home_team.team_fouls = home_team_data["team_fouls"]
+                            logging.info(f"🔄 Home team fouls restored: {home_team_data['team_fouls']}")
+                        if "team_fouls" in away_team_data:
+                            gm.away_team.team_fouls = away_team_data["team_fouls"]
+                            logging.info(f"🔄 Away team fouls restored: {away_team_data['team_fouls']}")
+                        
+                        # Restore team totals (aggregated stats)
+                        if "totals" in home_team_data:
+                            gm.team_totals[gm.home_team.name] = home_team_data["totals"]
+                            logging.info(f"🔄 Home team totals restored: {home_team_data['totals']}")
+                        if "totals" in away_team_data:
+                            gm.team_totals[gm.away_team.name] = away_team_data["totals"]
+                            logging.info(f"🔄 Away team totals restored: {away_team_data['totals']}")
+                        
+                        # Restore points by quarter
+                        if "points_by_quarter" in home_team_data:
+                            gm.game_state["points_by_quarter"][gm.home_team.name] = home_team_data["points_by_quarter"]
+                            logging.info(f"🔄 Home team points_by_quarter restored: {home_team_data['points_by_quarter']}")
+                        if "points_by_quarter" in away_team_data:
+                            gm.game_state["points_by_quarter"][gm.away_team.name] = away_team_data["points_by_quarter"]
+                            logging.info(f"🔄 Away team points_by_quarter restored: {away_team_data['points_by_quarter']}")
+                        
+                        # Restore game_stats_initialized flag to prevent stats reset
+                        if "game_stats_initialized" in saved:
+                            gm.game_state["game_stats_initialized"] = saved["game_stats_initialized"]
+                            logging.info(f"🔄 game_stats_initialized restored: {saved['game_stats_initialized']}")
                         
                         # Restore opening_tip_winner for Q2-Q4 possession logic
                         if "opening_tip_winner" in saved:
