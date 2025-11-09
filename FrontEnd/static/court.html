@@ -329,7 +329,8 @@
     }
 
     .player-role-icon.ball {
-      /* Ball emoji will be displayed */
+      /* Ball emoji styling */
+      font-size: inherit;
     }
 
     .player-role-icon.defense {
@@ -2716,7 +2717,7 @@
 
     // ==================== POPULATE PLAY HEADSHOTS ====================
     // Load headshots from roster data (user's team)
-    const urlParams = new URLSearchParams(window.location.search);
+    // Note: urlParams is already declared earlier in this script
     const userTeamId = urlParams.get('user_team_id');
     
     console.log('🖼️ Attempting to load headshots for team:', userTeamId);
