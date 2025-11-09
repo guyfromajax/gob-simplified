@@ -3124,13 +3124,13 @@
           playerData: playerData
         });
         
-        // Show announcement with shooter's headshot
-        if (typeof window.showAnnouncement === 'function') {
-          window.showAnnouncement(audibleText, shooterTeam, playerData);
+        // Import and show announcement with shooter's headshot
+        import('/static/js/phaser/utils/announcements.js').then(module => {
+          module.showAnnouncement(audibleText, shooterTeam, playerData);
           console.log('🔥 [updateActivePlayersDisplay] showAnnouncement called successfully');
-        } else {
-          console.warn('⚠️ window.showAnnouncement function not found');
-        }
+        }).catch(err => {
+          console.error('❌ Failed to load announcements module:', err);
+        });
       }
     };
   </script>
