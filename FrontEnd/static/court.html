@@ -923,9 +923,10 @@
     }
 
     .play-headshot {
-      width: 32px;  /* CHANGE: smaller */
-      height: 32px;
-      border-radius: 50%;
+      width: auto;  /* CHANGE: proportional to height */
+      height: 100%;  /* CHANGE: fill container height */
+      max-height: 44px;  /* Match play-option min-height */
+      border-radius: 4px;  /* CHANGE: rectangular with slight rounding */
       border: 2px solid rgba(255, 255, 255, 0.3);
       object-fit: cover;
       background: rgba(0, 0, 0, 0.5);
@@ -1084,13 +1085,9 @@
       border-radius: 0 0 25px 25px;
     }
 
-    /* Panel Flipping Based on Possession */
-    #playcall-center[data-home-offense="true"] #playcall-main-row {
-      flex-direction: row-reverse;
-    }
-
-    #playcall-center[data-home-offense="false"] #playcall-main-row {
-      flex-direction: row;
+    /* Panel Order: Always offense left, defense right (no flipping) */
+    #playcall-main-row {
+      flex-direction: row;  /* Fixed: offense always left, defense always right */
     }
 
     /* ==================== PLAYCALL REVEAL HUD ==================== */
@@ -2722,16 +2719,27 @@
     const urlParams = new URLSearchParams(window.location.search);
     const userTeamId = urlParams.get('user_team_id');
     
+    console.log('🖼️ Attempting to load headshots for team:', userTeamId);
+    console.log('🖼️ Found play options:', playOptions.length);
+    
     if (userTeamId) {
       fetch(`/roster/${userTeamId}`)
         .then(res => res.json())
         .then(roster => {
-          if (!roster || !roster.players) return;
+          console.log('🖼️ Roster loaded:', roster);
+          if (!roster || !roster.players) {
+            console.warn('⚠️ No players in roster');
+            return;
+          }
+          
+          console.log('🖼️ Roster players:', roster.players.length);
           
           // For each play, find the primary shooter and set headshot
-          playOptions.forEach(playOption => {
+          playOptions.forEach((playOption, idx) => {
             const playName = playOption.getAttribute('data-play');
             const playFocus = playOption.getAttribute('data-focus');
+            
+            console.log(`🖼️ Play ${idx + 1}:`, playName, 'focus:', playFocus);
             
             // Heuristic: Pick shooter based on play focus
             let shooter = null;
@@ -2749,20 +2757,31 @@
                        roster.players.find(p => p.position === 'SF');
             }
             
+            console.log(`🖼️ Selected shooter for ${playName}:`, shooter?.name, shooter?.position, shooter?.player_id);
+            
             if (shooter && shooter.player_id) {
               const headshotImg = playOption.querySelector('.play-headshot');
               if (headshotImg) {
-                headshotImg.src = `/static/images/players/${shooter.player_id}.png`;
+                const imgPath = `/static/images/players/${shooter.player_id}.png`;
+                console.log(`🖼️ Setting headshot src:`, imgPath);
+                headshotImg.src = imgPath;
                 headshotImg.onerror = () => {
+                  console.warn(`⚠️ Headshot failed to load: ${imgPath}, using default`);
                   headshotImg.src = '/static/images/players/default.png';
                 };
+              } else {
+                console.warn('⚠️ No .play-headshot img found in play option');
               }
+            } else {
+              console.warn(`⚠️ No shooter found for ${playName} (focus: ${playFocus})`);
             }
           });
           
           console.log('✅ Play headshots populated from roster');
         })
         .catch(err => console.error('❌ Failed to load roster for headshots:', err));
+    } else {
+      console.warn('⚠️ No userTeamId found in URL params');
     }
 
     // ==================== PLAYCALL REVEAL HUD FUNCTION ====================
