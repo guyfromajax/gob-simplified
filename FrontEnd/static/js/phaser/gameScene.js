@@ -58,12 +58,6 @@ export function createGameScene(Phaser) {
         this.quarter = data.quarter || 1;
         this.gamePlanSettings = data.gamePlanSettings;
         this.userTeamSide = data.userTeamSide;
-        
-        console.log('🎮 [gameScene.init] Received game plan data:', { 
-          hasSettings: !!this.gamePlanSettings, 
-          userTeamSide: this.userTeamSide,
-          quarter: this.quarter
-        });
 
         if (DEBUG_FLOW) {
           const teams = gameStore.getTeams();
@@ -185,12 +179,6 @@ export function createGameScene(Phaser) {
         payload.user_team_side = this.userTeamSide;
         payload.playcall_settings = this.gamePlanSettings.playcall_settings;
         payload.strategy_settings = this.gamePlanSettings.strategy_settings;
-        console.log(`🎮 [gameScene] Sending game plan settings (${this.mode} mode):`, { 
-          userTeamSide: this.userTeamSide, 
-          playcall: this.gamePlanSettings.playcall_settings,
-          strategy: this.gamePlanSettings.strategy_settings,
-          fullSettings: this.gamePlanSettings
-        });
       } else if (this.quarter === 1) {
         console.warn('⚠️ [gameScene] Not sending game plan:', { 
           hasSettings: !!this.gamePlanSettings, 
@@ -310,7 +298,7 @@ export function createGameScene(Phaser) {
         return !isBall && hasPosition;
       });
       
-      console.log(`✅ Filtered to ${actualPlayers.length} active players (from ${simData.players.length} total)`);
+      // Filtered active players from roster
       
       this.nameToId = Object.fromEntries(actualPlayers.map(p => [p.name, p.playerId ?? p.player_id]));
       this.playerInfo = Object.fromEntries(actualPlayers.map(p => [p.playerId ?? p.player_id, { name: p.name, team: p.team, pos: p.pos }]));
@@ -1221,14 +1209,14 @@ export function createGameScene(Phaser) {
      */
     runStructureValidation() {
       try {
-        console.log('🔍 Running inbound pass structure validation...');
+        // Running inbound pass structure validation
         
         // Import and run validation
         import('./animation/validateStructure.js').then(module => {
           const result = module.validateInboundPassStructure();
           
           if (result.isValid) {
-            console.log('✅ Inbound pass structure validation passed!');
+            // Inbound pass structure validation passed
           } else {
             console.log('❌ Inbound pass structure validation failed:');
             result.issues.forEach(issue => {

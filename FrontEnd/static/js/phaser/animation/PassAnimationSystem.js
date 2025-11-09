@@ -479,24 +479,11 @@ export class PassAnimationSystem {
   }
 
   validatePassData(turnData) {
-    console.log('🔍 PassAnimationSystem: Validating pass data', {
-      result_type: turnData.result_type,
-      passer_id: turnData.passer_id,
-      player_id: turnData.player_id,
-      receiver_id: turnData.receiver_id,
-      oDestinations: turnData.oDestinations,
-      dDestinations: turnData.dDestinations,
-      ball_spot: turnData.ball_spot,
-      allKeys: Object.keys(turnData),
-      fullTurnData: turnData
-    });
-    
     // For regular passes (MAKE/MISS), check for passer and receiver
     if (turnData.result_type === 'MAKE' || turnData.result_type === 'MISS') {
       const isValid = turnData && 
              (turnData.passer_id || turnData.player_id) &&
              turnData.receiver_id;
-      console.log('✅ PassAnimationSystem: Regular pass validation result:', isValid);
       return isValid;
     }
     
@@ -507,11 +494,8 @@ export class PassAnimationSystem {
              turnData.dDestinations &&
              turnData.ball_spot &&
              turnData.possession_team_id;
-      console.log('✅ PassAnimationSystem: Inbound pass validation result:', isValid);
       return isValid;
     }
-    
-    console.log('✅ PassAnimationSystem: Unknown pass type validation result: false');
     return false;
   }
 

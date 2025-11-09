@@ -131,7 +131,6 @@ async function loadGamePlanSettings() {
     if (stored) {
       try {
         gamePlanSettings = JSON.parse(stored);
-        console.log('📋 Loaded game plan settings from localStorage (single mode):', gamePlanSettings);
       } catch (e) {
         console.error('Failed to parse game plan settings:', e);
       }
@@ -248,7 +247,6 @@ async function fetchTeamRoster(teamName) {
       franchise_id: mode === 'franchise' ? franchiseId : null,
     });
     url = `/roster/${encodeURIComponent(teamName)}${query}`;
-    console.log(`Loading standard roster for ${teamName}`);
   }
   
   const res = await fetch(url);
@@ -388,7 +386,6 @@ async function handleButtonClick(animate) {
   }
 
   try {
-    console.log('About to fetch rosters for teams:', { homeTeam, awayTeam });
     if (DEBUG_TEAMS) {
       console.log('Fetching rosters for teams:', { homeTeam, awayTeam });
     }
@@ -396,8 +393,6 @@ async function handleButtonClick(animate) {
       fetchTeamRoster(homeTeam),
       fetchTeamRoster(awayTeam),
     ]);
-    console.log('Rosters fetched successfully:', { homeRoster: !!homeRoster, awayRoster: !!awayRoster });
-    console.log('About to start game with animate:', animate);
     const finalScore = await startGame({ homeRoster, awayRoster, animate });
     console.log('Game completed, final score:', finalScore);
     showPopup(finalScore);

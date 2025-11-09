@@ -42,16 +42,6 @@ export function loadPhaserPlayers(
 
   const playerSprites = {};
 
-  console.log('loadPhaserPlayers DEBUG:', {
-    totalPlayers: allPlayers.length,
-    allPlayers: allPlayers.map(p => ({ 
-      id: p.playerId ?? p.player_id, 
-      name: p.name, 
-      team: p.team, 
-      pos: p.pos 
-    }))
-  });
-
   for (const player of allPlayers) {
     const id = player.playerId ?? player.player_id;
     
@@ -63,14 +53,6 @@ export function loadPhaserPlayers(
     
     const isHome = teamInfo.home.player_ids.includes(id) || player.team === "home";
     const teamColors = isHome ? teamInfo.home : teamInfo.away;
-
-    console.log(`Creating sprite for player: ${id}`, {
-      name: player.name,
-      team: player.team,
-      pos: player.pos,
-      isHome,
-      teamColors: teamColors.primary_color
-    });
 
     const sprite = createPhaserPlayer({
       scene,
