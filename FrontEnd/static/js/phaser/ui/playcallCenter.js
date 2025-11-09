@@ -23,8 +23,7 @@ export function updatePlaycallCenter(turnData, homeTeamId) {
     return;
   }
 
-  // Set data attribute for panel flipping
-  playcallCenter.setAttribute('data-home-offense', isHomeOffense);
+  // Panel flipping removed - offense always left, defense always right
 
   // Update top row status displays
   const offenseStatusText = document.getElementById('offense-status-text');
