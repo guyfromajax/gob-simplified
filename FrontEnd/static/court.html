@@ -2168,7 +2168,7 @@
           </div>
         </div>  <!-- Close .play-scroller-container -->
         <button id="clear-offense-override" class="clear-override-btn">Clear Override</button>
-      </div>
+    </div>
 
       <!-- Lean Meter (Center - Absolute Focal Point) -->
     <div id="lean-meter-container">
@@ -2717,8 +2717,8 @@
 
     // ==================== POPULATE PLAY HEADSHOTS ====================
     // Load headshots from roster data (user's team)
-    // Note: urlParams is already declared earlier in this script
-    const userTeamId = urlParams.get('user_team_id');
+    const headshotUrlParams = new URLSearchParams(window.location.search);
+    const userTeamId = headshotUrlParams.get('user_team_id');
     
     console.log('🖼️ Attempting to load headshots for team:', userTeamId);
     console.log('🖼️ Found play options:', playOptions.length);
