@@ -2716,74 +2716,64 @@
     });
 
     // ==================== POPULATE PLAY HEADSHOTS ====================
-    // Load headshots from roster data (user's team)
+    // Get lineup player IDs from URL params
     const headshotUrlParams = new URLSearchParams(window.location.search);
-    const userTeamId = headshotUrlParams.get('user_team_id');
+    const lineup = {
+      pg: headshotUrlParams.get('home_pg'),
+      sg: headshotUrlParams.get('home_sg'),
+      sf: headshotUrlParams.get('home_sf'),
+      pf: headshotUrlParams.get('home_pf'),
+      c: headshotUrlParams.get('home_c')
+    };
     
-    console.log('🖼️ Attempting to load headshots for team:', userTeamId);
-    console.log('🖼️ Found play options:', playOptions.length);
+    console.log('🖼️ Lineup player IDs:', lineup);
     
-    if (userTeamId) {
-      fetch(`/roster/${userTeamId}`)
-        .then(res => res.json())
-        .then(roster => {
-          console.log('🖼️ Roster loaded:', roster);
-          if (!roster || !roster.players) {
-            console.warn('⚠️ No players in roster');
-            return;
+    // Map play focus to position
+    const focusToPosition = {
+      'inside': ['c', 'pf'],       // Inside plays → C or PF
+      'attack': ['pg', 'sg'],      // Attack plays → PG or SG
+      'outside': ['sg', 'sf']      // Outside plays → SG or SF
+    };
+    
+    // For each play, set headshot based on focus
+    playOptions.forEach((playOption, idx) => {
+      const playName = playOption.getAttribute('data-play');
+      const playFocus = playOption.getAttribute('data-focus');
+      
+      console.log(`🖼️ Play ${idx + 1}:`, playName, 'focus:', playFocus);
+      
+      // Get positions for this focus
+      const positions = focusToPosition[playFocus];
+      let shooterId = null;
+      
+      if (positions) {
+        // Use first available position
+        for (const pos of positions) {
+          if (lineup[pos]) {
+            shooterId = lineup[pos];
+            console.log(`🖼️ Selected ${pos.toUpperCase()} (${shooterId}) for ${playName}`);
+            break;
           }
-          
-          console.log('🖼️ Roster players:', roster.players.length);
-          
-          // For each play, find the primary shooter and set headshot
-          playOptions.forEach((playOption, idx) => {
-            const playName = playOption.getAttribute('data-play');
-            const playFocus = playOption.getAttribute('data-focus');
-            
-            console.log(`🖼️ Play ${idx + 1}:`, playName, 'focus:', playFocus);
-            
-            // Heuristic: Pick shooter based on play focus
-            let shooter = null;
-            if (playFocus === 'inside') {
-              // Find C or PF
-              shooter = roster.players.find(p => p.position === 'C') || 
-                       roster.players.find(p => p.position === 'PF');
-            } else if (playFocus === 'attack') {
-              // Find PG or SG
-              shooter = roster.players.find(p => p.position === 'PG') || 
-                       roster.players.find(p => p.position === 'SG');
-            } else if (playFocus === 'outside') {
-              // Find SG or SF
-              shooter = roster.players.find(p => p.position === 'SG') || 
-                       roster.players.find(p => p.position === 'SF');
-            }
-            
-            console.log(`🖼️ Selected shooter for ${playName}:`, shooter?.name, shooter?.position, shooter?.player_id);
-            
-            if (shooter && shooter.player_id) {
-              const headshotImg = playOption.querySelector('.play-headshot');
-              if (headshotImg) {
-                const imgPath = `/static/images/players/${shooter.player_id}.png`;
-                console.log(`🖼️ Setting headshot src:`, imgPath);
-                headshotImg.src = imgPath;
-                headshotImg.onerror = () => {
-                  console.warn(`⚠️ Headshot failed to load: ${imgPath}, using default`);
-                  headshotImg.src = '/static/images/players/default.png';
-                };
-              } else {
-                console.warn('⚠️ No .play-headshot img found in play option');
-              }
-            } else {
-              console.warn(`⚠️ No shooter found for ${playName} (focus: ${playFocus})`);
-            }
-          });
-          
-          console.log('✅ Play headshots populated from roster');
-        })
-        .catch(err => console.error('❌ Failed to load roster for headshots:', err));
-    } else {
-      console.warn('⚠️ No userTeamId found in URL params');
-    }
+        }
+      }
+      
+      if (shooterId) {
+        const headshotImg = playOption.querySelector('.play-headshot');
+        if (headshotImg) {
+          const imgPath = `/static/images/players/${shooterId}.png`;
+          console.log(`🖼️ Setting headshot src:`, imgPath);
+          headshotImg.src = imgPath;
+          headshotImg.onerror = () => {
+            console.warn(`⚠️ Headshot failed to load: ${imgPath}, using default`);
+            headshotImg.src = '/static/images/players/default.png';
+          };
+        }
+      } else {
+        console.warn(`⚠️ No shooter found for ${playName} (focus: ${playFocus})`);
+      }
+    });
+    
+    console.log('✅ Play headshots populated from lineup');
 
     // ==================== PLAYCALL REVEAL HUD FUNCTION ====================
     /**
