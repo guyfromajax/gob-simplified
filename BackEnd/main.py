@@ -196,6 +196,12 @@ def simulate_quarter(
 
     # Ensure the turn manager is aware of any lineup changes
     gm.turn_manager = TurnManager(gm)
+    
+    # In turn-by-turn mode, clear turns from previous quarters to prevent stale data
+    # from being included in player lookups (old lineups appearing with pos: null)
+    if turn_by_turn_mode and gm.quarter > 1:
+        logging.info(f"🧹 Clearing {len(gm.turns)} stale turns from Q{gm.quarter-1} (turn-by-turn mode)")
+        gm.turns = []
 
     q = gm.quarter
     gm.game_state["quarter"] = q
