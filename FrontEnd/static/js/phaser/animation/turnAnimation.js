@@ -1225,7 +1225,10 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
         const homeTeamId = scene.simData?.home_team_id || null;
         
         if (typeof window.updateActivePlayersDisplay === 'function') {
+          console.log('🔥 Calling updateActivePlayersDisplay with audibleText:', audibleText);
           window.updateActivePlayersDisplay(shotInfo.playerId, defenderId, homeTeamId, playerSprites, audibleText);
+        } else {
+          console.warn('⚠️ window.updateActivePlayersDisplay not found');
         }
         
         isAudible = true;
