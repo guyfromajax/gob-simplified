@@ -1202,12 +1202,22 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
           turnData.intended_shooter_pos && 
           turnData.shooter_pos !== turnData.intended_shooter_pos) {
         
+        console.log('🔥 AUDIBLE DETECTED:', {
+          shooter_pos: turnData.shooter_pos,
+          intended_shooter_pos: turnData.intended_shooter_pos,
+          shooter_id: shotInfo.playerId
+        });
+        
         // Get shooter info
         const shooterInfo = scene.playerInfo?.[shotInfo.playerId];
         const shooterMO = shooterInfo?.attributes?.MO || 5;
         
+        console.log('🔥 Shooter MO:', shooterMO, 'Info:', shooterInfo);
+        
         // Determine audible text based on MO attribute
         const audibleText = shooterMO >= 7 ? "HOT READ!" : "AUDIBLE!";
+        
+        console.log('🔥 Audible text:', audibleText);
         
         // Update scoreboard with audible text next to ball icon (stays visible until shot completes)
         const { getBallHandlerIdFromTurn, getDefenderIdFromTurn } = await import('../utils/activePlayerDisplay.js');
