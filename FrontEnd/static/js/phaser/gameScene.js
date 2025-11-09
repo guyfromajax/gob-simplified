@@ -120,6 +120,9 @@ export function createGameScene(Phaser) {
     async create() {
       if (DEBUG_FLOW) console.log("🎬 GameScene created");
       
+      // Expose gameScene globally for Playcall Center tooltips
+      window.currentGameScene = this;
+      
       // Run structure validation for inbound passes
       this.runStructureValidation();
 

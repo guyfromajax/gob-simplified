@@ -2767,6 +2767,12 @@
             console.warn(`⚠️ Headshot failed to load: ${imgPath}, using default`);
             headshotImg.src = '/static/images/players/default.png';
           };
+          
+          // Add tooltip event listeners
+          headshotImg.setAttribute('data-player-id', shooterId);
+          headshotImg.addEventListener('mouseover', (e) => showPlaycallHeadshotTooltip(e, shooterId));
+          headshotImg.addEventListener('mousemove', updatePlaycallTooltipPosition);
+          headshotImg.addEventListener('mouseout', hidePlaycallHeadshotTooltip);
         }
       } else {
         console.warn(`⚠️ No shooter found for ${playName} (focus: ${playFocus})`);
@@ -2774,6 +2780,73 @@
     });
     
     console.log('✅ Play headshots populated from lineup');
+
+    // ==================== PLAYCALL CENTER HEADSHOT TOOLTIP ====================
+    function showPlaycallHeadshotTooltip(event, playerId) {
+      const tooltip = document.getElementById('player-tooltip');
+      const image = document.getElementById('tooltip-player-image');
+      const energyEl = document.getElementById('tooltip-player-energy');
+      const momentumEl = document.getElementById('tooltip-player-momentum');
+      const emotionEl = document.getElementById('tooltip-player-emotion');
+      
+      if (!tooltip) return;
+      
+      // Get player data from gameScene if available
+      const player = window.currentGameScene?.playerInfo?.[playerId];
+      const stats = window.currentGameScene?.playerStats?.[playerId];
+      
+      if (!player || !stats) return;
+      
+      // Set player image
+      image.src = `/static/images/players/${playerId}.png`;
+      image.onerror = () => { image.src = '/static/images/players/default.png'; };
+      
+      // Energy (NG)
+      const ng = stats.NG ?? stats.ng ?? 1.0;
+      const energyPercent = Math.round(ng * 100);
+      const energyColor = ng > 0.89 ? '#00aa00' : ng >= 0.8 ? '#cccc00' : ng >= 0.7 ? '#ff8800' : '#cc0000';
+      energyEl.innerHTML = `<strong>Energy:</strong> <span style="color: ${energyColor}">${energyPercent}%</span>`;
+      
+      // Momentum bar
+      const mo = stats.MO ?? stats.mo ?? 0;
+      const barWidth = Math.abs(mo) * 50;
+      const barColor = mo > 0 ? '#44ff44' : '#ff4444';
+      const barSide = mo > 0 ? 'right' : 'left';
+      
+      momentumEl.innerHTML = `
+        <div style="position: relative; width: 100px; height: 10px; background: #333; border-radius: 5px; margin: 5px 0;">
+          <div style="position: absolute; ${barSide}: 50%; width: ${barWidth}%; height: 100%; background: ${barColor}; border-radius: 5px;"></div>
+          <div style="position: absolute; left: 50%; width: 2px; height: 100%; background: #ffd700;"></div>
+        </div>
+      `;
+      
+      // Hide emotion line for Playcall Center tooltips
+      if (emotionEl) emotionEl.style.display = 'none';
+      
+      // Position and show tooltip
+      updatePlaycallTooltipPosition(event);
+      tooltip.classList.add('visible');
+    }
+    
+    function updatePlaycallTooltipPosition(event) {
+      const tooltip = document.getElementById('player-tooltip');
+      if (!tooltip || !tooltip.classList.contains('visible')) return;
+      
+      const offsetX = 15;
+      const offsetY = 15;
+      tooltip.style.left = `${event.clientX + offsetX}px`;
+      tooltip.style.top = `${event.clientY + offsetY}px`;
+    }
+    
+    function hidePlaycallHeadshotTooltip() {
+      const tooltip = document.getElementById('player-tooltip');
+      if (tooltip) {
+        tooltip.classList.remove('visible');
+        // Restore emotion display for regular player tooltips
+        const emotionEl = document.getElementById('tooltip-player-emotion');
+        if (emotionEl) emotionEl.style.display = '';
+      }
+    }
 
     // ==================== PLAYCALL REVEAL HUD FUNCTION ====================
     /**
