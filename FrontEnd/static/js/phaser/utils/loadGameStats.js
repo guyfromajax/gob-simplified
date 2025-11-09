@@ -134,6 +134,32 @@ export function displayAccumulatedPlayerStats(gameData, homeTeam, awayTeam) {
 }
 
 /**
+ * Update team totals (S1 tab - Team Stats)
+ * @param {Object} gameData - Game data from backend
+ * @param {string} homeTeam - Home team name
+ * @param {string} awayTeam - Away team name
+ */
+export function displayTeamTotals(gameData, homeTeam, awayTeam) {
+  if (!gameData || !gameData.team_totals) {
+    console.warn('⚠️ No team_totals in game data');
+    return;
+  }
+  
+  const homeTotals = gameData.team_totals[homeTeam] || {};
+  const awayTotals = gameData.team_totals[awayTeam] || {};
+  
+  console.log('📊 Team totals loaded:', { homeTotals, awayTotals });
+  
+  // Store globally so S1 tab can access it
+  window.teamTotals = {
+    home: homeTotals,
+    away: awayTotals
+  };
+  
+  console.log('📊 Team totals stored globally for S1 tab');
+}
+
+/**
  * Initialize court page with accumulated game stats
  * Call this on page load if game_id exists
  */
@@ -149,6 +175,7 @@ export async function initializeGameStats() {
   if (gameData) {
     displayAccumulatedScores(gameData, homeTeam, awayTeam);
     displayAccumulatedPlayerStats(gameData, homeTeam, awayTeam);
+    displayTeamTotals(gameData, homeTeam, awayTeam);
   }
 }
 
