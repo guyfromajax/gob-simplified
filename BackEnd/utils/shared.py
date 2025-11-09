@@ -467,8 +467,10 @@ def summarize_game_state(game, exclude_animations=True):
             })
 
     # Only include non-lineup players if we're including animations (full turn data)
-    # For turn-by-turn mode (exclude_animations=True), only current lineup is needed
-    if not exclude_animations:
+    # For turn-by-turn mode, only current lineup is needed (turns are empty or stale)
+    # Check both exclude_animations flag AND if there are actual NEW turns to reference
+    has_fresh_turns = len(game.turns) > 0 and not exclude_animations
+    if has_fresh_turns:
         included_ids = {p["playerId"] for p in players}
         for pid in referenced_ids:
             if pid in included_ids:
