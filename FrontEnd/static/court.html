@@ -2783,19 +2783,42 @@
 
     // ==================== PLAYCALL CENTER HEADSHOT TOOLTIP ====================
     function showPlaycallHeadshotTooltip(event, playerId) {
+      console.log('🎯 Tooltip hover triggered for player:', playerId);
+      
       const tooltip = document.getElementById('player-tooltip');
       const image = document.getElementById('tooltip-player-image');
       const energyEl = document.getElementById('tooltip-player-energy');
       const momentumEl = document.getElementById('tooltip-player-momentum');
       const emotionEl = document.getElementById('tooltip-player-emotion');
       
-      if (!tooltip) return;
+      console.log('🎯 Tooltip elements found:', {
+        tooltip: !!tooltip,
+        image: !!image,
+        energyEl: !!energyEl,
+        momentumEl: !!momentumEl,
+        emotionEl: !!emotionEl
+      });
+      
+      if (!tooltip) {
+        console.warn('⚠️ Tooltip element not found');
+        return;
+      }
       
       // Get player data from gameScene if available
       const player = window.currentGameScene?.playerInfo?.[playerId];
       const stats = window.currentGameScene?.playerStats?.[playerId];
       
-      if (!player || !stats) return;
+      console.log('🎯 Player data:', {
+        hasGameScene: !!window.currentGameScene,
+        hasPlayerInfo: !!window.currentGameScene?.playerInfo,
+        player: player,
+        stats: stats
+      });
+      
+      if (!player || !stats) {
+        console.warn('⚠️ No player data or stats found for:', playerId);
+        return;
+      }
       
       // Set player image
       image.src = `/static/images/players/${playerId}.png`;
