@@ -1,5 +1,6 @@
 import random
 import json
+import logging
 from BackEnd.db import players_collection, teams_collection, games_collection
 from BackEnd.utils.db_utils import build_lineup_from_mongo, assign_lineup_from_ids
 from BackEnd.models.player import Player
