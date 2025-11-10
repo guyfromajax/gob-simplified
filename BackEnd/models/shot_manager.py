@@ -429,6 +429,7 @@ class ShotManager:
                     # OREB will be handled as a separate turn
                     # Don't process putback here - let next turn handle it
                 else:
+                    # DREB - determine next play type
                     possession_flips = True
                     events.append({
                         "event_type": "defReb",
@@ -436,7 +437,15 @@ class ShotManager:
                     })
                     self.game.turn_manager.logger.log("defReb")
                     self.game_state["last_rebounder"] = rebounder
-                    next_play_type = "FAST_BREAK" if random.random() < get_fast_break_chance(self.game) else "HCO"
+                    
+                    # NEW FAST BREAK LOGIC:
+                    # If a defender released for fast break during shot, auto-trigger fast break
+                    # Otherwise, use old random check based on tempo
+                    if defense_release_list:
+                        next_play_type = "FAST_BREAK"
+                    else:
+                        next_play_type = "FAST_BREAK" if random.random() < get_fast_break_chance(self.game) else "HCO"
+                    
                     self.game_state["offensive_state"] = next_play_type
                     result["next_play_type"] = next_play_type
 
