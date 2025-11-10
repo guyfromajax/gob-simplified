@@ -10,7 +10,6 @@ from BackEnd.constants import (
 from BackEnd.utils.shared import (
     apply_help_defense_if_triggered,
     apply_scoring,
-    get_fast_break_chance,
     get_time_elapsed,
     resolve_offensive_rebound,
     get_player_position,
@@ -453,12 +452,13 @@ class ShotManager:
                     self.game_state["last_rebounder"] = rebounder
                     
                     # NEW FAST BREAK LOGIC:
-                    # If a defender released for fast break during shot, auto-trigger fast break
-                    # Otherwise, use old random check based on tempo
+                    # Fast Break is determined DURING the shot (by defense tempo), not after DREB
+                    # If a defender released for fast break during shot → auto-trigger fast break
+                    # If no defender released → regular HCO
                     if defense_release_list:
                         next_play_type = "FAST_BREAK"
                     else:
-                        next_play_type = "FAST_BREAK" if random.random() < get_fast_break_chance(self.game) else "HCO"
+                        next_play_type = "HCO"
                     
                     self.game_state["offensive_state"] = next_play_type
                     result["next_play_type"] = next_play_type
