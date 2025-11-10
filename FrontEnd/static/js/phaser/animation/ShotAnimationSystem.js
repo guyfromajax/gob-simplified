@@ -348,6 +348,51 @@ export class ShotAnimationSystem {
       ballSprite.setPosition(shooterSprite.x, shooterSprite.y - 10);
       ballSprite.setVisible(true);
 
+      // ==================== ANIMATE PLAYERS DURING SHOT ====================
+      // Defenders releasing for fast break
+      if (turnData.defense_release && turnData.defense_release.length > 0) {
+        turnData.defense_release.forEach(playerId => {
+          const sprite = this.playerSprites[playerId];
+          if (sprite) {
+            const targetY = Phaser.Math.Between(15, 35);
+            const targetX = Phaser.Math.Between(45, 55);
+            const targetPixel = gridToPixels(targetX, targetY, this.scene.game.config.width, this.scene.game.config.height);
+            
+            this.scene.tweens.add({
+              targets: sprite,
+              x: targetPixel.x,
+              y: targetPixel.y,
+              duration: this.shotConfig.flightDuration,
+              ease: 'Power1'
+            });
+          }
+        });
+      }
+      
+      // Offensive players getting back on defense
+      if (turnData.offense_getback && turnData.offense_getback.length > 0) {
+        const isHomeTeamShooting = turnData.offense_team === turnData.home_team_id;
+        
+        turnData.offense_getback.forEach(playerId => {
+          const sprite = this.playerSprites[playerId];
+          if (sprite) {
+            const targetY = Phaser.Math.Between(14, 36);
+            // Away team shooting → x: 50-60, Home team shooting → x: 40-50
+            const targetX = isHomeTeamShooting ? Phaser.Math.Between(40, 50) : Phaser.Math.Between(50, 60);
+            const targetPixel = gridToPixels(targetX, targetY, this.scene.game.config.width, this.scene.game.config.height);
+            
+            this.scene.tweens.add({
+              targets: sprite,
+              x: targetPixel.x,
+              y: targetPixel.y,
+              duration: this.shotConfig.flightDuration,
+              ease: 'Power1'
+            });
+          }
+        });
+      }
+      // ==================== END PLAYER POSITIONING ====================
+
       // Animate ball to rim
       const tween = this.scene.tweens.add({
         targets: ballSprite,
@@ -503,7 +548,7 @@ export class ShotAnimationSystem {
     }
 
     // Animate players collapsing toward rebound spot (after rebounder gets the ball)
-    await this.animatePlayerCollapse(rebounderSprite, { x: ballBounceX, y: ballBounceY });
+    await this.animatePlayerCollapse(rebounderSprite, { x: ballBounceX, y: ballBounceY }, turnData);
 
     // Determine next action based on rebound type
     console.log('🎬 ShotAnimationSystem: Determining rebound action', {
@@ -537,42 +582,60 @@ export class ShotAnimationSystem {
 
   /**
    * Animate players collapsing toward rebound spot
+   * NEW: Only animate players who were rebounders (not those who released/got back)
    */
-  async animatePlayerCollapse(rebounderSprite, ballBounceCoords) {
+  async animatePlayerCollapse(rebounderSprite, ballBounceCoords, turnData) {
     return new Promise((resolve) => {
       const collapsePromises = [];
       
-      // Get all player sprites
-      const allPlayers = Object.values(this.playerSprites);
+      // Get lists of players involved in rebounding
+      const offense_rebounders = turnData.offense_rebounders || [];
+      const defense_rebounders = turnData.defense_rebounders || [];
+      const all_rebounders = [...offense_rebounders, ...defense_rebounders];
       
-      // Convert ball bounce coords to grid for distance calculations
-      const bounceGridX = ballBounceCoords.x / (this.scene.game.config.width / 100);
-      const bounceGridY = ballBounceCoords.y / (this.scene.game.config.height / 100);
+      // Convert ball bounce coords to grid for positioning
+      const bounceGridX = Math.round(ballBounceCoords.x / (this.scene.game.config.width / 100));
+      const bounceGridY = Math.round(ballBounceCoords.y / (this.scene.game.config.height / 100));
       
-      console.log('🎬 ShotAnimationSystem: Multi-player rebound animation', {
+      console.log('🎬 ShotAnimationSystem: Animating non-rebounders to ball bounce', {
         bounceGrid: { x: bounceGridX, y: bounceGridY },
-        totalPlayers: allPlayers.length
+        totalRebounders: all_rebounders.length,
+        rebounderId: turnData.rebounderId
       });
       
-      // Animate each player based on their distance from the basket
-      allPlayers.forEach(playerSprite => {
-        if (playerSprite === rebounderSprite) return; // Skip rebounder (handled separately)
+      // Animate each player who was attempting the rebound (but didn't get it)
+      all_rebounders.forEach(playerId => {
+        if (playerId === turnData.rebounderId) return; // Skip actual rebounder (handled separately)
         
-        // Convert player position to grid
-        const playerGridX = playerSprite.x / (this.scene.game.config.width / 100);
-        const playerGridY = playerSprite.y / (this.scene.game.config.height / 100);
+        const playerSprite = this.playerSprites[playerId];
+        if (!playerSprite) return;
         
-        // Calculate distance from basket (using actual rim coords)
-        const rimCoords = this.getRimCoordinates(rebounderSprite, { possession_team_id: rebounderSprite.team === 'home' ? this.scene.homeTeamId : this.scene.awayTeamId });
-        const rimGridX = rimCoords.x / (this.scene.game.config.width / 100);
-        const rimGridY = rimCoords.y / (this.scene.game.config.height / 100);
-        const distanceFromBasket = Math.abs(playerGridX - rimGridX) + Math.abs(playerGridY - rimGridY);
+        // Position near ball bounce: ±6y, ±4x (can stack)
+        const offsetY = Phaser.Math.Between(-6, 6);
+        const offsetX = Phaser.Math.Between(-4, 4);
         
-        // Only animate players within 15 grid spots of the basket
-        if (distanceFromBasket <= 15) {
-          const collapsePromise = this.animatePlayerToReboundSpot(playerSprite, ballBounceCoords, bounceGridX, bounceGridY);
-          collapsePromises.push(collapsePromise);
-        }
+        // Apply offsets and clamp to bounds
+        let targetGridX = bounceGridX + offsetX;
+        let targetGridY = bounceGridY + offsetY;
+        
+        // Clamp to court bounds (0-100 x, 0-50 y)
+        targetGridX = Math.max(0, Math.min(100, targetGridX));
+        targetGridY = Math.max(0, Math.min(50, targetGridY));
+        
+        const targetPixel = gridToPixels(targetGridX, targetGridY, this.scene.game.config.width, this.scene.game.config.height);
+        
+        const collapsePromise = new Promise((playerResolve) => {
+          this.scene.tweens.add({
+            targets: playerSprite,
+            x: targetPixel.x,
+            y: targetPixel.y,
+            duration: 400,
+            ease: 'Power2',
+            onComplete: () => playerResolve()
+          });
+        });
+        
+        collapsePromises.push(collapsePromise);
       });
       
       // Wait for all collapse animations to complete
