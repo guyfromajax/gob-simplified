@@ -387,6 +387,8 @@ class ShotManager:
                 result["offense_rebounders"] = [off_team.lineup[pos].player_id for pos in offense_rebounders]
                 result["defense_rebounders"] = [def_team.lineup[pos].player_id for pos in defense_rebounders]
                 
+                print(f"🏃 REBOUND POSITIONING DATA: O_getback={len(offense_getback_list)}, D_release={len(defense_release_list)}, O_reb={len(offense_rebounders)}, D_reb={len(defense_rebounders)}")
+                
                 # ==================== OLD REBOUND SYSTEM (COMMENTED OUT) ====================
                 # rebounder_dict = {
                 #     "offense": {"PG": 0.1, "SG": 0.1, "SF": 0.2, "PF": 0.3, "C": 0.3},

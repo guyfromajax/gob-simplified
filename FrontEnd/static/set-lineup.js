@@ -524,9 +524,14 @@ async function init() {
   
   // NEW: Optional Game Plan button
   const gameplanBtn = document.getElementById('gameplan-optional');
+  console.log('🔍 Game Plan button found:', gameplanBtn, 'Disabled:', gameplanBtn?.classList.contains('disabled'));
   if (gameplanBtn) {
     gameplanBtn.addEventListener('click', () => {
-      if (gameplanBtn.classList.contains('disabled')) return;
+      console.log('🎮 GAME PLAN BUTTON CLICKED!', 'Disabled:', gameplanBtn.classList.contains('disabled'));
+      if (gameplanBtn.classList.contains('disabled')) {
+        console.log('⚠️ Button is disabled, returning');
+        return;
+      }
       const currentGameId = urlParams.get('game_id') ||
         (typeof localStorage !== 'undefined' ? localStorage.getItem('game_id') : null);
       const params = new URLSearchParams();

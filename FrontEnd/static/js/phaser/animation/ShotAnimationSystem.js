@@ -349,8 +349,14 @@ export class ShotAnimationSystem {
       ballSprite.setVisible(true);
 
       // ==================== ANIMATE PLAYERS DURING SHOT ====================
+      console.log('🏃 Checking player positioning data:', {
+        defense_release: turnData.defense_release,
+        offense_getback: turnData.offense_getback
+      });
+      
       // Defenders releasing for fast break
       if (turnData.defense_release && turnData.defense_release.length > 0) {
+        console.log('🏃 Animating', turnData.defense_release.length, 'defenders releasing for fast break');
         turnData.defense_release.forEach(playerId => {
           const sprite = this.playerSprites[playerId];
           if (sprite) {
