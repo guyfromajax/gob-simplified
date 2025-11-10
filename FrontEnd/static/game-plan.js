@@ -178,21 +178,16 @@ async function loadSettings() {
   }
 }
 
-async function saveSettings() {
+// Save settings silently (no validation, no navigation, no toast)
+async function saveSettingsQuietly() {
   try {
-    // Validate offense settings
-    if (!validateOffenseSettings()) {
-      showModal("At least one Offense setting must be above 'Never'. Please increase any Offense slider.");
-      return;
-    }
-    
     let mode = modeParam || 'single';
     
     // For single game mode, save to localStorage
     if (mode === 'single') {
       const storageKey = `gameplan_${teamName}_${homeTeam}_${awayTeam}`;
       localStorage.setItem(storageKey, JSON.stringify(currentSettings));
-      console.log('✅ Saved game plan to localStorage for single game mode');
+      console.log('✅ Saved game plan to localStorage (quietly)');
     } else {
       // For franchise/tournament, save to database
       const payload = {
@@ -215,12 +210,33 @@ async function saveSettings() {
       });
       
       if (!res.ok) {
-        const error = await res.json();
-        showModal(error.detail || 'Failed to save game plan');
-        return;
+        console.warn('Failed to save game plan quietly:', await res.text());
+        return false;
       }
       
-      console.log('✅ Saved game plan to database');
+      console.log('✅ Saved game plan to database (quietly)');
+    }
+    return true;
+  } catch (err) {
+    console.error('Error saving settings quietly:', err);
+    return false;
+  }
+}
+
+async function saveSettings() {
+  try {
+    // Validate offense settings
+    if (!validateOffenseSettings()) {
+      showModal("At least one Offense setting must be above 'Never'. Please increase any Offense slider.");
+      return;
+    }
+    
+    // Save the settings
+    const saved = await saveSettingsQuietly();
+    
+    if (!saved) {
+      showModal('Failed to save game plan. Please try again.');
+      return;
     }
     
     showToast('Game plan saved!');
@@ -278,7 +294,10 @@ function navigateToCourt() {
   window.location.href = `/court.html?${params.toString()}`;
 }
 
-function navigateBack() {
+async function navigateBack() {
+  // Save settings quietly before navigating back to lineup
+  await saveSettingsQuietly();
+  
   // Go back to lineup selection
   const params = new URLSearchParams();
   params.set('home', homeTeam);
@@ -297,7 +316,10 @@ function navigateBack() {
   window.location.href = `/static/set-lineup.html?${params.toString()}`;
 }
 
-function navigateToCommandCenter() {
+async function navigateToCommandCenter() {
+  // Save settings quietly before navigating back to command center
+  await saveSettingsQuietly();
+  
   // Return to command center (tournament or franchise)
   const mode = modeParam || 'single';
   
