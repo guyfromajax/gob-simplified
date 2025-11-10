@@ -43,13 +43,13 @@ def assign_bh_defender_coords(ball_coords, aggression_level: str, is_away_offens
     return {"x": x_def, "y": y_def}
 
 
-def assign_non_bh_defender_coords(o_coords, ball_coords, aggression_level, is_away_offense, ball_spot="key"):
+def assign_non_bh_defender_coords(o_coords, ball_coords, aggression_level, is_away_offense, ball_spot="key", o_spot="key"):
     """
     Assigns defensive positioning for a non-ball-handler defender in man defense.
     Returns {"x": int, "y": int}
     """
     
-    print(f"🏀 assign_non_bh_defender_coords called with ball_spot: '{ball_spot}'")
+    print(f"🏀 D-positioning: ball_spot='{ball_spot}', o_spot='{o_spot}'")
 
     d_spacing_map = {"aggressive": 1, "normal": 2, "passive": 3}
     d_spacing = d_spacing_map.get(aggression_level.lower(), 2)  
@@ -76,47 +76,53 @@ def assign_non_bh_defender_coords(o_coords, ball_coords, aggression_level, is_aw
     # x_direction = 1  # Always toward home basket in home orientation
     x_direction = 1 if bx > ox else -1
     
-    # print("Inside assign_non_bh_defender_coords")
-    # print(f"is_away_offense: {is_away_offense}")
-    # print(f"After flip - ox: {ox}, oy: {oy}, x_direction: {x_direction}")
+    if ball_spot == "key":
+        pass
+    elif ball_spot in ["lower wing", "upper wing", "lower midwing", "upper midwing"]:
+        pass
+    elif ball_spot in ["lower corner", "upper corner", "lower midcorner", "upper midcorner", "lower midBaseline", "upper midBaseline"]:
+        pass
+    elif ball_spot in ["lower lowpost", "upper lowpost", "lower midpost", "upper midpost", "midLane"]:
+        pass
+    elif ball_spot in ["lower lowPost", "upper lowPost"]:
+        pass
+    else:
+        pass
 
     
     # Edge case: defending someone on the block or in the lane (score threat)
-    if 74 <= ox <= 88 and 15 <= oy <= 33:
-        result = {
-            "x": ox + (x_direction * d_spacing),
-            "y": oy + random.choice([-1, 1, 0])
-        }
+    # if 74 <= ox <= 88 and 15 <= oy <= 33:
+    #     result = {
+    #         "x": ox + (x_direction * d_spacing),
+    #         "y": oy + random.choice([-1, 1, 0])
+    #     }
 
-    # Edge case: defending someone on the baseline
-    elif oy <= 6 or oy >= 44:
-        result = {
-            "x": ox,  # No X spacing on baseline - defender matches offensive player's X
-            # Vertical offset shouldn't flip when court orientation changes
-            "y": oy + d_spacing * y_direction
-        }
+    # # Edge case: defending someone on the baseline
+    # elif oy <= 6 or oy >= 44:
+    #     result = {
+    #         "x": ox,  # No X spacing on baseline - defender matches offensive player's X
+    #         # Vertical offset shouldn't flip when court orientation changes
+    #         "y": oy + d_spacing * y_direction
+    #     }
 
-    # Edge case: defending someone near the top or wings and ball is on the key
-    elif (62 <= bx <= 66 and 22 <= by <= 28) or (35 <= bx <= 39 and 22 <= by <= 28):
-        result = {
-            "x": ox + (x_direction * random.randint(2, 4)),
-            "y": oy + y_direction * random.randint(1, 3)
-        }
+    # # Edge case: defending someone near the top or wings and ball is on the key
+    # elif (62 <= bx <= 66 and 22 <= by <= 28) or (35 <= bx <= 39 and 22 <= by <= 28):
+    #     result = {
+    #         "x": ox + (x_direction * random.randint(2, 4)),
+    #         "y": oy + y_direction * random.randint(1, 3)
+    #     }
 
-    # General rule: mirror ball spacing, maintain triangle
-    else:
-        delta_x = abs(bx - ox)
-        delta_y = abs(by - oy)
+    # # General rule: mirror ball spacing, maintain triangle
+    # else:
+    #     delta_x = abs(bx - ox)
+    #     delta_y = abs(by - oy)
 
-        # x = ox + int(delta_x * 0.3) + (x_direction * d_spacing)
-        # y = oy + int(delta_y * 0.3) + (y_direction * d_spacing)
-        x = ox + (int(delta_x * 0.3) * x_direction)
-        y = oy + (int(delta_y * 0.3) * y_direction)
+    #     # x = ox + int(delta_x * 0.3) + (x_direction * d_spacing)
+    #     # y = oy + int(delta_y * 0.3) + (y_direction * d_spacing)
+    #     x = ox + (int(delta_x * 0.3) * x_direction)
+    #     y = oy + (int(delta_y * 0.3) * y_direction)
 
-        result = {"x": x, "y": y}
+    #     result = {"x": x, "y": y}
     
-    # If coords were flipped to home orientation, flip result back to away orientation
-    # if is_away_offense:
-    #     result = get_away_player_coords(result)
     
     return result
