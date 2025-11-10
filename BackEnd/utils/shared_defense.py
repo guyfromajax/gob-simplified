@@ -43,11 +43,13 @@ def assign_bh_defender_coords(ball_coords, aggression_level: str, is_away_offens
     return {"x": x_def, "y": y_def}
 
 
-def assign_non_bh_defender_coords(o_coords, ball_coords, aggression_level, is_away_offense):
+def assign_non_bh_defender_coords(o_coords, ball_coords, aggression_level, is_away_offense, ball_spot="key"):
     """
     Assigns defensive positioning for a non-ball-handler defender in man defense.
     Returns {"x": int, "y": int}
     """
+    
+    print(f"🏀 assign_non_bh_defender_coords called with ball_spot: '{ball_spot}'")
 
     d_spacing_map = {"aggressive": 1, "normal": 2, "passive": 3}
     d_spacing = d_spacing_map.get(aggression_level.lower(), 2)  
