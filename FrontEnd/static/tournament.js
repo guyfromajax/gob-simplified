@@ -653,6 +653,21 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
+  // Set Game Plan button (Tournament Command Center)
+  const setGameplanBtn = document.getElementById('set-gameplan-tournament');
+  if (setGameplanBtn) {
+    setGameplanBtn.addEventListener('click', () => {
+      if (!tournament || !tournament._id || !userTeamId) {
+        alert('Tournament or user team not loaded');
+        return;
+      }
+      
+      // Redirect to Game Plan screen with tournament context
+      const url = `/game-plan.html?mode=tournament&tournament_id=${encodeURIComponent(tournament._id)}&user_team_id=${encodeURIComponent(userTeamId)}&from=command_center`;
+      window.location.href = url;
+    });
+  }
+
   const simBtn = document.getElementById('sim-remaining');
   if (simBtn) {
     simBtn.addEventListener('click', async () => {

@@ -217,13 +217,31 @@ function renderRoster() {
 }
 
 function updatePlayButton() {
-  const btn = document.getElementById('play-now');
-  if (!btn) return;
+  const playBtn = document.getElementById('play-now');
+  const gameplanBtn = document.getElementById('gameplan-optional');
+  
   const filled = ['PG','SG','SF','PF','C'].every(pos => lineup[pos]);
+  
   if (filled) {
-    btn.classList.remove('disabled');
+    // Enable both buttons when lineup is complete
+    if (playBtn) {
+      playBtn.classList.remove('disabled');
+      playBtn.style.cursor = 'pointer';
+    }
+    if (gameplanBtn) {
+      gameplanBtn.classList.remove('disabled');
+      gameplanBtn.style.cursor = 'pointer';
+    }
   } else {
-    btn.classList.add('disabled');
+    // Disable both buttons when lineup is incomplete
+    if (playBtn) {
+      playBtn.classList.add('disabled');
+      playBtn.style.cursor = 'not-allowed';
+    }
+    if (gameplanBtn) {
+      gameplanBtn.classList.add('disabled');
+      gameplanBtn.style.cursor = 'not-allowed';
+    }
   }
 }
 
@@ -497,9 +515,55 @@ async function init() {
         // optional: params.set('debug_flow', '1');
       }
       if (DEBUG) {
-        console.debug('🔀 Redirecting to game-plan.html', { home: homeTeam, away: awayTeam, gameId: currentGameId });
+        console.debug('🔀 Redirecting to court.html (bypassing game plan)', { home: homeTeam, away: awayTeam, gameId: currentGameId });
       }
       DEBUG && console.log('[lineup] launching quarter', quarter);
+      window.location.href = `/court.html?${params.toString()}`;
+    });
+  }
+  
+  // NEW: Optional Game Plan button
+  const gameplanBtn = document.getElementById('gameplan-optional');
+  if (gameplanBtn) {
+    gameplanBtn.addEventListener('click', () => {
+      if (gameplanBtn.classList.contains('disabled')) return;
+      const currentGameId = urlParams.get('game_id') ||
+        (typeof localStorage !== 'undefined' ? localStorage.getItem('game_id') : null);
+      const params = new URLSearchParams();
+      params.set('home', homeTeam);
+      params.set('away', awayTeam);
+      if (homeId) params.set('home_id', homeId);
+      if (awayId) params.set('away_id', awayId);
+      if (myTeamSide) params.set('my_team', myTeamSide);
+      if (userTeamIdParam) params.set('user_team_id', userTeamIdParam);
+      if (franchiseId) params.set('franchise_id', franchiseId);
+      if (weekParam) params.set('week', weekParam);
+      if (tournamentId) params.set('tournament_id', tournamentId);
+      if (modeParam) params.set('mode', modeParam);
+      params.set('quarter', String(quarter));
+      params.set('period', periodLabel);
+      if (quarter > 1 && currentGameId) params.set('game_id', currentGameId);
+      ['PG','SG','SF','PF','C'].forEach(pos => {
+        const id = lineup[pos];
+        if (id) params.set(`${myTeamSide}_${pos.toLowerCase()}`, id);
+      });
+      
+      // Carry forward start_with_inbound and starting_possession if present
+      const startWithInbound = urlParams.get('start_with_inbound');
+      const startingPossession = urlParams.get('starting_possession');
+      if (startWithInbound) params.set('start_with_inbound', startWithInbound);
+      if (startingPossession) params.set('starting_possession', startingPossession);
+
+      if (DEBUG) {
+        params.set('debug', '1');
+      }
+      
+      // Add "from=lineup" so Game Plan screen knows where user came from
+      params.set('from', 'lineup');
+      
+      if (DEBUG) {
+        console.debug('🔀 Redirecting to game-plan.html', { home: homeTeam, away: awayTeam, gameId: currentGameId });
+      }
       window.location.href = `/game-plan.html?${params.toString()}`;
     });
   }
