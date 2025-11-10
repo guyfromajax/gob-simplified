@@ -371,7 +371,7 @@ export class ShotAnimationSystem {
       
       // Offensive players getting back on defense
       if (turnData.offense_getback && turnData.offense_getback.length > 0) {
-        const isHomeTeamShooting = turnData.offense_team === turnData.home_team_id;
+        const isHomeTeamShooting = turnData.offense_team === this.scene.homeTeamId;
         
         turnData.offense_getback.forEach(playerId => {
           const sprite = this.playerSprites[playerId];
