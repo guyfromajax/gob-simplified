@@ -640,37 +640,54 @@ class ShotManager:
             passer = None
         
         attrs = shooter.attributes
+        defender_count = fb_roles.get("defender_count", len(fb_roles["defense"]))
         
         shot_score = (attrs["SC"] * 0.6 + attrs["AG"] * 0.2 + attrs["IQ"] * 0.2) * random.randint(1, 6)
         text = f"fast break shot_score: {shot_score}"
-        defender = random.choice(fb_roles["defense"]) if fb_roles["defense"] else None
         
-        # Fallback: If no defender assigned, use defender at shooter's position for animation
-        if not defender:
-            shooter_pos = get_player_position(off_lineup, shooter)
-            defender = def_lineup.get(shooter_pos)
-            if not defender:
-                # Final fallback: use defensive PG
-                defender = def_lineup.get("PG", list(def_lineup.values())[0])
-            print(f"⚡ Fast Break Shot: No defender in defense list, using {get_name_safe(defender)} at {shooter_pos}")
+        # Defender assignment based on defender count
+        if defender_count == 0:
+            # 0 defenders: No defender assigned
+            defender = None
+            fb_roles["defender"] = None
+        elif defender_count == 1:
+            # 1 defender: Assign the single defender
+            defender = fb_roles["defense"][0] if fb_roles["defense"] else None
+            fb_roles["defender"] = defender
+        else:  # defender_count >= 2
+            # 2+ defenders: Randomly select one as primary shot defender
+            defender = random.choice(fb_roles["defense"])
+            fb_roles["defender"] = defender
+            # Store all defenders for animation (other defenders position around basket)
+            fb_roles["all_defenders"] = fb_roles["defense"]
         
-        fb_roles["defender"] = defender  # Store for animation
-        
-        defense_attrs = defender.attributes if defender else {"ID": 0, "IQ": 0, "CH": 0}
-        defense_score = (
-            defense_attrs.get("ID", 0) * 0.8 +
-            defense_attrs.get("IQ", 0) * 0.1 +
-            defense_attrs.get("CH", 0) * 0.1
-        ) * random.randint(1, 6)
-        # Track defense score for statistics (fast break)
-        self.defense_scores.append(defense_score)
-        shot_score -= (defense_score * 0.2)
-        text += f" - defense score: {defense_score}"
+        # Calculate defense score and apply to shot
         if defender:
+            defense_attrs = defender.attributes
+            defense_score = (
+                defense_attrs.get("ID", 0) * 0.8 +
+                defense_attrs.get("IQ", 0) * 0.1 +
+                defense_attrs.get("CH", 0) * 0.1
+            ) * random.randint(1, 6)
+            # Track defense score for statistics (fast break)
+            self.defense_scores.append(defense_score)
+            shot_score -= (defense_score * 0.2)
+            text += f" - defense score: {defense_score}"
             defender.record_stat("DEF_A")
         
+        # Adjust shot threshold based on defender count
+        shot_threshold = off_team.team_attributes["shot_threshold"]
+        
+        if defender_count == 0:
+            # 0 defenders: 99% make chance (threshold = 1)
+            shot_threshold = 1
+            print(f"⚡ Fast Break: 0 defenders, 99% make chance (threshold = 1)")
+        elif defender_count >= 2:
+            # 2+ defenders: +300 shot threshold (much harder shot)
+            shot_threshold += 300
+            print(f"⚡ Fast Break: {defender_count} defenders, +300 threshold = {shot_threshold}")
 
-        made = shot_score >= off_team.team_attributes["shot_threshold"]
+        made = shot_score >= shot_threshold
         text += f"shot threshold: {off_team.team_attributes['shot_threshold']}"
         shooter.record_stat("FGA")
 
@@ -686,19 +703,94 @@ class ShotManager:
             self.game_state["offensive_state"] = pressure_type
             result["next_defensive_setup"] = pressure_type
         else:
+            # Fast break shot missed
             if defender:
                 defender.record_stat("DEF_S")
-            rebounder = random.choice(fb_roles["defense"]) if fb_roles["defense"] else self.game.defense_team.lineup["PG"]
-            text += f"{shooter} misses the fast break shot -- {rebounder} grabs the rebound."
-            rebounder.record_stat("DREB")
-            result["rebounderId"] = getattr(rebounder, "player_id", None)
-            result["rebound_type"] = "DREB"
-            possession_flips = True
-            # Force HCO after defensive rebound from missed fast break shot
-            text += " -- entering half court."
-            self.game_state["offensive_state"] = "HCO"
-            self.game_state["last_rebounder"] = rebounder
-            self.game_state["last_rebound"] = "DREB"
+            
+            if defender_count == 0:
+                # 0 defenders: Find closest player to ball (excluding shooter)
+                # Ball bounces to a random spot near the basket
+                # Determine which basket based on offense team
+                is_away_team = off_team.team_id == self.game.away_team.team_id
+                
+                # Basket coordinates: Home basket x=9, Away basket x=91
+                basket_x = 91 if is_away_team else 9
+                basket_y = 25
+                
+                # Ball bounces ±8 y, ±5 x from basket
+                bounce_x = basket_x + random.randint(-5, 5)
+                bounce_y = basket_y + random.randint(-8, 8)
+                
+                # Find closest player (excluding shooter)
+                shooter_id = getattr(shooter, "player_id", None)
+                all_players = list(off_lineup.values()) + list(def_lineup.values())
+                closest_player = None
+                closest_distance = float("inf")
+                
+                for player in all_players:
+                    player_id = getattr(player, "player_id", None)
+                    if player_id == shooter_id:
+                        continue  # Skip shooter
+                    
+                    # Get player's current position (or default position)
+                    player_coords = getattr(player, "coords", {"x": 50, "y": 25})
+                    player_x = player_coords.get("x", 50)
+                    player_y = player_coords.get("y", 25)
+                    
+                    # Calculate distance to ball bounce spot
+                    distance = ((player_x - bounce_x) ** 2 + (player_y - bounce_y) ** 2) ** 0.5
+                    
+                    if distance < closest_distance:
+                        closest_distance = distance
+                        closest_player = player
+                
+                rebounder = closest_player
+                
+                # Determine if OREB or DREB based on rebounder's team
+                rebounder_team_id = getattr(rebounder, "team_id", None)
+                is_oreb = rebounder_team_id == off_team.team_id
+                
+                if is_oreb:
+                    # OREB: Use standard OREB system
+                    rebounder.record_stat("OREB")
+                    text += f"{shooter} misses the layup -- {get_name_safe(rebounder)} grabs the offensive rebound!"
+                    result["rebounderId"] = getattr(rebounder, "player_id", None)
+                    result["rebound_type"] = "OREB"
+                    possession_flips = False
+                    # Store OREB info for game_manager to create a separate OREB turn
+                    self.game_state["pending_oreb"] = {
+                        "rebounder": rebounder,
+                        "rebounder_id": getattr(rebounder, "player_id", None),
+                    }
+                else:
+                    # DREB: Transition to HCO with outlet step
+                    rebounder.record_stat("DREB")
+                    text += f"{shooter} misses the layup -- {get_name_safe(rebounder)} grabs the defensive rebound."
+                    result["rebounderId"] = getattr(rebounder, "player_id", None)
+                    result["rebound_type"] = "DREB"
+                    possession_flips = True
+                    text += " -- entering half court."
+                    self.game_state["offensive_state"] = "HCO"
+                    self.game_state["last_rebounder"] = rebounder
+                    self.game_state["last_rebound"] = "DREB"
+                    result["next_play_type"] = "HCO"
+                
+                # Store bounce spot for animation
+                result["ball_bounce_x"] = bounce_x
+                result["ball_bounce_y"] = bounce_y
+            else:
+                # 1+ defenders: Defender grabs rebound (original logic)
+                rebounder = random.choice(fb_roles["defense"]) if fb_roles["defense"] else self.game.defense_team.lineup["PG"]
+                text += f"{shooter} misses the fast break shot -- {get_name_safe(rebounder)} grabs the rebound."
+                rebounder.record_stat("DREB")
+                result["rebounderId"] = getattr(rebounder, "player_id", None)
+                result["rebound_type"] = "DREB"
+                possession_flips = True
+                # Force HCO after defensive rebound from missed fast break shot
+                text += " -- entering half court."
+                self.game_state["offensive_state"] = "HCO"
+                self.game_state["last_rebounder"] = rebounder
+                self.game_state["last_rebound"] = "DREB"
 
         time_elapsed = random.randint(5, 10)
 
@@ -715,7 +807,9 @@ class ShotManager:
             "defenderId": getattr(defender, "player_id", None) if defender else None,
             "text": text,
             "possession_flips": possession_flips,
-            "time_elapsed": time_elapsed
+            "time_elapsed": time_elapsed,
+            "defender_count": defender_count,  # For frontend animation logic
+            "outlet_passer_id": fb_roles.get("outlet_passer"),  # Outlet passer stays stationary for 0 defenders
         })
 
         if made:

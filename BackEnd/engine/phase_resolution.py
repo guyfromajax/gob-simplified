@@ -271,21 +271,26 @@ def resolve_fast_break_logic(game: "GameManager"):
         hold_up = True
         stopper_id = best_defender.player_id
 
-    # Determine event type
+    # Determine event type based on defender count
+    # Note: o_count is always 1 (ball handler only) for rebounds
     o_count = len(fb_roles["offense"]) + 1  # include ball handler
     d_count = len(fb_roles["defense"])
+    
+    # Store defender count for shot resolution logic
+    fb_roles["defender_count"] = d_count
 
     if d_count == 0:
+        # 0 defenders: Always shot (99% make chance)
         event_type = "SHOT"
-    elif o_count > d_count:
-        event_type = random.choices(["SHOT", "HCO"], weights=[0.9, 0.1])[0]
-    elif o_count == d_count:
-        event_type = random.choices(["SHOT", "HCO"], weights=[0.75, 0.25])[0]
-    else:
-        event_type = random.choices(["SHOT", "HCO"], weights=[0.4, 0.6])[0]
+    elif d_count == 1:
+        # 1 defender: 75% shot, 25% defensive stop
+        event_type = random.choices(["SHOT", "DEFENSIVE_STOP"], weights=[0.75, 0.25])[0]
+    else:  # d_count >= 2
+        # 2+ defenders: 10% shot, 90% defensive stop
+        event_type = random.choices(["SHOT", "DEFENSIVE_STOP"], weights=[0.10, 0.90])[0]
 
-    # If HCO triggered, defense stopped the fast break
-    if event_type == "HCO":
+    # If defensive stop triggered, defense stopped the fast break
+    if event_type == "DEFENSIVE_STOP":
         def_scouting["defense"]["vs_Fast_Break"]["success"] += 1
         game.game_state["offensive_state"] = "HCO"
         
