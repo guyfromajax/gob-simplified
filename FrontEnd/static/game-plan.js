@@ -294,7 +294,7 @@ function navigateBack() {
   params.set('quarter', String(quarter));
   params.set('period', periodLabel);
   
-  window.location.href = `/set-lineup.html?${params.toString()}`;
+  window.location.href = `/static/set-lineup.html?${params.toString()}`;
 }
 
 function navigateToCommandCenter() {
