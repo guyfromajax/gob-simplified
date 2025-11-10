@@ -134,29 +134,60 @@ export function displayAccumulatedPlayerStats(gameData, homeTeam, awayTeam) {
 }
 
 /**
- * Update team totals (S1 tab - Team Stats)
+ * Update Team Box Score (S1, S2, S3 tabs)
  * @param {Object} gameData - Game data from backend
  * @param {string} homeTeam - Home team name
  * @param {string} awayTeam - Away team name
  */
-export function displayTeamTotals(gameData, homeTeam, awayTeam) {
-  if (!gameData || !gameData.team_totals) {
-    console.warn('⚠️ No team_totals in game data');
+export function displayTeamBoxScore(gameData, homeTeam, awayTeam) {
+  if (!gameData) {
+    console.warn('⚠️ No game data provided to displayTeamBoxScore');
     return;
   }
   
-  const homeTotals = gameData.team_totals[homeTeam] || {};
-  const awayTotals = gameData.team_totals[awayTeam] || {};
+  // Check if setTeamBoxData function exists (defined in court.html)
+  if (typeof window.setTeamBoxData !== 'function') {
+    console.warn('⚠️ window.setTeamBoxData function not found');
+    return;
+  }
   
-  console.log('📊 Team totals loaded:', { homeTotals, awayTotals });
+  const homeTotals = gameData.team_totals?.[homeTeam] || {};
+  const awayTotals = gameData.team_totals?.[awayTeam] || {};
   
-  // Store globally so S1 tab can access it
-  window.teamTotals = {
-    home: homeTotals,
-    away: awayTotals
-  };
+  // Get team attributes from home_team/away_team objects
+  const homeAttrs = gameData.home_team?.attributes || {};
+  const awayAttrs = gameData.away_team?.attributes || {};
   
-  console.log('📊 Team totals stored globally for S1 tab');
+  // Get playcall stats (S2 tab) - these come from team_stats if available
+  const homeOffense = gameData.team_stats?.[homeTeam]?.offense || {};
+  const awayOffense = gameData.team_stats?.[awayTeam]?.offense || {};
+  const homeDefense = gameData.team_stats?.[homeTeam]?.defense || {};
+  const awayDefense = gameData.team_stats?.[awayTeam]?.defense || {};
+  
+  console.log('📊 Team Box Score data loaded:', {
+    homeTotals,
+    awayTotals,
+    homeOffense,
+    awayOffense
+  });
+  
+  // Call the global setTeamBoxData function (same as used during gameplay)
+  window.setTeamBoxData({
+    home: {
+      offense: homeOffense,
+      defense: homeDefense,
+      attributes: homeAttrs,
+      totals: homeTotals
+    },
+    away: {
+      offense: awayOffense,
+      defense: awayDefense,
+      attributes: awayAttrs,
+      totals: awayTotals
+    }
+  });
+  
+  console.log('📊 Team Box Score updated (S1, S2, S3 tabs)');
 }
 
 /**
@@ -175,7 +206,7 @@ export async function initializeGameStats() {
   if (gameData) {
     displayAccumulatedScores(gameData, homeTeam, awayTeam);
     displayAccumulatedPlayerStats(gameData, homeTeam, awayTeam);
-    displayTeamTotals(gameData, homeTeam, awayTeam);
+    displayTeamBoxScore(gameData, homeTeam, awayTeam);
   }
 }
 

@@ -390,6 +390,18 @@ def get_game_state(game_id: str):
                         "team": team.name
                     })
             
+            # Build team_stats structure (for S2 tab - playcall stats)
+            team_stats = {
+                gm.home_team.name: {
+                    "offense": gm.home_team.scouting_data.get("offense", {}),
+                    "defense": gm.home_team.scouting_data.get("defense", {})
+                },
+                gm.away_team.name: {
+                    "offense": gm.away_team.scouting_data.get("offense", {}),
+                    "defense": gm.away_team.scouting_data.get("defense", {})
+                }
+            }
+            
             return {
                 "game_id": game_id,
                 "score": gm.score,
@@ -397,16 +409,19 @@ def get_game_state(game_id: str):
                 "quarter": gm.quarter,
                 "clock": gm.game_state.get("clock", "8:00"),
                 "players": players,
-                # Team-level stats (for S1/S2 tabs and scoreboard)
+                # Team-level stats (for S1/S2/S3 tabs and scoreboard)
                 "team_totals": gm.team_totals,
+                "team_stats": team_stats,  # Playcall stats for S2 tab
                 "points_by_quarter": gm.game_state.get("points_by_quarter", {}),
                 "home_team": {
                     "name": gm.home_team.name,
-                    "team_fouls": gm.home_team.team_fouls
+                    "team_fouls": gm.home_team.team_fouls,
+                    "attributes": gm.home_team.team_attributes  # Team attributes for S3 tab
                 },
                 "away_team": {
                     "name": gm.away_team.name,
-                    "team_fouls": gm.away_team.team_fouls
+                    "team_fouls": gm.away_team.team_fouls,
+                    "attributes": gm.away_team.team_attributes  # Team attributes for S3 tab
                 }
             }
         
@@ -431,6 +446,30 @@ def get_game_state(game_id: str):
                 home_team_data = saved.get("home_team", {})
                 away_team_data = saved.get("away_team", {})
                 
+                # Extract scouting data from teams object (contains playcall stats for S2 tab)
+                teams_obj = saved.get("teams", {})
+                home_team_id = saved.get("home_team_id")
+                away_team_id = saved.get("away_team_id")
+                
+                home_scouting = {}
+                away_scouting = {}
+                if home_team_id and home_team_id in teams_obj:
+                    home_scouting = teams_obj[home_team_id].get("scouting", {})
+                if away_team_id and away_team_id in teams_obj:
+                    away_scouting = teams_obj[away_team_id].get("scouting", {})
+                
+                # Build team_stats structure (for S2 tab - playcall stats)
+                team_stats = {
+                    home_team_data.get("name"): {
+                        "offense": home_scouting.get("offense", {}),
+                        "defense": home_scouting.get("defense", {})
+                    },
+                    away_team_data.get("name"): {
+                        "offense": away_scouting.get("offense", {}),
+                        "defense": away_scouting.get("defense", {})
+                    }
+                }
+                
                 return {
                     "game_id": game_id,
                     "score": saved.get("score", {}),
@@ -438,22 +477,25 @@ def get_game_state(game_id: str):
                     "quarter": saved.get("quarter", 1),
                     "clock": saved.get("clock", "8:00"),
                     "players": players_with_energy,
-                    # Team-level stats (for S1/S2 tabs and scoreboard)
+                    # Team-level stats (for S1/S2/S3 tabs and scoreboard)
                     "team_totals": {
                         home_team_data.get("name"): home_team_data.get("totals", {}),
                         away_team_data.get("name"): away_team_data.get("totals", {})
                     },
+                    "team_stats": team_stats,  # Playcall stats for S2 tab
                     "points_by_quarter": {
                         home_team_data.get("name"): home_team_data.get("points_by_quarter", [0, 0, 0, 0]),
                         away_team_data.get("name"): away_team_data.get("points_by_quarter", [0, 0, 0, 0])
                     },
                     "home_team": {
                         "name": home_team_data.get("name"),
-                        "team_fouls": home_team_data.get("team_fouls", 0)
+                        "team_fouls": home_team_data.get("team_fouls", 0),
+                        "attributes": home_team_data.get("attributes", {})  # Team attributes for S3 tab
                     },
                     "away_team": {
                         "name": away_team_data.get("name"),
-                        "team_fouls": away_team_data.get("team_fouls", 0)
+                        "team_fouls": away_team_data.get("team_fouls", 0),
+                        "attributes": away_team_data.get("attributes", {})  # Team attributes for S3 tab
                     }
                 }
         
