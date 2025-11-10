@@ -332,6 +332,9 @@ async function init() {
   const btnBackToLineup = document.getElementById('btn-back-to-lineup');
   const modalClose = document.getElementById('modal-close');
   
+  // Check if lineup is valid (all 5 positions filled)
+  const lineupValid = pgId && sgId && sfId && pfId && cId;
+  
   // Show/hide buttons based on where user came from
   if (from === 'command_center') {
     // From command center: show Cancel (→ command center), hide Back To Lineup
@@ -342,7 +345,22 @@ async function init() {
     // From lineup: show Back To Lineup, hide Cancel
     if (btnCancel) btnCancel.style.display = 'none';
     if (btnBackToLineup) btnBackToLineup.style.display = 'inline-block';
-    if (btnSave) btnSave.textContent = 'Play Game';  // Save and go to court
+    if (btnSave) {
+      btnSave.textContent = 'Play Game';  // Save and go to court
+      
+      // Disable "Play Game" if lineup is invalid
+      if (!lineupValid) {
+        btnSave.disabled = true;
+        btnSave.style.opacity = '0.5';
+        btnSave.style.cursor = 'not-allowed';
+        btnSave.title = 'Please complete your lineup first (Back To Lineup)';
+      } else {
+        btnSave.disabled = false;
+        btnSave.style.opacity = '1';
+        btnSave.style.cursor = 'pointer';
+        btnSave.title = '';
+      }
+    }
   }
   
   if (btnSave) {
