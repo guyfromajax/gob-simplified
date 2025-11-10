@@ -480,6 +480,94 @@ export function shootBall({
           }
         });
       }
+      
+      // ==================== REBOUND POSITIONING ====================
+      // Animate all other players (not shooter, defender, release, get back) 
+      // into rebound position during shot flight
+      
+      // Build exclusion list
+      const excludedPlayerIds = new Set();
+      excludedPlayerIds.add(shooterId); // Shooter
+      if (turnData.defenderId) excludedPlayerIds.add(turnData.defenderId); // Shot defender
+      if (turnData.defender_id) excludedPlayerIds.add(turnData.defender_id); // Alternative defender field
+      if (turnData.defense_release) {
+        turnData.defense_release.forEach(id => excludedPlayerIds.add(id)); // Release players
+      }
+      if (turnData.offense_getback) {
+        turnData.offense_getback.forEach(id => excludedPlayerIds.add(id)); // Get back players
+      }
+      
+      // Determine basket x coordinate (which basket is being attacked)
+      const basketX = isHomeTeam ? 91 : 9; // Home attacks away basket (91), away attacks home basket (9)
+      
+      // Animate all other players into rebound position
+      const playerSprites = scene.playerSprites || {};
+      let reboundPositionCount = 0;
+      
+      Object.keys(playerSprites).forEach(playerId => {
+        if (excludedPlayerIds.has(playerId)) {
+          return; // Skip excluded players
+        }
+        
+        const sprite = playerSprites[playerId];
+        if (!sprite) return;
+        
+        // Get player's current position in grid coordinates
+        const currentPixelX = sprite.x;
+        const currentPixelY = sprite.y;
+        
+        // Convert pixel to grid (reverse of gridToPixels)
+        const canvasWidth = scene.game.config.width;
+        const canvasHeight = scene.game.config.height;
+        const currentGridX = (currentPixelX / canvasWidth) * 100;
+        const currentGridY = 50 - (currentPixelY / canvasHeight) * 50;
+        
+        // Calculate target position based on rebound positioning rules
+        let targetGridX = currentGridX;
+        let targetGridY = currentGridY;
+        
+        // X movement: Move toward basket if > 3 spots away
+        const distanceFromBasket = Math.abs(currentGridX - basketX);
+        if (distanceFromBasket > 3) {
+          const moveAmount = Phaser.Math.Between(3, 6);
+          // Move closer to basket
+          if (currentGridX > basketX) {
+            targetGridX = currentGridX - moveAmount;
+          } else {
+            targetGridX = currentGridX + moveAmount;
+          }
+        }
+        // Else: Keep x the same (already close to basket)
+        
+        // Y movement: Move toward center court (y = 25)
+        if (currentGridY > 25) {
+          // Move down (negative y)
+          const moveAmount = Phaser.Math.Between(1, 6);
+          targetGridY = currentGridY - moveAmount;
+        } else if (currentGridY < 26) {
+          // Move up (positive y)
+          const moveAmount = Phaser.Math.Between(1, 6);
+          targetGridY = currentGridY + moveAmount;
+        }
+        // Else: y is exactly 25 or 26, keep it the same (rare)
+        
+        // Convert target grid back to pixels
+        const targetPixel = gridToPixels(targetGridX, targetGridY, canvasWidth, canvasHeight);
+        
+        // Animate to rebound position
+        scene.tweens.add({
+          targets: sprite,
+          x: targetPixel.x,
+          y: targetPixel.y,
+          duration: duration, // Same duration as ball flight
+          ease: 'Power1'
+        });
+        
+        reboundPositionCount++;
+      });
+      
+      console.log(`🏀 Animating ${reboundPositionCount} players into rebound position during shot`);
+      // ==================== END REBOUND POSITIONING ====================
     }
     // ==================== END PLAYER POSITIONING ====================
     
