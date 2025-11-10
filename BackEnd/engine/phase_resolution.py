@@ -278,6 +278,19 @@ def resolve_fast_break_logic(game: "GameManager"):
     
     # Store defender count for shot resolution logic
     fb_roles["defender_count"] = d_count
+    
+    # ==================== STAT TRACKING ====================
+    # Track Fast Break defender count for offense team (team running the break)
+    if not hasattr(off_team, 'team_stats'):
+        off_team.team_stats = {}
+    
+    if d_count == 0:
+        off_team.team_stats['zero_defenders_back'] = off_team.team_stats.get('zero_defenders_back', 0) + 1
+    elif d_count == 1:
+        off_team.team_stats['one_defender_back'] = off_team.team_stats.get('one_defender_back', 0) + 1
+    else:  # d_count >= 2
+        off_team.team_stats['two_defenders_back'] = off_team.team_stats.get('two_defenders_back', 0) + 1
+    # ==================== END STAT TRACKING ====================
 
     if d_count == 0:
         # 0 defenders: Always shot (99% make chance)
