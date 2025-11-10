@@ -174,6 +174,65 @@ class ShotManager:
         if is_three:
             shooter.record_stat("3PTA")
 
+        # ==================== PLAYER POSITIONING (FOR ALL SHOTS) ====================
+        # Players release for fast break / get back on defense when shot is TAKEN,
+        # not when it's made/missed. They don't know the outcome yet!
+        shooter_pos = get_player_position(off_lineup, shooter)
+        
+        # Get strategy settings
+        offense_rebounding = off_team.strategy_calls.get("rebounding_call", "normal")  # Crash boards vs get back
+        defense_tempo = def_team.strategy_calls.get("tempo_call", "normal")  # Stay vs release for FB
+        
+        # Convert strategy calls to numeric values (0-4)
+        setting_to_value = {"never": 0, "rarely": 1, "normal": 2, "often": 3, "always": 4}
+        offense_reb_value = setting_to_value.get(offense_rebounding, 2)
+        defense_tempo_value = setting_to_value.get(defense_tempo, 2)
+        
+        # Determine defensive players releasing for fast break
+        defense_release_chances = {0: 0.0, 1: 0.25, 2: 0.5, 3: 0.75, 4: 1.0}
+        defense_releases = random.random() < defense_release_chances[defense_tempo_value]
+        release_pos = "PG" if shooter_pos != "PG" else "SG"
+        
+        defense_rebounders = [pos for pos, p in def_team.lineup.items() if pos != release_pos] if defense_releases else list(def_team.lineup.keys())
+        defense_release_list = [release_pos] if defense_releases else []
+        
+        # Determine offensive players getting back on defense
+        offense_getback_chances = {
+            0: {"none": 1.0, "one": 0.0, "two": 0.0},
+            1: {"none": 0.5, "one": 0.5, "two": 0.0},
+            2: {"none": 0.25, "one": 0.75, "two": 0.0},
+            3: {"none": 0.1, "one": 0.8, "two": 0.1},
+            4: {"none": 0.0, "one": 0.5, "two": 0.5}
+        }
+        
+        chances = offense_getback_chances[offense_reb_value]
+        rand = random.random()
+        
+        if rand < chances["none"]:
+            num_getback = 0
+        elif rand < chances["none"] + chances["one"]:
+            num_getback = 1
+        else:
+            num_getback = 2
+        
+        offense_getback_list = []
+        if num_getback >= 1:
+            if shooter_pos != "PG":
+                offense_getback_list.append("PG")
+            else:
+                offense_getback_list.append("SG")
+        
+        if num_getback >= 2:
+            if shooter_pos != "SG" and "SG" not in offense_getback_list:
+                offense_getback_list.append("SG")
+            else:
+                offense_getback_list.append("SF")
+        
+        offense_rebounders = [pos for pos in off_team.lineup.keys() if pos not in offense_getback_list]
+        
+        print(f"🏃 REBOUND POSITIONING DATA (ALL SHOTS): O_getback={len(offense_getback_list)}, D_release={len(defense_release_list)}, O_reb={len(offense_rebounders)}, D_reb={len(defense_rebounders)}")
+        # ==================== END PLAYER POSITIONING ====================
+
         # ------------------------
         # 🎯 Shot is Made
         # ------------------------
@@ -225,6 +284,12 @@ class ShotManager:
                 # Store pressure type for animator to use
                 result["next_defensive_setup"] = pressure_type
                 text = f"{get_name_safe(shooter)} drains a 3!" if is_three else f"{get_name_safe(shooter)} makes the shot."
+            
+            # Add player positioning data for frontend animation (MAKE shots)
+            result["offense_getback"] = [off_team.lineup[pos].player_id for pos in offense_getback_list]
+            result["defense_release"] = [def_team.lineup[pos].player_id for pos in defense_release_list]
+            result["offense_rebounders"] = [off_team.lineup[pos].player_id for pos in offense_rebounders]
+            result["defense_rebounders"] = [def_team.lineup[pos].player_id for pos in defense_rebounders]
 
         # ------------------------
         # ❌ Shot is Missed
@@ -257,59 +322,8 @@ class ShotManager:
                     defender.record_stat("BLK")
 
                 # ==================== NEW REBOUND SYSTEM ====================
-                # Step 1: Determine which players are involved in rebounding
-                shooter_pos = get_player_position(off_lineup, shooter)
-                
-                # Get strategy settings
-                offense_rebounding = off_team.strategy_calls.get("rebounding_call", "normal")  # Crash boards vs get back
-                defense_tempo = def_team.strategy_calls.get("tempo_call", "normal")  # Stay vs release for FB
-                
-                # Convert strategy calls to numeric values (0-4)
-                setting_to_value = {"never": 0, "rarely": 1, "normal": 2, "often": 3, "always": 4}
-                offense_reb_value = setting_to_value.get(offense_rebounding, 2)
-                defense_tempo_value = setting_to_value.get(defense_tempo, 2)
-                
-                # Determine defensive players releasing for fast break
-                defense_release_chances = {0: 0.0, 1: 0.25, 2: 0.5, 3: 0.75, 4: 1.0}
-                defense_releases = random.random() < defense_release_chances[defense_tempo_value]
-                release_pos = "PG" if shooter_pos != "PG" else "SG"
-                
-                defense_rebounders = [pos for pos, p in def_team.lineup.items() if pos != release_pos] if defense_releases else list(def_team.lineup.keys())
-                defense_release_list = [release_pos] if defense_releases else []
-                
-                # Determine offensive players getting back on defense
-                offense_getback_chances = {
-                    0: {"none": 1.0, "one": 0.0, "two": 0.0},
-                    1: {"none": 0.5, "one": 0.5, "two": 0.0},
-                    2: {"none": 0.25, "one": 0.75, "two": 0.0},
-                    3: {"none": 0.1, "one": 0.8, "two": 0.1},
-                    4: {"none": 0.0, "one": 0.5, "two": 0.5}
-                }
-                
-                chances = offense_getback_chances[offense_reb_value]
-                rand = random.random()
-                
-                if rand < chances["none"]:
-                    num_getback = 0
-                elif rand < chances["none"] + chances["one"]:
-                    num_getback = 1
-                else:
-                    num_getback = 2
-                
-                offense_getback_list = []
-                if num_getback >= 1:
-                    if shooter_pos != "PG":
-                        offense_getback_list.append("PG")
-                    else:
-                        offense_getback_list.append("SG")
-                
-                if num_getback >= 2:
-                    if shooter_pos != "SG" and "SG" not in offense_getback_list:
-                        offense_getback_list.append("SG")
-                    else:
-                        offense_getback_list.append("SF")
-                
-                offense_rebounders = [pos for pos in off_team.lineup.keys() if pos not in offense_getback_list]
+                # Step 1: Player positioning already calculated above (lines 177-233)
+                # Using offense_rebounders, defense_rebounders, offense_getback_list, defense_release_list
                 
                 # Step 2: Calculate base def_prob with player advantage
                 def_prob = 0.7
@@ -381,13 +395,11 @@ class ShotManager:
                 result["rebounderId"] = getattr(rebounder, "player_id", None)
                 result["rebound_type"] = stat
                 
-                # Add player positioning data for frontend animation
+                # Add player positioning data for frontend animation (already added at top for MAKE shots)
                 result["offense_getback"] = [off_team.lineup[pos].player_id for pos in offense_getback_list]
                 result["defense_release"] = [def_team.lineup[pos].player_id for pos in defense_release_list]
                 result["offense_rebounders"] = [off_team.lineup[pos].player_id for pos in offense_rebounders]
                 result["defense_rebounders"] = [def_team.lineup[pos].player_id for pos in defense_rebounders]
-                
-                print(f"🏃 REBOUND POSITIONING DATA: O_getback={len(offense_getback_list)}, D_release={len(defense_release_list)}, O_reb={len(offense_rebounders)}, D_reb={len(defense_rebounders)}")
                 
                 # ==================== OLD REBOUND SYSTEM (COMMENTED OUT) ====================
                 # rebounder_dict = {
