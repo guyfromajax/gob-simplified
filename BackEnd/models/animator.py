@@ -1232,7 +1232,13 @@ class Animator:
                 else:
                     # Non-ball handler defender
                     bh_coords = offensive_positions_by_step.get(ball_handler_pos, [{}])[0] if ball_handler_pos in offensive_positions_by_step else {"x": 50, "y": 25}
-                    def_coords = assign_non_bh_defender_coords(off_coords, bh_coords, aggression, is_away_offense)
+                    
+                    # Extract ball handler's spot from first skeleton step
+                    first_step = skeleton_steps[0] if skeleton_steps else {}
+                    bh_action = first_step.get("pos_actions", {}).get(ball_handler_pos, {})
+                    bh_spot = bh_action.get("location") or bh_action.get("spot") or "key"
+                    
+                    def_coords = assign_non_bh_defender_coords(off_coords, bh_coords, aggression, is_away_offense, bh_spot)
                 
                 def_start = def_coords
                 def_movement.append({
@@ -1256,7 +1262,12 @@ class Animator:
                         # Non-ball handler defender - need ball handler position for this step
                         bh_coords_list = offensive_positions_by_step.get(ball_handler_pos, [])
                         bh_coords = bh_coords_list[step_idx] if step_idx < len(bh_coords_list) else {"x": 50, "y": 25}
-                        def_coords = assign_non_bh_defender_coords(off_coords, bh_coords, aggression, is_away_offense)
+                        
+                        # Extract ball handler's spot from current skeleton step
+                        bh_action = skeleton_step.get("pos_actions", {}).get(ball_handler_pos, {})
+                        bh_spot = bh_action.get("location") or bh_action.get("spot") or "key"
+                        
+                        def_coords = assign_non_bh_defender_coords(off_coords, bh_coords, aggression, is_away_offense, bh_spot)
                     
                     def_end = def_coords
                     def_movement.append({
