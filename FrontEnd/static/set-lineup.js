@@ -223,25 +223,24 @@ function updatePlayButton() {
   const filled = ['PG','SG','SF','PF','C'].every(pos => lineup[pos]);
   
   if (filled) {
-    // Enable both buttons when lineup is complete
+    // Enable play button when lineup is complete
     if (playBtn) {
       playBtn.classList.remove('disabled');
       playBtn.style.cursor = 'pointer';
     }
-    if (gameplanBtn) {
-      gameplanBtn.classList.remove('disabled');
-      gameplanBtn.style.cursor = 'pointer';
-    }
   } else {
-    // Disable both buttons when lineup is incomplete
+    // Disable play button when lineup is incomplete
     if (playBtn) {
       playBtn.classList.add('disabled');
       playBtn.style.cursor = 'not-allowed';
     }
-    if (gameplanBtn) {
-      gameplanBtn.classList.add('disabled');
-      gameplanBtn.style.cursor = 'not-allowed';
-    }
+  }
+  
+  // Game Plan button is ALWAYS enabled (user can go to Game Plan anytime)
+  if (gameplanBtn) {
+    gameplanBtn.classList.remove('disabled');
+    gameplanBtn.style.cursor = 'pointer';
+    gameplanBtn.removeAttribute('disabled');
   }
 }
 
@@ -522,16 +521,12 @@ async function init() {
     });
   }
   
-  // NEW: Optional Game Plan button
+  // NEW: Optional Game Plan button (always enabled)
   const gameplanBtn = document.getElementById('gameplan-optional');
-  console.log('🔍 Game Plan button found:', gameplanBtn, 'Disabled:', gameplanBtn?.classList.contains('disabled'));
+  console.log('🔍 Game Plan button found:', gameplanBtn);
   if (gameplanBtn) {
     gameplanBtn.addEventListener('click', () => {
-      console.log('🎮 GAME PLAN BUTTON CLICKED!', 'Disabled:', gameplanBtn.classList.contains('disabled'));
-      if (gameplanBtn.classList.contains('disabled')) {
-        console.log('⚠️ Button is disabled, returning');
-        return;
-      }
+      console.log('🎮 GAME PLAN BUTTON CLICKED! Redirecting to game-plan.html');
       const currentGameId = urlParams.get('game_id') ||
         (typeof localStorage !== 'undefined' ? localStorage.getItem('game_id') : null);
       const params = new URLSearchParams();
