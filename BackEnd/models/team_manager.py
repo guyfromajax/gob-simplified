@@ -24,6 +24,7 @@ class TeamManager:
         self.points_by_quarter = [0, 0, 0, 0]
         self.team_fouls = 0
         self.stats = {}
+        self.team_stats = {}  # Team-level stats (release/get back tracking, fast break defender counts)
         
         # Use provided scouting_data or initialize fresh
         if scouting_data:
@@ -246,6 +247,7 @@ class TeamManager:
         self.points_by_quarter = [0, 0, 0, 0]
         self.team_fouls = 0
         self.stats = {}
+        self.team_stats = {}  # Reset team-level stats
         self.scouting_data = self._init_scouting_data()
         for player in self.players.values():
             player.stats["game"] = {stat: 0 for stat in player.stats["game"]}
@@ -288,5 +290,15 @@ class TeamManager:
                 team_stats[key] += stats.get(key, 0)
 
         team_stats["REB"] = team_stats["OREB"] + team_stats["DREB"]
+        
+        # Add team-level stats (not aggregated from player stats)
+        if hasattr(self, 'team_stats'):
+            team_stats["release_instances"] = self.team_stats.get("release_instances", 0)
+            team_stats["get_back_instances"] = self.team_stats.get("get_back_instances", 0)
+            team_stats["actual_releases"] = self.team_stats.get("actual_releases", 0)
+            team_stats["zero_defenders_back"] = self.team_stats.get("zero_defenders_back", 0)
+            team_stats["one_defender_back"] = self.team_stats.get("one_defender_back", 0)
+            team_stats["two_defenders_back"] = self.team_stats.get("two_defenders_back", 0)
+        
         return team_stats
 

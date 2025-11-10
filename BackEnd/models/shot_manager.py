@@ -230,6 +230,24 @@ class ShotManager:
         offense_rebounders = [pos for pos in off_team.lineup.keys() if pos not in offense_getback_list]
         
         print(f"🏃 REBOUND POSITIONING DATA (ALL SHOTS): O_getback={len(offense_getback_list)}, D_release={len(defense_release_list)}, O_reb={len(offense_rebounders)}, D_reb={len(defense_rebounders)}")
+        
+        # ==================== STAT TRACKING ====================
+        # Track release/get back instances for both teams
+        # Defense team: Increment release_instances (every shot calculates this)
+        if not hasattr(def_team, 'team_stats'):
+            def_team.team_stats = {}
+        def_team.team_stats['release_instances'] = def_team.team_stats.get('release_instances', 0) + 1
+        
+        # Offense team: Increment get_back_instances (every shot calculates this)
+        if not hasattr(off_team, 'team_stats'):
+            off_team.team_stats = {}
+        off_team.team_stats['get_back_instances'] = off_team.team_stats.get('get_back_instances', 0) + 1
+        
+        # Defense team: If actually sending a release player, increment actual_releases
+        if defense_release_list:
+            def_team.team_stats['actual_releases'] = def_team.team_stats.get('actual_releases', 0) + 1
+        # ==================== END STAT TRACKING ====================
+        
         # ==================== END PLAYER POSITIONING ====================
 
         # ------------------------
