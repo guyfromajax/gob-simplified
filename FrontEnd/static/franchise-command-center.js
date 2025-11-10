@@ -438,6 +438,21 @@ playNowBtn.addEventListener('click', async () => {
   }
 });
 
+// Set Game Plan button (Franchise Command Center)
+const setGameplanBtn = document.getElementById('set-gameplan-franchise');
+if (setGameplanBtn) {
+  setGameplanBtn.addEventListener('click', () => {
+    if (!franchiseId || !userTeamName) {
+      alert('Franchise or user team not loaded');
+      return;
+    }
+    
+    // Redirect to Game Plan screen with franchise context
+    const url = `/game-plan.html?mode=franchise&franchise_id=${encodeURIComponent(franchiseId)}&user_team_id=${encodeURIComponent(userTeamName)}&from=command_center`;
+    window.location.href = url;
+  });
+}
+
 window.addEventListener('DOMContentLoaded', () => {
   franchiseId = localStorage.getItem('franchiseId');
   if (franchiseId) {

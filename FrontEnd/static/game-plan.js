@@ -225,9 +225,18 @@ async function saveSettings() {
     
     showToast('Game plan saved!');
     
-    // Redirect to court.html after short delay
+    // Redirect based on where user came from
     setTimeout(() => {
-      navigateToCourt();
+      const urlParams = new URLSearchParams(window.location.search);
+      const from = urlParams.get('from') || 'lineup';
+      
+      if (from === 'command_center') {
+        // Return to command center
+        navigateToCommandCenter();
+      } else {
+        // Go to court.html (start game)
+        navigateToCourt();
+      }
     }, 500);
   } catch (err) {
     console.error('Error saving settings:', err);
@@ -288,6 +297,20 @@ function navigateBack() {
   window.location.href = `/set-lineup.html?${params.toString()}`;
 }
 
+function navigateToCommandCenter() {
+  // Return to command center (tournament or franchise)
+  const mode = modeParam || 'single';
+  
+  if (mode === 'tournament' && tournamentId) {
+    window.location.href = `/static/tournament.html?tournament_id=${encodeURIComponent(tournamentId)}`;
+  } else if (mode === 'franchise' && franchiseId) {
+    window.location.href = `/static/franchise-command-center.html?franchise_id=${encodeURIComponent(franchiseId)}`;
+  } else {
+    // Fallback to home
+    window.location.href = '/';
+  }
+}
+
 async function resetSettings() {
   await loadSettings();
   showToast('Settings reset');
@@ -298,11 +321,29 @@ async function init() {
   setupSliders();
   await loadSettings();
   
+  // Check where user came from (command_center vs lineup)
+  const urlParams = new URLSearchParams(window.location.search);
+  const from = urlParams.get('from') || 'lineup';  // Default to lineup for backwards compatibility
+  
   // Button event listeners
   const btnSave = document.getElementById('btn-save');
   const btnReset = document.getElementById('btn-reset');
   const btnCancel = document.getElementById('btn-cancel');
+  const btnBackToLineup = document.getElementById('btn-back-to-lineup');
   const modalClose = document.getElementById('modal-close');
+  
+  // Show/hide buttons based on where user came from
+  if (from === 'command_center') {
+    // From command center: show Cancel (→ command center), hide Back To Lineup
+    if (btnCancel) btnCancel.style.display = 'inline-block';
+    if (btnBackToLineup) btnBackToLineup.style.display = 'none';
+    if (btnSave) btnSave.textContent = 'Save';  // Just save, return to command center
+  } else {
+    // From lineup: show Back To Lineup, hide Cancel
+    if (btnCancel) btnCancel.style.display = 'none';
+    if (btnBackToLineup) btnBackToLineup.style.display = 'inline-block';
+    if (btnSave) btnSave.textContent = 'Play Game';  // Save and go to court
+  }
   
   if (btnSave) {
     btnSave.addEventListener('click', saveSettings);
@@ -313,7 +354,11 @@ async function init() {
   }
   
   if (btnCancel) {
-    btnCancel.addEventListener('click', navigateBack);
+    btnCancel.addEventListener('click', navigateToCommandCenter);
+  }
+  
+  if (btnBackToLineup) {
+    btnBackToLineup.addEventListener('click', navigateBack);
   }
   
   if (modalClose) {
