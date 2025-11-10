@@ -368,7 +368,7 @@ def get_quarter_index_from_game(game):
 
 def calculate_rebound_score(player):
     attr = player.attributes
-    return attr["RB"] * 0.5 + attr["ST"] * 0.3 + attr["AG"] * 0.2
+    return (attr["RB"] * 0.5 + attr["ST"] * 0.3 + attr["IQ"] * 0.2) * random.randint(1, 6)
 
 def apply_scoring(game, team, player, points, stats):
     """Record player scoring stats and update team points.
