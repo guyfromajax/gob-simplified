@@ -77,17 +77,83 @@ def assign_non_bh_defender_coords(o_coords, ball_coords, aggression_level, is_aw
     x_direction = 1 if bx > ox else -1
     
     if ball_spot == "key":
-        pass
+        if o_spot in ["lower corner", "upper corner", "lower baseline", "upper baseline"]:
+            x = abs(bx - ox) * x_direction
+            y = abs(by - oy) * y_direction
+        elif o_spot in ["lower wing", "upper wing", "lower midwing", "upper midwing", "lower midCorner", "upper midCorner"]:
+            x = abs(bx - ox) * x_direction
+            y = abs(by - oy) * y_direction
+        elif o_spot in ["lower lowPost", "upper lowPost", "lower midPost", "upper midPost"]:
+            x = ox - 2 if is_away_offense else ox + 2
+            y = oy
+        else:
+            x = abs(bx - ox) * x_direction
+            y = abs(by - oy) * y_direction
     elif ball_spot in ["lower wing", "upper wing", "lower midwing", "upper midwing"]:
-        pass
+        if o_spot in ["lower corner", "upper corner", "lower baseline", "upper baseline"]:
+            x = abs(bx - ox) * x_direction
+            y = abs(by - oy) * y_direction
+        elif o_spot in ["lower wing", "upper wing", "lower midwing", "upper midwing", "lower midCorner", "upper midCorner"]:
+            x = abs(bx - ox) * x_direction
+            y = abs(by - oy) * y_direction
+        elif o_spot in ["lower lowPost", "upper lowPost", "lower midPost", "upper midPost"]:
+            x = ox - 2 if is_away_offense else ox + 2
+            y = oy
+        else:
+            x = abs(bx - ox) * x_direction
+            y = abs(by - oy) * y_direction
     elif ball_spot in ["lower corner", "upper corner", "lower midcorner", "upper midcorner", "lower midBaseline", "upper midBaseline"]:
-        pass
+        if o_spot in ["lower corner", "upper corner", "lower baseline", "upper baseline"]:
+            x = abs(bx - ox) * x_direction
+            y = abs(by - oy) * y_direction
+        elif o_spot in ["lower wing", "upper wing", "lower midwing", "upper midwing", "lower midCorner", "upper midCorner"]:
+            x = abs(bx - ox) * x_direction
+            y = abs(by - oy) * y_direction
+        elif o_spot in ["lower lowPost", "upper lowPost", "lower midPost", "upper midPost"]:
+            x = ox - 2 if is_away_offense else ox + 2
+            y = oy
+        else:
+            x = abs(bx - ox) * x_direction
+            y = abs(by - oy) * y_direction
     elif ball_spot in ["lower lowpost", "upper lowpost", "lower midpost", "upper midpost", "midLane"]:
-        pass
+        if o_spot in ["lower corner", "upper corner", "lower baseline", "upper baseline"]:
+            x = abs(bx - ox) * x_direction
+            y = abs(by - oy) * y_direction
+        elif o_spot in ["lower wing", "upper wing", "lower midwing", "upper midwing", "lower midCorner", "upper midCorner"]:
+            x = abs(bx - ox) * x_direction
+            y = abs(by - oy) * y_direction
+        elif o_spot in ["lower lowPost", "upper lowPost", "lower midPost", "upper midPost"]:
+            x = ox - 2 if is_away_offense else ox + 2
+            y = oy
+        else:
+            x = abs(bx - ox) * x_direction
+            y = abs(by - oy) * y_direction
     elif ball_spot in ["lower lowPost", "upper lowPost"]:
-        pass
+        if o_spot in ["lower corner", "upper corner", "lower baseline", "upper baseline"]:
+            x = abs(bx - ox) * x_direction
+            y = abs(by - oy) * y_direction
+        elif o_spot in ["lower wing", "upper wing", "lower midwing", "upper midwing", "lower midCorner", "upper midCorner"]:
+            x = abs(bx - ox) * x_direction
+            y = abs(by - oy) * y_direction
+        elif o_spot in ["lower lowPost", "upper lowPost", "lower midPost", "upper midPost"]:
+            x = ox - 2 if is_away_offense else ox + 2
+            y = oy
+        else:
+            x = abs(bx - ox) * x_direction
+            y = abs(by - oy) * y_direction
     else:
-        pass
+        if o_spot in ["lower corner", "upper corner", "lower baseline", "upper baseline"]:
+            x = abs(bx - ox) * x_direction
+            y = abs(by - oy) * y_direction
+        elif o_spot in ["lower wing", "upper wing", "lower midwing", "upper midwing", "lower midCorner", "upper midCorner"]:
+            x = abs(bx - ox) * x_direction
+            y = abs(by - oy) * y_direction
+        elif o_spot in ["lower lowPost", "upper lowPost", "lower midPost", "upper midPost"]:
+            x = ox - 2 if is_away_offense else ox + 2
+            y = oy
+        else:
+            x = abs(bx - ox) * x_direction
+            y = abs(by - oy) * y_direction
 
     
     # Edge case: defending someone on the block or in the lane (score threat)
