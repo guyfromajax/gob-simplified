@@ -364,13 +364,23 @@ export class ShotAnimationSystem {
             const targetX = Phaser.Math.Between(45, 55);
             const targetPixel = gridToPixels(targetX, targetY, this.scene.game.config.width, this.scene.game.config.height);
             
+            console.log(`🏃 DEFENDER ${playerId} releasing: from (${sprite.x}, ${sprite.y}) → to (${targetPixel.x}, ${targetPixel.y})`);
+            
             this.scene.tweens.add({
               targets: sprite,
               x: targetPixel.x,
               y: targetPixel.y,
               duration: this.shotConfig.flightDuration,
-              ease: 'Power1'
+              ease: 'Power1',
+              onStart: () => {
+                console.log(`🏃 STARTED: Defender ${playerId} moving to fast break spot`);
+              },
+              onComplete: () => {
+                console.log(`🏃 COMPLETED: Defender ${playerId} reached fast break spot`);
+              }
             });
+          } else {
+            console.warn(`🏃 ⚠️ Defender sprite not found for player ${playerId}`);
           }
         });
       }
@@ -378,6 +388,7 @@ export class ShotAnimationSystem {
       // Offensive players getting back on defense
       if (turnData.offense_getback && turnData.offense_getback.length > 0) {
         const isHomeTeamShooting = turnData.offense_team === this.scene.homeTeamId;
+        console.log('🏃 Animating', turnData.offense_getback.length, 'offensive players getting back');
         
         turnData.offense_getback.forEach(playerId => {
           const sprite = this.playerSprites[playerId];
@@ -387,13 +398,23 @@ export class ShotAnimationSystem {
             const targetX = isHomeTeamShooting ? Phaser.Math.Between(40, 50) : Phaser.Math.Between(50, 60);
             const targetPixel = gridToPixels(targetX, targetY, this.scene.game.config.width, this.scene.game.config.height);
             
+            console.log(`🏃 OFFENSE ${playerId} getting back: from (${sprite.x}, ${sprite.y}) → to (${targetPixel.x}, ${targetPixel.y})`);
+            
             this.scene.tweens.add({
               targets: sprite,
               x: targetPixel.x,
               y: targetPixel.y,
               duration: this.shotConfig.flightDuration,
-              ease: 'Power1'
+              ease: 'Power1',
+              onStart: () => {
+                console.log(`🏃 STARTED: Offense ${playerId} getting back on defense`);
+              },
+              onComplete: () => {
+                console.log(`🏃 COMPLETED: Offense ${playerId} back on defense`);
+              }
             });
+          } else {
+            console.warn(`🏃 ⚠️ Offensive sprite not found for player ${playerId}`);
           }
         });
       }
