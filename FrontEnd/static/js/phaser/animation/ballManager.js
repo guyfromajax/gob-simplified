@@ -408,6 +408,81 @@ export function shootBall({
     // });
     
     const tweenStartTime = Date.now();
+    
+    // ==================== ANIMATE PLAYERS DURING SHOT ====================
+    // Defenders releasing for fast break + Offensive players getting back on defense
+    if (turnData) {
+      console.log('🏃 Checking player positioning data:', {
+        defense_release: turnData.defense_release,
+        offense_getback: turnData.offense_getback
+      });
+      
+      // Defenders releasing for fast break
+      if (turnData.defense_release && turnData.defense_release.length > 0) {
+        console.log('🏃 Animating', turnData.defense_release.length, 'defenders releasing for fast break');
+        turnData.defense_release.forEach(playerId => {
+          const sprite = scene.playerSprites[playerId];
+          if (sprite) {
+            const targetY = Phaser.Math.Between(15, 35);
+            const targetX = Phaser.Math.Between(45, 55);
+            const targetPixel = gridToPixels(targetX, targetY, scene.game.config.width, scene.game.config.height);
+            
+            console.log(`🏃 DEFENDER ${playerId} releasing: from (${sprite.x}, ${sprite.y}) → to (${targetPixel.x}, ${targetPixel.y})`);
+            
+            scene.tweens.add({
+              targets: sprite,
+              x: targetPixel.x,
+              y: targetPixel.y,
+              duration: duration, // Same duration as ball flight
+              ease: 'Power1',
+              onStart: () => {
+                console.log(`🏃 STARTED: Defender ${playerId} moving to fast break spot`);
+              },
+              onComplete: () => {
+                console.log(`🏃 COMPLETED: Defender ${playerId} reached fast break spot`);
+              }
+            });
+          } else {
+            console.warn(`🏃 ⚠️ Defender sprite not found for player ${playerId}`);
+          }
+        });
+      }
+      
+      // Offensive players getting back on defense
+      if (turnData.offense_getback && turnData.offense_getback.length > 0) {
+        console.log('🏃 Animating', turnData.offense_getback.length, 'offensive players getting back');
+        
+        turnData.offense_getback.forEach(playerId => {
+          const sprite = scene.playerSprites[playerId];
+          if (sprite) {
+            const targetY = Phaser.Math.Between(14, 36);
+            // Away team shooting → x: 50-60, Home team shooting → x: 40-50
+            const targetX = isHomeTeam ? Phaser.Math.Between(40, 50) : Phaser.Math.Between(50, 60);
+            const targetPixel = gridToPixels(targetX, targetY, scene.game.config.width, scene.game.config.height);
+            
+            console.log(`🏃 OFFENSE ${playerId} getting back: from (${sprite.x}, ${sprite.y}) → to (${targetPixel.x}, ${targetPixel.y})`);
+            
+            scene.tweens.add({
+              targets: sprite,
+              x: targetPixel.x,
+              y: targetPixel.y,
+              duration: duration, // Same duration as ball flight
+              ease: 'Power1',
+              onStart: () => {
+                console.log(`🏃 STARTED: Offense ${playerId} getting back on defense`);
+              },
+              onComplete: () => {
+                console.log(`🏃 COMPLETED: Offense ${playerId} back on defense`);
+              }
+            });
+          } else {
+            console.warn(`🏃 ⚠️ Offensive sprite not found for player ${playerId}`);
+          }
+        });
+      }
+    }
+    // ==================== END PLAYER POSITIONING ====================
+    
     const tween = scene.tweens.add({
       targets: ballSprite,
       x: rim.x,
