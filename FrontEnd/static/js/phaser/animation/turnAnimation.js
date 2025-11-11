@@ -153,7 +153,24 @@ async function runSideInboundSetup({ scene, ballSprite, playerSprites, turnData 
   if (!turnData || scene?.skipToEnd || scene?.stateMachine?.is(States.FreeThrow) || scene?.stateMachine?.is(States.FastBreak)) return;
 
   scene.isInboundSetup = true;
+  
+  // Allow transition from HalfCourt (after fouls) or other states
+  // Only transition if not already in Inbound state
   if (!scene.stateMachine?.is(States.Inbound)) {
+    // If coming from HalfCourt (e.g., after a foul), transition through Turnover first
+    if (scene.stateMachine?.is(States.HalfCourt)) {
+      safeTransition(
+        scene.stateMachine,
+        States.Turnover,
+        {
+          stepIndex: 0,
+          currentOwnerId: getCurrentOwner(scene),
+          pendingOwnerId: getPendingOwner(scene),
+        },
+        ["stepIndex"]
+      );
+    }
+    
     safeTransition(
       scene.stateMachine,
       States.Inbound,
