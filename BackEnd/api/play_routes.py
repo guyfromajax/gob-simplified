@@ -3,12 +3,28 @@ API routes for managing plays (offensive play skeletons).
 """
 
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from typing import Dict, List, Any, Optional
 from BackEnd.db import plays_collection
 from bson import ObjectId
+from pathlib import Path
 
 router = APIRouter()
+
+STATIC_DIR = Path(__file__).resolve().parents[2] / "FrontEnd" / "static"
+
+
+@router.get("/play-builder-v2.html")
+def serve_play_builder_v2():
+    """Serve the Play Builder V2 HTML page."""
+    return FileResponse(STATIC_DIR / "play-builder-v2.html")
+
+
+@router.get("/play-builder.html")
+def serve_play_builder():
+    """Serve the Play Builder V1 HTML page."""
+    return FileResponse(STATIC_DIR / "play-builder.html")
 
 
 class PlayCreate(BaseModel):
