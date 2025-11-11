@@ -564,9 +564,37 @@ export async function animateGameTurns({ //hasBallAtStep
         console.warn(`🚨 No foul_player_id found in turn data:`, turn);
       }
       
+      // Also check for turnover (FCP/HCT can have STEAL or DEAD_BALL_TURNOVER as result_type before converting to FOUL)
+      const victimId = turn.victim_id;
+      if (victimId && turn.text && (turn.text.includes('TRAVEL') || turn.text.includes('DRIBBLE') || turn.text.includes('steal') || turn.text.includes('turnover'))) {
+        console.log(`🚨 Turnover detected in FOUL turn:`, victimId);
+        triggerTurnoverEffect(scene, victimId);
+      }
+      
       // Announce foul
       announceFromTurnData(turn, 'end', scene.simData?.home_team_id, scene);
       // Update scoreboard for all fouls (FCP or not)
+      if (onUpdate) {
+        try {
+          onUpdate(turn);
+        } catch (err) {
+          console.error('Scoreboard update failed:', err);
+        }
+      }
+      updateDebugScore(turn, { turnIndex: i, possessionId });
+      continue;
+    }
+    
+    if (turn.result_type === "DEAD BALL") {
+      // DEAD BALL turnover (from FCP/HCT) - trigger turnover effect
+      const victimId = turn.victim_id || turn.ball_handler?.player_id;
+      if (victimId) {
+        console.log(`🚨 DEAD BALL turnover - triggering effect on victim:`, victimId);
+        triggerTurnoverEffect(scene, victimId);
+      }
+      
+      // Announce turnover
+      announceFromTurnData(turn, 'end', scene.simData?.home_team_id, scene);
       if (onUpdate) {
         try {
           onUpdate(turn);
@@ -950,6 +978,14 @@ export async function animateGameTurns({ //hasBallAtStep
           duration: cfg.duration,
           easing: cfg.easing
         });
+        
+        // Trigger turnover effect on victim
+        const victimId = turn.victim_id || ballHandlerId;
+        if (victimId) {
+          console.log(`🚨 STEAL - triggering turnover effect on victim:`, victimId);
+          triggerTurnoverEffect(scene, victimId);
+        }
+        
         const defenderSprite = playerSprites[stealerId];
         // runPass reattaches the ball after the tween resolves, so only emit
         // possession change once that handoff has finished.

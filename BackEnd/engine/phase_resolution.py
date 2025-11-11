@@ -944,8 +944,8 @@ def resolve_full_court_press_logic(game: "GameManager"):
     # print(f"offenseScore: {offenseScore}")
     # print(f"defenseScore: {defenseScore}")
 
-    # 🚨 TESTING: Force offensive foul on ALL FCP instances
-    result_type = "O_FOUL"
+    # 🚨 TESTING: Force turnover on ALL FCP instances (to test TO animation)
+    result_type = "DEAD_BALL_TURNOVER"  # or "STEAL"
     
     # if (offenseScore + 500) > defenseScore:
     #     if offenseScore - defenseScore > 1000:
