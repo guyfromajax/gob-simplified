@@ -1322,11 +1322,45 @@
       const skeletons = playData.skeletons || {};
       ['successful', 'mid_play_change', 'contested', 'broken'].forEach(variant => {
         if (skeletons[variant]) {
-          playState.variants[variant] = {
-            steps: skeletons[variant].steps || [],
-            complete: skeletons[variant].complete || false,
-            currentStep: (skeletons[variant].steps || []).length + 1
-          };
+          if (variant === 'successful') {
+            // Successful variant: simple structure
+            playState.variants[variant] = {
+              steps: skeletons[variant].steps || [],
+              complete: skeletons[variant].complete || false,
+              currentStep: (skeletons[variant].steps || []).length + 1
+            };
+          } else {
+            // Other variants: version structure
+            const versions = skeletons[variant].versions || [];
+            
+            // Convert versions array to object format
+            const versionsObj = {};
+            if (versions.length > 0) {
+              // Has version array structure (new format)
+              versions.forEach(v => {
+                versionsObj[v.version] = {
+                  steps: v.steps || []
+                };
+              });
+            } else if (skeletons[variant].steps) {
+              // Old format: single steps array - migrate to v1
+              versionsObj.v1 = { steps: skeletons[variant].steps };
+              // Create empty v2-v6
+              for (let i = 2; i <= 6; i++) {
+                versionsObj[`v${i}`] = { steps: [] };
+              }
+            } else {
+              // No data - create empty versions
+              for (let i = 1; i <= 6; i++) {
+                versionsObj[`v${i}`] = { steps: [] };
+              }
+            }
+            
+            playState.variants[variant] = {
+              currentVersion: 'v1',
+              versions: versionsObj
+            };
+          }
         }
       });
       

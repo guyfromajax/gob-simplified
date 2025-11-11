@@ -1223,18 +1223,22 @@ def get_skeleton_by_lean(play_doc, lean_score):
     if skeleton and variant != "successful":
         # Check if this variant has multiple versions
         if "versions" in skeleton and isinstance(skeleton["versions"], list):
-            # Randomly select one version from the array
+            # Filter to only non-empty versions
             versions_list = skeleton["versions"]
-            if versions_list:
-                selected_version = random.choice(versions_list)
+            non_empty_versions = [v for v in versions_list if v.get("steps") and len(v.get("steps", [])) > 0]
+            
+            if non_empty_versions:
+                # Randomly select one non-empty version
+                selected_version = random.choice(non_empty_versions)
                 # Create skeleton dict with the selected version's steps
                 skeleton = {
                     "steps": selected_version.get("steps", []),
                     "version": selected_version.get("version", "v1")
                 }
-                logging.debug(f"Selected {selected_version.get('version')} for {variant}")
+                logging.debug(f"Selected {selected_version.get('version')} for {variant} (from {len(non_empty_versions)} available)")
             else:
-                # No versions available, fallback to successful
+                # No non-empty versions available, fallback to successful
+                logging.debug(f"No non-empty versions for {variant}, falling back to successful")
                 skeleton = skeletons.get("successful")
                 variant = "successful"
         # Old format (single steps array) - maintain backwards compatibility
