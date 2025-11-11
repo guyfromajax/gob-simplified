@@ -162,7 +162,9 @@ def resolve_non_shooting_foul(roles, game):
         "defender": defender,
         "text": text,
         "possession_flips": False,
-        "time_elapsed": time_elapsed
+        "time_elapsed": time_elapsed,
+        "foul_player_id": getattr(foul_player, "player_id", None) if foul_player else None,
+        "foul_team": game_state.get("foul_team")
     }
 
 # #FAST BREAK
