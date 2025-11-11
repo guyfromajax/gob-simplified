@@ -88,7 +88,7 @@ def create_quarter_start_inbound(game):
     
     for pos in defense_team.lineup.keys():
         if pos == "PG":
-            d_coords = assign_bh_defender_coords(bh_coords, aggression, is_away_offense)
+            d_coords = assign_bh_defender_coords(bh_coords, aggression, is_away_offense, "quarter_start_inbound")
             if is_away_offense:
                 d_coords = getAwayTeamCoords({"tmp": d_coords})["tmp"]
             d_dest[pos] = d_coords

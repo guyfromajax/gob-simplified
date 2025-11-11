@@ -1,11 +1,20 @@
 import random
 from BackEnd.utils.shared import get_away_player_coords
 
-def assign_bh_defender_coords(ball_coords, aggression_level: str, is_away_offense: bool) -> dict:
+def assign_bh_defender_coords(ball_coords, aggression_level: str, is_away_offense: bool, bh_spot: str = "key") -> dict:
     """
     Returns defensive positioning for the ball handler's man-to-man defender.
     Adjusts based on court orientation: if away team is on offense, direction is reversed.
+    
+    Args:
+        ball_coords: Ball handler's coordinates
+        aggression_level: Defense aggression setting
+        is_away_offense: Whether away team has the ball
+        bh_spot: Ball handler's spot string ("key", "lower wing", etc.) - NEW
     """
+    
+    print(f"🏀 BH-defender positioning: bh_spot='{bh_spot}'")
+    
     spacing_map = {"aggressive": 1, "normal": 2, "passive": 3}
     d_spacing = spacing_map.get(aggression_level.lower(), 2)
 
