@@ -1275,6 +1275,14 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
       );
       
       if (turnData.result_type === "MAKE") {
+        // Trigger foul effect if this was an AND-1 situation
+        const foulPlayerId = turnData.foul_player_id || turnData.foul_player?.player_id;
+        if (foulPlayerId) {
+          console.log(`🚨 AND-1 foul detected after MAKE:`, foulPlayerId);
+          const { triggerFoulEffect } = await import('./negativeActionEffects.js');
+          triggerFoulEffect(scene, foulPlayerId);
+        }
+        
         // Check if there's a free throw coming (AND-1 or technical foul)
         // In turn-by-turn mode, check turnData.free_throws_remaining
         // In batch mode, check next turn in array
