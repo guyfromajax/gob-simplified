@@ -14,6 +14,7 @@ import { updatePlaycallDisplay } from "../utils/playcallDisplay.js";
 import { announceFromTurnData } from "../utils/announcements.js";
 import { updateStrategyBars } from "../utils/strategyBars.js";
 import { updatePlaycallCenter, animateLeanMeter, parseLeanScoreFromText } from "../ui/playcallCenter.js";
+import { triggerFoulEffect, triggerTurnoverEffect } from "./negativeActionEffects.js";
 import {
   animationDebugLog,
   animationDebugWarn,
@@ -552,6 +553,13 @@ export async function animateGameTurns({ //hasBallAtStep
           },
         });
       }
+      
+      // Trigger foul effect on fouling player
+      const foulPlayerId = turn.foul_player_id || turn.foul_player?.player_id;
+      if (foulPlayerId) {
+        triggerFoulEffect(scene, foulPlayerId);
+      }
+      
       // Announce foul
       announceFromTurnData(turn, 'end', scene.simData?.home_team_id, scene);
       // Update scoreboard for all fouls (FCP or not)
