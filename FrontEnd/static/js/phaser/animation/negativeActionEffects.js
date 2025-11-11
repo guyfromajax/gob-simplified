@@ -16,6 +16,9 @@ export function triggerNegativeAction(scene, playerId, actionType = 'foul') {
     return;
   }
   
+  console.log(`💥 Sprite type:`, sprite.constructor.name, `Has setTint:`, typeof sprite.setTint, `Has tint:`, typeof sprite.tint);
+  console.log(`💥 Sprite object keys:`, Object.keys(sprite));
+  
   const isFoul = actionType === 'foul';
   const config = isFoul ? {
     tint: 0xff6666,      // Light red tint
@@ -39,9 +42,15 @@ export function triggerNegativeAction(scene, playerId, actionType = 'foul') {
   const originalTint = sprite.tint;
   const originalAlpha = sprite.alpha;
   
-  // Apply red tint
-  sprite.setTint(config.tint);
-  sprite.setAlpha(1.0 - config.tintAlpha); // Reduce alpha to simulate overlay
+  try {
+    // Apply red tint
+    sprite.setTint(config.tint);
+    sprite.setAlpha(1.0 - config.tintAlpha); // Reduce alpha to simulate overlay
+  } catch (err) {
+    console.error(`💥 ERROR applying tint:`, err);
+    console.error(`💥 Sprite methods:`, Object.getOwnPropertyNames(Object.getPrototypeOf(sprite)));
+    return; // Exit early if tint can't be applied
+  }
   
   // Apply animation (pulse or shake)
   if (config.animation === 'pulse') {
