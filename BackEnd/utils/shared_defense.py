@@ -78,82 +78,82 @@ def assign_non_bh_defender_coords(o_coords, ball_coords, aggression_level, is_aw
     
     if ball_spot == "key":
         if o_spot in ["lower corner", "upper corner", "lower baseline", "upper baseline"]:
-            x = abs(bx - ox) * x_direction
-            y = abs(by - oy) * y_direction
+            x = ox + (abs(bx - ox) * x_direction)
+            y = oy + (abs(by - oy) * y_direction)
         elif o_spot in ["lower wing", "upper wing", "lower midwing", "upper midwing", "lower midCorner", "upper midCorner"]:
-            x = abs(bx - ox) * x_direction
-            y = abs(by - oy) * y_direction
+            x = ox + (abs(bx - ox) * x_direction)
+            y = oy + (abs(by - oy) * y_direction)
         elif o_spot in ["lower lowPost", "upper lowPost", "lower midPost", "upper midPost"]:
             x = ox - 2 if is_away_offense else ox + 2
             y = oy
         else:
-            x = abs(bx - ox) * x_direction
-            y = abs(by - oy) * y_direction
+            x = ox + (abs(bx - ox) * x_direction)
+            y = oy + (abs(by - oy) * y_direction)
     elif ball_spot in ["lower wing", "upper wing", "lower midwing", "upper midwing"]:
         if o_spot in ["lower corner", "upper corner", "lower baseline", "upper baseline"]:
-            x = abs(bx - ox) * x_direction
-            y = abs(by - oy) * y_direction
+            x = ox + (abs(bx - ox) * x_direction)
+            y = oy + (abs(by - oy) * y_direction)
         elif o_spot in ["lower wing", "upper wing", "lower midwing", "upper midwing", "lower midCorner", "upper midCorner"]:
-            x = abs(bx - ox) * x_direction
-            y = abs(by - oy) * y_direction
+            x = ox + (abs(bx - ox) * x_direction)
+            y = oy + (abs(by - oy) * y_direction)
         elif o_spot in ["lower lowPost", "upper lowPost", "lower midPost", "upper midPost"]:
             x = ox - 2 if is_away_offense else ox + 2
             y = oy
         else:
-            x = abs(bx - ox) * x_direction
-            y = abs(by - oy) * y_direction
+            x = ox + (abs(bx - ox) * x_direction)
+            y = oy + (abs(by - oy) * y_direction)
     elif ball_spot in ["lower corner", "upper corner", "lower midcorner", "upper midcorner", "lower midBaseline", "upper midBaseline"]:
         if o_spot in ["lower corner", "upper corner", "lower baseline", "upper baseline"]:
-            x = abs(bx - ox) * x_direction
-            y = abs(by - oy) * y_direction
+            x = ox + (abs(bx - ox) * x_direction)
+            y = oy + (abs(by - oy) * y_direction)
         elif o_spot in ["lower wing", "upper wing", "lower midwing", "upper midwing", "lower midCorner", "upper midCorner"]:
-            x = abs(bx - ox) * x_direction
-            y = abs(by - oy) * y_direction
+            x = ox + (abs(bx - ox) * x_direction)
+            y = oy + (abs(by - oy) * y_direction)       
         elif o_spot in ["lower lowPost", "upper lowPost", "lower midPost", "upper midPost"]:
             x = ox - 2 if is_away_offense else ox + 2
             y = oy
         else:
-            x = abs(bx - ox) * x_direction
-            y = abs(by - oy) * y_direction
+            x = ox + (abs(bx - ox) * x_direction)
+            y = oy + (abs(by - oy) * y_direction)
     elif ball_spot in ["lower lowpost", "upper lowpost", "lower midpost", "upper midpost", "midLane"]:
         if o_spot in ["lower corner", "upper corner", "lower baseline", "upper baseline"]:
-            x = abs(bx - ox) * x_direction
-            y = abs(by - oy) * y_direction
+            x = ox + (abs(bx - ox) * x_direction)
+            y = oy + (abs(by - oy) * y_direction)
         elif o_spot in ["lower wing", "upper wing", "lower midwing", "upper midwing", "lower midCorner", "upper midCorner"]:
-            x = abs(bx - ox) * x_direction
-            y = abs(by - oy) * y_direction
+            x = ox + (abs(bx - ox) * x_direction)
+            y = oy + (abs(by - oy) * y_direction)
         elif o_spot in ["lower lowPost", "upper lowPost", "lower midPost", "upper midPost"]:
             x = ox - 2 if is_away_offense else ox + 2
             y = oy
         else:
-            x = abs(bx - ox) * x_direction
-            y = abs(by - oy) * y_direction
+            x = ox + (abs(bx - ox) * x_direction)
+            y = oy + (abs(by - oy) * y_direction)
     elif ball_spot in ["lower lowPost", "upper lowPost"]:
         if o_spot in ["lower corner", "upper corner", "lower baseline", "upper baseline"]:
-            x = abs(bx - ox) * x_direction
-            y = abs(by - oy) * y_direction
+            x = ox + (abs(bx - ox) * x_direction)
+            y = oy + (abs(by - oy) * y_direction)
         elif o_spot in ["lower wing", "upper wing", "lower midwing", "upper midwing", "lower midCorner", "upper midCorner"]:
-            x = abs(bx - ox) * x_direction
-            y = abs(by - oy) * y_direction
+            x = ox + (abs(bx - ox) * x_direction)
+            y = oy + (abs(by - oy) * y_direction)
         elif o_spot in ["lower lowPost", "upper lowPost", "lower midPost", "upper midPost"]:
             x = ox - 2 if is_away_offense else ox + 2
             y = oy
         else:
-            x = abs(bx - ox) * x_direction
-            y = abs(by - oy) * y_direction
+            x = ox + (abs(bx - ox) * x_direction)
+            y = oy + (abs(by - oy) * y_direction)
     else:
         if o_spot in ["lower corner", "upper corner", "lower baseline", "upper baseline"]:
-            x = abs(bx - ox) * x_direction
-            y = abs(by - oy) * y_direction
+            x = ox + (abs(bx - ox) * x_direction)
+            y = oy + (abs(by - oy) * y_direction)
         elif o_spot in ["lower wing", "upper wing", "lower midwing", "upper midwing", "lower midCorner", "upper midCorner"]:
-            x = abs(bx - ox) * x_direction
-            y = abs(by - oy) * y_direction
+            x = ox + (abs(bx - ox) * x_direction)
+            y = oy + (abs(by - oy) * y_direction)
         elif o_spot in ["lower lowPost", "upper lowPost", "lower midPost", "upper midPost"]:
             x = ox - 2 if is_away_offense else ox + 2
             y = oy
         else:
-            x = abs(bx - ox) * x_direction
-            y = abs(by - oy) * y_direction
+            x = ox + (abs(bx - ox) * x_direction)
+            y = oy + (abs(by - oy) * y_direction)
     
     # Create result dictionary from calculated x and y
     result = {"x": int(x), "y": int(y)}
