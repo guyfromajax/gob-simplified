@@ -353,6 +353,24 @@
       overflow: hidden;
       text-overflow: ellipsis;
     }
+    
+    .audible-scoreboard-text {
+      font-size: 18px;
+      font-weight: bold;
+      color: #4caf50; /* Green */
+      text-shadow: 0 0 6px rgba(0, 0, 0, 0.9), 0 2px 4px rgba(0, 0, 0, 0.8);
+      white-space: nowrap;
+      animation: audiblePulse 0.5s ease-in-out infinite alternate;
+    }
+    
+    .audible-scoreboard-text:empty {
+      display: none;
+    }
+    
+    @keyframes audiblePulse {
+      from { transform: scale(1); }
+      to { transform: scale(1.05); }
+    }
 
     /* Home TOL/F - Grid column 22 */
     .tol-fouls.home {
@@ -1755,6 +1773,7 @@
         <div id="away-player-name" class="player-name-label"></div>
       </div>
       <div id="away-player-role" class="player-role-icon">🏀</div>
+      <div id="away-audible-text" class="audible-scoreboard-text"></div>
     </div>
     
     <!-- COMMENTED OUT: Now shown in Playcall Center below court -->
@@ -1831,11 +1850,12 @@
     
     <!-- Home Active Player - Grid column 20 -->
     <div id="home-active-player" class="active-player-display home-side">
+      <div id="home-audible-text" class="audible-scoreboard-text"></div>
+      <div id="home-player-role" class="player-role-icon">D</div>
       <div class="active-player-info">
         <img id="home-active-headshot" class="active-player-headshot" src="" alt="" />
         <div id="home-player-name" class="player-name-label"></div>
       </div>
-      <div id="home-player-role" class="player-role-icon">D</div>
     </div>
     
     <!-- COMMENTED OUT: Now shown in Playcall Center below court -->
@@ -3020,6 +3040,8 @@
       const homeRole = document.getElementById('home-player-role');
       const awayName = document.getElementById('away-player-name');
       const homeName = document.getElementById('home-player-name');
+      const awayAudibleText = document.getElementById('away-audible-text');
+      const homeAudibleText = document.getElementById('home-audible-text');
 
       if (!awayDisplay || !homeDisplay) return;
 
@@ -3096,41 +3118,27 @@
         homeHeadshot.src = '/static/images/players/default.png';
       };
 
-      // Trigger announcement system if audible text provided
+      // Display audible text in scoreboard if provided
       if (audibleText) {
-        console.log('🔥 [updateActivePlayersDisplay] Audible text received:', audibleText);
-        
-        const shooterTeam = isBallHandlerHome ? 'home' : 'away';
-        
-        // Get team name for background image (check if window.simData is available)
-        let shooterTeamName = null;
-        if (typeof window.simData !== 'undefined') {
-          const homeTeamField = window.simData?.home_team;
-          const awayTeamField = window.simData?.away_team;
-          const homeTeamName = typeof homeTeamField === 'object' ? homeTeamField?.name : homeTeamField;
-          const awayTeamName = typeof awayTeamField === 'object' ? awayTeamField?.name : awayTeamField;
-          shooterTeamName = ballHandlerTeamId === homeTeamId ? homeTeamName : awayTeamName;
+        if (isBallHandlerHome) {
+          if (homeAudibleText) {
+            homeAudibleText.textContent = audibleText;
+          }
+          if (awayAudibleText) {
+            awayAudibleText.textContent = '';
+          }
+        } else {
+          if (awayAudibleText) {
+            awayAudibleText.textContent = audibleText;
+          }
+          if (homeAudibleText) {
+            homeAudibleText.textContent = '';
+          }
         }
-        
-        const playerData = {
-          playerId: ballHandlerId,
-          photo: ballHandlerSprite.photo || `/static/images/players/${ballHandlerId}.png`,
-          teamName: shooterTeamName
-        };
-        
-        console.log('🔥 [updateActivePlayersDisplay] Calling showAnnouncement:', {
-          text: audibleText,
-          team: shooterTeam,
-          playerData: playerData
-        });
-        
-        // Import and show announcement with shooter's headshot
-        import('/static/js/phaser/utils/announcements.js').then(module => {
-          module.showAnnouncement(audibleText, shooterTeam, playerData);
-          console.log('🔥 [updateActivePlayersDisplay] showAnnouncement called successfully');
-        }).catch(err => {
-          console.error('❌ Failed to load announcements module:', err);
-        });
+      } else {
+        // Clear audible text when not provided
+        if (awayAudibleText) awayAudibleText.textContent = '';
+        if (homeAudibleText) homeAudibleText.textContent = '';
       }
     };
   </script>
