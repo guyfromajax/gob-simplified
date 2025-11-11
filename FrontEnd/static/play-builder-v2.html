@@ -3627,6 +3627,38 @@
       await savePlayToDatabase();
     }
 
+    function buildVariantVersions(variantName) {
+      /**
+       * Dynamically build versions array for a variant.
+       * Only includes versions that exist in playState.
+       * This makes the system flexible - variants can have any number of versions.
+       */
+      const variant = playState.variants[variantName];
+      if (!variant || !variant.versions) {
+        return { versions: [] };
+      }
+      
+      // Build array from all versions that exist
+      const versionsArray = [];
+      for (const versionKey in variant.versions) {
+        if (variant.versions.hasOwnProperty(versionKey)) {
+          versionsArray.push({
+            version: versionKey,
+            steps: variant.versions[versionKey].steps || []
+          });
+        }
+      }
+      
+      // Sort by version name (v1, v2, v3, ...)
+      versionsArray.sort((a, b) => {
+        const aNum = parseInt(a.version.replace('v', ''));
+        const bNum = parseInt(b.version.replace('v', ''));
+        return aNum - bNum;
+      });
+      
+      return { versions: versionsArray };
+    }
+
     async function savePlayToDatabase() {
       // Build play data with all variants
       const playData = {
@@ -3638,36 +3670,9 @@
             steps: playState.variants.successful.steps,
             complete: playState.variants.successful.complete
           },
-          mid_play_change: {
-            versions: [
-              { version: 'v1', steps: playState.variants.mid_play_change.versions.v1.steps },
-              { version: 'v2', steps: playState.variants.mid_play_change.versions.v2.steps },
-              { version: 'v3', steps: playState.variants.mid_play_change.versions.v3.steps },
-              { version: 'v4', steps: playState.variants.mid_play_change.versions.v4.steps },
-              { version: 'v5', steps: playState.variants.mid_play_change.versions.v5.steps },
-              { version: 'v6', steps: playState.variants.mid_play_change.versions.v6.steps }
-            ]
-          },
-          contested: {
-            versions: [
-              { version: 'v1', steps: playState.variants.contested.versions.v1.steps },
-              { version: 'v2', steps: playState.variants.contested.versions.v2.steps },
-              { version: 'v3', steps: playState.variants.contested.versions.v3.steps },
-              { version: 'v4', steps: playState.variants.contested.versions.v4.steps },
-              { version: 'v5', steps: playState.variants.contested.versions.v5.steps },
-              { version: 'v6', steps: playState.variants.contested.versions.v6.steps }
-            ]
-          },
-          broken: {
-            versions: [
-              { version: 'v1', steps: playState.variants.broken.versions.v1.steps },
-              { version: 'v2', steps: playState.variants.broken.versions.v2.steps },
-              { version: 'v3', steps: playState.variants.broken.versions.v3.steps },
-              { version: 'v4', steps: playState.variants.broken.versions.v4.steps },
-              { version: 'v5', steps: playState.variants.broken.versions.v5.steps },
-              { version: 'v6', steps: playState.variants.broken.versions.v6.steps }
-            ]
-          }
+          mid_play_change: buildVariantVersions('mid_play_change'),
+          contested: buildVariantVersions('contested'),
+          broken: buildVariantVersions('broken')
         },
         game_stats: {
           times_run: 0,
