@@ -769,6 +769,14 @@ export async function animateGameTurns({ //hasBallAtStep
           if (onAction) onAction(action, sprite, timestamp);
         },
       });
+      
+      // Check for shooting foul after HCO animation completes
+      const foulPlayerId = turn.foul_player_id || turn.foul_player?.player_id;
+      if (foulPlayerId) {
+        console.log(`🚨 Shooting foul detected after ${turn.result_type}:`, foulPlayerId);
+        triggerFoulEffect(scene, foulPlayerId);
+      }
+      
       announceFromTurnData(turn, 'end', scene.simData?.home_team_id, scene);
       if (onUpdate) {
         try {
