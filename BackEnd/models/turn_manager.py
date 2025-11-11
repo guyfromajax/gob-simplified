@@ -189,7 +189,7 @@ class TurnManager:
         for pos, defender in defense_team.lineup.items():
             if pos == "PG":
                 d_coords = assign_bh_defender_coords(
-                    bh_coords, aggression, is_away_offense
+                    bh_coords, aggression, is_away_offense, "baseline_inbound"
                 )
                 if is_away_offense:
                     d_coords = getAwayTeamCoords({"tmp": d_coords})["tmp"]
