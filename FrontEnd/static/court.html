@@ -2746,8 +2746,6 @@
       c: headshotUrlParams.get('home_c')
     };
     
-    console.log('🖼️ Lineup player IDs:', lineup);
-    
     // Map play focus to position
     const focusToPosition = {
       'inside': ['c', 'pf'],       // Inside plays → C or PF
@@ -2760,8 +2758,6 @@
       const playName = playOption.getAttribute('data-play');
       const playFocus = playOption.getAttribute('data-focus');
       
-      console.log(`🖼️ Play ${idx + 1}:`, playName, 'focus:', playFocus);
-      
       // Get positions for this focus
       const positions = focusToPosition[playFocus];
       let shooterId = null;
@@ -2771,7 +2767,6 @@
         for (const pos of positions) {
           if (lineup[pos]) {
             shooterId = lineup[pos];
-            console.log(`🖼️ Selected ${pos.toUpperCase()} (${shooterId}) for ${playName}`);
             break;
           }
         }
@@ -2781,7 +2776,6 @@
         const headshotImg = playOption.querySelector('.play-headshot');
         if (headshotImg) {
           const imgPath = `/static/images/players/${shooterId}.png`;
-          console.log(`🖼️ Setting headshot src:`, imgPath);
           headshotImg.src = imgPath;
           headshotImg.onerror = () => {
             console.warn(`⚠️ Headshot failed to load: ${imgPath}, using default`);
