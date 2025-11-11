@@ -154,7 +154,9 @@ def assign_non_bh_defender_coords(o_coords, ball_coords, aggression_level, is_aw
         else:
             x = abs(bx - ox) * x_direction
             y = abs(by - oy) * y_direction
-
+    
+    # Create result dictionary from calculated x and y
+    result = {"x": int(x), "y": int(y)}
     
     # Edge case: defending someone on the block or in the lane (score threat)
     # if 74 <= ox <= 88 and 15 <= oy <= 33:
