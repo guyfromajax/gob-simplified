@@ -38,19 +38,45 @@ export function triggerNegativeAction(scene, playerId, actionType = 'foul') {
   
   console.log(`💥 Triggering ${actionType} effect for player ${playerId}`);
   
-  // Store original tint to restore later
-  const originalTint = sprite.tint;
-  const originalAlpha = sprite.alpha;
+  // Helper function to apply tint (handles both single sprites and containers)
+  const applyTintToSprite = (target, tint, alpha) => {
+    if (target.type === 'Container') {
+      // For containers, apply to all children
+      target.list.forEach(child => {
+        if (child.setTint) {
+          child.setTint(tint);
+        }
+        if (child.setAlpha) {
+          child.setAlpha(alpha);
+        }
+      });
+    } else if (target.setTint) {
+      // For single sprites
+      target.setTint(tint);
+      target.setAlpha(alpha);
+    }
+  };
   
-  try {
-    // Apply red tint
-    sprite.setTint(config.tint);
-    sprite.setAlpha(1.0 - config.tintAlpha); // Reduce alpha to simulate overlay
-  } catch (err) {
-    console.error(`💥 ERROR applying tint:`, err);
-    console.error(`💥 Sprite methods:`, Object.getOwnPropertyNames(Object.getPrototypeOf(sprite)));
-    return; // Exit early if tint can't be applied
+  // Store original state
+  const originalState = {
+    tints: [],
+    alphas: [],
+    isContainer: sprite.type === 'Container'
+  };
+  
+  if (sprite.type === 'Container') {
+    // Store original state of children
+    sprite.list.forEach(child => {
+      originalState.tints.push(child.tint || 0xffffff);
+      originalState.alphas.push(child.alpha || 1.0);
+    });
+  } else {
+    originalState.tints.push(sprite.tint || 0xffffff);
+    originalState.alphas.push(sprite.alpha || 1.0);
   }
+  
+  // Apply red tint
+  applyTintToSprite(sprite, config.tint, 1.0 - config.tintAlpha);
   
   // Apply animation (pulse or shake)
   if (config.animation === 'pulse') {
@@ -112,8 +138,25 @@ export function triggerNegativeAction(scene, playerId, actionType = 'foul') {
   
   // Restore original tint and alpha after duration
   scene.time.delayedCall(config.duration, () => {
-    sprite.clearTint();
-    sprite.setAlpha(originalAlpha);
+    if (originalState.isContainer) {
+      // Restore container children
+      sprite.list.forEach((child, index) => {
+        if (child.clearTint) {
+          child.clearTint();
+        }
+        if (child.setAlpha && originalState.alphas[index] !== undefined) {
+          child.setAlpha(originalState.alphas[index]);
+        }
+      });
+    } else {
+      // Restore single sprite
+      if (sprite.clearTint) {
+        sprite.clearTint();
+      }
+      if (sprite.setAlpha && originalState.alphas[0] !== undefined) {
+        sprite.setAlpha(originalState.alphas[0]);
+      }
+    }
   });
 }
 
