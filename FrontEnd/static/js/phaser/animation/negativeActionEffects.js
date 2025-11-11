@@ -7,9 +7,12 @@
  */
 
 export function triggerNegativeAction(scene, playerId, actionType = 'foul') {
+  console.log(`💥 triggerNegativeAction called:`, { playerId, actionType, hasPlayerSprites: !!scene.playerSprites });
+  
   const sprite = scene.playerSprites?.[playerId];
   if (!sprite) {
     console.warn(`⚠️ Cannot trigger negative action: sprite not found for ${playerId}`);
+    console.log(`Available sprites:`, Object.keys(scene.playerSprites || {}));
     return;
   }
   
