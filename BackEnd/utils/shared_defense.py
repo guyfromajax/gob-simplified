@@ -34,10 +34,10 @@ def assign_bh_defender_coords(ball_coords, aggression_level: str, is_away_offens
     if bh_spot == "key":
         x = x_bh + (x_direction * d_spacing)
         y = y_bh + random.randint(-1,1)
-    elif bh_spot in ["lower wing", "upper wing", "lower midwing", "upper midwing"]:
+    elif bh_spot in ["lower wing", "upper wing", "lower midwing", "upper midwing", "lower midcorner", "upper midcorner",]:
         x = x_bh + (x_direction * d_spacing)
         y = y_bh + random.randint(2,4) * y_direction
-    elif bh_spot in ["lower corner", "upper corner", "lower midcorner", "upper midcorner", "lower midBaseline", "upper midBaseline"]:
+    elif bh_spot in ["lower corner", "upper corner", "lower midBaseline", "upper midBaseline"]:
         x = x_bh
         y = y_bh + (y_direction * d_spacing)
     elif bh_spot in ["midLane","lower lowPost", "upper lowPost", "lower midPost", "upper midPost", "lower highPost", "upper highPost"]:
