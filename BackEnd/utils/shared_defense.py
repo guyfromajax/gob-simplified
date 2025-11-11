@@ -75,6 +75,7 @@ def assign_non_bh_defender_coords(o_coords, ball_coords, aggression_level, is_aw
     y_direction = -1 if oy > 25 else 1
     # x_direction = 1  # Always toward home basket in home orientation
     x_direction = 1 if bx > ox else -1
+    basket_direction = -1 if is_away_offense else 1
     
     if ball_spot == "key":
         if o_spot in ["lower corner", "upper corner", "lower baseline", "upper baseline"]:
@@ -96,9 +97,9 @@ def assign_non_bh_defender_coords(o_coords, ball_coords, aggression_level, is_aw
         elif o_spot == "key":
             x = bx
             y = oy + 0.5 * (abs(by - oy) * y_direction)
-        elif o_spot in ["upper wing", "lower midwing", "upper midwing", "lower midCorner", "upper midCorner"]:
-            x = ox + 0.5 * (abs(bx - ox) * x_direction)
-            y = oy + 0.5 * (abs(by - oy) * y_direction)
+        elif o_spot in ["lower wing","upper wing", "lower midwing", "upper midwing", "lower midCorner", "upper midCorner"]:
+            x = bx + (3 * basket_direction)
+            y = oy + 0.3 * (abs(by - oy) * y_direction)
         elif o_spot in ["lower lowPost", "upper lowPost", "lower midPost", "upper midPost"]:
             x = ox - 2 if is_away_offense else ox + 2
             y = oy
@@ -107,17 +108,17 @@ def assign_non_bh_defender_coords(o_coords, ball_coords, aggression_level, is_aw
             y = oy + 0.5 * (abs(by - oy) * y_direction)
     elif ball_spot in ["lower corner", "upper corner", "lower midcorner", "upper midcorner", "lower midBaseline", "upper midBaseline"]:
         if o_spot in ["upper corner", "lower baseline", "upper baseline"]:
-            x = ox + (abs(bx - ox) * x_direction)
-            y = oy + (abs(by - oy) * y_direction)
+            x = ox + 0.1 *(abs(bx - ox) * x_direction)
+            y = oy + (5 * y_direction)
         elif o_spot in ["lower wing", "upper wing", "lower midwing", "upper midwing", "lower midCorner", "upper midCorner"]:
-            x = ox + (abs(bx - ox) * x_direction)
-            y = oy + (abs(by - oy) * y_direction)       
+            x = ox + 0.5(abs(bx - ox) * x_direction)
+            y = oy + (4 * y_direction)       
         elif o_spot in ["lower lowPost", "upper lowPost", "lower midPost", "upper midPost"]:
             x = ox - 2 if is_away_offense else ox + 2
             y = oy
         else:
-            x = ox + (abs(bx - ox) * x_direction)
-            y = oy + (abs(by - oy) * y_direction)
+            x = ox + 0.5 * (abs(bx - ox) * x_direction)
+            y = oy + 0.5 * (abs(by - oy) * y_direction)
     elif ball_spot in ["lower lowpost", "upper lowpost", "lower midpost", "upper midpost", "midLane"]:
         if o_spot in ["lower corner", "upper corner", "lower baseline", "upper baseline"]:
             x = ox + 0.5 * (abs(bx - ox) * x_direction)
