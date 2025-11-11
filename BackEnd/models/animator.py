@@ -815,7 +815,8 @@ class Animator:
                 end_coords = coords
                 
                 # Determine if player has ball at this step
-                has_ball = action in ["handle_ball", "receive", "shoot", "pass"]
+                # Note: "pass" means releasing ball, NOT holding it
+                has_ball = action in ["handle_ball", "receive", "shoot", "drive"]
                 
                 movement.append({
                     "timestamp": timestamp,
@@ -1261,20 +1262,31 @@ class Animator:
                 if step_idx < len(off_coords_list):
                     off_coords = off_coords_list[step_idx]
                     
+                    # Dynamically determine who has ball at THIS step
+                    current_ball_handler_pos = None
+                    for pos, off_anim in offensive_animations.items():
+                        if off_anim.get("hasBallAtStep", [])[step_idx] if step_idx < len(off_anim.get("hasBallAtStep", [])) else False:
+                            current_ball_handler_pos = pos
+                            break
+                    
+                    # If no one has ball at this step, use previous ball handler
+                    if not current_ball_handler_pos:
+                        current_ball_handler_pos = ball_handler_pos
+                    
                     # Calculate defensive position for this step
-                    if off_pos_to_guard == ball_handler_pos:
-                        # Ball handler defender - extract ball handler's spot from current skeleton step
-                        bh_action = skeleton_step.get("pos_actions", {}).get(ball_handler_pos, {})
+                    if off_pos_to_guard == current_ball_handler_pos:
+                        # Ball handler defender - extract CURRENT ball handler's spot from skeleton step
+                        bh_action = skeleton_step.get("pos_actions", {}).get(current_ball_handler_pos, {})
                         bh_spot = bh_action.get("location") or bh_action.get("spot") or "key"
                         
                         def_coords = assign_bh_defender_coords(off_coords, aggression, is_away_offense, bh_spot)
                     else:
-                        # Non-ball handler defender - need ball handler position for this step
-                        bh_coords_list = offensive_positions_by_step.get(ball_handler_pos, [])
+                        # Non-ball handler defender - need CURRENT ball handler position for this step
+                        bh_coords_list = offensive_positions_by_step.get(current_ball_handler_pos, [])
                         bh_coords = bh_coords_list[step_idx] if step_idx < len(bh_coords_list) else {"x": 50, "y": 25}
                         
-                        # Extract spots from current skeleton step
-                        bh_action = skeleton_step.get("pos_actions", {}).get(ball_handler_pos, {})
+                        # Extract spots from current skeleton step using CURRENT ball handler
+                        bh_action = skeleton_step.get("pos_actions", {}).get(current_ball_handler_pos, {})
                         bh_spot = bh_action.get("location") or bh_action.get("spot") or "key"
                         
                         o_action = skeleton_step.get("pos_actions", {}).get(off_pos_to_guard, {})
@@ -1286,7 +1298,7 @@ class Animator:
                     def_movement.append({
                         "timestamp": timestamp,
                         "coords": def_coords,
-                        "action": "guard_ball" if off_pos_to_guard == ball_handler_pos else "guard_offball"
+                        "action": "guard_ball" if off_pos_to_guard == current_ball_handler_pos else "guard_offball"
                     })
                 else:
                     # No more offensive movement - stay at last position
