@@ -87,15 +87,16 @@ export function triggerNegativeAction(scene, playerId, actionType = 'foul') {
     scene.game.config.width,
     scene.game.config.height,
     0xff0000,
-    0.4  // 40% opacity red overlay
+    0.5  // 50% opacity red overlay (more visible)
   );
   screenFlash.setDepth(999); // Just below icon
   
-  // Flash in and out quickly, then fade slowly
+  // Hold at full opacity for 1 second, then fade out slowly
   scene.tweens.add({
     targets: screenFlash,
     alpha: 0,
-    duration: 400,  // Quick fade to 0
+    duration: 1500,  // 1.5s fade out
+    delay: 1000,     // Hold at 50% opacity for 1 second first
     ease: 'Cubic.easeOut',
     onComplete: () => {
       screenFlash.destroy();
