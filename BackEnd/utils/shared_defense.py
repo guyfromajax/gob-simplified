@@ -18,8 +18,8 @@ def assign_bh_defender_coords(ball_coords, aggression_level: str, is_away_offens
     spacing_map = {"aggressive": 1, "normal": 2, "passive": 3}
     d_spacing = spacing_map.get(aggression_level.lower(), 2)
 
-    x = ball_coords["x"]
-    y = ball_coords["y"]
+    x_bh = ball_coords["x"]
+    y_bh = ball_coords["y"]
 
     # Convert ball handler coords back to home orientation so the spacing logic
     # is consistent regardless of which team has possession.
