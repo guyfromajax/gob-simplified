@@ -133,7 +133,7 @@ def resolve_offensive_rebound(game, rebounder):
             "possession_flips": True,
         }
 
-    if random.random() < 0.65:  # putback attempt
+    if random.random() < 0.90:  # 90% putback attempt, 10% kickout
         attrs = rebounder.attributes
         shot_score = (
             attrs["SC"] * 0.6 +
