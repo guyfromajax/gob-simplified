@@ -8,6 +8,7 @@ import {
   getCurrentOwner,
   getPendingOwner,
 } from "../ball/ballController.js";
+import { triggerTurnoverEffect } from "./negativeActionEffects.js";
 
 /**
  * Map backend TURNOVER events to appropriate animation sequences.
@@ -38,6 +39,12 @@ export async function handleTurnover(scene, { playerSprites, ballSprite, turnDat
     turnData?.live_ball === true ||
     turnData?.turnover_type === "STEAL" ||
     turnData?.result_type === "STEAL";
+  
+  // Trigger turnover effect on player who lost the ball
+  const victimId = turnData?.victim_id || turnData?.ball_handler_id || turnData?.ball_handler?.player_id;
+  if (victimId) {
+    triggerTurnoverEffect(scene, victimId);
+  }
 
   const offenseId = turnData?.possession_team_id;
   if (offenseId != null) {

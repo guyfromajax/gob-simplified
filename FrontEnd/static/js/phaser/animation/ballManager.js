@@ -638,6 +638,10 @@ export function shootBall({
               photo: foulPlayerSprite?.photo || null,
               teamName: foulPlayerTeamName
             };
+            
+            // Trigger foul effect
+            const { triggerFoulEffect } = await import('./negativeActionEffects.js');
+            triggerFoulEffect(scene, foulPlayerId);
           }
           
           showAnnouncement("Shooting Foul!", 'neutral', foulPlayerData);
