@@ -78,7 +78,7 @@ def assign_non_bh_defender_coords(o_coords, ball_coords, aggression_level, is_aw
     
     if ball_spot == "key":
         if o_spot in ["lower corner", "upper corner", "lower baseline", "upper baseline"]:
-            x = ox + 0.5 * (abs(bx - ox) * x_direction)
+            x = ox + 0.3 * (abs(bx - ox) * x_direction)
             y = oy + 0.5 * (abs(by - oy) * y_direction)
         elif o_spot in ["lower wing", "upper wing", "lower midwing", "upper midwing", "lower midCorner", "upper midCorner"]:
             x = ox #+ 0.5 * (abs(bx - ox) * x_direction)
@@ -106,7 +106,7 @@ def assign_non_bh_defender_coords(o_coords, ball_coords, aggression_level, is_aw
             x = ox + 0.5 * (abs(bx - ox) * x_direction)
             y = oy + 0.5 * (abs(by - oy) * y_direction)
     elif ball_spot in ["lower corner", "upper corner", "lower midcorner", "upper midcorner", "lower midBaseline", "upper midBaseline"]:
-        if o_spot in ["lower corner", "upper corner", "lower baseline", "upper baseline"]:
+        if o_spot in ["upper corner", "lower baseline", "upper baseline"]:
             x = ox + (abs(bx - ox) * x_direction)
             y = oy + (abs(by - oy) * y_direction)
         elif o_spot in ["lower wing", "upper wing", "lower midwing", "upper midwing", "lower midCorner", "upper midCorner"]:
