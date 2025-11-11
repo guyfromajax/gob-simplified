@@ -520,6 +520,8 @@ class ShotManager:
             "possession_flips": possession_flips,
             "time_elapsed": time_elapsed,
             "events": events,
+            "foul_player_id": getattr(foul_player, "player_id", None) if d_foul and foul_player else None,
+            "foul_team": self.game_state.get("foul_team") if d_foul else None,
         })
 
         if made:
