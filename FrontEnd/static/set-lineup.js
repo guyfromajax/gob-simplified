@@ -1133,40 +1133,8 @@ function setupSlotDragAndDrop() {
 }
 
 function updateAllSlots() {
-  ['PG', 'SG', 'SF', 'PF', 'C'].forEach(pos => {
-    const slot = document.querySelector(`.slot[data-pos="${pos}"]`);
-    if (!slot) return;
-    
-    const playerId = lineup[pos];
-    if (playerId && playerMap[playerId]) {
-      const player = playerMap[playerId];
-      const rating = player.position_ratings?.[pos] ?? '--';
-      slot.textContent = `${player.name} — ${rating}`;
-      slot.classList.add('filled');
-      slot.draggable = true;
-      slot.setAttribute('draggable', 'true');
-      const removeBtn = slot.querySelector('.remove') || document.createElement('button');
-      removeBtn.className = 'remove';
-      removeBtn.textContent = '✕';
-      removeBtn.hidden = false;
-      removeBtn.onclick = (e) => {
-        e.stopPropagation();
-        delete lineup[pos];
-        updateAllSlots();
-        updatePlayButton();
-        if (currentView === 'player') renderPlayerView();
-      };
-      if (!slot.querySelector('.remove')) slot.appendChild(removeBtn);
-    } else {
-      slot.textContent = pos;
-      slot.classList.remove('filled');
-      slot.draggable = false;
-      slot.setAttribute('draggable', 'false');
-      const removeBtn = slot.querySelector('.remove');
-      if (removeBtn) removeBtn.hidden = true;
-    }
-  });
-  
+  // Use the new updateAllSlotDisplays() function which handles the new HTML structure
+  updateAllSlotDisplays();
   updatePlayButton();
   if (currentView === 'player') renderPlayerView();
   if (currentView === 'grid') renderRoster();
