@@ -1,4 +1,5 @@
 import random
+import logging
 from typing import TYPE_CHECKING
 from fastapi import HTTPException
 from BackEnd.utils.shared import (
