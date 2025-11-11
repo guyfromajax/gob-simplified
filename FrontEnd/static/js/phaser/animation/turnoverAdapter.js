@@ -42,8 +42,12 @@ export async function handleTurnover(scene, { playerSprites, ballSprite, turnDat
   
   // Trigger turnover effect on player who lost the ball
   const victimId = turnData?.victim_id || turnData?.ball_handler_id || turnData?.ball_handler?.player_id;
+  console.log(`🔄 TURNOVER detected:`, { victimId, turnData_type: turnData?.result_type });
   if (victimId) {
+    console.log(`🔄 Calling triggerTurnoverEffect for player:`, victimId);
     triggerTurnoverEffect(scene, victimId);
+  } else {
+    console.warn(`🔄 No victim_id found in turnData:`, turnData);
   }
 
   const offenseId = turnData?.possession_team_id;

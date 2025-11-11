@@ -556,8 +556,12 @@ export async function animateGameTurns({ //hasBallAtStep
       
       // Trigger foul effect on fouling player
       const foulPlayerId = turn.foul_player_id || turn.foul_player?.player_id;
+      console.log(`🚨 FOUL detected in animateGameTurns:`, { foulPlayerId, turn_type: turn.result_type });
       if (foulPlayerId) {
+        console.log(`🚨 Calling triggerFoulEffect for player:`, foulPlayerId);
         triggerFoulEffect(scene, foulPlayerId);
+      } else {
+        console.warn(`🚨 No foul_player_id found in turn data:`, turn);
       }
       
       // Announce foul
