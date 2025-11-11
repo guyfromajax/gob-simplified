@@ -21,18 +21,20 @@ export function triggerNegativeAction(scene, playerId, actionType = 'foul') {
   
   const isFoul = actionType === 'foul';
   const config = isFoul ? {
-    tint: 0xff6666,      // Light red tint
-    tintAlpha: 0.3,      // Lower opacity for fouls
-    duration: 3000,      // 3.0s - long enough to notice
+    tint: 0xff0000,      // BRIGHT RED tint
+    tintAlpha: 0.6,      // More visible opacity
+    duration: 3000,      // 3.0s
     iconText: 'F',
-    iconDuration: 3000,  // 3.0s - matches tint duration
+    iconDuration: 3000,  // 3.0s
+    iconSize: '48px',    // Much larger text
     animation: 'pulse'   // Pulse effect
   } : {
-    tint: 0xff3333,      // Darker red tint
-    tintAlpha: 0.5,      // Higher opacity for turnovers
-    duration: 3000,      // 3.0s - long enough to notice
+    tint: 0xff0000,      // BRIGHT RED tint (same as foul)
+    tintAlpha: 0.7,      // Even more visible for turnovers
+    duration: 3000,      // 3.0s
     iconText: 'TO',
-    iconDuration: 3000,  // 3.0s - matches tint duration
+    iconDuration: 3000,  // 3.0s
+    iconSize: '48px',    // Much larger text
     animation: 'shake'   // Shake effect
   };
   
@@ -78,27 +80,49 @@ export function triggerNegativeAction(scene, playerId, actionType = 'foul') {
   // Apply red tint
   applyTintToSprite(sprite, config.tint, 1.0 - config.tintAlpha);
   
-  // Apply animation (pulse or shake)
+  // Add red screen flash effect
+  const screenFlash = scene.add.rectangle(
+    scene.game.config.width / 2,
+    scene.game.config.height / 2,
+    scene.game.config.width,
+    scene.game.config.height,
+    0xff0000,
+    0.4  // 40% opacity red overlay
+  );
+  screenFlash.setDepth(999); // Just below icon
+  
+  // Flash in and out quickly, then fade slowly
+  scene.tweens.add({
+    targets: screenFlash,
+    alpha: 0,
+    duration: 400,  // Quick fade to 0
+    ease: 'Cubic.easeOut',
+    onComplete: () => {
+      screenFlash.destroy();
+    }
+  });
+  
+  // Apply animation (pulse or shake) - MORE DRAMATIC
   if (config.animation === 'pulse') {
-    // Pulse: Scale up and down
+    // Pulse: Bigger scale change, multiple pulses
     scene.tweens.add({
       targets: sprite,
-      scaleX: 1.15,
-      scaleY: 1.15,
-      duration: 150,
+      scaleX: 1.3,
+      scaleY: 1.3,
+      duration: 300,
       yoyo: true,
-      repeat: 1,
+      repeat: 3,  // Pulse 3 times
       ease: 'Sine.easeInOut'
     });
   } else if (config.animation === 'shake') {
-    // Shake: Horizontal wobble (3-4 small wobbles)
+    // Shake: Much more violent horizontal wobble
     const originalX = sprite.x;
     scene.tweens.add({
       targets: sprite,
-      x: originalX + 3,
-      duration: 50,
+      x: originalX + 10,  // Increased from 3 to 10
+      duration: 80,
       yoyo: true,
-      repeat: 3,
+      repeat: 6,  // More shakes
       ease: 'Sine.easeInOut',
       onComplete: () => {
         sprite.x = originalX; // Ensure exact position restoration
@@ -106,30 +130,41 @@ export function triggerNegativeAction(scene, playerId, actionType = 'foul') {
     });
   }
   
-  // Create icon above sprite
-  const iconText = scene.add.text(sprite.x, sprite.y - 40, config.iconText, {
-    fontSize: '24px',
+  // Create LARGE icon above sprite
+  const iconText = scene.add.text(sprite.x, sprite.y - 60, config.iconText, {
+    fontSize: config.iconSize,  // Now 48px
     fontStyle: 'bold',
-    color: '#ffffff',
-    stroke: '#ff0000',
-    strokeThickness: 4,
+    color: '#ffff00',  // YELLOW text (more visible than white)
+    stroke: '#ff0000',  // Red outline
+    strokeThickness: 8,  // Thicker stroke
     shadow: {
-      offsetX: 2,
-      offsetY: 2,
+      offsetX: 4,
+      offsetY: 4,
       color: '#000000',
-      blur: 4,
+      blur: 8,
       fill: true
     }
   });
   iconText.setOrigin(0.5, 0.5);
   iconText.setDepth(1000); // Ensure it's above all other sprites
   
-  // Fade out icon
+  // Pulse the icon while it's visible
+  scene.tweens.add({
+    targets: iconText,
+    scale: 1.2,
+    duration: 400,
+    yoyo: true,
+    repeat: -1,  // Infinite pulse
+    ease: 'Sine.easeInOut'
+  });
+  
+  // Fade out icon after duration
   scene.tweens.add({
     targets: iconText,
     alpha: 0,
-    y: sprite.y - 60, // Float upward
+    y: sprite.y - 100, // Float upward more
     duration: config.iconDuration,
+    delay: 2500,  // Stay visible for most of the duration, then fade
     ease: 'Cubic.easeOut',
     onComplete: () => {
       iconText.destroy();

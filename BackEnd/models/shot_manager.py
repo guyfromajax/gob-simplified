@@ -641,7 +641,8 @@ class ShotManager:
         aggression_factor = AGGRESSION_FOUL_MULTIPLIER.get(aggression_level, 0.2)
         foul_threshold = defense_team.team_attributes.get("foul_threshold", 30)
 
-        d_foul = defense_score < (foul_threshold * aggression_factor)
+        # 🚨 TESTING: Force defensive foul on ALL shots
+        d_foul = True  # defense_score < (foul_threshold * aggression_factor)
         # print("End of check_defensive_foul_on_shot")
         # print(f"defense_score: {defense_score} < foul_threshold: {foul_threshold} * aggression_factor: {aggression_factor}")
         return d_foul, defender if d_foul else None
