@@ -1657,12 +1657,12 @@
     // ==================== VALIDATION FUNCTIONS ====================
     
     function validateCurrentStep(isFinalStep = false) {
-      """
-      Validate current step assignments against skeleton rules.
-      
-      Returns:
-        {valid: boolean, errors: string[]}
-      """
+      /**
+       * Validate current step assignments against skeleton rules.
+       * 
+       * Returns:
+       *   {valid: boolean, errors: string[]}
+       */
       const errors = [];
       
       // Track actions
