@@ -23,16 +23,16 @@ export function triggerNegativeAction(scene, playerId, actionType = 'foul') {
   const config = isFoul ? {
     tint: 0xff6666,      // Light red tint
     tintAlpha: 0.3,      // Lower opacity for fouls
-    duration: 600,       // 0.6s
+    duration: 3000,      // 3.0s - long enough to notice
     iconText: 'F',
-    iconDuration: 1000,  // 1.0s
+    iconDuration: 3000,  // 3.0s - matches tint duration
     animation: 'pulse'   // Pulse effect
   } : {
     tint: 0xff3333,      // Darker red tint
     tintAlpha: 0.5,      // Higher opacity for turnovers
-    duration: 800,       // 0.8s
+    duration: 3000,      // 3.0s - long enough to notice
     iconText: 'TO',
-    iconDuration: 1000,  // 1.0s
+    iconDuration: 3000,  // 3.0s - matches tint duration
     animation: 'shake'   // Shake effect
   };
   
