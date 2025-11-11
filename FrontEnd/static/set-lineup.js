@@ -289,6 +289,8 @@ function autosetLineup() {
   // Update all slot displays with correct position ratings
   updateAllSlotDisplays();
   updatePlayButton();
+  // Re-attach event listeners after DOM update
+  setupSlotDragAndDrop();
   showToast('Lineup auto-generated!');
 }
 
@@ -1029,6 +1031,9 @@ function assignToSlot(pos, playerId) {
   
   updatePlayButton();
   
+  // Re-attach event listeners after DOM update
+  setupSlotDragAndDrop();
+  
   // Re-render views to update selection state
   if (currentView === 'player') {
     renderPlayerView();
@@ -1089,6 +1094,19 @@ function setupSlotDragAndDrop() {
     slot.draggable = filled;
     slot.setAttribute('draggable', filled ? 'true' : 'false');
 
+    // Wire up remove button click event
+    const removeBtn = slot.querySelector('.remove');
+    if (removeBtn) {
+      // Remove any existing listeners to prevent duplicates
+      const newRemoveBtn = removeBtn.cloneNode(true);
+      removeBtn.parentNode.replaceChild(newRemoveBtn, removeBtn);
+      
+      newRemoveBtn.addEventListener('click', (e) => {
+        e.stopPropagation(); // Prevent slot click from firing
+        clearSlot(slot);
+      });
+    }
+
     // Provide drag data when dragging a filled slot
     slot.addEventListener('dragstart', (e) => {
       const playerId = lineup[pos];
@@ -1136,6 +1154,8 @@ function updateAllSlots() {
   // Use the new updateAllSlotDisplays() function which handles the new HTML structure
   updateAllSlotDisplays();
   updatePlayButton();
+  // Re-attach event listeners after DOM update
+  setupSlotDragAndDrop();
   if (currentView === 'player') renderPlayerView();
   if (currentView === 'grid') renderRoster();
 }
