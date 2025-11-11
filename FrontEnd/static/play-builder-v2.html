@@ -914,6 +914,20 @@
           </div>
         </div>
 
+        <!-- Version Selector (only shown for non-successful variants) -->
+        <div id="version-selector" style="display: none; margin-top: 15px; text-align: center;">
+          <label style="font-size: 0.9rem; color: #FFD700; margin-right: 10px;">Version:</label>
+          <select id="version-select" onchange="switchVersion()" style="padding: 5px 10px; font-size: 0.9rem;">
+            <option value="v1">v1</option>
+            <option value="v2">v2</option>
+            <option value="v3">v3</option>
+            <option value="v4">v4</option>
+            <option value="v5">v5</option>
+            <option value="v6">v6</option>
+          </select>
+          <span id="version-info" style="margin-left: 15px; font-size: 0.85rem; opacity: 0.7;">(Version 1 of 6)</span>
+        </div>
+
         <div class="variant-info">
           <div>
             <strong>Current Variant:</strong> <span id="current-variant-name">Successful</span> |
@@ -1167,19 +1181,37 @@
           currentStep: 1
         },
         mid_play_change: {
-          steps: [],
-          complete: false,
-          currentStep: 1
+          currentVersion: 'v1',
+          versions: {
+            v1: { steps: [], complete: false, currentStep: 1 },
+            v2: { steps: [], complete: false, currentStep: 1 },
+            v3: { steps: [], complete: false, currentStep: 1 },
+            v4: { steps: [], complete: false, currentStep: 1 },
+            v5: { steps: [], complete: false, currentStep: 1 },
+            v6: { steps: [], complete: false, currentStep: 1 }
+          }
         },
         contested: {
-          steps: [],
-          complete: false,
-          currentStep: 1
+          currentVersion: 'v1',
+          versions: {
+            v1: { steps: [], complete: false, currentStep: 1 },
+            v2: { steps: [], complete: false, currentStep: 1 },
+            v3: { steps: [], complete: false, currentStep: 1 },
+            v4: { steps: [], complete: false, currentStep: 1 },
+            v5: { steps: [], complete: false, currentStep: 1 },
+            v6: { steps: [], complete: false, currentStep: 1 }
+          }
         },
         broken: {
-          steps: [],
-          complete: false,
-          currentStep: 1
+          currentVersion: 'v1',
+          versions: {
+            v1: { steps: [], complete: false, currentStep: 1 },
+            v2: { steps: [], complete: false, currentStep: 1 },
+            v3: { steps: [], complete: false, currentStep: 1 },
+            v4: { steps: [], complete: false, currentStep: 1 },
+            v5: { steps: [], complete: false, currentStep: 1 },
+            v6: { steps: [], complete: false, currentStep: 1 }
+          }
         }
       }
     };
@@ -1189,7 +1221,13 @@
     
     // Helper to get current variant data
     function getCurrentVariantData() {
-      return playState.variants[currentVariant];
+      const variant = playState.variants[currentVariant];
+      if (currentVariant === 'successful') {
+        return variant;
+      } else {
+        // For multi-version variants, return the current version
+        return variant.versions[variant.currentVersion];
+      }
     }
 
     // Current step assignments (position -> {location, action})
@@ -1347,6 +1385,23 @@
         }
       });
       
+      // Show/hide version selector
+      const versionSelector = document.getElementById('version-selector');
+      const versionSelect = document.getElementById('version-select');
+      
+      if (variant === 'successful') {
+        // Hide version selector for successful
+        versionSelector.style.display = 'none';
+      } else {
+        // Show version selector for other variants
+        versionSelector.style.display = 'block';
+        
+        // Set to current version for this variant
+        const variantData = playState.variants[variant];
+        versionSelect.value = variantData.currentVersion;
+        updateVersionInfo();
+      }
+      
       // Load new variant with reset to Step 1
       loadVariantForEditing(variant, true);
       
@@ -1357,6 +1412,33 @@
       document.getElementById('clone-btn').style.display = 
         (variant === 'successful') ? 'none' : 'block';
     }
+    
+    function switchVersion() {
+      const versionSelect = document.getElementById('version-select');
+      const newVersion = versionSelect.value;
+      
+      // Save current version's work
+      saveVariantProgress();
+      
+      // Update current version for this variant
+      playState.variants[currentVariant].currentVersion = newVersion;
+      
+      // Load the new version
+      loadVariantForEditing(currentVariant, false);
+      
+      // Update version info display
+      updateVersionInfo();
+      
+      // Update variant info
+      updateVariantInfo();
+    }
+    
+    function updateVersionInfo() {
+      const versionInfo = document.getElementById('version-info');
+      const versionSelect = document.getElementById('version-select');
+      const versionNum = versionSelect.value.replace('v', '');
+      versionInfo.textContent = `(Version ${versionNum} of 6)`;
+    }
 
     function saveVariantProgress() {
       // Save current step assignments to variant
@@ -1365,7 +1447,8 @@
     }
 
     function loadVariantForEditing(variant, resetToStepOne = false) {
-      const variantData = playState.variants[variant];
+      // Get the actual variant data (handles both single and multi-version variants)
+      const variantData = getCurrentVariantData();
       
       // Reset current assignments
       currentStepAssignments = {};
@@ -3522,16 +3605,34 @@
             complete: playState.variants.successful.complete
           },
           mid_play_change: {
-            steps: playState.variants.mid_play_change.steps,
-            complete: playState.variants.mid_play_change.complete
+            versions: [
+              { version: 'v1', steps: playState.variants.mid_play_change.versions.v1.steps },
+              { version: 'v2', steps: playState.variants.mid_play_change.versions.v2.steps },
+              { version: 'v3', steps: playState.variants.mid_play_change.versions.v3.steps },
+              { version: 'v4', steps: playState.variants.mid_play_change.versions.v4.steps },
+              { version: 'v5', steps: playState.variants.mid_play_change.versions.v5.steps },
+              { version: 'v6', steps: playState.variants.mid_play_change.versions.v6.steps }
+            ]
           },
           contested: {
-            steps: playState.variants.contested.steps,
-            complete: playState.variants.contested.complete
+            versions: [
+              { version: 'v1', steps: playState.variants.contested.versions.v1.steps },
+              { version: 'v2', steps: playState.variants.contested.versions.v2.steps },
+              { version: 'v3', steps: playState.variants.contested.versions.v3.steps },
+              { version: 'v4', steps: playState.variants.contested.versions.v4.steps },
+              { version: 'v5', steps: playState.variants.contested.versions.v5.steps },
+              { version: 'v6', steps: playState.variants.contested.versions.v6.steps }
+            ]
           },
           broken: {
-            steps: playState.variants.broken.steps,
-            complete: playState.variants.broken.complete
+            versions: [
+              { version: 'v1', steps: playState.variants.broken.versions.v1.steps },
+              { version: 'v2', steps: playState.variants.broken.versions.v2.steps },
+              { version: 'v3', steps: playState.variants.broken.versions.v3.steps },
+              { version: 'v4', steps: playState.variants.broken.versions.v4.steps },
+              { version: 'v5', steps: playState.variants.broken.versions.v5.steps },
+              { version: 'v6', steps: playState.variants.broken.versions.v6.steps }
+            ]
           }
         },
         game_stats: {
