@@ -27,7 +27,7 @@ def assign_bh_defender_coords(ball_coords, aggression_level: str, is_away_offens
         flipped = get_away_player_coords(ball_coords)
         x_bh, y_bh = flipped["x"], flipped["y"]
 
-    y_direction = -1 if y > 25 else 1  # direction toward basket
+    y_direction = -1 if y_bh > 25 else 1  # direction toward basket
     x_direction = -1 if is_away_offense else 1
     
 

@@ -20,18 +20,54 @@
   </div>
   
   <div id="lineup-container">
-    <ul id="slots">
-      <li class="slot" data-pos="PG">PG<button class="remove" hidden>✕</button></li>
-      <li class="slot" data-pos="SG">SG<button class="remove" hidden>✕</button></li>
-      <li class="slot" data-pos="SF">SF<button class="remove" hidden>✕</button></li>
-      <li class="slot" data-pos="PF">PF<button class="remove" hidden>✕</button></li>
-      <li class="slot" data-pos="C">C<button class="remove" hidden>✕</button></li>
-    </ul>
-    <button id="play-now" class="play-button disabled">GO TO GAME</button>
-    <button id="gameplan-optional" class="gameplan-button" style="background: #4a90e2; color: white; padding: 12px 24px; border-radius: 4px; border: none; font-size: 16px; margin-left: 10px; cursor: pointer;">GAME PLAN</button>
-    <button id="autoset-lineup" class="autoset-button">AUTOSET LINEUP</button>
+    <div id="lineup-main">
+      <!-- Header Row -->
+      <div class="lineup-header">
+        <div class="header-pos">POS</div>
+        <div class="header-image"></div>
+        <div class="header-name">NAME</div>
+        <div class="header-rating">POS RATING</div>
+        <div class="header-energy">ENERGY</div>
+        <div class="header-fouls">FOULS</div>
+      </div>
+      
+      <!-- Lineup Slots -->
+      <ul id="slots">
+        <li class="slot" data-pos="PG">
+          <div class="slot-pos">PG</div>
+          <div class="slot-content"></div>
+          <button class="remove" hidden>✕</button>
+        </li>
+        <li class="slot" data-pos="SG">
+          <div class="slot-pos">SG</div>
+          <div class="slot-content"></div>
+          <button class="remove" hidden>✕</button>
+        </li>
+        <li class="slot" data-pos="SF">
+          <div class="slot-pos">SF</div>
+          <div class="slot-content"></div>
+          <button class="remove" hidden>✕</button>
+        </li>
+        <li class="slot" data-pos="PF">
+          <div class="slot-pos">PF</div>
+          <div class="slot-content"></div>
+          <button class="remove" hidden>✕</button>
+        </li>
+        <li class="slot" data-pos="C">
+          <div class="slot-pos">C</div>
+          <div class="slot-content"></div>
+          <button class="remove" hidden>✕</button>
+        </li>
+      </ul>
+    </div>
+    
+    <!-- Buttons (Vertically Stacked) -->
+    <div id="lineup-buttons">
+      <button id="play-now" class="lineup-btn disabled">GO TO GAME</button>
+      <button id="autoset-lineup" class="lineup-btn">AUTOSET LINEUP</button>
+      <button id="gameplan-optional" class="lineup-btn">GAME PLAN</button>
+    </div>
   </div>
-
   <!-- Grid View -->
   <div id="roster-table-container" class="view-content active">
     <table class="roster-table">

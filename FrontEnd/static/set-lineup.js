@@ -296,28 +296,52 @@ function updateSlotDisplay(slot) {
   const pos = slot.dataset.pos;
   const playerId = lineup[pos];
   const remove = slot.querySelector('.remove');
+  const slotContent = slot.querySelector('.slot-content');
   
   if (playerId && playerMap[playerId]) {
     const player = playerMap[playerId];
     const rating = player.position_ratings?.[pos] ?? '--';
-    slot.textContent = `${player.name} — ${rating}`;
-    if (!remove) {
-      const newRemove = document.createElement('button');
-      newRemove.className = 'remove';
-      newRemove.textContent = '✕';
-      newRemove.addEventListener('click', (e) => { e.stopPropagation(); clearSlot(slot); });
-      slot.appendChild(newRemove);
-    } else {
+    const energy = player.attributes?.NG ?? 1.0;
+    const energyPercent = Math.round(energy * 100);
+    const fouls = player.stats?.game?.F ?? 0;
+    
+    // Determine energy color class
+    let energyClass = 'high';
+    if (energyPercent < 25) energyClass = 'critical';
+    else if (energyPercent < 50) energyClass = 'low';
+    else if (energyPercent < 75) energyClass = 'medium';
+    
+    // Build slot content HTML
+    slotContent.innerHTML = `
+      <div class="player-image-container">
+        <img class="player-image" src="/static/images/players/${playerId}.png" 
+             onerror="this.src='/static/images/players/default.png'" alt="${player.name}">
+      </div>
+      <div class="player-name">${player.name}</div>
+      <div class="player-rating">${rating}</div>
+      <div class="player-energy ${energyClass}">${energyPercent}%</div>
+      <div class="player-fouls">${fouls}</div>
+    `;
+    
+    slotContent.classList.remove('empty');
+    
+    // Show remove button
+    if (remove) {
       remove.hidden = false;
     }
+    
     slot.classList.add('filled');
     slot.draggable = true;
     slot.setAttribute('draggable', 'true');
   } else {
-    slot.textContent = pos;
+    // Empty slot
+    slotContent.innerHTML = '';
+    slotContent.classList.add('empty');
+    
     if (remove) {
       remove.hidden = true;
     }
+    
     slot.classList.remove('filled');
     slot.draggable = false;
     slot.setAttribute('draggable', 'false');
