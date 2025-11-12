@@ -6,8 +6,8 @@
  * - TURNOVER: Red tint (0.5) + shake + "TO" icon (1.0s)
  */
 
-export function triggerNegativeAction(scene, playerId, actionType = 'foul') {
-  console.log(`💥 triggerNegativeAction called:`, { playerId, actionType, hasPlayerSprites: !!scene.playerSprites });
+export function triggerNegativeAction(scene, playerId, actionType = 'foul', skipScreenFlash = false) {
+  console.log(`💥 triggerNegativeAction called:`, { playerId, actionType, skipScreenFlash, hasPlayerSprites: !!scene.playerSprites });
   
   const sprite = scene.playerSprites?.[playerId];
   if (!sprite) {
@@ -80,28 +80,30 @@ export function triggerNegativeAction(scene, playerId, actionType = 'foul') {
   // Apply red tint
   applyTintToSprite(sprite, config.tint, 1.0 - config.tintAlpha);
   
-  // Add red screen flash effect
-  const screenFlash = scene.add.rectangle(
-    scene.game.config.width / 2,
-    scene.game.config.height / 2,
-    scene.game.config.width,
-    scene.game.config.height,
-    0xff0000,
-    0.5  // 50% opacity red overlay (more visible)
-  );
-  screenFlash.setDepth(999); // Just below icon
-  
-  // Hold at full opacity for 1 second, then fade out slowly
-  scene.tweens.add({
-    targets: screenFlash,
-    alpha: 0,
-    duration: 1500,  // 1.5s fade out
-    delay: 1000,     // Hold at 50% opacity for 1 second first
-    ease: 'Cubic.easeOut',
-    onComplete: () => {
-      screenFlash.destroy();
-    }
-  });
+  // Add red screen flash effect (skip for AND-1 to avoid mixing with green flash)
+  if (!skipScreenFlash) {
+    const screenFlash = scene.add.rectangle(
+      scene.game.config.width / 2,
+      scene.game.config.height / 2,
+      scene.game.config.width,
+      scene.game.config.height,
+      0xff0000,
+      0.5  // 50% opacity red overlay (more visible)
+    );
+    screenFlash.setDepth(999); // Just below icon
+    
+    // Hold at full opacity for 1 second, then fade out slowly
+    scene.tweens.add({
+      targets: screenFlash,
+      alpha: 0,
+      duration: 1500,  // 1.5s fade out
+      delay: 1000,     // Hold at 50% opacity for 1 second first
+      ease: 'Cubic.easeOut',
+      onComplete: () => {
+        screenFlash.destroy();
+      }
+    });
+  }
   
   // Shake/pulse animations removed - rely on announcement system + screen flash + sprite tint
   
