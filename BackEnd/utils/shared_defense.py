@@ -34,10 +34,10 @@ def assign_bh_defender_coords(ball_coords, aggression_level: str, is_away_offens
     if bh_spot == "key":
         x = x_bh + (x_direction * d_spacing)
         y = y_bh + random.randint(-1,1)
-    elif bh_spot in ["lower wing", "upper wing", "lower midwing", "upper midwing", "lower midcorner", "upper midcorner",]:
+    elif bh_spot in ["lower wing", "upper wing", "lower midwing", "upper midwing"]:
         x = x_bh + (x_direction * d_spacing)
         y = y_bh + random.randint(2,4) * y_direction
-    elif bh_spot in ["lower corner", "upper corner", "lower midBaseline", "upper midBaseline"]:
+    elif bh_spot in ["lower corner", "upper corner", "lower midBaseline", "upper midBaseline", "lower midcorner", "upper midcorner"]:
         x = x_bh
         y = y_bh + (y_direction * d_spacing)
     elif bh_spot in ["midLane","lower lowPost", "upper lowPost", "lower midPost", "upper midPost", "lower highPost", "upper highPost"]:
@@ -122,7 +122,7 @@ def assign_non_bh_defender_coords(o_coords, ball_coords, aggression_level, is_aw
         else:
             x = ox + 0.5 * (abs(bx - ox) * x_direction)
             y = oy + 0.5 * (abs(by - oy) * y_direction)
-    elif ball_spot in ["lower wing", "upper wing", "lower midwing", "upper midwing"]:
+    elif ball_spot in ["lower wing", "upper wing", "lower midwing", "upper midwing", "lower midcorner", "upper midcorner"]:
         if o_spot in ["lower corner", "upper corner", "lower baseline", "upper baseline"]:
             x = ox + 0.1 * (abs(bx - ox) * x_direction)
             y = oy + 4 * y_direction
@@ -138,7 +138,7 @@ def assign_non_bh_defender_coords(o_coords, ball_coords, aggression_level, is_aw
         else:
             x = ox + 0.5 * (abs(bx - ox) * x_direction)
             y = oy + 0.5 * (abs(by - oy) * y_direction)
-    elif ball_spot in ["lower corner", "upper corner", "lower midcorner", "upper midcorner", "lower midBaseline", "upper midBaseline"]:
+    elif ball_spot in ["lower corner", "upper corner", "lower midBaseline", "upper midBaseline"]:
         if o_spot in ["upper corner", "lower baseline", "upper baseline"]:
             x = ox + 0.1 *(abs(bx - ox) * x_direction)
             y = oy + (5 * y_direction)
