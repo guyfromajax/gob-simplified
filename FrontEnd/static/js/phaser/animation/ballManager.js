@@ -639,8 +639,8 @@ export function shootBall({
               
               showAndOneAnnouncement(teamStyle, shooterPlayerData, foulPlayerData);
               
-              // Trigger red foul effect on fouling player
-              triggerFoulEffect(scene, foulPlayerId);
+              // NOTE: Red visual is handled by announcement box styling
+              // No need for separate red flash (would mix with green flash)
             } else {
               // Fallback if data missing
               showAnnouncement("It's Good! And 1!", teamStyle, shooterPlayerData);
