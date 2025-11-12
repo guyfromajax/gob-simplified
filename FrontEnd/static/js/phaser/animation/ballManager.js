@@ -594,7 +594,8 @@ export function shootBall({
         // console.log(`🏀 shootBall: Tween COMPLETE | Result: ${result} | Actual: ${actualDuration}ms / Expected: ${duration}ms | Ratio: ${(actualDuration / duration).toFixed(2)}x`);
         
         // Announce shot result when ball reaches rim
-        const { showAnnouncement } = await import('../utils/announcements.js');
+        const { showAnnouncement, showAndOneAnnouncement } = await import('../utils/announcements.js');
+        const { triggerFoulEffect, triggerMadeShotFlash } = await import('./negativeActionEffects.js');
         const teamStyle = isHomeTeam ? 'home' : 'away';
         
         // Check if this is a shooting foul (AND-1 or foul on shot)
@@ -619,16 +620,33 @@ export function shootBall({
         } : null;
         
         if (result === "MAKE") {
+          // Trigger green flash for all made shots
+          triggerMadeShotFlash(scene);
+          
           if (isShootingFoul) {
-            showAnnouncement("It's Good! And 1!", teamStyle, shooterPlayerData);
-            
-            // Trigger visual effect on fouling player for AND-1
+            // AND-1 - Use special two-row announcement
             const foulPlayerId = turnData.foul_player_id || turnData.foul_player?.player_id;
-            if (foulPlayerId) {
-              const { triggerFoulEffect } = await import('./negativeActionEffects.js');
+            if (foulPlayerId && shooterPlayerData) {
+              const foulPlayerSprite = scene.playerSprites?.[foulPlayerId];
+              const foulPlayerTeamId = foulPlayerSprite?.team_id;
+              const foulPlayerTeamName = foulPlayerTeamId === scene.homeTeamId ? homeTeamName : awayTeamName;
+              
+              const foulPlayerData = {
+                playerId: foulPlayerId,
+                photo: foulPlayerSprite?.photo || null,
+                teamName: foulPlayerTeamName
+              };
+              
+              showAndOneAnnouncement(teamStyle, shooterPlayerData, foulPlayerData);
+              
+              // Trigger red foul effect on fouling player
               triggerFoulEffect(scene, foulPlayerId);
+            } else {
+              // Fallback if data missing
+              showAnnouncement("It's Good! And 1!", teamStyle, shooterPlayerData);
             }
           } else {
+            // Regular made shot
             showAnnouncement("It's Good!", teamStyle, shooterPlayerData);
           }
         } else if (result === "MISS" && isShootingFoul) {
