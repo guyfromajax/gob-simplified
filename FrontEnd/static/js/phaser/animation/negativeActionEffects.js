@@ -103,35 +103,7 @@ export function triggerNegativeAction(scene, playerId, actionType = 'foul') {
     }
   });
   
-  // Apply animation (pulse or shake) - MORE DRAMATIC
-  if (config.animation === 'pulse') {
-    // Pulse: Bigger scale change, multiple pulses
-    scene.tweens.add({
-      targets: sprite,
-      scaleX: 1.3,
-      scaleY: 1.3,
-      duration: 300,
-      yoyo: true,
-      repeat: 3,  // Pulse 3 times
-      ease: 'Sine.easeInOut'
-    });
-  } else if (config.animation === 'shake') {
-    // Shake: Much more violent horizontal wobble
-    const originalX = sprite.x;
-    scene.tweens.add({
-      targets: sprite,
-      x: originalX + 10,  // Increased from 3 to 10
-      duration: 80,
-      yoyo: true,
-      repeat: 6,  // More shakes
-      ease: 'Sine.easeInOut',
-      onComplete: () => {
-        sprite.x = originalX; // Ensure exact position restoration
-      }
-    });
-  }
-  
-  // Icon removed - announcements handle text display
+  // Shake/pulse animations removed - rely on announcement system + screen flash + sprite tint
   
   // Restore original tint and alpha after duration
   scene.time.delayedCall(config.duration, () => {
