@@ -620,8 +620,8 @@ export function shootBall({
         } : null;
         
         if (result === "MAKE") {
-          // Trigger green flash for all made shots
-          triggerMadeShotFlash(scene);
+          // Trigger flash - diagonal split for AND-1, full green for regular makes
+          triggerMadeShotFlash(scene, isShootingFoul);
           
           if (isShootingFoul) {
             // AND-1 - Use special two-row announcement

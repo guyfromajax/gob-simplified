@@ -174,31 +174,81 @@ export function triggerTurnoverEffect(scene, playerId) {
 /**
  * Trigger green flash for made shots (HCO, Fast Break, Putback)
  * No sprite effect - just screen flash
+ * @param {boolean} hasAndOne - If true, creates diagonal split (green + red)
  */
-export function triggerMadeShotFlash(scene) {
+export function triggerMadeShotFlash(scene, hasAndOne = false) {
   if (!scene) return;
   
-  // Add green screen flash effect
-  const screenFlash = scene.add.rectangle(
-    scene.game.config.width / 2,
-    scene.game.config.height / 2,
-    scene.game.config.width,
-    scene.game.config.height,
-    0x00ff00,  // GREEN
-    0.4  // 40% opacity green overlay
-  );
-  screenFlash.setDepth(999);
+  const width = scene.game.config.width;
+  const height = scene.game.config.height;
   
-  // Hold at full opacity for 0.5s, then fade out
-  scene.tweens.add({
-    targets: screenFlash,
-    alpha: 0,
-    duration: 1000,  // 1s fade out
-    delay: 500,      // Hold at 40% opacity for 0.5s first
-    ease: 'Cubic.easeOut',
-    onComplete: () => {
-      screenFlash.destroy();
-    }
-  });
+  if (hasAndOne) {
+    // Diagonal split: Green (upper-right) + Red (lower-left)
+    // Diagonal line from top-left (0,0) to bottom-right (width, height)
+    
+    // Upper-right triangle (GREEN)
+    const greenTriangle = scene.add.polygon(
+      0, 0,
+      [
+        0, 0,              // Top-left corner
+        width, 0,          // Top-right corner
+        width, height,     // Bottom-right corner
+      ],
+      0x00ff00,  // GREEN
+      0.5        // 50% opacity
+    );
+    greenTriangle.setOrigin(0, 0);
+    greenTriangle.setDepth(999);
+    
+    // Lower-left triangle (RED)
+    const redTriangle = scene.add.polygon(
+      0, 0,
+      [
+        0, 0,              // Top-left corner
+        0, height,         // Bottom-left corner
+        width, height,     // Bottom-right corner
+      ],
+      0xff0000,  // RED
+      0.5        // 50% opacity
+    );
+    redTriangle.setOrigin(0, 0);
+    redTriangle.setDepth(999);
+    
+    // Hold for 1s, then fade both out
+    scene.tweens.add({
+      targets: [greenTriangle, redTriangle],
+      alpha: 0,
+      duration: 1500,  // 1.5s fade out
+      delay: 1000,     // Hold at 50% opacity for 1s first
+      ease: 'Cubic.easeOut',
+      onComplete: () => {
+        greenTriangle.destroy();
+        redTriangle.destroy();
+      }
+    });
+  } else {
+    // Regular green flash (full screen)
+    const screenFlash = scene.add.rectangle(
+      width / 2,
+      height / 2,
+      width,
+      height,
+      0x00ff00,  // GREEN
+      0.4  // 40% opacity green overlay
+    );
+    screenFlash.setDepth(999);
+    
+    // Hold at full opacity for 0.5s, then fade out
+    scene.tweens.add({
+      targets: screenFlash,
+      alpha: 0,
+      duration: 1000,  // 1s fade out
+      delay: 500,      // Hold at 40% opacity for 0.5s first
+      ease: 'Cubic.easeOut',
+      onComplete: () => {
+        screenFlash.destroy();
+      }
+    });
+  }
 }
 
