@@ -14,7 +14,6 @@ import { updatePlaycallDisplay } from "../utils/playcallDisplay.js";
 import { announceFromTurnData } from "../utils/announcements.js";
 import { updateStrategyBars } from "../utils/strategyBars.js";
 import { updatePlaycallCenter, animateLeanMeter, parseLeanScoreFromText } from "../ui/playcallCenter.js";
-import { triggerFoulEffect, triggerTurnoverEffect } from "./negativeActionEffects.js";
 import {
   animationDebugLog,
   animationDebugWarn,
@@ -554,24 +553,7 @@ export async function animateGameTurns({ //hasBallAtStep
         });
       }
       
-      // Trigger foul effect on fouling player
-      const foulPlayerId = turn.foul_player_id || turn.foul_player?.player_id;
-      console.log(`🚨 FOUL detected in animateGameTurns:`, { foulPlayerId, turn_type: turn.result_type });
-      if (foulPlayerId) {
-        console.log(`🚨 Calling triggerFoulEffect for player:`, foulPlayerId);
-        triggerFoulEffect(scene, foulPlayerId);
-      } else {
-        console.warn(`🚨 No foul_player_id found in turn data:`, turn);
-      }
-      
-      // Also check for turnover (FCP/HCT can have STEAL or DEAD_BALL_TURNOVER as result_type before converting to FOUL)
-      const victimId = turn.victim_id;
-      if (victimId && turn.text && (turn.text.includes('TRAVEL') || turn.text.includes('DRIBBLE') || turn.text.includes('steal') || turn.text.includes('turnover'))) {
-        console.log(`🚨 Turnover detected in FOUL turn:`, victimId);
-        triggerTurnoverEffect(scene, victimId);
-      }
-      
-      // Announce foul
+      // Announce foul (visual effects now handled by announcement system)
       announceFromTurnData(turn, 'end', scene.simData?.home_team_id, scene);
       // Update scoreboard for all fouls (FCP or not)
       if (onUpdate) {
@@ -586,13 +568,7 @@ export async function animateGameTurns({ //hasBallAtStep
     }
     
     if (turn.result_type === "DEAD BALL") {
-      // DEAD BALL turnover (from FCP/HCT) - trigger turnover effect
-      const victimId = turn.victim_id || turn.ball_handler?.player_id;
-      if (victimId) {
-        console.log(`🚨 DEAD BALL turnover - triggering effect on victim:`, victimId);
-        triggerTurnoverEffect(scene, victimId);
-      }
-      
+      // DEAD BALL turnover (from FCP/HCT) - visual effects handled by announcement system
       // Announce turnover
       announceFromTurnData(turn, 'end', scene.simData?.home_team_id, scene);
       if (onUpdate) {
@@ -798,13 +774,7 @@ export async function animateGameTurns({ //hasBallAtStep
         },
       });
       
-      // Check for shooting foul after HCO animation completes
-      const foulPlayerId = turn.foul_player_id || turn.foul_player?.player_id;
-      if (foulPlayerId) {
-        console.log(`🚨 Shooting foul detected after ${turn.result_type}:`, foulPlayerId);
-        triggerFoulEffect(scene, foulPlayerId);
-      }
-      
+      // Announce result (visual effects now handled by announcement/ballManager)
       announceFromTurnData(turn, 'end', scene.simData?.home_team_id, scene);
       if (onUpdate) {
         try {
@@ -979,13 +949,7 @@ export async function animateGameTurns({ //hasBallAtStep
           easing: cfg.easing
         });
         
-        // Trigger turnover effect on victim
-        const victimId = turn.victim_id || ballHandlerId;
-        if (victimId) {
-          console.log(`🚨 STEAL - triggering turnover effect on victim:`, victimId);
-          triggerTurnoverEffect(scene, victimId);
-        }
-        
+        // Visual effects handled by announcement system
         const defenderSprite = playerSprites[stealerId];
         // runPass reattaches the ball after the tween resolves, so only emit
         // possession change once that handoff has finished.

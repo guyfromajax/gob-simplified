@@ -131,46 +131,7 @@ export function triggerNegativeAction(scene, playerId, actionType = 'foul') {
     });
   }
   
-  // Create LARGE icon above sprite
-  const iconText = scene.add.text(sprite.x, sprite.y - 60, config.iconText, {
-    fontSize: config.iconSize,  // Now 48px
-    fontStyle: 'bold',
-    color: '#ffff00',  // YELLOW text (more visible than white)
-    stroke: '#ff0000',  // Red outline
-    strokeThickness: 8,  // Thicker stroke
-    shadow: {
-      offsetX: 4,
-      offsetY: 4,
-      color: '#000000',
-      blur: 8,
-      fill: true
-    }
-  });
-  iconText.setOrigin(0.5, 0.5);
-  iconText.setDepth(1000); // Ensure it's above all other sprites
-  
-  // Pulse the icon while it's visible
-  scene.tweens.add({
-    targets: iconText,
-    scale: 1.2,
-    duration: 400,
-    yoyo: true,
-    repeat: -1,  // Infinite pulse
-    ease: 'Sine.easeInOut'
-  });
-  
-  // Fade out icon after duration
-  scene.tweens.add({
-    targets: iconText,
-    alpha: 0,
-    y: sprite.y - 100, // Float upward more
-    duration: config.iconDuration,
-    delay: 2500,  // Stay visible for most of the duration, then fade
-    ease: 'Cubic.easeOut',
-    onComplete: () => {
-      iconText.destroy();
-    }
-  });
+  // Icon removed - announcements handle text display
   
   // Restore original tint and alpha after duration
   scene.time.delayedCall(config.duration, () => {

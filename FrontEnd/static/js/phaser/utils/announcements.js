@@ -1,9 +1,32 @@
 /**
  * Announcement system for significant game events
  * Shows animated text that pops from scoreboard to center screen
+ * Also triggers visual effects (red flash, sprite tint) for fouls/turnovers
  */
 
 let currentAnnouncement = null;
+
+/**
+ * Trigger visual effects for fouls/turnovers
+ * @param {Object} scene - Phaser scene
+ * @param {string} playerId - Player ID to apply effect to
+ * @param {string} effectType - 'foul' or 'turnover'
+ */
+function triggerVisualEffect(scene, playerId, effectType) {
+  if (!scene || !playerId) return;
+  
+  const sprite = scene.playerSprites?.[playerId];
+  if (!sprite) return;
+  
+  // Import and call the effect function
+  import('../animation/negativeActionEffects.js').then(module => {
+    if (effectType === 'foul') {
+      module.triggerFoulEffect(scene, playerId);
+    } else if (effectType === 'turnover') {
+      module.triggerTurnoverEffect(scene, playerId);
+    }
+  });
+}
 
 /**
  * Show an announcement with pop-to-center animation
@@ -162,6 +185,11 @@ export function announceFromTurnData(turnData, timing = 'start', homeTeamId = nu
           // Defensive foul - show in offense team color (they benefited)
           showAnnouncement("DEFENSIVE FOUL!", offenseTeam, playerData);
         }
+        
+        // Trigger visual effect on fouling player
+        if (scene && turnData.foul_player_id) {
+          triggerVisualEffect(scene, turnData.foul_player_id, 'foul');
+        }
       }
       return;
     }
@@ -190,6 +218,11 @@ export function announceFromTurnData(turnData, timing = 'start', homeTeamId = nu
       }
       
       showAnnouncement("STEAL!", defenseTeam, playerData);
+      
+      // Trigger visual effect on turnover victim (ball handler who got stolen from)
+      if (scene && turnData.victim_id) {
+        triggerVisualEffect(scene, turnData.victim_id, 'turnover');
+      }
       return;
     }
     
@@ -253,6 +286,11 @@ export function announceFromTurnData(turnData, timing = 'start', homeTeamId = nu
       
       console.log(`📢 Announcing turnover: ${turnoverText} (result_type: ${turnData.result_type}, source: ${turnData.offensive_state || 'HCO'})`);
       showAnnouncement(turnoverText, offenseTeam, playerData);
+      
+      // Trigger visual effect on turnover victim
+      if (scene && turnData.victim_id) {
+        triggerVisualEffect(scene, turnData.victim_id, 'turnover');
+      }
       return;
     }
   }
