@@ -640,10 +640,29 @@ class TurnManager:
         if not hasattr(self.game.defense_team, 'strategy_calls') or not self.game.defense_team.strategy_calls:
             self.game.defense_team.strategy_calls = {}
 
+        # Map for rebounding and tempo (0-4 → "never"/"rarely"/"normal"/"often"/"always")
+        intensity_map = {
+            0: "never",
+            1: "rarely", 
+            2: "normal",
+            3: "often",
+            4: "always"
+        }
+
+        # Set tempo and rebounding for BOTH teams (roles flip after rebounds)
+        # Offense team: rebounding setting (crash boards vs get back)
+        offense_rebounding_setting = self.game.offense_team.strategy_settings["rebounding"]
+        self.game.offense_team.strategy_calls["rebounding_call"] = intensity_map[offense_rebounding_setting]
+        
+        # Defense team: tempo setting (release for fast break vs stay back)  
+        defense_tempo_setting = self.game.defense_team.strategy_settings["tempo"]
+        self.game.defense_team.strategy_calls["tempo_call"] = intensity_map[defense_tempo_setting]
+        
+        # Also set legacy tempo/aggression calls for backward compatibility
         tempo_setting = self.game.offense_team.strategy_settings["tempo"]
         aggression_setting = self.game.defense_team.strategy_settings["aggression"]
-
-        self.game.offense_team.strategy_calls["tempo_call"] = random.choice(STRATEGY_CALL_DICTS["tempo"][tempo_setting])
+        
+        self.game.offense_team.strategy_calls["tempo_call_legacy"] = random.choice(STRATEGY_CALL_DICTS["tempo"][tempo_setting])
         self.game.defense_team.strategy_calls["aggression_call"] = random.choice(STRATEGY_CALL_DICTS["aggression"][aggression_setting])
         
 
