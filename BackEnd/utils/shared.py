@@ -146,11 +146,12 @@ def resolve_offensive_rebound(game, rebounder):
         defender = def_team.lineup[defender_pos]
         defense_attrs = defender.attributes
         defense_penalty = (
-            defense_attrs["ID"] * 0.8 +
+            defense_attrs["ID"] * 0.6 +
+            defense_attrs["ST"] * 0.2 +
             defense_attrs["IQ"] * 0.1 +
             defense_attrs["CH"] * 0.1
-        ) * random.randint(1, 6)
-        shot_score -= defense_penalty * 0.2
+        ) * random.randint(1, 6) * 0.7
+        shot_score -= defense_penalty
 
         # Track defensive attempt for putback
         defender.record_stat("DEF_A")
