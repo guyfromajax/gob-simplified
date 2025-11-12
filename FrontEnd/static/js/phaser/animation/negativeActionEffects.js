@@ -158,44 +158,36 @@ export function triggerMadeShotFlash(scene, hasAndOne = false) {
     // Diagonal split: Green (upper-right) + Red (lower-left)
     // Diagonal line from top-left (0,0) to bottom-right (width, height)
     
-    // Upper-right triangle (GREEN)
-    const greenTriangle = scene.add.polygon(
-      0, 0,
-      [
-        0, 0,              // Top-left corner
-        width, 0,          // Top-right corner
-        width, height,     // Bottom-right corner
-      ],
-      0x00ff00,  // GREEN
-      0.5        // 50% opacity
+    // Upper-right triangle (GREEN) - separate graphics object
+    const greenGraphics = scene.add.graphics();
+    greenGraphics.fillStyle(0x00ff00, 0.5);  // Green, 50% opacity
+    greenGraphics.fillTriangle(
+      0, 0,              // Top-left corner
+      width, 0,          // Top-right corner
+      width, height      // Bottom-right corner
     );
-    greenTriangle.setOrigin(0, 0);
-    greenTriangle.setDepth(999);
+    greenGraphics.setDepth(999);
     
-    // Lower-left triangle (RED)
-    const redTriangle = scene.add.polygon(
-      0, 0,
-      [
-        0, 0,              // Top-left corner
-        0, height,         // Bottom-left corner
-        width, height,     // Bottom-right corner
-      ],
-      0xff0000,  // RED
-      0.5        // 50% opacity
+    // Lower-left triangle (RED) - separate graphics object
+    const redGraphics = scene.add.graphics();
+    redGraphics.fillStyle(0xff0000, 0.5);  // Red, 50% opacity
+    redGraphics.fillTriangle(
+      0, 0,              // Top-left corner
+      0, height,         // Bottom-left corner
+      width, height      // Bottom-right corner
     );
-    redTriangle.setOrigin(0, 0);
-    redTriangle.setDepth(999);
+    redGraphics.setDepth(999);
     
     // Hold for 1s, then fade both out
     scene.tweens.add({
-      targets: [greenTriangle, redTriangle],
+      targets: [greenGraphics, redGraphics],
       alpha: 0,
       duration: 1500,  // 1.5s fade out
-      delay: 1000,     // Hold at 50% opacity for 1s first
+      delay: 1000,     // Hold at full opacity for 1s first
       ease: 'Cubic.easeOut',
       onComplete: () => {
-        greenTriangle.destroy();
-        redTriangle.destroy();
+        greenGraphics.destroy();
+        redGraphics.destroy();
       }
     });
   } else {

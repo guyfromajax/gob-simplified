@@ -28,24 +28,24 @@ export function createPhaserPlayer({ scene, player, teamInfo, position, Phaser }
     ? teamInfo.secondary_color
     : teamInfo.primary_color;
 
-  // ✅ Create player circle (50% larger: 20 → 30)
-  const circle = scene.add.circle(0, 0, 30, fillColor);
-  circle.setStrokeStyle(4, borderColor);  // Slightly thicker border too
+  // ✅ Create player circle (20% larger than original: 20 → 24)
+  const circle = scene.add.circle(0, 0, 24, fillColor);
+  circle.setStrokeStyle(3, borderColor);
   circle.setDepth(1);
 
-  // ✅ Position abbreviation — centered inside (larger font for bigger circle)
+  // ✅ Position abbreviation — centered inside
   const label = scene.add.text(0, 0, position, {
-    font: "bold 20px Arial",  // Increased from 16px
+    font: "bold 18px Arial",
     color: textColor,
     align: "center"
   });
   label.setOrigin(0.5);
   label.setDepth(2);
 
-  // ✅ Jersey number — above if home, below if away (adjusted offset for larger circle)
-  const jerseyOffset = isHome ? -38 : 38;  // Increased from ±28 to ±38
+  // ✅ Jersey number — above if home, below if away
+  const jerseyOffset = isHome ? -32 : 32;
   const jersey = scene.add.text(0, jerseyOffset, player.jersey || "", {
-    font: "bold 16px Arial",  // Increased from 14px
+    font: "bold 15px Arial",
     color: textColor,
     align: "center"
   });
