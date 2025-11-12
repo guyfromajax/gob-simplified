@@ -99,7 +99,7 @@ def assign_non_bh_defender_coords(o_coords, ball_coords, aggression_level, is_aw
             y = oy + random.choice([0.3, 0.4, 0.5]) * (abs(by - oy) * y_direction)
         elif o_spot in ["lower midcorner", "upper midcorner"]:
             x = ox
-            y = 
+            y = oy + random.choice([0.3, 0.4, 0.5]) * (abs(by - oy) * y_direction)
         elif o_spot in ["lower lowPost", "upper lowPost", "lower midPost", "upper midPost"]:
             x = ox - 2 if is_away_offense else ox + 2
             y = oy + random.choice([0.3, 0.4, 0.5]) * (abs(by - oy) * y_direction)
