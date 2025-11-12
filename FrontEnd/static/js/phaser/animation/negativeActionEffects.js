@@ -155,23 +155,25 @@ export function triggerMadeShotFlash(scene, hasAndOne = false) {
   const height = scene.game.config.height;
   
   if (hasAndOne) {
-    // Diagonal split: Green (upper-right) + Red (lower-left)
-    // Diagonal line from top-left (0,0) to bottom-right (width, height)
+    // Diagonal split: Green (full screen background) + Red (lower-left triangle on top)
+    // This approach prevents color blending
     
-    // Upper-right triangle (GREEN) - separate graphics object
-    const greenGraphics = scene.add.graphics();
-    greenGraphics.setDepth(998);  // Below red to ensure red doesn't cover it
-    greenGraphics.fillStyle(0x00ff00, 0.6);  // Green, 60% opacity (more visible)
-    greenGraphics.fillTriangle(
-      0, 0,              // Top-left corner
-      width, 0,          // Top-right corner
-      width, height      // Bottom-right corner
+    // Full screen GREEN background
+    const greenRect = scene.add.rectangle(
+      width / 2,
+      height / 2,
+      width,
+      height,
+      0x00ff00,  // Bright green
+      0.5        // 50% opacity
     );
+    greenRect.setOrigin(0.5, 0.5);
+    greenRect.setDepth(998);
     
-    // Lower-left triangle (RED) - separate graphics object  
+    // Lower-left RED triangle overlaid on top
     const redGraphics = scene.add.graphics();
-    redGraphics.setDepth(998);  // Same depth as green
-    redGraphics.fillStyle(0xff0000, 0.6);  // Red, 60% opacity
+    redGraphics.setDepth(999);  // Above green
+    redGraphics.fillStyle(0xff0000, 0.5);  // Red, 50% opacity
     redGraphics.fillTriangle(
       0, 0,              // Top-left corner
       0, height,         // Bottom-left corner
@@ -180,13 +182,13 @@ export function triggerMadeShotFlash(scene, hasAndOne = false) {
     
     // Hold for 1s, then fade both out
     scene.tweens.add({
-      targets: [greenGraphics, redGraphics],
+      targets: [greenRect, redGraphics],
       alpha: 0,
       duration: 1500,  // 1.5s fade out
       delay: 1000,     // Hold at full opacity for 1s first
       ease: 'Cubic.easeOut',
       onComplete: () => {
-        greenGraphics.destroy();
+        greenRect.destroy();
         redGraphics.destroy();
       }
     });

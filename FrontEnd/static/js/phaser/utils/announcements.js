@@ -80,7 +80,7 @@ export function showAndOneAnnouncement(team, shooterData, foulPlayerData) {
   row2.style.justifyContent = 'center';
   row2.style.gap = '10px';
   
-  const foulHeadshot = createHeadshotElement(foulPlayerData, 0.6); // 60% size
+  const foulHeadshot = createHeadshotElement(foulPlayerData, 1.0); // Full size (same as shooter)
   
   const arrow = document.createElement('span');
   arrow.textContent = '←';
