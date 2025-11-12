@@ -171,3 +171,34 @@ export function triggerTurnoverEffect(scene, playerId) {
   triggerNegativeAction(scene, playerId, 'turnover');
 }
 
+/**
+ * Trigger green flash for made shots (HCO, Fast Break, Putback)
+ * No sprite effect - just screen flash
+ */
+export function triggerMadeShotFlash(scene) {
+  if (!scene) return;
+  
+  // Add green screen flash effect
+  const screenFlash = scene.add.rectangle(
+    scene.game.config.width / 2,
+    scene.game.config.height / 2,
+    scene.game.config.width,
+    scene.game.config.height,
+    0x00ff00,  // GREEN
+    0.4  // 40% opacity green overlay
+  );
+  screenFlash.setDepth(999);
+  
+  // Hold at full opacity for 0.5s, then fade out
+  scene.tweens.add({
+    targets: screenFlash,
+    alpha: 0,
+    duration: 1000,  // 1s fade out
+    delay: 500,      // Hold at 40% opacity for 0.5s first
+    ease: 'Cubic.easeOut',
+    onComplete: () => {
+      screenFlash.destroy();
+    }
+  });
+}
+

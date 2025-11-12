@@ -4,7 +4,7 @@
  * Also triggers visual effects (red flash, sprite tint) for fouls/turnovers
  */
 
-import { triggerFoulEffect, triggerTurnoverEffect } from '../animation/negativeActionEffects.js';
+import { triggerFoulEffect, triggerTurnoverEffect, triggerMadeShotFlash } from '../animation/negativeActionEffects.js';
 
 let currentAnnouncement = null;
 
@@ -26,6 +26,129 @@ function triggerVisualEffect(scene, playerId, effectType) {
   } else if (effectType === 'turnover') {
     triggerTurnoverEffect(scene, playerId);
   }
+}
+
+/**
+ * Show AND-1 announcement with two rows (made shot + foul)
+ * @param {string} team - Team that made the shot
+ * @param {Object} shooterData - Shooter data { playerId, photo, teamName }
+ * @param {Object} foulPlayerData - Fouling player data { playerId, photo, teamName }
+ */
+export function showAndOneAnnouncement(team, shooterData, foulPlayerData) {
+  // Remove any existing announcement
+  if (currentAnnouncement) {
+    currentAnnouncement.remove();
+    currentAnnouncement = null;
+  }
+  
+  // Create announcement container
+  const announcement = document.createElement('div');
+  announcement.className = 'game-announcement and-one-announcement';
+  if (team === 'home') {
+    announcement.classList.add('home-team');
+  } else if (team === 'away') {
+    announcement.classList.add('away-team');
+  }
+  
+  // Row 1: "It's Good!" + shooter headshot (right-aligned)
+  const row1 = document.createElement('div');
+  row1.className = 'and-one-row-1';
+  row1.style.display = 'flex';
+  row1.style.alignItems = 'center';
+  row1.style.justifyContent = 'center';
+  row1.style.gap = '15px';
+  row1.style.marginBottom = '10px';
+  
+  const madeText = document.createElement('span');
+  madeText.textContent = "IT'S GOOD!";
+  madeText.style.fontSize = '2.5rem';
+  madeText.style.fontWeight = 'bold';
+  
+  const shooterHeadshot = createHeadshotElement(shooterData, 1.0); // Full size
+  
+  row1.appendChild(madeText);
+  row1.appendChild(shooterHeadshot);
+  
+  // Row 2: Foul player headshot (left) + "←" + "FOUL" (yellow, 60% size)
+  const row2 = document.createElement('div');
+  row2.className = 'and-one-row-2';
+  row2.style.display = 'flex';
+  row2.style.alignItems = 'center';
+  row2.style.justifyContent = 'center';
+  row2.style.gap = '10px';
+  
+  const foulHeadshot = createHeadshotElement(foulPlayerData, 0.6); // 60% size
+  
+  const arrow = document.createElement('span');
+  arrow.textContent = '←';
+  arrow.style.fontSize = '1.5rem';
+  arrow.style.color = '#ffff00';
+  arrow.style.fontWeight = 'bold';
+  
+  const foulText = document.createElement('span');
+  foulText.textContent = "FOUL";
+  foulText.style.fontSize = '1.5rem'; // 60% of 2.5rem
+  foulText.style.fontWeight = 'bold';
+  foulText.style.color = '#ffff00'; // Yellow
+  
+  row2.appendChild(foulHeadshot);
+  row2.appendChild(arrow);
+  row2.appendChild(foulText);
+  
+  announcement.appendChild(row1);
+  announcement.appendChild(row2);
+  
+  // Add to body
+  document.body.appendChild(announcement);
+  currentAnnouncement = announcement;
+  
+  // Trigger animation
+  requestAnimationFrame(() => {
+    announcement.classList.add('active');
+  });
+  
+  // Remove after animation completes
+  setTimeout(() => {
+    if (announcement.parentElement) {
+      announcement.remove();
+    }
+    if (currentAnnouncement === announcement) {
+      currentAnnouncement = null;
+    }
+  }, 2500);
+}
+
+/**
+ * Helper to create headshot element
+ * @param {Object} playerData - { playerId, photo, teamName }
+ * @param {number} scale - Size multiplier (1.0 = full, 0.6 = 60%)
+ */
+function createHeadshotElement(playerData, scale = 1.0) {
+  const container = document.createElement('div');
+  container.className = 'announcement-headshot';
+  container.style.width = `${60 * scale}px`;
+  container.style.height = `${60 * scale}px`;
+  container.style.flexShrink = '0';
+  
+  if (playerData.teamName) {
+    const teamNameNormalized = playerData.teamName.toLowerCase().replace(/\s+/g, '-');
+    container.style.backgroundImage = `url(/static/images/team-backgrounds/${teamNameNormalized}-background.png)`;
+    container.style.backgroundSize = 'cover';
+    container.style.backgroundPosition = 'center';
+  }
+  
+  const img = document.createElement('img');
+  img.src = playerData.photo || `/static/images/players/${playerData.playerId}.png`;
+  img.alt = 'Player';
+  img.style.width = '100%';
+  img.style.height = '100%';
+  img.style.objectFit = 'cover';
+  img.onerror = () => {
+    img.style.display = 'none';
+  };
+  container.appendChild(img);
+  
+  return container;
 }
 
 /**
