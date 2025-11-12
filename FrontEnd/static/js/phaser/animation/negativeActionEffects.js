@@ -160,23 +160,23 @@ export function triggerMadeShotFlash(scene, hasAndOne = false) {
     
     // Upper-right triangle (GREEN) - separate graphics object
     const greenGraphics = scene.add.graphics();
-    greenGraphics.fillStyle(0x00ff00, 0.5);  // Green, 50% opacity
+    greenGraphics.setDepth(998);  // Below red to ensure red doesn't cover it
+    greenGraphics.fillStyle(0x00ff00, 0.6);  // Green, 60% opacity (more visible)
     greenGraphics.fillTriangle(
       0, 0,              // Top-left corner
       width, 0,          // Top-right corner
       width, height      // Bottom-right corner
     );
-    greenGraphics.setDepth(999);
     
-    // Lower-left triangle (RED) - separate graphics object
+    // Lower-left triangle (RED) - separate graphics object  
     const redGraphics = scene.add.graphics();
-    redGraphics.fillStyle(0xff0000, 0.5);  // Red, 50% opacity
+    redGraphics.setDepth(998);  // Same depth as green
+    redGraphics.fillStyle(0xff0000, 0.6);  // Red, 60% opacity
     redGraphics.fillTriangle(
       0, 0,              // Top-left corner
       0, height,         // Bottom-left corner
       width, height      // Bottom-right corner
     );
-    redGraphics.setDepth(999);
     
     // Hold for 1s, then fade both out
     scene.tweens.add({
