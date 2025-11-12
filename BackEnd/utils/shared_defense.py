@@ -124,7 +124,7 @@ def assign_non_bh_defender_coords(o_coords, ball_coords, aggression_level, is_aw
             y = oy + 0.5 * (abs(by - oy) * y_direction)
     elif ball_spot in ["lower wing", "upper wing", "lower midwing", "upper midwing", "lower midcorner", "upper midcorner"]:
         if o_spot in ["lower corner", "upper corner", "lower baseline", "upper baseline"]:
-            x = ox + random.randint(-1,1)
+            x = ox + random.randint(0, 2) * x_direction
             y = oy + 4 * y_direction
         elif o_spot == "key":
             x = bx + (3 * basket_direction)
