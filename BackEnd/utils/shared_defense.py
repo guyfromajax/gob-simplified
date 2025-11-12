@@ -52,25 +52,6 @@ def assign_bh_defender_coords(ball_coords, aggression_level: str, is_away_offens
     else:
         x = x_bh + (x_direction * random.randint(3,6))
         y = y_bh + random.randint(-3,3)
-    
-    # Edge case: ball on baseline
-    # if y <= 4 or y >= 46:
-    #     # Vertical positioning doesn't depend on court orientation
-    #     y_def = y + (y_direction * d_spacing)
-    #     x_def = x  # No X spacing on baseline - defender matches ball handler's X
-
-    # # Edge case: top of key
-    # elif (62 <= x <= 66 or 35 <= x <= 39) and 22 <= y <= 28:
-    #     x_def = x + (x_direction * d_spacing)
-    #     y_def = y
-
-    # # General case
-    # else:
-    #     # y_shift = y_direction * random.randint(1, 3)
-    #     y_def = y + (y_direction * d_spacing)
-    #     # y_def = y + y_shift if y < 25 else y - y_shift
-    #     x_def = x + (x_direction * d_spacing)
-
 
     return {"x": x, "y": y}
 
@@ -114,11 +95,14 @@ def assign_non_bh_defender_coords(o_coords, ball_coords, aggression_level, is_aw
             x = ox + 0.1 * (abs(bx - ox) * x_direction)
             y = oy + 0.4 * (abs(by - oy) * y_direction)
         elif o_spot in ["lower wing", "upper wing", "lower midwing", "upper midwing", "lower midCorner", "upper midCorner"]:
-            x = ox #+ 0.5 * (abs(bx - ox) * x_direction)
+            x = ox + (random.randint(-3,0) * x_direction)#+ 0.5 * (abs(bx - ox) * x_direction)
             y = oy + random.choice([0.3, 0.4, 0.5]) * (abs(by - oy) * y_direction)
+        elif o_spot in ["lower midcorner", "upper midcorner"]:
+            x = ox
+            y = 
         elif o_spot in ["lower lowPost", "upper lowPost", "lower midPost", "upper midPost"]:
             x = ox - 2 if is_away_offense else ox + 2
-            y = oy
+            y = oy + random.choice([0.3, 0.4, 0.5]) * (abs(by - oy) * y_direction)
         else:
             x = ox + 0.5 * (abs(bx - ox) * x_direction)
             y = oy + 0.5 * (abs(by - oy) * y_direction)
