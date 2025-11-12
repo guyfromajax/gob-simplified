@@ -944,16 +944,14 @@ def resolve_full_court_press_logic(game: "GameManager"):
     # print(f"offenseScore: {offenseScore}")
     # print(f"defenseScore: {defenseScore}")
 
-    # 🚨 TESTING: Force turnover on ALL FCP instances (to test TO animation)
-    result_type = "DEAD_BALL_TURNOVER"  # or "STEAL"
-    
-    # if (offenseScore + 500) > defenseScore:
-    #     if offenseScore - defenseScore > 1000:
-    #         result_type = random.choices(["D_FOUL", "HCO", "SHOT"], weights=[0.5, 0.3, 0.2])[0]
-    #     else:
-    #         result_type = "HCO"
-    # else:
-    #     result_type = random.choices(["O_FOUL", "DEAD_BALL_TURNOVER", "STEAL"], weights=[0.5, 0.3, 0.2])[0]
+    # Real FCP result calculation
+    if (offenseScore + 500) > defenseScore:
+        if offenseScore - defenseScore > 1000:
+            result_type = random.choices(["D_FOUL", "HCO", "SHOT"], weights=[0.5, 0.3, 0.2])[0]
+        else:
+            result_type = "HCO"
+    else:
+        result_type = random.choices(["O_FOUL", "DEAD_BALL_TURNOVER", "STEAL"], weights=[0.5, 0.3, 0.2])[0]
     
     result_text_dict = {
         "HCO": "they break the press & establish their half court offense",
@@ -1527,16 +1525,14 @@ def resolve_half_court_trap_logic(game: "GameManager"):
     # print(f"offenseScore: {offenseScore}")
     # print(f"defenseScore: {defenseScore}")
 
-    # 🚨 TESTING: Force defensive foul on ALL HCT instances
-    result_type = "D_FOUL"
-    
-    # if (offenseScore + 300) > defenseScore:
-    #     if offenseScore - defenseScore > 1000:
-    #         result_type = random.choices(["D_FOUL", "HCO", "SHOT"], weights=[0.5, 0.3, 0.2])[0]
-    #     else:
-    #         result_type = "HCO"
-    # else:
-    #     result_type = random.choices(["O_FOUL", "DEAD_BALL_TURNOVER", "STEAL"], weights=[0.5, 0.3, 0.2])[0]
+    # Real HCT result calculation
+    if (offenseScore + 300) > defenseScore:
+        if offenseScore - defenseScore > 1000:
+            result_type = random.choices(["D_FOUL", "HCO", "SHOT"], weights=[0.5, 0.3, 0.2])[0]
+        else:
+            result_type = "HCO"
+    else:
+        result_type = random.choices(["O_FOUL", "DEAD_BALL_TURNOVER", "STEAL"], weights=[0.5, 0.3, 0.2])[0]
     
     result_text_dict = {
         "HCO": "they break the trap & establish their half court offense",
