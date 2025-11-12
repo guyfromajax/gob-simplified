@@ -178,14 +178,10 @@ class ShotManager:
         # not when it's made/missed. They don't know the outcome yet!
         shooter_pos = get_player_position(off_lineup, shooter)
         
-        # Get strategy settings
-        offense_rebounding = off_team.strategy_calls.get("rebounding_call", "normal")  # Crash boards vs get back
-        defense_tempo = def_team.strategy_calls.get("tempo_call", "normal")  # Stay vs release for FB
-        
-        # Convert strategy calls to numeric values (0-4)
-        setting_to_value = {"never": 0, "rarely": 1, "normal": 2, "often": 3, "always": 4}
-        offense_reb_value = setting_to_value.get(offense_rebounding, 2)
-        defense_tempo_value = setting_to_value.get(defense_tempo, 2)
+        # Get strategy settings directly as numeric values (0-4)
+        # No need for string conversion - we just need the numbers for probability calculations
+        offense_reb_value = off_team.strategy_settings.get("rebounding", 2)  # Crash boards vs get back
+        defense_tempo_value = def_team.strategy_settings.get("tempo", 2)  # Stay vs release for FB
         
         # Determine defensive players releasing for fast break
         defense_release_chances = {0: 0.0, 1: 0.25, 2: 0.5, 3: 0.75, 4: 1.0}
