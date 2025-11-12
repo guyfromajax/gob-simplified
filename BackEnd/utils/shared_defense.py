@@ -15,7 +15,7 @@ def assign_bh_defender_coords(ball_coords, aggression_level: str, is_away_offens
     
     print(f"🏀 BH-defender positioning: bh_spot='{bh_spot}'")
     
-    spacing_map = {"aggressive": 1, "normal": 2, "passive": 3}
+    spacing_map = {"aggressive": 2, "normal": 3, "passive": 4}
     d_spacing = spacing_map.get(aggression_level.lower(), 2)
 
     x_bh = ball_coords["x"]
