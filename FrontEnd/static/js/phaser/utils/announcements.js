@@ -44,20 +44,23 @@ export function showAndOneAnnouncement(team, shooterData, foulPlayerData) {
   // Create announcement container
   const announcement = document.createElement('div');
   announcement.className = 'game-announcement and-one-announcement';
+  announcement.style.display = 'flex';
+  announcement.style.flexDirection = 'column';  // Vertical stacking
+  announcement.style.alignItems = 'center';
+  announcement.style.gap = '10px';
   if (team === 'home') {
     announcement.classList.add('home-team');
   } else if (team === 'away') {
     announcement.classList.add('away-team');
   }
   
-  // Row 1: "It's Good!" + shooter headshot (right-aligned)
+  // Row 1: "IT'S GOOD!" + shooter headshot
   const row1 = document.createElement('div');
   row1.className = 'and-one-row-1';
   row1.style.display = 'flex';
   row1.style.alignItems = 'center';
   row1.style.justifyContent = 'center';
   row1.style.gap = '15px';
-  row1.style.marginBottom = '10px';
   
   const madeText = document.createElement('span');
   madeText.textContent = "IT'S GOOD!";
@@ -69,7 +72,7 @@ export function showAndOneAnnouncement(team, shooterData, foulPlayerData) {
   row1.appendChild(madeText);
   row1.appendChild(shooterHeadshot);
   
-  // Row 2: Foul player headshot (left) + "←" + "FOUL" (yellow, 60% size)
+  // Row 2: Foul player headshot + "←" + "FOUL" (yellow, smaller)
   const row2 = document.createElement('div');
   row2.className = 'and-one-row-2';
   row2.style.display = 'flex';
