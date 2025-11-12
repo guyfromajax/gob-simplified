@@ -521,14 +521,14 @@ body {
 
 .slot {
   border: 2px dashed #ccc !important;
-  padding: 6px 10px !important;
+  padding: 5px 10px !important;  /* Reduced from 6px to 5px */
   display: grid !important;
   grid-template-columns: 50px 1fr auto !important;
   gap: 10px !important;
   align-items: center !important;
   background: #f9f9f9 !important;
   border-radius: 4px !important;
-  min-height: 55px !important;
+  min-height: 44px !important;  /* Reduced by 20%: 55px → 44px */
   cursor: pointer !important;
   transition: all 0.2s ease !important;
   width: auto !important;
@@ -559,10 +559,10 @@ body {
 }
 
 .player-image-container {
-  width: 50px;
-  height: 50px;
+  width: 40px;   /* Reduced by 20%: 50px → 40px */
+  height: 40px;  /* Reduced by 20%: 50px → 40px */
   overflow: hidden;
-  border-radius: 6px;
+  border-radius: 5px;  /* Slightly smaller radius to match */
   background: #eee;
   display: flex;
   align-items: center;
