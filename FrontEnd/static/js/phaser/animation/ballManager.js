@@ -621,6 +621,13 @@ export function shootBall({
         if (result === "MAKE") {
           if (isShootingFoul) {
             showAnnouncement("It's Good! And 1!", teamStyle, shooterPlayerData);
+            
+            // Trigger visual effect on fouling player for AND-1
+            const foulPlayerId = turnData.foul_player_id || turnData.foul_player?.player_id;
+            if (foulPlayerId) {
+              const { triggerFoulEffect } = await import('./negativeActionEffects.js');
+              triggerFoulEffect(scene, foulPlayerId);
+            }
           } else {
             showAnnouncement("It's Good!", teamStyle, shooterPlayerData);
           }
