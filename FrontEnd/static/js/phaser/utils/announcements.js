@@ -4,6 +4,8 @@
  * Also triggers visual effects (red flash, sprite tint) for fouls/turnovers
  */
 
+import { triggerFoulEffect, triggerTurnoverEffect } from '../animation/negativeActionEffects.js';
+
 let currentAnnouncement = null;
 
 /**
@@ -18,14 +20,12 @@ function triggerVisualEffect(scene, playerId, effectType) {
   const sprite = scene.playerSprites?.[playerId];
   if (!sprite) return;
   
-  // Import and call the effect function
-  import('../animation/negativeActionEffects.js').then(module => {
-    if (effectType === 'foul') {
-      module.triggerFoulEffect(scene, playerId);
-    } else if (effectType === 'turnover') {
-      module.triggerTurnoverEffect(scene, playerId);
-    }
-  });
+  // Call the appropriate effect function
+  if (effectType === 'foul') {
+    triggerFoulEffect(scene, playerId);
+  } else if (effectType === 'turnover') {
+    triggerTurnoverEffect(scene, playerId);
+  }
 }
 
 /**
