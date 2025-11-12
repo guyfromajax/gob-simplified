@@ -163,7 +163,7 @@ class ShotManager:
 
         # ✅ New: returns shot_score, help defender, and foul info
         shot_score, help_defender, d_foul, foul_player = self.calculate_shot_score(
-            shooter, passer, screener, defender, playcall, defense_call, is_three
+            shooter, passer, screener, defender, playcall, defense_call, is_three, is_paint
         )
 
         made = shot_score >= shot_threshold
@@ -537,7 +537,7 @@ class ShotManager:
         return result
 
     
-    def calculate_shot_score(self, shooter, passer, screener, defender, playcall, defense_call, is_three):
+    def calculate_shot_score(self, shooter, passer, screener, defender, playcall, defense_call, is_three, is_paint=False):
         """
         Calculate shot score based on attributes, playcall, defense, gravity, etc.
         Also returns:
@@ -562,18 +562,39 @@ class ShotManager:
             dribble_score = (attrs["AG"] * 0.8 + attrs["IQ"] * 0.2) * random.randint(1, 6)
             shot_score += dribble_score * 0.2
 
-        # Defensive impact
-        defense_attrs = defender.attributes if defender else {"OD": 0, "IQ": 0, "CH": 0}
-        defense_score = (
-            defense_attrs["OD"] * 0.8 +
-            defense_attrs["IQ"] * 0.1 +
-            defense_attrs["CH"] * 0.1
-        ) * random.randint(1, 6)
+        # Defensive impact - varies by shot type
+        defense_attrs = defender.attributes if defender else {"OD": 0, "ID": 0, "AG": 0, "ST": 0, "IQ": 0, "CH": 0}
+        
+        if is_paint:
+            # Paint shots: ID-focused defense
+            defense_score = (
+                defense_attrs["ID"] * 0.6 +
+                defense_attrs["ST"] * 0.2 +
+                defense_attrs["IQ"] * 0.1 +
+                defense_attrs["CH"] * 0.1
+            ) * random.randint(1, 6)
+        elif is_three:
+            # Three-point shots: OD-focused defense
+            defense_score = (
+                defense_attrs["OD"] * 0.8 +
+                defense_attrs["IQ"] * 0.1 +
+                defense_attrs["CH"] * 0.1
+            ) * random.randint(1, 6)
+        else:
+            # Mid-range shots: balanced defense
+            defense_score = (
+                defense_attrs["OD"] * 0.3 +
+                defense_attrs["ID"] * 0.3 +
+                defense_attrs["AG"] * 0.1 +
+                defense_attrs["ST"] * 0.1 +
+                defense_attrs["IQ"] * 0.1 +
+                defense_attrs["CH"] * 0.1
+            ) * random.randint(1, 6)
         
         # Track defense score for statistics
         self.defense_scores.append(defense_score)
 
-        d_foul, foul_player = self.check_defensive_foul_on_shot(defender, defense_score)
+        d_foul, foul_player = self.check_defensive_foul_on_shot(defender, defense_score, is_three)
 
         shot_score -= defense_score * 0.2
         if defender:
@@ -626,9 +647,10 @@ class ShotManager:
         return shot_score, help_defender, d_foul, foul_player
 
     
-    def check_defensive_foul_on_shot(self, defender, defense_score):
+    def check_defensive_foul_on_shot(self, defender, defense_score, is_three=False):
         """
         Determines if a defensive foul occurs based on defender skill and team aggression.
+        Three-point shots are less likely to result in fouls (reduced threshold).
         Returns (bool, player) → (was_foul_committed, fouling_defender)
         """
         if not defender:
@@ -640,6 +662,10 @@ class ShotManager:
         aggression_level = defense_team.strategy_calls.get("aggression", 2)
         aggression_factor = AGGRESSION_FOUL_MULTIPLIER.get(aggression_level, 0.2)
         foul_threshold = defense_team.team_attributes.get("foul_threshold", 30)
+
+        # Reduce foul likelihood on three-point shots
+        if is_three:
+            foul_threshold *= 0.75
 
         # Real foul calculation based on defender skill and team aggression
         d_foul = defense_score < (foul_threshold * aggression_factor)
