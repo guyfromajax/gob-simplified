@@ -155,40 +155,40 @@ export function triggerMadeShotFlash(scene, hasAndOne = false) {
   const height = scene.game.config.height;
   
   if (hasAndOne) {
-    // Diagonal split: Green (full screen background) + Red (lower-left triangle on top)
-    // This approach prevents color blending
+    // Diagonal split: Create TWO completely separate graphics at DIFFERENT positions
+    // Offset red slightly to avoid edge overlap
     
-    // Full screen GREEN background
-    const greenRect = scene.add.rectangle(
-      width / 2,
-      height / 2,
-      width,
-      height,
-      0x00ff00,  // Bright green
-      0.5        // 50% opacity
+    // Upper-right triangle (GREEN)
+    const greenGraphics = scene.add.graphics();
+    greenGraphics.fillStyle(0x00FF00, 1.0);  // Pure green, FULL opacity
+    greenGraphics.fillTriangle(
+      0, 0,              // Top-left
+      width, 0,          // Top-right
+      width, height      // Bottom-right
     );
-    greenRect.setOrigin(0.5, 0.5);
-    greenRect.setDepth(998);
+    greenGraphics.setAlpha(0.6);  // Apply alpha to entire object
+    greenGraphics.setDepth(998);
     
-    // Lower-left RED triangle overlaid on top
+    // Lower-left triangle (RED) - offset by 1 pixel to avoid shared edge
     const redGraphics = scene.add.graphics();
-    redGraphics.setDepth(999);  // Above green
-    redGraphics.fillStyle(0xff0000, 0.5);  // Red, 50% opacity
+    redGraphics.fillStyle(0xFF0000, 1.0);  // Pure red, FULL opacity
     redGraphics.fillTriangle(
-      0, 0,              // Top-left corner
-      0, height,         // Bottom-left corner
-      width, height      // Bottom-right corner
+      1, 1,              // Top-left (offset by 1px)
+      1, height,         // Bottom-left (offset by 1px)
+      width, height      // Bottom-right
     );
+    redGraphics.setAlpha(0.6);  // Apply alpha to entire object
+    redGraphics.setDepth(999);  // On top of green
     
-    // Hold for 1s, then fade both out
+    // Hold for 1s, then fade out
     scene.tweens.add({
-      targets: [greenRect, redGraphics],
+      targets: [greenGraphics, redGraphics],
       alpha: 0,
-      duration: 1500,  // 1.5s fade out
-      delay: 1000,     // Hold at full opacity for 1s first
+      duration: 1500,
+      delay: 1000,
       ease: 'Cubic.easeOut',
       onComplete: () => {
-        greenRect.destroy();
+        greenGraphics.destroy();
         redGraphics.destroy();
       }
     });
