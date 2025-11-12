@@ -357,7 +357,7 @@ export function shootBall({
         timestamp: Date.now()
       });
       // Log what player is at this position
-      const playersNearby = Object.values(playerSprites).filter(p => {
+      const playersNearby = Object.values(scene.playerSprites || {}).filter(p => {
         const dist = Math.hypot(p.x - ballSprite.x, p.y - ballSprite.y);
         return dist < 50;
       });
