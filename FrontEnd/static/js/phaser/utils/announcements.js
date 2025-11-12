@@ -41,13 +41,18 @@ export function showAndOneAnnouncement(team, shooterData, foulPlayerData) {
     currentAnnouncement = null;
   }
   
-  // Create announcement container
+  // Create announcement container with red background (foul overlay)
   const announcement = document.createElement('div');
   announcement.className = 'game-announcement and-one-announcement';
   announcement.style.display = 'flex';
   announcement.style.flexDirection = 'column';  // Vertical stacking
   announcement.style.alignItems = 'center';
   announcement.style.gap = '10px';
+  announcement.style.backgroundColor = 'rgba(255, 0, 0, 0.85)';  // Red background at 85% opacity
+  announcement.style.padding = '20px 30px';
+  announcement.style.borderRadius = '12px';
+  announcement.style.border = '3px solid rgba(255, 255, 255, 0.3)';  // Subtle white border
+  announcement.style.boxShadow = '0 8px 32px rgba(0, 0, 0, 0.5)';  // Strong shadow for depth
   if (team === 'home') {
     announcement.classList.add('home-team');
   } else if (team === 'away') {
@@ -66,6 +71,7 @@ export function showAndOneAnnouncement(team, shooterData, foulPlayerData) {
   madeText.textContent = "IT'S GOOD!";
   madeText.style.fontSize = '2.5rem';
   madeText.style.fontWeight = 'bold';
+  madeText.style.color = '#ffffff';  // White text on red background
   
   const shooterHeadshot = createHeadshotElement(shooterData, 1.0); // Full size
   

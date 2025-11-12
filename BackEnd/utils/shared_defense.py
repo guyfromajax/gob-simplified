@@ -95,7 +95,7 @@ def assign_non_bh_defender_coords(o_coords, ball_coords, aggression_level, is_aw
             x = ox + 0.1 * (abs(bx - ox) * x_direction)
             y = oy + 0.4 * (abs(by - oy) * y_direction)
         elif o_spot in ["lower wing", "upper wing", "lower midwing", "upper midwing", "lower midCorner", "upper midCorner"]:
-            x = ox + (random.randint(-3,0) * x_direction)#+ 0.5 * (abs(bx - ox) * x_direction)
+            x = ox + (random.randint(1,4) * x_direction)#+ 0.5 * (abs(bx - ox) * x_direction)
             y = oy + random.choice([0.3, 0.4, 0.5]) * (abs(by - oy) * y_direction)
         elif o_spot in ["lower midcorner", "upper midcorner"]:
             x = ox

@@ -155,41 +155,28 @@ export function triggerMadeShotFlash(scene, hasAndOne = false) {
   const height = scene.game.config.height;
   
   if (hasAndOne) {
-    // Diagonal split: Create TWO completely separate graphics at DIFFERENT positions
-    // Offset red slightly to avoid edge overlap
-    
-    // Upper-right triangle (GREEN)
-    const greenGraphics = scene.add.graphics();
-    greenGraphics.fillStyle(0x00FF00, 1.0);  // Pure green, FULL opacity
-    greenGraphics.fillTriangle(
-      0, 0,              // Top-left
-      width, 0,          // Top-right
-      width, height      // Bottom-right
+    // AND-1: Full screen green flash (made shot)
+    // Red tint will be applied to announcement container in announcements.js
+    const screenFlash = scene.add.rectangle(
+      width / 2,
+      height / 2,
+      width,
+      height,
+      0x00ff00,  // Bright green
+      0.5        // 50% opacity
     );
-    greenGraphics.setAlpha(0.6);  // Apply alpha to entire object
-    greenGraphics.setDepth(998);
-    
-    // Lower-left triangle (RED) - offset by 1 pixel to avoid shared edge
-    const redGraphics = scene.add.graphics();
-    redGraphics.fillStyle(0xFF0000, 1.0);  // Pure red, FULL opacity
-    redGraphics.fillTriangle(
-      1, 1,              // Top-left (offset by 1px)
-      1, height,         // Bottom-left (offset by 1px)
-      width, height      // Bottom-right
-    );
-    redGraphics.setAlpha(0.6);  // Apply alpha to entire object
-    redGraphics.setDepth(999);  // On top of green
+    screenFlash.setOrigin(0.5, 0.5);
+    screenFlash.setDepth(998);
     
     // Hold for 1s, then fade out
     scene.tweens.add({
-      targets: [greenGraphics, redGraphics],
+      targets: screenFlash,
       alpha: 0,
-      duration: 1500,
-      delay: 1000,
+      duration: 1500,  // 1.5s fade out
+      delay: 1000,     // Hold at 50% opacity for 1s first
       ease: 'Cubic.easeOut',
       onComplete: () => {
-        greenGraphics.destroy();
-        redGraphics.destroy();
+        screenFlash.destroy();
       }
     });
   } else {
