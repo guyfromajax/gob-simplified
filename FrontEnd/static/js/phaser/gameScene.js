@@ -1072,7 +1072,7 @@ export function createGameScene(Phaser) {
             });
           }
 
-          this.ballSprite = this.add.image(0, 0, "ball").setVisible(true).setDepth(1000).setScale(1);
+          this.ballSprite = this.add.image(0, 0, "ball").setVisible(true).setDepth(1000).setScale(1.5);  // 50% larger
 
           // Initialize BallController for the new animation system
           try {
