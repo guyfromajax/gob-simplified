@@ -36,11 +36,24 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
         return;
       }
       const distance = Math.hypot(sprite.x - targetX, sprite.y - targetY);
-      const tweenManagerState = scene.tweens ? {
-        total: scene.tweens.getAll().length,
-        paused: scene.tweens.isPaused(),
-        timeScale: scene.tweens.timeScale
-      } : null;
+      let tweenManagerState = null;
+      if (scene.tweens) {
+        try {
+          const total = typeof scene.tweens.getAll === 'function' 
+            ? scene.tweens.getAll().length 
+            : 'N/A';
+          const paused = typeof scene.tweens.isPaused === 'function'
+            ? scene.tweens.isPaused()
+            : 'N/A';
+          tweenManagerState = {
+            total,
+            paused,
+            timeScale: scene.tweens.timeScale || 'N/A'
+          };
+        } catch (error) {
+          tweenManagerState = { error: error.message };
+        }
+      }
       console.warn('animateStep: Timeout - forcing resolve', {
         playerId: sprite?.playerId,
         action: step.action,
