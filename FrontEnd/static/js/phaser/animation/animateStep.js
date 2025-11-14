@@ -71,8 +71,15 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
 
     let startPromise = Promise.resolve();
 
+    // Determine if this player has the ball - if so, include ball in tween targets
+    // This ensures ball and player move together smoothly (based on WIP_GOB learnings)
+    const playerHasBall = currentBallOwnerRef?.value === sprite && !getPendingOwner(scene);
+    const tweenTargets = playerHasBall && ballSprite 
+      ? [sprite, ballSprite]  // Ball moves WITH player
+      : [sprite];             // Player only
+
     const tween = scene.tweens.add({
-      targets: [sprite],
+      targets: tweenTargets,
       x: targetX,
       y: targetY,
       duration,
@@ -97,10 +104,13 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
         }
       },
       onUpdate: () => {
+        // Ball position is now handled by tween targets, but keep this as fallback
+        // for cases where ball might not be in targets array
         if (
           currentBallOwnerRef?.value === sprite &&
           ballSprite?.setPosition &&
-          !getPendingOwner(scene)
+          !getPendingOwner(scene) &&
+          !tweenTargets.includes(ballSprite)
         ) {
           ballSprite.setPosition(sprite.x, sprite.y);
         }
