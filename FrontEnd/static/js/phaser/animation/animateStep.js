@@ -35,14 +35,25 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
         // Tween already completed, just clear timeout
         return;
       }
+      const distance = Math.hypot(sprite.x - targetX, sprite.y - targetY);
+      const tweenManagerState = scene.tweens ? {
+        total: scene.tweens.getAll().length,
+        paused: scene.tweens.isPaused(),
+        timeScale: scene.tweens.timeScale
+      } : null;
       console.warn('animateStep: Timeout - forcing resolve', {
         playerId: sprite?.playerId,
         action: step.action,
         duration,
         timeoutMs,
         tweenActive: tween?.isPlaying !== false,
+        tweenProgress: tween?.progress,
         spritePos: { x: sprite.x, y: sprite.y },
-        targetPos: { x: targetX, y: targetY }
+        targetPos: { x: targetX, y: targetY },
+        distanceToTarget: distance,
+        tweenManagerState,
+        scenePaused: scene.scene?.isPaused(),
+        skipToEnd: scene.skipToEnd
       });
       if (tween) {
         scene.tweens?.killTweensOf(tween);
