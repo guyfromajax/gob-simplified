@@ -73,13 +73,34 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
 
     // Determine if this player has the ball - if so, include ball in tween targets
     // This ensures ball and player move together smoothly (based on WIP_GOB learnings)
+    // Must check that ballSprite exists and is a valid Phaser object before including it
+    // Also exclude ball if a pass is happening (ball will be detached)
     const playerHasBall = currentBallOwnerRef?.value === sprite && !getPendingOwner(scene);
-    const tweenTargets = playerHasBall && ballSprite 
+    const isPassing = step.action === 'pass' || scene.passInFlight;
+    const ballIsValid = ballSprite && 
+                       ballSprite.scene && 
+                       ballSprite.active !== false && 
+                       !ballSprite.destroyed &&
+                       !isPassing;  // Don't include ball if pass is happening
+    const tweenTargets = playerHasBall && ballIsValid
       ? [sprite, ballSprite]  // Ball moves WITH player
       : [sprite];             // Player only
 
+    // Filter out any null/invalid targets before creating tween
+    const validTargets = tweenTargets.filter(target => 
+      target && 
+      target.scene && 
+      target.active !== false && 
+      !target.destroyed
+    );
+
+    // If no valid targets, resolve immediately
+    if (validTargets.length === 0) {
+      return Promise.resolve();
+    }
+
     const tween = scene.tweens.add({
-      targets: tweenTargets,
+      targets: validTargets,
       x: targetX,
       y: targetY,
       duration,
