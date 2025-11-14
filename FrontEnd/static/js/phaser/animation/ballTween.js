@@ -35,12 +35,38 @@ const MAX_BALL_DURATION = 1000; // ms - cap for very long passes
  */
 function getBallDuration(ballSprite, targetX, targetY) {
   if (!ballSprite) return 300; // Default fallback if ball sprite doesn't exist
+  
   const currentX = ballSprite.x;
   const currentY = ballSprite.y;
+  
+  // Validate positions - if invalid, return default
+  if (isNaN(currentX) || isNaN(currentY) || isNaN(targetX) || isNaN(targetY)) {
+    console.warn('getBallDuration: Invalid positions, using default 300ms', {
+      currentX, currentY, targetX, targetY
+    });
+    return 300;
+  }
+  
   const distance = Phaser.Math.Distance.Between(currentX, currentY, targetX, targetY);
+  
+  // If distance is 0 or very small, use minimum duration
+  if (distance < 1) {
+    return 50; // Minimum duration for very short distances
+  }
+  
   const duration = (distance / BALL_SPEED) * 1000; // Convert to milliseconds
   // Clamp between 50ms (minimum) and MAX_BALL_DURATION (maximum)
-  return Math.min(MAX_BALL_DURATION, Math.max(50, duration));
+  const clampedDuration = Math.min(MAX_BALL_DURATION, Math.max(50, duration));
+  
+  // Final validation - ensure we return a valid number
+  if (isNaN(clampedDuration) || clampedDuration <= 0) {
+    console.warn('getBallDuration: Invalid calculated duration, using default 300ms', {
+      distance, duration, clampedDuration
+    });
+    return 300;
+  }
+  
+  return clampedDuration;
 }
 
 function resolveBallController(scene) {
@@ -472,6 +498,10 @@ export async function runPass(scene, cfg = {}) {
         startPosition = { x: ballSprite.x, y: ballSprite.y };
       }
 
+      // Capture ball position BEFORE detaching (detach might change position)
+      const ballStartX = ballSprite.x;
+      const ballStartY = ballSprite.y;
+
       detachBall(scene, ballSprite);
       scene.ballDetached = true;
       scene.events?.emit('ballDetached');
@@ -489,9 +519,37 @@ export async function runPass(scene, cfg = {}) {
       }
       
       // Calculate duration based on distance if not explicitly provided
-      // Use ball's current position (after detach) to calculate distance-based duration
+      // Use startPosition (captured before detach) for accurate calculation
       if (!duration) {
-        usedDuration = getBallDuration(ballSprite, end.x, end.y);
+        // Validate positions
+        if (!startPosition || isNaN(startPosition.x) || isNaN(startPosition.y) || isNaN(end.x) || isNaN(end.y)) {
+          console.warn('runPass: Invalid positions for duration calculation, using default 300ms', {
+            startPosition, end
+          });
+          usedDuration = 300;
+        } else {
+          // Calculate distance from startPosition to end
+          const distance = Phaser.Math.Distance.Between(startPosition.x, startPosition.y, end.x, end.y);
+          
+          // If distance is 0 or very small, use minimum duration
+          if (distance < 1) {
+            usedDuration = 50;
+          } else {
+            // Calculate duration based on distance
+            const calculatedDuration = (distance / BALL_SPEED) * 1000;
+            const clampedDuration = Math.min(MAX_BALL_DURATION, Math.max(50, calculatedDuration));
+            
+            // Validate duration
+            if (clampedDuration && clampedDuration > 0 && !isNaN(clampedDuration)) {
+              usedDuration = clampedDuration;
+            } else {
+              console.warn('runPass: Invalid duration calculated, using default 300ms', {
+                distance, calculatedDuration, clampedDuration
+              });
+              usedDuration = 300;
+            }
+          }
+        }
       }
 
       const doTween = animationConfig.enableBallTween !== false;
