@@ -258,7 +258,7 @@ async function runSideInboundSetup({ scene, ballSprite, playerSprites, turnData 
     animationDebugLog("ballAttach(SF)");
 
     animationDebugLog(`[sideInbound][holdStart] sf:${sfId} pg:${pgId}`);
-    await new Promise((resolve) => scene.time.delayedCall(1000, resolve));
+    // Removed 1000ms pause for smoother transitions
 
     scene.events?.once('passStart', () => animationDebugLog('passStart'));
     scene.events?.once('tweenStart', () => animationDebugLog('tweenStart'));
@@ -953,7 +953,7 @@ async function runInboundSetup({
   attachBallToPlayer(scene, ballSprite, sfSprite);
 
   animationDebugLog(`[inbound][holdStart][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
-  await new Promise((resolve) => scene.time.delayedCall(1000, resolve));
+  // Removed 1000ms pause for smoother transitions
 
   if (scene.tweens) {
     scene.tweens.killTweensOf(ballSprite);
