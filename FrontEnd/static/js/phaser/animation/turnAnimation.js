@@ -38,6 +38,61 @@ import {
 // otherwise produce multi‑second tweens that appear as animation stalls.
 const MAX_STEP_DURATION = 1000; // ms
 
+// Animation speed constants (pixels per second)
+// Based on learnings from WIP_GOB repository for smooth, consistent animations
+// These ensure consistent speeds regardless of distance, making animations feel natural
+const PLAYER_SPEED = 200; // pixels per second for player movement
+const BALL_SPEED = 250; // pixels per second for ball movement
+
+/**
+ * Calculate animation duration based on distance traveled
+ * This ensures consistent speeds regardless of distance, making animations feel natural
+ * 
+ * @param {number} currentX - Current X position in pixels
+ * @param {number} currentY - Current Y position in pixels
+ * @param {number} targetX - Target X position in pixels
+ * @param {number} targetY - Target Y position in pixels
+ * @param {number} speed - Speed in pixels per second
+ * @returns {number} Duration in milliseconds
+ */
+function getDurationFromDistance(currentX, currentY, targetX, targetY, speed) {
+  const distance = Phaser.Math.Distance.Between(currentX, currentY, targetX, targetY);
+  const duration = (distance / speed) * 1000; // Convert to milliseconds
+  // Clamp between 50ms (minimum) and MAX_STEP_DURATION (maximum)
+  return Math.min(MAX_STEP_DURATION, Math.max(50, duration));
+}
+
+/**
+ * Calculate player movement duration based on distance from current sprite position to target
+ * Uses the sprite's actual current position (sprite.x, sprite.y) as the starting point,
+ * which ensures smooth transitions between turns without requiring setup tweens.
+ * 
+ * @param {Phaser.GameObjects.Sprite} sprite - The player sprite
+ * @param {number} targetX - Target X position in pixels
+ * @param {number} targetY - Target Y position in pixels
+ * @returns {number} Duration in milliseconds
+ */
+function getPlayerDuration(sprite, targetX, targetY) {
+  const currentX = sprite.x;
+  const currentY = sprite.y;
+  return getDurationFromDistance(currentX, currentY, targetX, targetY, PLAYER_SPEED);
+}
+
+/**
+ * Calculate ball movement duration based on distance from current sprite position to target
+ * 
+ * @param {Phaser.GameObjects.Sprite} ballSprite - The ball sprite
+ * @param {number} targetX - Target X position in pixels
+ * @param {number} targetY - Target Y position in pixels
+ * @returns {number} Duration in milliseconds
+ */
+function getBallDuration(ballSprite, targetX, targetY) {
+  if (!ballSprite) return 300; // Default fallback if ball sprite doesn't exist
+  const currentX = ballSprite.x;
+  const currentY = ballSprite.y;
+  return getDurationFromDistance(currentX, currentY, targetX, targetY, BALL_SPEED);
+}
+
 
 /**
  * Centralized ball ownership logic
@@ -1144,10 +1199,27 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
       const curr = movement[stepIndex];
       const step = prev;
       const nextStep = curr;
-      const rawDuration = (nextStep.timestamp - step.timestamp) * 3;
-      const duration = Math.min(MAX_STEP_DURATION, rawDuration);
+      
+      // Calculate target position in pixels
+      const { x: targetX, y: targetY } = gridToPixels(
+        nextStep.coords.x,
+        nextStep.coords.y,
+        scene.game.config.width,
+        scene.game.config.height
+      );
+      
+      // Use distance-based duration calculation (from current sprite position to target)
+      // This ensures smooth transitions between turns and consistent speeds
+      // The sprite's current position (sprite.x, sprite.y) is where it actually is,
+      // which may be from the end of the previous turn or from a previous step
+      const duration = getPlayerDuration(sprite, targetX, targetY);
 
-      DEBUG && animationDebugLog('[turn]', turnData?.id, step.timestamp, nextStep.timestamp, duration);
+      DEBUG && animationDebugLog('[turn]', turnData?.id, step.timestamp, nextStep.timestamp, duration, {
+        currentPos: { x: sprite.x, y: sprite.y },
+        targetPos: { x: targetX, y: targetY },
+        distance: Phaser.Math.Distance.Between(sprite.x, sprite.y, targetX, targetY),
+        method: 'distance-based'
+      });
       if (duration <= 0) {
         animationDebugWarn('[turn] Non-positive duration', { turnId: turnData?.id, step, nextStep });
         if (typeof window !== 'undefined') {
