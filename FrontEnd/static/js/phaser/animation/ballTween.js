@@ -19,6 +19,30 @@ import { getBallController } from './BallControllerAdapter.js';
 const BALL_DEPTH = 1000;
 export const PASS_DEBUG = false;
 
+// Animation speed constants (pixels per second)
+// Based on learnings from WIP_GOB repository for smooth, consistent animations
+const BALL_SPEED = 250; // pixels per second for ball movement
+const MAX_BALL_DURATION = 1000; // ms - cap for very long passes
+
+/**
+ * Calculate ball movement duration based on distance from current position to target
+ * This ensures consistent pass speeds regardless of distance
+ * 
+ * @param {Phaser.GameObjects.Sprite} ballSprite - The ball sprite
+ * @param {number} targetX - Target X position in pixels
+ * @param {number} targetY - Target Y position in pixels
+ * @returns {number} Duration in milliseconds
+ */
+function getBallDuration(ballSprite, targetX, targetY) {
+  if (!ballSprite) return 300; // Default fallback if ball sprite doesn't exist
+  const currentX = ballSprite.x;
+  const currentY = ballSprite.y;
+  const distance = Phaser.Math.Distance.Between(currentX, currentY, targetX, targetY);
+  const duration = (distance / BALL_SPEED) * 1000; // Convert to milliseconds
+  // Clamp between 50ms (minimum) and MAX_BALL_DURATION (maximum)
+  return Math.min(MAX_BALL_DURATION, Math.max(50, duration));
+}
+
 function resolveBallController(scene) {
   if (scene?.ballController) {
     return scene.ballController;
@@ -333,7 +357,8 @@ export function tweenPlayerTo(scene, sprite, target, opts = {}) {
 export async function runPass(scene, cfg = {}) {
   if (!scene) return;
   const { fromId, toId, startCoords, endCoords, duration, easing } = cfg;
-  const usedDuration = duration ?? 300;
+  // Duration will be calculated based on distance if not explicitly provided
+  // This ensures consistent pass speeds (based on WIP_GOB learnings)
   const usedEasing = easing ?? 'Linear';
   const deferOwnership = typeof cfg.onComplete === 'function';
   const ballSprite = scene.ballSprite;
@@ -380,6 +405,9 @@ export async function runPass(scene, cfg = {}) {
   let endPosition = null;
   let plannedDistance = 0;
   let summaryEmitted = false;
+  // Duration will be calculated after we know the end position
+  // Initialize with provided duration or default, will be updated with distance-based calculation
+  let usedDuration = duration ?? 300;
   const emitSummary = (status, extra = {}) => {
     if (summaryEmitted) return;
     summaryEmitted = true;
@@ -458,6 +486,12 @@ export async function runPass(scene, cfg = {}) {
       endPosition = { ...end };
       if (startPosition) {
         plannedDistance = Math.hypot(end.x - startPosition.x, end.y - startPosition.y);
+      }
+      
+      // Calculate duration based on distance if not explicitly provided
+      // Use ball's current position (after detach) to calculate distance-based duration
+      if (!duration) {
+        usedDuration = getBallDuration(ballSprite, end.x, end.y);
       }
 
       const doTween = animationConfig.enableBallTween !== false;
