@@ -694,11 +694,9 @@ export function shootBall({
               resolve();
             });
           };
-          if (scene.time?.delayedCall) {
-            scene.time.delayedCall(1000, finish);
-          } else {
-            setTimeout(finish, 1000);
-          }
+          // Removed 1000ms rim hold pause for smoother transitions
+          // Immediately finish to allow next turn to start
+          finish();
         } else if (result === "MISS") {
           if (scene.stateMachine?.is(States.ShotAttempt)) {
             safeTransition(
