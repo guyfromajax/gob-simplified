@@ -1108,13 +1108,17 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   }
 
   // 🔶 Pre-possession: Move players to their step 0 positions
-  await runSetupTween({
-    scene,
-    ballSprite,
-    animations: turnData.animations,
-    playerSprites,
-    currentBallOwnerRef
-  });
+  // ⚠️ REMOVED: With distance-based duration calculation, players can start from their current positions.
+  // The first step (stepIndex 1) will automatically calculate duration from wherever the player
+  // ended the previous turn to step 1's target, ensuring smooth transitions without a setup pause.
+  // If needed for edge cases, uncomment below:
+  // await runSetupTween({
+  //   scene,
+  //   ballSprite,
+  //   animations: turnData.animations,
+  //   playerSprites,
+  //   currentBallOwnerRef
+  // });
 
   if (scene.skipToEnd || scene.stateMachine?.is(States.FastBreak)) {
     return;
