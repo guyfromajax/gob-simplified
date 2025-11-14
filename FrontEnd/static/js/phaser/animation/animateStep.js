@@ -27,18 +27,27 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
   if (scene.skipToEnd) return Promise.resolve();
   return new Promise((resolve) => {
     let tween = null;
+    let tweenCompleted = false;
     // Safety timeout: if tween doesn't complete within reasonable time, force resolve
     const timeoutMs = Math.max(duration * 2, 5000); // At least 2x duration or 5 seconds
     const timeoutId = setTimeout(() => {
+      if (tweenCompleted) {
+        // Tween already completed, just clear timeout
+        return;
+      }
       console.warn('animateStep: Timeout - forcing resolve', {
         playerId: sprite?.playerId,
         action: step.action,
         duration,
-        timeoutMs
+        timeoutMs,
+        tweenActive: tween?.isPlaying !== false,
+        spritePos: { x: sprite.x, y: sprite.y },
+        targetPos: { x: targetX, y: targetY }
       });
       if (tween) {
         scene.tweens?.killTweensOf(tween);
       }
+      tweenCompleted = true;
       resolve();
     }, timeoutMs);
     const { x: targetX, y: targetY } = gridToPixels(
@@ -111,6 +120,7 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
 
     // If no valid targets, resolve immediately
     if (validTargets.length === 0) {
+      tweenCompleted = true;
       clearTimeout(timeoutId);
       resolve();
       return;
@@ -154,14 +164,32 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
         }
       },
       onComplete: async () => {
+        if (tweenCompleted) {
+          // Already resolved via timeout, don't resolve again
+          return;
+        }
+        tweenCompleted = true;
         clearTimeout(timeoutId);
-        await startPromise;
+        try {
+          await startPromise;
+        } catch (error) {
+          console.error('animateStep: Error in startPromise', { error, playerId: sprite?.playerId });
+        }
         emitSummary('complete');
         resolve();
       },
       onStop: async () => {
+        if (tweenCompleted) {
+          // Already resolved via timeout, don't resolve again
+          return;
+        }
+        tweenCompleted = true;
         clearTimeout(timeoutId);
-        await startPromise;
+        try {
+          await startPromise;
+        } catch (error) {
+          console.error('animateStep: Error in startPromise', { error, playerId: sprite?.playerId });
+        }
         emitSummary('stop');
         resolve();
       }
