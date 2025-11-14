@@ -62,7 +62,7 @@ def assign_non_bh_defender_coords(o_coords, ball_coords, aggression_level, is_aw
     Returns {"x": int, "y": int}
     """
     
-    print(f"🏀 D-positioning: ball_spot='{ball_spot}', o_spot='{o_spot}'")
+    # Removed verbose D-positioning log
 
     d_spacing_map = {"aggressive": 1, "normal": 2, "passive": 3}
     d_spacing = d_spacing_map.get(aggression_level.lower(), 2)  
