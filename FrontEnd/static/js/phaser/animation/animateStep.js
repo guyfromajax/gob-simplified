@@ -26,6 +26,21 @@ export const PLAYER_TWEEN_DEBUG = false;
 export function animateStep({ scene, sprite, step, duration, ballSprite, currentBallOwnerRef, onAction }) {
   if (scene.skipToEnd) return Promise.resolve();
   return new Promise((resolve) => {
+    let tween = null;
+    // Safety timeout: if tween doesn't complete within reasonable time, force resolve
+    const timeoutMs = Math.max(duration * 2, 5000); // At least 2x duration or 5 seconds
+    const timeoutId = setTimeout(() => {
+      console.warn('animateStep: Timeout - forcing resolve', {
+        playerId: sprite?.playerId,
+        action: step.action,
+        duration,
+        timeoutMs
+      });
+      if (tween) {
+        scene.tweens?.killTweensOf(tween);
+      }
+      resolve();
+    }, timeoutMs);
     const { x: targetX, y: targetY } = gridToPixels(
       step.coords.x,
       step.coords.y,
@@ -96,10 +111,12 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
 
     // If no valid targets, resolve immediately
     if (validTargets.length === 0) {
-      return Promise.resolve();
+      clearTimeout(timeoutId);
+      resolve();
+      return;
     }
 
-    const tween = scene.tweens.add({
+    tween = scene.tweens.add({
       targets: validTargets,
       x: targetX,
       y: targetY,
@@ -137,11 +154,13 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
         }
       },
       onComplete: async () => {
+        clearTimeout(timeoutId);
         await startPromise;
         emitSummary('complete');
         resolve();
       },
       onStop: async () => {
+        clearTimeout(timeoutId);
         await startPromise;
         emitSummary('stop');
         resolve();
