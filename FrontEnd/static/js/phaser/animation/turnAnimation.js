@@ -1053,15 +1053,13 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   }
 
   // 🔶 Pre-possession: Move players to their step 0 positions
-  // ⚠️ TESTING: Commented out to test removing 1000ms setup pause
-  // Uncomment below to restore setup tween:
-  // await runSetupTween({
-  //   scene,
-  //   ballSprite,
-  //   animations: turnData.animations,
-  //   playerSprites,
-  //   currentBallOwnerRef
-  // });
+  await runSetupTween({
+    scene,
+    ballSprite,
+    animations: turnData.animations,
+    playerSprites,
+    currentBallOwnerRef
+  });
 
   if (scene.skipToEnd || scene.stateMachine?.is(States.FastBreak)) {
     return;
