@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Box Score - Game of Basketball</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/box-score.css">
+</head>
+<body>
+  <div id="box-score-container">
+    <!-- Header -->
+    <header id="box-score-header">
+      <div id="header-content">
+        <span id="away-team-name" class="team-name">Away Team</span>
+        <span id="away-score" class="score">0</span>
+        <span class="at-symbol">@</span>
+        <span id="home-team-name" class="team-name">Home Team</span>
+        <span id="home-score" class="score">0</span>
+      </div>
+    </header>
+
+    <!-- Section 1: Quarter Scoring -->
+    <section id="quarter-scoring-section">
+      <h2>Quarter Scoring</h2>
+      <table id="quarter-scoring-table">
+        <thead>
+          <tr>
+            <th>Team</th>
+            <th>Q1</th>
+            <th>Q2</th>
+            <th>Q3</th>
+            <th>Q4</th>
+            <th id="ot-header" style="display: none;">OT</th>
+            <th>Final</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr id="home-quarter-row">
+            <td id="home-quarter-team-name" class="team-name-cell">Home</td>
+            <td class="quarter-score" data-quarter="0">0</td>
+            <td class="quarter-score" data-quarter="1">0</td>
+            <td class="quarter-score" data-quarter="2">0</td>
+            <td class="quarter-score" data-quarter="3">0</td>
+            <td id="home-ot-score" class="quarter-score ot-score" style="display: none;">0</td>
+            <td id="home-final-score" class="final-score">0</td>
+          </tr>
+          <tr id="away-quarter-row">
+            <td id="away-quarter-team-name" class="team-name-cell">Away</td>
+            <td class="quarter-score" data-quarter="0">0</td>
+            <td class="quarter-score" data-quarter="1">0</td>
+            <td class="quarter-score" data-quarter="2">0</td>
+            <td class="quarter-score" data-quarter="3">0</td>
+            <td id="away-ot-score" class="quarter-score ot-score" style="display: none;">0</td>
+            <td id="away-final-score" class="final-score">0</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- Tabs -->
+    <div id="team-tabs">
+      <button class="tab-button active" data-team="home">Home Team</button>
+      <button class="tab-button" data-team="away">Away Team</button>
+    </div>
+
+    <!-- Tab Content -->
+    <div id="tab-content">
+      <!-- Home Team Content -->
+      <div id="home-content" class="team-content active">
+        <!-- Section 2: Player Stats -->
+        <section id="player-stats-section" class="stats-section">
+          <h2>Player Stats</h2>
+          <div class="table-container">
+            <table id="home-player-stats-table" class="player-stats-table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Year</th>
+                  <th>PTS</th>
+                  <th>FGM/FGA</th>
+                  <th>3PTM/3PTA</th>
+                  <th>FTM/FTA</th>
+                  <th>DREB</th>
+                  <th>OREB</th>
+                  <th>TREB</th>
+                  <th>AST</th>
+                  <th>STL</th>
+                  <th>BLK</th>
+                  <th>F</th>
+                  <th>TO</th>
+                  <th>DEFA</th>
+                  <th>DEF%</th>
+                  <th>MIN</th>
+                </tr>
+              </thead>
+              <tbody id="home-player-stats-body">
+                <!-- Populated by JavaScript -->
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- Section 3: Team Stats -->
+        <section id="team-stats-section" class="stats-section">
+          <h2>Team Stats</h2>
+          <div class="table-container">
+            <table id="home-team-stats-table" class="team-stats-table">
+              <thead>
+                <tr>
+                  <th>PTS</th>
+                  <th>FGM/FGA</th>
+                  <th>3PTM/3PTA</th>
+                  <th>FTM/FTA</th>
+                  <th>DREB</th>
+                  <th>OREB</th>
+                  <th>TREB</th>
+                  <th>AST</th>
+                  <th>STL</th>
+                  <th>BLK</th>
+                  <th>F</th>
+                  <th>TO</th>
+                  <th>DEFA</th>
+                  <th>DEF%</th>
+                </tr>
+              </thead>
+              <tbody id="home-team-stats-body">
+                <!-- Populated by JavaScript -->
+              </tbody>
+            </table>
+          </div>
+          <div id="home-special-stats" class="special-stats">
+            <div class="special-stat-item">
+              <span class="special-stat-label">Fast Breaks:</span>
+              <span id="home-fb-attempts" class="special-stat-value">0 / 0</span>
+              <span id="home-fb-success-pct" class="special-stat-pct">(0%)</span>
+            </div>
+            <div class="special-stat-item">
+              <span class="special-stat-label">Fast Break Points:</span>
+              <span id="home-fb-points" class="special-stat-value">0</span>
+            </div>
+            <div class="special-stat-item">
+              <span class="special-stat-label">Points In The Paint:</span>
+              <span id="home-pip" class="special-stat-value">0</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- Section 4: Scouting Notes -->
+        <section id="scouting-notes-section" class="stats-section">
+          <h2>Scouting Notes</h2>
+          <div id="home-scouting-content" class="scouting-content">
+            <!-- Populated by JavaScript -->
+          </div>
+        </section>
+      </div>
+
+      <!-- Away Team Content -->
+      <div id="away-content" class="team-content">
+        <!-- Section 2: Player Stats -->
+        <section id="away-player-stats-section" class="stats-section">
+          <h2>Player Stats</h2>
+          <div class="table-container">
+            <table id="away-player-stats-table" class="player-stats-table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Year</th>
+                  <th>PTS</th>
+                  <th>FGM/FGA</th>
+                  <th>3PTM/3PTA</th>
+                  <th>FTM/FTA</th>
+                  <th>DREB</th>
+                  <th>OREB</th>
+                  <th>TREB</th>
+                  <th>AST</th>
+                  <th>STL</th>
+                  <th>BLK</th>
+                  <th>F</th>
+                  <th>TO</th>
+                  <th>DEFA</th>
+                  <th>DEF%</th>
+                  <th>MIN</th>
+                </tr>
+              </thead>
+              <tbody id="away-player-stats-body">
+                <!-- Populated by JavaScript -->
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- Section 3: Team Stats -->
+        <section id="away-team-stats-section" class="stats-section">
+          <h2>Team Stats</h2>
+          <div class="table-container">
+            <table id="away-team-stats-table" class="team-stats-table">
+              <thead>
+                <tr>
+                  <th>PTS</th>
+                  <th>FGM/FGA</th>
+                  <th>3PTM/3PTA</th>
+                  <th>FTM/FTA</th>
+                  <th>DREB</th>
+                  <th>OREB</th>
+                  <th>TREB</th>
+                  <th>AST</th>
+                  <th>STL</th>
+                  <th>BLK</th>
+                  <th>F</th>
+                  <th>TO</th>
+                  <th>DEFA</th>
+                  <th>DEF%</th>
+                </tr>
+              </thead>
+              <tbody id="away-team-stats-body">
+                <!-- Populated by JavaScript -->
+              </tbody>
+            </table>
+          </div>
+          <div id="away-special-stats" class="special-stats">
+            <div class="special-stat-item">
+              <span class="special-stat-label">Fast Breaks:</span>
+              <span id="away-fb-attempts" class="special-stat-value">0 / 0</span>
+              <span id="away-fb-success-pct" class="special-stat-pct">(0%)</span>
+            </div>
+            <div class="special-stat-item">
+              <span class="special-stat-label">Fast Break Points:</span>
+              <span id="away-fb-points" class="special-stat-value">0</span>
+            </div>
+            <div class="special-stat-item">
+              <span class="special-stat-label">Points In The Paint:</span>
+              <span id="away-pip" class="special-stat-value">0</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- Section 4: Scouting Notes -->
+        <section id="away-scouting-notes-section" class="stats-section">
+          <h2>Scouting Notes</h2>
+          <div id="away-scouting-content" class="scouting-content">
+            <!-- Populated by JavaScript -->
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/box-score.js"></script>
+</body>
+</html>
+
