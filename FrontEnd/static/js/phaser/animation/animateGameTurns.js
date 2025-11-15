@@ -64,6 +64,13 @@ async function handleOrebTurn(scene, { playerSprites, ballSprite, turnData, onUp
     const rimCoords = isHomeTeam ? HOME_RIM_COORDS : AWAY_RIM_COORDS;
     const result = turnData.result_type === "PUTBACK_MAKE" ? "MAKE" : "MISS";
     
+    // CRITICAL: Attach ball to rebounder BEFORE calling shootBall
+    // This ensures the ball is at the rebounder's position and not attached to a defender
+    const { attachBallToPlayer } = await import('./BallControllerAdapter.js');
+    attachBallToPlayer(scene, ballSprite, rebounderSprite, {
+      debugInfo: { rebounderId, reason: 'putback_attempt' }
+    });
+    
     // Get rebounder's current position for shot start
     const fromCoords = {
       x: (rebounderSprite.x / scene.game.config.width) * 100,
