@@ -1123,18 +1123,28 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   }
 
   // Determine which player owns the ball at step 0
-  let step0OwnerSprite = null;
-  for (const anim of turnData.animations) {
-    if (scene.skipToEnd || scene.stateMachine?.is(States.FastBreak)) break;
-    if (anim.hasBallAtStep?.[0]) {
-      step0OwnerSprite = playerSprites[anim.playerId];
-      break;
-    }
+  // BUT: Skip this if the previous turn was a shot (MAKE or MISS)
+  // After a shot, the ball should remain at the rim/bounce spot until the next turn's animation moves it
+  const previousTurnWasShot = scene._previousTurnWasShot === true;
+  if (previousTurnWasShot) {
+    console.log('🏀 playTurnAnimation: Skipping step 0 ball attachment - previous turn was a shot');
+    scene._previousTurnWasShot = false; // Clear the flag
   }
+  
+  let step0OwnerSprite = null;
+  if (!previousTurnWasShot) {
+    for (const anim of turnData.animations) {
+      if (scene.skipToEnd || scene.stateMachine?.is(States.FastBreak)) break;
+      if (anim.hasBallAtStep?.[0]) {
+        step0OwnerSprite = playerSprites[anim.playerId];
+        break;
+      }
+    }
 
-  if (step0OwnerSprite) {
-    attachBallToPlayer(scene, ballSprite, step0OwnerSprite);
-    currentBallOwnerRef.value = step0OwnerSprite;
+    if (step0OwnerSprite) {
+      attachBallToPlayer(scene, ballSprite, step0OwnerSprite);
+      currentBallOwnerRef.value = step0OwnerSprite;
+    }
   }
 
   // 🔶 Pre-possession: Move players to their step 0 positions

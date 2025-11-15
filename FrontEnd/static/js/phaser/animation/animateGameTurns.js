@@ -818,6 +818,13 @@ export async function animateGameTurns({ //hasBallAtStep
           }
         }
         updateDebugScore(turn, { turnIndex: i, possessionId });
+        
+        // Set flag if this was a shot turn (MAKE or MISS) so the next turn knows to skip step 0 ball attachment
+        if (turn.result_type === "MAKE" || turn.result_type === "MISS") {
+          scene._previousTurnWasShot = true;
+          console.log('🏀 animateGameTurns: Set _previousTurnWasShot flag after fast break', turn.result_type);
+        }
+        
         continue;
       }
     }
@@ -926,6 +933,12 @@ export async function animateGameTurns({ //hasBallAtStep
           // }
         }
       });
+      
+      // Set flag if this was a shot turn (MAKE or MISS) so the next turn knows to skip step 0 ball attachment
+      if (turn.result_type === "MAKE" || turn.result_type === "MISS") {
+        scene._previousTurnWasShot = true;
+        console.log('🏀 animateGameTurns: Set _previousTurnWasShot flag after', turn.result_type);
+      }
     }
 
     const stealEvent = turn.events?.find(e => e.event_type === "STEAL");
