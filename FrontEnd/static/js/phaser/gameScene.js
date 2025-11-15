@@ -1558,6 +1558,18 @@ export function createGameScene(Phaser) {
           });
           this.finalScore = finalScore;
           this.finalized = true;
+          
+          // Show game completion popup
+          const { showGameCompletionPopup } = await import('./utils/gameCompletionPopup.js');
+          const mode = this.tournamentId ? 'tournament' : (this.franchiseId ? 'franchise' : 'single');
+          showGameCompletionPopup({
+            gameId: gameId,
+            mode: mode,
+            tournamentId: this.tournamentId,
+            franchiseId: this.franchiseId,
+            finalScore: finalScore
+          });
+          
           return finalScore;
         };
         await finalize();
