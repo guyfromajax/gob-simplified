@@ -795,8 +795,8 @@ async function runInboundSetup({
           height
         ).x;
         // Use distance-based duration for consistent speed (same as HCO step movements)
-        // isTransition=true allows longer durations for transition movements
-        const retreatDuration = getPlayerDuration(sprite, targetX, sprite.y, true);
+        // Use regular speed (not transition) for retreat - should match inbound setup speed
+        const retreatDuration = getPlayerDuration(sprite, targetX, sprite.y, false);
         retreatPromises.push(
           new Promise((resolve) => {
             let timeoutId;
@@ -967,8 +967,8 @@ async function runInboundSetup({
 
   const sfTween = new Promise((resolve) => {
     // Use distance-based duration for consistent speed (same as HCO step movements)
-    // isTransition=true allows longer durations for transition movements
-    const sfDuration = getPlayerDuration(sfSprite, spotPx.x, spotPx.y, true);
+    // Use regular speed (not transition) for inbound setup - should be faster
+    const sfDuration = getPlayerDuration(sfSprite, spotPx.x, spotPx.y, false);
     scene.tweens.add({
       targets: sfSprite,
       x: spotPx.x,
@@ -989,8 +989,8 @@ async function runInboundSetup({
   const pgTween = new Promise((resolve) => {
     animationDebugLog("pgTween start");
     // Use distance-based duration for consistent speed (same as HCO step movements)
-    // isTransition=true allows longer durations for transition movements
-    const pgDuration = getPlayerDuration(pgSprite, pgDestPx.x, pgDestPx.y, true);
+    // Use regular speed (not transition) for inbound setup - should be faster
+    const pgDuration = getPlayerDuration(pgSprite, pgDestPx.x, pgDestPx.y, false);
     scene.tweens.add({
       targets: pgSprite,
       x: pgDestPx.x,
@@ -1012,8 +1012,8 @@ async function runInboundSetup({
     ? new Promise((resolve) => {
         animationDebugLog("sgTween start");
         // Use distance-based duration for consistent speed (same as HCO step movements)
-        // isTransition=true allows longer durations for transition movements
-        const sgDuration = getPlayerDuration(sgSprite, sgDestPx.x, sgDestPx.y, true);
+        // Use regular speed (not transition) for inbound setup - should be faster
+        const sgDuration = getPlayerDuration(sgSprite, sgDestPx.x, sgDestPx.y, false);
         scene.tweens.add({
           targets: sgSprite,
           x: sgDestPx.x,
@@ -1036,8 +1036,8 @@ async function runInboundSetup({
     ? new Promise((resolve) => {
         animationDebugLog("pfTween start");
         // Use distance-based duration for consistent speed (same as HCO step movements)
-        // isTransition=true allows longer durations for transition movements
-        const pfDuration = getPlayerDuration(pfSprite, pfDestPx.x, pfDestPx.y, true);
+        // Use regular speed (not transition) for inbound setup - should be faster
+        const pfDuration = getPlayerDuration(pfSprite, pfDestPx.x, pfDestPx.y, false);
         scene.tweens.add({
           targets: pfSprite,
           x: pfDestPx.x,
@@ -1060,8 +1060,8 @@ async function runInboundSetup({
     ? new Promise((resolve) => {
         animationDebugLog("cTween start");
         // Use distance-based duration for consistent speed (same as HCO step movements)
-        // isTransition=true allows longer durations for transition movements
-        const cDuration = getPlayerDuration(cSprite, cDestPx.x, cDestPx.y, true);
+        // Use regular speed (not transition) for inbound setup - should be faster
+        const cDuration = getPlayerDuration(cSprite, cDestPx.x, cDestPx.y, false);
         scene.tweens.add({
           targets: cSprite,
           x: cDestPx.x,
@@ -1204,17 +1204,53 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   }
 
   // 🔶 Pre-possession: Move players to their step 0 positions
-  // ⚠️ REMOVED: With distance-based duration calculation, players can start from their current positions.
-  // The first step (stepIndex 1) will automatically calculate duration from wherever the player
-  // ended the previous turn to step 1's target, ensuring smooth transitions without a setup pause.
-  // If needed for edge cases, uncomment below:
-  // await runSetupTween({
-  //   scene,
-  //   ballSprite,
-  //   animations: turnData.animations,
-  //   playerSprites,
-  //   currentBallOwnerRef
-  // });
+  // After inbound passes, players are at inbound positions and need to smoothly animate
+  // to their HCO step 0 positions before starting the HCO steps.
+  // Use distance-based duration to ensure consistent speed matching HCO step movements.
+  if (turnData.animations && turnData.animations.length > 0) {
+    const setupPromises = [];
+    for (const anim of turnData.animations) {
+      const sprite = playerSprites[anim.playerId];
+      const firstStep = anim.movement?.[0];
+      if (!sprite || !firstStep) continue;
+
+      const { x: targetX, y: targetY } = gridToPixels(
+        firstStep.coords.x,
+        firstStep.coords.y,
+        scene.game.config.width,
+        scene.game.config.height
+      );
+
+      // Calculate distance from current position to step 0 position
+      const distance = Phaser.Math.Distance.Between(sprite.x, sprite.y, targetX, targetY);
+      
+      // Only animate if player is not already at step 0 position (within 5 pixels)
+      if (distance > 5) {
+        // Use distance-based duration with regular speed (not transition)
+        // This ensures consistent speed matching HCO step movements
+        const setupDuration = getPlayerDuration(sprite, targetX, targetY, false);
+        
+        setupPromises.push(
+          new Promise((resolve) => {
+            const tween = scene.tweens.add({
+              targets: sprite,
+              x: targetX,
+              y: targetY,
+              duration: setupDuration,
+              ease: "Linear", // Match HCO step movements
+              onComplete: resolve,
+              onStop: resolve
+            });
+          })
+        );
+      }
+    }
+    
+    // Wait for all players to reach step 0 positions before starting HCO steps
+    if (setupPromises.length > 0) {
+      await Promise.all(setupPromises);
+    }
+  }
 
   if (scene.skipToEnd || scene.stateMachine?.is(States.FastBreak)) {
     return;
