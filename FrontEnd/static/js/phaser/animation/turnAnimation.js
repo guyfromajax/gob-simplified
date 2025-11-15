@@ -763,15 +763,30 @@ async function runInboundSetup({
         ).x;
         retreatPromises.push(
           new Promise((resolve) => {
-            scene.tweens.add({
+            let timeoutId;
+            const tween = scene.tweens.add({
               targets: sprite,
               x: targetX,
               y: sprite.y,
               duration: 500,
               ease: "Sine.easeInOut",
-              onComplete: resolve,
-              onStop: resolve
+              onComplete: () => {
+                if (timeoutId) clearTimeout(timeoutId);
+                resolve();
+              },
+              onStop: () => {
+                if (timeoutId) clearTimeout(timeoutId);
+                resolve();
+              }
             });
+            
+            // Timeout safety: force resolve after 1000ms (2x duration + buffer)
+            timeoutId = setTimeout(() => {
+              if (tween && tween.isPlaying && tween.isPlaying()) {
+                scene.tweens.killTweensOf(sprite);
+              }
+              resolve();
+            }, 1000);
           })
         );
       }
@@ -792,15 +807,30 @@ async function runInboundSetup({
           const targetPx = gridToPixels(targetPos.x, targetPos.y, width, height);
           retreatPromises.push(
             new Promise((resolve) => {
-              scene.tweens.add({
+              let timeoutId;
+              const tween = scene.tweens.add({
                 targets: sprite,
                 x: targetPx.x,
                 y: targetPx.y,
                 duration: 500,
                 ease: "Sine.easeInOut",
-                onComplete: resolve,
-                onStop: resolve
+                onComplete: () => {
+                  if (timeoutId) clearTimeout(timeoutId);
+                  resolve();
+                },
+                onStop: () => {
+                  if (timeoutId) clearTimeout(timeoutId);
+                  resolve();
+                }
               });
+              
+              // Timeout safety: force resolve after 1000ms (2x duration + buffer)
+              timeoutId = setTimeout(() => {
+                if (tween && tween.isPlaying && tween.isPlaying()) {
+                  scene.tweens.killTweensOf(sprite);
+                }
+                resolve();
+              }, 1000);
             })
           );
         }
