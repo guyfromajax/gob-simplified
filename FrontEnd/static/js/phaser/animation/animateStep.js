@@ -302,20 +302,98 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
       });
     }
     
-    if (typeof tween.play === 'function') {
-      const wasPlaying = tween.isPlaying();
-      if (!wasPlaying) {
-        tween.play();
-        // Log if we had to manually start it
-        if (duration < 2000) { // Only log for shorter tweens to avoid spam
-          console.log('animateStep: Manually started tween', {
-            playerId: sprite?.playerId,
-            action: step.action,
-            wasPlaying,
-            nowPlaying: tween.isPlaying()
-          });
-        }
+    // Verify tween is actually playing after creation
+    let tweenStarted = false;
+    if (typeof tween.isPlaying === 'function') {
+      tweenStarted = tween.isPlaying();
+    }
+    
+    if (!tweenStarted && typeof tween.play === 'function') {
+      tween.play();
+      // Verify it started
+      if (typeof tween.isPlaying === 'function') {
+        tweenStarted = tween.isPlaying();
       }
+      
+      // Log if we had to manually start it (especially for receive actions which are problematic)
+      if (!tweenStarted || step.action === 'receive' || step.action === 'guard_ball') {
+        console.warn('animateStep: Tween not playing after creation/play()', {
+          playerId: sprite?.playerId,
+          action: step.action,
+          wasPlaying: false,
+          nowPlaying: tweenStarted,
+          tweenState: {
+            isPlaying: typeof tween.isPlaying === 'function' ? tween.isPlaying() : 'N/A',
+            isPaused: typeof tween.isPaused === 'function' ? tween.isPaused() : 'N/A',
+            progress: tween.progress,
+            totalProgress: tween.totalProgress
+          },
+          spriteState: {
+            active: sprite?.active,
+            visible: sprite?.visible,
+            x: sprite?.x,
+            y: sprite?.y
+          }
+        });
+      }
+    }
+    
+    // For receive/guard_ball actions specifically, add a safety check after a short delay
+    // These actions are prone to getting stuck, so we monitor them more closely
+    if (step.action === 'receive' || step.action === 'guard_ball') {
+      let checkCount = 0;
+      const maxChecks = 10; // Check 10 times over 1 second
+      const checkInterval = scene.time.addEvent({
+        delay: 100,
+        repeat: maxChecks - 1,
+        callback: () => {
+          checkCount++;
+          if (tweenCompleted) {
+            checkInterval.destroy();
+            return;
+          }
+          
+          const isPlaying = typeof tween.isPlaying === 'function' ? tween.isPlaying() : false;
+          const progress = tween?.progress || 0;
+          
+          if (!isPlaying && progress === 0 && checkCount >= 3) {
+            // Tween still not playing after 300ms, try to force it
+            console.warn(`animateStep: ${step.action} tween still not playing after ${checkCount * 100}ms, forcing start`, {
+              playerId: sprite?.playerId,
+              action: step.action,
+              checkCount,
+              tweenProgress: progress,
+              isPlaying
+            });
+            
+            // Try multiple methods to start the tween
+            if (typeof tween.play === 'function') {
+              tween.play();
+            }
+            if (typeof tween.restart === 'function') {
+              tween.restart();
+            }
+            
+            // If still not playing after all attempts, resolve to prevent infinite wait
+            if (checkCount >= maxChecks) {
+              console.error(`animateStep: ${step.action} tween failed to start after ${maxChecks * 100}ms, forcing resolve`, {
+                playerId: sprite?.playerId,
+                action: step.action
+              });
+              if (tween) {
+                scene.tweens?.killTweensOf(tween);
+              }
+              tweenCompleted = true;
+              clearTimeout(timeoutId);
+              resolve();
+              checkInterval.destroy();
+            }
+          } else if (isPlaying || progress > 0) {
+            // Tween is working, stop checking
+            checkInterval.destroy();
+          }
+        }
+      });
     }
     
     if (duration > 2000 || Math.hypot(sprite.x - targetX, sprite.y - targetY) > 500) {
