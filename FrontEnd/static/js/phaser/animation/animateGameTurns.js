@@ -119,17 +119,19 @@ async function handleOrebTurn(scene, { playerSprites, ballSprite, turnData, onUp
       const { animateRebound } = await import('./ballManager.js');
       
       // CRITICAL: shootBall already handled the bounce for MISS shots
+      // The ball is already at the bounce spot from shootBall's bounceFromRim
       // Use the bounce result from shootBall (which has the correct basket and position)
-      // OR use backend's ballSpot if provided (ensures DREB animates at correct basket)
+      // Do NOT use backend's ballSpot (which is rim coordinates) - that causes ball to snap to rim
       // Do NOT call bounceFromRim again - it causes double bounce and wrong basket issues
-      const reboundBallSpot = turnData.ballSpot || (shotResult?.grid || { x: 50, y: 25 });
+      const reboundBallSpot = shotResult?.grid || turnData.ballSpot || { x: 50, y: 25 };
       
       console.log('🏀 handleOrebTurn: Putback miss - using ball spot', {
         reboundBallSpot,
         shotResultGrid: shotResult?.grid,
         backendBallSpot: turnData.ballSpot,
         rebounderId: turnData.rebounderId,
-        rebound_type: turnData.rebound_type
+        rebound_type: turnData.rebound_type,
+        note: 'Using shotResult grid (bounce spot) instead of backend ballSpot (rim) to prevent ball snap'
       });
       
       await animateRebound({
@@ -139,7 +141,8 @@ async function handleOrebTurn(scene, { playerSprites, ballSprite, turnData, onUp
         animations: [],
         rebounderId: turnData.rebounderId,
         ballSpot: reboundBallSpot,
-        shooterId: rebounderId
+        shooterId: rebounderId,
+        preserveBallPosition: true // Ball is already at bounce spot from shootBall - don't reposition
       });
       
       // If DREB, set up next play

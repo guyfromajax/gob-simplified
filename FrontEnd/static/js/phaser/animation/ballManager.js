@@ -804,6 +804,7 @@ export function animateRebound({
   ballSpot,
   shooterId,
   upcomingFastBreak,
+  preserveBallPosition = false, // If true, don't move ball - it's already at correct position
 }) {
   if (!scene || !ballSprite || !ballSpot) return Promise.resolve();
   if (scene?.stateMachine?.is(States.FreeThrow)) return Promise.resolve();
@@ -826,7 +827,12 @@ export function animateRebound({
     scene.game.config.height
   );
 
-  ballSprite.setPosition(spotPx.x, spotPx.y);
+  // CRITICAL: For putback misses, the ball is already at the bounce spot from shootBall
+  // Do NOT reposition the ball - it will cause it to snap to rim/rebounder position
+  // Only set position if preserveBallPosition is false (for regular rebounds)
+  if (!preserveBallPosition) {
+    ballSprite.setPosition(spotPx.x, spotPx.y);
+  }
   ballSprite.setVisible(true);
 
   const rebounderSprite = playerSprites[rebounderId];
