@@ -615,9 +615,11 @@ export async function animateGameTurns({ //hasBallAtStep
     if (turn.result_type === "BASELINE_INBOUND") {
       // console.log('🏀 Quarter start BASELINE_INBOUND detected, animating all players');
       
-      // Animate all players to their positions
+      // Animate all players to their positions using distance-based duration
+      // This ensures consistent speed matching HCO step movements
       const { tweenPlayerTo } = await import('./ballTween.js');
       const { gridToPixels } = await import('../utils/gridToPixels.js');
+      const { getPlayerDuration } = await import('./turnAnimation.js');
       
       await Promise.all(
         (turn.animations || []).map(anim => {
@@ -627,8 +629,11 @@ export async function animateGameTurns({ //hasBallAtStep
           const endStep = anim.movement[anim.movement.length - 1];
           const endPixels = gridToPixels(endStep.coords.x, endStep.coords.y, scene.game.config.width, scene.game.config.height);
           
+          // Use distance-based duration for consistent speed (not transition - should match inbound setup speed)
+          const duration = getPlayerDuration(sprite, endPixels.x, endPixels.y, false);
+          
           // tweenPlayerTo returns a Promise that resolves when complete
-          return tweenPlayerTo(scene, sprite, endPixels, { duration: 800 });
+          return tweenPlayerTo(scene, sprite, endPixels, { duration, easing: 'Linear' });
         })
       );
       
