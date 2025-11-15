@@ -1204,9 +1204,11 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   }
 
   // 🔶 Pre-possession: Move players to their step 0 positions
+  // CRITICAL: This handles transitions between states (e.g., Inbound -> HCO)
   // After inbound passes, players are at inbound positions and need to smoothly animate
   // to their HCO step 0 positions before starting the HCO steps.
   // Use distance-based duration to ensure consistent speed matching HCO step movements.
+  // This MUST run for all HCO turns to ensure smooth transitions from any previous state.
   if (turnData.animations && turnData.animations.length > 0) {
     const setupPromises = [];
     for (const anim of turnData.animations) {
@@ -1224,8 +1226,9 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
       // Calculate distance from current position to step 0 position
       const distance = Phaser.Math.Distance.Between(sprite.x, sprite.y, targetX, targetY);
       
-      // Only animate if player is not already at step 0 position (within 5 pixels)
-      if (distance > 5) {
+      // Always animate if distance is > 1 pixel (reduced threshold to catch more cases)
+      // This ensures smooth transitions between states (Inbound -> HCO, DREB -> HCO, etc.)
+      if (distance > 1) {
         // Use distance-based duration with regular speed (not transition)
         // This ensures consistent speed matching HCO step movements
         const setupDuration = getPlayerDuration(sprite, targetX, targetY, false);
@@ -1247,6 +1250,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
     }
     
     // Wait for all players to reach step 0 positions before starting HCO steps
+    // This ensures smooth transitions between states
     if (setupPromises.length > 0) {
       await Promise.all(setupPromises);
     }
@@ -1725,7 +1729,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   }
 }
 
-export { runInboundSetup, runSideInboundSetup, runDefensiveReboundSetup };
+export { runInboundSetup, runSideInboundSetup, runDefensiveReboundSetup, getPlayerDuration };
 
 if (typeof window !== "undefined") {
   window.playTurnAnimation = playTurnAnimation;
