@@ -150,20 +150,23 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
       return;
     }
 
-    tween = scene.tweens.add({
+    // Track tween creation for debugging long pauses
+    const tweenId = `tween_${sprite?.playerId}_${Date.now()}`;
+    
+    const tweenConfig = {
       targets: validTargets,
       x: targetX,
       y: targetY,
       duration,
       ease: "Linear",
       onStart: async () => {
-        if (PLAYER_TWEEN_DEBUG) {
+        if (PLAYER_TWEEN_DEBUG || duration > 2000) {
           const team = sprite?.team_id ?? sprite?.team ?? null;
-          console.log("player:tweenStart", {
-            type: "playerTweenStart",
-            shooterId: null,
-            reboundSpot: null,
+          console.log("animateStep: Tween started", {
+            tweenId,
             playerId: sprite?.playerId ?? null,
+            action: step.action,
+            duration,
             team
           });
         }
@@ -194,6 +197,14 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
         }
         tweenCompleted = true;
         clearTimeout(timeoutId);
+        if (duration > 2000) {
+          console.log('animateStep: Tween completed', {
+            tweenId,
+            playerId: sprite?.playerId,
+            action: step.action,
+            duration
+          });
+        }
         try {
           await startPromise;
         } catch (error) {
@@ -217,7 +228,47 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
         emitSummary('stop');
         resolve();
       }
-    });
+    };
+    
+    // Log tween creation for debugging
+    if (duration > 4000) {
+      console.warn('animateStep: Creating tween with unusually long duration', {
+        playerId: sprite?.playerId,
+        action: step.action,
+        duration,
+        distance: Math.hypot(sprite.x - targetX, sprite.y - targetY),
+        from: { x: sprite.x, y: sprite.y },
+        to: { x: targetX, y: targetY }
+      });
+    }
+    
+    tween = scene.tweens.add(tweenConfig);
+    tween._animateStepId = tweenId;
+    
+    // Verify tween was created and started
+    if (!tween) {
+      console.error('animateStep: Failed to create tween', {
+        playerId: sprite?.playerId,
+        action: step.action,
+        validTargetsCount: validTargets.length
+      });
+      tweenCompleted = true;
+      clearTimeout(timeoutId);
+      resolve();
+      return;
+    }
+    
+    if (duration > 2000 || Math.hypot(sprite.x - targetX, sprite.y - targetY) > 500) {
+      console.log('animateStep: Created tween', {
+        tweenId,
+        playerId: sprite?.playerId,
+        action: step.action,
+        duration,
+        distance: Math.hypot(sprite.x - targetX, sprite.y - targetY),
+        from: { x: sprite.x, y: sprite.y },
+        to: { x: targetX, y: targetY }
+      });
+    }
 
     if (scene.skipToEnd) {
       tween.stop();
