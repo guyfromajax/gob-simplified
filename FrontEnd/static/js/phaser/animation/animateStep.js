@@ -54,6 +54,12 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
           tweenManagerState = { error: error.message };
         }
       }
+      // Check if this is a step before a shot (common cause of pauses)
+      const isBeforeShot = step.action === 'guard_ball' || step.action === 'receive' || 
+                          (scene.currentTurnData?.animations?.some(anim => 
+                            anim.movement?.some(m => m.action === 'shoot' && m.timestamp > step.timestamp)
+                          ));
+      
       console.warn('animateStep: Timeout - forcing resolve', {
         playerId: sprite?.playerId,
         action: step.action,
@@ -66,7 +72,9 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
         distanceToTarget: distance,
         tweenManagerState,
         scenePaused: scene.scene?.isPaused(),
-        skipToEnd: scene.skipToEnd
+        skipToEnd: scene.skipToEnd,
+        isBeforeShot,
+        stepTimestamp: step.timestamp
       });
       if (tween) {
         scene.tweens?.killTweensOf(tween);
@@ -144,8 +152,35 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
 
     // If no valid targets, resolve immediately
     if (validTargets.length === 0) {
+      console.warn('animateStep: No valid targets for tween', {
+        playerId: sprite?.playerId,
+        action: step.action,
+        tweenTargetsCount: tweenTargets.length,
+        validTargetsCount: validTargets.length,
+        spriteValid: sprite && sprite.scene && sprite.active !== false && !sprite.destroyed,
+        ballValid: ballIsValid
+      });
       tweenCompleted = true;
       clearTimeout(timeoutId);
+      resolve();
+      return;
+    }
+    
+    // Check if distance is effectively zero (sprite already at target)
+    const distance = Math.hypot(sprite.x - targetX, sprite.y - targetY);
+    if (distance < 1) {
+      // Sprite is already at target, resolve immediately
+      // Call onAction if needed (fire and forget for zero-distance moves)
+      if (step.action && onAction) {
+        try {
+          onAction(step.action, sprite, step.timestamp);
+        } catch (error) {
+          console.error('animateStep: Error in onAction for zero-distance step', { error, playerId: sprite?.playerId });
+        }
+      }
+      tweenCompleted = true;
+      clearTimeout(timeoutId);
+      emitSummary('complete');
       resolve();
       return;
     }
