@@ -258,6 +258,31 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
       return;
     }
     
+    // Ensure tween starts immediately (Phaser tweens should auto-start, but verify)
+    // Check if tween manager is paused or if tween needs explicit start
+    if (scene.tweens && typeof scene.tweens.isPaused === 'function' && scene.tweens.isPaused()) {
+      console.warn('animateStep: Tween manager is paused!', {
+        playerId: sprite?.playerId,
+        action: step.action
+      });
+    }
+    
+    if (typeof tween.play === 'function') {
+      const wasPlaying = tween.isPlaying();
+      if (!wasPlaying) {
+        tween.play();
+        // Log if we had to manually start it
+        if (duration < 2000) { // Only log for shorter tweens to avoid spam
+          console.log('animateStep: Manually started tween', {
+            playerId: sprite?.playerId,
+            action: step.action,
+            wasPlaying,
+            nowPlaying: tween.isPlaying()
+          });
+        }
+      }
+    }
+    
     if (duration > 2000 || Math.hypot(sprite.x - targetX, sprite.y - targetY) > 500) {
       console.log('animateStep: Created tween', {
         tweenId,
@@ -266,7 +291,9 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
         duration,
         distance: Math.hypot(sprite.x - targetX, sprite.y - targetY),
         from: { x: sprite.x, y: sprite.y },
-        to: { x: targetX, y: targetY }
+        to: { x: targetX, y: targetY },
+        isPlaying: tween.isPlaying(),
+        isPaused: tween.isPaused ? tween.isPaused() : 'N/A'
       });
     }
 
