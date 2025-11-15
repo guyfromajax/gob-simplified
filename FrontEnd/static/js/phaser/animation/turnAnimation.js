@@ -434,9 +434,11 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
     };
 
     const outletPx = gridToPixels(outletTarget.x, outletTarget.y, width, height);
+    // Use distance-based duration for consistent speed (same as HCO step movements)
+    const outletDuration = getPlayerDuration(outletReceiverSprite, outletPx.x, outletPx.y);
     promises.push(
       tweenPlayerTo(scene, outletReceiverSprite, outletPx, {
-        duration: animationConfig.outletSetup.playerMoveMs,
+        duration: outletDuration,
       })
     );
     
@@ -528,9 +530,11 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
       };
       
       const targetPx = gridToPixels(targetGrid.x, targetGrid.y, width, height);
+      // Use distance-based duration for consistent speed (same as HCO step movements)
+      const playerDuration = getPlayerDuration(sprite, targetPx.x, targetPx.y);
       promises.push(
         tweenPlayerTo(scene, sprite, targetPx, {
-          duration: animationConfig.outletSetup.playerMoveMs,
+          duration: playerDuration,
         })
       );
       
@@ -761,6 +765,8 @@ async function runInboundSetup({
           width,
           height
         ).x;
+        // Use distance-based duration for consistent speed (same as HCO step movements)
+        const retreatDuration = getPlayerDuration(sprite, targetX, sprite.y);
         retreatPromises.push(
           new Promise((resolve) => {
             let timeoutId;
@@ -768,7 +774,7 @@ async function runInboundSetup({
               targets: sprite,
               x: targetX,
               y: sprite.y,
-              duration: 500,
+              duration: retreatDuration,
               ease: "Sine.easeInOut",
               onComplete: () => {
                 if (timeoutId) clearTimeout(timeoutId);
@@ -780,13 +786,14 @@ async function runInboundSetup({
               }
             });
             
-            // Timeout safety: force resolve after 1000ms (2x duration + buffer)
+            // Timeout safety: force resolve after 2x duration + buffer
+            const timeoutMs = Math.max(retreatDuration * 2, 1000);
             timeoutId = setTimeout(() => {
               if (tween && tween.isPlaying && tween.isPlaying()) {
                 scene.tweens.killTweensOf(sprite);
               }
               resolve();
-            }, 1000);
+            }, timeoutMs);
           })
         );
       }
@@ -805,6 +812,8 @@ async function runInboundSetup({
         const targetPos = fcpDefensiveSetup[info.pos];
         if (targetPos) {
           const targetPx = gridToPixels(targetPos.x, targetPos.y, width, height);
+          // Use distance-based duration for consistent speed (same as HCO step movements)
+          const fcpDuration = getPlayerDuration(sprite, targetPx.x, targetPx.y);
           retreatPromises.push(
             new Promise((resolve) => {
               let timeoutId;
@@ -812,7 +821,7 @@ async function runInboundSetup({
                 targets: sprite,
                 x: targetPx.x,
                 y: targetPx.y,
-                duration: 500,
+                duration: fcpDuration,
                 ease: "Sine.easeInOut",
                 onComplete: () => {
                   if (timeoutId) clearTimeout(timeoutId);
@@ -824,13 +833,14 @@ async function runInboundSetup({
                 }
               });
               
-              // Timeout safety: force resolve after 1000ms (2x duration + buffer)
+              // Timeout safety: force resolve after 2x duration + buffer
+              const timeoutMs = Math.max(fcpDuration * 2, 1000);
               timeoutId = setTimeout(() => {
                 if (tween && tween.isPlaying && tween.isPlaying()) {
                   scene.tweens.killTweensOf(sprite);
                 }
                 resolve();
-              }, 1000);
+              }, timeoutMs);
             })
           );
         }
@@ -925,11 +935,13 @@ async function runInboundSetup({
   }
 
   const sfTween = new Promise((resolve) => {
+    // Use distance-based duration for consistent speed (same as HCO step movements)
+    const sfDuration = getPlayerDuration(sfSprite, spotPx.x, spotPx.y);
     scene.tweens.add({
       targets: sfSprite,
       x: spotPx.x,
       y: spotPx.y,
-      duration: 500,
+      duration: sfDuration,
       ease: "Sine.easeInOut",
       onComplete: () => {
         animationDebugLog(`[inbound][sfTweenEnd][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
@@ -944,11 +956,13 @@ async function runInboundSetup({
 
   const pgTween = new Promise((resolve) => {
     animationDebugLog("pgTween start");
+    // Use distance-based duration for consistent speed (same as HCO step movements)
+    const pgDuration = getPlayerDuration(pgSprite, pgDestPx.x, pgDestPx.y);
     scene.tweens.add({
       targets: pgSprite,
       x: pgDestPx.x,
       y: pgDestPx.y,
-      duration: 500,
+      duration: pgDuration,
       ease: "Sine.easeInOut",
       onComplete: () => {
         animationDebugLog("pgTween end");
@@ -964,11 +978,13 @@ async function runInboundSetup({
   const sgTween = sgSprite
     ? new Promise((resolve) => {
         animationDebugLog("sgTween start");
+        // Use distance-based duration for consistent speed (same as HCO step movements)
+        const sgDuration = getPlayerDuration(sgSprite, sgDestPx.x, sgDestPx.y);
         scene.tweens.add({
           targets: sgSprite,
           x: sgDestPx.x,
           y: sgDestPx.y,
-          duration: 500,
+          duration: sgDuration,
           ease: "Sine.easeInOut",
           onComplete: () => {
             animationDebugLog("sgTween end");
@@ -985,11 +1001,13 @@ async function runInboundSetup({
   const pfTween = pfSprite
     ? new Promise((resolve) => {
         animationDebugLog("pfTween start");
+        // Use distance-based duration for consistent speed (same as HCO step movements)
+        const pfDuration = getPlayerDuration(pfSprite, pfDestPx.x, pfDestPx.y);
         scene.tweens.add({
           targets: pfSprite,
           x: pfDestPx.x,
           y: pfDestPx.y,
-          duration: 500,
+          duration: pfDuration,
           ease: "Sine.easeInOut",
           onComplete: () => {
             animationDebugLog("pfTween end");
@@ -1006,11 +1024,13 @@ async function runInboundSetup({
   const cTween = cSprite
     ? new Promise((resolve) => {
         animationDebugLog("cTween start");
+        // Use distance-based duration for consistent speed (same as HCO step movements)
+        const cDuration = getPlayerDuration(cSprite, cDestPx.x, cDestPx.y);
         scene.tweens.add({
           targets: cSprite,
           x: cDestPx.x,
           y: cDestPx.y,
-          duration: 500,
+          duration: cDuration,
           ease: "Sine.easeInOut",
           onComplete: () => {
             animationDebugLog("cTween end");
