@@ -439,6 +439,7 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
     promises.push(
       tweenPlayerTo(scene, outletReceiverSprite, outletPx, {
         duration: outletDuration,
+        easing: 'Linear', // Match HCO step movements for consistent feel
       })
     );
     
@@ -535,6 +536,7 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
       promises.push(
         tweenPlayerTo(scene, sprite, targetPx, {
           duration: playerDuration,
+          easing: 'Linear', // Match HCO step movements for consistent feel
         })
       );
       
@@ -548,9 +550,10 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
 
   await Promise.all(promises);
 
-  // Do outlet pass for HCO, HCT, and FCP
+  // Do outlet pass ONLY for HCO instances
   // For FAST_BREAK, the outlet pass will be handled in the next turn (the actual fast break turn)
-  if ((nextPlayType === "HCO" || nextPlayType === "HCT" || nextPlayType === "FCP") && outletReceiverId && outletReceiverId !== rebounderId) {
+  // For FCP/HCT, no outlet pass - players go directly to press positions
+  if (nextPlayType === "HCO" && outletReceiverId && outletReceiverId !== rebounderId) {
     const outletLog = {
       event: 'OUTLET_PASS',
       from: rebounderId,
@@ -566,6 +569,13 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
       outletLog.newOffenseTeam = newOffenseTeam;
       outletLog.attackRim = newOffenseBasket;
     }
+    // Always log outlet pass execution (not just when DebugFlags?.OUTLET is enabled)
+    console.log('🏀 runDefensiveReboundSetup: Executing outlet pass', {
+      from: rebounderId,
+      to: outletReceiverId,
+      nextPlayType,
+      outletTarget: outletTarget ? `(${outletTarget.x}, ${outletTarget.y})` : 'null (will use receiver current position)'
+    });
     if (DebugFlags?.OUTLET) animationDebugLog(outletLog);
     if (DebugFlags?.OUTLET) animationDebugLog('Starting outlet pass animation...');
     await runPass(scene, {
@@ -577,11 +587,24 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
         setPendingOwner(scene, outletReceiverId);
         setCurrentOwner(scene, outletReceiverId);
         outletLog.completedAt = Date.now();
+        console.log('🏀 runDefensiveReboundSetup: Outlet pass completed', {
+          from: rebounderId,
+          to: outletReceiverId
+        });
         if (DebugFlags?.OUTLET) animationDebugLog(outletLog);
         if (DebugFlags?.OUTLET) animationDebugLog('Outlet pass completed!');
       }
     });
   } else {
+    // Always log when outlet pass is skipped (not just when DebugFlags?.OUTLET is enabled)
+    console.warn('🏀 runDefensiveReboundSetup: Outlet pass skipped', { 
+      outletReceiverId, 
+      rebounderId,
+      nextPlayType,
+      reason: nextPlayType === "FAST_BREAK" ? 'Fast break - outlet handled in next turn' : 
+              !outletReceiverId ? 'No outlet receiver found' : 
+              outletReceiverId === rebounderId ? 'Outlet receiver is rebounder' : 'Unknown reason'
+    });
     if (DebugFlags?.OUTLET) {
       animationDebugLog('Outlet pass skipped:', { 
         outletReceiverId, 
@@ -775,7 +798,7 @@ async function runInboundSetup({
               x: targetX,
               y: sprite.y,
               duration: retreatDuration,
-              ease: "Sine.easeInOut",
+              ease: "Linear", // Match HCO step movements for consistent feel
               onComplete: () => {
                 if (timeoutId) clearTimeout(timeoutId);
                 resolve();
@@ -822,7 +845,7 @@ async function runInboundSetup({
                 x: targetPx.x,
                 y: targetPx.y,
                 duration: fcpDuration,
-                ease: "Sine.easeInOut",
+                ease: "Linear", // Match HCO step movements for consistent feel
                 onComplete: () => {
                   if (timeoutId) clearTimeout(timeoutId);
                   resolve();
@@ -942,7 +965,7 @@ async function runInboundSetup({
       x: spotPx.x,
       y: spotPx.y,
       duration: sfDuration,
-      ease: "Sine.easeInOut",
+      ease: "Linear", // Match HCO step movements for consistent feel
       onComplete: () => {
         animationDebugLog(`[inbound][sfTweenEnd][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
         resolve();
@@ -963,7 +986,7 @@ async function runInboundSetup({
       x: pgDestPx.x,
       y: pgDestPx.y,
       duration: pgDuration,
-      ease: "Sine.easeInOut",
+      ease: "Linear", // Match HCO step movements for consistent feel
       onComplete: () => {
         animationDebugLog("pgTween end");
         resolve();
@@ -985,7 +1008,7 @@ async function runInboundSetup({
           x: sgDestPx.x,
           y: sgDestPx.y,
           duration: sgDuration,
-          ease: "Sine.easeInOut",
+          ease: "Linear", // Match HCO step movements for consistent feel
           onComplete: () => {
             animationDebugLog("sgTween end");
             resolve();
@@ -1008,7 +1031,7 @@ async function runInboundSetup({
           x: pfDestPx.x,
           y: pfDestPx.y,
           duration: pfDuration,
-          ease: "Sine.easeInOut",
+          ease: "Linear", // Match HCO step movements for consistent feel
           onComplete: () => {
             animationDebugLog("pfTween end");
             resolve();
@@ -1031,7 +1054,7 @@ async function runInboundSetup({
           x: cDestPx.x,
           y: cDestPx.y,
           duration: cDuration,
-          ease: "Sine.easeInOut",
+          ease: "Linear", // Match HCO step movements for consistent feel
           onComplete: () => {
             animationDebugLog("cTween end");
             resolve();
