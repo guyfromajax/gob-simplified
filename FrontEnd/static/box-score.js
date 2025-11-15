@@ -17,6 +17,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadGameData(gameId);
     renderBoxScore();
     setupTabs();
+    setupLockerRoomButton();
   } catch (error) {
     console.error('Error loading box score:', error);
   }
@@ -486,6 +487,43 @@ function setupTabs() {
       teamContents.forEach(content => content.classList.remove('active'));
       document.getElementById(`${team}-content`).classList.add('active');
     });
+  });
+}
+
+// Setup Locker Room button navigation
+function setupLockerRoomButton() {
+  const button = document.getElementById('locker-room-button');
+  if (!button) return;
+
+  // Determine mode from URL params or localStorage
+  const urlParams = new URLSearchParams(window.location.search);
+  const tournamentId = urlParams.get('tournament_id');
+  const franchiseId = urlParams.get('franchise_id');
+  
+  // Also check localStorage for mode context
+  let mode = 'single';
+  let lockerRoomUrl;
+  
+  if (tournamentId || (typeof localStorage !== 'undefined' && localStorage.getItem('activeTournament'))) {
+    mode = 'tournament';
+    lockerRoomUrl = '/static/tournament.html';
+    if (tournamentId) {
+      lockerRoomUrl += `?tournament_id=${tournamentId}`;
+    }
+  } else if (franchiseId || (typeof localStorage !== 'undefined' && localStorage.getItem('franchise_id'))) {
+    mode = 'franchise';
+    const storedFranchiseId = franchiseId || (typeof localStorage !== 'undefined' ? localStorage.getItem('franchise_id') : null);
+    lockerRoomUrl = '/franchise/command-center';
+    if (storedFranchiseId) {
+      lockerRoomUrl += `?franchise_id=${storedFranchiseId}`;
+    }
+  } else {
+    mode = 'single';
+    lockerRoomUrl = '/static/mode-select.html';
+  }
+
+  button.addEventListener('click', () => {
+    window.location.href = lockerRoomUrl;
   });
 }
 

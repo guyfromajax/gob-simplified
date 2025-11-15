@@ -323,33 +323,27 @@ async function startGame({ homeRoster, awayRoster, animate = true }) {
   });
 }
 
-function showPopup(score) {
-  const container = document.getElementById('phaser-container');
-  const popup = document.createElement('div');
-  popup.className = 'result-popup';
-
-  let backUrl;
-  switch (mode) {
-    case 'tournament':
-      backUrl = '/static/tournament.html';
-      break;
-    case 'franchise':
-      backUrl = '/franchise/command-center' + buildQuery({ franchise_id: franchiseId });
-      break;
-    default:
-      backUrl = '/static/mode-select.html';
+async function showPopup(score) {
+  // Get gameId from localStorage or URL params
+  const params = new URLSearchParams(window.location.search);
+  let gameId = params.get('game_id');
+  if (!gameId && typeof localStorage !== 'undefined') {
+    gameId = localStorage.getItem('game_id');
+  }
+  
+  if (!gameId) {
+    console.warn('No game_id found for box score');
   }
 
-  console.log('showPopup back navigation', { tournamentId, franchiseId, mode, backUrl });
-
-  popup.innerHTML = `
-    <div class="popup-content">
-      <h2>Final Score</h2>
-      <p>${score.homeTeam} ${score.homeScore} - ${score.awayScore} ${score.awayTeam}</p>
-      <a href="${backUrl}" class="back-button">Back To Locker Room</a>
-    </div>
-  `;
-  container.appendChild(popup);
+  // Use the new game completion popup
+  const { showGameCompletionPopup } = await import('./utils/gameCompletionPopup.js');
+  showGameCompletionPopup({
+    gameId: gameId || '',
+    mode: mode || 'single',
+    tournamentId: tournamentId,
+    franchiseId: franchiseId,
+    finalScore: score
+  });
 }
 
 async function handleButtonClick(animate) {
