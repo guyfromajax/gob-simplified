@@ -1,0 +1,368 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+  background: #f5f5f5;
+  color: #333;
+  padding: 20px;
+}
+
+#box-score-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  overflow: hidden;
+}
+
+/* Header */
+#box-score-header {
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  color: white;
+  padding: 30px;
+  text-align: center;
+}
+
+#header-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  font-size: 24px;
+}
+
+.team-name {
+  font-weight: 700;
+  font-size: 28px;
+  font-family: 'Bebas Neue', sans-serif;
+  letter-spacing: 1px;
+}
+
+.score {
+  font-size: 36px;
+  font-weight: 700;
+  font-family: 'Bebas Neue', sans-serif;
+  min-width: 60px;
+}
+
+.at-symbol {
+  font-size: 24px;
+  opacity: 0.8;
+}
+
+/* Section Styling */
+section {
+  padding: 30px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+section:last-child {
+  border-bottom: none;
+}
+
+h2 {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 32px;
+  margin-bottom: 20px;
+  color: #1a1a2e;
+  letter-spacing: 1px;
+}
+
+/* Quarter Scoring Table */
+#quarter-scoring-section {
+  background: #fafafa;
+}
+
+#quarter-scoring-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 16px;
+}
+
+#quarter-scoring-table thead {
+  background: #1a1a2e;
+  color: white;
+}
+
+#quarter-scoring-table th {
+  padding: 12px;
+  text-align: center;
+  font-weight: 700;
+  font-family: 'Bebas Neue', sans-serif;
+  letter-spacing: 0.5px;
+}
+
+#quarter-scoring-table tbody tr {
+  border-bottom: 2px solid #e0e0e0;
+}
+
+#quarter-scoring-table tbody tr:last-child {
+  border-bottom: none;
+}
+
+#quarter-scoring-table td {
+  padding: 12px;
+  text-align: center;
+}
+
+.team-name-cell {
+  font-weight: 700;
+  text-align: left;
+  padding-left: 20px;
+}
+
+.quarter-score {
+  font-weight: 600;
+}
+
+.final-score {
+  font-weight: 700;
+  font-size: 18px;
+  background: #f0f0f0;
+}
+
+/* Tabs */
+#team-tabs {
+  display: flex;
+  background: #1a1a2e;
+  border-bottom: 3px solid #0f3460;
+}
+
+.tab-button {
+  flex: 1;
+  padding: 15px 30px;
+  background: transparent;
+  border: none;
+  color: white;
+  font-size: 18px;
+  font-weight: 700;
+  font-family: 'Bebas Neue', sans-serif;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: all 0.3s;
+  border-bottom: 3px solid transparent;
+}
+
+.tab-button:hover {
+  background: rgba(255,255,255,0.1);
+}
+
+.tab-button.active {
+  background: #0f3460;
+  border-bottom-color: #4a90e2;
+}
+
+/* Team Content */
+.team-content {
+  display: none;
+}
+
+.team-content.active {
+  display: block;
+}
+
+/* Table Container */
+.table-container {
+  overflow-x: auto;
+  margin-bottom: 20px;
+}
+
+/* Player Stats Table */
+.player-stats-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  min-width: 1200px;
+}
+
+.player-stats-table thead {
+  background: #1a1a2e;
+  color: white;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.player-stats-table th {
+  padding: 12px 8px;
+  text-align: center;
+  font-weight: 700;
+  font-family: 'Bebas Neue', sans-serif;
+  letter-spacing: 0.5px;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.player-stats-table th:first-child {
+  text-align: left;
+  padding-left: 15px;
+}
+
+.player-stats-table tbody tr {
+  border-bottom: 1px solid #e0e0e0;
+  transition: background 0.2s;
+}
+
+.player-stats-table tbody tr:hover {
+  background: #f9f9f9;
+}
+
+.player-stats-table tbody tr:last-child {
+  border-bottom: 2px solid #1a1a2e;
+}
+
+.player-stats-table td {
+  padding: 10px 8px;
+  text-align: center;
+}
+
+.player-stats-table td:first-child {
+  text-align: left;
+  padding-left: 15px;
+  font-weight: 600;
+}
+
+/* Team Stats Table */
+.team-stats-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 16px;
+  margin-bottom: 20px;
+}
+
+.team-stats-table thead {
+  background: #1a1a2e;
+  color: white;
+}
+
+.team-stats-table th {
+  padding: 12px;
+  text-align: center;
+  font-weight: 700;
+  font-family: 'Bebas Neue', sans-serif;
+  letter-spacing: 0.5px;
+}
+
+.team-stats-table tbody tr {
+  border-bottom: 2px solid #1a1a2e;
+}
+
+.team-stats-table td {
+  padding: 15px;
+  text-align: center;
+  font-weight: 600;
+  font-size: 18px;
+}
+
+/* Special Stats */
+.special-stats {
+  display: flex;
+  gap: 40px;
+  flex-wrap: wrap;
+  margin-top: 20px;
+  padding: 20px;
+  background: #f9f9f9;
+  border-radius: 6px;
+}
+
+.special-stat-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.special-stat-label {
+  font-weight: 700;
+  color: #1a1a2e;
+}
+
+.special-stat-value {
+  font-weight: 600;
+  font-size: 18px;
+}
+
+.special-stat-pct {
+  color: #666;
+  font-size: 14px;
+}
+
+/* Scouting Notes */
+.scouting-content {
+  padding: 20px;
+  background: #f9f9f9;
+  border-radius: 6px;
+}
+
+.scouting-section {
+  margin-bottom: 30px;
+}
+
+.scouting-section h3 {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 24px;
+  margin-bottom: 15px;
+  color: #1a1a2e;
+  letter-spacing: 0.5px;
+}
+
+.scouting-subsection {
+  margin-left: 20px;
+  margin-bottom: 15px;
+}
+
+.scouting-subsection h4 {
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 10px;
+  color: #333;
+}
+
+.scouting-item {
+  margin-left: 20px;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.scouting-item-label {
+  font-weight: 600;
+  min-width: 150px;
+}
+
+.scouting-item-value {
+  font-weight: 600;
+  color: #1a1a2e;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  #header-content {
+    flex-direction: column;
+    gap: 10px;
+    font-size: 18px;
+  }
+
+  .team-name {
+    font-size: 22px;
+  }
+
+  .score {
+    font-size: 28px;
+  }
+
+  .table-container {
+    overflow-x: scroll;
+  }
+
+  .special-stats {
+    flex-direction: column;
+    gap: 15px;
+  }
+}
+
