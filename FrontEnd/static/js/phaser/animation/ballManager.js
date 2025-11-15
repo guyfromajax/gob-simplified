@@ -739,9 +739,13 @@ export function shootBall({
               scene.events.off('update', positionWatcher);
             });
             // Small delay to ensure watcher is fully removed before re-enabling
+            // CRITICAL: Do NOT set ballDetached = false after MISS shots
+            // The ball should remain detached until the rebound is handled
+            // Setting it to false would re-enable ball following and might re-attach to shooter
             scene.time.delayedCall(50, () => {
               scene._shotInProgress = false;
-              scene.ballDetached = false;
+              // Keep ballDetached = true for MISS shots - rebound will handle ball attachment
+              // scene.ballDetached = false; // REMOVED - prevents ball from re-attaching to shooter
               resolve(miss);
             });
           });
