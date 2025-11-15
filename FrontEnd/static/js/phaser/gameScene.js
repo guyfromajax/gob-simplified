@@ -1248,6 +1248,9 @@ export function createGameScene(Phaser) {
       
       let quarterComplete = false;
       let turnCount = 0;
+      let lastHomeScore = initialSimData.home_score || 0;
+      let lastAwayScore = initialSimData.away_score || 0;
+      let nextQuarterNumber = this.quarter + 1; // Will be updated when quarter completes
       
       // Initialize with any turns from the initial simulation (e.g., opening tip, inbound)
       const initialTurns = initialSimData.turns || [];
@@ -1327,6 +1330,19 @@ export function createGameScene(Phaser) {
               away_team_fouls: turnData.away_team_fouls,
               clock: turnData.clock
             });
+            
+            // Update tracked scores from final turnData
+            if (turnData.home_score !== undefined) {
+              lastHomeScore = turnData.home_score;
+            }
+            if (turnData.away_score !== undefined) {
+              lastAwayScore = turnData.away_score;
+            }
+            
+            // Track the next quarter number from backend
+            if (turnData.quarter !== undefined) {
+              nextQuarterNumber = turnData.quarter;
+            }
             
             break;
           }
@@ -1415,6 +1431,14 @@ export function createGameScene(Phaser) {
             clock: turnData.clock
           });
           
+          // Track latest scores for game completion check
+          if (turnData.home_score !== undefined) {
+            lastHomeScore = turnData.home_score;
+          }
+          if (turnData.away_score !== undefined) {
+            lastAwayScore = turnData.away_score;
+          }
+          
           // Check if next turn is HCO (eligible for quick adjust window)
           // Use finalTurn (last sub-turn in batch, or the single turn)
           const nextIsHCO = turnData.next_offensive_state === 'HCO';
@@ -1490,6 +1514,147 @@ export function createGameScene(Phaser) {
       }
       
       console.log(`🏁 Quarter ${this.quarter} finished! Total turns: ${turnCount}`);
+      
+      // Check if game should end or go to overtime
+      // nextQuarterNumber is the quarter number the backend is ready for next
+      // So the quarter we just finished is nextQuarterNumber - 1
+      const quarterThatJustFinished = nextQuarterNumber - 1;
+      const finalHomeScore = lastHomeScore;
+      const finalAwayScore = lastAwayScore;
+      const finalIsTied = finalHomeScore === finalAwayScore;
+      
+      console.log('🏁 Game completion check:', {
+        quarterJustFinished: quarterThatJustFinished,
+        nextQuarter: nextQuarterNumber,
+        homeScore: finalHomeScore,
+        awayScore: finalAwayScore,
+        isTied: finalIsTied
+      });
+      
+      // Game ends if:
+      // 1. Q4 is complete and scores are NOT tied → game over
+      // 2. Any OT is complete and scores are NOT tied → game over
+      // Game continues if:
+      // 1. Q4 is complete and scores ARE tied → go to OT
+      // 2. OT is complete and scores ARE tied → go to next OT
+      
+      if (quarterThatJustFinished >= 4 && !finalIsTied) {
+        // Game is over - finalize
+        console.log('🏆 Game complete! Finalizing...');
+        const finalize = async () => {
+          const { finalizeGame } = await import('./finalizeGame.js');
+          const finalScore = await finalizeGame({
+            simData: {
+              ...initialSimData,
+              home_score: finalHomeScore,
+              away_score: finalAwayScore,
+              game_id: gameId,
+              home_team: initialSimData.home_team,
+              away_team: initialSimData.away_team
+            },
+            tournamentId: this.tournamentId,
+            franchiseId: this.franchiseId,
+            game: this.game,
+          });
+          this.finalScore = finalScore;
+          this.finalized = true;
+          return finalScore;
+        };
+        await finalize();
+        return; // Exit - game is over
+      } else if (quarterThatJustFinished === 4 && finalIsTied) {
+        // Q4 tied - go to OT
+        console.log('⏰ Game tied after Q4! Going to overtime...');
+        // Show locker room popup for OT
+        const nextQ = nextQuarterNumber; // Should be 5 (first OT)
+        const params = new URLSearchParams(window.location.search);
+        params.set('game_id', this.gameId);
+        params.set('quarter', nextQ);
+        params.set('period', 'OT1');
+        if (this.gameId && typeof localStorage !== 'undefined') {
+          localStorage.setItem('game_id', this.gameId);
+        }
+        
+        // Create locker room popup
+        const popup = document.createElement('div');
+        popup.className = 'locker-room-popup';
+        popup.innerHTML = `
+          <div class="locker-room-content">
+            <h2>Overtime!</h2>
+            <p>Game tied ${finalHomeScore}-${finalAwayScore}</p>
+            <button class="locker-room-button">Start Overtime</button>
+          </div>
+        `;
+        document.body.appendChild(popup);
+        
+        // Wire up button
+        const button = popup.querySelector('.locker-room-button');
+        button.addEventListener('click', () => {
+          window.location.href = `/static/set-lineup.html?${params.toString()}`;
+        });
+        return;
+      } else if (quarterThatJustFinished > 4 && finalIsTied) {
+        // OT tied - go to next OT
+        const currentOTNumber = quarterThatJustFinished - 4;
+        const nextOTNumber = currentOTNumber + 1;
+        console.log(`⏰ OT${currentOTNumber} tied! Going to OT${nextOTNumber}...`);
+        const nextOT = nextQuarterNumber; // Should be the next OT quarter number
+        const params = new URLSearchParams(window.location.search);
+        params.set('game_id', this.gameId);
+        params.set('quarter', nextOT);
+        params.set('period', `OT${nextOTNumber}`);
+        if (this.gameId && typeof localStorage !== 'undefined') {
+          localStorage.setItem('game_id', this.gameId);
+        }
+        
+        // Create locker room popup
+        const popup = document.createElement('div');
+        popup.className = 'locker-room-popup';
+        popup.innerHTML = `
+          <div class="locker-room-content">
+            <h2>Overtime ${currentOTNumber} Complete!</h2>
+            <p>Game still tied ${finalHomeScore}-${finalAwayScore}</p>
+            <button class="locker-room-button">Start OT${nextOTNumber}</button>
+          </div>
+        `;
+        document.body.appendChild(popup);
+        
+        // Wire up button
+        const button = popup.querySelector('.locker-room-button');
+        button.addEventListener('click', () => {
+          window.location.href = `/static/set-lineup.html?${params.toString()}`;
+        });
+        return;
+      } else {
+        // Regular quarter complete (Q1-Q3) - show locker room popup
+        console.log('✅ Quarter complete - showing locker room popup');
+        const nextQ = this.quarter + 1;
+        const params = new URLSearchParams(window.location.search);
+        params.set('game_id', this.gameId);
+        params.set('quarter', nextQ);
+        params.set('period', `Q${nextQ}`);
+        if (this.gameId && typeof localStorage !== 'undefined') {
+          localStorage.setItem('game_id', this.gameId);
+        }
+        
+        // Create locker room popup
+        const popup = document.createElement('div');
+        popup.className = 'locker-room-popup';
+        popup.innerHTML = `
+          <div class="locker-room-content">
+            <h2>Quarter ${this.quarter} Complete!</h2>
+            <button class="locker-room-button">Go To Locker Room</button>
+          </div>
+        `;
+        document.body.appendChild(popup);
+        
+        // Wire up button
+        const button = popup.querySelector('.locker-room-button');
+        button.addEventListener('click', () => {
+          window.location.href = `/static/set-lineup.html?${params.toString()}`;
+        });
+        return;
+      }
     }
   };
 }
