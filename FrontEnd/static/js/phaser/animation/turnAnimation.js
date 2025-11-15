@@ -36,7 +36,8 @@ import {
 
 // Cap the time spent on any single movement step. Large timestamp gaps can
 // otherwise produce multi‑second tweens that appear as animation stalls.
-const MAX_STEP_DURATION = 1000; // ms
+const MAX_STEP_DURATION = 1000; // ms - for HCO step movements
+const MAX_TRANSITION_DURATION = 3000; // ms - for transition movements (DREB, inbound, etc.)
 
 // Animation speed constants (pixels per second)
 // Based on learnings from WIP_GOB repository for smooth, consistent animations
@@ -53,13 +54,14 @@ const BALL_SPEED = 250; // pixels per second for ball movement
  * @param {number} targetX - Target X position in pixels
  * @param {number} targetY - Target Y position in pixels
  * @param {number} speed - Speed in pixels per second
+ * @param {number} maxDuration - Maximum duration in milliseconds (default: MAX_STEP_DURATION)
  * @returns {number} Duration in milliseconds
  */
-function getDurationFromDistance(currentX, currentY, targetX, targetY, speed) {
+function getDurationFromDistance(currentX, currentY, targetX, targetY, speed, maxDuration = MAX_STEP_DURATION) {
   const distance = Phaser.Math.Distance.Between(currentX, currentY, targetX, targetY);
   const duration = (distance / speed) * 1000; // Convert to milliseconds
-  // Clamp between 50ms (minimum) and MAX_STEP_DURATION (maximum)
-  return Math.min(MAX_STEP_DURATION, Math.max(50, duration));
+  // Clamp between 50ms (minimum) and maxDuration (maximum)
+  return Math.min(maxDuration, Math.max(50, duration));
 }
 
 /**
@@ -70,12 +72,14 @@ function getDurationFromDistance(currentX, currentY, targetX, targetY, speed) {
  * @param {Phaser.GameObjects.Sprite} sprite - The player sprite
  * @param {number} targetX - Target X position in pixels
  * @param {number} targetY - Target Y position in pixels
+ * @param {boolean} isTransition - If true, use MAX_TRANSITION_DURATION instead of MAX_STEP_DURATION
  * @returns {number} Duration in milliseconds
  */
-function getPlayerDuration(sprite, targetX, targetY) {
+function getPlayerDuration(sprite, targetX, targetY, isTransition = false) {
   const currentX = sprite.x;
   const currentY = sprite.y;
-  return getDurationFromDistance(currentX, currentY, targetX, targetY, PLAYER_SPEED);
+  const maxDuration = isTransition ? MAX_TRANSITION_DURATION : MAX_STEP_DURATION;
+  return getDurationFromDistance(currentX, currentY, targetX, targetY, PLAYER_SPEED, maxDuration);
 }
 
 /**
@@ -435,7 +439,8 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
 
     const outletPx = gridToPixels(outletTarget.x, outletTarget.y, width, height);
     // Use distance-based duration for consistent speed (same as HCO step movements)
-    const outletDuration = getPlayerDuration(outletReceiverSprite, outletPx.x, outletPx.y);
+    // isTransition=true allows longer durations for transition movements
+    const outletDuration = getPlayerDuration(outletReceiverSprite, outletPx.x, outletPx.y, true);
     promises.push(
       tweenPlayerTo(scene, outletReceiverSprite, outletPx, {
         duration: outletDuration,
@@ -532,7 +537,8 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
       
       const targetPx = gridToPixels(targetGrid.x, targetGrid.y, width, height);
       // Use distance-based duration for consistent speed (same as HCO step movements)
-      const playerDuration = getPlayerDuration(sprite, targetPx.x, targetPx.y);
+      // isTransition=true allows longer durations for transition movements
+      const playerDuration = getPlayerDuration(sprite, targetPx.x, targetPx.y, true);
       promises.push(
         tweenPlayerTo(scene, sprite, targetPx, {
           duration: playerDuration,
@@ -789,7 +795,8 @@ async function runInboundSetup({
           height
         ).x;
         // Use distance-based duration for consistent speed (same as HCO step movements)
-        const retreatDuration = getPlayerDuration(sprite, targetX, sprite.y);
+        // isTransition=true allows longer durations for transition movements
+        const retreatDuration = getPlayerDuration(sprite, targetX, sprite.y, true);
         retreatPromises.push(
           new Promise((resolve) => {
             let timeoutId;
@@ -836,7 +843,8 @@ async function runInboundSetup({
         if (targetPos) {
           const targetPx = gridToPixels(targetPos.x, targetPos.y, width, height);
           // Use distance-based duration for consistent speed (same as HCO step movements)
-          const fcpDuration = getPlayerDuration(sprite, targetPx.x, targetPx.y);
+          // isTransition=true allows longer durations for transition movements
+          const fcpDuration = getPlayerDuration(sprite, targetPx.x, targetPx.y, true);
           retreatPromises.push(
             new Promise((resolve) => {
               let timeoutId;
@@ -959,7 +967,8 @@ async function runInboundSetup({
 
   const sfTween = new Promise((resolve) => {
     // Use distance-based duration for consistent speed (same as HCO step movements)
-    const sfDuration = getPlayerDuration(sfSprite, spotPx.x, spotPx.y);
+    // isTransition=true allows longer durations for transition movements
+    const sfDuration = getPlayerDuration(sfSprite, spotPx.x, spotPx.y, true);
     scene.tweens.add({
       targets: sfSprite,
       x: spotPx.x,
@@ -980,7 +989,8 @@ async function runInboundSetup({
   const pgTween = new Promise((resolve) => {
     animationDebugLog("pgTween start");
     // Use distance-based duration for consistent speed (same as HCO step movements)
-    const pgDuration = getPlayerDuration(pgSprite, pgDestPx.x, pgDestPx.y);
+    // isTransition=true allows longer durations for transition movements
+    const pgDuration = getPlayerDuration(pgSprite, pgDestPx.x, pgDestPx.y, true);
     scene.tweens.add({
       targets: pgSprite,
       x: pgDestPx.x,
@@ -1002,7 +1012,8 @@ async function runInboundSetup({
     ? new Promise((resolve) => {
         animationDebugLog("sgTween start");
         // Use distance-based duration for consistent speed (same as HCO step movements)
-        const sgDuration = getPlayerDuration(sgSprite, sgDestPx.x, sgDestPx.y);
+        // isTransition=true allows longer durations for transition movements
+        const sgDuration = getPlayerDuration(sgSprite, sgDestPx.x, sgDestPx.y, true);
         scene.tweens.add({
           targets: sgSprite,
           x: sgDestPx.x,
@@ -1025,7 +1036,8 @@ async function runInboundSetup({
     ? new Promise((resolve) => {
         animationDebugLog("pfTween start");
         // Use distance-based duration for consistent speed (same as HCO step movements)
-        const pfDuration = getPlayerDuration(pfSprite, pfDestPx.x, pfDestPx.y);
+        // isTransition=true allows longer durations for transition movements
+        const pfDuration = getPlayerDuration(pfSprite, pfDestPx.x, pfDestPx.y, true);
         scene.tweens.add({
           targets: pfSprite,
           x: pfDestPx.x,
@@ -1048,7 +1060,8 @@ async function runInboundSetup({
     ? new Promise((resolve) => {
         animationDebugLog("cTween start");
         // Use distance-based duration for consistent speed (same as HCO step movements)
-        const cDuration = getPlayerDuration(cSprite, cDestPx.x, cDestPx.y);
+        // isTransition=true allows longer durations for transition movements
+        const cDuration = getPlayerDuration(cSprite, cDestPx.x, cDestPx.y, true);
         scene.tweens.add({
           targets: cSprite,
           x: cDestPx.x,
