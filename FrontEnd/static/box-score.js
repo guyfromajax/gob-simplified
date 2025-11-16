@@ -276,7 +276,20 @@ function renderPlayerStatsTable(team, players) {
       const stats = player.stats || {};
       const name = player.name || 'Unknown';
       const jersey = player.jersey || '';
-      const year = player.year || 'SR'; // Default to SR if not available
+      const yearRaw = (player.year || 'SR').toString().toLowerCase();
+      // Normalize year to two-letter abbreviation
+      const yearMap = {
+        freshman: 'FR',
+        frosh: 'FR',
+        fr: 'FR',
+        sophomore: 'SO',
+        so: 'SO',
+        junior: 'JR',
+        jr: 'JR',
+        senior: 'SR',
+        sr: 'SR'
+      };
+      const year = yearMap[yearRaw] || (player.year || 'SR');
       
       // Calculate TREB and DEF%
       const treb = (stats.DREB || 0) + (stats.OREB || 0);
