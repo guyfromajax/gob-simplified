@@ -997,10 +997,59 @@ export function createGameScene(Phaser) {
 
       const pauseBtn = document.getElementById('pause-btn');
       const skipBtn = document.getElementById('skip-btn');
+      const gameSpeedBtn = document.getElementById('game-speed-btn');
+      const speedDropdown = document.getElementById('speed-dropdown');
       this.isPaused = false;
       this.skipToEnd = false;
       this.isSkipping = false;
       this.finalized = false;
+      
+      // Initialize game speed from localStorage
+      const { loadSpeedPreference, setGameSpeed, getSpeedPresets } = await import('./utils/gameSpeedManager.js');
+      const initialSpeed = loadSpeedPreference();
+      updateSpeedDropdown(initialSpeed);
+      
+      // Game Speed button handler
+      if (gameSpeedBtn && speedDropdown) {
+        gameSpeedBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const isVisible = speedDropdown.style.display !== 'none';
+          speedDropdown.style.display = isVisible ? 'none' : 'flex';
+        });
+        
+        // Close dropdown when clicking outside
+        document.addEventListener('click', (e) => {
+          if (!speedDropdown.contains(e.target) && e.target !== gameSpeedBtn) {
+            speedDropdown.style.display = 'none';
+          }
+        });
+        
+        // Speed option handlers
+        const speedOptions = speedDropdown.querySelectorAll('.speed-option');
+        speedOptions.forEach(option => {
+          option.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const speed = parseInt(option.dataset.speed, 10);
+            setGameSpeed(speed);
+            updateSpeedDropdown(speed);
+            speedDropdown.style.display = 'none';
+          });
+        });
+      }
+      
+      function updateSpeedDropdown(currentSpeed) {
+        if (!speedDropdown) return;
+        const speedOptions = speedDropdown.querySelectorAll('.speed-option');
+        speedOptions.forEach(option => {
+          const optionSpeed = parseInt(option.dataset.speed, 10);
+          if (optionSpeed === currentSpeed) {
+            option.classList.add('active');
+          } else {
+            option.classList.remove('active');
+          }
+        });
+      }
+      
       if (pauseBtn) {
         pauseBtn.addEventListener('click', () => {
           this.isPaused = !this.isPaused;
