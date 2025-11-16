@@ -413,11 +413,12 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
   let outletTarget = null;
   let outletContext = null;
 
-  if (outletReceiverId && outletReceiverId !== rebounderId && outletReceiverSprite && nextPlayType === "HCO") {
-    // Only animate outlet receiver for HCO
-    // For FAST_BREAK, outlet pass is handled in the fast break turn itself
+  // Set up outlet receiver movement and outlet pass for both HCO and FAST_BREAK
+  // This ensures smooth transitions from DREB to the next play type
+  if (outletReceiverId && outletReceiverId !== rebounderId && outletReceiverSprite && 
+      (nextPlayType === "HCO" || nextPlayType === "FAST_BREAK")) {
     
-    // For HCO: move PG near the rebounder
+    // Move PG near the rebounder for outlet pass
     const sign = newOffenseBasket.x > rebGridX ? 1 : -1;
     outletTarget = {
       x: Phaser.Math.Clamp(
@@ -466,7 +467,11 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
         outletReceiverId, 
         rebounderId, 
         samePerson: outletReceiverId === rebounderId,
-        reason: !outletReceiverId ? 'No outlet receiver found' : 'Outlet receiver is rebounder'
+        nextPlayType,
+        reason: !outletReceiverId ? 'No outlet receiver found' : 
+                outletReceiverId === rebounderId ? 'Outlet receiver is rebounder' :
+                (nextPlayType !== "HCO" && nextPlayType !== "FAST_BREAK") ? `Next play type is ${nextPlayType} (not HCO or FAST_BREAK)` :
+                'Unknown reason'
       });
     }
   }
@@ -556,10 +561,10 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
 
   await Promise.all(promises);
 
-  // Do outlet pass ONLY for HCO instances
-  // For FAST_BREAK, the outlet pass will be handled in the next turn (the actual fast break turn)
+  // Do outlet pass for both HCO and FAST_BREAK instances
+  // This ensures smooth transitions from DREB (especially after OREB putback misses)
   // For FCP/HCT, no outlet pass - players go directly to press positions
-  if (nextPlayType === "HCO" && outletReceiverId && outletReceiverId !== rebounderId) {
+  if ((nextPlayType === "HCO" || nextPlayType === "FAST_BREAK") && outletReceiverId && outletReceiverId !== rebounderId) {
     const outletLog = {
       event: 'OUTLET_PASS',
       from: rebounderId,
@@ -607,17 +612,20 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
       outletReceiverId, 
       rebounderId,
       nextPlayType,
-      reason: nextPlayType === "FAST_BREAK" ? 'Fast break - outlet handled in next turn' : 
-              !outletReceiverId ? 'No outlet receiver found' : 
-              outletReceiverId === rebounderId ? 'Outlet receiver is rebounder' : 'Unknown reason'
+      reason: !outletReceiverId ? 'No outlet receiver found' : 
+              outletReceiverId === rebounderId ? 'Outlet receiver is rebounder' :
+              (nextPlayType !== "HCO" && nextPlayType !== "FAST_BREAK") ? `Next play type is ${nextPlayType} (not HCO or FAST_BREAK)` :
+              'Unknown reason'
     });
     if (DebugFlags?.OUTLET) {
       animationDebugLog('Outlet pass skipped:', { 
         outletReceiverId, 
         rebounderId,
         nextPlayType,
-        reason: nextPlayType === "FAST_BREAK" ? 'Fast break - outlet handled in next turn' : 
-                !outletReceiverId ? 'No outlet receiver found' : 'Outlet receiver is rebounder'
+        reason: !outletReceiverId ? 'No outlet receiver found' : 
+                outletReceiverId === rebounderId ? 'Outlet receiver is rebounder' :
+                (nextPlayType !== "HCO" && nextPlayType !== "FAST_BREAK") ? `Next play type is ${nextPlayType} (not HCO or FAST_BREAK)` :
+                'Unknown reason'
       });
     }
   }
