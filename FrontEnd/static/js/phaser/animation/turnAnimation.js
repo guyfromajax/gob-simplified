@@ -1196,10 +1196,16 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
     return;
   }
 
+  const fromInbound = scene._previousTurnWasInbound === true;
+
   scene.passInFlight = false;
-  scene.ballDetached = false;
   scene.rebounderId = null;
-  clearPendingOwner(scene);
+  // Only clear ball attachment/ownership when NOT coming directly from an inbound,
+  // so the ball can carry over with the inbound receiver into HCO.
+  if (!fromInbound) {
+    scene.ballDetached = false;
+    clearPendingOwner(scene);
+  }
 
   const currentBallOwnerRef = { value: null };
   // Store a reference on the scene so other modules (e.g., runPass)
@@ -1214,8 +1220,11 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   }
 
   if (ballSprite && scene?.tweens) {
+    // Always clear any stray tweens, but don't hide the ball if we're carrying over from inbound
     scene.tweens.killTweensOf(ballSprite);
-    ballSprite.setVisible(false);
+    if (!fromInbound) {
+      ballSprite.setVisible(false);
+    }
   }
 
   const homeTeamId = simData.home_team_id;
@@ -1236,7 +1245,9 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   }
   
   let step0OwnerSprite = null;
-  if (!previousTurnWasShot) {
+  // If we are coming directly from an inbound, the ball should already be attached
+  // to the inbound receiver, so we don't re-derive or re-attach at step 0.
+  if (!previousTurnWasShot && !fromInbound) {
     for (const anim of turnData.animations) {
       if (scene.skipToEnd || scene.stateMachine?.is(States.FastBreak)) break;
       if (anim.hasBallAtStep?.[0]) {
@@ -1277,9 +1288,11 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
       // Always animate if distance is > 1 pixel (reduced threshold to catch more cases)
       // This ensures smooth transitions between states (Inbound -> HCO, DREB -> HCO, etc.)
       if (distance > 1) {
-        // Use distance-based duration with regular speed (not transition)
-        // This ensures consistent speed matching HCO step movements
-        const setupDuration = getPlayerDuration(sprite, targetX, targetY, false);
+        // Use distance-based duration; for Inbound -> HCO we remove the max cap so players don't \"jet\"
+        const useUncapped = scene._previousTurnWasInbound === true;
+        const setupDuration = useUncapped
+          ? getPlayerDurationUncapped(sprite, targetX, targetY)
+          : getPlayerDuration(sprite, targetX, targetY, false);
         
         setupPromises.push(
           new Promise((resolve) => {
