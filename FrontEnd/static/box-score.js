@@ -201,7 +201,8 @@ function combinePlayersAndBoxScore(lineupPlayers, boxScore, teamName) {
     playerMap.set(p.playerId, {
       ...p,
       stats: p.stats?.game || p.stats || {},
-      year: p.year || 'SR' // Use year from player data or default
+      year: p.year || 'SR', // Use year from player data or default
+      jersey: p.jersey !== undefined ? p.jersey : (p.jerseyNumber || p.jersey_number || '') // Preserve jersey from multiple possible sources
     });
   });
 
@@ -227,6 +228,10 @@ function combinePlayersAndBoxScore(lineupPlayers, boxScore, teamName) {
           }
         });
         existingPlayer.stats = { ...existingPlayer.stats, ...boxStats };
+        // Preserve jersey if it exists in box_score, otherwise keep existing jersey
+        if (playerData.jersey !== undefined) {
+          existingPlayer.jersey = playerData.jersey;
+        }
       } else {
         // New player from box_score (bench player)
         const statKeys = ['FGM', 'FGA', '3PTM', '3PTA', 'FTM', 'FTA', 'OREB', 'DREB', 'REB', 
@@ -241,7 +246,7 @@ function combinePlayersAndBoxScore(lineupPlayers, boxScore, teamName) {
         playerMap.set(`bench_${pos}`, {
           playerId: playerData.playerId || `bench_${pos}`,
           name: playerData.name || `Player ${pos}`,
-          jersey: playerData.jersey || '',
+          jersey: playerData.jersey !== undefined ? playerData.jersey : (playerData.jerseyNumber || playerData.jersey_number || ''),
           pos: pos,
           stats: boxStats,
           year: playerData.year || 'SR'
@@ -303,9 +308,38 @@ function renderPlayerStatsTable(team, players) {
       // Format MIN (convert seconds to MM:SS or just minutes)
       const min = formatMinutes(stats.MIN || 0);
       
-      // Format jersey number - check multiple possible fields
-      const jerseyNum = jersey || player.jerseyNumber || player.jersey_number || '';
-      const jerseyDisplay = jerseyNum ? ` (#${jerseyNum})` : '';
+      // Format jersey number - check multiple possible fields and handle 0 as valid jersey number
+      // Jersey can be a number (including 0) or string
+      let jerseyNum = null;
+      // Check in order: jersey, jerseyNumber, jersey_number
+      // Allow 0 as a valid jersey number, only exclude undefined/null/empty string
+      if (typeof jersey === 'number') {
+        // Handle jersey as number (including 0)
+        jerseyNum = jersey;
+      } else if (jersey !== undefined && jersey !== null && jersey !== '') {
+        jerseyNum = jersey;
+      } else if (typeof player.jerseyNumber === 'number') {
+        jerseyNum = player.jerseyNumber;
+      } else if (player.jerseyNumber !== undefined && player.jerseyNumber !== null && player.jerseyNumber !== '') {
+        jerseyNum = player.jerseyNumber;
+      } else if (typeof player.jersey_number === 'number') {
+        jerseyNum = player.jersey_number;
+      } else if (player.jersey_number !== undefined && player.jersey_number !== null && player.jersey_number !== '') {
+        jerseyNum = player.jersey_number;
+      }
+      
+      // Debug logging (can be removed after verification)
+      if (!jerseyNum && player.playerId) {
+        console.log(`[Box Score] No jersey found for ${name} (${player.playerId}):`, {
+          jersey,
+          jerseyNumber: player.jerseyNumber,
+          jersey_number: player.jersey_number,
+          playerKeys: Object.keys(player)
+        });
+      }
+      
+      // Convert to string and display if we have a valid jersey (including 0)
+      const jerseyDisplay = (jerseyNum !== null && jerseyNum !== undefined) ? ` (#${String(jerseyNum)})` : '';
 
       row.innerHTML = `
         <td>${name}${jerseyDisplay}</td>
