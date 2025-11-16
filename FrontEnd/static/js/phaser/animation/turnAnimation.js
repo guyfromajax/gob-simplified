@@ -387,6 +387,7 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
   let outletReceiverSprite = null;
   
   // For HCO, always find the PG
+  // CRITICAL: This must find the PG for the outlet pass to execute
   for (const [id, info] of Object.entries(scene.playerInfo || {})) {
     if (info.pos === "PG" && info.team === rebounderSprite.team) {
       outletReceiverId = id;
@@ -394,6 +395,22 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
       break;
     }
   }
+  
+  // Always log outlet receiver lookup (not just when DebugFlags?.OUTLET is enabled)
+  console.log('🏀 runDefensiveReboundSetup: Outlet receiver lookup', {
+    rebounderId,
+    rebounderTeam: rebounderSprite.team,
+    nextPlayType,
+    outletReceiverId,
+    hasOutletReceiverSprite: !!outletReceiverSprite,
+    playerInfoCount: Object.keys(scene.playerInfo || {}).length,
+    playerInfoKeys: Object.keys(scene.playerInfo || {}),
+    playerInfoEntries: Object.entries(scene.playerInfo || {}).map(([id, info]) => ({
+      id,
+      pos: info.pos,
+      team: info.team
+    }))
+  });
   
   // Debug logging for outlet pass setup
   if (DebugFlags?.OUTLET) {
@@ -460,18 +477,18 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
       });
     }
     if (DebugFlags?.OUTLET) animationDebugLog(`${nextPlayType} outlet receiver movement queued`);
-  } else {
-    if (DebugFlags?.OUTLET) {
-      animationDebugLog('Outlet pass skipped:', { 
-        outletReceiverId, 
-        rebounderId, 
-        samePerson: outletReceiverId === rebounderId,
-        nextPlayType,
-        reason: !outletReceiverId ? 'No outlet receiver found' : 
-                outletReceiverId === rebounderId ? 'Outlet receiver is rebounder' :
-                'Unknown reason'
-      });
-    }
+  } else if (nextPlayType === "HCO") {
+    // Log why outlet receiver movement was skipped (for debugging)
+    console.warn('🏀 runDefensiveReboundSetup: Outlet receiver movement skipped', {
+      outletReceiverId,
+      rebounderId,
+      hasOutletReceiverSprite: !!outletReceiverSprite,
+      nextPlayType,
+      reason: !outletReceiverId ? 'No outlet receiver found' : 
+              outletReceiverId === rebounderId ? 'Outlet receiver is rebounder' :
+              !outletReceiverSprite ? 'Outlet receiver sprite not found' :
+              'Unknown reason'
+    });
   }
 
   // For HCO scenarios, move all other players toward the new offense basket
@@ -562,7 +579,16 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
   // Do outlet pass ONLY for HCO instances
   // For FAST_BREAK, the outlet pass is handled in the fast break sequence itself (fastBreak.js)
   // For FCP/HCT, no outlet pass - players go directly to press positions
+  // CRITICAL: This outlet pass step is required for smooth DREB -> HCO transitions
   if (nextPlayType === "HCO" && outletReceiverId && outletReceiverId !== rebounderId) {
+    // If outletTarget wasn't set (receiver movement was skipped), use receiver's current position
+    if (!outletTarget && outletReceiverSprite) {
+      outletTarget = {
+        x: (outletReceiverSprite.x / width) * 100,
+        y: 50 - (outletReceiverSprite.y / height) * 50
+      };
+      console.log('🏀 runDefensiveReboundSetup: Using receiver current position as outlet target', outletTarget);
+    }
     const outletLog = {
       event: 'OUTLET_PASS',
       from: rebounderId,
