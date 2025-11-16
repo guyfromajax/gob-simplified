@@ -1793,6 +1793,64 @@ export function getPlayerDurationUncapped(sprite, targetX, targetY) {
   return Math.max(50, duration);
 }
 
+// Animate a short defensive stop resolution and transition to HalfCourt
+export async function runDefensiveStopTransition({ scene, playerSprites, ballSprite }) {
+  try {
+    const width = scene.game.config.width;
+    const height = scene.game.config.height;
+    const isHomeOffense = (scene.offenseTeamId && scene.simData?.home_team_id === scene.offenseTeamId) || false;
+    // Choose a generic "top of key" on offense side
+    const targetGrid = isHomeOffense ? { x: 86, y: 25 } : { x: 14, y: 25 };
+    const targetPx = gridToPixels(targetGrid.x, targetGrid.y, width, height);
+
+    const currentOwnerId = getCurrentOwner(scene);
+    const handlerSprite = currentOwnerId ? playerSprites[currentOwnerId] : null;
+
+    const promises = [];
+    if (handlerSprite) {
+      const handlerDuration = getPlayerDuration(handlerSprite, targetPx.x, targetPx.y, true);
+      promises.push(
+        tweenPlayerTo(scene, handlerSprite, targetPx, { duration: handlerDuration, easing: 'Linear' })
+      );
+      // Attach ball if not attached so it follows visually
+      if (ballSprite) attachBallToPlayer(scene, ballSprite, handlerSprite);
+    }
+
+    // Move nearest defender to contest
+    let nearestDefender = null;
+    let nearestDist = Infinity;
+    for (const [id, sprite] of Object.entries(playerSprites)) {
+      if (!sprite || !scene.playerInfo?.[id]) continue;
+      const info = scene.playerInfo[id];
+      // Opposite team of offense
+      const isDefender = info.team !== (isHomeOffense ? 'home' : 'away');
+      if (!isDefender) continue;
+      const d = Phaser.Math.Distance.Between(sprite.x, sprite.y, targetPx.x, targetPx.y);
+      if (d < nearestDist) {
+        nearestDist = d;
+        nearestDefender = sprite;
+      }
+    }
+    if (nearestDefender) {
+      // Slight offset to indicate contest
+      const contestPx = { x: targetPx.x + (isHomeOffense ? -18 : 18), y: targetPx.y };
+      const defDuration = getPlayerDuration(nearestDefender, contestPx.x, contestPx.y, true);
+      promises.push(
+        tweenPlayerTo(scene, nearestDefender, contestPx, { duration: defDuration, easing: 'Linear' })
+      );
+    }
+
+    if (promises.length) await Promise.all(promises);
+
+    // Transition to HalfCourt for next possession
+    if (scene.stateMachine) {
+      safeTransition(scene.stateMachine, States.HalfCourt, 'defensive_stop_to_halfcourt');
+    }
+  } catch (err) {
+    console.warn('runDefensiveStopTransition failed', err);
+  }
+}
+
 if (typeof window !== "undefined") {
   window.playTurnAnimation = playTurnAnimation;
 }
