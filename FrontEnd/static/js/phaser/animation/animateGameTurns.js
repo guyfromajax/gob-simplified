@@ -659,7 +659,13 @@ export async function animateGameTurns({ //hasBallAtStep
     }
 
     if (turn.result_type === "DEFENSIVE_STOP") {
-      // Fast break was stopped by defense - just display text and continue to next turn (HCO)
+      // Animate a brief stop resolution (move ball handler to key, nearest defender contests), then enter HalfCourt
+      try {
+        const { runDefensiveStopTransition } = await import('./turnAnimation.js');
+        await runDefensiveStopTransition({ scene, playerSprites, ballSprite });
+      } catch (err) {
+        console.warn('DEFENSIVE_STOP: transition animation failed, falling back to text only', err);
+      }
       appendToTextScroll(turn.text || "Defense stops the break!");
       if (onUpdate) {
         try {
