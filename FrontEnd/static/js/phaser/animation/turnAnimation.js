@@ -1338,6 +1338,11 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
     }
   }
 
+  // Clear inbound flag after applying pre-step setup
+  if (scene._previousTurnWasInbound) {
+    scene._previousTurnWasInbound = false;
+  }
+
   let eventsProcessed = false;
 
   for (let stepIndex = 1; stepIndex < maxSteps; stepIndex++) {
@@ -1778,6 +1783,15 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
 }
 
 export { runInboundSetup, runSideInboundSetup, runDefensiveReboundSetup, getPlayerDuration };
+// Provide an uncapped duration helper for long transitions (e.g., inbound -> HCO)
+export function getPlayerDurationUncapped(sprite, targetX, targetY) {
+  const currentX = sprite.x;
+  const currentY = sprite.y;
+  const distance = Phaser.Math.Distance.Between(currentX, currentY, targetX, targetY);
+  const duration = (distance / PLAYER_SPEED) * 1000;
+  // Keep a small lower bound to avoid zero-duration tweens; no upper cap
+  return Math.max(50, duration);
+}
 
 if (typeof window !== "undefined") {
   window.playTurnAnimation = playTurnAnimation;
