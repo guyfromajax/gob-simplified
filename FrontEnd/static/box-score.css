@@ -253,6 +253,15 @@ h2 {
   font-weight: 600;
 }
 
+/* Compact Year column for 2-letter abbreviations */
+.player-stats-table th:nth-child(2),
+.player-stats-table td:nth-child(2) {
+  width: 48px;
+  min-width: 48px;
+  max-width: 60px;
+  text-align: center;
+}
+
 /* Team Stats Table */
 .team-stats-table {
   width: 100%;
