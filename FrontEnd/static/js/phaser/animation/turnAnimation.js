@@ -54,14 +54,14 @@ const BALL_SPEED = 250; // pixels per second for ball movement
  * @param {number} targetX - Target X position in pixels
  * @param {number} targetY - Target Y position in pixels
  * @param {number} speed - Speed in pixels per second
- * @param {number} maxDuration - Maximum duration in milliseconds (default: MAX_STEP_DURATION)
+ * @param {number} maxDuration - (Unused) maximum duration in milliseconds (kept for backwards compatibility)
  * @returns {number} Duration in milliseconds
  */
 function getDurationFromDistance(currentX, currentY, targetX, targetY, speed, maxDuration = MAX_STEP_DURATION) {
   const distance = Phaser.Math.Distance.Between(currentX, currentY, targetX, targetY);
   const duration = (distance / speed) * 1000; // Convert to milliseconds
-  // Clamp between 50ms (minimum) and maxDuration (maximum)
-  return Math.min(maxDuration, Math.max(50, duration));
+  // Clamp to a small minimum to avoid zero-length tweens; no upper cap so distance fully determines time
+  return Math.max(50, duration);
 }
 
 /**
