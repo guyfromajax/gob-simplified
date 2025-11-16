@@ -145,8 +145,8 @@ async function handleOrebTurn(scene, { playerSprites, ballSprite, turnData, onUp
         preserveBallPosition: true // Ball is already at bounce spot from shootBall - don't reposition
       });
       
-      // If DREB, set up next play
-      if (turnData.rebound_type === "DREB" && turnData.next_play_type !== "FAST_BREAK") {
+      // If DREB, set up next play (including outlet pass for both HCO and FAST_BREAK)
+      if (turnData.rebound_type === "DREB") {
         const { runDefensiveReboundSetup } = await import('./turnAnimation.js');
         await runDefensiveReboundSetup({
           scene,
