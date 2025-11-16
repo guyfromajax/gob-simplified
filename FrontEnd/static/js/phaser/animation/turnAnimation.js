@@ -249,8 +249,7 @@ async function runSideInboundSetup({ scene, ballSprite, playerSprites, turnData 
   const height = scene.game.config.height;
 
   const cfg = globalThis?.animation_config?.sideInbound || {};
-  const duration = cfg.duration ?? 500;
-  const ease = cfg.ease ?? "Sine.easeInOut";
+  const ease = cfg.ease ?? "Linear"; // Use Linear to match HCO step movements
 
   const offenseSprites = {};
   const defenseSprites = {};
@@ -275,6 +274,8 @@ async function runSideInboundSetup({ scene, ballSprite, playerSprites, turnData 
   const addTween = (sprite, coords, pos) => {
     if (!sprite || !coords) return;
     const { x, y } = gridToPixels(coords.x, coords.y, width, height);
+    // Use distance-based duration for consistent speed
+    const duration = getPlayerDuration(sprite, x, y);
     promises.push(
       new Promise((resolve) => {
         scene.tweens.add({
@@ -326,7 +327,8 @@ async function runSideInboundSetup({ scene, ballSprite, playerSprites, turnData 
 
     animationDebugLog(`[sideInbound][passStart] sf:${sfId} pg:${pgId}`);
     if (pgSprite && !scene.stateMachine?.is(States.FastBreak)) {
-      await runPass(scene, { fromId: sfId, toId: pgId, duration, easing: ease });
+      // Pass duration will be calculated by runPass based on distance
+      await runPass(scene, { fromId: sfId, toId: pgId, easing: ease });
     }
     animationDebugLog(`[sideInbound][passEnd] sf:${sfId} pg:${pgId}`);
     if (pgSprite) {
