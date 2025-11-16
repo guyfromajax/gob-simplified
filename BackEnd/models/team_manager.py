@@ -281,6 +281,8 @@ class TeamManager:
             "F": 0,
             "PIP": 0,  # Points in Paint
             "FB_PTS": 0,  # Fast Break Points
+            "DEF_A": 0,  # Defensive Attempts
+            "DEF_S": 0,  # Defensive Stops
         }
 
         # Include all players (not just current lineup) to capture bench contributions
