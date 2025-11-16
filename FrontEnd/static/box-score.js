@@ -291,17 +291,24 @@ function renderPlayerStatsTable(team, players) {
       };
       const year = yearMap[yearRaw] || (player.year || 'SR');
       
-      // Calculate TREB and DEF%
+      // Calculate TREB, DEF%, and SCR%
       const treb = (stats.DREB || 0) + (stats.OREB || 0);
       const defa = stats.DEF_A || 0;
       const defs = stats.DEF_S || 0;
       const defPct = defa > 0 ? ((defs / defa) * 100).toFixed(0) : '0';
+      const scra = stats.SCR_A || 0;
+      const scrs = stats.SCR_S || 0;
+      const scrPct = scra > 0 ? ((scrs / scra) * 100).toFixed(0) : '0';
       
       // Format MIN (convert seconds to MM:SS or just minutes)
       const min = formatMinutes(stats.MIN || 0);
+      
+      // Format jersey number - check multiple possible fields
+      const jerseyNum = jersey || player.jerseyNumber || player.jersey_number || '';
+      const jerseyDisplay = jerseyNum ? ` (#${jerseyNum})` : '';
 
       row.innerHTML = `
-        <td>${name}${jersey ? ` (#${jersey})` : ''}</td>
+        <td>${name}${jerseyDisplay}</td>
         <td>${year}</td>
         <td>${stats.PTS || 0}</td>
         <td>${stats.FGM || 0}/${stats.FGA || 0}</td>
@@ -317,11 +324,15 @@ function renderPlayerStatsTable(team, players) {
         <td>${stats.TO || 0}</td>
         <td>${defa}</td>
         <td>${defPct}%</td>
+        <td>${scra}</td>
+        <td>${scrPct}%</td>
         <td>${min}</td>
       `;
     } else {
       // Empty row
       row.innerHTML = `
+        <td>-</td>
+        <td>-</td>
         <td>-</td>
         <td>-</td>
         <td>-</td>
