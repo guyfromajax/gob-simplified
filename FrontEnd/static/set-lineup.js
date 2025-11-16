@@ -600,14 +600,21 @@ async function init() {
     boxBtn.addEventListener('click', () => {
       const currentGameId = urlParams.get('game_id') ||
         (typeof localStorage !== 'undefined' ? localStorage.getItem('game_id') : null);
-      if (!currentGameId) {
-        showToast('No completed game found yet');
-        return;
-      }
       const params = new URLSearchParams();
-      params.set('game_id', currentGameId);
-      if (tournamentId) params.set('tournament_id', tournamentId);
-      if (franchiseId) params.set('franchise_id', franchiseId);
+      if (currentGameId) {
+        params.set('game_id', currentGameId);
+      } else {
+        // Pre-game: pass team context so box score can render zeroed stats
+        if (homeTeam) params.set('home', homeTeam);
+        if (awayTeam) params.set('away', awayTeam);
+        if (homeId) params.set('home_id', homeId);
+        if (awayId) params.set('away_id', awayId);
+        if (myTeamSide) params.set('my_team', myTeamSide);
+        if (modeParam) params.set('mode', modeParam);
+        if (tournamentId) params.set('tournament_id', tournamentId);
+        if (franchiseId) params.set('franchise_id', franchiseId);
+        params.set('pregame', '1');
+      }
       window.location.href = `/static/box-score.html?${params.toString()}`;
     });
   }

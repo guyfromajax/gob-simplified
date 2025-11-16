@@ -7,10 +7,26 @@ let gameData = null;
 document.addEventListener('DOMContentLoaded', async () => {
   const urlParams = new URLSearchParams(window.location.search);
   const gameId = urlParams.get('game_id');
+  const pregame = urlParams.get('pregame') === '1';
+  const homeTeamName = urlParams.get('home');
+  const awayTeamName = urlParams.get('away');
+  const franchiseId = urlParams.get('franchise_id');
   
   if (!gameId) {
-    console.error('No game_id provided');
-    return;
+    if (!homeTeamName || !awayTeamName) {
+      console.error('No game_id provided and team names missing');
+      return;
+    }
+    try {
+      await loadPreGameData({ homeTeamName, awayTeamName, franchiseId });
+      renderBoxScore();
+      setupTabs();
+      setupLockerRoomButton();
+      return;
+    } catch (e) {
+      console.error('Error loading pregame box score:', e);
+      return;
+    }
   }
 
   try {
@@ -42,6 +58,50 @@ function renderBoxScore() {
   renderPlayerStats();
   renderTeamStats();
   renderScoutingNotes();
+}
+
+// Build zeroed box score data from rosters when viewing pre-game
+async function loadPreGameData({ homeTeamName, awayTeamName, franchiseId }) {
+  const fetchRoster = async (team) => {
+    const path = franchiseId
+      ? `/franchise/roster?franchise_id=${franchiseId}&team_name=${encodeURIComponent(team)}`
+      : `/roster/${encodeURIComponent(team)}`;
+    const res = await fetch(path);
+    if (!res.ok) throw new Error(`Failed to load roster for ${team}`);
+    const data = await res.json();
+    return Array.isArray(data.players) ? data.players : [];
+  };
+
+  const [homeRoster, awayRoster] = await Promise.all([
+    fetchRoster(homeTeamName),
+    fetchRoster(awayTeamName),
+  ]);
+
+  // Map players to box-score-ready format with zeroed stats
+  const mapPlayers = (players, teamKey) =>
+    players.map((p) => ({
+      playerId: p._id,
+      team: teamKey,
+      name: p.name,
+      jersey: p.jersey || '',
+      pos: p.pos || p.position || null,
+      stats: {}, // zeroed in renderer
+      year: p.year || 'SR',
+    }));
+
+  gameData = {
+    home_team: { name: homeTeamName, score: 0 },
+    away_team: { name: awayTeamName, score: 0 },
+    score: { [homeTeamName]: 0, [awayTeamName]: 0 },
+    points_by_quarter: { [homeTeamName]: [0, 0, 0, 0], [awayTeamName]: [0, 0, 0, 0] },
+    players: [
+      ...mapPlayers(homeRoster, 'home'),
+      ...mapPlayers(awayRoster, 'away'),
+    ],
+    box_score: {},
+    team_totals: { [homeTeamName]: {}, [awayTeamName]: {} },
+    team_stats: {},
+  };
 }
 
 // Render header with team names and scores
