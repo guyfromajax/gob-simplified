@@ -560,6 +560,18 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
       const currentGridX = (sprite.x / width) * 100;
       const currentGridY = 50 - (sprite.y / height) * 50;
       
+      // Skip deep players (players sent back to protect against fast break)
+      // These players are far from the new offense basket and shouldn't be animated
+      // Deep players are typically at x < 40 (right side) when new offense is away (left side)
+      // or x > 60 (left side) when new offense is home (right side)
+      const isDeepPlayer = (newOffenseTeam === "away" && currentGridX < 40) || 
+                          (newOffenseTeam === "home" && currentGridX > 60);
+      
+      if (isDeepPlayer) {
+        animationDebugLog(`Skipping deep player ${id} (protecting against fast break) at grid x=${currentGridX.toFixed(1)}`);
+        continue;
+      }
+      
       // Move 20-30 grid spots toward new offense basket
       const distance = Phaser.Math.Between(20, 30);
       // Determine direction based on new offense team:
