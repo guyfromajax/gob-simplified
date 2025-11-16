@@ -737,7 +737,8 @@ class ShotManager:
             if passer:
                 passer.record_stat("AST")
             points = 2
-            apply_scoring(self.game, off_team, shooter, points, ["FGM", "FB_PTS"])  # Track fast break points
+            apply_scoring(self.game, off_team, shooter, points, ["FGM"])  # Record FGM
+            shooter.record_stat("FB_PTS", amount=points)  # Track fast break points - increment by points scored (2 or 3)
             text += f"{shooter} converts the fast break shot!"
             possession_flips = True
             # Check for defensive pressure opportunity (FCP/HCT) after fast break make
