@@ -42,7 +42,7 @@ const MAX_TRANSITION_DURATION = 3000; // ms - for transition movements (DREB, in
 // Animation speed constants (pixels per second)
 // Based on learnings from WIP_GOB repository for smooth, consistent animations
 // These ensure consistent speeds regardless of distance, making animations feel natural
-const PLAYER_SPEED = 200; // pixels per second for player movement
+const PLAYER_SPEED = 250; // pixels per second for player movement
 const BALL_SPEED = 250; // pixels per second for ball movement
 
 /**
