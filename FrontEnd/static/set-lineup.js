@@ -593,6 +593,24 @@ async function init() {
       window.location.href = `/game-plan.html?${params.toString()}`;
     });
   }
+
+  // BOX SCORE button: go to current game's box score if available
+  const boxBtn = document.getElementById('box-score-button');
+  if (boxBtn) {
+    boxBtn.addEventListener('click', () => {
+      const currentGameId = urlParams.get('game_id') ||
+        (typeof localStorage !== 'undefined' ? localStorage.getItem('game_id') : null);
+      if (!currentGameId) {
+        showToast('No completed game found yet');
+        return;
+      }
+      const params = new URLSearchParams();
+      params.set('game_id', currentGameId);
+      if (tournamentId) params.set('tournament_id', tournamentId);
+      if (franchiseId) params.set('franchise_id', franchiseId);
+      window.location.href = `/static/box-score.html?${params.toString()}`;
+    });
+  }
 }
 
 // ========== PLAYER VIEW IMPLEMENTATION ==========
