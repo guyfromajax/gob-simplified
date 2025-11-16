@@ -652,6 +652,8 @@ export async function animateGameTurns({ //hasBallAtStep
         }
       }
       updateDebugScore(turn, { turnIndex: i, possessionId });
+      // Mark that previous turn was inbound so HCO pre-step setup can use uncapped durations
+      scene._previousTurnWasInbound = true;
       // console.log('🏀 Continuing to next turn after BASELINE_INBOUND');
       continue;
     }
