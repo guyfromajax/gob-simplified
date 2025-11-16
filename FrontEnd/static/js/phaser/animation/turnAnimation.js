@@ -829,8 +829,8 @@ async function runInboundSetup({
         PG: { x: 80, y: 25 },   // Deep in offensive zone
         SG: { x: 73, y: 40 },   // Upper wing
         SF: { x: 73, y: 10 },   // Lower wing
-        PF: { x: 21, y: 36 },   // Protecting opposite end
-        C: { x: 21, y: 15 }     // Protecting opposite end
+        PF: { x: 37, y: 36 },   // Protecting opposite end
+        C: { x: 35, y: 15 }     // Protecting opposite end
       };
     }
 
