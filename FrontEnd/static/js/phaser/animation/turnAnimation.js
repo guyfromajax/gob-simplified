@@ -42,8 +42,30 @@ const MAX_TRANSITION_DURATION = 3000; // ms - for transition movements (DREB, in
 // Animation speed constants (pixels per second)
 // Based on learnings from WIP_GOB repository for smooth, consistent animations
 // These ensure consistent speeds regardless of distance, making animations feel natural
-const PLAYER_SPEED = 250; // pixels per second for player movement
-const BALL_SPEED = 250; // pixels per second for ball movement
+// Speed can be changed dynamically via gameSpeedManager
+const DEFAULT_PLAYER_SPEED = 350; // Default speed (Normal preset)
+const DEFAULT_BALL_SPEED = 350; // Default speed (Normal preset)
+
+/**
+ * Get current player speed (can be changed dynamically)
+ * @returns {number} Speed in pixels per second
+ */
+function getPlayerSpeed() {
+  // Check for dynamic speed from gameSpeedManager
+  if (typeof window !== 'undefined' && window.__GAME_SPEED) {
+    return window.__GAME_SPEED;
+  }
+  return DEFAULT_PLAYER_SPEED;
+}
+
+/**
+ * Get current ball speed (can be changed dynamically)
+ * @returns {number} Speed in pixels per second
+ */
+function getBallSpeed() {
+  // Ball speed matches player speed for consistency
+  return getPlayerSpeed();
+}
 
 /**
  * Calculate animation duration based on distance traveled
@@ -79,7 +101,8 @@ function getPlayerDuration(sprite, targetX, targetY, isTransition = false) {
   const currentX = sprite.x;
   const currentY = sprite.y;
   const maxDuration = isTransition ? MAX_TRANSITION_DURATION : MAX_STEP_DURATION;
-  return getDurationFromDistance(currentX, currentY, targetX, targetY, PLAYER_SPEED, maxDuration);
+  const speed = getPlayerSpeed();
+  return getDurationFromDistance(currentX, currentY, targetX, targetY, speed, maxDuration);
 }
 
 /**
@@ -94,7 +117,8 @@ function getBallDuration(ballSprite, targetX, targetY) {
   if (!ballSprite) return 300; // Default fallback if ball sprite doesn't exist
   const currentX = ballSprite.x;
   const currentY = ballSprite.y;
-  return getDurationFromDistance(currentX, currentY, targetX, targetY, BALL_SPEED);
+  const speed = getBallSpeed();
+  return getDurationFromDistance(currentX, currentY, targetX, targetY, speed);
 }
 
 

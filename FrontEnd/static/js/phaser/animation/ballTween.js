@@ -21,8 +21,21 @@ export const PASS_DEBUG = false;
 
 // Animation speed constants (pixels per second)
 // Based on learnings from WIP_GOB repository for smooth, consistent animations
-const BALL_SPEED = 250; // pixels per second for ball movement
+// Speed can be changed dynamically via gameSpeedManager
+const DEFAULT_BALL_SPEED = 350; // Default speed (Normal preset)
 const MAX_BALL_DURATION = 1000; // ms - cap for very long passes
+
+/**
+ * Get current ball speed (can be changed dynamically)
+ * @returns {number} Speed in pixels per second
+ */
+function getBallSpeed() {
+  // Check for dynamic speed from gameSpeedManager
+  if (typeof window !== 'undefined' && window.__GAME_SPEED) {
+    return window.__GAME_SPEED;
+  }
+  return DEFAULT_BALL_SPEED;
+}
 
 /**
  * Calculate ball movement duration based on distance from current position to target
@@ -54,7 +67,8 @@ function getBallDuration(ballSprite, targetX, targetY) {
     return 50; // Minimum duration for very short distances
   }
   
-  const duration = (distance / BALL_SPEED) * 1000; // Convert to milliseconds
+  const speed = getBallSpeed();
+  const duration = (distance / speed) * 1000; // Convert to milliseconds
   // Clamp between 50ms (minimum) and MAX_BALL_DURATION (maximum)
   const clampedDuration = Math.min(MAX_BALL_DURATION, Math.max(50, duration));
   
@@ -536,7 +550,8 @@ export async function runPass(scene, cfg = {}) {
             usedDuration = 50;
           } else {
             // Calculate duration based on distance
-            const calculatedDuration = (distance / BALL_SPEED) * 1000;
+            const speed = getBallSpeed();
+            const calculatedDuration = (distance / speed) * 1000;
             const clampedDuration = Math.min(MAX_BALL_DURATION, Math.max(50, calculatedDuration));
             
             // Validate duration

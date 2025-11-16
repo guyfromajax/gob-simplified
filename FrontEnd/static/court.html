@@ -1462,14 +1462,14 @@
       display: flex;
       flex-direction: row;
       align-items: center;
-      justify-content: center;
-      gap: 20px;
+      justify-content: space-between;
+      width: 400px; /* Fixed width to center Pause button */
       z-index: 950; /* Below HUD (1000) but above Playcall Center (900) */
     }
 
+    #game-speed-btn,
     #pause-btn,
     #skip-btn {
-      background-color: #ff6200;
       color: #fff;
       border: none;
       padding: 8px 20px;
@@ -1481,12 +1481,28 @@
       box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
     }
 
-    #skip-btn {
-      background-color: #007bff;
+    #game-speed-btn {
+      background-color: #9c27b0; /* Purple */
+    }
+
+    #game-speed-btn:hover {
+      background-color: #7b1fa2; /* Darker purple */
+    }
+
+    #pause-btn {
+      background-color: #ff6200;
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
     }
 
     #pause-btn:hover {
       background-color: #ff7a1a;
+    }
+
+    #skip-btn {
+      background-color: #007bff;
+      margin-left: auto; /* Push to right */
     }
 
     #skip-btn:hover {
@@ -1494,9 +1510,52 @@
     }
 
     #pause-btn:disabled,
-    #skip-btn:disabled {
+    #skip-btn:disabled,
+    #game-speed-btn:disabled {
       opacity: 0.5;
       cursor: not-allowed;
+    }
+
+    /* ==================== GAME SPEED DROPDOWN ==================== */
+    .speed-dropdown {
+      position: absolute;
+      bottom: calc(var(--pbp-height) + var(--court-bottom-trim) + 20px + 40px);
+      left: 50%;
+      transform: translateX(-50%);
+      background: linear-gradient(135deg, #2a2a2a 0%, #1a1a1a 100%);
+      border: 2px solid #9c27b0;
+      border-radius: 8px;
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      z-index: 951;
+      min-width: 120px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+    }
+
+    .speed-option {
+      background-color: #333;
+      color: #fff;
+      border: 1px solid #555;
+      padding: 8px 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 14px;
+      transition: all 0.2s;
+      text-align: center;
+    }
+
+    .speed-option:hover {
+      background-color: #9c27b0;
+      border-color: #9c27b0;
+    }
+
+    .speed-option.active {
+      background-color: #9c27b0;
+      border-color: #9c27b0;
+      font-weight: bold;
     }
 
     /* ==================== PLAYER TOOLTIP ==================== */
@@ -2008,8 +2067,16 @@
       
       <!-- Game controls (pause/skip) at bottom of court -->
       <div class="game-controls">
+        <button id="game-speed-btn">Game Speed</button>
         <button id="pause-btn">Pause</button>
         <button id="skip-btn">Skip To End</button>
+      </div>
+      
+      <!-- Game Speed Selection Dropdown -->
+      <div id="speed-dropdown" class="speed-dropdown" style="display: none;">
+        <button class="speed-option" data-speed="250">Slow</button>
+        <button class="speed-option" data-speed="350">Normal</button>
+        <button class="speed-option" data-speed="450">Fast</button>
       </div>
     </div>
 
