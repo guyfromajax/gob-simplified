@@ -6,7 +6,7 @@ import animationConfig from "./animation_config.js";
 import { HOME_RIM_COORDS, AWAY_RIM_COORDS, HOME_TOP_KEY, AWAY_TOP_KEY } from "./courtConstants.js";
 import { States, safeTransition } from "../state/gameStateMachine.js";
 import { getCurrentOwner } from "../ball/ballController.js";
-import { runInboundSetup } from "./turnAnimation.js";
+import { runInboundSetup, getPlayerDuration } from "./turnAnimation.js";
 import { animationDebugLog, isAnimationDebugEnabled } from "../utils/debugFlags.js";
 import { appendToTextScroll } from "../utils/textScroll.js";
 
@@ -207,10 +207,12 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
   
   // Move shooter
   attachBallToPlayer(scene, ballSprite, shooterSprite);
+  // Use distance-based duration for consistent speed
+  const shooterDuration = getPlayerDuration(shooterSprite, shotPx.x, shotPx.y);
   promises.push(
     tweenPlayerTo(scene, shooterSprite, shotPx, {
-      duration: 600,
-      easing: "Sine.easeInOut"
+      duration: shooterDuration,
+      easing: "Linear" // Match HCO step movements
     })
   );
   
@@ -260,10 +262,12 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
     // });
     
     const defenderPx = gridToPixels(defenderSpot.x, defenderSpot.y, width, height);
+    // Use distance-based duration for consistent speed
+    const defenderDuration = getPlayerDuration(defenderSprite, defenderPx.x, defenderPx.y);
     promises.push(
       tweenPlayerTo(scene, defenderSprite, defenderPx, {
-        duration: 600,
-        easing: "Sine.easeInOut"
+        duration: defenderDuration,
+        easing: "Linear" // Match HCO step movements
       })
     );
   } else {
@@ -402,10 +406,12 @@ async function animateDefensiveStop(scene, turnData, playerSprites, ballSprite, 
   // Move ball handler to top of key
   attachBallToPlayer(scene, ballSprite, ballHandlerSprite);
   const topKeyPx = gridToPixels(topKey.x, topKey.y, width, height);
+  // Use distance-based duration for consistent speed
+  const handlerDuration = getPlayerDuration(ballHandlerSprite, topKeyPx.x, topKeyPx.y);
   promises.push(
     tweenPlayerTo(scene, ballHandlerSprite, topKeyPx, {
-      duration: 600,
-      easing: "Sine.easeInOut"
+      duration: handlerDuration,
+      easing: "Linear" // Match HCO step movements
     })
   );
   
@@ -423,10 +429,12 @@ async function animateDefensiveStop(scene, turnData, playerSprites, ballSprite, 
     stopperSpot.x = Phaser.Math.Clamp(stopperSpot.x, 4, 97);
     
     const stopperPx = gridToPixels(stopperSpot.x, stopperSpot.y, width, height);
+    // Use distance-based duration for consistent speed
+    const stopperDuration = getPlayerDuration(stopperSprite, stopperPx.x, stopperPx.y);
     promises.push(
       tweenPlayerTo(scene, stopperSprite, stopperPx, {
-        duration: 600,
-        easing: "Sine.easeInOut"
+        duration: stopperDuration,
+        easing: "Linear" // Match HCO step movements
       })
     );
   }
@@ -454,10 +462,12 @@ async function animateDefensiveStop(scene, turnData, playerSprites, ballSprite, 
       defenderTarget.x = Phaser.Math.Clamp(defenderTarget.x, 4, 97);
       
       const defenderPx = gridToPixels(defenderTarget.x, defenderTarget.y, width, height);
+      // Use distance-based duration for consistent speed
+      const defenderDuration = getPlayerDuration(sprite, defenderPx.x, defenderPx.y);
       promises.push(
         tweenPlayerTo(scene, sprite, defenderPx, {
-          duration: 600,
-          easing: "Sine.easeInOut"
+          duration: defenderDuration,
+          easing: "Linear" // Match HCO step movements
         })
       );
     }
@@ -536,10 +546,12 @@ async function moveOtherPlayersToStandardPositions(
     }
     
     const targetPx = gridToPixels(targetSpot.x, targetSpot.y, width, height);
+    // Use distance-based duration for consistent speed
+    const playerDuration = getPlayerDuration(sprite, targetPx.x, targetPx.y);
     promises.push(
       tweenPlayerTo(scene, sprite, targetPx, {
-        duration: 600,
-        easing: "Sine.easeInOut"
+        duration: playerDuration,
+        easing: "Linear" // Match HCO step movements
       })
     );
   }

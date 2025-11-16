@@ -7,6 +7,7 @@ import { bounceFromRim } from "./ballManager.js";
 import { States, safeTransition, createTransitionGuard } from "../state/gameStateMachine.js";
 import { getCurrentOwner, getPendingOwner } from "../ball/ballController.js";
 import { DebugFlags, animationDebugLog } from "../utils/debugFlags.js";
+import { getPlayerDuration } from "./turnAnimation.js";
 
 function wait(scene, ms) {
   if (!ms) return Promise.resolve();
@@ -97,13 +98,15 @@ export async function runFreeThrowSequence(
       const end = anim.movement?.[1]?.coords;
       if (!sprite || !end) continue;
       const px = gridToPixels(end.x, end.y, width, height);
+      // Use distance-based duration for consistent speed
+      const duration = getPlayerDuration(sprite, px.x, px.y);
       promises.push(
         new Promise((resolve) => {
           scene.tweens.add({
             targets: sprite,
             x: px.x,
             y: px.y,
-            duration: anim.duration || animationConfig.freeThrow.lineupMoveMs,
+            duration,
             ease: "Linear",
             onComplete: resolve,
             onStop: resolve,
@@ -120,12 +123,14 @@ export async function runFreeThrowSequence(
     const end = shooterAnim?.movement?.[1]?.coords;
     if (sprite && end) {
       const px = gridToPixels(end.x, end.y, width, height);
+      // Use distance-based duration for consistent speed
+      const duration = getPlayerDuration(sprite, px.x, px.y);
       await new Promise((resolve) => {
         scene.tweens.add({
           targets: sprite,
           x: px.x,
           y: px.y,
-          duration: shooterAnim.duration || animationConfig.freeThrow.lineupMoveMs,
+          duration,
           ease: "Linear",
           onComplete: resolve,
           onStop: resolve,
