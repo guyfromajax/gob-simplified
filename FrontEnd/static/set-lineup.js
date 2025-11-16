@@ -93,19 +93,44 @@ async function loadRoster() {
         const gameData = await gameRes.json();
         const gamePlayers = gameData.players || [];
         
+        console.log(`Found ${gamePlayers.length} players with energy data from game`);
+        
         // Merge energy data into roster
+        let updatedCount = 0;
         gamePlayers.forEach(gp => {
-          const rosterPlayer = roster.find(p => p._id === gp._id);
+          const playerId = gp._id || gp.playerId || gp.player_id;
+          if (!playerId) {
+            console.warn("Game player missing ID:", gp);
+            return;
+          }
+          
+          const rosterPlayer = roster.find(p => {
+            const rosterId = p._id || p.playerId || p.player_id;
+            return String(rosterId) === String(playerId);
+          });
+          
           if (rosterPlayer) {
             rosterPlayer.attributes = rosterPlayer.attributes || {};
-            rosterPlayer.attributes.NG = gp.NG;
-            console.log(`Updated ${gp.name} energy to ${gp.NG}`);
+            const energyValue = gp.NG ?? gp.energy ?? 1.0;
+            rosterPlayer.attributes.NG = energyValue;
+            // Also set on player object directly for compatibility
+            rosterPlayer.NG = energyValue;
+            updatedCount++;
+            console.log(`Updated ${gp.name || 'Unknown'} energy to ${energyValue} (${Math.round(energyValue * 100)}%)`);
+          } else {
+            console.warn(`Could not find roster player for game player: ${gp.name || 'Unknown'} (ID: ${playerId})`);
           }
         });
+        
+        console.log(`Successfully updated energy for ${updatedCount} players`);
+      } else {
+        console.warn(`Failed to fetch game data: ${gameRes.status} ${gameRes.statusText}`);
       }
     } catch (err) {
       console.warn("Could not load player energy from game:", err);
     }
+  } else {
+    console.log("No gameId found, skipping energy load (players will show default 100%)");
   }
   
   roster.sort((a, b) => {

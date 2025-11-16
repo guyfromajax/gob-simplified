@@ -604,6 +604,13 @@ function setupLockerRoomButton() {
     if (period) params.set('period', period);
     if (startWithInbound) params.set('start_with_inbound', startWithInbound);
     if (startingPossession) params.set('starting_possession', startingPossession);
+    
+    // Include game_id if available (from URL or localStorage) to preserve in-game state
+    const gameId = urlParams.get('game_id') || 
+                   (typeof localStorage !== 'undefined' ? localStorage.getItem('game_id') : null);
+    if (gameId) {
+      params.set('game_id', gameId);
+    }
 
     button.addEventListener('click', () => {
       window.location.href = `/static/set-lineup.html?${params.toString()}`;
