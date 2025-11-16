@@ -281,20 +281,6 @@ function renderPlayerStatsTable(team, players) {
       const stats = player.stats || {};
       const name = player.name || 'Unknown';
       const jersey = player.jersey || '';
-      const yearRaw = (player.year || 'SR').toString().toLowerCase();
-      // Normalize year to two-letter abbreviation
-      const yearMap = {
-        freshman: 'FR',
-        frosh: 'FR',
-        fr: 'FR',
-        sophomore: 'SO',
-        so: 'SO',
-        junior: 'JR',
-        jr: 'JR',
-        senior: 'SR',
-        sr: 'SR'
-      };
-      const year = yearMap[yearRaw] || (player.year || 'SR');
       
       // Calculate TREB, DEF%, and SCR%
       const treb = (stats.DREB || 0) + (stats.OREB || 0);
@@ -343,7 +329,6 @@ function renderPlayerStatsTable(team, players) {
 
       row.innerHTML = `
         <td>${name}${jerseyDisplay}</td>
-        <td>${year}</td>
         <td>${stats.PTS || 0}</td>
         <td>${stats.FGM || 0}/${stats.FGA || 0}</td>
         <td>${stats['3PTM'] || 0}/${stats['3PTA'] || 0}</td>
@@ -365,7 +350,6 @@ function renderPlayerStatsTable(team, players) {
     } else {
       // Empty row
       row.innerHTML = `
-        <td>-</td>
         <td>-</td>
         <td>-</td>
         <td>-</td>

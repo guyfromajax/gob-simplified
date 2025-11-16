@@ -111,10 +111,29 @@ async function loadRoster() {
           
           if (rosterPlayer) {
             rosterPlayer.attributes = rosterPlayer.attributes || {};
-            const energyValue = gp.NG ?? gp.energy ?? 1.0;
+            const energyValue = gp.NG ?? gp.energy ?? gp.attributes?.NG ?? 1.0;
             rosterPlayer.attributes.NG = energyValue;
             // Also set on player object directly for compatibility
             rosterPlayer.NG = energyValue;
+            
+            // Merge game stats if available
+            if (gp.stats) {
+              rosterPlayer.stats = rosterPlayer.stats || {};
+              rosterPlayer.stats.game = gp.stats.game || gp.stats || {};
+            }
+            
+            // Merge emotion and momentum from attributes if available
+            if (gp.attributes) {
+              if (gp.attributes.EM !== undefined) {
+                rosterPlayer.attributes.EM = gp.attributes.EM;
+                rosterPlayer.EM = gp.attributes.EM;
+              }
+              if (gp.attributes.MO !== undefined) {
+                rosterPlayer.attributes.MO = gp.attributes.MO;
+                rosterPlayer.MO = gp.attributes.MO;
+              }
+            }
+            
             updatedCount++;
             console.log(`Updated ${gp.name || 'Unknown'} energy to ${energyValue} (${Math.round(energyValue * 100)}%)`);
           } else {
@@ -123,6 +142,9 @@ async function loadRoster() {
         });
         
         console.log(`Successfully updated energy for ${updatedCount} players`);
+        
+        // Refresh slot displays to show updated stats
+        updateAllSlotDisplays();
       } else {
         console.warn(`Failed to fetch game data: ${gameRes.status} ${gameRes.statusText}`);
       }
