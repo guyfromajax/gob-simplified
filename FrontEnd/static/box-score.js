@@ -507,22 +507,22 @@ function createPlaycallSubsection(title, playcallData) {
 
   subsection.innerHTML = `<h4>${title}: ${overallSuccess} / ${overallAttempts} (${overallPct}%)</h4>`;
 
-  // Inside
-  const inside = playcallData.Inside || {};
+  // Inside (backend uses lowercase 'inside')
+  const inside = playcallData.inside || playcallData.Inside || {};
   const insideAttempts = inside.attempts || 0;
   const insideSuccess = inside.success || 0;
   const insidePct = insideAttempts > 0 ? ((insideSuccess / insideAttempts) * 100).toFixed(0) : '0';
   subsection.appendChild(createScoutingItem('Inside', `${insideSuccess} / ${insideAttempts}`, `${insidePct}%`));
 
-  // Attack
-  const attack = playcallData.Attack || {};
+  // Attack (backend uses lowercase 'attack')
+  const attack = playcallData.attack || playcallData.Attack || {};
   const attackAttempts = attack.attempts || 0;
   const attackSuccess = attack.success || 0;
   const attackPct = attackAttempts > 0 ? ((attackSuccess / attackAttempts) * 100).toFixed(0) : '0';
   subsection.appendChild(createScoutingItem('Attack', `${attackSuccess} / ${attackAttempts}`, `${attackPct}%`));
 
-  // Outside
-  const outside = playcallData.Outside || {};
+  // Outside (backend uses lowercase 'outside')
+  const outside = playcallData.outside || playcallData.Outside || {};
   const outsideAttempts = outside.attempts || 0;
   const outsideSuccess = outside.success || 0;
   const outsidePct = outsideAttempts > 0 ? ((outsideSuccess / outsideAttempts) * 100).toFixed(0) : '0';
