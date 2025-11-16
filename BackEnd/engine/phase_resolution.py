@@ -632,7 +632,7 @@ def resolve_turnover_logic(roles, game, turnover_type="DEAD BALL"):
     return result
 
 
-def generate_logic(off_call, def_call, off_team, def_team, off_lineup, def_lineup):
+def generate_logic(off_call, def_call, off_team, def_team, off_lineup, def_lineup, game=None):
     """
     Calculate lean score based on offensive/defensive matchup.
     
@@ -646,6 +646,7 @@ def generate_logic(off_call, def_call, off_team, def_team, off_lineup, def_lineu
         def_team: Defensive team object with attributes
         off_lineup (dict): Offensive lineup {pos: player}
         def_lineup (dict): Defensive lineup {pos: player}
+        game: Game context object (optional, needed to retrieve skeleton)
     
     Returns:
         float: Lean score from -2 to 2
@@ -661,6 +662,56 @@ def generate_logic(off_call, def_call, off_team, def_team, off_lineup, def_lineu
         - Game situation (score, time, quarter)
     """
     import random
+    from BackEnd.constants import ACTIONS
+    
+    # Analyze skeleton to count screen attempts
+    screen_attempts_by_pos = {}
+    if game:
+        try:
+            # Get the successful variant skeleton to analyze screen usage
+            skeleton = get_hco_skeleton(None, game, lean_score=1.0)
+            if skeleton and "steps" in skeleton:
+                steps = skeleton.get("steps", [])
+                for step in steps:
+                    # Check pos_actions for SCREEN actions
+                    pos_actions = step.get("pos_actions", {})
+                    for pos, action_info in pos_actions.items():
+                        action = action_info.get("action", "")
+                        if action == ACTIONS["SCREEN"] or action == "screen":
+                            screen_attempts_by_pos[pos] = screen_attempts_by_pos.get(pos, 0) + 1
+                    
+                    # Check events for screen events
+                    events = step.get("events", [])
+                    for event in events:
+                        if event.get("type") == "screen":
+                            screener_pos = event.get("by")
+                            if screener_pos:
+                                screen_attempts_by_pos[screener_pos] = screen_attempts_by_pos.get(screener_pos, 0) + 1
+                
+                # Record screen stats for each player
+                if screen_attempts_by_pos:
+                    print(f"[generate_logic] Screen attempts in skeleton:")
+                    for pos, count in sorted(screen_attempts_by_pos.items()):
+                        player = off_lineup.get(pos)
+                        if player:
+                            player_name = get_name_safe(player)
+                            print(f"  {pos} ({player_name}): {count} screen attempt(s)")
+                            
+                            # Increment SCR_A for each screen attempt
+                            for _ in range(count):
+                                player.record_stat("SCR_A")
+                                
+                                # 50% chance to increment SCR_S for each attempt
+                                success = random.randint(1, 2)
+                                if success == 1:
+                                    player.record_stat("SCR_S")
+                                    print(f"    → Screen success! ({player_name} SCR_S incremented)")
+                        else:
+                            print(f"  {pos} (Unknown): {count} screen attempt(s) - player not found in lineup")
+                else:
+                    print(f"[generate_logic] No screen attempts found in skeleton")
+        except Exception as e:
+            print(f"[generate_logic] Error analyzing skeleton for screens: {e}")
     
     # PLACEHOLDER: Return random lean score for now
     # This allows the system to work while full logic is implemented
@@ -682,7 +733,7 @@ def resolve_half_court_offense_logic(game):
     print(f"def_call: {def_call}")
 
     # Generate logic to determine lean score
-    lean_score = generate_logic(off_call, def_call, off_team, def_team, off_lineup, def_lineup)
+    lean_score = generate_logic(off_call, def_call, off_team, def_team, off_lineup, def_lineup, game=game)
     
     # Get skeleton from MongoDB BEFORE assigning roles, so assign_roles can use the correct skeleton
     # Pass lean_score to select the appropriate skeleton variant
