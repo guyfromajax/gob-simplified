@@ -580,7 +580,17 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
   // For FAST_BREAK, the outlet pass is handled in the fast break sequence itself (fastBreak.js)
   // For FCP/HCT, no outlet pass - players go directly to press positions
   // CRITICAL: This outlet pass step is required for smooth DREB -> HCO transitions
+  // The outlet pass MUST execute if we have an outletReceiverId, even if receiver movement was skipped
   if (nextPlayType === "HCO" && outletReceiverId && outletReceiverId !== rebounderId) {
+    // If outletReceiverSprite is missing, try to get it from playerSprites
+    if (!outletReceiverSprite && outletReceiverId) {
+      outletReceiverSprite = playerSprites[outletReceiverId];
+      console.log('🏀 runDefensiveReboundSetup: Re-fetched outlet receiver sprite', {
+        outletReceiverId,
+        hasSprite: !!outletReceiverSprite
+      });
+    }
+    
     // If outletTarget wasn't set (receiver movement was skipped), use receiver's current position
     if (!outletTarget && outletReceiverSprite) {
       outletTarget = {
@@ -588,6 +598,14 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
         y: 50 - (outletReceiverSprite.y / height) * 50
       };
       console.log('🏀 runDefensiveReboundSetup: Using receiver current position as outlet target', outletTarget);
+    } else if (!outletTarget) {
+      // If we still don't have outletTarget and no sprite, log a warning but proceed anyway
+      // runPass will use the receiver's current position from playerSprites
+      console.warn('🏀 runDefensiveReboundSetup: No outletTarget and no sprite, but proceeding with outlet pass', {
+        outletReceiverId,
+        outletTarget,
+        hasOutletReceiverSprite: !!outletReceiverSprite
+      });
     }
     const outletLog = {
       event: 'OUTLET_PASS',
