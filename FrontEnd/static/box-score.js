@@ -570,28 +570,66 @@ function setupLockerRoomButton() {
 
   // Determine mode from URL params or localStorage
   const urlParams = new URLSearchParams(window.location.search);
+  const from = urlParams.get('from');
   const tournamentId = urlParams.get('tournament_id');
   const franchiseId = urlParams.get('franchise_id');
+  const home = urlParams.get('home');
+  const away = urlParams.get('away');
+  const homeId = urlParams.get('home_id');
+  const awayId = urlParams.get('away_id');
+  const myTeam = urlParams.get('my_team');
+  const userTeamId = urlParams.get('user_team_id');
+  const week = urlParams.get('week');
+  const mode = urlParams.get('mode');
+  const quarter = urlParams.get('quarter');
+  const period = urlParams.get('period');
+  const startWithInbound = urlParams.get('start_with_inbound');
+  const startingPossession = urlParams.get('starting_possession');
   
-  // Also check localStorage for mode context
-  let mode = 'single';
+  // If we came from the lineup screen, show a Back button that returns to lineup
+  if (from === 'lineup') {
+    button.textContent = 'Back';
+    const params = new URLSearchParams();
+    if (home) params.set('home', home);
+    if (away) params.set('away', away);
+    if (homeId) params.set('home_id', homeId);
+    if (awayId) params.set('away_id', awayId);
+    if (myTeam) params.set('my_team', myTeam);
+    if (userTeamId) params.set('user_team_id', userTeamId);
+    if (franchiseId) params.set('franchise_id', franchiseId);
+    if (week) params.set('week', week);
+    if (tournamentId) params.set('tournament_id', tournamentId);
+    if (mode) params.set('mode', mode);
+    if (quarter) params.set('quarter', quarter);
+    if (period) params.set('period', period);
+    if (startWithInbound) params.set('start_with_inbound', startWithInbound);
+    if (startingPossession) params.set('starting_possession', startingPossession);
+
+    button.addEventListener('click', () => {
+      window.location.href = `/static/set-lineup.html?${params.toString()}`;
+    });
+    return;
+  }
+
+  // Otherwise, behave like a post-game \"Go To Locker Room\" button
+  let navMode = 'single';
   let lockerRoomUrl;
   
   if (tournamentId || (typeof localStorage !== 'undefined' && localStorage.getItem('activeTournament'))) {
-    mode = 'tournament';
+    navMode = 'tournament';
     lockerRoomUrl = '/static/tournament.html';
     if (tournamentId) {
       lockerRoomUrl += `?tournament_id=${tournamentId}`;
     }
   } else if (franchiseId || (typeof localStorage !== 'undefined' && localStorage.getItem('franchise_id'))) {
-    mode = 'franchise';
+    navMode = 'franchise';
     const storedFranchiseId = franchiseId || (typeof localStorage !== 'undefined' ? localStorage.getItem('franchise_id') : null);
     lockerRoomUrl = '/franchise/command-center';
     if (storedFranchiseId) {
       lockerRoomUrl += `?franchise_id=${storedFranchiseId}`;
     }
   } else {
-    mode = 'single';
+    navMode = 'single';
     lockerRoomUrl = '/static/mode-select.html';
   }
 

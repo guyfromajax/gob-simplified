@@ -598,23 +598,43 @@ async function init() {
   const boxBtn = document.getElementById('box-score-button');
   if (boxBtn) {
     boxBtn.addEventListener('click', () => {
-      const currentGameId = urlParams.get('game_id') ||
+      const currentGameId =
+        urlParams.get('game_id') ||
         (typeof localStorage !== 'undefined' ? localStorage.getItem('game_id') : null);
+
       const params = new URLSearchParams();
+
+      // Always pass game context so Box Score can route back to lineup if needed
+      if (homeTeam) params.set('home', homeTeam);
+      if (awayTeam) params.set('away', awayTeam);
+      if (homeId) params.set('home_id', homeId);
+      if (awayId) params.set('away_id', awayId);
+      if (myTeamSide) params.set('my_team', myTeamSide);
+      if (userTeamIdParam) params.set('user_team_id', userTeamIdParam);
+      if (franchiseId) params.set('franchise_id', franchiseId);
+      if (weekParam) params.set('week', weekParam);
+      if (tournamentId) params.set('tournament_id', tournamentId);
+      if (modeParam) params.set('mode', modeParam);
+      params.set('quarter', String(quarter));
+      params.set('period', periodLabel);
+
+      // Carry forward inbound/possession flags if present
+      const startWithInbound = urlParams.get('start_with_inbound');
+      const startingPossession = urlParams.get('starting_possession');
+      if (startWithInbound) params.set('start_with_inbound', startWithInbound);
+      if (startingPossession) params.set('starting_possession', startingPossession);
+
+      // If we have an active game, include it so Box Score shows live stats
       if (currentGameId) {
         params.set('game_id', currentGameId);
       } else {
-        // Pre-game: pass team context so box score can render zeroed stats
-        if (homeTeam) params.set('home', homeTeam);
-        if (awayTeam) params.set('away', awayTeam);
-        if (homeId) params.set('home_id', homeId);
-        if (awayId) params.set('away_id', awayId);
-        if (myTeamSide) params.set('my_team', myTeamSide);
-        if (modeParam) params.set('mode', modeParam);
-        if (tournamentId) params.set('tournament_id', tournamentId);
-        if (franchiseId) params.set('franchise_id', franchiseId);
+        // Pre-game: let Box Score know to render zeroed stats
         params.set('pregame', '1');
       }
+
+      // Mark that navigation originated from lineup so Box Score can \"Back\" here
+      params.set('from', 'lineup');
+
       window.location.href = `/static/box-score.html?${params.toString()}`;
     });
   }
