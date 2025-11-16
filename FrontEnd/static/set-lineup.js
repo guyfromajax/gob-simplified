@@ -332,11 +332,46 @@ function updateSlotDisplay(slot) {
     const energyPercent = Math.round(energy * 100);
     const fouls = player.stats?.game?.F ?? 0;
     
+    // Get game stats
+    const stats = player.stats?.game || {};
+    const points = stats.PTS || 0;
+    const rebounds = (stats.OREB || 0) + (stats.DREB || 0);
+    const assists = stats.AST || 0;
+    const defA = stats.DEF_A || 0;
+    const defS = stats.DEF_S || 0;
+    const defPct = defA > 0 ? Math.round((defS / defA) * 100) : 0;
+    
+    // Get emotion (EM) and convert to emoji
+    const em = player.attributes?.EM ?? player.EM ?? 50;
+    let emoji = '😐'; // Default straight face
+    if (em >= 80) emoji = '😎';        // Sunglasses
+    else if (em >= 60) emoji = '😊';   // Big smile
+    else if (em >= 40) emoji = '😐';   // Straight face
+    else if (em >= 20) emoji = '😕';   // Slight frown
+    else emoji = '😞';                 // Sad face
+    
+    // Get momentum (MO)
+    const momentum = player.attributes?.MO ?? player.MO ?? 0;
+    const moValue = typeof momentum === 'number' ? momentum : 0;
+    
     // Determine energy color class
     let energyClass = 'high';
     if (energyPercent < 25) energyClass = 'critical';
     else if (energyPercent < 50) energyClass = 'low';
     else if (energyPercent < 75) energyClass = 'medium';
+    
+    // Calculate momentum bar widths
+    let leftWidth = '0%';
+    let rightWidth = '0%';
+    if (moValue < 0) {
+      // Negative momentum: fill left side with red
+      const fillPercent = Math.min(100, Math.abs(moValue) / 10 * 100); // -10 = 100%, -5 = 50%
+      leftWidth = `${fillPercent}%`;
+    } else if (moValue > 0) {
+      // Positive momentum: fill right side with green
+      const fillPercent = Math.min(100, moValue / 10 * 100); // +10 = 100%, +5 = 50%
+      rightWidth = `${fillPercent}%`;
+    }
     
     // Build slot content HTML
     slotContent.innerHTML = `
@@ -346,8 +381,20 @@ function updateSlotDisplay(slot) {
       </div>
       <div class="player-name">${player.name}</div>
       <div class="player-rating">${rating}</div>
-      <div class="player-energy ${energyClass}">${energyPercent}%</div>
+      <div class="player-points">${points}</div>
+      <div class="player-rebounds">${rebounds}</div>
+      <div class="player-assists">${assists}</div>
+      <div class="player-def-pct">${defPct}%</div>
+      <div class="player-emotion">${emoji}</div>
+      <div class="player-momentum">
+        <div class="momentum-bar-container">
+          <div class="momentum-bar-left" style="width: ${leftWidth}"></div>
+          <div class="momentum-bar-center"></div>
+          <div class="momentum-bar-right" style="width: ${rightWidth}"></div>
+        </div>
+      </div>
       <div class="player-fouls">${fouls}</div>
+      <div class="player-energy ${energyClass}">${energyPercent}%</div>
     `;
     
     slotContent.classList.remove('empty');
