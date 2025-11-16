@@ -1262,61 +1262,6 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
     }
   }
 
-  // 🔶 Pre-possession: Move players to their step 0 positions
-  // CRITICAL: This handles transitions between states (e.g., Inbound -> HCO)
-  // After inbound passes, players are at inbound positions and need to smoothly animate
-  // to their HCO step 0 positions before starting the HCO steps.
-  // Use distance-based duration to ensure consistent speed matching HCO step movements.
-  // This MUST run for all HCO turns to ensure smooth transitions from any previous state.
-  if (turnData.animations && turnData.animations.length > 0) {
-    const setupPromises = [];
-    for (const anim of turnData.animations) {
-      const sprite = playerSprites[anim.playerId];
-      const firstStep = anim.movement?.[0];
-      if (!sprite || !firstStep) continue;
-
-      const { x: targetX, y: targetY } = gridToPixels(
-        firstStep.coords.x,
-        firstStep.coords.y,
-        scene.game.config.width,
-        scene.game.config.height
-      );
-
-      // Calculate distance from current position to step 0 position
-      const distance = Phaser.Math.Distance.Between(sprite.x, sprite.y, targetX, targetY);
-      
-      // Always animate if distance is > 1 pixel (reduced threshold to catch more cases)
-      // This ensures smooth transitions between states (Inbound -> HCO, DREB -> HCO, etc.)
-      if (distance > 1) {
-        // Use distance-based duration; for Inbound -> HCO we remove the max cap so players don't \"jet\"
-        const useUncapped = scene._previousTurnWasInbound === true;
-        const setupDuration = useUncapped
-          ? getPlayerDurationUncapped(sprite, targetX, targetY)
-          : getPlayerDuration(sprite, targetX, targetY, false);
-        
-        setupPromises.push(
-          new Promise((resolve) => {
-            const tween = scene.tweens.add({
-              targets: sprite,
-              x: targetX,
-              y: targetY,
-              duration: setupDuration,
-              ease: "Linear", // Match HCO step movements
-              onComplete: resolve,
-              onStop: resolve
-            });
-          })
-        );
-      }
-    }
-    
-    // Wait for all players to reach step 0 positions before starting HCO steps
-    // This ensures smooth transitions between states
-    if (setupPromises.length > 0) {
-      await Promise.all(setupPromises);
-    }
-  }
-
   if (scene.skipToEnd || scene.stateMachine?.is(States.FastBreak)) {
     return;
   }
