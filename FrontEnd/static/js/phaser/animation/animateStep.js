@@ -206,45 +206,9 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
           });
         }
         if (step.action && onAction) {
-          // For passes, especially when entering HCO, ensure the passer reaches their position first
-          // This prevents the PG from passing too early when entering HCO
-          if (step.action === 'pass') {
-            const playerInfo = scene.playerInfo?.[sprite?.playerId];
-            const isPG = playerInfo?.pos === 'PG';
-            
-            // Check if the player is far from their target position
-            // If so, wait for them to get closer before executing the pass
-            let currentDistance = Phaser.Math.Distance.Between(sprite.x, sprite.y, targetX, targetY);
-            const shouldWaitForPosition = isPG && currentDistance > 50; // Wait if more than 50 pixels away
-            
-            if (shouldWaitForPosition) {
-              // Wait for the player to reach their position (within 30 pixels)
-              // Poll the sprite position as the tween progresses
-              const checkInterval = 50; // Check every 50ms
-              const maxWait = duration; // Don't wait longer than the movement duration
-              let waited = 0;
-              
-              while (currentDistance > 30 && waited < maxWait) {
-                await new Promise(resolve => setTimeout(resolve, checkInterval));
-                waited += checkInterval;
-                currentDistance = Phaser.Math.Distance.Between(sprite.x, sprite.y, targetX, targetY);
-                if (currentDistance <= 30) break;
-              }
-              
-              if (PASS_DEBUG) {
-                console.log('passStart (waited for position)', { 
-                  fromId: sprite?.playerId, 
-                  timestamp: step.timestamp,
-                  waited,
-                  initialDistance: Phaser.Math.Distance.Between(sprite.x, sprite.y, targetX, targetY),
-                  finalDistance: currentDistance
-                });
-              }
-            } else if (PASS_DEBUG) {
-              console.log('passStart', { fromId: sprite?.playerId, timestamp: step.timestamp });
-            }
+          if (PASS_DEBUG && step.action === 'pass') {
+            console.log('passStart', { fromId: sprite?.playerId, timestamp: step.timestamp });
           }
-          
           startPromise = onAction(step.action, sprite, step.timestamp);
           await startPromise;
         }
