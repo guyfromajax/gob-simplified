@@ -1,4 +1,5 @@
 import random
+import logging
 from BackEnd.constants import (
     THREE_POINT_PROBABILITY, 
     THREE_POINT_SPOTS,
@@ -491,8 +492,12 @@ class ShotManager:
                     # If no defender released → regular HCO
                     if defense_release_list:
                         next_play_type = "FAST_BREAK"
+                        # Log fast break determination with release player info
+                        release_player_ids = [def_team.lineup[pos].player_id for pos in defense_release_list]
+                        logging.info(f"🏀 FAST_BREAK determined during shot: defense_release_list={defense_release_list}, release_player_ids={release_player_ids}, shooter={get_name_safe(shooter)}")
                     else:
                         next_play_type = "HCO"
+                        logging.info(f"🏀 HCO determined during shot: no defense_release_list, shooter={get_name_safe(shooter)}")
                     
                     self.game_state["offensive_state"] = next_play_type
                     result["next_play_type"] = next_play_type
