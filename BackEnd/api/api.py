@@ -553,12 +553,12 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                 list(ongoing_games.keys()),
             )
             if games_collection is not None:
-                logging.info(
-                    "simulate_quarter_endpoint querying DB for game_id=%s", game_id
+                logging.warning(
+                    "🔍 simulate_quarter_endpoint querying DB for game_id=%s", game_id
                 )
             else:
-                logging.info(
-                    "simulate_quarter_endpoint skipping DB lookup for game_id=%s; no collection",
+                logging.warning(
+                    "🔍 simulate_quarter_endpoint skipping DB lookup for game_id=%s; no collection",
                     game_id,
                 )
             saved = (
@@ -664,7 +664,7 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                         is_new_game = not teams_match or (request.quarter == 1 and saved_quarter == 1 and not has_existing_turns and not has_non_zero_score)
                         should_restore_stats = not is_new_game
                         
-                        logging.info(f"🔍 Loaded from DB: saved_quarter={saved_quarter}, request_quarter={request.quarter}, saved_teams=({saved_home_name},{saved_away_name}), request_teams=({request.home_team},{request.away_team}), teams_match={teams_match}, has_turns={has_existing_turns}, has_scores={has_non_zero_score}, is_new_game={is_new_game}, should_restore_stats={should_restore_stats}")
+                        logging.warning(f"🔍 Loaded from DB: saved_quarter={saved_quarter}, request_quarter={request.quarter}, saved_teams=({saved_home_name},{saved_away_name}), request_teams=({request.home_team},{request.away_team}), teams_match={teams_match}, has_turns={has_existing_turns}, has_scores={has_non_zero_score}, is_new_game={is_new_game}, should_restore_stats={should_restore_stats}")
                         
                         # CRITICAL: Build lineups BEFORE restoring player stats
                         # Player stat restoration (below) looks up players in team.lineup, so lineups must exist
@@ -672,16 +672,16 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                         if request.home_lineup:
                             from BackEnd.utils.db_utils import assign_lineup_from_ids
                             gm.home_team.lineup = assign_lineup_from_ids(gm.home_team, request.home_lineup)
-                            logging.info(f"✅ Loaded from DB: Set home lineup from request: {list(gm.home_team.lineup.keys())}")
+                            logging.warning(f"✅ Loaded from DB: Set home lineup from request: {list(gm.home_team.lineup.keys())}")
                         elif not gm.home_team.lineup:
                             from BackEnd.utils.db_utils import build_lineup_from_mongo
                             gm.home_team.lineup = build_lineup_from_mongo(gm.home_team)
-                            logging.info(f"✅ Loaded from DB: Built home lineup from MongoDB: {list(gm.home_team.lineup.keys())}")
+                            logging.warning(f"✅ Loaded from DB: Built home lineup from MongoDB: {list(gm.home_team.lineup.keys())}")
                         
                         if request.away_lineup:
                             from BackEnd.utils.db_utils import assign_lineup_from_ids
                             gm.away_team.lineup = assign_lineup_from_ids(gm.away_team, request.away_lineup)
-                            logging.info(f"✅ Loaded from DB: Set away lineup from request: {list(gm.away_team.lineup.keys())}")
+                            logging.warning(f"✅ Loaded from DB: Set away lineup from request: {list(gm.away_team.lineup.keys())}")
                         elif not gm.away_team.lineup:
                             from BackEnd.utils.db_utils import build_lineup_from_mongo
                             gm.away_team.lineup = build_lineup_from_mongo(gm.away_team)
@@ -704,7 +704,7 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                             logging.info(f"🔄 Restoring stats for {len(saved_players_list)} players")
                         else:
                             saved_players_list = []
-                            logging.info(f"🆕 New Q1 game detected - skipping stat restoration (starting fresh)")
+                            logging.warning(f"🆕 New Q1 game detected - skipping stat restoration (starting fresh)")
                         
                         for saved_player_data in saved_players_list:
                             player_id = saved_player_data.get("playerId")
@@ -782,7 +782,7 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                                 logging.info(f"🔄 game_stats_initialized restored: {saved['game_stats_initialized']}")
                         else:
                             # New Q1 game - ensure stats are zeroed
-                            logging.info(f"🆕 New Q1 game - scores/stats will be zeroed in simulate_quarter")
+                            logging.warning(f"🆕 New Q1 game - scores/stats will be zeroed in simulate_quarter")
                             gm.score = {gm.home_team.name: 0, gm.away_team.name: 0}
                             gm.home_team.team_fouls = 0
                             gm.away_team.team_fouls = 0
@@ -802,7 +802,7 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                                 del gm.game_state["opening_tip_winner"]
                             # Clear any old turns from previous game - opening tip will be added in simulate_quarter
                             gm.turns = []
-                            logging.info(f"🆕 New Q1 game - opening_tip_winner cleared and turns cleared (opening tip will run)")
+                            logging.warning(f"🆕 New Q1 game - opening_tip_winner cleared and turns cleared (opening tip will run)")
                         
                         ongoing_games[game_id] = gm
                         if debug:
