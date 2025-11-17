@@ -629,6 +629,15 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                         # Only update quarter - game_state is already initialized by GameManager.__init__
                         gm.quarter = saved.get("quarter", 1)
                         
+                        # CRITICAL: For Q1 new games, don't restore stats - start fresh
+                        # If quarter === 1 and this is a new game (no prior gameplay), skip stat restoration
+                        saved_quarter = saved.get("quarter", 1)
+                        is_new_game_q1 = saved_quarter == 1 and request.quarter == 1
+                        has_existing_turns = len(saved.get("turns", [])) > 0
+                        should_restore_stats = not is_new_game_q1 or has_existing_turns
+                        
+                        logging.info(f"🔍 Loaded from DB: saved_quarter={saved_quarter}, request_quarter={request.quarter}, has_turns={has_existing_turns}, should_restore_stats={should_restore_stats}")
+                        
                         # CRITICAL: Build lineups BEFORE restoring player stats
                         # Player stat restoration (below) looks up players in team.lineup, so lineups must exist
                         # If request has lineups, use them; otherwise build from MongoDB
@@ -660,9 +669,14 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                         # The default game_state from _init_game_state() is fine for a fresh load
                         
                         # Restore player stats and NG (energy) from saved game state
+                        # Only restore if this is NOT a new Q1 game (fresh start)
                         # Players are stored as an array: [{"playerId": "...", "team": "home", "stats": {...}, "attributes": {...}}]
-                        saved_players_list = saved.get("players", [])
-                        logging.info(f"🔄 Restoring stats for {len(saved_players_list)} players")
+                        if should_restore_stats:
+                            saved_players_list = saved.get("players", [])
+                            logging.info(f"🔄 Restoring stats for {len(saved_players_list)} players")
+                        else:
+                            saved_players_list = []
+                            logging.info(f"🆕 New Q1 game detected - skipping stat restoration (starting fresh)")
                         
                         for saved_player_data in saved_players_list:
                             player_id = saved_player_data.get("playerId")
@@ -697,45 +711,53 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                                 logging.info(f"🔄 Player {player_id}: PTS restored {old_pts} → {new_pts}")
                         
                         # Restore team-level stats (score, fouls, totals, points by quarter)
-                        home_team_data = saved.get("home_team", {})
-                        away_team_data = saved.get("away_team", {})
-                        
-                        # Restore team scores
-                        if "score" in home_team_data:
-                            gm.score[gm.home_team.name] = home_team_data["score"]
-                            logging.info(f"🔄 Home team score restored: {home_team_data['score']}")
-                        if "score" in away_team_data:
-                            gm.score[gm.away_team.name] = away_team_data["score"]
-                            logging.info(f"🔄 Away team score restored: {away_team_data['score']}")
-                        
-                        # Restore team fouls
-                        if "team_fouls" in home_team_data:
-                            gm.home_team.team_fouls = home_team_data["team_fouls"]
-                            logging.info(f"🔄 Home team fouls restored: {home_team_data['team_fouls']}")
-                        if "team_fouls" in away_team_data:
-                            gm.away_team.team_fouls = away_team_data["team_fouls"]
-                            logging.info(f"🔄 Away team fouls restored: {away_team_data['team_fouls']}")
-                        
-                        # Restore team totals (aggregated stats)
-                        if "totals" in home_team_data:
-                            gm.team_totals[gm.home_team.name] = home_team_data["totals"]
-                            logging.info(f"🔄 Home team totals restored: {home_team_data['totals']}")
-                        if "totals" in away_team_data:
-                            gm.team_totals[gm.away_team.name] = away_team_data["totals"]
-                            logging.info(f"🔄 Away team totals restored: {away_team_data['totals']}")
-                        
-                        # Restore points by quarter
-                        if "points_by_quarter" in home_team_data:
-                            gm.game_state["points_by_quarter"][gm.home_team.name] = home_team_data["points_by_quarter"]
-                            logging.info(f"🔄 Home team points_by_quarter restored: {home_team_data['points_by_quarter']}")
-                        if "points_by_quarter" in away_team_data:
-                            gm.game_state["points_by_quarter"][gm.away_team.name] = away_team_data["points_by_quarter"]
-                            logging.info(f"🔄 Away team points_by_quarter restored: {away_team_data['points_by_quarter']}")
-                        
-                        # Restore game_stats_initialized flag to prevent stats reset
-                        if "game_stats_initialized" in saved:
-                            gm.game_state["game_stats_initialized"] = saved["game_stats_initialized"]
-                            logging.info(f"🔄 game_stats_initialized restored: {saved['game_stats_initialized']}")
+                        # Only restore if this is NOT a new Q1 game (fresh start)
+                        if should_restore_stats:
+                            home_team_data = saved.get("home_team", {})
+                            away_team_data = saved.get("away_team", {})
+                            
+                            # Restore team scores
+                            if "score" in home_team_data:
+                                gm.score[gm.home_team.name] = home_team_data["score"]
+                                logging.info(f"🔄 Home team score restored: {home_team_data['score']}")
+                            if "score" in away_team_data:
+                                gm.score[gm.away_team.name] = away_team_data["score"]
+                                logging.info(f"🔄 Away team score restored: {away_team_data['score']}")
+                            
+                            # Restore team fouls
+                            if "team_fouls" in home_team_data:
+                                gm.home_team.team_fouls = home_team_data["team_fouls"]
+                                logging.info(f"🔄 Home team fouls restored: {home_team_data['team_fouls']}")
+                            if "team_fouls" in away_team_data:
+                                gm.away_team.team_fouls = away_team_data["team_fouls"]
+                                logging.info(f"🔄 Away team fouls restored: {away_team_data['team_fouls']}")
+                            
+                            # Restore team totals (aggregated stats)
+                            if "totals" in home_team_data:
+                                gm.team_totals[gm.home_team.name] = home_team_data["totals"]
+                                logging.info(f"🔄 Home team totals restored: {home_team_data['totals']}")
+                            if "totals" in away_team_data:
+                                gm.team_totals[gm.away_team.name] = away_team_data["totals"]
+                                logging.info(f"🔄 Away team totals restored: {away_team_data['totals']}")
+                            
+                            # Restore points by quarter
+                            if "points_by_quarter" in home_team_data:
+                                gm.game_state["points_by_quarter"][gm.home_team.name] = home_team_data["points_by_quarter"]
+                                logging.info(f"🔄 Home team points_by_quarter restored: {home_team_data['points_by_quarter']}")
+                            if "points_by_quarter" in away_team_data:
+                                gm.game_state["points_by_quarter"][gm.away_team.name] = away_team_data["points_by_quarter"]
+                                logging.info(f"🔄 Away team points_by_quarter restored: {away_team_data['points_by_quarter']}")
+                            
+                            # Restore game_stats_initialized flag to prevent stats reset
+                            if "game_stats_initialized" in saved:
+                                gm.game_state["game_stats_initialized"] = saved["game_stats_initialized"]
+                                logging.info(f"🔄 game_stats_initialized restored: {saved['game_stats_initialized']}")
+                        else:
+                            # New Q1 game - ensure stats are zeroed
+                            logging.info(f"🆕 New Q1 game - scores/stats will be zeroed in simulate_quarter")
+                            gm.score = {gm.home_team.name: 0, gm.away_team.name: 0}
+                            gm.home_team.team_fouls = 0
+                            gm.away_team.team_fouls = 0
                         
                         # Restore opening_tip_winner for Q2-Q4 possession logic
                         if "opening_tip_winner" in saved:
