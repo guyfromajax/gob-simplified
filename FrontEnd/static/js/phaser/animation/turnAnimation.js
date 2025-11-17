@@ -377,6 +377,19 @@ async function runSideInboundSetup({ scene, ballSprite, playerSprites, turnData 
 
 // Setup positions after a defensive rebound before new half-court offense or fast break
 async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebounderId, nextPlayType = "HCO" }) {
+  // Get the previous turn's offense_getback list if available
+  const previousTurn = scene.simData?.turns?.[(scene.currentTurn || 0) - 1];
+  const previousGetBackList = previousTurn?.offense_getback || [];
+  
+  console.log('🔍 [GET BACK DEBUG] runDefensiveReboundSetup called', {
+    rebounderId,
+    nextPlayType,
+    previousTurnResultType: previousTurn?.result_type || null,
+    previousGetBackPlayerIds: previousGetBackList,
+    getBackCount: previousGetBackList.length,
+    note: 'Checking if any get-back players are animated again here'
+  });
+  
   animationDebugLog('runDefensiveReboundSetup called with:', { rebounderId, nextPlayType });
   if (!scene || !playerSprites || rebounderId == null) return;
 
@@ -543,6 +556,8 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
     let playersMoved = 0;
     for (const [id, sprite] of Object.entries(playerSprites)) {
       const info = scene.playerInfo?.[id];
+      const isGetBackPlayer = previousGetBackList.includes(id);
+      
       animationDebugLog(`Checking player ${id}:`, { 
         hasInfo: !!info, 
         isRebounder: id === rebounderId, 
@@ -551,8 +566,24 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
         rebounderTeam: rebounderSprite.team
       });
       
+      console.log(`🔍 [GET BACK DEBUG] Checking player for DREB animation`, {
+        playerId: id,
+        isRebounder: id === rebounderId,
+        isOutletReceiver: id === outletReceiverId,
+        isGetBackPlayer,
+        spriteTeam: sprite.team,
+        rebounderTeam: rebounderSprite.team,
+        note: isGetBackPlayer ? '⚠️ This player was on get-back list - will they animate again?' : 'Player not on get-back list'
+      });
+      
       if (!info || id === rebounderId || id === outletReceiverId) {
         animationDebugLog(`Skipping player ${id}`);
+        if (isGetBackPlayer) {
+          console.log(`🔍 [GET BACK DEBUG] Skipping get-back player (is rebounder or outlet receiver)`, {
+            playerId: id,
+            reason: id === rebounderId ? 'isRebounder' : 'isOutletReceiver'
+          });
+        }
         continue;
       }
       
@@ -585,14 +616,42 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
       // Use distance-based duration for consistent speed (same as HCO step movements)
       // isTransition=true allows longer durations for transition movements
       const playerDuration = getPlayerDuration(sprite, targetPx.x, targetPx.y, true);
+      
+      if (isGetBackPlayer) {
+        console.log(`🔍 [GET BACK DEBUG] ⚠️ WARNING: Animating get-back player again in DREB setup!`, {
+          playerId: id,
+          fromPos: { x: sprite.x, y: sprite.y },
+          toPos: { x: targetPx.x, y: targetPx.y },
+          duration: playerDuration,
+          wasOnGetBackList: true,
+          note: 'This player already animated during shot - extra animation detected!'
+        });
+      } else {
+        console.log(`🔍 [GET BACK DEBUG] Animating player in DREB setup (not on get-back list)`, {
+          playerId: id,
+          fromPos: { x: sprite.x, y: sprite.y },
+          toPos: { x: targetPx.x, y: targetPx.y },
+          duration: playerDuration
+        });
+      }
+      
       promises.push(
         tweenPlayerTo(scene, sprite, targetPx, {
           duration: playerDuration,
           easing: 'Linear', // Match HCO step movements for consistent feel
+        }).then(() => {
+          playersMoved++;
+          if (isGetBackPlayer) {
+            console.log(`🔍 [GET BACK DEBUG] DREB animation COMPLETED for get-back player`, {
+              playerId: id,
+              finalPosition: { x: sprite.x, y: sprite.y },
+              wasOnGetBackList: true,
+              note: 'This confirms double animation - player animated during shot AND during DREB'
+            });
+          }
         })
       );
       
-      playersMoved++;
       animationDebugLog(`HCO player movement: ${id} from (${currentGridX.toFixed(1)}, ${currentGridY.toFixed(1)}) to (${targetGrid.x}, ${targetGrid.y}) [direction: ${direction}, newOffenseTeam: ${newOffenseTeam}]`);
     }
     animationDebugLog(`Total players moved for HCO: ${playersMoved}`);

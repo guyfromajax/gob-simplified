@@ -450,6 +450,15 @@ export function shootBall({
       
       // Offensive players getting back on defense
       if (turnData.offense_getback && turnData.offense_getback.length > 0) {
+        console.log('🔍 [GET BACK DEBUG] offense_getback list received during shot attempt', {
+          getBackPlayerIds: turnData.offense_getback,
+          count: turnData.offense_getback.length,
+          shooterId,
+          shooterTeamId,
+          result,
+          turnIndex: turnData?.index || turnIndex || null,
+          note: 'These players will animate back on defense during shot flight'
+        });
         console.log('🏃 Animating', turnData.offense_getback.length, 'offensive players getting back');
         
         turnData.offense_getback.forEach(playerId => {
@@ -461,6 +470,14 @@ export function shootBall({
             const targetPixel = gridToPixels(targetX, targetY, scene.game.config.width, scene.game.config.height);
             
             console.log(`🏃 OFFENSE ${playerId} getting back: from (${sprite.x}, ${sprite.y}) → to (${targetPixel.x}, ${targetPixel.y})`);
+            console.log(`🔍 [GET BACK DEBUG] Starting get-back animation for player`, {
+              playerId,
+              fromPos: { x: sprite.x, y: sprite.y },
+              toPos: { x: targetPixel.x, y: targetPixel.y },
+              duration,
+              shooterId,
+              result
+            });
             
             scene.tweens.add({
               targets: sprite,
@@ -470,9 +487,23 @@ export function shootBall({
               ease: 'Power1',
               onStart: () => {
                 console.log(`🏃 STARTED: Offense ${playerId} getting back on defense`);
+                console.log(`🔍 [GET BACK DEBUG] Get-back animation STARTED for player`, {
+                  playerId,
+                  tweenActive: true,
+                  shooterId,
+                  result
+                });
               },
               onComplete: () => {
                 console.log(`🏃 COMPLETED: Offense ${playerId} back on defense`);
+                console.log(`🔍 [GET BACK DEBUG] Get-back animation COMPLETED for player`, {
+                  playerId,
+                  finalPosition: { x: sprite.x, y: sprite.y },
+                  tweenActive: false,
+                  shooterId,
+                  result,
+                  note: 'This player should NOT animate again during DREB setup'
+                });
               }
             });
           } else {
