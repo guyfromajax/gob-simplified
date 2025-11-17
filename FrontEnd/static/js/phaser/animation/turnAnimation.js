@@ -1678,6 +1678,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
             ballSpot,
             shooterId: shotInfo?.playerId ?? null,
             upcomingFastBreak: turnData.fast_break || false,
+            turnData: turnData // Pass turnData so get-back players can be excluded
           });
           
           const rebounderSprite = playerSprites[rebounderId];
@@ -1776,7 +1777,8 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
                       animations: reboundData.animations || turnData.animations,
                       rebounderId,
                       ballSpot: putbackResult?.grid || reboundData.ballSpot,
-                      shooterId: evt.shooterId
+                      shooterId: evt.shooterId,
+                      turnData: turnData // Pass turnData so get-back players can be excluded
                     });
                     if (
                       reboundData.rebound_type === "DREB" &&
@@ -1879,7 +1881,8 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
                       animations: reboundData.animations || turnData.animations,
                       rebounderId,
                       ballSpot: putbackResult?.grid || reboundData.ballSpot,
-                      shooterId: evt.shooterId
+                      shooterId: evt.shooterId,
+                      turnData: turnData // Pass turnData so get-back players can be excluded
                     });
                     if (
                       reboundData.rebound_type === "DREB" &&
