@@ -1226,8 +1226,11 @@ def init_game(request: dict):
     summary = summarize_game_state(gm, exclude_animations=True)
     summary["_id"] = game_id
     summary["game_stats_initialized"] = True
-    summary["quarter"] = 0  # Pre-game
+    summary["quarter"] = 1  # Pre-game, but set to 1 so simulate-quarter works correctly
     summary["score"] = {home_team: 0, away_team: 0}
+    
+    # Set GameManager quarter to 1 to match
+    gm.quarter = 1
     
     # Save to database
     games_collection.update_one({"_id": game_id}, {"$set": summary}, upsert=True)
