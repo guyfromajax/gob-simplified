@@ -104,10 +104,19 @@ async function loadRoster() {
             return;
           }
           
-          const rosterPlayer = roster.find(p => {
+          // Try to find by ID first, then by name (same as box-score.js)
+          let rosterPlayer = roster.find(p => {
             const rosterId = p._id || p.playerId || p.player_id;
             return String(rosterId) === String(playerId);
           });
+          
+          // Fallback to name matching if ID doesn't match
+          if (!rosterPlayer && gp.name) {
+            rosterPlayer = roster.find(p => p.name === gp.name);
+            if (rosterPlayer) {
+              console.log(`[Lineup] Matched ${gp.name} by name (ID mismatch: game=${playerId}, roster=${rosterPlayer._id || rosterPlayer.playerId || rosterPlayer.player_id})`);
+            }
+          }
           
           if (rosterPlayer) {
             // Energy (same as before)
