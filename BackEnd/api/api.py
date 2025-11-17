@@ -797,10 +797,12 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                                     saved["opening_tip_winner"]
                                 )
                         elif not should_restore_stats:
-                            # New Q1 game - clear opening_tip_winner so opening tip can run
+                            # New Q1 game - clear opening_tip_winner and old turns so opening tip can run
                             if "opening_tip_winner" in gm.game_state:
                                 del gm.game_state["opening_tip_winner"]
-                            logging.info(f"🆕 New Q1 game - opening_tip_winner cleared (opening tip will run)")
+                            # Clear any old turns from previous game - opening tip will be added in simulate_quarter
+                            gm.turns = []
+                            logging.info(f"🆕 New Q1 game - opening_tip_winner cleared and turns cleared (opening tip will run)")
                         
                         ongoing_games[game_id] = gm
                         if debug:
@@ -809,8 +811,9 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                                 home,
                                 away,
                             )
-                except Exception:
+                except Exception as e:
                     logging.exception("Failed to load game state for %s", game_id)
+                    logging.error(f"❌ Exception loading game: {type(e).__name__}: {str(e)}")
             if gm is None:
                 if request.quarter == 1:
                     # Determine which team gets the user's settings

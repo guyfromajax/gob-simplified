@@ -200,7 +200,10 @@ def simulate_quarter(
     _ensure_complete_lineup(gm.away_team)
 
     # Zero per-game stats exactly once per game before the opening tip.
-    _initialize_game_stats(gm, game_id)
+    # Only initialize stats if game_stats_initialized flag is not set (prevents resetting stats mid-game)
+    if not gm.game_state.get("game_stats_initialized", False):
+        _initialize_game_stats(gm, game_id)
+        gm.game_state["game_stats_initialized"] = True
     gm.game_state["start_box_score"] = gm.get_box_score()
 
     # Ensure the turn manager is aware of any lineup changes
