@@ -58,6 +58,9 @@ export function createGameScene(Phaser) {
         this.quarter = data.quarter || 1;
         this.gamePlanSettings = data.gamePlanSettings;
         this.userTeamSide = data.userTeamSide;
+        
+        // Reset pause state for new game
+        this.isPaused = false;
 
         if (DEBUG_FLOW) {
           const teams = gameStore.getTeams();
@@ -76,6 +79,31 @@ export function createGameScene(Phaser) {
 
     shutdown() {
       if (DEBUG_FLOW) console.log("🧹 GameScene shutdown - cleaning up sprites");
+      
+      // Reset pause state and kill all tweens
+      this.isPaused = false;
+      if (this.tweens) {
+        // Resume all tweens before killing them to prevent stuck state
+        this.tweens.resumeAll();
+        // Kill all active tweens
+        if (typeof this.tweens.killAll === 'function') {
+          this.tweens.killAll();
+        } else {
+          // Fallback: kill all tweens individually
+          const allTweens = this.tweens.getAll ? this.tweens.getAll() : [];
+          allTweens.forEach(tween => {
+            if (tween && typeof tween.stop === 'function') {
+              tween.stop();
+            }
+          });
+        }
+      }
+      
+      // Update pause button text if it exists
+      const pauseBtn = document.getElementById('pause-btn');
+      if (pauseBtn) {
+        pauseBtn.textContent = 'Pause';
+      }
       
       // Destroy all player sprites
       if (this.playerSprites) {
@@ -99,8 +127,6 @@ export function createGameScene(Phaser) {
       this.playerStats = {};
       this.teamPlaysData = {};  // Store team plays data for tooltips
       this.teamStatsData = {};  // Store team stats data for tooltips
-      this.teamPlaysData = {};  // Store team plays data for tooltips
-      this.teamStatsData = {};  // Store team stats data for tooltips
       
       console.log("✅ GameScene cleanup complete");
     }
@@ -122,6 +148,30 @@ export function createGameScene(Phaser) {
       
       // Expose gameScene globally for Playcall Center tooltips
       window.currentGameScene = this;
+      
+      // Reset pause state and ensure all tweens are active
+      this.isPaused = false;
+      if (this.tweens) {
+        // Ensure tweens are resumed and kill any stale tweens
+        this.tweens.resumeAll();
+        if (typeof this.tweens.killAll === 'function') {
+          this.tweens.killAll();
+        } else {
+          // Fallback: kill all tweens individually
+          const allTweens = this.tweens.getAll ? this.tweens.getAll() : [];
+          allTweens.forEach(tween => {
+            if (tween && typeof tween.stop === 'function') {
+              tween.stop();
+            }
+          });
+        }
+      }
+      
+      // Update pause button text
+      const pauseBtn = document.getElementById('pause-btn');
+      if (pauseBtn) {
+        pauseBtn.textContent = 'Pause';
+      }
       
       // Run structure validation for inbound passes
       this.runStructureValidation();
@@ -1054,11 +1104,19 @@ export function createGameScene(Phaser) {
         pauseBtn.addEventListener('click', () => {
           this.isPaused = !this.isPaused;
           if (this.isPaused) {
-            this.tweens.pauseAll();
+            // Pause all tweens
+            if (this.tweens) {
+              this.tweens.pauseAll();
+            }
             pauseBtn.textContent = 'Resume';
+            if (DEBUG_FLOW) console.log('⏸️ Game paused');
           } else {
-            this.tweens.resumeAll();
+            // Resume all tweens
+            if (this.tweens) {
+              this.tweens.resumeAll();
+            }
             pauseBtn.textContent = 'Pause';
+            if (DEBUG_FLOW) console.log('▶️ Game resumed');
           }
         });
       }
