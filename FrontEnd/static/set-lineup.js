@@ -117,9 +117,20 @@ async function loadRoster() {
             rosterPlayer.NG = energyValue;
             
             // Stats: Use same approach as box-score.js (line 203)
-            rosterPlayer.stats = {
-              game: gp.stats?.game || gp.stats || {}
-            };
+            // Backend sends: gp.stats = { PTS: 5, FGM: 2, ... } (game stats directly)
+            const gameStats = gp.stats?.game || gp.stats || {};
+            rosterPlayer.stats = { game: gameStats };
+            
+            // Log first player to verify
+            if (updatedCount === 0) {
+              console.log('[Lineup] First player stats merge:', {
+                name: gp.name,
+                gpStats: gp.stats,
+                gpStatsGame: gp.stats?.game,
+                finalGameStats: gameStats,
+                rosterPlayerStats: rosterPlayer.stats
+              });
+            }
             
             // Attributes: EM and MO
             if (gp.attributes) {
@@ -358,6 +369,25 @@ function updateSlotDisplay(slot) {
     
     // Get game stats
     const stats = player.stats?.game || {};
+    
+    // Debug first slot to see what we have
+    if (pos === 'PG' && player.name) {
+      console.log(`[Lineup] updateSlotDisplay for ${player.name}:`, {
+        hasStats: !!player.stats,
+        hasStatsGame: !!player.stats?.game,
+        statsKeys: stats ? Object.keys(stats) : [],
+        PTS: stats.PTS,
+        OREB: stats.OREB,
+        DREB: stats.DREB,
+        AST: stats.AST,
+        DEF_A: stats.DEF_A,
+        DEF_S: stats.DEF_S,
+        F: stats.F,
+        EM: player.attributes?.EM,
+        MO: player.attributes?.MO
+      });
+    }
+    
     const points = stats.PTS || 0;
     const rebounds = (stats.OREB || 0) + (stats.DREB || 0);
     const assists = stats.AST || 0;
