@@ -153,10 +153,11 @@ async function loadRoster() {
   }
   
   // If there's an active game, fetch current player energy levels
+  // Pass quarter=1 to detect new game scenarios (Q1 request when saved game is Q2+)
   if (gameId) {
     console.log("Loading current player energy from game:", gameId);
     try {
-        const gameRes = await fetch(`/api/game/${gameId}`);
+        const gameRes = await fetch(`/api/game/${gameId}?quarter=1`);
         if (gameRes.ok) {
           const gameData = await gameRes.json();
           const gamePlayers = gameData.players || [];

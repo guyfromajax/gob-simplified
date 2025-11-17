@@ -371,12 +371,18 @@ def simulate_game(request: SimulationRequest):
 
 
 @app.get("/api/game/{game_id}")
-def get_game_state(game_id: str):
-    """Fetch current game state for displaying accumulated stats and player energy"""
+def get_game_state(game_id: str, quarter: int | None = None):
+    """Fetch current game state for displaying accumulated stats and player energy
+    
+    Args:
+        game_id: Game ID
+        quarter: Optional quarter query parameter. If quarter=1 and saved game is Q2+,
+                 returns empty stats (new game scenario)
+    """
     try:
         # Check ongoing games first
         gm = ongoing_games.get(game_id)
-        logging.info(f"📊 /api/game/{game_id} - GameManager in memory: {gm is not None}")
+        logging.info(f"📊 /api/game/{game_id} - GameManager in memory: {gm is not None}, quarter param: {quarter}")
         logging.info(f"📊 Active games in memory: {list(ongoing_games.keys())}")
         if gm:
             # Get players with current energy levels
@@ -429,6 +435,64 @@ def get_game_state(game_id: str):
         if games_collection is not None:
             saved = games_collection.find_one({"_id": game_id})
             if saved:
+                saved_quarter = saved.get("quarter", 1)
+                
+                # Check if this is a "new game" scenario: user requesting Q1 but saved game is Q2+
+                # In this case, return empty stats (Lineup Screen loads before simulate-quarter detects new game)
+                is_new_game_from_get = (quarter == 1 and saved_quarter > 1)
+                if is_new_game_from_get:
+                    logging.warning(
+                        f"🆕 /api/game/{game_id} - New game detected: requested Q1 but saved game is Q{saved_quarter}. Returning empty stats."
+                    )
+                    # Return empty game state structure (energy levels, but no stats/scores)
+                    home_team_data = saved.get("home_team", {})
+                    away_team_data = saved.get("away_team", {})
+                    
+                    # Extract players with energy but no stats
+                    players = saved.get("players", [])
+                    players_with_energy = []
+                    for p in players:
+                        player_data = {
+                            "_id": p.get("playerId") or p.get("player_id"),
+                            "name": p.get("name"),
+                            "NG": p.get("NG", 1.0),
+                            "team": p.get("team"),
+                            "stats": {}  # Empty stats for new game
+                        }
+                        players_with_energy.append(player_data)
+                    
+                    # Return empty stats structure
+                    return {
+                        "game_id": game_id,
+                        "score": {home_team_data.get("name", ""): 0, away_team_data.get("name", ""): 0},
+                        "box_score": {},
+                        "quarter": 1,
+                        "clock": "12:00",
+                        "players": players_with_energy,
+                        "team_totals": {
+                            home_team_data.get("name", ""): {},
+                            away_team_data.get("name", ""): {}
+                        },
+                        "team_stats": {
+                            home_team_data.get("name", ""): {"offense": {}, "defense": {}},
+                            away_team_data.get("name", ""): {"offense": {}, "defense": {}}
+                        },
+                        "points_by_quarter": {
+                            home_team_data.get("name", ""): [0, 0, 0, 0],
+                            away_team_data.get("name", ""): [0, 0, 0, 0]
+                        },
+                        "home_team": {
+                            "name": home_team_data.get("name", ""),
+                            "team_fouls": 0,
+                            "attributes": home_team_data.get("attributes", {})
+                        },
+                        "away_team": {
+                            "name": away_team_data.get("name", ""),
+                            "team_fouls": 0,
+                            "attributes": away_team_data.get("attributes", {})
+                        }
+                    }
+                
                 # Extract player energy from saved game doc
                 players = saved.get("players", [])
                 # Map to include NG if available
