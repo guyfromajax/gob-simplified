@@ -840,11 +840,12 @@ class TurnManager:
                             "rebounder_id": rebounder_id,
                         }
                     elif rebound_data.get("rebound_type") == "DREB":
-                        # Defensive rebound - check for fast break
-                        from BackEnd.utils.shared import get_fast_break_chance
-                        import random
-                        next_play_type = "FAST_BREAK" if random.random() < get_fast_break_chance(self.game) else "HCO"
-                        game_state["offensive_state"] = next_play_type
+                        # Defensive rebound - preserve next_play_type from original shot
+                        # Fast Break is determined DURING the shot (by defense tempo), not after DREB
+                        # If defense_release_list was set during the shot, next_play_type was already set to FAST_BREAK
+                        # If not, it was set to HCO. We preserve that decision here.
+                        # Legacy: Don't recalculate fast break here - it causes bugs where fast break has no release player
+                        next_play_type = game_state.get("offensive_state", "HCO")
                         result["next_play_type"] = next_play_type
                 
                 # Compute stat deltas (same as run_micro_turn)
