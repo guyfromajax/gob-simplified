@@ -866,7 +866,7 @@ export function animateRebound({
   }
   ballSprite.setVisible(true);
 
-  const rebounderSprite = playerSprites[rebounderId];
+  // rebounderSprite already declared earlier for OREB/DREB detection
   if (debugEnabled && REBOUND_DEBUG) {
     const team = rebounderSprite?.team_id ?? rebounderSprite?.team;
     animationDebugLog("reb:event", {
