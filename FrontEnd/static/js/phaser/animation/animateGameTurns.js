@@ -225,13 +225,27 @@ async function handleOrebTurn(scene, { playerSprites, ballSprite, turnData, onUp
       // If DREB, set up next play (outlet pass for HCO only)
       // For FAST_BREAK, the outlet pass is handled in the fast break sequence itself
       if (turnData.rebound_type === "DREB" && turnData.next_play_type !== "FAST_BREAK") {
+        // For putback misses leading to DREB, find the original MISS turn that has offense_getback
+        // This might be a previous turn (the original shot attempt) or the putback turn itself
+        let missTurn = null;
+        const currentIndex = scene.currentTurn || 0;
+        // Check if previous turn is a MISS (original shot attempt)
+        const previousTurn = scene.simData?.turns?.[currentIndex - 1];
+        if (previousTurn?.result_type === "MISS") {
+          missTurn = previousTurn;
+        } else {
+          // Otherwise, check current turn (might be a MISS with putback)
+          missTurn = scene.simData?.turns?.[currentIndex];
+        }
+        
         const { runDefensiveReboundSetup } = await import('./turnAnimation.js');
         await runDefensiveReboundSetup({
           scene,
           ballSprite,
           playerSprites,
           rebounderId: turnData.rebounderId,
-          nextPlayType: turnData.next_play_type || "HCO"
+          nextPlayType: turnData.next_play_type || "HCO",
+          turnData: missTurn // Pass the MISS turn with offense_getback
         });
       }
       // If another OREB, it will be handled by the next OREB turn

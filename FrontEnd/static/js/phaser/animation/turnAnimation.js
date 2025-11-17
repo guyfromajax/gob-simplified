@@ -376,19 +376,48 @@ async function runSideInboundSetup({ scene, ballSprite, playerSprites, turnData 
 }
 
 // Setup positions after a defensive rebound before new half-court offense or fast break
-async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebounderId, nextPlayType = "HCO" }) {
-  // Get the previous turn's offense_getback list if available
-  const previousTurn = scene.simData?.turns?.[(scene.currentTurn || 0) - 1];
-  const previousGetBackList = previousTurn?.offense_getback || [];
+async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebounderId, nextPlayType = "HCO", turnData = null }) {
+  // Get the offense_getback list from the MISS turn that led to this DREB
+  // The turnData parameter should be the MISS turn, but if not provided, try to find it
+  let missTurn = turnData;
+  if (!missTurn) {
+    // Try current turn first (most likely)
+    const currentTurn = scene.simData?.turns?.[scene.currentTurn || 0];
+    if (currentTurn?.result_type === "MISS") {
+      missTurn = currentTurn;
+    } else {
+      // Fallback to previous turn
+      missTurn = scene.simData?.turns?.[(scene.currentTurn || 0) - 1];
+    }
+  }
+  
+  const getBackList = missTurn?.offense_getback || [];
   
   console.log('🔍 [GET BACK DEBUG] runDefensiveReboundSetup called', {
     rebounderId,
     nextPlayType,
-    previousTurnResultType: previousTurn?.result_type || null,
-    previousGetBackPlayerIds: previousGetBackList,
-    getBackCount: previousGetBackList.length,
-    note: 'Checking if any get-back players are animated again here'
+    currentTurnIndex: scene.currentTurn || null,
+    missTurnIndex: missTurn?.index ?? (scene.currentTurn || 0),
+    missTurnResultType: missTurn?.result_type || null,
+    getBackPlayerIds: getBackList,
+    getBackCount: getBackList.length,
+    turnDataProvided: !!turnData,
+    note: 'Checking if any get-back players from MISS turn are animated again here'
   });
+  
+  if (getBackList.length > 0) {
+    console.log('🔍 [GET BACK DEBUG] Found get-back players from MISS turn', {
+      getBackPlayerIds: getBackList,
+      missTurnResultType: missTurn?.result_type,
+      note: 'These players should be excluded from DREB animation'
+    });
+  } else {
+    console.log('🔍 [GET BACK DEBUG] No get-back players found in MISS turn', {
+      missTurnResultType: missTurn?.result_type,
+      missTurnHasGetBack: !!missTurn?.offense_getback,
+      note: 'If offense_getback should exist but is missing, this could be the issue'
+    });
+  }
   
   animationDebugLog('runDefensiveReboundSetup called with:', { rebounderId, nextPlayType });
   if (!scene || !playerSprites || rebounderId == null) return;
@@ -556,7 +585,7 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
     let playersMoved = 0;
     for (const [id, sprite] of Object.entries(playerSprites)) {
       const info = scene.playerInfo?.[id];
-      const isGetBackPlayer = previousGetBackList.includes(id);
+      const isGetBackPlayer = getBackList.includes(id);
       
       animationDebugLog(`Checking player ${id}:`, { 
         hasInfo: !!info, 
@@ -1656,12 +1685,45 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
             ? turnData.rebound_type === "DREB"
             : rebounderSprite?.team_id !== turnData.possession_team_id;
           if (isDreb && !turnData.fast_break) {
+            // Find the MISS turn that led to this DREB
+            // In playTurnAnimation, turnData should be the MISS turn itself
+            // Check if this turnData is a MISS turn first, otherwise look for it
+            let missTurn = turnData?.result_type === "MISS" ? turnData : null;
+            if (!missTurn) {
+              // If not, look for it in previous turn or current turn
+              const currentIndex = scene.currentTurn || 0;
+              const previousTurn = scene.simData?.turns?.[currentIndex - 1];
+              const currentTurn = scene.simData?.turns?.[currentIndex];
+              
+              if (previousTurn?.result_type === "MISS") {
+                missTurn = previousTurn;
+              } else if (currentTurn?.result_type === "MISS") {
+                missTurn = currentTurn;
+              }
+              
+              console.log('🔍 [GET BACK DEBUG] Searching for MISS turn', {
+                turnDataResultType: turnData?.result_type,
+                currentTurnIndex: currentIndex,
+                previousTurnResultType: previousTurn?.result_type,
+                currentTurnResultType: currentTurn?.result_type,
+                foundMissTurn: !!missTurn,
+                missTurnHasGetBack: !!missTurn?.offense_getback
+              });
+            } else {
+              console.log('🔍 [GET BACK DEBUG] Using current turnData as MISS turn', {
+                turnDataResultType: turnData?.result_type,
+                hasOffenseGetBack: !!turnData?.offense_getback,
+                offenseGetBackCount: turnData?.offense_getback?.length || 0
+              });
+            }
+            
             await runDefensiveReboundSetup({
               scene,
               ballSprite,
               playerSprites,
               rebounderId,
-              nextPlayType: turnData.next_play_type || "HCO"
+              nextPlayType: turnData.next_play_type || "HCO",
+              turnData: missTurn // Pass the MISS turn so we can get offense_getback list
             });
           } else {
             const pause = animationConfig.offensiveRebound.pauseMs;
@@ -1720,12 +1782,21 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
                       reboundData.rebound_type === "DREB" &&
                       !turnData.fast_break
                     ) {
+                      // For putback events, find the MISS turn with offense_getback
+                      // This is the turn containing this event (putback after original MISS)
+                      let missTurn = turnData?.result_type === "MISS" ? turnData : null;
+                      if (!missTurn) {
+                        const currentIndex = scene.currentTurn || 0;
+                        missTurn = scene.simData?.turns?.[currentIndex - 1];
+                      }
+                      
                       await runDefensiveReboundSetup({
                         scene,
                         ballSprite,
                         playerSprites,
                         rebounderId,
-                        nextPlayType: turnData.next_play_type || "HCO"
+                        nextPlayType: turnData.next_play_type || "HCO",
+                        turnData: missTurn
                       });
                     }
                   }
@@ -1814,12 +1885,20 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
                       reboundData.rebound_type === "DREB" &&
                       !turnData.fast_break
                     ) {
+                      // For putback events, find the MISS turn with offense_getback
+                      let missTurn = turnData?.result_type === "MISS" ? turnData : null;
+                      if (!missTurn) {
+                        const currentIndex = scene.currentTurn || 0;
+                        missTurn = scene.simData?.turns?.[currentIndex - 1];
+                      }
+                      
                       await runDefensiveReboundSetup({
                         scene,
                         ballSprite,
                         playerSprites,
                         rebounderId,
-                        nextPlayType: turnData.next_play_type || "HCO"
+                        nextPlayType: turnData.next_play_type || "HCO",
+                        turnData: missTurn
                       });
                     }
                   }

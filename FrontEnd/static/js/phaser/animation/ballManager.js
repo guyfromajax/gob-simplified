@@ -449,6 +449,19 @@ export function shootBall({
       }
       
       // Offensive players getting back on defense
+      // Always log whether offense_getback exists, even if empty
+      console.log('🔍 [GET BACK DEBUG] Checking for offense_getback during shot attempt', {
+        hasOffenseGetBack: !!turnData?.offense_getback,
+        offenseGetBackValue: turnData?.offense_getback || null,
+        offenseGetBackCount: turnData?.offense_getback?.length || 0,
+        shooterId,
+        shooterTeamId,
+        result,
+        turnIndex: turnData?.index || turnIndex || null,
+        turnResultType: turnData?.result_type || null,
+        note: 'If offense_getback is missing or empty, get-back players won\'t be excluded from DREB animation'
+      });
+      
       if (turnData.offense_getback && turnData.offense_getback.length > 0) {
         console.log('🔍 [GET BACK DEBUG] offense_getback list received during shot attempt', {
           getBackPlayerIds: turnData.offense_getback,
