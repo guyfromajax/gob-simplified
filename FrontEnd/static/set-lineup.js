@@ -21,20 +21,33 @@ const tournamentId = urlParams.get('tournament_id');
 const modeParam = urlParams.get('mode');
 const DEBUG = urlParams.has('debug');
 const quarter = parseInt(urlParams.get('quarter'), 10) || 1;
-let gameId = urlParams.get('game_id') ||
-  (typeof localStorage !== 'undefined' ? localStorage.getItem('game_id') : null);
+let gameId = urlParams.get('game_id') || null;  // Only get from URL, not localStorage initially
+
+// OPTION 3: Clear game_id for new Q1 games (explicit new game start)
+// Only use localStorage game_id for resuming games (Q2+ or explicit game_id in URL)
+const storedGameId = typeof localStorage !== 'undefined' ? localStorage.getItem('game_id') : null;
 const storedHome = typeof localStorage !== 'undefined' ? localStorage.getItem('game_home') : null;
 const storedAway = typeof localStorage !== 'undefined' ? localStorage.getItem('game_away') : null;
-// Only clear gameId if it's truly a new matchup (teams changed) AND we don't have a game_id in URL
-// If we have game_id in URL, keep it (user is navigating back during active game)
-const isNewMatchup = !urlParams.get('game_id') && (storedHome !== homeTeam || storedAway !== awayTeam);
-if (isNewMatchup) {
+
+// Clear gameId for new games:
+// 1. Q1 with no game_id in URL = NEW GAME (clear old game_id from localStorage)
+// 2. Teams changed = NEW MATCHUP (always clear)
+// Otherwise, if Q2+ and game_id not in URL, try to resume from localStorage
+const isNewMatchup = storedHome !== homeTeam || storedAway !== awayTeam;
+const isNewQ1Game = quarter === 1 && !gameId;  // Q1 with no game_id in URL = new game
+
+if (isNewMatchup || isNewQ1Game) {
+  // Clear game_id for new game/new matchup
   gameId = null;
   if (typeof localStorage !== 'undefined') {
     localStorage.removeItem('game_id');
     localStorage.setItem('game_home', homeTeam || '');
     localStorage.setItem('game_away', awayTeam || '');
   }
+} else if (!gameId && quarter > 1 && storedGameId) {
+  // Resume game: Q2+ and no game_id in URL, but we have one in localStorage
+  gameId = storedGameId;
+}
   if (typeof history !== 'undefined' && history.replaceState) {
     const clean = new URLSearchParams(urlParams);
     ['quarter', 'period', 'game_id'].forEach(k => clean.delete(k));
@@ -153,11 +166,10 @@ async function loadRoster() {
   }
   
   // If there's an active game, fetch current player energy levels
-  // Pass quarter=1 to detect new game scenarios (Q1 request when saved game is Q2+)
   if (gameId) {
     console.log("Loading current player energy from game:", gameId);
     try {
-        const gameRes = await fetch(`/api/game/${gameId}?quarter=1`);
+        const gameRes = await fetch(`/api/game/${gameId}`);
         if (gameRes.ok) {
           const gameData = await gameRes.json();
           const gamePlayers = gameData.players || [];
