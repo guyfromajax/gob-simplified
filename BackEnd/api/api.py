@@ -1231,11 +1231,18 @@ def init_game(request: dict):
     _initialize_game_stats(gm, game_id=None)  # None = new game, will randomize
     
     # Create minimal game document with players
+    # CRITICAL: Ensure scores are zeroed before summarizing
+    gm.score = {home_team: 0, away_team: 0}
     summary = summarize_game_state(gm, exclude_animations=True)
     summary["_id"] = game_id
     summary["game_stats_initialized"] = True
     summary["quarter"] = 1  # Pre-game, but set to 1 so simulate-quarter works correctly
+    # Ensure score is explicitly zeroed in summary (summarize_game_state should already include this, but be explicit)
     summary["score"] = {home_team: 0, away_team: 0}
+    if "home_team" in summary and isinstance(summary["home_team"], dict):
+        summary["home_team"]["score"] = 0
+    if "away_team" in summary and isinstance(summary["away_team"], dict):
+        summary["away_team"]["score"] = 0
     
     # Set GameManager quarter to 1 to match
     gm.quarter = 1
