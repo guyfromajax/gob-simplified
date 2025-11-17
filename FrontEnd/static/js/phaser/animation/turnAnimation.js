@@ -393,14 +393,16 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
   
   const getBackList = missTurn?.offense_getback || [];
   
-  console.log('🏀 [OUTLET STEP DEBUG] runDefensiveReboundSetup called', {
+  console.log(`🏀 [OUTLET STEP DEBUG] runDefensiveReboundSetup called with nextPlayType="${nextPlayType}"`, {
     rebounderId,
     nextPlayType,
     nextPlayTypeType: typeof nextPlayType,
     nextPlayTypeIsHCO: nextPlayType === "HCO",
+    nextPlayTypeValue: JSON.stringify(nextPlayType),
     missTurnResultType: missTurn?.result_type,
     getBackListCount: getBackList.length,
-    getBackList
+    getBackList,
+    willAnimateOutletStep: nextPlayType === "HCO"
   });
   
   animationDebugLog('runDefensiveReboundSetup called with:', { rebounderId, nextPlayType });
@@ -693,12 +695,13 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
     });
     animationDebugLog(`Total players moved for HCO: ${playersMoved}`);
   } else {
-    console.warn('🏀 [OUTLET STEP DEBUG] Outlet step animation SKIPPED - not HCO scenario', {
+    console.warn(`🏀 [OUTLET STEP DEBUG] ⚠️ Outlet step animation SKIPPED - nextPlayType is "${nextPlayType}" (expected "HCO")`, {
       nextPlayType,
       nextPlayTypeType: typeof nextPlayType,
       nextPlayTypeIsHCO: nextPlayType === "HCO",
+      nextPlayTypeValue: JSON.stringify(nextPlayType),
       rebounderId,
-      note: 'This is why no players animated during outlet step!'
+      note: 'This is why no players animated during outlet step! Check where nextPlayType is set.'
     });
     animationDebugLog('Not HCO scenario, nextPlayType:', nextPlayType);
   }
