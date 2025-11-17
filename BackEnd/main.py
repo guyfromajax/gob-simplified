@@ -175,7 +175,6 @@ def simulate_quarter(
         gm.game_id = game_id
 
     # Apply lineups if provided or build them if not already set
-    import logging
     logging.info(f"🏀 simulate_quarter: home_lineup_ids={home_lineup_ids}, away_lineup_ids={away_lineup_ids}, current_home_lineup_keys={list(gm.home_team.lineup.keys()) if gm.home_team.lineup else 'EMPTY'}, current_away_lineup_keys={list(gm.away_team.lineup.keys()) if gm.away_team.lineup else 'EMPTY'}")
     
     if home_lineup_ids:
