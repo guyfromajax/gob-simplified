@@ -332,6 +332,7 @@ def simulate_quarter(
         gm.quarter += 1
     else:
         # Turn-by-turn mode: Quarter is initialized, ready for turn-by-turn sim
+        pass
 
     return gm
 
