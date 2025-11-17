@@ -379,16 +379,41 @@ def get_game_state(game_id: str):
         logging.info(f"📊 /api/game/{game_id} - GameManager in memory: {gm is not None}")
         logging.info(f"📊 Active games in memory: {list(ongoing_games.keys())}")
         if gm:
-            # Get players with current energy levels
+            # Get players with current energy levels, stats, and attributes
+            # Pre-game (lineup empty): return all roster players
+            # Between quarters (lineup set): return lineup players with game stats
             players = []
             for team in [gm.home_team, gm.away_team]:
-                for pos, player in team.lineup.items():
-                    players.append({
-                        "_id": player.player_id,
-                        "name": player.name,
-                        "NG": player.attributes.get("NG", 1.0),
-                        "team": team.name
-                    })
+                if team.lineup:
+                    # Lineup is set (between quarters) - return lineup players with game stats
+                    for pos, player in team.lineup.items():
+                        players.append({
+                            "_id": player.player_id,
+                            "name": player.name,
+                            "NG": player.attributes.get("NG", 1.0),
+                            "team": team.name,
+                            "stats": player.stats.get("game", {}),
+                            "attributes": {
+                                "EM": player.attributes.get("EM", 50),
+                                "MO": player.attributes.get("MO", 0),
+                                "NG": player.attributes.get("NG", 1.0)
+                            }
+                        })
+                else:
+                    # Lineup not set (pre-game) - return all roster players for lineup selection
+                    for player in team.get_all_players():
+                        players.append({
+                            "_id": player.player_id,
+                            "name": player.name,
+                            "NG": player.attributes.get("NG", 1.0),
+                            "team": team.name,
+                            "stats": player.stats.get("game", {}),
+                            "attributes": {
+                                "EM": player.attributes.get("EM", 50),
+                                "MO": player.attributes.get("MO", 0),
+                                "NG": player.attributes.get("NG", 1.0)
+                            }
+                        })
             
             # Build team_stats structure (for S2 tab - playcall stats)
             team_stats = {
