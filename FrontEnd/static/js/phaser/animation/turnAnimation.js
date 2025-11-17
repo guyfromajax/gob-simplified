@@ -576,10 +576,20 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
         note: isGetBackPlayer ? '⚠️ This player was on get-back list - will they animate again?' : 'Player not on get-back list'
       });
       
-      if (!info || id === rebounderId || id === outletReceiverId) {
+      // CRITICAL: Exclude get-back players from DREB animation
+      // These players already animated back during the shot attempt, so animating them again
+      // causes the extra animation step bug. They should already be in position.
+      if (!info || id === rebounderId || id === outletReceiverId || isGetBackPlayer) {
         animationDebugLog(`Skipping player ${id}`);
         if (isGetBackPlayer) {
-          console.log(`🔍 [GET BACK DEBUG] Skipping get-back player (is rebounder or outlet receiver)`, {
+          console.log(`🔍 [GET BACK DEBUG] ✅ CORRECT: Skipping get-back player - already animated during shot`, {
+            playerId: id,
+            reason: 'already animated during shot attempt',
+            currentPosition: { x: sprite.x, y: sprite.y },
+            note: 'This prevents double animation'
+          });
+        } else {
+          console.log(`🔍 [GET BACK DEBUG] Skipping player (is rebounder or outlet receiver)`, {
             playerId: id,
             reason: id === rebounderId ? 'isRebounder' : 'isOutletReceiver'
           });
@@ -617,23 +627,13 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
       // isTransition=true allows longer durations for transition movements
       const playerDuration = getPlayerDuration(sprite, targetPx.x, targetPx.y, true);
       
-      if (isGetBackPlayer) {
-        console.log(`🔍 [GET BACK DEBUG] ⚠️ WARNING: Animating get-back player again in DREB setup!`, {
-          playerId: id,
-          fromPos: { x: sprite.x, y: sprite.y },
-          toPos: { x: targetPx.x, y: targetPx.y },
-          duration: playerDuration,
-          wasOnGetBackList: true,
-          note: 'This player already animated during shot - extra animation detected!'
-        });
-      } else {
-        console.log(`🔍 [GET BACK DEBUG] Animating player in DREB setup (not on get-back list)`, {
-          playerId: id,
-          fromPos: { x: sprite.x, y: sprite.y },
-          toPos: { x: targetPx.x, y: targetPx.y },
-          duration: playerDuration
-        });
-      }
+      // Note: get-back players are excluded above, so we only animate players not on that list
+      console.log(`🔍 [GET BACK DEBUG] Animating player in DREB setup (not on get-back list)`, {
+        playerId: id,
+        fromPos: { x: sprite.x, y: sprite.y },
+        toPos: { x: targetPx.x, y: targetPx.y },
+        duration: playerDuration
+      });
       
       promises.push(
         tweenPlayerTo(scene, sprite, targetPx, {
@@ -641,14 +641,6 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
           easing: 'Linear', // Match HCO step movements for consistent feel
         }).then(() => {
           playersMoved++;
-          if (isGetBackPlayer) {
-            console.log(`🔍 [GET BACK DEBUG] DREB animation COMPLETED for get-back player`, {
-              playerId: id,
-              finalPosition: { x: sprite.x, y: sprite.y },
-              wasOnGetBackList: true,
-              note: 'This confirms double animation - player animated during shot AND during DREB'
-            });
-          }
         })
       );
       
