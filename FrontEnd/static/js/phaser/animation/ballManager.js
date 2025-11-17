@@ -814,18 +814,38 @@ export function animateRebound({
   const debugEnabled = isAnimationDebugEnabled();
   const shouldHoldForFastBreak = () => isUpcomingFastBreak(scene, upcomingFastBreak);
 
+  // Identify if this is OREB or DREB BEFORE setting scene.rebounderId
+  const rebounderSprite = playerSprites[rebounderId];
+  const shooterSprite = playerSprites[shooterId];
+  const rebounderTeamId = rebounderSprite?.team_id;
+  const shooterTeamId = shooterSprite?.team_id;
+  const isOREB = rebounderTeamId === shooterTeamId;
+  const reboundType = isOREB ? 'OREB' : 'DREB';
+  
+  const previousRebounderId = scene.rebounderId;
+  
   console.log('🔍 [REBOUND DEBUG] animateRebound started', {
     rebounderId,
+    reboundType,
     shooterId,
     ballSpot,
     preserveBallPosition,
+    previousRebounderId,
     sceneRebounderId: scene.rebounderId,
     shotInProgress: scene._shotInProgress,
     currentBallOwner: scene.currentBallOwnerRef?.value?.playerId || null,
-    note: 'Setting scene.rebounderId - this allows ball attachment to rebounder'
+    note: 'About to set scene.rebounderId - this allows ball attachment to rebounder'
   });
   
   scene.rebounderId = rebounderId;
+  
+  console.log('🔍 [REBOUND DEBUG] animateRebound: scene.rebounderId SET', {
+    rebounderId,
+    reboundType,
+    previousRebounderId,
+    newRebounderId: scene.rebounderId,
+    note: 'scene.rebounderId is now set - any code checking this will see the rebounder'
+  });
   const rebCfg = animationConfig.rebound;
   const promises = [];
   const finalPositions = [];
@@ -905,23 +925,46 @@ export function animateRebound({
             
             showAnnouncement("Rebound!", rebounderTeam, playerData);
             
+            // Identify if this is OREB or DREB
+            const rebounderTeamId = rebounderSprite.team_id;
+            const shooterSprite = playerSprites[shooterId];
+            const shooterTeamId = shooterSprite?.team_id;
+            const isOREB = rebounderTeamId === shooterTeamId;
+            const reboundType = isOREB ? 'OREB' : 'DREB';
+            
             console.log('🔍 [REBOUND DEBUG] animateRebound: About to attach ball to rebounder', {
               rebounderId,
+              reboundType,
               shooterId,
               ballSpot,
               shotInProgress: scene._shotInProgress,
               sceneRebounderId: scene.rebounderId,
-              currentBallOwner: scene.currentBallOwnerRef?.value?.playerId || null
+              currentBallOwner: scene.currentBallOwnerRef?.value?.playerId || null,
+              note: 'Setting scene.rebounderId allows attachment - this might attach ball if not in flight'
             });
+            
+            // Store the current ball owner before attachment attempt
+            const previousBallOwner = scene.currentBallOwnerRef?.value?.playerId || null;
             
             attachBallToPlayer(scene, ballSprite, rebounderSprite, {
-              debugInfo: { shooterId, reboundSpot: ballSpot }
+              debugInfo: { shooterId, reboundSpot: ballSpot, reboundType }
             });
             
-            console.log('🔍 [REBOUND DEBUG] animateRebound: Ball attached to rebounder', {
+            // Check if attachment actually succeeded
+            const newBallOwner = scene.currentBallOwnerRef?.value?.playerId || null;
+            const attachmentSucceeded = newBallOwner === rebounderId;
+            
+            console.log('🔍 [REBOUND DEBUG] animateRebound: Ball attachment result', {
               rebounderId,
+              reboundType,
+              attachmentSucceeded,
+              previousBallOwner,
+              newBallOwner,
               shotInProgress: scene._shotInProgress,
-              currentBallOwner: scene.currentBallOwnerRef?.value?.playerId || null
+              sceneRebounderId: scene.rebounderId,
+              note: attachmentSucceeded 
+                ? 'Ball successfully attached to rebounder' 
+                : 'Ball attachment FAILED (ball in flight or blocked)'
             });
             
             const newOffenseId = rebounderSprite.team_id;

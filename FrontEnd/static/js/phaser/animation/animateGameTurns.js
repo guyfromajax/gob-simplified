@@ -67,7 +67,8 @@ async function handleOrebTurn(scene, { playerSprites, ballSprite, turnData, onUp
     sceneBallDetached: scene.ballDetached,
     currentBallOwner: scene.currentBallOwnerRef?.value?.playerId || null,
     nextRebounderId: turnData.rebound_type ? turnData.rebounderId : null, // If there's a rebound_type, turnData.rebounderId is the NEXT rebounder
-    reboundType: turnData.rebound_type
+    reboundType: turnData.rebound_type,
+    note: 'CRITICAL: If scene.rebounderId is set to D rebounder here, ball might attach to them before we clear it!'
   });
   
   if (!rebounderSprite) return;
