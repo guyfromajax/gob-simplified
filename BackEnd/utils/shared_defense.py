@@ -114,7 +114,7 @@ def assign_non_bh_defender_coords(o_coords, ball_coords, aggression_level, is_aw
                     x = ox - (abs(bx - ox) * 0.5)
                     y = oy + (random.randint(3,5) * y_direction)
                 else:
-                    x = ox + (abs(bx - ox) * 0.5)
+                    x = ox + random.randint(0,1)
                     y = oy + (random.randint(3,5) * y_direction)
             else:
                 if bx > ox:
@@ -170,11 +170,11 @@ def assign_non_bh_defender_coords(o_coords, ball_coords, aggression_level, is_aw
                     x = ox - (abs(bx - ox) * 0.5)
                     y = oy + ((abs(by - oy) * 0.5) * y_direction)
                 else:
-                    x = ox + (abs(bx - ox) * 0.5)
+                    x = ox + random.randint(0,1)
                     y = oy + ((abs(by - oy) * 0.5) * y_direction)
             else:
                 if bx > ox:
-                    x = ox + (abs(bx - ox) * 0.5)
+                    x = ox + random.randint(0,1)
                     y = oy + (random.randint(3,5) * y_direction)
                 else:
                     x = ox + random.randint(-1,1)
