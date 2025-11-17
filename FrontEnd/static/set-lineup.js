@@ -50,8 +50,16 @@ if (isNewMatchup) {
 }
 
 // Re-check localStorage for gameId if we still don't have one (user navigating back during active game)
+// Also check if teams match stored teams to ensure gameId is for this matchup
 if (!gameId && typeof localStorage !== 'undefined') {
-  gameId = localStorage.getItem('game_id');
+  const storedGameId = localStorage.getItem('game_id');
+  const storedHome = localStorage.getItem('game_home');
+  const storedAway = localStorage.getItem('game_away');
+  // Only use stored gameId if teams match (same matchup)
+  if (storedGameId && storedHome === homeTeam && storedAway === awayTeam) {
+    gameId = storedGameId;
+    console.log('[Lineup] Using gameId from localStorage (teams match)');
+  }
 }
 
 console.log('[Lineup] gameId check:', {
@@ -60,7 +68,9 @@ console.log('[Lineup] gameId check:', {
   finalGameId: gameId,
   quarter: quarter,
   homeTeam: homeTeam,
-  awayTeam: awayTeam
+  awayTeam: awayTeam,
+  storedHome: typeof localStorage !== 'undefined' ? localStorage.getItem('game_home') : null,
+  storedAway: typeof localStorage !== 'undefined' ? localStorage.getItem('game_away') : null
 });
 
 const periodLabel = urlParams.get('period') || `Q${quarter}`;
@@ -100,6 +110,47 @@ async function loadRoster() {
   if (!res.ok) return;
   const data = await res.json();
   roster = (data.players || []).map((p, idx) => ({ ...p, _idx: idx }));
+  
+  // If no gameId, initialize a new game (for pre-game lineup screen)
+  // This creates a game document with initialized players (Emotion, Momentum)
+  if (!gameId && homeTeam && awayTeam) {
+    console.log("No gameId found - initializing new game for pre-game lineup");
+    try {
+      const mode = modeParam || 'single';
+      const initRes = await fetch('/api/init-game', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          home_team: homeTeam,
+          away_team: awayTeam,
+          mode: mode
+        })
+      });
+      if (initRes.ok) {
+        const initData = await initRes.json();
+        gameId = initData.game_id;
+        console.log("✅ Initialized new game:", gameId);
+        
+        // Store gameId in localStorage and URL
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem('game_id', gameId);
+          localStorage.setItem('game_home', homeTeam);
+          localStorage.setItem('game_away', awayTeam);
+        }
+        
+        // Update URL with gameId (without page reload)
+        const newParams = new URLSearchParams(window.location.search);
+        newParams.set('game_id', gameId);
+        if (typeof history !== 'undefined' && history.replaceState) {
+          history.replaceState(null, '', `${window.location.pathname}?${newParams.toString()}`);
+        }
+      } else {
+        console.warn("Failed to initialize game:", initRes.status, initRes.statusText);
+      }
+    } catch (err) {
+      console.warn("Could not initialize game:", err);
+    }
+  }
   
   // If there's an active game, fetch current player energy levels
   if (gameId) {

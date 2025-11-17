@@ -1198,6 +1198,46 @@ def get_team_roster(team_name: str, tournament_id: str | None = None):
     }
 
 
+@app.post("/api/init-game")
+def init_game(request: dict):
+    """Initialize a game document with players (Emotion, Momentum) before first quarter starts"""
+    from BackEnd.models.game_manager import GameManager
+    from BackEnd.utils.game_id_utils import generate_game_id
+    from BackEnd.utils.shared import summarize_game_state
+    from BackEnd.main import _initialize_game_stats
+    
+    home_team = request.get("home_team")
+    away_team = request.get("away_team")
+    mode = request.get("mode", "single")
+    
+    if not home_team or not away_team:
+        raise HTTPException(status_code=400, detail="home_team and away_team required")
+    
+    # Generate game_id
+    game_id = generate_game_id()
+    
+    # Create GameManager (this initializes teams and players)
+    gm = GameManager(home_team, away_team, mode=mode)
+    
+    # Initialize game stats (this randomizes EM, CH, MO for all players)
+    _initialize_game_stats(gm, game_id=None)  # None = new game, will randomize
+    
+    # Create minimal game document with players
+    summary = summarize_game_state(gm, exclude_animations=True)
+    summary["_id"] = game_id
+    summary["game_stats_initialized"] = True
+    summary["quarter"] = 0  # Pre-game
+    summary["score"] = {home_team: 0, away_team: 0}
+    
+    # Save to database
+    games_collection.update_one({"_id": game_id}, {"$set": summary}, upsert=True)
+    
+    # Store in ongoing_games so /api/game/{game_id} can access it
+    ongoing_games[game_id] = gm
+    
+    return {"game_id": game_id}
+
+
 @app.get("/games")
 def get_games():
     # Fetch the 10 most recent games (you can adjust this)
