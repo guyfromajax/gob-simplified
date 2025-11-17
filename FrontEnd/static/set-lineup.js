@@ -447,21 +447,27 @@ function updateSlotDisplay(slot) {
   if (playerId && playerMap[playerId]) {
     const player = playerMap[playerId];
     const rating = player.position_ratings?.[pos] ?? '--';
-    const energy = player.attributes?.NG ?? 1.0;
+    
+    // Get energy (same pattern as energy - check attributes first, then fallback)
+    const energy = player.attributes?.NG ?? player.NG ?? 1.0;
     const energyPercent = Math.round(energy * 100);
-    const fouls = player.stats?.F ?? 0;
     
-    // Get game stats (flattened, same as box-score.js line 281)
-    const stats = player.stats || {};
+    // Get stats - handle both flat (game stats) and nested (season stats) structures
+    // Game stats are already flattened at loadRoster line 211: rosterPlayer.stats = gp.stats?.game || gp.stats || {}
+    // Initial roster stats are nested: stats.season.PTS (from API line 1317)
+    const rawStats = player.stats || {};
+    const stats = rawStats.game || rawStats.season || rawStats || {};
     
+    // Get all stats with fallbacks (same pattern as energy)
     const points = stats.PTS || 0;
-    const rebounds = (stats.OREB || 0) + (stats.DREB || 0);
+    const rebounds = (stats.OREB || 0) + (stats.DREB || 0) + (stats.REB || 0);
     const assists = stats.AST || 0;
     const defA = stats.DEF_A || 0;
     const defS = stats.DEF_S || 0;
     const defPct = defA > 0 ? Math.round((defS / defA) * 100) : 0;
+    const fouls = stats.F || 0;
     
-    // Get emotion (EM) and convert to emoji
+    // Get emotion (EM) - same pattern as energy: check attributes first, then fallback
     const em = player.attributes?.EM ?? player.EM ?? 50;
     let emoji = '😐'; // Default straight face
     if (em >= 80) emoji = '😎';        // Sunglasses
@@ -470,7 +476,7 @@ function updateSlotDisplay(slot) {
     else if (em >= 20) emoji = '😕';   // Slight frown
     else emoji = '😞';                 // Sad face
     
-    // Get momentum (MO)
+    // Get momentum (MO) - same pattern as energy: check attributes first, then fallback
     const momentum = player.attributes?.MO ?? player.MO ?? 0;
     const moValue = typeof momentum === 'number' ? momentum : 0;
     
