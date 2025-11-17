@@ -760,13 +760,19 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                             gm.away_team.team_fouls = 0
                         
                         # Restore opening_tip_winner for Q2-Q4 possession logic
-                        if "opening_tip_winner" in saved:
+                        # Only restore if this is NOT a new Q1 game (opening tip hasn't happened yet for new games)
+                        if should_restore_stats and "opening_tip_winner" in saved:
                             gm.game_state["opening_tip_winner"] = saved["opening_tip_winner"]
                             if debug:
                                 logging.debug(
                                     "Restored opening_tip_winner: %s",
                                     saved["opening_tip_winner"]
                                 )
+                        elif not should_restore_stats:
+                            # New Q1 game - clear opening_tip_winner so opening tip can run
+                            if "opening_tip_winner" in gm.game_state:
+                                del gm.game_state["opening_tip_winner"]
+                            logging.info(f"🆕 New Q1 game - opening_tip_winner cleared (opening tip will run)")
                         
                         ongoing_games[game_id] = gm
                         if debug:
