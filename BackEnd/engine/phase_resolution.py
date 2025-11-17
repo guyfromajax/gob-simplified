@@ -690,13 +690,9 @@ def generate_logic(off_call, def_call, off_team, def_team, off_lineup, def_lineu
                 
                 # Record screen stats for each player
                 if screen_attempts_by_pos:
-                    print(f"[generate_logic] Screen attempts in skeleton:")
                     for pos, count in sorted(screen_attempts_by_pos.items()):
                         player = off_lineup.get(pos)
                         if player:
-                            player_name = get_name_safe(player)
-                            print(f"  {pos} ({player_name}): {count} screen attempt(s)")
-                            
                             # Increment SCR_A for each screen attempt
                             for _ in range(count):
                                 player.record_stat("SCR_A")
@@ -705,19 +701,12 @@ def generate_logic(off_call, def_call, off_team, def_team, off_lineup, def_lineu
                                 success = random.randint(1, 2)
                                 if success == 1:
                                     player.record_stat("SCR_S")
-                                    print(f"    → Screen success! ({player_name} SCR_S incremented)")
-                        else:
-                            print(f"  {pos} (Unknown): {count} screen attempt(s) - player not found in lineup")
-                else:
-                    print(f"[generate_logic] No screen attempts found in skeleton")
         except Exception as e:
-            print(f"[generate_logic] Error analyzing skeleton for screens: {e}")
+            pass  # Silently handle skeleton analysis errors
     
     # PLACEHOLDER: Return random lean score for now
     # This allows the system to work while full logic is implemented
     lean_score = random.uniform(-2, 2)
-    
-    print(f"[generate_logic] Lean score: {lean_score:.2f}")
     
     return lean_score
 
@@ -728,9 +717,6 @@ def resolve_half_court_offense_logic(game):
     # 1. Tactical Setup
     off_call = game_state["current_playcall"]
     def_call = game_state["defense_playcall"]
-    print("Entering resolve_half_court_offense_logic")
-    print(f"off_call: {off_call}")
-    print(f"def_call: {def_call}")
 
     # Generate logic to determine lean score
     lean_score = generate_logic(off_call, def_call, off_team, def_team, off_lineup, def_lineup, game=game)
@@ -1328,8 +1314,6 @@ def get_hco_skeleton(result_type, game_context, lean_score=None):
     
     # Get the current playcall from game context
     playcall = game_context.game_state.get("current_playcall", "Inside") if game_context else "Inside"
-    print("Entering get_hco_skeleton")
-    print(f"playcall: {playcall}, lean_score: {lean_score}")
     
     # Get the offensive team
     offense_team = game_context.offense_team

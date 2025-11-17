@@ -256,7 +256,6 @@ def simulate_quarter(
         minutes = gm.game_state["time_remaining"] // 60
         seconds = gm.game_state["time_remaining"] % 60
         gm.game_state["clock"] = f"{minutes}:{seconds:02d}"
-        print(f"🏀 Opening tip: {tip_turn['winner']} wins for {gm.offense_team.name}")
     elif q == 2 or q == 3:
         # Q2/Q3: Losing team from opening tip gets possession via inbound pass
         opening_tip_winner = gm.game_state.get("opening_tip_winner", "home")
@@ -333,7 +332,6 @@ def simulate_quarter(
         gm.quarter += 1
     else:
         # Turn-by-turn mode: Quarter is initialized, ready for turn-by-turn sim
-        print(f"🎮 Quarter {q} initialized for turn-by-turn simulation")
 
     return gm
 

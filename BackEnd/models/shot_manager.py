@@ -236,7 +236,6 @@ class ShotManager:
         
         offense_rebounders = [pos for pos in off_team.lineup.keys() if pos not in offense_getback_list]
         
-        print(f"🏃 REBOUND POSITIONING DATA (ALL SHOTS): O_getback={len(offense_getback_list)}, D_release={len(defense_release_list)}, O_reb={len(offense_rebounders)}, D_reb={len(defense_rebounders)}")
         
         # ==================== STAT TRACKING ====================
         # Track release/get back instances for both teams
