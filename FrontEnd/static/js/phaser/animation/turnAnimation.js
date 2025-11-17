@@ -607,6 +607,9 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
       // CRITICAL: Exclude get-back players from DREB animation
       // These players already animated back during the shot attempt, so animating them again
       // causes the extra animation step bug. They should already be in position.
+      // 
+      // BUG CHECK: If only get-back player animates, it means ALL OTHER players have a skipReason.
+      // This suggests a condition might be inverted or all players are being incorrectly skipped.
       if (skipReason) {
         playersSkipped++;
         console.log(`🏀 [OUTLET STEP DEBUG] Skipping player ${id}`, {
@@ -658,8 +661,12 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
         fromPos: { x: sprite.x, y: sprite.y },
         toPos: { x: targetPx.x, y: targetPx.y },
         duration: playerDuration,
-        isGetBackPlayer: false,
-        note: 'This player should animate along with others'
+        isGetBackPlayer,
+        isInGetBackList: isGetBackPlayer,
+        skipReasonWas: skipReason,
+        note: isGetBackPlayer 
+          ? '⚠️ WARNING: Get-back player is animating! This should NOT happen - check if condition is inverted!'
+          : 'This player should animate along with others'
       });
       
       promises.push(
