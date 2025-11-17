@@ -424,6 +424,16 @@ class ShotManager:
                 result["offense_rebounders"] = [off_team.lineup[pos].player_id for pos in offense_rebounders]
                 result["defense_rebounders"] = [def_team.lineup[pos].player_id for pos in defense_rebounders]
                 
+                # Debug log to verify offense_getback is populated
+                print(f"🔍 [BACKEND GET BACK DEBUG] MISS shot - offense_getback populated:", {
+                    "offense_getback_positions": offense_getback_list,
+                    "offense_getback_player_ids": result["offense_getback"],
+                    "count": len(result["offense_getback"]),
+                    "shooter_pos": shooter_pos,
+                    "offense_reb_value": offense_reb_value,
+                    "note": "This should match frontend logs"
+                })
+                
                 # ==================== OLD REBOUND SYSTEM (COMMENTED OUT) ====================
                 # rebounder_dict = {
                 #     "offense": {"PG": 0.1, "SG": 0.1, "SF": 0.2, "PF": 0.3, "C": 0.3},

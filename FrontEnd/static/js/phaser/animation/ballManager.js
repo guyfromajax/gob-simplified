@@ -454,12 +454,14 @@ export function shootBall({
         hasOffenseGetBack: !!turnData?.offense_getback,
         offenseGetBackValue: turnData?.offense_getback || null,
         offenseGetBackCount: turnData?.offense_getback?.length || 0,
+        offenseGetBackPlayerIds: turnData?.offense_getback || [],
         shooterId,
         shooterTeamId,
         result,
         turnIndex: turnData?.index || turnIndex || null,
         turnResultType: turnData?.result_type || null,
-        note: 'If offense_getback is missing or empty, get-back players won\'t be excluded from DREB animation'
+        turnDataKeys: turnData ? Object.keys(turnData) : [],
+        note: 'If offense_getback is missing or empty, get-back players won\'t be excluded from DREB animation. Compare with backend logs.'
       });
       
       if (turnData.offense_getback && turnData.offense_getback.length > 0) {

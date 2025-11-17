@@ -393,16 +393,35 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
   
   const getBackList = missTurn?.offense_getback || [];
   
+  // Debug: Check all recent turns to see if offense_getback exists elsewhere
+  const currentIndex = scene.currentTurn || 0;
+  const recentTurns = [];
+  for (let i = Math.max(0, currentIndex - 3); i <= currentIndex; i++) {
+    const turn = scene.simData?.turns?.[i];
+    if (turn) {
+      recentTurns.push({
+        index: i,
+        result_type: turn.result_type,
+        hasOffenseGetBack: !!turn.offense_getback,
+        offenseGetBackCount: turn.offense_getback?.length || 0,
+        offenseGetBackPlayerIds: turn.offense_getback || []
+      });
+    }
+  }
+  
   console.log('🔍 [GET BACK DEBUG] runDefensiveReboundSetup called', {
     rebounderId,
     nextPlayType,
-    currentTurnIndex: scene.currentTurn || null,
-    missTurnIndex: missTurn?.index ?? (scene.currentTurn || 0),
+    currentTurnIndex: currentIndex,
+    missTurnIndex: missTurn?.index ?? (currentIndex),
     missTurnResultType: missTurn?.result_type || null,
     getBackPlayerIds: getBackList,
     getBackCount: getBackList.length,
     turnDataProvided: !!turnData,
-    note: 'Checking if any get-back players from MISS turn are animated again here'
+    recentTurns: recentTurns,
+    missTurnHasOffenseGetBack: !!missTurn?.offense_getback,
+    missTurnKeys: missTurn ? Object.keys(missTurn) : [],
+    note: 'Checking if any get-back players from MISS turn are animated again here. Compare recentTurns to find where offense_getback exists.'
   });
   
   if (getBackList.length > 0) {
