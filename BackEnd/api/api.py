@@ -623,8 +623,32 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                             away_plays_data=away_plays,
                             mode="single"  # Loaded games are always single mode from games_collection
                         )
+                        # Initialize game_state, then restore from saved document
                         gm.game_state = gm._init_game_state()
                         gm.quarter = saved.get("quarter", 1)
+                        
+                        # Restore game_state fields from saved document (critical for FREE_THROW state)
+                        saved_game_state = saved.get("game_state", {})
+                        if saved_game_state:
+                            # Restore critical game_state fields that affect turn flow
+                            if "offensive_state" in saved_game_state:
+                                gm.game_state["offensive_state"] = saved_game_state["offensive_state"]
+                            if "free_throws" in saved_game_state:
+                                gm.game_state["free_throws"] = saved_game_state["free_throws"]
+                            if "free_throws_remaining" in saved_game_state:
+                                gm.game_state["free_throws_remaining"] = saved_game_state["free_throws_remaining"]
+                            if "one_and_one" in saved_game_state:
+                                gm.game_state["one_and_one"] = saved_game_state["one_and_one"]
+                            if "shooter" in saved_game_state:
+                                # Restore shooter reference if needed
+                                shooter_id = saved_game_state.get("shooter")
+                                if shooter_id:
+                                    # Find shooter in lineup
+                                    for team in [gm.home_team, gm.away_team]:
+                                        for pos, player in team.lineup.items():
+                                            if player.player_id == shooter_id:
+                                                gm.game_state["shooter"] = player
+                                                break
                         
                         # Restore player stats and NG (energy) from saved game state
                         # Players are stored as an array: [{"playerId": "...", "team": "home", "stats": {...}, "attributes": {...}}]
