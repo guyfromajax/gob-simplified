@@ -484,11 +484,10 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
   let outletTarget = null;
   let outletContext = null;
 
-  // Set up outlet receiver movement and outlet pass for HCO and FAST_BREAK scenarios
-  // Note: FAST_BREAK has its own outlet pass in the fast break sequence, BUT we still need
-  // the DREB outlet pass here to transition from rebound to starting the fast break
-  // After free throws, we properly handle this by calling runDefensiveReboundSetup for both cases
-  if (outletReceiverId && outletReceiverId !== rebounderId && outletReceiverSprite && (nextPlayType === "HCO" || nextPlayType === "FAST_BREAK")) {
+  // Set up outlet receiver movement and outlet pass for HCO ONLY
+  // FAST_BREAK has its own outlet pass in the fast break sequence (animateOutletPhase in fastBreak.js)
+  // These two outlet steps are MUTUALLY EXCLUSIVE - never run together
+  if (outletReceiverId && outletReceiverId !== rebounderId && outletReceiverSprite && nextPlayType === "HCO") {
     
     // Move PG near the rebounder for outlet pass
     const sign = newOffenseBasket.x > rebGridX ? 1 : -1;
@@ -713,14 +712,13 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
 
   await Promise.all(promises);
 
-  // Do outlet pass for HCO and FAST_BREAK instances
-  // For HCO: This is the only outlet pass (to start the half-court offense)
-  // For FAST_BREAK: This is the DREB outlet pass (to transition to fast break), 
-  //                 and the fast break sequence will have its own outlet pass later
+  // Do outlet pass for HCO ONLY
+  // FAST_BREAK outlet pass is handled separately in fastBreak.js (animateOutletPhase)
+  // These two outlet steps are MUTUALLY EXCLUSIVE - never run together
   // For FCP/HCT: No outlet pass - players go directly to press positions
-  // CRITICAL: This outlet pass step is required for smooth DREB -> HCO/FAST_BREAK transitions
+  // CRITICAL: This outlet pass step is required for smooth DREB -> HCO transitions
   // The outlet pass MUST execute if we have an outletReceiverId, even if receiver movement was skipped
-  if ((nextPlayType === "HCO" || nextPlayType === "FAST_BREAK") && outletReceiverId && outletReceiverId !== rebounderId) {
+  if (nextPlayType === "HCO" && outletReceiverId && outletReceiverId !== rebounderId) {
     // If outletReceiverSprite is missing, try to get it from playerSprites
     if (!outletReceiverSprite && outletReceiverId) {
       outletReceiverSprite = playerSprites[outletReceiverId];
@@ -795,7 +793,8 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
       nextPlayType,
       reason: !outletReceiverId ? 'No outlet receiver found' : 
               outletReceiverId === rebounderId ? 'Outlet receiver is rebounder' : 
-              (nextPlayType !== "HCO" && nextPlayType !== "FAST_BREAK") ? `nextPlayType is "${nextPlayType}" (only HCO and FAST_BREAK execute outlet pass)` :
+              nextPlayType === "FAST_BREAK" ? 'FAST_BREAK - outlet pass handled in fast break sequence (fastBreak.js)' :
+              nextPlayType !== "HCO" ? `nextPlayType is "${nextPlayType}" (only HCO executes outlet pass here)` :
               'Unknown reason'
     });
     if (DebugFlags?.OUTLET) {
@@ -805,7 +804,8 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
         nextPlayType,
         reason: !outletReceiverId ? 'No outlet receiver found' : 
                 outletReceiverId === rebounderId ? 'Outlet receiver is rebounder' : 
-                (nextPlayType !== "HCO" && nextPlayType !== "FAST_BREAK") ? `nextPlayType is "${nextPlayType}"` : 
+                nextPlayType === "FAST_BREAK" ? 'FAST_BREAK - outlet pass handled in fast break sequence' :
+                nextPlayType !== "HCO" ? `nextPlayType is "${nextPlayType}"` : 
                 'Unknown reason'
       });
     }
