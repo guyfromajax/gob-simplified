@@ -1015,6 +1015,7 @@ class TurnManager:
 
     def assign_roles(self, off_call="INSIDE", def_call="MAN", skeleton=None):
         from BackEnd.utils.shared import get_name_safe
+        import logging
         
         game = self.game
         game_state = game.game_state
@@ -1023,6 +1024,9 @@ class TurnManager:
         off_lineup = off_team.lineup
         def_lineup = def_team.lineup
         tempo_call = off_team.strategy_calls["tempo_call"]
+        
+        # Log lineup state to diagnose KeyError
+        logging.info(f"🏀 assign_roles: offense_team={off_team.name} ({'HOME' if off_team.is_home_team else 'AWAY'}), offense_lineup_keys={list(off_lineup.keys()) if off_lineup else 'EMPTY'}, defense_team={def_team.name} ({'HOME' if def_team.is_home_team else 'AWAY'}), defense_lineup_keys={list(def_lineup.keys()) if def_lineup else 'EMPTY'}")
 
         # --- Step 1: Pick scene based on playcall
         from BackEnd.playcall_skeletons.outside_skeletons import OUTSIDE_SCENES
@@ -1186,6 +1190,9 @@ class TurnManager:
             events = step.get("events", [])
 
             for pos, action_info in pos_actions.items():
+                if pos not in off_lineup:
+                    logging.error(f"❌ assign_roles KeyError: position '{pos}' not in offense_lineup. offense_team={off_team.name}, offense_lineup_keys={list(off_lineup.keys()) if off_lineup else 'EMPTY'}")
+                    raise KeyError(f"Position '{pos}' not found in offense lineup for {off_team.name}. Available positions: {list(off_lineup.keys()) if off_lineup else 'EMPTY'}")
                 player = off_lineup[pos]
                 action = action_info["action"]
                 # MongoDB skeletons use "location", old skeletons use "spot"
