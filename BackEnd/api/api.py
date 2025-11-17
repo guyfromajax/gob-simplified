@@ -371,16 +371,18 @@ def simulate_game(request: SimulationRequest):
 
 
 @app.get("/api/game/{game_id}")
-def get_game_state(game_id: str):
+def get_game_state(game_id: str, quarter: int | None = None):
     """Fetch current game state for displaying accumulated stats and player energy
     
-    With Option 3: Frontend clears game_id for new games, so if game_id exists here,
-    it's always a resume request. No heuristic detection needed.
+    Args:
+        game_id: Game ID
+        quarter: Optional quarter query parameter. If quarter=1 and saved game is Q2+,
+                 returns empty stats (new game scenario)
     """
     try:
         # Check ongoing games first
         gm = ongoing_games.get(game_id)
-        logging.info(f"📊 /api/game/{game_id} - GameManager in memory: {gm is not None}")
+        logging.info(f"📊 /api/game/{game_id} - GameManager in memory: {gm is not None}, quarter param: {quarter}")
         logging.info(f"📊 Active games in memory: {list(ongoing_games.keys())}")
         if gm:
             # Get players with current energy levels
@@ -433,8 +435,64 @@ def get_game_state(game_id: str):
         if games_collection is not None:
             saved = games_collection.find_one({"_id": game_id})
             if saved:
-                # With Option 3: If game_id exists here, frontend explicitly wants to resume
-                # No heuristic detection needed - just return the saved state
+                saved_quarter = saved.get("quarter", 1)
+                
+                # Check if this is a "new game" scenario: user requesting Q1 but saved game is Q2+
+                # In this case, return empty stats (Lineup Screen loads before simulate-quarter detects new game)
+                is_new_game_from_get = (quarter == 1 and saved_quarter > 1)
+                if is_new_game_from_get:
+                    logging.warning(
+                        f"🆕 /api/game/{game_id} - New game detected: requested Q1 but saved game is Q{saved_quarter}. Returning empty stats."
+                    )
+                    # Return empty game state structure (energy levels, but no stats/scores)
+                    home_team_data = saved.get("home_team", {})
+                    away_team_data = saved.get("away_team", {})
+                    
+                    # Extract players with energy but no stats
+                    players = saved.get("players", [])
+                    players_with_energy = []
+                    for p in players:
+                        player_data = {
+                            "_id": p.get("playerId") or p.get("player_id"),
+                            "name": p.get("name"),
+                            "NG": p.get("NG", 1.0),
+                            "team": p.get("team"),
+                            "stats": {}  # Empty stats for new game
+                        }
+                        players_with_energy.append(player_data)
+                    
+                    # Return empty stats structure
+                    return {
+                        "game_id": game_id,
+                        "score": {home_team_data.get("name", ""): 0, away_team_data.get("name", ""): 0},
+                        "box_score": {},
+                        "quarter": 1,
+                        "clock": "12:00",
+                        "players": players_with_energy,
+                        "team_totals": {
+                            home_team_data.get("name", ""): {},
+                            away_team_data.get("name", ""): {}
+                        },
+                        "team_stats": {
+                            home_team_data.get("name", ""): {"offense": {}, "defense": {}},
+                            away_team_data.get("name", ""): {"offense": {}, "defense": {}}
+                        },
+                        "points_by_quarter": {
+                            home_team_data.get("name", ""): [0, 0, 0, 0],
+                            away_team_data.get("name", ""): [0, 0, 0, 0]
+                        },
+                        "home_team": {
+                            "name": home_team_data.get("name", ""),
+                            "team_fouls": 0,
+                            "attributes": home_team_data.get("attributes", {})
+                        },
+                        "away_team": {
+                            "name": away_team_data.get("name", ""),
+                            "team_fouls": 0,
+                            "attributes": away_team_data.get("attributes", {})
+                        }
+                    }
+                
                 # Extract player energy from saved game doc
                 players = saved.get("players", [])
                 # Map to include NG if available
@@ -552,9 +610,14 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                 status_code=400,
                 detail="game_id belongs to a different matchup",
             )
-        # With Option 3: Frontend clears game_id for new games
-        # If game_id is provided, it's always a resume request
-        # No heuristic detection needed here
+        # Check if this is a "new game" scenario: user wants Q1 but saved game is Q2+
+        # In this case, remove from memory and reload from DB (which will run new game detection)
+        if gm is not None and request.quarter == 1 and gm.quarter > 1:
+            logging.warning(
+                f"🆕 New game detected: game_id={game_id} in memory at Q{gm.quarter}, but user requested Q1. Removing from memory to reload from DB."
+            )
+            del ongoing_games[game_id]
+            gm = None  # Force reload from DB where new game detection will run
         if gm is None:
             logging.warning(
                 "simulate_quarter_endpoint unknown game_id=%s; active=%s",
@@ -638,11 +701,44 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                         # Only update quarter - game_state is already initialized by GameManager.__init__
                         gm.quarter = saved.get("quarter", 1)
                         
-                        # OPTION 3: Simple rule - if game_id exists, always restore stats (it's a resume)
-                        # Frontend clears game_id for new games, so we don't need heuristic detection here
-                        should_restore_stats = True
+                        # CRITICAL: For Q1 new games, don't restore stats - start fresh
+                        # Check if teams match - if teams don't match, it's a NEW game (different matchup)
+                        # Also check if this is Q1 with no meaningful gameplay (no turns or zero scores)
+                        saved_quarter = saved.get("quarter", 1)
+                        saved_home_team = saved.get("home_team", {})
+                        saved_away_team = saved.get("away_team", {})
                         
-                        logging.info(f"🔄 Loading game from DB: game_id={game_id}, quarter={request.quarter}, restoring_stats={should_restore_stats}")
+                        # Extract team names from saved data (handle both dict and string formats)
+                        if isinstance(saved_home_team, dict):
+                            saved_home_name = saved_home_team.get("name") or saved_home_team.get("team")
+                        else:
+                            saved_home_name = saved_home_team or ""
+                        
+                        if isinstance(saved_away_team, dict):
+                            saved_away_name = saved_away_team.get("name") or saved_away_team.get("team")
+                        else:
+                            saved_away_name = saved_away_team or ""
+                        
+                        teams_match = (saved_home_name == request.home_team and saved_away_name == request.away_team)
+                        has_existing_turns = len(saved.get("turns", [])) > 0
+                        
+                        # Check if scores are non-zero (indicates gameplay happened)
+                        saved_score = saved.get("score", {})
+                        has_non_zero_score = False
+                        if isinstance(saved_score, dict):
+                            has_non_zero_score = any(v > 0 for v in saved_score.values() if isinstance(v, (int, float)))
+                        elif isinstance(saved_score, (int, float)):
+                            has_non_zero_score = saved_score > 0
+                        
+                        # This is a NEW game if:
+                        # 1. Teams don't match (different matchup) OR
+                        # 2. Requesting Q1 but saved game is at a later quarter (user starting fresh) OR
+                        # 3. Q1 with no turns and no scores (truly new game)
+                        quarter_mismatch_new_game = request.quarter == 1 and saved_quarter > 1
+                        is_new_game = not teams_match or quarter_mismatch_new_game or (request.quarter == 1 and saved_quarter == 1 and not has_existing_turns and not has_non_zero_score)
+                        should_restore_stats = not is_new_game
+                        
+                        logging.warning(f"🔍 Loaded from DB: saved_quarter={saved_quarter}, request_quarter={request.quarter}, saved_teams=({saved_home_name},{saved_away_name}), request_teams=({request.home_team},{request.away_team}), teams_match={teams_match}, has_turns={has_existing_turns}, has_scores={has_non_zero_score}, is_new_game={is_new_game}, should_restore_stats={should_restore_stats}")
                         
                         # CRITICAL: Build lineups BEFORE restoring player stats
                         # Player stat restoration (below) looks up players in team.lineup, so lineups must exist
@@ -675,10 +771,14 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                         # The default game_state from _init_game_state() is fine for a fresh load
                         
                         # Restore player stats and NG (energy) from saved game state
-                        # With Option 3: If game_id exists, always restore (frontend cleared it for new games)
-                        saved_players_list = saved.get("players", []) if should_restore_stats else []
+                        # Only restore if this is NOT a new Q1 game (fresh start)
+                        # Players are stored as an array: [{"playerId": "...", "team": "home", "stats": {...}, "attributes": {...}}]
                         if should_restore_stats:
+                            saved_players_list = saved.get("players", [])
                             logging.info(f"🔄 Restoring stats for {len(saved_players_list)} players")
+                        else:
+                            saved_players_list = []
+                            logging.warning(f"🆕 New Q1 game detected - skipping stat restoration (starting fresh)")
                         
                         for saved_player_data in saved_players_list:
                             player_id = saved_player_data.get("playerId")
@@ -713,7 +813,7 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                                 logging.info(f"🔄 Player {player_id}: PTS restored {old_pts} → {new_pts}")
                         
                         # Restore team-level stats (score, fouls, totals, points by quarter)
-                        # With Option 3: If game_id exists, always restore
+                        # Only restore if this is NOT a new Q1 game (fresh start)
                         if should_restore_stats:
                             home_team_data = saved.get("home_team", {})
                             away_team_data = saved.get("away_team", {})
@@ -755,15 +855,14 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                                 gm.game_state["game_stats_initialized"] = saved["game_stats_initialized"]
                                 logging.info(f"🔄 game_stats_initialized restored: {saved['game_stats_initialized']}")
                         else:
-                            # With Option 3: This shouldn't happen - if game_id exists, we restore stats
-                            # But keep as safety fallback
-                            logging.warning(f"⚠️ Shouldn't reach here with Option 3 - game_id exists but not restoring stats")
+                            # New Q1 game - ensure stats are zeroed
+                            logging.warning(f"🆕 New Q1 game - scores/stats will be zeroed in simulate_quarter")
                             gm.score = {gm.home_team.name: 0, gm.away_team.name: 0}
                             gm.home_team.team_fouls = 0
                             gm.away_team.team_fouls = 0
                         
                         # Restore opening_tip_winner for Q2-Q4 possession logic
-                        # With Option 3: If game_id exists, always restore (it's a resume)
+                        # Only restore if this is NOT a new Q1 game (opening tip hasn't happened yet for new games)
                         if should_restore_stats and "opening_tip_winner" in saved:
                             gm.game_state["opening_tip_winner"] = saved["opening_tip_winner"]
                             if debug:
@@ -771,12 +870,13 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                                     "Restored opening_tip_winner: %s",
                                     saved["opening_tip_winner"]
                                 )
-                        else:
-                            # New game - clear opening_tip_winner so opening tip can run
+                        elif not should_restore_stats:
+                            # New Q1 game - clear opening_tip_winner and old turns so opening tip can run
                             if "opening_tip_winner" in gm.game_state:
                                 del gm.game_state["opening_tip_winner"]
+                            # Clear any old turns from previous game - opening tip will be added in simulate_quarter
                             gm.turns = []
-                            logging.info(f"🆕 New game - opening_tip_winner cleared (opening tip will run)")
+                            logging.warning(f"🆕 New Q1 game - opening_tip_winner cleared and turns cleared (opening tip will run)")
                         
                         ongoing_games[game_id] = gm
                         if debug:
