@@ -439,7 +439,9 @@ def get_game_state(game_id: str, quarter: int | None = None):
                 
                 # Check if this is a "new game" scenario: user requesting Q1 but saved game is Q2+
                 # In this case, return empty stats (Lineup Screen loads before simulate-quarter detects new game)
+                logging.info(f"📊 /api/game/{game_id} - DB check: quarter param={quarter}, saved_quarter={saved_quarter}")
                 is_new_game_from_get = (quarter == 1 and saved_quarter > 1)
+                logging.info(f"📊 /api/game/{game_id} - is_new_game_from_get={is_new_game_from_get} (quarter==1: {quarter == 1}, saved_quarter>1: {saved_quarter > 1})")
                 if is_new_game_from_get:
                     logging.warning(
                         f"🆕 /api/game/{game_id} - New game detected: requested Q1 but saved game is Q{saved_quarter}. Returning empty stats."
