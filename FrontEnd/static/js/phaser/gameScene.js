@@ -303,7 +303,11 @@ export function createGameScene(Phaser) {
           away: awayColors,
         });
       }
+      // Detect if this is a new game (Q1 with no existing gameId or new gameId)
+      const previousGameId = this.gameId;
       this.gameId = simData.game_id || this.gameId;
+      const isNewGame = this.quarter === 1 && (!previousGameId || (simData.game_id && simData.game_id !== previousGameId));
+      
       if (this.gameId && typeof localStorage !== 'undefined') {
         localStorage.setItem('game_id', this.gameId);
       }
@@ -352,10 +356,15 @@ export function createGameScene(Phaser) {
       
       this.nameToId = Object.fromEntries(actualPlayers.map(p => [p.name, p.playerId ?? p.player_id]));
       this.playerInfo = Object.fromEntries(actualPlayers.map(p => [p.playerId ?? p.player_id, { name: p.name, team: p.team, pos: p.pos }]));
+      
+      // Reset player stats to 0 for all players (force clean slate)
       this.playerStats = {};
       simData.players.forEach(p => {
         const id = p.playerId ?? p.player_id;
-        this.playerStats[id] = { PTS: 0, REB: 0, AST: 0 };
+        // Initialize all stats to 0 to prevent stats from previous games carrying over
+        this.playerStats[id] = { 
+          PTS: 0, F: 0, REB: 0, AST: 0, STL: 0, BLK: 0, TO: 0, DEF_A: 0, DEF_S: 0 
+        };
       });
       this.rowRefs = { home: {}, away: {} };
       this.currentLineup = { home: {}, away: {} };
@@ -667,7 +676,8 @@ export function createGameScene(Phaser) {
       const hydrateBoxScore = () => {
         // Use the baseline stats captured at the start of the quarter so the
         // table initially reflects pre-tip totals.
-        const box = simData.start_box_score || {};
+        // For new games, force empty box score to ensure stats start at 0
+        const box = isNewGame ? {} : (simData.start_box_score || {});
         // Preserve the final (cumulative) box score separately for any
         // consumers that need the completed stats (e.g. post-game summaries).
         this.finalBoxScore = simData.final_box_score || simData.box_score || {};
@@ -962,11 +972,20 @@ export function createGameScene(Phaser) {
         return parts.join(' ');
       };
 
-      // Live scoreboard state seeded from persisted game data
+      // Live scoreboard state - force to 0 for new games
+      // Only use persisted scores if continuing an existing game
       const liveScore = {
-        [homeTeam]: simData.score?.[homeTeam] ?? 0,
-        [awayTeam]: simData.score?.[awayTeam] ?? 0,
+        [homeTeam]: isNewGame ? 0 : (simData.score?.[homeTeam] ?? 0),
+        [awayTeam]: isNewGame ? 0 : (simData.score?.[awayTeam] ?? 0),
       };
+      
+      // Explicitly reset scoreboard UI for new games
+      if (isNewGame) {
+        emit('score:update', {
+          home: 0,
+          away: 0,
+        });
+      }
       let liveHomeFouls = simData.fouls?.home ?? 0;
       let liveAwayFouls = simData.fouls?.away ?? 0;
       let liveClock = simData.clock || '8:00';
