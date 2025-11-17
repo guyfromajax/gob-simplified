@@ -685,7 +685,7 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                         elif not gm.away_team.lineup:
                             from BackEnd.utils.db_utils import build_lineup_from_mongo
                             gm.away_team.lineup = build_lineup_from_mongo(gm.away_team)
-                            logging.info(f"✅ Loaded from DB: Built away lineup from MongoDB: {list(gm.away_team.lineup.keys())}")
+                            logging.warning(f"✅ Loaded from DB: Built away lineup from MongoDB: {list(gm.away_team.lineup.keys())}")
                         
                         # Validate lineups are set
                         if not gm.home_team.lineup or not gm.away_team.lineup:
