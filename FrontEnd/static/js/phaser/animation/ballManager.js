@@ -412,14 +412,9 @@ export function shootBall({
     // ==================== ANIMATE PLAYERS DURING SHOT ====================
     // Defenders releasing for fast break + Offensive players getting back on defense
     if (turnData) {
-      console.log('🏃 Checking player positioning data:', {
-        defense_release: turnData.defense_release,
-        offense_getback: turnData.offense_getback
-      });
       
       // Defenders releasing for fast break
       if (turnData.defense_release && turnData.defense_release.length > 0) {
-        console.log('🏃 Animating', turnData.defense_release.length, 'defenders releasing for fast break');
         turnData.defense_release.forEach(playerId => {
           const sprite = scene.playerSprites[playerId];
           if (sprite) {
@@ -427,20 +422,12 @@ export function shootBall({
             const targetX = Phaser.Math.Between(45, 55);
             const targetPixel = gridToPixels(targetX, targetY, scene.game.config.width, scene.game.config.height);
             
-            console.log(`🏃 DEFENDER ${playerId} releasing: from (${sprite.x}, ${sprite.y}) → to (${targetPixel.x}, ${targetPixel.y})`);
-            
             scene.tweens.add({
               targets: sprite,
               x: targetPixel.x,
               y: targetPixel.y,
               duration: duration, // Same duration as ball flight
-              ease: 'Power1',
-              onStart: () => {
-                console.log(`🏃 STARTED: Defender ${playerId} moving to fast break spot`);
-              },
-              onComplete: () => {
-                console.log(`🏃 COMPLETED: Defender ${playerId} reached fast break spot`);
-              }
+              ease: 'Power1'
             });
           } else {
             console.warn(`🏃 ⚠️ Defender sprite not found for player ${playerId}`);
@@ -450,8 +437,6 @@ export function shootBall({
       
       // Offensive players getting back on defense
       if (turnData.offense_getback && turnData.offense_getback.length > 0) {
-        console.log('🏃 Animating', turnData.offense_getback.length, 'offensive players getting back');
-        
         turnData.offense_getback.forEach(playerId => {
           const sprite = scene.playerSprites[playerId];
           if (sprite) {
@@ -558,7 +543,7 @@ export function shootBall({
         reboundPositionCount++;
       });
       
-      console.log(`🏀 Animating ${reboundPositionCount} players into rebound position during shot`);
+      // Rebound positioning complete
       // ==================== END REBOUND POSITIONING ====================
     }
     // ==================== END PLAYER POSITIONING ====================

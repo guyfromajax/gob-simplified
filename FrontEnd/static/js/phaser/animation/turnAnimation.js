@@ -393,17 +393,7 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
   
   const getBackList = missTurn?.offense_getback || [];
   
-  console.log(`🏀 [OUTLET STEP DEBUG] runDefensiveReboundSetup called with nextPlayType="${nextPlayType}"`, {
-    rebounderId,
-    nextPlayType,
-    nextPlayTypeType: typeof nextPlayType,
-    nextPlayTypeIsHCO: nextPlayType === "HCO",
-    nextPlayTypeValue: JSON.stringify(nextPlayType),
-    missTurnResultType: missTurn?.result_type,
-    getBackListCount: getBackList.length,
-    getBackList,
-    willAnimateOutletStep: nextPlayType === "HCO"
-  });
+  // runDefensiveReboundSetup called
   
   animationDebugLog('runDefensiveReboundSetup called with:', { rebounderId, nextPlayType });
   if (!scene || !playerSprites || rebounderId == null) return;
@@ -617,15 +607,6 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
       // This suggests a condition might be inverted or all players are being incorrectly skipped.
       if (skipReason) {
         playersSkipped++;
-        console.log(`🏀 [OUTLET STEP DEBUG] Skipping player ${id}`, {
-          playerId: id,
-          reason: skipReason,
-          hasInfo: !!info,
-          isGetBackPlayer,
-          isRebounder: id === rebounderId,
-          isOutletReceiver: id === outletReceiverId,
-          spriteTeam: sprite?.team
-        });
         continue;
       }
       
@@ -659,20 +640,7 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
       // isTransition=true allows longer durations for transition movements
       const playerDuration = getPlayerDuration(sprite, targetPx.x, targetPx.y, true);
       
-      console.log(`🏀 [OUTLET STEP DEBUG] Animating player in DREB outlet step`, {
-        playerId: id,
-        pos: info?.pos,
-        team: sprite?.team,
-        fromPos: { x: sprite.x, y: sprite.y },
-        toPos: { x: targetPx.x, y: targetPx.y },
-        duration: playerDuration,
-        isGetBackPlayer,
-        isInGetBackList: isGetBackPlayer,
-        skipReasonWas: skipReason,
-        note: isGetBackPlayer 
-          ? '⚠️ WARNING: Get-back player is animating! This should NOT happen - check if condition is inverted!'
-          : 'This player should animate along with others'
-      });
+      // Animate player in DREB outlet step
       
       promises.push(
         tweenPlayerTo(scene, sprite, targetPx, {
@@ -686,16 +654,14 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
       animationDebugLog(`HCO player movement: ${id} from (${currentGridX.toFixed(1)}, ${currentGridY.toFixed(1)}) to (${targetGrid.x}, ${targetGrid.y}) [direction: ${direction}, newOffenseTeam: ${newOffenseTeam}]`);
     }
     
-    console.log('🏀 [OUTLET STEP DEBUG] DREB outlet animation summary', {
-      totalPlayers: Object.keys(playerSprites).length,
-      playersAnimated: playersMoved,
-      playersSkipped,
-      playersSkippedReasons,
-      expectedAnimated: Object.keys(playerSprites).length - playersSkipped,
-      warning: playersMoved === 0 ? '⚠️ NO PLAYERS ANIMATED - This is the bug!' : 
-               playersMoved === 1 ? '⚠️ ONLY ONE PLAYER ANIMATED - This might be the bug!' : 
-               null
-    });
+    if (playersMoved === 0 || playersMoved === 1) {
+      console.warn('⚠️ [OUTLET STEP] Few players animated:', {
+        totalPlayers: Object.keys(playerSprites).length,
+        playersAnimated: playersMoved,
+        playersSkipped,
+        playersSkippedReasons
+      });
+    }
     animationDebugLog(`Total players moved for HCO: ${playersMoved}`);
   } else {
     console.warn(`🏀 [OUTLET STEP DEBUG] ⚠️ Outlet step animation SKIPPED - nextPlayType is "${nextPlayType}" (expected "HCO" or "FAST_BREAK")`, {
