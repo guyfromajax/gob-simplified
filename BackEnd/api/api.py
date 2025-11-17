@@ -546,6 +546,14 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                 status_code=400,
                 detail="game_id belongs to a different matchup",
             )
+        # Check if this is a "new game" scenario: user wants Q1 but saved game is Q2+
+        # In this case, remove from memory and reload from DB (which will run new game detection)
+        if gm is not None and request.quarter == 1 and gm.quarter > 1:
+            logging.warning(
+                f"🆕 New game detected: game_id={game_id} in memory at Q{gm.quarter}, but user requested Q1. Removing from memory to reload from DB."
+            )
+            del ongoing_games[game_id]
+            gm = None  # Force reload from DB where new game detection will run
         if gm is None:
             logging.warning(
                 "simulate_quarter_endpoint unknown game_id=%s; active=%s",
