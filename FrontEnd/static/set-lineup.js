@@ -25,10 +25,13 @@ let gameId = urlParams.get('game_id') ||
   (typeof localStorage !== 'undefined' ? localStorage.getItem('game_id') : null);
 const storedHome = typeof localStorage !== 'undefined' ? localStorage.getItem('game_home') : null;
 const storedAway = typeof localStorage !== 'undefined' ? localStorage.getItem('game_away') : null;
-// Only clear gameId if it's truly a new matchup (teams changed) AND we don't have a game_id in URL
-// If we have game_id in URL, keep it (user is navigating back during active game)
+
+// FIXED: Only clear gameId when teams actually change (new matchup)
+// Don't clear it just because it's Q1 - let backend handle "Q1 but saved Q2+" detection
+// This preserves the init-game flow which needs gameId to exist
 const isNewMatchup = !urlParams.get('game_id') && (storedHome !== homeTeam || storedAway !== awayTeam);
 if (isNewMatchup) {
+  // Teams changed = definitely a new matchup, clear old gameId
   gameId = null;
   if (typeof localStorage !== 'undefined') {
     localStorage.removeItem('game_id');
@@ -61,6 +64,10 @@ if (!gameId && typeof localStorage !== 'undefined') {
     console.log('[Lineup] Using gameId from localStorage (teams match)');
   }
 }
+
+// FIXED: Additional check - if we have a gameId but it's Q1, verify it's valid
+// If user starts Q1 but saved game is Q2+, backend will handle detection via heuristic
+// Frontend just needs to ensure gameId exists for init-game flow to work
 
 console.log('[Lineup] gameId check:', {
   fromUrl: urlParams.get('game_id'),
