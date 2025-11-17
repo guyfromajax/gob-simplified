@@ -925,12 +925,12 @@ export function animateRebound({
             
             showAnnouncement("Rebound!", rebounderTeam, playerData);
             
-            // Identify if this is OREB or DREB
-            const rebounderTeamId = rebounderSprite.team_id;
-            const shooterSprite = playerSprites[shooterId];
-            const shooterTeamId = shooterSprite?.team_id;
-            const isOREB = rebounderTeamId === shooterTeamId;
-            const reboundType = isOREB ? 'OREB' : 'DREB';
+            // Identify if this is OREB or DREB (rebounderTeamId already declared above on line 911)
+            // Use outer scope variables or re-declare only what we need
+            const shooterSpriteInner = playerSprites[shooterId];
+            const shooterTeamIdInner = shooterSpriteInner?.team_id;
+            const isOREBInner = rebounderTeamId === shooterTeamIdInner;
+            const reboundType = isOREBInner ? 'OREB' : 'DREB';
             
             console.log('🔍 [REBOUND DEBUG] animateRebound: About to attach ball to rebounder', {
               rebounderId,
@@ -1011,7 +1011,7 @@ export function animateRebound({
   }
 
   // Determine shooting team to apply proximity criteria
-  const shooterSprite = playerSprites[shooterId];
+  // shooterSprite already declared earlier on line 819
   const shootingTeam = shooterSprite?.team; // "home" or "away"
   const isHomeTeamShot = shootingTeam === "home";
 
