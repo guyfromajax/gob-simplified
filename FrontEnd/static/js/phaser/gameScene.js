@@ -99,10 +99,10 @@ export function createGameScene(Phaser) {
         }
       }
       
-      // Update pause button text if it exists
-      const pauseBtn = document.getElementById('pause-btn');
-      if (pauseBtn) {
-        pauseBtn.textContent = 'Pause';
+      // Update pause button text if it exists (element may not exist during shutdown)
+      const pauseBtnEl = document.getElementById('pause-btn');
+      if (pauseBtnEl) {
+        pauseBtnEl.textContent = 'Pause';
       }
       
       // Destroy all player sprites
@@ -165,12 +165,6 @@ export function createGameScene(Phaser) {
             }
           });
         }
-      }
-      
-      // Update pause button text
-      const pauseBtn = document.getElementById('pause-btn');
-      if (pauseBtn) {
-        pauseBtn.textContent = 'Pause';
       }
       
       // Run structure validation for inbound passes
