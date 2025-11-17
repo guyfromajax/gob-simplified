@@ -630,13 +630,41 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                         gm.quarter = saved.get("quarter", 1)
                         
                         # CRITICAL: For Q1 new games, don't restore stats - start fresh
-                        # If quarter === 1 and this is a new game (no prior gameplay), skip stat restoration
+                        # Check if teams match - if teams don't match, it's a NEW game (different matchup)
+                        # Also check if this is Q1 with no meaningful gameplay (no turns or zero scores)
                         saved_quarter = saved.get("quarter", 1)
-                        is_new_game_q1 = saved_quarter == 1 and request.quarter == 1
-                        has_existing_turns = len(saved.get("turns", [])) > 0
-                        should_restore_stats = not is_new_game_q1 or has_existing_turns
+                        saved_home_team = saved.get("home_team", {})
+                        saved_away_team = saved.get("away_team", {})
                         
-                        logging.info(f"🔍 Loaded from DB: saved_quarter={saved_quarter}, request_quarter={request.quarter}, has_turns={has_existing_turns}, should_restore_stats={should_restore_stats}")
+                        # Extract team names from saved data (handle both dict and string formats)
+                        if isinstance(saved_home_team, dict):
+                            saved_home_name = saved_home_team.get("name") or saved_home_team.get("team")
+                        else:
+                            saved_home_name = saved_home_team or ""
+                        
+                        if isinstance(saved_away_team, dict):
+                            saved_away_name = saved_away_team.get("name") or saved_away_team.get("team")
+                        else:
+                            saved_away_name = saved_away_team or ""
+                        
+                        teams_match = (saved_home_name == request.home_team and saved_away_name == request.away_team)
+                        has_existing_turns = len(saved.get("turns", [])) > 0
+                        
+                        # Check if scores are non-zero (indicates gameplay happened)
+                        saved_score = saved.get("score", {})
+                        has_non_zero_score = False
+                        if isinstance(saved_score, dict):
+                            has_non_zero_score = any(v > 0 for v in saved_score.values() if isinstance(v, (int, float)))
+                        elif isinstance(saved_score, (int, float)):
+                            has_non_zero_score = saved_score > 0
+                        
+                        # This is a NEW game if:
+                        # 1. Teams don't match (different matchup) OR
+                        # 2. Q1 with no turns and no scores (truly new game)
+                        is_new_game = not teams_match or (request.quarter == 1 and saved_quarter == 1 and not has_existing_turns and not has_non_zero_score)
+                        should_restore_stats = not is_new_game
+                        
+                        logging.info(f"🔍 Loaded from DB: saved_quarter={saved_quarter}, request_quarter={request.quarter}, saved_teams=({saved_home_name},{saved_away_name}), request_teams=({request.home_team},{request.away_team}), teams_match={teams_match}, has_turns={has_existing_turns}, has_scores={has_non_zero_score}, is_new_game={is_new_game}, should_restore_stats={should_restore_stats}")
                         
                         # CRITICAL: Build lineups BEFORE restoring player stats
                         # Player stat restoration (below) looks up players in team.lineup, so lineups must exist
