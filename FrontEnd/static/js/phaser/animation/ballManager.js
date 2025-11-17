@@ -1126,16 +1126,18 @@ export function animateRebound({
       ? currentGridX >= 74 
       : currentGridX <= 25;
 
-    // console.log('Player proximity check:', {
-    //   playerId: sprite.playerId,
-    //   currentGridX,
-    //   currentGridY,
-    //   meetsProximityCriteria,
-    //   isHomeTeamShot,
-    //   threshold: isHomeTeamShot ? '>=74' : '<=25'
-    // });
-
-    if (!meetsProximityCriteria) continue;
+    if (!meetsProximityCriteria) {
+      console.log(`🔍 [GET BACK DEBUG] animateRebound: Skipping player - doesn't meet proximity criteria`, {
+        playerId: sprite.playerId,
+        currentGridX,
+        currentGridY,
+        isHomeTeamShot,
+        threshold: isHomeTeamShot ? '>=74' : '<=25',
+        meetsProximityCriteria: false,
+        note: 'This player will animate later in DREB setup - might cause isolated animation step'
+      });
+      continue;
+    }
 
     // Random spot within 6 X and 8 Y of ball, staying in bounds
     const targetX = Phaser.Math.Clamp(
