@@ -814,6 +814,17 @@ export function animateRebound({
   const debugEnabled = isAnimationDebugEnabled();
   const shouldHoldForFastBreak = () => isUpcomingFastBreak(scene, upcomingFastBreak);
 
+  console.log('🔍 [REBOUND DEBUG] animateRebound started', {
+    rebounderId,
+    shooterId,
+    ballSpot,
+    preserveBallPosition,
+    sceneRebounderId: scene.rebounderId,
+    shotInProgress: scene._shotInProgress,
+    currentBallOwner: scene.currentBallOwnerRef?.value?.playerId || null,
+    note: 'Setting scene.rebounderId - this allows ball attachment to rebounder'
+  });
+  
   scene.rebounderId = rebounderId;
   const rebCfg = animationConfig.rebound;
   const promises = [];
@@ -894,9 +905,25 @@ export function animateRebound({
             
             showAnnouncement("Rebound!", rebounderTeam, playerData);
             
+            console.log('🔍 [REBOUND DEBUG] animateRebound: About to attach ball to rebounder', {
+              rebounderId,
+              shooterId,
+              ballSpot,
+              shotInProgress: scene._shotInProgress,
+              sceneRebounderId: scene.rebounderId,
+              currentBallOwner: scene.currentBallOwnerRef?.value?.playerId || null
+            });
+            
             attachBallToPlayer(scene, ballSprite, rebounderSprite, {
               debugInfo: { shooterId, reboundSpot: ballSpot }
             });
+            
+            console.log('🔍 [REBOUND DEBUG] animateRebound: Ball attached to rebounder', {
+              rebounderId,
+              shotInProgress: scene._shotInProgress,
+              currentBallOwner: scene.currentBallOwnerRef?.value?.playerId || null
+            });
+            
             const newOffenseId = rebounderSprite.team_id;
             const previousOffenseId = scene.offenseTeamId;
             scene.offenseTeamId = newOffenseId;
@@ -927,6 +954,10 @@ export function animateRebound({
                 });
               }
             }
+            console.log('🔍 [REBOUND DEBUG] animateRebound: Clearing scene.rebounderId after attachment', {
+              rebounderId,
+              previousRebounderId: scene.rebounderId
+            });
             scene.rebounderId = null;
             resolve();
           },

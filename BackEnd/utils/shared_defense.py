@@ -106,22 +106,102 @@ def assign_non_bh_defender_coords(o_coords, ball_coords, aggression_level, is_aw
         else:
             x = ox + 0.5 * (abs(bx - ox) * x_direction)
             y = oy + 0.5 * (abs(by - oy) * y_direction)
-    elif ball_spot in ["lower wing", "upper wing", "lower midwing", "upper midwing", "lower midcorner", "upper midcorner"]:
-        if o_spot in ["lower corner", "upper corner", "lower baseline", "upper baseline"]:
-            x = ox + random.randint(0, 2) * x_direction
-            y = oy + 4 * y_direction
-        elif o_spot == "key":
-            x = bx + (3 * basket_direction)
-            y = oy + 0.3 * (abs(by - oy) * y_direction)
-        elif o_spot in ["lower wing","upper wing", "lower midwing", "upper midwing", "lower midCorner", "upper midCorner"]:
-            x = bx + (3 * basket_direction)
-            y = oy + 0.3 * (abs(by - oy) * y_direction)
+    elif ball_spot in ["lower wing", "lower midWing", "lower midCorner"]:
+        if o_spot in ["lower corner", "lower midCorner", "lower wing", "lower midWing", "lower baseline"]
+            if is_away_offense:
+                if bx < ox:
+                    #ball is closer to basket
+                    x = ox - (abs(bx - ox) * 0.5)
+                    y = oy + (random.randint(3,5) * y_direction)
+                else:
+                    x = ox + (abs(bx - ox) * 0.5)
+                    y = oy + (random.randint(3,5) * y_direction)
+            else:
+                if bx > ox:
+                    x = bx + random.randint(-1,1)
+                    y = oy + (random.randint(3,5) * y_direction)
+                else:
+                    x = ox + random.randint(-1,1)
+                    y = oy + (random.randint(3,5) * y_direction)
+        elif o_spot in ["upper corner", "upper midCorner", "upper wing", "upper midWing", "upper baseline"]:
+            if is_away_offense:
+                if bx < ox:
+                    #ball is closer to basket
+                    x = ox - (abs(bx - ox) * 0.5)
+                    y = oy + ((abs(by - oy) * 0.5) * y_direction)
+                else:
+                    x = ox + (abs(bx - ox) * 0.5)
+                    y = oy + ((abs(by - oy) * 0.5) * y_direction)
+            else:
+                if bx > ox:
+                    x = ox + (abs(bx - ox) * 0.5)
+                    y = oy + (random.randint(3,5) * y_direction)
+                else:
+                    x = ox + random.randint(-1,1)
+                    y = oy + (random.randint(3,5) * y_direction)
+
         elif o_spot in ["lower lowPost", "upper lowPost", "lower midPost", "upper midPost"]:
             x = ox - 2 if is_away_offense else ox + 2
             y = oy
         else:
             x = ox + 0.5 * (abs(bx - ox) * x_direction)
             y = oy + 0.5 * (abs(by - oy) * y_direction)
+    elif ball_spot in ["upper wing", "upper midWing", "upper midCorner"]:
+        if o_spot in ["lower corner", "lower midCorner", "lower wing", "lower midWing", "lower baseline"]
+            if is_away_offense:
+                if bx < ox:
+                    #ball is closer to basket
+                    x = ox - (abs(bx - ox) * 0.5)
+                    y = oy + (random.randint(3,5) * y_direction)
+                else:
+                    x = ox + (abs(bx - ox) * 0.5)
+                    y = oy + (random.randint(3,5) * y_direction)
+            else:
+                if bx > ox:
+                    x = bx + random.randint(-1,1)
+                    y = oy + (random.randint(3,5) * y_direction)
+                else:
+                    x = ox + random.randint(-1,1)
+                    y = oy + (random.randint(3,5) * y_direction)
+        elif o_spot in ["upper corner", "upper midCorner", "upper wing", "upper midWing", "upper baseline"]:
+            if is_away_offense:
+                if bx < ox:
+                    #ball is closer to basket
+                    x = ox - (abs(bx - ox) * 0.5)
+                    y = oy + ((abs(by - oy) * 0.5) * y_direction)
+                else:
+                    x = ox + (abs(bx - ox) * 0.5)
+                    y = oy + ((abs(by - oy) * 0.5) * y_direction)
+            else:
+                if bx > ox:
+                    x = ox + (abs(bx - ox) * 0.5)
+                    y = oy + (random.randint(3,5) * y_direction)
+                else:
+                    x = ox + random.randint(-1,1)
+                    y = oy + (random.randint(3,5) * y_direction)
+        elif o_spot in ["lower lowPost", "upper lowPost", "lower midPost", "upper midPost"]:
+            x = ox - 2 if is_away_offense else ox + 2
+            y = oy
+        else:
+            x = ox + 0.5 * (abs(bx - ox) * x_direction)
+            y = oy + 0.5 * (abs(by - oy) * y_direction)
+    # elif ball_spot in ["lower wing", "upper wing", "lower midwing", "upper midwing", "lower midcorner", "upper midcorner"]:
+    #     if o_spot in ["lower corner", "upper corner", "lower baseline", "upper baseline"]:
+    #         x = ox + random.randint(0, 2) * x_direction
+    #         y = oy + 4 * y_direction
+    #     elif o_spot == "key":
+    #         x = bx + (3 * basket_direction)
+    #         y = oy + 0.3 * (abs(by - oy) * y_direction)
+    #     elif o_spot in ["lower wing","upper wing", "lower midwing", "upper midwing", "lower midCorner", "upper midCorner"]:
+    #         x = bx + (3 * basket_direction)
+    #         y = oy + 0.3 * (abs(by - oy) * y_direction)
+    #     elif o_spot in ["lower lowPost", "upper lowPost", "lower midPost", "upper midPost"]:
+    #         x = ox - 2 if is_away_offense else ox + 2
+    #         y = oy
+    #     else:
+    #         x = ox + 0.5 * (abs(bx - ox) * x_direction)
+    #         y = oy + 0.5 * (abs(by - oy) * y_direction)
+    
     elif ball_spot in ["lower corner", "upper corner", "lower midBaseline", "upper midBaseline"]:
         if o_spot in ["upper corner", "lower baseline", "upper baseline"]:
             x = ox + 0.1 *(abs(bx - ox) * x_direction)

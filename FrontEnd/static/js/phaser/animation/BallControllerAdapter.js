@@ -62,9 +62,33 @@ function attachBallToPlayer(scene, ballSprite, playerSprite, opts = {}) {
     return;
   }
   
-  // Don't attach during shot animations
-  if (scene._shotInProgress) {
-    console.log('BallControllerAdapter: Skipping attach - shot in progress');
+  const targetPlayerId = playerSprite?.playerId;
+  const isPutbackAttempt = opts?.debugInfo?.reason === 'putback_attempt';
+  const isPutbackScenario = scene._putbackInProgress || isPutbackAttempt;
+  
+  if (isPutbackAttempt || isPutbackScenario) {
+    console.log('🔍 [BALL ATTACH DEBUG] attachBallToPlayer called', {
+      targetPlayerId,
+      reason: opts?.debugInfo?.reason || 'unknown',
+      shotInProgress: scene._shotInProgress,
+      sceneRebounderId: scene.rebounderId,
+      ballDetached: scene.ballDetached,
+      currentBallOwner: scene.currentBallOwnerRef?.value?.playerId || null,
+      callStack: new Error().stack?.split('\n').slice(1, 5).map(s => s.trim())
+    });
+  }
+  
+  // Don't attach during shot animations (unless this is the initial putback attachment)
+  if (scene._shotInProgress && !isPutbackAttempt) {
+    if (isPutbackScenario) {
+      console.log('🔍 [BALL ATTACH DEBUG] BLOCKED: shot in progress (not putback attempt)', {
+        targetPlayerId,
+        shotInProgress: scene._shotInProgress,
+        isPutbackAttempt
+      });
+    } else {
+      console.log('BallControllerAdapter: Skipping attach - shot in progress');
+    }
     return;
   }
 
@@ -76,7 +100,15 @@ function attachBallToPlayer(scene, ballSprite, playerSprite, opts = {}) {
 
   // Handle rebound state restrictions (old system behavior)
   if (scene.stateMachine?.is('Rebound') && playerSprite.playerId !== scene.rebounderId) {
-    console.log('BallControllerAdapter: Skipping attach - not the rebounder during rebound state');
+    if (isPutbackScenario) {
+      console.log('🔍 [BALL ATTACH DEBUG] BLOCKED: not the rebounder during rebound state', {
+        targetPlayerId,
+        sceneRebounderId: scene.rebounderId,
+        state: scene.stateMachine?.state
+      });
+    } else {
+      console.log('BallControllerAdapter: Skipping attach - not the rebounder during rebound state');
+    }
     return;
   }
 
@@ -122,7 +154,15 @@ function attachBallToPlayer(scene, ballSprite, playerSprite, opts = {}) {
     scene.ballDetached = false;
     
     // Log for debugging (old system style)
-    if (opts.debugInfo) {
+    if (isPutbackAttempt || isPutbackScenario) {
+      console.log('🔍 [BALL ATTACH DEBUG] SUCCESS: Ball attached', {
+        targetPlayerId,
+        reason: opts?.debugInfo?.reason || 'unknown',
+        shotInProgress: scene._shotInProgress,
+        sceneRebounderId: scene.rebounderId,
+        currentBallOwner: scene.currentBallOwnerRef?.value?.playerId || null
+      });
+    } else if (opts.debugInfo) {
       console.log('BallControllerAdapter: Ball attached', {
         type: 'ballAttach',
         shooterId: opts.debugInfo.shooterId ?? null,
@@ -132,10 +172,19 @@ function attachBallToPlayer(scene, ballSprite, playerSprite, opts = {}) {
       });
     }
   } else {
-    console.warn('BallControllerAdapter: Failed to attach ball to player', {
-      playerId: playerSprite.playerId,
-      team: playerSprite.team_id ?? playerSprite.team
-    });
+    if (isPutbackAttempt || isPutbackScenario) {
+      console.warn('🔍 [BALL ATTACH DEBUG] FAILED: Failed to attach ball', {
+        targetPlayerId,
+        reason: opts?.debugInfo?.reason || 'unknown',
+        shotInProgress: scene._shotInProgress,
+        sceneRebounderId: scene.rebounderId
+      });
+    } else {
+      console.warn('BallControllerAdapter: Failed to attach ball to player', {
+        playerId: playerSprite.playerId,
+        team: playerSprite.team_id ?? playerSprite.team
+      });
+    }
   }
 }
 

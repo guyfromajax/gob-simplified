@@ -56,6 +56,20 @@ async function handleOrebTurn(scene, { playerSprites, ballSprite, turnData, onUp
   const rebounderId = turnData.rebounderId || turnData.ball_handler?.player_id;
   const rebounderSprite = playerSprites[rebounderId];
   
+  console.log('🔍 [PUTBACK DEBUG] handleOrebTurn started', {
+    result_type: turnData.result_type,
+    rebounderId,
+    turnDataRebounderId: turnData.rebounderId,
+    ballHandlerId: turnData.ball_handler?.player_id,
+    shooterId: turnData.shooter_id,
+    sceneRebounderId: scene.rebounderId,
+    sceneShotInProgress: scene._shotInProgress,
+    sceneBallDetached: scene.ballDetached,
+    currentBallOwner: scene.currentBallOwnerRef?.value?.playerId || null,
+    nextRebounderId: turnData.rebound_type ? turnData.rebounderId : null, // If there's a rebound_type, turnData.rebounderId is the NEXT rebounder
+    reboundType: turnData.rebound_type
+  });
+  
   if (!rebounderSprite) return;
   
   if (turnData.result_type === "PUTBACK_MAKE" || turnData.result_type === "PUTBACK_MISS") {
@@ -64,11 +78,42 @@ async function handleOrebTurn(scene, { playerSprites, ballSprite, turnData, onUp
     const rimCoords = isHomeTeam ? HOME_RIM_COORDS : AWAY_RIM_COORDS;
     const result = turnData.result_type === "PUTBACK_MAKE" ? "MAKE" : "MISS";
     
+    // CRITICAL: Clear scene.rebounderId BEFORE attaching ball for putback
+    // This prevents premature attachment to the next rebounder
+    const previousRebounderId = scene.rebounderId;
+    if (previousRebounderId) {
+      console.log('🔍 [PUTBACK DEBUG] Clearing scene.rebounderId before putback', {
+        previousRebounderId,
+        currentRebounderId: rebounderId,
+        note: 'This prevents premature attachment to next rebounder'
+      });
+      scene.rebounderId = null;
+    }
+    
+    // CRITICAL: Set _shotInProgress flag BEFORE attaching ball
+    // This prevents other systems from attaching the ball during the shot
+    console.log('🔍 [PUTBACK DEBUG] Setting scene._shotInProgress = true before putback');
+    scene._shotInProgress = true;
+    
     // CRITICAL: Attach ball to rebounder BEFORE calling shootBall
     // This ensures the ball is at the rebounder's position and not attached to a defender
     const { attachBallToPlayer } = await import('./BallControllerAdapter.js');
+    console.log('🔍 [PUTBACK DEBUG] About to attach ball to offensive rebounder for putback', {
+      rebounderId,
+      rebounderSpriteExists: !!rebounderSprite,
+      rebounderPosition: { x: rebounderSprite.x, y: rebounderSprite.y },
+      shotInProgress: scene._shotInProgress,
+      sceneRebounderId: scene.rebounderId
+    });
+    
     attachBallToPlayer(scene, ballSprite, rebounderSprite, {
       debugInfo: { rebounderId, reason: 'putback_attempt' }
+    });
+    
+    console.log('🔍 [PUTBACK DEBUG] Ball attached to offensive rebounder', {
+      rebounderId,
+      shotInProgress: scene._shotInProgress,
+      currentBallOwner: scene.currentBallOwnerRef?.value?.playerId || null
     });
     
     // Get rebounder's current position for shot start
@@ -76,6 +121,14 @@ async function handleOrebTurn(scene, { playerSprites, ballSprite, turnData, onUp
       x: (rebounderSprite.x / scene.game.config.width) * 100,
       y: 50 - (rebounderSprite.y / scene.game.config.height) * 50
     };
+    
+    console.log('🔍 [PUTBACK DEBUG] About to call shootBall', {
+      rebounderId,
+      fromCoords,
+      result,
+      shotInProgress: scene._shotInProgress,
+      sceneRebounderId: scene.rebounderId
+    });
     
     const shotResult = await shootBall({
       scene,
@@ -125,13 +178,29 @@ async function handleOrebTurn(scene, { playerSprites, ballSprite, turnData, onUp
       // Do NOT call bounceFromRim again - it causes double bounce and wrong basket issues
       const reboundBallSpot = shotResult?.grid || turnData.ballSpot || { x: 50, y: 25 };
       
-      console.log('🏀 handleOrebTurn: Putback miss - using ball spot', {
+      // CRITICAL: Clear _shotInProgress BEFORE calling animateRebound
+      // The shot animation is complete, so it's safe to allow ball attachments again
+      console.log('🔍 [PUTBACK DEBUG] Clearing scene._shotInProgress before animateRebound', {
+        previousShotInProgress: scene._shotInProgress,
+        rebounderId: turnData.rebounderId,
+        rebound_type: turnData.rebound_type,
+        note: 'Shot animation complete, allowing ball attachments for rebound'
+      });
+      scene._shotInProgress = false;
+      
+      // CRITICAL: turnData.rebounderId contains the NEXT rebounder (the one who will get this rebound)
+      // This is NOT the same as the putback shooter (rebounderId variable above)
+      const nextRebounderId = turnData.rebounderId;
+      console.log('🔍 [PUTBACK DEBUG] About to animate rebound after putback miss', {
+        putbackShooterId: rebounderId, // The player who attempted the putback
+        nextRebounderId, // The player who will get the rebound
         reboundBallSpot,
         shotResultGrid: shotResult?.grid,
         backendBallSpot: turnData.ballSpot,
-        rebounderId: turnData.rebounderId,
         rebound_type: turnData.rebound_type,
-        note: 'Using shotResult grid (bounce spot) instead of backend ballSpot (rim) to prevent ball snap'
+        shotInProgress: scene._shotInProgress,
+        sceneRebounderId: scene.rebounderId,
+        note: 'turnData.rebounderId is the NEXT rebounder, not the putback shooter'
       });
       
       await animateRebound({
@@ -139,10 +208,17 @@ async function handleOrebTurn(scene, { playerSprites, ballSprite, turnData, onUp
         ballSprite,
         playerSprites,
         animations: [],
-        rebounderId: turnData.rebounderId,
+        rebounderId: nextRebounderId, // This is the NEXT rebounder who will get the ball
         ballSpot: reboundBallSpot,
-        shooterId: rebounderId,
+        shooterId: rebounderId, // This is the putback shooter
         preserveBallPosition: true // Ball is already at bounce spot from shootBall - don't reposition
+      });
+      
+      console.log('🔍 [PUTBACK DEBUG] animateRebound completed', {
+        nextRebounderId,
+        shotInProgress: scene._shotInProgress,
+        sceneRebounderId: scene.rebounderId,
+        currentBallOwner: scene.currentBallOwnerRef?.value?.playerId || null
       });
       
       // If DREB, set up next play (outlet pass for HCO only)
