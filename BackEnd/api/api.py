@@ -673,14 +673,13 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                             
                             team = gm.home_team if team_key == "home" else gm.away_team
                             
-                            # Find player in lineup by position (players are stored by position, not ID)
-                            player = None
-                            for pos, lineup_player in team.lineup.items():
-                                if lineup_player.player_id == player_id:
-                                    player = lineup_player
-                                    break
+                            # Find player in full roster by ID (not just lineup)
+                            # Players might have stats from Q1 but not be in Q2 lineup
+                            # So we need to look in team.players (full roster) not just team.lineup
+                            player = team.get_player_by_id(player_id)
                             
                             if not player:
+                                logging.warning(f"⚠️ Loaded from DB: Could not find player {player_id} in {team_key} roster to restore stats")
                                 continue
                             
                             # Restore NG (energy)
