@@ -149,11 +149,12 @@ export function createGameScene(Phaser) {
       // Expose gameScene globally for Playcall Center tooltips
       window.currentGameScene = this;
       
-      // Reset pause state and ensure all tweens are active
+      // Reset pause state BEFORE killing tweens
       this.isPaused = false;
       if (this.tweens) {
-        // Ensure tweens are resumed and kill any stale tweens
+        // Resume all tweens first (if any were paused)
         this.tweens.resumeAll();
+        // Kill all active tweens to start fresh
         if (typeof this.tweens.killAll === 'function') {
           this.tweens.killAll();
         } else {
@@ -165,6 +166,8 @@ export function createGameScene(Phaser) {
             }
           });
         }
+        // Ensure tween manager is not paused for new animations
+        // Phaser doesn't have a direct "unpause" for the manager, but new tweens should start normally
       }
       
       // Run structure validation for inbound passes
@@ -1101,16 +1104,48 @@ export function createGameScene(Phaser) {
             // Pause all tweens
             if (this.tweens) {
               this.tweens.pauseAll();
+              const activeTweens = this.tweens.getAll ? this.tweens.getAll() : [];
+              if (DEBUG_FLOW) console.log('⏸️ Game paused', {
+                activeTweensCount: activeTweens.length,
+                tweenManagerPaused: typeof this.tweens.isPaused === 'function' ? this.tweens.isPaused() : 'N/A'
+              });
             }
             pauseBtn.textContent = 'Resume';
-            if (DEBUG_FLOW) console.log('⏸️ Game paused');
           } else {
             // Resume all tweens
             if (this.tweens) {
+              // Resume all existing tweens
               this.tweens.resumeAll();
+              
+              // Also explicitly resume each tween individually (in case resumeAll() doesn't work)
+              const activeTweens = this.tweens.getAll ? this.tweens.getAll() : [];
+              activeTweens.forEach(tween => {
+                if (tween) {
+                  // Try multiple methods to ensure tween resumes
+                  if (typeof tween.resume === 'function') {
+                    tween.resume();
+                  }
+                  if (typeof tween.play === 'function' && !tween.isPlaying()) {
+                    tween.play();
+                  }
+                  // If tween has an isPaused check, ensure it's not paused
+                  if (typeof tween.isPaused === 'function' && tween.isPaused()) {
+                    if (typeof tween.resume === 'function') {
+                      tween.resume();
+                    }
+                  }
+                }
+              });
+              
+              if (DEBUG_FLOW) console.log('▶️ Game resumed', {
+                activeTweensCount: activeTweens.length,
+                tweenManagerPaused: typeof this.tweens.isPaused === 'function' ? this.tweens.isPaused() : 'N/A',
+                resumedTweens: activeTweens.length,
+                scenePaused: this.scene?.isPaused ? this.scene.isPaused() : false
+              });
             }
+            
             pauseBtn.textContent = 'Pause';
-            if (DEBUG_FLOW) console.log('▶️ Game resumed');
           }
         });
       }
