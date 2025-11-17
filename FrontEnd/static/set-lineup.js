@@ -88,14 +88,14 @@ async function loadRoster() {
   if (gameId) {
     console.log("Loading current player energy from game:", gameId);
     try {
-      const gameRes = await fetch(`/api/game/${gameId}`);
-      if (gameRes.ok) {
-        const gameData = await gameRes.json();
-        const gamePlayers = gameData.players || [];
+        const gameRes = await fetch(`/api/game/${gameId}`);
+        if (gameRes.ok) {
+          const gameData = await gameRes.json();
+          const gamePlayers = gameData.players || [];
+          
+          console.log(`Found ${gamePlayers.length} players with energy data from game`);
         
-        console.log(`Found ${gamePlayers.length} players with energy data from game`);
-        
-        // Merge energy data into roster
+        // Merge game data into roster (same approach as box-score.js)
         let updatedCount = 0;
         gamePlayers.forEach(gp => {
           const playerId = gp._id || gp.playerId || gp.player_id;
@@ -110,38 +110,40 @@ async function loadRoster() {
           });
           
           if (rosterPlayer) {
+            // Energy (same as before)
             rosterPlayer.attributes = rosterPlayer.attributes || {};
             const energyValue = gp.NG ?? gp.energy ?? gp.attributes?.NG ?? 1.0;
             rosterPlayer.attributes.NG = energyValue;
-            // Also set on player object directly for compatibility
             rosterPlayer.NG = energyValue;
             
-            // Merge game stats if available
-            if (gp.stats) {
-              rosterPlayer.stats = rosterPlayer.stats || {};
-              rosterPlayer.stats.game = gp.stats.game || gp.stats || {};
-            }
+            // Stats: Use same approach as box-score.js (line 203)
+            rosterPlayer.stats = {
+              game: gp.stats?.game || gp.stats || {}
+            };
             
-            // Merge emotion and momentum from attributes if available
+            // Attributes: EM and MO
             if (gp.attributes) {
-              if (gp.attributes.EM !== undefined) {
-                rosterPlayer.attributes.EM = gp.attributes.EM;
-                rosterPlayer.EM = gp.attributes.EM;
-              }
-              if (gp.attributes.MO !== undefined) {
-                rosterPlayer.attributes.MO = gp.attributes.MO;
-                rosterPlayer.MO = gp.attributes.MO;
-              }
+              rosterPlayer.attributes.EM = gp.attributes.EM ?? rosterPlayer.attributes.EM ?? 50;
+              rosterPlayer.attributes.MO = gp.attributes.MO ?? rosterPlayer.attributes.MO ?? 0;
+              rosterPlayer.EM = rosterPlayer.attributes.EM;
+              rosterPlayer.MO = rosterPlayer.attributes.MO;
             }
             
             updatedCount++;
-            console.log(`Updated ${gp.name || 'Unknown'} energy to ${energyValue} (${Math.round(energyValue * 100)}%)`);
           } else {
             console.warn(`Could not find roster player for game player: ${gp.name || 'Unknown'} (ID: ${playerId})`);
           }
         });
         
-        console.log(`Successfully updated energy for ${updatedCount} players`);
+        console.log(`Successfully updated ${updatedCount} players with game data`);
+        
+        // Update playerMap (same objects, just ensure references are current)
+        roster.forEach(p => {
+          const playerId = p._id || p.playerId || p.player_id;
+          if (playerId) {
+            playerMap[playerId] = p;
+          }
+        });
         
         // Refresh slot displays to show updated stats
         updateAllSlotDisplays();
