@@ -660,8 +660,10 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                         
                         # This is a NEW game if:
                         # 1. Teams don't match (different matchup) OR
-                        # 2. Q1 with no turns and no scores (truly new game)
-                        is_new_game = not teams_match or (request.quarter == 1 and saved_quarter == 1 and not has_existing_turns and not has_non_zero_score)
+                        # 2. Requesting Q1 but saved game is at a later quarter (user starting fresh) OR
+                        # 3. Q1 with no turns and no scores (truly new game)
+                        quarter_mismatch_new_game = request.quarter == 1 and saved_quarter > 1
+                        is_new_game = not teams_match or quarter_mismatch_new_game or (request.quarter == 1 and saved_quarter == 1 and not has_existing_turns and not has_non_zero_score)
                         should_restore_stats = not is_new_game
                         
                         logging.warning(f"🔍 Loaded from DB: saved_quarter={saved_quarter}, request_quarter={request.quarter}, saved_teams=({saved_home_name},{saved_away_name}), request_teams=({request.home_team},{request.away_team}), teams_match={teams_match}, has_turns={has_existing_turns}, has_scores={has_non_zero_score}, is_new_game={is_new_game}, should_restore_stats={should_restore_stats}")
