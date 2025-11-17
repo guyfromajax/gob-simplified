@@ -107,7 +107,7 @@ def assign_non_bh_defender_coords(o_coords, ball_coords, aggression_level, is_aw
             x = ox + 0.5 * (abs(bx - ox) * x_direction)
             y = oy + 0.5 * (abs(by - oy) * y_direction)
     elif ball_spot in ["lower wing", "lower midWing", "lower midCorner"]:
-        if o_spot in ["lower corner", "lower midCorner", "lower wing", "lower midWing", "lower baseline"]
+        if o_spot in ["lower corner", "lower midCorner", "lower wing", "lower midWing", "lower baseline"]:
             if is_away_offense:
                 if bx < ox:
                     #ball is closer to basket
@@ -147,7 +147,7 @@ def assign_non_bh_defender_coords(o_coords, ball_coords, aggression_level, is_aw
             x = ox + 0.5 * (abs(bx - ox) * x_direction)
             y = oy + 0.5 * (abs(by - oy) * y_direction)
     elif ball_spot in ["upper wing", "upper midWing", "upper midCorner"]:
-        if o_spot in ["lower corner", "lower midCorner", "lower wing", "lower midWing", "lower baseline"]
+        if o_spot in ["lower corner", "lower midCorner", "lower wing", "lower midWing", "lower baseline"]:
             if is_away_offense:
                 if bx < ox:
                     #ball is closer to basket
