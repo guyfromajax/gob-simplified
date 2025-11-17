@@ -247,9 +247,6 @@ class TurnManager:
         
         # Create debug string for frontend display
         debug_turn_start = f"***** RUN TURN, turn number: {turn_num}, time remaining: {time_remaining}, offensive state: {state} *****"
-        
-        if DEBUG:
-            print(debug_turn_start)
         # if state in ["HCO", "HALF_COURT"]:
         #     print(f"{self.game.offense_team.name}: {self.game.game_state['current_playcall']}")
         #     print(f"{self.game.defense_team.name}: {self.game.game_state['defense_playcall']}")
@@ -583,9 +580,6 @@ class TurnManager:
             # Randomly select one play from matches
             selected_play = random.choice(matching_plays)
             chosen_playcall = selected_play["name"]
-            from BackEnd.constants import DEBUG
-            if DEBUG:
-                print(f"🎯 Selected play: {chosen_playcall} (type={chosen_play_type}, focus={chosen_focus})")
         
         # Record playcall attempt under new buckets
         try:

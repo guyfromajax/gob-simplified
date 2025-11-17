@@ -94,7 +94,6 @@ def execute_opening_tip(game):
         ball_spot_x = 50 + random.randint(7, 10)   # Away wins -> ball bounces right
     
     ball_landing_coords = {"x": ball_spot_x, "y": ball_spot_y}
-    print(f"🏀 Opening tip ball landing at: x={ball_spot_x}, y={ball_spot_y} ({'home' if home_wins else 'away'} wins)")
     
     # Build animations for all players
     animations = []
