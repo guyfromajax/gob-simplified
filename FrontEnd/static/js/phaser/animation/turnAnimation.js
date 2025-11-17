@@ -393,51 +393,6 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
   
   const getBackList = missTurn?.offense_getback || [];
   
-  // Debug: Check all recent turns to see if offense_getback exists elsewhere
-  const currentIndex = scene.currentTurn || 0;
-  const recentTurns = [];
-  for (let i = Math.max(0, currentIndex - 3); i <= currentIndex; i++) {
-    const turn = scene.simData?.turns?.[i];
-    if (turn) {
-      recentTurns.push({
-        index: i,
-        result_type: turn.result_type,
-        hasOffenseGetBack: !!turn.offense_getback,
-        offenseGetBackCount: turn.offense_getback?.length || 0,
-        offenseGetBackPlayerIds: turn.offense_getback || []
-      });
-    }
-  }
-  
-  console.log('🔍 [GET BACK DEBUG] runDefensiveReboundSetup called', {
-    rebounderId,
-    nextPlayType,
-    currentTurnIndex: currentIndex,
-    missTurnIndex: missTurn?.index ?? (currentIndex),
-    missTurnResultType: missTurn?.result_type || null,
-    getBackPlayerIds: getBackList,
-    getBackCount: getBackList.length,
-    turnDataProvided: !!turnData,
-    recentTurns: recentTurns,
-    missTurnHasOffenseGetBack: !!missTurn?.offense_getback,
-    missTurnKeys: missTurn ? Object.keys(missTurn) : [],
-    note: 'Checking if any get-back players from MISS turn are animated again here. Compare recentTurns to find where offense_getback exists.'
-  });
-  
-  if (getBackList.length > 0) {
-    console.log('🔍 [GET BACK DEBUG] Found get-back players from MISS turn', {
-      getBackPlayerIds: getBackList,
-      missTurnResultType: missTurn?.result_type,
-      note: 'These players should be excluded from DREB animation'
-    });
-  } else {
-    console.log('🔍 [GET BACK DEBUG] No get-back players found in MISS turn', {
-      missTurnResultType: missTurn?.result_type,
-      missTurnHasGetBack: !!missTurn?.offense_getback,
-      note: 'If offense_getback should exist but is missing, this could be the issue'
-    });
-  }
-  
   animationDebugLog('runDefensiveReboundSetup called with:', { rebounderId, nextPlayType });
   if (!scene || !playerSprites || rebounderId == null) return;
 
@@ -602,46 +557,57 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
     }
     
     let playersMoved = 0;
+    let playersSkipped = 0;
+    let playersSkippedReasons = {
+      noInfo: 0,
+      isRebounder: 0,
+      isOutletReceiver: 0,
+      isGetBackPlayer: 0
+    };
+    
+    console.log('🏀 [OUTLET STEP DEBUG] Starting DREB outlet animation - player check', {
+      totalPlayers: Object.keys(playerSprites).length,
+      getBackListCount: getBackList.length,
+      getBackList,
+      rebounderId,
+      outletReceiverId,
+      nextPlayType
+    });
+    
     for (const [id, sprite] of Object.entries(playerSprites)) {
       const info = scene.playerInfo?.[id];
       const isGetBackPlayer = getBackList.includes(id);
       
-      animationDebugLog(`Checking player ${id}:`, { 
-        hasInfo: !!info, 
-        isRebounder: id === rebounderId, 
-        isOutletReceiver: id === outletReceiverId,
-        spriteTeam: sprite.team,
-        rebounderTeam: rebounderSprite.team
-      });
-      
-      console.log(`🔍 [GET BACK DEBUG] Checking player for DREB animation`, {
-        playerId: id,
-        isRebounder: id === rebounderId,
-        isOutletReceiver: id === outletReceiverId,
-        isGetBackPlayer,
-        spriteTeam: sprite.team,
-        rebounderTeam: rebounderSprite.team,
-        note: isGetBackPlayer ? '⚠️ This player was on get-back list - will they animate again?' : 'Player not on get-back list'
-      });
+      // Collect skip reasons for debugging
+      let skipReason = null;
+      if (!info) {
+        skipReason = 'noInfo';
+        playersSkippedReasons.noInfo++;
+      } else if (id === rebounderId) {
+        skipReason = 'isRebounder';
+        playersSkippedReasons.isRebounder++;
+      } else if (id === outletReceiverId) {
+        skipReason = 'isOutletReceiver';
+        playersSkippedReasons.isOutletReceiver++;
+      } else if (isGetBackPlayer) {
+        skipReason = 'isGetBackPlayer';
+        playersSkippedReasons.isGetBackPlayer++;
+      }
       
       // CRITICAL: Exclude get-back players from DREB animation
       // These players already animated back during the shot attempt, so animating them again
       // causes the extra animation step bug. They should already be in position.
-      if (!info || id === rebounderId || id === outletReceiverId || isGetBackPlayer) {
-        animationDebugLog(`Skipping player ${id}`);
-        if (isGetBackPlayer) {
-          console.log(`🔍 [GET BACK DEBUG] ✅ CORRECT: Skipping get-back player - already animated during shot`, {
-            playerId: id,
-            reason: 'already animated during shot attempt',
-            currentPosition: { x: sprite.x, y: sprite.y },
-            note: 'This prevents double animation'
-          });
-        } else {
-          console.log(`🔍 [GET BACK DEBUG] Skipping player (is rebounder or outlet receiver)`, {
-            playerId: id,
-            reason: id === rebounderId ? 'isRebounder' : 'isOutletReceiver'
-          });
-        }
+      if (skipReason) {
+        playersSkipped++;
+        console.log(`🏀 [OUTLET STEP DEBUG] Skipping player ${id}`, {
+          playerId: id,
+          reason: skipReason,
+          hasInfo: !!info,
+          isGetBackPlayer,
+          isRebounder: id === rebounderId,
+          isOutletReceiver: id === outletReceiverId,
+          spriteTeam: sprite?.team
+        });
         continue;
       }
       
@@ -675,12 +641,15 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
       // isTransition=true allows longer durations for transition movements
       const playerDuration = getPlayerDuration(sprite, targetPx.x, targetPx.y, true);
       
-      // Note: get-back players are excluded above, so we only animate players not on that list
-      console.log(`🔍 [GET BACK DEBUG] Animating player in DREB setup (not on get-back list)`, {
+      console.log(`🏀 [OUTLET STEP DEBUG] Animating player in DREB outlet step`, {
         playerId: id,
+        pos: info?.pos,
+        team: sprite?.team,
         fromPos: { x: sprite.x, y: sprite.y },
         toPos: { x: targetPx.x, y: targetPx.y },
-        duration: playerDuration
+        duration: playerDuration,
+        isGetBackPlayer: false,
+        note: 'This player should animate along with others'
       });
       
       promises.push(
@@ -694,6 +663,17 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
       
       animationDebugLog(`HCO player movement: ${id} from (${currentGridX.toFixed(1)}, ${currentGridY.toFixed(1)}) to (${targetGrid.x}, ${targetGrid.y}) [direction: ${direction}, newOffenseTeam: ${newOffenseTeam}]`);
     }
+    
+    console.log('🏀 [OUTLET STEP DEBUG] DREB outlet animation summary', {
+      totalPlayers: Object.keys(playerSprites).length,
+      playersAnimated: playersMoved,
+      playersSkipped,
+      playersSkippedReasons,
+      expectedAnimated: Object.keys(playerSprites).length - playersSkipped,
+      warning: playersMoved === 0 ? '⚠️ NO PLAYERS ANIMATED - This is the bug!' : 
+               playersMoved === 1 ? '⚠️ ONLY ONE PLAYER ANIMATED - This might be the bug!' : 
+               null
+    });
     animationDebugLog(`Total players moved for HCO: ${playersMoved}`);
   } else {
     animationDebugLog('Not HCO scenario, nextPlayType:', nextPlayType);

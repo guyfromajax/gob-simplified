@@ -449,31 +449,7 @@ export function shootBall({
       }
       
       // Offensive players getting back on defense
-      // Always log whether offense_getback exists, even if empty
-      console.log('🔍 [GET BACK DEBUG] Checking for offense_getback during shot attempt', {
-        hasOffenseGetBack: !!turnData?.offense_getback,
-        offenseGetBackValue: turnData?.offense_getback || null,
-        offenseGetBackCount: turnData?.offense_getback?.length || 0,
-        offenseGetBackPlayerIds: turnData?.offense_getback || [],
-        shooterId,
-        shooterTeamId,
-        result,
-        turnIndex: turnData?.index || turnIndex || null,
-        turnResultType: turnData?.result_type || null,
-        turnDataKeys: turnData ? Object.keys(turnData) : [],
-        note: 'If offense_getback is missing or empty, get-back players won\'t be excluded from DREB animation. Compare with backend logs.'
-      });
-      
       if (turnData.offense_getback && turnData.offense_getback.length > 0) {
-        console.log('🔍 [GET BACK DEBUG] offense_getback list received during shot attempt', {
-          getBackPlayerIds: turnData.offense_getback,
-          count: turnData.offense_getback.length,
-          shooterId,
-          shooterTeamId,
-          result,
-          turnIndex: turnData?.index || turnIndex || null,
-          note: 'These players will animate back on defense during shot flight'
-        });
         console.log('🏃 Animating', turnData.offense_getback.length, 'offensive players getting back');
         
         turnData.offense_getback.forEach(playerId => {
@@ -484,42 +460,12 @@ export function shootBall({
             const targetX = isHomeTeam ? Phaser.Math.Between(40, 50) : Phaser.Math.Between(50, 60);
             const targetPixel = gridToPixels(targetX, targetY, scene.game.config.width, scene.game.config.height);
             
-            console.log(`🏃 OFFENSE ${playerId} getting back: from (${sprite.x}, ${sprite.y}) → to (${targetPixel.x}, ${targetPixel.y})`);
-            console.log(`🔍 [GET BACK DEBUG] Starting get-back animation for player`, {
-              playerId,
-              fromPos: { x: sprite.x, y: sprite.y },
-              toPos: { x: targetPixel.x, y: targetPixel.y },
-              duration,
-              shooterId,
-              result
-            });
-            
             scene.tweens.add({
               targets: sprite,
               x: targetPixel.x,
               y: targetPixel.y,
               duration: duration, // Same duration as ball flight
-              ease: 'Power1',
-              onStart: () => {
-                console.log(`🏃 STARTED: Offense ${playerId} getting back on defense`);
-                console.log(`🔍 [GET BACK DEBUG] Get-back animation STARTED for player`, {
-                  playerId,
-                  tweenActive: true,
-                  shooterId,
-                  result
-                });
-              },
-              onComplete: () => {
-                console.log(`🏃 COMPLETED: Offense ${playerId} back on defense`);
-                console.log(`🔍 [GET BACK DEBUG] Get-back animation COMPLETED for player`, {
-                  playerId,
-                  finalPosition: { x: sprite.x, y: sprite.y },
-                  tweenActive: false,
-                  shooterId,
-                  result,
-                  note: 'This player should NOT animate again during DREB setup'
-                });
-              }
+              ease: 'Power1'
             });
           } else {
             console.warn(`🏃 ⚠️ Offensive sprite not found for player ${playerId}`);
@@ -869,30 +815,7 @@ export function animateRebound({
   const isOREB = rebounderTeamId === shooterTeamId;
   const reboundType = isOREB ? 'OREB' : 'DREB';
   
-  const previousRebounderId = scene.rebounderId;
-  
-  console.log('🔍 [REBOUND DEBUG] animateRebound started', {
-    rebounderId,
-    reboundType,
-    shooterId,
-    ballSpot,
-    preserveBallPosition,
-    previousRebounderId,
-    sceneRebounderId: scene.rebounderId,
-    shotInProgress: scene._shotInProgress,
-    currentBallOwner: scene.currentBallOwnerRef?.value?.playerId || null,
-    note: 'About to set scene.rebounderId - this allows ball attachment to rebounder'
-  });
-  
   scene.rebounderId = rebounderId;
-  
-  console.log('🔍 [REBOUND DEBUG] animateRebound: scene.rebounderId SET', {
-    rebounderId,
-    reboundType,
-    previousRebounderId,
-    newRebounderId: scene.rebounderId,
-    note: 'scene.rebounderId is now set - any code checking this will see the rebounder'
-  });
   const rebCfg = animationConfig.rebound;
   const promises = [];
   const finalPositions = [];
@@ -979,39 +902,8 @@ export function animateRebound({
             const isOREBInner = rebounderTeamId === shooterTeamIdInner;
             const reboundType = isOREBInner ? 'OREB' : 'DREB';
             
-            console.log('🔍 [REBOUND DEBUG] animateRebound: About to attach ball to rebounder', {
-              rebounderId,
-              reboundType,
-              shooterId,
-              ballSpot,
-              shotInProgress: scene._shotInProgress,
-              sceneRebounderId: scene.rebounderId,
-              currentBallOwner: scene.currentBallOwnerRef?.value?.playerId || null,
-              note: 'Setting scene.rebounderId allows attachment - this might attach ball if not in flight'
-            });
-            
-            // Store the current ball owner before attachment attempt
-            const previousBallOwner = scene.currentBallOwnerRef?.value?.playerId || null;
-            
             attachBallToPlayer(scene, ballSprite, rebounderSprite, {
               debugInfo: { shooterId, reboundSpot: ballSpot, reboundType }
-            });
-            
-            // Check if attachment actually succeeded
-            const newBallOwner = scene.currentBallOwnerRef?.value?.playerId || null;
-            const attachmentSucceeded = newBallOwner === rebounderId;
-            
-            console.log('🔍 [REBOUND DEBUG] animateRebound: Ball attachment result', {
-              rebounderId,
-              reboundType,
-              attachmentSucceeded,
-              previousBallOwner,
-              newBallOwner,
-              shotInProgress: scene._shotInProgress,
-              sceneRebounderId: scene.rebounderId,
-              note: attachmentSucceeded 
-                ? 'Ball successfully attached to rebounder' 
-                : 'Ball attachment FAILED (ball in flight or blocked)'
             });
             
             const newOffenseId = rebounderSprite.team_id;
@@ -1044,10 +936,6 @@ export function animateRebound({
                 });
               }
             }
-            console.log('🔍 [REBOUND DEBUG] animateRebound: Clearing scene.rebounderId after attachment', {
-              rebounderId,
-              previousRebounderId: scene.rebounderId
-            });
             scene.rebounderId = null;
             resolve();
           },
@@ -1083,15 +971,6 @@ export function animateRebound({
     }
   }
   
-  if (offenseGetBackList.length > 0) {
-    console.log('🔍 [GET BACK DEBUG] animateRebound: Excluding get-back players from rebound animation', {
-      getBackPlayerIds: offenseGetBackList,
-      getBackCount: offenseGetBackList.length,
-      rebounderId,
-      reboundType,
-      note: 'These players already animated back during shot - they should NOT animate toward rebound spot'
-    });
-  }
 
   // console.log('REBOUND ANIMATION DEBUG:', {
   //   shooterId,
@@ -1109,11 +988,6 @@ export function animateRebound({
     
     // Exclude get-back players - they already moved back during the shot attempt
     if (offenseGetBackList.includes(sprite.playerId)) {
-      console.log(`🔍 [GET BACK DEBUG] animateRebound: Skipping get-back player`, {
-        playerId: sprite.playerId,
-        currentPosition: { x: sprite.x, y: sprite.y },
-        note: 'Already animated back during shot - excluding from rebound animation'
-      });
       continue;
     }
 
@@ -1129,15 +1003,6 @@ export function animateRebound({
       : currentGridX <= 25;
 
     if (!meetsProximityCriteria) {
-      console.log(`🔍 [GET BACK DEBUG] animateRebound: Skipping player - doesn't meet proximity criteria`, {
-        playerId: sprite.playerId,
-        currentGridX,
-        currentGridY,
-        isHomeTeamShot,
-        threshold: isHomeTeamShot ? '>=74' : '<=25',
-        meetsProximityCriteria: false,
-        note: 'This player will animate later in DREB setup - might cause isolated animation step'
-      });
       continue;
     }
 
