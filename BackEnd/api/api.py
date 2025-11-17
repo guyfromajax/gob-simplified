@@ -454,16 +454,37 @@ def get_game_state(game_id: str):
         if games_collection is not None:
             saved = games_collection.find_one({"_id": game_id})
             if saved:
-                # Extract player energy from saved game doc
+                # Extract player data from saved game doc
                 players = saved.get("players", [])
-                # Map to include NG if available
+                # Map to include stats, attributes (EM, MO, NG), and energy
                 players_with_energy = []
                 for p in players:
+                    # Stats can be nested under "stats" or "stats.game"
+                    stats = p.get("stats", {})
+                    if isinstance(stats, dict) and "game" in stats:
+                        stats = stats["game"]
+                    
+                    # Attributes can be nested under "attributes" or at top level
+                    attributes = p.get("attributes", {})
+                    if not attributes:
+                        # Fallback to top-level attributes
+                        attributes = {
+                            "EM": p.get("EM", 50),
+                            "MO": p.get("MO", 0),
+                            "NG": p.get("NG", 1.0)
+                        }
+                    
                     player_data = {
                         "_id": p.get("playerId") or p.get("player_id"),
                         "name": p.get("name"),
-                        "NG": p.get("NG", 1.0),  # May be saved in game doc
-                        "team": p.get("team")
+                        "NG": attributes.get("NG", p.get("NG", 1.0)),
+                        "team": p.get("team"),
+                        "stats": stats,
+                        "attributes": {
+                            "EM": attributes.get("EM", 50),
+                            "MO": attributes.get("MO", 0),
+                            "NG": attributes.get("NG", p.get("NG", 1.0))
+                        }
                     }
                     players_with_energy.append(player_data)
                 
