@@ -175,16 +175,26 @@ def simulate_quarter(
         gm.game_id = game_id
 
     # Apply lineups if provided or build them if not already set
+    import logging
+    logging.info(f"🏀 simulate_quarter: home_lineup_ids={home_lineup_ids}, away_lineup_ids={away_lineup_ids}, current_home_lineup_keys={list(gm.home_team.lineup.keys()) if gm.home_team.lineup else 'EMPTY'}, current_away_lineup_keys={list(gm.away_team.lineup.keys()) if gm.away_team.lineup else 'EMPTY'}")
+    
     if home_lineup_ids:
         gm.home_team.lineup = assign_lineup_from_ids(gm.home_team, home_lineup_ids)
+        logging.info(f"✅ simulate_quarter: Set home lineup from home_lineup_ids: {list(gm.home_team.lineup.keys())}")
     elif not gm.home_team.lineup:
         # Reuse existing player objects so per-game stats persist mid-game.
         gm.home_team.lineup = build_lineup_from_mongo(gm.home_team)
+        logging.info(f"✅ simulate_quarter: Built home lineup from MongoDB: {list(gm.home_team.lineup.keys())}")
 
     if away_lineup_ids:
         gm.away_team.lineup = assign_lineup_from_ids(gm.away_team, away_lineup_ids)
+        logging.info(f"✅ simulate_quarter: Set away lineup from away_lineup_ids: {list(gm.away_team.lineup.keys())}")
     elif not gm.away_team.lineup:
         gm.away_team.lineup = build_lineup_from_mongo(gm.away_team)
+        logging.info(f"✅ simulate_quarter: Built away lineup from MongoDB: {list(gm.away_team.lineup.keys())}")
+    
+    # Final check - log final lineup state
+    logging.info(f"🏀 simulate_quarter: FINAL home_lineup_keys={list(gm.home_team.lineup.keys()) if gm.home_team.lineup else 'EMPTY'}, away_lineup_keys={list(gm.away_team.lineup.keys()) if gm.away_team.lineup else 'EMPTY'}")
 
     # Validate that both lineups contain all required positions
     _ensure_complete_lineup(gm.home_team)

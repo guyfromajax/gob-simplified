@@ -1041,6 +1041,9 @@ def simulate_turn_endpoint(request: TurnSimulationRequest):
             detail=f"Game {game_id} not found. Start a quarter first with /api/simulate-quarter"
         )
     
+    # Log lineup state when simulate-turn is called
+    logging.info(f"🏀 simulate-turn: Retrieved game from ongoing_games, home_lineup_keys={list(gm.home_team.lineup.keys()) if gm.home_team.lineup else 'EMPTY'}, away_lineup_keys={list(gm.away_team.lineup.keys()) if gm.away_team.lineup else 'EMPTY'}")
+    
     # Apply user overrides for THIS turn only
     if request.offense_override:
         gm.game_state["user_offense_override"] = request.offense_override
