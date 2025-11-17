@@ -1107,13 +1107,19 @@ export function createGameScene(Phaser) {
               const activeTweens = this.tweens.getAll ? this.tweens.getAll() : [];
               if (DEBUG_FLOW) console.log('⏸️ Game paused', {
                 activeTweensCount: activeTweens.length,
-                tweenManagerPaused: typeof this.tweens.isPaused === 'function' ? this.tweens.isPaused() : 'N/A'
+                tweenManagerPaused: typeof this.tweens.isPaused === 'function' ? this.tweens.isPaused() : 'N/A',
+                tweenManagerTimeScale: this.tweens.timeScale
               });
             }
             pauseBtn.textContent = 'Resume';
           } else {
             // Resume all tweens
             if (this.tweens) {
+              // Ensure timeScale is set to 1 (normal speed) - it might have been set to 0
+              if (typeof this.tweens.timeScale !== 'undefined') {
+                this.tweens.timeScale = 1;
+              }
+              
               // Resume all existing tweens
               this.tweens.resumeAll();
               
@@ -1134,14 +1140,18 @@ export function createGameScene(Phaser) {
                       tween.resume();
                     }
                   }
+                  // Ensure tween's timeScale is set to 1 (normal speed)
+                  if (typeof tween.timeScale !== 'undefined') {
+                    tween.timeScale = 1;
+                  }
                 }
               });
               
               if (DEBUG_FLOW) console.log('▶️ Game resumed', {
                 activeTweensCount: activeTweens.length,
                 tweenManagerPaused: typeof this.tweens.isPaused === 'function' ? this.tweens.isPaused() : 'N/A',
-                resumedTweens: activeTweens.length,
-                scenePaused: this.scene?.isPaused ? this.scene.isPaused() : false
+                tweenManagerTimeScale: this.tweens.timeScale,
+                resumedTweens: activeTweens.length
               });
             }
             
