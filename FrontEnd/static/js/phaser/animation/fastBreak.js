@@ -359,6 +359,30 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
     const { bounceFromRim, animateRebound } = await import('./ballManager.js');
     const miss = await bounceFromRim(scene, ballSprite, basket, isHomeOffense, 300);
     
+    // Find the original MISS turn that led to this Fast Break
+    // The current turnData is the FAST_BREAK turn, but we need the original MISS turn
+    // to get the offense_getback list
+    let missTurn = null;
+    const currentIndex = scene.currentTurn || 0;
+    const previousTurn = scene.simData?.turns?.[currentIndex - 1];
+    const currentTurn = scene.simData?.turns?.[currentIndex];
+    
+    // Check previous turn first (the MISS that led to this Fast Break)
+    if (previousTurn?.result_type === "MISS") {
+      missTurn = previousTurn;
+    } else if (currentTurn?.result_type === "MISS") {
+      missTurn = currentTurn;
+    }
+    
+    console.log('🔍 [GET BACK DEBUG] Fast Break MISS - finding original MISS turn', {
+      currentTurnIndex: currentIndex,
+      currentTurnResultType: currentTurn?.result_type,
+      previousTurnResultType: previousTurn?.result_type,
+      foundMissTurn: !!missTurn,
+      missTurnHasGetBack: !!missTurn?.offense_getback,
+      note: 'Need original MISS turn to get offense_getback list for DREB setup'
+    });
+    
     await animateRebound({
       scene,
       ballSprite,
@@ -366,7 +390,8 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
       animations: [],
       rebounderId: turnData.rebounderId || turnData.rebounder_player_id,
       ballSpot: miss.grid,
-      shooterId
+      shooterId,
+      turnData: missTurn // Pass the original MISS turn so get-back players can be excluded
     });
     
     // Defensive rebound setup if needed
@@ -377,7 +402,8 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
         ballSprite,
         playerSprites,
         rebounderId: turnData.rebounderId || turnData.rebounder_player_id,
-        nextPlayType: "HCO"
+        nextPlayType: turnData.next_play_type || "HCO", // Use turnData.next_play_type instead of hardcoded "HCO"
+        turnData: missTurn // Pass the original MISS turn so we can get offense_getback list
       });
     }
   }
