@@ -799,13 +799,32 @@ export async function animateGameTurns({ //hasBallAtStep
       continue;
     }
 
-    // Opening tip at start of Q1 and OT
+    // Opening tip at start of Q1 and OT ONLY
+    // Guard against opening tip appearing mid-game (should only happen at Q1 or OT start)
     if (turn.result_type === "OPENING_TIP") {
+      const turnQuarter = turn.quarter ?? scene.quarter ?? 1;
+      const isQ1Start = turnQuarter === 1 && i === 0;
+      const isOTStart = turnQuarter > 4 && i === 0;
+      
+      if (!isQ1Start && !isOTStart) {
+        console.error('⚠️ OPENING_TIP detected mid-game! This should not happen.', {
+          turnIndex: i,
+          quarter: turnQuarter,
+          sceneQuarter: scene.quarter,
+          turn: turn
+        });
+        // Skip opening tip if it's not at the start of Q1 or OT
+        continue;
+      }
+      
       animationDebugLog('OPENING TIP DETECTED - routing to runOpeningTipSequence:', {
         result_type: turn.result_type,
         winner: turn.winner,
         home_wins: turn.home_wins,
-        turn_index: i
+        turn_index: i,
+        quarter: turnQuarter,
+        isQ1Start,
+        isOTStart
       });
       await new Promise(resolve => {
         runOpeningTipSequence(scene, {
