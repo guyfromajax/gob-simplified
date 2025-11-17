@@ -94,6 +94,19 @@ async function loadRoster() {
           const gamePlayers = gameData.players || [];
           
           console.log(`Found ${gamePlayers.length} players with energy data from game`);
+          
+          // Debug: Log roster player names and IDs
+          console.log('[Lineup] Roster players:', roster.map(p => ({
+            name: p.name,
+            id: p._id || p.playerId || p.player_id
+          })));
+          
+          // Debug: Log game player names and IDs
+          console.log('[Lineup] Game players:', gamePlayers.map(gp => ({
+            name: gp.name,
+            id: gp._id || gp.playerId || gp.player_id,
+            hasStats: !!gp.stats
+          })));
         
         // Merge game data into roster (same approach as box-score.js)
         let updatedCount = 0;
@@ -139,7 +152,13 @@ async function loadRoster() {
             
             updatedCount++;
           } else {
-            console.warn(`Could not find roster player for game player: ${gp.name || 'Unknown'} (ID: ${playerId})`);
+            // Debug: Show what we tried to match
+            const rosterNames = roster.map(p => p.name).join(', ');
+            console.warn(`Could not find roster player for game player: ${gp.name || 'Unknown'} (ID: ${playerId})`, {
+              triedName: gp.name,
+              rosterNames: rosterNames,
+              rosterCount: roster.length
+            });
           }
         });
         
