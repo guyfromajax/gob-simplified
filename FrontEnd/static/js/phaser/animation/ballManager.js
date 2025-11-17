@@ -849,6 +849,7 @@ export function animateRebound({
   shooterId,
   upcomingFastBreak,
   preserveBallPosition = false, // If true, don't move ball - it's already at correct position
+  turnData = null, // Turn data with offense_getback list to exclude get-back players
 }) {
   if (!scene || !ballSprite || !ballSpot) return Promise.resolve();
   if (scene?.stateMachine?.is(States.FreeThrow)) return Promise.resolve();
@@ -1059,6 +1060,37 @@ export function animateRebound({
   const shootingTeam = shooterSprite?.team; // "home" or "away"
   const isHomeTeamShot = shootingTeam === "home";
 
+  // Get offense_getback list to exclude get-back players from rebound animation
+  // These players already animated back during the shot attempt, so they shouldn't
+  // animate toward the rebound spot - they're already back on defense
+  let offenseGetBackList = [];
+  if (turnData?.offense_getback) {
+    offenseGetBackList = turnData.offense_getback;
+  } else {
+    // Try to find the MISS turn from scene.simData
+    const currentIndex = scene.currentTurn || 0;
+    const currentTurn = scene.simData?.turns?.[currentIndex];
+    const previousTurn = scene.simData?.turns?.[currentIndex - 1];
+    
+    // Check current turn first (if this turn is the rebound turn after a MISS)
+    if (currentTurn?.result_type === "MISS" && currentTurn?.offense_getback) {
+      offenseGetBackList = currentTurn.offense_getback;
+    } else if (previousTurn?.result_type === "MISS" && previousTurn?.offense_getback) {
+      // Otherwise, check previous turn
+      offenseGetBackList = previousTurn.offense_getback;
+    }
+  }
+  
+  if (offenseGetBackList.length > 0) {
+    console.log('🔍 [GET BACK DEBUG] animateRebound: Excluding get-back players from rebound animation', {
+      getBackPlayerIds: offenseGetBackList,
+      getBackCount: offenseGetBackList.length,
+      rebounderId,
+      reboundType,
+      note: 'These players already animated back during shot - they should NOT animate toward rebound spot'
+    });
+  }
+
   // console.log('REBOUND ANIMATION DEBUG:', {
   //   shooterId,
   //   shootingTeam,
@@ -1069,8 +1101,19 @@ export function animateRebound({
   // });
 
   // Animate other players attempting to rebound
+  // CRITICAL: Exclude get-back players - they already animated back during the shot
   for (const sprite of Object.values(playerSprites)) {
     if (!sprite || sprite.playerId === rebounderId) continue;
+    
+    // Exclude get-back players - they already moved back during the shot attempt
+    if (offenseGetBackList.includes(sprite.playerId)) {
+      console.log(`🔍 [GET BACK DEBUG] animateRebound: Skipping get-back player`, {
+        playerId: sprite.playerId,
+        currentPosition: { x: sprite.x, y: sprite.y },
+        note: 'Already animated back during shot - excluding from rebound animation'
+      });
+      continue;
+    }
 
     // Get current position in grid coordinates
     const currentGridX = (sprite.x / scene.game.config.width) * 100;

@@ -212,7 +212,8 @@ async function handleOrebTurn(scene, { playerSprites, ballSprite, turnData, onUp
         rebounderId: nextRebounderId, // This is the NEXT rebounder who will get the ball
         ballSpot: reboundBallSpot,
         shooterId: rebounderId, // This is the putback shooter
-        preserveBallPosition: true // Ball is already at bounce spot from shootBall - don't reposition
+        preserveBallPosition: true, // Ball is already at bounce spot from shootBall - don't reposition
+        turnData: turnData // Pass turnData so get-back players can be excluded
       });
       
       console.log('🔍 [PUTBACK DEBUG] animateRebound completed', {
