@@ -393,6 +393,16 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
   
   const getBackList = missTurn?.offense_getback || [];
   
+  console.log('🏀 [OUTLET STEP DEBUG] runDefensiveReboundSetup called', {
+    rebounderId,
+    nextPlayType,
+    nextPlayTypeType: typeof nextPlayType,
+    nextPlayTypeIsHCO: nextPlayType === "HCO",
+    missTurnResultType: missTurn?.result_type,
+    getBackListCount: getBackList.length,
+    getBackList
+  });
+  
   animationDebugLog('runDefensiveReboundSetup called with:', { rebounderId, nextPlayType });
   if (!scene || !playerSprites || rebounderId == null) return;
 
@@ -676,6 +686,13 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
     });
     animationDebugLog(`Total players moved for HCO: ${playersMoved}`);
   } else {
+    console.warn('🏀 [OUTLET STEP DEBUG] Outlet step animation SKIPPED - not HCO scenario', {
+      nextPlayType,
+      nextPlayTypeType: typeof nextPlayType,
+      nextPlayTypeIsHCO: nextPlayType === "HCO",
+      rebounderId,
+      note: 'This is why no players animated during outlet step!'
+    });
     animationDebugLog('Not HCO scenario, nextPlayType:', nextPlayType);
   }
 
