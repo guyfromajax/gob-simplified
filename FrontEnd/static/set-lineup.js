@@ -25,7 +25,9 @@ let gameId = urlParams.get('game_id') ||
   (typeof localStorage !== 'undefined' ? localStorage.getItem('game_id') : null);
 const storedHome = typeof localStorage !== 'undefined' ? localStorage.getItem('game_home') : null;
 const storedAway = typeof localStorage !== 'undefined' ? localStorage.getItem('game_away') : null;
-const isNewMatchup = !urlParams.get('game_id') || storedHome !== homeTeam || storedAway !== awayTeam;
+// Only clear gameId if it's truly a new matchup (teams changed) AND we don't have a game_id in URL
+// If we have game_id in URL, keep it (user is navigating back during active game)
+const isNewMatchup = !urlParams.get('game_id') && (storedHome !== homeTeam || storedAway !== awayTeam);
 if (isNewMatchup) {
   gameId = null;
   if (typeof localStorage !== 'undefined') {
@@ -46,6 +48,21 @@ if (isNewMatchup) {
   const qs = clean.toString();
   history.replaceState(null, '', `${window.location.pathname}${qs ? `?${qs}` : ''}`);
 }
+
+// Re-check localStorage for gameId if we still don't have one (user navigating back during active game)
+if (!gameId && typeof localStorage !== 'undefined') {
+  gameId = localStorage.getItem('game_id');
+}
+
+console.log('[Lineup] gameId check:', {
+  fromUrl: urlParams.get('game_id'),
+  fromLocalStorage: typeof localStorage !== 'undefined' ? localStorage.getItem('game_id') : null,
+  finalGameId: gameId,
+  quarter: quarter,
+  homeTeam: homeTeam,
+  awayTeam: awayTeam
+});
+
 const periodLabel = urlParams.get('period') || `Q${quarter}`;
 let teamName = '';
 
