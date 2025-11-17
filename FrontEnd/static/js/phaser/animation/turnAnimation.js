@@ -1283,8 +1283,30 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
     }
 
     if (step0OwnerSprite) {
+      const step0OwnerId = step0OwnerSprite.playerId;
+      const isPutbackTurn = turnData.result_type === "PUTBACK_MAKE" || turnData.result_type === "PUTBACK_MISS";
+      
+      if (isPutbackTurn) {
+        console.log('🔍 [PUTBACK DEBUG] playTurnAnimation: Step 0 ball attachment attempt for putback turn', {
+          step0OwnerId,
+          result_type: turnData.result_type,
+          turnDataRebounderId: turnData.rebounderId,
+          shotInProgress: scene._shotInProgress,
+          sceneRebounderId: scene.rebounderId,
+          note: 'This should be blocked if putback is in progress'
+        });
+      }
+      
       attachBallToPlayer(scene, ballSprite, step0OwnerSprite);
       currentBallOwnerRef.value = step0OwnerSprite;
+      
+      if (isPutbackTurn) {
+        console.log('🔍 [PUTBACK DEBUG] playTurnAnimation: Step 0 ball attachment completed (or blocked)', {
+          step0OwnerId,
+          currentBallOwner: scene.currentBallOwnerRef?.value?.playerId || null,
+          shotInProgress: scene._shotInProgress
+        });
+      }
     }
   }
 
