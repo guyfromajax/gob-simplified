@@ -629,6 +629,31 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                         # Only update quarter - game_state is already initialized by GameManager.__init__
                         gm.quarter = saved.get("quarter", 1)
                         
+                        # CRITICAL: Build lineups BEFORE restoring player stats
+                        # Player stat restoration (below) looks up players in team.lineup, so lineups must exist
+                        # If request has lineups, use them; otherwise build from MongoDB
+                        if request.home_lineup:
+                            from BackEnd.utils.db_utils import assign_lineup_from_ids
+                            gm.home_team.lineup = assign_lineup_from_ids(gm.home_team, request.home_lineup)
+                            logging.info(f"✅ Loaded from DB: Set home lineup from request: {list(gm.home_team.lineup.keys())}")
+                        elif not gm.home_team.lineup:
+                            from BackEnd.utils.db_utils import build_lineup_from_mongo
+                            gm.home_team.lineup = build_lineup_from_mongo(gm.home_team)
+                            logging.info(f"✅ Loaded from DB: Built home lineup from MongoDB: {list(gm.home_team.lineup.keys())}")
+                        
+                        if request.away_lineup:
+                            from BackEnd.utils.db_utils import assign_lineup_from_ids
+                            gm.away_team.lineup = assign_lineup_from_ids(gm.away_team, request.away_lineup)
+                            logging.info(f"✅ Loaded from DB: Set away lineup from request: {list(gm.away_team.lineup.keys())}")
+                        elif not gm.away_team.lineup:
+                            from BackEnd.utils.db_utils import build_lineup_from_mongo
+                            gm.away_team.lineup = build_lineup_from_mongo(gm.away_team)
+                            logging.info(f"✅ Loaded from DB: Built away lineup from MongoDB: {list(gm.away_team.lineup.keys())}")
+                        
+                        # Validate lineups are set
+                        if not gm.home_team.lineup or not gm.away_team.lineup:
+                            logging.error(f"❌ Loaded from DB: Lineups still empty after building. home_keys={list(gm.home_team.lineup.keys()) if gm.home_team.lineup else 'EMPTY'}, away_keys={list(gm.away_team.lineup.keys()) if gm.away_team.lineup else 'EMPTY'}")
+                        
                         # Note: game_state is NOT persisted to database (it's in-memory only)
                         # So we can't restore offensive_state, free_throws, etc. from saved document
                         # But we also shouldn't reset them - they're set during turn simulation
