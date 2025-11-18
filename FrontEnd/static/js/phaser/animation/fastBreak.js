@@ -39,33 +39,37 @@ export async function runFastBreakSequence({
     scene.__activeTimeline = null;
   }
   
-  // Transition to FastBreakOutlet or FastBreak state
-  if (turnData.roles?.outlet_passer) {
-    safeTransition(scene.stateMachine, States.FastBreakOutlet);
-  } else {
+  const currentState = scene.stateMachine?.state;
+  
+  // ✅ Check current state before transitioning - avoid invalid transitions
+  // For defensive stops after HCO, we're already in HalfCourt, so transition to FastBreak directly
+  // For Fast Break from DREB, we should be in Rebound/OutletSetup, so can transition to FastBreakOutlet
+  if (turnData.roles?.outlet_passer && currentState !== States.FastBreak && currentState !== States.FastBreakOutlet) {
+    // Only transition to FastBreakOutlet if we have outlet pass and we're not already in Fast Break state
+    // Check if we can transition (must be coming from Rebound or OutletSetup)
+    if (currentState === States.Rebound || currentState === States.OutletSetup) {
+      safeTransition(scene.stateMachine, States.FastBreakOutlet);
+    } else {
+      // Coming from HalfCourt (defensive stop scenario) - go directly to FastBreak
+      safeTransition(scene.stateMachine, States.FastBreak);
+    }
+  } else if (currentState !== States.FastBreak && currentState !== States.FastBreakOutlet) {
+    // No outlet pass or already in Fast Break state - just ensure we're in FastBreak
     safeTransition(scene.stateMachine, States.FastBreak);
   }
+  
   scene.events?.emit("fb:start");
   
   // ============================================================================
   // PHASE 1: OUTLET PASS (if applicable)
   // ============================================================================
-  console.log("🏀 Fast Break - Checking outlet pass roles:", {
-    outlet_passer: turnData.roles?.outlet_passer,
-    outlet_receiver: turnData.roles?.outlet_receiver,
-    hasOutletPasser: !!turnData.roles?.outlet_passer,
-    hasOutletReceiver: !!turnData.roles?.outlet_receiver,
-    allRoles: turnData.roles ? Object.keys(turnData.roles) : "NO ROLES"
-  });
-  
   if (turnData.roles?.outlet_passer && turnData.roles?.outlet_receiver) {
-    console.log("✅ Fast Break - Outlet pass WILL execute");
     await animateOutletPhase(scene, turnData, playerSprites, ballSprite, width, height);
     
-    // Transition to FastBreak state after outlet
-    safeTransition(scene.stateMachine, States.FastBreak);
-  } else {
-    console.warn("❌ Fast Break - Outlet pass SKIPPED (missing outlet_passer or outlet_receiver)");
+    // Transition to FastBreak state after outlet (only if not already there)
+    if (scene.stateMachine?.state !== States.FastBreak) {
+      safeTransition(scene.stateMachine, States.FastBreak);
+    }
   }
   
   if (scene.skipToEnd) return;
@@ -74,15 +78,12 @@ export async function runFastBreakSequence({
   // PHASE 2: FAST BREAK RESOLUTION
   // ============================================================================
   const result = turnData.result_type;
-  const holdUp = turnData.hold_up;
   
-  console.log("🏀 Fast Break - Phase 2 Resolution:", {
+  console.log("🏀 Fast Break - Phase 2:", {
     result_type: result,
-    hold_up: holdUp,
-    hasRoles: !!turnData.roles,
-    ball_handler: turnData.roles?.ball_handler,
-    ball_handler_id: turnData.roles?.ball_handler?.player_id,
-    allRoleKeys: turnData.roles ? Object.keys(turnData.roles) : "NO ROLES"
+    current_state: scene.stateMachine?.state,
+    next_play_type: turnData.next_play_type,
+    has_animations: !!turnData.animations?.length
   });
   
   if (result === "MAKE" || result === "MISS") {
@@ -90,7 +91,6 @@ export async function runFastBreakSequence({
     await animateFastBreakShot(scene, turnData, playerSprites, ballSprite, width, height);
   } else {
     // Defensive stop, foul, turnover, or steal - all use same defensive stop positioning
-    console.log("🏀 Fast Break - Routing to animateDefensiveStop");
     await animateDefensiveStop(scene, turnData, playerSprites, ballSprite, width, height);
   }
   
@@ -417,9 +417,6 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
     const newOffenseSide = isHomeOffense ? "away" : "home";
     const skipRetreat = turnData.next_defensive_setup === "FCP" || turnData.next_defensive_setup === "HCT";
     const pressureType = skipRetreat ? turnData.next_defensive_setup : null;
-    if (skipRetreat) {
-      console.log(`${turnData.next_defensive_setup} detected after fast break - skipping defensive retreat`);
-    }
     await runInboundSetup({ 
       scene, 
       ballSprite, 
@@ -453,14 +450,6 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
       missTurn = currentTurn;
     }
     
-    console.log('🔍 [GET BACK DEBUG] Fast Break MISS - finding original MISS turn', {
-      currentTurnIndex: currentIndex,
-      currentTurnResultType: currentTurn?.result_type,
-      previousTurnResultType: previousTurn?.result_type,
-      foundMissTurn: !!missTurn,
-      missTurnHasGetBack: !!missTurn?.offense_getback,
-      note: 'Need original MISS turn to get offense_getback list for DREB setup'
-    });
     
     await animateRebound({
       scene,
@@ -496,14 +485,12 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
  * - All other players scatter to half court
  */
 async function animateDefensiveStop(scene, turnData, playerSprites, ballSprite, width, height) {
-  console.log("🛑 animateDefensiveStop - START", {
-    hasRoles: !!turnData.roles,
-    ballHandlerData: turnData.roles?.ball_handler,
-    ballHandlerDataType: typeof turnData.roles?.ball_handler,
-    stopper_id: turnData.stopper_id,
-    hold_up: turnData.hold_up,
-    hasAnimations: !!turnData.animations,
-    animationCount: turnData.animations?.length || 0
+  console.log("🛑 Fast Break Defensive Stop:", {
+    current_state: scene.stateMachine?.state,
+    next_play_type: turnData.next_play_type,
+    has_animations: !!turnData.animations?.length,
+    animation_count: turnData.animations?.length || 0,
+    stopper_id: turnData.stopper_id
   });
   
   // ✅ Use backend animation end coords for positioning (matches other transitions like DREB -> HCO)
@@ -604,13 +591,7 @@ async function animateDefensiveStop(scene, turnData, playerSprites, ballSprite, 
     );
   }
   
-  console.log("🛑 animateDefensiveStop - Waiting for all animations to complete", {
-    numPromises: promises.length
-  });
-  
   await Promise.all(promises);
-  
-  console.log("✅ animateDefensiveStop - All animations completed");
   
   // ✅ Show "Great Stop!" announcement with stopper headshot (for Fast Break defensive stops)
   if (turnData.fast_break === true && turnData.stopper_id) {
@@ -654,18 +635,25 @@ async function animateDefensiveStop(scene, turnData, playerSprites, ballSprite, 
     }
   }
   
-  // Transition to HalfCourt for next possession
-  console.log("🛑 animateDefensiveStop - Transitioning to HalfCourt state");
-  safeTransition(scene.stateMachine, States.HalfCourt);
+  // Transition to HalfCourt for next possession (only if not already there)
+  const currentState = scene.stateMachine?.state;
+  if (currentState !== States.HalfCourt) {
+    safeTransition(scene.stateMachine, States.HalfCourt);
+  }
   
   // ✅ Ensure HCO setup is triggered after defensive stop transitions to HCO
   // This ensures players are properly positioned for the next HCO turn
-  if (turnData.next_play_type === "HCO" && typeof scene.startNextHalfCourtOffense === "function") {
-    console.log("🛑 animateDefensiveStop - Triggering HCO setup for next turn");
-    scene.startNextHalfCourtOffense();
+  if (turnData.next_play_type === "HCO") {
+    console.log("🛑 Fast Break Defensive Stop -> HCO transition:", {
+      next_play_type: turnData.next_play_type,
+      has_startNextHalfCourtOffense: typeof scene.startNextHalfCourtOffense === "function",
+      current_state: scene.stateMachine?.state
+    });
+    
+    if (typeof scene.startNextHalfCourtOffense === "function") {
+      scene.startNextHalfCourtOffense();
+    }
   }
-  
-  console.log("✅ animateDefensiveStop - COMPLETE");
 }
 
 /**

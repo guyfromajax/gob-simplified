@@ -885,19 +885,9 @@ export async function animateGameTurns({ //hasBallAtStep
       continue;
     }
     
-    // Debug: Check if this should be a fast break but isn't being detected
+    // Fast break shots now use the new system (same as HCO shots)
     if (turn.result_type === "MAKE" || turn.result_type === "MISS") {
-      animationDebugLog('SHOT TURN - checking for fast break indicators:', {
-        result_type: turn.result_type,
-        fast_break: turn.fast_break,
-        turn_index: i,
-        all_turn_keys: Object.keys(turn),
-        full_turn_data: turn
-      });
-      
-      // Fast break shots now use the new system (same as HCO shots)
       if (turn.fast_break === true) {
-        animationDebugLog('FAST BREAK TURN DETECTED - routing to runFastBreakSequence');
         
         // Update active player display for fast break
         const { getBallHandlerIdFromTurn, getDefenderIdFromTurn, updateActivePlayers } = await import('../utils/activePlayerDisplay.js');
@@ -920,7 +910,6 @@ export async function animateGameTurns({ //hasBallAtStep
         // Set flag if this was a shot turn (MAKE or MISS) so the next turn knows to skip step 0 ball attachment
         if (turn.result_type === "MAKE" || turn.result_type === "MISS") {
           scene._previousTurnWasShot = true;
-          console.log('🏀 animateGameTurns: Set _previousTurnWasShot flag after fast break', turn.result_type);
         }
         
         continue;
@@ -949,6 +938,26 @@ export async function animateGameTurns({ //hasBallAtStep
       }));
 
     if (!handledByRunner) {
+      // ✅ Debug log for HCO turns after Fast Break defensive stop
+      const previousTurn = i > 0 ? turns[i - 1] : null;
+      const wasDefensiveStop = previousTurn?.result_type === "DEFENSIVE_STOP" && previousTurn?.fast_break === true;
+      const isHCO = !turn.fast_break && (turn.result_type === "MAKE" || turn.result_type === "MISS") && 
+                    (turn.next_play_type === "HCO" || turn.offensive_state === "HCO");
+      
+      if (wasDefensiveStop && isHCO) {
+        console.log("🏀 HCO Turn After Defensive Stop:", {
+          turn_index: i,
+          previous_turn_result: previousTurn?.result_type,
+          previous_turn_fast_break: previousTurn?.fast_break,
+          current_turn_result: turn.result_type,
+          current_turn_next_play_type: turn.next_play_type,
+          current_turn_offensive_state: turn.offensive_state,
+          current_state: scene.stateMachine?.state,
+          has_animations: !!turn.animations?.length,
+          animation_count: turn.animations?.length || 0
+        });
+      }
+      
       await playTurnAnimation({
         scene,
         simData,
@@ -1035,7 +1044,6 @@ export async function animateGameTurns({ //hasBallAtStep
       // Set flag if this was a shot turn (MAKE or MISS) so the next turn knows to skip step 0 ball attachment
       if (turn.result_type === "MAKE" || turn.result_type === "MISS") {
         scene._previousTurnWasShot = true;
-        console.log('🏀 animateGameTurns: Set _previousTurnWasShot flag after', turn.result_type);
       }
     }
 
