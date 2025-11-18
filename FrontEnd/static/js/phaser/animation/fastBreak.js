@@ -635,10 +635,27 @@ async function animateDefensiveStop(scene, turnData, playerSprites, ballSprite, 
     }
   }
   
-  // Transition to HalfCourt for next possession (only if not already there)
+  // Transition to HalfCourt for next possession
+  // This is critical - if we don't transition, playTurnAnimation will return early
+  // because it checks if state is FastBreak and skips animation
   const currentState = scene.stateMachine?.state;
   if (currentState !== States.HalfCourt) {
+    console.log("🛑 Fast Break Defensive Stop - Transitioning state:", {
+      from_state: currentState,
+      to_state: States.HalfCourt,
+      transition_allowed: scene.stateMachine?.canTransition?.(States.HalfCourt)
+    });
     safeTransition(scene.stateMachine, States.HalfCourt);
+    
+    // Verify transition succeeded
+    const newState = scene.stateMachine?.state;
+    if (newState !== States.HalfCourt) {
+      console.error("❌ Fast Break Defensive Stop - State transition FAILED:", {
+        expected: States.HalfCourt,
+        actual: newState,
+        current_state: currentState
+      });
+    }
   }
   
   // ✅ Ensure HCO setup is triggered after defensive stop transitions to HCO

@@ -1322,8 +1322,27 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
     ...turnData.animations.map(anim => anim.movement.length)
   );
 
-  if (scene.stateMachine?.is(States.FastBreak)) {
+  // ✅ Allow HCO turns even if state is FastBreak (can happen after defensive stop transition fails)
+  // Check if this is an HCO turn (not fast_break and has animations) - if so, allow it
+  const isHCOAfterFastBreak = !turnData.fast_break && 
+                               (turnData.result_type === "MAKE" || turnData.result_type === "MISS") &&
+                               turnData.animations?.length > 0 &&
+                               scene.stateMachine?.is(States.FastBreak);
+  
+  if (scene.stateMachine?.is(States.FastBreak) && !isHCOAfterFastBreak) {
+    console.log("⚠️ playTurnAnimation: Skipping - state is FastBreak and turn is not HCO", {
+      result_type: turnData.result_type,
+      fast_break: turnData.fast_break,
+      has_animations: !!turnData.animations?.length
+    });
     return;
+  }
+  
+  // If we're allowing HCO after FastBreak, force transition to HalfCourt
+  if (isHCOAfterFastBreak) {
+    console.log("🔄 playTurnAnimation: Forcing transition from FastBreak to HalfCourt for HCO turn");
+    const { safeTransition, States: StateMachineStates } = await import('../state/gameStateMachine.js');
+    safeTransition(scene.stateMachine, StateMachineStates.HalfCourt);
   }
 
   if (ballSprite && scene?.tweens) {

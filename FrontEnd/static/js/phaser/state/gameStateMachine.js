@@ -33,7 +33,7 @@ export const transitions = {
   ],
   [States.OutletSetup]: [States.HalfCourt],
   [States.FastBreakOutlet]: [States.FastBreak],
-  [States.FastBreak]: [States.ShotAttempt, States.Rebound, States.FreeThrow, States.Inbound, States.EndQuarter],
+  [States.FastBreak]: [States.ShotAttempt, States.Rebound, States.FreeThrow, States.Inbound, States.HalfCourt, States.EndQuarter],
   [States.Turnover]: [States.FastBreak, States.Inbound],
   [States.FreeThrow]: [States.Rebound, States.Inbound, States.EndQuarter],
   [States.EndQuarter]: [States.Inbound]
