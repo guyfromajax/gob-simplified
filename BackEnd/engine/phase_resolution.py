@@ -325,7 +325,17 @@ def resolve_fast_break_logic(game: "GameManager"):
         off_team.team_stats['two_defenders_back'] = off_team.team_stats.get('two_defenders_back', 0) + 1
     # ==================== END STAT TRACKING ====================
 
-    if d_count == 0:
+    # ✅ If outlet pass exists, ALWAYS shoot - outlet pass implies commitment to fast break attempt
+    # The outlet receiver has already moved toward the basket, so we must shoot
+    # Defensive stops can only happen before the outlet pass (no outlet_passer/receiver)
+    has_outlet_pass = fb_roles.get("outlet_passer") is not None and fb_roles.get("outlet_receiver") is not None
+    
+    if has_outlet_pass:
+        # Outlet pass exists - force shot attempt (can still miss or be contested)
+        event_type = "SHOT"
+        import logging
+        logging.info(f"🏀 Fast Break with outlet pass - forcing SHOT (outlet_passer={fb_roles.get('outlet_passer')}, outlet_receiver={fb_roles.get('outlet_receiver')})")
+    elif d_count == 0:
         # 0 defenders: Always shot (99% make chance)
         event_type = "SHOT"
     elif d_count == 1:
@@ -336,6 +346,7 @@ def resolve_fast_break_logic(game: "GameManager"):
         event_type = random.choices(["SHOT", "DEFENSIVE_STOP"], weights=[0.10, 0.90])[0]
 
     # If defensive stop triggered, defense stopped the fast break
+    # NOTE: This should NOT happen if has_outlet_pass is True (handled above)
     if event_type == "DEFENSIVE_STOP":
         def_scouting["defense"]["vs_Fast_Break"]["success"] += 1
         game.game_state["offensive_state"] = "HCO"
