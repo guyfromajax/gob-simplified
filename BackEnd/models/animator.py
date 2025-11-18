@@ -97,21 +97,18 @@ class Animator:
         if ball_handler:
             if hold_up:
                 # Stopped at top of key
-                # ✅ Use correct top key based on which team is on offense
-                # Home offense: HOME_TOP_KEY (x=64), Away offense: AWAY_TOP_KEY (x=36)
-                bh_end = AWAY_TOP_KEY if is_away_offense else HOME_TOP_KEY
+                # ✅ Always use HOME_TOP_KEY in home orientation - build_movement will flip it for away team
+                # get_away_player_coords flips x around center (x=50), so:
+                # HOME_TOP_KEY (x=64) -> flipped to x=36 (away orientation) when is_away_offense=True
+                bh_end = HOME_TOP_KEY.copy()
             else:
                 # Shot attempt - position 4-6 grid spots from rim
-                rim_x = AWAY_RIM_COORDS["x"] if is_away_offense else HOME_RIM_COORDS["x"]
+                # ✅ Always use HOME_RIM_COORDS in home orientation - build_movement will flip it for away team
+                rim_x = HOME_RIM_COORDS["x"]  # Always use home rim, get_away_player_coords will flip if needed
                 shot_distance = random.randint(4, 6)
                 
-                if is_away_offense:
-                    # Attacking left (away rim at x=10), so shooter at x=10+4 to x=10+6
-                    shooter_x = rim_x + shot_distance
-                else:
-                    # Attacking right (home rim at x=90), so shooter at x=90-4 to x=90-6
-                    shooter_x = rim_x - shot_distance
-                
+                # In home orientation: home rim at x=90, shooter at x=90-4 to x=90-6 (toward center)
+                shooter_x = rim_x - shot_distance
                 shooter_y = random.randint(20, 30)  # Random Y near center
                 bh_end = {"x": shooter_x, "y": shooter_y}
             
@@ -129,17 +126,15 @@ class Animator:
         if hold_up:
             # Stopping defender when break is stopped at top of key
             # ✅ Position stopper DIRECTLY in front of ball handler (between ball handler and basket they're defending)
-            # Home offense: stopper x = ball handler x + 2 (GREATER, toward basket)
-            # Away offense: stopper x = ball handler x - 2 (LESS, toward basket)
+            # Always use HOME_TOP_KEY in home orientation - build_movement will flip it for away team
+            # In home orientation: stopper x GREATER than ball handler (toward basket at x=90)
+            # After flipping for away team: stopper x LESS than ball handler (toward basket at x=10)
             if stopper:
-                # ✅ Use correct top key based on which team is on offense
-                top_key = AWAY_TOP_KEY if is_away_offense else HOME_TOP_KEY
-                # Home offense (attacking right): stopper x GREATER than ball handler
-                # Away offense (attacking left): stopper x LESS than ball handler
-                offset_x = 2 if not is_away_offense else -2
+                # In home orientation, stopper is 2 spots to the right (toward home basket)
+                # After get_away_player_coords flips: x=66 -> x=34, which is 2 spots LEFT of x=36 (away top key)
                 end = {
-                    "x": top_key["x"] + offset_x,
-                    "y": top_key["y"],  # Same Y as ball handler (directly in front)
+                    "x": HOME_TOP_KEY["x"] + 2,  # 2 spots toward home basket (x=64+2=66)
+                    "y": HOME_TOP_KEY["y"],  # Same Y as ball handler (directly in front)
                 }
                 build_movement(stopper, end, action=ACTIONS["GUARD_BALL"])
                 animated_player_ids.add(getattr(stopper, "player_id", None))
@@ -155,15 +150,10 @@ class Animator:
             shot_defender = fb_roles.get("defender")
             if shot_defender:
                 # Defender positioned 2 grid spots closer to basket than shooter
-                rim_x = AWAY_RIM_COORDS["x"] if is_away_offense else HOME_RIM_COORDS["x"]
-                
-                if is_away_offense:
-                    # Attacking left, defender is 2 spots closer (left) than shooter
-                    defender_x = bh_end["x"] - 2
-                else:
-                    # Attacking right, defender is 2 spots closer (right) than shooter
-                    defender_x = bh_end["x"] + 2
-                
+                # ✅ Always use home orientation - build_movement will flip it for away team
+                # In home orientation: defender 2 spots closer to home rim (to the right, x+2)
+                # After flipping for away team: defender 2 spots closer to away rim (to the left)
+                defender_x = bh_end["x"] + 2  # 2 spots toward home basket in home orientation
                 defender_end = {"x": defender_x, "y": bh_end["y"]}  # Same Y as shooter
                 build_movement(shot_defender, defender_end, action=ACTIONS["GUARD_BALL"])
                 animated_player_ids.add(getattr(shot_defender, "player_id", None))
