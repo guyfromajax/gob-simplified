@@ -394,6 +394,10 @@ def resolve_fast_break_logic(game: "GameManager"):
     )
     turn_result["roles"] = fb_roles
     turn_result["fast_break"] = True  # ✅ Add fast_break flag for frontend routing
+    
+    # Debug logging for outlet pass roles
+    import logging
+    logging.warning(f"🏀 Fast Break roles - outlet_passer={fb_roles.get('outlet_passer')}, outlet_receiver={fb_roles.get('outlet_receiver')}, rebounder={getattr(game_state.get('last_rebounder'), 'player_id', None) if game_state.get('last_rebounder') else None}, ball_handler={getattr(fb_roles.get('ball_handler'), 'player_id', None) if fb_roles.get('ball_handler') else None}")
     if hold_up:
         turn_result["hold_up"] = True
         turn_result["stopper_id"] = stopper_id
