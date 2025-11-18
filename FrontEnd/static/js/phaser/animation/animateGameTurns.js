@@ -691,7 +691,8 @@ export async function animateGameTurns({ //hasBallAtStep
         // Fast Break defensive stop - route to Fast Break animation sequence
         // This will animate outlet pass (if applicable) then defensive stop
         try {
-          const runFastBreakSequence = (await import('./fastBreak.js')).default || (await import('./fastBreak.js')).runFastBreakSequence;
+          // Import the named export directly (not the default wrapper)
+          const { runFastBreakSequence } = await import('./fastBreak.js');
           await runFastBreakSequence({ scene, turnData: turn, playerSprites, ballSprite, turnIndex: i });
         } catch (err) {
           console.warn('DEFENSIVE_STOP (Fast Break): animation failed, falling back to text only', err);

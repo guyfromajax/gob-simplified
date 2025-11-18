@@ -224,8 +224,10 @@ export function createGameScene(Phaser) {
       if (Object.keys(this.homeLineup).length) payload.home_lineup = this.homeLineup;
       if (Object.keys(this.awayLineup).length) payload.away_lineup = this.awayLineup;
       
-      // Add game plan settings for Q1
-      if (this.quarter === 1 && this.gamePlanSettings && this.userTeamSide) {
+      // ✅ CRITICAL FIX: Send game plan settings for ALL quarters (not just Q1)
+      // This ensures strategy_settings are available when resuming games from DB
+      // If DB has None/missing strategy_settings, backend can use request.strategy_settings as fallback
+      if (this.gamePlanSettings && this.userTeamSide) {
         payload.user_team_side = this.userTeamSide;
         payload.playcall_settings = this.gamePlanSettings.playcall_settings;
         payload.strategy_settings = this.gamePlanSettings.strategy_settings;
