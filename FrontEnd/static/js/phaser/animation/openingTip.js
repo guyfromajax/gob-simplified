@@ -7,7 +7,7 @@ import { tweenPlayerTo } from "./ballTween.js";
 import { appendToTextScroll } from "../utils/textScroll.js";
 import { gridToPixels } from "../utils/gridToPixels.js";
 
-const INITIAL_HOLD_DURATION = 4000; // Hold starting positions for 4 seconds
+const INITIAL_HOLD_DURATION = 2000; // Hold starting positions for 2 seconds (reduced from 4 seconds)
 const JUMP_DURATION = 1500; // Jump animation duration (up and down)
 const CONVERGE_DURATION = 1500; // Convergence duration
 const BALL_JUMP_HEIGHT = 5; // Ball jumps higher than players
