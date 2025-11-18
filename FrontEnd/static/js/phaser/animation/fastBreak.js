@@ -488,15 +488,18 @@ async function animateDefensiveStop(scene, turnData, playerSprites, ballSprite, 
     })
   );
   
-  // Move stopper (if exists) - same Y as ball handler, 3 X closer to basket
+  // Move stopper (if exists) - same Y as ball handler, 2 X closer to basket
+  // Defender should be between ball handler and the basket they're defending
+  // Home offense (attacks away basket x=9): defender x should be LESS than ball handler (x=36) → x=34
+  // Away offense (attacks home basket x=91): defender x should be LESS than ball handler (x=64) → x=62
   const stopperId = turnData.stopper_id;
   const stopperSprite = stopperId ? playerSprites[stopperId] : null;
   
   if (stopperSprite) {
     const stopperSpot = {
       x: isHomeOffense
-        ? topKey.x - 3  // 3 closer to basket
-        : topKey.x + 3,
+        ? topKey.x - 2  // Home offense: defender closer to away basket (x < ball handler)
+        : topKey.x - 2, // Away offense: defender closer to home basket (x < ball handler)
       y: topKey.y  // Same Y as ball handler
     };
     stopperSpot.x = Phaser.Math.Clamp(stopperSpot.x, 4, 97);
