@@ -516,9 +516,19 @@ class ShotManager:
                         next_play_type = "FAST_BREAK"
                         # Log fast break determination with release player info
                         release_player_ids = [def_team.lineup[pos].player_id for pos in defense_release_list]
-                        logging.info(f"🏀 FAST_BREAK determined during shot: defense_release_list={defense_release_list}, release_player_ids={release_player_ids}, shooter={get_name_safe(shooter)}")
+                        # ✅ Store release player in game_state for use in resolve_fast_break_logic
+                        # The outlet pass should go to the release player, not a randomly chosen ball handler
+                        release_pos = defense_release_list[0]  # Get first release position (usually only one)
+                        release_player = def_team.lineup.get(release_pos)
+                        if release_player:
+                            self.game_state["last_release_player"] = release_player
+                            logging.info(f"🏀 FAST_BREAK determined during shot: defense_release_list={defense_release_list}, release_player_ids={release_player_ids}, release_player_stored={getattr(release_player, 'player_id', None)}, shooter={get_name_safe(shooter)}")
+                        else:
+                            logging.warning(f"⚠️ FAST_BREAK determined but release_player not found at position {release_pos}")
                     else:
                         next_play_type = "HCO"
+                        # Clear release player if not doing fast break
+                        self.game_state["last_release_player"] = None
                         logging.info(f"🏀 HCO determined during shot: no defense_release_list, shooter={get_name_safe(shooter)}")
                     
                     self.game_state["offensive_state"] = next_play_type
