@@ -168,16 +168,6 @@ class ShotManager:
         )
 
         made = shot_score >= shot_threshold
-        
-        # ==================== DEBUG: FORCE MISS FOR ALL HCO SHOTS ====================
-        # TODO: REMOVE THIS AFTER DEBUGGING - Hard code all HCO shots to MISS
-        # Check if this is an HCO shot (not Fast Break, FCP, or HCT)
-        offensive_state = self.game_state.get("offensive_state", "")
-        is_hco_shot = offensive_state in ["HCO", ""]  # HCO or default state
-        if is_hco_shot:
-            made = False
-            print("🔧 DEBUG: FORCED MISS for HCO shot (debugging get-back animation issue)")
-        # ==================== END DEBUG FLAG ====================
 
         # Stat tracking (attempts)
         shooter.record_stat("FGA")
