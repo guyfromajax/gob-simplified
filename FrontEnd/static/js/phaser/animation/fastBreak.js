@@ -122,6 +122,21 @@ async function animateOutletPhase(scene, turnData, playerSprites, ballSprite, wi
   // Determine offense team and basket
   const isHomeOffense = receiverSprite.team === "home";
   const targetBasket = isHomeOffense ? HOME_RIM_COORDS : AWAY_RIM_COORDS;
+  const newOffenseTeam = isHomeOffense ? "home" : "away";
+  
+  // Find the original MISS turn to get offense_getback list
+  let missTurn = null;
+  const currentIndex = scene.currentTurn || 0;
+  const previousTurn = scene.simData?.turns?.[currentIndex - 1];
+  const currentTurn = scene.simData?.turns?.[currentIndex];
+  
+  if (previousTurn?.result_type === "MISS") {
+    missTurn = previousTurn;
+  } else if (currentTurn?.result_type === "MISS") {
+    missTurn = currentTurn;
+  }
+  
+  const getBackList = missTurn?.offense_getback || [];
   
   // Move outlet receiver to outlet spot (keep existing logic)
   const receiverCurrentGrid = {
@@ -155,9 +170,7 @@ async function animateOutletPhase(scene, turnData, playerSprites, ballSprite, wi
   
   // SIMULTANEOUSLY animate defenders chasing
   const defendersList = turnData.roles?.defense || [];
-  // console.log("🏀 FB Outlet - Defenders list:", defendersList);
   const defendersSet = new Set(defendersList.map(d => d.player_id || d));
-  // console.log("🏀 FB Outlet - Defenders Set:", Array.from(defendersSet));
   
   let defenderCount = 0;
   for (const [id, sprite] of Object.entries(playerSprites)) {
@@ -178,15 +191,60 @@ async function animateOutletPhase(scene, turnData, playerSprites, ballSprite, wi
         })
       );
     }
-    // All other players hold position (no animation)
   }
   
-  // console.log(`🏀 FB Outlet - Animating ${defenderCount} defenders with receiver. Total promises: ${promises.length}`);
+  // ✅ SIMULTANEOUSLY advance all other players (except get-back, outlet passer, and outlet receiver)
+  // This moves players up the court at the same time as the outlet pass
+  let playersAdvanced = 0;
+  for (const [id, sprite] of Object.entries(playerSprites)) {
+    const info = scene.playerInfo?.[id];
+    const isGetBackPlayer = getBackList.includes(id);
+    const isOutletPasser = id === passerId;
+    const isOutletReceiver = id === receiverId;
+    const isDefender = defendersSet.has(id);
+    
+    // Skip: get-back players, outlet passer/receiver, defenders (already handled above)
+    if (!info || isGetBackPlayer || isOutletPasser || isOutletReceiver || isDefender) {
+      continue;
+    }
+    
+    // Calculate movement toward new offense basket
+    const currentGridX = (sprite.x / width) * 100;
+    const currentGridY = 50 - (sprite.y / height) * 50;
+    
+    // Move 20-30 grid spots toward new offense basket
+    const distance = Phaser.Math.Between(20, 30);
+    const directionAdvance = newOffenseTeam === "home" ? 1 : -1;
+    
+    const targetGrid = {
+      x: Phaser.Math.Clamp(
+        currentGridX + directionAdvance * distance,
+        4,
+        97
+      ),
+      y: Phaser.Math.Clamp(
+        currentGridY + Phaser.Math.Between(-10, 10),
+        10,
+        40
+      )
+    };
+    
+    const targetPx = gridToPixels(targetGrid.x, targetGrid.y, width, height);
+    const playerDuration = getPlayerDuration(sprite, targetPx.x, targetPx.y, true);
+    
+    promises.push(
+      tweenPlayerTo(scene, sprite, targetPx, {
+        duration: playerDuration,
+        easing: "Linear"
+      })
+    );
+    playersAdvanced++;
+  }
   
-  // Wait for ALL movements (receiver + defenders) to complete simultaneously
+  // Wait for ALL movements (receiver + defenders + advancing players) to complete simultaneously
   await Promise.all(promises);
   
-  // THEN outlet pass
+  // THEN outlet pass (happens after all players are in position, but visually flows with the movement)
   await runPass(scene, {
     fromId: passerId,
     toId: receiverId,
@@ -573,9 +631,35 @@ async function animateDefensiveStop(scene, turnData, playerSprites, ballSprite, 
   
   console.log("✅ animateDefensiveStop - All animations completed");
   
-  // Display outcome text
-  if (turnData.hold_up) {
-    appendToTextScroll("Defensive stop!");
+  // ✅ Show "Great Stop!" announcement with stopper headshot (for Fast Break defensive stops)
+  if (turnData.fast_break === true && stopperId && stopperSprite) {
+    const { showAnnouncement } = await import('../utils/announcements.js');
+    const stopperInfo = scene.playerInfo?.[stopperId];
+    const stopperTeamId = stopperSprite?.team_id;
+    
+    // Handle both new nested structure (object) and old flat structure (string)
+    const homeTeamField = scene.simData?.home_team;
+    const awayTeamField = scene.simData?.away_team;
+    const homeTeamName = typeof homeTeamField === 'object' ? homeTeamField?.name : homeTeamField;
+    const awayTeamName = typeof awayTeamField === 'object' ? awayTeamField?.name : awayTeamField;
+    const stopperTeamName = stopperTeamId === scene.homeTeamId ? homeTeamName : awayTeamName;
+    
+    const stopperPlayerData = stopperInfo ? {
+      playerId: stopperId,
+      photo: stopperSprite?.photo || null,
+      teamName: stopperTeamName
+    } : null;
+    
+    // Defensive stop: show in defense team color (they benefited)
+    const defenseTeam = isHomeOffense ? 'away' : 'home';
+    showAnnouncement("Great Stop!", defenseTeam, stopperPlayerData);
+    
+    await new Promise(resolve => scene.time.delayedCall(1000, resolve));
+  } else {
+    // Display outcome text for non-Fast Break stops
+    if (turnData.hold_up) {
+      appendToTextScroll("Defensive stop!");
+    }
   }
   
   // Transition to HalfCourt for next possession
