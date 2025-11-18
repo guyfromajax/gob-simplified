@@ -250,7 +250,8 @@ class ShotManager:
         getback_names_str = ", ".join(getback_player_names) if getback_player_names else "NONE"
         
         # Debug logging for release player logic with all player/team names
-        logging.warning(f"🏃 RELEASE PLAYER DEBUG - shooter={shooter_name}, offense_team={off_team.name}, defense_team={def_team.name}, defense_tempo={defense_tempo_value}, release_player={release_player_name}, getback_players={getback_names_str}, defense_releases={defense_releases}")
+        offense_tempo_value = off_team.strategy_settings.get("tempo", 2)  # Get offense tempo for logging
+        logging.warning(f"🏃 RELEASE PLAYER DEBUG - shooter={shooter_name}, offense_team={off_team.name}, defense_team={def_team.name}, offense_tempo={offense_tempo_value}, defense_tempo={defense_tempo_value}, release_player={release_player_name}, getback_players={getback_names_str}, defense_releases={defense_releases}")
         
         # ==================== STAT TRACKING ====================
         # Track release/get back instances for both teams
@@ -348,6 +349,13 @@ class ShotManager:
                 self.game_state["free_throws_remaining"] = self.game_state["free_throws"]
                 text = f"{get_name_safe(foul_player)} fouls {get_name_safe(shooter)} on the shot."
                 possession_flips = False
+                
+                # ✅ Add player positioning data for frontend animation (defensive foul on miss)
+                # Players still released/got back when shot was taken, so include this data
+                result["offense_getback"] = [off_team.lineup[pos].player_id for pos in offense_getback_list]
+                result["defense_release"] = [def_team.lineup[pos].player_id for pos in defense_release_list]
+                result["offense_rebounders"] = [off_team.lineup[pos].player_id for pos in offense_rebounders]
+                result["defense_rebounders"] = [def_team.lineup[pos].player_id for pos in defense_rebounders]
             else:
                 # Regular miss → rebound logic
                 defense_attrs = defender.attributes if defender else {"ID": 0}
