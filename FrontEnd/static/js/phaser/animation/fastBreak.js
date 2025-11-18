@@ -76,11 +76,21 @@ export async function runFastBreakSequence({
   const result = turnData.result_type;
   const holdUp = turnData.hold_up;
   
+  console.log("🏀 Fast Break - Phase 2 Resolution:", {
+    result_type: result,
+    hold_up: holdUp,
+    hasRoles: !!turnData.roles,
+    ball_handler: turnData.roles?.ball_handler,
+    ball_handler_id: turnData.roles?.ball_handler?.player_id,
+    allRoleKeys: turnData.roles ? Object.keys(turnData.roles) : "NO ROLES"
+  });
+  
   if (result === "MAKE" || result === "MISS") {
     // Shot attempt scenario
     await animateFastBreakShot(scene, turnData, playerSprites, ballSprite, width, height);
   } else {
     // Defensive stop, foul, turnover, or steal - all use same defensive stop positioning
+    console.log("🏀 Fast Break - Routing to animateDefensiveStop");
     await animateDefensiveStop(scene, turnData, playerSprites, ballSprite, width, height);
   }
   
@@ -428,11 +438,37 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
  * - All other players scatter to half court
  */
 async function animateDefensiveStop(scene, turnData, playerSprites, ballSprite, width, height) {
+  console.log("🛑 animateDefensiveStop - START", {
+    hasRoles: !!turnData.roles,
+    ballHandlerData: turnData.roles?.ball_handler,
+    ballHandlerDataType: typeof turnData.roles?.ball_handler,
+    stopper_id: turnData.stopper_id,
+    hold_up: turnData.hold_up
+  });
+  
   const ballHandlerData = turnData.roles?.ball_handler;
   const ballHandlerId = ballHandlerData?.player_id || ballHandlerData || getCurrentOwner(scene);
+  
+  console.log("🛑 animateDefensiveStop - Ball Handler Resolution:", {
+    ballHandlerId,
+    ballHandlerIdType: typeof ballHandlerId,
+    availableSpriteIds: Object.keys(playerSprites),
+    hasSprite: !!playerSprites[ballHandlerId]
+  });
+  
   const ballHandlerSprite = playerSprites[ballHandlerId];
   
-  if (!ballHandlerSprite) return;
+  if (!ballHandlerSprite) {
+    console.error("❌ animateDefensiveStop - EARLY RETURN: ballHandlerSprite not found!", {
+      ballHandlerId,
+      availableIds: Object.keys(playerSprites),
+      ballHandlerData,
+      fallbackOwner: getCurrentOwner(scene)
+    });
+    return;
+  }
+  
+  console.log("✅ animateDefensiveStop - Ball handler sprite found, proceeding with animation");
   
   const isHomeOffense = ballHandlerSprite.team === "home";
   const topKey = isHomeOffense ? HOME_TOP_KEY : AWAY_TOP_KEY;
@@ -522,7 +558,13 @@ async function animateDefensiveStop(scene, turnData, playerSprites, ballSprite, 
     promises
   );
   
+  console.log("🛑 animateDefensiveStop - Waiting for all animations to complete", {
+    numPromises: promises.length
+  });
+  
   await Promise.all(promises);
+  
+  console.log("✅ animateDefensiveStop - All animations completed");
   
   // Display outcome text
   if (turnData.hold_up) {
@@ -530,7 +572,10 @@ async function animateDefensiveStop(scene, turnData, playerSprites, ballSprite, 
   }
   
   // Transition to HalfCourt for next possession
+  console.log("🛑 animateDefensiveStop - Transitioning to HalfCourt state");
   safeTransition(scene.stateMachine, States.HalfCourt);
+  
+  console.log("✅ animateDefensiveStop - COMPLETE");
 }
 
 /**
