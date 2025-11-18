@@ -116,9 +116,9 @@ async function loadSettings() {
   try {
     let mode = modeParam || 'single';
     
-    // For single game mode, use localStorage (no persistent game doc yet)
+    // For single game mode, use localStorage (persist by team, not matchup)
     if (mode === 'single') {
-      const storageKey = `gameplan_${teamName}_${homeTeam}_${awayTeam}`;
+      const storageKey = `gameplan_${teamName}`;
       const stored = localStorage.getItem(storageKey);
       
       if (stored) {
@@ -183,9 +183,9 @@ async function saveSettingsQuietly() {
   try {
     let mode = modeParam || 'single';
     
-    // For single game mode, save to localStorage
+    // For single game mode, save to localStorage (persist by team, not matchup)
     if (mode === 'single') {
-      const storageKey = `gameplan_${teamName}_${homeTeam}_${awayTeam}`;
+      const storageKey = `gameplan_${teamName}`;
       localStorage.setItem(storageKey, JSON.stringify(currentSettings));
       console.log('✅ Saved game plan to localStorage (quietly)');
     } else {
