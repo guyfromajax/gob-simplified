@@ -50,11 +50,22 @@ export async function runFastBreakSequence({
   // ============================================================================
   // PHASE 1: OUTLET PASS (if applicable)
   // ============================================================================
+  console.log("🏀 Fast Break - Checking outlet pass roles:", {
+    outlet_passer: turnData.roles?.outlet_passer,
+    outlet_receiver: turnData.roles?.outlet_receiver,
+    hasOutletPasser: !!turnData.roles?.outlet_passer,
+    hasOutletReceiver: !!turnData.roles?.outlet_receiver,
+    allRoles: turnData.roles ? Object.keys(turnData.roles) : "NO ROLES"
+  });
+  
   if (turnData.roles?.outlet_passer && turnData.roles?.outlet_receiver) {
+    console.log("✅ Fast Break - Outlet pass WILL execute");
     await animateOutletPhase(scene, turnData, playerSprites, ballSprite, width, height);
     
     // Transition to FastBreak state after outlet
     safeTransition(scene.stateMachine, States.FastBreak);
+  } else {
+    console.warn("❌ Fast Break - Outlet pass SKIPPED (missing outlet_passer or outlet_receiver)");
   }
   
   if (scene.skipToEnd) return;
