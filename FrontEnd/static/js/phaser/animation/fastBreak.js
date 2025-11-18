@@ -501,127 +501,108 @@ async function animateDefensiveStop(scene, turnData, playerSprites, ballSprite, 
     ballHandlerData: turnData.roles?.ball_handler,
     ballHandlerDataType: typeof turnData.roles?.ball_handler,
     stopper_id: turnData.stopper_id,
-    hold_up: turnData.hold_up
+    hold_up: turnData.hold_up,
+    hasAnimations: !!turnData.animations,
+    animationCount: turnData.animations?.length || 0
   });
   
-  const ballHandlerData = turnData.roles?.ball_handler;
-  const ballHandlerId = ballHandlerData?.player_id || ballHandlerData || getCurrentOwner(scene);
-  
-  console.log("🛑 animateDefensiveStop - Ball Handler Resolution:", {
-    ballHandlerId,
-    ballHandlerIdType: typeof ballHandlerId,
-    availableSpriteIds: Object.keys(playerSprites),
-    hasSprite: !!playerSprites[ballHandlerId]
-  });
-  
-  const ballHandlerSprite = playerSprites[ballHandlerId];
-  
-  if (!ballHandlerSprite) {
-    console.error("❌ animateDefensiveStop - EARLY RETURN: ballHandlerSprite not found!", {
-      ballHandlerId,
-      availableIds: Object.keys(playerSprites),
-      ballHandlerData,
-      fallbackOwner: getCurrentOwner(scene)
-    });
-    return;
-  }
-  
-  console.log("✅ animateDefensiveStop - Ball handler sprite found, proceeding with animation");
-  
-  const isHomeOffense = ballHandlerSprite.team === "home";
-  const topKey = isHomeOffense ? HOME_TOP_KEY : AWAY_TOP_KEY;
-  const basket = isHomeOffense ? HOME_RIM_COORDS : AWAY_RIM_COORDS;
-  
+  // ✅ Use backend animation end coords for positioning (matches other transitions like DREB -> HCO)
+  // This ensures frontend sprite positions match backend player.coords for accurate distance calculations
+  const animations = turnData.animations || [];
   const promises = [];
   
-  // Move ball handler to top of key
-  attachBallToPlayer(scene, ballSprite, ballHandlerSprite);
-  const topKeyPx = gridToPixels(topKey.x, topKey.y, width, height);
-  // Use distance-based duration for consistent speed
-  const handlerDuration = getPlayerDuration(ballHandlerSprite, topKeyPx.x, topKeyPx.y);
-  promises.push(
-    tweenPlayerTo(scene, ballHandlerSprite, topKeyPx, {
-      duration: handlerDuration,
-      easing: "Linear" // Match HCO step movements
-    })
-  );
-  
-  // Move stopper (if exists) - same Y as ball handler, 2 X closer to their defensive basket
-  // Defender should be between ball handler and the basket they're defending
-  // Home offense (attacks away basket x=9, ball handler at x=36): 
-  //   Defender defending away basket (x=9), should be x < 36 → x = 34
-  // Away offense (attacks home basket x=91, ball handler at x=64):
-  //   Defender defending home basket (x=91), should be x < 64 → x = 62
-  // BUT: User says away offense needs defender x LESS, home offense needs defender x GREATER
-  // This suggests the defender positioning is relative to offensive direction, not basket location
-  const stopperId = turnData.stopper_id;
-  const stopperSprite = stopperId ? playerSprites[stopperId] : null;
-  
-  if (stopperSprite) {
-    const stopperSpot = {
-      x: isHomeOffense
-        ? topKey.x + 2  // Home offense: defender x GREATER than ball handler
-        : topKey.x - 2, // Away offense: defender x LESS than ball handler
-      y: topKey.y  // Same Y as ball handler
-    };
-    stopperSpot.x = Phaser.Math.Clamp(stopperSpot.x, 4, 97);
-    
-    const stopperPx = gridToPixels(stopperSpot.x, stopperSpot.y, width, height);
-    // Use distance-based duration for consistent speed
-    const stopperDuration = getPlayerDuration(stopperSprite, stopperPx.x, stopperPx.y);
-    promises.push(
-      tweenPlayerTo(scene, stopperSprite, stopperPx, {
-        duration: stopperDuration,
-        easing: "Linear" // Match HCO step movements
-      })
-    );
-  }
-  
-  // Move other defenders in list - same Y, 15 X closer to basket from their current position
-  const defendersList = turnData.roles?.defense || [];
-  const defendersSet = new Set(defendersList.map(d => d.player_id || d));
-  
-  for (const [id, sprite] of Object.entries(playerSprites)) {
-    if (id === ballHandlerId || id === stopperId) continue;
-    
-    if (defendersSet.has(id)) {
-      // Other defenders: same Y, 15 X closer to basket
-      const currentGrid = {
-        x: (sprite.x / width) * 100,
-        y: 50 - (sprite.y / height) * 50
-      };
+  if (animations.length > 0) {
+    // Use backend animation end coords for positioning (consistent with other animations)
+    for (const anim of animations) {
+      const sprite = playerSprites[anim.playerId];
+      if (!sprite || !anim.movement || anim.movement.length < 2) continue;
       
-      const defenderTarget = {
-        x: isHomeOffense
-          ? currentGrid.x - 15  // 15 closer to home basket
-          : currentGrid.x + 15, // 15 closer to away basket
-        y: currentGrid.y  // Same Y
-      };
-      defenderTarget.x = Phaser.Math.Clamp(defenderTarget.x, 4, 97);
+      const endStep = anim.movement[anim.movement.length - 1];
+      if (!endStep || !endStep.coords) continue;
       
-      const defenderPx = gridToPixels(defenderTarget.x, defenderTarget.y, width, height);
-      // Use distance-based duration for consistent speed
-      const defenderDuration = getPlayerDuration(sprite, defenderPx.x, defenderPx.y);
+      const endPixels = gridToPixels(endStep.coords.x, endStep.coords.y, width, height);
+      
+      // Use distance-based duration for consistent speed (matches HCO step movements)
+      const duration = getPlayerDuration(sprite, endPixels.x, endPixels.y);
+      
+      // Track if this player has the ball
+      const hasBall = anim.hasBallAtStep?.[anim.movement.length - 1] || false;
+      if (hasBall) {
+        attachBallToPlayer(scene, ballSprite, sprite);
+      }
+      
       promises.push(
-        tweenPlayerTo(scene, sprite, defenderPx, {
-          duration: defenderDuration,
+        tweenPlayerTo(scene, sprite, endPixels, {
+          duration,
           easing: "Linear" // Match HCO step movements
         })
       );
     }
+  } else {
+    // Fallback to manual positioning if animations are missing (backwards compatibility)
+    console.warn("⚠️ animateDefensiveStop - No animations found, using manual positioning");
+    
+    const ballHandlerData = turnData.roles?.ball_handler;
+    const ballHandlerId = ballHandlerData?.player_id || ballHandlerData || getCurrentOwner(scene);
+    const ballHandlerSprite = playerSprites[ballHandlerId];
+    
+    if (!ballHandlerSprite) {
+      console.error("❌ animateDefensiveStop - EARLY RETURN: ballHandlerSprite not found!", {
+        ballHandlerId,
+        availableIds: Object.keys(playerSprites),
+        ballHandlerData,
+        fallbackOwner: getCurrentOwner(scene)
+      });
+      return;
+    }
+    
+    const isHomeOffense = ballHandlerSprite.team === "home";
+    const topKey = isHomeOffense ? HOME_TOP_KEY : AWAY_TOP_KEY;
+    
+    // Move ball handler to top of key
+    attachBallToPlayer(scene, ballSprite, ballHandlerSprite);
+    const topKeyPx = gridToPixels(topKey.x, topKey.y, width, height);
+    const handlerDuration = getPlayerDuration(ballHandlerSprite, topKeyPx.x, topKeyPx.y);
+    promises.push(
+      tweenPlayerTo(scene, ballHandlerSprite, topKeyPx, {
+        duration: handlerDuration,
+        easing: "Linear"
+      })
+    );
+    
+    // Move stopper (if exists)
+    const stopperId = turnData.stopper_id;
+    const stopperSprite = stopperId ? playerSprites[stopperId] : null;
+    
+    if (stopperSprite) {
+      const stopperSpot = {
+        x: isHomeOffense ? topKey.x + 2 : topKey.x - 2,
+        y: topKey.y
+      };
+      stopperSpot.x = Phaser.Math.Clamp(stopperSpot.x, 4, 97);
+      
+      const stopperPx = gridToPixels(stopperSpot.x, stopperSpot.y, width, height);
+      const stopperDuration = getPlayerDuration(stopperSprite, stopperPx.x, stopperPx.y);
+      promises.push(
+        tweenPlayerTo(scene, stopperSprite, stopperPx, {
+          duration: stopperDuration,
+          easing: "Linear"
+        })
+      );
+    }
+    
+    // Move other defenders and non-involved players
+    await moveOtherPlayersToStandardPositions(
+      scene,
+      playerSprites,
+      ballHandlerId,
+      stopperId,
+      turnData,
+      width,
+      height,
+      promises
+    );
   }
-  
-  // Move all other players (not involved) to half court
-  await moveOtherPlayersToStandardPositions(
-    scene,
-    playerSprites,
-    ballHandlerId,
-    stopperId,
-    turnData,
-    width,
-    height,
-    promises
-  );
   
   console.log("🛑 animateDefensiveStop - Waiting for all animations to complete", {
     numPromises: promises.length
@@ -632,29 +613,40 @@ async function animateDefensiveStop(scene, turnData, playerSprites, ballSprite, 
   console.log("✅ animateDefensiveStop - All animations completed");
   
   // ✅ Show "Great Stop!" announcement with stopper headshot (for Fast Break defensive stops)
-  if (turnData.fast_break === true && stopperId && stopperSprite) {
-    const { showAnnouncement } = await import('../utils/announcements.js');
-    const stopperInfo = scene.playerInfo?.[stopperId];
-    const stopperTeamId = stopperSprite?.team_id;
+  if (turnData.fast_break === true && turnData.stopper_id) {
+    const stopperId = turnData.stopper_id;
+    const stopperSprite = playerSprites[stopperId];
     
-    // Handle both new nested structure (object) and old flat structure (string)
-    const homeTeamField = scene.simData?.home_team;
-    const awayTeamField = scene.simData?.away_team;
-    const homeTeamName = typeof homeTeamField === 'object' ? homeTeamField?.name : homeTeamField;
-    const awayTeamName = typeof awayTeamField === 'object' ? awayTeamField?.name : awayTeamField;
-    const stopperTeamName = stopperTeamId === scene.homeTeamId ? homeTeamName : awayTeamName;
-    
-    const stopperPlayerData = stopperInfo ? {
-      playerId: stopperId,
-      photo: stopperSprite?.photo || null,
-      teamName: stopperTeamName
-    } : null;
-    
-    // Defensive stop: show in defense team color (they benefited)
-    const defenseTeam = isHomeOffense ? 'away' : 'home';
-    showAnnouncement("Great Stop!", defenseTeam, stopperPlayerData);
-    
-    await new Promise(resolve => scene.time.delayedCall(1000, resolve));
+    if (stopperSprite) {
+      const { showAnnouncement } = await import('../utils/announcements.js');
+      const stopperInfo = scene.playerInfo?.[stopperId];
+      const stopperTeamId = stopperSprite?.team_id;
+      
+      // Handle both new nested structure (object) and old flat structure (string)
+      const homeTeamField = scene.simData?.home_team;
+      const awayTeamField = scene.simData?.away_team;
+      const homeTeamName = typeof homeTeamField === 'object' ? homeTeamField?.name : homeTeamField;
+      const awayTeamName = typeof awayTeamField === 'object' ? awayTeamField?.name : awayTeamField;
+      const stopperTeamName = stopperTeamId === scene.homeTeamId ? homeTeamName : awayTeamName;
+      
+      // Determine offense side for defense team calculation
+      const ballHandlerData = turnData.roles?.ball_handler;
+      const ballHandlerId = ballHandlerData?.player_id || ballHandlerData || getCurrentOwner(scene);
+      const ballHandlerSprite = playerSprites[ballHandlerId];
+      const isHomeOffense = ballHandlerSprite?.team === "home";
+      
+      const stopperPlayerData = stopperInfo ? {
+        playerId: stopperId,
+        photo: stopperSprite?.photo || null,
+        teamName: stopperTeamName
+      } : null;
+      
+      // Defensive stop: show in defense team color (they benefited)
+      const defenseTeam = isHomeOffense ? 'away' : 'home';
+      showAnnouncement("Great Stop!", defenseTeam, stopperPlayerData);
+      
+      await new Promise(resolve => scene.time.delayedCall(1000, resolve));
+    }
   } else {
     // Display outcome text for non-Fast Break stops
     if (turnData.hold_up) {
@@ -665,6 +657,13 @@ async function animateDefensiveStop(scene, turnData, playerSprites, ballSprite, 
   // Transition to HalfCourt for next possession
   console.log("🛑 animateDefensiveStop - Transitioning to HalfCourt state");
   safeTransition(scene.stateMachine, States.HalfCourt);
+  
+  // ✅ Ensure HCO setup is triggered after defensive stop transitions to HCO
+  // This ensures players are properly positioned for the next HCO turn
+  if (turnData.next_play_type === "HCO" && typeof scene.startNextHalfCourtOffense === "function") {
+    console.log("🛑 animateDefensiveStop - Triggering HCO setup for next turn");
+    scene.startNextHalfCourtOffense();
+  }
   
   console.log("✅ animateDefensiveStop - COMPLETE");
 }
