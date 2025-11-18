@@ -61,7 +61,7 @@ export async function runFastBreakSequence({
   scene.events?.emit("fb:start");
   
   // ============================================================================
-  // PHASE 1: OUTLET PASS (if applicable)
+  // PHASE 1: OUTLET PASS (if applicable) - WITHOUT moving receiver toward basket
   // ============================================================================
   if (turnData.roles?.outlet_passer && turnData.roles?.outlet_receiver) {
     await animateOutletPhase(scene, turnData, playerSprites, ballSprite, width, height);
@@ -75,7 +75,7 @@ export async function runFastBreakSequence({
   if (scene.skipToEnd) return;
   
   // ============================================================================
-  // PHASE 2: FAST BREAK RESOLUTION
+  // PHASE 2: FAST BREAK RESOLUTION - Check result BEFORE moving toward basket
   // ============================================================================
   const result = turnData.result_type;
   
@@ -87,10 +87,10 @@ export async function runFastBreakSequence({
   });
   
   if (result === "MAKE" || result === "MISS") {
-    // Shot attempt scenario
+    // Shot attempt scenario - move shooter toward basket now
     await animateFastBreakShot(scene, turnData, playerSprites, ballSprite, width, height);
   } else {
-    // Defensive stop, foul, turnover, or steal - all use same defensive stop positioning
+    // Defensive stop, foul, turnover, or steal - position for defensive stop (outlet receiver hasn't moved too far)
     await animateDefensiveStop(scene, turnData, playerSprites, ballSprite, width, height);
   }
   
@@ -138,15 +138,20 @@ async function animateOutletPhase(scene, turnData, playerSprites, ballSprite, wi
   
   const getBackList = missTurn?.offense_getback || [];
   
-  // Move outlet receiver to outlet spot (keep existing logic)
+  // ✅ Move outlet receiver to NEUTRAL outlet spot (not toward basket yet)
+  // We'll move toward basket AFTER we know if it's a shot or defensive stop
+  // Outlet spot is just where they receive the pass (mid-court area)
   const receiverCurrentGrid = {
     x: (receiverSprite.x / width) * 100,
     y: 50 - (receiverSprite.y / height) * 50
   };
+  
+  // Outlet spot: move toward basket direction but not too far (5-10 spots, not 15-20)
+  // This keeps them in position to receive pass without committing to basket
   const direction = targetBasket.x > receiverCurrentGrid.x ? 1 : -1;
   const outletTarget = {
     x: Phaser.Math.Clamp(
-      receiverCurrentGrid.x + direction * Phaser.Math.Between(15, 20),
+      receiverCurrentGrid.x + direction * Phaser.Math.Between(5, 10),  // Reduced from 15-20
       4,
       97
     ),
@@ -160,7 +165,7 @@ async function animateOutletPhase(scene, turnData, playerSprites, ballSprite, wi
   
   const promises = [];
   
-  // Move outlet receiver
+  // Move outlet receiver to neutral outlet spot (will move toward basket later if shot)
   promises.push(
     tweenPlayerTo(scene, receiverSprite, outletPx, {
       duration: 500,
