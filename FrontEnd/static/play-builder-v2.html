@@ -1389,6 +1389,7 @@
       // Update variant tabs
       updateVariantTabs();
       updateVariantInfo();
+      updateVersionDropdown(); // Update dropdown with version info after loading
       
       // Show animation preview section
       const animSection = document.getElementById('animation-preview-section');
@@ -1433,6 +1434,7 @@
         // Set to current version for this variant
         const variantData = playState.variants[variant];
         versionSelect.value = variantData.currentVersion;
+        updateVersionDropdown(); // Update dropdown with version info
         updateVersionInfo();
       }
       
@@ -1461,6 +1463,7 @@
       loadVariantForEditing(currentVariant, false);
       
       // Update version info display
+      updateVersionDropdown(); // Update dropdown with version info
       updateVersionInfo();
       
       // Update variant info
@@ -1472,6 +1475,51 @@
       const versionSelect = document.getElementById('version-select');
       const versionNum = versionSelect.value.replace('v', '');
       versionInfo.textContent = `(Version ${versionNum} of 6)`;
+    }
+
+    function updateVersionDropdown() {
+      const versionSelect = document.getElementById('version-select');
+      if (!versionSelect) return;
+
+      // Only update if we're on a variant that has versions
+      if (currentVariant === 'successful') return;
+
+      const variantData = playState.variants[currentVariant];
+      if (!variantData || !variantData.versions) return;
+
+      // Update each option in the dropdown
+      ['v1', 'v2', 'v3', 'v4', 'v5', 'v6'].forEach(version => {
+        const option = versionSelect.querySelector(`option[value="${version}"]`);
+        if (!option) return;
+
+        const versionData = variantData.versions[version];
+        if (!versionData || !versionData.steps || versionData.steps.length === 0) {
+          // Version doesn't exist - just show version number
+          option.textContent = version;
+        } else {
+          // Version exists - find shooter and location from final step
+          const finalStep = versionData.steps[versionData.steps.length - 1];
+          let shooterPos = null;
+          let shooterLocation = null;
+
+          if (finalStep && finalStep.pos_actions) {
+            for (const [pos, actionInfo] of Object.entries(finalStep.pos_actions)) {
+              if (actionInfo && actionInfo.action && actionInfo.action.toLowerCase() === 'shoot') {
+                shooterPos = pos;
+                shooterLocation = actionInfo.location || 'unknown';
+                break;
+              }
+            }
+          }
+
+          if (shooterPos && shooterLocation) {
+            option.textContent = `${version} (exists, shooter: ${shooterPos}, location: ${shooterLocation})`;
+          } else {
+            // Version exists but no shooter found in final step
+            option.textContent = `${version} (exists)`;
+          }
+        }
+      });
     }
 
     function saveVariantProgress() {
@@ -1602,6 +1650,7 @@
       loadVariantForEditing(currentVariant, true);
       updateVariantTabs();
       updateVariantInfo();
+      updateVersionDropdown(); // Update dropdown with version info after cloning
       updateAnimationVariantDropdown();
       
       alert(`Cloned ${successfulData.steps.length} steps from Successful variant!`);
@@ -2177,6 +2226,7 @@
       // Update UI
       updateVariantTabs();
       updateVariantInfo();
+      updateVersionDropdown(); // Update dropdown with version info
       updateAnimationVariantDropdown();
       
       // Clear current step work
