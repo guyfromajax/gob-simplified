@@ -439,12 +439,10 @@ def get_game_state(game_id: str, quarter: int | None = None):
                 
                 # Check if this is a "new game" scenario: user requesting Q1 but saved game is Q2+
                 # In this case, return empty stats (Lineup Screen loads before simulate-quarter detects new game)
-                logging.info(f"📊 /api/game/{game_id} - DB check: quarter param={quarter}, saved_quarter={saved_quarter}")
                 is_new_game_from_get = (quarter == 1 and saved_quarter > 1)
-                logging.info(f"📊 /api/game/{game_id} - is_new_game_from_get={is_new_game_from_get} (quarter==1: {quarter == 1}, saved_quarter>1: {saved_quarter > 1})")
                 if is_new_game_from_get:
-                    logging.warning(
-                        f"🆕 /api/game/{game_id} - New game detected: requested Q1 but saved game is Q{saved_quarter}. Returning empty stats."
+                    logging.info(
+                        f"🆕 /api/game/{game_id} - New game: requested Q1 but saved game is Q{saved_quarter}. Returning empty stats."
                     )
                     # Return empty game state structure (energy levels, but no stats/scores)
                     home_team_data = saved.get("home_team", {})
@@ -615,8 +613,8 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
         # Check if this is a "new game" scenario: user wants Q1 but saved game is Q2+
         # In this case, remove from memory and reload from DB (which will run new game detection)
         if gm is not None and request.quarter == 1 and gm.quarter > 1:
-            logging.warning(
-                f"🆕 New game detected: game_id={game_id} in memory at Q{gm.quarter}, but user requested Q1. Removing from memory to reload from DB."
+            logging.info(
+                f"🆕 New game: game_id={game_id} in memory at Q{gm.quarter}, but user requested Q1. Removing from memory to reload from DB."
             )
             del ongoing_games[game_id]
             gm = None  # Force reload from DB where new game detection will run
@@ -702,45 +700,11 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                         # Resetting it here wipes out FREE_THROW state that might be set during active gameplay
                         # Only update quarter - game_state is already initialized by GameManager.__init__
                         gm.quarter = saved.get("quarter", 1)
-                        
-                        # CRITICAL: For Q1 new games, don't restore stats - start fresh
-                        # Check if teams match - if teams don't match, it's a NEW game (different matchup)
-                        # Also check if this is Q1 with no meaningful gameplay (no turns or zero scores)
                         saved_quarter = saved.get("quarter", 1)
-                        saved_home_team = saved.get("home_team", {})
-                        saved_away_team = saved.get("away_team", {})
                         
-                        # Extract team names from saved data (handle both dict and string formats)
-                        if isinstance(saved_home_team, dict):
-                            saved_home_name = saved_home_team.get("name") or saved_home_team.get("team")
-                        else:
-                            saved_home_name = saved_home_team or ""
-                        
-                        if isinstance(saved_away_team, dict):
-                            saved_away_name = saved_away_team.get("name") or saved_away_team.get("team")
-                        else:
-                            saved_away_name = saved_away_team or ""
-                        
-                        teams_match = (saved_home_name == request.home_team and saved_away_name == request.away_team)
-                        has_existing_turns = len(saved.get("turns", [])) > 0
-                        
-                        # Check if scores are non-zero (indicates gameplay happened)
-                        saved_score = saved.get("score", {})
-                        has_non_zero_score = False
-                        if isinstance(saved_score, dict):
-                            has_non_zero_score = any(v > 0 for v in saved_score.values() if isinstance(v, (int, float)))
-                        elif isinstance(saved_score, (int, float)):
-                            has_non_zero_score = saved_score > 0
-                        
-                        # This is a NEW game if:
-                        # 1. Teams don't match (different matchup) OR
-                        # 2. Requesting Q1 but saved game is at a later quarter (user starting fresh) OR
-                        # 3. Q1 with no turns and no scores (truly new game)
-                        quarter_mismatch_new_game = request.quarter == 1 and saved_quarter > 1
-                        is_new_game = not teams_match or quarter_mismatch_new_game or (request.quarter == 1 and saved_quarter == 1 and not has_existing_turns and not has_non_zero_score)
+                        # Simple check: If requesting Q1 but saved game is at a later quarter, start fresh (new game)
+                        is_new_game = (request.quarter == 1 and saved_quarter > 1)
                         should_restore_stats = not is_new_game
-                        
-                        logging.warning(f"🔍 Loaded from DB: saved_quarter={saved_quarter}, request_quarter={request.quarter}, saved_teams=({saved_home_name},{saved_away_name}), request_teams=({request.home_team},{request.away_team}), teams_match={teams_match}, has_turns={has_existing_turns}, has_scores={has_non_zero_score}, is_new_game={is_new_game}, should_restore_stats={should_restore_stats}")
                         
                         # CRITICAL: Build lineups BEFORE restoring player stats
                         # Player stat restoration (below) looks up players in team.lineup, so lineups must exist
@@ -748,20 +712,20 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                         if request.home_lineup:
                             from BackEnd.utils.db_utils import assign_lineup_from_ids
                             gm.home_team.lineup = assign_lineup_from_ids(gm.home_team, request.home_lineup)
-                            logging.warning(f"✅ Loaded from DB: Set home lineup from request: {list(gm.home_team.lineup.keys())}")
+                            logging.info(f"✅ Loaded from DB: Set home lineup from request: {list(gm.home_team.lineup.keys())}")
                         elif not gm.home_team.lineup:
                             from BackEnd.utils.db_utils import build_lineup_from_mongo
                             gm.home_team.lineup = build_lineup_from_mongo(gm.home_team)
-                            logging.warning(f"✅ Loaded from DB: Built home lineup from MongoDB: {list(gm.home_team.lineup.keys())}")
+                            logging.info(f"✅ Loaded from DB: Built home lineup from MongoDB: {list(gm.home_team.lineup.keys())}")
                         
                         if request.away_lineup:
                             from BackEnd.utils.db_utils import assign_lineup_from_ids
                             gm.away_team.lineup = assign_lineup_from_ids(gm.away_team, request.away_lineup)
-                            logging.warning(f"✅ Loaded from DB: Set away lineup from request: {list(gm.away_team.lineup.keys())}")
+                            logging.info(f"✅ Loaded from DB: Set away lineup from request: {list(gm.away_team.lineup.keys())}")
                         elif not gm.away_team.lineup:
                             from BackEnd.utils.db_utils import build_lineup_from_mongo
                             gm.away_team.lineup = build_lineup_from_mongo(gm.away_team)
-                            logging.warning(f"✅ Loaded from DB: Built away lineup from MongoDB: {list(gm.away_team.lineup.keys())}")
+                            logging.info(f"✅ Loaded from DB: Built away lineup from MongoDB: {list(gm.away_team.lineup.keys())}")
                         
                         # Validate lineups are set
                         if not gm.home_team.lineup or not gm.away_team.lineup:
@@ -780,7 +744,7 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                             logging.info(f"🔄 Restoring stats for {len(saved_players_list)} players")
                         else:
                             saved_players_list = []
-                            logging.warning(f"🆕 New Q1 game detected - skipping stat restoration (starting fresh)")
+                            logging.info(f"🆕 New Q1 game (requested Q1 but saved game is Q{saved_quarter}) - skipping stat restoration")
                         
                         for saved_player_data in saved_players_list:
                             player_id = saved_player_data.get("playerId")
@@ -858,7 +822,6 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                                 logging.info(f"🔄 game_stats_initialized restored: {saved['game_stats_initialized']}")
                         else:
                             # New Q1 game - ensure stats are zeroed
-                            logging.warning(f"🆕 New Q1 game - scores/stats will be zeroed in simulate_quarter")
                             gm.score = {gm.home_team.name: 0, gm.away_team.name: 0}
                             gm.home_team.team_fouls = 0
                             gm.away_team.team_fouls = 0
@@ -878,7 +841,6 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                                 del gm.game_state["opening_tip_winner"]
                             # Clear any old turns from previous game - opening tip will be added in simulate_quarter
                             gm.turns = []
-                            logging.warning(f"🆕 New Q1 game - opening_tip_winner cleared and turns cleared (opening tip will run)")
                         
                         ongoing_games[game_id] = gm
                         if debug:
