@@ -682,16 +682,28 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                             home_scouting = saved.get("scouting", {}).get(home)
                             away_scouting = saved.get("scouting", {}).get(away)
                         
-                        # ✅ CRITICAL FIX: If strategy_settings are None from DB (game saved before settings were persisted),
-                        # use request.strategy_settings for user's team to ensure their settings are applied
-                        # This prevents random tempo values when resuming games
+                        # ✅ CRITICAL FIX: Always prioritize request.strategy_settings over DB for user's team
+                        # This ensures user's current settings (from Game Plan screen) are applied, even if DB has old/wrong settings
+                        # This fixes Q1 issues where DB might have tempo=1 but user set tempo=4
                         if request.strategy_settings and request.user_team_side:
-                            if request.user_team_side == "home" and home_strategy is None:
-                                home_strategy = request.strategy_settings
-                                logging.warning(f"🔧 FALLBACK - Using request.strategy_settings for home team (DB had None)")
-                            elif request.user_team_side == "away" and away_strategy is None:
-                                away_strategy = request.strategy_settings
-                                logging.warning(f"🔧 FALLBACK - Using request.strategy_settings for away team (DB had None)")
+                            if request.user_team_side == "home":
+                                if home_strategy is None:
+                                    home_strategy = request.strategy_settings
+                                    logging.warning(f"🔧 FALLBACK - Using request.strategy_settings for home team (DB had None)")
+                                else:
+                                    # DB has settings, but prioritize request (user's current settings from Game Plan screen)
+                                    old_tempo = home_strategy.get('tempo', 'MISSING')
+                                    home_strategy = request.strategy_settings
+                                    logging.warning(f"🔧 OVERRIDE - Using request.strategy_settings for home team (DB had tempo={old_tempo}, request has tempo={request.strategy_settings.get('tempo', 'MISSING')})")
+                            elif request.user_team_side == "away":
+                                if away_strategy is None:
+                                    away_strategy = request.strategy_settings
+                                    logging.warning(f"🔧 FALLBACK - Using request.strategy_settings for away team (DB had None)")
+                                else:
+                                    # DB has settings, but prioritize request (user's current settings from Game Plan screen)
+                                    old_tempo = away_strategy.get('tempo', 'MISSING')
+                                    away_strategy = request.strategy_settings
+                                    logging.warning(f"🔧 OVERRIDE - Using request.strategy_settings for away team (DB had tempo={old_tempo}, request has tempo={request.strategy_settings.get('tempo', 'MISSING')})")
                         
                         # Debug logging for strategy_settings loading
                         logging.warning(f"🔧 LOADING FROM DB - home_strategy={home_strategy}, away_strategy={away_strategy}")
