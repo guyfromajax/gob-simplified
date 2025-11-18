@@ -6,10 +6,9 @@
 import { tweenPlayerTo } from "./ballTween.js";
 import { appendToTextScroll } from "../utils/textScroll.js";
 import { gridToPixels } from "../utils/gridToPixels.js";
+import { getPlayerDuration } from "./turnAnimation.js";
 
 const INITIAL_HOLD_DURATION = 2000; // Hold starting positions for 2 seconds (reduced from 4 seconds)
-const JUMP_DURATION = 1500; // Jump animation duration (up and down)
-const CONVERGE_DURATION = 1500; // Convergence duration
 const BALL_JUMP_HEIGHT = 5; // Ball jumps higher than players
 
 /**
@@ -104,12 +103,15 @@ function animateJumpBall(scene, playerSprites, animations, ballSprite, onComplet
         const jumpPixels = gridToPixels(jumpCoords.x, jumpCoords.y, canvasWidth, canvasHeight);
         const startPixels = gridToPixels(startCoords.x, startCoords.y, canvasWidth, canvasHeight);
         
+        // ✅ Use distance-based duration for consistent speed (matches rest of game engine)
+        const jumpDuration = getPlayerDuration(playerSprite, jumpPixels.x, jumpPixels.y);
+        
         // Player jumps up and stays at peak (no coming down)
         const tween = scene.tweens.add({
             targets: playerSprite,
             x: jumpPixels.x,
             y: jumpPixels.y,
-            duration: JUMP_DURATION / 2,
+            duration: jumpDuration,
             ease: 'Quad.easeOut',
             onComplete: () => {
                 // Stay at peak position
@@ -127,11 +129,20 @@ function animateJumpBall(scene, playerSprites, animations, ballSprite, onComplet
     const ballStartPixels = gridToPixels(ballStartCoords.x, ballStartCoords.y, canvasWidth, canvasHeight);
     const ballJumpPixels = gridToPixels(ballJumpCoords.x, ballJumpCoords.y, canvasWidth, canvasHeight);
     
+    // ✅ Use distance-based duration for ball (matches player speed system)
+    // Calculate distance from current ball position to jump position
+    const ballDistance = Phaser.Math.Distance.Between(
+        ballSprite.x, ballSprite.y,
+        ballJumpPixels.x, ballJumpPixels.y
+    );
+    // Use same speed as players (350 pixels/second default)
+    const ballJumpDuration = (ballDistance / 350) * 1000; // Convert to milliseconds
+    
     const ballTween = scene.tweens.add({
         targets: ballSprite,
         x: ballJumpPixels.x,
         y: ballJumpPixels.y,
-        duration: JUMP_DURATION / 2,
+        duration: ballJumpDuration,
         ease: 'Quad.easeOut',
         onComplete: () => {
             // Stay at peak position
@@ -167,12 +178,15 @@ function animateConvergence(scene, playerSprites, animations, ballSprite, ballLa
         // Convert grid coordinates to pixels
         const pixelCoords = gridToPixels(endCoords.x, endCoords.y, canvasWidth, canvasHeight);
         
+        // ✅ Use distance-based duration for consistent speed (matches rest of game engine)
+        const convergeDuration = getPlayerDuration(playerSprite, pixelCoords.x, pixelCoords.y);
+        
         // Tween player to their convergence spot
         const tween = tweenPlayerTo(
             scene,
             playerSprite,
             pixelCoords,  // Pass as {x, y} object
-            { duration: CONVERGE_DURATION, easing: 'Linear' }
+            { duration: convergeDuration, easing: 'Linear' }
         );
         
         convergeTweens.push(tween);
@@ -186,11 +200,20 @@ function animateConvergence(scene, playerSprites, animations, ballSprite, ballLa
         pixelCoords: ballPixelCoords
     });
     
+    // ✅ Use distance-based duration for ball (matches player speed system)
+    // Calculate distance from current ball position to landing position
+    const ballConvergeDistance = Phaser.Math.Distance.Between(
+        ballSprite.x, ballSprite.y,
+        ballPixelCoords.x, ballPixelCoords.y
+    );
+    // Use same speed as players (350 pixels/second default)
+    const ballConvergeDuration = (ballConvergeDistance / 350) * 1000; // Convert to milliseconds
+    
     const ballTween = scene.tweens.add({
         targets: ballSprite,
         x: ballPixelCoords.x,
         y: ballPixelCoords.y,
-        duration: CONVERGE_DURATION,
+        duration: ballConvergeDuration,
         ease: 'Quad.easeOut',
         onComplete: () => {
             console.log("🏀 Ball landed at grid:", ballLandingCoords, "pixel:", { x: ballSprite.x, y: ballSprite.y });
