@@ -125,8 +125,8 @@ async function loadGamePlanSettings() {
   const teamId = userTeamSide === 'home' ? urlParams.get('home_id') : urlParams.get('away_id');
   
   if (mode === 'single' && typeof localStorage !== 'undefined') {
-    // Single game mode: load from localStorage
-    const storageKey = `gameplan_${teamName}_${homeTeam}_${awayTeam}`;
+    // Single game mode: load from localStorage (persist by team, not matchup)
+    const storageKey = `gameplan_${teamName}`;
     const stored = localStorage.getItem(storageKey);
     if (stored) {
       try {
