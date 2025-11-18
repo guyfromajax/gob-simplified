@@ -685,7 +685,30 @@ export async function animateGameTurns({ //hasBallAtStep
     }
 
     if (turn.result_type === "DEFENSIVE_STOP") {
-      // Animate a brief stop resolution (move ball handler to key, nearest defender contests), then enter HalfCourt
+      // Check if this is a Fast Break defensive stop - if so, route to Fast Break animation
+      // so outlet pass can animate before showing the stop
+      if (turn.fast_break === true) {
+        // Fast Break defensive stop - route to Fast Break animation sequence
+        // This will animate outlet pass (if applicable) then defensive stop
+        try {
+          const runFastBreakSequence = (await import('./fastBreak.js')).default || (await import('./fastBreak.js')).runFastBreakSequence;
+          await runFastBreakSequence({ scene, turnData: turn, playerSprites, ballSprite, turnIndex: i });
+        } catch (err) {
+          console.warn('DEFENSIVE_STOP (Fast Break): animation failed, falling back to text only', err);
+        }
+        appendToTextScroll(turn.text || "Fast Break! Defense stops the break!");
+        if (onUpdate) {
+          try {
+            onUpdate(turn);
+          } catch (err) {
+            console.error('Scoreboard update failed:', err);
+          }
+        }
+        updateDebugScore(turn, { turnIndex: i, possessionId });
+        continue;
+      }
+      
+      // Non-Fast Break defensive stop - use standard defensive stop transition
       try {
         const { runDefensiveStopTransition } = await import('./turnAnimation.js');
         await runDefensiveStopTransition({ scene, playerSprites, ballSprite });

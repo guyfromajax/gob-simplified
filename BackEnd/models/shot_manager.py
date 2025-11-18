@@ -194,19 +194,22 @@ class ShotManager:
         offense_reb_value = off_team.strategy_settings.get("rebounding", 2)  # Crash boards vs get back
         defense_tempo_value = def_team.strategy_settings.get("tempo", 2)  # Stay vs release for FB
         
-        # Debug logging for release player logic
+        # Import for debug logging
         import logging
-        logging.warning(f"🏃 RELEASE PLAYER DEBUG - def_team={def_team.name}, defense_tempo_value={defense_tempo_value}, strategy_settings={def_team.strategy_settings.get('tempo', 'MISSING')}")
+        from BackEnd.utils.shared import get_name_safe
+        shooter_name = get_name_safe(shooter)
         
         # Determine defensive players releasing for fast break
         defense_release_chances = {0: 0.0, 1: 0.25, 2: 0.5, 3: 0.75, 4: 1.0}
         defense_releases = random.random() < defense_release_chances[defense_tempo_value]
-        
-        logging.warning(f"🏃 RELEASE PLAYER DEBUG - defense_releases={defense_releases}, release_chance={defense_release_chances.get(defense_tempo_value, 'INVALID')}")
         release_pos = "PG" if shooter_pos != "PG" else "SG"
         
         defense_rebounders = [pos for pos, p in def_team.lineup.items() if pos != release_pos] if defense_releases else list(def_team.lineup.keys())
         defense_release_list = [release_pos] if defense_releases else []
+        
+        # Get names for debug logging
+        release_player = def_team.lineup.get(release_pos) if defense_releases else None
+        release_player_name = get_name_safe(release_player) if release_player else "NONE"
         
         # Determine offensive players getting back on defense
         offense_getback_chances = {
@@ -242,6 +245,12 @@ class ShotManager:
         
         offense_rebounders = [pos for pos in off_team.lineup.keys() if pos not in offense_getback_list]
         
+        # Get names for debug logging
+        getback_player_names = [get_name_safe(off_team.lineup.get(pos)) for pos in offense_getback_list if off_team.lineup.get(pos)]
+        getback_names_str = ", ".join(getback_player_names) if getback_player_names else "NONE"
+        
+        # Debug logging for release player logic with all player/team names
+        logging.warning(f"🏃 RELEASE PLAYER DEBUG - shooter={shooter_name}, offense_team={off_team.name}, defense_team={def_team.name}, defense_tempo={defense_tempo_value}, release_player={release_player_name}, getback_players={getback_names_str}, defense_releases={defense_releases}")
         
         # ==================== STAT TRACKING ====================
         # Track release/get back instances for both teams

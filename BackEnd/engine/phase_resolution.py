@@ -310,19 +310,38 @@ def resolve_fast_break_logic(game: "GameManager"):
         def_scouting["defense"]["vs_Fast_Break"]["success"] += 1
         game.game_state["offensive_state"] = "HCO"
         
-        # Return a defensive stop result instead of recursively calling run_micro_turn
+        # Build animation packet for the fast break play (for outlet pass animation)
+        animator = Animator(game)
+        animations = animator.capture_fast_break_animation(
+            fb_roles, hold_up, stopper_id
+        )
+        
+        # Return a defensive stop result but include Fast Break roles and flags
+        # This ensures the frontend can animate the outlet pass before showing the stop
         ball_handler = fb_roles["ball_handler"]
         defender_name = get_name_safe(best_defender) if best_defender else "Defense"
-        return {
+        result = {
             "result_type": "DEFENSIVE_STOP",
             "ball_handler": ball_handler,
             "defender": best_defender,
             "text": f"Fast Break! Nice stop by {defender_name}!",
             "possession_flips": False,
             "time_elapsed": 3,
-            "animations": [],
+            "animations": animations,
             "next_play_type": "HCO",
+            "roles": fb_roles,  # ✅ Include roles so frontend can animate outlet pass
+            "fast_break": True,  # ✅ Mark as Fast Break so frontend routes to Fast Break animation
         }
+        
+        # Debug logging for outlet pass roles
+        import logging
+        logging.warning(f"🏀 Fast Break DEFENSIVE_STOP roles - outlet_passer={fb_roles.get('outlet_passer')}, outlet_receiver={fb_roles.get('outlet_receiver')}, rebounder={getattr(game_state.get('last_rebounder'), 'player_id', None) if game_state.get('last_rebounder') else None}, ball_handler={getattr(fb_roles.get('ball_handler'), 'player_id', None) if fb_roles.get('ball_handler') else None}")
+        
+        if hold_up:
+            result["hold_up"] = True
+            result["stopper_id"] = stopper_id
+        
+        return result
 
     #get shooter and passer (if applicable)
     # Assign shooter and passer for shot, turnover, or foul scenarios
