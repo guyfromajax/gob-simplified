@@ -126,11 +126,14 @@ class Animator:
         
         if hold_up:
             # Stopping defender when break is stopped at top of key
+            # ✅ Position stopper DIRECTLY in front of ball handler (between ball handler and basket they're defending)
+            # Home offense (attacking right): stopper x GREATER than ball handler (toward basket)
+            # Away offense (attacking left): stopper x LESS than ball handler (toward basket)
             if stopper:
-                offset_x = 6 if not is_away_offense else -6
+                offset_x = 2 if not is_away_offense else -2  # Position 2 spots in front (between ball handler and basket)
                 end = {
                     "x": TOP_KEY_COORDS["x"] + offset_x,
-                    "y": TOP_KEY_COORDS["y"] + random.randint(-3, 3),
+                    "y": TOP_KEY_COORDS["y"],  # Same Y as ball handler (directly in front)
                 }
                 build_movement(stopper, end, action=ACTIONS["GUARD_BALL"])
                 animated_player_ids.add(getattr(stopper, "player_id", None))
