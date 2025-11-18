@@ -618,6 +618,18 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
             )
             del ongoing_games[game_id]
             gm = None  # Force reload from DB where new game detection will run
+        
+        # ✅ CRITICAL FIX: If game is already in memory, update strategy_settings if request has them
+        # This ensures user's updated Game Plan settings are applied even if game is already loaded
+        if gm is not None and request.strategy_settings and request.user_team_side:
+            if request.user_team_side == "home":
+                old_tempo = gm.home_team.strategy_settings.get('tempo', 'MISSING')
+                gm.home_team.strategy_settings = request.strategy_settings
+                logging.warning(f"🔧 OVERRIDE (IN MEMORY) - Updated home team strategy_settings (old tempo={old_tempo}, new tempo={request.strategy_settings.get('tempo', 'MISSING')})")
+            elif request.user_team_side == "away":
+                old_tempo = gm.away_team.strategy_settings.get('tempo', 'MISSING')
+                gm.away_team.strategy_settings = request.strategy_settings
+                logging.warning(f"🔧 OVERRIDE (IN MEMORY) - Updated away team strategy_settings (old tempo={old_tempo}, new tempo={request.strategy_settings.get('tempo', 'MISSING')})")
         if gm is None:
             logging.warning(
                 "simulate_quarter_endpoint unknown game_id=%s; active=%s",
