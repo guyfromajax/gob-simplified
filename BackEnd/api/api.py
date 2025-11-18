@@ -682,6 +682,17 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                             home_scouting = saved.get("scouting", {}).get(home)
                             away_scouting = saved.get("scouting", {}).get(away)
                         
+                        # ✅ CRITICAL FIX: If strategy_settings are None from DB (game saved before settings were persisted),
+                        # use request.strategy_settings for user's team to ensure their settings are applied
+                        # This prevents random tempo values when resuming games
+                        if request.strategy_settings and request.user_team_side:
+                            if request.user_team_side == "home" and home_strategy is None:
+                                home_strategy = request.strategy_settings
+                                logging.warning(f"🔧 FALLBACK - Using request.strategy_settings for home team (DB had None)")
+                            elif request.user_team_side == "away" and away_strategy is None:
+                                away_strategy = request.strategy_settings
+                                logging.warning(f"🔧 FALLBACK - Using request.strategy_settings for away team (DB had None)")
+                        
                         # Debug logging for strategy_settings loading
                         logging.warning(f"🔧 LOADING FROM DB - home_strategy={home_strategy}, away_strategy={away_strategy}")
                         
