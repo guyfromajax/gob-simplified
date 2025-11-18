@@ -3,6 +3,7 @@
  * Handles the jump ball animation at the start of Q1 and OT periods
  */
 
+import * as Phaser from "https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.esm.js";
 import { tweenPlayerTo } from "./ballTween.js";
 import { appendToTextScroll } from "../utils/textScroll.js";
 import { gridToPixels } from "../utils/gridToPixels.js";
