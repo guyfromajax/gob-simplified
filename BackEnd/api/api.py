@@ -671,7 +671,7 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                         home_scouting = home_team_data.get("scouting")
                         away_scouting = away_team_data.get("scouting")
                         home_strategy = home_team_data.get("strategy_settings")
-                        away_strategy = away_team_data.get("strategy_settings")
+                        away_strategy = away_team_data.get("strategy_settings")  # Fixed: was reading from home_team_data
                         
                         # Fallback to old flat structure if teams object doesn't exist (backwards compatibility)
                         if not home_plays and not teams_obj:
@@ -681,6 +681,9 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                             away_attrs = saved.get("team_attributes", {}).get(away)
                             home_scouting = saved.get("scouting", {}).get(home)
                             away_scouting = saved.get("scouting", {}).get(away)
+                        
+                        # Debug logging for strategy_settings loading
+                        logging.warning(f"🔧 LOADING FROM DB - home_strategy={home_strategy}, away_strategy={away_strategy}")
                         
                         gm = GameManager(
                             home, 
@@ -695,6 +698,9 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                             away_plays_data=away_plays,
                             mode="single"  # Loaded games are always single mode from games_collection
                         )
+                        
+                        # Debug logging after GameManager creation
+                        logging.warning(f"🔧 AFTER GAMEMANAGER - home.strategy_settings={gm.home_team.strategy_settings.get('tempo', 'MISSING')}, away.strategy_settings={gm.away_team.strategy_settings.get('tempo', 'MISSING')}")
                         # CRITICAL: Don't reset game_state when loading from database
                         # The GameManager constructor already initialized game_state with defaults
                         # Resetting it here wipes out FREE_THROW state that might be set during active gameplay
@@ -870,7 +876,9 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                     # Get mode from request (default to "single")
                     mode = request.mode or "single"
                     
-                    #temp comment
+                    # Debug logging for new game creation
+                    logging.warning(f"🔧 CREATING NEW GAME - user_team_side={request.user_team_side}, request.strategy_settings={request.strategy_settings}, home_strategy={home_strategy}, away_strategy={away_strategy}")
+                    
                     gm = GameManager(
                         request.home_team, 
                         request.away_team,
@@ -878,6 +886,9 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                         away_strategy_settings=away_strategy,
                         mode=mode  # Pass mode so teams can initialize plays with correct stats structure
                     )
+                    
+                    # Debug logging after GameManager creation
+                    logging.warning(f"🔧 AFTER GAMEMANAGER (NEW) - home.strategy_settings={gm.home_team.strategy_settings.get('tempo', 'MISSING')}, away.strategy_settings={gm.away_team.strategy_settings.get('tempo', 'MISSING')}")
                     # Use the game_id from the request if provided, otherwise generate a new one
                     if request.game_id:
                         game_id = request.game_id
