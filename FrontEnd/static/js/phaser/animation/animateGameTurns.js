@@ -941,17 +941,23 @@ export async function animateGameTurns({ //hasBallAtStep
       // ✅ Debug log for HCO turns after Fast Break defensive stop
       const previousTurn = i > 0 ? turns[i - 1] : null;
       const wasDefensiveStop = previousTurn?.result_type === "DEFENSIVE_STOP" && previousTurn?.fast_break === true;
-      const isHCO = !turn.fast_break && (turn.result_type === "MAKE" || turn.result_type === "MISS") && 
-                    (turn.next_play_type === "HCO" || turn.offensive_state === "HCO");
+      const isHCO = !turn.fast_break && (turn.result_type === "MAKE" || turn.result_type === "MISS");
       
-      if (wasDefensiveStop && isHCO) {
-        console.log("🏀 HCO Turn After Defensive Stop:", {
+      // Enhanced debug for HCO detection after defensive stop
+      if (wasDefensiveStop) {
+        console.log("🔍 HCO Detection After Defensive Stop:", {
           turn_index: i,
           previous_turn_result: previousTurn?.result_type,
           previous_turn_fast_break: previousTurn?.fast_break,
           current_turn_result: turn.result_type,
+          current_turn_fast_break: turn.fast_break,
           current_turn_next_play_type: turn.next_play_type,
           current_turn_offensive_state: turn.offensive_state,
+          isHCO_criteria: {
+            not_fast_break: !turn.fast_break,
+            is_shot: turn.result_type === "MAKE" || turn.result_type === "MISS",
+            matches_criteria: isHCO
+          },
           current_state: scene.stateMachine?.state,
           has_animations: !!turn.animations?.length,
           animation_count: turn.animations?.length || 0
