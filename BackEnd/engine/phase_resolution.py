@@ -193,19 +193,49 @@ def resolve_fast_break_logic(game: "GameManager"):
         
         # Choose outlet passer (rebounder)
         rebounder = game_state.get("last_rebounder", None)
-
-        bh_pos = random.choices(["PG", "SG", "SF"], weights=[75, 15, 10])[0]
-        ball_handler = off_lineup[bh_pos]
-
-        fb_roles["ball_handler"] = ball_handler
-
-        # Ensure outlet passer and receiver are set to IDs and only if different
-        if rebounder and rebounder != ball_handler:
-            fb_roles["outlet_passer"] = getattr(rebounder, "player_id", None)
-            fb_roles["outlet_receiver"] = getattr(ball_handler, "player_id", None)
+        
+        # ✅ Use release player as outlet receiver (if available), otherwise fallback to random ball handler
+        # The release player is the defender who released for fast break during the shot
+        # This ensures outlet passes go to the player who was set up to receive it
+        release_player = game_state.get("last_release_player", None)
+        
+        if release_player:
+            # Use release player as ball handler and outlet receiver
+            ball_handler = release_player
+            fb_roles["ball_handler"] = ball_handler
+            
+            # Clear release player after use to avoid carry-over bugs
+            game_state["last_release_player"] = None
+            
+            # Ensure outlet passer and receiver are set to IDs and only if different
+            if rebounder and rebounder != ball_handler:
+                fb_roles["outlet_passer"] = getattr(rebounder, "player_id", None)
+                fb_roles["outlet_receiver"] = getattr(ball_handler, "player_id", None)
+                
+                import logging
+                from BackEnd.utils.shared import get_name_safe
+                logging.warning(f"🏀 Fast Break outlet pass: outlet_passer={get_name_safe(rebounder)} (rebounder), outlet_receiver={get_name_safe(ball_handler)} (release player)")
+            else:
+                fb_roles["outlet_passer"] = None
+                fb_roles["outlet_receiver"] = None
         else:
-            fb_roles["outlet_passer"] = None
-            fb_roles["outlet_receiver"] = None
+            # Fallback: Random ball handler if no release player (shouldn't happen, but safety check)
+            bh_pos = random.choices(["PG", "SG", "SF"], weights=[75, 15, 10])[0]
+            ball_handler = off_lineup[bh_pos]
+
+            fb_roles["ball_handler"] = ball_handler
+
+            # Ensure outlet passer and receiver are set to IDs and only if different
+            if rebounder and rebounder != ball_handler:
+                fb_roles["outlet_passer"] = getattr(rebounder, "player_id", None)
+                fb_roles["outlet_receiver"] = getattr(ball_handler, "player_id", None)
+                
+                import logging
+                from BackEnd.utils.shared import get_name_safe
+                logging.warning(f"⚠️ Fast Break outlet pass (FALLBACK - no release player): outlet_passer={get_name_safe(rebounder)} (rebounder), outlet_receiver={get_name_safe(ball_handler)} (random)")
+            else:
+                fb_roles["outlet_passer"] = None
+                fb_roles["outlet_receiver"] = None
 
         # No additional offensive players when starting from a rebound
         fb_roles["offense"] = []
