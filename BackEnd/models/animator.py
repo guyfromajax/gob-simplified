@@ -8,7 +8,7 @@ from BackEnd.utils.shared_defense import (
     assign_non_bh_defender_coords
 )
 from collections import defaultdict
-from BackEnd.constants import HCO_STRING_SPOTS, ACTIONS, RIM_COORDS, TOP_KEY_COORDS, HOME_RIM_COORDS, AWAY_RIM_COORDS
+from BackEnd.constants import HCO_STRING_SPOTS, ACTIONS, RIM_COORDS, TOP_KEY_COORDS, HOME_RIM_COORDS, AWAY_RIM_COORDS, HOME_TOP_KEY, AWAY_TOP_KEY
 import random
 import logging
 
@@ -97,7 +97,9 @@ class Animator:
         if ball_handler:
             if hold_up:
                 # Stopped at top of key
-                bh_end = TOP_KEY_COORDS
+                # ✅ Use correct top key based on which team is on offense
+                # Home offense: HOME_TOP_KEY (x=64), Away offense: AWAY_TOP_KEY (x=36)
+                bh_end = AWAY_TOP_KEY if is_away_offense else HOME_TOP_KEY
             else:
                 # Shot attempt - position 4-6 grid spots from rim
                 rim_x = AWAY_RIM_COORDS["x"] if is_away_offense else HOME_RIM_COORDS["x"]
@@ -127,13 +129,17 @@ class Animator:
         if hold_up:
             # Stopping defender when break is stopped at top of key
             # ✅ Position stopper DIRECTLY in front of ball handler (between ball handler and basket they're defending)
-            # Home offense (attacking right): stopper x GREATER than ball handler (toward basket)
-            # Away offense (attacking left): stopper x LESS than ball handler (toward basket)
+            # Home offense: stopper x = ball handler x + 2 (GREATER, toward basket)
+            # Away offense: stopper x = ball handler x - 2 (LESS, toward basket)
             if stopper:
-                offset_x = 2 if not is_away_offense else -2  # Position 2 spots in front (between ball handler and basket)
+                # ✅ Use correct top key based on which team is on offense
+                top_key = AWAY_TOP_KEY if is_away_offense else HOME_TOP_KEY
+                # Home offense (attacking right): stopper x GREATER than ball handler
+                # Away offense (attacking left): stopper x LESS than ball handler
+                offset_x = 2 if not is_away_offense else -2
                 end = {
-                    "x": TOP_KEY_COORDS["x"] + offset_x,
-                    "y": TOP_KEY_COORDS["y"],  # Same Y as ball handler (directly in front)
+                    "x": top_key["x"] + offset_x,
+                    "y": top_key["y"],  # Same Y as ball handler (directly in front)
                 }
                 build_movement(stopper, end, action=ACTIONS["GUARD_BALL"])
                 animated_player_ids.add(getattr(stopper, "player_id", None))
