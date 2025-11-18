@@ -194,9 +194,15 @@ class ShotManager:
         offense_reb_value = off_team.strategy_settings.get("rebounding", 2)  # Crash boards vs get back
         defense_tempo_value = def_team.strategy_settings.get("tempo", 2)  # Stay vs release for FB
         
+        # Debug logging for release player logic
+        import logging
+        logging.warning(f"🏃 RELEASE PLAYER DEBUG - def_team={def_team.name}, defense_tempo_value={defense_tempo_value}, strategy_settings={def_team.strategy_settings.get('tempo', 'MISSING')}")
+        
         # Determine defensive players releasing for fast break
         defense_release_chances = {0: 0.0, 1: 0.25, 2: 0.5, 3: 0.75, 4: 1.0}
         defense_releases = random.random() < defense_release_chances[defense_tempo_value]
+        
+        logging.warning(f"🏃 RELEASE PLAYER DEBUG - defense_releases={defense_releases}, release_chance={defense_release_chances.get(defense_tempo_value, 'INVALID')}")
         release_pos = "PG" if shooter_pos != "PG" else "SG"
         
         defense_rebounders = [pos for pos, p in def_team.lineup.items() if pos != release_pos] if defense_releases else list(def_team.lineup.keys())
