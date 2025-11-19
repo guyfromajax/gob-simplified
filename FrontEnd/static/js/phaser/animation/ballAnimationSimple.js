@@ -120,10 +120,13 @@ export function getPlayerTweenTargets(scene, playerSprite, jerseyNo = null) {
   
   // If player has ball, include ball and shadow in targets
   // This makes Phaser keep them in sync automatically
+  // ✅ SAFETY GUARD: Don't include ball if pass is in flight (prevents conflicts)
+  // This is defensive programming - even if state wasn't cleared proactively, this prevents conflicts
   const ballHolderId = getBallHolderId(scene);
   const playerId = playerSprite?.playerId || null;
+  const passInFlight = scene.passInFlight === true;
   
-  if (ballHolderId && playerId === ballHolderId) {
+  if (ballHolderId && playerId === ballHolderId && !passInFlight) {
     const ballSprite = scene.ballSprite;
     const ballShadowSprite = scene.ballShadowSprite;
     

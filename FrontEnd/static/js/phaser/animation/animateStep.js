@@ -26,6 +26,7 @@ import {
   isBallHolder,
   initializeBallHolderState,
   setBallHolderId,
+  clearBallHolder,
 } from "./ballAnimationSimple.js";
 
 export const PLAYER_TWEEN_DEBUG = false;
@@ -138,6 +139,12 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
     // For non-pass movements, check simple ball holder state and include ball/shadow in targets
     // For passes, use old system (ball will be detached and animated separately)
     const isPassing = step.action === 'pass' || scene.passInFlight;
+    
+    // ✅ PROACTIVE STATE MANAGEMENT: Clear ball holder state when pass action detected
+    // This ensures state is correct before creating tween (prevents ball from being in passer's tween)
+    if (step.action === 'pass') {
+      clearBallHolder(scene);
+    }
     
     let tweenTargets;
     if (isPassing) {

@@ -15,6 +15,11 @@ import {
   isAnimationDebugEnabled,
 } from "../utils/debugFlags.js";
 import { getBallController } from './BallControllerAdapter.js';
+// ✅ NEW (Step 1): Import simple ball holder state functions
+import {
+  clearBallHolder,
+  setBallHolderId,
+} from "./ballAnimationSimple.js";
 
 const BALL_DEPTH = 1000;
 export const PASS_DEBUG = false;
@@ -440,6 +445,11 @@ export async function runPass(scene, cfg = {}) {
 
   scene.passInFlight = true;
   if (!deferOwnership) setPendingOwner(scene, toId);
+  
+  // ✅ PROACTIVE STATE MANAGEMENT: Clear ball holder state when pass starts
+  // This ensures ball holder state reflects reality (ball is in flight, not with any player)
+  // This prevents conflicts where passer's tween might still include ball
+  clearBallHolder(scene);
 
   let startPosition = null;
   let endPosition = null;
@@ -590,6 +600,12 @@ export async function runPass(scene, cfg = {}) {
           scene.currentBallOwnerRef.value = toSprite;
         }
         scene.ballDetached = false;
+        
+        // ✅ PROACTIVE STATE MANAGEMENT: Set ball holder state to receiver when pass completes
+        // This ensures ball holder state reflects reality (receiver now has the ball)
+        // This enables receiver's tween to include ball in targets (WIP_GOB approach)
+        setBallHolderId(scene, toId);
+        
         scene.events?.emit('ballAttached', { toId });
         if (PASS_DEBUG) animationDebugLog('attach(B)', { toId });
       }
