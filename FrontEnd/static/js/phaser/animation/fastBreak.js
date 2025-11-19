@@ -1,7 +1,7 @@
 import * as Phaser from "https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.esm.js";
 import { gridToPixels } from "../utils/gridToPixels.js";
 import { attachBallToPlayer } from "./BallControllerAdapter.js";
-import { tweenPlayerTo, runPass } from "./ballTween.js";
+import { tweenPlayerTo, runPass, detachBall } from "./ballTween.js";
 import { animateBallToPosition } from "./ballAnimationSimple.js";
 import animationConfig from "./animation_config.js";
 import { HOME_RIM_COORDS, AWAY_RIM_COORDS, HOME_TOP_KEY, AWAY_TOP_KEY } from "./courtConstants.js";
@@ -381,6 +381,18 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
   // Shoot the ball
   safeTransition(scene.stateMachine, States.ShotAttempt);
   
+  // ✅ DETACH BALL: Must detach ball from player before animating shot
+  // Similar to shootBall() in ballManager.js - prevents ball from following player during shot
+  detachBall(scene, ballSprite);
+  scene.ballDetached = true; // Stop old ball following system
+  if (scene.ballController) {
+    if (typeof scene.ballController.stopFollowingPlayer === 'function') {
+      scene.ballController.stopFollowingPlayer();
+    }
+    scene.ballController.isAttached = false;
+    scene._shotInProgress = true; // Prevent re-attachment during shot
+  }
+  
   // Adjust rim position for made shots (1 grid unit closer to shooter)
   const adjustedBasket = { ...basket };
   if (turnData.result_type === "MAKE") {
@@ -396,6 +408,11 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
     easing: "Sine.easeInOut",
     arc: { height: 50 }
   });
+  
+  // Clear shot in progress flag after animation completes
+  if (scene.ballController) {
+    scene._shotInProgress = false;
+  }
   
   // Handle outcome
   if (turnData.result_type === "MAKE") {
