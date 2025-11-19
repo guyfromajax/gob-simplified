@@ -233,13 +233,14 @@ function getBallControllerFromScene(scene) {
  * Simple, clean function that animates the ball to a position using:
  * - Distance-based duration (consistent speeds)
  * - BallController integration (flight state management)
- * - Simple Phaser tween (no complex arc logic)
+ * - Optional arc support via QuadraticBezier curve
  * 
  * @param {Phaser.Scene} scene - The Phaser scene
  * @param {{x: number, y: number}} targetPosition - Target position in pixels
  * @param {Object} options - Optional parameters
  * @param {number} options.duration - Duration in ms (if not provided, calculated from distance)
  * @param {string} options.easing - Easing function (default: 'Linear')
+ * @param {Object|boolean} options.arc - Arc options: {height: number} or true/false (default: false)
  * @returns {Promise} Resolves when animation completes
  */
 export async function animateBallToPosition(scene, targetPosition, options = {}) {
@@ -248,7 +249,7 @@ export async function animateBallToPosition(scene, targetPosition, options = {})
   }
   
   const ballSprite = scene.ballSprite;
-  const { duration, easing = 'Linear' } = options;
+  const { duration, easing = 'Linear', arc } = options;
   
   // Calculate duration from distance if not provided
   const calculatedDuration = duration || calculateBallDuration(ballSprite, targetPosition.x, targetPosition.y);
@@ -272,23 +273,69 @@ export async function animateBallToPosition(scene, targetPosition, options = {})
   }
   
   return new Promise((resolve, reject) => {
-    // Create simple tween (no arc support - can add later if needed)
-    const tween = scene.tweens.add({
-      targets: ballSprite,
-      x: targetPosition.x,
-      y: targetPosition.y,
-      duration: calculatedDuration,
-      ease: easing,
-      onComplete: () => {
-        // ✅ BALL CONTROLLER INTEGRATION: End flight state
-        if (controllerStartedFlight && ballController) {
-          ballController.endFlight(null, { keepVisible: true });
+    // Check if arc is enabled
+    const arcEnabled =
+      !!arc &&
+      !(
+        typeof arc === 'object' &&
+        Object.prototype.hasOwnProperty.call(arc, 'enabled') &&
+        arc.enabled === false
+      );
+
+    if (arcEnabled) {
+      // ✅ ARC SUPPORT: Use QuadraticBezier curve for arced motion
+      const startX = ballSprite.x;
+      const startY = ballSprite.y;
+      const controlX = (startX + targetPosition.x) / 2;
+      const hasHeightProp =
+        typeof arc === 'object' && Object.prototype.hasOwnProperty.call(arc, 'height');
+      const height = hasHeightProp && arc.height != null && arc.height !== false ? arc.height : 50;
+      const controlY = Math.min(startY, targetPosition.y) - height;
+      
+      const curve = new Phaser.Curves.QuadraticBezier(
+        new Phaser.Math.Vector2(startX, startY),
+        new Phaser.Math.Vector2(controlX, controlY),
+        new Phaser.Math.Vector2(targetPosition.x, targetPosition.y)
+      );
+      
+      const progress = { t: 0 };
+      const tween = scene.tweens.add({
+        targets: progress,
+        t: 1,
+        duration: calculatedDuration,
+        ease: easing,
+        onUpdate: () => {
+          const p = curve.getPoint(progress.t);
+          ballSprite.setPosition(p.x, p.y);
+        },
+        onComplete: () => {
+          // ✅ BALL CONTROLLER INTEGRATION: End flight state
+          if (controllerStartedFlight && ballController) {
+            ballController.endFlight(null, { keepVisible: true });
+          }
+          resolve();
         }
-        resolve();
-      }
-    });
-    
-    tween?.once?.('stop', () => reject(new Error('tween stopped')));
+      });
+      tween?.once?.('stop', () => reject(new Error('tween stopped')));
+    } else {
+      // ✅ STRAIGHT LINE: Simple tween for straight ball motion
+      const tween = scene.tweens.add({
+        targets: ballSprite,
+        x: targetPosition.x,
+        y: targetPosition.y,
+        duration: calculatedDuration,
+        ease: easing,
+        onComplete: () => {
+          // ✅ BALL CONTROLLER INTEGRATION: End flight state
+          if (controllerStartedFlight && ballController) {
+            ballController.endFlight(null, { keepVisible: true });
+          }
+          resolve();
+        }
+      });
+      
+      tween?.once?.('stop', () => reject(new Error('tween stopped')));
+    }
   });
 }
 
