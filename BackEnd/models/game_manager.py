@@ -123,7 +123,8 @@ class GameManager:
             "last_rebounder": None,
             "last_rebound": None,
             "last_stealer": None,
-            "last_turnover_player": None
+            "last_turnover_player": None,
+            "ineligible_players": []  # Track players with 5+ fouls (fouled out)
         }
 
 

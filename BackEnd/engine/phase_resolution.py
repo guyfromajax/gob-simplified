@@ -54,6 +54,39 @@ def get_in_play_defenders(ball_handler, defense_lineup, target_is_away):
     return in_play
 
 
+def check_and_handle_foul_out(foul_player, game_state, foul_team):
+    """
+    Check if player fouled out (5+ fouls) and handle accordingly.
+    Returns dict with foul_out info.
+    """
+    if not foul_player:
+        return {"fouled_out": False, "foul_count": 0}
+    
+    foul_count = foul_player.get_stat("F", "game")
+    fouled_out = foul_count >= 5
+    
+    if fouled_out:
+        # Add to ineligible players list if not already there
+        if "ineligible_players" not in game_state:
+            game_state["ineligible_players"] = []
+        if foul_player.player_id not in game_state["ineligible_players"]:
+            game_state["ineligible_players"].append(foul_player.player_id)
+        
+        # Remove from lineup if currently in lineup
+        for pos, player in list(foul_team.lineup.items()):
+            if player and hasattr(player, "player_id") and player.player_id == foul_player.player_id:
+                foul_team.lineup[pos] = None
+                break
+    
+    return {
+        "fouled_out": fouled_out,
+        "foul_count": foul_count,
+        "foul_player_id": foul_player.player_id if fouled_out else None,
+        "foul_player_name": foul_player.get_name() if fouled_out else None,
+        "foul_player_photo": getattr(foul_player, "photo", None) if fouled_out else None,
+        "foul_player_team": foul_team.name if fouled_out else None
+    }
+
 def select_foul_player(foul_team_type, ball_handler, off_lineup, def_lineup):
     """
     Select which player committed the foul based on probabilistic logic.
@@ -114,6 +147,10 @@ def resolve_non_shooting_foul(roles, game):
 
     # Track the foul
     foul_player.record_stat("F")
+    
+    # Check if player fouled out and handle accordingly
+    foul_out_info = check_and_handle_foul_out(foul_player, game_state, foul_team)
+    
     if foul_team == def_team:
         def_team.team_fouls += 1
         text = f"{get_name_safe(foul_player)} fouls {get_name_safe(ball_handler)}!"
@@ -154,7 +191,7 @@ def resolve_non_shooting_foul(roles, game):
 
     bh_pos = get_player_position(off_team.lineup, ball_handler)
     
-    return {
+    result = {
         "result_type": "FOUL",
         "ball_handler": ball_handler,
         "screener": screener,
@@ -164,8 +201,21 @@ def resolve_non_shooting_foul(roles, game):
         "possession_flips": False,
         "time_elapsed": time_elapsed,
         "foul_player_id": getattr(foul_player, "player_id", None) if foul_player else None,
-        "foul_team": game_state.get("foul_team")
+        "foul_team": game_state.get("foul_team"),
+        "foul_count": foul_out_info["foul_count"],
+        "fouled_out": foul_out_info["fouled_out"]
     }
+    
+    # Add foul out player info if applicable
+    if foul_out_info["fouled_out"]:
+        result["foul_out_player"] = {
+            "player_id": foul_out_info["foul_player_id"],
+            "name": foul_out_info["foul_player_name"],
+            "photo": foul_out_info["foul_player_photo"],
+            "team": foul_out_info["foul_player_team"]
+        }
+    
+    return result
 
 # #FAST BREAK
 def resolve_fast_break_logic(game: "GameManager"):
@@ -1131,6 +1181,8 @@ def resolve_full_court_press_logic(game: "GameManager"):
         foul_player.record_stat("F")
         def_team.team_fouls += 1  # Increment team fouls
         roles["foul_player"] = foul_player
+        # Check for foul out
+        check_and_handle_foul_out(foul_player, game_state, def_team)
         # For now, treat as non-shooting foul (FCP happens before shot attempt)
         # This will trigger side inbound or bonus free throws via existing logic
         result_type = "FOUL"
@@ -1142,6 +1194,8 @@ def resolve_full_court_press_logic(game: "GameManager"):
         foul_player.record_stat("F")
         off_team.team_fouls += 1  # Increment team fouls
         roles["foul_player"] = foul_player
+        # Check for foul out
+        check_and_handle_foul_out(foul_player, game_state, off_team)
         result_type = "FOUL"
         # text = "PRESS! Offensive foul"
         # Track FCP success: offensive foul = defensive success
@@ -1706,6 +1760,8 @@ def resolve_half_court_trap_logic(game: "GameManager"):
         foul_player.record_stat("F")
         def_team.team_fouls += 1  # Increment team fouls
         roles["foul_player"] = foul_player
+        # Check for foul out
+        check_and_handle_foul_out(foul_player, game_state, def_team)
         result_type = "FOUL"
     elif result_type == "O_FOUL":
         game_state["foul_team"] = "OFFENSE"
@@ -1714,6 +1770,8 @@ def resolve_half_court_trap_logic(game: "GameManager"):
         foul_player.record_stat("F")
         off_team.team_fouls += 1  # Increment team fouls
         roles["foul_player"] = foul_player
+        # Check for foul out
+        check_and_handle_foul_out(foul_player, game_state, off_team)
         result_type = "FOUL"
         # Track HCT success: offensive foul = defensive success
         def_scouting["defense"]["HCT"]["success"] += 1

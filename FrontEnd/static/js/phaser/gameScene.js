@@ -1045,6 +1045,29 @@ export function createGameScene(Phaser) {
         applyPlayerStats(turn);
         applyTeamStats(turn);
 
+        // Check for foul out and show popup
+        if (turn.fouled_out && turn.foul_out_player) {
+          // Dynamically import foul out popup
+          import('./utils/foulOutPopup.js').then(({ showFoulOutPopup }) => {
+            // Get game context from scene
+            const mode = this.mode || (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('mode') : null) || 'single';
+            const urlParams = new URLSearchParams(window.location.search);
+            const tournamentId = urlParams.get('tournament_id') || null;
+            const franchiseId = urlParams.get('franchise_id') || null;
+            
+            showFoulOutPopup({
+              player: turn.foul_out_player,
+              gameId: this.gameId,
+              mode: mode,
+              quarter: liveQuarter,
+              tournamentId: tournamentId,
+              franchiseId: franchiseId
+            });
+          }).catch(err => {
+            console.error('Failed to load foul out popup:', err);
+          });
+        }
+
         if (liveScore[homeTeam] !== prevHome || liveScore[awayTeam] !== prevAway) {
           emit('score:update', {
             home: liveScore[homeTeam],

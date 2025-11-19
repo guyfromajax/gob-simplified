@@ -299,12 +299,28 @@ class ShotManager:
                 # AND-1 situation
                 self.game_state["shooter"] = shooter 
                 foul_player.record_stat("F")
+                
+                # Check if player fouled out (5th foul)
+                from BackEnd.engine.phase_resolution import check_and_handle_foul_out
+                foul_out_info = check_and_handle_foul_out(foul_player, self.game_state, def_team)
+                
                 def_team.team_fouls += 1  # Increment team fouls for shooting foul
                 self.game_state["foul_team"] = "DEFENSE"
                 self.game_state["offensive_state"] = "FREE_THROW"
                 self.game_state["free_throws"] = 1
                 self.game_state["free_throws_remaining"] = 1
                 text = f"{get_name_safe(shooter)} makes the shot. {get_name_safe(foul_player)} fouls him! AND-1 opportunity!"
+                
+                # Add foul out info to result if applicable
+                if foul_out_info["fouled_out"]:
+                    result["fouled_out"] = True
+                    result["foul_out_player"] = {
+                        "player_id": foul_out_info["foul_player_id"],
+                        "name": foul_out_info["foul_player_name"],
+                        "photo": foul_out_info["foul_player_photo"],
+                        "team": foul_out_info["foul_player_team"]
+                    }
+                    result["foul_count"] = foul_out_info["foul_count"]
             else:
                 # Check for defensive pressure opportunity (FCP/HCT)
                 pressure_type = self.game.turn_manager.determine_defensive_pressure_type()
@@ -332,6 +348,11 @@ class ShotManager:
                 # Shooting foul → free throws
                 self.game_state["shooter"] = shooter 
                 foul_player.record_stat("F")
+                
+                # Check if player fouled out (5th foul)
+                from BackEnd.engine.phase_resolution import check_and_handle_foul_out
+                foul_out_info = check_and_handle_foul_out(foul_player, self.game_state, def_team)
+                
                 def_team.team_fouls += 1  # Increment team fouls for shooting foul
                 self.game_state["foul_team"] = "DEFENSE"
                 self.game_state["offensive_state"] = "FREE_THROW"
@@ -339,6 +360,17 @@ class ShotManager:
                 self.game_state["free_throws_remaining"] = self.game_state["free_throws"]
                 text = f"{get_name_safe(foul_player)} fouls {get_name_safe(shooter)} on the shot."
                 possession_flips = False
+                
+                # Add foul out info to result if applicable
+                if foul_out_info["fouled_out"]:
+                    result["fouled_out"] = True
+                    result["foul_out_player"] = {
+                        "player_id": foul_out_info["foul_player_id"],
+                        "name": foul_out_info["foul_player_name"],
+                        "photo": foul_out_info["foul_player_photo"],
+                        "team": foul_out_info["foul_player_team"]
+                    }
+                    result["foul_count"] = foul_out_info["foul_count"]
                 
                 # ✅ Add player positioning data for frontend animation (defensive foul on miss)
                 # Players still released/got back when shot was taken, so include this data
