@@ -426,11 +426,13 @@ def get_game_state(game_id: str, quarter: int | None = None):
                 "home_team": {
                     "name": gm.home_team.name,
                     "team_fouls": gm.home_team.team_fouls,
+                    "timeouts": getattr(gm.home_team, 'timeouts', 5),
                     "attributes": gm.home_team.team_attributes  # Team attributes for S3 tab
                 },
                 "away_team": {
                     "name": gm.away_team.name,
                     "team_fouls": gm.away_team.team_fouls,
+                    "timeouts": getattr(gm.away_team, 'timeouts', 5),
                     "attributes": gm.away_team.team_attributes  # Team attributes for S3 tab
                 }
             }
