@@ -610,6 +610,7 @@ export async function runPass(scene, cfg = {}) {
         // We can detect if this is a receive pass by checking if passInFlight will be cleared soon
         // Actually, simpler: only set it for non-receive passes, receive actions will handle their own state
         // For now, don't set it here - let the receive action handle it after its tween completes
+      }
 
       scene.events?.emit('passEnd', { toId });
       if (PASS_DEBUG) animationDebugLog('passEnd', { toId });
