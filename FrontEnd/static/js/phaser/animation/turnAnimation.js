@@ -8,7 +8,7 @@ import {
   animateKickoutReset
 } from "./ballManager.js";
 import { attachBallToPlayer } from "./BallControllerAdapter.js";
-import { tweenBallTo, runPass, PASS_DEBUG, tweenPlayerTo } from "./ballTween.js";
+import { runPass, PASS_DEBUG, tweenPlayerTo } from "./ballTween.js";
 import animationConfig from "./animation_config.js";
 import { HOME_RIM_COORDS, AWAY_RIM_COORDS } from "./courtConstants.js";
 import { deriveOffenseContext, computeFastBreakOutletTarget } from "./outletUtils.js";
@@ -34,10 +34,12 @@ import {
   getCurrentOwner
 } from "../ball/ballController.js";
 // ✅ NEW (Step 1): Import simple ball holder state functions
+// ✅ STEP 3 MIGRATION: Import new ball animation function
 import {
   initializeBallHolderState,
   setBallHolderId,
   clearBallHolder,
+  animateBallToPosition,
 } from "./ballAnimationSimple.js";
 
 // Cap the time spent on any single movement step. Large timestamp gaps can
@@ -1125,7 +1127,9 @@ async function runInboundSetup({
   animationDebugLog(`[inbound][ballTweenStart][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
   let ballTween;
   if (animationConfig.enableBallTween) {
-    ballTween = tweenBallTo(scene, ballSprite, spotPx, {
+    // ✅ STEP 3 MIGRATION: Use new animateBallToPosition() instead of tweenBallTo()
+    // animateBallToPosition() gets ballSprite from scene.ballSprite internally
+    ballTween = animateBallToPosition(scene, spotPx, {
       duration: 500,
       easing: "Sine.easeInOut"
     }).then(() => {
