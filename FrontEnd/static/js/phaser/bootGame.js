@@ -489,7 +489,10 @@ async function handleSimToFourth() {
           away: payload.away_team,
         });
       }
-      console.log({event:'simulate-quarter:request', mode, homeTeam, awayTeam, quarter: currentQ, gameId: gId});
+      // ✅ FIX: Add full_sim=true for "simming" operations (fully simulate without animation)
+      payload.full_sim = true;
+      
+      console.log({event:'simulate-quarter:request', mode, homeTeam, awayTeam, quarter: currentQ, gameId: gId, full_sim: true});
       const res = await fetch('/api/simulate-quarter', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
