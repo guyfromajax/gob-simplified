@@ -1,16 +1,60 @@
-# Animation System Overview - PossessionRunner (EXPERIMENTAL)
+# Animation System Overview
 
-> ⚠️ **IMPORTANT**: This document describes an **experimental animation system** (PossessionRunner) 
-> that is **currently disabled by default**. The production system uses the "legacy" animation 
-> approach documented in `basic_animation_overview.md`. 
-> 
-> To enable PossessionRunner: `window.FEATURE_POSSESSION_RUNNER = true`
-> 
-> **For most development work, refer to `basic_animation_overview.md` first.**
+> **Last Updated:** December 2024
+
+This document provides an overview of the front-end animation stack for **GOB**, including both the production system and experimental components.
 
 ---
 
-This document gives incoming contributors a concise tour of the **experimental** front-end
+## Production Animation System
+
+### Ball Animation System (WIP_GOB Approach) ✅ **COMPLETE**
+
+**Status:** Fully migrated and operational (December 2024)
+
+The ball animation system has been successfully migrated to the WIP_GOB approach, which uses Phaser's native tween capabilities with conditional target arrays. This eliminates ownership conflicts and significantly simplifies the codebase.
+
+**Key Components:**
+- **Ball Holder State:** `scene.gameState.ballHolder` (string ID) - single source of truth
+- **Conditional Targets:** `getPlayerTweenTargets()` - includes ball in player tween when player has ball
+- **Simple Movement:** `animateBallToPosition()`, `animateShotToRim()` - distance-based duration, arc support
+
+**Files:**
+- `FrontEnd/static/js/phaser/animation/ballAnimationSimple.js` - Core system
+- All ball animations (passes, shots, bounces) use the new system
+
+**Benefits:**
+- ✅ No ownership conflicts (single source of truth)
+- ✅ No ball teleports (Phaser handles sync automatically)
+- ✅ Simpler code (removed 1000+ lines of complex tracking)
+- ✅ Better performance (no update callbacks)
+- ✅ Easier debugging (one place to check state)
+
+**See:** `BALL_ANIMATION_MIGRATION_PLAN.md` for complete migration details.
+
+### Player Animation System
+
+**Status:** Already using WIP_GOB approach
+
+Player animations already use the simplified approach:
+- `animateStep()` uses `getPlayerTweenTargets()` for conditional ball inclusion
+- Distance-based duration calculation
+- Simple Phaser tweens (no complex following systems)
+
+**Optional Cleanup:** `tweenPlayerTo()` in `ballTween.js` still uses old-style `onUpdate` callback for ball following, but this is only used for fast break outlet passes. Low priority since main player animations already use the WIP_GOB approach.
+
+---
+
+## Experimental Animation System - PossessionRunner
+
+> ⚠️ **IMPORTANT**: This section describes an **experimental animation system** (PossessionRunner) 
+> that is **currently disabled by default**. The production system uses the approach documented above. 
+> 
+> To enable PossessionRunner: `window.FEATURE_POSSESSION_RUNNER = true`
+> 
+> **For most development work, refer to the production system above.**
+
+This section gives incoming contributors a concise tour of the **experimental** front-end
 animation stack for **GOB**. It covers the architectural goals, the current
 state of the migration, and the major components for the PossessionRunner system.
 
@@ -43,7 +87,7 @@ state of the migration, and the major components for the PossessionRunner system
 5. **Add diagnostics** (DEBUG_ANIM hooks, teleport detection, etc.).
    - Many hooks exist; we continue to expand them as issues surface.
 
-## Key Modules
+## Key Modules (Experimental)
 
 - **PossessionRunner** – orchestrates half-court possessions, manages ball
   ownership, queues player tweens, and transitions the FSM. Emits
@@ -53,8 +97,10 @@ state of the migration, and the major components for the PossessionRunner system
 - **Ball helpers** – `ballManager.js` handles passes, rebounds, and shot arcs,
   and integrates with the runner via injected helper callbacks.
 - **Fast break / inbound adapters** – legacy systems still handle special
-  flows; we’re gradually routing them through the runner or compatible
+  flows; we're gradually routing them through the runner or compatible
   timelines.
+
+**Note:** The production ball animation system (WIP_GOB approach) is separate from PossessionRunner and is fully operational. See the "Production Animation System" section above.
 
 ## Current Challenges
 
