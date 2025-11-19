@@ -146,17 +146,28 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
       clearBallHolder(scene);
     }
     
+    // ✅ FIX: Don't include ball in receiver's tween during "receive" action
+    // The ball is already being attached by runPass(), and including it here causes conflicts
+    // We'll set ball holder state after receive action completes, not during
+    const isReceiving = step.action === 'receive';
+    if (isReceiving) {
+      // Don't include ball in receive tween - ball attachment is handled by runPass()
+      // Setting ball holder state here would cause the tween to include ball, which conflicts with pass cleanup
+    }
+    
     let tweenTargets;
-    if (isPassing) {
-      // Pass action - use old system for now (ball will be animated separately)
+    if (isPassing || isReceiving) {
+      // Pass or receive action - use old system (ball will be animated separately)
+      // Don't include ball in receiver's tween - it's already being attached by runPass()
       const playerHasBall = currentBallOwnerRef?.value === sprite && !getPendingOwner(scene);
       const ballIsValid = ballSprite && 
                          ballSprite.scene && 
                          ballSprite.active !== false && 
                          !ballSprite.destroyed;
-      tweenTargets = playerHasBall && ballIsValid
-        ? [sprite, ballSprite]  // Ball moves WITH player (old system)
-        : [sprite];             // Player only
+      // Only include ball for pass actions, not receive actions (receiver gets ball from runPass)
+      tweenTargets = (isPassing && playerHasBall && ballIsValid)
+        ? [sprite, ballSprite]  // Ball moves WITH player (old system) - only for passers
+        : [sprite];             // Player only (receiver doesn't have ball in tween)
     } else {
       // Simple HCO movement (non-pass) - use WIP_GOB approach
       // This uses getPlayerTweenTargets which checks ball holder state and includes ball/shadow automatically
@@ -281,6 +292,16 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
         }
         tweenCompleted = true;
         clearTimeout(timeoutId);
+        
+        // ✅ FIX: Set ball holder state after receive action completes
+        // Don't set it during receive (conflicts with pass cleanup), but set it after receive completes
+        // This ensures receiver's subsequent movements will include ball in targets
+        if (step.action === 'receive' && sprite.playerId) {
+          // Always set ball holder state after receive completes (ball is now with receiver)
+          // The pass might still be completing, but the ball is attached to receiver now
+          // Setting it here ensures receiver's subsequent movements will include ball in targets
+          setBallHolderId(scene, sprite.playerId);
+        }
         if (duration > 2000) {
           console.log('animateStep: Tween completed', {
             tweenId,
