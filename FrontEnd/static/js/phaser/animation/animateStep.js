@@ -20,6 +20,13 @@ import {
   animationDebugWarn,
   isAnimationDebugEnabled,
 } from "../utils/debugFlags.js";
+// ✅ NEW (Step 1): Import simple ball holder state functions
+import {
+  getPlayerTweenTargets,
+  isBallHolder,
+  initializeBallHolderState,
+  setBallHolderId,
+} from "./ballAnimationSimple.js";
 
 export const PLAYER_TWEEN_DEBUG = false;
 
@@ -127,20 +134,41 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
 
     let startPromise = Promise.resolve();
 
-    // Determine if this player has the ball - if so, include ball in tween targets
-    // This ensures ball and player move together smoothly (based on WIP_GOB learnings)
-    // Must check that ballSprite exists and is a valid Phaser object before including it
-    // Also exclude ball if a pass is happening (ball will be detached)
-    const playerHasBall = currentBallOwnerRef?.value === sprite && !getPendingOwner(scene);
+    // ✅ NEW (Step 2): Use WIP_GOB approach - conditional target arrays
+    // For non-pass movements, check simple ball holder state and include ball/shadow in targets
+    // For passes, use old system (ball will be detached and animated separately)
     const isPassing = step.action === 'pass' || scene.passInFlight;
-    const ballIsValid = ballSprite && 
-                       ballSprite.scene && 
-                       ballSprite.active !== false && 
-                       !ballSprite.destroyed &&
-                       !isPassing;  // Don't include ball if pass is happening
-    const tweenTargets = playerHasBall && ballIsValid
-      ? [sprite, ballSprite]  // Ball moves WITH player
-      : [sprite];             // Player only
+    
+    let tweenTargets;
+    if (isPassing) {
+      // Pass action - use old system for now (ball will be animated separately)
+      const playerHasBall = currentBallOwnerRef?.value === sprite && !getPendingOwner(scene);
+      const ballIsValid = ballSprite && 
+                         ballSprite.scene && 
+                         ballSprite.active !== false && 
+                         !ballSprite.destroyed;
+      tweenTargets = playerHasBall && ballIsValid
+        ? [sprite, ballSprite]  // Ball moves WITH player (old system)
+        : [sprite];             // Player only
+    } else {
+      // Simple HCO movement (non-pass) - use WIP_GOB approach
+      // This uses getPlayerTweenTargets which checks ball holder state and includes ball/shadow automatically
+      const jerseyNo = sprite.jerseyNo || null;
+      const targets = getPlayerTweenTargets(scene, sprite, jerseyNo);
+      
+      // Filter out any null/invalid targets
+      tweenTargets = targets.filter(target => 
+        target && 
+        target.scene && 
+        target.active !== false && 
+        !target.destroyed
+      );
+      
+      // Fallback to old system if new system didn't return valid targets
+      if (tweenTargets.length === 0) {
+        tweenTargets = [sprite];
+      }
+    }
 
     // Filter out any null/invalid targets before creating tween
     const validTargets = tweenTargets.filter(target => 
@@ -214,15 +242,29 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
         }
       },
       onUpdate: () => {
-        // Ball position is now handled by tween targets, but keep this as fallback
-        // for cases where ball might not be in targets array
-        if (
-          currentBallOwnerRef?.value === sprite &&
-          ballSprite?.setPosition &&
-          !getPendingOwner(scene) &&
-          !tweenTargets.includes(ballSprite)
-        ) {
-          ballSprite.setPosition(sprite.x, sprite.y);
+        // ✅ NEW (Step 2): Handle ball shadow offset when using WIP_GOB approach
+        // When ball shadow is in targets, it should be offset from ball position
+        const ballSpriteInTargets = validTargets.find(t => t === ballSprite);
+        const ballShadowSpriteInTargets = validTargets.find(t => t === scene.ballShadowSprite);
+        
+        if (ballSpriteInTargets && ballShadowSpriteInTargets) {
+          // Ball and shadow are in targets - offset shadow from ball (WIP_GOB approach)
+          const ballSpriteObj = ballSprite;
+          const ballShadowSprite = scene.ballShadowSprite;
+          if (ballSpriteObj && ballShadowSprite) {
+            ballShadowSprite.x = ballSpriteObj.x + 4;
+            ballShadowSprite.y = ballSpriteObj.y + 4;
+          }
+        } else {
+          // Fallback: Old system - update ball position manually if not in targets
+          if (
+            currentBallOwnerRef?.value === sprite &&
+            ballSprite?.setPosition &&
+            !getPendingOwner(scene) &&
+            !validTargets.includes(ballSprite)
+          ) {
+            ballSprite.setPosition(sprite.x, sprite.y);
+          }
         }
       },
       onComplete: async () => {
