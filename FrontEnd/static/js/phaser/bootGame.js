@@ -498,11 +498,16 @@ async function handleSimToFourth() {
       if (!res.ok) throw new Error('Simulation failed');
       lastSummary = await res.json();
       gId = lastSummary.game_id;
-      // ✅ FIX: When full_sim=true, backend increments quarter automatically after completion
-      // So we should use the quarter from the response, not just increment currentQ
-      // This ensures we're in sync with the backend's quarter number
-      currentQ = lastSummary.quarter || (currentQ + 1);
-      console.log(`✅ Q${currentQ - 1} fully simulated, backend reports quarter=${lastSummary.quarter}`);
+      // ✅ FIX: After fully simulating a quarter, increment to the next quarter
+      // This ensures the loop progresses: Q1 → Q2 → Q3 → exit (4 > 3)
+      const simulatedQuarter = currentQ;
+      currentQ += 1;
+      console.log(`✅ Q${simulatedQuarter} fully simulated, backend reports next quarter=${lastSummary.quarter}, moving to Q${currentQ}`);
+      // Safety check: if currentQ didn't increment, break to prevent infinite loop
+      if (currentQ === simulatedQuarter) {
+        console.error('🚨 Infinite loop detected: currentQ did not increment! Breaking loop.');
+        break;
+      }
     }
 
     // After Q1-Q3 simulated, redirect to set-lineup for Q4
@@ -646,9 +651,11 @@ async function handleSimFullGame() {
       lastSummary = await res.json();
       gId = lastSummary.game_id;
       if (lastSummary.is_final) break;
-      // ✅ FIX: When full_sim=true, backend increments quarter automatically
-      // So we should use the quarter from the response, not just increment currentQ
-      currentQ = lastSummary.quarter || (currentQ + 1);
+      // ✅ FIX: After fully simulating a quarter, increment to the next quarter
+      // The backend's quarter in the response is the NEXT quarter (after increment)
+      // But we need to manually increment currentQ to move to the next iteration
+      currentQ += 1;
+      console.log(`✅ Q${currentQ - 1} fully simulated, backend reports next quarter=${lastSummary.quarter}, moving to Q${currentQ}`);
     }
 
     gameId = gId;
