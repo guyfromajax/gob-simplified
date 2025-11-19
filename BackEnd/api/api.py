@@ -1341,6 +1341,7 @@ def simulate_turn_endpoint(request: TurnSimulationRequest):
             "offense_team": gm.offense_team.name,
             "defense_team": gm.defense_team.name,
             "game_id": game_id,
+            "ineligible_players": gm.game_state.get("ineligible_players", []),  # Players with 5+ fouls
             # Box score for real-time updates
             "box_score": gm.get_box_score(),
             "team_totals": {
