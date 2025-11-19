@@ -168,6 +168,46 @@ async function loadRoster() {
         if (gameRes.ok) {
           const gameData = await gameRes.json();
           const gamePlayers = gameData.players || [];
+          const ineligiblePlayers = gameData.ineligible_players || [];
+          
+          // Mark ineligible players in roster
+          if (ineligiblePlayers.length > 0) {
+            console.log(`Found ${ineligiblePlayers.length} ineligible players (fouled out)`);
+            roster.forEach(player => {
+              const playerId = player._id || player.playerId || player.player_id;
+              if (playerId && ineligiblePlayers.includes(String(playerId))) {
+                player.ineligible = true;
+                player.fouled_out = true;
+                console.log(`Marked ${player.name} as ineligible (fouled out)`);
+                
+                // Remove from current lineup if in lineup
+                Object.keys(lineup).forEach(pos => {
+                  if (lineup[pos] === playerId) {
+                    console.log(`Removing ${player.name} from lineup position ${pos} (fouled out)`);
+                    lineup[pos] = null;
+                    const slot = document.querySelector(`.slot[data-pos="${pos}"]`);
+                    if (slot) {
+                      const slotContent = slot.querySelector('.slot-content');
+                      if (slotContent) {
+                        slotContent.innerHTML = '';
+                        slotContent.classList.add('empty');
+                        slot.classList.remove('filled');
+                        slot.draggable = false;
+                        const removeBtn = slot.querySelector('.remove-btn');
+                        if (removeBtn) removeBtn.hidden = true;
+                      }
+                    }
+                  }
+                });
+              }
+            });
+            // Re-render views to show visual indicators
+            if (currentView === 'grid') {
+              renderRoster();
+            } else if (currentView === 'player') {
+              renderPlayerView();
+            }
+          }
           
           console.log(`Found ${gamePlayers.length} players with energy data from game`);
           
@@ -278,8 +318,13 @@ function renderRoster() {
   tbody.innerHTML = '';
   roster.forEach(p => {
     const tr = document.createElement('tr');
-    tr.draggable = true;
+    tr.draggable = !p.ineligible;  // Disable drag for ineligible players
     tr.dataset.playerId = p._id;
+    if (p.ineligible) {
+      tr.classList.add('ineligible');  // Add class for styling
+      tr.style.opacity = '0.5';  // Shade out
+      tr.style.pointerEvents = 'none';  // Disable interactions
+    }
     tr.addEventListener('dragstart', e => {
       e.dataTransfer.setData('text/plain', p._id);
     });
@@ -957,6 +1002,14 @@ function renderPlayerView() {
 
 function createPlayerCard(player) {
   const card = document.createElement('div');
+  
+  // Add ineligible styling for fouled-out players
+  if (player.ineligible || player.fouled_out) {
+    card.classList.add('ineligible');
+    card.style.opacity = '0.5';
+    card.style.pointerEvents = 'none';
+    card.style.cursor = 'not-allowed';
+  }
   card.className = 'player-card';
   card.dataset.playerId = player._id;
   
@@ -972,18 +1025,20 @@ function createPlayerCard(player) {
     e.dataTransfer.setData('text/plain', player._id);
   });
   
-  // Click to fill next slot
-  card.addEventListener('click', (e) => {
-    // Don't trigger on flip button, dropdown, or headshot clicks
-    if (e.target.closest('.flip-btn') || 
-        e.target.closest('.ratings-dropdown') || 
-        e.target.closest('.player-headshot-container')) {
-      return;
-    }
-    if (!isSelected) {
-      fillNextSlot(player._id);
-    }
-  });
+  // Click to fill next slot (only if not ineligible)
+  if (!player.ineligible && !player.fouled_out) {
+    card.addEventListener('click', (e) => {
+      // Don't trigger on flip button, dropdown, or headshot clicks
+      if (e.target.closest('.flip-btn') || 
+          e.target.closest('.ratings-dropdown') || 
+          e.target.closest('.player-headshot-container')) {
+        return;
+      }
+      if (!isSelected) {
+        fillNextSlot(player._id);
+      }
+    });
+  }
   
   const inner = document.createElement('div');
   inner.className = 'player-card-inner';
@@ -1050,6 +1105,38 @@ function createCardFront(player) {
     img.style.display = 'none';
   };
   headshotContainer.appendChild(img);
+  
+  // Add ineligible overlay/shade for fouled-out players
+  if (player.ineligible || player.fouled_out) {
+    headshotContainer.style.position = 'relative';
+    
+    // Add overlay shade
+    const overlay = document.createElement('div');
+    overlay.style.position = 'absolute';
+    overlay.style.top = '0';
+    overlay.style.left = '0';
+    overlay.style.right = '0';
+    overlay.style.bottom = '0';
+    overlay.style.backgroundColor = 'rgba(0, 0, 0, 0.6)';
+    overlay.style.zIndex = '10';
+    overlay.style.pointerEvents = 'none';
+    headshotContainer.appendChild(overlay);
+    
+    // Add "FOULED OUT" label
+    const label = document.createElement('div');
+    label.textContent = 'FOULED OUT';
+    label.style.position = 'absolute';
+    label.style.top = '50%';
+    label.style.left = '50%';
+    label.style.transform = 'translate(-50%, -50%)';
+    label.style.color = '#e74c3c';
+    label.style.fontWeight = 'bold';
+    label.style.fontSize = '14px';
+    label.style.zIndex = '11';
+    label.style.pointerEvents = 'none';
+    label.style.textShadow = '0 0 4px rgba(0,0,0,0.8)';
+    headshotContainer.appendChild(label);
+  }
   
   headshotLink.appendChild(headshotContainer);
   front.appendChild(headshotLink);
@@ -1274,6 +1361,12 @@ function assignToSlot(pos, playerId) {
   const player = playerMap[playerId];
   if (!player) return false;
   
+  // Check if player is ineligible (fouled out)
+  if (player.ineligible || player.fouled_out) {
+    showToast(`${player.name} has fouled out and cannot play`);
+    return false;
+  }
+  
   // Update lineup data
   lineup[pos] = playerId;
   
@@ -1296,6 +1389,14 @@ function assignToSlot(pos, playerId) {
 }
 
 function fillNextSlot(playerId) {
+  const player = playerMap[playerId];
+  
+  // Check if player is ineligible (fouled out)
+  if (player && (player.ineligible || player.fouled_out)) {
+    showToast(`${player.name} has fouled out and cannot play`);
+    return;
+  }
+  
   const positions = ['PG', 'SG', 'SF', 'PF', 'C'];
   
   for (const pos of positions) {
@@ -1324,12 +1425,19 @@ renderRoster = function() {
         row.classList.remove('selected');
       }
       
-      // Add click handler to fill next slot
-      row.addEventListener('click', (e) => {
-        if (!selectedIds.includes(p._id)) {
-          fillNextSlot(p._id);
-        }
-      });
+      // Add click handler to fill next slot (only if not ineligible)
+      if (!p.ineligible) {
+        row.addEventListener('click', (e) => {
+          if (!selectedIds.includes(p._id)) {
+            fillNextSlot(p._id);
+          }
+        });
+      } else {
+        // Mark ineligible rows
+        row.classList.add('ineligible');
+        row.style.opacity = '0.5';
+        row.style.pointerEvents = 'none';
+      }
     }
   });
 };
