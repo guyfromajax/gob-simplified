@@ -1275,14 +1275,16 @@ def simulate_turn_endpoint(request: TurnSimulationRequest):
         # If quarter is complete, increment quarter number
         if quarter_complete:
             gm.quarter += 1
+            gm.game_state["quarter"] = gm.quarter  # ✅ FIX: Ensure game_state is updated
             logging.info(f"✅ Advanced to quarter {gm.quarter}")
         
         # Save game state to database every 10 turns (for crash recovery)
+        # ✅ FIX: Always save when quarter completes to ensure quarter number is persisted
         if len(gm.turns) % 10 == 0 or quarter_complete:
             try:
                 db_summary = summarize_game_state(gm, exclude_animations=True)
                 games_collection.update_one({"_id": game_id}, {"$set": db_summary}, upsert=True)
-                logging.info(f"💾 Saved game state at turn {len(gm.turns)}")
+                logging.info(f"💾 Saved game state at turn {len(gm.turns)}, quarter={gm.quarter}")
             except Exception as e:
                 logging.error(f"Failed to save game state: {e}")
         
