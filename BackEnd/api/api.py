@@ -87,6 +87,10 @@ class QuarterSimulationRequest(BaseModel):
     mode: str | None = None  # "single", "tournament", or "franchise"
     tournament_id: str | None = None
     franchise_id: str | None = None
+    # ✅ FIX: Allow full simulation (without animation) for "simming" operations
+    # When True, fully simulates the quarter instantly and increments quarter number
+    # When False (default), uses turn-by-turn mode (for playing with animation)
+    full_sim: bool = False  # If True, turn_by_turn_mode=False (fully simulate instantly)
 
 
 ongoing_games: dict[str, GameManager] = {}
@@ -1118,6 +1122,12 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
         )
 
     try:
+        # ✅ FIX: Use full_sim parameter to determine turn_by_turn_mode
+        # When full_sim=True (simming), fully simulate the quarter instantly (no animation)
+        # When full_sim=False (playing), use turn-by-turn mode (for animation)
+        turn_by_turn_mode = not request.full_sim
+        logging.info(f"🎮 simulate_quarter_endpoint: full_sim={request.full_sim}, turn_by_turn_mode={turn_by_turn_mode}, quarter={request.quarter}")
+        
         simulate_quarter(
             gm,
             request.home_lineup,
@@ -1125,7 +1135,7 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
             game_id,
             request.start_with_inbound,
             request.starting_possession,
-            turn_by_turn_mode=True,  # NEW: Enable turn-by-turn mode
+            turn_by_turn_mode=turn_by_turn_mode,
         )
         
     except ValueError as e:
