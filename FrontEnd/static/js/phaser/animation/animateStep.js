@@ -27,6 +27,7 @@ import {
   initializeBallHolderState,
   setBallHolderId,
   clearBallHolder,
+  getBallHolderId,
 } from "./ballAnimationSimple.js";
 
 export const PLAYER_TWEEN_DEBUG = false;
@@ -136,56 +137,54 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
     let startPromise = Promise.resolve();
 
     // ✅ NEW (Step 2): Use WIP_GOB approach - conditional target arrays
-    // For non-pass movements, check simple ball holder state and include ball/shadow in targets
-    // For passes, use old system (ball will be detached and animated separately)
-    const isPassing = step.action === 'pass' || scene.passInFlight;
+    // Check ball holder state BEFORE creating tween (matches WIP_GOB pattern)
+    // This ensures ball is only included if player actually has ball at tween creation time
     
     // ✅ PROACTIVE STATE MANAGEMENT: Clear ball holder state when pass action detected
     // This ensures state is correct before creating tween (prevents ball from being in passer's tween)
+    // This matches WIP_GOB: ball holder state is updated before tween targets are calculated
+    const isPassing = step.action === 'pass' || scene.passInFlight;
     if (step.action === 'pass') {
       clearBallHolder(scene);
     }
     
-    // ✅ FIX: Don't include ball in receiver's tween during "receive" action
-    // The ball is already being attached by runPass(), and including it here causes conflicts
-    // We'll set ball holder state after receive action completes, not during
+    // ✅ PROACTIVE STATE MANAGEMENT: Clear ball holder state for receive actions
+    // Ball is being attached by runPass(), so we shouldn't include it in receiver's tween
+    // We'll set ball holder state after receive action completes
     const isReceiving = step.action === 'receive';
     if (isReceiving) {
-      // Don't include ball in receive tween - ball attachment is handled by runPass()
-      // Setting ball holder state here would cause the tween to include ball, which conflicts with pass cleanup
+      clearBallHolder(scene);  // Clear state so ball isn't included in receiver's tween
     }
     
-    let tweenTargets;
-    if (isPassing || isReceiving) {
-      // Pass or receive action - use old system (ball will be animated separately)
-      // Don't include ball in receiver's tween - it's already being attached by runPass()
-      const playerHasBall = currentBallOwnerRef?.value === sprite && !getPendingOwner(scene);
-      const ballIsValid = ballSprite && 
-                         ballSprite.scene && 
-                         ballSprite.active !== false && 
-                         !ballSprite.destroyed;
-      // Only include ball for pass actions, not receive actions (receiver gets ball from runPass)
-      tweenTargets = (isPassing && playerHasBall && ballIsValid)
-        ? [sprite, ballSprite]  // Ball moves WITH player (old system) - only for passers
-        : [sprite];             // Player only (receiver doesn't have ball in tween)
-    } else {
-      // Simple HCO movement (non-pass) - use WIP_GOB approach
-      // This uses getPlayerTweenTargets which checks ball holder state and includes ball/shadow automatically
-      const jerseyNo = sprite.jerseyNo || null;
-      const targets = getPlayerTweenTargets(scene, sprite, jerseyNo);
-      
-      // Filter out any null/invalid targets
-      tweenTargets = targets.filter(target => 
-        target && 
-        target.scene && 
-        target.active !== false && 
-        !target.destroyed
-      );
-      
-      // Fallback to old system if new system didn't return valid targets
-      if (tweenTargets.length === 0) {
-        tweenTargets = [sprite];
-      }
+    // ✅ WIP_GOB APPROACH: Use getPlayerTweenTargets() for ALL movements (including passes)
+    // This matches WIP_GOB: targets are calculated based on ball holder state at creation time
+    // If ball holder state was cleared above, ball won't be included (no need for explicit exclusion)
+    const jerseyNo = sprite.jerseyNo || null;
+    const targets = getPlayerTweenTargets(scene, sprite, jerseyNo);
+    
+    // Filter out any null/invalid targets
+    let tweenTargets = targets.filter(target => 
+      target && 
+      target.scene && 
+      target.active !== false && 
+      !target.destroyed
+    );
+    
+    // Fallback to old system if new system didn't return valid targets
+    if (tweenTargets.length === 0) {
+      tweenTargets = [sprite];
+    }
+    
+    // ✅ SAFETY: For pass/receive actions, ensure ball is not in tween targets
+    // This is a defensive check - ball holder state should already be cleared, but just in case
+    // Remove ball from targets if it's there (shouldn't be, but safety first)
+    if ((isPassing || isReceiving) && tweenTargets.includes(ballSprite)) {
+      tweenTargets = tweenTargets.filter(t => t !== ballSprite && t !== scene.ballShadowSprite);
+      console.warn('animateStep: Ball was in tween targets for pass/receive action, removing it', {
+        playerId: sprite?.playerId,
+        action: step.action,
+        ballHolderId: getBallHolderId(scene)
+      });
     }
 
     // Filter out any null/invalid targets before creating tween
