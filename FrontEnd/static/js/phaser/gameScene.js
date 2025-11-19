@@ -337,6 +337,8 @@ export function createGameScene(Phaser) {
 
       const homeFoulsEl = document.getElementById('home-fouls');
       const awayFoulsEl = document.getElementById('away-fouls');
+      const homeTolEl = document.getElementById('home-tol');
+      const awayTolEl = document.getElementById('away-tol');
       const clockEl = document.getElementById('game-clock');
       const quarterEl = document.getElementById('quarter');
 
@@ -987,9 +989,17 @@ export function createGameScene(Phaser) {
           home: 0,
           away: 0,
         });
+        // Initialize timeout display for new games
+        if (homeTolEl) homeTolEl.textContent = 'TOL: 5';
+        if (awayTolEl) awayTolEl.textContent = 'TOL: 5';
       }
       let liveHomeFouls = simData.fouls?.home ?? 0;
       let liveAwayFouls = simData.fouls?.away ?? 0;
+      // Extract timeouts from nested team objects or flat structure, default to 5 for new games
+      const homeTimeoutsFromData = homeTeamObj?.timeouts ?? simData.timeouts?.home ?? simData.home_team_timeouts;
+      const awayTimeoutsFromData = awayTeamObj?.timeouts ?? simData.timeouts?.away ?? simData.away_team_timeouts;
+      let liveHomeTimeouts = typeof homeTimeoutsFromData === 'number' ? homeTimeoutsFromData : (isNewGame ? 5 : 5);
+      let liveAwayTimeouts = typeof awayTimeoutsFromData === 'number' ? awayTimeoutsFromData : (isNewGame ? 5 : 5);
       let liveClock = simData.clock || '8:00';
       let liveQuarter = this.quarter;
       let livePeriodLabel = simData.period_label || `Q${this.quarter}`;
@@ -1011,6 +1021,12 @@ export function createGameScene(Phaser) {
         if (typeof homeF === 'number') liveHomeFouls = homeF;
         if (typeof awayF === 'number') liveAwayFouls = awayF;
 
+        // Update timeouts from turn data
+        const homeT = turn.home_team_timeouts ?? turn.timeouts?.home;
+        const awayT = turn.away_team_timeouts ?? turn.timeouts?.away;
+        if (typeof homeT === 'number') liveHomeTimeouts = homeT;
+        if (typeof awayT === 'number') liveAwayTimeouts = awayT;
+
         if (turn.clock || turn.game_clock) liveClock = turn.clock || turn.game_clock;
         if (turn.quarter != null) liveQuarter = turn.quarter;
         if (turn.period_label) {
@@ -1021,6 +1037,8 @@ export function createGameScene(Phaser) {
 
         if (homeFoulsEl) homeFoulsEl.textContent = `F: ${liveHomeFouls}`;
         if (awayFoulsEl) awayFoulsEl.textContent = `F: ${liveAwayFouls}`;
+        if (homeTolEl) homeTolEl.textContent = `TOL: ${liveHomeTimeouts}`;
+        if (awayTolEl) awayTolEl.textContent = `TOL: ${liveAwayTimeouts}`;
         if (clockEl) clockEl.textContent = liveClock;
         if (quarterEl) quarterEl.textContent = livePeriodLabel;
 
