@@ -1126,14 +1126,6 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
             turn_by_turn_mode=True,  # NEW: Enable turn-by-turn mode
         )
         
-        # ✅ FIX: If quarter was fully simulated (time_remaining <= 0), increment quarter
-        # This handles the case where a quarter is "simmed" (fully simulated via simulate-turn)
-        # but the quarter wasn't incremented because turn_by_turn_mode=True skips the increment
-        if gm.game_state.get("time_remaining", 480) <= 0:
-            logging.info(f"✅ Quarter {request.quarter} completed during initialization, incrementing quarter from {gm.quarter} to {gm.quarter + 1}")
-            gm.quarter += 1
-            gm.game_state["quarter"] = gm.quarter
-            
     except ValueError as e:
         logging.error(
             "simulate_quarter lineup error for game_id=%s, home_team=%s, away_team=%s, quarter=%s: %s",
