@@ -847,6 +847,22 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                                 gm.away_team.team_fouls = away_team_data["team_fouls"]
                                 logging.info(f"🔄 Away team fouls restored: {away_team_data['team_fouls']}")
                             
+                            # Restore team timeouts
+                            if "timeouts" in home_team_data:
+                                gm.home_team.timeouts = home_team_data["timeouts"]
+                                logging.info(f"🔄 Home team timeouts restored: {home_team_data['timeouts']}")
+                            else:
+                                # Default to 5 if not in saved data (backward compatibility)
+                                gm.home_team.timeouts = 5
+                                logging.info(f"🔄 Home team timeouts set to default: 5")
+                            if "timeouts" in away_team_data:
+                                gm.away_team.timeouts = away_team_data["timeouts"]
+                                logging.info(f"🔄 Away team timeouts restored: {away_team_data['timeouts']}")
+                            else:
+                                # Default to 5 if not in saved data (backward compatibility)
+                                gm.away_team.timeouts = 5
+                                logging.info(f"🔄 Away team timeouts set to default: 5")
+                            
                             # Restore team totals (aggregated stats)
                             if "totals" in home_team_data:
                                 gm.team_totals[gm.home_team.name] = home_team_data["totals"]
@@ -872,6 +888,8 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                             gm.score = {gm.home_team.name: 0, gm.away_team.name: 0}
                             gm.home_team.team_fouls = 0
                             gm.away_team.team_fouls = 0
+                            gm.home_team.timeouts = 5  # New game starts with 5 timeouts
+                            gm.away_team.timeouts = 5  # New game starts with 5 timeouts
                         
                         # Restore opening_tip_winner for Q2-Q4 possession logic
                         # Only restore if this is NOT a new Q1 game (opening tip hasn't happened yet for new games)
@@ -1316,6 +1334,8 @@ def simulate_turn_endpoint(request: TurnSimulationRequest):
             "away_score": gm.score.get(gm.away_team.name, 0),
             "home_team_fouls": gm.home_team.team_fouls,
             "away_team_fouls": gm.away_team.team_fouls,
+            "home_team_timeouts": getattr(gm.home_team, 'timeouts', 5),
+            "away_team_timeouts": getattr(gm.away_team, 'timeouts', 5),
             "offense_team": gm.offense_team.name,
             "defense_team": gm.defense_team.name,
             "game_id": game_id,

@@ -103,6 +103,10 @@ class GameManager:
                 self.home_team.name: 0,
                 self.away_team.name: 0,
             },
+            "team_timeouts": {
+                self.home_team.name: 5,
+                self.away_team.name: 5,
+            },
             "box_score": {
                 self.home_team.name: {},
                 self.away_team.name: {}
