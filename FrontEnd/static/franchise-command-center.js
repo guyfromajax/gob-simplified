@@ -453,6 +453,14 @@ if (setGameplanBtn) {
   });
 }
 
+// Playbooks button (Franchise Command Center)
+const playbooksBtn = document.getElementById('playbooks-franchise');
+if (playbooksBtn) {
+  playbooksBtn.addEventListener('click', () => {
+    window.location.href = '/static/play-builder-v2.html';
+  });
+}
+
 window.addEventListener('DOMContentLoaded', () => {
   franchiseId = localStorage.getItem('franchiseId');
   if (franchiseId) {
