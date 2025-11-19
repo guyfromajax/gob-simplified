@@ -33,6 +33,12 @@ import {
   setCurrentOwner,
   getCurrentOwner
 } from "../ball/ballController.js";
+// ✅ NEW (Step 1): Import simple ball holder state functions
+import {
+  initializeBallHolderState,
+  setBallHolderId,
+  clearBallHolder,
+} from "./ballAnimationSimple.js";
 
 // Cap the time spent on any single movement step. Large timestamp gaps can
 // otherwise produce multi‑second tweens that appear as animation stalls.
@@ -144,6 +150,10 @@ function updateBallOwnership({ scene, ballSprite, animations, playerSprites, ste
       ballSprite.setVisible(true);
       if (currentBallOwnerRef) currentBallOwnerRef.value = pendingSprite;
       setCurrentOwner(scene, pendingId);
+      
+      // ✅ NEW (Step 1): Also update simple ball holder state for pending owner
+      setBallHolderId(scene, pendingId);
+      
       if (PASS_DEBUG) animationDebugLog('ownershipUpdate', { target: pendingId, stepIndex });
     } else {
       animationDebugWarn(`Missing sprite for pending ball owner ${pendingId}`);
@@ -176,6 +186,13 @@ function updateBallOwnership({ scene, ballSprite, animations, playerSprites, ste
       ballSprite.setPosition(sprite.x, sprite.y);
       ballSprite.setVisible(true);
       if (currentBallOwnerRef) currentBallOwnerRef.value = sprite;
+      
+      // ✅ NEW (Step 1): Also update simple ball holder state for non-pass scenarios
+      // (Passes are not migrated yet, so they won't reach this code due to early return above)
+      if (sprite.playerId) {
+        setBallHolderId(scene, sprite.playerId);
+      }
+      
       if (PASS_DEBUG) animationDebugLog('ownershipUpdate', { target: anim.playerId, stepIndex });
       break;
     }
@@ -1303,6 +1320,9 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
     return;
   }
 
+  // ✅ NEW (Step 1): Initialize simple ball holder state (WIP_GOB approach)
+  initializeBallHolderState(scene);
+
   const fromInbound = scene._previousTurnWasInbound === true;
 
   scene.passInFlight = false;
@@ -1312,6 +1332,8 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   if (!fromInbound) {
     scene.ballDetached = false;
     clearPendingOwner(scene);
+    // ✅ NEW (Step 1): Also clear simple ball holder state
+    clearBallHolder(scene);
   }
 
   const currentBallOwnerRef = { value: null };
@@ -1399,6 +1421,10 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
       
       attachBallToPlayer(scene, ballSprite, step0OwnerSprite);
       currentBallOwnerRef.value = step0OwnerSprite;
+      
+      // ✅ NEW (Step 1): Also set simple ball holder ID (WIP_GOB approach)
+      // This enables the new simple ball animation system to track ball holder
+      setBallHolderId(scene, step0OwnerId);
       
       if (isPutbackTurn) {
         console.log('🔍 [PUTBACK DEBUG] playTurnAnimation: Step 0 ball attachment completed (or blocked)', {
