@@ -740,8 +740,10 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                         # The GameManager constructor already initialized game_state with defaults
                         # Resetting it here wipes out FREE_THROW state that might be set during active gameplay
                         # Only update quarter - game_state is already initialized by GameManager.__init__
-                        gm.quarter = saved.get("quarter", 1)
                         saved_quarter = saved.get("quarter", 1)
+                        gm.quarter = saved_quarter
+                        # ✅ FIX: Log loaded quarter to debug save/load issues
+                        logging.info(f"📂 Loaded game from DB: game_id={game_id}, saved_quarter={saved_quarter}, requested_quarter={request.quarter}")
                         
                         # Simple check: If requesting Q1 but saved game is at a later quarter, start fresh (new game)
                         is_new_game = (request.quarter == 1 and saved_quarter > 1)
@@ -1162,12 +1164,11 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
     # Save to database (WITHOUT animations to reduce document size)
     try:
         db_summary = summarize_game_state(gm, exclude_animations=True)
-        # print(f"🔍 DEBUG: Saving game with nested team structure")
-        # print(f"🔍 DEBUG: Home team plays: {len(db_summary.get('home_team', {}).get('plays', []))}")
-        # print(f"🔍 DEBUG: Away team plays: {len(db_summary.get('away_team', {}).get('plays', []))}")
+        # ✅ FIX: Log quarter before save to debug save/load issues
+        logging.info(f"💾 Saving game state: game_id={game_id}, quarter={db_summary.get('quarter')}, gm.quarter={gm.quarter}")
         
         games_collection.update_one({"_id": game_id}, {"$set": db_summary}, upsert=True)
-        # print(f"🔍 DEBUG: Game document saved successfully")
+        logging.info(f"✅ Game state saved successfully: game_id={game_id}, quarter={db_summary.get('quarter')}")
     except Exception as e:
         print("🚨 Mongo upsert failed:", e)
         traceback.print_exc()
