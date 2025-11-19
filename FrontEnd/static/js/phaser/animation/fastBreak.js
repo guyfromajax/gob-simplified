@@ -1,7 +1,8 @@
 import * as Phaser from "https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.esm.js";
 import { gridToPixels } from "../utils/gridToPixels.js";
 import { attachBallToPlayer } from "./BallControllerAdapter.js";
-import { tweenBallTo, tweenPlayerTo, runPass } from "./ballTween.js";
+import { tweenPlayerTo, runPass } from "./ballTween.js";
+import { animateBallToPosition } from "./ballAnimationSimple.js";
 import animationConfig from "./animation_config.js";
 import { HOME_RIM_COORDS, AWAY_RIM_COORDS, HOME_TOP_KEY, AWAY_TOP_KEY } from "./courtConstants.js";
 import { States, safeTransition } from "../state/gameStateMachine.js";
@@ -387,7 +388,10 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
   }
   
   const rimPx = gridToPixels(adjustedBasket.x, adjustedBasket.y, width, height);
-  await tweenBallTo(scene, ballSprite, rimPx, {
+  // ✅ STEP 3 MIGRATION: Use new animateBallToPosition() instead of tweenBallTo()
+  // animateBallToPosition() gets ballSprite from scene.ballSprite internally
+  // Arc support added to animateBallToPosition() for fast break shots
+  await animateBallToPosition(scene, rimPx, {
     duration: 400,
     easing: "Sine.easeInOut",
     arc: { height: 50 }
