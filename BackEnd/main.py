@@ -334,13 +334,31 @@ def simulate_quarter(
     # TURN-BY-TURN MODE: If enabled, skip the full simulation loop
     # Frontend will call /api/simulate-turn repeatedly instead
     if not turn_by_turn_mode:
+        # Safety guard: prevent infinite loops
+        max_turns = 200  # Reasonable limit for a quarter (480 seconds / ~2-3 seconds per turn)
+        turn_count = 0
+        
+        logging.info(f"🏀 Starting full simulation of Q{gm.quarter}, initial time_remaining={gm.game_state['time_remaining']}")
+        
         while gm.game_state["time_remaining"] > 0:
+            turn_count += 1
+            if turn_count > max_turns:
+                logging.error(f"🚨 Infinite loop detected! Exceeded {max_turns} turns. time_remaining={gm.game_state['time_remaining']}, quarter={gm.quarter}")
+                raise RuntimeError(f"Simulation exceeded {max_turns} turns. Possible infinite loop. time_remaining={gm.game_state['time_remaining']}")
+            
+            previous_time = gm.game_state["time_remaining"]
             gm.simulate_macro_turn()
             gm.game_state["team_fouls"] = {
                 gm.home_team.name: gm.home_team.team_fouls,
                 gm.away_team.name: gm.away_team.team_fouls,
             }
-
+            
+            # Safety check: ensure time is decreasing
+            if gm.game_state["time_remaining"] >= previous_time and turn_count > 10:
+                logging.warning(f"⚠️ Time not decreasing! previous={previous_time}, current={gm.game_state['time_remaining']}, turn={turn_count}")
+                # Don't break here, might be legitimate (e.g., fouls, timeouts)
+        
+        logging.info(f"✅ Full simulation complete: Q{gm.quarter} finished after {turn_count} turns, final time_remaining={gm.game_state['time_remaining']}")
         gm.quarter += 1
     else:
         # Turn-by-turn mode: Quarter is initialized, ready for turn-by-turn sim

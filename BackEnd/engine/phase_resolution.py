@@ -213,7 +213,6 @@ def resolve_fast_break_logic(game: "GameManager"):
                 fb_roles["outlet_receiver"] = getattr(ball_handler, "player_id", None)
                 
                 import logging
-                from BackEnd.utils.shared import get_name_safe
                 logging.warning(f"🏀 Fast Break outlet pass: outlet_passer={get_name_safe(rebounder)} (rebounder), outlet_receiver={get_name_safe(ball_handler)} (release player)")
             else:
                 fb_roles["outlet_passer"] = None
@@ -231,7 +230,6 @@ def resolve_fast_break_logic(game: "GameManager"):
                 fb_roles["outlet_receiver"] = getattr(ball_handler, "player_id", None)
                 
                 import logging
-                from BackEnd.utils.shared import get_name_safe
                 logging.warning(f"⚠️ Fast Break outlet pass (FALLBACK - no release player): outlet_passer={get_name_safe(rebounder)} (rebounder), outlet_receiver={get_name_safe(ball_handler)} (random)")
             else:
                 fb_roles["outlet_passer"] = None

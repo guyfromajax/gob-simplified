@@ -1149,16 +1149,21 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
         )
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        logging.exception(
-            "simulate_quarter failed for game_id=%s, home_team=%s, away_team=%s, quarter=%s, home_lineup_keys=%s, away_lineup_keys=%s",
+        import traceback
+        error_trace = traceback.format_exc()
+        logging.error(
+            "simulate_quarter failed for game_id=%s, home_team=%s, away_team=%s, quarter=%s, home_lineup_keys=%s, away_lineup_keys=%s, full_sim=%s, turn_by_turn_mode=%s",
             game_id,
             request.home_team,
             request.away_team,
             request.quarter,
             list((request.home_lineup or {}).keys()),
             list((request.away_lineup or {}).keys()),
+            request.full_sim,
+            not request.full_sim,
         )
-        raise HTTPException(status_code=500, detail=str(e))
+        logging.error(f"Full traceback:\n{error_trace}")
+        raise HTTPException(status_code=500, detail=f"{str(e)}\n\nFull traceback:\n{error_trace}")
 
     # Create TWO summaries:
     # 1. WITH animations for frontend (exclude_animations=False)
