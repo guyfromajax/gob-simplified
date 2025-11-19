@@ -235,6 +235,7 @@ def simulate_quarter(
     gm.home_team.team_fouls = 0
     gm.away_team.team_fouls = 0
     gm.game_state["team_fouls"] = {gm.home_team.name: 0, gm.away_team.name: 0}
+    # Note: timeouts do NOT reset per quarter - they carry over the whole game
 
     # Recharge energy between quarters
     # After Q1, Q3, Q4: +10% | After Q2 (halftime): +20%
@@ -351,6 +352,10 @@ def simulate_quarter(
             gm.game_state["team_fouls"] = {
                 gm.home_team.name: gm.home_team.team_fouls,
                 gm.away_team.name: gm.away_team.team_fouls,
+            }
+            gm.game_state["team_timeouts"] = {
+                gm.home_team.name: getattr(gm.home_team, 'timeouts', 5),
+                gm.away_team.name: getattr(gm.away_team, 'timeouts', 5),
             }
             
             # Safety check: ensure time is decreasing
