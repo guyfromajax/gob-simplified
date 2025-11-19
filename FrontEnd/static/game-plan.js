@@ -349,7 +349,7 @@ async function init() {
   
   // Button event listeners
   const btnSave = document.getElementById('btn-save');
-  const btnReset = document.getElementById('btn-reset');
+  const btnPlaybooks = document.getElementById('btn-playbooks');
   const btnCancel = document.getElementById('btn-cancel');
   const btnBackToLineup = document.getElementById('btn-back-to-lineup');
   const modalClose = document.getElementById('modal-close');
@@ -389,8 +389,10 @@ async function init() {
     btnSave.addEventListener('click', saveSettings);
   }
   
-  if (btnReset) {
-    btnReset.addEventListener('click', resetSettings);
+  if (btnPlaybooks) {
+    btnPlaybooks.addEventListener('click', () => {
+      window.location.href = '/static/play-builder-v2.html';
+    });
   }
   
   if (btnCancel) {

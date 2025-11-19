@@ -668,6 +668,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
+  // Playbooks button (Tournament Command Center)
+  const playbooksBtn = document.getElementById('playbooks-tournament');
+  if (playbooksBtn) {
+    playbooksBtn.addEventListener('click', () => {
+      window.location.href = '/static/play-builder-v2.html';
+    });
+  }
+
   const simBtn = document.getElementById('sim-remaining');
   if (simBtn) {
     simBtn.addEventListener('click', async () => {
