@@ -1019,11 +1019,13 @@ function createPlayerCard(player) {
     card.classList.add('selected');
   }
   
-  // Make draggable
-  card.draggable = !isSelected;
-  card.addEventListener('dragstart', (e) => {
-    e.dataTransfer.setData('text/plain', player._id);
-  });
+  // Make draggable (only if not ineligible)
+  card.draggable = !isSelected && !player.ineligible && !player.fouled_out;
+  if (card.draggable) {
+    card.addEventListener('dragstart', (e) => {
+      e.dataTransfer.setData('text/plain', player._id);
+    });
+  }
   
   // Click to fill next slot (only if not ineligible)
   if (!player.ineligible && !player.fouled_out) {
