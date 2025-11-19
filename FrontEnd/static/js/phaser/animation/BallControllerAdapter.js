@@ -273,7 +273,6 @@ function clearCurrentOwner(scene) {
 export {
   attachBallToPlayer,
   detachBall,
-  // tweenBallTo, // ✅ REMOVED: Legacy code - replaced by animateBallToPosition() in ballAnimationSimple.js
   getCurrentOwner,
   setCurrentOwner,
   clearCurrentOwner,
@@ -282,10 +281,10 @@ export {
 };
 
 // Default export for backward compatibility
+// ✅ NOTE: tweenBallTo removed from default export (legacy code - replaced by animateBallToPosition)
 export default {
   attachBallToPlayer,
   detachBall,
-  // tweenBallTo, // ✅ REMOVED: Legacy code - replaced by animateBallToPosition() in ballAnimationSimple.js
   getCurrentOwner,
   setCurrentOwner,
   clearCurrentOwner,
