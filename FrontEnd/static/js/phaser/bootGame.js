@@ -502,7 +502,7 @@ async function handleSimToFourth() {
       // So we should use the quarter from the response, not just increment currentQ
       // This ensures we're in sync with the backend's quarter number
       currentQ = lastSummary.quarter || (currentQ + 1);
-      logging.info(`✅ Q${currentQ - 1} fully simulated, backend reports quarter=${lastSummary.quarter}`);
+      console.log(`✅ Q${currentQ - 1} fully simulated, backend reports quarter=${lastSummary.quarter}`);
     }
 
     // After Q1-Q3 simulated, redirect to set-lineup for Q4
