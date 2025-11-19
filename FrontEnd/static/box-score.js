@@ -39,7 +39,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 });
 
-// Fetch game data from API
+// Fetch game data from API and merge with full rosters
 async function loadGameData(gameId) {
   const response = await fetch(`/api/game/${gameId}`);
   if (!response.ok) {
@@ -47,6 +47,70 @@ async function loadGameData(gameId) {
   }
   gameData = await response.json();
   console.log('Game data loaded:', gameData);
+  
+  // Fetch full rosters to ensure all 12 players are shown
+  const urlParams = new URLSearchParams(window.location.search);
+  const homeTeamName = urlParams.get('home') || gameData.home_team?.name;
+  const awayTeamName = urlParams.get('away') || gameData.away_team?.name;
+  const franchiseId = urlParams.get('franchise_id');
+  
+  if (homeTeamName && awayTeamName) {
+    await mergeFullRosters(homeTeamName, awayTeamName, franchiseId);
+  }
+}
+
+// Fetch and merge full rosters with game data to ensure all 12 players are shown
+async function mergeFullRosters(homeTeamName, awayTeamName, franchiseId) {
+  const fetchRoster = async (team) => {
+    const path = franchiseId
+      ? `/franchise/roster?franchise_id=${franchiseId}&team_name=${encodeURIComponent(team)}`
+      : `/roster/${encodeURIComponent(team)}`;
+    const res = await fetch(path);
+    if (!res.ok) throw new Error(`Failed to load roster for ${team}`);
+    const data = await res.json();
+    return Array.isArray(data.players) ? data.players : [];
+  };
+
+  const [homeRoster, awayRoster] = await Promise.all([
+    fetchRoster(homeTeamName),
+    fetchRoster(awayTeamName),
+  ]);
+
+  // Map roster players to box-score-ready format
+  const mapPlayers = (players, teamKey, teamName) =>
+    players.map((p) => {
+      // Check if this player is in the game data (lineup players)
+      const gamePlayer = gameData.players?.find(
+        gp => (gp.playerId || gp._id || gp.player_id) === (p._id || p.playerId)
+      );
+      
+      // Check if this player has box score stats
+      const boxScore = gameData.box_score?.[teamName] || {};
+      const boxScorePlayer = Object.entries(boxScore).find(
+        ([pos, playerData]) => 
+          typeof playerData === 'object' && 
+          playerData.name === p.name ||
+          (playerData.playerId || playerData.player_id) === (p._id || p.playerId)
+      )?.[1];
+
+      return {
+        playerId: p._id || p.playerId,
+        team: teamKey,
+        name: p.name,
+        jersey: boxScorePlayer?.jersey !== undefined ? boxScorePlayer.jersey : (p.jersey || ''),
+        pos: p.pos || p.position || null,
+        stats: gamePlayer?.stats?.game || boxScorePlayer || gamePlayer?.stats || {},
+        year: p.year || 'SR',
+      };
+    });
+
+  // Merge roster players with game data players
+  gameData.players = [
+    ...mapPlayers(homeRoster, 'home', homeTeamName),
+    ...mapPlayers(awayRoster, 'away', awayTeamName),
+  ];
+  
+  console.log(`Merged full rosters: ${homeRoster.length} home players, ${awayRoster.length} away players`);
 }
 
 // Render all box score sections
@@ -191,14 +255,15 @@ function renderPlayerStats() {
   renderPlayerStatsTable('away', allAwayPlayers);
 }
 
-// Combine lineup players with box_score to get all 12 players
+// Combine roster players with box_score to get all 12 players with stats
+// Now rosterPlayers includes all 12 players from the roster, not just lineup players
 // box_score structure: { pos: { name, FGM, FGA, ... } } (stats are direct properties)
-function combinePlayersAndBoxScore(lineupPlayers, boxScore, teamName) {
+function combinePlayersAndBoxScore(rosterPlayers, boxScore, teamName) {
   const playerMap = new Map();
   
-  // Add lineup players
-  lineupPlayers.forEach(p => {
-    playerMap.set(p.playerId, {
+  // Add all roster players (all 12 players, not just lineup)
+  rosterPlayers.forEach(p => {
+    playerMap.set(p.playerId || p._id, {
       ...p,
       stats: p.stats?.game || p.stats || {},
       year: p.year || 'SR', // Use year from player data or default
