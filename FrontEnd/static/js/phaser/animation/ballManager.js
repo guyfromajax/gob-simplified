@@ -9,7 +9,7 @@ import {
   runPass as baseRunPass
 } from "./ballTween.js";
 // ✅ STEP 3 MIGRATION: Import new ball animation functions
-import { animateShotToRim } from "./ballAnimationSimple.js";
+import { animateShotToRim, animateBallToPosition } from "./ballAnimationSimple.js";
 import { attachBallToPlayer as baseAttachBallToPlayer } from "./BallControllerAdapter.js";
 import { States, getDebugTransitions, safeTransition, createTransitionGuard } from "../state/gameStateMachine.js";
 import gameStore from "../../state/gameStore.js";
@@ -179,45 +179,51 @@ export function hideBall(ballSprite) {
  * Bounce a missed shot off the rim to a landing spot.
  * Resolves with the grid coordinates of the landing spot.
  */
-export function bounceFromRim(
+/**
+ * Bounce ball from rim (migrated to new system - Step 3)
+ * 
+ * For missed shots, animates the ball bouncing from the rim toward the center of the court.
+ * Uses animateBallToPosition() with Sine.easeOut easing for realistic bounce effect.
+ */
+export async function bounceFromRim(
   scene,
   ballSprite,
   rimCoords,
   isHomeTeam,
   duration
 ) {
-  return new Promise((resolve) => {
-    const rebCfg = animationConfig.rebound;
+  const rebCfg = animationConfig.rebound;
+  
+  // For missed shots, ball should bounce toward the center of the court
+  // Away basket (x=11): bounce right (increase x)
+  // Home basket (x=89): bounce left (decrease x)
+  const bounceGridX = rimCoords.x > 50 // Home basket
+    ? rimCoords.x - rebCfg.bounceArea.x  // Bounce left toward center
+    : rimCoords.x + rebCfg.bounceArea.x; // Bounce right toward center
     
-    // For missed shots, ball should bounce toward the center of the court
-    // Away basket (x=11): bounce right (increase x)
-    // Home basket (x=89): bounce left (decrease x)
-    const bounceGridX = rimCoords.x > 50 // Home basket
-      ? rimCoords.x - rebCfg.bounceArea.x  // Bounce left toward center
-      : rimCoords.x + rebCfg.bounceArea.x; // Bounce right toward center
-      
-    const bounceGridY =
-      rimCoords.y + Phaser.Math.Between(-rebCfg.bounceArea.y, rebCfg.bounceArea.y);
-      
-    // Ensure bounce stays in bounds
-    const clampedBounceX = Phaser.Math.Clamp(bounceGridX, 4, 97);
-    const clampedBounceY = Phaser.Math.Clamp(bounceGridY, 1, 50);
+  const bounceGridY =
+    rimCoords.y + Phaser.Math.Between(-rebCfg.bounceArea.y, rebCfg.bounceArea.y);
     
-    const bounce = gridToPixels(
-      clampedBounceX,
-      clampedBounceY,
-      scene.game.config.width,
-      scene.game.config.height
-    );
-    scene.tweens.add({
-      targets: ballSprite,
-      x: bounce.x,
-      y: bounce.y,
-      duration,
-      ease: "Sine.easeOut",
-      onComplete: () => resolve({ grid: { x: clampedBounceX, y: clampedBounceY } })
-    });
+  // Ensure bounce stays in bounds
+  const clampedBounceX = Phaser.Math.Clamp(bounceGridX, 4, 97);
+  const clampedBounceY = Phaser.Math.Clamp(bounceGridY, 1, 50);
+  
+  const bounce = gridToPixels(
+    clampedBounceX,
+    clampedBounceY,
+    scene.game.config.width,
+    scene.game.config.height
+  );
+  
+  // ✅ STEP 3 MIGRATION: Use new animateBallToPosition() instead of direct scene.tweens.add()
+  // Preserve Sine.easeOut easing for realistic bounce effect
+  await animateBallToPosition(scene, bounce, {
+    duration,
+    easing: "Sine.easeOut"
   });
+  
+  // Return grid coordinates for rebound logic
+  return { grid: { x: clampedBounceX, y: clampedBounceY } };
 }
 
 /**

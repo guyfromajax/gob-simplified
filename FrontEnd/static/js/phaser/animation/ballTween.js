@@ -235,6 +235,10 @@ export function detachBall(scene, ballSprite) {
  * @param {{x:number, y:number}} target
  * @param {{duration?:number, easing?:string, arc?:{height?:number}|boolean}} opts
  */
+// ✅ LEGACY CODE COMMENTED OUT: Replaced by animateBallToPosition() in ballAnimationSimple.js
+// This function is no longer used - all call sites have been migrated to the new system
+// Kept for reference only - can be removed after full validation
+/*
 export function tweenBallTo(scene, ballSprite, target, opts = {}) {
   if (!scene || !ballSprite || !target) return Promise.resolve();
   const { duration = 300, easing = 'Linear', arc } = opts;
@@ -311,6 +315,7 @@ export function tweenBallTo(scene, ballSprite, target, opts = {}) {
     }
   });
 }
+*/
 
 /**
  * Tween a player sprite to a target position. If the player currently has the
