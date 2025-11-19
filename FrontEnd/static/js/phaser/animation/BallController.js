@@ -211,6 +211,14 @@ export class BallController {
       this.stopOldBallFollowing();
     }
 
+    // ✅ PROACTIVE STATE MANAGEMENT: Clear ball holder state when BallController starts flight
+    // This prevents ball from being included in player movement tweens (WIP_GOB system)
+    // BallController is now managing the ball, so our simple ball holder state should reflect that
+    // Direct state access to avoid circular dependencies
+    if (this.scene && this.scene.gameState) {
+      this.scene.gameState.ballHolder = null;
+    }
+
     this.isInFlight = true;
     this.targetPosition = targetPosition;
     this.isMoving = true;
@@ -244,6 +252,13 @@ export class BallController {
 
     // Attach to new owner if provided
     if (newOwner) {
+      // ✅ PROACTIVE STATE MANAGEMENT: Set ball holder state to new owner when flight ends
+      // This ensures ball holder state reflects reality (new owner now has the ball)
+      // This enables new owner's tween to include ball in targets (WIP_GOB approach)
+      const newOwnerId = newOwner.playerId || (newOwner.id ? String(newOwner.id) : null);
+      if (this.scene && this.scene.gameState && newOwnerId) {
+        this.scene.gameState.ballHolder = newOwnerId;
+      }
       this.attachToPlayer(newOwner, options);
     } else if (!options.keepVisible) {
       // Hide ball if no new owner (unless keepVisible is set)
