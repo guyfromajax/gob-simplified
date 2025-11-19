@@ -498,7 +498,11 @@ async function handleSimToFourth() {
       if (!res.ok) throw new Error('Simulation failed');
       lastSummary = await res.json();
       gId = lastSummary.game_id;
-      currentQ += 1;
+      // ✅ FIX: When full_sim=true, backend increments quarter automatically after completion
+      // So we should use the quarter from the response, not just increment currentQ
+      // This ensures we're in sync with the backend's quarter number
+      currentQ = lastSummary.quarter || (currentQ + 1);
+      logging.info(`✅ Q${currentQ - 1} fully simulated, backend reports quarter=${lastSummary.quarter}`);
     }
 
     // After Q1-Q3 simulated, redirect to set-lineup for Q4
@@ -629,7 +633,10 @@ async function handleSimFullGame() {
           away: payload.away_team,
         });
       }
-      console.log({event:'simulate-quarter:request', mode, homeTeam, awayTeam, quarter: currentQ, gameId: gId});
+      // ✅ FIX: Add full_sim=true for "simming" operations (fully simulate without animation)
+      payload.full_sim = true;
+      
+      console.log({event:'simulate-quarter:request', mode, homeTeam, awayTeam, quarter: currentQ, gameId: gId, full_sim: true});
       const res = await fetch('/api/simulate-quarter', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -639,7 +646,9 @@ async function handleSimFullGame() {
       lastSummary = await res.json();
       gId = lastSummary.game_id;
       if (lastSummary.is_final) break;
-      currentQ += 1;
+      // ✅ FIX: When full_sim=true, backend increments quarter automatically
+      // So we should use the quarter from the response, not just increment currentQ
+      currentQ = lastSummary.quarter || (currentQ + 1);
     }
 
     gameId = gId;
