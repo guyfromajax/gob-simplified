@@ -16,9 +16,11 @@ import {
 } from "../utils/debugFlags.js";
 import { getBallController } from './BallControllerAdapter.js';
 // ✅ NEW (Step 1): Import simple ball holder state functions
+// ✅ STEP 3 MIGRATION: Import new ball animation function
 import {
   clearBallHolder,
   setBallHolderId,
+  animateBallToPosition,
 } from "./ballAnimationSimple.js";
 
 const BALL_DEPTH = 1000;
@@ -581,7 +583,9 @@ export async function runPass(scene, cfg = {}) {
       if (doTween) {
         scene.events?.emit('tweenStart', { fromId, toId, duration: usedDuration, easing: usedEasing });
         if (PASS_DEBUG) animationDebugLog('tweenStart', { fromId, toId, duration: usedDuration, easing: usedEasing });
-        await tweenBallTo(scene, ballSprite, end, { duration: usedDuration, easing: usedEasing });
+        // ✅ STEP 3 MIGRATION: Use new animateBallToPosition() instead of tweenBallTo()
+        // animateBallToPosition() gets ballSprite from scene.ballSprite internally
+        await animateBallToPosition(scene, end, { duration: usedDuration, easing: usedEasing });
         scene.events?.emit('tweenEnd', { toId });
         if (PASS_DEBUG) animationDebugLog('tweenEnd', { toId });
       } else {
