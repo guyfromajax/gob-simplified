@@ -114,7 +114,8 @@ function runPass(scene, cfg = {}) {
   return baseRunPass(scene, cfg);
 }
 
-export { attachBallToPlayer, detachBall, tweenBallTo, runPass, runInboundSetup };
+// ✅ STEP 3 MIGRATION: Removed tweenBallTo from exports (now using animateBallToPosition/animateShotToRim)
+export { attachBallToPlayer, detachBall, runPass, runInboundSetup };
 
 // Debug flags for logging shot / rebound details
 export const SHOT_DEBUG = false;
