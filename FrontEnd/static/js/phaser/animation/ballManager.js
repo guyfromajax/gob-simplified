@@ -6,9 +6,10 @@ import animationConfig from "./animation_config.js";
 import { HOME_RIM_COORDS, AWAY_RIM_COORDS } from "./courtConstants.js";
 import {
   detachBall,
-  tweenBallTo,
   runPass as baseRunPass
 } from "./ballTween.js";
+// ✅ STEP 3 MIGRATION: Import new ball animation functions
+import { animateShotToRim } from "./ballAnimationSimple.js";
 import { attachBallToPlayer as baseAttachBallToPlayer } from "./BallControllerAdapter.js";
 import { States, getDebugTransitions, safeTransition, createTransitionGuard } from "../state/gameStateMachine.js";
 import gameStore from "../../state/gameStore.js";
@@ -125,7 +126,7 @@ export const INBOUND_DEBUG = false;
 /**
  * Animate the ball flying from one point to another.
  */
-export function passBall({
+export async function passBall({
   scene,
   ballSprite,
   fromCoords,
@@ -134,7 +135,7 @@ export function passBall({
   toTimestamp
 }) {
   if (scene?.stateMachine?.is(States.FreeThrow)) return;
-  generateBallTween({
+  await generateBallTween({
     scene,
     ballSprite,
     startCoords: fromCoords,
@@ -146,7 +147,7 @@ export function passBall({
 }
 
 // Baseline inbound pass from one coordinate to another
-export function animateInboundPass(
+export async function animateInboundPass(
   scene,
   ballSprite,
   fromCoords,
@@ -155,7 +156,7 @@ export function animateInboundPass(
   endTs
 ) {
   if (scene?.stateMachine?.is(States.FreeThrow)) return;
-  generateBallTween({
+  await generateBallTween({
     scene,
     ballSprite,
     startCoords: fromCoords,
@@ -222,7 +223,7 @@ export function bounceFromRim(
  * Launches a shot toward the rim along a single tweened path.
  * Resolves after the ball reaches the rim.
 */
-export function shootBall({
+export async function shootBall({
   scene,
   ballSprite,
   fromCoords,
@@ -398,16 +399,9 @@ export function shootBall({
   
   // console.log('🏀 shootBall: Creating tween for ball flight');
 
-  return new Promise((resolve) => {
-    // console.log('🏀 shootBall: About to call scene.tweens.add', {
-    //   hasTweens: !!scene.tweens,
-    //   ballSpritePos: { x: ballSprite.x, y: ballSprite.y },
-    //   targetPos: { x: rim.x, y: rim.y },
-    //   distance: Phaser.Math.Distance.Between(ballSprite.x, ballSprite.y, rim.x, rim.y),
-    //   duration
-    // });
-    
-    const tweenStartTime = Date.now();
+  const tweenStartTime = Date.now();
+  
+  return new Promise(async (resolve) => {
     
     // ==================== ANIMATE PLAYERS DURING SHOT ====================
     // Defenders releasing for fast break + Offensive players getting back on defense
@@ -548,25 +542,20 @@ export function shootBall({
     }
     // ==================== END PLAYER POSITIONING ====================
     
-    const tween = scene.tweens.add({
-      targets: ballSprite,
-      x: rim.x,
-      y: rim.y,
-      duration,
-      ease: "Sine.easeInOut",
-      onStart: () => {
-        // console.log('🏀 shootBall: Tween STARTED!', {
-        //   timestamp: Date.now(),
-        //   elapsedSinceCreate: Date.now() - tweenStartTime
-        // });
-      },
-      onUpdate: (tween) => {
-        if (tween.progress === 0 || tween.progress === 0.5 || tween.progress === 1) {
-          const elapsed = Date.now() - tweenStartTime;
-          // console.log(`🏀 shootBall: Tween ${(tween.progress * 100).toFixed(0)}% | Elapsed: ${elapsed}ms / ${duration}ms | Ball at (${ballSprite.x.toFixed(0)}, ${ballSprite.y.toFixed(0)}) | Visible: ${ballSprite.visible}`);
-        }
-      },
-      onComplete: async () => {
+    // ✅ STEP 3 MIGRATION: Use new animateShotToRim() instead of direct scene.tweens.add()
+    // animateShotToRim() handles ball detachment and shot animation
+    // Note: Ball is already detached above (lines 254-265), but animateShotToRim() will handle it safely
+    const rimPosition = { x: rim.x, y: rim.y };
+    
+    // Animate shot to rim (async, so we need to handle completion after it resolves)
+    (async () => {
+      try {
+        await animateShotToRim(scene, rimPosition, {
+          duration,
+          easing: "Sine.easeInOut"
+        });
+        
+        // Handle completion (same logic as before, but now after animateShotToRim completes)
         const actualDuration = Date.now() - tweenStartTime;
         // console.log(`🏀 shootBall: Tween COMPLETE | Result: ${result} | Actual: ${actualDuration}ms / Expected: ${duration}ms | Ratio: ${(actualDuration / duration).toFixed(2)}x`);
         
@@ -729,8 +718,11 @@ export function shootBall({
         } else {
           resolve();
         }
+      } catch (error) {
+        console.error('shootBall: Error during shot animation', error);
+        resolve(); // Resolve anyway to prevent hanging
       }
-    });
+    })();
   });
 }
 

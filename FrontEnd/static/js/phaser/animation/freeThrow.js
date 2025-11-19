@@ -32,8 +32,8 @@ export async function runFreeThrowSequence(
     (await import("./ballTween.js")).attachBallToPlayer;
   const detach =
     helpers.detachBall || (await import("./ballTween.js")).detachBall;
-  const tween =
-    helpers.tweenBallTo || (await import("./ballTween.js")).tweenBallTo;
+  // ✅ STEP 3 MIGRATION: Import new ball animation functions
+  const { animateShotToRim, animateBallToPosition } = await import("./ballAnimationSimple.js");
   const inboundSetup =
     helpers.runInboundSetup || (await import("./turnAnimation.js")).runInboundSetup;
   const rebound =
@@ -167,11 +167,17 @@ export async function runFreeThrowSequence(
       easing: "Sine.easeInOut",
     };
 
-    shotTweenOptions.arc = animationConfig.freeThrow.useArc
+    // ✅ STEP 3 MIGRATION: Use new animateShotToRim() instead of tween()
+    // animateShotToRim() handles ball detachment and shot animation
+    const arcOption = animationConfig.freeThrow.useArc
       ? { height: animationConfig.freeThrow.arcHeight }
       : { height: animationConfig.freeThrow.arcHeight, enabled: false };
 
-    await tween(scene, ballSprite, rimPx, shotTweenOptions);
+    await animateShotToRim(scene, rimPx, {
+      duration: animationConfig.freeThrow.shotMs,
+      easing: "Sine.easeInOut",
+      arc: arcOption
+    });
 
     scene.events?.emit(result === "MAKE" ? "ft:make" : "ft:miss");
     
@@ -318,9 +324,11 @@ export async function runFreeThrowSequence(
           width,
           height
         );
-        await tween(scene, ballSprite, spotPx, {
+        // ✅ STEP 3 MIGRATION: Use new animateBallToPosition() instead of tween()
+        // This is just moving ball back to shooter between free throws (not a shot)
+        await animateBallToPosition(scene, spotPx, {
           duration: animationConfig.freeThrow.shotMs,
-          easing: "Sine.easeInOut",
+          easing: "Sine.easeInOut"
         });
         if (shooterSprite) attach(scene, ballSprite, shooterSprite);
       }
@@ -413,9 +421,11 @@ export async function runFreeThrowSequence(
           width,
           height
         );
-        await tween(scene, ballSprite, spotPx, {
+        // ✅ STEP 3 MIGRATION: Use new animateBallToPosition() instead of tween()
+        // This is just moving ball back to shooter between free throws (not a shot)
+        await animateBallToPosition(scene, spotPx, {
           duration: animationConfig.freeThrow.shotMs,
-          easing: "Sine.easeInOut",
+          easing: "Sine.easeInOut"
         });
         if (shooterSprite) attach(scene, ballSprite, shooterSprite);
       }
