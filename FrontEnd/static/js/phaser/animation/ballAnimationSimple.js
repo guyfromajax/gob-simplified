@@ -18,6 +18,7 @@
  */
 
 import * as Phaser from 'https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.esm.js';
+// Lazy import detachBall to avoid circular dependency (imported dynamically in animateShotToRim)
 
 /**
  * Initialize ball holder state on scene
@@ -417,5 +418,70 @@ export async function animateBallToPlayer(scene, playerSprite, options = {}) {
     
     tween?.once?.('stop', () => reject(new Error('tween stopped')));
   });
+}
+
+/**
+ * Animate shot to rim (high-level helper)
+ * 
+ * Handles ball detachment and shot animation - use this for all shot scenarios
+ * (fast break shots, free throws, putbacks, etc.)
+ * 
+ * This is a high-level helper that:
+ * - Detaches ball from player before animating
+ * - Prevents ball from following player during shot
+ * - Animates ball to rim with optional arc support
+ * - Cleans up shot flags after animation completes
+ * 
+ * @param {Phaser.Scene} scene - The Phaser scene
+ * @param {{x: number, y: number}} rimPosition - Rim position in pixels
+ * @param {Object} options - Optional parameters (same as animateBallToPosition)
+ * @param {number} options.duration - Duration in ms (if not provided, calculated from distance)
+ * @param {string} options.easing - Easing function (default: 'Linear')
+ * @param {Object|boolean} options.arc - Arc options: {height: number} or true/false (default: false)
+ * @returns {Promise} Resolves when animation completes
+ */
+export async function animateShotToRim(scene, rimPosition, options = {}) {
+  if (!scene || !scene.ballSprite || !rimPosition) {
+    return Promise.resolve();
+  }
+  
+  const ballSprite = scene.ballSprite;
+  
+  // ✅ DETACH BALL: Must detach ball from player before animating shot
+  // Similar to shootBall() in ballManager.js - prevents ball from following player during shot
+  // This ensures the ball animates to the rim instead of staying with the player
+  // Use dynamic import to avoid circular dependency with ballTween.js
+  let detachBall;
+  try {
+    const ballTweenModule = await import('./ballTween.js');
+    detachBall = ballTweenModule.detachBall;
+    detachBall(scene, ballSprite);
+  } catch (err) {
+    // Fallback: manual detachment if import fails (shouldn't happen, but defensive)
+    if (scene.tweens) scene.tweens.killTweensOf(ballSprite);
+    if (scene.ballController && typeof scene.ballController.stopFollowingPlayer === 'function') {
+      scene.ballController.stopFollowingPlayer();
+    }
+  }
+  
+  // Stop old ball following system
+  scene.ballDetached = true;
+  
+  // Stop BallController from following player during shot
+  if (scene.ballController) {
+    if (typeof scene.ballController.stopFollowingPlayer === 'function') {
+      scene.ballController.stopFollowingPlayer();
+    }
+    scene.ballController.isAttached = false;
+    scene._shotInProgress = true; // Prevent re-attachment during shot
+  }
+  
+  // Animate ball to rim
+  await animateBallToPosition(scene, rimPosition, options);
+  
+  // Clear shot in progress flag after animation completes
+  if (scene.ballController) {
+    scene._shotInProgress = false;
+  }
 }
 
