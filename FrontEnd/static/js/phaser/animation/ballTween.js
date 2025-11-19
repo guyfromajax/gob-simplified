@@ -646,10 +646,11 @@ export async function runPass(scene, cfg = {}) {
   return promise;
 }
 
+// ✅ NOTE: tweenBallTo removed from default export (legacy code - replaced by animateBallToPosition)
 export default {
   attachBallToPlayer,
   detachBall,
-  tweenBallTo,
+  // tweenBallTo, // ✅ REMOVED: Legacy code - replaced by animateBallToPosition() in ballAnimationSimple.js
   tweenPlayerTo,
   runPass
 };
