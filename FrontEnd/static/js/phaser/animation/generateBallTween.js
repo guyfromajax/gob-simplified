@@ -1,8 +1,12 @@
 import { gridToPixels } from '../utils/gridToPixels.js';
 import animationConfig from './animation_config.js';
-import { getBallController } from './BallControllerAdapter.js';
+import { animateBallToPosition } from './ballAnimationSimple.js';
 
-export function generateBallTween({
+/**
+ * Generate ball tween animation (STEP 3 MIGRATION)
+ * Now uses animateBallToPosition() instead of direct scene.tweens.add()
+ */
+export async function generateBallTween({
     scene,
     ballSprite,
     startCoords,
@@ -28,25 +32,11 @@ export function generateBallTween({
     const cfg = animationConfig[type] || animationConfig.pass;
     const duration = Math.max(endTimestamp - startTimestamp, cfg.duration);
 
-    const ballController = getBallController();
-    let controllerStartedFlight = false;
-    if (ballController && !ballController.isInFlight) {
-      const flightOpts = { duration, ease: cfg.easing };
-      controllerStartedFlight = ballController.startFlight(endPixels, flightOpts) !== false;
-    }
-
-    scene.tweens.add({
-      targets: ballSprite,
-      x: endPixels.x,
-      y: endPixels.y,
+    // ✅ STEP 3 MIGRATION: Use new animateBallToPosition() instead of direct scene.tweens.add()
+    // animateBallToPosition() handles BallController integration and distance-based duration
+    await animateBallToPosition(scene, endPixels, {
       duration,
-      ease: cfg.easing,
-      onComplete: () => {
-        if (controllerStartedFlight && ballController) {
-          ballController.endFlight(null, { keepVisible: true });
-        }
-        // Optionally hide or lock ball to receiver after pass completes
-      }
+      easing: cfg.easing
     });
   }
   
