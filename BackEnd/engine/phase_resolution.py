@@ -949,6 +949,24 @@ def resolve_half_court_offense_logic(game):
             elif offense_failure:
                 # We don't increment offense success; defensive success can be tracked separately if needed
                 pass
+            
+            # Track defensive playcall success
+            from BackEnd.utils.defense_utils import map_defense_playcall_to_tracking_name
+            defense_playcall = game.game_state.get("defense_playcall", "Man")  # "Man" or "Zone"
+            tracking_name = map_defense_playcall_to_tracking_name(defense_playcall)
+            if tracking_name in def_team.scouting_data["defense"]:
+                # Defense success = MISS (without defensive foul) OR TURNOVER OR O_FOUL
+                # Defense failure = MAKE OR DEFENSIVE FOUL
+                defense_success = (rt == "MISS" and not (foul_team == "DEFENSE")) or (rt == "TURNOVER") or (rt == "O_FOUL")
+                defense_failure = (rt == "MAKE") or (foul_team == "DEFENSE")
+                
+                if defense_success:
+                    def_team.scouting_data["defense"][tracking_name]["success"] += 1
+                    def_team.scouting_data["defense"][tracking_name]["game_stats"]["success"] += 1
+                elif defense_failure:
+                    # Defense failed (offense scored or committed defensive foul)
+                    pass  # Don't increment success (already at current count)
+            
             # Clear foul_team after success tracking to prevent it from affecting subsequent actions (like putbacks)
             # Note: Only clear if this is the original HCO play, not a putback (putbacks have result_type PUTBACK_MAKE/PUTBACK_MISS)
             if rt in ["MAKE", "MISS"]:

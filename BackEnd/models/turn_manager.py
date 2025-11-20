@@ -268,6 +268,16 @@ class TurnManager:
             calls = self.set_playcalls()
             self.game.game_state["current_playcall"] = calls["offense"]
             self.game.game_state["defense_playcall"] = calls["defense"]
+            
+            # Track defensive playcall usage
+            from BackEnd.utils.defense_utils import map_defense_playcall_to_tracking_name
+            def_team = self.game.defense_team
+            defense_playcall = calls["defense"]  # "Man" or "Zone"
+            tracking_name = map_defense_playcall_to_tracking_name(defense_playcall)
+            if tracking_name in def_team.scouting_data["defense"]:
+                def_team.scouting_data["defense"][tracking_name]["used"] += 1
+                def_team.scouting_data["defense"][tracking_name]["game_stats"]["used"] += 1
+            
             result = self.resolve_half_court_offense()
             # Add playcalls to result for frontend display
             result["offensive_playcall"] = calls["offense"]
