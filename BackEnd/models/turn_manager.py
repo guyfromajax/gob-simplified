@@ -1331,9 +1331,83 @@ class TurnManager:
             logging.info(f"🎯 ASSIST DEBUG: Passer conflicts with shooter/screener, setting to None (passer_pos={passer_pos}, shooter_pos={shooter_pos}, screener_pos={screener_pos})")
             passer_pos = None
 
+        # Determine shot defender based on defense type
         if game_state["defense_playcall"] == "Zone":
-            defender_pos = random.choice(list(def_lineup))
+            # For zone defense: find defender whose zone contains the shooter
+            from BackEnd.utils.shared_defense import _get_23_zone_boundaries, _point_in_zone
+            from BackEnd.constants import HCO_STRING_SPOTS
+            from BackEnd.utils.shared import get_away_player_coords
+            
+            # Get shooter's spot from final step (where they shoot)
+            shooter_spot = "key"  # Default fallback
+            if steps and shooter_pos:
+                final_step = steps[-1]
+                shooter_action = final_step.get("pos_actions", {}).get(shooter_pos, {})
+                shooter_spot = shooter_action.get("location") or shooter_action.get("spot") or "key"
+            
+            # Get shooter's coordinates
+            shooter_coords = HCO_STRING_SPOTS.get(shooter_spot, {"x": 50, "y": 25})
+            
+            # Determine court orientation
+            is_away_offense = off_team.team_id == def_team.away_team.team_id if hasattr(def_team, 'away_team') else False
+            if is_away_offense:
+                shooter_coords = get_away_player_coords(shooter_coords)
+            
+            # Determine ball location for zone shift (use ball handler's location from steps)
+            ball_spot = "key"  # Default fallback
+            ball_handler_pos = None
+            for step in steps:
+                pos_actions = step.get("pos_actions", {})
+                for pos, action_info in pos_actions.items():
+                    action = action_info.get("action", "")
+                    if action in ["handle_ball", "shoot"]:
+                        ball_handler_pos = pos
+                        ball_spot = action_info.get("location") or action_info.get("spot") or "key"
+                        break
+                if ball_handler_pos:
+                    break
+            
+            # Get zone boundaries based on ball location (applies shifts)
+            zone_boundaries = _get_23_zone_boundaries(ball_spot, is_away_offense)
+            
+            # Find which defender's zone contains the shooter
+            defender_pos = None
+            for def_pos in ["PG", "SG", "SF", "PF", "C"]:
+                if def_pos in def_lineup and def_pos in zone_boundaries:
+                    zone_coords = zone_boundaries[def_pos]
+                    if _point_in_zone(shooter_coords, zone_coords, False):
+                        defender_pos = def_pos
+                        logging.warning(f"🛡️ ZONE DEFENSE: Shot defender={defender_pos} (shooter at {shooter_spot}, coords={shooter_coords})")
+                        break
+            
+            # Fallback: if shooter not in any zone, use closest defender
+            if not defender_pos:
+                # Find defender whose zone center is closest to shooter
+                min_dist = float('inf')
+                for def_pos in ["PG", "SG", "SF", "PF", "C"]:
+                    if def_pos in def_lineup and def_pos in zone_boundaries:
+                        zone_coords = zone_boundaries[def_pos]
+                        if zone_coords:
+                            # Calculate zone center
+                            avg_x = sum(c[0] for c in zone_coords) / len(zone_coords)
+                            avg_y = sum(c[1] for c in zone_coords) / len(zone_coords)
+                            zone_center = {"x": avg_x, "y": avg_y}
+                            
+                            # Calculate distance
+                            dist = ((shooter_coords["x"] - zone_center["x"]) ** 2 + 
+                                   (shooter_coords["y"] - zone_center["y"]) ** 2) ** 0.5
+                            if dist < min_dist:
+                                min_dist = dist
+                                defender_pos = def_pos
+                
+                if defender_pos:
+                    logging.warning(f"🛡️ ZONE DEFENSE: Shot defender={defender_pos} (fallback - closest zone, shooter at {shooter_spot})")
+                else:
+                    # Final fallback: random defender
+                    defender_pos = random.choice(list(def_lineup))
+                    logging.warning(f"🛡️ ZONE DEFENSE: Shot defender={defender_pos} (final fallback - random)")
         else:
+            # Man-to-man: defender matches shooter position
             defender_pos = shooter_pos
 
         # --- Step 5: Lookup player objects
