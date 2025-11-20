@@ -555,7 +555,11 @@ async function handleSimToFourth() {
     window.location.href = `/static/set-lineup.html?${params.toString()}`;
   } catch (err) {
     console.error('Error simming to 4th quarter:', err);
-    showStatus('Simulation failed. Please try again.');
+    // ✅ FIX: Show actual error message instead of generic message
+    const errorMessage = err.message || 'Simulation failed. Please try again.';
+    showStatus(errorMessage);
+    // Also show in alert for better visibility
+    alert(`Simulation Error: ${errorMessage}`);
   } finally {
     isSimulating = false;
     if (playBtn) playBtn.disabled = false;
@@ -699,7 +703,11 @@ async function handleSimFullGame() {
     showPopup(finalScore);
   } catch (err) {
     console.error('Error simming full game:', err);
-    showStatus('Simulation failed. Please try again.');
+    // ✅ FIX: Show actual error message instead of generic message
+    const errorMessage = err.message || 'Simulation failed. Please try again.';
+    showStatus(errorMessage);
+    // Also show in alert for better visibility
+    alert(`Simulation Error: ${errorMessage}`);
     [playBtn, simFullBtn, sim4Btn].forEach(btn => { if (btn) btn.disabled = false; });
   } finally {
     isSimulating = false;
