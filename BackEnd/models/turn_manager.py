@@ -453,6 +453,24 @@ class TurnManager:
         
         result["deltas"] = deltas
         
+        # ✅ Debug logging for assists - check if AST is in deltas after a made shot
+        if result.get("result_type") == "MAKE":
+            # Check if any player has AST in deltas
+            has_ast_in_deltas = any("AST" in delta.get("stats", {}) for delta in deltas.values())
+            if has_ast_in_deltas:
+                ast_players = []
+                for pid, delta in deltas.items():
+                    if "AST" in delta.get("stats", {}):
+                        for team in (self.game.home_team, self.game.away_team):
+                            player = team.get_player_by_id(pid)
+                            if player:
+                                ast_players.append(get_name_safe(player))
+                                break
+                logging.info(f"🎯 ASSIST CHECK: Made shot - AST found in deltas for: {', '.join(ast_players) if ast_players else 'unknown'}")
+            else:
+                delta_summary = {pid: list(d.get("stats", {}).keys()) for pid, d in deltas.items()}
+                logging.warning(f"⚠️ ASSIST CHECK: Made shot - NO AST found in deltas! Deltas: {delta_summary}")
+        
         # ✅ Debug logging for free throw rebound deltas
         if result.get("result_type") == "FREE_THROW" and result.get("rebound_type"):
             rebounder_id = result.get("rebounderId")
@@ -1172,7 +1190,12 @@ class TurnManager:
                 
                 # Find the last pass event within the last 5 steps
                 # Start from the step before the shot and work backwards up to 5 steps
+                # Range: from (shot_step_index - 1) down to (shot_step_index - 5), inclusive
                 search_start = max(0, shot_step_index - 5)
+                # Fix: range should go down to search_start (inclusive), not search_start - 1
+                # But Python range() with -1 step is exclusive at the end, so we need search_start - 1
+                # Actually, we want: range(shot_step_index - 1, search_start - 1, -1)
+                # This gives us indices: [shot_step_index - 1, shot_step_index - 2, ..., search_start]
                 for step_index in range(shot_step_index - 1, search_start - 1, -1):
                     if step_index < 0:
                         break
@@ -1187,10 +1210,14 @@ class TurnManager:
                             pass_from = event.get("from")
                             pass_to = event.get("to")
                             
+                            # Debug: log all passes found
+                            logging.debug(f"🎯 ASSIST DEBUG: Checking pass from {pass_from} to {pass_to} (shooter_pos={shooter_pos}, step_index={step_index})")
+                            
                             if pass_to == shooter_pos:
                                 # This pass went to the shooter
                                 last_pass_event = event
                                 last_pass_step_index = step_index
+                                logging.info(f"🎯 ASSIST DEBUG: Found pass to shooter! from={pass_from}, to={pass_to}, step_index={step_index}, shot_step_index={shot_step_index}")
                                 break
                     
                     # If we found a pass, stop searching (we want the LAST pass to the shooter)
@@ -1207,7 +1234,7 @@ class TurnManager:
                     else:
                         logging.info(f"🎯 ASSIST DEBUG: Pass found but too far from shot (steps_from_shot={steps_from_shot}, max=5)")
                 else:
-                    logging.info(f"🎯 ASSIST DEBUG: No pass to shooter found in last 5 steps (shooter_pos={shooter_pos})")
+                    logging.warning(f"⚠️ ASSIST DEBUG: No pass to shooter found in last 5 steps (shooter_pos={shooter_pos}, shot_step_index={shot_step_index}, search_start={search_start}, total_steps={len(steps)})")
             
             # print(f"🎯 ASSIST DEBUG: Final passer_pos={passer_pos}")
             
