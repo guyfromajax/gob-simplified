@@ -955,6 +955,9 @@ def assign_all_zone_defenders(
             assigned_player_id = overlap_player_to_guard[defender_pos]
             assigned_player = next((p for p in offensive_players if p.get("player_id") == assigned_player_id), None)
             
+            # 🐛 DEBUG: Log overlap assignment
+            logging.warning(f"🛡️ ZONE DEFENSE DEBUG [assign_all_zone_defenders] Defender={defender_pos} has overlap assignment to player_id={assigned_player_id}, is_ball_handler={assigned_player.get('is_ball_handler') if assigned_player else 'NOT FOUND'}")
+            
             if assigned_player:
                 if assigned_player.get("is_ball_handler"):
                     coords = assign_bh_defender_coords(
@@ -963,6 +966,7 @@ def assign_all_zone_defenders(
                         is_away_offense,
                         ball_spot
                     )
+                    logging.warning(f"🛡️ ZONE DEFENSE DEBUG [assign_all_zone_defenders] Defender={defender_pos} assigned to guard BH via overlap resolution, coords={coords}")
                 else:
                     coords = assign_non_bh_defender_coords(
                         assigned_player["coords"],
@@ -972,6 +976,7 @@ def assign_all_zone_defenders(
                         ball_spot,
                         assigned_player.get("spot", "key")
                     )
+                    logging.warning(f"🛡️ ZONE DEFENSE DEBUG [assign_all_zone_defenders] Defender={defender_pos} assigned to guard non-BH player via overlap resolution, coords={coords}")
                 assignments[defender_pos] = coords
                 continue
         
