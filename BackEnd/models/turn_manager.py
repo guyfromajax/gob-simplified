@@ -1348,8 +1348,9 @@ class TurnManager:
             # Get shooter's coordinates
             shooter_coords = HCO_STRING_SPOTS.get(shooter_spot, {"x": 50, "y": 25})
             
-            # Determine court orientation
-            is_away_offense = off_team.team_id == def_team.away_team.team_id if hasattr(def_team, 'away_team') else False
+            # Determine court orientation (away team is on offense if offense team ID matches away team ID)
+            game = self.game
+            is_away_offense = game.offense_team.team_id == game.away_team.team_id
             if is_away_offense:
                 shooter_coords = get_away_player_coords(shooter_coords)
             
