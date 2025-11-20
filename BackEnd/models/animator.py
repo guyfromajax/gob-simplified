@@ -1250,6 +1250,9 @@ class Animator:
                 else:
                     current_ball_spot = ball_spot
                 
+                # 🐛 DEBUG: Log ball handler identification at each step
+                logging.info(f"🛡️ ZONE DEFENSE DEBUG [Step {step_index}]: Ball handler pos={ball_handler_pos}, coords={ball_handler_coords}, spot={current_ball_spot}, is_away_offense={is_away_offense}")
+                
                 # Update zone boundaries if ball spot changed (shift logic)
                 # ✅ Zone boundaries should be in SAME orientation as offensive coords
                 zone_boundaries = _get_23_zone_boundaries(current_ball_spot, is_away_offense)
@@ -1285,6 +1288,10 @@ class Animator:
                 # Use assign_all_zone_defenders which handles overlaps and priorities
                 # ✅ Pass is_away_offense as-is - zone functions expect coords in original flipped state
                 # They will unflip internally, calculate in home orientation, and return home orientation coords
+                
+                # 🐛 DEBUG: Log offensive players list before assignment
+                logging.info(f"🛡️ ZONE DEFENSE DEBUG [Step {step_index}]: Offensive players count={len(offensive_players)}, BH in list={any(p.get('is_ball_handler') for p in offensive_players)}")
+                
                 defender_coords_dict = assign_all_zone_defenders(
                     zone_boundaries,
                     offensive_players,
@@ -1293,6 +1300,9 @@ class Animator:
                     aggression,
                     is_away_offense
                 )
+                
+                # 🐛 DEBUG: Log assignments for this step
+                logging.info(f"🛡️ ZONE DEFENSE DEBUG [Step {step_index}]: Defender assignments={list(defender_coords_dict.keys())}, assignments_for_defender={defender_coords_dict.get(def_pos) is not None}")
                 
                 def_coords = defender_coords_dict.get(def_pos)
                 if not def_coords:
