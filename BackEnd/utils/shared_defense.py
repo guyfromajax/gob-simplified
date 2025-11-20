@@ -652,7 +652,13 @@ def assign_zone_defender_coords(
     if ball_handler_in_zone:
         # Guard ball handler
         logging.warning(f"🛡️ ZONE DEFENSE DEBUG [assign_zone_defender_coords] Defender={defender_pos}, PRIORITY 1 MATCH: Guarding ball handler")
-        return assign_bh_defender_coords(ball_handler_coords, aggression_level, is_away_offense, ball_spot)
+        # assign_bh_defender_coords returns coords in same orientation as input
+        # We want to return HOME orientation for consistency, so if input is away orientation, we need to unflip the result
+        result = assign_bh_defender_coords(ball_handler_coords, aggression_level, is_away_offense, ball_spot)
+        # If ball_handler_coords are in away orientation, result is in away orientation, so unflip to home
+        if is_away_offense:
+            result = get_away_player_coords(result)  # Unflip from away to home
+        return result
     
     # PRIORITY 1.5: Handle deep locations (ball handler outside zone boundaries)
     # Map deep locations to zone locations and check if mapped location is in this defender's zone
@@ -678,7 +684,13 @@ def assign_zone_defender_coords(
                 # Position defender as if guarding the mapped location (not the deep location)
                 # This keeps the defender in their zone area while still guarding the ball handler
                 logging.warning(f"🛡️ ZONE DEFENSE DEBUG [assign_zone_defender_coords] Defender={defender_pos}, PRIORITY 1.5 MATCH: Guarding mapped location")
-                return assign_bh_defender_coords(mapped_coords, aggression_level, is_away_offense, mapped_zone_location)
+                # assign_bh_defender_coords returns coords in same orientation as input
+                # mapped_coords are in away orientation if away offense, so result is in away orientation
+                # We want to return HOME orientation for consistency, so unflip if needed
+                result = assign_bh_defender_coords(mapped_coords, aggression_level, is_away_offense, mapped_zone_location)
+                if is_away_offense:
+                    result = get_away_player_coords(result)  # Unflip from away to home
+                return result
     
     # PRIORITY 2: Ball handler not in zone - check for offensive players in zone
     players_in_zone = []
@@ -977,12 +989,17 @@ def assign_all_zone_defenders(
             
             if assigned_player:
                 if assigned_player.get("is_ball_handler"):
+                    # assigned_player["coords"] are in away orientation if away offense
+                    # assign_bh_defender_coords returns coords in same orientation as input
+                    # We want HOME orientation for consistency, so unflip if needed
                     coords = assign_bh_defender_coords(
                         assigned_player["coords"],
                         aggression_level,
                         is_away_offense,
                         ball_spot
                     )
+                    if is_away_offense:
+                        coords = get_away_player_coords(coords)  # Unflip from away to home
                     logging.warning(f"🛡️ ZONE DEFENSE DEBUG [assign_all_zone_defenders] Defender={defender_pos} assigned to guard BH via overlap resolution, coords={coords}")
                 else:
                     coords = assign_non_bh_defender_coords(
@@ -1142,8 +1159,16 @@ def assign_all_zone_defenders(
                 if is_away_offense:
                     mapped_coords = get_away_player_coords(mapped_coords)
                 coords = assign_bh_defender_coords(mapped_coords, aggression_level, is_away_offense, mapped_zone_location)
+                # assign_bh_defender_coords returns coords in same orientation as input (away if away offense)
+                # We want HOME orientation for consistency, so unflip if needed
+                if is_away_offense:
+                    coords = get_away_player_coords(coords)  # Unflip from away to home
             else:
                 coords = assign_bh_defender_coords(ball_handler_coords, aggression_level, is_away_offense, ball_spot)
+                # assign_bh_defender_coords returns coords in same orientation as input (away if away offense)
+                # We want HOME orientation for consistency, so unflip if needed
+                if is_away_offense:
+                    coords = get_away_player_coords(coords)  # Unflip from away to home
             assignments[closest_defender] = coords
             logging.warning(f"🛡️ ZONE DEFENSE DEBUG [assign_all_zone_defenders] FALLBACK ASSIGNMENT: {closest_defender} assigned coords={coords}")
         else:

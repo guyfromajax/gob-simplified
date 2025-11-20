@@ -1326,30 +1326,25 @@ class Animator:
                     # Fallback: use center of zone
                     zone_coords_list = zone_boundaries.get(def_pos, [])
                     if zone_coords_list:
-                        # Average of zone coordinates
+                        # Average of zone coordinates (zone boundaries are in away orientation if away offense)
                         avg_x = sum(c[0] for c in zone_coords_list) / len(zone_coords_list)
                         avg_y = sum(c[1] for c in zone_coords_list) / len(zone_coords_list)
                         def_coords = {"x": int(avg_x), "y": int(avg_y)}
                     else:
                         def_coords = {"x": 50, "y": 25}
                 
-                # ✅ Flip defensive coordinates if away team is on offense
-                # EXCEPT for ball handler defenders: assign_bh_defender_coords now returns
-                # coordinates in the same orientation as input (away orientation if away offense),
-                # so we don't need to flip again.
-                # When away team has the ball, ALL players (both offense and defense) 
-                # are positioned on the away side of the court (left side of screen)
-                # This matches how offensive coords are flipped in skeleton_to_animations
-                
-                # Check if this defender is guarding the ball handler
-                ball_handler_in_this_zone = False
-                zone_coords_for_check = zone_boundaries.get(def_pos, [])
-                if zone_coords_for_check:
-                    ball_handler_in_this_zone = _point_in_zone(ball_handler_coords, zone_coords_for_check, False)
-                
-                # Only flip if NOT guarding ball handler (ball handler defenders are already in correct orientation)
-                if is_away_offense and not ball_handler_in_this_zone:
+                # ✅ IMPORTANT: assign_all_zone_defenders returns coords in HOME orientation
+                # (assign_bh_defender_coords and assign_non_bh_defender_coords both calculate in home orientation
+                # and return home orientation, even though assign_bh_defender_coords flips back to match input)
+                # When away team is on offense, we need to flip ALL defensive coords to away orientation
+                # to match the offensive coords (which are also in away orientation)
+                # This ensures all players (offense and defense) are positioned on the away side of the court
+                def_coords_before_flip = def_coords.copy() if def_coords else None
+                if is_away_offense:
                     def_coords = get_away_player_coords(def_coords)
+                    logging.warning(f"🛡️ ZONE DEFENSE DEBUG [Step {step_index}] Defender={def_pos}: Flipped coords from HOME {def_coords_before_flip} to AWAY {def_coords}")
+                else:
+                    logging.warning(f"🛡️ ZONE DEFENSE DEBUG [Step {step_index}] Defender={def_pos}: Coords in HOME orientation (no flip needed): {def_coords}")
                 
                 # Get timestamp
                 if step_index < len(skeleton_steps):
