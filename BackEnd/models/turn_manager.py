@@ -413,7 +413,21 @@ class TurnManager:
                 }
                 if diff:
                     deltas[player.player_id] = {"team": team.name, "stats": diff}
+                    
+                    # ✅ Debug logging for free throw rebounds
+                    if result.get("result_type") == "FREE_THROW" and ("OREB" in diff or "DREB" in diff):
+                        logging.info(f"🏀 Free Throw Turn Deltas: {get_name_safe(player)} has rebound in deltas: {diff}")
+        
         result["deltas"] = deltas
+        
+        # ✅ Debug logging for free throw rebound deltas
+        if result.get("result_type") == "FREE_THROW" and result.get("rebound_type"):
+            rebounder_id = result.get("rebounderId")
+            if rebounder_id and rebounder_id in deltas:
+                rebounder_deltas = deltas[rebounder_id].get("stats", {})
+                logging.info(f"🏀 Free Throw Turn Result: rebound_type={result.get('rebound_type')}, rebounderId={rebounder_id}, deltas={rebounder_deltas}")
+            else:
+                logging.warn(f"⚠️ Free Throw Rebound Missing in Deltas: rebound_type={result.get('rebound_type')}, rebounderId={rebounder_id}, deltas_keys={list(deltas.keys())}")
         
         # Include current energy levels for all active players (for frontend fatigue display)
         player_energy = {}
