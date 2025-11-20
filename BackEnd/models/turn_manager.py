@@ -420,6 +420,33 @@ class TurnManager:
                     if result.get("result_type") == "FREE_THROW" and ("OREB" in diff or "DREB" in diff):
                         logging.info(f"🏀 Free Throw Turn Deltas: {get_name_safe(player)} has rebound in deltas: {diff}")
         
+        # ✅ Additional debug logging for FREE_THROW turns to check if rebound stats were recorded
+        if result.get("result_type") == "FREE_THROW" and result.get("rebound_type"):
+            rebounder_id = result.get("rebounderId")
+            logging.info(f"🏀 Free Throw Turn - rebound_type={result.get('rebound_type')}, rebounderId={rebounder_id}")
+            if rebounder_id:
+                # Check if rebounder exists in deltas
+                if rebounder_id in deltas:
+                    logging.info(f"🏀 Free Throw Turn - Rebounder {rebounder_id} found in deltas: {deltas[rebounder_id]}")
+                else:
+                    logging.warning(f"⚠️ Free Throw Turn - Rebounder {rebounder_id} NOT found in deltas. Available player_ids: {list(deltas.keys())}")
+                    # Check if rebounder exists in pre_stats (might be from previous turn)
+                    if rebounder_id in pre_stats:
+                        prev_reb = pre_stats[rebounder_id].get(result.get("rebound_type"), 0)
+                        # Find the player object to check current stats
+                        for team in (self.game.home_team, self.game.away_team):
+                            for player in team.get_all_players():
+                                if player.player_id == rebounder_id:
+                                    current_reb = player.stats["game"].get(result.get("rebound_type"), 0)
+                                    logging.warning(f"⚠️ Free Throw Turn - Rebounder stats mismatch: prev={prev_reb}, current={current_reb}, should_diff={current_reb - prev_reb}, player_name={get_name_safe(player)}")
+                                    # If there's a diff but it's not in deltas, this is a bug
+                                    if current_reb != prev_reb:
+                                        expected_diff = {result.get("rebound_type"): current_reb - prev_reb}
+                                        logging.error(f"❌ Free Throw Turn - Rebound stat recorded but NOT in deltas! Expected: {expected_diff}, Player: {get_name_safe(player)}")
+                                    break
+                    else:
+                        logging.warning(f"⚠️ Free Throw Turn - Rebounder {rebounder_id} not found in pre_stats")
+        
         result["deltas"] = deltas
         
         # ✅ Debug logging for free throw rebound deltas
