@@ -1499,6 +1499,7 @@ def get_player(player_id: str):
             if sample:
                 # Debug logging removed - was cluttering logs
                 # logging.debug(f"📋 Sample player _id format: {sample.get('_id')} (type: {type(sample.get('_id'))})")
+                pass
             raise HTTPException(status_code=404, detail="Player not found")
         # Debug logging removed - was cluttering logs
         # logging.debug(f"✅ Player found: {player.get('first_name')} {player.get('last_name')}")
