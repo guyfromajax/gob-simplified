@@ -302,29 +302,29 @@ def assign_non_bh_defender_coords(o_coords, ball_coords, aggression_level, is_aw
 # 2-3 Zone Defense: Zone definitions (using spot names from HCO_STRING_SPOTS)
 # Each zone is defined by border points that form a polygon
 ZONE_23_NORMAL = {
-    "PG": ["key", "midLane", "upper midCorner", "upper wing", "upper midWing"],
-    "SG": ["key", "midLane", "lower midCorner", "lower wing", "lower midWing"],
-    "SF": ["lower midCorner", "lower corner", "lower lowPost", "lower midPost"],
-    "PF": ["upper midCorner", "upper corner", "upper lowPost", "upper midPost"],
+    "PG": ["key", "midLane", "topLane", "upper midCorner", "upper wing", "upper midWing"],
+    "SG": ["key", "midLane", "topLane", "lower midCorner", "lower wing", "lower midWing"],
+    "SF": ["lower midCorner", "lower corner", "lower lowPost", "lower midPost", "lower apex", "lower bird", "lower midBaseline"],
+    "PF": ["upper midCorner", "upper corner", "upper lowPost", "upper midPost", "upper apex", "upper bird", "upper midBaseline"],
     "C": ["upper lowPost", "lower lowPost", "lower midPost", "midLane", "upper midPost"],
 }
 
 # Lower shift (ball on lower wing, lower midCorner, or lower corner)
 ZONE_23_LOWER_SHIFT = {
     "PG": ["lower midWing", "lower highPost", "upper midCorner", "upper wing", "upper midWing", "key"],
-    "SG": ["lower corner", "lower midCorner", "lower midPost", "lower highPost"],
-    "SF": ["lower midCorner", "lower corner", "lower lowPost", "lower midPost"],  # No change
-    "PF": ["upper midCorner", "upper corner", "upper lowPost", "upper midPost"],  # No change
-    "C": ["upper lowPost", "lower lowPost", "lower midPost", "midLane", "upper midPost"],  # No change
+    "SG": ["lower corner", "lower midCorner", "lower wing", "lower midPost", "lower highPost", "lower apex", "lower bird", "lower midBaseline"],
+    "SF": ["lower midCorner", "lower corner", "lower lowPost", "lower midPost", "lower apex", "lower bird", "lower midBaseline"],
+    "PF": ["upper midCorner", "upper corner", "upper lowPost", "upper midPost", "upper apex", "upper bird", "upper midBaseline"],
+    "C": ["upper lowPost", "lower lowPost", "lower midPost", "midLane", "upper midPost"],
 }
 
 # Upper shift (ball on upper wing, upper midCorner, or upper corner)
 ZONE_23_UPPER_SHIFT = {
-    "SG": ["upper midWing", "upper highPost", "midLane", "lower midCorner", "lower wing", "lower midWing", "key"],
-    "PG": ["upper wing", "upper midCorner", "midLane", "upper highPost"],
-    "SF": ["lower midCorner", "lower corner", "lower lowPost", "lower midPost"],  # No change
-    "PF": ["upper midCorner", "upper corner", "upper lowPost", "upper midPost"],  # No change
-    "C": ["upper lowPost", "lower lowPost", "lower midPost", "midLane", "upper midPost"],  # No change
+    "SG": ["upper midWing", "upper highPost", "lower midCorner", "lower wing", "lower midWing", "key"],  # Removed midLane to mirror Lower PG
+    "PG": ["upper corner", "upper midCorner", "upper wing", "upper midPost", "upper highPost", "upper apex", "upper bird", "upper midBaseline"],  # Added upper corner, upper midPost, upper apex, upper bird, upper midBaseline to mirror Lower SG
+    "SF": ["lower midCorner", "lower corner", "lower lowPost", "lower midPost", "lower apex", "lower bird", "lower midBaseline"],
+    "PF": ["upper midCorner", "upper corner", "upper lowPost", "upper midPost", "upper apex", "upper bird", "upper midBaseline"],
+    "C": ["upper lowPost", "lower lowPost", "lower midPost", "midLane", "upper midPost"],
 }
 
 
