@@ -120,28 +120,76 @@ def _initialize_game_stats(gm: GameManager, game_id: str | None = None) -> None:
     # print(f"[DEV] Initialized game stats for players: {affected}")
 
 
-def _ensure_complete_lineup(team) -> None:
+def _ensure_complete_lineup(team, game_state=None) -> None:
     """Ensure a team has players at all required positions.
 
     If any position from ``POSITION_LIST`` is missing, attempt to build a
     complete lineup from the team's roster.  Raises ``ValueError`` when the
     roster cannot supply the missing positions.
+    
+    Args:
+        team: TeamManager instance
+        game_state: Optional game state dict to check for ineligible players
     """
 
     missing = [pos for pos in POSITION_LIST if not team.lineup.get(pos)]
     if not missing:
         return
 
-    try:
-        auto = build_lineup_from_mongo(team)
-    except ValueError as exc:
+    # Get ineligible players (fouled-out) if game_state is available
+    ineligible_player_ids = set()
+    if game_state:
+        ineligible_player_ids = set(game_state.get("ineligible_players", []))
+    
+    # Get currently assigned player IDs (to avoid duplicates)
+    current_player_ids = set()
+    for pos, player in team.lineup.items():
+        if player and hasattr(player, "player_id"):
+            current_player_ids.add(player.player_id)
+
+    # Filter available players: exclude ineligible and already-assigned players
+    available_players = [
+        p for p in team.get_all_players()
+        if p.player_id not in ineligible_player_ids 
+        and p.player_id not in current_player_ids
+    ]
+    
+    if len(available_players) < len(missing):
         raise ValueError(
-            f"Team '{team.name}' lineup missing positions {missing}: {exc}"
-        ) from exc
-
-    for pos in POSITION_LIST:
-        team.lineup.setdefault(pos, auto[pos])
-
+            f"Team '{team.name}' lineup missing positions {missing}: "
+            f"Only {len(available_players)} eligible players available "
+            f"(need {len(missing)}, excluding {len(ineligible_player_ids)} ineligible)"
+        )
+    
+    # Fill missing positions with available players
+    # Use simple assignment based on position needs
+    from BackEnd.utils.db_utils import POSITION_TRAITS, get_player_rating
+    import random
+    
+    position_order = ["PG", "SG", "SF", "PF", "C"]
+    random.shuffle(position_order)  # Randomize order for variety
+    
+    remaining_available = available_players.copy()
+    
+    for pos in missing:
+        if not remaining_available:
+            raise ValueError(
+                f"Team '{team.name}' lineup incomplete; missing positions: {missing}"
+            )
+        
+        # Rate players for this position
+        traits = POSITION_TRAITS.get(pos, [])
+        rated = [(p, get_player_rating(p, traits)) for p in remaining_available]
+        rated.sort(key=lambda tup: tup[1], reverse=True)
+        
+        # Pick from top 3 candidates (or all if fewer)
+        top_candidates = rated[:3] if len(rated) >= 3 else rated
+        chosen_player = random.choice(top_candidates)[0]
+        
+        team.lineup[pos] = chosen_player
+        remaining_available.remove(chosen_player)
+    
+    # Final validation
     remaining = [pos for pos in POSITION_LIST if not team.lineup.get(pos)]
     if remaining:
         raise ValueError(
@@ -196,8 +244,9 @@ def simulate_quarter(
     logging.info(f"🏀 simulate_quarter: FINAL home_lineup_keys={list(gm.home_team.lineup.keys()) if gm.home_team.lineup else 'EMPTY'}, away_lineup_keys={list(gm.away_team.lineup.keys()) if gm.away_team.lineup else 'EMPTY'}")
 
     # Validate that both lineups contain all required positions
-    _ensure_complete_lineup(gm.home_team)
-    _ensure_complete_lineup(gm.away_team)
+    # Pass game_state to filter out ineligible (fouled-out) players
+    _ensure_complete_lineup(gm.home_team, gm.game_state)
+    _ensure_complete_lineup(gm.away_team, gm.game_state)
 
     # Zero per-game stats exactly once per game before the opening tip.
     # Only initialize stats if game_stats_initialized flag is not set (prevents resetting stats mid-game)
