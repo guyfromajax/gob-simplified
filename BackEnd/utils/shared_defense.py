@@ -628,8 +628,9 @@ def assign_zone_defender_coords(
     # So pass is_away_offense=False to _point_in_zone so it doesn't flip coords (they're already matched)
     ball_handler_in_zone = _point_in_zone(ball_handler_coords, defender_zone_coords_list, False)
     
-    # 🐛 DEBUG: Log PRIORITY 1 check
-    logging.warning(f"🛡️ ZONE DEFENSE DEBUG [assign_zone_defender_coords] Defender={defender_pos}, PRIORITY 1: BH coords={ball_handler_coords}, BH in zone={ball_handler_in_zone}")
+    # 🐛 DEBUG: Log PRIORITY 1 check with zone polygon info
+    zone_polygon_summary = f"[{len(defender_zone_coords_list)} points]" if len(defender_zone_coords_list) <= 8 else f"[{len(defender_zone_coords_list)} points: {defender_zone_coords_list[:4]}...]"
+    logging.warning(f"🛡️ ZONE DEFENSE DEBUG [assign_zone_defender_coords] Defender={defender_pos}, PRIORITY 1: BH coords={ball_handler_coords}, zone_polygon={zone_polygon_summary}, BH in zone={ball_handler_in_zone}")
     
     if ball_handler_in_zone:
         # Guard ball handler
