@@ -8,8 +8,13 @@ def assign_bh_defender_coords(ball_coords, aggression_level: str, is_away_offens
     Returns defensive positioning for the ball handler's man-to-man defender.
     Adjusts based on court orientation: if away team is on offense, direction is reversed.
     
+    IMPORTANT: This function returns coordinates in the SAME orientation as ball_coords.
+    If ball_coords are in away orientation, result is in away orientation.
+    If ball_coords are in home orientation, result is in home orientation.
+    Callers should NOT flip the result again.
+    
     Args:
-        ball_coords: Ball handler's coordinates
+        ball_coords: Ball handler's coordinates (in whatever orientation they're provided)
         aggression_level: Defense aggression setting
         is_away_offense: Whether away team has the ball
         bh_spot: Ball handler's spot string ("key", "lower wing", etc.) - NEW
@@ -21,15 +26,19 @@ def assign_bh_defender_coords(ball_coords, aggression_level: str, is_away_offens
 
     x_bh = ball_coords["x"]
     y_bh = ball_coords["y"]
+    coords_were_flipped = False
 
     # Convert ball handler coords back to home orientation so the spacing logic
     # is consistent regardless of which team has possession.
     if is_away_offense:
         flipped = get_away_player_coords(ball_coords)
         x_bh, y_bh = flipped["x"], flipped["y"]
+        coords_were_flipped = True
 
     y_direction = -1 if y_bh > 25 else 1  # direction toward basket
-    x_direction = -1 if is_away_offense else 1
+    # In home orientation, defenders are always to the RIGHT of ball handler (toward basket at x=90)
+    # So x_direction should always be +1 in home orientation
+    x_direction = 1  # Always toward basket in home orientation
     
 
     if bh_spot == "key":
@@ -54,7 +63,13 @@ def assign_bh_defender_coords(ball_coords, aggression_level: str, is_away_offens
         x = x_bh + (x_direction * random.randint(3,6))
         y = y_bh + random.randint(-3,3)
 
-    return {"x": x, "y": y}
+    result = {"x": x, "y": y}
+    
+    # If we flipped input coords, flip result back to match input orientation
+    if coords_were_flipped:
+        result = get_away_player_coords(result)
+    
+    return result
 
 
 def assign_non_bh_defender_coords(o_coords, ball_coords, aggression_level, is_away_offense, ball_spot="key", o_spot="key"):
