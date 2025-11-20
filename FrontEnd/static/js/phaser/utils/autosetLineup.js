@@ -25,11 +25,12 @@ export function generateAutoSetLineup(roster) {
   
   // For each position in random order
   shuffledPositions.forEach(pos => {
-    // Get available players (not already assigned AND NG >= 0.8)
+    // Get available players (not already assigned AND NG >= 0.8 AND not ineligible)
     const availablePlayers = roster.filter(p => {
       const playerId = p._id || p.player_id || p.playerId;
       const ng = p.NG ?? p.attributes?.NG ?? 1.0;
-      return !assignedPlayers.has(playerId) && ng >= 0.8;
+      const isIneligible = p.ineligible || p.fouled_out;
+      return !assignedPlayers.has(playerId) && ng >= 0.8 && !isIneligible;
     });
     
     // Get players with ratings for this position, sorted by rating desc
