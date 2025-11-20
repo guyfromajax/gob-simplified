@@ -1125,22 +1125,54 @@ class TurnManager:
                 final_owner = ball_owner_by_step[-1]
                 shooter_pos = final_owner if isinstance(final_owner, str) else None
             
-            # 2. Get PASSER from ball ownership changes (check previous 2 steps before shot)
-            # Look at who had the ball in the 2 steps before the final shot step
-            # print(f"🎯 ASSIST DEBUG: shooter_pos={shooter_pos}, ball_owner_by_step={ball_owner_by_step}")
-            
-            if ball_owner_by_step and len(ball_owner_by_step) >= 2:
-                # Check the last 2 non-shooter ball owners
-                # Example: ['PG', 'PG', 'SG', 'SG', 'PF'] -> shooter=PF, check indices -3 and -2 (SG, SG)
-                for i in range(len(ball_owner_by_step) - 2, max(len(ball_owner_by_step) - 4, -1), -1):
-                    if i >= 0:
-                        potential_passer_pos = ball_owner_by_step[i]
-                        # print(f"🎯 ASSIST DEBUG: Checking index {i}: potential_passer={potential_passer_pos}")
-                        # Found a different player who had the ball before the shooter
-                        if potential_passer_pos and potential_passer_pos != shooter_pos:
-                            passer_pos = potential_passer_pos
-                            # print(f"🎯 ASSIST DEBUG: Found passer via ball ownership! passer_pos={passer_pos}")
-                            break
+            # 2. Get PASSER based on three criteria:
+            #    a) Last player to make a pass in the skeleton
+            #    b) The pass went to the shooter
+            #    c) The pass was within 5 steps of the shot being taken
+            if shooter_pos:
+                # Look back up to 5 steps from the final shot step
+                shot_step_index = len(steps) - 1
+                last_pass_event = None
+                last_pass_step_index = None
+                
+                # Find the last pass event within the last 5 steps
+                # Start from the step before the shot and work backwards up to 5 steps
+                search_start = max(0, shot_step_index - 5)
+                for step_index in range(shot_step_index - 1, search_start - 1, -1):
+                    if step_index < 0:
+                        break
+                    
+                    step = steps[step_index]
+                    events = step.get("events", [])
+                    
+                    # Check for pass events in this step
+                    for event in events:
+                        if event.get("type") == "pass":
+                            # Found a pass event - verify it went to the shooter
+                            pass_from = event.get("from")
+                            pass_to = event.get("to")
+                            
+                            if pass_to == shooter_pos:
+                                # This pass went to the shooter
+                                last_pass_event = event
+                                last_pass_step_index = step_index
+                                break
+                    
+                    # If we found a pass, stop searching (we want the LAST pass to the shooter)
+                    if last_pass_event:
+                        break
+                
+                # Verify the pass was within 5 steps of the shot
+                if last_pass_event and last_pass_step_index is not None:
+                    steps_from_shot = shot_step_index - last_pass_step_index
+                    if steps_from_shot <= 5:
+                        # All criteria met: last pass to shooter within 5 steps
+                        passer_pos = last_pass_event.get("from")
+                        # print(f"🎯 ASSIST DEBUG: Found passer={passer_pos}, pass_to={last_pass_event.get('to')}, steps_from_shot={steps_from_shot}")
+                    # else:
+                    #     print(f"🎯 ASSIST DEBUG: Pass found but too far from shot (steps_from_shot={steps_from_shot})")
+                # else:
+                #     print(f"🎯 ASSIST DEBUG: No pass to shooter found in last 5 steps")
             
             # print(f"🎯 ASSIST DEBUG: Final passer_pos={passer_pos}")
             
