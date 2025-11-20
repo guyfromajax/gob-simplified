@@ -313,12 +313,287 @@ To implement seamless turn transitions in the current system, you would need:
 
 ## Files Referenced (WIP_GOB)
 
+### Animation System
 - `/Users/jamesdavies/WIP_GOB/Frontend/app/components/gamePlay/Hooks/animations/useFullAnimation.ts`
 - `/Users/jamesdavies/WIP_GOB/Frontend/app/components/gamePlay/Hooks/animations/useContinueGame.ts`
 - `/Users/jamesdavies/WIP_GOB/Frontend/app/components/gamePlay/Hooks/animations/usePlayerAnimation.ts`
 - `/Users/jamesdavies/WIP_GOB/Frontend/app/components/gamePlay/Hooks/animations/useScenarios.ts`
 - `/Users/jamesdavies/WIP_GOB/Frontend/app/components/gamePlay/Hooks/animations/useTweens.ts`
 - `/Users/jamesdavies/WIP_GOB/Frontend/app/components/gamePlay/Hooks/animations/useDurations.ts`
+
+### Idle Animation System
+- `/Users/jamesdavies/WIP_GOB/Frontend/app/components/gamePlay/Hooks/utils/usePhaserPlayers.ts`
+- `/Users/jamesdavies/WIP_GOB/Frontend/app/components/gamePlay/Hooks/utils/useUpdateStatus.ts`
+- `/Users/jamesdavies/WIP_GOB/Frontend/app/components/gamePlay/Hooks/utils/useGeneral.ts`
+
+## Idle Animation System for Waiting Players
+
+WIP_GOB includes a sophisticated idle animation system that makes players who have reached their destination feel alive while waiting for other players to complete their longer animations.
+
+### Overview
+
+When 9 players finish their movement quickly but 1 player still has 25 grid spots to travel, the 9 waiting players don't just stand still. Instead, they perform subtle, organic animations that make the scene feel more natural and engaging.
+
+### Implementation
+
+#### 1. `animatePlayerWhileIdle` Function
+
+Called on every game status update, this function manages idle animations for all players:
+
+```typescript
+// usePhaserPlayers.ts (lines 169-197)
+const animatePlayerWhileIdle = ({ 
+  phaserAwayPlayers, 
+  phaserHomePlayers, 
+  scene, 
+  ballHolder, 
+  isPlaying, 
+  nextBallHolder, 
+  signal 
+}: AnimatePlayerIdle) => {
+  const combinePlayers = Object.values(phaserAwayPlayers).concat(Object.values(phaserHomePlayers));
+  
+  combinePlayers.forEach(({ phaserPlayer, jerseyNo, name }) => {
+    // Only animate players who are NOT ball holders
+    const ballHoldersCheck = ballHolder?.name !== name && nextBallHolder?.name !== name;
+    
+    // Stop if game is paused or signal is "stop"
+    const stopCheck = !isPlaying || signal == "stop";
+    
+    const playerTweens = scene.tweens?.getTweensOf(phaserPlayer);
+    
+    if (stopCheck) return stopIdleAnimation({ jerseyNo, name, phaserPlayer, scene });
+    
+    if (playerTweens.length) {
+      // If player has active tweens, stop idle animation
+      if (playerTweens.length > 1 || !ballHoldersCheck) {
+        stopIdleAnimation({ jerseyNo, name, phaserPlayer, scene });
+      }
+    } else if (ballHoldersCheck && (signal ? signal == "start" : true)) {
+      // Start idle animation if not already running
+      if (!scene.game.state.tweenRegistry?.[name]?.length) {
+        scene.game.state.tweenRegistry[name] = startIdlePlayerAnimation({ 
+          jerseyNo, 
+          phaserPlayer, 
+          scene 
+        });
+      }
+    }
+  });
+};
+```
+
+**Key Points:**
+- Runs continuously on every game status update
+- Only animates players who are NOT the ball holder or next ball holder
+- Respects the signal system (`signal === "start"` to allow animations)
+- Stops idle animations when players need to move again
+
+#### 2. `startIdlePlayerAnimation` Function
+
+Creates subtle, two-part animations for idle players:
+
+```typescript
+// usePhaserPlayers.ts (lines 94-147)
+const startIdlePlayerAnimation = ({ scene, phaserPlayer, jerseyNo }: StartIdleTweenType) => {
+  const { velocity } = scene.game.state;
+  const { randomX, randomY } = getRandomCoords(); // ±10 to ±25 pixels
+  
+  // Part 1: Random position movement (player)
+  const playerTween = scene.tweens.add({
+    targets: phaserPlayer,
+    props: {
+      x: { value: `+=${randomX}`, duration: velocity.delays.d600, yoyo: true },
+      y: { value: `+=${randomY}`, duration: velocity.delays.d600, yoyo: true },
+    },
+    ease: "Sine.easeInOut",
+    onComplete: () => {
+      // Part 2: Scale animation after position movement completes
+      const playerScale = scene.tweens.add({
+        targets: phaserPlayer,
+        props: {
+          scale: { value: 1.2, duration: velocity.delays.d300, yoyo: true },
+        },
+        ease: "Sine.easeInOut",
+        repeat: 1,
+        onComplete: () => (playerTween.isCompleted = true),
+      });
+    },
+  });
+  
+  // Part 1: Random position movement (jersey number)
+  const jerseyTween = scene.tweens.add({
+    targets: jerseyNo,
+    props: {
+      x: { value: `+=${randomX}`, duration: velocity.delays.d600, yoyo: true },
+      y: { value: `+=${randomY}`, duration: velocity.delays.d600, yoyo: true },
+    },
+    ease: "Sine.easeInOut",
+    onComplete: () => {
+      // Part 2: Scale animation after position movement completes
+      const jerseyScale = scene.tweens.add({
+        targets: jerseyNo,
+        props: {
+          scale: { value: 0.85, duration: velocity.delays.d300, yoyo: true },
+        },
+        ease: "Sine.easeInOut",
+        repeat: 1,
+        onComplete: () => (jerseyTween.isCompleted = true),
+      });
+    },
+  });
+  
+  return [playerTween, jerseyTween];
+};
+```
+
+**Animation Sequence:**
+1. **Position Movement**: Player and jersey number move ±10 to ±25 pixels in a random direction
+   - Duration: 600ms
+   - Uses `yoyo: true` to return to original position
+   - Easing: `Sine.easeInOut`
+
+2. **Scale Animation**: After position movement completes
+   - Player scales to 1.2x (slight grow)
+   - Jersey number scales to 0.85x (slight shrink)
+   - Duration: 300ms
+   - Repeats once (total: 2 cycles)
+   - Returns to original scale
+
+#### 3. Random Coordinates Generator
+
+Generates subtle random movements:
+
+```typescript
+// useGeneral.ts (lines 27-36)
+const getRandomCoords = () => {
+  // Random direction (positive or negative)
+  const willNegativeX = Math.round(Math.random());
+  const willNegativeY = Math.round(Math.random());
+  
+  // Random distance: 10-25 pixels
+  let randomX = ~~(Math.random() * (10 + 15) + 10);
+  randomX = willNegativeX ? -randomX : randomX;
+  
+  let randomY = ~~(Math.random() * (10 + 15) + 10);
+  randomY = willNegativeY ? -randomY : randomY;
+  
+  return { randomX, randomY };
+};
+```
+
+**Range**: ±10 to ±25 pixels in both X and Y directions
+
+#### 4. `stopIdleAnimation` Function
+
+Cleans up idle animations when players need to move:
+
+```typescript
+// usePhaserPlayers.ts (lines 149-167)
+const stopIdleAnimation = ({ scene, phaserPlayer, jerseyNo, name }: StopIdleTweenType) => {
+  scene.game.state.tweenRegistry[name]?.forEach((tween) => {
+    try {
+      // Reset to original state
+      phaserPlayer.setScale(playerScaleFactor);
+      jerseyNo.setScale(0.9);
+      phaserPlayer.setPosition(phaserPlayer.x, phaserPlayer.y);
+      jerseyNo.setPosition(jerseyNo.x, jerseyNo.y);
+      
+      // Destroy tween if not already destroyed
+      if (tween && !tween.isDestroyed()) {
+        tween.destroy();
+        tween.isCompleted = true;
+      }
+    } catch (error) {
+      gobConsole(error);
+    }
+  });
+};
+```
+
+### Integration with Game Status Updates
+
+The idle animation system is called on every game status update:
+
+```typescript
+// useUpdateStatus.ts (line 35)
+const handleGameStatus = async (scene: ExtendedScene) => {
+  // ... other status updates ...
+  
+  // Update idle animations for all players
+  if (phaserAwayPlayers && phaserHomePlayers) {
+    animatePlayerWhileIdle({ 
+      ballHolder, 
+      phaserAwayPlayers, 
+      phaserHomePlayers, 
+      scene, 
+      isPlaying, 
+      nextBallHolder, 
+      signal 
+    });
+  }
+  
+  // ... rest of status updates ...
+};
+```
+
+### Visual Effect
+
+**What users see:**
+- Players who finish early while others are still moving perform subtle animations
+- Random small movements (shifting weight, slight repositioning)
+- Gentle scaling (breathing, slight grow/shrink effect)
+- Continuous looping until players need to move again
+- Ball holder and next ball holder don't animate (they get dribble animation or are about to move)
+
+**Why it feels organic:**
+- Makes waiting players feel alive, not frozen
+- Prevents the "uncanny valley" of players standing perfectly still
+- Creates a sense of activity even during waiting periods
+- Smoothly transitions when players need to move (animations stop immediately)
+
+### When Idle Animations Are Active
+
+**Start when:**
+- Player has completed their movement animation
+- Player is NOT the ball holder (ball holder gets dribble animation)
+- Player is NOT the next ball holder (about to receive the ball)
+- `isPlaying === true` and `signal === "start"`
+
+**Stop when:**
+- Player needs to move again (has active movement tweens)
+- Player becomes the ball holder
+- Player becomes the next ball holder
+- `signal === "stop"` (critical animations in progress)
+- `isPlaying === false` (game paused or ended)
+
+### Tween Registry System
+
+WIP_GOB uses a tween registry to track idle animations:
+
+```typescript
+// Stored in scene.game.state.tweenRegistry[name]
+scene.game.state.tweenRegistry = {
+  "Player Name": [playerTween, jerseyTween],
+  // ... other players ...
+};
+
+// Registry cleanup when tweens complete
+if (scene.game.state.tweenRegistry) {
+  scene.game.state.tweenRegistry = Object.fromEntries(
+    Object.entries(scene.game.state.tweenRegistry).map(([key, val]) => {
+      if (!val?.length) return [key, []];
+      if (!val.some((tween) => tween.isCompleted)) return [key, []];
+      else return [key, val];
+    })
+  );
+}
+```
+
+**Purpose:**
+- Prevents duplicate idle animations
+- Allows cleanup of completed animations
+- Tracks active animations per player
 
 ## Notes
 
