@@ -361,13 +361,23 @@ export function createGameScene(Phaser) {
       this.nameToId = Object.fromEntries(actualPlayers.map(p => [p.name, p.playerId ?? p.player_id]));
       this.playerInfo = Object.fromEntries(actualPlayers.map(p => [p.playerId ?? p.player_id, { name: p.name, team: p.team, pos: p.pos }]));
       
-      // Reset player stats to 0 for all players (force clean slate)
+      // Initialize player stats from simData.players (accumulated stats from previous quarters)
+      // For Q2+, stats are restored from the database; for Q1, stats start at 0
       this.playerStats = {};
       simData.players.forEach(p => {
         const id = p.playerId ?? p.player_id;
-        // Initialize all stats to 0 to prevent stats from previous games carrying over
+        // Use stats from simData if available (Q2+), otherwise initialize to 0 (Q1)
+        const savedStats = p.stats || {};
         this.playerStats[id] = { 
-          PTS: 0, F: 0, REB: 0, AST: 0, STL: 0, BLK: 0, TO: 0, DEF_A: 0, DEF_S: 0 
+          PTS: savedStats.PTS || 0,
+          F: savedStats.F || 0,
+          REB: savedStats.REB || ((savedStats.OREB || 0) + (savedStats.DREB || 0)), // Calculate REB from OREB + DREB
+          AST: savedStats.AST || 0,
+          STL: savedStats.STL || 0,
+          BLK: savedStats.BLK || 0,
+          TO: savedStats.TO || 0,
+          DEF_A: savedStats.DEF_A || 0,
+          DEF_S: savedStats.DEF_S || 0
         };
       });
       this.rowRefs = { home: {}, away: {} };
