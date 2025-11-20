@@ -183,6 +183,12 @@ function renderHeader() {
   document.getElementById('away-team-name').textContent = awayName;
   document.getElementById('home-score').textContent = homeScore;
   document.getElementById('away-score').textContent = awayScore;
+  
+  // Update tab button labels with team names
+  const homeTabButton = document.querySelector('.tab-button[data-team="home"]');
+  const awayTabButton = document.querySelector('.tab-button[data-team="away"]');
+  if (homeTabButton) homeTabButton.textContent = homeName;
+  if (awayTabButton) awayTabButton.textContent = awayName;
 }
 
 // Render quarter scoring table
