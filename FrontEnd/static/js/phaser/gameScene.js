@@ -368,10 +368,17 @@ export function createGameScene(Phaser) {
         const id = p.playerId ?? p.player_id;
         // Use stats from simData if available (Q2+), otherwise initialize to 0 (Q1)
         const savedStats = p.stats || {};
+        // IMPORTANT: Initialize OREB and DREB separately (not just REB)
+        // REB is calculated from OREB + DREB, so we need to track all three
+        const oreb = savedStats.OREB || 0;
+        const dreb = savedStats.DREB || 0;
+        const reb = savedStats.REB || (oreb + dreb); // Use saved REB, or calculate from OREB + DREB
         this.playerStats[id] = { 
           PTS: savedStats.PTS || 0,
           F: savedStats.F || 0,
-          REB: savedStats.REB || ((savedStats.OREB || 0) + (savedStats.DREB || 0)), // Calculate REB from OREB + DREB
+          OREB: oreb,
+          DREB: dreb,
+          REB: reb,
           AST: savedStats.AST || 0,
           STL: savedStats.STL || 0,
           BLK: savedStats.BLK || 0,
