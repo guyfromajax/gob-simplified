@@ -171,8 +171,20 @@ class TeamManager:
                 }
             },
             "defense": {
-                "Man": {"used": 0, "success": 0},
-                "Zone": {"used": 0, "success": 0},
+                "Man": {
+                    "used": 0, 
+                    "success": 0, 
+                    "effectiveness": 0.0,
+                    "game_stats": {"used": 0, "success": 0}, 
+                    "season_stats": {"used": 0, "success": 0}
+                },
+                "2-3 Zone": {
+                    "used": 0, 
+                    "success": 0, 
+                    "effectiveness": 0.0,
+                    "game_stats": {"used": 0, "success": 0}, 
+                    "season_stats": {"used": 0, "success": 0}
+                },
                 "vs_Fast_Break": {"used": 0, "success": 0},
                 "FCP": {"used": 0, "success": 0},
                 "HCT": {"used": 0, "success": 0}
