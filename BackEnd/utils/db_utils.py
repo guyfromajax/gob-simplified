@@ -64,7 +64,17 @@ def build_lineup_from_mongo(team: Union[str, TeamManager]) -> Dict[str, Player]:
 
 
 def assign_lineup_from_ids(team: TeamManager, lineup_ids: Dict[str, str]) -> Dict[str, Player]:
+    """Assign lineup from player IDs, skipping None/empty values.
+    
+    This function will only assign positions that have valid player IDs.
+    Positions with None or missing values will remain unassigned and should
+    be filled by _ensure_complete_lineup().
+    """
     for pos, pid in lineup_ids.items():
+        # Skip None, empty string, or invalid player IDs
+        if not pid:
+            continue
+            
         existing = team.lineup.get(pos)
         if existing and existing.player_id == pid:
             continue
