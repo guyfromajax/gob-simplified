@@ -498,7 +498,22 @@ async function handleSimToFourth() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      if (!res.ok) throw new Error('Simulation failed');
+      if (!res.ok) {
+        // ✅ FIX: Extract actual error message from backend for better debugging
+        let errorDetail = `HTTP ${res.status}: ${res.statusText}`;
+        try {
+          const errorData = await res.json();
+          errorDetail = errorData.detail || errorData.message || errorDetail;
+        } catch (e) {
+          try {
+            errorDetail = await res.text();
+          } catch (e2) {
+            // Keep default errorDetail
+          }
+        }
+        console.error(`❌ Q${currentQ} simulation failed:`, errorDetail);
+        throw new Error(`Q${currentQ} simulation failed: ${errorDetail}`);
+      }
       lastSummary = await res.json();
       gId = lastSummary.game_id;
       // ✅ FIX: After fully simulating a quarter, increment to the next quarter
@@ -650,7 +665,22 @@ async function handleSimFullGame() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      if (!res.ok) throw new Error('Simulation failed');
+      if (!res.ok) {
+        // ✅ FIX: Extract actual error message from backend for better debugging
+        let errorDetail = `HTTP ${res.status}: ${res.statusText}`;
+        try {
+          const errorData = await res.json();
+          errorDetail = errorData.detail || errorData.message || errorDetail;
+        } catch (e) {
+          try {
+            errorDetail = await res.text();
+          } catch (e2) {
+            // Keep default errorDetail
+          }
+        }
+        console.error(`❌ Q${currentQ} simulation failed:`, errorDetail);
+        throw new Error(`Q${currentQ} simulation failed: ${errorDetail}`);
+      }
       lastSummary = await res.json();
       gId = lastSummary.game_id;
       if (lastSummary.is_final) break;
