@@ -20,6 +20,24 @@ def init_defenses_collection():
     # Import zone definitions from shared_defense
     from BackEnd.utils.shared_defense import ZONE_23_NORMAL, ZONE_23_LOWER_SHIFT, ZONE_23_UPPER_SHIFT
     
+    # Helper function to create granular stats structure
+    def create_granular_stats():
+        return {
+            "used": 0,
+            "success": 0,
+            "vs_motion": {"attempts": 0, "success": 0},
+            "vs_set": {"attempts": 0, "success": 0},
+            "vs_inside": {"attempts": 0, "success": 0},
+            "vs_attack": {"attempts": 0, "success": 0},
+            "vs_outside": {"attempts": 0, "success": 0},
+            "vs_motion_inside": {"attempts": 0, "success": 0},
+            "vs_motion_attack": {"attempts": 0, "success": 0},
+            "vs_motion_outside": {"attempts": 0, "success": 0},
+            "vs_set_inside": {"attempts": 0, "success": 0},
+            "vs_set_attack": {"attempts": 0, "success": 0},
+            "vs_set_outside": {"attempts": 0, "success": 0}
+        }
+    
     defenses = [
         {
             "defense_id": "man",
@@ -27,8 +45,8 @@ def init_defenses_collection():
             "name": "Man-to-Man",
             "description": "Standard man-to-man defense where each defender guards a specific offensive player",
             "effectiveness": 0.0,  # Top-level field (not in stats)
-            "game_stats": {"used": 0, "success": 0},
-            "season_stats": {"used": 0, "success": 0},
+            "game_stats": create_granular_stats(),
+            "season_stats": create_granular_stats(),
             "zone_definitions": None,  # Man defense doesn't use zones
             "shift_triggers": None  # Man defense doesn't use shifts
         },
@@ -38,8 +56,8 @@ def init_defenses_collection():
             "name": "2-3 Zone",
             "description": "Standard 2-3 zone defense with two guards up top and three players in the paint",
             "effectiveness": 0.0,  # Top-level field (not in stats)
-            "game_stats": {"used": 0, "success": 0},
-            "season_stats": {"used": 0, "success": 0},
+            "game_stats": create_granular_stats(),
+            "season_stats": create_granular_stats(),
             "zone_definitions": {
                 "normal": ZONE_23_NORMAL,
                 "lower_shift": ZONE_23_LOWER_SHIFT,

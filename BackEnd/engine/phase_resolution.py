@@ -945,24 +945,78 @@ def resolve_half_court_offense_logic(game):
                 pc[type_label]["overall"]["success"] += 1
                 pc[type_label][focus]["success"] += 1
                 pc["Cumulative"][focus]["success"] += 1
+                
+                # Track granular success against defensive playcall
+                from BackEnd.utils.defense_utils import is_zone_defense
+                defense_playcall = game.game_state.get("defense_playcall", "Man")  # "Man", "2-3 Zone", etc.
+                
+                # Determine defense tracking key based on specific defense name
+                if defense_playcall == "Man":
+                    vs_key = "vs_man"
+                elif defense_playcall == "2-3 Zone":
+                    vs_key = "vs_2-3_zone"
+                elif defense_playcall == "3-2 Zone":
+                    vs_key = "vs_3-2_zone"
+                elif defense_playcall == "1-3-1 Zone":
+                    vs_key = "vs_1-3-1_zone"
+                else:
+                    vs_key = None
+                
+                if vs_key:
+                    # Overall success vs defense
+                    if vs_key in pc[type_label]["overall"]:
+                        pc[type_label]["overall"][vs_key]["success"] += 1
+                    # Focus success vs defense
+                    if vs_key in pc[type_label][focus]:
+                        pc[type_label][focus][vs_key]["success"] += 1
+                    
+                    # Track aggregate vs_zone for any zone type
+                    if is_zone_defense(defense_playcall) and "vs_zone" in pc[type_label]["overall"]:
+                        pc[type_label]["overall"]["vs_zone"]["success"] += 1
+                        pc[type_label][focus]["vs_zone"]["success"] += 1
+                
                 # print(f"🎯 SUCCESS DEBUG: After - overall: {pc[type_label]['overall']['success']}, {focus}: {pc[type_label][focus]['success']}, Cumulative: {pc['Cumulative'][focus]['success']}")
             elif offense_failure:
                 # We don't increment offense success; defensive success can be tracked separately if needed
                 pass
             
-            # Track defensive playcall success
-            from BackEnd.utils.defense_utils import map_defense_playcall_to_tracking_name
-            defense_playcall = game.game_state.get("defense_playcall", "Man")  # "Man" or "Zone"
-            tracking_name = map_defense_playcall_to_tracking_name(defense_playcall)
+            # Track defensive playcall success with granular tracking
+            defense_playcall = game.game_state.get("defense_playcall", "Man")  # "Man", "2-3 Zone", etc.
+            # Defense playcall is now stored as specific name (e.g., "2-3 Zone")
+            tracking_name = defense_playcall  # Use specific name directly
             if tracking_name in def_team.scouting_data["defense"]:
                 # Defense success = MISS (without defensive foul) OR TURNOVER OR O_FOUL
                 # Defense failure = MAKE OR DEFENSIVE FOUL
                 defense_success = (rt == "MISS" and not (foul_team == "DEFENSE")) or (rt == "TURNOVER") or (rt == "O_FOUL")
                 defense_failure = (rt == "MAKE") or (foul_team == "DEFENSE")
                 
+                # Get offensive play type and focus for granular tracking
+                offense_play_type = game.game_state.get("offense_play_type", "").lower()  # "motion" or "set_play"
+                offense_focus = game.game_state.get("offense_play_focus", "")  # "inside", "attack", "outside"
+                
+                # Normalize play type (set_play -> set)
+                if offense_play_type == "set_play":
+                    offense_play_type = "set"
+                
                 if defense_success:
                     def_team.scouting_data["defense"][tracking_name]["success"] += 1
                     def_team.scouting_data["defense"][tracking_name]["game_stats"]["success"] += 1
+                    
+                    # Track granular success by play type
+                    if offense_play_type == "motion":
+                        def_team.scouting_data["defense"][tracking_name]["game_stats"]["vs_motion"]["success"] += 1
+                    elif offense_play_type == "set":
+                        def_team.scouting_data["defense"][tracking_name]["game_stats"]["vs_set"]["success"] += 1
+                    
+                    # Track granular success by focus type
+                    if offense_focus in ["inside", "attack", "outside"]:
+                        def_team.scouting_data["defense"][tracking_name]["game_stats"][f"vs_{offense_focus}"]["success"] += 1
+                        
+                        # Track combination of play type + focus
+                        if offense_play_type == "motion":
+                            def_team.scouting_data["defense"][tracking_name]["game_stats"][f"vs_motion_{offense_focus}"]["success"] += 1
+                        elif offense_play_type == "set":
+                            def_team.scouting_data["defense"][tracking_name]["game_stats"][f"vs_set_{offense_focus}"]["success"] += 1
                 elif defense_failure:
                     # Defense failed (offense scored or committed defensive foul)
                     pass  # Don't increment success (already at current count)
@@ -1003,7 +1057,8 @@ def calculate_foul_turnover(game, positions, roles):
     )
 
     d_foul_score = (d_attr["IQ"] * 0.3 + d_attr["CH"] * 0.3 + d_movement) * random.randint(1, 6)
-    if defense_call == "Zone":
+    from BackEnd.utils.defense_utils import is_zone_defense
+    if is_zone_defense(defense_call):
         d_foul_score *= 1.1
     is_d_foul = d_foul_score < def_team.team_attributes["foul_threshold"] * 1.2
 
@@ -1043,7 +1098,8 @@ def calculate_foul_turnover(game, positions, roles):
         def_mod_attr["IQ"] * 0.2 +
         def_mod_attr["CH"] * 0.2
     ) * random.randint(1, 6)
-    if defense_call == "Zone":
+    from BackEnd.utils.defense_utils import is_zone_defense
+    if is_zone_defense(defense_call):
         pressure *= 0.9
 
     turnover_score = bh_score - pressure

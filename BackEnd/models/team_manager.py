@@ -143,16 +143,80 @@ class TeamManager:
                 # Motion / Set buckets and cumulative (attempts/success)
                 "Playcalls": {
                     "Motion": {
-                        "overall": {"attempts": 0, "success": 0},
-                        "inside": {"attempts": 0, "success": 0},
-                        "attack": {"attempts": 0, "success": 0},
-                        "outside": {"attempts": 0, "success": 0},
+                        "overall": {
+                            "attempts": 0, 
+                            "success": 0,
+                            "vs_man": {"attempts": 0, "success": 0},
+                            "vs_zone": {"attempts": 0, "success": 0},
+                            "vs_2-3_zone": {"attempts": 0, "success": 0},
+                            "vs_3-2_zone": {"attempts": 0, "success": 0},
+                            "vs_1-3-1_zone": {"attempts": 0, "success": 0}
+                        },
+                        "inside": {
+                            "attempts": 0, 
+                            "success": 0,
+                            "vs_man": {"attempts": 0, "success": 0},
+                            "vs_zone": {"attempts": 0, "success": 0},
+                            "vs_2-3_zone": {"attempts": 0, "success": 0},
+                            "vs_3-2_zone": {"attempts": 0, "success": 0},
+                            "vs_1-3-1_zone": {"attempts": 0, "success": 0}
+                        },
+                        "attack": {
+                            "attempts": 0, 
+                            "success": 0,
+                            "vs_man": {"attempts": 0, "success": 0},
+                            "vs_zone": {"attempts": 0, "success": 0},
+                            "vs_2-3_zone": {"attempts": 0, "success": 0},
+                            "vs_3-2_zone": {"attempts": 0, "success": 0},
+                            "vs_1-3-1_zone": {"attempts": 0, "success": 0}
+                        },
+                        "outside": {
+                            "attempts": 0, 
+                            "success": 0,
+                            "vs_man": {"attempts": 0, "success": 0},
+                            "vs_zone": {"attempts": 0, "success": 0},
+                            "vs_2-3_zone": {"attempts": 0, "success": 0},
+                            "vs_3-2_zone": {"attempts": 0, "success": 0},
+                            "vs_1-3-1_zone": {"attempts": 0, "success": 0}
+                        },
                     },
                     "Set": {
-                        "overall": {"attempts": 0, "success": 0},
-                        "inside": {"attempts": 0, "success": 0},
-                        "attack": {"attempts": 0, "success": 0},
-                        "outside": {"attempts": 0, "success": 0},
+                        "overall": {
+                            "attempts": 0, 
+                            "success": 0,
+                            "vs_man": {"attempts": 0, "success": 0},
+                            "vs_zone": {"attempts": 0, "success": 0},
+                            "vs_2-3_zone": {"attempts": 0, "success": 0},
+                            "vs_3-2_zone": {"attempts": 0, "success": 0},
+                            "vs_1-3-1_zone": {"attempts": 0, "success": 0}
+                        },
+                        "inside": {
+                            "attempts": 0, 
+                            "success": 0,
+                            "vs_man": {"attempts": 0, "success": 0},
+                            "vs_zone": {"attempts": 0, "success": 0},
+                            "vs_2-3_zone": {"attempts": 0, "success": 0},
+                            "vs_3-2_zone": {"attempts": 0, "success": 0},
+                            "vs_1-3-1_zone": {"attempts": 0, "success": 0}
+                        },
+                        "attack": {
+                            "attempts": 0, 
+                            "success": 0,
+                            "vs_man": {"attempts": 0, "success": 0},
+                            "vs_zone": {"attempts": 0, "success": 0},
+                            "vs_2-3_zone": {"attempts": 0, "success": 0},
+                            "vs_3-2_zone": {"attempts": 0, "success": 0},
+                            "vs_1-3-1_zone": {"attempts": 0, "success": 0}
+                        },
+                        "outside": {
+                            "attempts": 0, 
+                            "success": 0,
+                            "vs_man": {"attempts": 0, "success": 0},
+                            "vs_zone": {"attempts": 0, "success": 0},
+                            "vs_2-3_zone": {"attempts": 0, "success": 0},
+                            "vs_3-2_zone": {"attempts": 0, "success": 0},
+                            "vs_1-3-1_zone": {"attempts": 0, "success": 0}
+                        },
                     },
                     "Cumulative": {
                         "inside": {"attempts": 0, "success": 0},
@@ -175,15 +239,71 @@ class TeamManager:
                     "used": 0, 
                     "success": 0, 
                     "effectiveness": 0.0,
-                    "game_stats": {"used": 0, "success": 0}, 
-                    "season_stats": {"used": 0, "success": 0}
+                    "game_stats": {
+                        "used": 0, 
+                        "success": 0,
+                        "vs_motion": {"attempts": 0, "success": 0},
+                        "vs_set": {"attempts": 0, "success": 0},
+                        "vs_inside": {"attempts": 0, "success": 0},
+                        "vs_attack": {"attempts": 0, "success": 0},
+                        "vs_outside": {"attempts": 0, "success": 0},
+                        "vs_motion_inside": {"attempts": 0, "success": 0},
+                        "vs_motion_attack": {"attempts": 0, "success": 0},
+                        "vs_motion_outside": {"attempts": 0, "success": 0},
+                        "vs_set_inside": {"attempts": 0, "success": 0},
+                        "vs_set_attack": {"attempts": 0, "success": 0},
+                        "vs_set_outside": {"attempts": 0, "success": 0}
+                    }, 
+                    "season_stats": {
+                        "used": 0, 
+                        "success": 0,
+                        "vs_motion": {"attempts": 0, "success": 0},
+                        "vs_set": {"attempts": 0, "success": 0},
+                        "vs_inside": {"attempts": 0, "success": 0},
+                        "vs_attack": {"attempts": 0, "success": 0},
+                        "vs_outside": {"attempts": 0, "success": 0},
+                        "vs_motion_inside": {"attempts": 0, "success": 0},
+                        "vs_motion_attack": {"attempts": 0, "success": 0},
+                        "vs_motion_outside": {"attempts": 0, "success": 0},
+                        "vs_set_inside": {"attempts": 0, "success": 0},
+                        "vs_set_attack": {"attempts": 0, "success": 0},
+                        "vs_set_outside": {"attempts": 0, "success": 0}
+                    }
                 },
                 "2-3 Zone": {
                     "used": 0, 
                     "success": 0, 
                     "effectiveness": 0.0,
-                    "game_stats": {"used": 0, "success": 0}, 
-                    "season_stats": {"used": 0, "success": 0}
+                    "game_stats": {
+                        "used": 0, 
+                        "success": 0,
+                        "vs_motion": {"attempts": 0, "success": 0},
+                        "vs_set": {"attempts": 0, "success": 0},
+                        "vs_inside": {"attempts": 0, "success": 0},
+                        "vs_attack": {"attempts": 0, "success": 0},
+                        "vs_outside": {"attempts": 0, "success": 0},
+                        "vs_motion_inside": {"attempts": 0, "success": 0},
+                        "vs_motion_attack": {"attempts": 0, "success": 0},
+                        "vs_motion_outside": {"attempts": 0, "success": 0},
+                        "vs_set_inside": {"attempts": 0, "success": 0},
+                        "vs_set_attack": {"attempts": 0, "success": 0},
+                        "vs_set_outside": {"attempts": 0, "success": 0}
+                    }, 
+                    "season_stats": {
+                        "used": 0, 
+                        "success": 0,
+                        "vs_motion": {"attempts": 0, "success": 0},
+                        "vs_set": {"attempts": 0, "success": 0},
+                        "vs_inside": {"attempts": 0, "success": 0},
+                        "vs_attack": {"attempts": 0, "success": 0},
+                        "vs_outside": {"attempts": 0, "success": 0},
+                        "vs_motion_inside": {"attempts": 0, "success": 0},
+                        "vs_motion_attack": {"attempts": 0, "success": 0},
+                        "vs_motion_outside": {"attempts": 0, "success": 0},
+                        "vs_set_inside": {"attempts": 0, "success": 0},
+                        "vs_set_attack": {"attempts": 0, "success": 0},
+                        "vs_set_outside": {"attempts": 0, "success": 0}
+                    }
                 },
                 "vs_Fast_Break": {"used": 0, "success": 0},
                 "FCP": {"used": 0, "success": 0},

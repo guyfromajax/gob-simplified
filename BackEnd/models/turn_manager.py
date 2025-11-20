@@ -272,11 +272,32 @@ class TurnManager:
             # Track defensive playcall usage
             from BackEnd.utils.defense_utils import map_defense_playcall_to_tracking_name
             def_team = self.game.defense_team
-            defense_playcall = calls["defense"]  # "Man" or "Zone"
-            tracking_name = map_defense_playcall_to_tracking_name(defense_playcall)
+            defense_playcall = calls["defense"]  # "Man", "2-3 Zone", "3-2 Zone", etc.
+            # Defense playcall is now stored as specific name (e.g., "2-3 Zone")
+            tracking_name = defense_playcall  # Use specific name directly
             if tracking_name in def_team.scouting_data["defense"]:
+                # Get offensive play type and focus for granular tracking
+                offense_play_type = calls.get("offense_type", "").lower()  # "motion" or "set"
+                offense_focus = calls.get("offense_focus", "")  # "inside", "attack", "outside"
+                
                 def_team.scouting_data["defense"][tracking_name]["used"] += 1
                 def_team.scouting_data["defense"][tracking_name]["game_stats"]["used"] += 1
+                
+                # Track granular usage by play type
+                if offense_play_type == "motion":
+                    def_team.scouting_data["defense"][tracking_name]["game_stats"]["vs_motion"]["attempts"] += 1
+                elif offense_play_type == "set":
+                    def_team.scouting_data["defense"][tracking_name]["game_stats"]["vs_set"]["attempts"] += 1
+                
+                # Track granular usage by focus type
+                if offense_focus in ["inside", "attack", "outside"]:
+                    def_team.scouting_data["defense"][tracking_name]["game_stats"][f"vs_{offense_focus}"]["attempts"] += 1
+                    
+                    # Track combination of play type + focus
+                    if offense_play_type == "motion":
+                        def_team.scouting_data["defense"][tracking_name]["game_stats"][f"vs_motion_{offense_focus}"]["attempts"] += 1
+                    elif offense_play_type == "set":
+                        def_team.scouting_data["defense"][tracking_name]["game_stats"][f"vs_set_{offense_focus}"]["attempts"] += 1
             
             result = self.resolve_half_court_offense()
             # Add playcalls to result for frontend display
@@ -663,9 +684,40 @@ class TurnManager:
             focus_label = chosen_focus if chosen_focus in ["inside", "attack", "outside"] else None
             if play_type_label and focus_label:
                 pc = self.game.offense_team.scouting_data["offense"]["Playcalls"]
+                # Get defensive playcall for granular tracking
+                defense_playcall = self.game.game_state.get("defense_playcall", "Man")  # "Man", "2-3 Zone", etc.
+                from BackEnd.utils.defense_utils import is_zone_defense
+                
+                # Determine defense tracking key based on specific defense name
+                if defense_playcall == "Man":
+                    vs_key = "vs_man"
+                elif defense_playcall == "2-3 Zone":
+                    vs_key = "vs_2-3_zone"
+                elif defense_playcall == "3-2 Zone":
+                    vs_key = "vs_3-2_zone"
+                elif defense_playcall == "1-3-1 Zone":
+                    vs_key = "vs_1-3-1_zone"
+                else:
+                    vs_key = None
+                
                 # Motion/Set overall + focus
                 pc[play_type_label]["overall"]["attempts"] += 1
                 pc[play_type_label][focus_label]["attempts"] += 1
+                
+                # Track granular attempts against defensive playcall
+                if vs_key:
+                    # Overall attempts vs defense
+                    if vs_key in pc[play_type_label]["overall"]:
+                        pc[play_type_label]["overall"][vs_key]["attempts"] += 1
+                    # Focus attempts vs defense
+                    if vs_key in pc[play_type_label][focus_label]:
+                        pc[play_type_label][focus_label][vs_key]["attempts"] += 1
+                    
+                    # Track aggregate vs_zone for any zone type
+                    if is_zone_defense(defense_playcall) and "vs_zone" in pc[play_type_label]["overall"]:
+                        pc[play_type_label]["overall"]["vs_zone"]["attempts"] += 1
+                        pc[play_type_label][focus_label]["vs_zone"]["attempts"] += 1
+                
                 # Cumulative by focus
                 pc["Cumulative"][focus_label]["attempts"] += 1
                 
@@ -1342,7 +1394,8 @@ class TurnManager:
             passer_pos = None
 
         # Determine shot defender based on defense type
-        if game_state["defense_playcall"] == "Zone":
+        from BackEnd.utils.defense_utils import is_zone_defense
+        if is_zone_defense(game_state.get("defense_playcall", "Man")):
             # For zone defense: find defender whose zone contains the shooter
             from BackEnd.utils.shared_defense import _get_23_zone_boundaries, _point_in_zone
             from BackEnd.constants import HCO_STRING_SPOTS
@@ -1482,7 +1535,8 @@ class TurnManager:
             ) * random.randint(1, 6)
 
             def_pos = get_player_position(off_lineup, player)
-            defender = def_lineup.get(def_pos) if defense_call != "Zone" else random.choice(list(def_lineup.values()))
+            from BackEnd.utils.defense_utils import is_zone_defense
+            defender = def_lineup.get(def_pos) if not is_zone_defense(defense_call) else random.choice(list(def_lineup.values()))
             def_attr = defender.attributes
             pressure = (
                 def_attr["OD"] * 0.3 +
@@ -1490,7 +1544,7 @@ class TurnManager:
                 def_attr["IQ"] * 0.2 +
                 def_attr["CH"] * 0.2
             ) * random.randint(1, 6)
-            if defense_call == "Zone":
+            if is_zone_defense(defense_call):
                 pressure *= 0.9
 
             score = bh_score - pressure - (touches * 2)
@@ -1505,7 +1559,8 @@ class TurnManager:
                     continue  # Only consider foul-prone actions
 
                 offender = off_lineup[pos]
-                defender = def_lineup[pos] if defense_call != "Zone" else random.choice(list(def_lineup.values()))
+                from BackEnd.utils.defense_utils import is_zone_defense
+                defender = def_lineup[pos] if not is_zone_defense(defense_call) else random.choice(list(def_lineup.values()))
                 o_attr = offender.attributes
                 d_attr = defender.attributes
 
