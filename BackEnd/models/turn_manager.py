@@ -416,6 +416,10 @@ class TurnManager:
                 if diff:
                     deltas[player.player_id] = {"team": team.name, "stats": diff}
                     
+                    # ✅ Debug logging for assists on made shots
+                    if "AST" in diff and result.get("result_type") in ["MAKE", "MISS"]:
+                        logging.info(f"🎯 ASSIST DELTA: {get_name_safe(player)} has AST in deltas: {diff}, result_type={result.get('result_type')}")
+                    
                     # ✅ Debug logging for free throw rebounds
                     if result.get("result_type") == "FREE_THROW" and ("OREB" in diff or "DREB" in diff):
                         logging.info(f"🏀 Free Throw Turn Deltas: {get_name_safe(player)} has rebound in deltas: {diff}")
