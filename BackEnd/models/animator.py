@@ -1237,22 +1237,34 @@ class Animator:
             ) if offensive_animations else 1
             
             for step_index in range(max_steps):
-                # Get ball handler coords for this step
-                bh_coords_list = offensive_positions_by_step.get(ball_handler_pos, [])
+                # Dynamically determine who has ball at THIS step (similar to man-to-man)
+                current_ball_handler_pos = None
+                for pos, off_anim in offensive_animations.items():
+                    has_ball_list = off_anim.get("hasBallAtStep", [])
+                    if step_index < len(has_ball_list) and has_ball_list[step_index]:
+                        current_ball_handler_pos = pos
+                        break
+                
+                # If no one has ball at this step, use previous ball handler (or fallback)
+                if not current_ball_handler_pos:
+                    current_ball_handler_pos = ball_handler_pos
+                
+                # Get ball handler coords for this step using CURRENT ball handler position
+                bh_coords_list = offensive_positions_by_step.get(current_ball_handler_pos, [])
                 ball_handler_coords = bh_coords_list[step_index] if step_index < len(bh_coords_list) else (
                     bh_coords_list[-1] if bh_coords_list else {"x": 50, "y": 25}
                 )
                 
-                # Get ball handler's spot for this step
+                # Get ball handler's spot for this step using CURRENT ball handler position
                 if step_index < len(skeleton_steps):
                     step = skeleton_steps[step_index]
-                    bh_action = step.get("pos_actions", {}).get(ball_handler_pos, {})
+                    bh_action = step.get("pos_actions", {}).get(current_ball_handler_pos, {})
                     current_ball_spot = bh_action.get("location") or bh_action.get("spot") or ball_spot
                 else:
                     current_ball_spot = ball_spot
                 
                 # 🐛 DEBUG: Log ball handler identification at each step
-                logging.warning(f"🛡️ ZONE DEFENSE DEBUG [Step {step_index}]: Ball handler pos={ball_handler_pos}, coords={ball_handler_coords}, spot={current_ball_spot}, is_away_offense={is_away_offense}")
+                logging.warning(f"🛡️ ZONE DEFENSE DEBUG [Step {step_index}]: Ball handler pos={current_ball_handler_pos} (initial={ball_handler_pos}), coords={ball_handler_coords}, spot={current_ball_spot}, is_away_offense={is_away_offense}")
                 
                 # Update zone boundaries if ball spot changed (shift logic)
                 # ✅ Zone boundaries should be in SAME orientation as offensive coords
@@ -1281,7 +1293,7 @@ class Animator:
                     offensive_players.append({
                         "player_id": player_id,
                         "coords": coords,
-                        "is_ball_handler": off_pos == ball_handler_pos,
+                        "is_ball_handler": off_pos == current_ball_handler_pos,
                         "spot": spot
                     })
                 
