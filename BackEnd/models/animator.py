@@ -860,8 +860,16 @@ class Animator:
                     steps
                 )
                 animations.extend(defensive_anims)
+            elif self.game.game_state.get("defense_playcall", "Man") == "Zone":
+                # Use zone defense positioning (2-3 zone)
+                defensive_anims = self._position_zone_defenders(
+                    offensive_animations,
+                    def_lineup,
+                    steps
+                )
+                animations.extend(defensive_anims)
             else:
-                # Use standard defensive positioning for HCO
+                # Use standard defensive positioning for HCO (man-to-man)
                 defensive_anims = self._position_standard_defenders(
                     offensive_animations, 
                     def_lineup, 
