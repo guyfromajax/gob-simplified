@@ -958,7 +958,8 @@ def resolve_half_court_offense_logic(game):
             pass
             # print(f"🎯 SUCCESS DEBUG: Skipping - type_label={type_label}, focus={focus}")
     except Exception as e:
-        print(f"🎯 SUCCESS DEBUG ERROR: {type(e).__name__}: {e}")
+        # Error logging kept - important for debugging actual errors
+        logging.error(f"🎯 SUCCESS DEBUG ERROR: {type(e).__name__}: {e}")
         import traceback
         traceback.print_exc()
 
@@ -1478,7 +1479,8 @@ def get_hco_skeleton(result_type, game_context, lean_score=None):
     # Randomly select one scene from the available scenes
     if scenes and len(scenes) > 0:
         selected_scene = random.choice(scenes)
-        print(f"📋 Using fallback skeleton with {len(selected_scene.get('steps', []))} steps")
+        # Debug logging removed - was cluttering logs
+        # logging.debug(f"📋 Using fallback skeleton with {len(selected_scene.get('steps', []))} steps")
         return selected_scene
 
 

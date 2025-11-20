@@ -1146,8 +1146,7 @@ class TurnManager:
             
             # === TURN-LEVEL ROLES (for backend shot calculation) ===
             # Extract from final steps only - much simpler and more accurate
-            if ball_owner_by_step:
-                print(f"ball_owner_by_step: {ball_owner_by_step}")
+            # Debug logging removed - was cluttering logs
             
             if not steps:
                 return {

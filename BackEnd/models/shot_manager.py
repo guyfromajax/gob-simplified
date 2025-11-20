@@ -160,7 +160,8 @@ class ShotManager:
             }
             variant_modifier = variant_modifiers.get(variant, 0)
             shot_threshold += variant_modifier
-            print(f"🎯 Variant modifier: {variant} → {variant_modifier:+d} (threshold: {shot_threshold})")
+            # Debug logging removed - was cluttering logs
+            # logging.debug(f"🎯 Variant modifier: {variant} → {variant_modifier:+d} (threshold: {shot_threshold})")
 
         # ✅ New: returns shot_score, help defender, and foul info
         shot_score, help_defender, d_foul, foul_player = self.calculate_shot_score(
@@ -240,8 +241,9 @@ class ShotManager:
         getback_names_str = ", ".join(getback_player_names) if getback_player_names else "NONE"
         
         # Debug logging for release player logic with all player/team names
-        offense_tempo_value = off_team.strategy_settings.get("tempo", 2)  # Get offense tempo for logging
-        logging.warning(f"🏃 RELEASE PLAYER DEBUG - shooter={shooter_name}, offense_team={off_team.name}, defense_team={def_team.name}, offense_tempo={offense_tempo_value}, defense_tempo={defense_tempo_value}, release_player={release_player_name}, getback_players={getback_names_str}, defense_releases={defense_releases}")
+        # Reduced to debug level - was cluttering logs
+        # offense_tempo_value = off_team.strategy_settings.get("tempo", 2)
+        # logging.debug(f"🏃 RELEASE PLAYER DEBUG - shooter={shooter_name}, offense_team={off_team.name}, defense_team={def_team.name}, offense_tempo={offense_tempo_value}, defense_tempo={defense_tempo_value}, release_player={release_player_name}, getback_players={getback_names_str}, defense_releases={defense_releases}")
         
         # ==================== STAT TRACKING ====================
         # Track release/get back instances for both teams
