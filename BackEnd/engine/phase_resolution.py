@@ -610,7 +610,14 @@ def resolve_free_throw_logic(game):
             stat = "DREB" if rebound_team == def_team else "OREB"
             game_state["last_rebound"] = stat
             game_state["last_rebounder"] = rebounder
+            
+            # ✅ Record rebound stat BEFORE checking team (applies to both DREB and OREB)
             rebounder.record_stat(stat)
+            
+            # Debug logging for free throw rebounds
+            logging.info(f"🏀 Free Throw Rebound: {get_name_safe(rebounder)} credited with {stat} (Free Throw miss)")
+            rebounder_game_reb = rebounder.stats["game"].get(stat, 0)
+            logging.info(f"🏀 Free Throw Rebound: {get_name_safe(rebounder)} now has {rebounder_game_reb} {stat} (game total)")
 
             if rebound_team == def_team:
                 possession_flips = True
