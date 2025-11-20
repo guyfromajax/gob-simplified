@@ -80,18 +80,26 @@ export async function runFastBreakSequence({
   // ============================================================================
   const result = turnData.result_type;
   
-  console.log("🏀 Fast Break - Phase 2:", {
+  console.log("🏀 Fast Break - Phase 2 Decision:", {
     result_type: result,
     current_state: scene.stateMachine?.state,
     next_play_type: turnData.next_play_type,
-    has_animations: !!turnData.animations?.length
+    has_animations: !!turnData.animations?.length,
+    animation_count: turnData.animations?.length || 0,
+    fast_break: turnData.fast_break,
+    will_shoot: result === "MAKE" || result === "MISS",
+    will_stop: result === "DEFENSIVE_STOP" || result === "FOUL" || result === "TURNOVER" || result === "STEAL",
+    ball_handler_id: turnData.roles?.ball_handler?.player_id || turnData.roles?.ball_handler || getCurrentOwner(scene),
+    outlet_receiver_id: turnData.roles?.outlet_receiver
   });
   
   if (result === "MAKE" || result === "MISS") {
     // Shot attempt scenario - move shooter toward basket now
+    console.log("🏀 Fast Break - Routing to SHOT animation");
     await animateFastBreakShot(scene, turnData, playerSprites, ballSprite, width, height);
   } else {
     // Defensive stop, foul, turnover, or steal - position for defensive stop (outlet receiver hasn't moved too far)
+    console.log("🏀 Fast Break - Routing to DEFENSIVE_STOP animation");
     await animateDefensiveStop(scene, turnData, playerSprites, ballSprite, width, height);
   }
   
@@ -494,12 +502,15 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
  * - All other players scatter to half court
  */
 async function animateDefensiveStop(scene, turnData, playerSprites, ballSprite, width, height) {
-  console.log("🛑 Fast Break Defensive Stop:", {
+  console.log("🛑 Fast Break Defensive Stop START:", {
     current_state: scene.stateMachine?.state,
     next_play_type: turnData.next_play_type,
     has_animations: !!turnData.animations?.length,
     animation_count: turnData.animations?.length || 0,
-    stopper_id: turnData.stopper_id
+    stopper_id: turnData.stopper_id,
+    ball_handler_id: turnData.roles?.ball_handler?.player_id || turnData.roles?.ball_handler,
+    outlet_receiver_id: turnData.roles?.outlet_receiver,
+    result_type: turnData.result_type
   });
   
   // ✅ Use backend animation end coords for positioning (matches other transitions like DREB -> HCO)
@@ -507,8 +518,150 @@ async function animateDefensiveStop(scene, turnData, playerSprites, ballSprite, 
   const animations = turnData.animations || [];
   const promises = [];
   
-  if (animations.length > 0) {
-    // Use backend animation end coords for positioning (consistent with other animations)
+  // ⚠️ CRITICAL CHECK: For DEFENSIVE_STOP, we should NOT use backend animations if they move ball handler toward basket
+  // Instead, force ball handler to top of key (defensive stop position)
+  const ballHandlerId = turnData.roles?.ball_handler?.player_id || turnData.roles?.ball_handler || getCurrentOwner(scene);
+  const ballHandlerSprite = playerSprites[ballHandlerId];
+  const isDefensiveStop = turnData.result_type === "DEFENSIVE_STOP" || turnData.fast_break === true;
+  let gotoStateTransition = false; // Flag to skip fallback logic if we've already handled positioning
+  
+  if (animations.length > 0 && isDefensiveStop && ballHandlerSprite) {
+    // For defensive stops, check if backend animation would move ball handler toward basket incorrectly
+    const ballHandlerAnim = animations.find(a => a.playerId === ballHandlerId);
+    if (ballHandlerAnim && ballHandlerAnim.movement && ballHandlerAnim.movement.length >= 2) {
+      const endStep = ballHandlerAnim.movement[ballHandlerAnim.movement.length - 1];
+      const startStep = ballHandlerAnim.movement[0];
+      
+      if (endStep?.coords && startStep?.coords) {
+        const ballHandlerSprite = playerSprites[ballHandlerId];
+        const isHomeOffense = ballHandlerSprite?.team === "home";
+        const basket = isHomeOffense ? HOME_RIM_COORDS : AWAY_RIM_COORDS;
+        const topKey = isHomeOffense ? HOME_TOP_KEY : AWAY_TOP_KEY;
+        
+        // Check if end coords are closer to basket than top of key (indicating incorrect animation)
+        const distanceToBasket = Math.abs(endStep.coords.x - basket.x);
+        const distanceToTopKey = Math.abs(endStep.coords.x - topKey.x);
+        
+        console.log("🛑 Defensive Stop - Animation Check:", {
+          ballHandlerId,
+          endCoords: endStep.coords,
+          topKeyCoords: topKey,
+          basketCoords: basket,
+          distanceToBasket,
+          distanceToTopKey,
+          wouldMoveTowardBasket: distanceToBasket < distanceToTopKey
+        });
+        
+        if (distanceToBasket < distanceToTopKey) {
+          // Backend animation incorrectly moves ball handler toward basket - use manual positioning instead
+          console.warn("⚠️ Defensive Stop - Backend animation moves ball handler toward basket! Using manual positioning instead.");
+          
+          // Skip backend animations for ball handler, but use them for other players
+          for (const anim of animations) {
+            const sprite = playerSprites[anim.playerId];
+            if (!sprite || !anim.movement || anim.movement.length < 2) continue;
+            
+            // Skip ball handler - we'll position manually to top of key
+            if (anim.playerId === ballHandlerId) continue;
+            
+            const endStep = anim.movement[anim.movement.length - 1];
+            if (!endStep || !endStep.coords) continue;
+            
+            const endPixels = gridToPixels(endStep.coords.x, endStep.coords.y, width, height);
+            const duration = getPlayerDuration(sprite, endPixels.x, endPixels.y);
+            
+            promises.push(
+              tweenPlayerTo(scene, sprite, endPixels, {
+                duration,
+                easing: "Linear"
+              })
+            );
+          }
+          
+          // Manually position ball handler to top of key (override incorrect backend animation)
+          attachBallToPlayer(scene, ballSprite, ballHandlerSprite);
+          const topKeyPx = gridToPixels(topKey.x, topKey.y, width, height);
+          const handlerDuration = getPlayerDuration(ballHandlerSprite, topKeyPx.x, topKeyPx.y);
+          promises.push(
+            tweenPlayerTo(scene, ballHandlerSprite, topKeyPx, {
+              duration: handlerDuration,
+              easing: "Linear"
+            })
+          );
+          
+          // Move stopper (if exists)
+          const stopperId = turnData.stopper_id;
+          const stopperSprite = stopperId ? playerSprites[stopperId] : null;
+          if (stopperSprite) {
+            const stopperSpot = {
+              x: isHomeOffense ? topKey.x + 2 : topKey.x - 2,
+              y: topKey.y
+            };
+            stopperSpot.x = Phaser.Math.Clamp(stopperSpot.x, 4, 97);
+            const stopperPx = gridToPixels(stopperSpot.x, stopperSpot.y, width, height);
+            const stopperDuration = getPlayerDuration(stopperSprite, stopperPx.x, stopperPx.y);
+            promises.push(
+              tweenPlayerTo(scene, stopperSprite, stopperPx, {
+                duration: stopperDuration,
+                easing: "Linear"
+              })
+            );
+          }
+          
+          // Move other players to standard positions
+          await moveOtherPlayersToStandardPositions(
+            scene,
+            playerSprites,
+            ballHandlerId,
+            turnData.stopper_id,
+            turnData,
+            width,
+            height,
+            promises
+          );
+          
+          // Wait for all animations to complete
+          await Promise.all(promises);
+          // Skip to announcement/state transition (avoid fallback logic)
+          gotoStateTransition = true;
+        } else {
+          // Backend animation looks correct (top of key or neutral) - use it
+          console.log("✅ Defensive Stop - Using backend animations (ball handler correctly positioned)");
+          
+          for (const anim of animations) {
+            const sprite = playerSprites[anim.playerId];
+            if (!sprite || !anim.movement || anim.movement.length < 2) continue;
+            
+            const endStep = anim.movement[anim.movement.length - 1];
+            if (!endStep || !endStep.coords) continue;
+            
+            const endPixels = gridToPixels(endStep.coords.x, endStep.coords.y, width, height);
+            const duration = getPlayerDuration(sprite, endPixels.x, endPixels.y);
+            
+            const hasBall = anim.hasBallAtStep?.[anim.movement.length - 1] || false;
+            if (hasBall) {
+              attachBallToPlayer(scene, ballSprite, sprite);
+            }
+            
+            promises.push(
+              tweenPlayerTo(scene, sprite, endPixels, {
+                duration,
+                easing: "Linear"
+              })
+            );
+          }
+        }
+      } else {
+        // No valid animation coords - fall through to manual positioning
+        console.warn("⚠️ Defensive Stop - Invalid animation coords, using manual positioning");
+      }
+    } else {
+      // No ball handler animation found - fall through to manual positioning
+      console.warn("⚠️ Defensive Stop - No ball handler animation found, using manual positioning");
+    }
+  } else if (animations.length > 0 && !isDefensiveStop) {
+    // Not a defensive stop - use backend animations as normal
+    console.log("✅ Using backend animations (not a defensive stop)");
     for (const anim of animations) {
       const sprite = playerSprites[anim.playerId];
       if (!sprite || !anim.movement || anim.movement.length < 2) continue;
@@ -517,11 +670,8 @@ async function animateDefensiveStop(scene, turnData, playerSprites, ballSprite, 
       if (!endStep || !endStep.coords) continue;
       
       const endPixels = gridToPixels(endStep.coords.x, endStep.coords.y, width, height);
-      
-      // Use distance-based duration for consistent speed (matches HCO step movements)
       const duration = getPlayerDuration(sprite, endPixels.x, endPixels.y);
       
-      // Track if this player has the ball
       const hasBall = anim.hasBallAtStep?.[anim.movement.length - 1] || false;
       if (hasBall) {
         attachBallToPlayer(scene, ballSprite, sprite);
@@ -530,13 +680,16 @@ async function animateDefensiveStop(scene, turnData, playerSprites, ballSprite, 
       promises.push(
         tweenPlayerTo(scene, sprite, endPixels, {
           duration,
-          easing: "Linear" // Match HCO step movements
+          easing: "Linear"
         })
       );
     }
-  } else {
-    // Fallback to manual positioning if animations are missing (backwards compatibility)
-    console.warn("⚠️ animateDefensiveStop - No animations found, using manual positioning");
+  }
+  
+  // Manual positioning fallback (if animations are missing or incorrect)
+  if (!gotoStateTransition && promises.length === 0 && (animations.length === 0 || isDefensiveStop)) {
+    // Fallback to manual positioning if animations are missing or incorrect (backwards compatibility)
+    console.log("🛑 Defensive Stop - Using manual positioning (fallback)");
     
     const ballHandlerData = turnData.roles?.ball_handler;
     const ballHandlerId = ballHandlerData?.player_id || ballHandlerData || getCurrentOwner(scene);
@@ -603,7 +756,10 @@ async function animateDefensiveStop(scene, turnData, playerSprites, ballSprite, 
     );
   }
   
-  await Promise.all(promises);
+  // Only wait for promises if we haven't already awaited them (manual positioning case)
+  if (!gotoStateTransition) {
+    await Promise.all(promises);
+  }
   
   // ✅ Show "Great Stop!" announcement with stopper headshot (for Fast Break defensive stops)
   if (turnData.fast_break === true && turnData.stopper_id) {
