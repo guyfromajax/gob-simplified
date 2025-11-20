@@ -152,7 +152,8 @@ def load_plays_from_doc(mode: str, doc_id: str, team_id: str):
                 team_obj = doc.get("teams", {}).get(team_id, {})
                 plays = team_obj.get("plays", [])
                 if plays:
-                    print(f"📋 Loaded {len(plays)} plays for team {team_id} from tournament doc")
+                    # Debug logging removed - was cluttering logs
+                    # logging.debug(f"📋 Loaded {len(plays)} plays for team {team_id} from tournament doc")
                     return plays
         except Exception as e:
             print(f"⚠️ Error loading plays from tournament doc: {e}")
@@ -163,7 +164,8 @@ def load_plays_from_doc(mode: str, doc_id: str, team_id: str):
                 team_obj = doc.get("teams", {}).get(team_id, {})
                 plays = team_obj.get("plays", [])
                 if plays:
-                    print(f"📋 Loaded {len(plays)} plays for team {team_id} from franchise doc")
+                    # Debug logging removed - was cluttering logs
+                    # logging.debug(f"📋 Loaded {len(plays)} plays for team {team_id} from franchise doc")
                     return plays
         except Exception as e:
             print(f"⚠️ Error loading plays from franchise doc: {e}")
@@ -631,11 +633,13 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
             if request.user_team_side == "home":
                 old_tempo = gm.home_team.strategy_settings.get('tempo', 'MISSING')
                 gm.home_team.strategy_settings = request.strategy_settings
-                logging.warning(f"🔧 OVERRIDE (IN MEMORY) - Updated home team strategy_settings (old tempo={old_tempo}, new tempo={request.strategy_settings.get('tempo', 'MISSING')})")
+                # Debug logging removed - was cluttering logs
+                # logging.debug(f"🔧 OVERRIDE (IN MEMORY) - Updated home team strategy_settings (old tempo={old_tempo}, new tempo={request.strategy_settings.get('tempo', 'MISSING')})")
             elif request.user_team_side == "away":
                 old_tempo = gm.away_team.strategy_settings.get('tempo', 'MISSING')
                 gm.away_team.strategy_settings = request.strategy_settings
-                logging.warning(f"🔧 OVERRIDE (IN MEMORY) - Updated away team strategy_settings (old tempo={old_tempo}, new tempo={request.strategy_settings.get('tempo', 'MISSING')})")
+                # Debug logging removed - was cluttering logs
+                # logging.debug(f"🔧 OVERRIDE (IN MEMORY) - Updated away team strategy_settings (old tempo={old_tempo}, new tempo={request.strategy_settings.get('tempo', 'MISSING')})")
         if gm is None:
             logging.warning(
                 "simulate_quarter_endpoint unknown game_id=%s; active=%s",
@@ -707,24 +711,28 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                             if request.user_team_side == "home":
                                 if home_strategy is None:
                                     home_strategy = request.strategy_settings
-                                    logging.warning(f"🔧 FALLBACK - Using request.strategy_settings for home team (DB had None)")
+                                    # Debug logging removed - was cluttering logs
+                                    # logging.debug(f"🔧 FALLBACK - Using request.strategy_settings for home team (DB had None)")
                                 else:
                                     # DB has settings, but prioritize request (user's current settings from Game Plan screen)
                                     old_tempo = home_strategy.get('tempo', 'MISSING')
                                     home_strategy = request.strategy_settings
-                                    logging.warning(f"🔧 OVERRIDE - Using request.strategy_settings for home team (DB had tempo={old_tempo}, request has tempo={request.strategy_settings.get('tempo', 'MISSING')})")
+                                    # Debug logging removed - was cluttering logs
+                                    # logging.debug(f"🔧 OVERRIDE - Using request.strategy_settings for home team (DB had tempo={old_tempo}, request has tempo={request.strategy_settings.get('tempo', 'MISSING')})")
                             elif request.user_team_side == "away":
                                 if away_strategy is None:
                                     away_strategy = request.strategy_settings
-                                    logging.warning(f"🔧 FALLBACK - Using request.strategy_settings for away team (DB had None)")
+                                    # Debug logging removed - was cluttering logs
+                                    # logging.debug(f"🔧 FALLBACK - Using request.strategy_settings for away team (DB had None)")
                                 else:
                                     # DB has settings, but prioritize request (user's current settings from Game Plan screen)
                                     old_tempo = away_strategy.get('tempo', 'MISSING')
                                     away_strategy = request.strategy_settings
-                                    logging.warning(f"🔧 OVERRIDE - Using request.strategy_settings for away team (DB had tempo={old_tempo}, request has tempo={request.strategy_settings.get('tempo', 'MISSING')})")
+                                    # Debug logging removed - was cluttering logs
+                                    # logging.debug(f"🔧 OVERRIDE - Using request.strategy_settings for away team (DB had tempo={old_tempo}, request has tempo={request.strategy_settings.get('tempo', 'MISSING')})")
                         
-                        # Debug logging for strategy_settings loading
-                        logging.warning(f"🔧 LOADING FROM DB - home_strategy={home_strategy}, away_strategy={away_strategy}")
+                        # Debug logging removed - was cluttering logs
+                        # logging.debug(f"🔧 LOADING FROM DB - home_strategy={home_strategy}, away_strategy={away_strategy}")
                         
                         gm = GameManager(
                             home, 
@@ -740,8 +748,8 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                             mode="single"  # Loaded games are always single mode from games_collection
                         )
                         
-                        # Debug logging after GameManager creation
-                        logging.warning(f"🔧 AFTER GAMEMANAGER - home.strategy_settings={gm.home_team.strategy_settings.get('tempo', 'MISSING')}, away.strategy_settings={gm.away_team.strategy_settings.get('tempo', 'MISSING')}")
+                        # Debug logging removed - was cluttering logs
+                        # logging.debug(f"🔧 AFTER GAMEMANAGER - home.strategy_settings={gm.home_team.strategy_settings.get('tempo', 'MISSING')}, away.strategy_settings={gm.away_team.strategy_settings.get('tempo', 'MISSING')}")
                         # CRITICAL: Don't reset game_state when loading from database
                         # The GameManager constructor already initialized game_state with defaults
                         # Resetting it here wipes out FREE_THROW state that might be set during active gameplay
@@ -937,8 +945,8 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                     # Get mode from request (default to "single")
                     mode = request.mode or "single"
                     
-                    # Debug logging for new game creation
-                    logging.warning(f"🔧 CREATING NEW GAME - user_team_side={request.user_team_side}, request.strategy_settings={request.strategy_settings}, home_strategy={home_strategy}, away_strategy={away_strategy}")
+                    # Debug logging removed - was cluttering logs
+                    # logging.debug(f"🔧 CREATING NEW GAME - user_team_side={request.user_team_side}, request.strategy_settings={request.strategy_settings}, home_strategy={home_strategy}, away_strategy={away_strategy}")
                     
                     gm = GameManager(
                         request.home_team, 
@@ -948,8 +956,8 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                         mode=mode  # Pass mode so teams can initialize plays with correct stats structure
                     )
                     
-                    # Debug logging after GameManager creation
-                    logging.warning(f"🔧 AFTER GAMEMANAGER (NEW) - home.strategy_settings={gm.home_team.strategy_settings.get('tempo', 'MISSING')}, away.strategy_settings={gm.away_team.strategy_settings.get('tempo', 'MISSING')}")
+                    # Debug logging removed - was cluttering logs
+                    # logging.debug(f"🔧 AFTER GAMEMANAGER (NEW) - home.strategy_settings={gm.home_team.strategy_settings.get('tempo', 'MISSING')}, away.strategy_settings={gm.away_team.strategy_settings.get('tempo', 'MISSING')}")
                     # Use the game_id from the request if provided, otherwise generate a new one
                     if request.game_id:
                         game_id = request.game_id
@@ -1489,9 +1497,11 @@ def get_player(player_id: str):
             # Try a broader search to help debug
             sample = players_collection.find_one({})
             if sample:
-                print(f"📋 Sample player _id format: {sample.get('_id')} (type: {type(sample.get('_id'))})")
+                # Debug logging removed - was cluttering logs
+                # logging.debug(f"📋 Sample player _id format: {sample.get('_id')} (type: {type(sample.get('_id'))})")
             raise HTTPException(status_code=404, detail="Player not found")
-        print(f"✅ Player found: {player.get('first_name')} {player.get('last_name')}")
+        # Debug logging removed - was cluttering logs
+        # logging.debug(f"✅ Player found: {player.get('first_name')} {player.get('last_name')}")
         player["_id"] = str(player["_id"])  # ensure JSON serializable
         return player
     except HTTPException:

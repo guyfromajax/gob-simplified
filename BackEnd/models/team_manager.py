@@ -231,7 +231,8 @@ class TeamManager:
             
             plays_dict[play["name"]] = play_data
         
-        print(f"📋 Initialized {len(plays_dict)} plays (reference-based) for {self.name} (mode: {mode})")
+        # Debug logging removed - was cluttering logs
+        # logging.debug(f"📋 Initialized {len(plays_dict)} plays (reference-based) for {self.name} (mode: {mode})")
         return plays_dict
 
     def record_team_foul(self):
