@@ -831,6 +831,10 @@ export function createGameScene(Phaser) {
             const ps = this.playerStats[playerId];
             if (ps && delta.stats) {
               for (const [stat, value] of Object.entries(delta.stats)) {
+                // Skip REB - it's calculated from OREB + DREB to avoid double-counting
+                // REB should NOT be in deltas (backend excludes it), but defensive check just in case
+                if (stat === 'REB') continue;
+                
                 ps[stat] = (ps[stat] || 0) + value;
                 if (ps.cells) {
                   // Map stat names to cell keys
