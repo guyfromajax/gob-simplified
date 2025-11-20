@@ -145,6 +145,8 @@ HCO_STRING_SPOTS = {
     "midLane": {"x": 80, "y": 25}, 
     "upper apex": {"x": 80, "y": 36}, 
     "lower apex": {"x": 80, "y": 15},
+    "upper bird": {"x": 84, "y": 36},
+    "lower bird": {"x": 84, "y": 15},
     "upper midBaseline": {"x": 89, "y": 36}, 
     "lower midBaseline": {"x": 89, "y": 15},
     "deep key": {"x": 57, "y": 25},
