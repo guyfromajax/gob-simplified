@@ -290,6 +290,9 @@ The WIP_GOB ball animation system is **dramatically simpler and more effective**
 
 ## ✅ MIGRATION STATUS: COMPLETE (December 2024)
 
+> **Last Reviewed:** December 2024  
+> **Status:** All ball animations successfully migrated and operational
+
 **All ball animations have been successfully migrated to the WIP_GOB system.**
 
 ### Completed Steps
@@ -313,9 +316,10 @@ The WIP_GOB ball animation system is **dramatically simpler and more effective**
    - Files: `ballTween.js`, `ballManager.js`, `freeThrow.js`, `fastBreak.js`, `generateBallTween.js`
 
 4. **Legacy Code Cleanup** ✅
-   - Commented out `tweenBallTo()` functions (no longer used)
-   - Removed from exports
-   - All call sites migrated to new system
+   - Commented out `tweenBallTo()` functions in `ballTween.js` and `BallControllerAdapter.js` (no longer used)
+   - Removed from exports (both named and default exports)
+   - All call sites migrated to new system (`animateBallToPosition()` and `animateShotToRim()`)
+   - Legacy functions kept in code (commented out) for reference but are not callable
 
 ### Files Created/Modified
 
@@ -357,5 +361,7 @@ animateBallToPosition() / animateShotToRim() → for passes/shots
 - No freezing or conflicts
 
 ### Optional Future Cleanup
+
+- **Legacy Function Removal:** The commented-out `tweenBallTo()` functions in `ballTween.js` (lines 242-413) and `BallControllerAdapter.js` could be fully deleted once validation is complete. Currently kept for reference/debugging purposes.
 
 - **Player Animation Cleanup:** `tweenPlayerTo()` in `ballTween.js` still uses old-style `onUpdate` callback for ball following. This is only used for fast break outlet passes. Could be migrated to use `getPlayerTweenTargets()` for consistency, but it's low priority since player animations are already using the WIP_GOB approach via `animateStep()`.
