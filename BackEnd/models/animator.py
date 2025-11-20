@@ -1330,10 +1330,21 @@ class Animator:
                         def_coords = {"x": 50, "y": 25}
                 
                 # ✅ Flip defensive coordinates if away team is on offense
+                # EXCEPT for ball handler defenders: assign_bh_defender_coords now returns
+                # coordinates in the same orientation as input (away orientation if away offense),
+                # so we don't need to flip again.
                 # When away team has the ball, ALL players (both offense and defense) 
                 # are positioned on the away side of the court (left side of screen)
                 # This matches how offensive coords are flipped in skeleton_to_animations
-                if is_away_offense:
+                
+                # Check if this defender is guarding the ball handler
+                ball_handler_in_this_zone = False
+                zone_coords_for_check = zone_boundaries.get(def_pos, [])
+                if zone_coords_for_check:
+                    ball_handler_in_this_zone = _point_in_zone(ball_handler_coords, zone_coords_for_check, False)
+                
+                # Only flip if NOT guarding ball handler (ball handler defenders are already in correct orientation)
+                if is_away_offense and not ball_handler_in_this_zone:
                     def_coords = get_away_player_coords(def_coords)
                 
                 # Get timestamp
