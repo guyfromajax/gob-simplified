@@ -430,9 +430,11 @@ def _get_23_zone_boundaries(ball_spot, is_away_offense=False):
         Dict mapping position → list of (x, y) coordinate tuples for that zone
     """
     # Determine which zone definition to use based on ball location
-    if ball_spot in ["lower wing", "lower midWing", "lower midCorner", "lower corner"]:
+    # Shift is triggered by ball on strong perimeter positions (wing, midCorner, corner)
+    # but NOT by midWing positions (weaker perimeter threat)
+    if ball_spot in ["lower wing", "lower midCorner", "lower corner"]:
         zone_def = ZONE_23_LOWER_SHIFT
-    elif ball_spot in ["upper wing", "upper midWing", "upper midCorner", "upper corner"]:
+    elif ball_spot in ["upper wing", "upper midCorner", "upper corner"]:
         zone_def = ZONE_23_UPPER_SHIFT
     else:
         zone_def = ZONE_23_NORMAL
