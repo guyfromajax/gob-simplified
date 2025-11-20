@@ -743,7 +743,7 @@ def update_player_coords_from_animations(game, animations):
         pid = anim["playerId"]
         for team in [game.home_team, game.away_team]:
             for player in team.lineup.values():
-                if player.player_id == pid:
+                if player is not None and hasattr(player, 'player_id') and player.player_id == pid:
                     player.coords = anim["end"]
 
 def serialize_lineup(lineup_dict):

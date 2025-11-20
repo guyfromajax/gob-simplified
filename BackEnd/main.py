@@ -132,14 +132,21 @@ def _ensure_complete_lineup(team, game_state=None) -> None:
         game_state: Optional game state dict to check for ineligible players
     """
 
-    missing = [pos for pos in POSITION_LIST if not team.lineup.get(pos)]
-    if not missing:
-        return
-
     # Get ineligible players (fouled-out) if game_state is available
     ineligible_player_ids = set()
     if game_state:
         ineligible_player_ids = set(game_state.get("ineligible_players", []))
+    
+    # First, remove any ineligible players from the lineup
+    for pos, player in list(team.lineup.items()):
+        if player and hasattr(player, "player_id") and player.player_id in ineligible_player_ids:
+            logging.warning(f"⚠️ Removing ineligible player {player.player_id} from {team.name} {pos} position")
+            team.lineup[pos] = None
+    
+    # Now find missing positions (including those we just cleared)
+    missing = [pos for pos in POSITION_LIST if not team.lineup.get(pos)]
+    if not missing:
+        return
     
     # Get currently assigned player IDs (to avoid duplicates)
     current_player_ids = set()
