@@ -571,6 +571,27 @@ def _find_closest_spot_in_zone_to_point(zone_coords, target_coords, is_away_offe
     return result
 
 
+def _map_deep_location_to_zone_location(ball_spot):
+    """
+    Map deep court locations to their corresponding zone locations.
+    Deep locations are outside zone boundaries but need to be guarded by zone defenders.
+    
+    Args:
+        ball_spot: String spot name (e.g., "deep key", "deep lower wing")
+    
+    Returns:
+        Mapped zone location string, or original spot if not a deep location
+    """
+    deep_location_map = {
+        "deep key": "key",
+        "deep lower wing": "lower wing",
+        "deep lower baseline": "lower wing",
+        "deep upper wing": "upper wing",
+        "deep upper baseline": "upper wing",
+    }
+    return deep_location_map.get(ball_spot, ball_spot)
+
+
 def assign_zone_defender_coords(
     defender_pos,
     zone_boundaries,
@@ -609,6 +630,25 @@ def assign_zone_defender_coords(
     if ball_handler_in_zone:
         # Guard ball handler
         return assign_bh_defender_coords(ball_handler_coords, aggression_level, is_away_offense, ball_spot)
+    
+    # PRIORITY 1.5: Handle deep locations (ball handler outside zone boundaries)
+    # Map deep locations to zone locations and check if mapped location is in this defender's zone
+    mapped_zone_location = _map_deep_location_to_zone_location(ball_spot)
+    if mapped_zone_location != ball_spot:  # This is a deep location
+        # Get coordinates for the mapped zone location (e.g., "key" instead of "deep key")
+        mapped_coords = HCO_STRING_SPOTS.get(mapped_zone_location, None)
+        if mapped_coords:
+            # Flip mapped coords if away offense (to match zone boundary orientation)
+            if is_away_offense:
+                mapped_coords = get_away_player_coords(mapped_coords)
+            
+            # Check if mapped location is in this defender's zone
+            mapped_location_in_zone = _point_in_zone(mapped_coords, defender_zone_coords_list, False)
+            
+            if mapped_location_in_zone:
+                # Position defender as if guarding the mapped location (not the deep location)
+                # This keeps the defender in their zone area while still guarding the ball handler
+                return assign_bh_defender_coords(mapped_coords, aggression_level, is_away_offense, mapped_zone_location)
     
     # PRIORITY 2: Ball handler not in zone - check for offensive players in zone
     players_in_zone = []
@@ -950,5 +990,95 @@ def assign_all_zone_defenders(
         )
         if coords:
             assignments[defender_pos] = coords
+    
+    # FALLBACK: Ensure at least one defender guards the ball handler
+    # Check if ball handler is being guarded by any defender
+    ball_handler_guarded = False
+    
+    # First check: Is ball handler in any defender's zone?
+    for defender_pos, coords in assignments.items():
+        zone_coords = zone_boundaries.get(defender_pos, [])
+        if zone_coords and _point_in_zone(ball_handler_coords, zone_coords, False):
+            ball_handler_guarded = True
+            break
+    
+    # Second check: Is ball handler at a deep location being handled?
+    if not ball_handler_guarded:
+        mapped_zone_location = _map_deep_location_to_zone_location(ball_spot)
+        if mapped_zone_location != ball_spot:  # This is a deep location
+            mapped_coords = HCO_STRING_SPOTS.get(mapped_zone_location, None)
+            if mapped_coords:
+                # Flip mapped coords if away offense (to match zone boundary orientation)
+                if is_away_offense:
+                    mapped_coords = get_away_player_coords(mapped_coords)
+                
+                # Check if any defender has the mapped location in their zone
+                for defender_pos, coords in assignments.items():
+                    zone_coords = zone_boundaries.get(defender_pos, [])
+                    if zone_coords and _point_in_zone(mapped_coords, zone_coords, False):
+                        ball_handler_guarded = True
+                        break
+    
+    # Third check: Is ball handler in an overlap that was resolved?
+    if not ball_handler_guarded:
+        for overlap_player_id, overlap_defenders in overlap_map.items():
+            # Find the overlap player to check if it's the ball handler
+            overlap_player = next((p for p in offensive_players if p.get("player_id") == overlap_player_id), None)
+            if overlap_player and overlap_player.get("is_ball_handler"):
+                # Ball handler was in an overlap - check if they're being guarded
+                if overlap_player_id in overlap_guarded_by:
+                    ball_handler_guarded = True
+                    break
+    
+    # Final fallback: If ball handler is still not guarded, assign defender closest to ball handler
+    if not ball_handler_guarded:
+        # Find defender with zone closest to ball handler
+        closest_defender = None
+        min_distance = float('inf')
+        
+        # Handle deep locations: use mapped location coordinates for distance calculation
+        if ball_spot in ["deep key", "deep lower wing", "deep lower baseline", "deep upper wing", "deep upper baseline"]:
+            mapped_zone_location = _map_deep_location_to_zone_location(ball_spot)
+            mapped_coords = HCO_STRING_SPOTS.get(mapped_zone_location, ball_handler_coords)
+            if is_away_offense:
+                search_coords = get_away_player_coords(mapped_coords)
+            else:
+                search_coords = mapped_coords
+        else:
+            search_coords = ball_handler_coords
+        
+        for defender_pos in ["PG", "SG", "SF", "PF", "C"]:
+            if defender_pos not in zone_boundaries:
+                continue
+            
+            zone_coords = zone_boundaries[defender_pos]
+            if not zone_coords:
+                continue
+            
+            # Calculate center of zone
+            avg_x = sum(c[0] for c in zone_coords) / len(zone_coords)
+            avg_y = sum(c[1] for c in zone_coords) / len(zone_coords)
+            zone_center = {"x": avg_x, "y": avg_y}
+            
+            # Calculate distance from ball handler (or mapped location) to zone center
+            bh_x, bh_y = search_coords["x"], search_coords["y"]
+            distance = ((bh_x - zone_center["x"]) ** 2 + (bh_y - zone_center["y"]) ** 2) ** 0.5
+            
+            if distance < min_distance:
+                min_distance = distance
+                closest_defender = defender_pos
+        
+        # Assign closest defender to guard ball handler
+        if closest_defender:
+            # For deep locations, guard the mapped location, not the deep location
+            if ball_spot in ["deep key", "deep lower wing", "deep lower baseline", "deep upper wing", "deep upper baseline"]:
+                mapped_zone_location = _map_deep_location_to_zone_location(ball_spot)
+                mapped_coords = HCO_STRING_SPOTS.get(mapped_zone_location, ball_handler_coords)
+                if is_away_offense:
+                    mapped_coords = get_away_player_coords(mapped_coords)
+                coords = assign_bh_defender_coords(mapped_coords, aggression_level, is_away_offense, mapped_zone_location)
+            else:
+                coords = assign_bh_defender_coords(ball_handler_coords, aggression_level, is_away_offense, ball_spot)
+            assignments[closest_defender] = coords
     
     return assignments
