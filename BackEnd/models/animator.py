@@ -862,6 +862,7 @@ class Animator:
                 animations.extend(defensive_anims)
             elif self.game.game_state.get("defense_playcall", "Man") == "Zone":
                 # Use zone defense positioning (2-3 zone)
+                logging.info(f"🛡️ ZONE DEFENSE ACTIVATED: Using zone defense for this turn")
                 defensive_anims = self._position_zone_defenders(
                     offensive_animations,
                     def_lineup,
