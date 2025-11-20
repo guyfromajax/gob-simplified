@@ -535,10 +535,10 @@ function renderScoutingContent(team, teamStats) {
   const defense = teamStats.defense || {};
   const playcalls = offense.Playcalls || {};
 
-  // Play Calls Section
+  // Offense Play Calls Section
   const playCallsSection = document.createElement('div');
   playCallsSection.className = 'scouting-section';
-  playCallsSection.innerHTML = '<h3>Play Calls</h3>';
+  playCallsSection.innerHTML = '<h3>Offense Play Calls</h3>';
 
   // Motion
   const motionSection = createPlaycallSubsection('Motion', playcalls.Motion);
@@ -580,6 +580,38 @@ function renderScoutingContent(team, teamStats) {
   specialSection.appendChild(createScoutingItem('FC Presses', `${fcpSuccess} / ${fcpUsed}`, `${fcpPct}%`));
 
   container.appendChild(specialSection);
+
+  // Defense Play Calls Section
+  const defensePlayCallsSection = document.createElement('div');
+  defensePlayCallsSection.className = 'scouting-section';
+  defensePlayCallsSection.innerHTML = '<h3>Defense Play Calls</h3>';
+
+  // Man
+  const manDefense = defense.Man || {};
+  const manDefenseSection = createDefensePlaycallSubsection('Man', manDefense);
+  defensePlayCallsSection.appendChild(manDefenseSection);
+
+  // Zone (aggregate)
+  const zoneDefense = defense.Zone || {};
+  const zoneDefenseSection = createDefensePlaycallSubsection('Zone', zoneDefense);
+  defensePlayCallsSection.appendChild(zoneDefenseSection);
+
+  // 2-3 Zone
+  const zone23Defense = defense['2-3 Zone'] || {};
+  const zone23DefenseSection = createDefensePlaycallSubsection('2-3 Zone', zone23Defense);
+  defensePlayCallsSection.appendChild(zone23DefenseSection);
+
+  // 3-2 Zone
+  const zone32Defense = defense['3-2 Zone'] || {};
+  const zone32DefenseSection = createDefensePlaycallSubsection('3-2 Zone', zone32Defense);
+  defensePlayCallsSection.appendChild(zone32DefenseSection);
+
+  // 1-3-1 Zone
+  const zone131Defense = defense['1-3-1 Zone'] || {};
+  const zone131DefenseSection = createDefensePlaycallSubsection('1-3-1 Zone', zone131Defense);
+  defensePlayCallsSection.appendChild(zone131DefenseSection);
+
+  container.appendChild(defensePlayCallsSection);
 }
 
 // Create playcall subsection (Motion, Set, Cumulative)
@@ -606,21 +638,45 @@ function createPlaycallSubsection(title, playcallData) {
   const insideAttempts = inside.attempts || 0;
   const insideSuccess = inside.success || 0;
   const insidePct = insideAttempts > 0 ? ((insideSuccess / insideAttempts) * 100).toFixed(0) : '0';
-  subsection.appendChild(createScoutingItem('Inside', `${insideSuccess} / ${insideAttempts}`, `${insidePct}%`));
+  const insideVsMan = inside.vs_man || {};
+  const insideVsManAtt = insideVsMan.attempts || 0;
+  const insideVsManSuc = insideVsMan.success || 0;
+  const insideVsManPct = insideVsManAtt > 0 ? ((insideVsManSuc / insideVsManAtt) * 100).toFixed(0) : '0';
+  const insideVsZone = inside.vs_zone || {};
+  const insideVsZoneAtt = insideVsZone.attempts || 0;
+  const insideVsZoneSuc = insideVsZone.success || 0;
+  const insideVsZonePct = insideVsZoneAtt > 0 ? ((insideVsZoneSuc / insideVsZoneAtt) * 100).toFixed(0) : '0';
+  subsection.appendChild(createScoutingItemWithVs('Inside', `${insideSuccess} / ${insideAttempts}`, `${insidePct}%`, `${insideVsManSuc} / ${insideVsManAtt}`, `${insideVsManPct}%`, `${insideVsZoneSuc} / ${insideVsZoneAtt}`, `${insideVsZonePct}%`));
 
   // Attack (backend uses lowercase 'attack')
   const attack = playcallData.attack || playcallData.Attack || {};
   const attackAttempts = attack.attempts || 0;
   const attackSuccess = attack.success || 0;
   const attackPct = attackAttempts > 0 ? ((attackSuccess / attackAttempts) * 100).toFixed(0) : '0';
-  subsection.appendChild(createScoutingItem('Attack', `${attackSuccess} / ${attackAttempts}`, `${attackPct}%`));
+  const attackVsMan = attack.vs_man || {};
+  const attackVsManAtt = attackVsMan.attempts || 0;
+  const attackVsManSuc = attackVsMan.success || 0;
+  const attackVsManPct = attackVsManAtt > 0 ? ((attackVsManSuc / attackVsManAtt) * 100).toFixed(0) : '0';
+  const attackVsZone = attack.vs_zone || {};
+  const attackVsZoneAtt = attackVsZone.attempts || 0;
+  const attackVsZoneSuc = attackVsZone.success || 0;
+  const attackVsZonePct = attackVsZoneAtt > 0 ? ((attackVsZoneSuc / attackVsZoneAtt) * 100).toFixed(0) : '0';
+  subsection.appendChild(createScoutingItemWithVs('Attack', `${attackSuccess} / ${attackAttempts}`, `${attackPct}%`, `${attackVsManSuc} / ${attackVsManAtt}`, `${attackVsManPct}%`, `${attackVsZoneSuc} / ${attackVsZoneAtt}`, `${attackVsZonePct}%`));
 
   // Outside (backend uses lowercase 'outside')
   const outside = playcallData.outside || playcallData.Outside || {};
   const outsideAttempts = outside.attempts || 0;
   const outsideSuccess = outside.success || 0;
   const outsidePct = outsideAttempts > 0 ? ((outsideSuccess / outsideAttempts) * 100).toFixed(0) : '0';
-  subsection.appendChild(createScoutingItem('Outside', `${outsideSuccess} / ${outsideAttempts}`, `${outsidePct}%`));
+  const outsideVsMan = outside.vs_man || {};
+  const outsideVsManAtt = outsideVsMan.attempts || 0;
+  const outsideVsManSuc = outsideVsMan.success || 0;
+  const outsideVsManPct = outsideVsManAtt > 0 ? ((outsideVsManSuc / outsideVsManAtt) * 100).toFixed(0) : '0';
+  const outsideVsZone = outside.vs_zone || {};
+  const outsideVsZoneAtt = outsideVsZone.attempts || 0;
+  const outsideVsZoneSuc = outsideVsZone.success || 0;
+  const outsideVsZonePct = outsideVsZoneAtt > 0 ? ((outsideVsZoneSuc / outsideVsZoneAtt) * 100).toFixed(0) : '0';
+  subsection.appendChild(createScoutingItemWithVs('Outside', `${outsideSuccess} / ${outsideAttempts}`, `${outsidePct}%`, `${outsideVsManSuc} / ${outsideVsManAtt}`, `${outsideVsManPct}%`, `${outsideVsZoneSuc} / ${outsideVsZoneAtt}`, `${outsideVsZonePct}%`));
 
   return subsection;
 }
@@ -635,6 +691,71 @@ function createScoutingItem(label, value, pct) {
     <span class="scouting-item-pct">(${pct})</span>
   `;
   return item;
+}
+
+// Create a scouting item element with vs Man and vs Zone columns
+function createScoutingItemWithVs(label, value, pct, vsManValue, vsManPct, vsZoneValue, vsZonePct) {
+  const item = document.createElement('div');
+  item.className = 'scouting-item';
+  item.innerHTML = `
+    <span class="scouting-item-label">${label}:</span>
+    <span class="scouting-item-value">${value}</span>
+    <span class="scouting-item-pct">(${pct})</span>
+    <span class="scouting-item-vs" style="margin-left: 15px;">vs Man: ${vsManValue} (${vsManPct}%), vs Zone: ${vsZoneValue} (${vsZonePct}%)</span>
+  `;
+  return item;
+}
+
+// Create defense playcall subsection (Man, Zone, etc.)
+function createDefensePlaycallSubsection(title, defenseData) {
+  // Check if we have game_stats or season_stats
+  const stats = defenseData.game_stats || defenseData.season_stats || defenseData || {};
+  
+  const subsection = document.createElement('div');
+  subsection.className = 'scouting-subsection';
+
+  const used = stats.used || 0;
+  const success = stats.success || 0;
+  const pct = used > 0 ? ((success / used) * 100).toFixed(0) : '0';
+
+  subsection.innerHTML = `<h4>${title}: ${success} / ${used} (${pct}%)</h4>`;
+
+  // vs Motion
+  const vsMotion = stats.vs_motion || {};
+  const vsMotionAtt = vsMotion.attempts || 0;
+  const vsMotionSuc = vsMotion.success || 0;
+  const vsMotionPct = vsMotionAtt > 0 ? ((vsMotionSuc / vsMotionAtt) * 100).toFixed(0) : '0';
+  subsection.appendChild(createScoutingItem('vs Motion', `${vsMotionSuc} / ${vsMotionAtt}`, `${vsMotionPct}%`));
+
+  // vs Set Play
+  const vsSet = stats.vs_set || {};
+  const vsSetAtt = vsSet.attempts || 0;
+  const vsSetSuc = vsSet.success || 0;
+  const vsSetPct = vsSetAtt > 0 ? ((vsSetSuc / vsSetAtt) * 100).toFixed(0) : '0';
+  subsection.appendChild(createScoutingItem('vs Set Play', `${vsSetSuc} / ${vsSetAtt}`, `${vsSetPct}%`));
+
+  // vs Inside
+  const vsInside = stats.vs_inside || {};
+  const vsInsideAtt = vsInside.attempts || 0;
+  const vsInsideSuc = vsInside.success || 0;
+  const vsInsidePct = vsInsideAtt > 0 ? ((vsInsideSuc / vsInsideAtt) * 100).toFixed(0) : '0';
+  subsection.appendChild(createScoutingItem('vs Inside', `${vsInsideSuc} / ${vsInsideAtt}`, `${vsInsidePct}%`));
+
+  // vs Attack
+  const vsAttack = stats.vs_attack || {};
+  const vsAttackAtt = vsAttack.attempts || 0;
+  const vsAttackSuc = vsAttack.success || 0;
+  const vsAttackPct = vsAttackAtt > 0 ? ((vsAttackSuc / vsAttackAtt) * 100).toFixed(0) : '0';
+  subsection.appendChild(createScoutingItem('vs Attack', `${vsAttackSuc} / ${vsAttackAtt}`, `${vsAttackPct}%`));
+
+  // vs Outside
+  const vsOutside = stats.vs_outside || {};
+  const vsOutsideAtt = vsOutside.attempts || 0;
+  const vsOutsideSuc = vsOutside.success || 0;
+  const vsOutsidePct = vsOutsideAtt > 0 ? ((vsOutsideSuc / vsOutsideAtt) * 100).toFixed(0) : '0';
+  subsection.appendChild(createScoutingItem('vs Outside', `${vsOutsideSuc} / ${vsOutsideAtt}`, `${vsOutsidePct}%`));
+
+  return subsection;
 }
 
 // Setup tab switching
