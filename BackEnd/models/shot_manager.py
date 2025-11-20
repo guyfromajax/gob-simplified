@@ -459,6 +459,8 @@ class ShotManager:
                 # Record rebound stat and update game state
                 self.game_state["last_rebound"] = stat
                 rebounder.record_stat(stat)
+                # Debug: Log when initial rebound stat is recorded
+                logging.info(f"🏀 Initial Rebound: {get_name_safe(rebounder)} credited with {stat} (initial shot miss)")
                 text += f"...{get_name_safe(rebounder)} grabs the rebound."
                 result["rebounderId"] = getattr(rebounder, "player_id", None)
                 result["rebound_type"] = stat

@@ -185,6 +185,8 @@ def resolve_offensive_rebound(game, rebounder):
             # Track defensive success for missed putback
             defender.record_stat("DEF_S")
             new_rebounder, new_team, new_stat = determine_rebounder(game)
+            # Debug: Log when putback miss rebound stat is recorded
+            logging.info(f"🏀 Putback Miss Rebound: {get_name_safe(new_rebounder)} credited with {new_stat} (putback miss)")
             new_rebounder.record_stat(new_stat)
             # DON'T flip possession here - let turn_manager handle it after the rebound
             # This ensures the shot animates to the correct basket before possession flips
