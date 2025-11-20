@@ -1199,11 +1199,11 @@ class TurnManager:
                     if steps_from_shot <= 5:
                         # All criteria met: last pass to shooter within 5 steps
                         passer_pos = last_pass_event.get("from")
-                        # print(f"🎯 ASSIST DEBUG: Found passer={passer_pos}, pass_to={last_pass_event.get('to')}, steps_from_shot={steps_from_shot}")
-                    # else:
-                    #     print(f"🎯 ASSIST DEBUG: Pass found but too far from shot (steps_from_shot={steps_from_shot})")
-                # else:
-                #     print(f"🎯 ASSIST DEBUG: No pass to shooter found in last 5 steps")
+                        logging.info(f"🎯 ASSIST DEBUG: Found passer_pos={passer_pos}, pass_to={last_pass_event.get('to')}, shooter_pos={shooter_pos}, steps_from_shot={steps_from_shot}")
+                    else:
+                        logging.info(f"🎯 ASSIST DEBUG: Pass found but too far from shot (steps_from_shot={steps_from_shot}, max=5)")
+                else:
+                    logging.info(f"🎯 ASSIST DEBUG: No pass to shooter found in last 5 steps (shooter_pos={shooter_pos})")
             
             # print(f"🎯 ASSIST DEBUG: Final passer_pos={passer_pos}")
             
@@ -1299,6 +1299,7 @@ class TurnManager:
         
         # Override passer if it conflicts with shooter/screener
         if passer_pos in [shooter_pos, screener_pos]:
+            logging.info(f"🎯 ASSIST DEBUG: Passer conflicts with shooter/screener, setting to None (passer_pos={passer_pos}, shooter_pos={shooter_pos}, screener_pos={screener_pos})")
             passer_pos = None
 
         if game_state["defense_playcall"] == "Zone":
@@ -1309,10 +1310,14 @@ class TurnManager:
         # --- Step 5: Lookup player objects
         shooter = off_lineup.get(shooter_pos) if shooter_pos else off_lineup["PG"]  # Fallback to PG
         screener = off_lineup.get(screener_pos) if screener_pos else off_lineup["PF"]  # Fallback to PF
-        passer = off_lineup.get(passer_pos)
+        passer = off_lineup.get(passer_pos) if passer_pos else None
         defender = def_lineup.get(defender_pos) if defender_pos else def_lineup["PG"]
         
-        # print(f"🎯 ASSIST DEBUG: passer_pos={passer_pos}, passer object={get_name_safe(passer) if passer else None}")
+        # Debug logging for passer assignment
+        if passer:
+            logging.info(f"🎯 ASSIST DEBUG: passer_pos={passer_pos}, passer={get_name_safe(passer)}, shooter={get_name_safe(shooter)}")
+        else:
+            logging.info(f"🎯 ASSIST DEBUG: No passer found (passer_pos={passer_pos}, shooter={get_name_safe(shooter)})")
 
         return {
             "shooter": shooter,

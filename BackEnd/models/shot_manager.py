@@ -121,7 +121,7 @@ class ShotManager:
         result = {}
 
         shooter = roles["shooter"]
-        passer = roles.get("passer", "")
+        passer = roles.get("passer")  # Can be None if no passer found
         screener = roles.get("screener", "")
         defender = roles.get("defender", "")
 
@@ -266,12 +266,12 @@ class ShotManager:
         # 🎯 Shot is Made
         # ------------------------
         if made:
-            # print(f"🎯 ASSIST DEBUG: Shot MADE! passer={get_name_safe(passer) if passer else None}")
+            # Debug logging for assist tracking
             if passer:
                 passer.record_stat("AST")
-                # print(f"🎯 ASSIST DEBUG: Recorded AST for {get_name_safe(passer)}")
-            # else:
-                # print(f"🎯 ASSIST DEBUG: No passer found, no assist awarded")
+                logging.info(f"🎯 ASSIST: {get_name_safe(passer)} credited with AST for assist to {get_name_safe(shooter)} (HCO shot)")
+            else:
+                logging.info(f"🎯 ASSIST: No passer found for shooter {get_name_safe(shooter)}, no assist awarded")
             stats = ["FGM", "3PTM"] if is_three else ["FGM"]
             points = 3 if is_three else 2
             
