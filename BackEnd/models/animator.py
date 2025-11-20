@@ -860,23 +860,27 @@ class Animator:
                     steps
                 )
                 animations.extend(defensive_anims)
-            elif self.game.game_state.get("defense_playcall", "Man") == "Zone":
-                # Use zone defense positioning (2-3 zone)
-                logging.warning(f"🛡️ ZONE DEFENSE ACTIVATED: Using zone defense for this turn")
-                defensive_anims = self._position_zone_defenders(
-                    offensive_animations,
-                    def_lineup,
-                    steps
-                )
-                animations.extend(defensive_anims)
             else:
-                # Use standard defensive positioning for HCO (man-to-man)
-                defensive_anims = self._position_standard_defenders(
-                    offensive_animations, 
-                    def_lineup, 
-                    steps
-                )
-                animations.extend(defensive_anims)
+                # Check if defense is a zone type (e.g., "2-3 Zone", "3-2 Zone", "1-3-1 Zone")
+                from BackEnd.utils.defense_utils import is_zone_defense
+                defense_playcall = self.game.game_state.get("defense_playcall", "Man")
+                if is_zone_defense(defense_playcall):
+                    # Use zone defense positioning (currently supports 2-3 zone, will expand for other types)
+                    logging.warning(f"🛡️ ZONE DEFENSE ACTIVATED: Using {defense_playcall} for this turn")
+                    defensive_anims = self._position_zone_defenders(
+                        offensive_animations,
+                        def_lineup,
+                        steps
+                    )
+                    animations.extend(defensive_anims)
+                else:
+                    # Use standard defensive positioning for HCO (man-to-man)
+                    defensive_anims = self._position_standard_defenders(
+                        offensive_animations, 
+                        def_lineup, 
+                        steps
+                    )
+                    animations.extend(defensive_anims)
         
         return animations
     

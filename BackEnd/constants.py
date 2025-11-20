@@ -75,10 +75,10 @@ PLAYCALLS = ["Base", "Freelance", "Inside", "Attack", "Outside", "Set"]
 STRATEGY_CALL_DICTS = {
     "defense": {
         0: ["Man"],
-        1: ["Man", "Man", "Zone"],
-        2: ["Man", "Zone"],
-        3: ["Man", "Zone", "Zone"],
-        4: ["Zone"]},
+        1: ["Man", "Man", "2-3 Zone"],  # Use specific zone name
+        2: ["Man", "2-3 Zone"],
+        3: ["Man", "2-3 Zone", "2-3 Zone"],
+        4: ["2-3 Zone"]},  # Use specific zone name (2-3 Zone for now, will add more later)
     "tempo": {
         0: ["slow"],
         1: ["slow", "normal"],
@@ -145,8 +145,8 @@ HCO_STRING_SPOTS = {
     "midLane": {"x": 80, "y": 25}, 
     "upper apex": {"x": 80, "y": 36}, 
     "lower apex": {"x": 80, "y": 15},
-    "upper bird": {"x": 84, "y": 36},
-    "lower bird": {"x": 84, "y": 15},
+    "upper bird": {"x": 85, "y": 36},
+    "lower bird": {"x": 85, "y": 15},
     "upper midBaseline": {"x": 89, "y": 36}, 
     "lower midBaseline": {"x": 89, "y": 15},
     "deep key": {"x": 57, "y": 25},
