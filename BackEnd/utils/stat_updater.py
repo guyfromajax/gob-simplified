@@ -4,7 +4,7 @@ from bson import ObjectId
 from pymongo import ReturnDocument
 
 from BackEnd.constants import BOX_SCORE_KEYS
-from BackEnd.db import db, players_collection, tournaments_collection, games_collection
+from BackEnd.db import db, players_collection, tournaments_collection, games_collection, teams_collection
 
 
 def _clean_stat_block(stats: Dict[str, Any]) -> Dict[str, float]:
@@ -375,6 +375,89 @@ def rollup_game_to_franchise(franchise_id: str | ObjectId, game_id: str | Object
         db.franchises.update_one({"_id": fid}, {"$set": stats_doc})
 
 
+def _update_defensive_playcall_season_stats(game: Dict[str, Any]) -> None:
+    """Update defensive playcall season_stats from game_stats for both teams.
+    
+    Extracts scouting data from the game document and copies all game_stats
+    values to season_stats for each defensive playcall (Man, 2-3 Zone, etc.).
+    This is called at the end of games in tournament and franchise modes.
+    """
+    teams_obj = game.get("teams", {})
+    if not teams_obj:
+        return
+    
+    for team_id, team_data in teams_obj.items():
+        scouting = team_data.get("scouting", {})
+        defense_data = scouting.get("defense", {})
+        
+        if not defense_data:
+            continue
+        
+        # Build $inc operations for all defensive playcall season_stats
+        inc_doc: Dict[str, Any] = {}
+        
+        for playcall_name, playcall_data in defense_data.items():
+            game_stats = playcall_data.get("game_stats", {})
+            if not game_stats:
+                continue
+            
+            # Base stats: used, success
+            if "used" in game_stats:
+                inc_doc[f"scouting_data.defense.{playcall_name}.season_stats.used"] = game_stats["used"]
+            if "success" in game_stats:
+                inc_doc[f"scouting_data.defense.{playcall_name}.season_stats.success"] = game_stats["success"]
+            
+            # Granular stats: vs_motion, vs_set, vs_inside, vs_attack, vs_outside
+            for vs_key in ["vs_motion", "vs_set", "vs_inside", "vs_attack", "vs_outside"]:
+                vs_data = game_stats.get(vs_key, {})
+                if isinstance(vs_data, dict):
+                    if "attempts" in vs_data:
+                        inc_doc[f"scouting_data.defense.{playcall_name}.season_stats.{vs_key}.attempts"] = vs_data["attempts"]
+                    if "success" in vs_data:
+                        inc_doc[f"scouting_data.defense.{playcall_name}.season_stats.{vs_key}.success"] = vs_data["success"]
+            
+            # Combination stats: vs_motion_inside, vs_motion_attack, etc.
+            for combo_key in ["vs_motion_inside", "vs_motion_attack", "vs_motion_outside",
+                             "vs_set_inside", "vs_set_attack", "vs_set_outside"]:
+                combo_data = game_stats.get(combo_key, {})
+                if isinstance(combo_data, dict):
+                    if "attempts" in combo_data:
+                        inc_doc[f"scouting_data.defense.{playcall_name}.season_stats.{combo_key}.attempts"] = combo_data["attempts"]
+                    if "success" in combo_data:
+                        inc_doc[f"scouting_data.defense.{playcall_name}.season_stats.{combo_key}.success"] = combo_data["success"]
+        
+        # Update the team document if we have any stats to increment
+        if inc_doc:
+            # Find team by team_id (which is stored in the teams object key)
+            # team_id is typically a string matching the team_id field in teams collection
+            result = teams_collection.update_one(
+                {"team_id": team_id},
+                {"$inc": inc_doc}
+            )
+            
+            # If team_id lookup failed, try finding by name as fallback
+            if result.matched_count == 0:
+                # Get team name from game document
+                home_team_id = game.get("home_team_id")
+                away_team_id = game.get("away_team_id")
+                home_team_data = game.get("home_team", {})
+                away_team_data = game.get("away_team", {})
+                home_team_name = home_team_data.get("name") if isinstance(home_team_data, dict) else game.get("home_team", "")
+                away_team_name = away_team_data.get("name") if isinstance(away_team_data, dict) else game.get("away_team", "")
+                
+                team_name = None
+                if team_id == home_team_id:
+                    team_name = home_team_name
+                elif team_id == away_team_id:
+                    team_name = away_team_name
+                
+                if team_name:
+                    teams_collection.update_one(
+                        {"name": team_name},
+                        {"$inc": inc_doc}
+                    )
+
+
 def backfill_franchise_player_stats(franchise_id: str | ObjectId) -> None:
     """Migrate a franchise document from legacy ``players`` schema.
 
@@ -467,6 +550,9 @@ def finalize_game(
         game = games_collection.find_one({"_id": gid}) or {}
         apply_stats_from_summary(game, game_id, tournament_id)
         recompute_tournament_leaders(tournament_id)
+        
+        # Update defensive playcall season_stats from game_stats
+        _update_defensive_playcall_season_stats(game)
 
         return
 
@@ -518,6 +604,9 @@ def finalize_game(
             return
 
         apply_stats_from_summary(game, game_id)
+        
+        # Update defensive playcall season_stats from game_stats
+        _update_defensive_playcall_season_stats(game)
 
         return
 
