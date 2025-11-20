@@ -18,6 +18,7 @@ def test_assist_tracking_with_pass_to_shooter():
     tm = TurnManager(game)
     
     # Create a skeleton with a pass to shooter in the last 3 steps
+    # Pass/receive in same step (PG passes, SG receives)
     steps = [
         {
             "timestamp": 0,
@@ -33,7 +34,7 @@ def test_assist_tracking_with_pass_to_shooter():
                 "PG": {"action": ACTIONS["PASS"], "spot": "key"},
                 "SG": {"action": ACTIONS["RECEIVE"], "spot": "upper wing"},
             },
-            "events": [{"type": "pass", "from": "PG", "to": "SG"}]
+            "events": []
         },
         {
             "timestamp": 600,
@@ -41,7 +42,7 @@ def test_assist_tracking_with_pass_to_shooter():
                 "PG": {"action": ACTIONS["DRIFT"], "spot": "key"},
                 "SG": {"action": ACTIONS["SHOOT"], "spot": "upper wing"},
             },
-            "events": [{"type": "shot", "by": "SG"}]
+            "events": []
         }
     ]
     
@@ -65,14 +66,14 @@ def test_assist_tracking_pass_too_far_from_shot():
     # Add 7 steps before the shot (pass on step 0, shot on step 6)
     for i in range(7):
         if i == 0:
-            # Pass step
+            # Pass step (PG passes, SG receives)
             steps.append({
                 "timestamp": i * 300,
                 "pos_actions": {
                     "PG": {"action": ACTIONS["PASS"], "spot": "key"},
                     "SG": {"action": ACTIONS["RECEIVE"], "spot": "upper wing"},
                 },
-                "events": [{"type": "pass", "from": "PG", "to": "SG"}]
+                "events": []
             })
         elif i == 6:
             # Shot step
@@ -82,7 +83,7 @@ def test_assist_tracking_pass_too_far_from_shot():
                     "PG": {"action": ACTIONS["DRIFT"], "spot": "key"},
                     "SG": {"action": ACTIONS["SHOOT"], "spot": "upper wing"},
                 },
-                "events": [{"type": "shot", "by": "SG"}]
+                "events": []
             })
         else:
             # Intermediate steps
@@ -108,6 +109,7 @@ def test_assist_tracking_pass_to_different_player():
     tm = TurnManager(game)
     
     # Create a skeleton with a pass to a different player (not the shooter)
+    # PG passes to SG, but SF is the shooter
     steps = [
         {
             "timestamp": 0,
@@ -116,7 +118,7 @@ def test_assist_tracking_pass_to_different_player():
                 "SG": {"action": ACTIONS["RECEIVE"], "spot": "upper wing"},
                 "SF": {"action": ACTIONS["DRIFT"], "spot": "lower wing"},
             },
-            "events": [{"type": "pass", "from": "PG", "to": "SG"}]
+            "events": []
         },
         {
             "timestamp": 300,
@@ -125,7 +127,7 @@ def test_assist_tracking_pass_to_different_player():
                 "SG": {"action": ACTIONS["DRIFT"], "spot": "upper wing"},
                 "SF": {"action": ACTIONS["SHOOT"], "spot": "lower wing"},
             },
-            "events": [{"type": "shot", "by": "SF"}]
+            "events": []
         }
     ]
     
