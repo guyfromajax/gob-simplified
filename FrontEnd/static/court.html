@@ -2017,22 +2017,29 @@
           <div class="team-tab team-tab-S2">
             <table class="team-stats-table">
               <tbody>
-                <tr><th>Motion</th><td data-key="motion_overall_attempts">0</td><td data-key="motion_overall_rate">0%</td></tr>
-                <tr class="play-stat-row" data-play-category="motion_inside" data-team="away"><td>-Inside</td><td data-key="motion_inside_attempts">0</td><td data-key="motion_inside_rate">0%</td></tr>
-                <tr class="play-stat-row" data-play-category="motion_attack" data-team="away"><td>-Attack</td><td data-key="motion_attack_attempts">0</td><td data-key="motion_attack_rate">0%</td></tr>
-                <tr class="play-stat-row" data-play-category="motion_outside" data-team="away"><td>-Outside</td><td data-key="motion_outside_attempts">0</td><td data-key="motion_outside_rate">0%</td></tr>
-                <tr><th>Set Play</th><td data-key="set_overall_attempts">0</td><td data-key="set_overall_rate">0%</td></tr>
-                <tr class="play-stat-row" data-play-category="set_inside" data-team="away"><td>-Inside</td><td data-key="set_inside_attempts">0</td><td data-key="set_inside_rate">0%</td></tr>
-                <tr class="play-stat-row" data-play-category="set_attack" data-team="away"><td>-Attack</td><td data-key="set_attack_attempts">0</td><td data-key="set_attack_rate">0%</td></tr>
-                <tr class="play-stat-row" data-play-category="set_outside" data-team="away"><td>-Outside</td><td data-key="set_outside_attempts">0</td><td data-key="set_outside_rate">0%</td></tr>
-                <tr><th colspan="3">Cumulative</th></tr>
-                <tr><td>Inside</td><td data-key="cum_inside_attempts">0</td><td data-key="cum_inside_rate">0%</td></tr>
-                <tr><td>Attack</td><td data-key="cum_attack_attempts">0</td><td data-key="cum_attack_rate">0%</td></tr>
-                <tr><td>Outside</td><td data-key="cum_outside_attempts">0</td><td data-key="cum_outside_rate">0%</td></tr>
-                <tr><th colspan="3">Special Situations</th></tr>
-                <tr><td>Fast Breaks</td><td data-key="fb_attempts">0</td><td data-key="fb_rate">0%</td></tr>
-                <tr><td>HC Traps</td><td data-key="hct_attempts">0</td><td data-key="hct_rate">0%</td></tr>
-                <tr><td>FC Presses</td><td data-key="fcp_attempts">0</td><td data-key="fcp_rate">0%</td></tr>
+                <!-- Section 1: Offense (7 columns) -->
+                <tr><th colspan="7">Offense</th></tr>
+                <tr><th>Offense</th><th>Set</th><th>%</th><th>Motion</th><th>%</th><th>Total</th><th>%</th></tr>
+                <tr><td>Inside</td><td data-key="set_inside_attempts">0</td><td data-key="set_inside_rate">0%</td><td data-key="motion_inside_attempts">0</td><td data-key="motion_inside_rate">0%</td><td data-key="total_inside_attempts">0</td><td data-key="total_inside_rate">0%</td></tr>
+                <tr><td>Attack</td><td data-key="set_attack_attempts">0</td><td data-key="set_attack_rate">0%</td><td data-key="motion_attack_attempts">0</td><td data-key="motion_attack_rate">0%</td><td data-key="total_attack_attempts">0</td><td data-key="total_attack_rate">0%</td></tr>
+                <tr><td>Outside</td><td data-key="set_outside_attempts">0</td><td data-key="set_outside_rate">0%</td><td data-key="motion_outside_attempts">0</td><td data-key="motion_outside_rate">0%</td><td data-key="total_outside_attempts">0</td><td data-key="total_outside_rate">0%</td></tr>
+                <tr><td>Motion: Total</td><td colspan="2" data-key="motion_total_attempts">0</td><td colspan="2" data-key="motion_total_success">0</td><td colspan="2" data-key="motion_total_rate">0%</td></tr>
+                <tr><td>Set Play: Total</td><td colspan="2" data-key="set_total_attempts">0</td><td colspan="2" data-key="set_total_success">0</td><td colspan="2" data-key="set_total_rate">0%</td></tr>
+                
+                <!-- Section 2: Defense (3 columns, using 7-column grid) -->
+                <tr><th colspan="7">Defense</th></tr>
+                <tr><th>Defense</th><th>Att</th><th>%</th><th colspan="4"></th></tr>
+                <tr><td>Man</td><td data-key="man_attempts">0</td><td data-key="man_rate">0%</td><td colspan="4"></td></tr>
+                <tr><td>Zone</td><td data-key="zone_total_attempts">0</td><td data-key="zone_total_rate">0%</td><td colspan="4"></td></tr>
+                <tr><td>-2-3 Zone</td><td data-key="zone_23_attempts">0</td><td data-key="zone_23_rate">0%</td><td colspan="4"></td></tr>
+                <tr><td>-3-2 Zone</td><td data-key="zone_32_attempts">0</td><td data-key="zone_32_rate">0%</td><td colspan="4"></td></tr>
+                <tr><td>-1-3-1 Zone</td><td data-key="zone_131_attempts">0</td><td data-key="zone_131_rate">0%</td><td colspan="4"></td></tr>
+                
+                <!-- Section 3: Special Situations (same layout) -->
+                <tr><th colspan="7">Special Situations</th></tr>
+                <tr><td>Fast Breaks</td><td data-key="fb_attempts">0</td><td data-key="fb_rate">0%</td><td colspan="4"></td></tr>
+                <tr><td>HC Traps</td><td data-key="hct_attempts">0</td><td data-key="hct_rate">0%</td><td colspan="4"></td></tr>
+                <tr><td>FC Presses</td><td data-key="fcp_attempts">0</td><td data-key="fcp_rate">0%</td><td colspan="4"></td></tr>
               </tbody>
             </table>
           </div>
@@ -2139,22 +2146,29 @@
           <div class="team-tab team-tab-S2">
             <table class="team-stats-table">
               <tbody>
-                <tr><th>Motion</th><td data-key="motion_overall_attempts">0</td><td data-key="motion_overall_rate">0%</td></tr>
-                <tr class="play-stat-row" data-play-category="motion_inside" data-team="home"><td>-Inside</td><td data-key="motion_inside_attempts">0</td><td data-key="motion_inside_rate">0%</td></tr>
-                <tr class="play-stat-row" data-play-category="motion_attack" data-team="home"><td>-Attack</td><td data-key="motion_attack_attempts">0</td><td data-key="motion_attack_rate">0%</td></tr>
-                <tr class="play-stat-row" data-play-category="motion_outside" data-team="home"><td>-Outside</td><td data-key="motion_outside_attempts">0</td><td data-key="motion_outside_rate">0%</td></tr>
-                <tr><th>Set Play</th><td data-key="set_overall_attempts">0</td><td data-key="set_overall_rate">0%</td></tr>
-                <tr class="play-stat-row" data-play-category="set_inside" data-team="home"><td>-Inside</td><td data-key="set_inside_attempts">0</td><td data-key="set_inside_rate">0%</td></tr>
-                <tr class="play-stat-row" data-play-category="set_attack" data-team="home"><td>-Attack</td><td data-key="set_attack_attempts">0</td><td data-key="set_attack_rate">0%</td></tr>
-                <tr class="play-stat-row" data-play-category="set_outside" data-team="home"><td>-Outside</td><td data-key="set_outside_attempts">0</td><td data-key="set_outside_rate">0%</td></tr>
-                <tr><th colspan="3">Cumulative</th></tr>
-                <tr><td>Inside</td><td data-key="cum_inside_attempts">0</td><td data-key="cum_inside_rate">0%</td></tr>
-                <tr><td>Attack</td><td data-key="cum_attack_attempts">0</td><td data-key="cum_attack_rate">0%</td></tr>
-                <tr><td>Outside</td><td data-key="cum_outside_attempts">0</td><td data-key="cum_outside_rate">0%</td></tr>
-                <tr><th colspan="3">Special Situations</th></tr>
-                <tr><td>Fast Breaks</td><td data-key="fb_attempts">0</td><td data-key="fb_rate">0%</td></tr>
-                <tr><td>HC Traps</td><td data-key="hct_attempts">0</td><td data-key="hct_rate">0%</td></tr>
-                <tr><td>FC Presses</td><td data-key="fcp_attempts">0</td><td data-key="fcp_rate">0%</td></tr>
+                <!-- Section 1: Offense (7 columns) -->
+                <tr><th colspan="7">Offense</th></tr>
+                <tr><th>Offense</th><th>Set</th><th>%</th><th>Motion</th><th>%</th><th>Total</th><th>%</th></tr>
+                <tr><td>Inside</td><td data-key="set_inside_attempts">0</td><td data-key="set_inside_rate">0%</td><td data-key="motion_inside_attempts">0</td><td data-key="motion_inside_rate">0%</td><td data-key="total_inside_attempts">0</td><td data-key="total_inside_rate">0%</td></tr>
+                <tr><td>Attack</td><td data-key="set_attack_attempts">0</td><td data-key="set_attack_rate">0%</td><td data-key="motion_attack_attempts">0</td><td data-key="motion_attack_rate">0%</td><td data-key="total_attack_attempts">0</td><td data-key="total_attack_rate">0%</td></tr>
+                <tr><td>Outside</td><td data-key="set_outside_attempts">0</td><td data-key="set_outside_rate">0%</td><td data-key="motion_outside_attempts">0</td><td data-key="motion_outside_rate">0%</td><td data-key="total_outside_attempts">0</td><td data-key="total_outside_rate">0%</td></tr>
+                <tr><td>Motion: Total</td><td colspan="2" data-key="motion_total_attempts">0</td><td colspan="2" data-key="motion_total_success">0</td><td colspan="2" data-key="motion_total_rate">0%</td></tr>
+                <tr><td>Set Play: Total</td><td colspan="2" data-key="set_total_attempts">0</td><td colspan="2" data-key="set_total_success">0</td><td colspan="2" data-key="set_total_rate">0%</td></tr>
+                
+                <!-- Section 2: Defense (3 columns, using 7-column grid) -->
+                <tr><th colspan="7">Defense</th></tr>
+                <tr><th>Defense</th><th>Att</th><th>%</th><th colspan="4"></th></tr>
+                <tr><td>Man</td><td data-key="man_attempts">0</td><td data-key="man_rate">0%</td><td colspan="4"></td></tr>
+                <tr><td>Zone</td><td data-key="zone_total_attempts">0</td><td data-key="zone_total_rate">0%</td><td colspan="4"></td></tr>
+                <tr><td>-2-3 Zone</td><td data-key="zone_23_attempts">0</td><td data-key="zone_23_rate">0%</td><td colspan="4"></td></tr>
+                <tr><td>-3-2 Zone</td><td data-key="zone_32_attempts">0</td><td data-key="zone_32_rate">0%</td><td colspan="4"></td></tr>
+                <tr><td>-1-3-1 Zone</td><td data-key="zone_131_attempts">0</td><td data-key="zone_131_rate">0%</td><td colspan="4"></td></tr>
+                
+                <!-- Section 3: Special Situations (same layout) -->
+                <tr><th colspan="7">Special Situations</th></tr>
+                <tr><td>Fast Breaks</td><td data-key="fb_attempts">0</td><td data-key="fb_rate">0%</td><td colspan="4"></td></tr>
+                <tr><td>HC Traps</td><td data-key="hct_attempts">0</td><td data-key="hct_rate">0%</td><td colspan="4"></td></tr>
+                <tr><td>FC Presses</td><td data-key="fcp_attempts">0</td><td data-key="fcp_rate">0%</td><td colspan="4"></td></tr>
               </tbody>
             </table>
           </div>
@@ -2640,46 +2654,111 @@
         setCell('pip_total', pip);
         setCell('fouls_total', fouls);
         
-        // S2 Tab: Playcall Stats (existing logic)
+        // S2 Tab: Section 1 - Offense (7 columns)
         const pc = (((data || {}).offense || {}).Playcalls) || {};
         const motion = pc.Motion || { overall:{attempts:0,success:0}, inside:{attempts:0,success:0}, attack:{attempts:0,success:0}, outside:{attempts:0,success:0} };
         const setb = pc.Set || { overall:{attempts:0,success:0}, inside:{attempts:0,success:0}, attack:{attempts:0,success:0}, outside:{attempts:0,success:0} };
-        const cum = pc.Cumulative || { inside:{attempts:0,success:0}, attack:{attempts:0,success:0}, outside:{attempts:0,success:0} };
+        
+        // Inside row
+        const insideSetAtt = setb.inside.attempts || 0;
+        const insideSetSuc = setb.inside.success || 0;
+        const insideMotionAtt = motion.inside.attempts || 0;
+        const insideMotionSuc = motion.inside.success || 0;
+        const insideTotalAtt = insideSetAtt + insideMotionAtt;
+        const insideTotalSuc = insideSetSuc + insideMotionSuc;
+        setCell('set_inside_attempts', insideSetAtt);
+        setCell('set_inside_rate', rate(insideSetSuc, insideSetAtt));
+        setCell('motion_inside_attempts', insideMotionAtt);
+        setCell('motion_inside_rate', rate(insideMotionSuc, insideMotionAtt));
+        setCell('total_inside_attempts', insideTotalAtt);
+        setCell('total_inside_rate', rate(insideTotalSuc, insideTotalAtt));
+        
+        // Attack row
+        const attackSetAtt = setb.attack.attempts || 0;
+        const attackSetSuc = setb.attack.success || 0;
+        const attackMotionAtt = motion.attack.attempts || 0;
+        const attackMotionSuc = motion.attack.success || 0;
+        const attackTotalAtt = attackSetAtt + attackMotionAtt;
+        const attackTotalSuc = attackSetSuc + attackMotionSuc;
+        setCell('set_attack_attempts', attackSetAtt);
+        setCell('set_attack_rate', rate(attackSetSuc, attackSetAtt));
+        setCell('motion_attack_attempts', attackMotionAtt);
+        setCell('motion_attack_rate', rate(attackMotionSuc, attackMotionAtt));
+        setCell('total_attack_attempts', attackTotalAtt);
+        setCell('total_attack_rate', rate(attackTotalSuc, attackTotalAtt));
+        
+        // Outside row
+        const outsideSetAtt = setb.outside.attempts || 0;
+        const outsideSetSuc = setb.outside.success || 0;
+        const outsideMotionAtt = motion.outside.attempts || 0;
+        const outsideMotionSuc = motion.outside.success || 0;
+        const outsideTotalAtt = outsideSetAtt + outsideMotionAtt;
+        const outsideTotalSuc = outsideSetSuc + outsideMotionSuc;
+        setCell('set_outside_attempts', outsideSetAtt);
+        setCell('set_outside_rate', rate(outsideSetSuc, outsideSetAtt));
+        setCell('motion_outside_attempts', outsideMotionAtt);
+        setCell('motion_outside_rate', rate(outsideMotionSuc, outsideMotionAtt));
+        setCell('total_outside_attempts', outsideTotalAtt);
+        setCell('total_outside_rate', rate(outsideTotalSuc, outsideTotalAtt));
+        
+        // Motion: Total
+        const motionTotalAtt = motion.overall.attempts || 0;
+        const motionTotalSuc = motion.overall.success || 0;
+        setCell('motion_total_attempts', motionTotalAtt);
+        setCell('motion_total_success', motionTotalSuc);
+        setCell('motion_total_rate', rate(motionTotalSuc, motionTotalAtt));
+        
+        // Set Play: Total
+        const setTotalAtt = setb.overall.attempts || 0;
+        const setTotalSuc = setb.overall.success || 0;
+        setCell('set_total_attempts', setTotalAtt);
+        setCell('set_total_success', setTotalSuc);
+        setCell('set_total_rate', rate(setTotalSuc, setTotalAtt));
+        
+        // S2 Tab: Section 2 - Defense (3 columns)
+        const defense = data.defense || {};
+        const man = defense.Man || { used: 0, success: 0 };
+        const zone23 = defense['2-3 Zone'] || { used: 0, success: 0 };
+        const zone32 = defense['3-2 Zone'] || { used: 0, success: 0 }; // Hardcoded 0s for now
+        const zone131 = defense['1-3-1 Zone'] || { used: 0, success: 0 }; // Hardcoded 0s for now
+        
+        // Man
+        const manAtt = man.used || 0;
+        const manSuc = man.success || 0;
+        setCell('man_attempts', manAtt);
+        setCell('man_rate', rate(manSuc, manAtt));
+        
+        // Zone (total of all zone types)
+        const zoneTotalAtt = (zone23.used || 0) + (zone32.used || 0) + (zone131.used || 0);
+        const zoneTotalSuc = (zone23.success || 0) + (zone32.success || 0) + (zone131.success || 0);
+        setCell('zone_total_attempts', zoneTotalAtt);
+        setCell('zone_total_rate', rate(zoneTotalSuc, zoneTotalAtt));
+        
+        // 2-3 Zone
+        const zone23Att = zone23.used || 0;
+        const zone23Suc = zone23.success || 0;
+        setCell('zone_23_attempts', zone23Att);
+        setCell('zone_23_rate', rate(zone23Suc, zone23Att));
+        
+        // 3-2 Zone (hardcoded 0s for now)
+        setCell('zone_32_attempts', 0);
+        setCell('zone_32_rate', '0%');
+        
+        // 1-3-1 Zone (hardcoded 0s for now)
+        setCell('zone_131_attempts', 0);
+        setCell('zone_131_rate', '0%');
+        
+        // S2 Tab: Section 3 - Special Situations
         const fbA = (data.offense && data.offense.Fast_Break_Entries) || 0;
         const fbS = (data.offense && data.offense.Fast_Break_Success) || 0;
-        setCell('motion_overall_attempts', motion.overall.attempts||0);
-        setCell('motion_inside_attempts', motion.inside.attempts||0);
-        setCell('motion_attack_attempts', motion.attack.attempts||0);
-        setCell('motion_outside_attempts', motion.outside.attempts||0);
-        setCell('set_overall_attempts', setb.overall.attempts||0);
-        setCell('set_inside_attempts', setb.inside.attempts||0);
-        setCell('set_attack_attempts', setb.attack.attempts||0);
-        setCell('set_outside_attempts', setb.outside.attempts||0);
-        setCell('cum_inside_attempts', cum.inside.attempts||0);
-        setCell('cum_attack_attempts', cum.attack.attempts||0);
-        setCell('cum_outside_attempts', cum.outside.attempts||0);
-        setCell('fb_attempts', fbA);
-        setCell('motion_overall_rate', rate(motion.overall.success||0, motion.overall.attempts||0));
-        setCell('motion_inside_rate', rate(motion.inside.success||0, motion.inside.attempts||0));
-        setCell('motion_attack_rate', rate(motion.attack.success||0, motion.attack.attempts||0));
-        setCell('motion_outside_rate', rate(motion.outside.success||0, motion.outside.attempts||0));
-        setCell('set_overall_rate', rate(setb.overall.success||0, setb.overall.attempts||0));
-        setCell('set_inside_rate', rate(setb.inside.success||0, setb.inside.attempts||0));
-        setCell('set_attack_rate', rate(setb.attack.success||0, setb.attack.attempts||0));
-        setCell('set_outside_rate', rate(setb.outside.success||0, setb.outside.attempts||0));
-        setCell('cum_inside_rate', rate(cum.inside.success||0, cum.inside.attempts||0));
-        setCell('cum_attack_rate', rate(cum.attack.success||0, cum.attack.attempts||0));
-        setCell('cum_outside_rate', rate(cum.outside.success||0, cum.outside.attempts||0));
-        setCell('fb_rate', rate(fbS, fbA));
-        
-        // Special Situations: Fast Breaks (offense), HC Traps (defense), FC Presses (defense)
-        const defense = data.defense || {};
         const hct = defense.HCT || { used: 0, success: 0 };
         const fcp = defense.FCP || { used: 0, success: 0 };
         const hctA = hct.used || 0;
         const hctS = hct.success || 0;
         const fcpA = fcp.used || 0;
         const fcpS = fcp.success || 0;
+        setCell('fb_attempts', fbA);
+        setCell('fb_rate', rate(fbS, fbA));
         setCell('hct_attempts', hctA);
         setCell('hct_rate', rate(hctS, hctA));
         setCell('fcp_attempts', fcpA);
