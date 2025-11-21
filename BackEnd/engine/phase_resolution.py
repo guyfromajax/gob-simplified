@@ -761,11 +761,11 @@ def generate_logic(off_call, def_call, off_team, def_team, off_lineup, def_lineu
         game: Game context object (optional, needed to retrieve skeleton)
     
     Returns:
-        float: Lean score from -2 to 2
-            >= 1: successful - play works perfectly
-            0 to 0.99: mid_play_change - play adjusts mid-execution
-            -0.01 to -1: contested - defense engaged, tougher execution
-            < -1: broken - defense disrupts, offense forced to react
+        float: Lean score from -1 to 1
+            >= 0.5: successful - play works perfectly
+            0 to 0.49: mid_play_change - play adjusts mid-execution
+            -0.01 to -0.5: contested - defense engaged, tougher execution
+            < -0.5: broken - defense disrupts, offense forced to react
     
     TODO: Implement full logic based on:
         - Team attributes (team speed, execution, discipline, etc.)
@@ -818,7 +818,7 @@ def generate_logic(off_call, def_call, off_team, def_team, off_lineup, def_lineu
     
     # PLACEHOLDER: Return random lean score for now
     # This allows the system to work while full logic is implemented
-    lean_score = random.uniform(-2, 2)
+    lean_score = random.uniform(-1, 1)
     
     return lean_score
 
@@ -1428,10 +1428,10 @@ def get_skeleton_by_lean(play_doc, lean_score):
     Args:
         play_doc (dict): Play document from MongoDB with skeletons
         lean_score (float): Lean score from generate_logic() function
-            >= 1: successful - play works perfectly
-            0 to 0.99: mid_play_change - play adjusts mid-execution
-            -0.01 to -1: contested - defense engaged, tougher execution
-            < -1: broken - defense disrupts, offense forced to react
+            >= 0.5: successful - play works perfectly
+            0 to 0.49: mid_play_change - play adjusts mid-execution
+            -0.01 to -0.5: contested - defense engaged, tougher execution
+            < -0.5: broken - defense disrupts, offense forced to react
     
     Returns:
         tuple: (skeleton dict, variant name string)
@@ -1439,11 +1439,11 @@ def get_skeleton_by_lean(play_doc, lean_score):
     skeletons = play_doc.get("skeletons", {})
     
     # Map lean score to skeleton variant
-    if lean_score >= 1:
+    if lean_score >= 0.5:
         variant = "successful"
     elif lean_score >= 0:
         variant = "mid_play_change"
-    elif lean_score >= -1:
+    elif lean_score >= -0.5:
         variant = "contested"
     else:
         variant = "broken"
