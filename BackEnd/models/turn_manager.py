@@ -299,6 +299,16 @@ class TurnManager:
                     elif offense_play_type == "set":
                         def_team.scouting_data["defense"][tracking_name]["game_stats"][f"vs_set_{offense_focus}"]["attempts"] += 1
             
+            # Calculate EV (Expected Value) for the playcall matchup
+            ev = self.calculate_ev(
+                offensive_playcall=calls["offense"],
+                defensive_playcall=calls["defense"],
+                offensive_lineup=self.game.offense_team.lineup,
+                defensive_lineup=self.game.defense_team.lineup,
+                offensive_team=self.game.offense_team,
+                defensive_team=self.game.defense_team
+            )
+            
             result = self.resolve_half_court_offense()
             # Add playcalls to result for frontend display
             result["offensive_playcall"] = calls["offense"]
@@ -309,6 +319,9 @@ class TurnManager:
             result["offensive_play_focus"] = calls.get("offense_focus", None)
             result["defensive_play_type"] = calls.get("defense_type", "-")
             result["defensive_play_focus"] = calls.get("defense_focus", None)
+            
+            # Add EV to result for frontend display
+            result["ev"] = ev
 
         # Record possession team before any potential flip
         result["starting_possession_team_id"] = self.game.offense_team.team_id
@@ -784,6 +797,39 @@ class TurnManager:
 
 
     
+    def calculate_ev(self, offensive_playcall, defensive_playcall, offensive_lineup, defensive_lineup, offensive_team, defensive_team):
+        """
+        Calculate Expected Value (EV) for the playcall matchup.
+        
+        Args:
+            offensive_playcall (str): Offensive playcall (e.g., "Motion - Inside Focus")
+            defensive_playcall (str): Defensive playcall (e.g., "Man", "2-3 Zone", "3-2 Zone", "1-3-1 Zone")
+            offensive_lineup (dict): Offensive lineup {pos: player}
+            defensive_lineup (dict): Defensive lineup {pos: player}
+            offensive_team: Offensive team object with attributes
+            defensive_team: Defensive team object with attributes
+        
+        Returns:
+            float: EV score from -2.0 to 2.0
+                >= 1: Strong offensive advantage
+                0 to 0.99: Slight offensive advantage
+                -0.01 to -1: Slight defensive advantage
+                < -1: Strong defensive advantage
+        """
+        import random
+        
+        # TODO: Implement real EV calculation based on:
+        # - Offensive playcall vs defensive playcall matchup
+        # - Player attributes (all 10 players on court)
+        # - Team attributes
+        # - Play type (motion vs set) and focus (inside/attack/outside)
+        # - Defensive aggression level
+        
+        # PLACEHOLDER: Return random EV for now
+        ev = random.uniform(-2.0, 2.0)
+        
+        return ev
+
     def resolve_half_court_offense(self):
         from BackEnd.engine.phase_resolution import resolve_half_court_offense_logic
         return resolve_half_court_offense_logic(self.game)
