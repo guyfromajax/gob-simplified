@@ -2738,9 +2738,11 @@
         setCell('zone_32_attempts', zone32Att);
         setCell('zone_32_rate', rate(zone32Suc, zone32Att));
         
-        // 1-3-1 Zone (hardcoded 0s for now)
-        setCell('zone_131_attempts', 0);
-        setCell('zone_131_rate', '0%');
+        // 1-3-1 Zone
+        const zone131Att = zone131.used || 0;
+        const zone131Suc = zone131.success || 0;
+        setCell('zone_131_attempts', zone131Att);
+        setCell('zone_131_rate', rate(zone131Suc, zone131Att));
         
         // S2 Tab: Section 3 - Special Situations
         const fbA = (data.offense && data.offense.Fast_Break_Entries) || 0;
