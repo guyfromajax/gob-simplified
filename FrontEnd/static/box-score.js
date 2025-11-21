@@ -597,8 +597,39 @@ function renderScoutingContent(team, teamStats) {
   const manDefenseSection = createDefensePlaycallSubsection('Man', manDefense);
   defensePlayCallsSection.appendChild(manDefenseSection);
 
-  // Zone (aggregate)
-  const zoneDefense = defense.Zone || {};
+  // Zone (aggregate all zone types: 2-3 Zone, 3-2 Zone, 1-3-1 Zone)
+  const zone23 = defense['2-3 Zone'] || {};
+  const zone32 = defense['3-2 Zone'] || {};
+  const zone131 = defense['1-3-1 Zone'] || {};
+  
+  // Aggregate stats from all zone types
+  const aggregateZoneStats = (statKey) => {
+    const stats23 = (zone23.game_stats || zone23.season_stats || zone23 || {})[statKey] || {};
+    const stats32 = (zone32.game_stats || zone32.season_stats || zone32 || {})[statKey] || {};
+    const stats131 = (zone131.game_stats || zone131.season_stats || zone131 || {})[statKey] || {};
+    
+    if (typeof stats23 === 'object' && stats23 !== null) {
+      // It's a nested object (like vs_motion, vs_set, etc.)
+      return {
+        attempts: (stats23.attempts || 0) + (stats32.attempts || 0) + (stats131.attempts || 0),
+        success: (stats23.success || 0) + (stats32.success || 0) + (stats131.success || 0)
+      };
+    } else {
+      // It's a number (like used, success)
+      return (stats23 || 0) + (stats32 || 0) + (stats131 || 0);
+    }
+  };
+  
+  const zoneDefense = {
+    used: aggregateZoneStats('used'),
+    success: aggregateZoneStats('success'),
+    vs_motion: aggregateZoneStats('vs_motion'),
+    vs_set: aggregateZoneStats('vs_set'),
+    vs_inside: aggregateZoneStats('vs_inside'),
+    vs_attack: aggregateZoneStats('vs_attack'),
+    vs_outside: aggregateZoneStats('vs_outside')
+  };
+  
   const zoneDefenseSection = createDefensePlaycallSubsection('Zone', zoneDefense);
   defensePlayCallsSection.appendChild(zoneDefenseSection);
 
@@ -730,36 +761,46 @@ function createDefensePlaycallSubsection(title, defenseData) {
   const vsMotion = stats.vs_motion || {};
   const vsMotionAtt = vsMotion.attempts || 0;
   const vsMotionSuc = vsMotion.success || 0;
-  const vsMotionPct = vsMotionAtt > 0 ? ((vsMotionSuc / vsMotionAtt) * 100).toFixed(0) : '0';
-  subsection.appendChild(createScoutingItem('vs Motion', `${vsMotionSuc} / ${vsMotionAtt}`, `${vsMotionPct}%`));
+  // Safety check: success can't exceed attempts
+  const safeVsMotionSuc = Math.min(vsMotionSuc, vsMotionAtt);
+  const vsMotionPct = vsMotionAtt > 0 ? ((safeVsMotionSuc / vsMotionAtt) * 100).toFixed(0) : '0';
+  subsection.appendChild(createScoutingItem('vs Motion', `${safeVsMotionSuc} / ${vsMotionAtt}`, `${vsMotionPct}%`));
 
   // vs Set Play
   const vsSet = stats.vs_set || {};
   const vsSetAtt = vsSet.attempts || 0;
   const vsSetSuc = vsSet.success || 0;
-  const vsSetPct = vsSetAtt > 0 ? ((vsSetSuc / vsSetAtt) * 100).toFixed(0) : '0';
-  subsection.appendChild(createScoutingItem('vs Set Play', `${vsSetSuc} / ${vsSetAtt}`, `${vsSetPct}%`));
+  // Safety check: success can't exceed attempts
+  const safeVsSetSuc = Math.min(vsSetSuc, vsSetAtt);
+  const vsSetPct = vsSetAtt > 0 ? ((safeVsSetSuc / vsSetAtt) * 100).toFixed(0) : '0';
+  subsection.appendChild(createScoutingItem('vs Set Play', `${safeVsSetSuc} / ${vsSetAtt}`, `${vsSetPct}%`));
 
   // vs Inside
   const vsInside = stats.vs_inside || {};
   const vsInsideAtt = vsInside.attempts || 0;
   const vsInsideSuc = vsInside.success || 0;
-  const vsInsidePct = vsInsideAtt > 0 ? ((vsInsideSuc / vsInsideAtt) * 100).toFixed(0) : '0';
-  subsection.appendChild(createScoutingItem('vs Inside', `${vsInsideSuc} / ${vsInsideAtt}`, `${vsInsidePct}%`));
+  // Safety check: success can't exceed attempts
+  const safeVsInsideSuc = Math.min(vsInsideSuc, vsInsideAtt);
+  const vsInsidePct = vsInsideAtt > 0 ? ((safeVsInsideSuc / vsInsideAtt) * 100).toFixed(0) : '0';
+  subsection.appendChild(createScoutingItem('vs Inside', `${safeVsInsideSuc} / ${vsInsideAtt}`, `${vsInsidePct}%`));
 
   // vs Attack
   const vsAttack = stats.vs_attack || {};
   const vsAttackAtt = vsAttack.attempts || 0;
   const vsAttackSuc = vsAttack.success || 0;
-  const vsAttackPct = vsAttackAtt > 0 ? ((vsAttackSuc / vsAttackAtt) * 100).toFixed(0) : '0';
-  subsection.appendChild(createScoutingItem('vs Attack', `${vsAttackSuc} / ${vsAttackAtt}`, `${vsAttackPct}%`));
+  // Safety check: success can't exceed attempts
+  const safeVsAttackSuc = Math.min(vsAttackSuc, vsAttackAtt);
+  const vsAttackPct = vsAttackAtt > 0 ? ((safeVsAttackSuc / vsAttackAtt) * 100).toFixed(0) : '0';
+  subsection.appendChild(createScoutingItem('vs Attack', `${safeVsAttackSuc} / ${vsAttackAtt}`, `${vsAttackPct}%`));
 
   // vs Outside
   const vsOutside = stats.vs_outside || {};
   const vsOutsideAtt = vsOutside.attempts || 0;
   const vsOutsideSuc = vsOutside.success || 0;
-  const vsOutsidePct = vsOutsideAtt > 0 ? ((vsOutsideSuc / vsOutsideAtt) * 100).toFixed(0) : '0';
-  subsection.appendChild(createScoutingItem('vs Outside', `${vsOutsideSuc} / ${vsOutsideAtt}`, `${vsOutsidePct}%`));
+  // Safety check: success can't exceed attempts
+  const safeVsOutsideSuc = Math.min(vsOutsideSuc, vsOutsideAtt);
+  const vsOutsidePct = vsOutsideAtt > 0 ? ((safeVsOutsideSuc / vsOutsideAtt) * 100).toFixed(0) : '0';
+  subsection.appendChild(createScoutingItem('vs Outside', `${safeVsOutsideSuc} / ${vsOutsideAtt}`, `${vsOutsidePct}%`));
 
   return subsection;
 }

@@ -277,8 +277,12 @@ class TurnManager:
             tracking_name = defense_playcall  # Use specific name directly
             if tracking_name in def_team.scouting_data["defense"]:
                 # Get offensive play type and focus for granular tracking
-                offense_play_type = calls.get("offense_type", "").lower()  # "motion" or "set"
+                offense_play_type = calls.get("offense_type", "").lower()  # "motion" or "set_play"
                 offense_focus = calls.get("offense_focus", "")  # "inside", "attack", "outside"
+                
+                # Normalize play type (set_play -> set) to match phase_resolution.py
+                if offense_play_type == "set_play":
+                    offense_play_type = "set"
                 
                 def_team.scouting_data["defense"][tracking_name]["used"] += 1
                 def_team.scouting_data["defense"][tracking_name]["game_stats"]["used"] += 1
