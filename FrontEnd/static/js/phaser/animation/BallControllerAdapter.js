@@ -78,6 +78,18 @@ function attachBallToPlayer(scene, ballSprite, playerSprite, opts = {}) {
     });
   }
   
+  // CRITICAL: Don't attach during putback shot animations
+  // The putback shot animation is still running, and attaching the ball here causes a flash
+  if (scene._putbackInProgress && !isPutbackAttempt) {
+    console.log('🔍 [BALL ATTACH DEBUG] BLOCKED: putback in progress (not putback attempt)', {
+      targetPlayerId,
+      putbackInProgress: scene._putbackInProgress,
+      isPutbackAttempt,
+      reason: 'putback_shot_animation_running'
+    });
+    return;
+  }
+  
   // Don't attach during shot animations (unless this is the initial putback attachment)
   if (scene._shotInProgress && !isPutbackAttempt) {
     if (isPutbackScenario) {
