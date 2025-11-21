@@ -1564,11 +1564,13 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
       const promise = animateStep({
         scene,
         sprite,
-        step: nextStep,
+        step: prev,  // Previous step (for position calculation)
+        nextStep: curr,  // Current step (for action checking)
         duration,
         ballSprite,
         currentBallOwnerRef,
-        onAction
+        onAction,
+        stepIndex  // Pass stepIndex to identify first step
       });
 
       promises.push(promise);

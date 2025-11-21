@@ -71,15 +71,36 @@ async function handleOrebTurn(scene, { playerSprites, ballSprite, turnData, onUp
       scene.rebounderId = null;
     }
     
-    // CRITICAL: Set _shotInProgress flag BEFORE attaching ball
+    // 🔍 DEBUG: Log putback attachment sequence
+    console.log('🔍 [PUTBACK DEBUG] Starting putback sequence', {
+      rebounderId,
+      shotInProgressBefore: scene._shotInProgress,
+      resultType: turnData.result_type
+    });
+    
+    // CRITICAL: Attach ball to rebounder BEFORE setting _shotInProgress
+    // This ensures the ball can attach (BallController blocks attachments when _shotInProgress is true)
+    // We attach first, then set the flag to prevent other systems from interfering
+    const { attachBallToPlayer } = await import('./BallControllerAdapter.js');
+    const attachResult = attachBallToPlayer(scene, ballSprite, rebounderSprite, {
+      debugInfo: { rebounderId, reason: 'putback_attempt' }
+    });
+    
+    // 🔍 DEBUG: Log attachment result
+    console.log('🔍 [PUTBACK DEBUG] Ball attachment result', {
+      rebounderId,
+      attachResult,
+      shotInProgressAfterAttach: scene._shotInProgress
+    });
+    
+    // CRITICAL: Set _shotInProgress flag AFTER attaching ball
     // This prevents other systems from attaching the ball during the shot
     scene._shotInProgress = true;
     
-    // CRITICAL: Attach ball to rebounder BEFORE calling shootBall
-    // This ensures the ball is at the rebounder's position and not attached to a defender
-    const { attachBallToPlayer } = await import('./BallControllerAdapter.js');
-    attachBallToPlayer(scene, ballSprite, rebounderSprite, {
-      debugInfo: { rebounderId, reason: 'putback_attempt' }
+    // 🔍 DEBUG: Log after setting flag
+    console.log('🔍 [PUTBACK DEBUG] Set _shotInProgress flag', {
+      rebounderId,
+      shotInProgress: scene._shotInProgress
     });
     
     // Get rebounder's current position for shot start
