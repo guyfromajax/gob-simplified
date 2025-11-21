@@ -1789,34 +1789,12 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
               for (const evt of turnData.events) {
                 if (scene.skipToEnd) break;
                 if (evt.event_type === "PUTBACK_ATTEMPT") {
-                  const shooterId = evt.shooterId;
-                  const rebounderSprite = playerSprites[shooterId];
-                  if (!rebounderSprite) continue;
-                  attachBallToPlayer(scene, ballSprite, rebounderSprite, {
-                    debugInfo: { shooterId, reboundSpot: evt.rebound?.ballSpot || null }
-                  });
-                  const rimCoords =
-                    rebounderSprite.team === "home" ? HOME_RIM_COORDS : AWAY_RIM_COORDS;
-                  const width = scene.game.config.width;
-                  const height = scene.game.config.height;
-                  const fromCoords = {
-                    x: (rebounderSprite.x / width) * 100,
-                    y: 50 - (rebounderSprite.y / height) * 50
-                  };
-                  const shooterTeamId = rebounderSprite.team_id ?? rebounderSprite.teamId ?? null;
-                  const putbackResult = await shootBall({
-                    scene,
-                    ballSprite,
-                    fromCoords,
-                    startTimestamp: evt.timeElapsed ?? 0,
-                    result: evt.result || "MISS",
-                    shooterPos: scene.playerInfo?.[shooterId]?.pos ?? null,
-                    shooterId,
-                    shooterTeamId,
-                    homeTeamId,
-                    stepIndex: 0,
-                    turnIndex: scene.currentTurn
-                  });
+                  // SKIP: Putback attempts are handled by handleOrebTurn() in animateGameTurns.js
+                  // This event processing happens during step-by-step animation, but putbacks
+                  // should be handled as a separate turn type, not as an event in the animation sequence.
+                  // Attaching the ball here causes it to briefly attach before the shot animation.
+                  // The handleOrebTurn function already properly handles ball attachment and shot animation.
+                  continue;
                   if (evt.result === "MISS" && evt.rebound) {
                     const reboundData = evt.rebound;
                     const rebounderId =

@@ -233,6 +233,11 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
     // Track tween creation for debugging long pauses
     const tweenId = `tween_${sprite?.playerId}_${Date.now()}`;
     
+    // Check if this is the first step of HCO and the action is a pass
+    // For HCO entry, we want to delay the pass until the ball handler reaches their destination
+    const isFirstStepHCO = step.timestamp === 0 && step.action === 'pass';
+    const shouldDelayPass = isFirstStepHCO;
+    
     const tweenConfig = {
       targets: validTargets,
       x: targetX,
@@ -250,7 +255,8 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
             team
           });
         }
-        if (step.action && onAction) {
+        // For first step HCO passes, delay the pass action until player reaches destination
+        if (step.action && onAction && !shouldDelayPass) {
           if (PASS_DEBUG && step.action === 'pass') {
             console.log('passStart', { fromId: sprite?.playerId, timestamp: step.timestamp });
           }
@@ -291,6 +297,18 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
         }
         tweenCompleted = true;
         clearTimeout(timeoutId);
+        
+        // ✅ FIX: For first step HCO passes, trigger the pass action after player reaches destination
+        if (shouldDelayPass && step.action && onAction) {
+          if (PASS_DEBUG && step.action === 'pass') {
+            console.log('passStart (delayed for HCO entry)', { fromId: sprite?.playerId, timestamp: step.timestamp });
+          }
+          try {
+            await onAction(step.action, sprite, step.timestamp);
+          } catch (error) {
+            console.error('animateStep: Error in delayed onAction for first step pass', { error, playerId: sprite?.playerId });
+          }
+        }
         
         // ✅ FIX: Set ball holder state after receive action completes
         // Don't set it during receive (conflicts with pass cleanup), but set it after receive completes
