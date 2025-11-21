@@ -219,7 +219,7 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
     if (distance < 1) {
       // Sprite is already at target, resolve immediately
       // Call onAction if needed (fire and forget for zero-distance moves)
-      const currentAction = nextStep ? nextStep.action : step.action;
+      // currentAction already declared above
       if (currentAction && onAction) {
         try {
           onAction(currentAction, sprite, nextStep?.timestamp || step.timestamp);
@@ -363,7 +363,7 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
         // ✅ FIX: Set ball holder state after receive action completes
         // Don't set it during receive (conflicts with pass cleanup), but set it after receive completes
         // This ensures receiver's subsequent movements will include ball in targets
-        const currentAction = nextStep ? nextStep.action : step.action;
+        // currentAction already declared above in onComplete
         if (currentAction === 'receive' && sprite.playerId) {
           // Always set ball holder state after receive completes (ball is now with receiver)
           // The pass might still be completing, but the ball is attached to receiver now
