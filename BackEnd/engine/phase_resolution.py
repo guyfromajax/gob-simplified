@@ -76,6 +76,9 @@ def check_and_handle_foul_out(foul_player, game_state, foul_team):
         for pos, player in list(foul_team.lineup.items()):
             if player and hasattr(player, "player_id") and player.player_id == foul_player.player_id:
                 foul_team.lineup[pos] = None
+                # Immediately replace the fouled-out player to ensure lineup is always complete
+                from BackEnd.main import _ensure_complete_lineup
+                _ensure_complete_lineup(foul_team, game_state)
                 break
     
     return {
