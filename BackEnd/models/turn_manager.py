@@ -1473,8 +1473,7 @@ class TurnManager:
                                 min_dist = dist
                                 defender_pos = def_pos
                 
-                if defender_pos:
-                else:
+                if not defender_pos:
                     # Final fallback: random defender
                     defender_pos = random.choice(list(def_lineup))
         else:
