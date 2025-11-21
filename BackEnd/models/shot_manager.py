@@ -237,8 +237,7 @@ class ShotManager:
         offense_reb_value = off_team.strategy_settings.get("rebounding", 2)  # Crash boards vs get back
         defense_tempo_value = def_team.strategy_settings.get("tempo", 2)  # Stay vs release for FB
         
-        # Import for debug logging
-        import logging
+        # Import for debug logging (logging already imported at top of file)
         from BackEnd.utils.shared import get_name_safe
         shooter_name = get_name_safe(shooter)
         
