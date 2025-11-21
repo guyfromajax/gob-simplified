@@ -126,9 +126,50 @@ class ShotManager:
         defender = roles.get("defender", "")
         second_defender = roles.get("second_defender")  # Second defender if shooter has two defenders in zone
         
-        # Add second_defender_id to result for frontend announcement
-        if second_defender:
-            result["second_defender_id"] = getattr(second_defender, "player_id", None)
+        # Check actual defender assignments at the shot step (not just zone boundaries at turn start)
+        # Find the shot step (last step where shooter has "shoot" action)
+        steps = roles.get("steps", [])
+        shooter_id = getattr(shooter, "player_id", None)
+        shot_step_index = None
+        
+        if steps and shooter_id:
+            # Find the last step with a shot action
+            for step_idx in range(len(steps) - 1, -1, -1):
+                step = steps[step_idx]
+                pos_actions = step.get("pos_actions", {})
+                shooter_pos = get_player_position(off_lineup, shooter)
+                if shooter_pos:
+                    shooter_action = pos_actions.get(shooter_pos, {})
+                    if shooter_action.get("action") == "shoot":
+                        shot_step_index = step_idx
+                        break
+        
+        # Check if shooter has two defenders at the actual shot step
+        has_double_team_at_shot = False
+        second_defender_id_at_shot = None
+        
+        if shot_step_index is not None and hasattr(self.game, 'zone_defender_assignments_by_step'):
+            assignments_by_step = getattr(self.game, 'zone_defender_assignments_by_step', {})
+            shot_step_assignments = assignments_by_step.get(shot_step_index, {})
+            
+            # Count how many defenders are assigned to the shooter at the shot step
+            defenders_on_shooter = [
+                def_pos for def_pos, guarded_player_id in shot_step_assignments.items()
+                if guarded_player_id == shooter_id
+            ]
+            
+            if len(defenders_on_shooter) >= 2:
+                has_double_team_at_shot = True
+                # Get the second defender's player_id
+                if len(defenders_on_shooter) >= 2:
+                    second_def_pos = defenders_on_shooter[1]
+                    second_defender_obj = def_lineup.get(second_def_pos)
+                    if second_defender_obj:
+                        second_defender_id_at_shot = getattr(second_defender_obj, "player_id", None)
+        
+        # Add second_defender_id to result for frontend announcement (only if actually double-teamed at shot step)
+        if has_double_team_at_shot and second_defender_id_at_shot:
+            result["second_defender_id"] = second_defender_id_at_shot
             result["has_double_team"] = True
 
         # Debug: Print shooter information with object ID
