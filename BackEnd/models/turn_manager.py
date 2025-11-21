@@ -1408,7 +1408,7 @@ class TurnManager:
         second_defender_pos = None  # Initialize second defender position
         if is_zone_defense(game_state.get("defense_playcall", "Man")):
             # For zone defense: find defender whose zone contains the shooter
-            from BackEnd.utils.shared_defense import _get_23_zone_boundaries, _get_32_zone_boundaries, _point_in_zone
+            from BackEnd.utils.shared_defense import _get_23_zone_boundaries, _get_32_zone_boundaries, _get_131_zone_boundaries, _point_in_zone
             from BackEnd.constants import HCO_STRING_SPOTS
             from BackEnd.utils.shared import get_away_player_coords
             
@@ -1447,6 +1447,8 @@ class TurnManager:
             defense_playcall = game_state.get("defense_playcall", "Man")
             if defense_playcall == "3-2 Zone":
                 zone_boundaries = _get_32_zone_boundaries(ball_spot, is_away_offense)
+            elif defense_playcall == "1-3-1 Zone":
+                zone_boundaries = _get_131_zone_boundaries(ball_spot, is_away_offense)
             else:
                 zone_boundaries = _get_23_zone_boundaries(ball_spot, is_away_offense)
             

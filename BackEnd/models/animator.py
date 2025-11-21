@@ -1173,6 +1173,8 @@ class Animator:
         """
         from BackEnd.utils.shared_defense import (
             _get_23_zone_boundaries,
+            _get_32_zone_boundaries,
+            _get_131_zone_boundaries,
             assign_all_zone_defenders,
             _point_in_zone
         )
@@ -1217,7 +1219,13 @@ class Animator:
         # ✅ Zone boundaries should be in SAME orientation as offensive coords
         # When away team has ball, offensive coords are in away orientation (flipped)
         # So zone boundaries should also be in away orientation (flipped) to match
-        zone_boundaries = _get_23_zone_boundaries(ball_spot, is_away_offense)
+        defense_playcall = self.game.game_state.get("defense_playcall", "Man")
+        if defense_playcall == "3-2 Zone":
+            zone_boundaries = _get_32_zone_boundaries(ball_spot, is_away_offense)
+        elif defense_playcall == "1-3-1 Zone":
+            zone_boundaries = _get_131_zone_boundaries(ball_spot, is_away_offense)
+        else:
+            zone_boundaries = _get_23_zone_boundaries(ball_spot, is_away_offense)
         
         # Create defensive animations for each position
         for def_pos in ['PG', 'SG', 'SF', 'PF', 'C']:
@@ -1270,7 +1278,13 @@ class Animator:
                 
                 # Update zone boundaries if ball spot changed (shift logic)
                 # ✅ Zone boundaries should be in SAME orientation as offensive coords
-                zone_boundaries = _get_23_zone_boundaries(current_ball_spot, is_away_offense)
+                defense_playcall = self.game.game_state.get("defense_playcall", "Man")
+                if defense_playcall == "3-2 Zone":
+                    zone_boundaries = _get_32_zone_boundaries(current_ball_spot, is_away_offense)
+                elif defense_playcall == "1-3-1 Zone":
+                    zone_boundaries = _get_131_zone_boundaries(current_ball_spot, is_away_offense)
+                else:
+                    zone_boundaries = _get_23_zone_boundaries(current_ball_spot, is_away_offense)
                 
                 # Build list of offensive players with their coords and ball handler status
                 offensive_players = []
