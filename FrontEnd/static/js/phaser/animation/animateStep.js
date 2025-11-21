@@ -32,7 +32,7 @@ import {
 
 export const PLAYER_TWEEN_DEBUG = false;
 
-export function animateStep({ scene, sprite, step, duration, ballSprite, currentBallOwnerRef, onAction }) {
+export function animateStep({ scene, sprite, step, duration, ballSprite, currentBallOwnerRef, onAction, stepIndex = null, nextStep = null }) {
   if (scene.skipToEnd) return Promise.resolve();
   return new Promise((resolve) => {
     let tween = null;
@@ -91,9 +91,11 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
       tweenCompleted = true;
       resolve();
     }, timeoutMs);
+    // Use nextStep.coords if available (for movement target), otherwise step.coords
+    const targetStep = nextStep || step;
     const { x: targetX, y: targetY } = gridToPixels(
-      step.coords.x,
-      step.coords.y,
+      targetStep.coords.x,
+      targetStep.coords.y,
       scene.game.config.width,
       scene.game.config.height
     );
@@ -143,15 +145,16 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
     // ✅ PROACTIVE STATE MANAGEMENT: Clear ball holder state when pass action detected
     // This ensures state is correct before creating tween (prevents ball from being in passer's tween)
     // This matches WIP_GOB: ball holder state is updated before tween targets are calculated
-    const isPassing = step.action === 'pass' || scene.passInFlight;
-    if (step.action === 'pass') {
+    const currentAction = nextStep ? nextStep.action : step.action;
+    const isPassing = currentAction === 'pass' || scene.passInFlight;
+    if (currentAction === 'pass') {
       clearBallHolder(scene);
     }
     
     // ✅ PROACTIVE STATE MANAGEMENT: Clear ball holder state for receive actions
     // Ball is being attached by runPass(), so we shouldn't include it in receiver's tween
     // We'll set ball holder state after receive action completes
-    const isReceiving = step.action === 'receive';
+    const isReceiving = currentAction === 'receive';
     if (isReceiving) {
       clearBallHolder(scene);  // Clear state so ball isn't included in receiver's tween
     }
@@ -216,9 +219,10 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
     if (distance < 1) {
       // Sprite is already at target, resolve immediately
       // Call onAction if needed (fire and forget for zero-distance moves)
-      if (step.action && onAction) {
+      const currentAction = nextStep ? nextStep.action : step.action;
+      if (currentAction && onAction) {
         try {
-          onAction(step.action, sprite, step.timestamp);
+          onAction(currentAction, sprite, nextStep?.timestamp || step.timestamp);
         } catch (error) {
           console.error('animateStep: Error in onAction for zero-distance step', { error, playerId: sprite?.playerId });
         }
@@ -235,15 +239,19 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
     
     // Check if this is the first step of HCO and the action is a pass
     // For HCO entry, we want to delay the pass until the ball handler reaches their destination
-    const isFirstStepHCO = step.timestamp === 0 && step.action === 'pass';
+    // stepIndex === 1 means it's the first step in the animation loop (loop starts at 1)
+    // nextStep.action === 'pass' means the current step's action is a pass
+    const isFirstStepHCO = stepIndex === 1 && nextStep && nextStep.action === 'pass';
     const shouldDelayPass = isFirstStepHCO;
     
     // 🔍 DEBUG: Log pass timing for HCO entry
-    if (step.action === 'pass') {
+    if (nextStep && nextStep.action === 'pass') {
       console.log('🔍 [PASS TIMING DEBUG]', {
         playerId: sprite?.playerId,
-        action: step.action,
-        timestamp: step.timestamp,
+        action: nextStep.action,
+        stepIndex,
+        stepTimestamp: step.timestamp,
+        nextStepTimestamp: nextStep.timestamp,
         isFirstStepHCO,
         shouldDelayPass,
         currentPos: { x: sprite.x, y: sprite.y },
@@ -271,25 +279,29 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
           });
         }
         // For first step HCO passes, delay the pass action until player reaches destination
-        if (step.action && onAction && !shouldDelayPass) {
-          if (PASS_DEBUG && step.action === 'pass') {
-            console.log('passStart', { fromId: sprite?.playerId, timestamp: step.timestamp });
+        // Use nextStep.action since that's the action for the current step being animated
+        const currentAction = nextStep ? nextStep.action : step.action;
+        if (currentAction && onAction && !shouldDelayPass) {
+          if (PASS_DEBUG && currentAction === 'pass') {
+            console.log('passStart', { fromId: sprite?.playerId, timestamp: nextStep?.timestamp || step.timestamp });
           }
           // 🔍 DEBUG: Log when pass is triggered in onStart
-          if (step.action === 'pass') {
+          if (currentAction === 'pass') {
             console.log('🔍 [PASS TIMING DEBUG] Pass triggered in onStart (not delayed)', {
               playerId: sprite?.playerId,
-              timestamp: step.timestamp,
+              timestamp: nextStep?.timestamp || step.timestamp,
+              stepIndex,
               shouldDelayPass
             });
           }
-          startPromise = onAction(step.action, sprite, step.timestamp);
+          startPromise = onAction(currentAction, sprite, nextStep?.timestamp || step.timestamp);
           await startPromise;
-        } else if (step.action === 'pass' && shouldDelayPass) {
+        } else if (currentAction === 'pass' && shouldDelayPass) {
           // 🔍 DEBUG: Log when pass is being delayed
           console.log('🔍 [PASS TIMING DEBUG] Pass delayed - will trigger in onComplete', {
             playerId: sprite?.playerId,
-            timestamp: step.timestamp
+            timestamp: nextStep?.timestamp || step.timestamp,
+            stepIndex
           });
         }
       },
@@ -328,19 +340,21 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
         clearTimeout(timeoutId);
         
         // ✅ FIX: For first step HCO passes, trigger the pass action after player reaches destination
-        if (shouldDelayPass && step.action && onAction) {
+        const currentAction = nextStep ? nextStep.action : step.action;
+        if (shouldDelayPass && currentAction && onAction) {
           // 🔍 DEBUG: Log when delayed pass is triggered
           console.log('🔍 [PASS TIMING DEBUG] Delayed pass triggered in onComplete', {
             playerId: sprite?.playerId,
-            timestamp: step.timestamp,
+            timestamp: nextStep?.timestamp || step.timestamp,
+            stepIndex,
             finalPos: { x: sprite.x, y: sprite.y },
             targetPos: { x: targetX, y: targetY }
           });
-          if (PASS_DEBUG && step.action === 'pass') {
-            console.log('passStart (delayed for HCO entry)', { fromId: sprite?.playerId, timestamp: step.timestamp });
+          if (PASS_DEBUG && currentAction === 'pass') {
+            console.log('passStart (delayed for HCO entry)', { fromId: sprite?.playerId, timestamp: nextStep?.timestamp || step.timestamp });
           }
           try {
-            await onAction(step.action, sprite, step.timestamp);
+            await onAction(currentAction, sprite, nextStep?.timestamp || step.timestamp);
           } catch (error) {
             console.error('animateStep: Error in delayed onAction for first step pass', { error, playerId: sprite?.playerId });
           }
@@ -349,7 +363,8 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
         // ✅ FIX: Set ball holder state after receive action completes
         // Don't set it during receive (conflicts with pass cleanup), but set it after receive completes
         // This ensures receiver's subsequent movements will include ball in targets
-        if (step.action === 'receive' && sprite.playerId) {
+        const currentAction = nextStep ? nextStep.action : step.action;
+        if (currentAction === 'receive' && sprite.playerId) {
           // Always set ball holder state after receive completes (ball is now with receiver)
           // The pass might still be completing, but the ball is attached to receiver now
           // Setting it here ensures receiver's subsequent movements will include ball in targets
