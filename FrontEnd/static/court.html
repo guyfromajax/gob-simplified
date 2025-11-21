@@ -3074,13 +3074,14 @@
         headshotEl.style.display = 'none';
       }
 
-      // Defense type (Man or Zone)
+      // Defense type (Man, 2-3 Zone, 3-2 Zone, etc.)
       const defenseType = data.defense.type || 'MAN';
+      const defenseTypeLower = defenseType.toLowerCase();
+      // Check if it's a zone defense and format accordingly
+      const isZone = defenseTypeLower.includes('zone');
       defenseEl.textContent = defenseType.toUpperCase();
-      defenseEl.style.color = {
-        'man': '#D0D0D0',
-        'zone': '#BB86FC'
-      }[defenseType.toLowerCase()] || '#999';
+      // Color: Man = gray, any Zone = purple
+      defenseEl.style.color = isZone ? '#BB86FC' : (defenseTypeLower === 'man' ? '#D0D0D0' : '#999');
 
       // Offense (Type → Focus)
       const offenseType = data.offense.type || 'MOTION';

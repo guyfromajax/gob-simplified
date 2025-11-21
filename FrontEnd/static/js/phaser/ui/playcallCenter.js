@@ -35,10 +35,16 @@ export function updatePlaycallCenter(turnData, homeTeamId) {
     offenseStatusText.textContent = `${type} → ${focus}`;
   }
   
-  if (defenseStatusText && turnData.defensive_play_type) {
-    const defType = turnData.defensive_play_type.charAt(0).toUpperCase() + turnData.defensive_play_type.slice(1);
-    const aggr = turnData.aggression || 'Normal';
-    defenseStatusText.textContent = `${defType} ${aggr}`;
+  if (defenseStatusText) {
+    // Use defensive_playcall if available (contains full name like "2-3 Zone" or "3-2 Zone")
+    // Otherwise fall back to defensive_play_type (just "Man" or "Zone")
+    const defPlaycall = turnData.defensive_playcall || turnData.defense_playcall;
+    const defType = defPlaycall || turnData.defensive_play_type;
+    if (defType) {
+      const formattedDefType = defType.charAt(0).toUpperCase() + defType.slice(1);
+      const aggr = turnData.aggression || 'Normal';
+      defenseStatusText.textContent = `${formattedDefType} ${aggr}`;
+    }
   }
 
   // Reset lean meter to neutral
@@ -48,7 +54,10 @@ export function updatePlaycallCenter(turnData, homeTeamId) {
   // Show transient HUD overlay with playcall info
   const playType = turnData.offensive_play_type;
   const playFocus = turnData.offensive_play_focus;
-  const defenseType = turnData.defensive_play_type;
+  // Use defensive_playcall if available (contains full name like "2-3 Zone" or "3-2 Zone")
+  // Otherwise fall back to defensive_play_type (just "Man" or "Zone")
+  const defensePlaycall = turnData.defensive_playcall || turnData.defense_playcall;
+  const defenseType = defensePlaycall || turnData.defensive_play_type;
   const aggression = turnData.aggression || 'normal';
   
   if (typeof window.showPlaycallReveal === 'function' && playType && playFocus && defenseType) {
