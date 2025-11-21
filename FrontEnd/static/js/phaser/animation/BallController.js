@@ -77,6 +77,19 @@ export class BallController {
     // Don't attach during shot animations (unless this is a putback attempt)
     // Putback attempts need to attach the ball before the shot animation starts
     const isPutbackAttempt = options?.debugInfo?.reason === 'putback_attempt';
+    
+    // CRITICAL: Don't attach during putback shot animations
+    // The putback shot animation is still running, and attaching the ball here causes a flash
+    if (this.scene._putbackInProgress && !isPutbackAttempt) {
+      if (this.debug) {
+        console.log('BallController: Cannot attach - putback in progress', {
+          putbackInProgress: this.scene._putbackInProgress,
+          isPutbackAttempt
+        });
+      }
+      return false;
+    }
+    
     if (this.scene._shotInProgress && !isPutbackAttempt) {
       if (this.debug) {
         console.log('BallController: Cannot attach - shot in progress');
