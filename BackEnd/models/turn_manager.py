@@ -607,9 +607,9 @@ class TurnManager:
                 defense_setting = self.game.defense_team.strategy_settings["defense"]
                 chosen_defense = random.choice(STRATEGY_CALL_DICTS["defense"][defense_setting])
                 
-                # If "Zone" is selected, randomly choose between 2-3 Zone and 3-2 Zone (50/50)
+                # If "Zone" is selected, randomly choose between 2-3 Zone, 3-2 Zone, and 1-3-1 Zone (1/3 each)
                 if chosen_defense == "Zone":
-                    chosen_defense = random.choice(["2-3 Zone", "3-2 Zone"])
+                    chosen_defense = random.choice(["2-3 Zone", "3-2 Zone", "1-3-1 Zone"])
             
             # Return early with user's choices
             return {
@@ -742,9 +742,9 @@ class TurnManager:
             defense_setting = self.game.defense_team.strategy_settings["defense"]
             chosen_defense = random.choice(STRATEGY_CALL_DICTS["defense"][defense_setting])
             
-            # If "Zone" is selected, randomly choose between 2-3 Zone and 3-2 Zone (50/50)
+            # If "Zone" is selected, randomly choose between 2-3 Zone, 3-2 Zone, and 1-3-1 Zone (1/3 each)
             if chosen_defense == "Zone":
-                chosen_defense = random.choice(["2-3 Zone", "3-2 Zone"])
+                chosen_defense = random.choice(["2-3 Zone", "3-2 Zone", "1-3-1 Zone"])
         
         # Legacy trackers removed from incrementing to avoid serving old structure
 
