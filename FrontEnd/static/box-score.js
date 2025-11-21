@@ -754,8 +754,26 @@ function createDefensePlaycallSubsection(title, defenseData) {
   const used = stats.used || 0;
   const success = stats.success || 0;
   const pct = used > 0 ? ((success / used) * 100).toFixed(0) : '0';
-
-  subsection.innerHTML = `<h4>${title}: ${success} / ${used} (${pct}%)</h4>`;
+  
+  // Calculate average EV and Exec (lean_score)
+  const evScores = stats.ev_scores || [];
+  const leanScores = stats.lean_scores || [];
+  const avgEV = evScores.length > 0 
+    ? (evScores.reduce((a, b) => a + b, 0) / evScores.length).toFixed(0)
+    : '0';
+  const avgExec = leanScores.length > 0
+    ? (leanScores.reduce((a, b) => a + b, 0) / leanScores.length * 100).toFixed(0)
+    : '0';
+  
+  const evSign = parseFloat(avgEV) >= 0 ? '+' : '';
+  const execSign = parseFloat(avgExec) >= 0 ? '+' : '';
+  
+  const headerText = `${title}: ${success} / ${used} (${pct}%)`;
+  const avgText = evScores.length > 0 || leanScores.length > 0
+    ? ` (Avg EV: ${evSign}${avgEV}%) (Avg Exec: ${execSign}${avgExec}%)`
+    : '';
+  
+  subsection.innerHTML = `<h4>${headerText}${avgText}</h4>`;
 
   // vs Motion
   const vsMotion = stats.vs_motion || {};
@@ -764,7 +782,25 @@ function createDefensePlaycallSubsection(title, defenseData) {
   // Safety check: success can't exceed attempts
   const safeVsMotionSuc = Math.min(vsMotionSuc, vsMotionAtt);
   const vsMotionPct = vsMotionAtt > 0 ? ((safeVsMotionSuc / vsMotionAtt) * 100).toFixed(0) : '0';
-  subsection.appendChild(createScoutingItem('vs Motion', `${safeVsMotionSuc} / ${vsMotionAtt}`, `${vsMotionPct}%`));
+  
+  // Calculate average EV and Exec for vs Motion
+  const vsMotionEvScores = vsMotion.ev_scores || [];
+  const vsMotionLeanScores = vsMotion.lean_scores || [];
+  const vsMotionAvgEV = vsMotionEvScores.length > 0
+    ? (vsMotionEvScores.reduce((a, b) => a + b, 0) / vsMotionEvScores.length).toFixed(0)
+    : null;
+  const vsMotionAvgExec = vsMotionLeanScores.length > 0
+    ? (vsMotionLeanScores.reduce((a, b) => a + b, 0) / vsMotionLeanScores.length * 100).toFixed(0)
+    : null;
+  
+  const vsMotionEvSign = vsMotionAvgEV !== null && parseFloat(vsMotionAvgEV) >= 0 ? '+' : '';
+  const vsMotionExecSign = vsMotionAvgExec !== null && parseFloat(vsMotionAvgExec) >= 0 ? '+' : '';
+  const vsMotionAvgText = vsMotionAvgEV !== null || vsMotionAvgExec !== null
+    ? ` (Avg EV: ${vsMotionEvSign}${vsMotionAvgEV || '0'}%) (Avg Exec: ${vsMotionExecSign}${vsMotionAvgExec || '0'}%)`
+    : '';
+  
+  const vsMotionDisplayPct = vsMotionAvgText ? `${vsMotionPct}%${vsMotionAvgText}` : `${vsMotionPct}%`;
+  subsection.appendChild(createScoutingItem('vs Motion', `${safeVsMotionSuc} / ${vsMotionAtt}`, vsMotionDisplayPct));
 
   // vs Set Play
   const vsSet = stats.vs_set || {};
@@ -773,7 +809,25 @@ function createDefensePlaycallSubsection(title, defenseData) {
   // Safety check: success can't exceed attempts
   const safeVsSetSuc = Math.min(vsSetSuc, vsSetAtt);
   const vsSetPct = vsSetAtt > 0 ? ((safeVsSetSuc / vsSetAtt) * 100).toFixed(0) : '0';
-  subsection.appendChild(createScoutingItem('vs Set Play', `${safeVsSetSuc} / ${vsSetAtt}`, `${vsSetPct}%`));
+  
+  // Calculate average EV and Exec for vs Set Play
+  const vsSetEvScores = vsSet.ev_scores || [];
+  const vsSetLeanScores = vsSet.lean_scores || [];
+  const vsSetAvgEV = vsSetEvScores.length > 0
+    ? (vsSetEvScores.reduce((a, b) => a + b, 0) / vsSetEvScores.length).toFixed(0)
+    : null;
+  const vsSetAvgExec = vsSetLeanScores.length > 0
+    ? (vsSetLeanScores.reduce((a, b) => a + b, 0) / vsSetLeanScores.length * 100).toFixed(0)
+    : null;
+  
+  const vsSetEvSign = vsSetAvgEV !== null && parseFloat(vsSetAvgEV) >= 0 ? '+' : '';
+  const vsSetExecSign = vsSetAvgExec !== null && parseFloat(vsSetAvgExec) >= 0 ? '+' : '';
+  const vsSetAvgText = vsSetAvgEV !== null || vsSetAvgExec !== null
+    ? ` (Avg EV: ${vsSetEvSign}${vsSetAvgEV || '0'}%) (Avg Exec: ${vsSetExecSign}${vsSetAvgExec || '0'}%)`
+    : '';
+  
+  const vsSetDisplayPct = vsSetAvgText ? `${vsSetPct}%${vsSetAvgText}` : `${vsSetPct}%`;
+  subsection.appendChild(createScoutingItem('vs Set Play', `${safeVsSetSuc} / ${vsSetAtt}`, vsSetDisplayPct));
 
   // vs Inside
   const vsInside = stats.vs_inside || {};
