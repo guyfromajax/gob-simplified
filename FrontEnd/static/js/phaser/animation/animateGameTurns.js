@@ -149,8 +149,9 @@ async function handleOrebTurn(scene, { playerSprites, ballSprite, turnData, onUp
       turnData: turnData
     });
     
-    // Clear putback flag after shot animation starts
-    scene._putbackInProgress = false;
+    // CRITICAL: Keep _putbackInProgress true until AFTER the rebound animation
+    // This prevents runDefensiveReboundSetup from attaching the ball during the putback shot animation
+    // We'll clear it right before calling runDefensiveReboundSetup (if DREB) or after animateRebound (if OREB)
     
     // Handle putback make - run inbound setup
     if (turnData.result_type === "PUTBACK_MAKE") {
@@ -222,6 +223,10 @@ async function handleOrebTurn(scene, { playerSprites, ballSprite, turnData, onUp
           // Otherwise, check current turn (might be a MISS with putback)
           missTurn = scene.simData?.turns?.[currentIndex];
         }
+        
+        // CRITICAL: Clear _putbackInProgress BEFORE calling runDefensiveReboundSetup
+        // The putback shot animation is complete, so it's safe to allow ball attachments
+        scene._putbackInProgress = false;
         
         const { runDefensiveReboundSetup } = await import('./turnAnimation.js');
         await runDefensiveReboundSetup({

@@ -421,7 +421,17 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
   if (!rebounderSprite) return;
 
   scene.possessionFlipInProgress = true;
-  if (ballSprite) attachBallToPlayer(scene, ballSprite, rebounderSprite);
+  
+  // CRITICAL: Don't attach ball if a putback is in progress
+  // The putback shot animation is still running, and attaching the ball here
+  // causes a flash before the shot animation completes
+  if (!scene._putbackInProgress && ballSprite) {
+    attachBallToPlayer(scene, ballSprite, rebounderSprite);
+  } else if (scene._putbackInProgress) {
+    console.log('🔍 [PUTBACK DEBUG] runDefensiveReboundSetup: Skipping ball attachment - putback in progress', {
+      rebounderId
+    });
+  }
 
   if (scene.stateMachine?.is(States.Rebound)) {
     if (DebugFlags?.FSM) animationDebugLog('FSM: Rebound -> OutletSetup');
