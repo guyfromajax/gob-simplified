@@ -2732,9 +2732,11 @@
         setCell('zone_23_attempts', zone23Att);
         setCell('zone_23_rate', rate(zone23Suc, zone23Att));
         
-        // 3-2 Zone (hardcoded 0s for now)
-        setCell('zone_32_attempts', 0);
-        setCell('zone_32_rate', '0%');
+        // 3-2 Zone
+        const zone32Att = zone32.used || 0;
+        const zone32Suc = zone32.success || 0;
+        setCell('zone_32_attempts', zone32Att);
+        setCell('zone_32_rate', rate(zone32Suc, zone32Att));
         
         // 1-3-1 Zone (hardcoded 0s for now)
         setCell('zone_131_attempts', 0);
