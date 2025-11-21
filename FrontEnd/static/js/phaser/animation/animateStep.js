@@ -241,7 +241,8 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
     // For HCO entry, we want to delay the pass until the ball handler reaches their destination
     // stepIndex === 1 means it's the first step in the animation loop (loop starts at 1)
     // nextStep.action === 'pass' means the current step's action is a pass
-    const isFirstStepHCO = stepIndex === 1 && nextStep && nextStep.action === 'pass';
+    // Also check if timestamp is 0 (first step) to catch edge cases like post-opening-tip
+    const isFirstStepHCO = (stepIndex === 1 || (nextStep && nextStep.timestamp === 0)) && nextStep && nextStep.action === 'pass';
     const shouldDelayPass = isFirstStepHCO;
     
     // 🔍 DEBUG: Log pass timing for HCO entry
