@@ -450,11 +450,15 @@ class ShotManager:
                 o_scores = {}
                 for pos in offense_rebounders:
                     player = off_team.lineup[pos]
+                    if player is None:
+                        raise ValueError(f"Offensive player at position {pos} is None in lineup: {off_team.lineup}")
                     o_scores[pos] = calculate_rebound_score(player)
                 
                 d_scores = {}
                 for pos in defense_rebounders:
                     player = def_team.lineup[pos]
+                    if player is None:
+                        raise ValueError(f"Defensive player at position {pos} is None in lineup: {def_team.lineup}")
                     d_scores[pos] = calculate_rebound_score(player)
                 
                 # Handle edge cases (all players released/got back)
@@ -479,6 +483,11 @@ class ShotManager:
                     
                     o_rebounder = off_team.lineup[o_best_pos]
                     d_rebounder = def_team.lineup[d_best_pos]
+                    
+                    if o_rebounder is None:
+                        raise ValueError(f"Offensive rebounder at position {o_best_pos} is None")
+                    if d_rebounder is None:
+                        raise ValueError(f"Defensive rebounder at position {d_best_pos} is None")
                     
                     o_rebounder_score = o_scores[o_best_pos]
                     d_rebounder_score = d_scores[d_best_pos]
