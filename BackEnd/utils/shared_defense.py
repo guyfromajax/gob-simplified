@@ -342,6 +342,34 @@ ZONE_23_UPPER_SHIFT = {
     "C": ["upper lowPost", "lower lowPost", "lower midPost", "midLane", "upper midPost"],
 }
 
+# 3-2 Zone Defense: Zone definitions (using spot names from HCO_STRING_SPOTS)
+# Each zone is defined by border points that form a polygon
+ZONE_32_NORMAL = {
+    "PG": ["key", "upper midWing", "upper highPost", "midLane", "lower highPost", "lower midWing"],
+    "SG": ["upper wing", "upper midWing", "upper highPost", "upper midPost", "upper bird", "upper midCorner"],
+    "SF": ["lower wing", "lower midWing", "lower highPost", "lower midPost", "lower bird", "lower midCorner"],
+    "PF": ["basketSpot", "midLane", "upper midPost", "upper bird", "upper midCorner", "upper corner", "upper midBaseline", "upper lowPost"],
+    "C": ["basketSpot", "midLane", "lower midPost", "lower bird", "lower midCorner", "lower corner", "lower midBaseline", "lower lowPost"],
+}
+
+# Lower corner shift (ball on lower corner)
+ZONE_32_LOWER_SHIFT = {
+    "PG": ["key", "upper midWing", "upper highPost", "midLane", "lower highPost", "lower midWing"],
+    "SG": ["upper wing", "upper midWing", "upper highPost", "upper midPost", "upper bird", "upper midCorner"],
+    "SF": ["lower wing", "lower midWing", "lower highPost", "lower midPost", "lower bird", "lower midCorner"],
+    "PF": ["basketSpot", "midLane", "upper midPost", "upper bird", "upper midCorner", "upper corner", "upper midBaseline", "upper lowPost", "basketSpot", "midLane", "lower corner"],
+    "C": ["basketSpot", "midLane", "lower midPost", "lower bird", "lower midCorner", "lower corner", "lower midBaseline", "lower lowPost"],
+}
+
+# Upper corner shift (ball on upper corner)
+ZONE_32_UPPER_SHIFT = {
+    "PG": ["key", "upper midWing", "upper highPost", "midLane", "lower highPost", "lower midWing"],
+    "SG": ["upper wing", "upper midWing", "upper highPost", "upper midPost", "upper bird", "upper midCorner"],
+    "SF": ["lower wing", "lower midWing", "lower highPost", "lower midPost", "lower bird", "lower midCorner"],
+    "PF": ["basketSpot", "midLane", "upper midPost", "upper bird", "upper midCorner", "upper corner", "upper midBaseline", "upper lowPost"],
+    "C": ["basketSpot", "midLane", "lower midPost", "lower bird", "lower midCorner", "lower corner", "lower midBaseline", "lower lowPost", "basketSpot", "midLane", "upper corner"],
+}
+
 
 def _get_zone_coords(zone_definition, is_away_offense=False):
     """
@@ -438,6 +466,34 @@ def _get_23_zone_boundaries(ball_spot, is_away_offense=False):
         zone_def = ZONE_23_UPPER_SHIFT
     else:
         zone_def = ZONE_23_NORMAL
+    
+    # Convert spot names to coordinates
+    zone_boundaries = {}
+    for position, spot_list in zone_def.items():
+        zone_boundaries[position] = _get_zone_coords(spot_list, is_away_offense)
+    
+    return zone_boundaries
+
+
+def _get_32_zone_boundaries(ball_spot, is_away_offense=False):
+    """
+    Get zone boundaries for 3-2 zone defense, applying shifts based on ball location.
+    
+    Args:
+        ball_spot: String spot name where ball is located
+        is_away_offense: Whether away team is on offense
+    
+    Returns:
+        Dict mapping position → list of (x, y) coordinate tuples for that zone
+    """
+    # Determine which zone definition to use based on ball location
+    # Shift is triggered only by ball in corner positions (not wing or midCorner)
+    if ball_spot == "lower corner":
+        zone_def = ZONE_32_LOWER_SHIFT
+    elif ball_spot == "upper corner":
+        zone_def = ZONE_32_UPPER_SHIFT
+    else:
+        zone_def = ZONE_32_NORMAL
     
     # Convert spot names to coordinates
     zone_boundaries = {}
