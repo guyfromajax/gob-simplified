@@ -89,6 +89,24 @@ async function handleOrebTurn(scene, { playerSprites, ballSprite, turnData, onUp
       scene._shotInProgress = false;
     }
     
+    // CRITICAL: Detach ball from any current owner BEFORE positioning
+    // The ball might still be attached from the previous rebound animation
+    if (scene.ballController) {
+      if (scene.ballController.isAttached) {
+        console.log('🔍 [PUTBACK DEBUG] Detaching ball from previous owner before putback', {
+          rebounderId,
+          previousOwner: scene.ballController.currentOwner?.playerId
+        });
+        scene.ballController.detachFromPlayer('putback_prep');
+      }
+    }
+    
+    // Also clear old system ball state
+    if (scene.currentBallOwnerRef) {
+      scene.currentBallOwnerRef.value = null;
+    }
+    scene.ballDetached = true;
+    
     // CRITICAL: Position ball at rebounder's location WITHOUT attaching
     // shootBall() will handle detachment and animation, so we just need to position the ball
     // This prevents the brief attachment flash before the shot animation
