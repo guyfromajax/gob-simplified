@@ -124,6 +124,12 @@ class ShotManager:
         passer = roles.get("passer")  # Can be None if no passer found
         screener = roles.get("screener", "")
         defender = roles.get("defender", "")
+        second_defender = roles.get("second_defender")  # Second defender if shooter has two defenders in zone
+        
+        # Add second_defender_id to result for frontend announcement
+        if second_defender:
+            result["second_defender_id"] = getattr(second_defender, "player_id", None)
+            result["has_double_team"] = True
 
         # Debug: Print shooter information with object ID
         # from BackEnd.constants import DEBUG
@@ -165,7 +171,7 @@ class ShotManager:
 
         # ✅ New: returns shot_score, help defender, and foul info
         shot_score, help_defender, d_foul, foul_player = self.calculate_shot_score(
-            shooter, passer, screener, defender, playcall, defense_call, is_three, is_paint
+            shooter, passer, screener, defender, playcall, defense_call, is_three, is_paint, second_defender
         )
 
         made = shot_score >= shot_threshold
@@ -616,7 +622,7 @@ class ShotManager:
         return result
 
     
-    def calculate_shot_score(self, shooter, passer, screener, defender, playcall, defense_call, is_three, is_paint=False):
+    def calculate_shot_score(self, shooter, passer, screener, defender, playcall, defense_call, is_three, is_paint=False, second_defender=None):
         """
         Calculate shot score based on attributes, playcall, defense, gravity, etc.
         Also returns:
@@ -642,6 +648,7 @@ class ShotManager:
             shot_score += dribble_score * 0.2
 
         # Defensive impact - varies by shot type
+        # Calculate defense score for primary defender
         defense_attrs = defender.attributes if defender else {"OD": 0, "ID": 0, "AG": 0, "ST": 0, "IQ": 0, "CH": 0}
         
         if is_paint:
@@ -675,7 +682,50 @@ class ShotManager:
 
         d_foul, foul_player = self.check_defensive_foul_on_shot(defender, defense_score, is_three)
 
-        shot_score -= defense_score * 0.2
+        # Apply primary defender's defense score
+        if second_defender:
+            # Two defenders: apply both with 30% discount (0.2 * 0.7 = 0.14 each)
+            shot_score -= defense_score * 0.14
+            
+            # Calculate defense score for second defender
+            second_defense_attrs = second_defender.attributes if second_defender else {"OD": 0, "ID": 0, "AG": 0, "ST": 0, "IQ": 0, "CH": 0}
+            
+            if is_paint:
+                second_defense_score = (
+                    second_defense_attrs["ID"] * 0.6 +
+                    second_defense_attrs["ST"] * 0.2 +
+                    second_defense_attrs["IQ"] * 0.1 +
+                    second_defense_attrs["CH"] * 0.1
+                ) * random.randint(1, 6)
+            elif is_three:
+                second_defense_score = (
+                    second_defense_attrs["OD"] * 0.8 +
+                    second_defense_attrs["IQ"] * 0.1 +
+                    second_defense_attrs["CH"] * 0.1
+                ) * random.randint(1, 6)
+            else:
+                second_defense_score = (
+                    second_defense_attrs["OD"] * 0.3 +
+                    second_defense_attrs["ID"] * 0.3 +
+                    second_defense_attrs["AG"] * 0.1 +
+                    second_defense_attrs["ST"] * 0.1 +
+                    second_defense_attrs["IQ"] * 0.1 +
+                    second_defense_attrs["CH"] * 0.1
+                ) * random.randint(1, 6)
+            
+            # Track second defender's defense score
+            self.defense_scores.append(second_defense_score)
+            
+            # Apply second defender's defense score with 30% discount
+            shot_score -= second_defense_score * 0.14
+            
+            # Record defensive attempts for both defenders
+            if second_defender:
+                second_defender.record_stat("DEF_A")
+        else:
+            # Single defender: apply normal 20% impact
+            shot_score -= defense_score * 0.2
+        
         if defender:
             defender.record_stat("DEF_A")
 

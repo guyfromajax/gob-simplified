@@ -969,9 +969,12 @@ def assign_all_zone_defenders(
         is_away_offense: Whether away team is on offense
     
     Returns:
-        Dict mapping defender_pos → {"x": int, "y": int} coordinates for that defender
+        Tuple of:
+        - Dict mapping defender_pos → {"x": int, "y": int} coordinates for that defender
+        - Dict mapping defender_pos → offensive_player_id (which offensive player each defender is guarding)
     """
     assignments = {}  # defender_pos → {"x": int, "y": int}
+    defender_to_offensive_player = {}  # defender_pos → offensive_player_id (tracking which player each defender is guarding)
     
     # Detect overlapping zones
     overlap_map = _detect_overlapping_zones(offensive_players, zone_boundaries, is_away_offense)
@@ -1016,6 +1019,9 @@ def assign_all_zone_defenders(
             assigned_player = next((p for p in offensive_players if p.get("player_id") == assigned_player_id), None)
             
             if assigned_player:
+                # Track which offensive player this defender is guarding
+                defender_to_offensive_player[defender_pos] = assigned_player_id
+                
                 if assigned_player.get("is_ball_handler"):
                     # assigned_player["coords"] are in away orientation if away offense
                     # assign_bh_defender_coords returns coords in same orientation as input
@@ -1081,6 +1087,32 @@ def assign_all_zone_defenders(
         )
         if coords:
             assignments[defender_pos] = coords
+            # Determine which offensive player this defender is guarding
+            # Check which player in players_to_consider is closest to the defender's assigned position
+            # or if ball handler is in zone, they're guarding the ball handler
+            ball_handler_in_zone = False
+            zone_coords = zone_boundaries.get(defender_pos, [])
+            if zone_coords:
+                for p in players_to_consider:
+                    if p.get("is_ball_handler") and _point_in_zone(p.get("coords"), zone_coords, False):
+                        defender_to_offensive_player[defender_pos] = p.get("player_id")
+                        ball_handler_in_zone = True
+                        break
+            
+            if not ball_handler_in_zone and players_to_consider:
+                # Find closest offensive player to defender's assigned position
+                min_dist = float('inf')
+                closest_player_id = None
+                for p in players_to_consider:
+                    player_coords = p.get("coords")
+                    if player_coords:
+                        dist = ((coords["x"] - player_coords["x"]) ** 2 + 
+                               (coords["y"] - player_coords["y"]) ** 2) ** 0.5
+                        if dist < min_dist:
+                            min_dist = dist
+                            closest_player_id = p.get("player_id")
+                if closest_player_id:
+                    defender_to_offensive_player[defender_pos] = closest_player_id
     
     # FALLBACK: Ensure at least one defender guards the ball handler
     # Check if ball handler is being guarded by any defender
@@ -1180,5 +1212,8 @@ def assign_all_zone_defenders(
                 if is_away_offense:
                     coords = get_away_player_coords(coords)  # Unflip from away to home
             assignments[closest_defender] = coords
+            # Track that this defender is guarding the ball handler
+            if ball_handler_id:
+                defender_to_offensive_player[closest_defender] = ball_handler_id
     
-    return assignments
+    return assignments, defender_to_offensive_player

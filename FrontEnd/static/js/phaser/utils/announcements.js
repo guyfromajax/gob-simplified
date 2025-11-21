@@ -191,6 +191,14 @@ export function showAnnouncement(text, team = 'home', playerData = null) {
   // Add text first (so image appears on the right)
   const textSpan = document.createElement('span');
   textSpan.textContent = text;
+  
+  // Special styling for "DOUBLE TEAM!" - red text
+  if (text === "DOUBLE TEAM!") {
+    textSpan.style.color = '#ff0000'; // Red text
+    textSpan.style.fontWeight = 'bold';
+    textSpan.style.fontSize = '2.5rem';
+  }
+  
   announcement.appendChild(textSpan);
   
   // Add player headshot if provided (will appear after text)

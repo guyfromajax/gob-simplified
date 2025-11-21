@@ -329,6 +329,14 @@ export async function shootBall({
   
   const rimCoords = isHomeTeam ? HOME_RIM_COORDS : AWAY_RIM_COORDS;
   
+  // Check for double team and show announcement (before shot animation)
+  if (turnData?.has_double_team || turnData?.second_defender_id) {
+    // Import and show announcement immediately
+    const { showAnnouncement } = await import('../utils/announcements.js');
+    // Show "DOUBLE TEAM!" in red text with no player images
+    showAnnouncement("DOUBLE TEAM!", 'neutral', null);
+  }
+  
   // Adjust landing position for made shots
   // Home team (attacks away basket x=91): reduce by 1 → 90
   // Away team (attacks home basket x=9): increase by 1 → 10

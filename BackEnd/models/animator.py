@@ -1306,7 +1306,7 @@ class Animator:
                 
                 # 🐛 DEBUG: Log offensive players list before assignment
                 
-                defender_coords_dict = assign_all_zone_defenders(
+                defender_coords_dict, defender_to_offensive_player = assign_all_zone_defenders(
                     zone_boundaries,
                     offensive_players,
                     ball_handler_coords,
@@ -1314,6 +1314,11 @@ class Animator:
                     aggression,
                     is_away_offense
                 )
+                
+                # Store defender assignments for this step (for shot resolution)
+                if not hasattr(self.game, 'zone_defender_assignments_by_step'):
+                    self.game.zone_defender_assignments_by_step = {}
+                self.game.zone_defender_assignments_by_step[step_index] = defender_to_offensive_player
                 
                 # 🐛 DEBUG: Log assignments for this step
                 
