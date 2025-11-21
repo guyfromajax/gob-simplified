@@ -1807,15 +1807,15 @@ class TurnManager:
             if defender is None:
                 pressure = 0
             else:
-            def_attr = defender.attributes
-            pressure = (
-                def_attr["OD"] * 0.3 +
-                def_attr["AG"] * 0.3 +
-                def_attr["IQ"] * 0.2 +
-                def_attr["CH"] * 0.2
-            ) * random.randint(1, 6)
-            if is_zone_defense(defense_call):
-                pressure *= 0.9
+                def_attr = defender.attributes
+                pressure = (
+                    def_attr["OD"] * 0.3 +
+                    def_attr["AG"] * 0.3 +
+                    def_attr["IQ"] * 0.2 +
+                    def_attr["CH"] * 0.2
+                ) * random.randint(1, 6)
+                if is_zone_defense(defense_call):
+                    pressure *= 0.9
 
             score = bh_score - pressure - (touches * 2)
             turnover_risks.append((score, player, defender))
@@ -1838,7 +1838,7 @@ class TurnManager:
                     d_score = 0
                 else:
                     d_attr = defender.attributes
-                d_score = (d_attr["IQ"] * 0.3 + d_attr["CH"] * 0.3 + d_attr["AG"] * 0.2 + d_attr["OD"] * 0.2) * random.randint(1, 6)
+                    d_score = (d_attr["IQ"] * 0.3 + d_attr["CH"] * 0.3 + d_attr["AG"] * 0.2 + d_attr["OD"] * 0.2) * random.randint(1, 6)
                 o_score = (o_attr["IQ"] * 0.3 + o_attr["CH"] * 0.3 + o_attr["AG"] * 0.2 + o_attr["ST"] * 0.2) * random.randint(1, 6)
 
                 # Slightly bias toward foul when high activity + tempo

@@ -773,7 +773,7 @@ class ShotManager:
                 second_defender.record_stat("DEF_A")
         else:
             # Single defender: apply normal 20% impact
-        shot_score -= defense_score * 0.2
+            shot_score -= defense_score * 0.2
         
         if defender:
             defender.record_stat("DEF_A")
