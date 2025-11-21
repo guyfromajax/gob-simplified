@@ -866,7 +866,6 @@ class Animator:
                 defense_playcall = self.game.game_state.get("defense_playcall", "Man")
                 if is_zone_defense(defense_playcall):
                     # Use zone defense positioning (currently supports 2-3 zone, will expand for other types)
-                    logging.warning(f"🛡️ ZONE DEFENSE ACTIVATED: Using {defense_playcall} for this turn")
                     defensive_anims = self._position_zone_defenders(
                         offensive_animations,
                         def_lineup,
@@ -1268,7 +1267,6 @@ class Animator:
                     current_ball_spot = ball_spot
                 
                 # 🐛 DEBUG: Log ball handler identification at each step
-                logging.warning(f"🛡️ ZONE DEFENSE DEBUG [Step {step_index}]: Ball handler pos={current_ball_handler_pos} (initial={ball_handler_pos}), coords={ball_handler_coords}, spot={current_ball_spot}, is_away_offense={is_away_offense}")
                 
                 # Update zone boundaries if ball spot changed (shift logic)
                 # ✅ Zone boundaries should be in SAME orientation as offensive coords
@@ -1307,7 +1305,6 @@ class Animator:
                 # They will unflip internally, calculate in home orientation, and return home orientation coords
                 
                 # 🐛 DEBUG: Log offensive players list before assignment
-                logging.warning(f"🛡️ ZONE DEFENSE DEBUG [Step {step_index}]: Offensive players count={len(offensive_players)}, BH in list={any(p.get('is_ball_handler') for p in offensive_players)}")
                 
                 defender_coords_dict = assign_all_zone_defenders(
                     zone_boundaries,
@@ -1319,7 +1316,6 @@ class Animator:
                 )
                 
                 # 🐛 DEBUG: Log assignments for this step
-                logging.warning(f"🛡️ ZONE DEFENSE DEBUG [Step {step_index}]: Defender assignments={list(defender_coords_dict.keys())}, assignments_for_defender={defender_coords_dict.get(def_pos) is not None}")
                 
                 def_coords = defender_coords_dict.get(def_pos)
                 if not def_coords:
@@ -1342,9 +1338,6 @@ class Animator:
                 def_coords_before_flip = def_coords.copy() if def_coords else None
                 if is_away_offense:
                     def_coords = get_away_player_coords(def_coords)
-                    logging.warning(f"🛡️ ZONE DEFENSE DEBUG [Step {step_index}] Defender={def_pos}: Flipped coords from HOME {def_coords_before_flip} to AWAY {def_coords}")
-                else:
-                    logging.warning(f"🛡️ ZONE DEFENSE DEBUG [Step {step_index}] Defender={def_pos}: Coords in HOME orientation (no flip needed): {def_coords}")
                 
                 # Get timestamp
                 if step_index < len(skeleton_steps):
