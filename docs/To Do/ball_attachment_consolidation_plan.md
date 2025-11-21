@@ -2,6 +2,8 @@
 
 ## Problem Statement
 
+**CRITICAL BUG**: OREB putback animation bug - ball briefly attaches to rebounder before putback shot animation, causing a visual flash. This bug persists despite multiple attempts to fix it by adding `_putbackInProgress` checks to all three attachment functions. The root cause is having multiple attachment systems that need to be kept in sync.
+
 Currently, we have **three different `attachBallToPlayer` functions** across the codebase:
 
 1. **`BallControllerAdapter.attachBallToPlayer`** (New system - recommended)
@@ -107,10 +109,11 @@ Currently, we have **three different `attachBallToPlayer` functions** across the
 ## Testing Requirements
 
 ### Critical Test Cases:
-1. **Putback animations** (the bug that revealed this issue)
+1. **Putback animations** (PRIORITY: Fix the persistent bug)
    - OREB → putback attempt → DREB
    - OREB → putback attempt → OREB
-   - Verify no ball attachment flash
+   - **VERIFY**: No ball attachment flash before putback shot animation
+   - This is the primary bug that consolidation should fix
 
 2. **Pass animations**:
    - Outlet passes (DREB → outlet)
