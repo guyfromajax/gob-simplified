@@ -216,6 +216,11 @@ class ShotManager:
         )
 
         made = shot_score >= shot_threshold
+        
+        # 🔧 TEMPORARY: Force misses on all HCO shots for testing putback animations
+        # TODO: REMOVE THIS - Temporary test code
+        made = False
+        logging.warning("🔧 TEMP: Forcing miss on HCO shot for testing")
 
         # Stat tracking (attempts)
         shooter.record_stat("FGA")
@@ -504,6 +509,20 @@ class ShotManager:
                     rebound_team = def_team if random.random() < d_weight else off_team
                     rebounder = d_rebounder if rebound_team == def_team else o_rebounder
                     stat = "DREB" if rebound_team == def_team else "OREB"
+                
+                # 🔧 TEMPORARY: Force OREB on all misses for testing putback animations
+                # TODO: REMOVE THIS - Temporary test code
+                if not o_scores:
+                    # If no offensive rebounders, create one
+                    o_pos = "C"  # Default to center
+                    o_rebounder = off_team.lineup.get(o_pos, list(off_team.lineup.values())[0])
+                else:
+                    o_pos = max(o_scores, key=o_scores.get)
+                    o_rebounder = off_team.lineup[o_pos]
+                rebound_team = off_team
+                rebounder = o_rebounder
+                stat = "OREB"
+                logging.warning("🔧 TEMP: Forcing OREB on miss for testing")
                 
                 # Record rebound stat and update game state
                 self.game_state["last_rebound"] = stat

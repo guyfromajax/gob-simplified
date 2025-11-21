@@ -157,6 +157,12 @@ def resolve_offensive_rebound(game, rebounder):
         defender.record_stat("DEF_A")
 
         made = shot_score >= off_team.team_attributes["shot_threshold"]
+        
+        # 🔧 TEMPORARY: Force misses on all putback attempts for testing
+        # TODO: REMOVE THIS - Temporary test code
+        made = False
+        logging.warning("🔧 TEMP: Forcing miss on putback attempt for testing")
+        
         rebounder.record_stat("FGA")
         # print(f"📦 PUTBACK FGA: Recorded FGA for {get_name_safe(rebounder)}")
         # print(f"📦 PUTBACK DEBUG: shot_score={shot_score}, threshold={off_team.team_attributes['shot_threshold']}, made={made}")
