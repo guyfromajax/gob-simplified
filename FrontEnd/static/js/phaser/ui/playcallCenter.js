@@ -61,8 +61,8 @@ export function updatePlaycallCenter(turnData, homeTeamId) {
   const aggression = turnData.aggression || 'normal';
   
   if (typeof window.showPlaycallReveal === 'function' && playType && playFocus && defenseType) {
-    // Calculate random EV placeholder from -2 to +2 (will be replaced with real logic later)
-    const ev = (Math.random() * 4) - 2; // -2.0 to +2.0
+    // Get EV from backend calculation (if available), otherwise fallback to random
+    const ev = turnData.ev !== undefined ? parseFloat(turnData.ev) : (Math.random() * 4) - 2;
     
     // Get intended shooter info (from turnData if available)
     const intendedShooterId = turnData.intended_shooter_id || null;
