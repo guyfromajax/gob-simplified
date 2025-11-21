@@ -827,6 +827,36 @@ class TurnManager:
         
         # PLACEHOLDER: Return random EV for now
         ev = random.uniform(-2.0, 2.0)
+
+        # if offense play type == motion
+            # offense inside score = (all offense lineup players' SC + all offense lineup players' ST * 0.5) / 5
+            # offense attack score = (all offense lineup players' SC + all offesne lineup players' AG * 0.5) / 5
+            # offense outside score = (all offense lineup players' SH * 1.5) / 5
+        # elif offense play type = set play
+            # offense inside score = projected shooter's SC + projected shooter's ST * 0.25 + projected passer's PS * 0.25
+            # offense attack score = projected shooter's SC + projected shooter's AG * 0.25 + projected passer's PS * 0.25
+            # offense outside score = projected shooter's SH * 1.25 + projected passer's IQ * 0.25
+            # Note, passer refers to teh player who would get credit for the assist if the shot is made. If there is no passer, multiply ST * 0.5 in inside, AG * 0.5 in attack, and SH * 1.5
+
+        # if defense call == man
+            # defense inside score, add teh following values
+                # vs motion offense call
+                    # all five players' (ID + ST * 0.5) / 5
+                # vs set offense call
+                    # use the attributes of the same position as the projected shooter and inverse them to the offense's attributes used in the calcuation as follows:
+                        # SC = ID, SH = OD, AG = AG, ST = ST
+                        #multiply by 1.5
+        # if defense call is any type of zone call, defense value will = team_d value + players_d value
+            #2-3 zone:
+                # team_d value = (80 vas inside, 40 vs attack, 10 vs outside)
+                # players_d value on the following scale:
+                    #
+            #3-2 zone:
+                # team_d value = (10 vs inside, 20 vs attack, 80 vs outside)
+            #1-3-1 zone:
+                # team_d value = (30 vs inside, 80 vs attack, 20 vs outside)
+
+        #ev = offense value - defense value
         
         return ev
 
@@ -1609,15 +1639,20 @@ class TurnManager:
             def_pos = get_player_position(off_lineup, player)
             from BackEnd.utils.defense_utils import is_zone_defense
             defender = def_lineup.get(def_pos) if not is_zone_defense(defense_call) else random.choice(list(def_lineup.values()))
-            def_attr = defender.attributes
-            pressure = (
-                def_attr["OD"] * 0.3 +
-                def_attr["AG"] * 0.3 +
-                def_attr["IQ"] * 0.2 +
-                def_attr["CH"] * 0.2
-            ) * random.randint(1, 6)
-            if is_zone_defense(defense_call):
-                pressure *= 0.9
+            
+            # Handle case where defender is None (no defender assigned)
+            if defender is None:
+                pressure = 0
+            else:
+                def_attr = defender.attributes
+                pressure = (
+                    def_attr["OD"] * 0.3 +
+                    def_attr["AG"] * 0.3 +
+                    def_attr["IQ"] * 0.2 +
+                    def_attr["CH"] * 0.2
+                ) * random.randint(1, 6)
+                if is_zone_defense(defense_call):
+                    pressure *= 0.9
 
             score = bh_score - pressure - (touches * 2)
             turnover_risks.append((score, player, defender))
@@ -1632,11 +1667,15 @@ class TurnManager:
 
                 offender = off_lineup[pos]
                 from BackEnd.utils.defense_utils import is_zone_defense
-                defender = def_lineup[pos] if not is_zone_defense(defense_call) else random.choice(list(def_lineup.values()))
+                defender = def_lineup.get(pos) if not is_zone_defense(defense_call) else random.choice([p for p in def_lineup.values() if p is not None])
                 o_attr = offender.attributes
-                d_attr = defender.attributes
-
-                d_score = (d_attr["IQ"] * 0.3 + d_attr["CH"] * 0.3 + d_attr["AG"] * 0.2 + d_attr["OD"] * 0.2) * random.randint(1, 6)
+                
+                # Handle case where defender is None (no defender assigned)
+                if defender is None:
+                    d_score = 0
+                else:
+                    d_attr = defender.attributes
+                    d_score = (d_attr["IQ"] * 0.3 + d_attr["CH"] * 0.3 + d_attr["AG"] * 0.2 + d_attr["OD"] * 0.2) * random.randint(1, 6)
                 o_score = (o_attr["IQ"] * 0.3 + o_attr["CH"] * 0.3 + o_attr["AG"] * 0.2 + o_attr["ST"] * 0.2) * random.randint(1, 6)
 
                 # Slightly bias toward foul when high activity + tempo
