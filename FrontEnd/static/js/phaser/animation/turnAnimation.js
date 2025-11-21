@@ -1318,9 +1318,17 @@ async function runInboundSetup({
  * Each stepIndex is animated across all players, then the next step begins.
  */
 export async function playTurnAnimation({ scene, simData, playerSprites, turnData, ballSprite, onAction }) {
-  // Guard: Skip if this is an opening tip or if animations is missing
-  if (turnData.result_type === "OPENING_TIP" || !turnData.animations) {
-    console.warn('⚠️ playTurnAnimation called for turn without animations:', turnData.result_type);
+  // Guard: Skip if this is an opening tip, putback, or if animations is missing
+  // Putback turns are handled by handleOrebTurn in animateGameTurns.js
+  if (turnData.result_type === "OPENING_TIP" || 
+      turnData.result_type === "PUTBACK_MAKE" || 
+      turnData.result_type === "PUTBACK_MISS" ||
+      !turnData.animations) {
+    if (turnData.result_type === "PUTBACK_MAKE" || turnData.result_type === "PUTBACK_MISS") {
+      console.warn('⚠️ playTurnAnimation called for putback turn - this should be handled by handleOrebTurn:', turnData.result_type);
+    } else {
+      console.warn('⚠️ playTurnAnimation called for turn without animations:', turnData.result_type);
+    }
     return;
   }
 
@@ -1413,29 +1421,23 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
       const isPutbackTurn = turnData.result_type === "PUTBACK_MAKE" || turnData.result_type === "PUTBACK_MISS";
       
       if (isPutbackTurn) {
-        console.log('🔍 [PUTBACK DEBUG] playTurnAnimation: Step 0 ball attachment attempt for putback turn', {
+        console.log('🔍 [PUTBACK DEBUG] playTurnAnimation: Step 0 ball attachment attempt for putback turn - BLOCKING', {
           step0OwnerId,
           result_type: turnData.result_type,
           turnDataRebounderId: turnData.rebounderId,
           shotInProgress: scene._shotInProgress,
           sceneRebounderId: scene.rebounderId,
-          note: 'This should be blocked if putback is in progress'
+          note: 'Putback turns are handled by handleOrebTurn - skipping step 0 attachment'
         });
-      }
-      
-      attachBallToPlayer(scene, ballSprite, step0OwnerSprite);
-      currentBallOwnerRef.value = step0OwnerSprite;
-      
-      // ✅ NEW (Step 1): Also set simple ball holder ID (WIP_GOB approach)
-      // This enables the new simple ball animation system to track ball holder
-      setBallHolderId(scene, step0OwnerId);
-      
-      if (isPutbackTurn) {
-        console.log('🔍 [PUTBACK DEBUG] playTurnAnimation: Step 0 ball attachment completed (or blocked)', {
-          step0OwnerId,
-          currentBallOwner: scene.currentBallOwnerRef?.value?.playerId || null,
-          shotInProgress: scene._shotInProgress
-        });
+        // CRITICAL: Don't attach ball for putback turns - handleOrebTurn handles it
+        // This prevents the brief attachment flash before the putback shot
+      } else {
+        attachBallToPlayer(scene, ballSprite, step0OwnerSprite);
+        currentBallOwnerRef.value = step0OwnerSprite;
+        
+        // ✅ NEW (Step 1): Also set simple ball holder ID (WIP_GOB approach)
+        // This enables the new simple ball animation system to track ball holder
+        setBallHolderId(scene, step0OwnerId);
       }
     }
   }
