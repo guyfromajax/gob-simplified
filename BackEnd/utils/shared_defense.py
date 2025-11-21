@@ -370,6 +370,52 @@ ZONE_32_UPPER_SHIFT = {
     "C": ["basketSpot", "midLane", "lower midPost", "lower bird", "lower midCorner", "lower corner", "lower midBaseline", "lower lowPost", "basketSpot", "midLane", "upper corner"],
 }
 
+# 1-3-1 Zone Defense: Zone definitions (using spot names from HCO_STRING_SPOTS)
+# Each zone is defined by border points that form a polygon
+ZONE_131_NORMAL = {
+    "PG": ["key", "lower midWing", "lower wing", "lower apex", "lower highPost", "topLane", "upper highPost", "upper apex", "upper wing", "upper midWing"],
+    "SG": ["upper apex", "upper wing", "upper midCorner", "upper bird"],
+    "SF": ["lower apex", "lower wing", "lower midCorner", "lower bird"],
+    "PF": ["midLane", "lower lowPost", "lower midPost", "lower highPost", "topLane", "upper highPost", "upper midPost", "upper lowPost"],
+    "C": ["basketSpot", "upper corner", "upper midBaseline", "upper lowPost", "basketSpot", "lower lowPost", "lower midBaseline", "lower corner", "lower midCorner", "lower bird", "lower midPost", "midLane", "basketSpot"],
+}
+
+# Lower shift (ball on lower wing, lower midWing, lower midCorner)
+ZONE_131_LOWER_SHIFT = {
+    "PG": ["key", "lower midWing", "lower wing", "lower apex", "lower highPost", "topLane"],
+    "SG": ["upper midWing", "upper wing", "upper midCorner", "upper corner", "upper midBaseline", "upper lowPost", "upper midPost", "upper highPost"],
+    "SF": ["lower midWing", "lower wing", "lower midCorner"],
+    "PF": ["midLane", "lower lowPost", "lower midPost", "lower highPost", "topLane", "upper highPost", "upper midPost", "upper lowPost"],
+    "C": ["basketSpot", "lower lowPost", "lower midBaseline", "lower corner"],
+}
+
+# Lower corner shift (ball on lower corner)
+ZONE_131_LOWER_CORNER_SHIFT = {
+    "PG": ["key", "lower midWing", "lower wing", "lower apex", "lower highPost", "lower midPost", "midLane", "topLane"],
+    "SG": ["key", "upper midWing", "upper wing", "upper midCorner", "upper corner", "upper midBaseline", "upper lowPost", "upper midPost", "upper highPost"],
+    "SF": ["lower midWing", "lower wing", "lower midCorner"],
+    "PF": ["midLane", "lower lowPost", "lower midPost", "lower highPost", "topLane", "upper highPost", "upper midPost", "upper lowPost"],
+    "C": ["lower corner"],
+}
+
+# Upper shift (ball on upper wing, upper midWing, upper midCorner)
+ZONE_131_UPPER_SHIFT = {
+    "PG": ["key", "upper midWing", "upper wing", "upper apex", "upper highPost", "topLane"],
+    "SG": ["upper midWing", "upper wing", "upper midCorner"],
+    "SF": ["lower midWing", "lower wing", "lower midCorner", "lower corner", "lower midBaseline", "lower lowPost", "lower midPost", "lower highPost"],
+    "PF": ["midLane", "lower lowPost", "lower midPost", "lower highPost", "topLane", "upper highPost", "upper midPost", "upper lowPost"],
+    "C": ["basketSpot", "upper lowPost", "upper midBaseline", "upper corner"],
+}
+
+# Upper corner shift (ball on upper corner)
+ZONE_131_UPPER_CORNER_SHIFT = {
+    "PG": ["key", "upper midWing", "upper wing", "upper apex", "upper highPost", "upper midPost", "midLane", "topLane"],
+    "SG": ["upper midWing", "upper wing", "upper midCorner"],
+    "SF": ["key", "lower midWing", "lower wing", "lower midCorner", "lower corner", "lower midBaseline", "lower lowPost", "lower midPost", "lower highPost"],
+    "PF": ["midLane", "lower lowPost", "lower midPost", "lower highPost", "topLane", "upper highPost", "upper midPost", "upper lowPost"],
+    "C": ["upper corner"],
+}
+
 
 def _get_zone_coords(zone_definition, is_away_offense=False):
     """
@@ -494,6 +540,41 @@ def _get_32_zone_boundaries(ball_spot, is_away_offense=False):
         zone_def = ZONE_32_UPPER_SHIFT
     else:
         zone_def = ZONE_32_NORMAL
+    
+    # Convert spot names to coordinates
+    zone_boundaries = {}
+    for position, spot_list in zone_def.items():
+        zone_boundaries[position] = _get_zone_coords(spot_list, is_away_offense)
+    
+    return zone_boundaries
+
+
+def _get_131_zone_boundaries(ball_spot, is_away_offense=False):
+    """
+    Get zone boundaries for 1-3-1 zone defense, applying shifts based on ball location.
+    
+    Args:
+        ball_spot: String spot name where ball is located
+        is_away_offense: Whether away team is on offense
+    
+    Returns:
+        Dict mapping position → list of (x, y) coordinate tuples for that zone
+    """
+    # Determine which zone definition to use based on ball location
+    # Lower shift: ball at lower wing, lower midWing, lower midCorner
+    if ball_spot in ["lower wing", "lower midWing", "lower midCorner"]:
+        zone_def = ZONE_131_LOWER_SHIFT
+    # Lower corner shift: ball at lower corner
+    elif ball_spot in ["lower corner"]:
+        zone_def = ZONE_131_LOWER_CORNER_SHIFT
+    # Upper shift: ball at upper wing, upper midWing, upper midCorner
+    elif ball_spot in ["upper wing", "upper midWing", "upper midCorner"]:
+        zone_def = ZONE_131_UPPER_SHIFT
+    # Upper corner shift: ball at upper corner
+    elif ball_spot in ["upper corner"]:
+        zone_def = ZONE_131_UPPER_CORNER_SHIFT
+    else:
+        zone_def = ZONE_131_NORMAL
     
     # Convert spot names to coordinates
     zone_boundaries = {}
