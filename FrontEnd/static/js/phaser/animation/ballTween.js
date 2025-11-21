@@ -112,6 +112,17 @@ function resolveBallController(scene) {
 export function attachBallToPlayer(scene, ballSprite, playerSprite, opts = {}) {
   if (!scene || !ballSprite || !playerSprite) return;
   
+  // CRITICAL: Don't attach during putback shot animations
+  // The putback shot animation is still running, and attaching the ball here causes a flash
+  const isPutbackAttempt = opts?.debugInfo?.reason === 'putback_attempt';
+  if (scene._putbackInProgress && !isPutbackAttempt) {
+    console.log('🏀 attachBallToPlayer (ballTween): Blocked during putback shot animation', {
+      putbackInProgress: scene._putbackInProgress,
+      isPutbackAttempt
+    });
+    return;
+  }
+  
   // Don't attach ball during shot animation - it would override the tween
   if (scene._shotInProgress) {
     console.log('🏀 attachBallToPlayer: Blocked during shot animation');
