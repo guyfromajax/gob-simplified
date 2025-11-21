@@ -701,13 +701,8 @@ def assign_zone_defender_coords(
     # So pass is_away_offense=False to _point_in_zone so it doesn't flip coords (they're already matched)
     ball_handler_in_zone = _point_in_zone(ball_handler_coords, defender_zone_coords_list, False)
     
-    # 🐛 DEBUG: Log PRIORITY 1 check with zone polygon info
-    zone_polygon_summary = f"[{len(defender_zone_coords_list)} points]" if len(defender_zone_coords_list) <= 8 else f"[{len(defender_zone_coords_list)} points: {defender_zone_coords_list[:4]}...]"
-    logging.warning(f"🛡️ ZONE DEFENSE DEBUG [assign_zone_defender_coords] Defender={defender_pos}, PRIORITY 1: BH coords={ball_handler_coords}, zone_polygon={zone_polygon_summary}, BH in zone={ball_handler_in_zone}")
-    
     if ball_handler_in_zone:
         # Guard ball handler
-        logging.warning(f"🛡️ ZONE DEFENSE DEBUG [assign_zone_defender_coords] Defender={defender_pos}, PRIORITY 1 MATCH: Guarding ball handler")
         # assign_bh_defender_coords returns coords in same orientation as input
         # We want to return HOME orientation for consistency, so if input is away orientation, we need to unflip the result
         result = assign_bh_defender_coords(ball_handler_coords, aggression_level, is_away_offense, ball_spot)
@@ -720,9 +715,6 @@ def assign_zone_defender_coords(
     # Map deep locations to zone locations and check if mapped location is in this defender's zone
     mapped_zone_location = _map_deep_location_to_zone_location(ball_spot)
     if mapped_zone_location != ball_spot:  # This is a deep location
-        # 🐛 DEBUG: Log deep location mapping
-        logging.warning(f"🛡️ ZONE DEFENSE DEBUG [assign_zone_defender_coords] Defender={defender_pos}, PRIORITY 1.5: Deep location detected, ball_spot={ball_spot}, mapped={mapped_zone_location}")
-        
         # Get coordinates for the mapped zone location (e.g., "key" instead of "deep key")
         mapped_coords = HCO_STRING_SPOTS.get(mapped_zone_location, None)
         if mapped_coords:
@@ -733,13 +725,9 @@ def assign_zone_defender_coords(
             # Check if mapped location is in this defender's zone
             mapped_location_in_zone = _point_in_zone(mapped_coords, defender_zone_coords_list, False)
             
-            # 🐛 DEBUG: Log PRIORITY 1.5 check
-            logging.warning(f"🛡️ ZONE DEFENSE DEBUG [assign_zone_defender_coords] Defender={defender_pos}, PRIORITY 1.5: Mapped coords={mapped_coords}, mapped in zone={mapped_location_in_zone}")
-            
             if mapped_location_in_zone:
                 # Position defender as if guarding the mapped location (not the deep location)
                 # This keeps the defender in their zone area while still guarding the ball handler
-                logging.warning(f"🛡️ ZONE DEFENSE DEBUG [assign_zone_defender_coords] Defender={defender_pos}, PRIORITY 1.5 MATCH: Guarding mapped location")
                 # assign_bh_defender_coords returns coords in same orientation as input
                 # mapped_coords are in away orientation if away offense, so result is in away orientation
                 # We want to return HOME orientation for consistency, so unflip if needed
@@ -985,21 +973,8 @@ def assign_all_zone_defenders(
     """
     assignments = {}  # defender_pos → {"x": int, "y": int}
     
-    # 🐛 DEBUG: Log initial state
-    ball_handler_id = None
-    for p in offensive_players:
-        if p.get("is_ball_handler"):
-            ball_handler_id = p.get("player_id")
-            break
-    
-    logging.warning(f"🛡️ ZONE DEFENSE DEBUG [assign_all_zone_defenders] START: BH coords={ball_handler_coords}, BH spot={ball_spot}, BH player_id={ball_handler_id}, is_away_offense={is_away_offense}, offensive_players_count={len(offensive_players)}")
-    
     # Detect overlapping zones
     overlap_map = _detect_overlapping_zones(offensive_players, zone_boundaries, is_away_offense)
-    
-    # 🐛 DEBUG: Log overlap detection
-    if overlap_map:
-        logging.warning(f"🛡️ ZONE DEFENSE DEBUG [assign_all_zone_defenders] Overlaps detected: {overlap_map}")
     
     # Create map of which defenders are involved in overlaps
     defenders_in_overlaps = set()
@@ -1040,9 +1015,6 @@ def assign_all_zone_defenders(
             assigned_player_id = overlap_player_to_guard[defender_pos]
             assigned_player = next((p for p in offensive_players if p.get("player_id") == assigned_player_id), None)
             
-            # 🐛 DEBUG: Log overlap assignment
-            logging.warning(f"🛡️ ZONE DEFENSE DEBUG [assign_all_zone_defenders] Defender={defender_pos} has overlap assignment to player_id={assigned_player_id}, is_ball_handler={assigned_player.get('is_ball_handler') if assigned_player else 'NOT FOUND'}")
-            
             if assigned_player:
                 if assigned_player.get("is_ball_handler"):
                     # assigned_player["coords"] are in away orientation if away offense
@@ -1056,7 +1028,6 @@ def assign_all_zone_defenders(
                     )
                     if is_away_offense:
                         coords = get_away_player_coords(coords)  # Unflip from away to home
-                    logging.warning(f"🛡️ ZONE DEFENSE DEBUG [assign_all_zone_defenders] Defender={defender_pos} assigned to guard BH via overlap resolution, coords={coords}")
                 else:
                     coords = assign_non_bh_defender_coords(
                         assigned_player["coords"],
@@ -1066,7 +1037,6 @@ def assign_all_zone_defenders(
                         ball_spot,
                         assigned_player.get("spot", "key")
                     )
-                    logging.warning(f"🛡️ ZONE DEFENSE DEBUG [assign_all_zone_defenders] Defender={defender_pos} assigned to guard non-BH player via overlap resolution, coords={coords}")
                 assignments[defender_pos] = coords
                 continue
         
@@ -1100,11 +1070,6 @@ def assign_all_zone_defenders(
                                   overlap_guarded_by.get(p.get("player_id")) == defender_pos]
         
         # Use standard priority logic with filtered players
-        # 🐛 DEBUG: Log before calling assign_zone_defender_coords
-        players_to_consider_count = len(players_to_consider)
-        bh_in_consideration = any(p.get("is_ball_handler") for p in players_to_consider)
-        logging.warning(f"🛡️ ZONE DEFENSE DEBUG [assign_all_zone_defenders] Defender={defender_pos}, players_to_consider={players_to_consider_count}, BH in consideration={bh_in_consideration}")
-        
         coords = assign_zone_defender_coords(
             defender_pos,
             zone_boundaries,
@@ -1116,14 +1081,9 @@ def assign_all_zone_defenders(
         )
         if coords:
             assignments[defender_pos] = coords
-            logging.warning(f"🛡️ ZONE DEFENSE DEBUG [assign_all_zone_defenders] Defender={defender_pos} assigned coords={coords}")
-        else:
-            logging.warning(f"🛡️ ZONE DEFENSE DEBUG [assign_all_zone_defenders] Defender={defender_pos} NO assignment returned")
     
     # FALLBACK: Ensure at least one defender guards the ball handler
     # Check if ball handler is being guarded by any defender
-    logging.warning(f"🛡️ ZONE DEFENSE DEBUG [assign_all_zone_defenders] FALLBACK CHECK: Checking if BH is guarded, assignments={list(assignments.keys())}")
-    
     ball_handler_guarded = False
     
     # First check: Is ball handler in any defender's zone?
@@ -1131,7 +1091,6 @@ def assign_all_zone_defenders(
         zone_coords = zone_boundaries.get(defender_pos, [])
         if zone_coords and _point_in_zone(ball_handler_coords, zone_coords, False):
             ball_handler_guarded = True
-            logging.warning(f"🛡️ ZONE DEFENSE DEBUG [assign_all_zone_defenders] FALLBACK CHECK: BH is guarded by {defender_pos} (in zone)")
             break
     
     # Second check: Is ball handler at a deep location being handled?
@@ -1149,7 +1108,6 @@ def assign_all_zone_defenders(
                     zone_coords = zone_boundaries.get(defender_pos, [])
                     if zone_coords and _point_in_zone(mapped_coords, zone_coords, False):
                         ball_handler_guarded = True
-                        logging.warning(f"🛡️ ZONE DEFENSE DEBUG [assign_all_zone_defenders] FALLBACK CHECK: BH is guarded by {defender_pos} (deep location mapped)")
                         break
     
     # Third check: Is ball handler in an overlap that was resolved?
@@ -1161,12 +1119,10 @@ def assign_all_zone_defenders(
                 # Ball handler was in an overlap - check if they're being guarded
                 if overlap_player_id in overlap_guarded_by:
                     ball_handler_guarded = True
-                    logging.warning(f"🛡️ ZONE DEFENSE DEBUG [assign_all_zone_defenders] FALLBACK CHECK: BH is guarded by {overlap_guarded_by[overlap_player_id]} (overlap resolution)")
                     break
     
     # Final fallback: If ball handler is still not guarded, assign defender closest to ball handler
     if not ball_handler_guarded:
-        logging.warning(f"🛡️ ZONE DEFENSE DEBUG [assign_all_zone_defenders] FALLBACK TRIGGERED: BH is NOT guarded! BH coords={ball_handler_coords}, BH spot={ball_spot}, assignments={list(assignments.keys())}")
         
         # Find defender with zone closest to ball handler
         closest_defender = None
@@ -1206,8 +1162,6 @@ def assign_all_zone_defenders(
         
         # Assign closest defender to guard ball handler
         if closest_defender:
-            logging.warning(f"🛡️ ZONE DEFENSE DEBUG [assign_all_zone_defenders] FALLBACK ASSIGNMENT: Assigning {closest_defender} to guard BH (closest defender, distance={min_distance:.2f})")
-            
             # For deep locations, guard the mapped location, not the deep location
             if ball_spot in ["deep key", "deep lower wing", "deep lower baseline", "deep upper wing", "deep upper baseline"]:
                 mapped_zone_location = _map_deep_location_to_zone_location(ball_spot)
@@ -1226,8 +1180,5 @@ def assign_all_zone_defenders(
                 if is_away_offense:
                     coords = get_away_player_coords(coords)  # Unflip from away to home
             assignments[closest_defender] = coords
-            logging.warning(f"🛡️ ZONE DEFENSE DEBUG [assign_all_zone_defenders] FALLBACK ASSIGNMENT: {closest_defender} assigned coords={coords}")
-        else:
-            logging.error(f"🛡️ ZONE DEFENSE DEBUG [assign_all_zone_defenders] FALLBACK FAILED: No closest defender found!")
     
     return assignments

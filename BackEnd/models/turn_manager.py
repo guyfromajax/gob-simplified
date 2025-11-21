@@ -515,6 +515,8 @@ class TurnManager:
         player_energy = {}
         for team in (self.game.home_team, self.game.away_team):
             for pos, player in team.lineup.items():
+                if player is None:
+                    continue  # Skip None players in lineup
                 player_energy[player.player_id] = {
                     "NG": player.attributes.get("NG", 1.0),
                     "team": team.name
@@ -1449,7 +1451,6 @@ class TurnManager:
                     zone_coords = zone_boundaries[def_pos]
                     if _point_in_zone(shooter_coords, zone_coords, False):
                         defender_pos = def_pos
-                        logging.warning(f"🛡️ ZONE DEFENSE: Shot defender={defender_pos} (shooter at {shooter_spot}, coords={shooter_coords})")
                         break
             
             # Fallback: if shooter not in any zone, use closest defender
@@ -1473,11 +1474,9 @@ class TurnManager:
                                 defender_pos = def_pos
                 
                 if defender_pos:
-                    logging.warning(f"🛡️ ZONE DEFENSE: Shot defender={defender_pos} (fallback - closest zone, shooter at {shooter_spot})")
                 else:
                     # Final fallback: random defender
                     defender_pos = random.choice(list(def_lineup))
-                    logging.warning(f"🛡️ ZONE DEFENSE: Shot defender={defender_pos} (final fallback - random)")
         else:
             # Man-to-man: defender matches shooter position
             defender_pos = shooter_pos
