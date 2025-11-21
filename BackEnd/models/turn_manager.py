@@ -1022,9 +1022,7 @@ class TurnManager:
             ev_percentage = -99.0
         
         return ev_percentage
-
-        return ev
-
+    
     def resolve_half_court_offense(self):
         from BackEnd.engine.phase_resolution import resolve_half_court_offense_logic
         return resolve_half_court_offense_logic(self.game)
@@ -1691,7 +1689,7 @@ class TurnManager:
             elif defense_playcall == "1-3-1 Zone":
                 zone_boundaries = _get_131_zone_boundaries(ball_spot, is_away_offense)
             else:
-                zone_boundaries = _get_23_zone_boundaries(ball_spot, is_away_offense)
+            zone_boundaries = _get_23_zone_boundaries(ball_spot, is_away_offense)
             
             # Find which defender's zone contains the shooter (check for multiple defenders)
             defender_positions = []
@@ -1809,15 +1807,15 @@ class TurnManager:
             if defender is None:
                 pressure = 0
             else:
-                def_attr = defender.attributes
-                pressure = (
-                    def_attr["OD"] * 0.3 +
-                    def_attr["AG"] * 0.3 +
-                    def_attr["IQ"] * 0.2 +
-                    def_attr["CH"] * 0.2
-                ) * random.randint(1, 6)
-                if is_zone_defense(defense_call):
-                    pressure *= 0.9
+            def_attr = defender.attributes
+            pressure = (
+                def_attr["OD"] * 0.3 +
+                def_attr["AG"] * 0.3 +
+                def_attr["IQ"] * 0.2 +
+                def_attr["CH"] * 0.2
+            ) * random.randint(1, 6)
+            if is_zone_defense(defense_call):
+                pressure *= 0.9
 
             score = bh_score - pressure - (touches * 2)
             turnover_risks.append((score, player, defender))
@@ -1834,13 +1832,13 @@ class TurnManager:
                 from BackEnd.utils.defense_utils import is_zone_defense
                 defender = def_lineup.get(pos) if not is_zone_defense(defense_call) else random.choice([p for p in def_lineup.values() if p is not None])
                 o_attr = offender.attributes
-                
+
                 # Handle case where defender is None (no defender assigned)
                 if defender is None:
                     d_score = 0
                 else:
                     d_attr = defender.attributes
-                    d_score = (d_attr["IQ"] * 0.3 + d_attr["CH"] * 0.3 + d_attr["AG"] * 0.2 + d_attr["OD"] * 0.2) * random.randint(1, 6)
+                d_score = (d_attr["IQ"] * 0.3 + d_attr["CH"] * 0.3 + d_attr["AG"] * 0.2 + d_attr["OD"] * 0.2) * random.randint(1, 6)
                 o_score = (o_attr["IQ"] * 0.3 + o_attr["CH"] * 0.3 + o_attr["AG"] * 0.2 + o_attr["ST"] * 0.2) * random.randint(1, 6)
 
                 # Slightly bias toward foul when high activity + tempo

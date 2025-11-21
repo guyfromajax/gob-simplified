@@ -905,9 +905,9 @@ export function animateRebound({
                 });
               }
             } else {
-              attachBallToPlayer(scene, ballSprite, rebounderSprite, {
-                debugInfo: { shooterId, reboundSpot: ballSpot, reboundType }
-              });
+            attachBallToPlayer(scene, ballSprite, rebounderSprite, {
+              debugInfo: { shooterId, reboundSpot: ballSpot, reboundType }
+            });
             }
             
             const newOffenseId = rebounderSprite.team_id;
