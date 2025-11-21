@@ -3101,7 +3101,16 @@
       // EV + Hot Player (optional)
       const hot = data.hotPlayer ? `${data.hotPlayer.pos} #${data.hotPlayer.jersey} ` : '';
       const evNum = parseFloat(data.ev);
-      const evValue = evNum >= 0 ? `+${data.ev}` : data.ev;
+      
+      // Format EV as percentage with sign (no space between sign and number)
+      let evValue;
+      if (evNum > 0) {
+        evValue = `+${Math.round(evNum)}%`;
+      } else if (evNum < 0) {
+        evValue = `${Math.round(evNum)}%`; // Negative sign already included
+      } else {
+        evValue = `0%`;
+      }
       
       // Color-code EV: Red (negative), Yellow (zero), Green (positive)
       let evColor;
@@ -3113,7 +3122,7 @@
         evColor = '#00FF88'; // Green for positive
       }
       
-      evEl.textContent = `${hot}${evValue} EV`;
+      evEl.textContent = `${hot}${evValue}`;
       evEl.style.color = evColor;
 
       // Show HUD

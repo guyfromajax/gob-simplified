@@ -810,54 +810,219 @@ class TurnManager:
             defensive_team: Defensive team object with attributes
         
         Returns:
-            float: EV score from -2.0 to 2.0
-                >= 1: Strong offensive advantage
-                0 to 0.99: Slight offensive advantage
-                -0.01 to -1: Slight defensive advantage
-                < -1: Strong defensive advantage
+            float: EV percentage from -99.0 to 99.0
+                Positive: Offensive advantage
+                Negative: Defensive advantage
         """
         import random
         
-        # TODO: Implement real EV calculation based on:
-        # - Offensive playcall vs defensive playcall matchup
-        # - Player attributes (all 10 players on court)
-        # - Team attributes
-        # - Play type (motion vs set) and focus (inside/attack/outside)
-        # - Defensive aggression level
+        # Implement EV calculation
+        from BackEnd.db import plays_collection
+        from BackEnd.engine.phase_resolution import get_hco_skeleton
+        from BackEnd.utils.shared_defense import (
+            _get_23_zone_boundaries,
+            _get_32_zone_boundaries,
+            _get_131_zone_boundaries,
+            _point_in_zone
+        )
+        from BackEnd.constants import HCO_STRING_SPOTS
+        from BackEnd.utils.shared import get_away_player_coords
         
-        # PLACEHOLDER: Return random EV for now
-        ev = random.uniform(-2.0, 2.0)
-
-        # if offense play type == motion
-            # offense inside score = (all offense lineup players' SC + all offense lineup players' ST * 0.5) / 5
-            # offense attack score = (all offense lineup players' SC + all offesne lineup players' AG * 0.5) / 5
-            # offense outside score = (all offense lineup players' SH * 1.5) / 5
-        # elif offense play type = set play
-            # offense inside score = projected shooter's SC + projected shooter's ST * 0.25 + projected passer's PS * 0.25
-            # offense attack score = projected shooter's SC + projected shooter's AG * 0.25 + projected passer's PS * 0.25
-            # offense outside score = projected shooter's SH * 1.25 + projected passer's IQ * 0.25
-            # Note, passer refers to teh player who would get credit for the assist if the shot is made. If there is no passer, multiply ST * 0.5 in inside, AG * 0.5 in attack, and SH * 1.5
-
-        # if defense call == man
-            # defense inside score, add teh following values
-                # vs motion offense call
-                    # all five players' (ID + ST * 0.5) / 5
-                # vs set offense call
-                    # use the attributes of the same position as the projected shooter and inverse them to the offense's attributes used in the calcuation as follows:
-                        # SC = ID, SH = OD, AG = AG, ST = ST
-                        #multiply by 1.5
-        # if defense call is any type of zone call, defense value will = team_d value + players_d value
-            #2-3 zone:
-                # team_d value = (80 vas inside, 40 vs attack, 10 vs outside)
-                # players_d value on the following scale:
-                    #
-            #3-2 zone:
-                # team_d value = (10 vs inside, 20 vs attack, 80 vs outside)
-            #1-3-1 zone:
-                # team_d value = (30 vs inside, 80 vs attack, 20 vs outside)
-
-        #ev = offense value - defense value
+        # Step 1: Get play type and focus from playcall
+        play_doc = plays_collection.find_one({"name": offensive_playcall})
+        if not play_doc:
+            return 0.0
         
+        play_type = play_doc.get("play_type", "motion")
+        play_focus = play_doc.get("play_focus", "inside")
+        
+        # Step 2: Get successful variant skeleton to find projected shooter and passer
+        successful_skeleton = get_hco_skeleton(None, self.game, lean_score=1.0)
+        if not successful_skeleton or "steps" not in successful_skeleton:
+            return 0.0
+        
+        steps = successful_skeleton.get("steps", [])
+        if not steps:
+            return 0.0
+        
+        # Extract projected shooter and passer
+        projected_shooter_pos = None
+        projected_passer_pos = None
+        
+        final_step = steps[-1]
+        for pos, action_info in final_step.get("pos_actions", {}).items():
+            if action_info.get("action", "").lower() == "shoot":
+                projected_shooter_pos = pos
+                break
+        
+        if projected_shooter_pos:
+            shot_step_index = len(steps) - 1
+            for step_index in range(shot_step_index - 1, max(0, shot_step_index - 5) - 1, -1):
+                if step_index < 0:
+                    break
+                step = steps[step_index]
+                pos_actions = step.get("pos_actions", {})
+                shooter_action_info = pos_actions.get(projected_shooter_pos)
+                if shooter_action_info and shooter_action_info.get("action", "").lower() == "receive":
+                    for pos, action_info in pos_actions.items():
+                        if pos != projected_shooter_pos and action_info.get("action", "").lower() == "pass":
+                            projected_passer_pos = pos
+                            break
+                    if projected_passer_pos:
+                        break
+        
+        # Step 3: Calculate offense score
+        offense_score = 0.0
+        
+        if play_type == "motion":
+            total_sc = sum(player.attributes.get("SC", 50) for player in offensive_lineup.values() if player)
+            total_st = sum(player.attributes.get("ST", 50) for player in offensive_lineup.values() if player)
+            total_ag = sum(player.attributes.get("AG", 50) for player in offensive_lineup.values() if player)
+            total_sh = sum(player.attributes.get("SH", 50) for player in offensive_lineup.values() if player)
+            
+            if play_focus == "inside":
+                offense_score = (total_sc + total_st * 0.5) / 5
+            elif play_focus == "attack":
+                offense_score = (total_sc + total_ag * 0.5) / 5
+            elif play_focus == "outside":
+                offense_score = (total_sh * 1.5) / 5
+        else:  # set_play
+            shooter = offensive_lineup.get(projected_shooter_pos) if projected_shooter_pos else None
+            passer = offensive_lineup.get(projected_passer_pos) if projected_passer_pos else None
+            
+            if not shooter:
+                return 0.0
+            
+            shooter_sc = shooter.attributes.get("SC", 50)
+            shooter_st = shooter.attributes.get("ST", 50)
+            shooter_ag = shooter.attributes.get("AG", 50)
+            shooter_sh = shooter.attributes.get("SH", 50)
+            
+            if play_focus == "inside":
+                if passer:
+                    offense_score = shooter_sc + shooter_st * 0.25 + passer.attributes.get("PS", 50) * 0.25
+                else:
+                    offense_score = shooter_sc + shooter_st * 0.5
+            elif play_focus == "attack":
+                if passer:
+                    offense_score = shooter_sc + shooter_ag * 0.25 + passer.attributes.get("PS", 50) * 0.25
+                else:
+                    offense_score = shooter_sc + shooter_ag * 0.5
+            elif play_focus == "outside":
+                if passer:
+                    offense_score = shooter_sh * 1.25 + passer.attributes.get("IQ", 50) * 0.25
+                else:
+                    offense_score = shooter_sh * 1.5
+        
+        # Step 4: Calculate defense score
+        defense_score = 0.0
+        
+        if defensive_playcall == "Man":
+            if play_type == "motion":
+                total_id = sum(player.attributes.get("ID", 50) for player in defensive_lineup.values() if player)
+                total_st = sum(player.attributes.get("ST", 50) for player in defensive_lineup.values() if player)
+                defense_score = (total_id + total_st * 0.5) / 5
+            else:  # set_play
+                defender = defensive_lineup.get(projected_shooter_pos) if projected_shooter_pos else None
+                if not defender:
+                    defense_score = 0.0
+                else:
+                    def_id = defender.attributes.get("ID", 50)
+                    def_od = defender.attributes.get("OD", 50)
+                    def_ag = defender.attributes.get("AG", 50)
+                    def_st = defender.attributes.get("ST", 50)
+                    
+                    if play_focus == "inside":
+                        defense_score = def_id + def_st * 0.25
+                    elif play_focus == "attack":
+                        defense_score = def_id + def_ag * 0.25
+                    elif play_focus == "outside":
+                        defense_score = def_od * 1.25
+        else:
+            # Zone defense: team_d + 0.5 * player_d
+            zone_team_d_values = {
+                "2-3 Zone": {"inside": 80, "attack": 40, "outside": 5},
+                "3-2 Zone": {"inside": 10, "attack": 30, "outside": 80},
+                "1-3-1 Zone": {"inside": 20, "attack": 60, "outside": 20}
+            }
+            team_d = zone_team_d_values.get(defensive_playcall, {}).get(play_focus, 0)
+            
+            shooter_spot = "key"
+            if steps and projected_shooter_pos:
+                final_step = steps[-1]
+                shooter_action = final_step.get("pos_actions", {}).get(projected_shooter_pos, {})
+                shooter_spot = shooter_action.get("location") or shooter_action.get("spot") or "key"
+            
+            shooter_coords = HCO_STRING_SPOTS.get(shooter_spot, {"x": 50, "y": 25})
+            is_away_offense = self.game.offense_team.team_id == self.game.away_team.team_id
+            if is_away_offense:
+                shooter_coords = get_away_player_coords(shooter_coords)
+            
+            if defensive_playcall == "3-2 Zone":
+                zone_boundaries = _get_32_zone_boundaries(shooter_spot, is_away_offense)
+            elif defensive_playcall == "1-3-1 Zone":
+                zone_boundaries = _get_131_zone_boundaries(shooter_spot, is_away_offense)
+            else:
+                zone_boundaries = _get_23_zone_boundaries(shooter_spot, is_away_offense)
+            
+            zone_defender_pos = None
+            for def_pos in ["PG", "SG", "SF", "PF", "C"]:
+                if def_pos in defensive_lineup and def_pos in zone_boundaries:
+                    zone_coords = zone_boundaries[def_pos]
+                    if _point_in_zone(shooter_coords, zone_coords, False):
+                        zone_defender_pos = def_pos
+                        break
+            
+            if not zone_defender_pos:
+                min_dist = float('inf')
+                for def_pos in ["PG", "SG", "SF", "PF", "C"]:
+                    if def_pos in defensive_lineup and def_pos in zone_boundaries:
+                        zone_coords = zone_boundaries[def_pos]
+                        if zone_coords:
+                            avg_x = sum(c[0] for c in zone_coords) / len(zone_coords)
+                            avg_y = sum(c[1] for c in zone_coords) / len(zone_coords)
+                            zone_center = {"x": avg_x, "y": avg_y}
+                            dist = ((shooter_coords["x"] - zone_center["x"]) ** 2 + 
+                                   (shooter_coords["y"] - zone_center["y"]) ** 2) ** 0.5
+                            if dist < min_dist:
+                                min_dist = dist
+                                zone_defender_pos = def_pos
+                
+                if not zone_defender_pos:
+                    zone_defender_pos = "C"
+            
+            zone_defender = defensive_lineup.get(zone_defender_pos) if zone_defender_pos else None
+            if not zone_defender:
+                player_d = 0.0
+            else:
+                def_id = zone_defender.attributes.get("ID", 50)
+                def_od = zone_defender.attributes.get("OD", 50)
+                def_ag = zone_defender.attributes.get("AG", 50)
+                def_st = zone_defender.attributes.get("ST", 50)
+                
+                if play_focus == "inside":
+                    player_d = def_id + def_st * 0.25
+                elif play_focus == "attack":
+                    player_d = def_id + def_ag * 0.25
+                elif play_focus == "outside":
+                    player_d = def_od * 1.25
+            
+            if defensive_playcall == "1-3-1 Zone":
+                player_d *= 1.15
+            
+            defense_score = team_d + 0.5 * player_d
+        
+        # Step 5: Calculate EV = (offense - defense) * 2, capped at ±99%
+        ev_diff = offense_score - defense_score
+        ev_percentage = ev_diff * 2.0
+        
+        if ev_percentage > 99.0:
+            ev_percentage = 99.0
+        elif ev_percentage < -99.0:
+            ev_percentage = -99.0
+        
+        return ev_percentage
+
         return ev
 
     def resolve_half_court_offense(self):

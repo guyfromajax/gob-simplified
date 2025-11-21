@@ -62,7 +62,8 @@ export function updatePlaycallCenter(turnData, homeTeamId) {
   
   if (typeof window.showPlaycallReveal === 'function' && playType && playFocus && defenseType) {
     // Get EV from backend calculation (if available), otherwise fallback to random
-    const ev = turnData.ev !== undefined ? parseFloat(turnData.ev) : (Math.random() * 4) - 2;
+    // Backend now returns EV as percentage (-99 to +99), so we use it directly
+    const ev = turnData.ev !== undefined ? parseFloat(turnData.ev) : ((Math.random() * 4) - 2) * 50; // Fallback: convert old range to percentage
     
     // Get intended shooter info (from turnData if available)
     const intendedShooterId = turnData.intended_shooter_id || null;
@@ -76,7 +77,7 @@ export function updatePlaycallCenter(turnData, homeTeamId) {
         type: defenseType,
         aggression: aggression
       },
-      ev: ev.toFixed(1),
+      ev: ev, // Pass as number, formatting will happen in showPlaycallReveal
       intendedShooterId: intendedShooterId,  // For headshot display
       // hotPlayer can be added later if available in turnData
       hotPlayer: null
