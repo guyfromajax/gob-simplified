@@ -1337,7 +1337,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
     if (turnData.result_type === "PUTBACK_MAKE" || turnData.result_type === "PUTBACK_MISS") {
       console.warn('⚠️ playTurnAnimation called for putback turn - this should be handled by handleOrebTurn:', turnData.result_type);
     } else {
-      console.warn('⚠️ playTurnAnimation called for turn without animations:', turnData.result_type);
+    console.warn('⚠️ playTurnAnimation called for turn without animations:', turnData.result_type);
     }
     return;
   }
@@ -1442,12 +1442,12 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
         // CRITICAL: Don't attach ball for putback turns - handleOrebTurn handles it
         // This prevents the brief attachment flash before the putback shot
       } else {
-        attachBallToPlayer(scene, ballSprite, step0OwnerSprite);
-        currentBallOwnerRef.value = step0OwnerSprite;
-        
-        // ✅ NEW (Step 1): Also set simple ball holder ID (WIP_GOB approach)
-        // This enables the new simple ball animation system to track ball holder
-        setBallHolderId(scene, step0OwnerId);
+      attachBallToPlayer(scene, ballSprite, step0OwnerSprite);
+      currentBallOwnerRef.value = step0OwnerSprite;
+      
+      // ✅ NEW (Step 1): Also set simple ball holder ID (WIP_GOB approach)
+      // This enables the new simple ball animation system to track ball holder
+      setBallHolderId(scene, step0OwnerId);
       }
     }
   }

@@ -1225,7 +1225,7 @@ class Animator:
         elif defense_playcall == "1-3-1 Zone":
             zone_boundaries = _get_131_zone_boundaries(ball_spot, is_away_offense)
         else:
-            zone_boundaries = _get_23_zone_boundaries(ball_spot, is_away_offense)
+        zone_boundaries = _get_23_zone_boundaries(ball_spot, is_away_offense)
         
         # Create defensive animations for each position
         for def_pos in ['PG', 'SG', 'SF', 'PF', 'C']:
@@ -1284,7 +1284,7 @@ class Animator:
                 elif defense_playcall == "1-3-1 Zone":
                     zone_boundaries = _get_131_zone_boundaries(current_ball_spot, is_away_offense)
                 else:
-                    zone_boundaries = _get_23_zone_boundaries(current_ball_spot, is_away_offense)
+                zone_boundaries = _get_23_zone_boundaries(current_ball_spot, is_away_offense)
                 
                 # Build list of offensive players with their coords and ball handler status
                 offensive_players = []
