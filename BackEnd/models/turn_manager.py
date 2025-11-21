@@ -1405,9 +1405,10 @@ class TurnManager:
 
         # Determine shot defender based on defense type
         from BackEnd.utils.defense_utils import is_zone_defense
+        second_defender_pos = None  # Initialize second defender position
         if is_zone_defense(game_state.get("defense_playcall", "Man")):
             # For zone defense: find defender whose zone contains the shooter
-            from BackEnd.utils.shared_defense import _get_23_zone_boundaries, _point_in_zone
+            from BackEnd.utils.shared_defense import _get_23_zone_boundaries, _get_32_zone_boundaries, _point_in_zone
             from BackEnd.constants import HCO_STRING_SPOTS
             from BackEnd.utils.shared import get_away_player_coords
             
@@ -1442,16 +1443,31 @@ class TurnManager:
                     break
             
             # Get zone boundaries based on ball location (applies shifts)
-            zone_boundaries = _get_23_zone_boundaries(ball_spot, is_away_offense)
+            # Check if it's 2-3 or 3-2 zone and use appropriate function
+            defense_playcall = game_state.get("defense_playcall", "Man")
+            if defense_playcall == "3-2 Zone":
+                zone_boundaries = _get_32_zone_boundaries(ball_spot, is_away_offense)
+            else:
+                zone_boundaries = _get_23_zone_boundaries(ball_spot, is_away_offense)
             
-            # Find which defender's zone contains the shooter
-            defender_pos = None
+            # Find which defender's zone contains the shooter (check for multiple defenders)
+            defender_positions = []
             for def_pos in ["PG", "SG", "SF", "PF", "C"]:
                 if def_pos in def_lineup and def_pos in zone_boundaries:
                     zone_coords = zone_boundaries[def_pos]
                     if _point_in_zone(shooter_coords, zone_coords, False):
-                        defender_pos = def_pos
-                        break
+                        defender_positions.append(def_pos)
+            
+            # If shooter has two defenders, store both; otherwise use single defender
+            if len(defender_positions) >= 2:
+                defender_pos = defender_positions[0]  # Primary defender
+                second_defender_pos = defender_positions[1]  # Second defender
+            elif len(defender_positions) == 1:
+                defender_pos = defender_positions[0]
+                second_defender_pos = None
+            else:
+                defender_pos = None
+                second_defender_pos = None
             
             # Fallback: if shooter not in any zone, use closest defender
             if not defender_pos:
@@ -1485,6 +1501,7 @@ class TurnManager:
         screener = off_lineup.get(screener_pos) if screener_pos else off_lineup["PF"]  # Fallback to PF
         passer = off_lineup.get(passer_pos) if passer_pos else None
         defender = def_lineup.get(defender_pos) if defender_pos else def_lineup["PG"]
+        second_defender = def_lineup.get(second_defender_pos) if second_defender_pos and second_defender_pos in def_lineup else None
         
         # Debug logging for passer assignment
         if passer:
@@ -1498,6 +1515,7 @@ class TurnManager:
             "ball_handler": shooter,
             "passer": passer,
             "defender": defender,
+            "second_defender": second_defender,  # Second defender if shooter has two defenders in zone
             "steps": steps,
             "skeleton": skeleton,  # Include skeleton for variant info
             "action_timeline": action_timeline,
