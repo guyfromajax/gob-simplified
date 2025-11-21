@@ -823,6 +823,82 @@ def generate_logic(off_call, def_call, off_team, def_team, off_lineup, def_lineu
     return lean_score
 
 
+def _store_lean_score(lean_score, game, offense_team, defense_team):
+    """
+    Store lean_score in offense scouting data.
+    
+    Args:
+        lean_score (float): Lean score from -1.0 to 1.0
+        game: Game context object
+        offense_team: Offensive team object
+        defense_team: Defensive team object
+    """
+    try:
+        # Get play type and focus from game_state
+        offense_play_type = game.game_state.get("offense_play_type", "").lower()
+        offense_focus = game.game_state.get("offense_play_focus", "")
+        defense_playcall = game.game_state.get("defense_playcall", "")
+        
+        # Normalize play type
+        if offense_play_type == "set_play":
+            offense_play_type = "set"
+        
+        # Store in offense scouting data
+        if offense_play_type in ["motion", "set"] and offense_focus in ["inside", "attack", "outside"]:
+            play_type_label = "Motion" if offense_play_type == "motion" else "Set"
+            pc = offense_team.scouting_data["offense"]["Playcalls"]
+            
+            # Determine defense tracking key
+            if defense_playcall == "Man":
+                vs_key = "vs_man"
+            elif defense_playcall == "2-3 Zone":
+                vs_key = "vs_2-3_zone"
+            elif defense_playcall == "3-2 Zone":
+                vs_key = "vs_3-2_zone"
+            elif defense_playcall == "1-3-1 Zone":
+                vs_key = "vs_1-3-1_zone"
+            else:
+                vs_key = None
+            
+            # Store lean_score in overall and focus buckets
+            if "lean_scores" not in pc[play_type_label]["overall"]:
+                pc[play_type_label]["overall"]["lean_scores"] = []
+            if "lean_scores" not in pc[play_type_label][offense_focus]:
+                pc[play_type_label][offense_focus]["lean_scores"] = []
+            
+            pc[play_type_label]["overall"]["lean_scores"].append(lean_score)
+            pc[play_type_label][offense_focus]["lean_scores"].append(lean_score)
+            
+            # Store lean_score in vs_* buckets
+            if vs_key and vs_key in pc[play_type_label]["overall"]:
+                if "lean_scores" not in pc[play_type_label]["overall"][vs_key]:
+                    pc[play_type_label]["overall"][vs_key]["lean_scores"] = []
+                pc[play_type_label]["overall"][vs_key]["lean_scores"].append(lean_score)
+            
+            if vs_key and vs_key in pc[play_type_label][offense_focus]:
+                if "lean_scores" not in pc[play_type_label][offense_focus][vs_key]:
+                    pc[play_type_label][offense_focus][vs_key]["lean_scores"] = []
+                pc[play_type_label][offense_focus][vs_key]["lean_scores"].append(lean_score)
+            
+            # Store in vs_zone aggregate if zone defense
+            from BackEnd.utils.defense_utils import is_zone_defense
+            if is_zone_defense(defense_playcall) and "vs_zone" in pc[play_type_label]["overall"]:
+                if "lean_scores" not in pc[play_type_label]["overall"]["vs_zone"]:
+                    pc[play_type_label]["overall"]["vs_zone"]["lean_scores"] = []
+                if "lean_scores" not in pc[play_type_label][offense_focus]["vs_zone"]:
+                    pc[play_type_label][offense_focus]["vs_zone"]["lean_scores"] = []
+                pc[play_type_label]["overall"]["vs_zone"]["lean_scores"].append(lean_score)
+                pc[play_type_label][offense_focus]["vs_zone"]["lean_scores"].append(lean_score)
+            
+            # Store in Cumulative
+            if "lean_scores" not in pc["Cumulative"][offense_focus]:
+                pc["Cumulative"][offense_focus]["lean_scores"] = []
+            pc["Cumulative"][offense_focus]["lean_scores"].append(lean_score)
+    except Exception as e:
+        # Silently handle errors to avoid disrupting gameplay
+        pass
+
+
 def resolve_half_court_offense_logic(game):
     game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
 
@@ -832,6 +908,9 @@ def resolve_half_court_offense_logic(game):
 
     # Generate logic to determine lean score
     lean_score = generate_logic(off_call, def_call, off_team, def_team, off_lineup, def_lineup, game=game)
+    
+    # Store lean_score in scouting data
+    _store_lean_score(lean_score, game, off_team, def_team)
     
     # Get skeleton from MongoDB BEFORE assigning roles, so assign_roles can use the correct skeleton
     # Pass lean_score to select the appropriate skeleton variant

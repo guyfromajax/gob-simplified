@@ -313,6 +313,9 @@ class TurnManager:
                 defensive_team=self.game.defense_team
             )
             
+            # Store EV score in scouting data
+            self._store_ev_score(ev, calls, self.game.offense_team, self.game.defense_team)
+            
             result = self.resolve_half_court_offense()
             # Add playcalls to result for frontend display
             result["offensive_playcall"] = calls["offense"]
@@ -1026,6 +1029,119 @@ class TurnManager:
             ev_percentage = -99.0
         
         return ev_percentage
+    
+    def _store_ev_score(self, ev, calls, offense_team, defense_team):
+        """
+        Store EV score in offense and defense scouting data.
+        
+        Args:
+            ev (float): EV percentage from -99.0 to 99.0
+            calls (dict): Playcall information with offense_type, offense_focus, defense_playcall
+            offense_team: Offensive team object
+            defense_team: Defensive team object
+        """
+        try:
+            # Get play type and focus
+            offense_play_type = calls.get("offense_type", "").lower()
+            offense_focus = calls.get("offense_focus", "")
+            defense_playcall = calls.get("defense", "")
+            
+            # Normalize play type
+            if offense_play_type == "set_play":
+                offense_play_type = "set"
+            
+            # Store in offense scouting data
+            if offense_play_type in ["motion", "set"] and offense_focus in ["inside", "attack", "outside"]:
+                play_type_label = "Motion" if offense_play_type == "motion" else "Set"
+                pc = offense_team.scouting_data["offense"]["Playcalls"]
+                
+                # Determine defense tracking key
+                if defense_playcall == "Man":
+                    vs_key = "vs_man"
+                elif defense_playcall == "2-3 Zone":
+                    vs_key = "vs_2-3_zone"
+                elif defense_playcall == "3-2 Zone":
+                    vs_key = "vs_3-2_zone"
+                elif defense_playcall == "1-3-1 Zone":
+                    vs_key = "vs_1-3-1_zone"
+                else:
+                    vs_key = None
+                
+                # Store EV in overall and focus buckets
+                if "ev_scores" not in pc[play_type_label]["overall"]:
+                    pc[play_type_label]["overall"]["ev_scores"] = []
+                if "ev_scores" not in pc[play_type_label][offense_focus]:
+                    pc[play_type_label][offense_focus]["ev_scores"] = []
+                
+                pc[play_type_label]["overall"]["ev_scores"].append(ev)
+                pc[play_type_label][offense_focus]["ev_scores"].append(ev)
+                
+                # Store EV in vs_* buckets
+                if vs_key and vs_key in pc[play_type_label]["overall"]:
+                    if "ev_scores" not in pc[play_type_label]["overall"][vs_key]:
+                        pc[play_type_label]["overall"][vs_key]["ev_scores"] = []
+                    pc[play_type_label]["overall"][vs_key]["ev_scores"].append(ev)
+                
+                if vs_key and vs_key in pc[play_type_label][offense_focus]:
+                    if "ev_scores" not in pc[play_type_label][offense_focus][vs_key]:
+                        pc[play_type_label][offense_focus][vs_key]["ev_scores"] = []
+                    pc[play_type_label][offense_focus][vs_key]["ev_scores"].append(ev)
+                
+                # Store in vs_zone aggregate if zone defense
+                from BackEnd.utils.defense_utils import is_zone_defense
+                if is_zone_defense(defense_playcall) and "vs_zone" in pc[play_type_label]["overall"]:
+                    if "ev_scores" not in pc[play_type_label]["overall"]["vs_zone"]:
+                        pc[play_type_label]["overall"]["vs_zone"]["ev_scores"] = []
+                    if "ev_scores" not in pc[play_type_label][offense_focus]["vs_zone"]:
+                        pc[play_type_label][offense_focus]["vs_zone"]["ev_scores"] = []
+                    pc[play_type_label]["overall"]["vs_zone"]["ev_scores"].append(ev)
+                    pc[play_type_label][offense_focus]["vs_zone"]["ev_scores"].append(ev)
+                
+                # Store in Cumulative
+                if "ev_scores" not in pc["Cumulative"][offense_focus]:
+                    pc["Cumulative"][offense_focus]["ev_scores"] = []
+                pc["Cumulative"][offense_focus]["ev_scores"].append(ev)
+            
+            # Store in defense scouting data
+            if defense_playcall in defense_team.scouting_data["defense"]:
+                def_data = defense_team.scouting_data["defense"][defense_playcall]
+                game_stats = def_data.get("game_stats", {})
+                
+                # Store EV in top-level game_stats
+                if "ev_scores" not in game_stats:
+                    game_stats["ev_scores"] = []
+                game_stats["ev_scores"].append(ev)
+                
+                # Store EV in vs_* buckets
+                if offense_play_type == "motion":
+                    if "ev_scores" not in game_stats.get("vs_motion", {}):
+                        game_stats.setdefault("vs_motion", {})["ev_scores"] = []
+                    game_stats["vs_motion"]["ev_scores"].append(ev)
+                elif offense_play_type == "set":
+                    if "ev_scores" not in game_stats.get("vs_set", {}):
+                        game_stats.setdefault("vs_set", {})["ev_scores"] = []
+                    game_stats["vs_set"]["ev_scores"].append(ev)
+                
+                if offense_focus in ["inside", "attack", "outside"]:
+                    vs_focus_key = f"vs_{offense_focus}"
+                    if "ev_scores" not in game_stats.get(vs_focus_key, {}):
+                        game_stats.setdefault(vs_focus_key, {})["ev_scores"] = []
+                    game_stats[vs_focus_key]["ev_scores"].append(ev)
+                    
+                    # Store in combination buckets
+                    if offense_play_type == "motion":
+                        combo_key = f"vs_motion_{offense_focus}"
+                        if "ev_scores" not in game_stats.get(combo_key, {}):
+                            game_stats.setdefault(combo_key, {})["ev_scores"] = []
+                        game_stats[combo_key]["ev_scores"].append(ev)
+                    elif offense_play_type == "set":
+                        combo_key = f"vs_set_{offense_focus}"
+                        if "ev_scores" not in game_stats.get(combo_key, {}):
+                            game_stats.setdefault(combo_key, {})["ev_scores"] = []
+                        game_stats[combo_key]["ev_scores"].append(ev)
+        except Exception as e:
+            # Silently handle errors to avoid disrupting gameplay
+            pass
     
     def resolve_half_court_offense(self):
         from BackEnd.engine.phase_resolution import resolve_half_court_offense_logic
