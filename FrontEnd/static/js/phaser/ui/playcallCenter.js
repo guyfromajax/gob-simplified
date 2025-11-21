@@ -42,7 +42,7 @@ export function updatePlaycallCenter(turnData, homeTeamId) {
     const defType = defPlaycall || turnData.defensive_play_type;
     if (defType) {
       const formattedDefType = defType.charAt(0).toUpperCase() + defType.slice(1);
-      const aggr = turnData.aggression || 'Normal';
+    const aggr = turnData.aggression || 'Normal';
       defenseStatusText.textContent = `${formattedDefType} ${aggr}`;
     }
   }
@@ -98,7 +98,7 @@ export function resetLeanMeter() {
 
 /**
  * Animate lean meter based on lean score
- * @param {number} leanScore - Score from -2.0 to 2.0
+ * @param {number} leanScore - Score from -1.0 to 1.0
  */
 export function animateLeanMeter(leanScore) {
 
@@ -107,8 +107,8 @@ export function animateLeanMeter(leanScore) {
     return;
   }
 
-  // Clamp to -2 to 2 range
-  const clampedScore = Math.max(-2, Math.min(2, leanScore));
+  // Clamp to -1 to 1 range
+  const clampedScore = Math.max(-1, Math.min(1, leanScore));
 
   const posFill = document.getElementById('lean-fill-positive');
   const negFill = document.getElementById('lean-fill-negative');
@@ -120,12 +120,12 @@ export function animateLeanMeter(leanScore) {
 
   if (clampedScore > 0) {
     // Positive score: fill upward (green)
-    const percentage = (clampedScore / 2) * 100; // 0-100%
+    const percentage = (clampedScore / 1) * 100; // 0-100%
     posFill.style.height = `${percentage}%`;
     negFill.style.height = '0%';
   } else if (clampedScore < 0) {
     // Negative score: fill downward (red)
-    const percentage = (Math.abs(clampedScore) / 2) * 100; // 0-100%
+    const percentage = (Math.abs(clampedScore) / 1) * 100; // 0-100%
     posFill.style.height = '0%';
     negFill.style.height = `${percentage}%`;
   } else {
