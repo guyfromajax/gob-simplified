@@ -894,9 +894,21 @@ export function animateRebound({
             const isOREBInner = rebounderTeamId === shooterTeamIdInner;
             const reboundType = isOREBInner ? 'OREB' : 'DREB';
             
-            attachBallToPlayer(scene, ballSprite, rebounderSprite, {
-              debugInfo: { shooterId, reboundSpot: ballSpot, reboundType }
-            });
+            // CRITICAL: Don't attach ball if a putback is in progress
+            // The putback turn will handle ball positioning and shooting
+            if (scene._putbackInProgress) {
+              if (debugEnabled && REBOUND_DEBUG) {
+                animationDebugLog("reb:skipAttach", {
+                  reason: 'putback_in_progress',
+                  rebounderId,
+                  reboundType
+                });
+              }
+            } else {
+              attachBallToPlayer(scene, ballSprite, rebounderSprite, {
+                debugInfo: { shooterId, reboundSpot: ballSpot, reboundType }
+              });
+            }
             
             const newOffenseId = rebounderSprite.team_id;
             const previousOffenseId = scene.offenseTeamId;

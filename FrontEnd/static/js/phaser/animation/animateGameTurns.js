@@ -89,6 +89,11 @@ async function handleOrebTurn(scene, { playerSprites, ballSprite, turnData, onUp
       scene._shotInProgress = false;
     }
     
+    // CRITICAL: Set flag to prevent rebound animation from attaching ball
+    // The rebound animation from the previous turn might still be running
+    // and trying to attach the ball, which causes the flash before the putback shot
+    scene._putbackInProgress = true;
+    
     // CRITICAL: Detach ball from any current owner BEFORE positioning
     // The ball might still be attached from the previous rebound animation
     if (scene.ballController) {
@@ -143,6 +148,9 @@ async function handleOrebTurn(scene, { playerSprites, ballSprite, turnData, onUp
       turnIndex: scene.currentTurn,
       turnData: turnData
     });
+    
+    // Clear putback flag after shot animation starts
+    scene._putbackInProgress = false;
     
     // Handle putback make - run inbound setup
     if (turnData.result_type === "PUTBACK_MAKE") {
