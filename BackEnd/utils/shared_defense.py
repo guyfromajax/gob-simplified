@@ -786,10 +786,26 @@ def assign_zone_defender_coords(
         # Guard ball handler
         # assign_bh_defender_coords returns coords in same orientation as input
         # We want to return HOME orientation for consistency, so if input is away orientation, we need to unflip the result
+        
+        # 🐛 DEBUG: Log coordinate flow for ball handler's defender
+        logging.warning(f"🔍 [ZONE DEFENSE DEBUG] assign_zone_defender_coords - Defender {defender_pos}, BH in zone")
+        logging.warning(f"   - is_away_offense: {is_away_offense}")
+        logging.warning(f"   - BH coords (input): {ball_handler_coords}")
+        logging.warning(f"   - BH coords x < 50 (away side)? {ball_handler_coords.get('x', 50) < 50}")
+        
         result = assign_bh_defender_coords(ball_handler_coords, aggression_level, is_away_offense, ball_spot)
+        
+        logging.warning(f"   - Coords from assign_bh_defender_coords: {result}")
+        logging.warning(f"   - Coords x < 50 (away side)? {result.get('x', 50) < 50}")
+        
         # If ball_handler_coords are in away orientation, result is in away orientation, so unflip to home
         if is_away_offense:
+            result_before_unflip = result.copy()
             result = get_away_player_coords(result)  # Unflip from away to home
+            logging.warning(f"   - Coords AFTER unflip: {result}")
+            logging.warning(f"   - Coords x < 50 (away side)? {result.get('x', 50) < 50}")
+            logging.warning(f"   - Expected: x >= 50 (home side), Actual: x={result.get('x')}")
+        
         return result
     
     # PRIORITY 1.5: Handle deep locations (ball handler outside zone boundaries)
@@ -1112,16 +1128,31 @@ def assign_all_zone_defenders(
                     #   - It flips input to home internally, calculates in home, flips result back to away
                     #   - Result is in away orientation (matching input)
                     # Then we unflip to home orientation
+                    
+                    # 🐛 DEBUG: Log coordinate flow for ball handler's defender
+                    logging.warning(f"🔍 [ZONE DEFENSE DEBUG] assign_all_zone_defenders - Defender {defender_pos} assigned to BH")
+                    logging.warning(f"   - is_away_offense: {is_away_offense}")
+                    logging.warning(f"   - BH coords (input): {assigned_player['coords']}")
+                    logging.warning(f"   - BH coords x < 50 (away side)? {assigned_player['coords'].get('x', 50) < 50}")
+                    
                     coords = assign_bh_defender_coords(
                         assigned_player["coords"],
                         aggression_level,
                         is_away_offense,
                         ball_spot
                     )
+                    
+                    logging.warning(f"   - Coords from assign_bh_defender_coords: {coords}")
+                    logging.warning(f"   - Coords x < 50 (away side)? {coords.get('x', 50) < 50}")
+                    
                     if is_away_offense:
                         # assign_bh_defender_coords returned coords in away orientation (matching input)
                         # Unflip to home orientation for consistency with assign_non_bh_defender_coords
+                        coords_before_unflip = coords.copy()
                         coords = get_away_player_coords(coords)  # Unflip from away to home
+                        logging.warning(f"   - Coords AFTER unflip: {coords}")
+                        logging.warning(f"   - Coords x < 50 (away side)? {coords.get('x', 50) < 50}")
+                        logging.warning(f"   - Expected: x >= 50 (home side), Actual: x={coords.get('x')}")
                 else:
                     coords = assign_non_bh_defender_coords(
                         assigned_player["coords"],
