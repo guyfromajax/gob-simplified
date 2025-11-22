@@ -703,6 +703,16 @@ class TurnManager:
             selected_play = random.choice(matching_plays)
             chosen_playcall = selected_play["name"]
         
+        # Defense setting - use override if set, otherwise choose normally
+        # NOTE: This must happen BEFORE offense attempt tracking so we know the correct defense
+        if chosen_defense is None:  # Not set by user override
+            defense_setting = self.game.defense_team.strategy_settings["defense"]
+            chosen_defense = random.choice(STRATEGY_CALL_DICTS["defense"][defense_setting])
+            
+            # If "Zone" is selected, randomly choose between 2-3 Zone, 3-2 Zone, and 1-3-1 Zone (1/3 each)
+            if chosen_defense == "Zone":
+                chosen_defense = random.choice(["2-3 Zone", "3-2 Zone", "1-3-1 Zone"])
+        
         # Record playcall attempt under new buckets
         try:
             # Normalize type/focus labels
@@ -710,8 +720,8 @@ class TurnManager:
             focus_label = chosen_focus if chosen_focus in ["inside", "attack", "outside"] else None
             if play_type_label and focus_label:
                 pc = self.game.offense_team.scouting_data["offense"]["Playcalls"]
-                # Get defensive playcall for granular tracking
-                defense_playcall = self.game.game_state.get("defense_playcall", "Man")  # "Man", "2-3 Zone", etc.
+                # Use chosen_defense for granular tracking (not from game_state, which isn't set yet)
+                defense_playcall = chosen_defense  # Use the defense we just determined
                 from BackEnd.utils.defense_utils import is_zone_defense
                 
                 # Determine defense tracking key based on specific defense name
@@ -756,15 +766,6 @@ class TurnManager:
         # Persist play type/focus to game_state for later success attribution
         self.game.game_state["offense_play_type"] = chosen_play_type
         self.game.game_state["offense_play_focus"] = chosen_focus
-
-        # Defense setting - use override if set, otherwise choose normally
-        if chosen_defense is None:  # Not set by user override
-            defense_setting = self.game.defense_team.strategy_settings["defense"]
-            chosen_defense = random.choice(STRATEGY_CALL_DICTS["defense"][defense_setting])
-            
-            # If "Zone" is selected, randomly choose between 2-3 Zone, 3-2 Zone, and 1-3-1 Zone (1/3 each)
-            if chosen_defense == "Zone":
-                chosen_defense = random.choice(["2-3 Zone", "3-2 Zone", "1-3-1 Zone"])
         
         # Legacy trackers removed from incrementing to avoid serving old structure
 
