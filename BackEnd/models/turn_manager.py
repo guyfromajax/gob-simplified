@@ -2028,7 +2028,7 @@ class TurnManager:
             logging.warning(f"⚠️ [STRATEGY SETTINGS] {def_team.name} has empty strategy_settings dict, initializing with defaults")
             def_team.strategy_settings = def_team._init_strategy_settings()
         
-        # Get strategy settings
+        # Get strategy settings - explicitly check for 0 values
         hct_value = def_team.strategy_settings.get("hc_trap", 0)
         fcp_value = def_team.strategy_settings.get("fc_press", 0)
         
@@ -2036,30 +2036,42 @@ class TurnManager:
         import logging
         logging.warning(f"🛡️ [DEFENSIVE PRESSURE] {def_team.name} - HCT={hct_value}, FCP={fcp_value}")
         logging.warning(f"   - Full strategy_settings: {def_team.strategy_settings}")
+        logging.warning(f"   - HCT type: {type(hct_value)}, FCP type: {type(fcp_value)}")
+        logging.warning(f"   - HCT == 0: {hct_value == 0}, FCP == 0: {fcp_value == 0}")
         
-        # If both are 0, default to HCO
+        # If both are 0, default to HCO (no pressure)
+        # CRITICAL: Check for 0 explicitly - if user set both to 0, they want NO pressure
         if hct_value == 0 and fcp_value == 0:
+            logging.warning(f"   - ✅ Both HCT and FCP are 0, returning HCO (no pressure)")
             return "HCO"
         
         # Remove any strategy with value 0 from consideration
+        # CRITICAL: Only add strategies if their values are > 0
+        # If user set hc_trap=0 and fc_press=0, neither should be added to strategies dict
         strategies = {"HCO": 8}
         hco_removed = False
         
-        if hct_value > 0:
+        # Only add HCT if value is > 0 (user wants it enabled)
+        if hct_value and hct_value > 0:
             strategies["HCT"] = hct_value
             if hct_value == 4:
                 strategies.pop("HCO", None)  # Remove HCO entirely, don't set to 0
                 hco_removed = True
             elif not hco_removed:
                 strategies["HCO"] = max(0, strategies["HCO"] - hct_value)
+        else:
+            logging.warning(f"   - ⚠️ HCT value is {hct_value} (0 or invalid), NOT adding to strategies")
         
-        if fcp_value > 0:
+        # Only add FCP if value is > 0 (user wants it enabled)
+        if fcp_value and fcp_value > 0:
             strategies["FCP"] = fcp_value
             if fcp_value == 4:
                 strategies.pop("HCO", None)  # Remove HCO entirely, don't set to 0
                 hco_removed = True
             elif not hco_removed:
                 strategies["HCO"] = max(0, strategies.get("HCO", 8) - fcp_value)
+        else:
+            logging.warning(f"   - ⚠️ FCP value is {fcp_value} (0 or invalid), NOT adding to strategies")
         
         # Remove any strategies with value 0 from consideration
         strategies = {k: v for k, v in strategies.items() if v > 0}
