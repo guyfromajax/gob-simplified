@@ -35,9 +35,14 @@ class TeamManager:
 
         # Use provided strategy_settings or fall back to random initialization
         # MALLEABLE: Generated per game instance (not loaded from universal teams collection)
-        if strategy_settings:
-            self.strategy_settings = strategy_settings
+        if strategy_settings and isinstance(strategy_settings, dict) and len(strategy_settings) > 0:
+            # Ensure all required keys exist (merge with defaults if missing keys)
+            default_settings = self._init_strategy_settings()
+            self.strategy_settings = {**default_settings, **strategy_settings}  # User settings override defaults
         else:
+            import logging
+            if strategy_settings is not None:
+                logging.warning(f"⚠️ [STRATEGY SETTINGS] {self.name} - strategy_settings provided but invalid (type={type(strategy_settings)}, len={len(strategy_settings) if isinstance(strategy_settings, dict) else 'N/A'}), using defaults")
             self.strategy_settings = self._init_strategy_settings()
         
         self.strategy_calls = {}

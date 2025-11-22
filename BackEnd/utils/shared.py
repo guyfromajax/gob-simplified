@@ -102,7 +102,7 @@ def get_fast_break_chance(game):
     """
     game_state = game.game_state
     off_team = game.offense_team  # Team that just got the rebound (now on offense)
-    level = off_team.strategy_settings["tempo"]
+    level = off_team.strategy_settings.get("tempo", 2)
     return [0.0, 0.25, 0.5, 0.75, 1.0][level]
 
 def get_time_elapsed(tempo_call):

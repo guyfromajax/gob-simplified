@@ -624,7 +624,7 @@ class TurnManager:
                 self.game.game_state["user_defense_override"] = None  # Clear after use
                 logging.info(f"🎮 Using user defense override: {chosen_defense}")
             else:
-                defense_setting = self.game.defense_team.strategy_settings["defense"]
+                defense_setting = self.game.defense_team.strategy_settings.get("defense", 2)
                 chosen_defense = random.choice(STRATEGY_CALL_DICTS["defense"][defense_setting])
                 
                 # If "Zone" is selected, randomly choose between 2-3 Zone, 3-2 Zone, and 1-3-1 Zone (1/3 each)
@@ -706,7 +706,7 @@ class TurnManager:
         # Defense setting - use override if set, otherwise choose normally
         # NOTE: This must happen BEFORE offense attempt tracking so we know the correct defense
         if chosen_defense is None:  # Not set by user override
-            defense_setting = self.game.defense_team.strategy_settings["defense"]
+            defense_setting = self.game.defense_team.strategy_settings.get("defense", 2)
             chosen_defense = random.choice(STRATEGY_CALL_DICTS["defense"][defense_setting])
             
             # If "Zone" is selected, randomly choose between 2-3 Zone, 3-2 Zone, and 1-3-1 Zone (1/3 each)
@@ -780,11 +780,31 @@ class TurnManager:
 
 
     def set_strategy_calls(self):
-        # Ensure strategy_settings are initialized for both teams
-        if not hasattr(self.game.offense_team, 'strategy_settings') or not self.game.offense_team.strategy_settings:
+        # Ensure strategy_settings are initialized for both teams (but don't overwrite existing settings)
+        # Only initialize if it's completely missing (None), not if it's an empty dict
+        if not hasattr(self.game.offense_team, 'strategy_settings') or self.game.offense_team.strategy_settings is None:
+            import logging
+            logging.warning(f"⚠️ [STRATEGY SETTINGS] {self.game.offense_team.name} missing strategy_settings in set_strategy_calls, initializing with defaults")
             self.game.offense_team.strategy_settings = self.game.offense_team._init_strategy_settings()
-        if not hasattr(self.game.defense_team, 'strategy_settings') or not self.game.defense_team.strategy_settings:
+        elif isinstance(self.game.offense_team.strategy_settings, dict) and len(self.game.offense_team.strategy_settings) == 0:
+            import logging
+            logging.warning(f"⚠️ [STRATEGY SETTINGS] {self.game.offense_team.name} has empty strategy_settings dict in set_strategy_calls, initializing with defaults")
+            self.game.offense_team.strategy_settings = self.game.offense_team._init_strategy_settings()
+        
+        if not hasattr(self.game.defense_team, 'strategy_settings') or self.game.defense_team.strategy_settings is None:
+            import logging
+            logging.warning(f"⚠️ [STRATEGY SETTINGS] {self.game.defense_team.name} missing strategy_settings in set_strategy_calls, initializing with defaults")
             self.game.defense_team.strategy_settings = self.game.defense_team._init_strategy_settings()
+        elif isinstance(self.game.defense_team.strategy_settings, dict) and len(self.game.defense_team.strategy_settings) == 0:
+            import logging
+            logging.warning(f"⚠️ [STRATEGY SETTINGS] {self.game.defense_team.name} has empty strategy_settings dict in set_strategy_calls, initializing with defaults")
+            self.game.defense_team.strategy_settings = self.game.defense_team._init_strategy_settings()
+        
+        # 🐛 DEBUG: Log strategy settings being used
+        import logging
+        logging.warning(f"🔧 [SET STRATEGY CALLS] Offense: {self.game.offense_team.name}, Defense: {self.game.defense_team.name}")
+        logging.warning(f"   - Offense strategy_settings: {self.game.offense_team.strategy_settings}")
+        logging.warning(f"   - Defense strategy_settings: {self.game.defense_team.strategy_settings}")
         
         # Ensure strategy_calls dictionaries exist
         if not hasattr(self.game.offense_team, 'strategy_calls') or not self.game.offense_team.strategy_calls:
@@ -793,8 +813,8 @@ class TurnManager:
             self.game.defense_team.strategy_calls = {}
 
         # Set tempo/aggression calls (string values for time elapsed and foul calculations)
-        tempo_setting = self.game.offense_team.strategy_settings["tempo"]
-        aggression_setting = self.game.defense_team.strategy_settings["aggression"]
+        tempo_setting = self.game.offense_team.strategy_settings.get("tempo", 2)
+        aggression_setting = self.game.defense_team.strategy_settings.get("aggression", 2)
         
         self.game.offense_team.strategy_calls["tempo_call"] = random.choice(STRATEGY_CALL_DICTS["tempo"][tempo_setting])
         self.game.defense_team.strategy_calls["aggression_call"] = random.choice(STRATEGY_CALL_DICTS["aggression"][aggression_setting])
@@ -1997,17 +2017,25 @@ class TurnManager:
         """
         def_team = self.game.defense_team
         
-        # Ensure strategy_settings is initialized
-        if not hasattr(def_team, 'strategy_settings') or not def_team.strategy_settings:
+        # Ensure strategy_settings is initialized (but don't overwrite existing settings)
+        # Only initialize if it's completely missing (None), not if it's an empty dict
+        if not hasattr(def_team, 'strategy_settings') or def_team.strategy_settings is None:
+            import logging
+            logging.warning(f"⚠️ [STRATEGY SETTINGS] {def_team.name} missing strategy_settings, initializing with defaults")
+            def_team.strategy_settings = def_team._init_strategy_settings()
+        elif isinstance(def_team.strategy_settings, dict) and len(def_team.strategy_settings) == 0:
+            import logging
+            logging.warning(f"⚠️ [STRATEGY SETTINGS] {def_team.name} has empty strategy_settings dict, initializing with defaults")
             def_team.strategy_settings = def_team._init_strategy_settings()
         
         # Get strategy settings
         hct_value = def_team.strategy_settings.get("hc_trap", 0)
         fcp_value = def_team.strategy_settings.get("fc_press", 0)
         
-        # print(f"🛡️ DEFENSIVE PRESSURE: {def_team.name} - HCT={hct_value}, FCP={fcp_value}")
-        
-        # print(f"🛡️ Defense pressure check - {def_team.name}: HCT={hct_value}, FCP={fcp_value}")
+        # 🐛 DEBUG: Log strategy settings being used
+        import logging
+        logging.warning(f"🛡️ [DEFENSIVE PRESSURE] {def_team.name} - HCT={hct_value}, FCP={fcp_value}")
+        logging.warning(f"   - Full strategy_settings: {def_team.strategy_settings}")
         
         # If both are 0, default to HCO
         if hct_value == 0 and fcp_value == 0:
