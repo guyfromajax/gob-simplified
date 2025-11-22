@@ -505,19 +505,10 @@ function renderTeamStatsTable(team, totals) {
   tbody.appendChild(row);
 }
 
-// Render special stats (Fast Breaks, PIP)
+// Render special stats (Fast Break Points, PIP)
 function renderSpecialStats(team, totals, teamName) {
-  // Fast Breaks
-  const teamStats = gameData.team_stats || {};
-  const scouting = teamStats[teamName] || {};
-  const offense = scouting.offense || {};
-  
-  const fbEntries = offense.Fast_Break_Entries || 0;
-  const fbSuccess = offense.Fast_Break_Success || 0;
-  const fbPct = fbEntries > 0 ? ((fbSuccess / fbEntries) * 100).toFixed(0) : '0';
-  
-  document.getElementById(`${team}-fb-attempts`).textContent = `${fbSuccess} / ${fbEntries}`;
-  document.getElementById(`${team}-fb-success-pct`).textContent = `(${fbPct}%)`;
+  // Fast Breaks ratio is shown in Special Situations section, not here
+  // Only show Fast Break Points and Points In The Paint
   document.getElementById(`${team}-fb-points`).textContent = totals.FB_PTS || 0;
   document.getElementById(`${team}-pip`).textContent = totals.PIP || 0;
 }
@@ -554,9 +545,13 @@ function renderScoutingContent(team, teamStats) {
   const setSection = createPlaycallSubsection('Set Plays', playcalls.Set);
   playCallsSection.appendChild(setSection);
 
-  // Cumulative
-  const cumulativeSection = createPlaycallSubsection('Cumulative', playcalls.Cumulative);
-  playCallsSection.appendChild(cumulativeSection);
+  // Focus Success Rates (only show if there's data)
+  const cumulative = playcalls.Cumulative || {};
+  const hasCumulativeData = Object.values(cumulative).some(focus => (focus.attempts || 0) > 0);
+  if (hasCumulativeData) {
+    const cumulativeSection = createPlaycallSubsection('Focus Success Rates', cumulative);
+    playCallsSection.appendChild(cumulativeSection);
+  }
 
   container.appendChild(playCallsSection);
 
@@ -667,8 +662,33 @@ function createPlaycallSubsection(title, playcallData) {
   const overallAttempts = overall.attempts || 0;
   const overallSuccess = overall.success || 0;
   const overallPct = overallAttempts > 0 ? ((overallSuccess / overallAttempts) * 100).toFixed(0) : '0';
+  
+  // Calculate average EV and Exec for offense playcalls
+  const overallEvScores = overall.ev_scores || [];
+  const overallLeanScores = overall.lean_scores || [];
+  const overallAvgEV = overallEvScores.length > 0 
+    ? (overallEvScores.reduce((a, b) => a + b, 0) / overallEvScores.length).toFixed(0)
+    : null;
+  const overallAvgExec = overallLeanScores.length > 0
+    ? (overallLeanScores.reduce((a, b) => a + b, 0) / overallLeanScores.length * 100).toFixed(0)
+    : null;
+  
+  const overallEvSign = overallAvgEV !== null && parseFloat(overallAvgEV) >= 0 ? '+' : '';
+  const overallExecSign = overallAvgExec !== null && parseFloat(overallAvgExec) >= 0 ? '+' : '';
+  
+  // Color coding: negative=red, zero=yellow, positive=green
+  const overallEvColor = overallAvgEV !== null 
+    ? (parseFloat(overallAvgEV) < 0 ? '#ff0000' : (parseFloat(overallAvgEV) === 0 ? '#ffd700' : '#00ff00'))
+    : null;
+  const overallExecColor = overallAvgExec !== null
+    ? (parseFloat(overallAvgExec) < 0 ? '#ff0000' : (parseFloat(overallAvgExec) === 0 ? '#ffd700' : '#00ff00'))
+    : null;
+  
+  const overallAvgText = overallAvgEV !== null || overallAvgExec !== null
+    ? ` (Avg EV: <span style="color: ${overallEvColor || '#000'}">${overallEvSign}${overallAvgEV || '0'}%</span>) (Avg Exec: <span style="color: ${overallExecColor || '#000'}">${overallExecSign}${overallAvgExec || '0'}%</span>)`
+    : '';
 
-  subsection.innerHTML = `<h4>${title}: ${overallSuccess} / ${overallAttempts} (${overallPct}%)</h4>`;
+  subsection.innerHTML = `<h4>${title}: ${overallSuccess} / ${overallAttempts} (${overallPct}%)${overallAvgText}</h4>`;
 
   // Inside (backend uses lowercase 'inside')
   const inside = playcallData.inside || playcallData.Inside || {};
@@ -780,9 +800,13 @@ function createDefensePlaycallSubsection(title, defenseData) {
   const evSign = parseFloat(avgEV) >= 0 ? '+' : '';
   const execSign = parseFloat(avgExec) >= 0 ? '+' : '';
   
+  // Color coding: negative=red, zero=yellow, positive=green
+  const evColor = parseFloat(avgEV) < 0 ? '#ff0000' : (parseFloat(avgEV) === 0 ? '#ffd700' : '#00ff00');
+  const execColor = parseFloat(avgExec) < 0 ? '#ff0000' : (parseFloat(avgExec) === 0 ? '#ffd700' : '#00ff00');
+  
   const headerText = `${title}: ${success} / ${used} (${pct}%)`;
   const avgText = evScores.length > 0 || leanScores.length > 0
-    ? ` (Avg EV: ${evSign}${avgEV}%) (Avg Exec: ${execSign}${avgExec}%)`
+    ? ` (Avg EV: <span style="color: ${evColor}">${evSign}${avgEV}%</span>) (Avg Exec: <span style="color: ${execColor}">${execSign}${avgExec}%</span>)`
     : '';
   
   subsection.innerHTML = `<h4>${headerText}${avgText}</h4>`;
@@ -807,8 +831,17 @@ function createDefensePlaycallSubsection(title, defenseData) {
   
   const vsMotionEvSign = vsMotionAvgEV !== null && parseFloat(vsMotionAvgEV) >= 0 ? '+' : '';
   const vsMotionExecSign = vsMotionAvgExec !== null && parseFloat(vsMotionAvgExec) >= 0 ? '+' : '';
+  
+  // Color coding for vs Motion
+  const vsMotionEvColor = vsMotionAvgEV !== null
+    ? (parseFloat(vsMotionAvgEV) < 0 ? '#ff0000' : (parseFloat(vsMotionAvgEV) === 0 ? '#ffd700' : '#00ff00'))
+    : null;
+  const vsMotionExecColor = vsMotionAvgExec !== null
+    ? (parseFloat(vsMotionAvgExec) < 0 ? '#ff0000' : (parseFloat(vsMotionAvgExec) === 0 ? '#ffd700' : '#00ff00'))
+    : null;
+  
   const vsMotionAvgText = vsMotionAvgEV !== null || vsMotionAvgExec !== null
-    ? ` (Avg EV: ${vsMotionEvSign}${vsMotionAvgEV || '0'}%) (Avg Exec: ${vsMotionExecSign}${vsMotionAvgExec || '0'}%)`
+    ? ` (Avg EV: <span style="color: ${vsMotionEvColor || '#000'}">${vsMotionEvSign}${vsMotionAvgEV || '0'}%</span>) (Avg Exec: <span style="color: ${vsMotionExecColor || '#000'}">${vsMotionExecSign}${vsMotionAvgExec || '0'}%</span>)`
     : '';
   
   const vsMotionDisplayPct = vsMotionAvgText ? `${vsMotionPct}%${vsMotionAvgText}` : `${vsMotionPct}%`;
@@ -834,8 +867,17 @@ function createDefensePlaycallSubsection(title, defenseData) {
   
   const vsSetEvSign = vsSetAvgEV !== null && parseFloat(vsSetAvgEV) >= 0 ? '+' : '';
   const vsSetExecSign = vsSetAvgExec !== null && parseFloat(vsSetAvgExec) >= 0 ? '+' : '';
+  
+  // Color coding for vs Set Play
+  const vsSetEvColor = vsSetAvgEV !== null
+    ? (parseFloat(vsSetAvgEV) < 0 ? '#ff0000' : (parseFloat(vsSetAvgEV) === 0 ? '#ffd700' : '#00ff00'))
+    : null;
+  const vsSetExecColor = vsSetAvgExec !== null
+    ? (parseFloat(vsSetAvgExec) < 0 ? '#ff0000' : (parseFloat(vsSetAvgExec) === 0 ? '#ffd700' : '#00ff00'))
+    : null;
+  
   const vsSetAvgText = vsSetAvgEV !== null || vsSetAvgExec !== null
-    ? ` (Avg EV: ${vsSetEvSign}${vsSetAvgEV || '0'}%) (Avg Exec: ${vsSetExecSign}${vsSetAvgExec || '0'}%)`
+    ? ` (Avg EV: <span style="color: ${vsSetEvColor || '#000'}">${vsSetEvSign}${vsSetAvgEV || '0'}%</span>) (Avg Exec: <span style="color: ${vsSetExecColor || '#000'}">${vsSetExecSign}${vsSetAvgExec || '0'}%</span>)`
     : '';
   
   const vsSetDisplayPct = vsSetAvgText ? `${vsSetPct}%${vsSetAvgText}` : `${vsSetPct}%`;
@@ -876,10 +918,25 @@ function setupTabs() {
   const tabButtons = document.querySelectorAll('.tab-button');
   const teamContents = document.querySelectorAll('.team-content');
 
-  tabButtons.forEach(button => {
-    button.addEventListener('click', () => {
-      const team = button.dataset.team;
+  // Get team colors from gameData
+  const homeTeam = gameData?.home_team || {};
+  const awayTeam = gameData?.away_team || {};
+  const homePrimaryColor = homeTeam.primary_color || '#000000';
+  const awayPrimaryColor = awayTeam.primary_color || '#000000';
 
+  tabButtons.forEach(button => {
+    const team = button.dataset.team;
+    
+    // Set background color based on team
+    if (team === 'home') {
+      button.style.backgroundColor = homePrimaryColor;
+      button.style.color = '#fff';
+    } else if (team === 'away') {
+      button.style.backgroundColor = awayPrimaryColor;
+      button.style.color = '#fff';
+    }
+    
+    button.addEventListener('click', () => {
       // Update active tab
       tabButtons.forEach(btn => btn.classList.remove('active'));
       button.classList.add('active');
