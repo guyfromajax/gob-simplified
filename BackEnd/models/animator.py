@@ -559,9 +559,21 @@ class Animator:
                 bh_last_spot = bh_timeline[-1][2] if bh_timeline else None
                 first_coords = HCO_STRING_SPOTS.get(bh_first_spot, ball_handler_end_coords)
                 final_coords = HCO_STRING_SPOTS.get(bh_last_spot, ball_handler_end_coords)
+                
+                # 🐛 DEBUG: Log coordinate flow for ball handler's defender in man defense
+                if is_away_offense:
+                    logging.warning(f"🔍 [MAN DEFENSE DEBUG] Ball handler defender positioning - Step 1: Initial coords")
+                    logging.warning(f"   - is_away_offense: {is_away_offense}")
+                    logging.warning(f"   - first_coords (from HCO_STRING_SPOTS, home orientation): {first_coords}")
+                    logging.warning(f"   - final_coords (from HCO_STRING_SPOTS, home orientation): {final_coords}")
+                
                 if is_away_offense:
                     first_coords = get_away_player_coords(first_coords)
                     final_coords = get_away_player_coords(final_coords)
+                    
+                    if is_away_offense:
+                        logging.warning(f"   - first_coords AFTER flip to away: {first_coords}")
+                        logging.warning(f"   - final_coords AFTER flip to away: {final_coords}")
                 
                 # Override end position if FCP is next
                 if next_defensive_setup == "FCP":
@@ -574,7 +586,13 @@ class Animator:
                         "y": final_coords["y"]
                     }
                 else:
+                    if is_away_offense:
+                        logging.warning(f"   - Calling assign_bh_defender_coords with final_coords (away orientation): {final_coords}")
                     def_coords = assign_bh_defender_coords(final_coords, aggression_call, is_away_offense, bh_last_spot or "key")
+                    if is_away_offense:
+                        logging.warning(f"   - def_coords returned from assign_bh_defender_coords: {def_coords}")
+                        logging.warning(f"   - def_coords x < 50 (away side)? {def_coords.get('x', 50) < 50}")
+                        logging.warning(f"   - Expected: x < 50 (away side), Actual: x={def_coords.get('x')}")
                 action_type = ACTIONS["GUARD_BALL"]
             elif pos in off_lineup:
                 off_player = off_lineup[pos]
@@ -602,7 +620,14 @@ class Animator:
             if pos == bh_pos:
                 # assign_bh_defender_coords expects coords in original orientation and returns in same orientation
                 # So if is_away_offense, first_coords should be in away orientation, and result will be in away orientation
+                if is_away_offense:
+                    logging.warning(f"🔍 [MAN DEFENSE DEBUG] Setting start position for BH defender")
+                    logging.warning(f"   - first_coords (away orientation): {first_coords}")
                 start = assign_bh_defender_coords(first_coords, aggression_call, is_away_offense, bh_first_spot or "key")
+                if is_away_offense:
+                    logging.warning(f"   - start returned from assign_bh_defender_coords: {start}")
+                    logging.warning(f"   - start x < 50 (away side)? {start.get('x', 50) < 50}")
+                    logging.warning(f"   - Expected: x < 50 (away side), Actual: x={start.get('x')}")
                 # Don't flip start - assign_bh_defender_coords already handles orientation
 
             if is_away_offense and pos != bh_pos:
@@ -619,9 +644,16 @@ class Animator:
                     # assign_bh_defender_coords expects coords in original orientation (away if away offense)
                     # and returns coords in the same orientation
                     if is_away_offense:
+                        logging.warning(f"🔍 [MAN DEFENSE DEBUG] Movement step t={t}, spot={spot}")
+                        logging.warning(f"   - bh_coords (from HCO_STRING_SPOTS, home orientation): {bh_coords}")
                         bh_coords = get_away_player_coords(bh_coords)
+                        logging.warning(f"   - bh_coords AFTER flip to away: {bh_coords}")
                     # Function handles internal flipping and returns coords in same orientation as input
                     d_coords = assign_bh_defender_coords(bh_coords, aggression_call, is_away_offense, spot or "key")
+                    if is_away_offense:
+                        logging.warning(f"   - d_coords returned from assign_bh_defender_coords: {d_coords}")
+                        logging.warning(f"   - d_coords x < 50 (away side)? {d_coords.get('x', 50) < 50}")
+                        logging.warning(f"   - Expected: x < 50 (away side), Actual: x={d_coords.get('x')}")
                     # Don't flip d_coords - assign_bh_defender_coords already returns in correct orientation
                     movement.append({
                         "timestamp": t,
