@@ -28,12 +28,17 @@ def assign_bh_defender_coords(ball_coords, aggression_level: str, is_away_offens
     y_bh = ball_coords["y"]
     coords_were_flipped = False
 
+    # 🐛 DEBUG: Log coordinate flow inside assign_bh_defender_coords
+    if is_away_offense:
+        logging.warning(f"🔍 [ASSIGN_BH_DEFENDER] Input coords (away orientation): {ball_coords}")
+
     # Convert ball handler coords back to home orientation so the spacing logic
     # is consistent regardless of which team has possession.
     if is_away_offense:
         flipped = get_away_player_coords(ball_coords)
         x_bh, y_bh = flipped["x"], flipped["y"]
         coords_were_flipped = True
+        logging.warning(f"   - Coords flipped to home orientation: x={x_bh}, y={y_bh}")
 
     y_direction = -1 if y_bh > 25 else 1  # direction toward basket
     # In home orientation, defenders are always to the RIGHT of ball handler (toward basket at x=90)
@@ -65,9 +70,16 @@ def assign_bh_defender_coords(ball_coords, aggression_level: str, is_away_offens
 
     result = {"x": x, "y": y}
     
+    if is_away_offense:
+        logging.warning(f"   - Defender position calculated in home orientation: {result}")
+    
     # If we flipped input coords, flip result back to match input orientation
     if coords_were_flipped:
+        result_before_flip = result.copy()
         result = get_away_player_coords(result)
+        logging.warning(f"   - Result flipped back to away orientation: {result_before_flip} → {result}")
+        logging.warning(f"   - Final result x < 50 (away side)? {result.get('x', 50) < 50}")
+        logging.warning(f"   - Expected: x < 50 (away side), Actual: x={result.get('x')}")
     
     return result
 
