@@ -2014,8 +2014,14 @@ class TurnManager:
         """
         Determine if defensive team should attempt FCP or HCT after a made shot.
         Returns 'FCP', 'HCT', or 'HCO' based on strategy settings and random rolls.
+        
+        NOTE: After a made shot, possession will flip. The team that just scored
+        (currently offense_team) will become the defense team. So we use offense_team's
+        settings, not defense_team's settings.
         """
-        def_team = self.game.defense_team
+        # After a made shot, possession will flip. The team that just scored
+        # (currently offense_team) will become the defense team and apply pressure.
+        def_team = self.game.offense_team
         
         # Ensure strategy_settings is initialized (but don't overwrite existing settings)
         # Only initialize if it's completely missing (None), not if it's an empty dict
