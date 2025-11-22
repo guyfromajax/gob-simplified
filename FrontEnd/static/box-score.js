@@ -599,25 +599,48 @@ function renderScoutingContent(team, teamStats) {
   
   // Aggregate stats from all zone types
   const aggregateZoneStats = (statKey) => {
-    const stats23 = (zone23.game_stats || zone23.season_stats || zone23 || {})[statKey] || {};
-    const stats32 = (zone32.game_stats || zone32.season_stats || zone32 || {})[statKey] || {};
-    const stats131 = (zone131.game_stats || zone131.season_stats || zone131 || {})[statKey] || {};
+    const base23 = zone23.game_stats || zone23.season_stats || zone23 || {};
+    const base32 = zone32.game_stats || zone32.season_stats || zone32 || {};
+    const base131 = zone131.game_stats || zone131.season_stats || zone131 || {};
     
-    if (typeof stats23 === 'object' && stats23 !== null) {
+    const stats23 = base23[statKey];
+    const stats32 = base32[statKey];
+    const stats131 = base131[statKey];
+    
+    // Check if any of them is an object (like vs_motion, vs_set, etc.)
+    if (stats23 && typeof stats23 === 'object' && stats23 !== null && !Array.isArray(stats23)) {
       // It's a nested object (like vs_motion, vs_set, etc.)
       return {
-        attempts: (stats23.attempts || 0) + (stats32.attempts || 0) + (stats131.attempts || 0),
-        success: (stats23.success || 0) + (stats32.success || 0) + (stats131.success || 0)
+        attempts: (stats23.attempts || 0) + ((stats32 && stats32.attempts) || 0) + ((stats131 && stats131.attempts) || 0),
+        success: (stats23.success || 0) + ((stats32 && stats32.success) || 0) + ((stats131 && stats131.success) || 0),
+        ev_scores: [...(stats23.ev_scores || []), ...(stats32?.ev_scores || []), ...(stats131?.ev_scores || [])],
+        lean_scores: [...(stats23.lean_scores || []), ...(stats32?.lean_scores || []), ...(stats131?.lean_scores || [])]
       };
     } else {
-      // It's a number (like used, success)
-      return (stats23 || 0) + (stats32 || 0) + (stats131 || 0);
+      // It's a number (like used, success) or array (like ev_scores, lean_scores)
+      if (Array.isArray(stats23) || Array.isArray(stats32) || Array.isArray(stats131)) {
+        // It's an array (like ev_scores, lean_scores)
+        return [...(stats23 || []), ...(stats32 || []), ...(stats131 || [])];
+      } else {
+        // It's a number
+        const val23 = (typeof stats23 === 'number') ? stats23 : 0;
+        const val32 = (typeof stats32 === 'number') ? stats32 : 0;
+        const val131 = (typeof stats131 === 'number') ? stats131 : 0;
+        return val23 + val32 + val131;
+      }
     }
   };
+  
+  // Aggregate ev_scores and lean_scores at the top level
+  const base23 = zone23.game_stats || zone23.season_stats || zone23 || {};
+  const base32 = zone32.game_stats || zone32.season_stats || zone32 || {};
+  const base131 = zone131.game_stats || zone131.season_stats || zone131 || {};
   
   const zoneDefense = {
     used: aggregateZoneStats('used'),
     success: aggregateZoneStats('success'),
+    ev_scores: [...(base23.ev_scores || []), ...(base32.ev_scores || []), ...(base131.ev_scores || [])],
+    lean_scores: [...(base23.lean_scores || []), ...(base32.lean_scores || []), ...(base131.lean_scores || [])],
     vs_motion: aggregateZoneStats('vs_motion'),
     vs_set: aggregateZoneStats('vs_set'),
     vs_inside: aggregateZoneStats('vs_inside'),
