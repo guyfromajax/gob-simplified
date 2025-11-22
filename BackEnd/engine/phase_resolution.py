@@ -1317,9 +1317,36 @@ def resolve_full_court_press_logic(game: "GameManager"):
     # Handle SHOT result - execute actual shot resolution
     if result_type == "SHOT":
         # Build roles for shot
-        passer = off_lineup.get("PG", list(off_lineup.values())[0])
-        shooter = random.choice([off_lineup.get("PF"), off_lineup.get("C")])
-        defender = def_lineup.get("PG", list(def_lineup.values())[0])
+        passer = off_lineup.get("PG")
+        if not passer:
+            passer = next((p for p in off_lineup.values() if p is not None), None)
+        
+        # Ensure shooter is not None
+        pf_player = off_lineup.get("PF")
+        c_player = off_lineup.get("C")
+        possible_shooters = [p for p in [pf_player, c_player] if p is not None]
+        if not possible_shooters:
+            # Fallback to any available offensive player
+            possible_shooters = [p for p in off_lineup.values() if p is not None]
+        shooter = random.choice(possible_shooters) if possible_shooters else None
+        
+        defender = def_lineup.get("PG")
+        if not defender:
+            defender = next((p for p in def_lineup.values() if p is not None), None)
+        
+        # Validate all required players exist
+        if not shooter:
+            import logging
+            logging.error(f"❌ FCP SHOT ERROR: No shooter available for {off_team.name}")
+            return {
+                "result_type": "DEAD_BALL_TURNOVER",
+                "text": "they can't find a shooter!",
+                "time_elapsed": 5,
+                "possession_flips": True,
+            }
+        
+        if not passer:
+            passer = shooter
         
         shot_roles = {
             "ball_handler": passer,
@@ -1892,9 +1919,36 @@ def resolve_half_court_trap_logic(game: "GameManager"):
     # Handle SHOT result - execute actual shot resolution (same as FCP)
     if result_type == "SHOT":
         # Build roles for shot
-        passer = off_lineup.get("PG", list(off_lineup.values())[0])
-        shooter = random.choice([off_lineup.get("PF"), off_lineup.get("C")])
-        defender = def_lineup.get("PG", list(def_lineup.values())[0])
+        passer = off_lineup.get("PG")
+        if not passer:
+            passer = next((p for p in off_lineup.values() if p is not None), None)
+        
+        # Ensure shooter is not None
+        pf_player = off_lineup.get("PF")
+        c_player = off_lineup.get("C")
+        possible_shooters = [p for p in [pf_player, c_player] if p is not None]
+        if not possible_shooters:
+            # Fallback to any available offensive player
+            possible_shooters = [p for p in off_lineup.values() if p is not None]
+        shooter = random.choice(possible_shooters) if possible_shooters else None
+        
+        defender = def_lineup.get("PG")
+        if not defender:
+            defender = next((p for p in def_lineup.values() if p is not None), None)
+        
+        # Validate all required players exist
+        if not shooter:
+            import logging
+            logging.error(f"❌ HCT SHOT ERROR: No shooter available for {off_team.name}")
+            return {
+                "result_type": "DEAD_BALL_TURNOVER",
+                "text": "they can't find a shooter!",
+                "time_elapsed": 5,
+                "possession_flips": True,
+            }
+        
+        if not passer:
+            passer = shooter
         
         shot_roles = {
             "ball_handler": passer,
