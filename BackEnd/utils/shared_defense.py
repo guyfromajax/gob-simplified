@@ -42,8 +42,11 @@ def assign_bh_defender_coords(ball_coords, aggression_level: str, is_away_offens
 
     y_direction = -1 if y_bh > 25 else 1  # direction toward basket
     # In home orientation, defenders are always to the RIGHT of ball handler (toward basket at x=90)
-    # So x_direction should always be +1 in home orientation
-    x_direction = 1  # Always toward basket in home orientation
+    # However, when away team has the ball, after we flip back to away orientation,
+    # the defender needs to be to the RIGHT of the ball handler (toward away basket at x=0)
+    # So in home orientation (after flipping), we need x_direction = -1 to position defender to the LEFT
+    # which will become RIGHT when flipped back to away orientation
+    x_direction = -1 if is_away_offense else 1  # Toward basket: -1 when away offense (becomes right after flip), +1 when home offense
     
 
     if bh_spot == "key":
