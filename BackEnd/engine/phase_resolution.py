@@ -825,7 +825,7 @@ def generate_logic(off_call, def_call, off_team, def_team, off_lineup, def_lineu
 
 def _store_lean_score(lean_score, game, offense_team, defense_team):
     """
-    Store lean_score in offense scouting data.
+    Store lean_score in offense and defense scouting data.
     
     Args:
         lean_score (float): Lean score from -1.0 to 1.0
@@ -894,6 +894,44 @@ def _store_lean_score(lean_score, game, offense_team, defense_team):
             if "lean_scores" not in pc["Cumulative"][offense_focus]:
                 pc["Cumulative"][offense_focus]["lean_scores"] = []
             pc["Cumulative"][offense_focus]["lean_scores"].append(lean_score)
+        
+        # Store lean_score in defense scouting data
+        if defense_playcall in defense_team.scouting_data["defense"]:
+            def_data = defense_team.scouting_data["defense"][defense_playcall]
+            game_stats = def_data.get("game_stats", {})
+            
+            # Store lean_score in top-level game_stats
+            if "lean_scores" not in game_stats:
+                game_stats["lean_scores"] = []
+            game_stats["lean_scores"].append(lean_score)
+            
+            # Store lean_score in vs_* buckets
+            if offense_play_type == "motion":
+                if "lean_scores" not in game_stats.get("vs_motion", {}):
+                    game_stats.setdefault("vs_motion", {})["lean_scores"] = []
+                game_stats["vs_motion"]["lean_scores"].append(lean_score)
+            elif offense_play_type == "set":
+                if "lean_scores" not in game_stats.get("vs_set", {}):
+                    game_stats.setdefault("vs_set", {})["lean_scores"] = []
+                game_stats["vs_set"]["lean_scores"].append(lean_score)
+            
+            if offense_focus in ["inside", "attack", "outside"]:
+                vs_focus_key = f"vs_{offense_focus}"
+                if "lean_scores" not in game_stats.get(vs_focus_key, {}):
+                    game_stats.setdefault(vs_focus_key, {})["lean_scores"] = []
+                game_stats[vs_focus_key]["lean_scores"].append(lean_score)
+                
+                # Store in combination buckets
+                if offense_play_type == "motion":
+                    combo_key = f"vs_motion_{offense_focus}"
+                    if "lean_scores" not in game_stats.get(combo_key, {}):
+                        game_stats.setdefault(combo_key, {})["lean_scores"] = []
+                    game_stats[combo_key]["lean_scores"].append(lean_score)
+                elif offense_play_type == "set":
+                    combo_key = f"vs_set_{offense_focus}"
+                    if "lean_scores" not in game_stats.get(combo_key, {}):
+                        game_stats.setdefault(combo_key, {})["lean_scores"] = []
+                    game_stats[combo_key]["lean_scores"].append(lean_score)
     except Exception as e:
         # Silently handle errors to avoid disrupting gameplay
         pass
