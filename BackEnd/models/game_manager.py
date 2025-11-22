@@ -200,16 +200,35 @@ class GameManager:
         self.game_state["defense_playcall"] = ""
 
     def get_box_score(self):
-        return {
-            team.name: {
-                pos: {
-                    "name": player.get_name(),
-                    **player.stats["game"]
-                }
-                for pos, player in team.lineup.items()
-            }
-            for team in [self.home_team, self.away_team]
-        }
+        """Get box score with all players (lineup + bench) to match team totals."""
+        box_score = {}
+        for team in [self.home_team, self.away_team]:
+            team_box = {}
+            # Include all players from roster (not just lineup) to match team_totals calculation
+            # First, add lineup players with their positions
+            for pos, player in team.lineup.items():
+                if player:  # Skip None players
+                    team_box[pos] = {
+                        "name": player.get_name(),
+                        "playerId": player.player_id,
+                        **player.stats["game"]
+                    }
+            # Then add bench players (players not in current lineup)
+            lineup_player_ids = {p.player_id for p in team.lineup.values() if p}
+            for player in team.players.values():
+                if player.player_id not in lineup_player_ids:
+                    # Use player's position attribute or default to bench
+                    pos = getattr(player, "position", None) or getattr(player, "pos", None) or "BENCH"
+                    # Handle multiple bench players with same position by appending player_id
+                    if pos in team_box:
+                        pos = f"{pos}_{player.player_id[:8]}"
+                    team_box[pos] = {
+                        "name": player.get_name(),
+                        "playerId": player.player_id,
+                        **player.stats["game"]
+                    }
+            box_score[team.name] = team_box
+        return box_score
 
     def to_dict(self):
         output = deepcopy(self.game_state)
