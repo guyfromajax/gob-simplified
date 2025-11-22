@@ -1348,13 +1348,12 @@ class Animator:
                     else:
                         def_coords = {"x": 50, "y": 25}
                 
-                # ✅ IMPORTANT: assign_all_zone_defenders returns coords in HOME orientation
-                # (assign_bh_defender_coords and assign_non_bh_defender_coords both calculate in home orientation
-                # and return home orientation, even though assign_bh_defender_coords flips back to match input)
+                # ✅ IMPORTANT: assign_all_zone_defenders should return coords in HOME orientation
+                # (assign_bh_defender_coords returns away orientation but is unflipped to home in assign_zone_defender_coords/assign_all_zone_defenders)
+                # (assign_non_bh_defender_coords returns home orientation directly)
                 # When away team is on offense, we need to flip ALL defensive coords to away orientation
                 # to match the offensive coords (which are also in away orientation)
                 # This ensures all players (offense and defense) are positioned on the away side of the court
-                def_coords_before_flip = def_coords.copy() if def_coords else None
                 if is_away_offense:
                     def_coords = get_away_player_coords(def_coords)
                 

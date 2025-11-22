@@ -1107,6 +1107,11 @@ def assign_all_zone_defenders(
                     # assigned_player["coords"] are in away orientation if away offense
                     # assign_bh_defender_coords returns coords in same orientation as input
                     # We want HOME orientation for consistency, so unflip if needed
+                    # IMPORTANT: assign_bh_defender_coords flips internally if is_away_offense is True
+                    # So if input is away orientation and is_away_offense is True:
+                    #   - It flips input to home internally, calculates in home, flips result back to away
+                    #   - Result is in away orientation (matching input)
+                    # Then we unflip to home orientation
                     coords = assign_bh_defender_coords(
                         assigned_player["coords"],
                         aggression_level,
@@ -1114,6 +1119,8 @@ def assign_all_zone_defenders(
                         ball_spot
                     )
                     if is_away_offense:
+                        # assign_bh_defender_coords returned coords in away orientation (matching input)
+                        # Unflip to home orientation for consistency with assign_non_bh_defender_coords
                         coords = get_away_player_coords(coords)  # Unflip from away to home
                 else:
                     coords = assign_non_bh_defender_coords(
