@@ -28,21 +28,20 @@ def assign_bh_defender_coords(ball_coords, aggression_level: str, is_away_offens
     x_bh = ball_coords["x"]
     y_bh = ball_coords["y"]
 
-    # Determine which basket is being attacked (in home orientation)
-    # - When home team has ball: attacking AWAY basket (x=10)
-    # - When away team has ball: attacking HOME basket (x=90)
-    target_basket = AWAY_RIM_COORDS if not is_away_offense else HOME_RIM_COORDS
-    basket_x = target_basket["x"]
-    
-    # Defender must be closer to basket than ball handler
-    # Calculate direction: if basket is to the left (x < ball_handler_x), defender goes left (negative)
-    #                      if basket is to the right (x > ball_handler_x), defender goes right (positive)
-    if basket_x < x_bh:
-        # Basket is to the LEFT, defender should be to the LEFT of ball handler
+    # SIMPLE RULE: Defender positioning based on which team has the ball
+    # - When HOME team has ball: defender to the RIGHT (toward home basket they're defending) = x_direction = +1
+    # - When AWAY team has ball: defender to the LEFT (toward away basket they're defending) = x_direction = -1
+    # This positions the defender between the ball handler and the basket they're defending
+    if is_away_offense:
+        # Away team has ball - defender should be to the LEFT (toward away basket at x=10)
         x_direction = -1
     else:
-        # Basket is to the RIGHT, defender should be to the RIGHT of ball handler
+        # Home team has ball - defender should be to the RIGHT (toward home basket at x=90)
         x_direction = 1
+    
+    # Determine which basket is being attacked (for verification/debugging)
+    target_basket = AWAY_RIM_COORDS if not is_away_offense else HOME_RIM_COORDS
+    basket_x = target_basket["x"]
     
     # Y direction: toward the basket
     y_direction = -1 if y_bh > 25 else 1

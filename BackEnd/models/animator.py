@@ -1554,6 +1554,11 @@ class Animator:
                     
                     def_coords = assign_non_bh_defender_coords(off_coords, bh_coords, aggression, is_away_offense, bh_spot, o_spot)
                 
+                # assign_bh_defender_coords and assign_non_bh_defender_coords return coords in HOME orientation
+                # If away team has the ball, we need to flip defensive coords to away orientation for display
+                if is_away_offense:
+                    def_coords = get_away_player_coords(def_coords)
+                
                 def_start = def_coords
                 def_movement.append({
                     "timestamp": 0,
@@ -1599,6 +1604,11 @@ class Animator:
                         o_spot = o_action.get("location") or o_action.get("spot") or "key"
                         
                         def_coords = assign_non_bh_defender_coords(off_coords, bh_coords, aggression, is_away_offense, bh_spot, o_spot)
+                    
+                    # assign_bh_defender_coords and assign_non_bh_defender_coords return coords in HOME orientation
+                    # If away team has the ball, we need to flip defensive coords to away orientation for display
+                    if is_away_offense:
+                        def_coords = get_away_player_coords(def_coords)
                     
                     def_end = def_coords
                     def_movement.append({
