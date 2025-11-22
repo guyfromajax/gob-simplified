@@ -630,23 +630,29 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
         # ✅ CRITICAL FIX: If game is already in memory, update strategy_settings if request has them
         # This ensures user's updated Game Plan settings are applied even if game is already loaded
         if gm is not None and request.strategy_settings and request.user_team_side:
-            import logging
-            if request.user_team_side == "home":
-                old_hct = gm.home_team.strategy_settings.get('hc_trap', 'MISSING') if hasattr(gm.home_team, 'strategy_settings') and gm.home_team.strategy_settings else 'MISSING'
-                old_fcp = gm.home_team.strategy_settings.get('fc_press', 'MISSING') if hasattr(gm.home_team, 'strategy_settings') and gm.home_team.strategy_settings else 'MISSING'
-                gm.home_team.strategy_settings = request.strategy_settings.copy()  # Use copy to avoid reference issues
-                new_hct = request.strategy_settings.get('hc_trap', 'MISSING')
-                new_fcp = request.strategy_settings.get('fc_press', 'MISSING')
-                logging.warning(f"🔧 [STRATEGY SETTINGS] Updated home team (IN MEMORY) - HCT: {old_hct} → {new_hct}, FCP: {old_fcp} → {new_fcp}")
-                logging.warning(f"   - Full strategy_settings: {gm.home_team.strategy_settings}")
-            elif request.user_team_side == "away":
-                old_hct = gm.away_team.strategy_settings.get('hc_trap', 'MISSING') if hasattr(gm.away_team, 'strategy_settings') and gm.away_team.strategy_settings else 'MISSING'
-                old_fcp = gm.away_team.strategy_settings.get('fc_press', 'MISSING') if hasattr(gm.away_team, 'strategy_settings') and gm.away_team.strategy_settings else 'MISSING'
-                gm.away_team.strategy_settings = request.strategy_settings.copy()  # Use copy to avoid reference issues
-                new_hct = request.strategy_settings.get('hc_trap', 'MISSING')
-                new_fcp = request.strategy_settings.get('fc_press', 'MISSING')
-                logging.warning(f"🔧 [STRATEGY SETTINGS] Updated away team (IN MEMORY) - HCT: {old_hct} → {new_hct}, FCP: {old_fcp} → {new_fcp}")
-                logging.warning(f"   - Full strategy_settings: {gm.away_team.strategy_settings}")
+            try:
+                # Ensure strategy_settings is a dict before copying
+                if not isinstance(request.strategy_settings, dict):
+                    logging.error(f"⚠️ [STRATEGY SETTINGS] request.strategy_settings is not a dict: {type(request.strategy_settings)}")
+                else:
+                    if request.user_team_side == "home":
+                        old_hct = gm.home_team.strategy_settings.get('hc_trap', 'MISSING') if hasattr(gm.home_team, 'strategy_settings') and gm.home_team.strategy_settings else 'MISSING'
+                        old_fcp = gm.home_team.strategy_settings.get('fc_press', 'MISSING') if hasattr(gm.home_team, 'strategy_settings') and gm.home_team.strategy_settings else 'MISSING'
+                        gm.home_team.strategy_settings = dict(request.strategy_settings)  # Use dict() constructor for safety
+                        new_hct = request.strategy_settings.get('hc_trap', 'MISSING')
+                        new_fcp = request.strategy_settings.get('fc_press', 'MISSING')
+                        logging.warning(f"🔧 [STRATEGY SETTINGS] Updated home team (IN MEMORY) - HCT: {old_hct} → {new_hct}, FCP: {old_fcp} → {new_fcp}")
+                        logging.warning(f"   - Full strategy_settings: {gm.home_team.strategy_settings}")
+                    elif request.user_team_side == "away":
+                        old_hct = gm.away_team.strategy_settings.get('hc_trap', 'MISSING') if hasattr(gm.away_team, 'strategy_settings') and gm.away_team.strategy_settings else 'MISSING'
+                        old_fcp = gm.away_team.strategy_settings.get('fc_press', 'MISSING') if hasattr(gm.away_team, 'strategy_settings') and gm.away_team.strategy_settings else 'MISSING'
+                        gm.away_team.strategy_settings = dict(request.strategy_settings)  # Use dict() constructor for safety
+                        new_hct = request.strategy_settings.get('hc_trap', 'MISSING')
+                        new_fcp = request.strategy_settings.get('fc_press', 'MISSING')
+                        logging.warning(f"🔧 [STRATEGY SETTINGS] Updated away team (IN MEMORY) - HCT: {old_hct} → {new_hct}, FCP: {old_fcp} → {new_fcp}")
+                        logging.warning(f"   - Full strategy_settings: {gm.away_team.strategy_settings}")
+            except Exception as e:
+                logging.error(f"❌ [STRATEGY SETTINGS] Error updating strategy_settings: {e}", exc_info=True)
         if gm is None:
             logging.warning(
                 "simulate_quarter_endpoint unknown game_id=%s; active=%s",
@@ -714,36 +720,42 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                         # ✅ CRITICAL FIX: Always prioritize request.strategy_settings over DB for user's team
                         # This ensures user's current settings (from Game Plan screen) are applied, even if DB has old/wrong settings
                         # This fixes Q1 issues where DB might have tempo=1 but user set tempo=4
-                        import logging
                         if request.strategy_settings and request.user_team_side:
-                            if request.user_team_side == "home":
-                                old_hct = home_strategy.get('hc_trap', 'MISSING') if home_strategy else 'MISSING'
-                                old_fcp = home_strategy.get('fc_press', 'MISSING') if home_strategy else 'MISSING'
-                                if home_strategy is None:
-                                    home_strategy = request.strategy_settings.copy()  # Use copy to avoid reference issues
-                                    logging.warning(f"🔧 [STRATEGY SETTINGS] FALLBACK (DB LOAD) - Using request.strategy_settings for home team (DB had None)")
+                            try:
+                                # Ensure strategy_settings is a dict
+                                if not isinstance(request.strategy_settings, dict):
+                                    logging.error(f"⚠️ [STRATEGY SETTINGS] request.strategy_settings is not a dict: {type(request.strategy_settings)}")
                                 else:
-                                    # DB has settings, but prioritize request (user's current settings from Game Plan screen)
-                                    home_strategy = request.strategy_settings.copy()  # Use copy to avoid reference issues
-                                    logging.warning(f"🔧 [STRATEGY SETTINGS] OVERRIDE (DB LOAD) - Using request.strategy_settings for home team")
-                                new_hct = request.strategy_settings.get('hc_trap', 'MISSING')
-                                new_fcp = request.strategy_settings.get('fc_press', 'MISSING')
-                                logging.warning(f"   - HCT: {old_hct} → {new_hct}, FCP: {old_fcp} → {new_fcp}")
-                                logging.warning(f"   - Full strategy_settings: {home_strategy}")
-                            elif request.user_team_side == "away":
-                                old_hct = away_strategy.get('hc_trap', 'MISSING') if away_strategy else 'MISSING'
-                                old_fcp = away_strategy.get('fc_press', 'MISSING') if away_strategy else 'MISSING'
-                                if away_strategy is None:
-                                    away_strategy = request.strategy_settings.copy()  # Use copy to avoid reference issues
-                                    logging.warning(f"🔧 [STRATEGY SETTINGS] FALLBACK (DB LOAD) - Using request.strategy_settings for away team (DB had None)")
-                                else:
-                                    # DB has settings, but prioritize request (user's current settings from Game Plan screen)
-                                    away_strategy = request.strategy_settings.copy()  # Use copy to avoid reference issues
-                                    logging.warning(f"🔧 [STRATEGY SETTINGS] OVERRIDE (DB LOAD) - Using request.strategy_settings for away team")
-                                new_hct = request.strategy_settings.get('hc_trap', 'MISSING')
-                                new_fcp = request.strategy_settings.get('fc_press', 'MISSING')
-                                logging.warning(f"   - HCT: {old_hct} → {new_hct}, FCP: {old_fcp} → {new_fcp}")
-                                logging.warning(f"   - Full strategy_settings: {away_strategy}")
+                                    if request.user_team_side == "home":
+                                        old_hct = home_strategy.get('hc_trap', 'MISSING') if home_strategy else 'MISSING'
+                                        old_fcp = home_strategy.get('fc_press', 'MISSING') if home_strategy else 'MISSING'
+                                        if home_strategy is None:
+                                            home_strategy = dict(request.strategy_settings)  # Use dict() constructor for safety
+                                            logging.warning(f"🔧 [STRATEGY SETTINGS] FALLBACK (DB LOAD) - Using request.strategy_settings for home team (DB had None)")
+                                        else:
+                                            # DB has settings, but prioritize request (user's current settings from Game Plan screen)
+                                            home_strategy = dict(request.strategy_settings)  # Use dict() constructor for safety
+                                            logging.warning(f"🔧 [STRATEGY SETTINGS] OVERRIDE (DB LOAD) - Using request.strategy_settings for home team")
+                                        new_hct = request.strategy_settings.get('hc_trap', 'MISSING')
+                                        new_fcp = request.strategy_settings.get('fc_press', 'MISSING')
+                                        logging.warning(f"   - HCT: {old_hct} → {new_hct}, FCP: {old_fcp} → {new_fcp}")
+                                        logging.warning(f"   - Full strategy_settings: {home_strategy}")
+                                    elif request.user_team_side == "away":
+                                        old_hct = away_strategy.get('hc_trap', 'MISSING') if away_strategy else 'MISSING'
+                                        old_fcp = away_strategy.get('fc_press', 'MISSING') if away_strategy else 'MISSING'
+                                        if away_strategy is None:
+                                            away_strategy = dict(request.strategy_settings)  # Use dict() constructor for safety
+                                            logging.warning(f"🔧 [STRATEGY SETTINGS] FALLBACK (DB LOAD) - Using request.strategy_settings for away team (DB had None)")
+                                        else:
+                                            # DB has settings, but prioritize request (user's current settings from Game Plan screen)
+                                            away_strategy = dict(request.strategy_settings)  # Use dict() constructor for safety
+                                            logging.warning(f"🔧 [STRATEGY SETTINGS] OVERRIDE (DB LOAD) - Using request.strategy_settings for away team")
+                                        new_hct = request.strategy_settings.get('hc_trap', 'MISSING')
+                                        new_fcp = request.strategy_settings.get('fc_press', 'MISSING')
+                                        logging.warning(f"   - HCT: {old_hct} → {new_hct}, FCP: {old_fcp} → {new_fcp}")
+                                        logging.warning(f"   - Full strategy_settings: {away_strategy}")
+                            except Exception as e:
+                                logging.error(f"❌ [STRATEGY SETTINGS] Error processing strategy_settings from request: {e}", exc_info=True)
                         
                         # Debug logging removed - was cluttering logs
                         # logging.debug(f"🔧 LOADING FROM DB - home_strategy={home_strategy}, away_strategy={away_strategy}")
@@ -947,19 +959,30 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                     home_strategy = None
                     away_strategy = None
                     
-                    import logging
                     if request.user_team_side == "home" and request.strategy_settings:
-                        home_strategy = request.strategy_settings.copy()  # Use copy to avoid reference issues
-                        # In single game mode, apply defensive strategy to BOTH teams for consistent pressure
-                        away_strategy = request.strategy_settings.copy()  # Use copy to avoid reference issues
-                        logging.warning(f"🔧 [STRATEGY SETTINGS] CREATING NEW GAME - user_team_side=home")
-                        logging.warning(f"   - Applied to BOTH teams: HCT={request.strategy_settings.get('hc_trap')}, FCP={request.strategy_settings.get('fc_press')}")
+                        try:
+                            if isinstance(request.strategy_settings, dict):
+                                home_strategy = dict(request.strategy_settings)  # Use dict() constructor for safety
+                                # In single game mode, apply defensive strategy to BOTH teams for consistent pressure
+                                away_strategy = dict(request.strategy_settings)  # Use dict() constructor for safety
+                                logging.warning(f"🔧 [STRATEGY SETTINGS] CREATING NEW GAME - user_team_side=home")
+                                logging.warning(f"   - Applied to BOTH teams: HCT={request.strategy_settings.get('hc_trap')}, FCP={request.strategy_settings.get('fc_press')}")
+                            else:
+                                logging.error(f"⚠️ [STRATEGY SETTINGS] request.strategy_settings is not a dict: {type(request.strategy_settings)}")
+                        except Exception as e:
+                            logging.error(f"❌ [STRATEGY SETTINGS] Error processing strategy_settings for new game: {e}", exc_info=True)
                     elif request.user_team_side == "away" and request.strategy_settings:
-                        away_strategy = request.strategy_settings.copy()  # Use copy to avoid reference issues
-                        # In single game mode, apply defensive strategy to BOTH teams for consistent pressure
-                        home_strategy = request.strategy_settings.copy()  # Use copy to avoid reference issues
-                        logging.warning(f"🔧 [STRATEGY SETTINGS] CREATING NEW GAME - user_team_side=away")
-                        logging.warning(f"   - Applied to BOTH teams: HCT={request.strategy_settings.get('hc_trap')}, FCP={request.strategy_settings.get('fc_press')}")
+                        try:
+                            if isinstance(request.strategy_settings, dict):
+                                away_strategy = dict(request.strategy_settings)  # Use dict() constructor for safety
+                                # In single game mode, apply defensive strategy to BOTH teams for consistent pressure
+                                home_strategy = dict(request.strategy_settings)  # Use dict() constructor for safety
+                                logging.warning(f"🔧 [STRATEGY SETTINGS] CREATING NEW GAME - user_team_side=away")
+                                logging.warning(f"   - Applied to BOTH teams: HCT={request.strategy_settings.get('hc_trap')}, FCP={request.strategy_settings.get('fc_press')}")
+                            else:
+                                logging.error(f"⚠️ [STRATEGY SETTINGS] request.strategy_settings is not a dict: {type(request.strategy_settings)}")
+                        except Exception as e:
+                            logging.error(f"❌ [STRATEGY SETTINGS] Error processing strategy_settings for new game: {e}", exc_info=True)
                     else:
                         logging.warning(f"⚠️ [STRATEGY SETTINGS] CREATING NEW GAME - No strategy_settings provided!")
                         logging.warning(f"   - user_team_side={request.user_team_side}, has_strategy_settings={bool(request.strategy_settings)}")
