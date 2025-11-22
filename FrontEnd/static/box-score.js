@@ -678,12 +678,16 @@ function createPlaycallSubsection(title, playcallData) {
   const insideVsMan = inside.vs_man || {};
   const insideVsManAtt = insideVsMan.attempts || 0;
   const insideVsManSuc = insideVsMan.success || 0;
-  const insideVsManPct = insideVsManAtt > 0 ? ((insideVsManSuc / insideVsManAtt) * 100).toFixed(0) : '0';
+  // Safety check: success can't exceed attempts
+  const safeInsideVsManSuc = Math.min(insideVsManSuc, insideVsManAtt);
+  const insideVsManPct = insideVsManAtt > 0 ? ((safeInsideVsManSuc / insideVsManAtt) * 100).toFixed(0) : '0';
   const insideVsZone = inside.vs_zone || {};
   const insideVsZoneAtt = insideVsZone.attempts || 0;
   const insideVsZoneSuc = insideVsZone.success || 0;
-  const insideVsZonePct = insideVsZoneAtt > 0 ? ((insideVsZoneSuc / insideVsZoneAtt) * 100).toFixed(0) : '0';
-  subsection.appendChild(createScoutingItemWithVs('Inside', `${insideSuccess} / ${insideAttempts}`, `${insidePct}%`, `${insideVsManSuc} / ${insideVsManAtt}`, `${insideVsManPct}%`, `${insideVsZoneSuc} / ${insideVsZoneAtt}`, `${insideVsZonePct}%`));
+  // Safety check: success can't exceed attempts
+  const safeInsideVsZoneSuc = Math.min(insideVsZoneSuc, insideVsZoneAtt);
+  const insideVsZonePct = insideVsZoneAtt > 0 ? ((safeInsideVsZoneSuc / insideVsZoneAtt) * 100).toFixed(0) : '0';
+  subsection.appendChild(createScoutingItemWithVs('Inside', `${insideSuccess} / ${insideAttempts}`, `${insidePct}%`, `${safeInsideVsManSuc} / ${insideVsManAtt}`, `${insideVsManPct}%`, `${safeInsideVsZoneSuc} / ${insideVsZoneAtt}`, `${insideVsZonePct}%`));
 
   // Attack (backend uses lowercase 'attack')
   const attack = playcallData.attack || playcallData.Attack || {};
@@ -693,12 +697,16 @@ function createPlaycallSubsection(title, playcallData) {
   const attackVsMan = attack.vs_man || {};
   const attackVsManAtt = attackVsMan.attempts || 0;
   const attackVsManSuc = attackVsMan.success || 0;
-  const attackVsManPct = attackVsManAtt > 0 ? ((attackVsManSuc / attackVsManAtt) * 100).toFixed(0) : '0';
+  // Safety check: success can't exceed attempts
+  const safeAttackVsManSuc = Math.min(attackVsManSuc, attackVsManAtt);
+  const attackVsManPct = attackVsManAtt > 0 ? ((safeAttackVsManSuc / attackVsManAtt) * 100).toFixed(0) : '0';
   const attackVsZone = attack.vs_zone || {};
   const attackVsZoneAtt = attackVsZone.attempts || 0;
   const attackVsZoneSuc = attackVsZone.success || 0;
-  const attackVsZonePct = attackVsZoneAtt > 0 ? ((attackVsZoneSuc / attackVsZoneAtt) * 100).toFixed(0) : '0';
-  subsection.appendChild(createScoutingItemWithVs('Attack', `${attackSuccess} / ${attackAttempts}`, `${attackPct}%`, `${attackVsManSuc} / ${attackVsManAtt}`, `${attackVsManPct}%`, `${attackVsZoneSuc} / ${attackVsZoneAtt}`, `${attackVsZonePct}%`));
+  // Safety check: success can't exceed attempts
+  const safeAttackVsZoneSuc = Math.min(attackVsZoneSuc, attackVsZoneAtt);
+  const attackVsZonePct = attackVsZoneAtt > 0 ? ((safeAttackVsZoneSuc / attackVsZoneAtt) * 100).toFixed(0) : '0';
+  subsection.appendChild(createScoutingItemWithVs('Attack', `${attackSuccess} / ${attackAttempts}`, `${attackPct}%`, `${safeAttackVsManSuc} / ${attackVsManAtt}`, `${attackVsManPct}%`, `${safeAttackVsZoneSuc} / ${attackVsZoneAtt}`, `${attackVsZonePct}%`));
 
   // Outside (backend uses lowercase 'outside')
   const outside = playcallData.outside || playcallData.Outside || {};
@@ -708,12 +716,16 @@ function createPlaycallSubsection(title, playcallData) {
   const outsideVsMan = outside.vs_man || {};
   const outsideVsManAtt = outsideVsMan.attempts || 0;
   const outsideVsManSuc = outsideVsMan.success || 0;
-  const outsideVsManPct = outsideVsManAtt > 0 ? ((outsideVsManSuc / outsideVsManAtt) * 100).toFixed(0) : '0';
+  // Safety check: success can't exceed attempts
+  const safeOutsideVsManSuc = Math.min(outsideVsManSuc, outsideVsManAtt);
+  const outsideVsManPct = outsideVsManAtt > 0 ? ((safeOutsideVsManSuc / outsideVsManAtt) * 100).toFixed(0) : '0';
   const outsideVsZone = outside.vs_zone || {};
   const outsideVsZoneAtt = outsideVsZone.attempts || 0;
   const outsideVsZoneSuc = outsideVsZone.success || 0;
-  const outsideVsZonePct = outsideVsZoneAtt > 0 ? ((outsideVsZoneSuc / outsideVsZoneAtt) * 100).toFixed(0) : '0';
-  subsection.appendChild(createScoutingItemWithVs('Outside', `${outsideSuccess} / ${outsideAttempts}`, `${outsidePct}%`, `${outsideVsManSuc} / ${outsideVsManAtt}`, `${outsideVsManPct}%`, `${outsideVsZoneSuc} / ${outsideVsZoneAtt}`, `${outsideVsZonePct}%`));
+  // Safety check: success can't exceed attempts
+  const safeOutsideVsZoneSuc = Math.min(outsideVsZoneSuc, outsideVsZoneAtt);
+  const outsideVsZonePct = outsideVsZoneAtt > 0 ? ((safeOutsideVsZoneSuc / outsideVsZoneAtt) * 100).toFixed(0) : '0';
+  subsection.appendChild(createScoutingItemWithVs('Outside', `${outsideSuccess} / ${outsideAttempts}`, `${outsidePct}%`, `${safeOutsideVsManSuc} / ${outsideVsManAtt}`, `${outsideVsManPct}%`, `${safeOutsideVsZoneSuc} / ${outsideVsZoneAtt}`, `${outsideVsZonePct}%`));
 
   return subsection;
 }
