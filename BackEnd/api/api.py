@@ -963,10 +963,11 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                         try:
                             if isinstance(request.strategy_settings, dict):
                                 home_strategy = dict(request.strategy_settings)  # Use dict() constructor for safety
-                                # In single game mode, apply defensive strategy to BOTH teams for consistent pressure
-                                away_strategy = dict(request.strategy_settings)  # Use dict() constructor for safety
+                                # Only apply user's settings to their team, not the CPU team
+                                away_strategy = None  # CPU team will use random defaults
                                 logging.warning(f"🔧 [STRATEGY SETTINGS] CREATING NEW GAME - user_team_side=home")
-                                logging.warning(f"   - Applied to BOTH teams: HCT={request.strategy_settings.get('hc_trap')}, FCP={request.strategy_settings.get('fc_press')}")
+                                logging.warning(f"   - Applied to HOME team only: HCT={request.strategy_settings.get('hc_trap')}, FCP={request.strategy_settings.get('fc_press')}")
+                                logging.warning(f"   - AWAY team will use random defaults")
                             else:
                                 logging.error(f"⚠️ [STRATEGY SETTINGS] request.strategy_settings is not a dict: {type(request.strategy_settings)}")
                         except Exception as e:
@@ -975,10 +976,11 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                         try:
                             if isinstance(request.strategy_settings, dict):
                                 away_strategy = dict(request.strategy_settings)  # Use dict() constructor for safety
-                                # In single game mode, apply defensive strategy to BOTH teams for consistent pressure
-                                home_strategy = dict(request.strategy_settings)  # Use dict() constructor for safety
+                                # Only apply user's settings to their team, not the CPU team
+                                home_strategy = None  # CPU team will use random defaults
                                 logging.warning(f"🔧 [STRATEGY SETTINGS] CREATING NEW GAME - user_team_side=away")
-                                logging.warning(f"   - Applied to BOTH teams: HCT={request.strategy_settings.get('hc_trap')}, FCP={request.strategy_settings.get('fc_press')}")
+                                logging.warning(f"   - Applied to AWAY team only: HCT={request.strategy_settings.get('hc_trap')}, FCP={request.strategy_settings.get('fc_press')}")
+                                logging.warning(f"   - HOME team will use random defaults")
                             else:
                                 logging.error(f"⚠️ [STRATEGY SETTINGS] request.strategy_settings is not a dict: {type(request.strategy_settings)}")
                         except Exception as e:
