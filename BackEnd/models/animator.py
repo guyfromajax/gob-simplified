@@ -1397,8 +1397,8 @@ class Animator:
                     logging.warning(f"   - Def coords BEFORE flip: {def_coords}")
                     logging.warning(f"   - Def coords x < 50 (away side)? {def_coords.get('x', 50) < 50}")
                 
-                # ✅ IMPORTANT: assign_all_zone_defenders should return coords in HOME orientation
-                # (assign_bh_defender_coords returns away orientation but is unflipped to home in assign_zone_defender_coords/assign_all_zone_defenders)
+                # ✅ IMPORTANT: assign_all_zone_defenders returns coords in HOME orientation
+                # (assign_bh_defender_coords now returns home orientation when away team has ball)
                 # (assign_non_bh_defender_coords returns home orientation directly)
                 # When away team is on offense, we need to flip ALL defensive coords to away orientation
                 # to match the offensive coords (which are also in away orientation)
