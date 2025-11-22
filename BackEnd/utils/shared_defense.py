@@ -41,22 +41,18 @@ def assign_bh_defender_coords(ball_coords, aggression_level: str, is_away_offens
         logging.warning(f"   - Coords flipped to home orientation: x={x_bh}, y={y_bh}")
 
     y_direction = -1 if y_bh > 25 else 1  # direction toward basket
-    # In home orientation, defenders are always to the RIGHT of ball handler (toward basket at x=90)
+    # In home orientation, defenders are always to the RIGHT of ball handler (toward home basket at x=90)
+    # This is true regardless of which team has the ball, because we're calculating in home orientation.
     # When away team has the ball:
     #   - Ball handler is at x=64 (away orientation, away side)
     #   - Flip to home: x=36 (home orientation, home side)
-    #   - Defender should be to the LEFT of ball handler in home orientation (toward away basket)
-    #   - So x_direction = -1: defender at x = 36 - spacing = 33 (home orientation)
-    #   - If we flip back: x = 100 - 33 = 67 (away orientation, still away side - WRONG)
-    #   - We want defender at x < 50 (away side, but actually home side of screen)
-    #   
-    # The real issue: When away team has the ball, the defender should be on the HOME side (x < 50)
-    # to guard them. So we should NOT flip the result back - keep it in home orientation.
-    # OR, we need to position defender to the LEFT in home orientation, which becomes LEFT in away orientation.
-    # 
-    # Actually, I think the fix is: when away team has the ball, don't flip the result back.
-    # Keep the result in home orientation, which will be on the home side (x < 50) where the defender should be.
-    x_direction = -1 if is_away_offense else 1  # Toward basket: -1 when away offense (left in home = left in away), +1 when home offense
+    #   - Defender should be to the RIGHT (toward home basket at x=90) = x_direction = +1
+    #   - Defender at x = 36 + spacing = 39 (home orientation)
+    #   - Animator flips to away: x = 100 - 39 = 61 (away orientation)
+    #   - Ball handler is at x=64 (away orientation)
+    #   - Defender at x=61 is to the LEFT of ball handler (toward away basket)
+    #   - This positions defender between ball handler and the basket they're attacking - correct for guarding!
+    x_direction = 1  # Always to the RIGHT in home orientation (toward home basket at x=90)
     
 
     if bh_spot == "key":
