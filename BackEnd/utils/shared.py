@@ -384,16 +384,34 @@ def apply_scoring(game, team, player, points, stats):
         points: int number of points scored
         stats: iterable of stat strings to record on the player
     """
-    # Debug: Print player info in apply_scoring
-    # from BackEnd.constants import DEBUG
-    # if DEBUG:
-    #     print(f"🎯 APPLY_SCORING DEBUG: player={get_name_safe(player)}, player_id={id(player)}")
-    #     print(f"🎯 APPLY_SCORING DEBUG: player object: {player}")
+    import logging
+    from BackEnd.utils.shared import get_name_safe
     
-    for stat in stats:
-        player.record_stat(stat)
+    # Validate inputs
+    if player is None:
+        logging.error(f"❌ APPLY_SCORING ERROR: player is None for team {team.name}, points={points}, stats={stats}")
+        # Still record team points to prevent score mismatch
+        record_team_points(game, team, points)
+        return
     
-    record_team_points(game, team, points)
+    if team is None:
+        logging.error(f"❌ APPLY_SCORING ERROR: team is None for player {get_name_safe(player)}, points={points}, stats={stats}")
+        return
+    
+    try:
+        # Record player stats first
+        for stat in stats:
+            player.record_stat(stat)
+        
+        # Then record team points
+        record_team_points(game, team, points)
+    except Exception as e:
+        logging.error(f"❌ APPLY_SCORING ERROR: Exception recording stats for player {get_name_safe(player)}, team {team.name}: {e}")
+        # Still record team points to prevent score mismatch
+        try:
+            record_team_points(game, team, points)
+        except Exception as e2:
+            logging.error(f"❌ APPLY_SCORING ERROR: Failed to record team points: {e2}")
 
 def record_team_points(game, team, points):
     """
