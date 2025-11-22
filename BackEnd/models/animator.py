@@ -615,12 +615,14 @@ class Animator:
             if pos == bh_pos:
                 for t, _, spot in bh_timeline:
                     bh_coords = HCO_STRING_SPOTS.get(spot, HCO_STRING_SPOTS["key"])
+                    # HCO_STRING_SPOTS are in home orientation, so flip to away if away offense
                     # assign_bh_defender_coords expects coords in original orientation (away if away offense)
                     # and returns coords in the same orientation
-                    # So we should NOT flip bh_coords before passing, and NOT flip the result
-                    # The function handles orientation internally
+                    if is_away_offense:
+                        bh_coords = get_away_player_coords(bh_coords)
+                    # Function handles internal flipping and returns coords in same orientation as input
                     d_coords = assign_bh_defender_coords(bh_coords, aggression_call, is_away_offense, spot or "key")
-                    # Don't flip d_coords - assign_bh_defender_coords already handles orientation
+                    # Don't flip d_coords - assign_bh_defender_coords already returns in correct orientation
                     movement.append({
                         "timestamp": t,
                         "coords": d_coords,
