@@ -42,11 +42,21 @@ def assign_bh_defender_coords(ball_coords, aggression_level: str, is_away_offens
 
     y_direction = -1 if y_bh > 25 else 1  # direction toward basket
     # In home orientation, defenders are always to the RIGHT of ball handler (toward basket at x=90)
-    # However, when away team has the ball, after we flip back to away orientation,
-    # the defender needs to be to the RIGHT of the ball handler (toward away basket at x=0)
-    # So in home orientation (after flipping), we need x_direction = -1 to position defender to the LEFT
-    # which will become RIGHT when flipped back to away orientation
-    x_direction = -1 if is_away_offense else 1  # Toward basket: -1 when away offense (becomes right after flip), +1 when home offense
+    # When away team has the ball:
+    #   - Ball handler is at x=64 (away orientation, away side)
+    #   - Flip to home: x=36 (home orientation, home side)
+    #   - Defender should be to the LEFT of ball handler in home orientation (toward away basket)
+    #   - So x_direction = -1: defender at x = 36 - spacing = 33 (home orientation)
+    #   - If we flip back: x = 100 - 33 = 67 (away orientation, still away side - WRONG)
+    #   - We want defender at x < 50 (away side, but actually home side of screen)
+    #   
+    # The real issue: When away team has the ball, the defender should be on the HOME side (x < 50)
+    # to guard them. So we should NOT flip the result back - keep it in home orientation.
+    # OR, we need to position defender to the LEFT in home orientation, which becomes LEFT in away orientation.
+    # 
+    # Actually, I think the fix is: when away team has the ball, don't flip the result back.
+    # Keep the result in home orientation, which will be on the home side (x < 50) where the defender should be.
+    x_direction = -1 if is_away_offense else 1  # Toward basket: -1 when away offense (left in home = left in away), +1 when home offense
     
 
     if bh_spot == "key":
@@ -76,13 +86,17 @@ def assign_bh_defender_coords(ball_coords, aggression_level: str, is_away_offens
     if is_away_offense:
         logging.warning(f"   - Defender position calculated in home orientation: {result}")
     
-    # If we flipped input coords, flip result back to match input orientation
+    # If we flipped input coords, we need to decide whether to flip the result back
+    # When away team has the ball, the defender should be on the HOME side (x < 50) to guard them
+    # So we should NOT flip the result back - keep it in home orientation
+    # This way, the defender will be at x < 50 (home side) where they should be
     if coords_were_flipped:
-        result_before_flip = result.copy()
-        result = get_away_player_coords(result)
-        logging.warning(f"   - Result flipped back to away orientation: {result_before_flip} → {result}")
-        logging.warning(f"   - Final result x < 50 (away side)? {result.get('x', 50) < 50}")
-        logging.warning(f"   - Expected: x < 50 (away side), Actual: x={result.get('x')}")
+        # Don't flip the result back - keep it in home orientation
+        # The defender should be on the home side (x < 50) when away team has the ball
+        logging.warning(f"   - Result kept in home orientation (NOT flipped back): {result}")
+        logging.warning(f"   - Final result x < 50 (home side)? {result.get('x', 50) < 50}")
+        logging.warning(f"   - Expected: x < 50 (home side for defender), Actual: x={result.get('x')}")
+    # If coords were not flipped (home offense), result is already in correct orientation
     
     return result
 
