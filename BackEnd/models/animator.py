@@ -752,7 +752,6 @@ class Animator:
         # Determine if away team is on offense ONCE at the start (not inside loops)
         # This ensures consistency when loading saved games where game state may have changed
         is_away_offense = self.game.offense_team.team_id == self.game.away_team.team_id
-        # print(f"🎬 COORD DEBUG: skeleton_to_animations - offense_team={self.game.offense_team.name}, offense_id={self.game.offense_team.team_id}, away_team={self.game.away_team.name}, away_id={self.game.away_team.team_id}, home_team={self.game.home_team.name}, home_id={self.game.home_team.team_id}, is_away_offense={is_away_offense}")
         
         # Group all positions that appear in any step
         all_positions = set()
@@ -1274,8 +1273,6 @@ class Animator:
                 else:
                     current_ball_spot = ball_spot
                 
-                # 🐛 DEBUG: Log ball handler identification at each step
-                
                 # Update zone boundaries if ball spot changed (shift logic)
                 # ✅ Zone boundaries should be in SAME orientation as offensive coords
                 defense_playcall = self.game.game_state.get("defense_playcall", "Man")
@@ -1317,9 +1314,6 @@ class Animator:
                 # Use assign_all_zone_defenders which handles overlaps and priorities
                 # ✅ Pass is_away_offense as-is - zone functions expect coords in original flipped state
                 # They will unflip internally, calculate in home orientation, and return home orientation coords
-                
-                # 🐛 DEBUG: Log offensive players list before assignment
-                
                 defender_coords_dict, defender_to_offensive_player = assign_all_zone_defenders(
                     zone_boundaries,
                     offensive_players,
@@ -1333,8 +1327,6 @@ class Animator:
                 if not hasattr(self.game, 'zone_defender_assignments_by_step'):
                     self.game.zone_defender_assignments_by_step = {}
                 self.game.zone_defender_assignments_by_step[step_index] = defender_to_offensive_player
-                
-                # 🐛 DEBUG: Log assignments for this step
                 
                 def_coords = defender_coords_dict.get(def_pos)
                 if not def_coords:
@@ -1423,8 +1415,6 @@ class Animator:
         # Determine court orientation
         is_away_offense = self.game.offense_team.team_id == self.game.away_team.team_id
         aggression = self.game.defense_team.strategy_calls.get("aggression_call", "normal")
-        
-        # print(f"🔍 Positioning standard defenders for HCO (away_offense: {is_away_offense}, aggression: {aggression})")
         
         # Build offensive player positions by step for tracking
         # Note: HCO_STRING_SPOTS are in home orientation, so:
