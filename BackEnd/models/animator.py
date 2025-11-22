@@ -618,17 +618,18 @@ class Animator:
 
             start = getattr(defender, "coords", {"x": 25, "y": 50})
             if pos == bh_pos:
-                # assign_bh_defender_coords expects coords in original orientation and returns in same orientation
-                # So if is_away_offense, first_coords should be in away orientation, and result will be in away orientation
+                # assign_bh_defender_coords now returns home-oriented coords when away team has the ball
+                # (to keep defender on home side where they should be)
+                # So we need to pass home-oriented coords and expect home-oriented coords back
                 if is_away_offense:
                     logging.warning(f"🔍 [MAN DEFENSE DEBUG] Setting start position for BH defender")
-                    logging.warning(f"   - first_coords (away orientation): {first_coords}")
+                    logging.warning(f"   - first_coords (away orientation, will be flipped inside function): {first_coords}")
                 start = assign_bh_defender_coords(first_coords, aggression_call, is_away_offense, bh_first_spot or "key")
                 if is_away_offense:
-                    logging.warning(f"   - start returned from assign_bh_defender_coords: {start}")
-                    logging.warning(f"   - start x < 50 (away side)? {start.get('x', 50) < 50}")
-                    logging.warning(f"   - Expected: x < 50 (away side), Actual: x={start.get('x')}")
-                # Don't flip start - assign_bh_defender_coords already handles orientation
+                    logging.warning(f"   - start returned from assign_bh_defender_coords (home orientation): {start}")
+                    logging.warning(f"   - start x < 50 (home side)? {start.get('x', 50) < 50}")
+                    logging.warning(f"   - Expected: x < 50 (home side for defender), Actual: x={start.get('x')}")
+                # Don't flip start - assign_bh_defender_coords returns home orientation when away team has ball
 
             if is_away_offense and pos != bh_pos:
                 # Only flip start for non-BH defenders (BH defender start is already in correct orientation)
@@ -640,21 +641,26 @@ class Animator:
             if pos == bh_pos:
                 for t, _, spot in bh_timeline:
                     bh_coords = HCO_STRING_SPOTS.get(spot, HCO_STRING_SPOTS["key"])
-                    # HCO_STRING_SPOTS are in home orientation, so flip to away if away offense
-                    # assign_bh_defender_coords expects coords in original orientation (away if away offense)
-                    # and returns coords in the same orientation
+                    # HCO_STRING_SPOTS are in home orientation
+                    # assign_bh_defender_coords now returns home-oriented coords when away team has the ball
+                    # So we should pass home-oriented coords (don't flip) and expect home-oriented coords back
                     if is_away_offense:
                         logging.warning(f"🔍 [MAN DEFENSE DEBUG] Movement step t={t}, spot={spot}")
                         logging.warning(f"   - bh_coords (from HCO_STRING_SPOTS, home orientation): {bh_coords}")
-                        bh_coords = get_away_player_coords(bh_coords)
-                        logging.warning(f"   - bh_coords AFTER flip to away: {bh_coords}")
-                    # Function handles internal flipping and returns coords in same orientation as input
-                    d_coords = assign_bh_defender_coords(bh_coords, aggression_call, is_away_offense, spot or "key")
+                        # Don't flip bh_coords - function will handle flipping internally and return home orientation
+                    # Function expects away-oriented coords when is_away_offense, but returns home-oriented coords
+                    # So we need to flip bh_coords before passing
                     if is_away_offense:
-                        logging.warning(f"   - d_coords returned from assign_bh_defender_coords: {d_coords}")
-                        logging.warning(f"   - d_coords x < 50 (away side)? {d_coords.get('x', 50) < 50}")
-                        logging.warning(f"   - Expected: x < 50 (away side), Actual: x={d_coords.get('x')}")
-                    # Don't flip d_coords - assign_bh_defender_coords already returns in correct orientation
+                        bh_coords_for_function = get_away_player_coords(bh_coords)
+                        logging.warning(f"   - bh_coords flipped to away for function call: {bh_coords_for_function}")
+                    else:
+                        bh_coords_for_function = bh_coords
+                    d_coords = assign_bh_defender_coords(bh_coords_for_function, aggression_call, is_away_offense, spot or "key")
+                    if is_away_offense:
+                        logging.warning(f"   - d_coords returned from assign_bh_defender_coords (home orientation): {d_coords}")
+                        logging.warning(f"   - d_coords x < 50 (home side)? {d_coords.get('x', 50) < 50}")
+                        logging.warning(f"   - Expected: x < 50 (home side for defender), Actual: x={d_coords.get('x')}")
+                    # Don't flip d_coords - assign_bh_defender_coords returns home orientation when away team has ball
                     movement.append({
                         "timestamp": t,
                         "coords": d_coords,
