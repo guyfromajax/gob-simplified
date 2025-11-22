@@ -678,17 +678,22 @@ function createPlaycallSubsection(title, playcallData) {
   
   // Color coding: negative=red, zero=yellow, positive=green
   const overallEvColor = overallAvgEV !== null 
-    ? (parseFloat(overallAvgEV) < 0 ? '#ff0000' : (parseFloat(overallAvgEV) === 0 ? '#ffd700' : '#00ff00'))
+    ? (parseFloat(overallAvgEV) < 0 ? '#ff0000' : (parseFloat(overallAvgEV) === 0 ? '#ffd700' : '#00AA00'))
     : null;
   const overallExecColor = overallAvgExec !== null
-    ? (parseFloat(overallAvgExec) < 0 ? '#ff0000' : (parseFloat(overallAvgExec) === 0 ? '#ffd700' : '#00ff00'))
+    ? (parseFloat(overallAvgExec) < 0 ? '#ff0000' : (parseFloat(overallAvgExec) === 0 ? '#ffd700' : '#00AA00'))
     : null;
   
   const overallAvgText = overallAvgEV !== null || overallAvgExec !== null
     ? ` (Avg EV: <span style="color: ${overallEvColor || '#000'}">${overallEvSign}${overallAvgEV || '0'}%</span>) (Avg Exec: <span style="color: ${overallExecColor || '#000'}">${overallExecSign}${overallAvgExec || '0'}%</span>)`
     : '';
 
-  subsection.innerHTML = `<h4>${title}: ${overallSuccess} / ${overallAttempts} (${overallPct}%)${overallAvgText}</h4>`;
+  // For "Focus Success Rates", don't show the numbers in the header
+  const headerText = title === 'Focus Success Rates' 
+    ? `<h4>${title}${overallAvgText}</h4>`
+    : `<h4>${title}: ${overallSuccess} / ${overallAttempts} (${overallPct}%)${overallAvgText}</h4>`;
+  
+  subsection.innerHTML = headerText;
 
   // Inside (backend uses lowercase 'inside')
   const inside = playcallData.inside || playcallData.Inside || {};
@@ -801,8 +806,8 @@ function createDefensePlaycallSubsection(title, defenseData) {
   const execSign = parseFloat(avgExec) >= 0 ? '+' : '';
   
   // Color coding: negative=red, zero=yellow, positive=green
-  const evColor = parseFloat(avgEV) < 0 ? '#ff0000' : (parseFloat(avgEV) === 0 ? '#ffd700' : '#00ff00');
-  const execColor = parseFloat(avgExec) < 0 ? '#ff0000' : (parseFloat(avgExec) === 0 ? '#ffd700' : '#00ff00');
+  const evColor = parseFloat(avgEV) < 0 ? '#ff0000' : (parseFloat(avgEV) === 0 ? '#ffd700' : '#00AA00');
+  const execColor = parseFloat(avgExec) < 0 ? '#ff0000' : (parseFloat(avgExec) === 0 ? '#ffd700' : '#00AA00');
   
   const headerText = `${title}: ${success} / ${used} (${pct}%)`;
   const avgText = evScores.length > 0 || leanScores.length > 0
@@ -834,10 +839,10 @@ function createDefensePlaycallSubsection(title, defenseData) {
   
   // Color coding for vs Motion
   const vsMotionEvColor = vsMotionAvgEV !== null
-    ? (parseFloat(vsMotionAvgEV) < 0 ? '#ff0000' : (parseFloat(vsMotionAvgEV) === 0 ? '#ffd700' : '#00ff00'))
+    ? (parseFloat(vsMotionAvgEV) < 0 ? '#ff0000' : (parseFloat(vsMotionAvgEV) === 0 ? '#ffd700' : '#00AA00'))
     : null;
   const vsMotionExecColor = vsMotionAvgExec !== null
-    ? (parseFloat(vsMotionAvgExec) < 0 ? '#ff0000' : (parseFloat(vsMotionAvgExec) === 0 ? '#ffd700' : '#00ff00'))
+    ? (parseFloat(vsMotionAvgExec) < 0 ? '#ff0000' : (parseFloat(vsMotionAvgExec) === 0 ? '#ffd700' : '#00AA00'))
     : null;
   
   const vsMotionAvgText = vsMotionAvgEV !== null || vsMotionAvgExec !== null
@@ -870,10 +875,10 @@ function createDefensePlaycallSubsection(title, defenseData) {
   
   // Color coding for vs Set Play
   const vsSetEvColor = vsSetAvgEV !== null
-    ? (parseFloat(vsSetAvgEV) < 0 ? '#ff0000' : (parseFloat(vsSetAvgEV) === 0 ? '#ffd700' : '#00ff00'))
+    ? (parseFloat(vsSetAvgEV) < 0 ? '#ff0000' : (parseFloat(vsSetAvgEV) === 0 ? '#ffd700' : '#00AA00'))
     : null;
   const vsSetExecColor = vsSetAvgExec !== null
-    ? (parseFloat(vsSetAvgExec) < 0 ? '#ff0000' : (parseFloat(vsSetAvgExec) === 0 ? '#ffd700' : '#00ff00'))
+    ? (parseFloat(vsSetAvgExec) < 0 ? '#ff0000' : (parseFloat(vsSetAvgExec) === 0 ? '#ffd700' : '#00AA00'))
     : null;
   
   const vsSetAvgText = vsSetAvgEV !== null || vsSetAvgExec !== null
