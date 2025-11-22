@@ -387,31 +387,23 @@ def apply_scoring(game, team, player, points, stats):
     import logging
     from BackEnd.utils.shared import get_name_safe
     
-    # Validate inputs
+    # Validate inputs - if player is None, log error and return (don't record team points)
+    # The reconciliation function will handle any score mismatches
     if player is None:
-        logging.error(f"❌ APPLY_SCORING ERROR: player is None for team {team.name}, points={points}, stats={stats}")
-        # Still record team points to prevent score mismatch
-        record_team_points(game, team, points)
+        logging.error(f"❌ APPLY_SCORING ERROR: player is None for team {team.name if team else 'Unknown'}, points={points}, stats={stats}")
         return
     
     if team is None:
         logging.error(f"❌ APPLY_SCORING ERROR: team is None for player {get_name_safe(player)}, points={points}, stats={stats}")
         return
     
-    try:
-        # Record player stats first
-        for stat in stats:
-            player.record_stat(stat)
-        
-        # Then record team points
-        record_team_points(game, team, points)
-    except Exception as e:
-        logging.error(f"❌ APPLY_SCORING ERROR: Exception recording stats for player {get_name_safe(player)}, team {team.name}: {e}")
-        # Still record team points to prevent score mismatch
-        try:
-            record_team_points(game, team, points)
-        except Exception as e2:
-            logging.error(f"❌ APPLY_SCORING ERROR: Failed to record team points: {e2}")
+    # Record player stats first, then team points
+    # If this fails, let it fail - don't record team points without player stats
+    # The reconciliation function will correct any mismatches
+    for stat in stats:
+        player.record_stat(stat)
+    
+    record_team_points(game, team, points)
 
 def record_team_points(game, team, points):
     """
