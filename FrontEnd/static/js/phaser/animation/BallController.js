@@ -1,15 +1,34 @@
 /**
- * BallController - Single Source of Truth for Ball Ownership
+ * BallController - Single Source of Truth for Ball Ownership and State
  * 
  * Replaces the scattered ball ownership systems across multiple files
  * with a single, reliable system that prevents floating balls and conflicts.
  * 
  * Key Benefits:
- * - Single source of truth for ball ownership
+ * - Single source of truth for ball ownership and state
  * - Proper attachment/detachment logic
  * - No floating ball issues
  * - Thread-safe ownership changes
  * - Comprehensive ball state tracking
+ * - Lifecycle methods for shot, pass, and putback animations
+ * - Automatic synchronization with WIP_GOB system (gameState.ballHolder)
+ * 
+ * Lifecycle Methods:
+ * - onShotStart(options): Called when a shot animation begins
+ * - onShotEnd(): Called when a shot animation completes
+ * - onPassStart(options): Called when a pass animation begins
+ * - onPassEnd(receiver): Called when a pass animation completes
+ * - onPutbackStart(options): Called when a putback shot begins
+ * - onPutbackEnd(): Called when a putback shot completes
+ * 
+ * State Management:
+ * - isAttached: Ball is attached to a player
+ * - isInFlight: Ball is in motion (shot, pass, etc.)
+ * - isMoving: Ball is currently animating
+ * - reason: Current reason for state (shot, pass, putback_shot, etc.)
+ * - currentOwner: Player sprite that currently owns the ball
+ * 
+ * @class BallController
  */
 
 import { AnimationStates } from './SimplifiedStateMachine.js';
@@ -637,7 +656,12 @@ export class BallController {
 
   /**
    * Lifecycle: Shot animation ended
-   * Clears in-flight state, ball is ready for next action
+   * 
+   * Called when a shot animation completes. Clears in-flight state,
+   * allowing the ball to be attached to a new owner (e.g., rebounder).
+   * 
+   * @example
+   * ballController.onShotEnd();
    */
   onShotEnd() {
     // Save previous state
@@ -739,6 +763,19 @@ export class BallController {
    * Clears in-flight state and attaches to receiver if provided
    * @param {Object} receiverSprite - Sprite of the receiver (optional)
    * @param {Object} options - Options object
+   */
+  /**
+   * Lifecycle: Pass animation ended
+   * 
+   * Called when a pass animation completes. Clears in-flight state
+   * and optionally attaches ball to receiver.
+   * 
+   * @param {Phaser.GameObjects.Sprite} [receiverSprite=null] - Sprite of the receiver
+   * @param {Object} [options={}] - Options object
+   * @param {string} [options.reason='pass_complete'] - Reason for pass end
+   * 
+   * @example
+   * ballController.onPassEnd(receiverSprite, { reason: 'pass_complete' });
    */
   onPassEnd(receiverSprite = null, options = {}) {
     // Save previous state
