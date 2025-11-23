@@ -7,8 +7,14 @@
  * @param {string} options.quarter - Current quarter
  * @param {string} [options.tournamentId] - Tournament ID (for tournament mode)
  * @param {string} [options.franchiseId] - Franchise ID (for franchise mode)
+ * @param {string} [options.homeTeam] - Home team name
+ * @param {string} [options.awayTeam] - Away team name
+ * @param {string} [options.homeId] - Home team ID
+ * @param {string} [options.awayId] - Away team ID
+ * @param {string} [options.myTeamSide] - User's team side ('home' or 'away')
+ * @param {string} [options.userTeamId] - User's team ID
  */
-export function showFoulOutPopup({ player, gameId, mode, quarter, tournamentId, franchiseId }) {
+export function showFoulOutPopup({ player, gameId, mode, quarter, tournamentId, franchiseId, homeTeam, awayTeam, homeId, awayId, myTeamSide, userTeamId }) {
   // Remove any existing popup
   const existingPopup = document.querySelector('.foul-out-popup');
   if (existingPopup) {
@@ -17,6 +23,16 @@ export function showFoulOutPopup({ player, gameId, mode, quarter, tournamentId, 
 
   // Build lineup selection URL with game context
   const params = new URLSearchParams();
+  
+  // Team information (required for set-lineup to work)
+  if (homeTeam) params.set('home', homeTeam);
+  if (awayTeam) params.set('away', awayTeam);
+  if (homeId) params.set('home_id', homeId);
+  if (awayId) params.set('away_id', awayId);
+  if (myTeamSide) params.set('my_team', myTeamSide);
+  if (userTeamId) params.set('user_team_id', userTeamId);
+  
+  // Game context
   if (gameId) params.set('game_id', gameId);
   if (quarter) params.set('quarter', quarter);
   params.set('period', `Q${quarter}`);
@@ -24,13 +40,22 @@ export function showFoulOutPopup({ player, gameId, mode, quarter, tournamentId, 
   if (franchiseId) params.set('franchise_id', franchiseId);
   if (mode) params.set('mode', mode);
   
-  // Get home/away teams from URL or storage
-  const urlParams = new URLSearchParams(window.location.search);
-  const storedGameId = typeof localStorage !== 'undefined' ? localStorage.getItem('game_id') : null;
-  const currentGameId = gameId || urlParams.get('game_id') || storedGameId;
-  
-  if (currentGameId) {
-    params.set('game_id', currentGameId);
+  // Fallback: try to get team info from current URL if not provided
+  if (!homeTeam || !awayTeam) {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (!homeTeam) homeTeam = urlParams.get('home');
+    if (!awayTeam) awayTeam = urlParams.get('away');
+    if (!homeId) homeId = urlParams.get('home_id');
+    if (!awayId) awayId = urlParams.get('away_id');
+    if (!myTeamSide) myTeamSide = urlParams.get('my_team');
+    if (!userTeamId) userTeamId = urlParams.get('user_team_id');
+    
+    if (homeTeam) params.set('home', homeTeam);
+    if (awayTeam) params.set('away', awayTeam);
+    if (homeId) params.set('home_id', homeId);
+    if (awayId) params.set('away_id', awayId);
+    if (myTeamSide) params.set('my_team', myTeamSide);
+    if (userTeamId) params.set('user_team_id', userTeamId);
   }
   
   const lineupUrl = `/static/set-lineup.html?${params.toString()}`;
