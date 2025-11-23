@@ -620,7 +620,7 @@ class Animator:
             if pos == bh_pos:
                 # assign_bh_defender_coords now always expects and returns home-oriented coords
                 # So we need to unflip first_coords to home orientation if away team has the ball
-            if is_away_offense:
+                if is_away_offense:
                     logging.warning(f"🔍 [MAN DEFENSE DEBUG] Setting start position for BH defender")
                     logging.warning(f"   - first_coords (away orientation): {first_coords}")
                     first_coords_home = get_away_player_coords(first_coords)
@@ -1265,7 +1265,7 @@ class Animator:
         elif defense_playcall == "1-3-1 Zone":
             zone_boundaries = _get_131_zone_boundaries(ball_spot, is_away_offense)
         else:
-        zone_boundaries = _get_23_zone_boundaries(ball_spot, is_away_offense)
+            zone_boundaries = _get_23_zone_boundaries(ball_spot, is_away_offense)
         
         # Create defensive animations for each position
         for def_pos in ['PG', 'SG', 'SF', 'PF', 'C']:
@@ -1322,7 +1322,7 @@ class Animator:
                 elif defense_playcall == "1-3-1 Zone":
                     zone_boundaries = _get_131_zone_boundaries(current_ball_spot, is_away_offense)
                 else:
-                zone_boundaries = _get_23_zone_boundaries(current_ball_spot, is_away_offense)
+                    zone_boundaries = _get_23_zone_boundaries(current_ball_spot, is_away_offense)
                 
                 # Build list of offensive players with their coords and ball handler status
                 offensive_players = []
