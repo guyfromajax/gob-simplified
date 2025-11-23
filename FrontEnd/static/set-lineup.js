@@ -724,12 +724,35 @@ function resolveTeam() {
   return false;
 }
 
-function setHeader() {
+async function setHeader() {
   const title = document.getElementById('team-title');
-  if (title) {
-    const periodText = periodLabel ? ` — ${periodLabel}` : '';
-    title.textContent = `Set Your Lineup — ${teamName}${periodText}`;
+  if (!title) return;
+  
+  // Determine user team and opponent team
+  const userTeamName = teamName;
+  const opponentTeamName = myTeamSide === 'home' ? awayTeam : homeTeam;
+  
+  // Get scores from game data (default to 0)
+  let userTeamScore = 0;
+  let opponentTeamScore = 0;
+  
+  if (gameId) {
+    try {
+      const gameRes = await fetch(`/api/game/${gameId}?quarter=1`);
+      if (gameRes.ok) {
+        const gameData = await gameRes.json();
+        const score = gameData.score || {};
+        userTeamScore = score[userTeamName] || 0;
+        opponentTeamScore = score[opponentTeamName] || 0;
+      }
+    } catch (err) {
+      console.warn("Could not fetch game scores for header:", err);
+    }
   }
+  
+  // Update header format: "Set Your Lineup -- User Team Name: User Team Score -- Opponent Team Name: Opponent Team Score"
+  title.textContent = `Set Your Lineup — ${userTeamName}: ${userTeamScore} — ${opponentTeamName}: ${opponentTeamScore}`;
+  
   const logo = document.getElementById('team-logo');
   if (logo) {
     logo.src = `/static/images/homepage-logos/${teamName}.png`;
@@ -746,7 +769,7 @@ async function init() {
     if (btn) btn.classList.add('disabled');
     return;
   }
-  setHeader();
+  await setHeader();
   await loadRoster();
   setupSlots();
   
