@@ -1154,12 +1154,9 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
     if request.quarter < gm.quarter:
         summary = summarize_game_state(gm)
         summary["start_box_score"] = gm.game_state.get("start_box_score")
-        # Scores are nested in home_team and away_team objects
-        home_score = summary.get("home_team", {}).get("score", 0)
-        away_score = summary.get("away_team", {}).get("score", 0)
         is_final = (
             gm.quarter > 4
-            and home_score != away_score
+            and summary["score"][gm.home_team.name] != summary["score"][gm.away_team.name]
         )
         summary.update(
             {

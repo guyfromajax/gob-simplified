@@ -726,11 +726,16 @@ function resolveTeam() {
 
 async function setHeader() {
   const title = document.getElementById('team-title');
-  if (!title) return;
+  if (!title) {
+    console.warn('[setHeader] team-title element not found');
+    return;
+  }
   
   // Determine user team and opponent team
   const userTeamName = teamName;
   const opponentTeamName = myTeamSide === 'home' ? awayTeam : homeTeam;
+  
+  console.log('[setHeader] Setting header:', { userTeamName, opponentTeamName, gameId });
   
   // Get scores from game data (default to 0)
   let userTeamScore = 0;
@@ -744,14 +749,21 @@ async function setHeader() {
         const score = gameData.score || {};
         userTeamScore = score[userTeamName] || 0;
         opponentTeamScore = score[opponentTeamName] || 0;
+        console.log('[setHeader] Fetched scores:', { userTeamScore, opponentTeamScore, score });
+      } else {
+        console.warn('[setHeader] Failed to fetch game data:', gameRes.status);
       }
     } catch (err) {
-      console.warn("Could not fetch game scores for header:", err);
+      console.warn("[setHeader] Could not fetch game scores for header:", err);
     }
+  } else {
+    console.log('[setHeader] No gameId, using default scores (0)');
   }
   
   // Update header format: "Set Your Lineup -- User Team Name: User Team Score -- Opponent Team Name: Opponent Team Score"
-  title.textContent = `Set Your Lineup — ${userTeamName}: ${userTeamScore} — ${opponentTeamName}: ${opponentTeamScore}`;
+  const headerText = `Set Your Lineup — ${userTeamName}: ${userTeamScore} — ${opponentTeamName}: ${opponentTeamScore}`;
+  title.textContent = headerText;
+  console.log('[setHeader] Header updated to:', headerText);
   
   const logo = document.getElementById('team-logo');
   if (logo) {
@@ -764,14 +776,24 @@ async function setHeader() {
 
 function restoreLineupFromUrl() {
   // Restore lineup from URL parameters if present
+  // Ensure myTeamSide is set (should be set by resolveTeam() before this is called)
+  if (!myTeamSide) {
+    console.warn('[restoreLineupFromUrl] myTeamSide not set, cannot restore lineup');
+    return;
+  }
+  
   const positions = ['PG', 'SG', 'SF', 'PF', 'C'];
+  let restoredCount = 0;
   positions.forEach(pos => {
     const paramKey = `${myTeamSide}_${pos.toLowerCase()}`;
     const playerId = urlParams.get(paramKey);
     if (playerId) {
       lineup[pos] = playerId;
+      restoredCount++;
+      console.log(`[restoreLineupFromUrl] Restored ${pos}: ${playerId}`);
     }
   });
+  console.log(`[restoreLineupFromUrl] Restored ${restoredCount} players from URL`);
 }
 
 async function init() {
@@ -781,10 +803,14 @@ async function init() {
     if (btn) btn.classList.add('disabled');
     return;
   }
+  
   await setHeader();
   await loadRoster();
-  setupSlots(); // Setup slot event handlers (this clears slots, but we'll restore after)
-  restoreLineupFromUrl(); // Restore lineup from URL after slots are set up
+  setupSlots(); // Setup slot event handlers (this clears slots/lineup)
+  
+  // Restore lineup from URL AFTER setupSlots (which clears the lineup)
+  restoreLineupFromUrl();
+  
   updateAllSlotDisplays(); // Display restored lineup in slots
   updatePlayButton(); // Update play button state based on restored lineup
   
