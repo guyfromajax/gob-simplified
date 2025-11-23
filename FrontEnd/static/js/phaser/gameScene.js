@@ -1076,13 +1076,26 @@ export function createGameScene(Phaser) {
             const tournamentId = urlParams.get('tournament_id') || null;
             const franchiseId = urlParams.get('franchise_id') || null;
             
+            // Get team information from gameStore or URL
+            const { home: homeTeam, away: awayTeam } = gameStore.getTeams();
+            const homeId = this.homeTeamId || urlParams.get('home_id');
+            const awayId = this.awayTeamId || urlParams.get('away_id');
+            const myTeamSide = urlParams.get('my_team');
+            const userTeamId = urlParams.get('user_team_id');
+            
             showFoulOutPopup({
               player: turn.foul_out_player,
               gameId: this.gameId,
               mode: mode,
               quarter: liveQuarter,
               tournamentId: tournamentId,
-              franchiseId: franchiseId
+              franchiseId: franchiseId,
+              homeTeam: homeTeam,
+              awayTeam: awayTeam,
+              homeId: homeId,
+              awayId: awayId,
+              myTeamSide: myTeamSide,
+              userTeamId: userTeamId
             });
           }).catch(err => {
             console.error('Failed to load foul out popup:', err);
