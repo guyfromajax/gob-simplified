@@ -8,29 +8,47 @@ This document provides an overview of the front-end animation stack for **GOB**,
 
 ## Production Animation System
 
-### Ball Animation System (WIP_GOB Approach) ✅ **COMPLETE**
+### Ball Animation System ✅ **COMPLETE**
 
-**Status:** Fully migrated and operational (December 2024)
+**Status:** Fully refactored and operational (December 2024)
 
-The ball animation system has been successfully migrated to the WIP_GOB approach, which uses Phaser's native tween capabilities with conditional target arrays. This eliminates ownership conflicts and significantly simplifies the codebase.
+The ball animation system uses a unified architecture with **BallController** as the single source of truth for ball ownership and state. This system integrates with the WIP_GOB approach for player movement synchronization.
 
-**Key Components:**
-- **Ball Holder State:** `scene.gameState.ballHolder` (string ID) - single source of truth
-- **Conditional Targets:** `getPlayerTweenTargets()` - includes ball in player tween when player has ball
-- **Simple Movement:** `animateBallToPosition()`, `animateShotToRim()` - distance-based duration, arc support
+**Architecture:**
+- **BallController** (`BallController.js`) - Single source of truth for ball state
+  - Manages ball ownership, attachment/detachment, and flight state
+  - Lifecycle methods: `onShotStart()`, `onShotEnd()`, `onPassStart()`, `onPassEnd()`, `onPutbackStart()`, `onPutbackEnd()`
+  - Internal state: `isAttached`, `isInFlight`, `isMoving`, `reason`, `currentOwner`
+  
+- **BallControllerAdapter** (`BallControllerAdapter.js`) - Backward compatibility layer
+  - Provides `attachBallToPlayer()` function with old signature
+  - Handles state synchronization with WIP_GOB system
+  
+- **WIP_GOB Integration** (`ballAnimationSimple.js`)
+  - **Ball Holder State:** `scene.gameState.ballHolder` (string ID) - synchronized with BallController
+  - **Conditional Targets:** `getPlayerTweenTargets()` - includes ball in player tween when player has ball
+  - **Simple Movement:** `animateBallToPosition()`, `animateShotToRim()` - distance-based duration, arc support
 
-**Files:**
-- `FrontEnd/static/js/phaser/animation/ballAnimationSimple.js` - Core system
-- All ball animations (passes, shots, bounces) use the new system
+**Key Files:**
+- `BallController.js` - Core state management
+- `BallControllerAdapter.js` - Compatibility layer
+- `ballAnimationSimple.js` - WIP_GOB integration
+- `ballTween.js` - Pass animations (uses BallControllerAdapter)
+- `ballManager.js` - Shot animations (uses BallControllerAdapter)
+- `freeThrow.js`, `fastBreak.js` - Special animations (use BallControllerAdapter)
 
 **Benefits:**
-- ✅ No ownership conflicts (single source of truth)
+- ✅ Single source of truth (BallController)
+- ✅ No ownership conflicts
 - ✅ No ball teleports (Phaser handles sync automatically)
-- ✅ Simpler code (removed 1000+ lines of complex tracking)
+- ✅ Lifecycle methods for clean state management
 - ✅ Better performance (no update callbacks)
 - ✅ Easier debugging (one place to check state)
+- ✅ Full WIP_GOB integration for player movement
 
-**See:** `BALL_ANIMATION_MIGRATION_PLAN.md` for complete migration details.
+**See:** 
+- `BALL_ANIMATION_SYSTEM_REFACTORING_PLAN.md` - Complete refactoring details (December 2024)
+- `BALL_ANIMATION_MIGRATION_PLAN.md` - WIP_GOB migration details (earlier work)
 
 ### Player Animation System
 
