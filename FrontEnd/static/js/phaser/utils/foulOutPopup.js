@@ -14,7 +14,7 @@
  * @param {string} [options.myTeamSide] - User's team side ('home' or 'away')
  * @param {string} [options.userTeamId] - User's team ID
  */
-export function showFoulOutPopup({ player, gameId, mode, quarter, tournamentId, franchiseId, homeTeam, awayTeam, homeId, awayId, myTeamSide, userTeamId }) {
+export function showFoulOutPopup({ player, gameId, mode, quarter, clock, tournamentId, franchiseId, homeTeam, awayTeam, homeId, awayId, myTeamSide, userTeamId }) {
   // Remove any existing popup
   const existingPopup = document.querySelector('.foul-out-popup');
   if (existingPopup) {
@@ -36,6 +36,7 @@ export function showFoulOutPopup({ player, gameId, mode, quarter, tournamentId, 
   if (gameId) params.set('game_id', gameId);
   if (quarter) params.set('quarter', quarter);
   params.set('period', `Q${quarter}`);
+  if (clock) params.set('clock', clock); // ✅ Preserve clock time when navigating to lineup
   if (tournamentId) params.set('tournament_id', tournamentId);
   if (franchiseId) params.set('franchise_id', franchiseId);
   if (mode) params.set('mode', mode);

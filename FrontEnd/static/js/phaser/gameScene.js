@@ -1021,7 +1021,11 @@ export function createGameScene(Phaser) {
       const awayTimeoutsFromData = awayTeamObj?.timeouts ?? simData.timeouts?.away ?? simData.away_team_timeouts;
       let liveHomeTimeouts = typeof homeTimeoutsFromData === 'number' ? homeTimeoutsFromData : (isNewGame ? 5 : 5);
       let liveAwayTimeouts = typeof awayTimeoutsFromData === 'number' ? awayTimeoutsFromData : (isNewGame ? 5 : 5);
-      let liveClock = simData.clock || '8:00';
+      // ✅ FIX: Check URL params for clock (from foul out navigation) before using simData.clock
+      // This preserves the clock time when returning from lineup screen after a foul out
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlClock = urlParams.get('clock');
+      let liveClock = urlClock || simData.clock || '8:00';
       let liveQuarter = this.quarter;
       let livePeriodLabel = simData.period_label || `Q${this.quarter}`;
 
@@ -1088,6 +1092,7 @@ export function createGameScene(Phaser) {
               gameId: this.gameId,
               mode: mode,
               quarter: liveQuarter,
+              clock: liveClock, // ✅ Pass current clock time to preserve it
               tournamentId: tournamentId,
               franchiseId: franchiseId,
               homeTeam: homeTeam,

@@ -840,6 +840,11 @@ async function init() {
       params.set('quarter', String(quarter));
       params.set('period', periodLabel);
       if (quarter > 1 && currentGameId) params.set('game_id', currentGameId);
+      
+      // ✅ Preserve clock time if present (from foul out navigation)
+      const clock = urlParams.get('clock');
+      if (clock) params.set('clock', clock);
+      
       ['PG','SG','SF','PF','C'].forEach(pos => {
         const id = lineup[pos];
         if (id) params.set(`${myTeamSide}_${pos.toLowerCase()}`, id);
