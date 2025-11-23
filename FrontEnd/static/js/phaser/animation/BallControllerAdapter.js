@@ -78,9 +78,7 @@ function attachBallToPlayer(scene, ballSprite, playerSprite, opts = {}) {
     });
   }
   
-  // ✅ PHASE 1.4: Removed duplicate flag checks - BallController now handles these internally
-  // BallController.attachToPlayer() will check isInFlight and reason fields
-  // Old flags are still checked as fallback during transition period
+  // BallController.attachToPlayer() handles all state checks internally
 
   // Handle possession flip in progress (old system behavior)
   if (scene.possessionFlipInProgress) {
@@ -140,7 +138,7 @@ function attachBallToPlayer(scene, ballSprite, playerSprite, opts = {}) {
       scene.currentBallOwnerRef.value = playerSprite;
     }
     
-    // ✅ PHASE 4: Removed old ballDetached flag - BallController manages state internally
+    // BallController manages state internally
     
     // Log for debugging (old system style)
     if (isPutbackAttempt || isPutbackScenario) {
@@ -200,33 +198,9 @@ function detachBall(scene, ballSprite, options={}) {
 }
 
 /**
- * Backward compatible tweenBallTo function
- * 
- * @param {Phaser.Scene} scene - The game scene
- * @param {Phaser.GameObjects.Image} ballSprite - The ball sprite
- * @param {Object} targetCoords - Target coordinates
- * @param {Object} options - Tween options
+ * Legacy tweenBallTo function removed (Phase 5 cleanup)
+ * Replaced by animateBallToPosition() in ballAnimationSimple.js
  */
-function tweenBallTo(scene, ballSprite, targetCoords, options = {}) {
-  const ballController = getBallController();
-  
-  if (!ballController) {
-    console.error('BallControllerAdapter: Cannot tween ball - BallController not initialized');
-    return Promise.resolve();
-  }
-
-  // Use BallController to start flight
-  ballController.startFlight(targetCoords, options);
-  
-  // Return a promise that resolves when the tween completes
-  return new Promise((resolve) => {
-    if (options.duration) {
-      setTimeout(resolve, options.duration);
-    } else {
-      resolve();
-    }
-  });
-}
 
 /**
  * Helper function to get current ball owner (old system compatibility)
@@ -304,7 +278,6 @@ function synchronizeBallState(scene, options = {}) {
 }
 
 // Named exports for individual functions
-// ✅ NOTE: tweenBallTo removed from exports (legacy code - replaced by animateBallToPosition)
 export {
   attachBallToPlayer,
   detachBall,
@@ -317,7 +290,6 @@ export {
 };
 
 // Default export for backward compatibility
-// ✅ NOTE: tweenBallTo removed from default export (legacy code - replaced by animateBallToPosition)
 export default {
   attachBallToPlayer,
   detachBall,
