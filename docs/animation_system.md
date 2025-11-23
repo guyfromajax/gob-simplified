@@ -59,7 +59,10 @@ Player animations already use the simplified approach:
 - Distance-based duration calculation
 - Simple Phaser tweens (no complex following systems)
 
-**Optional Cleanup:** `tweenPlayerTo()` in `ballTween.js` still uses old-style `onUpdate` callback for ball following, but this is only used for fast break outlet passes. Low priority since main player animations already use the WIP_GOB approach.
+**Notes:**
+- `tweenPlayerTo()` in `ballTween.js` still uses `onUpdate` callback for ball following (only used for fast break outlet passes - low priority cleanup)
+- Old system flags (`_shotInProgress`, `ballDetached`, `_putbackInProgress`) are no longer **set** anywhere, but may still be **read** in debug logging or dead code checks
+- All ball state is managed by `BallController` - old flags are legacy references only
 
 ---
 

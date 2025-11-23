@@ -64,6 +64,8 @@ function attachBallToPlayer(scene, ballSprite, playerSprite, opts = {}) {
   
   const targetPlayerId = playerSprite?.playerId;
   const isPutbackAttempt = opts?.debugInfo?.reason === 'putback_attempt';
+  // Note: _putbackInProgress is never set anymore (Phase 4 cleanup), but kept for backward compatibility
+  // This check will only be true if isPutbackAttempt is true
   const isPutbackScenario = scene._putbackInProgress || isPutbackAttempt;
   
   if (isPutbackAttempt || isPutbackScenario) {
