@@ -1367,6 +1367,13 @@ def simulate_turn_endpoint(request: TurnSimulationRequest):
             gm.game_state["quarter"] = gm.quarter  # ✅ FIX: Ensure game_state is updated
             logging.info(f"✅ Advanced to quarter {gm.quarter}")
         
+        # Check if game is final (Q4+ complete and not tied)
+        is_final = (
+            quarter_complete 
+            and gm.quarter > 4 
+            and gm.score.get(gm.home_team.name, 0) != gm.score.get(gm.away_team.name, 0)
+        )
+        
         # Save game state to database every 10 turns (for crash recovery)
         # ✅ FIX: Always save when quarter completes to ensure quarter number is persisted
         if len(gm.turns) % 10 == 0 or quarter_complete:
@@ -1385,6 +1392,7 @@ def simulate_turn_endpoint(request: TurnSimulationRequest):
             "clock": gm.game_state.get("clock", "8:00"),
             "quarter_complete": quarter_complete,
             "quarter": gm.quarter,
+            "is_final": is_final,
             "home_score": gm.score.get(gm.home_team.name, 0),
             "away_score": gm.score.get(gm.away_team.name, 0),
             "home_team_fouls": gm.home_team.team_fouls,
