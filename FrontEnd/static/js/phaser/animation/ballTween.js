@@ -127,93 +127,10 @@ export function detachBall(scene, ballSprite) {
 }
 
 /**
- * Tween the ball to a specific position. Returns a promise that resolves when tween completes.
- * Supports optional arc motion via quadratic bezier.
- * @param {Phaser.Scene} scene
- * @param {Phaser.GameObjects.Image} ballSprite
- * @param {{x:number, y:number}} target
- * @param {{duration?:number, easing?:string, arc?:{height?:number}|boolean}} opts
+ * Legacy tweenBallTo function removed (Phase 5 cleanup)
+ * Replaced by animateBallToPosition() in ballAnimationSimple.js
+ * All call sites have been migrated to the new system
  */
-// ✅ LEGACY CODE COMMENTED OUT: Replaced by animateBallToPosition() in ballAnimationSimple.js
-// This function is no longer used - all call sites have been migrated to the new system
-// Kept for reference only - can be removed after full validation
-/*
-export function tweenBallTo(scene, ballSprite, target, opts = {}) {
-  if (!scene || !ballSprite || !target) return Promise.resolve();
-  const { duration = 300, easing = 'Linear', arc } = opts;
-  
-  // ✅ PHASE 4: Removed old ball following system - BallController handles following internally
-  
-  if (scene.tweens) scene.tweens.killTweensOf(ballSprite);
-  ballSprite.setDepth(BALL_DEPTH);
-  ballSprite.setVisible(true);
-
-  const ballController = resolveBallController(scene);
-  let controllerStartedFlight = false;
-  if (ballController && !ballController.isInFlight) {
-    const flightOpts = { duration, ease: easing };
-    controllerStartedFlight = ballController.startFlight(target, flightOpts) !== false;
-  }
-
-  return new Promise((resolve, reject) => {
-    const arcEnabled =
-      !!arc &&
-      !(
-        typeof arc === 'object' &&
-        Object.prototype.hasOwnProperty.call(arc, 'enabled') &&
-        arc.enabled === false
-      );
-
-    if (arcEnabled) {
-      const startX = ballSprite.x;
-      const startY = ballSprite.y;
-      const controlX = (startX + target.x) / 2;
-      const hasHeightProp =
-        typeof arc === 'object' && Object.prototype.hasOwnProperty.call(arc, 'height');
-      const height = hasHeightProp && arc.height != null && arc.height !== false ? arc.height : 50;
-      const controlY = Math.min(startY, target.y) - height;
-      const curve = new Phaser.Curves.QuadraticBezier(
-        new Phaser.Math.Vector2(startX, startY),
-        new Phaser.Math.Vector2(controlX, controlY),
-        new Phaser.Math.Vector2(target.x, target.y)
-      );
-      const progress = { t: 0 };
-      const tween = scene.tweens.add({
-        targets: progress,
-        t: 1,
-        duration,
-        ease: easing,
-        onUpdate: () => {
-          const p = curve.getPoint(progress.t);
-          ballSprite.setPosition(p.x, p.y);
-        },
-        onComplete: () => {
-          if (controllerStartedFlight && ballController) {
-            ballController.endFlight(null, { keepVisible: true });
-          }
-          resolve();
-        }
-      });
-      tween?.once?.('stop', () => reject(new Error('tween stopped')));
-    } else {
-      const tween = scene.tweens.add({
-        targets: ballSprite,
-        x: target.x,
-        y: target.y,
-        duration,
-        ease: easing,
-        onComplete: () => {
-          if (controllerStartedFlight && ballController) {
-            ballController.endFlight(null, { keepVisible: true });
-          }
-          resolve();
-        }
-      });
-      tween?.once?.('stop', () => reject(new Error('tween stopped')));
-    }
-  });
-}
-*/
 
 /**
  * Tween a player sprite to a target position. If the player currently has the
@@ -563,11 +480,10 @@ export async function runPass(scene, cfg = {}) {
   return promise;
 }
 
-// ✅ PHASE 3.1: Removed attachBallToPlayer from exports (now using BallControllerAdapter)
-// ✅ NOTE: tweenBallTo removed from default export (legacy code - replaced by animateBallToPosition)
+// Legacy functions removed (Phase 5 cleanup)
+// Now using BallControllerAdapter and animateBallToPosition from ballAnimationSimple.js
 export default {
   detachBall,
-  // tweenBallTo, // ✅ REMOVED: Legacy code - replaced by animateBallToPosition() in ballAnimationSimple.js
   tweenPlayerTo,
   runPass
 };
