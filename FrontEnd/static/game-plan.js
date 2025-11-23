@@ -16,11 +16,12 @@ const gameId = urlParams.get('game_id') || (typeof localStorage !== 'undefined' 
 const DEBUG = urlParams.has('debug');
 
 // Lineup params (passed from set-lineup)
-const pgId = urlParams.get(`${myTeamSide}_pg`);
-const sgId = urlParams.get(`${myTeamSide}_sg`);
-const sfId = urlParams.get(`${myTeamSide}_sf`);
-const pfId = urlParams.get(`${myTeamSide}_pf`);
-const cId = urlParams.get(`${myTeamSide}_c`);
+// Only read if myTeamSide is set
+const pgId = myTeamSide ? urlParams.get(`${myTeamSide}_pg`) : null;
+const sgId = myTeamSide ? urlParams.get(`${myTeamSide}_sg`) : null;
+const sfId = myTeamSide ? urlParams.get(`${myTeamSide}_sf`) : null;
+const pfId = myTeamSide ? urlParams.get(`${myTeamSide}_pf`) : null;
+const cId = myTeamSide ? urlParams.get(`${myTeamSide}_c`) : null;
 
 // Determine team name and ID
 let teamName = myTeamSide === 'home' ? homeTeam : awayTeam;
@@ -314,11 +315,16 @@ async function navigateBack() {
   params.set('period', periodLabel);
   
   // Pass lineup params back to preserve lineup when navigating back
-  if (pgId) params.set(`${myTeamSide}_pg`, pgId);
-  if (sgId) params.set(`${myTeamSide}_sg`, sgId);
-  if (sfId) params.set(`${myTeamSide}_sf`, sfId);
-  if (pfId) params.set(`${myTeamSide}_pf`, pfId);
-  if (cId) params.set(`${myTeamSide}_c`, cId);
+  if (myTeamSide) {
+    if (pgId) params.set(`${myTeamSide}_pg`, pgId);
+    if (sgId) params.set(`${myTeamSide}_sg`, sgId);
+    if (sfId) params.set(`${myTeamSide}_sf`, sfId);
+    if (pfId) params.set(`${myTeamSide}_pf`, pfId);
+    if (cId) params.set(`${myTeamSide}_c`, cId);
+    console.log('[navigateBack] Passing lineup params:', { pgId, sgId, sfId, pfId, cId, myTeamSide });
+  } else {
+    console.warn('[navigateBack] myTeamSide not set, cannot pass lineup params');
+  }
   
   window.location.href = `/static/set-lineup.html?${params.toString()}`;
 }
