@@ -12,9 +12,20 @@ document.addEventListener('DOMContentLoaded', async () => {
   const awayTeamName = urlParams.get('away');
   const franchiseId = urlParams.get('franchise_id');
   
+  console.log('📋 Box Score page loaded:', {
+    gameId,
+    pregame,
+    homeTeamName,
+    awayTeamName,
+    franchiseId,
+    fullUrl: window.location.href,
+    allParams: Object.fromEntries(urlParams.entries())
+  });
+  
   if (!gameId) {
+    console.warn('⚠️ No gameId in URL params');
     if (!homeTeamName || !awayTeamName) {
-      console.error('No game_id provided and team names missing');
+      console.error('❌ No game_id provided and team names missing');
       return;
     }
     try {
@@ -24,7 +35,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       setupLockerRoomButton();
       return;
     } catch (e) {
-      console.error('Error loading pregame box score:', e);
+      console.error('❌ Error loading pregame box score:', e);
       return;
     }
   }
@@ -35,7 +46,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     setupTabs();
     setupLockerRoomButton();
   } catch (error) {
-    console.error('Error loading box score:', error);
+    console.error('❌ Error loading box score:', error);
   }
 });
 
