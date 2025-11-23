@@ -47,8 +47,8 @@ The ball animation system uses a unified architecture with **BallController** as
 - ✅ Full WIP_GOB integration for player movement
 
 **See:** 
-- `BALL_ANIMATION_SYSTEM_REFACTORING_PLAN.md` - Complete refactoring details (December 2024)
-- `BALL_ANIMATION_MIGRATION_PLAN.md` - WIP_GOB migration details (earlier work)
+- `Historical/BALL_ANIMATION_SYSTEM_REFACTORING_PLAN.md` - Complete refactoring details (December 2024)
+- `Historical/BALL_ANIMATION_MIGRATION_PLAN.md` - WIP_GOB migration details (earlier work)
 
 ### Player Animation System
 
