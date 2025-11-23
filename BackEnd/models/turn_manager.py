@@ -1830,7 +1830,7 @@ class TurnManager:
             elif defense_playcall == "1-3-1 Zone":
                 zone_boundaries = _get_131_zone_boundaries(ball_spot, is_away_offense)
             else:
-            zone_boundaries = _get_23_zone_boundaries(ball_spot, is_away_offense)
+                zone_boundaries = _get_23_zone_boundaries(ball_spot, is_away_offense)
             
             # Find which defender's zone contains the shooter (check for multiple defenders)
             defender_positions = []
@@ -1948,7 +1948,7 @@ class TurnManager:
             if defender is None:
                 pressure = 0
             else:
-            def_attr = defender.attributes
+                def_attr = defender.attributes
             pressure = (
                 def_attr["OD"] * 0.3 +
                 def_attr["AG"] * 0.3 +

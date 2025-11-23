@@ -1332,7 +1332,7 @@ def assign_all_zone_defenders(
                 # assign_bh_defender_coords expects home-oriented coords, so unflip if away offense
                 if is_away_offense:
                     ball_handler_coords_home = get_away_player_coords(ball_handler_coords)
-        else:
+                else:
                     ball_handler_coords_home = ball_handler_coords
                 coords = assign_bh_defender_coords(ball_handler_coords_home, aggression_level, is_away_offense, ball_spot)
             assignments[closest_defender] = coords
