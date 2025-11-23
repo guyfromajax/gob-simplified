@@ -81,20 +81,17 @@ async function handleOrebTurn(scene, { playerSprites, ballSprite, turnData, onUp
     });
     
     // ✅ PHASE 2.5: Use BallController lifecycle methods for putback
-    const { getBallController } = await import('./BallControllerAdapter.js');
+    // ✅ PHASE 2.9: Add defensive state synchronization for putbacks
+    const { getBallController, synchronizeBallState } = await import('./BallControllerAdapter.js');
     const ballController = getBallController();
     
-    // Clear any lingering shot state from previous shot
-    if (ballController && ballController.isInFlight) {
-      ballController.onShotEnd();
-    }
-    // ✅ TRANSITION PERIOD: Also clear old flag for backward compatibility
-    if (scene._shotInProgress) {
-      console.log('🔍 [PUTBACK DEBUG] Clearing _shotInProgress from previous shot', {
-        rebounderId
-      });
-      scene._shotInProgress = false;
-    }
+    // ✅ DEFENSIVE: Comprehensive state clearing before putback
+    // Clear any lingering state from previous shot/rebound
+    synchronizeBallState(scene, {
+      clearShotState: true,
+      clearPutbackState: true,
+      allowAttachment: false // Don't allow attachment yet - we'll position ball manually
+    });
     
     // ✅ TRANSITION PERIOD: Keep old flag for backward compatibility (will be removed in Phase 4)
     // The rebound animation from the previous turn might still be running
@@ -106,16 +103,19 @@ async function handleOrebTurn(scene, { playerSprites, ballSprite, turnData, onUp
       ballController.onPutbackStart({ shooterId: rebounderId });
     }
     
-    // CRITICAL: Detach ball from any current owner BEFORE positioning
-    // The ball might still be attached from the previous rebound animation
-    if (scene.ballController) {
-      if (scene.ballController.isAttached) {
-        console.log('🔍 [PUTBACK DEBUG] Detaching ball from previous owner before putback', {
-          rebounderId,
-          previousOwner: scene.ballController.currentOwner?.playerId
-        });
-        scene.ballController.detachFromPlayer('putback_prep');
-      }
+    // ✅ DEFENSIVE: Ensure ball is NOT attached before positioning
+    // This prevents the flash where ball briefly attaches to rebounder
+    // Check both ballController (from adapter) and scene.ballController for redundancy
+    if (ballController && ballController.isAttached) {
+      console.log('🔍 [PUTBACK DEBUG] Detaching ball from previous owner before putback', {
+        rebounderId,
+        previousOwner: ballController.currentOwner?.playerId
+      });
+      ballController.detachFromPlayer('putback_prep', { reason: 'prevent_attachment_flash' });
+    }
+    // Also check scene.ballController as fallback (some code might use this directly)
+    if (scene.ballController && scene.ballController.isAttached) {
+      scene.ballController.detachFromPlayer('putback_prep');
     }
     
     // Also clear old system ball state
