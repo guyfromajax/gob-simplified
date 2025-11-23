@@ -266,18 +266,62 @@ async function animateOutletPhase(scene, turnData, playerSprites, ballSprite, wi
     easing: "Sine.easeInOut"
   });
   
-  // ✅ PHASE 2.2: Fix fast break bug - ensure ball is attached to receiver after pass
-  // This fixes the bug where ball detaches from receiver before next animation
-  const { getBallController } = await import('./BallControllerAdapter.js');
+  // ✅ PHASE 2.8: Defensive attachment verification for fast breaks
+  // Wait a small delay to ensure pass animation is fully complete
+  // Then verify and fix attachment if needed
+  await new Promise(resolve => {
+    if (scene.time?.delayedCall) {
+      scene.time.delayedCall(50, resolve); // Small delay to ensure pass completes
+    } else {
+      setTimeout(resolve, 50);
+    }
+  });
+  
+  const { getBallController, synchronizeBallState } = await import('./BallControllerAdapter.js');
   const ballController = getBallController();
   
+  // ✅ PHASE 2.9: Synchronize state to ensure consistency
+  synchronizeBallState(scene, {
+    clearPassState: true,
+    allowAttachment: true
+  });
+  
   if (ballController && receiverSprite) {
-    // Verify ball is attached to receiver after pass
-    // If not attached or attached to wrong player, fix it
+    // ✅ DEFENSIVE: Multiple checks to ensure ball is properly attached
+    const isAttachedToReceiver = ballController.isAttached && 
+                                  ballController.currentOwner === receiverSprite;
+    const isInFlight = ballController.isInFlight;
+    const wrongOwner = ballController.isAttached && 
+                       ballController.currentOwner !== receiverSprite;
+    
+    // Fix attachment if needed
+    if (!isAttachedToReceiver || isInFlight || wrongOwner) {
+      // Clear any in-flight state first
+      if (isInFlight) {
+        ballController.onPassEnd(receiverSprite, { reason: 'fast_break_outlet_fix' });
+      } else {
+        // Direct attachment if not in flight
+        attachBallToPlayer(scene, ballSprite, receiverSprite, { 
+          reason: 'fast_break_outlet_verify',
+          debugInfo: { reason: 'fast_break_outlet_verify', wasInFlight: isInFlight }
+        });
+      }
+    }
+    
+    // ✅ DEFENSIVE: Verify attachment succeeded with retry
     if (!ballController.isAttached || ballController.currentOwner !== receiverSprite) {
+      console.warn('Fast break: Ball attachment verification failed, retrying...', {
+        isAttached: ballController.isAttached,
+        currentOwner: ballController.currentOwner?.playerId,
+        expectedReceiver: receiverId,
+        isInFlight: ballController.isInFlight,
+        reason: ballController.reason
+      });
+      // Retry attachment with state sync
+      synchronizeBallState(scene, { clearPassState: true, allowAttachment: true });
       attachBallToPlayer(scene, ballSprite, receiverSprite, { 
-        reason: 'fast_break_outlet_verify',
-        debugInfo: { reason: 'fast_break_outlet_verify' }
+        reason: 'fast_break_outlet_retry',
+        debugInfo: { reason: 'fast_break_outlet_retry' }
       });
     }
   }

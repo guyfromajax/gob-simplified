@@ -139,20 +139,29 @@ export async function runFreeThrowSequence(
     }
   }
 
-  // ✅ PHASE 2.1: Fix free throw bug - clear any lingering shot state before attaching
+  // ✅ PHASE 2.7: Defensive state clearing for free throws - clear both old flags and new state
   // This fixes the bug where ball doesn't attach to free throw shooter after AND-1
-  const { getBallController } = await import('./BallControllerAdapter.js');
+  // More aggressive clearing to handle race conditions and inconsistent state
+  const { getBallController, synchronizeBallState } = await import('./BallControllerAdapter.js');
   const ballController = getBallController();
   
+  // ✅ PHASE 2.9: Use state synchronization helper for comprehensive state clearing
+  synchronizeBallState(scene, {
+    clearShotState: true,
+    clearPutbackState: true,
+    allowAttachment: true
+  });
+  
   if (ballController) {
-    // Clear any lingering shot state from previous made shot (AND-1 scenario)
-    if (ballController.isInFlight) {
-      ballController.onShotEnd();
+    // Also ensure ball is not attached to wrong player
+    if (ballController.isAttached && ballController.currentOwner?.playerId !== turnData.shooter_id) {
+      ballController.detachFromPlayer('free_throw_prep', { reason: 'clear_for_free_throw' });
     }
-    // Also clear any old flag state as fallback
-    if (scene._shotInProgress) {
-      scene._shotInProgress = false;
-    }
+  }
+  
+  // ✅ DEFENSIVE: Kill any active ball tweens that might interfere
+  if (scene.tweens && ballSprite) {
+    scene.tweens.killTweensOf(ballSprite);
   }
 
   const shooterSprite = playerSprites[turnData.shooter_id];

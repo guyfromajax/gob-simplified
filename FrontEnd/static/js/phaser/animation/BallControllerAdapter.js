@@ -258,6 +258,78 @@ function clearCurrentOwner(scene) {
   }
 }
 
+/**
+ * ✅ PHASE 2.9: State synchronization helper
+ * Keeps old flags and new BallController state in sync during transition period
+ * This prevents race conditions and inconsistent state
+ * 
+ * @param {Phaser.Scene} scene - The game scene
+ * @param {Object} options - Options object
+ * @param {boolean} options.clearShotState - Clear shot-related state
+ * @param {boolean} options.clearPassState - Clear pass-related state
+ * @param {boolean} options.clearPutbackState - Clear putback-related state
+ * @param {boolean} options.allowAttachment - Whether to allow ball attachment after clearing
+ */
+function synchronizeBallState(scene, options = {}) {
+  const ballController = getBallController();
+  if (!ballController) return;
+  
+  const { 
+    clearShotState = false, 
+    clearPassState = false, 
+    clearPutbackState = false,
+    allowAttachment = true
+  } = options;
+  
+  // Clear BallController state based on options
+  if (clearShotState) {
+    if (ballController.isInFlight && (ballController.reason === 'shot' || ballController.reason === 'putback_shot')) {
+      ballController.onShotEnd();
+    }
+  }
+  
+  if (clearPassState) {
+    if (ballController.isInFlight && ballController.reason === 'pass') {
+      ballController.onPassEnd(null, { reason: 'sync_clear' });
+    }
+  }
+  
+  if (clearPutbackState) {
+    if (ballController.reason === 'putback_shot') {
+      ballController.onPutbackEnd();
+    }
+  }
+  
+  // Synchronize old flags with BallController state
+  // If BallController says ball is in flight, set old flags accordingly
+  if (ballController.isInFlight) {
+    if (ballController.reason === 'shot' || ballController.reason === 'putback_shot') {
+      scene._shotInProgress = true;
+    } else if (ballController.reason === 'pass') {
+      scene.passInFlight = true;
+    }
+  } else {
+    // Ball is not in flight, clear old flags
+    scene._shotInProgress = false;
+    scene.passInFlight = false;
+  }
+  
+  // Sync putback state
+  if (ballController.reason === 'putback_shot') {
+    scene._putbackInProgress = true;
+  } else {
+    scene._putbackInProgress = false;
+  }
+  
+  // Sync attachment state
+  if (ballController.isAttached) {
+    scene.ballDetached = false;
+  } else if (!ballController.isInFlight && allowAttachment) {
+    // Only set ballDetached if not in flight and attachment is allowed
+    scene.ballDetached = true;
+  }
+}
+
 // Named exports for individual functions
 // ✅ NOTE: tweenBallTo removed from exports (legacy code - replaced by animateBallToPosition)
 export {
@@ -266,6 +338,7 @@ export {
   getCurrentOwner,
   setCurrentOwner,
   clearCurrentOwner,
+  synchronizeBallState,
   initializeBallController,
   getBallController
 };
