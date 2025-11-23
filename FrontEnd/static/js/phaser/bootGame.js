@@ -342,7 +342,9 @@ async function showPopup(score) {
     mode: mode || 'single',
     tournamentId: tournamentId,
     franchiseId: franchiseId,
-    finalScore: score
+    finalScore: score,
+    homeTeam: homeTeam,
+    awayTeam: awayTeam
   });
 }
 
@@ -696,6 +698,10 @@ async function handleSimFullGame() {
     }
 
     gameId = gId;
+    // Save gameId to localStorage so box score can access it
+    if (gameId && typeof localStorage !== 'undefined') {
+      localStorage.setItem('game_id', gameId);
+    }
     quarter = lastSummary.quarter || currentQ;
     periodLabel = lastSummary.period_label || (quarter > 4 ? `OT${quarter - 4}` : `Q${quarter}`);
 
