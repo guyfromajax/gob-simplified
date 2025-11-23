@@ -1776,8 +1776,14 @@ export function createGameScene(Phaser) {
       // nextQuarterNumber is the quarter number the backend is ready for next
       // So the quarter we just finished is nextQuarterNumber - 1
       const quarterThatJustFinished = nextQuarterNumber - 1;
-      const finalHomeScore = lastHomeScore;
-      const finalAwayScore = lastAwayScore;
+      
+      // Use scores from lastTurnData if available (most recent/accurate), otherwise fall back to tracked scores
+      const finalHomeScore = (lastTurnData && lastTurnData.home_score !== undefined) 
+        ? lastTurnData.home_score 
+        : lastHomeScore;
+      const finalAwayScore = (lastTurnData && lastTurnData.away_score !== undefined)
+        ? lastTurnData.away_score
+        : lastAwayScore;
       const finalIsTied = finalHomeScore === finalAwayScore;
       
       // Check if backend marked game as final (more reliable than frontend calculation)
@@ -1792,7 +1798,8 @@ export function createGameScene(Phaser) {
         homeScore: finalHomeScore,
         awayScore: finalAwayScore,
         isTied: finalIsTied,
-        isFinalFromBackend: isFinalFromBackend
+        isFinalFromBackend: isFinalFromBackend,
+        lastTurnDataScores: lastTurnData ? { home: lastTurnData.home_score, away: lastTurnData.away_score } : null
       });
       
       // Game ends if:
