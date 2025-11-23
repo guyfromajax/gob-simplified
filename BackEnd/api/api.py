@@ -635,7 +635,7 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                 if not isinstance(request.strategy_settings, dict):
                     logging.error(f"⚠️ [STRATEGY SETTINGS] request.strategy_settings is not a dict: {type(request.strategy_settings)}")
                 else:
-            if request.user_team_side == "home":
+                    if request.user_team_side == "home":
                         old_hct = gm.home_team.strategy_settings.get('hc_trap', 'MISSING') if hasattr(gm.home_team, 'strategy_settings') and gm.home_team.strategy_settings else 'MISSING'
                         old_fcp = gm.home_team.strategy_settings.get('fc_press', 'MISSING') if hasattr(gm.home_team, 'strategy_settings') and gm.home_team.strategy_settings else 'MISSING'
                         gm.home_team.strategy_settings = dict(request.strategy_settings)  # Use dict() constructor for safety
@@ -643,7 +643,7 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                         new_fcp = request.strategy_settings.get('fc_press', 'MISSING')
                         logging.warning(f"🔧 [STRATEGY SETTINGS] Updated home team (IN MEMORY) - HCT: {old_hct} → {new_hct}, FCP: {old_fcp} → {new_fcp}")
                         logging.warning(f"   - Full strategy_settings: {gm.home_team.strategy_settings}")
-            elif request.user_team_side == "away":
+                    elif request.user_team_side == "away":
                         old_hct = gm.away_team.strategy_settings.get('hc_trap', 'MISSING') if hasattr(gm.away_team, 'strategy_settings') and gm.away_team.strategy_settings else 'MISSING'
                         old_fcp = gm.away_team.strategy_settings.get('fc_press', 'MISSING') if hasattr(gm.away_team, 'strategy_settings') and gm.away_team.strategy_settings else 'MISSING'
                         gm.away_team.strategy_settings = dict(request.strategy_settings)  # Use dict() constructor for safety
