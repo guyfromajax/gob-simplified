@@ -30,11 +30,12 @@ def assign_bh_defender_coords(ball_coords, aggression_level: str, is_away_offens
 
     # SIMPLE RULE: Defender positioning based on which basket is being defended
     # - When HOME team has ball: they attack AWAY basket (x=10), defender defends AWAY basket, so defender to LEFT (x_direction = -1)
-    # - When AWAY team has ball: they attack HOME basket (x=90), defender defends HOME basket, so defender to RIGHT (x_direction = +1)
+    # - When AWAY team has ball: they attack AWAY basket (x=10), defender defends AWAY basket, so defender to LEFT (x_direction = -1)
     # This positions the defender between the ball handler and the basket they're defending
+    # NOTE: In home orientation, the away basket is always at x=10, so defender is always to the LEFT
     if is_away_offense:
-        # Away team has ball - they attack HOME basket (x=90), defender defends HOME basket, so defender to RIGHT
-        x_direction = 1
+        # Away team has ball - they attack AWAY basket (x=10), defender defends AWAY basket, so defender to LEFT
+        x_direction = -1
     else:
         # Home team has ball - they attack AWAY basket (x=10), defender defends AWAY basket, so defender to LEFT
         x_direction = -1
