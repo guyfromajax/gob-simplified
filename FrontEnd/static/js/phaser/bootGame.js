@@ -324,15 +324,25 @@ async function startGame({ homeRoster, awayRoster, animate = true }) {
 }
 
 async function showPopup(score) {
-  // Get gameId from localStorage or URL params
-  const params = new URLSearchParams(window.location.search);
-  let gameId = params.get('game_id');
-  if (!gameId && typeof localStorage !== 'undefined') {
-    gameId = localStorage.getItem('game_id');
+  // Get gameId from multiple sources (module variable, score object, localStorage, URL params)
+  let popupGameId = gameId; // Use module-level gameId first
+  if (!popupGameId && score && score.gameId) {
+    popupGameId = score.gameId;
+  }
+  if (!popupGameId && typeof localStorage !== 'undefined') {
+    popupGameId = localStorage.getItem('game_id');
+  }
+  if (!popupGameId) {
+    const params = new URLSearchParams(window.location.search);
+    popupGameId = params.get('game_id');
   }
   
   console.log('📋 showPopup called:', {
-    gameId,
+    popupGameId,
+    moduleGameId: gameId,
+    gameIdFromScore: score?.gameId,
+    gameIdFromLocalStorage: typeof localStorage !== 'undefined' ? localStorage.getItem('game_id') : 'N/A',
+    gameIdFromParams: new URLSearchParams(window.location.search).get('game_id'),
     score,
     homeTeam,
     awayTeam,
@@ -341,14 +351,14 @@ async function showPopup(score) {
     franchiseId
   });
   
-  if (!gameId) {
-    console.warn('⚠️ No game_id found for box score');
+  if (!popupGameId) {
+    console.error('❌ No game_id found for box score - box score will not have data!');
   }
 
   // Use the new game completion popup
   const { showGameCompletionPopup } = await import('./utils/gameCompletionPopup.js');
   showGameCompletionPopup({
-    gameId: gameId || '',
+    gameId: popupGameId || '',
     mode: mode || 'single',
     tournamentId: tournamentId,
     franchiseId: franchiseId,
@@ -760,7 +770,20 @@ async function handleSimFullGame() {
 
     const finalScore = await finalizeGame({ simData: finalGameData, tournamentId, franchiseId });
     console.log('🏆 Final score object:', finalScore);
-    showPopup(finalScore);
+    
+    // ✅ REPLICATE gameScene.js approach: Pass gameId directly to showGameCompletionPopup
+    // This matches exactly what gameScene.js does (line 1916: gameId: gameId)
+    const { showGameCompletionPopup } = await import('./utils/gameCompletionPopup.js');
+    const popupMode = tournamentId ? 'tournament' : (franchiseId ? 'franchise' : 'single');
+    showGameCompletionPopup({
+      gameId: gameId, // Use module-level gameId directly, just like gameScene.js
+      mode: popupMode,
+      tournamentId: tournamentId,
+      franchiseId: franchiseId,
+      finalScore: finalScore,
+      homeTeam: homeTeam,
+      awayTeam: awayTeam
+    });
   } catch (err) {
     console.error('Error simming full game:', err);
     // ✅ FIX: Show actual error message instead of generic message
