@@ -1024,6 +1024,19 @@ function setupLockerRoomButton() {
     if (gameId) {
       params.set('game_id', gameId);
     }
+    
+    // Preserve lineup params if present in URL (from set-lineup screen)
+    const myTeam = urlParams.get('my_team');
+    if (myTeam) {
+      const positions = ['pg', 'sg', 'sf', 'pf', 'c'];
+      positions.forEach(pos => {
+        const paramKey = `${myTeam}_${pos}`;
+        const playerId = urlParams.get(paramKey);
+        if (playerId) {
+          params.set(paramKey, playerId);
+        }
+      });
+    }
 
     button.addEventListener('click', () => {
       window.location.href = `/static/set-lineup.html?${params.toString()}`;

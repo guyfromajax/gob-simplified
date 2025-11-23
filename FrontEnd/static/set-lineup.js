@@ -762,6 +762,18 @@ async function setHeader() {
   }
 }
 
+function restoreLineupFromUrl() {
+  // Restore lineup from URL parameters if present
+  const positions = ['PG', 'SG', 'SF', 'PF', 'C'];
+  positions.forEach(pos => {
+    const paramKey = `${myTeamSide}_${pos.toLowerCase()}`;
+    const playerId = urlParams.get(paramKey);
+    if (playerId) {
+      lineup[pos] = playerId;
+    }
+  });
+}
+
 async function init() {
   if (!resolveTeam()) {
     alert("Can't determine your team for this game. Please return and relaunch.");
@@ -771,7 +783,10 @@ async function init() {
   }
   await setHeader();
   await loadRoster();
-  setupSlots();
+  setupSlots(); // Setup slot event handlers (this clears slots, but we'll restore after)
+  restoreLineupFromUrl(); // Restore lineup from URL after slots are set up
+  updateAllSlotDisplays(); // Display restored lineup in slots
+  updatePlayButton(); // Update play button state based on restored lineup
   
   // Wire up autoset button
   const autosetBtn = document.getElementById('autoset-lineup');
@@ -898,6 +913,12 @@ async function init() {
       const startingPossession = urlParams.get('starting_possession');
       if (startWithInbound) params.set('start_with_inbound', startWithInbound);
       if (startingPossession) params.set('starting_possession', startingPossession);
+      
+      // Pass lineup params to preserve lineup when navigating back
+      ['PG','SG','SF','PF','C'].forEach(pos => {
+        const id = lineup[pos];
+        if (id) params.set(`${myTeamSide}_${pos.toLowerCase()}`, id);
+      });
 
       // If we have an active game, include it so Box Score shows live stats
       if (currentGameId) {
