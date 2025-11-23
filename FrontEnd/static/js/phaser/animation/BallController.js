@@ -32,6 +32,14 @@ export class BallController {
     this.targetPosition = null;
     this.isMoving = false;
     
+    // ✅ PHASE 1.1: Internal state tracking for lifecycle management
+    // Track reason for current state (shot, pass, putback, etc.)
+    this.reason = null;
+    // Track previous state before transitions
+    this.previousState = null;
+    // Track state history for debugging
+    this.stateHistory = [];
+    
     // Debug logging
     this.debug = false;
     
@@ -78,11 +86,34 @@ export class BallController {
     // Putback attempts need to attach the ball before the shot animation starts
     const isPutbackAttempt = options?.debugInfo?.reason === 'putback_attempt';
     
-    // CRITICAL: Don't attach during putback shot animations
-    // The putback shot animation is still running, and attaching the ball here causes a flash
+    // ✅ PHASE 1.3: Use internal state instead of old scene flags
+    // Check if ball is in flight (from shot or pass)
+    if (this.isInFlight && !isPutbackAttempt) {
+      if (this.debug) {
+        console.log('BallController: Cannot attach - ball is in flight', {
+          reason: this.reason,
+          isPutbackAttempt
+        });
+      }
+      return false;
+    }
+    
+    // Check if this is a putback shot in progress (using internal state)
+    if (this.reason === 'putback_shot' && !isPutbackAttempt) {
+      if (this.debug) {
+        console.log('BallController: Cannot attach - putback shot in progress', {
+          reason: this.reason,
+          isPutbackAttempt
+        });
+      }
+      return false;
+    }
+    
+    // ✅ TRANSITION PERIOD: Also check old flags as fallback (will be removed in Phase 4)
+    // This ensures compatibility during migration
     if (this.scene._putbackInProgress && !isPutbackAttempt) {
       if (this.debug) {
-        console.log('BallController: Cannot attach - putback in progress', {
+        console.log('BallController: Cannot attach - putback in progress (old flag)', {
           putbackInProgress: this.scene._putbackInProgress,
           isPutbackAttempt
         });
@@ -92,7 +123,7 @@ export class BallController {
     
     if (this.scene._shotInProgress && !isPutbackAttempt) {
       if (this.debug) {
-        console.log('BallController: Cannot attach - shot in progress');
+        console.log('BallController: Cannot attach - shot in progress (old flag)');
       }
       return false;
     }
@@ -465,7 +496,11 @@ export class BallController {
       isInFlight: this.isInFlight,
       isMoving: this.isMoving,
       position: { x: this.ballSprite.x, y: this.ballSprite.y },
-      visible: this.ballSprite.visible
+      visible: this.ballSprite.visible,
+      // ✅ PHASE 1.1: Include new state tracking fields
+      reason: this.reason,
+      previousState: this.previousState,
+      lastStateChange: this.stateHistory.length > 0 ? this.stateHistory[this.stateHistory.length - 1] : null
     };
   }
 
@@ -524,6 +559,10 @@ export class BallController {
     this.isMoving = false;
     this.targetPosition = null;
     this.ownershipHistory = [];
+    // ✅ PHASE 1.1: Reset new state tracking fields
+    this.reason = null;
+    this.previousState = null;
+    this.stateHistory = [];
     
     if (this.ballSprite) {
       this.ballSprite.setVisible(false);
@@ -559,6 +598,226 @@ export class BallController {
     this.stopFollowingPlayer();
     this.attachmentCallbacks = [];
     this.detachmentCallbacks = [];
+  }
+
+  // ==================== PHASE 1.2: LIFECYCLE METHODS ====================
+  // These methods provide a clean API for managing ball state transitions
+  // They will eventually replace direct manipulation of scene flags
+
+  /**
+   * Lifecycle: Shot animation started
+   * Sets ball to in-flight state and detaches from current owner
+   * @param {Object} options - Options object
+   * @param {string} options.shooterId - ID of the shooter
+   * @param {boolean} options.isPutback - Whether this is a putback attempt
+   */
+  onShotStart(options = {}) {
+    const { shooterId, isPutback = false } = options;
+    
+    // Save previous state
+    this.previousState = {
+      isAttached: this.isAttached,
+      isInFlight: this.isInFlight,
+      currentOwner: this.currentOwner?.playerId || null,
+      reason: this.reason
+    };
+
+    // Set ball to in-flight state
+    this.isInFlight = true;
+    this.reason = isPutback ? 'putback_shot' : 'shot';
+    
+    // Detach from current owner if attached
+    if (this.isAttached) {
+      this.detachFromPlayer('shot_start', { reason: this.reason, shooterId });
+    }
+
+    // Record state change
+    this.stateHistory.push({
+      state: 'IN_FLIGHT',
+      reason: this.reason,
+      shooterId,
+      timestamp: Date.now(),
+      previousState: this.previousState
+    });
+
+    // Keep only last 50 state changes
+    if (this.stateHistory.length > 50) {
+      this.stateHistory = this.stateHistory.slice(-50);
+    }
+
+    if (this.debug) {
+      console.log('BallController: onShotStart', {
+        shooterId,
+        isPutback,
+        previousState: this.previousState
+      });
+    }
+  }
+
+  /**
+   * Lifecycle: Shot animation ended
+   * Clears in-flight state, ball is ready for next action
+   */
+  onShotEnd() {
+    // Save previous state
+    this.previousState = {
+      isAttached: this.isAttached,
+      isInFlight: this.isInFlight,
+      currentOwner: this.currentOwner?.playerId || null,
+      reason: this.reason
+    };
+
+    // Clear in-flight state
+    this.isInFlight = false;
+    const previousReason = this.reason;
+    this.reason = null;
+
+    // Record state change
+    this.stateHistory.push({
+      state: 'READY',
+      reason: 'shot_end',
+      previousReason,
+      timestamp: Date.now(),
+      previousState: this.previousState
+    });
+
+    // Keep only last 50 state changes
+    if (this.stateHistory.length > 50) {
+      this.stateHistory = this.stateHistory.slice(-50);
+    }
+
+    if (this.debug) {
+      console.log('BallController: onShotEnd', {
+        previousReason,
+        previousState: this.previousState
+      });
+    }
+  }
+
+  /**
+   * Lifecycle: Pass animation started
+   * Sets ball to in-flight state and detaches from passer
+   * @param {Object} options - Options object
+   * @param {string} options.passerId - ID of the passer
+   * @param {string} options.receiverId - ID of the receiver (optional)
+   */
+  onPassStart(options = {}) {
+    const { passerId, receiverId } = options;
+    
+    // Save previous state
+    this.previousState = {
+      isAttached: this.isAttached,
+      isInFlight: this.isInFlight,
+      currentOwner: this.currentOwner?.playerId || null,
+      reason: this.reason
+    };
+
+    // Set ball to in-flight state
+    this.isInFlight = true;
+    this.reason = 'pass';
+    
+    // Set pending owner if receiver is known
+    if (receiverId && this.scene && this.scene.playerSprites) {
+      const receiverSprite = this.scene.playerSprites[receiverId];
+      if (receiverSprite) {
+        this.setPendingOwner(receiverSprite, { reason: 'pass', receiverId });
+      }
+    }
+    
+    // Detach from current owner if attached
+    if (this.isAttached) {
+      this.detachFromPlayer('pass_start', { reason: 'pass', passerId, receiverId });
+    }
+
+    // Record state change
+    this.stateHistory.push({
+      state: 'IN_FLIGHT',
+      reason: 'pass',
+      passerId,
+      receiverId,
+      timestamp: Date.now(),
+      previousState: this.previousState
+    });
+
+    // Keep only last 50 state changes
+    if (this.stateHistory.length > 50) {
+      this.stateHistory = this.stateHistory.slice(-50);
+    }
+
+    if (this.debug) {
+      console.log('BallController: onPassStart', {
+        passerId,
+        receiverId,
+        previousState: this.previousState
+      });
+    }
+  }
+
+  /**
+   * Lifecycle: Pass animation ended
+   * Clears in-flight state and attaches to receiver if provided
+   * @param {Object} receiverSprite - Sprite of the receiver (optional)
+   * @param {Object} options - Options object
+   */
+  onPassEnd(receiverSprite = null, options = {}) {
+    // Save previous state
+    this.previousState = {
+      isAttached: this.isAttached,
+      isInFlight: this.isInFlight,
+      currentOwner: this.currentOwner?.playerId || null,
+      reason: this.reason
+    };
+
+    // Clear in-flight state
+    this.isInFlight = false;
+    const previousReason = this.reason;
+    this.reason = null;
+
+    // Attach to receiver if provided
+    if (receiverSprite) {
+      this.attachToPlayer(receiverSprite, { ...options, reason: 'pass_end' });
+    }
+
+    // Record state change
+    this.stateHistory.push({
+      state: receiverSprite ? 'ATTACHED' : 'DETACHED',
+      reason: 'pass_end',
+      previousReason,
+      receiverId: receiverSprite?.playerId || null,
+      timestamp: Date.now(),
+      previousState: this.previousState
+    });
+
+    // Keep only last 50 state changes
+    if (this.stateHistory.length > 50) {
+      this.stateHistory = this.stateHistory.slice(-50);
+    }
+
+    if (this.debug) {
+      console.log('BallController: onPassEnd', {
+        receiverId: receiverSprite?.playerId || null,
+        previousReason,
+        previousState: this.previousState
+      });
+    }
+  }
+
+  /**
+   * Lifecycle: Putback shot started
+   * Wrapper around onShotStart with isPutback flag
+   * @param {Object} options - Options object
+   * @param {string} options.shooterId - ID of the shooter
+   */
+  onPutbackStart(options = {}) {
+    this.onShotStart({ ...options, isPutback: true });
+  }
+
+  /**
+   * Lifecycle: Putback shot ended
+   * Wrapper around onShotEnd
+   */
+  onPutbackEnd() {
+    this.onShotEnd();
   }
 }
 
