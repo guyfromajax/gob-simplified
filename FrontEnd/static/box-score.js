@@ -550,7 +550,7 @@ function renderScoutingContent(team, teamStats) {
   const hasCumulativeData = Object.values(cumulative).some(focus => (focus.attempts || 0) > 0);
   if (hasCumulativeData) {
     const cumulativeSection = createPlaycallSubsection('Focus Success Rates', cumulative);
-    playCallsSection.appendChild(cumulativeSection);
+  playCallsSection.appendChild(cumulativeSection);
   }
 
   container.appendChild(playCallsSection);
@@ -685,7 +685,7 @@ function createPlaycallSubsection(title, playcallData) {
   const overallAttempts = overall.attempts || 0;
   const overallSuccess = overall.success || 0;
   const overallPct = overallAttempts > 0 ? ((overallSuccess / overallAttempts) * 100).toFixed(0) : '0';
-  
+
   // Calculate average EV and Exec for offense playcalls
   const overallEvScores = overall.ev_scores || [];
   const overallLeanScores = overall.lean_scores || [];
@@ -814,7 +814,7 @@ function createDefensePlaycallSubsection(title, defenseData) {
   const used = stats.used || 0;
   const success = stats.success || 0;
   const pct = used > 0 ? ((success / used) * 100).toFixed(0) : '0';
-  
+
   // Calculate average EV and Exec (lean_score)
   const evScores = stats.ev_scores || [];
   const leanScores = stats.lean_scores || [];
@@ -953,8 +953,8 @@ function setupTabs() {
   const awayPrimaryColor = awayTeam.primary_color || '#000000';
 
   tabButtons.forEach(button => {
-    const team = button.dataset.team;
-    
+      const team = button.dataset.team;
+
     // Set background color based on team
     if (team === 'home') {
       button.style.backgroundColor = homePrimaryColor;
