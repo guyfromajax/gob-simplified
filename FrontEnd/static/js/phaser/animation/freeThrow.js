@@ -27,9 +27,9 @@ export async function runFreeThrowSequence(
     ftContext = {},
   }
 ) {
-  const attach =
-    helpers.attachBallToPlayer ||
-    (await import("./ballTween.js")).attachBallToPlayer;
+  // ✅ PHASE 3.2: Use BallControllerAdapter directly instead of ballTween.js
+  const { attachBallToPlayer } = await import("./BallControllerAdapter.js");
+  const attach = helpers.attachBallToPlayer || attachBallToPlayer;
   const detach =
     helpers.detachBall || (await import("./ballTween.js")).detachBall;
   // ✅ STEP 3 MIGRATION: Import new ball animation functions

@@ -10,7 +10,7 @@ import {
 } from "./ballTween.js";
 // ✅ STEP 3 MIGRATION: Import new ball animation functions
 import { animateShotToRim, animateBallToPosition } from "./ballAnimationSimple.js";
-import { attachBallToPlayer as baseAttachBallToPlayer } from "./BallControllerAdapter.js";
+import { attachBallToPlayer } from "./BallControllerAdapter.js";
 import { States, getDebugTransitions, safeTransition, createTransitionGuard } from "../state/gameStateMachine.js";
 import gameStore from "../../state/gameStore.js";
 import {
@@ -27,53 +27,15 @@ import {
   isAnimationDebugEnabled,
 } from "../utils/debugFlags.js";
 
-function attachBallToPlayer(scene, ballSprite, playerSprite, opts = {}) {
-  if (scene.possessionFlipInProgress) return;
-
-  let targetId = playerSprite?.playerId;
-  if (targetId == null && scene?.playerSprites) {
-    for (const [pid, sprite] of Object.entries(scene.playerSprites)) {
-      if (sprite === playerSprite) {
-        targetId = pid;
-        break;
-      }
-    }
-  }
-
-  if (scene.stateMachine?.is(States.Rebound) && targetId !== scene.rebounderId) {
-    return;
-  }
-
-  const debugEnabled = isAnimationDebugEnabled();
-  if (debugEnabled && REBOUND_DEBUG) {
-    if (
-      scene?.currentBallOwnerRef &&
-      scene.currentBallOwnerRef.value &&
-      scene.currentBallOwnerRef.value !== playerSprite
-    ) {
-      const refId = scene.currentBallOwnerRef.value?.playerId;
-      animationDebugWarn("ball:owner mismatch", {
-        ref: refId,
-        target: targetId
-      });
-    }
-
-    const logPayload = {
-      type: "ballAttach",
-      shooterId: opts?.debugInfo?.shooterId ?? null,
-      reboundSpot: opts?.debugInfo?.reboundSpot ?? null,
-      playerId: targetId,
-      team: playerSprite?.team_id ?? playerSprite?.team ?? null
-    };
-    animationDebugLog("ball:attach", logPayload);
-  }
-
-  if (scene?.currentBallOwnerRef) {
-    scene.currentBallOwnerRef.value = playerSprite;
-  }
-
-  return baseAttachBallToPlayer(scene, ballSprite, playerSprite, opts);
-}
+/**
+ * ✅ PHASE 3.3: Removed wrapper function
+ * Now using attachBallToPlayer directly from BallControllerAdapter.js
+ * BallControllerAdapter already handles:
+ * - possessionFlipInProgress checks
+ * - rebound state restrictions
+ * - currentBallOwnerRef updates
+ * - debug logging
+ */
 
 function runInboundSetup(opts) {
   const scene = opts.scene;

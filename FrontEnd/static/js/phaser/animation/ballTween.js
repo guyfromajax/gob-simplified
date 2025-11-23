@@ -14,7 +14,7 @@ import {
   animationDebugWarn,
   isAnimationDebugEnabled,
 } from "../utils/debugFlags.js";
-import { getBallController } from './BallControllerAdapter.js';
+import { getBallController, attachBallToPlayer as attachBallToPlayerAdapter } from './BallControllerAdapter.js';
 // ✅ NEW (Step 1): Import simple ball holder state functions
 // ✅ STEP 3 MIGRATION: Import new ball animation function
 import {
@@ -102,72 +102,10 @@ function resolveBallController(scene) {
 }
 
 /**
- * Position the ball sprite on top of a player's sprite and optionally adjust depth.
- * Any active tweens on the ball are killed before attaching.
- * @param {Phaser.Scene} scene
- * @param {Phaser.GameObjects.Image} ballSprite
- * @param {Phaser.GameObjects.Sprite} playerSprite
- * @param {{depth?: number}} opts
+ * ✅ PHASE 3.1: Removed local attachBallToPlayer function
+ * Now using attachBallToPlayer from BallControllerAdapter.js
+ * All call sites updated to use attachBallToPlayerAdapter
  */
-export function attachBallToPlayer(scene, ballSprite, playerSprite, opts = {}) {
-  if (!scene || !ballSprite || !playerSprite) return;
-  
-  // CRITICAL: Don't attach during putback shot animations
-  // The putback shot animation is still running, and attaching the ball here causes a flash
-  const isPutbackAttempt = opts?.debugInfo?.reason === 'putback_attempt';
-  if (scene._putbackInProgress && !isPutbackAttempt) {
-    console.log('🏀 attachBallToPlayer (ballTween): Blocked during putback shot animation', {
-      putbackInProgress: scene._putbackInProgress,
-      isPutbackAttempt
-    });
-    return;
-  }
-  
-  // Don't attach ball during shot animation - it would override the tween
-  if (scene._shotInProgress) {
-    console.log('🏀 attachBallToPlayer: Blocked during shot animation');
-    return;
-  }
-
-  let targetId = playerSprite.playerId;
-  if (targetId == null && scene.playerSprites) {
-    for (const [pid, sprite] of Object.entries(scene.playerSprites)) {
-      if (sprite === playerSprite) {
-        targetId = pid;
-        break;
-      }
-    }
-  }
-
-  const targetTeamId = playerSprite.team_id;
-  if (
-    scene.possessionFlipInProgress &&
-    scene.offenseTeamId != null &&
-    String(targetTeamId) !== String(scene.offenseTeamId)
-  ) {
-    const from = getCurrentOwner(scene);
-    console.warn('overwrite', { from, to: targetId, reason: 'possessionFlipInProgress' });
-    return;
-  }
-
-  // Stop any existing ball following
-  stopBallFollowing(scene);
-
-  scene.ballDetached = false;
-  const depth = opts.depth ?? (playerSprite.depth != null ? playerSprite.depth + 1 : BALL_DEPTH);
-  if (scene.tweens) scene.tweens.killTweensOf(ballSprite);
-  ballSprite.setPosition(playerSprite.x, playerSprite.y);
-  ballSprite.setVisible(true);
-  ballSprite.setDepth(depth);
-  if (targetId != null) {
-    setCurrentOwner(scene, targetId);
-  } else {
-    clearCurrentOwner(scene);
-  }
-
-  // Start ball following for this player
-  startBallFollowing(scene, ballSprite, playerSprite, opts);
-}
 
 /**
  * Start ball following a player during movement animations
@@ -442,7 +380,7 @@ export async function runPass(scene, cfg = {}) {
     const lastId = getLastKnownOwner(scene);
     const lastSprite = lastId != null ? scene.playerSprites?.[lastId] : null;
     if (lastSprite) {
-      attachBallToPlayer(scene, ballSprite, lastSprite);
+      attachBallToPlayerAdapter(scene, ballSprite, lastSprite);
     }
     scene.__activePass.reject?.(new Error('pass cancelled'));
     scene.__activePass = null;
@@ -451,7 +389,7 @@ export async function runPass(scene, cfg = {}) {
   cancelBallTween(scene, ballSprite);
   if (scene.ballDetached && getLastKnownOwner(scene) != null) {
     const owner = scene.playerSprites?.[getLastKnownOwner(scene)];
-    if (owner) attachBallToPlayer(scene, ballSprite, owner);
+    if (owner) attachBallToPlayerAdapter(scene, ballSprite, owner);
   }
 
   let resolveFn, rejectFn;
@@ -535,7 +473,7 @@ export async function runPass(scene, cfg = {}) {
       if (PASS_DEBUG) animationDebugLog('passStart', { fromId, toId, duration: usedDuration, easing: usedEasing });
 
       if (fromSprite) {
-        attachBallToPlayer(scene, ballSprite, fromSprite);
+        attachBallToPlayerAdapter(scene, ballSprite, fromSprite);
         if (startCoords) {
           ballSprite.setPosition(startCoords.x, startCoords.y);
         }
@@ -630,7 +568,7 @@ export async function runPass(scene, cfg = {}) {
           ballController.onPassEnd(toSprite, { reason: 'pass_complete' });
         } else {
           // Fallback to direct attachment if BallController not available
-          attachBallToPlayer(scene, ballSprite, toSprite);
+          attachBallToPlayerAdapter(scene, ballSprite, toSprite);
         }
         if (scene.currentBallOwnerRef) {
           scene.currentBallOwnerRef.value = toSprite;
@@ -657,7 +595,7 @@ export async function runPass(scene, cfg = {}) {
       const lastId = getLastKnownOwner(scene);
       const lastSprite = lastId != null ? scene.playerSprites?.[lastId] : null;
       if (lastSprite) {
-        attachBallToPlayer(scene, ballSprite, lastSprite);
+        attachBallToPlayerAdapter(scene, ballSprite, lastSprite);
       }
       emitSummary('error', { error: err?.message });
       rejectFn(err);
@@ -673,9 +611,9 @@ export async function runPass(scene, cfg = {}) {
   return promise;
 }
 
+// ✅ PHASE 3.1: Removed attachBallToPlayer from exports (now using BallControllerAdapter)
 // ✅ NOTE: tweenBallTo removed from default export (legacy code - replaced by animateBallToPosition)
 export default {
-  attachBallToPlayer,
   detachBall,
   // tweenBallTo, // ✅ REMOVED: Legacy code - replaced by animateBallToPosition() in ballAnimationSimple.js
   tweenPlayerTo,
