@@ -143,6 +143,13 @@ export class BallController {
     this.isAttached = true;
     this.isDetached = false;
 
+    // ✅ SYNC WITH WIP_GOB: Set ball holder state when attaching directly
+    // This ensures WIP_GOB system (getPlayerTweenTargets) knows who has the ball
+    const playerId = playerSprite.playerId || (playerSprite.id ? String(playerSprite.id) : null);
+    if (this.scene && this.scene.gameState && playerId) {
+      this.scene.gameState.ballHolder = playerId;
+    }
+
     // Position ball on player
     this.positionBallOnPlayer(playerSprite, options);
 
@@ -189,6 +196,12 @@ export class BallController {
     this.currentOwner = null;
     this.isAttached = false;
     this.isDetached = true;
+
+    // ✅ SYNC WITH WIP_GOB: Clear ball holder state when detaching directly
+    // This ensures WIP_GOB system (getPlayerTweenTargets) doesn't include ball in player tweens
+    if (this.scene && this.scene.gameState) {
+      this.scene.gameState.ballHolder = null;
+    }
 
     // Hide ball if not in flight
     if (!this.isInFlight) {
