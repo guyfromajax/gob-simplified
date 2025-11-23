@@ -1776,14 +1776,8 @@ export function createGameScene(Phaser) {
       // nextQuarterNumber is the quarter number the backend is ready for next
       // So the quarter we just finished is nextQuarterNumber - 1
       const quarterThatJustFinished = nextQuarterNumber - 1;
-      
-      // Use scores from lastTurnData if available (most recent/accurate), otherwise fall back to tracked scores
-      const finalHomeScore = (lastTurnData && lastTurnData.home_score !== undefined) 
-        ? lastTurnData.home_score 
-        : lastHomeScore;
-      const finalAwayScore = (lastTurnData && lastTurnData.away_score !== undefined)
-        ? lastTurnData.away_score
-        : lastAwayScore;
+      const finalHomeScore = lastHomeScore;
+      const finalAwayScore = lastAwayScore;
       const finalIsTied = finalHomeScore === finalAwayScore;
       
       // Check if backend marked game as final (more reliable than frontend calculation)
@@ -1798,8 +1792,7 @@ export function createGameScene(Phaser) {
         homeScore: finalHomeScore,
         awayScore: finalAwayScore,
         isTied: finalIsTied,
-        isFinalFromBackend: isFinalFromBackend,
-        lastTurnDataScores: lastTurnData ? { home: lastTurnData.home_score, away: lastTurnData.away_score } : null
+        isFinalFromBackend: isFinalFromBackend
       });
       
       // Game ends if:
@@ -1826,16 +1819,7 @@ export function createGameScene(Phaser) {
               away_score: finalAwayScore,
               game_id: gameId,
               home_team: homeTeamName || initialSimData.home_team,
-              away_team: awayTeamName || initialSimData.away_team,
-              // Include score map for finalizeGame to use
-              score: {
-                [homeTeamName || initialSimData.home_team]: finalHomeScore,
-                [awayTeamName || initialSimData.away_team]: finalAwayScore
-              },
-              final_score: {
-                [homeTeamName || initialSimData.home_team]: finalHomeScore,
-                [awayTeamName || initialSimData.away_team]: finalAwayScore
-              }
+              away_team: awayTeamName || initialSimData.away_team
             },
             tournamentId: this.tournamentId,
             franchiseId: this.franchiseId,
