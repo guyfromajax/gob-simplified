@@ -1810,57 +1810,8 @@ export function createGameScene(Phaser) {
       // 1. Q4 is complete and scores ARE tied → go to OT
       // 2. OT is complete and scores ARE tied → go to next OT
       
-      if (isFinalFromBackend || (quarterThatJustFinished >= 4 && !finalIsTied)) {
-        // Game is over - finalize
-        console.log('🏆 Game complete! Finalizing...');
-        const finalize = async () => {
-          const { finalizeGame } = await import('./finalizeGame.js');
-          
-          // Get team names for score map
-          const { home: homeTeamName, away: awayTeamName } = gameStore.getTeams();
-          const homeName = homeTeamName || initialSimData.home_team;
-          const awayName = awayTeamName || initialSimData.away_team;
-          
-          // Update simData.score with current final scores (finalizeGame already checks this)
-          const updatedSimData = {
-            ...initialSimData,
-            home_score: finalHomeScore,
-            away_score: finalAwayScore,
-            game_id: gameId,
-            home_team: initialSimData.home_team,
-            away_team: initialSimData.away_team,
-            score: {
-              ...(initialSimData.score || {}),
-              [homeName]: finalHomeScore,
-              [awayName]: finalAwayScore
-            }
-          };
-          
-          const finalScore = await finalizeGame({
-            simData: updatedSimData,
-            tournamentId: this.tournamentId,
-            franchiseId: this.franchiseId,
-            game: this.game,
-          });
-          this.finalScore = finalScore;
-          this.finalized = true;
-          
-          // Show game completion popup
-          const { showGameCompletionPopup } = await import('./utils/gameCompletionPopup.js');
-          const mode = this.tournamentId ? 'tournament' : (this.franchiseId ? 'franchise' : 'single');
-          showGameCompletionPopup({
-            gameId: gameId,
-            mode: mode,
-            tournamentId: this.tournamentId,
-            franchiseId: this.franchiseId,
-            finalScore: finalScore
-          });
-          
-          return finalScore;
-        };
-        await finalize();
-        return; // Exit - game is over
-      } else if (quarterThatJustFinished === 4 && finalIsTied) {
+      // Check tie condition FIRST - if tied, go to OT regardless of isFinalFromBackend
+      if (quarterThatJustFinished === 4 && finalIsTied) {
         // Q4 tied - go to OT
         console.log('⏰ Game tied after Q4! Going to overtime...');
         // Show locker room popup for OT
@@ -1923,6 +1874,56 @@ export function createGameScene(Phaser) {
           window.location.href = `/static/set-lineup.html?${params.toString()}`;
         });
         return;
+      } else if (isFinalFromBackend || (quarterThatJustFinished >= 4 && !finalIsTied)) {
+        // Game is over - finalize
+        console.log('🏆 Game complete! Finalizing...');
+        const finalize = async () => {
+          const { finalizeGame } = await import('./finalizeGame.js');
+          
+          // Get team names for score map
+          const { home: homeTeamName, away: awayTeamName } = gameStore.getTeams();
+          const homeName = homeTeamName || initialSimData.home_team;
+          const awayName = awayTeamName || initialSimData.away_team;
+          
+          // Update simData.score with current final scores (finalizeGame already checks this)
+          const updatedSimData = {
+            ...initialSimData,
+            home_score: finalHomeScore,
+            away_score: finalAwayScore,
+            game_id: gameId,
+            home_team: initialSimData.home_team,
+            away_team: initialSimData.away_team,
+            score: {
+              ...(initialSimData.score || {}),
+              [homeName]: finalHomeScore,
+              [awayName]: finalAwayScore
+            }
+          };
+          
+          const finalScore = await finalizeGame({
+            simData: updatedSimData,
+            tournamentId: this.tournamentId,
+            franchiseId: this.franchiseId,
+            game: this.game,
+          });
+          this.finalScore = finalScore;
+          this.finalized = true;
+          
+          // Show game completion popup
+          const { showGameCompletionPopup } = await import('./utils/gameCompletionPopup.js');
+          const mode = this.tournamentId ? 'tournament' : (this.franchiseId ? 'franchise' : 'single');
+          showGameCompletionPopup({
+            gameId: gameId,
+            mode: mode,
+            tournamentId: this.tournamentId,
+            franchiseId: this.franchiseId,
+            finalScore: finalScore
+          });
+          
+          return finalScore;
+        };
+        await finalize();
+        return; // Exit - game is over
       } else {
         // Regular quarter complete (Q1-Q3) - show locker room popup
         console.log('✅ Quarter complete - showing locker room popup');
