@@ -29,17 +29,14 @@ def assign_bh_defender_coords(ball_coords, aggression_level: str, is_away_offens
     y_bh = ball_coords["y"]
 
     # SIMPLE RULE: Defender positioning relative to ball handler
-    # IMPORTANT: This function calculates in HOME orientation, but results are flipped back if is_away_offense=True
-    # The flip formula is: new_x = 100 - old_x, which inverts left/right
-    # - When AWAY team has ball: defender should be LEFT of ball handler in away orientation (final display)
-    #   So we calculate RIGHT in home orientation (x_direction = +1), which becomes LEFT after flipping
-    # - When HOME team has ball: defender should be RIGHT of ball handler in home orientation (no flipping)
-    #   So we calculate RIGHT in home orientation (x_direction = +1)
+    # - When AWAY team has ball: defender should be to LEFT of ball handler (x less) = x_direction = -1
+    # - When HOME team has ball: defender should be to RIGHT of ball handler (x more) = x_direction = +1
+    # This positions the defender between the ball handler and the basket they're defending
     if is_away_offense:
-        # Away team has ball - calculate RIGHT in home orientation (becomes LEFT in away after flipping)
-        x_direction = 1
+        # Away team has ball - defender to LEFT of ball handler (x less)
+        x_direction = -1
     else:
-        # Home team has ball - calculate RIGHT in home orientation (stays RIGHT, no flipping)
+        # Home team has ball - defender to RIGHT of ball handler (x more)
         x_direction = 1
     
     # Determine which basket is being attacked (for verification/debugging)

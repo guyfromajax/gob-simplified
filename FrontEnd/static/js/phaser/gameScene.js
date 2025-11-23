@@ -1492,6 +1492,7 @@ export function createGameScene(Phaser) {
       let lastHomeScore = initialSimData.home_score || 0;
       let lastAwayScore = initialSimData.away_score || 0;
       let nextQuarterNumber = this.quarter + 1; // Will be updated when quarter completes
+      let lastTurnData = null; // Track last turn data to check is_final
       
       // Initialize with any turns from the initial simulation (e.g., opening tip, inbound)
       const initialTurns = initialSimData.turns || [];
@@ -1559,9 +1560,11 @@ export function createGameScene(Phaser) {
               time_remaining: turnData.time_remaining,
               turnCount,
               home_score: turnData.home_score,
-              away_score: turnData.away_score
+              away_score: turnData.away_score,
+              is_final: turnData.is_final
             });
             quarterComplete = true;
+            lastTurnData = turnData; // Store last turn data for game completion check
             
             // Update final scores
             updateScoreboard({
@@ -1764,22 +1767,30 @@ export function createGameScene(Phaser) {
       const finalAwayScore = lastAwayScore;
       const finalIsTied = finalHomeScore === finalAwayScore;
       
+      // Check if backend marked game as final (more reliable than frontend calculation)
+      let isFinalFromBackend = false;
+      if (lastTurnData && lastTurnData.is_final !== undefined) {
+        isFinalFromBackend = lastTurnData.is_final;
+      }
+      
       console.log('🏁 Game completion check:', {
         quarterJustFinished: quarterThatJustFinished,
         nextQuarter: nextQuarterNumber,
         homeScore: finalHomeScore,
         awayScore: finalAwayScore,
-        isTied: finalIsTied
+        isTied: finalIsTied,
+        isFinalFromBackend: isFinalFromBackend
       });
       
       // Game ends if:
-      // 1. Q4 is complete and scores are NOT tied → game over
-      // 2. Any OT is complete and scores are NOT tied → game over
+      // 1. Backend says is_final = true (Q4+ complete and not tied)
+      // 2. Q4 is complete and scores are NOT tied → game over
+      // 3. Any OT is complete and scores are NOT tied → game over
       // Game continues if:
       // 1. Q4 is complete and scores ARE tied → go to OT
       // 2. OT is complete and scores ARE tied → go to next OT
       
-      if (quarterThatJustFinished >= 4 && !finalIsTied) {
+      if (isFinalFromBackend || (quarterThatJustFinished >= 4 && !finalIsTied)) {
         // Game is over - finalize
         console.log('🏆 Game complete! Finalizing...');
         const finalize = async () => {
