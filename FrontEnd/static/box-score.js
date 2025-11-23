@@ -1002,6 +1002,12 @@ function setupLockerRoomButton() {
   // If we came from the lineup screen, show a Back button that returns to lineup
   if (from === 'lineup') {
     button.textContent = 'Back';
+    
+    // Remove any existing event listeners by cloning the button
+    const newButton = button.cloneNode(true);
+    button.parentNode.replaceChild(newButton, button);
+    const backButton = newButton;
+    
     const params = new URLSearchParams();
     if (home) params.set('home', home);
     if (away) params.set('away', away);
@@ -1026,11 +1032,11 @@ function setupLockerRoomButton() {
     }
     
     // Preserve lineup params if present in URL (from set-lineup screen)
-    const myTeam = urlParams.get('my_team');
-    if (myTeam) {
+    const myTeamParam = urlParams.get('my_team');
+    if (myTeamParam) {
       const positions = ['pg', 'sg', 'sf', 'pf', 'c'];
       positions.forEach(pos => {
-        const paramKey = `${myTeam}_${pos}`;
+        const paramKey = `${myTeamParam}_${pos}`;
         const playerId = urlParams.get(paramKey);
         if (playerId) {
           params.set(paramKey, playerId);
@@ -1038,7 +1044,9 @@ function setupLockerRoomButton() {
       });
     }
 
-    button.addEventListener('click', () => {
+    backButton.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
       window.location.href = `/static/set-lineup.html?${params.toString()}`;
     });
     return;
