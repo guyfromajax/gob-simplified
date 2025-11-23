@@ -1890,14 +1890,23 @@ export function createGameScene(Phaser) {
           const homeName = homeTeamName || initialSimData.home_team;
           const awayName = awayTeamName || initialSimData.away_team;
           
-          // Update simData.score with current final scores (finalizeGame already checks this)
+          // ✅ FIX: Update nested team objects with final scores to prevent stale data
+          // Handle both object and string formats for home_team/away_team
+          const updatedHomeTeam = typeof initialSimData.home_team === 'object' 
+            ? { ...initialSimData.home_team, score: finalHomeScore }
+            : initialSimData.home_team;
+          const updatedAwayTeam = typeof initialSimData.away_team === 'object'
+            ? { ...initialSimData.away_team, score: finalAwayScore }
+            : initialSimData.away_team;
+          
+          // Update simData.score with current final scores (finalizeGame prioritizes this)
           const updatedSimData = {
             ...initialSimData,
             home_score: finalHomeScore,
             away_score: finalAwayScore,
             game_id: gameId,
-            home_team: initialSimData.home_team,
-            away_team: initialSimData.away_team,
+            home_team: updatedHomeTeam,
+            away_team: updatedAwayTeam,
             score: {
               ...(initialSimData.score || {}),
               [homeName]: finalHomeScore,

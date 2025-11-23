@@ -15,8 +15,31 @@ export async function finalizeGame({ simData, tournamentId, franchiseId, game })
   const awayKey = awayTeamObj.name || awayTeamField;
   
   const scoreMap = simData.final_score || simData.score || {};
-  const homeScore = homeTeamObj.score ?? scoreMap[homeKey] ?? 0;
-  const awayScore = awayTeamObj.score ?? scoreMap[awayKey] ?? 0;
+  // ✅ FIX: Prioritize scoreMap (updated scores) over nested object scores (may be stale from initialSimData)
+  // This ensures that when "Sim to 4th Quarter" is used, we use Q4 final scores, not Q3 scores from initialSimData
+  const homeScore = (scoreMap[homeKey] !== undefined && scoreMap[homeKey] !== null) 
+    ? scoreMap[homeKey] 
+    : (homeTeamObj.score ?? 0);
+  const awayScore = (scoreMap[awayKey] !== undefined && scoreMap[awayKey] !== null)
+    ? scoreMap[awayKey]
+    : (awayTeamObj.score ?? 0);
+  
+  // Debug logging to trace score extraction
+  if (DEBUG_GAME_ID || window.DEBUG_SCORES) {
+    console.log('🏆 finalizeGame score extraction:', {
+      homeKey,
+      awayKey,
+      scoreMap,
+      homeTeamObjScore: homeTeamObj.score,
+      awayTeamObjScore: awayTeamObj.score,
+      finalHomeScore: homeScore,
+      finalAwayScore: awayScore,
+      source: {
+        home: (scoreMap[homeKey] !== undefined && scoreMap[homeKey] !== null) ? 'scoreMap' : 'homeTeamObj',
+        away: (scoreMap[awayKey] !== undefined && scoreMap[awayKey] !== null) ? 'scoreMap' : 'awayTeamObj'
+      }
+    });
+  }
   const winner = homeScore > awayScore ? homeKey : awayKey;
   const params = new URLSearchParams(window.location.search);
   let week = parseInt(params.get('week'), 10);
