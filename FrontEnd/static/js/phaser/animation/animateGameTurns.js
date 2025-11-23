@@ -93,10 +93,7 @@ async function handleOrebTurn(scene, { playerSprites, ballSprite, turnData, onUp
       allowAttachment: false // Don't allow attachment yet - we'll position ball manually
     });
     
-    // ✅ TRANSITION PERIOD: Keep old flag for backward compatibility (will be removed in Phase 4)
-    // The rebound animation from the previous turn might still be running
-    // and trying to attach the ball, which causes the flash before the putback shot
-    scene._putbackInProgress = true;
+    // ✅ PHASE 4: Removed old _putbackInProgress flag - BallController manages state via lifecycle methods
     
     // Use lifecycle method to track putback start
     if (ballController) {
@@ -122,7 +119,7 @@ async function handleOrebTurn(scene, { playerSprites, ballSprite, turnData, onUp
     if (scene.currentBallOwnerRef) {
       scene.currentBallOwnerRef.value = null;
     }
-    scene.ballDetached = true;
+    // ✅ PHASE 4: Removed old ballDetached flag - BallController manages state internally
     
     // CRITICAL: Position ball at rebounder's location WITHOUT attaching
     // shootBall() will handle detachment and animation, so we just need to position the ball
@@ -200,8 +197,8 @@ async function handleOrebTurn(scene, { playerSprites, ballSprite, turnData, onUp
       const reboundBallSpot = shotResult?.grid || turnData.ballSpot || { x: 50, y: 25 };
       
       // CRITICAL: Clear _shotInProgress BEFORE calling animateRebound
-      // The shot animation is complete, so it's safe to allow ball attachments again
-      scene._shotInProgress = false;
+      // ✅ PHASE 4: Removed old _shotInProgress flag - BallController manages state via lifecycle methods
+      // The shot animation is complete, BallController state already cleared by onShotEnd()
       
       // CRITICAL: turnData.rebounderId contains the NEXT rebounder (the one who will get this rebound)
       // This is NOT the same as the putback shooter (rebounderId variable above)
@@ -244,9 +241,8 @@ async function handleOrebTurn(scene, { playerSprites, ballSprite, turnData, onUp
         }
         
         // ✅ TRANSITION PERIOD: Keep old flag for backward compatibility (will be removed in Phase 4)
-        // CRITICAL: Clear _putbackInProgress BEFORE calling runDefensiveReboundSetup
-        // The putback shot animation is complete, so it's safe to allow ball attachments
-        scene._putbackInProgress = false;
+        // ✅ PHASE 4: Removed old _putbackInProgress flag - BallController manages state via lifecycle methods
+        // The putback shot animation is complete, BallController state already cleared by onPutbackEnd()
         
         const { runDefensiveReboundSetup } = await import('./turnAnimation.js');
         await runDefensiveReboundSetup({

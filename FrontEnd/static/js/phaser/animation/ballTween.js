@@ -108,58 +108,10 @@ function resolveBallController(scene) {
  */
 
 /**
- * Start ball following a player during movement animations
+ * ✅ PHASE 4: Removed startBallFollowing() and stopBallFollowing() functions
+ * BallController now handles ball following internally via startFollowingPlayer()/stopFollowingPlayer()
+ * Old _ballFollowing system has been removed
  */
-function startBallFollowing(scene, ballSprite, playerSprite, opts = {}) {
-  if (!scene || !ballSprite || !playerSprite) return;
-
-  // Stop any existing following
-  stopBallFollowing(scene);
-
-  const offset = opts.offset || { x: 0, y: 0 };
-  
-  // Store following state on the scene
-  scene._ballFollowing = {
-    ballSprite,
-    playerSprite,
-    offset,
-    callback: () => {
-      if (scene._ballFollowing && 
-          scene._ballFollowing.ballSprite && 
-          scene._ballFollowing.playerSprite &&
-          !scene.ballDetached &&
-          !scene._shotInProgress) {  // Don't reposition during shots
-        const x = scene._ballFollowing.playerSprite.x + scene._ballFollowing.offset.x;
-        const y = scene._ballFollowing.playerSprite.y + scene._ballFollowing.offset.y;
-        scene._ballFollowing.ballSprite.setPosition(x, y);
-      }
-    }
-  };
-
-  // Add update callback to scene
-  if (scene.events) {
-    scene.events.on('update', scene._ballFollowing.callback);
-  }
-
-  if (PASS_DEBUG) {
-    console.log('Ball following started for player', playerSprite.playerId);
-  }
-}
-
-/**
- * Stop ball following
- */
-function stopBallFollowing(scene) {
-  if (scene._ballFollowing && scene._ballFollowing.callback && scene.events) {
-    scene.events.off('update', scene._ballFollowing.callback);
-  }
-  
-  scene._ballFollowing = null;
-
-  if (PASS_DEBUG) {
-    console.log('Ball following stopped');
-  }
-}
 
 /**
  * Detach ball from any player and optionally hide it.
@@ -168,10 +120,8 @@ function stopBallFollowing(scene) {
 export function detachBall(scene, ballSprite) {
   if (!scene || !ballSprite) return;
   
-  // Stop ball following
-  stopBallFollowing(scene);
-  
-  scene.ballDetached = true;
+  // ✅ PHASE 4: Removed old ball following system - BallController handles following internally
+  // ✅ PHASE 4: Removed old ballDetached flag - BallController manages state internally
   cancelBallTween(scene, ballSprite);
   clearCurrentOwner(scene);
 }
@@ -192,8 +142,7 @@ export function tweenBallTo(scene, ballSprite, target, opts = {}) {
   if (!scene || !ballSprite || !target) return Promise.resolve();
   const { duration = 300, easing = 'Linear', arc } = opts;
   
-  // Stop ball following when ball starts flight
-  stopBallFollowing(scene);
+  // ✅ PHASE 4: Removed old ball following system - BallController handles following internally
   
   if (scene.tweens) scene.tweens.killTweensOf(ballSprite);
   ballSprite.setDepth(BALL_DEPTH);
@@ -387,7 +336,9 @@ export async function runPass(scene, cfg = {}) {
   }
 
   cancelBallTween(scene, ballSprite);
-  if (scene.ballDetached && getLastKnownOwner(scene) != null) {
+  // ✅ PHASE 4: Check BallController state instead of old ballDetached flag
+  const ballController = getBallController();
+  if (ballController && !ballController.isAttached && !ballController.isInFlight && getLastKnownOwner(scene) != null) {
     const owner = scene.playerSprites?.[getLastKnownOwner(scene)];
     if (owner) attachBallToPlayerAdapter(scene, ballSprite, owner);
   }
@@ -493,7 +444,7 @@ export async function runPass(scene, cfg = {}) {
       const ballStartY = ballSprite.y;
 
       detachBall(scene, ballSprite);
-      scene.ballDetached = true;
+      // ✅ PHASE 4: Removed old ballDetached flag - BallController manages state internally
       scene.events?.emit('ballDetached');
       if (PASS_DEBUG) animationDebugLog('detach(A)', { fromId });
 
@@ -573,7 +524,7 @@ export async function runPass(scene, cfg = {}) {
         if (scene.currentBallOwnerRef) {
           scene.currentBallOwnerRef.value = toSprite;
         }
-        scene.ballDetached = false;
+        // ✅ PHASE 4: Removed old ballDetached flag - BallController manages state internally
         
         // ✅ NOTE: Don't set ball holder state here for "receive" actions
         // The receiver's "receive" action step will set it after the receive tween completes

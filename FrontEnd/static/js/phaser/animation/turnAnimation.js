@@ -134,12 +134,15 @@ function getBallDuration(ballSprite, targetX, targetY) {
  * Centralized ball ownership logic
  * Assigns the ball to the correct player for the current stepIndex
  */
-function updateBallOwnership({ scene, ballSprite, animations, playerSprites, stepIndex, offenseTeamId, currentBallOwnerRef }) {
+async function updateBallOwnership({ scene, ballSprite, animations, playerSprites, stepIndex, offenseTeamId, currentBallOwnerRef }) {
   if (scene?.skipToEnd || scene?.stateMachine?.is(States.FastBreak)) return;
 
   if (scene.passInFlight) return;
 
-  if (scene.ballDetached) {
+  // ✅ PHASE 4: Check BallController state instead of old ballDetached flag
+  const { getBallController } = await import('./BallControllerAdapter.js');
+  const ballController = getBallController();
+  if (ballController && !ballController.isAttached && !ballController.isInFlight) {
     if (PASS_DEBUG) animationDebugLog('ownershipSkipped', { stepIndex });
     return;
   }
@@ -391,7 +394,7 @@ async function runSideInboundSetup({ scene, ballSprite, playerSprites, turnData 
   }
   scene.isInboundSetup = false;
   scene.passInFlight = false;
-  scene.ballDetached = false;
+  // ✅ PHASE 4: Removed old ballDetached flag - BallController manages state internally
 }
 
 // Setup positions after a defensive rebound before new half-court offense or fast break
@@ -425,9 +428,13 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
   // CRITICAL: Don't attach ball if a putback is in progress
   // The putback shot animation is still running, and attaching the ball here
   // causes a flash before the shot animation completes
-  if (!scene._putbackInProgress && ballSprite) {
+  // ✅ PHASE 4: Check BallController state instead of old _putbackInProgress flag
+  const { getBallController } = await import('./BallControllerAdapter.js');
+  const ballController = getBallController();
+  const isPutbackInProgress = ballController && (ballController.reason === 'putback_shot' || ballController.state === 'PUTBACK_ATTEMPT');
+  if (!isPutbackInProgress && ballSprite) {
     attachBallToPlayer(scene, ballSprite, rebounderSprite);
-  } else if (scene._putbackInProgress) {
+  } else if (isPutbackInProgress) {
     console.log('🔍 [PUTBACK DEBUG] runDefensiveReboundSetup: Skipping ball attachment - putback in progress', {
       rebounderId
     });
@@ -1319,7 +1326,7 @@ async function runInboundSetup({
 
   scene.isInboundSetup = false;
   scene.passInFlight = false;
-  scene.ballDetached = false;
+  // ✅ PHASE 4: Removed old ballDetached flag - BallController manages state internally
 }
 
 
@@ -1352,7 +1359,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   // Only clear ball attachment/ownership when NOT coming directly from an inbound,
   // so the ball can carry over with the inbound receiver into HCO.
   if (!fromInbound) {
-    scene.ballDetached = false;
+    // ✅ PHASE 4: Removed old ballDetached flag - BallController manages state internally
     clearPendingOwner(scene);
     // ✅ NEW (Step 1): Also clear simple ball holder state
     clearBallHolder(scene);
@@ -1431,11 +1438,15 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
       const isPutbackTurn = turnData.result_type === "PUTBACK_MAKE" || turnData.result_type === "PUTBACK_MISS";
       
       if (isPutbackTurn) {
+        // ✅ PHASE 4: Check BallController state instead of old _shotInProgress flag
+        const { getBallController } = await import('./BallControllerAdapter.js');
+        const ballController = getBallController();
+        const isShotInProgress = ballController && ballController.isInFlight && (ballController.reason === 'shot' || ballController.reason === 'putback_shot');
         console.log('🔍 [PUTBACK DEBUG] playTurnAnimation: Step 0 ball attachment attempt for putback turn - BLOCKING', {
           step0OwnerId,
           result_type: turnData.result_type,
           turnDataRebounderId: turnData.rebounderId,
-          shotInProgress: scene._shotInProgress,
+          shotInProgress: isShotInProgress,
           sceneRebounderId: scene.rebounderId,
           note: 'Putback turns are handled by handleOrebTurn - skipping step 0 attachment'
         });

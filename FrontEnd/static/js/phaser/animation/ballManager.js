@@ -222,8 +222,7 @@ export async function shootBall({
   // });
   
   // ✅ PHASE 2.3: Use BallController lifecycle methods instead of direct flag manipulation
-  // Stop BOTH old and new ball following systems
-  scene.ballDetached = true; // Stop old system (scene._ballFollowing callback checks this)
+  // ✅ PHASE 4: Removed old ballDetached flag - BallController manages state internally
   
   // Use BallController lifecycle method for shot start
   const { getBallController } = await import('./BallControllerAdapter.js');
@@ -237,13 +236,8 @@ export async function shootBall({
     });
   }
   
-  // ✅ TRANSITION PERIOD: Keep old flag for backward compatibility (will be removed in Phase 4)
-  if (scene.ballController) {
-    if (typeof scene.ballController.stopFollowingPlayer === 'function') {
-      scene.ballController.stopFollowingPlayer();
-    }
-    scene._shotInProgress = true;
-  }
+  // ✅ PHASE 4: Removed old _shotInProgress flag - BallController manages state internally
+  // BallController lifecycle methods (onShotStart/onShotEnd) handle state management
   const stateMachine = scene.stateMachine;
   if (stateMachine) {
     const prevState = stateMachine.state;
@@ -627,8 +621,7 @@ export async function shootBall({
         }
         
         // ✅ PHASE 2.3: Use BallController lifecycle method for shot end
-        // Clear shot in progress flag (old system - kept for transition period)
-        scene._shotInProgress = false;
+        // ✅ PHASE 4: Removed old _shotInProgress flag assignment
         if (ballController) {
           ballController.onShotEnd();
         }
@@ -647,10 +640,8 @@ export async function shootBall({
             });
             // Small delay to ensure watcher is fully removed before re-enabling
             scene.time.delayedCall(50, () => {
-              // ✅ TRANSITION PERIOD: Keep old flag for backward compatibility
-              scene._shotInProgress = false;
-              scene.ballDetached = false;
-              // console.log('🏀 shootBall: Flags reset, ball following re-enabled');
+              // ✅ PHASE 4: Removed old flag assignments - BallController manages state
+              // console.log('🏀 shootBall: BallController state managed internally');
               resolve();
             });
           };
@@ -703,10 +694,9 @@ export async function shootBall({
             // The ball should remain detached until the rebound is handled
             // Setting it to false would re-enable ball following and might re-attach to shooter
             scene.time.delayedCall(50, () => {
-              // ✅ TRANSITION PERIOD: Keep old flag for backward compatibility
-              scene._shotInProgress = false;
+              // ✅ PHASE 4: Removed old _shotInProgress flag assignment
               // BallController state already cleared by onShotEnd() above
-              // Keep ballDetached = true for MISS shots - rebound will handle ball attachment
+              // BallController manages attachment state internally
               // scene.ballDetached = false; // REMOVED - prevents ball from re-attaching to shooter
               resolve(miss);
             });
@@ -877,7 +867,11 @@ export function animateRebound({
             
             // CRITICAL: Don't attach ball if a putback is in progress
             // The putback turn will handle ball positioning and shooting
-            if (scene._putbackInProgress) {
+            // ✅ PHASE 4: Check BallController state instead of old _putbackInProgress flag
+            const { getBallController } = await import('./BallControllerAdapter.js');
+            const ballController = getBallController();
+            const isPutbackInProgress = ballController && (ballController.reason === 'putback_shot' || ballController.state === 'PUTBACK_ATTEMPT');
+            if (isPutbackInProgress) {
               if (debugEnabled && REBOUND_DEBUG) {
                 animationDebugLog("reb:skipAttach", {
                   reason: 'putback_in_progress',

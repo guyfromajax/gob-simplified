@@ -109,24 +109,8 @@ export class BallController {
       return false;
     }
     
-    // ✅ TRANSITION PERIOD: Also check old flags as fallback (will be removed in Phase 4)
-    // This ensures compatibility during migration
-    if (this.scene._putbackInProgress && !isPutbackAttempt) {
-      if (this.debug) {
-        console.log('BallController: Cannot attach - putback in progress (old flag)', {
-          putbackInProgress: this.scene._putbackInProgress,
-          isPutbackAttempt
-        });
-      }
-      return false;
-    }
-    
-    if (this.scene._shotInProgress && !isPutbackAttempt) {
-      if (this.debug) {
-        console.log('BallController: Cannot attach - shot in progress (old flag)');
-      }
-      return false;
-    }
+    // ✅ PHASE 4: Removed old flag checks - BallController is now the single source of truth
+    // All state is managed internally via isInFlight, reason, and state fields
 
     // Validate player sprite
     if (!this.isValidPlayerSprite(playerSprite)) {
@@ -187,10 +171,7 @@ export class BallController {
     // Stop following the player (new system)
     this.stopFollowingPlayer();
     
-    // Also stop old ball following system if it exists
-    if (this.scene._ballFollowing) {
-      this.stopOldBallFollowing();
-    }
+    // ✅ PHASE 4: Removed old _ballFollowing system - BallController handles following internally
     
     // Update state
     this.currentOwner = null;
@@ -265,10 +246,7 @@ export class BallController {
     // Stop following player when ball starts flight (new system)
     this.stopFollowingPlayer();
 
-    // Also stop old ball following system if it exists
-    if (this.scene._ballFollowing) {
-      this.stopOldBallFollowing();
-    }
+    // ✅ PHASE 4: Removed old _ballFollowing system - BallController handles following internally
 
     // ✅ PROACTIVE STATE MANAGEMENT: Clear ball holder state when BallController starts flight
     // This prevents ball from being included in player movement tweens (WIP_GOB system)
@@ -414,19 +392,9 @@ export class BallController {
   }
 
   /**
-   * Stop old ball following system (from ballTween.js)
+   * ✅ PHASE 4: Removed stopOldBallFollowing() method
+   * Old _ballFollowing system has been removed - BallController handles following internally
    */
-  stopOldBallFollowing() {
-    if (this.scene._ballFollowing && this.scene._ballFollowing.callback && this.scene.events) {
-      this.scene.events.off('update', this.scene._ballFollowing.callback);
-    }
-    
-    this.scene._ballFollowing = null;
-
-    if (this.debug) {
-      console.log('BallController: Stopped old ball following system');
-    }
-  }
 
   /**
    * Validate player sprite

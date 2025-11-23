@@ -464,24 +464,19 @@ export async function animateShotToRim(scene, rimPosition, options = {}) {
     }
   }
   
-  // Stop old ball following system
-  scene.ballDetached = true;
-  
+  // ✅ PHASE 4: Removed old ball following system and flags - BallController manages state internally
   // Stop BallController from following player during shot
   if (scene.ballController) {
     if (typeof scene.ballController.stopFollowingPlayer === 'function') {
       scene.ballController.stopFollowingPlayer();
     }
     scene.ballController.isAttached = false;
-    scene._shotInProgress = true; // Prevent re-attachment during shot
+    // ✅ PHASE 4: Removed old _shotInProgress flag - BallController manages state via lifecycle methods
   }
   
   // Animate ball to rim
   await animateBallToPosition(scene, rimPosition, options);
   
-  // Clear shot in progress flag after animation completes
-  if (scene.ballController) {
-    scene._shotInProgress = false;
-  }
+  // ✅ PHASE 4: Removed old flag clearing - BallController manages state via lifecycle methods
 }
 
