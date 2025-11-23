@@ -337,7 +337,10 @@ export async function runPass(scene, cfg = {}) {
 
   cancelBallTween(scene, ballSprite);
   // ✅ PHASE 4: Check BallController state instead of old ballDetached flag
+  // ✅ PHASE 2.4: Use BallController lifecycle method for pass start
+  // Get BallController once (already imported at top of file)
   const ballController = getBallController();
+  
   if (ballController && !ballController.isAttached && !ballController.isInFlight && getLastKnownOwner(scene) != null) {
     const owner = scene.playerSprites?.[getLastKnownOwner(scene)];
     if (owner) attachBallToPlayerAdapter(scene, ballSprite, owner);
@@ -353,9 +356,7 @@ export async function runPass(scene, cfg = {}) {
   scene.passInFlight = true;
   if (!deferOwnership) setPendingOwner(scene, toId);
   
-  // ✅ PHASE 2.4: Use BallController lifecycle method for pass start
-  const { getBallController } = await import('./BallControllerAdapter.js');
-  const ballController = getBallController();
+  // Use the same ballController variable declared above
   if (ballController) {
     ballController.onPassStart({ 
       passerId: fromId, 
