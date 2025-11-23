@@ -313,6 +313,13 @@ async function navigateBack() {
   params.set('quarter', String(quarter));
   params.set('period', periodLabel);
   
+  // Pass lineup params back to preserve lineup when navigating back
+  if (pgId) params.set(`${myTeamSide}_pg`, pgId);
+  if (sgId) params.set(`${myTeamSide}_sg`, sgId);
+  if (sfId) params.set(`${myTeamSide}_sf`, sfId);
+  if (pfId) params.set(`${myTeamSide}_pf`, pfId);
+  if (cId) params.set(`${myTeamSide}_c`, cId);
+  
   window.location.href = `/static/set-lineup.html?${params.toString()}`;
 }
 
