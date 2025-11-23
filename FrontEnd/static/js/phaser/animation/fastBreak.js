@@ -265,6 +265,22 @@ async function animateOutletPhase(scene, turnData, playerSprites, ballSprite, wi
     duration: 500,
     easing: "Sine.easeInOut"
   });
+  
+  // ✅ PHASE 2.2: Fix fast break bug - ensure ball is attached to receiver after pass
+  // This fixes the bug where ball detaches from receiver before next animation
+  const { getBallController } = await import('./BallControllerAdapter.js');
+  const ballController = getBallController();
+  
+  if (ballController && receiverSprite) {
+    // Verify ball is attached to receiver after pass
+    // If not attached or attached to wrong player, fix it
+    if (!ballController.isAttached || ballController.currentOwner !== receiverSprite) {
+      attachBallToPlayer(scene, ballSprite, receiverSprite, { 
+        reason: 'fast_break_outlet_verify',
+        debugInfo: { reason: 'fast_break_outlet_verify' }
+      });
+    }
+  }
 }
 
 /**

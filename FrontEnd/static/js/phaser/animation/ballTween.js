@@ -464,6 +464,16 @@ export async function runPass(scene, cfg = {}) {
   scene.passInFlight = true;
   if (!deferOwnership) setPendingOwner(scene, toId);
   
+  // ✅ PHASE 2.4: Use BallController lifecycle method for pass start
+  const { getBallController } = await import('./BallControllerAdapter.js');
+  const ballController = getBallController();
+  if (ballController) {
+    ballController.onPassStart({ 
+      passerId: fromId, 
+      receiverId: toId 
+    });
+  }
+  
   // ✅ PROACTIVE STATE MANAGEMENT: Clear ball holder state when pass starts
   // This ensures ball holder state reflects reality (ball is in flight, not with any player)
   // This prevents conflicts where passer's tween might still include ball
@@ -615,7 +625,13 @@ export async function runPass(scene, cfg = {}) {
         if (PASS_DEBUG) animationDebugLog('tweenEnd', { toId, skipped: true });
       }
       if (toSprite) {
-        attachBallToPlayer(scene, ballSprite, toSprite);
+        // ✅ PHASE 2.4: Use BallController lifecycle method for pass end
+        if (ballController) {
+          ballController.onPassEnd(toSprite, { reason: 'pass_complete' });
+        } else {
+          // Fallback to direct attachment if BallController not available
+          attachBallToPlayer(scene, ballSprite, toSprite);
+        }
         if (scene.currentBallOwnerRef) {
           scene.currentBallOwnerRef.value = toSprite;
         }

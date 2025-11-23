@@ -139,6 +139,22 @@ export async function runFreeThrowSequence(
     }
   }
 
+  // ✅ PHASE 2.1: Fix free throw bug - clear any lingering shot state before attaching
+  // This fixes the bug where ball doesn't attach to free throw shooter after AND-1
+  const { getBallController } = await import('./BallControllerAdapter.js');
+  const ballController = getBallController();
+  
+  if (ballController) {
+    // Clear any lingering shot state from previous made shot (AND-1 scenario)
+    if (ballController.isInFlight) {
+      ballController.onShotEnd();
+    }
+    // Also clear any old flag state as fallback
+    if (scene._shotInProgress) {
+      scene._shotInProgress = false;
+    }
+  }
+
   const shooterSprite = playerSprites[turnData.shooter_id];
   if (shooterSprite) attach(scene, ballSprite, shooterSprite);
   scene.events?.emit("ft:lineupComplete", {});
