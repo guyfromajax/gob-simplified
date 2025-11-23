@@ -140,8 +140,7 @@ function attachBallToPlayer(scene, ballSprite, playerSprite, opts = {}) {
       scene.currentBallOwnerRef.value = playerSprite;
     }
     
-    // Set old system ball state
-    scene.ballDetached = false;
+    // ✅ PHASE 4: Removed old ballDetached flag - BallController manages state internally
     
     // Log for debugging (old system style)
     if (isPutbackAttempt || isPutbackScenario) {
@@ -195,8 +194,7 @@ function detachBall(scene, ballSprite, options={}) {
   // Use BallController to detach
   ballController.detachFromPlayer('detach', options);
   
-  // Update old system references
-  scene.ballDetached = true;
+  // ✅ PHASE 4: Removed old ballDetached flag - BallController manages state internally
   
   console.log('BallControllerAdapter: Ball detached');
 }
@@ -300,34 +298,9 @@ function synchronizeBallState(scene, options = {}) {
     }
   }
   
-  // Synchronize old flags with BallController state
-  // If BallController says ball is in flight, set old flags accordingly
-  if (ballController.isInFlight) {
-    if (ballController.reason === 'shot' || ballController.reason === 'putback_shot') {
-      scene._shotInProgress = true;
-    } else if (ballController.reason === 'pass') {
-      scene.passInFlight = true;
-    }
-  } else {
-    // Ball is not in flight, clear old flags
-    scene._shotInProgress = false;
-    scene.passInFlight = false;
-  }
-  
-  // Sync putback state
-  if (ballController.reason === 'putback_shot') {
-    scene._putbackInProgress = true;
-  } else {
-    scene._putbackInProgress = false;
-  }
-  
-  // Sync attachment state
-  if (ballController.isAttached) {
-    scene.ballDetached = false;
-  } else if (!ballController.isInFlight && allowAttachment) {
-    // Only set ballDetached if not in flight and attachment is allowed
-    scene.ballDetached = true;
-  }
+  // ✅ PHASE 4: Removed old flag synchronization - flags are no longer used
+  // BallController is now the single source of truth for ball state
+  // All code should check BallController state directly instead of old flags
 }
 
 // Named exports for individual functions
