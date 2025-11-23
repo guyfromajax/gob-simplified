@@ -39,6 +39,14 @@ export function showGameCompletionPopup({ gameId, mode, tournamentId, franchiseI
   if (homeTeam) boxScoreParams.set('home', homeTeam);
   if (awayTeam) boxScoreParams.set('away', awayTeam);
   const boxScoreUrl = `/static/box-score.html?${boxScoreParams.toString()}`;
+  
+  console.log('📊 Box Score URL constructed:', {
+    gameId,
+    homeTeam,
+    awayTeam,
+    boxScoreUrl,
+    finalScore
+  });
 
   // Create popup
   const popup = document.createElement('div');

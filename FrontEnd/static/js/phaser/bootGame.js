@@ -331,8 +331,18 @@ async function showPopup(score) {
     gameId = localStorage.getItem('game_id');
   }
   
+  console.log('📋 showPopup called:', {
+    gameId,
+    score,
+    homeTeam,
+    awayTeam,
+    mode,
+    tournamentId,
+    franchiseId
+  });
+  
   if (!gameId) {
-    console.warn('No game_id found for box score');
+    console.warn('⚠️ No game_id found for box score');
   }
 
   // Use the new game completion popup
@@ -688,7 +698,15 @@ async function handleSimFullGame() {
         throw new Error(`Q${currentQ} simulation failed: ${errorDetail}`);
       }
       lastSummary = await res.json();
-      gId = lastSummary.game_id;
+      // Ensure game_id is a string (backend might return ObjectId)
+      gId = lastSummary.game_id ? String(lastSummary.game_id) : lastSummary.game_id;
+      console.log('🎮 Quarter simulation response:', {
+        quarter: currentQ,
+        gameId: gId,
+        gameIdType: typeof gId,
+        isFinal: lastSummary.is_final,
+        hasBoxScore: !!lastSummary.box_score
+      });
       if (lastSummary.is_final) break;
       // ✅ FIX: After fully simulating a quarter, increment to the next quarter
       // The backend's quarter in the response is the NEXT quarter (after increment)
@@ -701,11 +719,24 @@ async function handleSimFullGame() {
     // Save gameId to localStorage so box score can access it
     if (gameId && typeof localStorage !== 'undefined') {
       localStorage.setItem('game_id', gameId);
+      console.log('💾 Saved gameId to localStorage:', gameId);
+    } else {
+      console.warn('⚠️ Could not save gameId to localStorage:', { gameId, gId, hasLocalStorage: typeof localStorage !== 'undefined' });
     }
     quarter = lastSummary.quarter || currentQ;
     periodLabel = lastSummary.period_label || (quarter > 4 ? `OT${quarter - 4}` : `Q${quarter}`);
 
+    console.log('📊 Final game summary:', {
+      gameId,
+      quarter,
+      hasBoxScore: !!lastSummary.box_score,
+      boxScoreKeys: lastSummary.box_score ? Object.keys(lastSummary.box_score) : [],
+      score: lastSummary.score,
+      isFinal: lastSummary.is_final
+    });
+
     const finalScore = await finalizeGame({ simData: lastSummary, tournamentId, franchiseId });
+    console.log('🏆 Final score object:', finalScore);
     showPopup(finalScore);
   } catch (err) {
     console.error('Error simming full game:', err);

@@ -41,12 +41,22 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 // Fetch game data from API and merge with full rosters
 async function loadGameData(gameId) {
+  console.log('📥 Loading game data for gameId:', gameId);
   const response = await fetch(`/api/game/${gameId}`);
   if (!response.ok) {
+    console.error('❌ Failed to fetch game data:', response.status, response.statusText);
     throw new Error(`Failed to fetch game data: ${response.statusText}`);
   }
   gameData = await response.json();
-  console.log('Game data loaded:', gameData);
+  console.log('✅ Game data loaded:', {
+    gameId,
+    hasBoxScore: !!gameData.box_score,
+    boxScoreKeys: gameData.box_score ? Object.keys(gameData.box_score) : [],
+    hasPlayers: !!gameData.players,
+    playerCount: gameData.players ? gameData.players.length : 0,
+    score: gameData.score,
+    quarter: gameData.quarter
+  });
   
   // Fetch full rosters to ensure all 12 players are shown
   const urlParams = new URLSearchParams(window.location.search);
