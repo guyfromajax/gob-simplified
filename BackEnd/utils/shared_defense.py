@@ -29,8 +29,8 @@ def assign_bh_defender_coords(ball_coords, aggression_level: str, is_away_offens
     y_bh = ball_coords["y"]
 
     # SIMPLE RULE: Defender positioning relative to ball handler
-    # IMPORTANT: This function calculates in HOME orientation, but results are flipped back to away orientation if is_away_offense=True
-    # When coordinates are flipped, LEFT becomes RIGHT and vice versa
+    # IMPORTANT: This function calculates in HOME orientation, but results are flipped back if is_away_offense=True
+    # The flip formula is: new_x = 100 - old_x, which inverts left/right
     # - When AWAY team has ball: defender should be LEFT of ball handler in away orientation (final display)
     #   So we calculate RIGHT in home orientation (x_direction = +1), which becomes LEFT after flipping
     # - When HOME team has ball: defender should be RIGHT of ball handler in home orientation (no flipping)
