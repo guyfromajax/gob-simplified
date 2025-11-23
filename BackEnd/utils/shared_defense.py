@@ -28,16 +28,16 @@ def assign_bh_defender_coords(ball_coords, aggression_level: str, is_away_offens
     x_bh = ball_coords["x"]
     y_bh = ball_coords["y"]
 
-    # SIMPLE RULE: Defender positioning based on which team has the ball
-    # - When HOME team has ball: defender to the RIGHT (toward home basket they're defending) = x_direction = +1
-    # - When AWAY team has ball: defender to the LEFT (toward away basket they're defending) = x_direction = -1
+    # SIMPLE RULE: Defender positioning based on which basket is being defended
+    # - When HOME team has ball: they attack AWAY basket (x=10), defender defends AWAY basket, so defender to LEFT (x_direction = -1)
+    # - When AWAY team has ball: they attack HOME basket (x=90), defender defends HOME basket, so defender to RIGHT (x_direction = +1)
     # This positions the defender between the ball handler and the basket they're defending
     if is_away_offense:
-        # Away team has ball - defender should be to the LEFT (toward away basket at x=10)
-        x_direction = -1
-    else:
-        # Home team has ball - defender should be to the RIGHT (toward home basket at x=90)
+        # Away team has ball - they attack HOME basket (x=90), defender defends HOME basket, so defender to RIGHT
         x_direction = 1
+    else:
+        # Home team has ball - they attack AWAY basket (x=10), defender defends AWAY basket, so defender to LEFT
+        x_direction = -1
     
     # Determine which basket is being attacked (for verification/debugging)
     target_basket = AWAY_RIM_COORDS if not is_away_offense else HOME_RIM_COORDS
@@ -1331,7 +1331,7 @@ def assign_all_zone_defenders(
                 # assign_bh_defender_coords expects home-oriented coords, so unflip if away offense
                 if is_away_offense:
                     ball_handler_coords_home = get_away_player_coords(ball_handler_coords)
-                else:
+        else:
                     ball_handler_coords_home = ball_handler_coords
                 coords = assign_bh_defender_coords(ball_handler_coords_home, aggression_level, is_away_offense, ball_spot)
             assignments[closest_defender] = coords

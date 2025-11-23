@@ -209,10 +209,10 @@ class GameManager:
             for pos, player in team.lineup.items():
                 if player:  # Skip None players
                     team_box[pos] = {
-                        "name": player.get_name(),
+                    "name": player.get_name(),
                         "playerId": player.player_id,
-                        **player.stats["game"]
-                    }
+                    **player.stats["game"]
+                }
             # Then add bench players (players not in current lineup)
             lineup_player_ids = {p.player_id for p in team.lineup.values() if p}
             for player in team.players.values():
@@ -226,7 +226,7 @@ class GameManager:
                         "name": player.get_name(),
                         "playerId": player.player_id,
                         **player.stats["game"]
-                    }
+        }
             box_score[team.name] = team_box
         return box_score
 
