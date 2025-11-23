@@ -15,9 +15,8 @@ export async function finalizeGame({ simData, tournamentId, franchiseId, game })
   const awayKey = awayTeamObj.name || awayTeamField;
   
   const scoreMap = simData.final_score || simData.score || {};
-  // Use home_score/away_score if provided (most direct), otherwise check score map or team object
-  const homeScore = simData.home_score ?? homeTeamObj.score ?? scoreMap[homeKey] ?? 0;
-  const awayScore = simData.away_score ?? awayTeamObj.score ?? scoreMap[awayKey] ?? 0;
+  const homeScore = homeTeamObj.score ?? scoreMap[homeKey] ?? 0;
+  const awayScore = awayTeamObj.score ?? scoreMap[awayKey] ?? 0;
   const winner = homeScore > awayScore ? homeKey : awayKey;
   const params = new URLSearchParams(window.location.search);
   let week = parseInt(params.get('week'), 10);
