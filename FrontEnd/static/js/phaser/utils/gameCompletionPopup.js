@@ -7,7 +7,7 @@
  * @param {string} [options.franchiseId] - Franchise ID (for franchise mode)
  * @param {Object} [options.finalScore] - Final score object with homeTeam, awayTeam, homeScore, awayScore
  */
-export function showGameCompletionPopup({ gameId, mode, tournamentId, franchiseId, finalScore }) {
+export function showGameCompletionPopup({ gameId, mode, tournamentId, franchiseId, finalScore, homeTeam, awayTeam }) {
   // Remove any existing popup
   const existingPopup = document.querySelector('.game-completion-popup');
   if (existingPopup) {
@@ -33,8 +33,12 @@ export function showGameCompletionPopup({ gameId, mode, tournamentId, franchiseI
       lockerRoomUrl = '/static/mode-select.html';
   }
 
-  // Box Score URL
-  const boxScoreUrl = `/static/box-score.html?game_id=${gameId}`;
+  // Box Score URL - include team names for better data loading
+  const boxScoreParams = new URLSearchParams();
+  if (gameId) boxScoreParams.set('game_id', gameId);
+  if (homeTeam) boxScoreParams.set('home', homeTeam);
+  if (awayTeam) boxScoreParams.set('away', awayTeam);
+  const boxScoreUrl = `/static/box-score.html?${boxScoreParams.toString()}`;
 
   // Create popup
   const popup = document.createElement('div');
