@@ -326,9 +326,10 @@ async function startGame({ homeRoster, awayRoster, animate = true }) {
 async function showPopup(score) {
   // Get gameId from multiple sources (module variable, score object, localStorage, URL params)
   let popupGameId = gameId; // Use module-level gameId first
-  if (!popupGameId && score && score.gameId) {
-    popupGameId = score.gameId;
-  }
+  // ❌ COMMENTED OUT: score.gameId check - not used by "Play Quarter" flow (goes through gameScene.js)
+  // if (!popupGameId && score && score.gameId) {
+  //   popupGameId = score.gameId;
+  // }
   if (!popupGameId && typeof localStorage !== 'undefined') {
     popupGameId = localStorage.getItem('game_id');
   }
@@ -340,7 +341,8 @@ async function showPopup(score) {
   console.log('📋 showPopup called:', {
     popupGameId,
     moduleGameId: gameId,
-    gameIdFromScore: score?.gameId,
+    // ❌ COMMENTED OUT: score.gameId check - not used by "Play Quarter" flow
+    // gameIdFromScore: score?.gameId,
     gameIdFromLocalStorage: typeof localStorage !== 'undefined' ? localStorage.getItem('game_id') : 'N/A',
     gameIdFromParams: new URLSearchParams(window.location.search).get('game_id'),
     score,
@@ -784,6 +786,21 @@ async function handleSimFullGame() {
       homeTeam: homeTeam,
       awayTeam: awayTeam
     });
+    
+    // ❌ COMMENTED OUT: No longer needed since we call showGameCompletionPopup directly
+    // // Add gameId to finalScore so showPopup can access it
+    // finalScore.gameId = gameId;
+    // 
+    // // Ensure gameId is in localStorage before showing popup
+    // if (gameId && typeof localStorage !== 'undefined') {
+    //   const storedGameId = localStorage.getItem('game_id');
+    //   if (storedGameId !== gameId) {
+    //     localStorage.setItem('game_id', gameId);
+    //     console.log('💾 Re-saved gameId to localStorage in finalize step:', gameId);
+    //   }
+    // }
+    // 
+    // showPopup(finalScore);
   } catch (err) {
     console.error('Error simming full game:', err);
     // ✅ FIX: Show actual error message instead of generic message
