@@ -44,13 +44,16 @@ export function showGameCompletionPopup({ gameId, mode, tournamentId, franchiseI
       <h2>Game Complete!</h2>
       ${finalScore ? `
         <div class="final-score-display">
-          <p class="score-line">
-            <span class="team-name">${finalScore.awayTeam || 'Away'}</span>
-            <span class="score">${finalScore.awayScore || 0}</span>
-            <span class="at-symbol">@</span>
-            <span class="team-name">${finalScore.homeTeam || 'Home'}</span>
-            <span class="score">${finalScore.homeScore || 0}</span>
-          </p>
+          <div class="score-line">
+            <div class="team-score-left">
+              <span class="team-name">${finalScore.homeTeam || 'Home'}</span>
+              <span class="score">${finalScore.homeScore || 0}</span>
+            </div>
+            <div class="team-score-right">
+              <span class="team-name">${finalScore.awayTeam || 'Away'}</span>
+              <span class="score">${finalScore.awayScore || 0}</span>
+            </div>
+          </div>
         </div>
       ` : ''}
       <div class="button-container">
@@ -111,7 +114,24 @@ export function showGameCompletionPopup({ gameId, mode, tournamentId, franchiseI
         margin: 0;
         display: flex;
         align-items: center;
-        gap: 15px;
+        justify-content: space-between;
+        width: 100%;
+        gap: 40px;
+      }
+
+      .team-score-left,
+      .team-score-right {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .team-score-left {
+        justify-content: flex-start;
+      }
+
+      .team-score-right {
+        justify-content: flex-end;
       }
 
       .score-line .team-name {
@@ -122,11 +142,6 @@ export function showGameCompletionPopup({ gameId, mode, tournamentId, franchiseI
         font-size: 32px;
         font-weight: 700;
         color: #1a1a2e;
-      }
-
-      .score-line .at-symbol {
-        font-size: 20px;
-        opacity: 0.7;
       }
 
       .button-container {
