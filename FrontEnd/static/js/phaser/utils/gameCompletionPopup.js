@@ -45,8 +45,18 @@ export function showGameCompletionPopup({ gameId, mode, tournamentId, franchiseI
     homeTeam,
     awayTeam,
     boxScoreUrl,
-    finalScore
+    finalScore,
+    hasGameId: !!gameId,
+    gameIdType: typeof gameId,
+    gameIdLength: gameId ? gameId.length : 0
   });
+  
+  // Also log to localStorage for persistence across page navigation
+  if (typeof localStorage !== 'undefined') {
+    localStorage.setItem('last_box_score_url', boxScoreUrl);
+    localStorage.setItem('last_box_score_gameId', gameId || '');
+    console.log('💾 Saved box score URL to localStorage for debugging');
+  }
 
   // Create popup
   const popup = document.createElement('div');
