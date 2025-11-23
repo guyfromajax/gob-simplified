@@ -80,8 +80,15 @@ async function handleOrebTurn(scene, { playerSprites, ballSprite, turnData, onUp
       ballControllerOwner: scene.ballController?.currentOwner?.playerId
     });
     
-    // CRITICAL: Clear _shotInProgress from previous shot if it's still set
-    // The previous shot may have left this flag set, which could interfere
+    // ✅ PHASE 2.5: Use BallController lifecycle methods for putback
+    const { getBallController } = await import('./BallControllerAdapter.js');
+    const ballController = getBallController();
+    
+    // Clear any lingering shot state from previous shot
+    if (ballController && ballController.isInFlight) {
+      ballController.onShotEnd();
+    }
+    // ✅ TRANSITION PERIOD: Also clear old flag for backward compatibility
     if (scene._shotInProgress) {
       console.log('🔍 [PUTBACK DEBUG] Clearing _shotInProgress from previous shot', {
         rebounderId
@@ -89,10 +96,15 @@ async function handleOrebTurn(scene, { playerSprites, ballSprite, turnData, onUp
       scene._shotInProgress = false;
     }
     
-    // CRITICAL: Set flag to prevent rebound animation from attaching ball
+    // ✅ TRANSITION PERIOD: Keep old flag for backward compatibility (will be removed in Phase 4)
     // The rebound animation from the previous turn might still be running
     // and trying to attach the ball, which causes the flash before the putback shot
     scene._putbackInProgress = true;
+    
+    // Use lifecycle method to track putback start
+    if (ballController) {
+      ballController.onPutbackStart({ shooterId: rebounderId });
+    }
     
     // CRITICAL: Detach ball from any current owner BEFORE positioning
     // The ball might still be attached from the previous rebound animation
@@ -224,6 +236,14 @@ async function handleOrebTurn(scene, { playerSprites, ballSprite, turnData, onUp
           missTurn = scene.simData?.turns?.[currentIndex];
         }
         
+        // ✅ PHASE 2.5: Use BallController lifecycle method for putback end
+        const { getBallController } = await import('./BallControllerAdapter.js');
+        const ballController = getBallController();
+        if (ballController) {
+          ballController.onPutbackEnd();
+        }
+        
+        // ✅ TRANSITION PERIOD: Keep old flag for backward compatibility (will be removed in Phase 4)
         // CRITICAL: Clear _putbackInProgress BEFORE calling runDefensiveReboundSetup
         // The putback shot animation is complete, so it's safe to allow ball attachments
         scene._putbackInProgress = false;

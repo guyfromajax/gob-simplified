@@ -259,16 +259,27 @@ export async function shootBall({
   //   shotInProgress: scene._shotInProgress
   // });
   
+  // ✅ PHASE 2.3: Use BallController lifecycle methods instead of direct flag manipulation
   // Stop BOTH old and new ball following systems
   scene.ballDetached = true; // Stop old system (scene._ballFollowing callback checks this)
+  
+  // Use BallController lifecycle method for shot start
+  const { getBallController } = await import('./BallControllerAdapter.js');
+  const ballController = getBallController();
+  
+  if (ballController) {
+    // Use lifecycle method to manage shot state
+    ballController.onShotStart({ 
+      shooterId, 
+      isPutback: turnData?.result_type === 'PUTBACK_MAKE' || turnData?.result_type === 'PUTBACK_MISS' 
+    });
+  }
+  
+  // ✅ TRANSITION PERIOD: Keep old flag for backward compatibility (will be removed in Phase 4)
   if (scene.ballController) {
     if (typeof scene.ballController.stopFollowingPlayer === 'function') {
       scene.ballController.stopFollowingPlayer();
     }
-    // Also set isAttached to false to prevent followCallback from running
-    scene.ballController.isAttached = false;
-    
-    // Set a flag to prevent re-attachment during shot
     scene._shotInProgress = true;
   }
   const stateMachine = scene.stateMachine;
@@ -653,8 +664,13 @@ export async function shootBall({
           showAnnouncement("Shooting Foul!", 'neutral', foulPlayerData);
         }
         
-        // Clear shot in progress flag
+        // ✅ PHASE 2.3: Use BallController lifecycle method for shot end
+        // Clear shot in progress flag (old system - kept for transition period)
         scene._shotInProgress = false;
+        if (ballController) {
+          ballController.onShotEnd();
+        }
+        
         if (result === "MAKE") {
           console.log("score");
           console.log("rimHoldStart");
@@ -669,6 +685,7 @@ export async function shootBall({
             });
             // Small delay to ensure watcher is fully removed before re-enabling
             scene.time.delayedCall(50, () => {
+              // ✅ TRANSITION PERIOD: Keep old flag for backward compatibility
               scene._shotInProgress = false;
               scene.ballDetached = false;
               // console.log('🏀 shootBall: Flags reset, ball following re-enabled');
@@ -724,7 +741,9 @@ export async function shootBall({
             // The ball should remain detached until the rebound is handled
             // Setting it to false would re-enable ball following and might re-attach to shooter
             scene.time.delayedCall(50, () => {
+              // ✅ TRANSITION PERIOD: Keep old flag for backward compatibility
               scene._shotInProgress = false;
+              // BallController state already cleared by onShotEnd() above
               // Keep ballDetached = true for MISS shots - rebound will handle ball attachment
               // scene.ballDetached = false; // REMOVED - prevents ball from re-attaching to shooter
               resolve(miss);
