@@ -78,31 +78,9 @@ function attachBallToPlayer(scene, ballSprite, playerSprite, opts = {}) {
     });
   }
   
-  // CRITICAL: Don't attach during putback shot animations
-  // The putback shot animation is still running, and attaching the ball here causes a flash
-  if (scene._putbackInProgress && !isPutbackAttempt) {
-    console.log('🔍 [BALL ATTACH DEBUG] BLOCKED: putback in progress (not putback attempt)', {
-      targetPlayerId,
-      putbackInProgress: scene._putbackInProgress,
-      isPutbackAttempt,
-      reason: 'putback_shot_animation_running'
-    });
-    return;
-  }
-  
-  // Don't attach during shot animations (unless this is the initial putback attachment)
-  if (scene._shotInProgress && !isPutbackAttempt) {
-    if (isPutbackScenario) {
-      console.log('🔍 [BALL ATTACH DEBUG] BLOCKED: shot in progress (not putback attempt)', {
-        targetPlayerId,
-        shotInProgress: scene._shotInProgress,
-        isPutbackAttempt
-      });
-    } else {
-      console.log('BallControllerAdapter: Skipping attach - shot in progress');
-    }
-    return;
-  }
+  // ✅ PHASE 1.4: Removed duplicate flag checks - BallController now handles these internally
+  // BallController.attachToPlayer() will check isInFlight and reason fields
+  // Old flags are still checked as fallback during transition period
 
   // Handle possession flip in progress (old system behavior)
   if (scene.possessionFlipInProgress) {
