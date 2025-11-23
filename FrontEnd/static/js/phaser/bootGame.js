@@ -726,7 +726,7 @@ async function handleSimFullGame() {
     quarter = lastSummary.quarter || currentQ;
     periodLabel = lastSummary.period_label || (quarter > 4 ? `OT${quarter - 4}` : `Q${quarter}`);
 
-    console.log('📊 Final game summary:', {
+    console.log('📊 Final game summary from last quarter response:', {
       gameId,
       quarter,
       hasBoxScore: !!lastSummary.box_score,
@@ -735,7 +735,30 @@ async function handleSimFullGame() {
       isFinal: lastSummary.is_final
     });
 
-    const finalScore = await finalizeGame({ simData: lastSummary, tournamentId, franchiseId });
+    // ✅ FIX: Fetch the complete game data from API to ensure box_score is fully populated
+    // This matches what happens when "Sim To 4th Quarter" → play Q4 normally
+    let finalGameData = lastSummary;
+    if (gameId) {
+      try {
+        console.log('📥 Fetching final game data from API to ensure box_score is complete...');
+        const gameResponse = await fetch(`/api/game/${gameId}`);
+        if (gameResponse.ok) {
+          finalGameData = await gameResponse.json();
+          console.log('✅ Fetched final game data:', {
+            hasBoxScore: !!finalGameData.box_score,
+            boxScoreKeys: finalGameData.box_score ? Object.keys(finalGameData.box_score) : [],
+            hasPlayers: !!finalGameData.players,
+            playerCount: finalGameData.players ? finalGameData.players.length : 0
+          });
+        } else {
+          console.warn('⚠️ Failed to fetch final game data, using lastSummary:', gameResponse.status);
+        }
+      } catch (err) {
+        console.error('❌ Error fetching final game data, using lastSummary:', err);
+      }
+    }
+
+    const finalScore = await finalizeGame({ simData: finalGameData, tournamentId, franchiseId });
     console.log('🏆 Final score object:', finalScore);
     showPopup(finalScore);
   } catch (err) {
