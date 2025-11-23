@@ -1815,15 +1815,29 @@ export function createGameScene(Phaser) {
         console.log('🏆 Game complete! Finalizing...');
         const finalize = async () => {
           const { finalizeGame } = await import('./finalizeGame.js');
+          
+          // Get team names for score map
+          const { home: homeTeamName, away: awayTeamName } = gameStore.getTeams();
+          const homeName = homeTeamName || initialSimData.home_team;
+          const awayName = awayTeamName || initialSimData.away_team;
+          
+          // Update simData.score with current final scores (finalizeGame already checks this)
+          const updatedSimData = {
+            ...initialSimData,
+            home_score: finalHomeScore,
+            away_score: finalAwayScore,
+            game_id: gameId,
+            home_team: initialSimData.home_team,
+            away_team: initialSimData.away_team,
+            score: {
+              ...(initialSimData.score || {}),
+              [homeName]: finalHomeScore,
+              [awayName]: finalAwayScore
+            }
+          };
+          
           const finalScore = await finalizeGame({
-            simData: {
-              ...initialSimData,
-              home_score: finalHomeScore,
-              away_score: finalAwayScore,
-              game_id: gameId,
-              home_team: initialSimData.home_team,
-              away_team: initialSimData.away_team
-            },
+            simData: updatedSimData,
             tournamentId: this.tournamentId,
             franchiseId: this.franchiseId,
             game: this.game,
