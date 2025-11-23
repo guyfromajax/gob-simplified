@@ -665,6 +665,12 @@ def summarize_game_state(game, exclude_animations=True):
         "opening_tip_winner": game.game_state.get("opening_tip_winner"),
         "game_stats_initialized": game.game_state.get("game_stats_initialized", False),  # Preserve stats initialization flag
         
+        # Top-level score map for backward compatibility (some code expects summary["score"])
+        "score": {
+            game.home_team.name: home_team_data["score"],
+            game.away_team.name: away_team_data["score"]
+        },
+        
         # Top-level team IDs for frontend compatibility (used by animation system)
         "home_team_id": game.home_team.team_id,
         "away_team_id": game.away_team.team_id,
