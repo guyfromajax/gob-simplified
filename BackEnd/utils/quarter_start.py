@@ -4,7 +4,7 @@ Uses BASELINE_INBOUND format for frontend compatibility
 """
 import random
 from BackEnd.utils.shared import getAwayTeamCoords
-from BackEnd.utils.shared_defense import assign_bh_defender_coords, assign_non_bh_defender_coords
+from BackEnd.utils.shared_defense import get_defender_coords
 
 # adding a comment for git push
 def create_quarter_start_inbound(game):
@@ -86,18 +86,34 @@ def create_quarter_start_inbound(game):
     aggression = defense_team.strategy_calls.get("aggression_call", "normal")
     d_dest = {}
     
+    # PHASE 6: Use new unified defender coordinate system
+    # get_defender_coords handles coordinate orientation automatically
     for pos in defense_team.lineup.keys():
         if pos == "PG":
-            d_coords = assign_bh_defender_coords(bh_coords, aggression, is_away_offense, "quarter_start_inbound")
-            if is_away_offense:
-                d_coords = getAwayTeamCoords({"tmp": d_coords})["tmp"]
+            # BH defender - get_defender_coords handles orientation automatically
+            d_coords = get_defender_coords(
+                bh_coords,
+                is_away_offense,
+                aggression,
+                "quarter_start_inbound",
+                None,
+                is_ball_handler=True
+            )
             d_dest[pos] = d_coords
         elif pos in o_dest:
             o_coords = o_dest[pos]
-            o_calc = getAwayTeamCoords({"tmp": o_coords})["tmp"] if is_away_offense else o_coords
-            d_coords = assign_non_bh_defender_coords(o_calc, bh_coords, aggression, is_away_offense)
-            if is_away_offense:
-                d_coords = getAwayTeamCoords({"tmp": d_coords})["tmp"]
+            # Non-BH defender - get_defender_coords handles orientation automatically
+            # Need to determine offensive player's spot (default to "key" for quarter start)
+            o_spot = "key"  # Default spot for quarter start inbound
+            d_coords = get_defender_coords(
+                o_coords,
+                is_away_offense,
+                aggression,
+                o_spot,
+                bh_coords,
+                is_ball_handler=False,
+                ball_spot="quarter_start_inbound"  # Ball handler's spot
+            )
             d_dest[pos] = d_coords
     
     # Build animations array for frontend (like opening tip)

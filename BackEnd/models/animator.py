@@ -4,8 +4,6 @@ from BackEnd.utils.shared import (
     get_away_player_coords,
 )
 from BackEnd.utils.shared_defense import (
-    assign_bh_defender_coords,
-    assign_non_bh_defender_coords,
     get_defender_coords
 )
 from collections import defaultdict
@@ -1483,8 +1481,7 @@ class Animator:
         Returns:
             List of defensive player animations
         """
-        from BackEnd.utils.shared_defense import assign_bh_defender_coords, assign_non_bh_defender_coords, get_defender_coords
-        from BackEnd.utils.shared import get_away_player_coords
+        from BackEnd.utils.shared_defense import get_defender_coords
         
         defensive_animations = []
         
@@ -1493,18 +1490,14 @@ class Animator:
         aggression = self.game.defense_team.strategy_calls.get("aggression_call", "normal")
         
         # Build offensive player positions by step for tracking
-        # IMPORTANT: Different defensive functions expect different coordinate orientations:
-        # - assign_bh_defender_coords: expects HOME orientation (unflip if away offense)
-        # - assign_non_bh_defender_coords: expects away orientation (pass as-is, it unflips internally)
-        # So we store coords in their original flipped state (away orientation if away offense)
-        # and unflip only when needed for BH defender
+        # PHASE 6: get_defender_coords handles coordinate orientation automatically
+        # Store coords as-is (away orientation if away offense, home orientation if home offense)
+        # The wrapper will handle orientation transformation internally
         offensive_positions_by_step = {}
         for pos, off_anim in offensive_animations.items():
             offensive_positions_by_step[pos] = []
             for step in off_anim.get("movement", []):
                 coords = step.get("coords", {"x": 50, "y": 25})
-                # Store coords as-is (away orientation if away offense, home orientation if home offense)
-                # assign_non_bh_defender_coords expects them in this state and will unflip internally
                 offensive_positions_by_step[pos].append(coords)
         
         # Find ball handler position (player with ball at step 0)

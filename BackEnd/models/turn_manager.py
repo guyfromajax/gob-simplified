@@ -29,8 +29,7 @@ from BackEnd.utils.shared import (
     getAwayTeamCoords
 )
 from BackEnd.utils.shared_defense import (
-    assign_bh_defender_coords,
-    assign_non_bh_defender_coords
+    get_defender_coords
 )
 from BackEnd.engine.phase_resolution import (
     resolve_fast_break_logic, 
@@ -184,25 +183,36 @@ class TurnManager:
         bh_coords = o_dest["PG"]
 
         # --- Defensive positioning ---
+        # PHASE 6: Use new unified defender coordinate system
+        # get_defender_coords handles coordinate orientation automatically
         self.logger.log("defenseUpdate:start")
         d_dest = {}
         for pos, defender in defense_team.lineup.items():
             if pos == "PG":
-                d_coords = assign_bh_defender_coords(
-                    bh_coords, aggression, is_away_offense, "baseline_inbound"
+                # BH defender - get_defender_coords handles orientation automatically
+                d_coords = get_defender_coords(
+                    bh_coords,
+                    is_away_offense,
+                    aggression,
+                    "baseline_inbound",
+                    None,
+                    is_ball_handler=True
                 )
-                if is_away_offense:
-                    d_coords = getAwayTeamCoords({"tmp": d_coords})["tmp"]
                 d_dest[pos] = d_coords
             elif pos in o_dest:
                 o_coords = o_dest[pos]
-                # Convert offensive coords back to home orientation for calc
-                o_calc = getAwayTeamCoords({"tmp": o_coords})["tmp"] if is_away_offense else o_coords
-                d_coords = assign_non_bh_defender_coords(
-                    o_calc, bh_coords, aggression, is_away_offense
+                # Non-BH defender - get_defender_coords handles orientation automatically
+                # Need to determine offensive player's spot (default to "key" for baseline inbound)
+                o_spot = "key"  # Default spot for baseline inbound
+                d_coords = get_defender_coords(
+                    o_coords,
+                    is_away_offense,
+                    aggression,
+                    o_spot,
+                    bh_coords,
+                    is_ball_handler=False,
+                    ball_spot="baseline_inbound"  # Ball handler's spot
                 )
-                if is_away_offense:
-                    d_coords = getAwayTeamCoords({"tmp": d_coords})["tmp"]
                 d_dest[pos] = d_coords
         self.logger.log("defenseUpdate:end")
 

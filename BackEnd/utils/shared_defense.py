@@ -3,93 +3,12 @@ import logging
 from BackEnd.utils.shared import get_away_player_coords
 from BackEnd.constants import HCO_STRING_SPOTS, HOME_RIM_COORDS, AWAY_RIM_COORDS
 
-def assign_bh_defender_coords(ball_coords, aggression_level: str, is_away_offense: bool, bh_spot: str = "key") -> dict:
-    """
-    Returns defensive positioning for the ball handler's defender.
-    
-    SIMPLE RULE: Defender is always positioned closer to the basket than the ball handler.
-    
-    IMPORTANT: This function always expects and returns coordinates in HOME orientation.
-    Callers must unflip coords to home orientation before calling (if they're in away orientation).
-    The function returns coords in HOME orientation - callers will flip to away orientation for display if needed.
-    
-    Args:
-        ball_coords: Ball handler's coordinates in HOME orientation
-        aggression_level: Defense aggression setting
-        is_away_offense: Whether away team has the ball
-        bh_spot: Ball handler's spot string ("key", "lower wing", etc.)
-    """
-    from BackEnd.constants import HOME_RIM_COORDS, AWAY_RIM_COORDS
-    
-    spacing_map = {"aggressive": 2, "normal": 3, "passive": 4}
-    d_spacing = spacing_map.get(aggression_level.lower(), 2)
-
-    # All calculations in HOME orientation
-    x_bh = ball_coords["x"]
-    y_bh = ball_coords["y"]
-
-    # SIMPLE RULE: Defender positioning relative to ball handler
-    # - When AWAY team has ball: defender should be to LEFT of ball handler (x less) = x_direction = -1
-    # - When HOME team has ball: defender should be to RIGHT of ball handler (x more) = x_direction = +1
-    # This positions the defender between the ball handler and the basket they're defending
-    if is_away_offense:
-        # Away team has ball - defender to LEFT of ball handler (x less)
-        x_direction = -1
-    else:
-        # Home team has ball - defender to RIGHT of ball handler (x more)
-        x_direction = 1
-    
-    # Determine which basket is being attacked (for verification/debugging)
-    target_basket = AWAY_RIM_COORDS if not is_away_offense else HOME_RIM_COORDS
-    basket_x = target_basket["x"]
-    
-    # Y direction: toward the basket
-    y_direction = -1 if y_bh > 25 else 1
-    
-
-    if bh_spot == "key":
-        x = x_bh + (x_direction * d_spacing)
-        y = y_bh + random.randint(-1,1)
-    elif bh_spot in ["lower wing", "upper wing", "lower midwing", "upper midwing"]:
-        x = x_bh + (x_direction * d_spacing)
-        y = y_bh + random.randint(2,4) * y_direction
-    elif bh_spot in ["lower corner", "upper corner", "lower midBaseline", "upper midBaseline", "lower midcorner", "upper midcorner"]:
-        x = x_bh
-        y = y_bh + (y_direction * d_spacing)
-    elif bh_spot in ["midLane","lower lowPost", "upper lowPost", "lower midPost", "upper midPost", "lower highPost", "upper highPost"]:
-        x = x_bh + (2 * x_direction)
-        y = y_bh + (1 * y_direction)
-    elif bh_spot in ["upper apex", "lower apex"]:
-        x = x_bh + (2 * x_direction)
-        y = y_bh + (2 * y_direction)
-    elif bh_spot in ["deep key", "deep lower wing", "deep lower baseline", "deep upper wing", "deep upper baseline"]:
-        x = x_bh + (random.randint(12,20) * x_direction)
-        y = y_bh + (random.randint(4,8) * y_direction)
-    else:
-        x = x_bh + (x_direction * random.randint(3,6))
-        y = y_bh + random.randint(-3,3)
-
-    result = {"x": x, "y": y}
-    
-    # Verify defender is closer to basket than ball handler
-    defender_to_basket = abs(result["x"] - basket_x) + abs(result["y"] - target_basket["y"])
-    bh_to_basket = abs(x_bh - basket_x) + abs(y_bh - target_basket["y"])
-    is_closer = defender_to_basket < bh_to_basket
-    
-    if is_away_offense:
-        logging.warning(f"🔍 [ASSIGN_BH_DEFENDER] Away offense - Defender positioning")
-        logging.warning(f"   - Ball handler (home orientation): x={x_bh}, y={y_bh}")
-        logging.warning(f"   - Target basket: HOME basket (x={basket_x})")
-        logging.warning(f"   - x_direction: {x_direction} ({'LEFT' if x_direction < 0 else 'RIGHT'})")
-        logging.warning(f"   - Defender (home orientation): x={result['x']}, y={result['y']}")
-        logging.warning(f"   - Defender closer to basket? {is_closer} (defender={defender_to_basket}, bh={bh_to_basket})")
-    
-    # Function always returns coords in HOME orientation
-    # Callers (animator) will flip to away orientation for display if needed
-    return result
+# PHASE 6: Old functions removed - use get_defender_coords() instead
+# assign_bh_defender_coords() and assign_non_bh_defender_coords() have been removed
+# All call sites now use the unified get_defender_coords() system
 
 
-def assign_non_bh_defender_coords(o_coords, ball_coords, aggression_level, is_away_offense, ball_spot="key", o_spot="key"):
+# ==================== ZONE DEFENSE LOGIC ====================
     """
     Assigns defensive positioning for a non-ball-handler defender in man defense.
     Returns {"x": int, "y": int}
@@ -1332,20 +1251,30 @@ def assign_all_zone_defenders(
         
         # Assign closest defender to guard ball handler
         if closest_defender:
-            # For deep locations, guard the mapped location, not the deep location
+            # PHASE 6: Use new unified defender coordinate system
+            # get_defender_coords handles coordinate orientation automatically
             if ball_spot in ["deep key", "deep lower wing", "deep lower baseline", "deep upper wing", "deep upper baseline"]:
                 mapped_zone_location = _map_deep_location_to_zone_location(ball_spot)
                 mapped_coords = HCO_STRING_SPOTS.get(mapped_zone_location, ball_handler_coords)
-                # HCO_STRING_SPOTS are in home orientation, and assign_bh_defender_coords expects home orientation
-                # So don't flip mapped_coords
-                coords = assign_bh_defender_coords(mapped_coords, aggression_level, is_away_offense, mapped_zone_location)
+                # get_defender_coords handles orientation automatically
+                coords = get_defender_coords(
+                    mapped_coords,
+                    is_away_offense,
+                    aggression_level,
+                    mapped_zone_location,
+                    None,
+                    is_ball_handler=True
+                )
             else:
-                # assign_bh_defender_coords expects home-oriented coords, so unflip if away offense
-                if is_away_offense:
-                    ball_handler_coords_home = get_away_player_coords(ball_handler_coords)
-                else:
-                    ball_handler_coords_home = ball_handler_coords
-                coords = assign_bh_defender_coords(ball_handler_coords_home, aggression_level, is_away_offense, ball_spot)
+                # get_defender_coords handles orientation automatically
+                coords = get_defender_coords(
+                    ball_handler_coords,
+                    is_away_offense,
+                    aggression_level,
+                    ball_spot,
+                    None,
+                    is_ball_handler=True
+                )
             assignments[closest_defender] = coords
             # Track that this defender is guarding the ball handler
             if ball_handler_id:
