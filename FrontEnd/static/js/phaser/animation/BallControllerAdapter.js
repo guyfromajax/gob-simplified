@@ -342,6 +342,7 @@ function synchronizeBallState(scene, options = {}) {
 }
 
 // Named exports for individual functions
+// Note: updateBallOwnership is exported as a function declaration below, not included here
 export {
   attachBallToPlayer,
   detachBall,
@@ -353,7 +354,6 @@ export {
   setPendingOwner,
   clearPendingOwner,
   cancelBallTween,
-  updateBallOwnership,
   synchronizeBallState,
   initializeBallController,
   getBallController
