@@ -1456,7 +1456,7 @@ class Animator:
         Returns:
             List of defensive player animations
         """
-        from BackEnd.utils.shared_defense import assign_bh_defender_coords, assign_non_bh_defender_coords
+        from BackEnd.utils.shared_defense import assign_bh_defender_coords, assign_non_bh_defender_coords, get_defender_coords
         from BackEnd.utils.shared import get_away_player_coords
         
         defensive_animations = []
@@ -1522,11 +1522,16 @@ class Animator:
                     bh_action = first_step.get("pos_actions", {}).get(ball_handler_pos, {})
                     bh_spot = bh_action.get("location") or bh_action.get("spot") or "key"
                     
-                    # assign_bh_defender_coords expects HOME orientation, so unflip if away offense
-                    bh_coords_for_calc = off_coords
-                    if is_away_offense:
-                        bh_coords_for_calc = get_away_player_coords(off_coords)
-                    def_coords = assign_bh_defender_coords(bh_coords_for_calc, aggression, is_away_offense, bh_spot)
+                    # PHASE 3: Use new unified defender coordinate system
+                    # get_defender_coords handles coordinate orientation automatically
+                    def_coords = get_defender_coords(
+                        off_coords,
+                        is_away_offense,
+                        aggression,
+                        bh_spot,
+                        None,
+                        is_ball_handler=True
+                    )
                 else:
                     # Non-ball handler defender
                     bh_coords = offensive_positions_by_step.get(ball_handler_pos, [{}])[0] if ball_handler_pos in offensive_positions_by_step else {"x": 50, "y": 25}
@@ -1541,10 +1546,8 @@ class Animator:
                     
                     def_coords = assign_non_bh_defender_coords(off_coords, bh_coords, aggression, is_away_offense, bh_spot, o_spot)
                 
-                # assign_bh_defender_coords and assign_non_bh_defender_coords return coords in HOME orientation
-                # If away team has the ball, we need to flip defensive coords to away orientation for display
-                if is_away_offense:
-                    def_coords = get_away_player_coords(def_coords)
+                # get_defender_coords returns coords in same orientation as input
+                # No need to flip - wrapper handles orientation automatically
                 
                 def_start = def_coords
                 def_movement.append({
@@ -1577,11 +1580,16 @@ class Animator:
                         bh_action = skeleton_step.get("pos_actions", {}).get(current_ball_handler_pos, {})
                         bh_spot = bh_action.get("location") or bh_action.get("spot") or "key"
                         
-                        # assign_bh_defender_coords expects HOME orientation, so unflip if away offense
-                        bh_coords_for_calc = off_coords
-                        if is_away_offense:
-                            bh_coords_for_calc = get_away_player_coords(off_coords)
-                        def_coords = assign_bh_defender_coords(bh_coords_for_calc, aggression, is_away_offense, bh_spot)
+                        # PHASE 3: Use new unified defender coordinate system
+                        # get_defender_coords handles coordinate orientation automatically
+                        def_coords = get_defender_coords(
+                            off_coords,
+                            is_away_offense,
+                            aggression,
+                            bh_spot,
+                            None,
+                            is_ball_handler=True
+                        )
                     else:
                         # Non-ball handler defender - need CURRENT ball handler position for this step
                         bh_coords_list = offensive_positions_by_step.get(current_ball_handler_pos, [])
@@ -1595,11 +1603,11 @@ class Animator:
                         o_spot = o_action.get("location") or o_action.get("spot") or "key"
                         
                         def_coords = assign_non_bh_defender_coords(off_coords, bh_coords, aggression, is_away_offense, bh_spot, o_spot)
-                    
-                    # assign_bh_defender_coords and assign_non_bh_defender_coords return coords in HOME orientation
-                    # If away team has the ball, we need to flip defensive coords to away orientation for display
-                    if is_away_offense:
-                        def_coords = get_away_player_coords(def_coords)
+                        # assign_non_bh_defender_coords returns coords in HOME orientation
+                        # If away team has the ball, we need to flip defensive coords to away orientation for display
+                        if is_away_offense:
+                            def_coords = get_away_player_coords(def_coords)
+                    # For BH defenders, get_defender_coords already returns correct orientation
                     
                     def_end = def_coords
                     def_movement.append({
