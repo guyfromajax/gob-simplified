@@ -62,7 +62,15 @@ def check_and_handle_foul_out(foul_player, game_state, foul_team):
     if not foul_player:
         return {"fouled_out": False, "foul_count": 0}
     
-    foul_count = foul_player.get_stat("F", "game")
+    # Support both real Player objects (with get_stat method) and test mocks (with stats dict)
+    from BackEnd.models.player import Player
+    if isinstance(foul_player, Player):
+        foul_count = foul_player.get_stat("F", "game")
+    elif hasattr(foul_player, "stats") and isinstance(foul_player.stats, dict):
+        game_stats = foul_player.stats.get("game", {})
+        foul_count = game_stats.get("F", 0) if isinstance(game_stats, dict) else 0
+    else:
+        foul_count = 0
     fouled_out = foul_count >= 5
     
     if fouled_out:
