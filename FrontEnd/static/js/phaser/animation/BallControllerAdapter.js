@@ -392,7 +392,8 @@ export async function updateBallOwnership(options) {
   } = options;
 
   // Early returns
-  if (scene?.skipToEnd || scene?.stateMachine?.is?.('FastBreak')) return;
+  // Check for FastBreak state (using string comparison to avoid importing States)
+  if (scene?.skipToEnd || scene?.stateMachine?.is?.('FastBreak') || scene?.stateMachine?.state === 'FastBreak') return;
   if (scene.passInFlight) return;
 
   // Get BallController
