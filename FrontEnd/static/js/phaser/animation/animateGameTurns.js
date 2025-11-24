@@ -9,7 +9,7 @@ import { animateStep } from "./animateStep.js";
 import { handleTurnover } from "./turnoverAdapter.js";
 import { States } from "../state/gameStateMachine.js";
 import { appendToTextScroll } from "../utils/textScroll.js";
-import { getCurrentOwner, getPendingOwner } from "../ball/ballController.js";
+import { getCurrentOwner, getPendingOwner } from "./BallControllerAdapter.js";
 import { updatePlaycallDisplay } from "../utils/playcallDisplay.js";
 import { announceFromTurnData } from "../utils/announcements.js";
 import { updateStrategyBars } from "../utils/strategyBars.js";

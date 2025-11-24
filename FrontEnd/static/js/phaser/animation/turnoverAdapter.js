@@ -7,7 +7,7 @@ import {
   cancelBallTween,
   getCurrentOwner,
   getPendingOwner,
-} from "../ball/ballController.js";
+} from "./BallControllerAdapter.js";
 import { triggerTurnoverEffect } from "./negativeActionEffects.js";
 
 /**

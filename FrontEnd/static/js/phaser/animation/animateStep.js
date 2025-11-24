@@ -14,7 +14,7 @@ import { PASS_DEBUG } from "./ballTween.js";
 import {
   getPendingOwner,
   getCurrentOwner,
-} from "../ball/ballController.js";
+} from "./BallControllerAdapter.js";
 import {
   animationDebugLog,
   animationDebugWarn,

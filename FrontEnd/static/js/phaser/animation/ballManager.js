@@ -19,7 +19,7 @@ import {
   getCurrentOwner,
   getPendingOwner,
   setPendingOwner,
-} from "../ball/ballController.js";
+} from "./BallControllerAdapter.js";
 import {
   DebugFlags,
   animationDebugLog,
