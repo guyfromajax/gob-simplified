@@ -26,7 +26,7 @@ function initializeBallController(scene, ballSprite) {
   }
   
   globalBallController = new BallController(scene, ballSprite);
-  globalBallController.debug = true; // Enable debug logging for adapter
+  globalBallController.debug = false; // Disable verbose debug logging by default
   
   console.log('BallControllerAdapter: Global BallController initialized');
   return globalBallController;
@@ -161,6 +161,7 @@ function attachBallToPlayer(scene, ballSprite, playerSprite, opts = {}) {
       });
     }
   } else {
+    // Only log failures in debug mode or for putback attempts (which are edge cases)
     if (isPutbackAttempt || isPutbackScenario) {
       console.warn('🔍 [BALL ATTACH DEBUG] FAILED: Failed to attach ball', {
         targetPlayerId,
@@ -168,12 +169,8 @@ function attachBallToPlayer(scene, ballSprite, playerSprite, opts = {}) {
         shotInProgress: scene._shotInProgress,
         sceneRebounderId: scene.rebounderId
       });
-    } else {
-      console.warn('BallControllerAdapter: Failed to attach ball to player', {
-        playerId: playerSprite.playerId,
-        team: playerSprite.team_id ?? playerSprite.team
-      });
     }
+    // Suppress normal "ball in flight" failures - this is expected behavior
   }
 }
 
