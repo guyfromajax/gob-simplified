@@ -80,6 +80,48 @@ The ball animation system uses a unified architecture with **BallController** as
 
 **For Details**: See `BALL_OWNERSHIP_CONSOLIDATION_PLAN.md` for complete migration plan and implementation details.
 
+---
+
+### Defender Coordinate System ✅ **COMPLETE** (December 2024)
+
+**Status:** Fully refactored and operational
+
+The defender coordinate system uses a unified architecture with **`get_defender_coords()`** as the single entry point for all defender positioning (ball handler defenders, non-ball handler defenders, and zone defenders).
+
+**Architecture:**
+- **`get_defender_coords()`** (`BackEnd/utils/shared_defense.py`) - Public API wrapper
+  - Handles coordinate orientation transformation automatically
+  - Accepts coordinates in any orientation (home or away)
+  - Returns coordinates in same orientation as input
+  - Delegates to `calculate_defender_coords()` for core logic
+  
+- **`calculate_defender_coords()`** (`BackEnd/utils/shared_defense.py`) - Core unified function
+  - Works internally in HOME orientation
+  - Handles both BH and non-BH defenders
+  - Uses geometric calculation for positioning
+  - Implements complex non-BH defender logic (ball_spot/o_spot combinations)
+
+**Key Features:**
+- ✅ Single unified function for all defender types
+- ✅ Automatic coordinate orientation handling (no manual flipping)
+- ✅ Geometric calculation (x_direction from coordinates, not flags)
+- ✅ BH defenders always closer to basket
+- ✅ Non-BH defenders positioned correctly relative to assignment
+- ✅ Full zone defense support (2-3, 3-2, 1-3-1)
+
+**Benefits:**
+- ✅ Single source of truth (one function instead of two)
+- ✅ No coordinate flipping bugs (handled automatically)
+- ✅ Fixed x_direction bug (geometric calculation)
+- ✅ Simpler call sites (no manual coordinate transformations)
+- ✅ Easier to maintain and extend
+- ✅ More testable and debuggable
+
+**See:** 
+- `DEFENDER_COORDINATE_SYSTEM_REFACTORING_PLAN.md` - Complete refactoring details (December 2024)
+
+---
+
 ### Player Animation System
 
 **Status:** Already using WIP_GOB approach
