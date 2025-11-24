@@ -17,11 +17,12 @@ import { getBallController } from './BallControllerAdapter.js';
 import { DebugFlags } from '../utils/debugFlags.js';
 
 export class AnimationRouter {
-  constructor(scene, playerSprites, ballSprite, onUpdate) {
+  constructor(scene, playerSprites, ballSprite, onUpdate, onAction = null) {
     this.scene = scene;
     this.playerSprites = playerSprites;
     this.ballSprite = ballSprite;
     this.onUpdate = onUpdate;
+    this.onAction = onAction;
     
     // Initialize core components
     this.ballController = getBallController(); // Use the global BallController from adapter
@@ -103,7 +104,8 @@ export class AnimationRouter {
         playerSprites: this.playerSprites,
         ballSprite: this.ballSprite,
         onUpdate: this.onUpdate,
-        simData: this.scene.simData
+        simData: this.scene.simData,
+        onAction: this.onAction // Pass onAction callback if provided
       };
       
       console.log('🚀 AnimationRouter: Calling animationEngine.processTurn');
