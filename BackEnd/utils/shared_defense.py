@@ -1340,3 +1340,198 @@ def assign_all_zone_defenders(
                 defender_to_offensive_player[closest_defender] = ball_handler_id
     
     return assignments, defender_to_offensive_player
+
+
+# ============================================================================
+# PHASE 1: UNIFIED DEFENDER COORDINATE SYSTEM
+# ============================================================================
+
+def get_spacing(aggression_level: str, is_ball_handler: bool = False) -> int:
+    """
+    Get defender spacing based on aggression level and defender type.
+    
+    Args:
+        aggression_level: Defense aggression setting ("aggressive", "normal", "passive")
+        is_ball_handler: Whether this is the ball handler's defender
+    
+    Returns:
+        Spacing value (grid units)
+    """
+    if is_ball_handler:
+        # BH defenders: tighter spacing
+        spacing_map = {"aggressive": 2, "normal": 3, "passive": 4}
+    else:
+        # Non-BH defenders: looser spacing
+        spacing_map = {"aggressive": 1, "normal": 2, "passive": 3}
+    
+    default_spacing = 3 if is_ball_handler else 2
+    return spacing_map.get(aggression_level.lower(), default_spacing)
+
+
+def verify_defender_closer_to_basket(
+    def_x: float, def_y: float,
+    off_x: float, off_y: float,
+    basket_x: float, basket_y: float
+) -> bool:
+    """
+    Verify that defender is closer to basket than offensive player.
+    Used for BH defenders only.
+    
+    Args:
+        def_x, def_y: Defender coordinates
+        off_x, off_y: Offensive player coordinates
+        basket_x, basket_y: Basket coordinates
+    
+    Returns:
+        True if defender is closer to basket, False otherwise
+    """
+    defender_to_basket = abs(def_x - basket_x) + abs(def_y - basket_y)
+    off_to_basket = abs(off_x - basket_x) + abs(off_y - basket_y)
+    return defender_to_basket < off_to_basket
+
+
+def apply_spot_adjustments(
+    def_x: float, def_y: float,
+    spot: str,
+    unit_x: float, unit_y: float,
+    spacing: int,
+    is_ball_handler: bool = False
+) -> tuple:
+    """
+    Apply spot-specific adjustments to defender positioning.
+    
+    Args:
+        def_x, def_y: Initial defender coordinates
+        spot: Court spot string
+        unit_x, unit_y: Unit direction vector toward basket
+        spacing: Base spacing value
+        is_ball_handler: Whether this is ball handler's defender
+    
+    Returns:
+        Tuple of (adjusted_x, adjusted_y)
+    """
+    # For most spots, the base calculation is sufficient
+    # This function can be extended for specialized positioning if needed
+    # Currently, spot-specific logic is handled in calculate_defender_coords()
+    return def_x, def_y
+
+
+def calculate_defender_coords(
+    offensive_coords: dict,
+    target_basket: dict,
+    aggression_level: str,
+    spot: str = "key",
+    ball_handler_coords: dict = None,
+    is_ball_handler: bool = False
+) -> dict:
+    """
+    Calculate defender coordinates for any defensive scenario.
+    
+    CORE RULES:
+    - For BH defenders: Defender is always positioned closer to the basket than the ball handler.
+    - For non-BH defenders: Defender is positioned relative to their assignment and ball handler,
+      maintaining proper spacing, but may not always be closer to basket.
+    
+    Args:
+        offensive_coords: Offensive player coordinates in HOME orientation
+        target_basket: Basket coordinates being defended (HOME_RIM_COORDS or AWAY_RIM_COORDS)
+        aggression_level: Defense aggression ("aggressive", "normal", "passive")
+        spot: Court spot string ("key", "lower wing", etc.)
+        ball_handler_coords: Optional ball handler coordinates (for non-BH defenders)
+        is_ball_handler: Whether this is the ball handler's defender
+    
+    Returns:
+        Defender coordinates in HOME orientation
+    """
+    ox = offensive_coords["x"]
+    oy = offensive_coords["y"]
+    basket_x = target_basket["x"]
+    basket_y = target_basket["y"]
+    
+    if is_ball_handler:
+        # BH DEFENDER: Always closer to basket than ball handler
+        # Calculate direction vector from offensive player to basket
+        dx = basket_x - ox  # Positive = toward basket (right), Negative = away from basket (left)
+        dy = basket_y - oy  # Positive = toward basket (down), Negative = away from basket (up)
+        
+        # Normalize direction (unit vector)
+        distance_to_basket = ((dx ** 2) + (dy ** 2)) ** 0.5
+        if distance_to_basket == 0:
+            # Offensive player is at basket (edge case)
+            unit_x = 0
+            unit_y = 0
+        else:
+            unit_x = dx / distance_to_basket
+            unit_y = dy / distance_to_basket
+        
+        # Get spacing based on aggression
+        spacing = get_spacing(aggression_level, is_ball_handler=True)
+        
+        # Calculate base defender position: move toward basket by spacing amount
+        def_x = ox + (unit_x * spacing)
+        def_y = oy + (unit_y * spacing)
+        
+        # Apply spot-specific adjustments
+        def_x, def_y = apply_spot_adjustments(def_x, def_y, spot, unit_x, unit_y, spacing, is_ball_handler=True)
+        
+        # EDGE CASE: Corner locations for BH defenders
+        if spot in ["lower corner", "upper corner", "lower midBaseline", "upper midBaseline", 
+                    "lower midcorner", "upper midcorner"]:
+            # X position: Defender's x should equal ball handler's x
+            def_x = ox  # Defender x equals ball handler x
+            
+            # Y position: Follow corner y-position rules
+            # Upper corner: defender's y must be LOWER (defender below ball handler)
+            if "upper" in spot:
+                def_y = oy - random.randint(2, 4)  # Defender below (lower y value)
+            # Lower corner: defender's y must be HIGHER (defender above ball handler)
+            elif "lower" in spot:
+                def_y = oy + random.randint(2, 4)  # Defender above (higher y value)
+        
+        # Verify defender is closer to basket (BH defender requirement)
+        if not verify_defender_closer_to_basket(def_x, def_y, ox, oy, basket_x, basket_y):
+            logging.warning(f"⚠️ [CALCULATE_DEFENDER_COORDS] BH defender not closer to basket! "
+                           f"Defender: ({def_x}, {def_y}), BH: ({ox}, {oy}), Basket: ({basket_x}, {basket_y})")
+        
+    else:
+        # NON-BH DEFENDER: Position relative to assignment and ball handler
+        bx = ball_handler_coords["x"] if ball_handler_coords else ox
+        by = ball_handler_coords["y"] if ball_handler_coords else oy
+        
+        # EDGE CASE 1: Post defenders (low/medium post)
+        # Offensive player is very close to basket, defender must stay tight (closer to player)
+        # rather than being in standard help defense position
+        if spot in ["lower lowPost", "upper lowPost", "lower midPost", "upper midPost"]:
+            # Tight defense: defender stays very close to offensive player
+            # X position: defender on basket side of offensive player
+            # Determine basket direction from target_basket
+            def_x = ox + 2 if basket_x > ox else ox - 2
+            # Y position: slight adjustment based on ball handler
+            y_direction = -1 if oy > 25 else 1
+            def_y = oy + random.choice([0.3, 0.4, 0.5]) * (abs(by - oy) * y_direction)
+        
+        # EDGE CASE 2: Corner locations for non-BH defenders
+        elif spot in ["lower corner", "upper corner", "lower midBaseline", "upper midBaseline",
+                      "lower midcorner", "upper midcorner"]:
+            # Upper corner: defender's y must be LOWER (defender below offensive player)
+            if "upper" in spot:
+                def_y = oy - random.randint(2, 4)  # Defender below (lower y value)
+            # Lower corner: defender's y must be HIGHER (defender above offensive player)
+            elif "lower" in spot:
+                def_y = oy + random.randint(2, 4)  # Defender above (higher y value)
+            
+            # X position: relative to ball handler and offensive player
+            x_direction = 1 if bx > ox else -1
+            def_x = ox + 0.1 * (abs(bx - ox) * x_direction)
+        
+        # Standard non-BH defender positioning
+        else:
+            # For now, use simplified relative positioning
+            # This will be enhanced in later phases with full logic from assign_non_bh_defender_coords
+            spacing = get_spacing(aggression_level, is_ball_handler=False)
+            x_direction = 1 if bx > ox else -1
+            y_direction = -1 if oy > 25 else 1
+            def_x = ox + (spacing * x_direction)
+            def_y = oy + (spacing * y_direction)
+    
+    return {"x": int(def_x), "y": int(def_y)}
