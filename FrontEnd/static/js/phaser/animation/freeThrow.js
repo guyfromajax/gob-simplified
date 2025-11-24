@@ -5,7 +5,7 @@ import animationConfig, {
 import { HOME_RIM_COORDS, AWAY_RIM_COORDS } from "./courtConstants.js";
 import { bounceFromRim } from "./ballManager.js";
 import { States, safeTransition, createTransitionGuard } from "../state/gameStateMachine.js";
-import { getCurrentOwner, getPendingOwner } from "../ball/ballController.js";
+import { getCurrentOwner, getPendingOwner } from "./BallControllerAdapter.js";
 import { DebugFlags, animationDebugLog } from "../utils/debugFlags.js";
 import { getPlayerDuration } from "./turnAnimation.js";
 

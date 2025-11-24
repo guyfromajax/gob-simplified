@@ -8,7 +8,7 @@ import {
   setPendingOwner,
   cancelBallTween,
   getPendingOwner,
-} from "../ball/ballController.js";
+} from "./BallControllerAdapter.js";
 import {
   animationDebugLog,
   animationDebugWarn,

@@ -32,7 +32,7 @@ import {
   setPendingOwner,
   setCurrentOwner,
   getCurrentOwner
-} from "../ball/ballController.js";
+} from "./BallControllerAdapter.js";
 // ✅ NEW (Step 1): Import simple ball holder state functions
 // ✅ STEP 3 MIGRATION: Import new ball animation function
 import {

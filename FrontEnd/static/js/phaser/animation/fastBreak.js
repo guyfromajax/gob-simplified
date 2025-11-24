@@ -6,7 +6,7 @@ import { animateShotToRim } from "./ballAnimationSimple.js";
 import animationConfig from "./animation_config.js";
 import { HOME_RIM_COORDS, AWAY_RIM_COORDS, HOME_TOP_KEY, AWAY_TOP_KEY } from "./courtConstants.js";
 import { States, safeTransition } from "../state/gameStateMachine.js";
-import { getCurrentOwner } from "../ball/ballController.js";
+import { getCurrentOwner } from "./BallControllerAdapter.js";
 import { runInboundSetup, getPlayerDuration } from "./turnAnimation.js";
 import { animationDebugLog, isAnimationDebugEnabled } from "../utils/debugFlags.js";
 import { appendToTextScroll } from "../utils/textScroll.js";
