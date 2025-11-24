@@ -1403,7 +1403,8 @@ def apply_spot_adjustments(
     Args:
         def_x, def_y: Initial defender coordinates
         spot: Court spot string
-        unit_x, unit_y: Unit direction vector toward basket
+        x_direction: X direction (-1 for left, +1 for right)
+        y_direction: Y direction (-1 for up, +1 for down)
         spacing: Base spacing value
         is_ball_handler: Whether this is ball handler's defender
     
@@ -1422,7 +1423,8 @@ def calculate_defender_coords(
     aggression_level: str,
     spot: str = "key",
     ball_handler_coords: dict = None,
-    is_ball_handler: bool = False
+    is_ball_handler: bool = False,
+    is_away_offense: bool = False
 ) -> dict:
     """
     Calculate defender coordinates for any defensive scenario.
@@ -1450,33 +1452,34 @@ def calculate_defender_coords(
     
     if is_ball_handler:
         # BH DEFENDER: Always closer to basket than ball handler
-        # Calculate direction vector from offensive player to basket
-        dx = basket_x - ox  # Positive = toward basket (right), Negative = away from basket (left)
-        dy = basket_y - oy  # Positive = toward basket (down), Negative = away from basket (up)
-        
-        # Normalize direction (unit vector)
-        distance_to_basket = ((dx ** 2) + (dy ** 2)) ** 0.5
-        if distance_to_basket == 0:
-            # Offensive player is at basket (edge case)
-            unit_x = 0
-            unit_y = 0
+        # Match the old function's x_direction logic exactly for consistency
+        # The old function uses is_away_offense to determine direction:
+        # - When AWAY team has ball: defender to LEFT (x_direction = -1)
+        # - When HOME team has ball: defender to RIGHT (x_direction = +1)
+        # Use is_away_offense parameter directly (passed from wrapper)
+        # NOTE: The wrapper handles coordinate flipping, so we need to account for that
+        # When away offense: wrapper flips coords to home orientation, calculates, then flips back
+        # So x_direction needs to be REVERSED for away offense to account for the flip
+        if is_away_offense:
+            x_direction = 1   # Away offense: defender to RIGHT in home orientation (becomes LEFT after flip)
         else:
-            unit_x = dx / distance_to_basket
-            unit_y = dy / distance_to_basket
+            x_direction = 1   # Home offense: defender to RIGHT in home orientation
+        
+        # Y direction: toward the basket (same as old function)
+        y_direction = -1 if oy > 25 else 1
         
         # Get spacing based on aggression
         spacing = get_spacing(aggression_level, is_ball_handler=True)
         
-        # Calculate base defender position: move toward basket by spacing amount
-        def_x = ox + (unit_x * spacing)
-        def_y = oy + (unit_y * spacing)
-        
-        # Apply spot-specific adjustments
-        def_x, def_y = apply_spot_adjustments(def_x, def_y, spot, unit_x, unit_y, spacing, is_ball_handler=True)
-        
-        # EDGE CASE: Corner locations for BH defenders
-        if spot in ["lower corner", "upper corner", "lower midBaseline", "upper midBaseline", 
-                    "lower midcorner", "upper midcorner"]:
+        # Apply spot-specific positioning (matching old function logic)
+        if spot == "key":
+            def_x = ox + (x_direction * spacing)
+            def_y = oy + random.randint(-1, 1)
+        elif spot in ["lower wing", "upper wing", "lower midwing", "upper midwing"]:
+            def_x = ox + (x_direction * spacing)
+            def_y = oy + random.randint(2, 4) * y_direction
+        elif spot in ["lower corner", "upper corner", "lower midBaseline", "upper midBaseline", 
+                      "lower midcorner", "upper midcorner"]:
             # X position: Defender's x should equal ball handler's x
             def_x = ox  # Defender x equals ball handler x
             
@@ -1624,7 +1627,8 @@ def get_defender_coords(
         aggression_level,
         spot,
         ball_handler_coords_home,
-        is_ball_handler
+        is_ball_handler,
+        is_away_offense  # Pass is_away_offense directly
     )
     
     # Convert result back to original orientation
