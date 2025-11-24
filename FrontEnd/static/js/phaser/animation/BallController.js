@@ -758,13 +758,7 @@ export class BallController {
       this.stateHistory = this.stateHistory.slice(-50);
     }
 
-    if (this.debug) {
-      console.log('BallController: onShotStart', {
-        shooterId,
-        isPutback,
-        previousState: this.previousState
-      });
-    }
+    // Removed verbose lifecycle logging - only log errors
   }
 
   /**

@@ -192,8 +192,7 @@ function detachBall(scene, ballSprite, options={}) {
   ballController.detachFromPlayer('detach', options);
   
   // ✅ PHASE 4: Removed old ballDetached flag - BallController manages state internally
-  
-  console.log('BallControllerAdapter: Ball detached');
+  // Removed verbose detachment logging
 }
 
 /**
