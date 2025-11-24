@@ -18,7 +18,6 @@ import {
   animationDebugLog,
   animationDebugWarn,
   isAnimationDebugEnabled,
-  isPossessionRunnerEnabled,
 } from "../utils/debugFlags.js";
 import { getSceneStepLogger } from "./debugStepLogger.js";
 
@@ -39,8 +38,7 @@ const NON_STANDARD_RESULTS = new Set([
   "OPENING_TIP",
 ]);
 
-let normalizeTurnModulePromise = null;
-let possessionRunnerModulePromise = null;
+// PossessionRunner removed - using standard animation path only
 
 /**
  * Handle offensive rebound turns (putbacks and kickouts)
@@ -284,107 +282,7 @@ function isStandardHalfCourtPossession(turn = {}) {
   return true;
 }
 
-async function loadPossessionRunnerDependencies() {
-  if (!normalizeTurnModulePromise) {
-    normalizeTurnModulePromise = import("./possession/normalizeTurn.js");
-  }
-  if (!possessionRunnerModulePromise) {
-    possessionRunnerModulePromise = import("./possession/PossessionRunner.js");
-  }
-  const [normalizerModule, runnerModule] = await Promise.all([
-    normalizeTurnModulePromise,
-    possessionRunnerModulePromise,
-  ]);
-  const normalizeTurnFn =
-    normalizerModule?.normalizeTurn || normalizerModule?.default || null;
-  const PossessionRunnerClass =
-    runnerModule?.PossessionRunner || runnerModule?.default || null;
-  return { normalizeTurnFn, PossessionRunnerClass };
-}
-
-async function maybeRunPossession({
-  scene,
-  ballSprite,
-  playerSprites,
-  simData,
-  turn,
-  turnIndex,
-  possessionId,
-  debugEnabled,
-}) {
-  if (!isStandardHalfCourtPossession(turn)) {
-    return false;
-  }
-
-  try {
-  const { normalizeTurnFn, PossessionRunnerClass } =
-      await loadPossessionRunnerDependencies();
-    if (typeof normalizeTurnFn !== "function") return false;
-    if (typeof PossessionRunnerClass !== "function") return false;
-
-    const graph = normalizeTurnFn(turn, simData, { turnIndex });
-    if (!graph) return false;
-    if (graph?.context?.fastBreak) return false;
-
-    const frames = Array.isArray(graph?.timeline?.frames)
-      ? graph.timeline.frames
-      : [];
-    if (!frames.length) return false;
-
-    const homeTeamId =
-      simData?.home_team_id ?? simData?.homeTeamId ?? graph?.context?.homeTeamId ?? null;
-    const awayTeamId =
-      simData?.away_team_id ?? simData?.awayTeamId ?? graph?.context?.awayTeamId ?? null;
-    if (graph.context) {
-      if (typeof graph.context.homeTeamId === "undefined") {
-        graph.context.homeTeamId = homeTeamId;
-      }
-      if (typeof graph.context.awayTeamId === "undefined") {
-        graph.context.awayTeamId = awayTeamId;
-      }
-    }
-
-    if (graph.context) {
-      if (typeof graph.context.turnIndex === "undefined") {
-        graph.context.turnIndex = turnIndex;
-      }
-      if (typeof graph.context.possessionId === "undefined") {
-        graph.context.possessionId = possessionId ?? null;
-      }
-    }
-
-    const runner = new PossessionRunnerClass({
-      scene,
-      ballSprite,
-      playerSprites,
-      graph,
-      config: {
-        turnIndex,
-        homeTeamId,
-        awayTeamId,
-      },
-    });
-    await runner.run();
-
-    if (debugEnabled) {
-      const parts = [`Turn ${turnIndex + 1}`];
-      const resultType = graph.context?.resultType || getResultType(turn);
-      if (resultType) parts.push(`result=${resultType}`);
-      if (possessionId != null) parts.push(`possession=${possessionId}`);
-      animationDebugLog(
-        `ANIM: PossessionRunner handled ${parts.join(" ")}`
-      );
-    }
-
-    return true;
-  } catch (error) {
-    animationDebugWarn(
-      "PossessionRunner failed, falling back to legacy animation",
-      error
-    );
-    return false;
-  }
-}
+// PossessionRunner functions removed - using standard animation path only
 
 function annotateFreeThrowTurns(turns = []) {
   let group = null;
@@ -582,9 +480,7 @@ export async function animateGameTurns({ //hasBallAtStep
     const possessionId =
       turn.possession_id ?? turn.possessionId ?? turn.possessionID ?? null;
     const shouldLogLegacySteps =
-      debugEnabled &&
-      stepLogger &&
-      (!isPossessionRunnerEnabled() || !isStandardHalfCourtPossession(turn));
+      debugEnabled && stepLogger;
 
     if (shouldLogLegacySteps) {
       const maxSteps = Math.max(
@@ -995,20 +891,8 @@ export async function animateGameTurns({ //hasBallAtStep
 
     const shooterId = playerMap[shooterName];
 
-    const handledByRunner =
-      isPossessionRunnerEnabled() &&
-      (await maybeRunPossession({
-        scene,
-        ballSprite,
-        playerSprites,
-        simData,
-        turn,
-        turnIndex: i,
-        possessionId,
-        debugEnabled,
-      }));
-
-    if (!handledByRunner) {
+    // PossessionRunner removed - always use standard animation path
+    {
       // ✅ Debug log for HCO turns after Fast Break defensive stop
       const previousTurn = i > 0 ? turns[i - 1] : null;
       const wasDefensiveStop = previousTurn?.result_type === "DEFENSIVE_STOP" && previousTurn?.fast_break === true;

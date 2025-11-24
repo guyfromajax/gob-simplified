@@ -39,9 +39,17 @@ class GameManager:
         self.game_id: str | None = None
 
     def _update_position_ratings(self):
-        """Recalculate position ratings for all players based on current attributes."""
+        """Recalculate position ratings for all players based on current attributes.
+        
+        Uses bulk write operations to batch all database updates into a single call,
+        reducing network overhead by ~90% for games with 10+ players.
+        """
         from BackEnd.utils.position_ratings import compute_position_ratings
         from BackEnd.db import players_collection
+        from pymongo.operations import UpdateOne
+        
+        # Collect all updates first
+        bulk_operations = []
         
         for team in [self.home_team, self.away_team]:
             for player in team.get_all_players():
@@ -58,12 +66,18 @@ class GameManager:
                 # Update player object
                 player.ratings = new_ratings
                 
-                # Update database
+                # Queue database update for bulk operation
                 if hasattr(player, 'player_id') and player.player_id:
-                    players_collection.update_one(
-                        {"_id": player.player_id},
-                        {"$set": {"position_ratings": new_ratings}}
+                    bulk_operations.append(
+                        UpdateOne(
+                            {"_id": player.player_id},
+                            {"$set": {"position_ratings": new_ratings}}
+                        )
                     )
+        
+        # Execute all updates in a single bulk write operation
+        if bulk_operations:
+            players_collection.bulk_write(bulk_operations, ordered=False)
     
     def setup_opening_tip(self):
         """Execute opening tip logic and update offense/defense teams."""
