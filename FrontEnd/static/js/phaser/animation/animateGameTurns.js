@@ -474,15 +474,6 @@ export async function animateGameTurns({ //hasBallAtStep
     });
   };
 
-  const logVerbose = (...args) => {
-    if (isAnimationDebugEnabled()) {
-      animationDebugLog(...args);
-      return;
-    }
-    if (DEBUG_FLOW) {
-      console.log(...args);
-    }
-  };
   if (DEBUG_FLOW || debugEnabled) {
     const stepCount = turns.reduce((acc, t) => {
       const turnSteps = (t.animations || []).reduce(
