@@ -97,7 +97,12 @@ export class BallController {
     }
 
     if (this.isInFlight) {
-      console.warn('BallController: Cannot attach - ball is in flight');
+      // Only log in debug mode - this is expected behavior during passes/shots
+      if (this.debug) {
+        console.warn('BallController: Cannot attach - ball is in flight', {
+          reason: this.reason
+        });
+      }
       return false;
     }
     
@@ -168,13 +173,7 @@ export class BallController {
     // Notify callbacks
     this.notifyAttachmentCallbacks(previousOwner, playerSprite, options);
 
-    if (this.debug) {
-      console.log('BallController: Ball attached to player', {
-        playerId: playerSprite.playerId,
-        team: playerSprite.team,
-        position: { x: this.ballSprite.x, y: this.ballSprite.y }
-      });
-    }
+    // Removed verbose attachment logging - only log in debug mode if needed
 
     return true;
   }
@@ -217,13 +216,7 @@ export class BallController {
     // Notify callbacks
     this.notifyDetachmentCallbacks(previousOwner, reason, options);
 
-    if (this.debug) {
-      console.log('BallController: Ball detached from player', {
-        previousOwner: previousOwner?.playerId,
-        reason,
-        position: { x: this.ballSprite.x, y: this.ballSprite.y }
-      });
-    }
+    // Removed verbose detachment logging - only log in debug mode if needed
 
     return true;
   }
@@ -239,12 +232,7 @@ export class BallController {
 
     this.pendingOwner = playerSprite;
 
-    if (this.debug) {
-      console.log('BallController: Pending owner set', {
-        playerId: playerSprite.playerId,
-        team: playerSprite.team
-      });
-    }
+    // Removed verbose pending owner logging
 
     return true;
   }
@@ -285,13 +273,7 @@ export class BallController {
     // Show ball if it was hidden
     this.ballSprite.setVisible(true);
 
-    if (this.debug) {
-      console.log('BallController: Ball flight started', {
-        from: this.lastPosition,
-        to: targetPosition,
-        currentOwner: this.currentOwner?.playerId
-      });
-    }
+    // Removed verbose flight start logging
 
     return true;
   }
@@ -325,12 +307,7 @@ export class BallController {
     }
     // If keepVisible is true, leave ball visible at current position
 
-    if (this.debug) {
-      console.log('BallController: Ball flight ended', {
-        newOwner: newOwner?.playerId,
-        position: { x: this.ballSprite.x, y: this.ballSprite.y }
-      });
-    }
+    // Removed verbose flight end logging
 
     return true;
   }
@@ -388,12 +365,7 @@ export class BallController {
       this.scene.events.on('update', this.followCallback);
     }
 
-    if (this.debug) {
-      console.log('BallController: Started following player', {
-        playerId: playerSprite.playerId,
-        offset: this.followOffset
-      });
-    }
+    // Removed verbose following start logging
   }
 
   /**
@@ -408,9 +380,7 @@ export class BallController {
     this.followOffset = null;
     this.followCallback = null;
 
-    if (this.debug) {
-      console.log('BallController: Stopped following player');
-    }
+    // Removed verbose following stop logging
   }
 
   /**
@@ -661,12 +631,7 @@ export class BallController {
     }
     this.scene.gameState.ballHolder = playerId || null;
     
-    if (this.debug) {
-      console.log('BallController: Set ball holder ID', {
-        playerId,
-        currentOwnerId: this.getCurrentOwnerId()
-      });
-    }
+    // Removed verbose ball holder ID logging
   }
 
   /**
@@ -676,9 +641,7 @@ export class BallController {
     if (this.scene && this.scene.gameState) {
       this.scene.gameState.ballHolder = null;
       
-      if (this.debug) {
-        console.log('BallController: Cleared ball holder ID');
-      }
+      // Removed verbose clear ball holder ID logging
     }
   }
 
@@ -841,12 +804,7 @@ export class BallController {
       this.stateHistory = this.stateHistory.slice(-50);
     }
 
-    if (this.debug) {
-      console.log('BallController: onShotEnd', {
-        previousReason,
-        previousState: this.previousState
-      });
-    }
+    // Removed verbose lifecycle logging
   }
 
   /**
@@ -899,13 +857,7 @@ export class BallController {
       this.stateHistory = this.stateHistory.slice(-50);
     }
 
-    if (this.debug) {
-      console.log('BallController: onPassStart', {
-        passerId,
-        receiverId,
-        previousState: this.previousState
-      });
-    }
+    // Removed verbose lifecycle logging
   }
 
   /**
@@ -961,13 +913,7 @@ export class BallController {
       this.stateHistory = this.stateHistory.slice(-50);
     }
 
-    if (this.debug) {
-      console.log('BallController: onPassEnd', {
-        receiverId: receiverSprite?.playerId || null,
-        previousReason,
-        previousState: this.previousState
-      });
-    }
+    // Removed verbose lifecycle logging
   }
 
   /**
