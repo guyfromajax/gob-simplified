@@ -106,7 +106,7 @@ class TeamManager:
             "outside": random.randint(1, 4),
             "tempo": random.randint(0, 4),
             "play_calling": random.randint(0, 4),
-            "defense": random.randint(0, 4),
+            "defense": 2,  # Hardcoded to 2 for testing (50/50 man/zone mix)
             "aggression": random.randint(0, 4),
             "hc_trap": random.randint(0, 4),
             "fc_press": random.randint(0, 4),
