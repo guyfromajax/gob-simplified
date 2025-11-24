@@ -1423,8 +1423,7 @@ def calculate_defender_coords(
     aggression_level: str,
     spot: str = "key",
     ball_handler_coords: dict = None,
-    is_ball_handler: bool = False,
-    is_away_offense: bool = False
+    is_ball_handler: bool = False
 ) -> dict:
     """
     Calculate defender coordinates for any defensive scenario.
@@ -1452,32 +1451,36 @@ def calculate_defender_coords(
     
     if is_ball_handler:
         # BH DEFENDER: Always closer to basket than ball handler
-        # Match the old function's x_direction logic exactly for consistency
-        # The old function uses is_away_offense to determine direction:
-        # - When AWAY team has ball: defender to LEFT (x_direction = -1)
-        # - When HOME team has ball: defender to RIGHT (x_direction = +1)
-        # Use is_away_offense parameter directly (passed from wrapper)
-        # NOTE: The wrapper handles coordinate flipping, so we need to account for that
-        # When away offense: wrapper flips coords to home orientation, calculates, then flips back
-        # So x_direction needs to be REVERSED for away offense to account for the flip
-        if is_away_offense:
-            x_direction = 1   # Away offense: defender to RIGHT in home orientation (becomes LEFT after flip)
-        else:
-            x_direction = 1   # Home offense: defender to RIGHT in home orientation
+        # Pure geometric calculation - no flags, no special cases
+        # Calculate direction vector from offensive player to basket
+        dx = basket_x - ox  # Positive = toward basket (right), Negative = away from basket (left)
+        dy = basket_y - oy  # Positive = toward basket (down), Negative = away from basket (up)
         
-        # Y direction: toward the basket (same as old function)
-        y_direction = -1 if oy > 25 else 1
+        # Normalize direction (unit vector)
+        distance_to_basket = ((dx ** 2) + (dy ** 2)) ** 0.5
+        if distance_to_basket == 0:
+            # Offensive player is at basket (edge case)
+            unit_x = 0
+            unit_y = 0
+        else:
+            unit_x = dx / distance_to_basket
+            unit_y = dy / distance_to_basket
         
         # Get spacing based on aggression
         spacing = get_spacing(aggression_level, is_ball_handler=True)
         
-        # Apply spot-specific positioning (matching old function logic)
+        # Calculate base defender position: move toward basket by spacing amount
+        def_x = ox + (unit_x * spacing)
+        def_y = oy + (unit_y * spacing)
+        
+        # Apply spot-specific positioning
         if spot == "key":
-            def_x = ox + (x_direction * spacing)
+            # Keep geometric calculation, just add small Y variation
             def_y = oy + random.randint(-1, 1)
         elif spot in ["lower wing", "upper wing", "lower midwing", "upper midwing"]:
-            def_x = ox + (x_direction * spacing)
-            def_y = oy + random.randint(2, 4) * y_direction
+            # Keep geometric X, adjust Y toward basket
+            def_x = ox + (unit_x * spacing)
+            def_y = oy + random.randint(2, 4) * (1 if unit_y > 0 else -1)
         elif spot in ["lower corner", "upper corner", "lower midBaseline", "upper midBaseline", 
                       "lower midcorner", "upper midcorner"]:
             # X position: Defender's x should equal ball handler's x
@@ -1594,12 +1597,15 @@ def get_defender_coords(
         # Returns coords in away orientation (automatically flipped)
     """
     # Determine target basket based on which team is on offense
+    # User clarification:
+    # - Home team on offense: basket at x=90 (HOME basket)
+    # - Away team on offense: basket at x=10 (AWAY basket)
     if is_away_offense:
-        # Away team attacking home basket (x=90 in home orientation)
-        target_basket = HOME_RIM_COORDS
-    else:
-        # Home team attacking away basket (x=10 in home orientation)
+        # Away team attacking AWAY basket (x=10 in home orientation)
         target_basket = AWAY_RIM_COORDS
+    else:
+        # Home team attacking HOME basket (x=90 in home orientation)
+        target_basket = HOME_RIM_COORDS
     
     # Convert offensive coords to HOME orientation for calculation
     if is_away_offense:
@@ -1621,20 +1627,41 @@ def get_defender_coords(
         ball_handler_coords_home = None
     
     # Calculate defender position in HOME orientation
+    # Core function uses pure geometric calculation
     defender_coords_home = calculate_defender_coords(
         offensive_coords_home,
         target_basket,
         aggression_level,
         spot,
         ball_handler_coords_home,
-        is_ball_handler,
-        is_away_offense  # Pass is_away_offense directly
+        is_ball_handler
     )
     
     # Convert result back to original orientation
     if is_away_offense:
-        # Return coords in away orientation (flip back)
-        return get_away_player_coords(defender_coords_home)
+        # For away offense: coordinate flip inverts relative positioning
+        # Geometric calculation gives correct position in home orientation,
+        # but after flipping, defender ends up on wrong side.
+        # Solution: Check if defender is on correct side in away orientation,
+        # and if not, invert the x position in home orientation before flipping.
+        defender_coords_away = get_away_player_coords(defender_coords_home)
+        offensive_coords_away = get_away_player_coords(offensive_coords_home)
+        
+        # For away offense, defender should be LEFT (x < offensive x) in away orientation
+        if defender_coords_away["x"] > offensive_coords_away["x"]:
+            # Defender is on wrong side - invert x position in home orientation
+            distance_from_bh = abs(defender_coords_home["x"] - offensive_coords_home["x"])
+            if defender_coords_home["x"] < offensive_coords_home["x"]:
+                # Currently left, move to right
+                defender_coords_home["x"] = offensive_coords_home["x"] + distance_from_bh
+            else:
+                # Currently right, move to left
+                defender_coords_home["x"] = offensive_coords_home["x"] - distance_from_bh
+            # Re-flip to get correct away orientation result
+            return get_away_player_coords(defender_coords_home)
+        else:
+            # Defender is on correct side
+            return defender_coords_away
     else:
         # Return coords in home orientation (no flip needed)
         return defender_coords_home
