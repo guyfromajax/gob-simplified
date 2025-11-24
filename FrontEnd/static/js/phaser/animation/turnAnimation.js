@@ -134,75 +134,29 @@ function getBallDuration(ballSprite, targetX, targetY) {
  * Centralized ball ownership logic
  * Assigns the ball to the correct player for the current stepIndex
  */
+/**
+ * Update ball ownership (step-index based)
+ * Delegates to unified updateBallOwnership function
+ * @param {Object} options
+ * @param {Phaser.Scene} options.scene
+ * @param {Phaser.GameObjects.Sprite} options.ballSprite
+ * @param {Array} options.animations
+ * @param {Object} options.playerSprites
+ * @param {number} options.stepIndex
+ * @param {string} [options.offenseTeamId]
+ * @param {Object} [options.currentBallOwnerRef]
+ */
 async function updateBallOwnership({ scene, ballSprite, animations, playerSprites, stepIndex, offenseTeamId, currentBallOwnerRef }) {
-  if (scene?.skipToEnd || scene?.stateMachine?.is(States.FastBreak)) return;
-
-  if (scene.passInFlight) return;
-
-  // ✅ PHASE 4: Check BallController state instead of old ballDetached flag
-  const { getBallController } = await import('./BallControllerAdapter.js');
-  const ballController = getBallController();
-  if (ballController && !ballController.isAttached && !ballController.isInFlight) {
-    if (PASS_DEBUG) animationDebugLog('ownershipSkipped', { stepIndex });
-    return;
-  }
-
-  const pendingId = getPendingOwner(scene);
-  if (pendingId != null) {
-    const pendingSprite = playerSprites[pendingId];
-    if (pendingSprite && ballSprite?.setPosition) {
-      ballSprite.setPosition(pendingSprite.x, pendingSprite.y);
-      ballSprite.setVisible(true);
-      if (currentBallOwnerRef) currentBallOwnerRef.value = pendingSprite;
-      setCurrentOwner(scene, pendingId);
-      
-      // ✅ NEW (Step 1): Also update simple ball holder state for pending owner
-      setBallHolderId(scene, pendingId);
-      
-      if (PASS_DEBUG) animationDebugLog('ownershipUpdate', { target: pendingId, stepIndex });
-    } else {
-      animationDebugWarn(`Missing sprite for pending ball owner ${pendingId}`);
-      const fallback = currentBallOwnerRef?.value;
-      if (fallback && ballSprite?.setPosition) {
-        ballSprite.setPosition(fallback.x, fallback.y);
-      } else if (ballSprite?.setVisible) {
-        ballSprite.setVisible(false);
-      }
-    }
-    clearPendingOwner(scene);
-    return;
-  }
-
-  const passHappening = animations.some(
-    anim => anim.movement?.[stepIndex]?.action === "pass"
-  );
-  if (passHappening) return;
-
-  for (const anim of animations) {
-    if (scene.skipToEnd) break;
-    const sprite = playerSprites[anim.playerId];
-    const hasBall = anim.hasBallAtStep?.[stepIndex];
-    if (hasBall && !sprite) {
-      animationDebugWarn(`Missing sprite for player ${anim.playerId}`);
-      if (ballSprite?.setVisible) ballSprite.setVisible(false);
-      continue;
-    }
-    if (hasBall && sprite && ballSprite?.setPosition) {
-      ballSprite.setPosition(sprite.x, sprite.y);
-      ballSprite.setVisible(true);
-      if (currentBallOwnerRef) currentBallOwnerRef.value = sprite;
-      
-      // ✅ NEW (Step 1): Also update simple ball holder state for non-pass scenarios
-      // (Passes are not migrated yet, so they won't reach this code due to early return above)
-      if (sprite.playerId) {
-        setBallHolderId(scene, sprite.playerId);
-      }
-      
-      if (PASS_DEBUG) animationDebugLog('ownershipUpdate', { target: anim.playerId, stepIndex });
-      break;
-    }
-
-  }
+  const { updateBallOwnership: unifiedUpdate } = await import('./BallControllerAdapter.js');
+  return unifiedUpdate({
+    scene,
+    ballSprite,
+    animations,
+    playerSprites,
+    stepIndex,
+    offenseTeamId,
+    currentBallOwnerRef
+  });
 }
 
 /**

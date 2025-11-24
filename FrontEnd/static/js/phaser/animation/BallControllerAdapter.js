@@ -353,10 +353,180 @@ export {
   setPendingOwner,
   clearPendingOwner,
   cancelBallTween,
+  updateBallOwnership,
   synchronizeBallState,
   initializeBallController,
   getBallController
 };
+
+/**
+ * Unified ball ownership update function
+ * Handles both timestamp-based and step-index-based updates
+ * 
+ * This function consolidates the three different updateBallOwnership implementations:
+ * - ballManager.js: Timestamp-based lookup
+ * - turnAnimation.js: Step-index based with pending owner handling
+ * - ShotAnimationSystem.js: Step-index based with BallController direct usage
+ * 
+ * @param {Object} options
+ * @param {Phaser.Scene} options.scene
+ * @param {Phaser.GameObjects.Sprite} options.ballSprite
+ * @param {Array} options.animations - Player animation data
+ * @param {Object} options.playerSprites - Map of playerId -> sprite
+ * @param {Object} [options.currentBallOwnerRef] - Reference object for current owner
+ * @param {number} [options.stepIndex] - Step index (if provided, uses this)
+ * @param {number} [options.currentTimestamp] - Timestamp in ms (if provided, calculates stepIndex)
+ * @param {string} [options.offenseTeamId] - Offense team ID
+ * @returns {Promise<void>}
+ */
+export async function updateBallOwnership(options) {
+  const {
+    scene,
+    ballSprite,
+    animations,
+    playerSprites,
+    currentBallOwnerRef,
+    stepIndex: providedStepIndex,
+    currentTimestamp,
+    offenseTeamId
+  } = options;
+
+  // Early returns
+  if (scene?.skipToEnd || scene?.stateMachine?.is?.('FastBreak')) return;
+  if (scene.passInFlight) return;
+
+  // Get BallController
+  const ballController = getBallController();
+  if (ballController && !ballController.isAttached && !ballController.isInFlight) {
+    return; // Ball is detached and not in flight, skip update
+  }
+
+  // Calculate stepIndex if timestamp provided
+  let stepIndex = providedStepIndex;
+  if (currentTimestamp !== undefined && stepIndex === undefined) {
+    stepIndex = calculateStepIndexFromTimestamp(animations, currentTimestamp);
+  }
+
+  // Handle pending owner first (from turnAnimation.js logic)
+  const pendingId = getPendingOwner(scene);
+  if (pendingId != null) {
+    const pendingSprite = playerSprites[pendingId];
+    if (pendingSprite) {
+      // Update ball position
+      if (ballSprite?.setPosition) {
+        ballSprite.setPosition(pendingSprite.x, pendingSprite.y);
+        ballSprite.setVisible(true);
+      }
+      
+      // Update references
+      if (currentBallOwnerRef) {
+        currentBallOwnerRef.value = pendingSprite;
+      }
+      
+      // Update BallController state
+      setCurrentOwner(scene, pendingId);
+      
+      // Update WIP_GOB ball holder state
+      const { setBallHolderId } = await import('./ballAnimationSimple.js');
+      setBallHolderId(scene, pendingId);
+      
+      // Clear pending owner
+      clearPendingOwner(scene);
+    }
+    return;
+  }
+
+  // Check if pass is happening at this step (from turnAnimation.js logic)
+  if (stepIndex !== undefined) {
+    const passHappening = animations.some(
+      anim => anim.movement?.[stepIndex]?.action === "pass"
+    );
+    if (passHappening) return;
+  }
+
+  // Find player who should have ball at this step (unified logic)
+  for (const anim of animations) {
+    if (!anim.hasBallAtStep) continue;
+    
+    let hasBall = false;
+    
+    if (stepIndex !== undefined) {
+      // Step-index based (turnAnimation.js, ShotAnimationSystem.js)
+      hasBall = anim.hasBallAtStep[stepIndex];
+    } else if (currentTimestamp !== undefined) {
+      // Timestamp-based (ballManager.js)
+      if (!anim.movement || !anim.movement.length) continue;
+      
+      // Find step index from timestamp
+      let calculatedStepIndex = 0;
+      while (
+        calculatedStepIndex < anim.movement.length - 1 &&
+        currentTimestamp >= anim.movement[calculatedStepIndex + 1].timestamp
+      ) {
+        calculatedStepIndex++;
+      }
+      hasBall = anim.hasBallAtStep[calculatedStepIndex];
+    } else {
+      // No step index or timestamp provided - skip
+      continue;
+    }
+    
+    if (hasBall) {
+      const playerSprite = playerSprites[anim.playerId];
+      if (!playerSprite) {
+        if (ballSprite?.setVisible) ballSprite.setVisible(false);
+        continue;
+      }
+      
+      // Update ball position
+      if (ballSprite?.setPosition) {
+        ballSprite.setPosition(playerSprite.x, playerSprite.y);
+        ballSprite.setVisible(true);
+      }
+      
+      // Update references
+      if (currentBallOwnerRef) {
+        currentBallOwnerRef.value = playerSprite;
+      }
+      
+      // Attach ball using BallController (unified approach)
+      attachBallToPlayer(scene, ballSprite, playerSprite);
+      
+      // Update WIP_GOB ball holder state
+      if (playerSprite.playerId) {
+        const { setBallHolderId } = await import('./ballAnimationSimple.js');
+        setBallHolderId(scene, playerSprite.playerId);
+      }
+      
+      break; // Only one player can have the ball
+    }
+  }
+}
+
+/**
+ * Calculate step index from timestamp (helper for timestamp-based updates)
+ * @param {Array} animations - Player animation data
+ * @param {number} timestamp - Timestamp in ms
+ * @returns {number} Step index
+ */
+function calculateStepIndexFromTimestamp(animations, timestamp) {
+  for (const anim of animations) {
+    if (!anim.movement || !anim.movement.length) continue;
+    
+    let stepIndex = 0;
+    while (
+      stepIndex < anim.movement.length - 1 &&
+      timestamp >= anim.movement[stepIndex + 1].timestamp
+    ) {
+      stepIndex++;
+    }
+    
+    if (anim.hasBallAtStep?.[stepIndex]) {
+      return stepIndex;
+    }
+  }
+  return 0; // Default to first step
+}
 
 // Default export for backward compatibility
 export default {
@@ -370,6 +540,7 @@ export default {
   setPendingOwner,
   clearPendingOwner,
   cancelBallTween,
+  updateBallOwnership,
   initializeBallController,
   getBallController
 };

@@ -1166,28 +1166,24 @@ export function animateKickoutReset(
  * @param {Object} playerSprites - Map of playerId → Phaser sprite
  * @param {number} currentTimestamp - The current animation timestamp (ms)
  */
-export function updateBallOwnership(scene, ballSprite, animations, playerSprites, currentTimestamp) {
-  for (const anim of animations) {
-    const { playerId, hasBallAtStep, movement } = anim;
-    if (!hasBallAtStep || !movement || !movement.length) continue;
-
-    // Find current step index based on timestamp
-    let stepIndex = 0;
-    while (
-      stepIndex < movement.length - 1 &&
-      currentTimestamp >= movement[stepIndex + 1].timestamp
-    ) {
-      stepIndex++;
-    }
-
-    if (hasBallAtStep[stepIndex]) {
-      const playerSprite = playerSprites[playerId];
-      if (playerSprite) {
-        attachBallToPlayer(scene, ballSprite, playerSprite);
-      }
-      break; // Only one player can have the ball
-    }
-  }
+/**
+ * Update ball ownership (timestamp-based)
+ * Delegates to unified updateBallOwnership function
+ * @param {Phaser.Scene} scene
+ * @param {Phaser.GameObjects.Sprite} ballSprite
+ * @param {Array} animations
+ * @param {Object} playerSprites
+ * @param {number} currentTimestamp
+ */
+export async function updateBallOwnership(scene, ballSprite, animations, playerSprites, currentTimestamp) {
+  const { updateBallOwnership: unifiedUpdate } = await import('./BallControllerAdapter.js');
+  return unifiedUpdate({
+    scene,
+    ballSprite,
+    animations,
+    playerSprites,
+    currentTimestamp
+  });
 }
 
 

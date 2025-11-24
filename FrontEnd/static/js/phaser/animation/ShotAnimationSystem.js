@@ -277,26 +277,18 @@ export class ShotAnimationSystem {
   
   /**
    * Update ball ownership for a specific step
+   * Delegates to unified updateBallOwnership function
    */
-  updateBallOwnership(turnData, ballSprite, currentBallOwnerRef, stepIndex) {
-    // Find who should have the ball at this step
-    for (const anim of turnData.animations) {
-      if (anim.hasBallAtStep?.[stepIndex]) {
-        const newOwnerSprite = this.playerSprites[anim.playerId];
-        if (newOwnerSprite && newOwnerSprite !== currentBallOwnerRef.value) {
-          console.log('🔄 ShotAnimationSystem: Transferring ball ownership', {
-            from: currentBallOwnerRef.value?.playerId || 'none',
-            to: anim.playerId,
-            stepIndex
-          });
-          
-          // Transfer ball to new owner using BallController
-          this.ballController.attachToPlayer(newOwnerSprite);
-          currentBallOwnerRef.value = newOwnerSprite;
-        }
-        break;
-      }
-    }
+  async updateBallOwnership(turnData, ballSprite, currentBallOwnerRef, stepIndex) {
+    const { updateBallOwnership: unifiedUpdate } = await import('./BallControllerAdapter.js');
+    return unifiedUpdate({
+      scene: this.scene,
+      ballSprite,
+      animations: turnData.animations,
+      playerSprites: this.playerSprites,
+      stepIndex,
+      currentBallOwnerRef
+    });
   }
   
   /**
