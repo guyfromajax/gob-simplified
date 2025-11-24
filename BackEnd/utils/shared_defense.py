@@ -1435,7 +1435,8 @@ def calculate_defender_coords(
     aggression_level: str,
     spot: str = "key",
     ball_handler_coords: dict = None,
-    is_ball_handler: bool = False
+    is_ball_handler: bool = False,
+    ball_spot: str = None  # For non-BH defenders: ball handler's spot
 ) -> dict:
     """
     Calculate defender coordinates for any defensive scenario.
@@ -1444,6 +1445,7 @@ def calculate_defender_coords(
     - For BH defenders: Defender is always positioned closer to the basket than the ball handler.
     - For non-BH defenders: Defender is positioned relative to their assignment and ball handler,
       maintaining proper spacing, but may not always be closer to basket.
+      Non-BH defenders require ball_spot parameter for complex positioning logic.
     
     Args:
         offensive_coords: Offensive player coordinates in HOME orientation
@@ -1513,42 +1515,159 @@ def calculate_defender_coords(
         
     else:
         # NON-BH DEFENDER: Position relative to assignment and ball handler
+        # Use the full complex logic from assign_non_bh_defender_coords
+        # This requires both ball_spot and o_spot (spot parameter)
         bx = ball_handler_coords["x"] if ball_handler_coords else ox
         by = ball_handler_coords["y"] if ball_handler_coords else oy
         
-        # EDGE CASE 1: Post defenders (low/medium post)
-        # Offensive player is very close to basket, defender must stay tight (closer to player)
-        # rather than being in standard help defense position
-        if spot in ["lower lowPost", "upper lowPost", "lower midPost", "upper midPost"]:
-            # Tight defense: defender stays very close to offensive player
-            # X position: defender on basket side of offensive player
-            # Determine basket direction from target_basket
-            def_x = ox + 2 if basket_x > ox else ox - 2
-            # Y position: slight adjustment based on ball handler
-            y_direction = -1 if oy > 25 else 1
-            def_y = oy + random.choice([0.3, 0.4, 0.5]) * (abs(by - oy) * y_direction)
+        # Determine is_away_offense from target_basket
+        # If target_basket is HOME_RIM_COORDS, away team is on offense (defending home basket)
+        # If target_basket is AWAY_RIM_COORDS, home team is on offense (defending away basket)
+        is_away_offense_calc = (target_basket == HOME_RIM_COORDS)
         
-        # EDGE CASE 2: Corner locations for non-BH defenders
-        elif spot in ["lower corner", "upper corner", "lower midBaseline", "upper midBaseline",
-                      "lower midcorner", "upper midcorner"]:
-            # Upper corner: defender's y must be LOWER (defender below offensive player)
-            if "upper" in spot:
-                def_y = oy - random.randint(2, 4)  # Defender below (lower y value)
-            # Lower corner: defender's y must be HIGHER (defender above offensive player)
-            elif "lower" in spot:
-                def_y = oy + random.randint(2, 4)  # Defender above (higher y value)
-            
-            # X position: relative to ball handler and offensive player
-            x_direction = 1 if bx > ox else -1
-            def_x = ox + 0.1 * (abs(bx - ox) * x_direction)
+        # Calculate directions (matching old function logic)
+        y_direction = -1 if oy > 25 else 1
+        x_direction = 1 if bx > ox else -1
+        basket_direction = -1 if is_away_offense_calc else 1
         
-        # Standard non-BH defender positioning
+        # Use ball_spot if provided, otherwise default to "key"
+        ball_spot_used = ball_spot if ball_spot else "key"
+        o_spot_used = spot
+        
+        # PHASE 4: Implement full non-BH defender logic from assign_non_bh_defender_coords
+        # This is the complex logic based on ball_spot and o_spot combinations
+        if ball_spot_used == "key":
+            if o_spot_used in ["lower corner", "upper corner", "lower baseline", "upper baseline"]:
+                def_x = ox + 0.1 * (abs(bx - ox) * x_direction)
+                def_y = oy + 0.4 * (abs(by - oy) * y_direction)
+            elif o_spot_used in ["lower wing", "upper wing", "lower midwing", "upper midwing", "lower midCorner", "upper midCorner"]:
+                def_x = ox + (random.randint(1, 4) * x_direction)
+                def_y = oy + random.choice([0.3, 0.4, 0.5]) * (abs(by - oy) * y_direction)
+            elif o_spot_used in ["lower midcorner", "upper midcorner"]:
+                def_x = ox
+                def_y = oy + random.choice([0.3, 0.4, 0.5]) * (abs(by - oy) * y_direction)
+            elif o_spot_used in ["lower lowPost", "upper lowPost", "lower midPost", "upper midPost"]:
+                def_x = ox - 2 if is_away_offense_calc else ox + 2
+                def_y = oy + random.choice([0.3, 0.4, 0.5]) * (abs(by - oy) * y_direction)
+            else:
+                def_x = ox + 0.5 * (abs(bx - ox) * x_direction)
+                def_y = oy + 0.5 * (abs(by - oy) * y_direction)
+        elif ball_spot_used in ["lower wing", "lower midWing", "lower midCorner"]:
+            if o_spot_used in ["lower corner", "lower midCorner", "lower wing", "lower midWing", "lower baseline"]:
+                if is_away_offense_calc:
+                    if bx < ox:
+                        def_x = ox - (abs(bx - ox) * 0.5)
+                        def_y = oy + (random.randint(3, 5) * y_direction)
+                    else:
+                        def_x = ox + random.randint(0, 1)
+                        def_y = oy + (random.randint(3, 5) * y_direction)
+                else:
+                    if bx > ox:
+                        def_x = bx + random.randint(-1, 1)
+                        def_y = oy + (random.randint(3, 5) * y_direction)
+                    else:
+                        def_x = ox + random.randint(-1, 1)
+                        def_y = oy + (random.randint(3, 5) * y_direction)
+            elif o_spot_used in ["upper corner", "upper midCorner", "upper wing", "upper midWing", "upper baseline"]:
+                if is_away_offense_calc:
+                    if bx < ox:
+                        def_x = ox - (abs(bx - ox) * 0.5)
+                        def_y = oy + ((abs(by - oy) * 0.5) * y_direction)
+                    else:
+                        def_x = ox + (abs(bx - ox) * 0.5)
+                        def_y = oy + ((abs(by - oy) * 0.5) * y_direction)
+                else:
+                    if bx > ox:
+                        def_x = ox + (abs(bx - ox) * 0.5)
+                        def_y = oy + (random.randint(3, 5) * y_direction)
+                    else:
+                        def_x = ox + random.randint(-1, 1)
+                        def_y = oy + (random.randint(3, 5) * y_direction)
+            elif o_spot_used in ["lower lowPost", "upper lowPost", "lower midPost", "upper midPost"]:
+                def_x = ox - 2 if is_away_offense_calc else ox + 2
+                def_y = oy
+            else:
+                def_x = ox + 0.5 * (abs(bx - ox) * x_direction)
+                def_y = oy + 0.5 * (abs(by - oy) * y_direction)
+        elif ball_spot_used in ["upper wing", "upper midWing", "upper midCorner"]:
+            if o_spot_used in ["lower corner", "lower midCorner", "lower wing", "lower midWing", "lower baseline"]:
+                if is_away_offense_calc:
+                    if bx < ox:
+                        def_x = ox - (abs(bx - ox) * 0.5)
+                        def_y = oy + (random.randint(3, 5) * y_direction)
+                    else:
+                        def_x = ox + (abs(bx - ox) * 0.5)
+                        def_y = oy + (random.randint(3, 5) * y_direction)
+                else:
+                    if bx > ox:
+                        def_x = bx + random.randint(-1, 1)
+                        def_y = oy + (random.randint(3, 5) * y_direction)
+                    else:
+                        def_x = ox + random.randint(-1, 1)
+                        def_y = oy + (random.randint(3, 5) * y_direction)
+            elif o_spot_used in ["upper corner", "upper midCorner", "upper wing", "upper midWing", "upper baseline"]:
+                if is_away_offense_calc:
+                    if bx < ox:
+                        def_x = ox - (abs(bx - ox) * 0.5)
+                        def_y = oy + ((abs(by - oy) * 0.5) * y_direction)
+                    else:
+                        def_x = ox + random.randint(0, 1)
+                        def_y = oy + ((abs(by - oy) * 0.5) * y_direction)
+                else:
+                    if bx > ox:
+                        def_x = ox + random.randint(0, 1)
+                        def_y = oy + (random.randint(3, 5) * y_direction)
+                    else:
+                        def_x = ox + random.randint(-1, 1)
+                        def_y = oy + (random.randint(3, 5) * y_direction)
+            elif o_spot_used in ["lower lowPost", "upper lowPost", "lower midPost", "upper midPost"]:
+                def_x = ox - 2 if is_away_offense_calc else ox + 2
+                def_y = oy
+            else:
+                def_x = ox + 0.5 * (abs(bx - ox) * x_direction)
+                def_y = oy + 0.5 * (abs(by - oy) * y_direction)
+        elif ball_spot_used in ["lower corner", "upper corner", "lower midBaseline", "upper midBaseline"]:
+            if o_spot_used in ["upper corner", "lower baseline", "upper baseline"]:
+                def_x = ox + 0.1 * (abs(bx - ox) * x_direction)
+                def_y = oy + (5 * y_direction)
+            elif o_spot_used in ["lower wing", "upper wing", "lower midwing", "upper midwing", "lower midCorner", "upper midCorner"]:
+                def_x = ox + 0.5 * (abs(bx - ox) * x_direction)
+                def_y = oy + (4 * y_direction)
+            elif o_spot_used in ["lower lowPost", "upper lowPost", "lower midPost", "upper midPost"]:
+                def_x = ox - 2 if is_away_offense_calc else ox + 2
+                def_y = oy
+            else:
+                def_x = ox + 0.5 * (abs(bx - ox) * x_direction)
+                def_y = oy + 0.5 * (abs(by - oy) * y_direction)
+        elif ball_spot_used in ["lower lowpost", "upper lowpost", "lower midpost", "upper midpost", "midLane"]:
+            if o_spot_used in ["lower corner", "upper corner", "lower baseline", "upper baseline"]:
+                def_x = ox + 0.5 * (abs(bx - ox) * x_direction)
+                def_y = oy + 0.5 * (abs(by - oy) * y_direction)
+            elif o_spot_used in ["key", "lower wing", "upper wing", "lower midwing", "upper midwing", "lower midCorner", "upper midCorner"]:
+                def_x = ox + 0.5 * (abs(bx - ox) * x_direction)
+                def_y = oy + 0.5 * (abs(by - oy) * y_direction)
+            elif o_spot_used in ["lower lowPost", "upper lowPost", "lower midPost", "upper midPost"]:
+                def_x = ox - 2 if is_away_offense_calc else ox + 2
+                def_y = oy
+            else:
+                def_x = ox + 0.5 * (abs(bx - ox) * x_direction)
+                def_y = oy + 0.5 * (abs(by - oy) * y_direction)
+        elif ball_spot_used in ["lower highPost", "upper highPost"]:
+            if o_spot_used in ["lower corner", "upper corner", "lower baseline", "upper baseline"]:
+                def_x = ox + 0.5 * (abs(bx - ox) * x_direction)
+                def_y = oy + 0.5 * (abs(by - oy) * y_direction)
+            elif o_spot_used in ["lower wing", "upper wing", "lower midwing", "upper midwing", "lower midCorner", "upper midCorner"]:
+                def_x = ox + 0.5 * (abs(bx - ox) * x_direction)
+                def_y = oy + 0.5 * (abs(by - oy) * y_direction)
+            elif o_spot_used in ["lower lowPost", "upper lowPost", "lower midPost", "upper midPost"]:
+                def_x = ox - 2 if is_away_offense_calc else ox + 2
+                def_y = oy
+            else:
+                def_x = ox + 0.5 * (abs(bx - ox) * x_direction)
+                def_y = oy + 0.5 * (abs(by - oy) * y_direction)
         else:
-            # For now, use simplified relative positioning
-            # This will be enhanced in later phases with full logic from assign_non_bh_defender_coords
+            # Default fallback
             spacing = get_spacing(aggression_level, is_ball_handler=False)
-            x_direction = 1 if bx > ox else -1
-            y_direction = -1 if oy > 25 else 1
             def_x = ox + (spacing * x_direction)
             def_y = oy + (spacing * y_direction)
     
@@ -1561,7 +1680,8 @@ def get_defender_coords(
     aggression_level: str,
     spot: str = "key",
     ball_handler_coords: dict = None,
-    is_ball_handler: bool = False
+    is_ball_handler: bool = False,
+    ball_spot: str = None  # For non-BH defenders: ball handler's spot
 ) -> dict:
     """
     Public API for getting defender coordinates.
