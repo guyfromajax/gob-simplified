@@ -1,4 +1,5 @@
 import random
+from copy import deepcopy
 from BackEnd.db import teams_collection
 from BackEnd.utils.roster_loader import load_roster
 from BackEnd.models.player import Player
@@ -129,6 +130,50 @@ class TeamManager:
             "team_chemistry": random.randint(7,25)
         }
 
+    def _create_defense_structure_template(self):
+        """Create the standard defense structure template used by all defense types.
+        
+        Returns a dictionary with the standard structure for Man, 2-3 Zone, 3-2 Zone, and 1-3-1 Zone.
+        This eliminates code duplication and makes it easier to add new defense types.
+        """
+        return {
+            "used": 0,
+            "success": 0,
+            "effectiveness": 0.0,
+            "game_stats": {
+                "used": 0,
+                "success": 0,
+                "ev_scores": [],
+                "lean_scores": [],
+                "vs_motion": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
+                "vs_set": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
+                "vs_inside": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
+                "vs_attack": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
+                "vs_outside": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
+                "vs_motion_inside": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
+                "vs_motion_attack": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
+                "vs_motion_outside": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
+                "vs_set_inside": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
+                "vs_set_attack": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
+                "vs_set_outside": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []}
+            },
+            "season_stats": {
+                "used": 0,
+                "success": 0,
+                "vs_motion": {"attempts": 0, "success": 0},
+                "vs_set": {"attempts": 0, "success": 0},
+                "vs_inside": {"attempts": 0, "success": 0},
+                "vs_attack": {"attempts": 0, "success": 0},
+                "vs_outside": {"attempts": 0, "success": 0},
+                "vs_motion_inside": {"attempts": 0, "success": 0},
+                "vs_motion_attack": {"attempts": 0, "success": 0},
+                "vs_motion_outside": {"attempts": 0, "success": 0},
+                "vs_set_inside": {"attempts": 0, "success": 0},
+                "vs_set_attack": {"attempts": 0, "success": 0},
+                "vs_set_outside": {"attempts": 0, "success": 0}
+            }
+        }
+
     def _init_scouting_data(self):
         # Get actual play names from database
         play_names = []
@@ -139,6 +184,9 @@ class TeamManager:
         except Exception as e:
             print(f"⚠️ Could not load play names for scouting data: {e}")
             play_names = PLAYCALLS  # Fallback to constants
+        
+        # Create defense structure template (used by all defense types)
+        defense_template = self._create_defense_structure_template()
         
         # New playcall tracking structure
         return {
@@ -256,154 +304,13 @@ class TeamManager:
                 }
             },
             "defense": {
-                "Man": {
-                    "used": 0, 
-                    "success": 0, 
-                    "effectiveness": 0.0,
-                    "game_stats": {
-                        "used": 0, 
-                        "success": 0,
-                        "ev_scores": [],
-                        "lean_scores": [],
-                        "vs_motion": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
-                        "vs_set": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
-                        "vs_inside": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
-                        "vs_attack": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
-                        "vs_outside": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
-                        "vs_motion_inside": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
-                        "vs_motion_attack": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
-                        "vs_motion_outside": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
-                        "vs_set_inside": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
-                        "vs_set_attack": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
-                        "vs_set_outside": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []}
-                    }, 
-                    "season_stats": {
-                        "used": 0, 
-                        "success": 0,
-                        "vs_motion": {"attempts": 0, "success": 0},
-                        "vs_set": {"attempts": 0, "success": 0},
-                        "vs_inside": {"attempts": 0, "success": 0},
-                        "vs_attack": {"attempts": 0, "success": 0},
-                        "vs_outside": {"attempts": 0, "success": 0},
-                        "vs_motion_inside": {"attempts": 0, "success": 0},
-                        "vs_motion_attack": {"attempts": 0, "success": 0},
-                        "vs_motion_outside": {"attempts": 0, "success": 0},
-                        "vs_set_inside": {"attempts": 0, "success": 0},
-                        "vs_set_attack": {"attempts": 0, "success": 0},
-                        "vs_set_outside": {"attempts": 0, "success": 0}
-                    }
-                },
-                "2-3 Zone": {
-                    "used": 0, 
-                    "success": 0, 
-                    "effectiveness": 0.0,
-                    "game_stats": {
-                        "used": 0, 
-                        "success": 0,
-                        "ev_scores": [],
-                        "lean_scores": [],
-                        "vs_motion": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
-                        "vs_set": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
-                        "vs_inside": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
-                        "vs_attack": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
-                        "vs_outside": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
-                        "vs_motion_inside": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
-                        "vs_motion_attack": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
-                        "vs_motion_outside": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
-                        "vs_set_inside": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
-                        "vs_set_attack": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
-                        "vs_set_outside": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []}
-                    }, 
-                    "season_stats": {
-                        "used": 0, 
-                        "success": 0,
-                        "vs_motion": {"attempts": 0, "success": 0},
-                        "vs_set": {"attempts": 0, "success": 0},
-                        "vs_inside": {"attempts": 0, "success": 0},
-                        "vs_attack": {"attempts": 0, "success": 0},
-                        "vs_outside": {"attempts": 0, "success": 0},
-                        "vs_motion_inside": {"attempts": 0, "success": 0},
-                        "vs_motion_attack": {"attempts": 0, "success": 0},
-                        "vs_motion_outside": {"attempts": 0, "success": 0},
-                        "vs_set_inside": {"attempts": 0, "success": 0},
-                        "vs_set_attack": {"attempts": 0, "success": 0},
-                        "vs_set_outside": {"attempts": 0, "success": 0}
-                    }
-                },
-                "3-2 Zone": {
-                    "used": 0, 
-                    "success": 0, 
-                    "effectiveness": 0.0,
-                    "game_stats": {
-                        "used": 0, 
-                        "success": 0,
-                        "ev_scores": [],
-                        "lean_scores": [],
-                        "vs_motion": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
-                        "vs_set": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
-                        "vs_inside": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
-                        "vs_attack": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
-                        "vs_outside": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
-                        "vs_motion_inside": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
-                        "vs_motion_attack": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
-                        "vs_motion_outside": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
-                        "vs_set_inside": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
-                        "vs_set_attack": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
-                        "vs_set_outside": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []}
-                    }, 
-                    "season_stats": {
-                        "used": 0, 
-                        "success": 0,
-                        "vs_motion": {"attempts": 0, "success": 0},
-                        "vs_set": {"attempts": 0, "success": 0},
-                        "vs_inside": {"attempts": 0, "success": 0},
-                        "vs_attack": {"attempts": 0, "success": 0},
-                        "vs_outside": {"attempts": 0, "success": 0},
-                        "vs_motion_inside": {"attempts": 0, "success": 0},
-                        "vs_motion_attack": {"attempts": 0, "success": 0},
-                        "vs_motion_outside": {"attempts": 0, "success": 0},
-                        "vs_set_inside": {"attempts": 0, "success": 0},
-                        "vs_set_attack": {"attempts": 0, "success": 0},
-                        "vs_set_outside": {"attempts": 0, "success": 0}
-                    }
-                },
-                "1-3-1 Zone": {
-                    "used": 0, 
-                    "success": 0, 
-                    "effectiveness": 0.0,
-                    "game_stats": {
-                        "used": 0, 
-                        "success": 0,
-                        "ev_scores": [],
-                        "lean_scores": [],
-                        "vs_motion": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
-                        "vs_set": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
-                        "vs_inside": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
-                        "vs_attack": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
-                        "vs_outside": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
-                        "vs_motion_inside": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
-                        "vs_motion_attack": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
-                        "vs_motion_outside": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
-                        "vs_set_inside": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
-                        "vs_set_attack": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []},
-                        "vs_set_outside": {"attempts": 0, "success": 0, "ev_scores": [], "lean_scores": []}
-                    }, 
-                    "season_stats": {
-                        "used": 0, 
-                        "success": 0,
-                        "vs_motion": {"attempts": 0, "success": 0},
-                        "vs_set": {"attempts": 0, "success": 0},
-                        "vs_inside": {"attempts": 0, "success": 0},
-                        "vs_attack": {"attempts": 0, "success": 0},
-                        "vs_outside": {"attempts": 0, "success": 0},
-                        "vs_motion_inside": {"attempts": 0, "success": 0},
-                        "vs_motion_attack": {"attempts": 0, "success": 0},
-                        "vs_motion_outside": {"attempts": 0, "success": 0},
-                        "vs_set_inside": {"attempts": 0, "success": 0},
-                        "vs_set_attack": {"attempts": 0, "success": 0},
-                        "vs_set_outside": {"attempts": 0, "success": 0}
-                    }
-                },
+                # Use template for all standard defense types (Man, 2-3 Zone, 3-2 Zone, 1-3-1 Zone)
+                # This eliminates ~280 lines of duplicate code
+                # Use deepcopy to ensure each defense type gets its own independent dictionary
+                "Man": deepcopy(defense_template),
+                "2-3 Zone": deepcopy(defense_template),
+                "3-2 Zone": deepcopy(defense_template),
+                "1-3-1 Zone": deepcopy(defense_template),
                 "vs_Fast_Break": {"used": 0, "success": 0},
                 "FCP": {"used": 0, "success": 0},
                 "HCT": {"used": 0, "success": 0}

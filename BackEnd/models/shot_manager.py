@@ -30,6 +30,45 @@ class ShotManager:
         # Add defense score tracking
         self.defense_scores = []
     
+    def _get_shooter_position_and_spot(self, shooter, roles):
+        """
+        Helper method to extract shooter's position and spot from roles.
+        Eliminates duplicate lookup logic between is_three_point_shot and is_paint_shot.
+        
+        Args:
+            shooter: The player taking the shot
+            roles: The roles dict containing steps/skeleton data
+            
+        Returns:
+            tuple: (shooter_pos, spot) or (None, None) if not found
+        """
+        # Get the shooter's position
+        shooter_pos = None
+        for pos, player in self.game.offense_team.lineup.items():
+            if player == shooter:
+                shooter_pos = pos
+                break
+        
+        if not shooter_pos:
+            return (None, None)
+        
+        # Find the shooter's spot from the final step (where they shoot)
+        steps = roles.get("steps", [])
+        if not steps:
+            return (None, None)
+        
+        # Check the last step for the shooter's spot
+        for step in reversed(steps):
+            pos_actions = step.get("pos_actions", {})
+            shooter_action = pos_actions.get(shooter_pos)
+            if shooter_action and shooter_action.get("action") == "shoot":
+                # MongoDB skeletons use "location", old skeletons use "spot"
+                location_key = shooter_action.get("location") or shooter_action.get("spot", "")
+                spot = location_key.lower() if location_key else ""
+                return (shooter_pos, spot)
+        
+        return (None, None)
+
     def is_three_point_shot(self, shooter, roles):
         """
         Determine if a shot is a three-pointer based on the shooter's spot.
@@ -41,35 +80,12 @@ class ShotManager:
         Returns:
             bool: True if three-pointer, False if two-pointer
         """
-        # Get the shooter's position
-        shooter_pos = None
-        for pos, player in self.game.offense_team.lineup.items():
-            if player == shooter:
-                shooter_pos = pos
-                break
-        
-        if not shooter_pos:
+        shooter_pos, spot = self._get_shooter_position_and_spot(shooter, roles)
+        if not spot:
             return False
         
-        # Find the shooter's spot from the final step (where they shoot)
-        steps = roles.get("steps", [])
-        if not steps:
-            return False
-        
-        # Check the last step for the shooter's spot
-        for step in reversed(steps):
-            pos_actions = step.get("pos_actions", {})
-            shooter_action = pos_actions.get(shooter_pos)
-            if shooter_action and shooter_action.get("action") == "shoot":
-                # MongoDB skeletons use "location", old skeletons use "spot"
-                location_key = shooter_action.get("location") or shooter_action.get("spot", "")
-                spot = location_key.lower() if location_key else ""
-                # Check if spot is a three-point spot (case insensitive)
-                if spot in THREE_POINT_SPOTS:
-                    return True
-                return False
-        
-        return False
+        # Check if spot is a three-point spot (case insensitive)
+        return spot in THREE_POINT_SPOTS
 
     def is_paint_shot(self, shooter, roles):
         """
@@ -82,34 +98,12 @@ class ShotManager:
         Returns:
             bool: True if paint shot, False otherwise
         """
-        # Get the shooter's position
-        shooter_pos = None
-        for pos, player in self.game.offense_team.lineup.items():
-            if player == shooter:
-                shooter_pos = pos
-                break
-        
-        if not shooter_pos:
-            return False
-
-        steps = roles.get("steps", [])
-        if not steps:
+        shooter_pos, spot = self._get_shooter_position_and_spot(shooter, roles)
+        if not spot:
             return False
         
-        # Check the last step for the shooter's spot
-        for step in reversed(steps):
-            pos_actions = step.get("pos_actions", {})
-            shooter_action = pos_actions.get(shooter_pos)
-            if shooter_action and shooter_action.get("action") == "shoot":
-                # MongoDB skeletons use "location", old skeletons use "spot"
-                location_key = shooter_action.get("location") or shooter_action.get("spot", "")
-                spot = location_key.lower() if location_key else ""
-                # Check if spot is a paint spot (case insensitive)
-                if spot in PAINT_SPOTS:
-                    return True
-                return False
-        
-        return False
+        # Check if spot is a paint spot (case insensitive)
+        return spot in PAINT_SPOTS
 
 
     def resolve_shot(self, roles):
