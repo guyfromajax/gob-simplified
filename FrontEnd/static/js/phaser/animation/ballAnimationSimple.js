@@ -19,6 +19,8 @@
 
 import * as Phaser from 'https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.esm.js';
 // Lazy import detachBall to avoid circular dependency (imported dynamically in animateShotToRim)
+// Import BallController adapter for delegation
+import { getBallController } from './BallControllerAdapter.js';
 
 /**
  * Initialize ball holder state on scene
@@ -35,35 +37,55 @@ export function initializeBallHolderState(scene) {
 
 /**
  * Get the current ball holder ID (string)
+ * Delegates to BallController for single source of truth
  * @param {Phaser.Scene} scene - The Phaser scene
  * @returns {string|null} Player ID who has the ball, or null
  */
 export function getBallHolderId(scene) {
-  if (!scene.gameState) {
-    return null;
+  const ballController = getBallControllerFromScene(scene);
+  if (ballController) {
+    return ballController.getBallHolderId();
   }
-  return scene.gameState.ballHolder || null;
+  // Fallback to direct access if BallController not available
+  if (scene?.gameState?.ballHolder !== undefined) {
+    return scene.gameState.ballHolder;
+  }
+  return null;
 }
 
 /**
  * Set the current ball holder ID (string)
+ * Delegates to BallController for single source of truth
  * @param {Phaser.Scene} scene - The Phaser scene
  * @param {string|null} playerId - Player ID who has the ball, or null to clear
  */
 export function setBallHolderId(scene, playerId) {
-  if (!scene.gameState) {
-    scene.gameState = {};
+  const ballController = getBallControllerFromScene(scene);
+  if (ballController) {
+    ballController.setBallHolderId(playerId);
+  } else {
+    // Fallback to direct access if BallController not available
+    if (!scene.gameState) {
+      scene.gameState = {};
+    }
+    scene.gameState.ballHolder = playerId || null;
   }
-  scene.gameState.ballHolder = playerId || null;
 }
 
 /**
  * Clear the ball holder state
+ * Delegates to BallController for single source of truth
  * @param {Phaser.Scene} scene - The Phaser scene
  */
 export function clearBallHolder(scene) {
-  if (scene.gameState) {
-    scene.gameState.ballHolder = null;
+  const ballController = getBallControllerFromScene(scene);
+  if (ballController) {
+    ballController.clearBallHolderId();
+  } else {
+    // Fallback to direct access if BallController not available
+    if (scene?.gameState) {
+      scene.gameState.ballHolder = null;
+    }
   }
 }
 
@@ -218,14 +240,18 @@ function calculateBallDuration(ballSprite, targetX, targetY) {
 }
 
 /**
- * Get BallController instance from scene
+ * Get BallController instance from adapter
  * @param {Phaser.Scene} scene - The Phaser scene
- * @returns {Object|null} BallController instance or null
+ * @returns {BallController|null} BallController instance or null
  */
 function getBallControllerFromScene(scene) {
-  // Use scene.ballController (most common case - set up during scene creation)
-  // If not available, BallController integration is skipped (functions still work)
-  return scene?.ballController || null;
+  // Try to get from adapter (preferred method)
+  try {
+    return getBallController();
+  } catch (e) {
+    // Fallback to scene property if adapter not available
+    return scene?.ballController || null;
+  }
 }
 
 /**
