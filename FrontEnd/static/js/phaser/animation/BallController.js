@@ -152,6 +152,9 @@ export class BallController {
     if (this.scene && this.scene.gameState && playerId) {
       this.scene.gameState.ballHolder = playerId;
     }
+    
+    // ✅ PHASE 1: Ensure ownership history is updated for getLastKnownOwnerId()
+    // This is already done in recordOwnershipChange below, but we ensure it happens
 
     // Position ball on player
     this.positionBallOnPlayer(playerSprite, options);
@@ -208,7 +211,7 @@ export class BallController {
       this.ballSprite.setVisible(false);
     }
 
-    // Record ownership change
+    // Record ownership change (this updates ownershipHistory for getLastKnownOwnerId())
     this.recordOwnershipChange(previousOwner, null, reason, options);
 
     // Notify callbacks
@@ -530,6 +533,153 @@ export class BallController {
    */
   isBallAttached() {
     return this.isAttached;
+  }
+
+  // ==================== PHASE 1: COMPATIBILITY METHODS ====================
+  // These methods provide compatibility with old ballController.js system
+  // They return/accept player IDs (strings) instead of sprites
+
+  /**
+   * Get current owner ID (string) - for compatibility with old system
+   * @returns {string|null} Player ID or null
+   */
+  getCurrentOwnerId() {
+    if (!this.currentOwner) return null;
+    return this.currentOwner.playerId || (this.currentOwner.id ? String(this.currentOwner.id) : null);
+  }
+
+  /**
+   * Set current owner by ID (string) - for compatibility with old system
+   * @param {string} playerId - Player ID
+   * @returns {boolean} Success
+   */
+  setCurrentOwnerById(playerId) {
+    if (!this.scene || !this.scene.playerSprites || !playerId) {
+      if (this.debug) {
+        console.warn('BallController: Cannot set current owner by ID - missing scene, playerSprites, or playerId', {
+          hasScene: !!this.scene,
+          hasPlayerSprites: !!this.scene?.playerSprites,
+          playerId
+        });
+      }
+      return false;
+    }
+    const playerSprite = this.scene.playerSprites[playerId];
+    if (!playerSprite) {
+      console.warn('BallController: Player sprite not found for ID', playerId);
+      return false;
+    }
+    return this.attachToPlayer(playerSprite);
+  }
+
+  /**
+   * Clear current owner
+   */
+  clearCurrentOwner() {
+    if (this.isAttached) {
+      this.detachFromPlayer('clear');
+    } else {
+      // Even if not attached, clear the current owner reference
+      this.currentOwner = null;
+    }
+  }
+
+  /**
+   * Get last known owner ID (string)
+   * @returns {string|null} Player ID or null
+   */
+  getLastKnownOwnerId() {
+    if (this.ownershipHistory.length === 0) {
+      // If no history but we have a current owner, return that
+      if (this.currentOwner) {
+        return this.getCurrentOwnerId();
+      }
+      return null;
+    }
+    // Find the last entry where 'to' is not null
+    for (let i = this.ownershipHistory.length - 1; i >= 0; i--) {
+      const entry = this.ownershipHistory[i];
+      if (entry.to) {
+        return entry.to;
+      }
+    }
+    // Fallback: return current owner ID if available
+    return this.getCurrentOwnerId();
+  }
+
+  /**
+   * Get pending owner ID (string) - for compatibility
+   * @returns {string|null} Player ID or null
+   */
+  getPendingOwnerId() {
+    if (!this.pendingOwner) return null;
+    return this.pendingOwner.playerId || (this.pendingOwner.id ? String(this.pendingOwner.id) : null);
+  }
+
+  /**
+   * Set pending owner by ID (string) - for compatibility
+   * @param {string} playerId - Player ID
+   * @returns {boolean} Success
+   */
+  setPendingOwnerById(playerId) {
+    if (!this.scene || !this.scene.playerSprites || !playerId) {
+      if (this.debug) {
+        console.warn('BallController: Cannot set pending owner by ID - missing scene, playerSprites, or playerId', {
+          hasScene: !!this.scene,
+          hasPlayerSprites: !!this.scene?.playerSprites,
+          playerId
+        });
+      }
+      return false;
+    }
+    const playerSprite = this.scene.playerSprites[playerId];
+    if (!playerSprite) {
+      console.warn('BallController: Pending owner sprite not found for ID', playerId);
+      return false;
+    }
+    this.setPendingOwner(playerSprite);
+    return true;
+  }
+
+  /**
+   * Get ball holder ID (string) - WIP_GOB compatibility
+   * @returns {string|null} Player ID or null
+   */
+  getBallHolderId() {
+    if (!this.scene || !this.scene.gameState) return null;
+    return this.scene.gameState.ballHolder || null;
+  }
+
+  /**
+   * Set ball holder ID (string) - WIP_GOB compatibility
+   * @param {string} playerId - Player ID
+   */
+  setBallHolderId(playerId) {
+    if (!this.scene) return;
+    if (!this.scene.gameState) {
+      this.scene.gameState = {};
+    }
+    this.scene.gameState.ballHolder = playerId || null;
+    
+    if (this.debug) {
+      console.log('BallController: Set ball holder ID', {
+        playerId,
+        currentOwnerId: this.getCurrentOwnerId()
+      });
+    }
+  }
+
+  /**
+   * Clear ball holder ID - WIP_GOB compatibility
+   */
+  clearBallHolderId() {
+    if (this.scene && this.scene.gameState) {
+      this.scene.gameState.ballHolder = null;
+      
+      if (this.debug) {
+        console.log('BallController: Cleared ball holder ID');
+      }
+    }
   }
 
   /**
