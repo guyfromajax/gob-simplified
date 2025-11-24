@@ -52,13 +52,16 @@ export function setAnimationDebugEnabled(value) {
   }
 }
 
+// DEPRECATED: PossessionRunner removed from production
+// Keeping these functions for backward compatibility but they always return false
 export function isPossessionRunnerEnabled() {
-  return resolveFeatureFlag('FEATURE_POSSESSION_RUNNER');
+  return false; // PossessionRunner removed - always use standard animation path
 }
 
 export function setPossessionRunnerEnabled(value) {
+  // No-op: PossessionRunner removed from production
   if (globalScope) {
-    globalScope.FEATURE_POSSESSION_RUNNER = coerceBoolean(value);
+    globalScope.FEATURE_POSSESSION_RUNNER = false;
   }
 }
 
@@ -85,9 +88,10 @@ Object.defineProperty(DebugFlags, 'ANIM', {
   get: () => isAnimationDebugEnabled(),
 });
 
+// DEPRECATED: PossessionRunner removed from production
 Object.defineProperty(DebugFlags, 'FEATURE_POSSESSION_RUNNER', {
   enumerable: true,
-  get: () => isPossessionRunnerEnabled(),
+  get: () => false, // Always false - PossessionRunner removed
 });
 
 export { DebugFlags };
