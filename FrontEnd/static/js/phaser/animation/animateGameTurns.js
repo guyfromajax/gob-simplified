@@ -1,6 +1,6 @@
 import { runSideInboundSetup } from "./turnAnimation.js";
 import { AnimationRouter } from "./AnimationRouter.js";
-import { onAction } from "./onAction.js";
+// Note: onAction import removed - we define a local onAction callback for pass handling
 import { runPass, REBOUND_DEBUG } from "./ballManager.js";
 import animationConfig from "./animation_config.js";
 import runFreeThrowSequence from "./freeThrow.js";
@@ -978,61 +978,6 @@ export async function animateGameTurns({ //hasBallAtStep
       
       // Note: onAction callbacks are now handled within AnimationRouter/AnimationEngine
       // If specific action handling is needed, it should be added to the specialized systems
-
-            const receiverAnim = animations.find(a =>
-              a.movement?.some(
-                m => m.action === "receive" && m.timestamp === timestamp
-              )
-            );
-            const receiveStep = receiverAnim?.movement.find(
-              m => m.action === "receive" && m.timestamp === timestamp
-            );
-
-            if (passStep && receiveStep && receiverAnim?.playerId != null) {
-              if (DEBUG_FLOW || debugEnabled) logVerbose("📤 Pass triggered");
-              const receiverSprite = playerSprites[receiverAnim.playerId];
-              const endCoords = receiverSprite
-                ? { x: receiverSprite.x, y: receiverSprite.y }
-                : undefined;
-
-              const delta = receiveStep.timestamp - timestamp;
-              const duration =
-                delta > 0 ? delta : animationConfig.pass.duration;
-              if (DEBUG_FLOW || debugEnabled)
-                logVerbose(
-                  `⏱️ Resolved pass duration: ${duration}ms (delta=${delta})`
-                );
-
-              if (DEBUG_FLOW || debugEnabled) {
-                scene.events?.once('passStart', () => logVerbose('passStart'));
-                scene.events?.once('tweenStart', () => logVerbose('tweenStart'));
-                scene.events?.once('tweenEnd', () => logVerbose('tweenEnd'));
-                scene.events?.once('ballAttached', () => logVerbose('ballAttached'));
-                scene.events?.once('passEnd', () => logVerbose('passEnd'));
-              }
-
-              if (scene.__activePass) {
-                animationDebugWarn(
-                  'Active pass tween detected before runPass call; cancelling previous tween'
-                );
-              }
-
-              await runPass(scene, {
-                fromId: playerId,
-                toId: receiverAnim.playerId,
-                endCoords,
-                duration,
-                easing: animationConfig.pass.easing
-              });
-            }
-          }
-
-          // if (action === "shoot" || sprite.playerId === shooterId) {
-          //   console.log("🏀 Shot triggered. Hiding ball.");
-          //   ballSprite.setVisible(false);
-          // }
-        }
-      });
       
       // Set flag if this was a shot turn (MAKE or MISS) so the next turn knows to skip step 0 ball attachment
       if (turn.result_type === "MAKE" || turn.result_type === "MISS") {
