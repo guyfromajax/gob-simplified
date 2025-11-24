@@ -205,30 +205,96 @@ function detachBall(scene, ballSprite, options={}) {
  */
 
 /**
- * Helper function to get current ball owner (old system compatibility)
+ * Get current owner ID (string) - replaces old ballController.js
+ * @param {Phaser.Scene} scene
+ * @returns {string|null} Player ID or null
  */
 function getCurrentOwner(scene) {
   const ballController = getBallController();
-  return ballController ? ballController.currentOwner : null;
+  if (!ballController) return null;
+  return ballController.getCurrentOwnerId();
 }
 
 /**
- * Helper function to set current ball owner (old system compatibility)
+ * Set current owner by ID (string) - replaces old ballController.js
+ * @param {Phaser.Scene} scene
+ * @param {string} playerId
  */
 function setCurrentOwner(scene, playerId) {
   const ballController = getBallController();
-  if (ballController && scene.playerSprites && scene.playerSprites[playerId]) {
-    ballController.attachToPlayer(scene.playerSprites[playerId]);
-  }
+  if (!ballController) return;
+  ballController.setCurrentOwnerById(playerId);
 }
 
 /**
- * Helper function to clear current ball owner (old system compatibility)
+ * Clear current owner - replaces old ballController.js
+ * @param {Phaser.Scene} scene
  */
 function clearCurrentOwner(scene) {
   const ballController = getBallController();
-  if (ballController) {
-    ballController.detachFromPlayer('clear');
+  if (!ballController) return;
+  ballController.clearCurrentOwner();
+}
+
+/**
+ * Get last known owner ID (string) - replaces old ballController.js
+ * @param {Phaser.Scene} scene
+ * @returns {string|null} Player ID or null
+ */
+function getLastKnownOwner(scene) {
+  const ballController = getBallController();
+  if (!ballController) return null;
+  return ballController.getLastKnownOwnerId();
+}
+
+/**
+ * Get pending owner ID (string) - replaces old ballController.js
+ * @param {Phaser.Scene} scene
+ * @returns {string|null} Player ID or null
+ */
+function getPendingOwner(scene) {
+  const ballController = getBallController();
+  if (!ballController) return null;
+  return ballController.getPendingOwnerId();
+}
+
+/**
+ * Set pending owner by ID (string) - replaces old ballController.js
+ * @param {Phaser.Scene} scene
+ * @param {string} playerId
+ */
+function setPendingOwner(scene, playerId) {
+  const ballController = getBallController();
+  if (!ballController) return;
+  ballController.setPendingOwnerById(playerId);
+}
+
+/**
+ * Clear pending owner - replaces old ballController.js
+ * @param {Phaser.Scene} scene
+ */
+function clearPendingOwner(scene) {
+  const ballController = getBallController();
+  if (!ballController) return;
+  ballController.clearPendingOwner();
+}
+
+/**
+ * Cancel ball tween - replaces old ballController.js
+ * @param {Phaser.Scene} scene
+ * @param {Phaser.GameObjects.Sprite} ballSpriteOverride
+ */
+function cancelBallTween(scene, ballSpriteOverride) {
+  const ballController = getBallController();
+  if (!ballController) return;
+  
+  // Clear pending owner
+  ballController.clearPendingOwner();
+  
+  // Kill ball tweens
+  const ballSprite = ballSpriteOverride || scene.ballSprite;
+  if (scene?.tweens && ballSprite) {
+    scene.tweens.killTweensOf(ballSprite);
   }
 }
 
@@ -286,6 +352,11 @@ export {
   getCurrentOwner,
   setCurrentOwner,
   clearCurrentOwner,
+  getLastKnownOwner,
+  getPendingOwner,
+  setPendingOwner,
+  clearPendingOwner,
+  cancelBallTween,
   synchronizeBallState,
   initializeBallController,
   getBallController
@@ -298,6 +369,11 @@ export default {
   getCurrentOwner,
   setCurrentOwner,
   clearCurrentOwner,
+  getLastKnownOwner,
+  getPendingOwner,
+  setPendingOwner,
+  clearPendingOwner,
+  cancelBallTween,
   initializeBallController,
   getBallController
 };
