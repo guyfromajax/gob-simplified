@@ -608,13 +608,16 @@ class Animator:
                     # get_defender_coords handles coordinate orientation automatically
                     # Need to extract spot from offensive player's action
                     o_spot = "key"  # Default spot, could be extracted from action if available
+                    # Use ball handler's last spot for ball_spot parameter (required for non-BH logic)
+                    ball_spot_for_non_bh = bh_last_spot or "key"
                     def_coords = get_defender_coords(
                         o_coords,
                         is_away_offense,
                         aggression_call,
                         o_spot,
                         ball_handler_end_coords,
-                        is_ball_handler=False
+                        is_ball_handler=False,
+                        ball_spot=ball_spot_for_non_bh
                     )
             else:
                 logging.warning("No offensive match for defender %s, skipping.", pos)
@@ -682,13 +685,19 @@ class Animator:
                     
                     # PHASE 4: Use new unified defender coordinate system
                     # get_defender_coords handles coordinate orientation automatically
+                    # Need ball handler's spot for this step (for non-BH defender complex logic)
+                    bh_spot_for_step = next(
+                        (step[2] for step in bh_timeline if step[0] == t),
+                        bh_last_spot or "key"
+                    )
                     d_coords = get_defender_coords(
                         o_coords,
                         is_away_offense,
                         aggression_call,
                         spot,  # Use spot from offensive player's action
                         current_bh_coords,
-                        is_ball_handler=False
+                        is_ball_handler=False,
+                        ball_spot=bh_spot_for_step  # Pass ball handler's spot for non-BH defender logic
                     )
                     movement.append({
                         "timestamp": t,
@@ -1564,13 +1573,15 @@ class Animator:
                     
                     # PHASE 4: Use new unified defender coordinate system
                     # get_defender_coords handles coordinate orientation automatically
+                    # Pass ball_spot for non-BH defenders (required for complex positioning logic)
                     def_coords = get_defender_coords(
                         off_coords,
                         is_away_offense,
                         aggression,
                         o_spot,
                         bh_coords,
-                        is_ball_handler=False
+                        is_ball_handler=False,
+                        ball_spot=bh_spot  # Pass ball handler's spot for non-BH defender logic
                     )
                 
                 # get_defender_coords returns coords in same orientation as input
@@ -1631,13 +1642,15 @@ class Animator:
                         
                         # PHASE 4: Use new unified defender coordinate system
                         # get_defender_coords handles coordinate orientation automatically
+                        # Pass ball_spot for non-BH defenders (required for complex positioning logic)
                         def_coords = get_defender_coords(
                             off_coords,
                             is_away_offense,
                             aggression,
                             o_spot,
                             bh_coords,
-                            is_ball_handler=False
+                            is_ball_handler=False,
+                            ball_spot=bh_spot  # Pass ball handler's spot for non-BH defender logic
                         )
                     # For BH defenders, get_defender_coords already returns correct orientation
                     
