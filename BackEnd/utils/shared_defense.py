@@ -1535,3 +1535,102 @@ def calculate_defender_coords(
             def_y = oy + (spacing * y_direction)
     
     return {"x": int(def_x), "y": int(def_y)}
+
+
+def get_defender_coords(
+    offensive_coords: dict,
+    is_away_offense: bool,
+    aggression_level: str,
+    spot: str = "key",
+    ball_handler_coords: dict = None,
+    is_ball_handler: bool = False
+) -> dict:
+    """
+    Public API for getting defender coordinates.
+    Handles coordinate orientation transformation automatically.
+    
+    This is the main entry point for calculating defender positions. It automatically
+    handles coordinate orientation (home/away) so callers don't need to worry about
+    flipping coordinates manually.
+    
+    COORDINATE CONTRACT:
+    - Input: Coordinates can be in any orientation (home or away)
+    - Internal: All calculations happen in HOME orientation
+    - Output: Coordinates returned in same orientation as input
+    
+    Args:
+        offensive_coords: Offensive player coordinates (in current orientation - home or away)
+        is_away_offense: Whether away team is on offense
+        aggression_level: Defense aggression setting ("aggressive", "normal", "passive")
+        spot: Court spot string ("key", "lower wing", etc.)
+        ball_handler_coords: Optional ball handler coordinates (for non-BH defenders, in current orientation)
+        is_ball_handler: Whether this is the ball handler's defender
+    
+    Returns:
+        Defender coordinates (in same orientation as input)
+    
+    Example:
+        # Home team offense - coordinates already in home orientation
+        def_coords = get_defender_coords(
+            {"x": 64, "y": 25},  # Offensive player coords (home orientation)
+            is_away_offense=False,
+            aggression_level="normal",
+            spot="key",
+            is_ball_handler=True
+        )
+        # Returns coords in home orientation
+        
+        # Away team offense - coordinates in away orientation
+        def_coords = get_defender_coords(
+            {"x": 36, "y": 25},  # Offensive player coords (away orientation)
+            is_away_offense=True,
+            aggression_level="normal",
+            spot="key",
+            is_ball_handler=True
+        )
+        # Returns coords in away orientation (automatically flipped)
+    """
+    # Determine target basket based on which team is on offense
+    if is_away_offense:
+        # Away team attacking home basket (x=90 in home orientation)
+        target_basket = HOME_RIM_COORDS
+    else:
+        # Home team attacking away basket (x=10 in home orientation)
+        target_basket = AWAY_RIM_COORDS
+    
+    # Convert offensive coords to HOME orientation for calculation
+    if is_away_offense:
+        # Input coords are in away orientation, flip to home orientation
+        offensive_coords_home = get_away_player_coords(offensive_coords)
+    else:
+        # Input coords already in home orientation
+        offensive_coords_home = offensive_coords
+    
+    # Convert ball handler coords if provided
+    if ball_handler_coords:
+        if is_away_offense:
+            # Input coords are in away orientation, flip to home orientation
+            ball_handler_coords_home = get_away_player_coords(ball_handler_coords)
+        else:
+            # Input coords already in home orientation
+            ball_handler_coords_home = ball_handler_coords
+    else:
+        ball_handler_coords_home = None
+    
+    # Calculate defender position in HOME orientation
+    defender_coords_home = calculate_defender_coords(
+        offensive_coords_home,
+        target_basket,
+        aggression_level,
+        spot,
+        ball_handler_coords_home,
+        is_ball_handler
+    )
+    
+    # Convert result back to original orientation
+    if is_away_offense:
+        # Return coords in away orientation (flip back)
+        return get_away_player_coords(defender_coords_home)
+    else:
+        # Return coords in home orientation (no flip needed)
+        return defender_coords_home
