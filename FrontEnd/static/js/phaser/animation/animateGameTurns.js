@@ -1,4 +1,5 @@
-import { playTurnAnimation, runSideInboundSetup } from "./turnAnimation.js";
+import { runSideInboundSetup } from "./turnAnimation.js";
+import { AnimationRouter } from "./AnimationRouter.js";
 import { onAction } from "./onAction.js";
 import { runPass, REBOUND_DEBUG } from "./ballManager.js";
 import animationConfig from "./animation_config.js";
@@ -331,6 +332,98 @@ export async function animateGameTurns({ //hasBallAtStep
   const allPlayers = simData.players || [];
   const debugEnabled = isAnimationDebugEnabled();
   const stepLogger = debugEnabled ? getSceneStepLogger(scene) : null;
+  
+  const logVerbose = (...args) => {
+    if (isAnimationDebugEnabled()) {
+      animationDebugLog(...args);
+      return;
+    }
+    if (DEBUG_FLOW) {
+      console.log(...args);
+    }
+  };
+  
+  // Create onAction callback for pass handling (will be passed to AnimationRouter)
+  const onAction = async (action, sprite, timestamp) => {
+    if (DEBUG_FLOW || debugEnabled)
+      logVerbose(
+        `🎬 Action "${action}" fired at ${timestamp}ms for sprite:`,
+        sprite
+      );
+    
+    // Handle pass actions (this logic should eventually move to PassAnimationSystem)
+    if (action === "pass") {
+      if (scene.stateMachine?.is(States.FastBreak)) return;
+      
+      const playerId = Object.keys(playerSprites).find(
+        key => playerSprites[key] === sprite
+      );
+      
+      const animations = scene.simData?.turns?.[scene.currentTurn]?.animations || [];
+      const anim = animations.find(a => a.playerId === playerId);
+      const movement = anim?.movement || [];
+      
+      const passStep = movement.find(
+        m => m.action === "pass" && m.timestamp === timestamp
+      );
+      if (!passStep) return;
+      
+      const receiverAnim = animations.find(a => {
+        const receiverStep = a.movement?.find(
+          m => m.timestamp === timestamp && m.action === "receive"
+        );
+        return receiverStep && receiverStep.pass_from === playerId;
+      });
+      
+      if (receiverAnim) {
+        const { gridToPixels } = await import("../utils/gridToPixels.js");
+        const { runPass } = await import("./ballManager.js");
+        const animationConfig = await import("./animation_config.js").then(m => m.default);
+        
+        const endCoords = gridToPixels(
+          passStep.coords.x,
+          passStep.coords.y,
+          scene.game.config.width,
+          scene.game.config.height
+        );
+        
+        const startCoords = movement[Math.max(0, movement.indexOf(passStep) - 1)]?.coords || passStep.coords;
+        const startPx = gridToPixels(
+          startCoords.x,
+          startCoords.y,
+          scene.game.config.width,
+          scene.game.config.height
+        );
+        
+        const distance = Phaser.Math.Distance.Between(startPx.x, startPx.y, endCoords.x, endCoords.y);
+        const baseDuration = animationConfig.pass.duration || 400;
+        const delta = distance / 350; // pixels per ms
+        const duration = Math.max(200, Math.min(800, baseDuration * delta));
+        
+        if (DEBUG_FLOW || debugEnabled)
+          logVerbose(
+            `⏱️ Resolved pass duration: ${duration}ms (delta=${delta})`
+          );
+        
+        if (scene.__activePass) {
+          animationDebugWarn(
+            'Active pass tween detected before runPass call; cancelling previous tween'
+          );
+        }
+        
+        await runPass(scene, {
+          fromId: playerId,
+          toId: receiverAnim.playerId,
+          endCoords,
+          duration,
+          easing: animationConfig.pass.easing
+        });
+      }
+    }
+  };
+  
+  // Initialize AnimationRouter as single entry point for all animations
+  const animationRouter = new AnimationRouter(scene, playerSprites, ballSprite, onUpdate, onAction);
 
   const clone = value => {
     if (!value) return value;
@@ -543,23 +636,8 @@ export async function animateGameTurns({ //hasBallAtStep
       // Check if this is an FCP or HCT foul with animations
       if ((turn.fcp_foul === true || turn.hct_foul === true) && turn.animations && turn.animations.length > 0) {
         // FCP/HCT foul with animations - animate it like a standard turn
-        await playTurnAnimation({
-          scene,
-          simData,
-          playerSprites,
-          turnData: turn,
-          ballSprite,
-          onUpdate,
-          turnIndex: i,
-          onAction: async (action, sprite, timestamp) => {
-            if (DEBUG_FLOW || debugEnabled)
-              logVerbose(
-                `🎬 Action "${action}" fired at ${timestamp}ms for sprite:`,
-                sprite
-              );
-            if (onAction) onAction(action, sprite, timestamp);
-          },
-        });
+        // Use AnimationRouter as single entry point
+        await animationRouter.processTurn(turn);
       }
       
       // Announce foul (visual effects now handled by announcement system)
@@ -821,23 +899,8 @@ export async function animateGameTurns({ //hasBallAtStep
         result_type: turn.result_type,
         turn_index: i
       });
-      await playTurnAnimation({
-        scene,
-        simData,
-        playerSprites,
-        turnData: turn,
-        ballSprite,
-        onUpdate,
-        turnIndex: i,
-        onAction: async (action, sprite, timestamp) => {
-          if (DEBUG_FLOW || debugEnabled)
-            logVerbose(
-              `🎬 Action "${action}" fired at ${timestamp}ms for sprite:`,
-              sprite
-            );
-          if (onAction) onAction(action, sprite, timestamp);
-        },
-      });
+      // Use AnimationRouter as single entry point
+      await animationRouter.processTurn(turn);
       
       // Announce result (visual effects now handled by announcement/ballManager)
       announceFromTurnData(turn, 'end', scene.simData?.home_team_id, scene);
@@ -919,33 +982,11 @@ export async function animateGameTurns({ //hasBallAtStep
         });
       }
       
-      await playTurnAnimation({
-        scene,
-        simData,
-        playerSprites,
-        turnData: turn,
-        ballSprite,
-        onAction: async (action, sprite, timestamp) => {
-          if (DEBUG_FLOW || debugEnabled)
-            logVerbose(
-              `🎬 Action "${action}" fired at ${timestamp}ms for sprite:`,
-              sprite
-            );
-          onAction(action, sprite, timestamp);
-
-          const playerId = Object.keys(playerSprites).find(
-            key => playerSprites[key] === sprite
-          );
-
-          const anim = animations.find(a => a.playerId === playerId);
-          const movement = anim?.movement || [];
-
-          if (action === "pass") {
-            if (scene.stateMachine?.is(States.FastBreak)) return;
-            const passStep = movement.find(
-              m => m.action === "pass" && m.timestamp === timestamp
-            );
-            if (!passStep) return;
+      // Use AnimationRouter as single entry point
+      await animationRouter.processTurn(turn);
+      
+      // Note: onAction callbacks are now handled within AnimationRouter/AnimationEngine
+      // If specific action handling is needed, it should be added to the specialized systems
 
             const receiverAnim = animations.find(a =>
               a.movement?.some(
