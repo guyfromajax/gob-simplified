@@ -5,7 +5,8 @@ from BackEnd.utils.shared import (
 )
 from BackEnd.utils.shared_defense import (
     assign_bh_defender_coords,
-    assign_non_bh_defender_coords
+    assign_non_bh_defender_coords,
+    get_defender_coords
 )
 from collections import defaultdict
 from BackEnd.constants import HCO_STRING_SPOTS, ACTIONS, RIM_COORDS, TOP_KEY_COORDS, HOME_RIM_COORDS, AWAY_RIM_COORDS, HOME_TOP_KEY, AWAY_TOP_KEY
@@ -560,20 +561,10 @@ class Animator:
                 first_coords = HCO_STRING_SPOTS.get(bh_first_spot, ball_handler_end_coords)
                 final_coords = HCO_STRING_SPOTS.get(bh_last_spot, ball_handler_end_coords)
                 
-                # 🐛 DEBUG: Log coordinate flow for ball handler's defender in man defense
-                if is_away_offense:
-                    logging.warning(f"🔍 [MAN DEFENSE DEBUG] Ball handler defender positioning - Step 1: Initial coords")
-                    logging.warning(f"   - is_away_offense: {is_away_offense}")
-                    logging.warning(f"   - first_coords (from HCO_STRING_SPOTS, home orientation): {first_coords}")
-                    logging.warning(f"   - final_coords (from HCO_STRING_SPOTS, home orientation): {final_coords}")
-                
+                # Flip to away orientation if needed (wrapper expects coords in current orientation)
                 if is_away_offense:
                     first_coords = get_away_player_coords(first_coords)
                     final_coords = get_away_player_coords(final_coords)
-                    
-                    if is_away_offense:
-                        logging.warning(f"   - first_coords AFTER flip to away: {first_coords}")
-                        logging.warning(f"   - final_coords AFTER flip to away: {final_coords}")
                 
                 # Override end position if FCP is next
                 if next_defensive_setup == "FCP":
@@ -586,13 +577,15 @@ class Animator:
                         "y": final_coords["y"]
                     }
                 else:
-                    if is_away_offense:
-                        logging.warning(f"   - Calling assign_bh_defender_coords with final_coords (away orientation): {final_coords}")
-                    def_coords = assign_bh_defender_coords(final_coords, aggression_call, is_away_offense, bh_last_spot or "key")
-                    if is_away_offense:
-                        logging.warning(f"   - def_coords returned from assign_bh_defender_coords: {def_coords}")
-                        logging.warning(f"   - def_coords x < 50 (away side)? {def_coords.get('x', 50) < 50}")
-                        logging.warning(f"   - Expected: x < 50 (away side), Actual: x={def_coords.get('x')}")
+                    # PHASE 3: Use new unified defender coordinate system
+                    def_coords = get_defender_coords(
+                        final_coords,
+                        is_away_offense,
+                        aggression_call,
+                        bh_last_spot or "key",
+                        None,
+                        is_ball_handler=True
+                    )
                 action_type = ACTIONS["GUARD_BALL"]
             elif pos in off_lineup:
                 off_player = off_lineup[pos]
@@ -618,21 +611,16 @@ class Animator:
 
             start = getattr(defender, "coords", {"x": 25, "y": 50})
             if pos == bh_pos:
-                # assign_bh_defender_coords now always expects and returns home-oriented coords
-                # So we need to unflip first_coords to home orientation if away team has the ball
-                if is_away_offense:
-                    logging.warning(f"🔍 [MAN DEFENSE DEBUG] Setting start position for BH defender")
-                    logging.warning(f"   - first_coords (away orientation): {first_coords}")
-                    first_coords_home = get_away_player_coords(first_coords)
-                    logging.warning(f"   - first_coords unflipped to home orientation: {first_coords_home}")
-                else:
-                    first_coords_home = first_coords
-                start = assign_bh_defender_coords(first_coords_home, aggression_call, is_away_offense, bh_first_spot or "key")
-                if is_away_offense:
-                    logging.warning(f"   - start returned from assign_bh_defender_coords (home orientation): {start}")
-                    logging.warning(f"   - start x < 50 (home side)? {start.get('x', 50) < 50}")
-                    logging.warning(f"   - Expected: x < 50 (home side for defender), Actual: x={start.get('x')}")
-                # Don't flip start - assign_bh_defender_coords returns home orientation when away team has ball
+                # PHASE 3: Use new unified defender coordinate system
+                # get_defender_coords handles coordinate orientation automatically
+                start = get_defender_coords(
+                    first_coords,
+                    is_away_offense,
+                    aggression_call,
+                    bh_first_spot or "key",
+                    None,
+                    is_ball_handler=True
+                )
 
             if is_away_offense and pos != bh_pos:
                 # Only flip start for non-BH defenders (BH defender start is already in correct orientation)
@@ -645,18 +633,19 @@ class Animator:
                 for t, _, spot in bh_timeline:
                     bh_coords = HCO_STRING_SPOTS.get(spot, HCO_STRING_SPOTS["key"])
                     # HCO_STRING_SPOTS are in home orientation
-                    # assign_bh_defender_coords now always expects and returns home-oriented coords
-                    # So we should pass home-oriented coords (don't flip) and expect home-oriented coords back
+                    # Flip to away orientation if needed (wrapper expects coords in current orientation)
                     if is_away_offense:
-                        logging.warning(f"🔍 [MAN DEFENSE DEBUG] Movement step t={t}, spot={spot}")
-                        logging.warning(f"   - bh_coords (from HCO_STRING_SPOTS, home orientation): {bh_coords}")
-                    # Don't flip bh_coords - function expects home orientation
-                    d_coords = assign_bh_defender_coords(bh_coords, aggression_call, is_away_offense, spot or "key")
-                    if is_away_offense:
-                        logging.warning(f"   - d_coords returned from assign_bh_defender_coords (home orientation): {d_coords}")
-                        logging.warning(f"   - d_coords x < 50 (home side)? {d_coords.get('x', 50) < 50}")
-                        logging.warning(f"   - Expected: x < 50 (home side for defender), Actual: x={d_coords.get('x')}")
-                    # Don't flip d_coords - assign_bh_defender_coords returns home orientation when away team has ball
+                        bh_coords = get_away_player_coords(bh_coords)
+                    # PHASE 3: Use new unified defender coordinate system
+                    # get_defender_coords handles coordinate orientation automatically
+                    d_coords = get_defender_coords(
+                        bh_coords,
+                        is_away_offense,
+                        aggression_call,
+                        spot or "key",
+                        None,
+                        is_ball_handler=True
+                    )
                     movement.append({
                         "timestamp": t,
                         "coords": d_coords,
