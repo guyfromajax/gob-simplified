@@ -302,10 +302,7 @@ def default_rebounder_dict():
 def determine_rebounder(game):
     
     game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
-    rebounder_dict = {
-        "offense": {"PG": 0.1, "SG": 0.1, "SF": 0.2, "PF": 0.3, "C": 0.3},
-        "defense": {"PG": 0.1, "SG": 0.1, "SF": 0.2, "PF": 0.3, "C": 0.3}
-    }
+    rebounder_dict = default_rebounder_dict()
 
     o_pos = choose_rebounder(rebounder_dict, "offense")
     d_pos = choose_rebounder(rebounder_dict, "defense")
