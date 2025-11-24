@@ -171,10 +171,11 @@ After integration, test:
 
 ## Notes
 
-- Zone defense functions in `shared_defense_ZONE_DEFENSE_ONLY.py` depend on existing MAN defense functions (`assign_bh_defender_coords`, `assign_non_bh_defender_coords`), which are already present ✅
-- Coordinate flipping logic is critical - ensure zone boundaries match offensive coordinate orientation
+- ✅ **Updated (December 2024)**: Zone defense functions now use the unified `get_defender_coords()` system. The old functions (`assign_bh_defender_coords`, `assign_non_bh_defender_coords`) have been removed and replaced with the unified system.
+- Coordinate orientation is handled automatically by `get_defender_coords()` - no manual flipping needed
 - Zone shifts (normal/lower/upper) are determined by ball handler location, not shooter location
 - Overlap resolution prioritizes defenders without other players in their zones
+- See `DEFENDER_COORDINATE_SYSTEM_REFACTORING_PLAN.md` for details on the unified system
 
 ---
 
