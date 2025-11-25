@@ -724,19 +724,35 @@ export async function animateGameTurns({ //hasBallAtStep
       const previousTurnResult = previousTurn?.result_type;
       const wasMISS = previousTurnResult === "MISS";
       const wasOREB = previousTurnResult === "OREB" || previousTurnResult === "OREB_KICKOUT";
+      const twoTurnsAgo = i > 1 ? turns[i - 2] : null;
       
       console.log('🔍 [PUTBACK/OREB PATH DEBUG]', {
         turnIndex: i,
         currentTurnResult: turn.result_type,
         previousTurnResult,
+        twoTurnsAgoResult: twoTurnsAgo?.result_type || null,
         wasMISS,
         wasOREB,
         path: wasMISS && wasOREB 
           ? 'HCO => MISS => OREB => Putback' 
+          : (wasMISS && previousTurnResult === 'MISS')
+          ? 'HCO => MISS => Putback (embedded OREB)'
           : 'Direct Putback/OREB',
         rebounderId: turn.rebounderId,
-        next_play_type: turn.next_play_type
+        next_play_type: turn.next_play_type,
+        sceneCurrentTurn: scene.currentTurn,
+        willProcessThisTurn: true
       });
+      
+      // ✅ DEBUG: Check if ball controller state might be blocking this
+      const { getBallController } = await import('./BallControllerAdapter.js');
+      const ballController = getBallController();
+      console.log('🔍 [PUTBACK TURN BALL STATE]', {
+        ballState: ballController?.getState?.() || 'unknown',
+        ballHolder: scene.gameState?.ballHolder || null,
+        rebounderId: turn.rebounderId
+      });
+      
       await handleOrebTurn(scene, { playerSprites, ballSprite, turnData: turn, onUpdate });
       announceFromTurnData(turn, 'end', scene.simData?.home_team_id, scene);
       if (onUpdate) {
@@ -1004,13 +1020,21 @@ export async function animateGameTurns({ //hasBallAtStep
       turn.index = i;
       
       // ✅ DEBUG: Log before processing turn through AnimationRouter
+      const nextTurn = i + 1 < turns.length ? turns[i + 1] : null;
+      const nextNextTurn = i + 2 < turns.length ? turns[i + 2] : null;
       console.log('🔍 [BEFORE PROCESS TURN]', {
         turn_index: i,
         result_type: turn.result_type,
         fast_break: turn.fast_break,
         isHCO,
         previousTurnWasShot: scene._previousTurnWasShot === true,
-        previousTurnResult: i > 0 ? turns[i - 1]?.result_type : null
+        previousTurnResult: i > 0 ? turns[i - 1]?.result_type : null,
+        nextTurnResult: nextTurn?.result_type || null,
+        nextNextTurnResult: nextNextTurn?.result_type || null,
+        willSeeOREB: nextTurn?.result_type === 'OREB' || nextTurn?.result_type === 'OREB_KICKOUT',
+        willSeePutback: nextTurn?.result_type === 'PUTBACK_MAKE' || nextTurn?.result_type === 'PUTBACK_MISS',
+        willSeePutbackAfterOREB: (nextTurn?.result_type === 'OREB' || nextTurn?.result_type === 'OREB_KICKOUT') && 
+                                  (nextNextTurn?.result_type === 'PUTBACK_MAKE' || nextNextTurn?.result_type === 'PUTBACK_MISS')
       });
       
       // AnimationRouter handles pre/post setup (prepareTurnForAnimation, finalizeTurnAfterAnimation)
@@ -1019,6 +1043,8 @@ export async function animateGameTurns({ //hasBallAtStep
       await animationRouter.processTurn(turn);
 
       // ✅ DEBUG: Log after processing turn
+      const nextTurnAfter = i + 1 < turns.length ? turns[i + 1] : null;
+      const nextNextTurnAfter = i + 2 < turns.length ? turns[i + 2] : null;
       console.log('🔍 [AFTER PROCESS TURN]', {
         turn_index: i,
         result_type: turn.result_type,
@@ -1026,7 +1052,12 @@ export async function animateGameTurns({ //hasBallAtStep
         isHCO,
         previousTurnWasShot: scene._previousTurnWasShot === true,
         nextTurnIndex: i + 1,
-        nextTurnResult: turns[i + 1]?.result_type || null
+        nextTurnResult: nextTurnAfter?.result_type || null,
+        nextNextTurnResult: nextNextTurnAfter?.result_type || null,
+        willProcessOREB: nextTurnAfter?.result_type === 'OREB' || nextTurnAfter?.result_type === 'OREB_KICKOUT',
+        willProcessPutback: nextTurnAfter?.result_type === 'PUTBACK_MAKE' || nextTurnAfter?.result_type === 'PUTBACK_MISS',
+        willProcessPutbackAfterOREB: (nextTurnAfter?.result_type === 'OREB' || nextTurnAfter?.result_type === 'OREB_KICKOUT') && 
+                                     (nextNextTurnAfter?.result_type === 'PUTBACK_MAKE' || nextNextTurnAfter?.result_type === 'PUTBACK_MISS')
       });
 
       if (shouldDebugHCO && isHCO) {
