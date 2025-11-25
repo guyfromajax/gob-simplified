@@ -451,10 +451,9 @@ export class ShotAnimationSystem {
     // This matches the pattern in ballManager.js (line 626)
     this.ballController.onShotEnd();
     
-    // ✅ FIX: Handle inbound pass transition after made shot (like Fast Break does)
-    // Only for regular HCO made shots (not putback makes, which are handled separately)
-    if (!isPutbackMake && turnData.next_play_type === "BASELINE_INBOUND") {
-      // Show "It's Good!" announcement (like Fast Break)
+    // ✅ FIX: Show "It's Good!" announcement for ALL made shots (like Fast Break does)
+    // This includes both regular makes and AND-1 situations
+    if (!isPutbackMake) {
       const { showAnnouncement } = await import('../utils/announcements.js');
       const shooterInfo = this.scene.playerInfo?.[turnData.shooter_id];
       const shooterSprite = this.playerSprites[turnData.shooter_id];
@@ -480,24 +479,27 @@ export class ShotAnimationSystem {
       // Wait for announcement (like Fast Break)
       await new Promise(resolve => this.scene.time.delayedCall(1000, resolve));
       
-      // Call runInboundSetup (like Fast Break)
-      const { runInboundSetup } = await import('./turnAnimation.js');
-      const newOffenseSide = isHomeOffense ? "away" : "home";
-      const skipRetreat = turnData.next_defensive_setup === "FCP" || turnData.next_defensive_setup === "HCT";
-      const pressureType = skipRetreat ? turnData.next_defensive_setup : null;
-      
-      await runInboundSetup({
-        scene: this.scene,
-        ballSprite: this.ballController.ballSprite,
-        playerSprites: this.playerSprites,
-        newOffenseSide: newOffenseSide,
-        homeTeamId: this.scene.simData?.home_team_id,
-        awayTeamId: this.scene.simData?.away_team_id,
-        skipRetreat: skipRetreat,
-        pressureType: pressureType
-      });
-      
-      console.log(`🔍 MADE SHOT - Inbound setup completed for BASELINE_INBOUND`);
+      // ✅ FIX: Only call runInboundSetup if next_play_type is BASELINE_INBOUND
+      // For AND-1 situations (next_play_type === "FREE_THROW"), let the free throw system handle the transition
+      if (turnData.next_play_type === "BASELINE_INBOUND") {
+        const { runInboundSetup } = await import('./turnAnimation.js');
+        const newOffenseSide = isHomeOffense ? "away" : "home";
+        const skipRetreat = turnData.next_defensive_setup === "FCP" || turnData.next_defensive_setup === "HCT";
+        const pressureType = skipRetreat ? turnData.next_defensive_setup : null;
+        
+        await runInboundSetup({
+          scene: this.scene,
+          ballSprite: this.ballController.ballSprite,
+          playerSprites: this.playerSprites,
+          newOffenseSide: newOffenseSide,
+          homeTeamId: this.scene.simData?.home_team_id,
+          awayTeamId: this.scene.simData?.away_team_id,
+          skipRetreat: skipRetreat,
+          pressureType: pressureType
+        });
+        
+        console.log(`🔍 MADE SHOT - Inbound setup completed for BASELINE_INBOUND`);
+      }
     }
     
     // ✅ DEBUG: Log completion of made shot
