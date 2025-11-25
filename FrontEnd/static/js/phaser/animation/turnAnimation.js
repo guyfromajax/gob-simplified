@@ -1667,6 +1667,14 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
       if (turnData.result_type === "MAKE") {
         // Visual effects for AND-1 now handled in ballManager.js when "And 1!" is announced
         
+        // ✅ OPTION 1 FIX: Ensure onShotEnd() is called before transitioning to next operation
+        // This ensures ball state is cleared before free throw or inbound pass
+        const { getBallController } = await import('./BallControllerAdapter.js');
+        const ballController = getBallController();
+        if (ballController && ballController.isInFlight) {
+          ballController.onShotEnd();
+        }
+        
         // Check if there's a free throw coming (AND-1 or technical foul)
         // In turn-by-turn mode, check turnData.free_throws_remaining
         // In batch mode, check next turn in array
