@@ -862,6 +862,11 @@ export async function animateGameTurns({ //hasBallAtStep
 
     const shooterId = playerMap[shooterName];
 
+    const shouldDebugHCO =
+      DEBUG_FLOW ||
+      debugEnabled ||
+      Boolean(typeof window !== 'undefined' && window.ROUTER_DEBUG);
+
     // PossessionRunner removed - always use standard animation path
     {
       // ✅ Debug log for HCO turns after Fast Break defensive stop
@@ -890,6 +895,18 @@ export async function animateGameTurns({ //hasBallAtStep
         });
       }
       
+      if (shouldDebugHCO) {
+        animationDebugLog('HCO_DIRECT_START', {
+          turn_index: i,
+          result_type: turn.result_type,
+          fast_break: turn.fast_break,
+          hasAnimations: !!turn.animations?.length,
+          animationCount: turn.animations?.length || 0,
+          currentBallOwner: scene.ballController?.currentOwner?.playerId ?? null,
+          state: scene.stateMachine?.state
+        });
+      }
+
       await playTurnAnimation({
         scene,
         simData,
@@ -908,6 +925,17 @@ export async function animateGameTurns({ //hasBallAtStep
         turnIndex: i,
         updateDebugScore
       });
+
+      if (shouldDebugHCO) {
+        animationDebugLog('HCO_DIRECT_END', {
+          turn_index: i,
+          result_type: turn.result_type,
+          fast_break: turn.fast_break,
+          currentBallOwner: scene.ballController?.currentOwner?.playerId ?? null,
+          previousTurnWasShot: scene._previousTurnWasShot === true,
+          state: scene.stateMachine?.state
+        });
+      }
     }
 
     const stealEvent = turn.events?.find(e => e.event_type === "STEAL");
