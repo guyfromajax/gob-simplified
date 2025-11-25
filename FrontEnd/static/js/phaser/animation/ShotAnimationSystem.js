@@ -62,11 +62,12 @@ export class ShotAnimationSystem {
   async processShot(turnData) {
     // ✅ DEBUG: Log shot attempt immediately - track shooter and shot details
     const isHCO = turnData.play_type === 'HCO' || turnData.playcall === 'HCO';
+    const shooterName = this.playerSprites[turnData.shooter_id]?.name || 'unknown';
     console.log('🏀 [SHOT ATTEMPT]', {
       turnIndex: this.scene.currentTurn,
       isHCO,
       shooter_id: turnData.shooter_id,
-      shooter_name: this.playerSprites[turnData.shooter_id]?.name || 'unknown',
+      shooter_name: shooterName,
       shot_type: turnData.shot_type,
       playcall: turnData.playcall,
       play_type: turnData.play_type,
@@ -76,6 +77,8 @@ export class ShotAnimationSystem {
       shot_score: turnData.shot_score,
       threshold: turnData.threshold
     });
+    // ✅ Also log separately for easier reading
+    console.log(`🏀 SHOT ATTEMPT: ${shooterName} (${turnData.shooter_id}) - Result: ${turnData.result_type} - HCO: ${isHCO}`);
     
     if (this.activeShot) {
       console.warn('ShotAnimationSystem: Already processing a shot, queuing...');
@@ -492,10 +495,11 @@ export class ShotAnimationSystem {
     const wasOREB = previousTurnResult === 'OREB' || previousTurnResult === 'OREB_KICKOUT';
     
     // ✅ DEBUG: Log made shot with shooter details
+    const shooterName = this.playerSprites[turnData.shooter_id]?.name || 'unknown';
     console.log('🏀 [ANIMATING MADE SHOT]', {
       turnIndex: this.scene.currentTurn,
       shooter_id: turnData.shooter_id,
-      shooter_name: this.playerSprites[turnData.shooter_id]?.name || 'unknown',
+      shooter_name: shooterName,
       result_type: turnData.result_type,
       shot_type: turnData.shot_type,
       isPutbackMake,
@@ -509,6 +513,8 @@ export class ShotAnimationSystem {
       // ✅ Track if this shooter might get stats updated
       shooterSprite: !!this.playerSprites[turnData.shooter_id]
     });
+    // ✅ Also log separately for easier reading
+    console.log(`🏀 ANIMATING MADE SHOT: ${shooterName} (${turnData.shooter_id}) - Type: ${turnData.shot_type || 'unknown'} - Putback: ${isPutbackMake}`);
     
     console.log('🔍 [MADE SHOT PATH DEBUG]', {
       turnIndex: this.scene.currentTurn,
@@ -578,20 +584,31 @@ export class ShotAnimationSystem {
    */
   async handleMissedShot(rimCoords, turnData) {
     // ✅ DEBUG: Log missed shot with shooter details
+    const previousTurn = this.scene.simData?.turns?.[(this.scene.currentTurn || 0) - 1];
+    const previousTurnResult = previousTurn?.result_type;
+    const shooterName = this.playerSprites[turnData.shooter_id]?.name || 'unknown';
+    const rebounderName = turnData.rebounderId ? (this.playerSprites[turnData.rebounderId]?.name || 'unknown') : null;
+    const isOwnRebound = turnData.rebounderId === turnData.shooter_id;
+    
     console.log('🏀 [ANIMATING MISSED SHOT]', {
       turnIndex: this.scene.currentTurn,
       shooter_id: turnData.shooter_id,
-      shooter_name: this.playerSprites[turnData.shooter_id]?.name || 'unknown',
+      shooter_name: shooterName,
       result_type: turnData.result_type,
       shot_type: turnData.shot_type,
-      previousTurnResult: this.scene.simData?.turns?.[(this.scene.currentTurn || 0) - 1]?.result_type || null,
+      previousTurnResult,
+      path: previousTurnResult === 'OREB' || previousTurnResult === 'OREB_KICKOUT'
+        ? 'HCO => MISS => OREB => Putback' 
+        : 'HCO => MISS',
       rebound_type: turnData.rebound_type,
       rebounderId: turnData.rebounderId,
-      rebounderName: turnData.rebounderId ? (this.playerSprites[turnData.rebounderId]?.name || 'unknown') : null,
+      rebounderName: rebounderName,
       next_play_type: turnData.next_play_type,
       // ✅ Track if shooter might get rebound (own rebound)
-      isOwnRebound: turnData.rebounderId === turnData.shooter_id
+      isOwnRebound: isOwnRebound
     });
+    // ✅ Also log separately for easier reading
+    console.log(`🏀 ANIMATING MISSED SHOT: ${shooterName} (${turnData.shooter_id}) - Rebounder: ${rebounderName || 'none'} (${turnData.rebounderId || 'none'}) - Own Rebound: ${isOwnRebound}`);
     console.log('ShotAnimationSystem: Shot missed', {
       shooter_id: turnData.shooter_id,
       shot_type: turnData.shot_type,
