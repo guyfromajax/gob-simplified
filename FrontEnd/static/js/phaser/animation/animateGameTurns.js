@@ -994,10 +994,31 @@ export async function animateGameTurns({ //hasBallAtStep
       // Ensure turn.index is set (AnimationRouter will use it for context)
       turn.index = i;
       
+      // ✅ DEBUG: Log before processing turn through AnimationRouter
+      console.log('🔍 [BEFORE PROCESS TURN]', {
+        turn_index: i,
+        result_type: turn.result_type,
+        fast_break: turn.fast_break,
+        isHCO,
+        previousTurnWasShot: scene._previousTurnWasShot === true,
+        previousTurnResult: i > 0 ? turns[i - 1]?.result_type : null
+      });
+      
       // AnimationRouter handles pre/post setup (prepareTurnForAnimation, finalizeTurnAfterAnimation)
       // Note: prepareTurnForAnimation was already called at line 479, but AnimationRouter will call it again
       // This is safe (idempotent) but we could optimize later by skipping the first call for HCO turns
       await animationRouter.processTurn(turn);
+
+      // ✅ DEBUG: Log after processing turn
+      console.log('🔍 [AFTER PROCESS TURN]', {
+        turn_index: i,
+        result_type: turn.result_type,
+        fast_break: turn.fast_break,
+        isHCO,
+        previousTurnWasShot: scene._previousTurnWasShot === true,
+        nextTurnIndex: i + 1,
+        nextTurnResult: turns[i + 1]?.result_type || null
+      });
 
       if (shouldDebugHCO && isHCO) {
         console.log('🔍 HCO_ROUTER_END', {

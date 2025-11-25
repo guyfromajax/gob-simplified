@@ -512,6 +512,16 @@ export class ShotAnimationSystem {
     // ✅ PRIORITY 1 FIX: Call onShotEnd() to clear in-flight state
     // This matches the pattern in ballManager.js (line 626)
     this.ballController.onShotEnd();
+    
+    // ✅ DEBUG: Log completion of made shot
+    console.log('🔍 [MADE SHOT COMPLETE]', {
+      turnIndex: this.scene.currentTurn,
+      shooter_id: turnData.shooter_id,
+      next_play_type: turnData.next_play_type,
+      possession_flips: turnData.possession_flips,
+      ballControllerState: this.ballController.getState(),
+      stateMachineState: this.stateMachine?.currentState
+    });
   }
 
   /**

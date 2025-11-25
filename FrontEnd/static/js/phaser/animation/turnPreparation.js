@@ -110,9 +110,21 @@ export function finalizeTurnAfterAnimation({
   turnIndex,
   updateDebugScore 
 }) {
+  // ✅ DEBUG: Log finalization
+  console.log('🔍 [FINALIZING TURN]', {
+    turnIndex: turnIndex ?? turn.index,
+    result_type: turn.result_type,
+    willSetPreviousTurnWasShot: turn.result_type === "MAKE" || turn.result_type === "MISS",
+    hasOnUpdate: !!onUpdate
+  });
+  
   // Set flag if this was a shot turn (MAKE or MISS) so the next turn knows to skip step 0 ball attachment
   if (turn.result_type === "MAKE" || turn.result_type === "MISS") {
     scene._previousTurnWasShot = true;
+    console.log('🔍 [SET _previousTurnWasShot]', {
+      turnIndex: turnIndex ?? turn.index,
+      result_type: turn.result_type
+    });
   }
   
   // Show announcements for shot results and rebounds (after animation)
@@ -123,6 +135,10 @@ export function finalizeTurnAfterAnimation({
   if (onUpdate) {
     try {
       onUpdate(turn);
+      console.log('🔍 [CALLED onUpdate]', {
+        turnIndex: turnIndex ?? turn.index,
+        result_type: turn.result_type
+      });
     } catch (err) {
       console.error('Scoreboard update failed:', err);
     }
