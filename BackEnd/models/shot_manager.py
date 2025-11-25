@@ -351,6 +351,8 @@ class ShotManager:
                 self.game_state["offensive_state"] = "FREE_THROW"
                 self.game_state["free_throws"] = 1
                 self.game_state["free_throws_remaining"] = 1
+                # ✅ FIX: Set next_play_type for AND-1 situations
+                result["next_play_type"] = "FREE_THROW"
                 text = f"{get_name_safe(shooter)} makes the shot. {get_name_safe(foul_player)} fouls him! AND-1 opportunity!"
                 
                 # Add foul out info to result if applicable
@@ -370,6 +372,9 @@ class ShotManager:
                 self.game_state["offensive_state"] = pressure_type
                 # Store pressure type for animator to use
                 result["next_defensive_setup"] = pressure_type
+                # ✅ FIX: Set next_play_type for made shots without fouls
+                # After a made shot, possession flips and the other team gets a baseline inbound
+                result["next_play_type"] = "BASELINE_INBOUND"
                 text = f"{get_name_safe(shooter)} drains a 3!" if is_three else f"{get_name_safe(shooter)} makes the shot."
             
             # Add player positioning data for frontend animation (MAKE shots)
