@@ -84,6 +84,13 @@ export class ShotAnimationSystem {
         player_id: turnData.player_id,
         shot_type: turnData.shot_type,
         allKeys: Object.keys(turnData),
+        // ✅ PRIORITY 2 FIX: Log next_play_type specifically to diagnose missing data
+        next_play_type: turnData.next_play_type,
+        hasNextPlayType: !!turnData.next_play_type,
+        rebound_type: turnData.rebound_type,
+        hasReboundType: !!turnData.rebound_type,
+        rebounderId: turnData.rebounderId,
+        hasRebounderId: !!turnData.rebounderId,
         fullTurnData: turnData
       });
       
@@ -735,15 +742,41 @@ export class ShotAnimationSystem {
    * Handle defensive rebound
    */
   async handleDefensiveRebound(rebounderSprite, turnData) {
+    // ✅ PRIORITY 2 FIX: Enhanced logging to diagnose missing next_play_type
     console.log('🎬 ShotAnimationSystem: Handling defensive rebound', {
       rebounderId: turnData.rebounderId,
       next_play_type: turnData.next_play_type,
-      rebound_type: turnData.rebound_type
+      rebound_type: turnData.rebound_type,
+      hasNextPlayType: !!turnData.next_play_type,
+      turnDataKeys: Object.keys(turnData),
+      fullTurnData: turnData // Log full object to see what's actually present
     });
     
-    // ✅ PRIORITY 2 FIX: Add defensive fallback for missing next_play_type
-    // Default to HCO if not specified (most common case for defensive rebounds)
-    const nextPlayType = turnData.next_play_type || 'HCO';
+    // ✅ PRIORITY 2 FIX: Validate next_play_type is present (no fallback - must be correct)
+    if (!turnData.next_play_type) {
+      // Diagnostic: Check if next_play_type is on the next turn (shouldn't be, but let's check)
+      const currentTurnIndex = this.scene.currentTurn || 0;
+      const nextTurn = this.scene.simData?.turns?.[currentTurnIndex + 1];
+      
+      console.error('❌ ShotAnimationSystem: next_play_type is missing from turnData!', {
+        rebounderId: turnData.rebounderId,
+        rebound_type: turnData.rebound_type,
+        currentTurnIndex,
+        currentTurnResultType: turnData.result_type,
+        nextTurnResultType: nextTurn?.result_type,
+        nextTurnNextPlayType: nextTurn?.next_play_type,
+        sceneOffensiveState: this.scene.gameState?.offensive_state,
+        turnData: turnData,
+        note: 'This should come from backend on the MISS turn - investigate why it is missing'
+      });
+      
+      // Don't proceed with outlet pass if we don't know what comes next
+      // This will help us identify the root cause
+      // The backend should set next_play_type on MISS turns with embedded rebounds (turn_manager.py line 1370)
+      return;
+    }
+    
+    const nextPlayType = turnData.next_play_type;
     
     // Use the same defensive rebound setup for HCO, HCT, and FCP
     // Fast breaks handle outlet in their own turn
@@ -758,7 +791,7 @@ export class ShotAnimationSystem {
           ballSprite: this.ballController.ballSprite,
           playerSprites: this.playerSprites,
           rebounderId: turnData.rebounderId,
-          nextPlayType: nextPlayType // Use the fallback value
+          nextPlayType: nextPlayType
         });
         console.log('✅ ShotAnimationSystem: runDefensiveReboundSetup completed successfully');
       } catch (error) {
