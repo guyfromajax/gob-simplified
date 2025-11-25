@@ -451,10 +451,11 @@ export class ShotAnimationSystem {
     // This matches the pattern in ballManager.js (line 626)
     this.ballController.onShotEnd();
     
-    // ✅ FIX: Show "It's Good!" announcement for ALL made shots (like Fast Break does)
+    // ✅ FIX: Show announcement for ALL made shots (like Fast Break does)
     // This includes both regular makes and AND-1 situations
     if (!isPutbackMake) {
-      const { showAnnouncement } = await import('../utils/announcements.js');
+      const { showAnnouncement, showAndOneAnnouncement } = await import('../utils/announcements.js');
+      const { triggerMadeShotFlash } = await import('./negativeActionEffects.js');
       const shooterInfo = this.scene.playerInfo?.[turnData.shooter_id];
       const shooterSprite = this.playerSprites[turnData.shooter_id];
       const shooterTeamId = shooterSprite?.team_id;
@@ -474,7 +475,37 @@ export class ShotAnimationSystem {
       
       const isHomeOffense = shooterTeamId === this.scene.simData?.home_team_id;
       const teamStyle = isHomeOffense ? 'home' : 'away';
-      showAnnouncement("It's Good!", teamStyle, shooterPlayerData);
+      
+      // Check if this is an AND-1 situation (made shot with defensive foul)
+      const isAndOne = turnData.next_play_type === "FREE_THROW" && 
+                       (turnData.foul_player_id || turnData.foul_player?.player_id);
+      
+      // Trigger green flash (full screen for regular makes, same for AND-1)
+      triggerMadeShotFlash(this.scene, isAndOne);
+      
+      if (isAndOne) {
+        // AND-1 - Use special two-row announcement (red box with shooter + fouler)
+        const foulPlayerId = turnData.foul_player_id || turnData.foul_player?.player_id;
+        if (foulPlayerId && shooterPlayerData) {
+          const foulPlayerSprite = this.playerSprites[foulPlayerId];
+          const foulPlayerTeamId = foulPlayerSprite?.team_id;
+          const foulPlayerTeamName = foulPlayerTeamId === this.scene.simData?.home_team_id ? homeTeamName : awayTeamName;
+          
+          const foulPlayerData = {
+            playerId: foulPlayerId,
+            photo: foulPlayerSprite?.photo || null,
+            teamName: foulPlayerTeamName
+          };
+          
+          showAndOneAnnouncement(teamStyle, shooterPlayerData, foulPlayerData);
+        } else {
+          // Fallback if data missing
+          showAnnouncement("It's Good! And 1!", teamStyle, shooterPlayerData);
+        }
+      } else {
+        // Regular made shot
+        showAnnouncement("It's Good!", teamStyle, shooterPlayerData);
+      }
       
       // Wait for announcement (like Fast Break)
       await new Promise(resolve => this.scene.time.delayedCall(1000, resolve));
