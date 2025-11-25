@@ -182,6 +182,15 @@ async function handleOrebTurn(scene, { playerSprites, ballSprite, turnData, onUp
       const shooterTeamIsHome = String(shooterTeamId) === String(homeTeamId);
       const newOffenseSide = shooterTeamIsHome ? "away" : "home";
       
+      // ✅ FIX: Call onPutbackEnd() before inbound setup (state clearing pattern)
+      // This ensures putback state is cleared before transitioning to inbound pass
+      const { getBallController } = await import('./BallControllerAdapter.js');
+      const ballController = getBallController();
+      if (ballController) {
+        ballController.onPutbackEnd();
+        console.log('🔍 [PUTBACK MAKE] Called onPutbackEnd() before inbound setup');
+      }
+      
       // Check for defensive pressure
       const skipRetreat = turnData.next_defensive_setup === "FCP" || turnData.next_defensive_setup === "HCT";
       const pressureType = skipRetreat ? turnData.next_defensive_setup : null;
@@ -574,17 +583,17 @@ export async function animateGameTurns({ //hasBallAtStep
         await animationRouter.processTurn(turn);
       } else {
         // Non-animated foul - just do announcements and updates
-        // Announce foul (visual effects now handled by announcement system)
-        announceFromTurnData(turn, 'end', scene.simData?.home_team_id, scene);
-        // Update scoreboard for all fouls (FCP or not)
-        if (onUpdate) {
-          try {
-            onUpdate(turn);
-          } catch (err) {
-            console.error('Scoreboard update failed:', err);
-          }
+      // Announce foul (visual effects now handled by announcement system)
+      announceFromTurnData(turn, 'end', scene.simData?.home_team_id, scene);
+      // Update scoreboard for all fouls (FCP or not)
+      if (onUpdate) {
+        try {
+          onUpdate(turn);
+        } catch (err) {
+          console.error('Scoreboard update failed:', err);
         }
-        updateDebugScore(turn, { turnIndex: i, possessionId });
+      }
+      updateDebugScore(turn, { turnIndex: i, possessionId });
       }
       continue;
     }
