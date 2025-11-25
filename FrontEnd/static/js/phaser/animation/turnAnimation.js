@@ -1484,13 +1484,18 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
       scene._leanAnimationTriggered = true;
     }
 
-    // ✅ FIX: Skip updateBallOwnership if a pass is happening at this step
+    // ✅ FIX: Skip updateBallOwnership if a pass is happening at this step OR
+    // if a pass just completed (passInFlight is still true from previous step)
     // We'll handle the pass explicitly after movements complete (like shots)
     const passHappeningAtThisStep = turnData.animations.some(
       anim => anim.movement?.[stepIndex]?.action === "pass"
     );
     
-    if (!passHappeningAtThisStep) {
+    // ✅ CRITICAL FIX: Also skip if passInFlight is true (pass just completed)
+    // This prevents updateBallOwnership from teleporting the ball immediately after runPass() completes
+    // The passInFlight flag will be cleared by runPass()'s finally block, but we keep it true
+    // for one more step to ensure the ball is properly attached before updateBallOwnership runs
+    if (!passHappeningAtThisStep && !scene.passInFlight) {
       updateBallOwnership({
         scene,
         ballSprite,
@@ -1500,6 +1505,11 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
         offenseTeamId: scene.currentOffenseTeamId ?? turnData.possession_team_id,
         currentBallOwnerRef
       });
+    } else if (scene.passInFlight && !passHappeningAtThisStep) {
+      // Pass just completed, clear the flag now that we've skipped updateBallOwnership
+      // This allows updateBallOwnership to run normally for subsequent steps
+      scene.passInFlight = false;
+      console.log('🏀 [PASS ANIMATION] Cleared passInFlight after skipping updateBallOwnership');
     }
 
     // Update active player displays in scoreboard
@@ -1654,7 +1664,13 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
           easing: "Sine.easeInOut"
         });
         
-        console.log('🏀 [PASS ANIMATION] runPass completed');
+        // ✅ CRITICAL FIX: Keep passInFlight true for the NEXT step to prevent
+        // updateBallOwnership from teleporting the ball immediately after pass completes
+        // runPass() clears passInFlight in its finally block, but we need it to stay true
+        // for one more step iteration to prevent updateBallOwnership from interfering
+        // This matches fast break behavior - no updateBallOwnership during/after pass
+        scene.passInFlight = true;
+        console.log('🏀 [PASS ANIMATION] runPass completed, keeping passInFlight=true for next step');
       } else {
         console.error('❌ [PASS ANIMATION] Missing sprites!', {
           passerSprite: !!passerSprite,
