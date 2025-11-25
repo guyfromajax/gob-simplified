@@ -453,13 +453,37 @@ export async function animateGameTurns({ //hasBallAtStep
     const turn = turns[i];
     if (scene.skipToEnd) break;
     
-    // ✅ PHASE 2.2: Use extracted prepareTurnForAnimation function
-    const { possessionId } = prepareTurnForAnimation({
-      turn,
-      scene,
-      turnIndex: i,
-      homeTeamId: scene.simData?.home_team_id
-    });
+    // ✅ PHASE 2.5: Check if this is a standard HCO turn (will be migrated to AnimationRouter)
+    // Standard HCO turns: not fast_break, result_type is MAKE or MISS, has animations
+    const isStandardHCOTurn = !turn.fast_break && 
+                               (turn.result_type === "MAKE" || turn.result_type === "MISS") &&
+                               turn.animations && turn.animations.length > 0 &&
+                               turn.result_type !== "FREE_THROW" &&
+                               turn.result_type !== "FOUL" &&
+                               turn.result_type !== "DEAD BALL" &&
+                               turn.result_type !== "SIDE_INBOUND" &&
+                               turn.result_type !== "BASELINE_INBOUND" &&
+                               turn.result_type !== "PUTBACK_MAKE" &&
+                               turn.result_type !== "PUTBACK_MISS" &&
+                               turn.result_type !== "OREB_KICKOUT" &&
+                               turn.result_type !== "TURNOVER" &&
+                               turn.result_type !== "OPENING_TIP" &&
+                               !turn.fcp_shot && !turn.hct_shot;
+    
+    // ✅ PHASE 2.2: Use extracted prepareTurnForAnimation function (skip for standard HCO turns - AnimationRouter handles it)
+    let possessionId;
+    if (!isStandardHCOTurn) {
+      const prepResult = prepareTurnForAnimation({
+        turn,
+        scene,
+        turnIndex: i,
+        homeTeamId: scene.simData?.home_team_id
+      });
+      possessionId = prepResult.possessionId;
+    } else {
+      // For standard HCO turns, just calculate possessionId (AnimationRouter will handle setup)
+      possessionId = turn.possession_id ?? turn.possessionId ?? turn.possessionID ?? null;
+    }
     
     const animations = turn.animations || [];
     const shouldLogLegacySteps =
@@ -890,24 +914,11 @@ export async function animateGameTurns({ //hasBallAtStep
         });
       }
       
-      await playTurnAnimation({
-        scene,
-        simData,
-        playerSprites,
-        turnData: turn,
-        ballSprite,
-        onAction
-      });
-      
-      // ✅ PHASE 2.2: Use extracted finalizeTurnAfterAnimation function
-      finalizeTurnAfterAnimation({
-        turn,
-        scene,
-        onUpdate,
-        possessionId,
-        turnIndex: i,
-        updateDebugScore
-      });
+      // ✅ PHASE 2.5: Standard HCO turns - route through AnimationRouter
+      // Ensure turn.index is set (AnimationRouter will use it for context)
+      turn.index = i;
+      // AnimationRouter handles pre/post setup (prepareTurnForAnimation, finalizeTurnAfterAnimation)
+      await animationRouter.processTurn(turn);
     }
 
     const stealEvent = turn.events?.find(e => e.event_type === "STEAL");
