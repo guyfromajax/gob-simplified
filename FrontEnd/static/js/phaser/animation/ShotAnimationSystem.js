@@ -197,12 +197,9 @@ export class ShotAnimationSystem {
           y,
           duration: 1000,
           ease: "Linear",
-          onUpdate: () => {
-            if (currentBallOwnerRef?.value === sprite && ballSprite?.setPosition) {
-              ballSprite.setPosition(sprite.x, sprite.y);
-              ballSprite.setVisible(true);
-            }
-          },
+          // ✅ FIX: Removed manual ball positioning - BallController handles ball following automatically
+          // When ball is attached via attachToPlayer(), it automatically follows the player
+          // Manual setPosition() calls conflict with BallController's following system
           onComplete: resolve,
           onStop: resolve
         });
