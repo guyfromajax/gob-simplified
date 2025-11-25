@@ -14,6 +14,7 @@ import { updatePlaycallDisplay } from "../utils/playcallDisplay.js";
 import { announceFromTurnData } from "../utils/announcements.js";
 import { updateStrategyBars } from "../utils/strategyBars.js";
 import { updatePlaycallCenter, animateLeanMeter, parseLeanScoreFromText } from "../ui/playcallCenter.js";
+import { prepareTurnForAnimation, finalizeTurnAfterAnimation } from "./turnPreparation.js";
 import {
   animationDebugLog,
   animationDebugWarn,
@@ -438,48 +439,18 @@ export async function animateGameTurns({ //hasBallAtStep
   // console.log('🎬 animateGameTurns: Starting turn processing loop', { totalTurns: turns.length });
   
   for (let i = 0; i < turns.length; i++) {
-    scene.currentTurn = i;
     const turn = turns[i];
-    turn.index = i;
     if (scene.skipToEnd) break;
     
-    // Update playcall display before animating the turn
-    updatePlaycallDisplay(turn, scene.simData?.home_team_id);
+    // ✅ PHASE 2.2: Use extracted prepareTurnForAnimation function
+    const { possessionId } = prepareTurnForAnimation({
+      turn,
+      scene,
+      turnIndex: i,
+      homeTeamId: scene.simData?.home_team_id
+    });
     
-    // Update strategy bars at start of turn
-    updateStrategyBars(turn, scene.simData?.home_team_id);
-    
-    // Update Playcall Center (panels and reset lean meter)
-    updatePlaycallCenter(turn, scene.simData?.home_team_id);
-    
-    // Parse lean score for later animation (at middle step)
-    const leanScore = parseLeanScoreFromText(turn);
     const animations = turn.animations || [];
-    
-    // Calculate middle step for lean meter animation
-    if (leanScore !== null && animations.length > 0) {
-      // Find the max number of steps across all player animations
-      const maxSteps = Math.max(
-        0,
-        ...animations.map(anim => anim.movement?.length || 0)
-      );
-      
-      // Calculate middle step (round up for even numbers)
-      const middleStep = Math.ceil(maxSteps / 2);
-      
-      // Store for use during animation
-      scene._leanScoreToAnimate = leanScore;
-      scene._leanAnimationStep = middleStep;
-      scene._leanAnimationTriggered = false;
-    } else {
-      scene._leanScoreToAnimate = null;
-    }
-    
-    // Show announcement for turn start events (Fast Break, Press, Trap)
-    announceFromTurnData(turn, 'start', scene.simData?.home_team_id, scene);
-    
-    const possessionId =
-      turn.possession_id ?? turn.possessionId ?? turn.possessionID ?? null;
     const shouldLogLegacySteps =
       debugEnabled && stepLogger;
 
@@ -929,10 +900,15 @@ export async function animateGameTurns({ //hasBallAtStep
         onAction
       });
       
-      // Set flag if this was a shot turn (MAKE or MISS) so the next turn knows to skip step 0 ball attachment
-      if (turn.result_type === "MAKE" || turn.result_type === "MISS") {
-        scene._previousTurnWasShot = true;
-      }
+      // ✅ PHASE 2.2: Use extracted finalizeTurnAfterAnimation function
+      finalizeTurnAfterAnimation({
+        turn,
+        scene,
+        onUpdate,
+        possessionId,
+        turnIndex: i,
+        updateDebugScore
+      });
     }
 
     const stealEvent = turn.events?.find(e => e.event_type === "STEAL");
@@ -965,18 +941,6 @@ export async function animateGameTurns({ //hasBallAtStep
         }
       }
     }
-
-    // Show announcements for shot results and rebounds (after animation)
-    announceFromTurnData(turn, 'end', scene.simData?.home_team_id, scene);
-    
-    if (onUpdate) {
-      try {
-        onUpdate(turn);
-      } catch (err) {
-        console.error('Scoreboard update failed:', err);
-      }
-    }
-    updateDebugScore(turn, { turnIndex: i, possessionId });
     if (scene.skipToEnd) {
       for (let j = i + 1; j < turns.length; j++) {
         try {
