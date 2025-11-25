@@ -1662,12 +1662,18 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
           passerId: passInfo.passerId,
           receiverId: passInfo.receiverId
         });
-      } else {
-        console.warn('⚠️ [PASS ANIMATION] Missing sprites', {
-          passerId: passInfo.passerId,
-          receiverId: passInfo.receiverId,
-          hasPasserSprite: !!passerSprite,
-          hasReceiverSprite: !!receiverSprite
+      }
+    } else {
+      // Debug: log when we DON'T have passInfo but might expect one
+      const hasPassAction = turnData.animations.some(anim => 
+        anim.movement?.some(step => step.action === "pass")
+      );
+      if (hasPassAction) {
+        console.log('⚠️ [PASS DEBUG] Pass action exists but passInfo is null', {
+          allActions: turnData.animations.map(a => ({
+            playerId: a.playerId,
+            actions: a.movement?.map(s => s.action) || []
+          }))
         });
       }
     }
