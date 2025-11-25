@@ -63,10 +63,14 @@ export class AnimationEngine {
    * Routes turn data to the appropriate handler
    */
   async processTurn(turnData, context = {}) {
-    if (this.isProcessing) {
-      console.warn('AnimationEngine: Already processing a turn, skipping');
-      return;
-    }
+    // ✅ COMMENTED OUT: Redundant guard - AnimationRouter already prevents concurrent calls
+    // AnimationRouter.processTurn() queues turns if already processing, and uses await,
+    // so AnimationEngine.processTurn() will never be called concurrently.
+    // If unforeseen issues arise, uncomment this guard.
+    // if (this.isProcessing) {
+    //   console.warn('AnimationEngine: Already processing a turn, skipping');
+    //   return;
+    // }
 
     this.isProcessing = true;
 
