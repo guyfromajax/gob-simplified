@@ -15,14 +15,16 @@
 import AnimationEngine from './AnimationEngine.js';
 import { getBallController } from './BallControllerAdapter.js';
 import { DebugFlags } from '../utils/debugFlags.js';
+import { prepareTurnForAnimation, finalizeTurnAfterAnimation } from './turnPreparation.js';
 
 export class AnimationRouter {
-  constructor(scene, playerSprites, ballSprite, onUpdate, onAction = null) {
+  constructor(scene, playerSprites, ballSprite, onUpdate, onAction = null, updateDebugScore = null) {
     this.scene = scene;
     this.playerSprites = playerSprites;
     this.ballSprite = ballSprite;
     this.onUpdate = onUpdate;
     this.onAction = onAction;
+    this.updateDebugScore = updateDebugScore; // ✅ PHASE 2.3: Store updateDebugScore function
     
     // Initialize core components
     this.ballController = getBallController(); // Use the global BallController from adapter
@@ -84,17 +86,26 @@ export class AnimationRouter {
     this.isProcessing = true;
     this.currentTurn = turnData;
 
-    try {
-      // ✅ PHASE 2.1: Ensure turn.index is set (required for context)
-      const turnIndex = turnData.index ?? turnData.turnIndex ?? null;
-      if (turnIndex !== null) {
-        turnData.index = turnIndex;
-      }
+    // ✅ PHASE 2.3: Variables for pre/post setup
+    let turnIndex = null;
+    let possessionId = null;
 
-      // ✅ PHASE 2.1: Set scene.currentTurn before routing (required by playTurnAnimation)
-      if (turnIndex !== null) {
-        this.scene.currentTurn = turnIndex;
-      }
+    try {
+      // ✅ PHASE 2.3: Call prepareTurnForAnimation at the start
+      // Extract turnIndex from turnData (will be set by prepareTurnForAnimation if not present)
+      turnIndex = turnData.index ?? turnData.turnIndex ?? null;
+      
+      const homeTeamId = this.scene.simData?.home_team_id;
+      const { possessionId: prepPossessionId } = prepareTurnForAnimation({
+        turn: turnData,
+        scene: this.scene,
+        turnIndex: turnIndex ?? 0, // Use 0 as fallback if not provided (prepareTurnForAnimation will set it)
+        homeTeamId
+      });
+      possessionId = prepPossessionId;
+      
+      // ✅ PHASE 2.3: Get turnIndex from prepared turn (prepareTurnForAnimation sets turn.index)
+      turnIndex = turnData.index ?? turnIndex;
 
       console.log('🎬 AnimationRouter: Starting turn processing', {
         result_type: turnData.result_type,
@@ -137,6 +148,24 @@ export class AnimationRouter {
       });
       throw error;
     } finally {
+      // ✅ PHASE 2.3: Call finalizeTurnAfterAnimation in finally block (always runs)
+      try {
+        finalizeTurnAfterAnimation({
+          turn: turnData,
+          scene: this.scene,
+          onUpdate: this.onUpdate,
+          possessionId,
+          turnIndex: turnIndex ?? turnData.index ?? null,
+          updateDebugScore: this.updateDebugScore
+        });
+      } catch (finalizeError) {
+        console.error('❌ AnimationRouter: Error in finalizeTurnAfterAnimation', {
+          error: finalizeError.message,
+          stack: finalizeError.stack
+        });
+        // Don't throw - we're in finally block, just log the error
+      }
+      
       this.isProcessing = false;
       this.currentTurn = null;
     }

@@ -323,6 +323,8 @@ export class AnimationEngine {
 
   async handleDefault(turnData, context) {
     console.log('AnimationEngine: Handling default animation');
+    // ✅ PHASE 2.3: Note: Pre/post setup is handled by AnimationRouter
+    // This handler only needs to call playTurnAnimation with the provided context
     // Import and use existing turn animation handler for now
     const { playTurnAnimation } = await import('./turnAnimation.js');
     // ✅ PHASE 2.1: Pass full context including turnIndex and onUpdate
