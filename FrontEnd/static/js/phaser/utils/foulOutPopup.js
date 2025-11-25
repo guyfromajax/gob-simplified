@@ -43,7 +43,7 @@ export function showFoulOutPopup({ player, gameId, mode, quarter, clock, tournam
   
   // Fallback: try to get team info from current URL if not provided
   if (!homeTeam || !awayTeam) {
-    const urlParams = new URLSearchParams(window.location.search);
+  const urlParams = new URLSearchParams(window.location.search);
     if (!homeTeam) homeTeam = urlParams.get('home');
     if (!awayTeam) awayTeam = urlParams.get('away');
     if (!homeId) homeId = urlParams.get('home_id');

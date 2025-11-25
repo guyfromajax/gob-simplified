@@ -901,7 +901,8 @@ export async function animateGameTurns({ //hasBallAtStep
       });
     }
 
-    // PossessionRunner removed - always use standard animation path
+    // ✅ PHASE 2.5: Standard HCO turns now route through AnimationRouter
+    // This includes all MAKE/MISS turns that are not fast breaks
     {
       // ✅ Debug log for HCO turns after Fast Break defensive stop
       const previousTurn = i > 0 ? turns[i - 1] : null;
@@ -912,7 +913,8 @@ export async function animateGameTurns({ //hasBallAtStep
       if (typeof window !== 'undefined' && window.ROUTER_DEBUG) {
         console.log('🔍 [DIAGNOSTIC HCO] Turn', i, {
           isHCO,
-          willLog: shouldDebugHCO && isHCO
+          willLog: shouldDebugHCO && isHCO,
+          routing: 'AnimationRouter'
         });
       }
       
@@ -933,12 +935,13 @@ export async function animateGameTurns({ //hasBallAtStep
           },
           current_state: scene.stateMachine?.state,
           has_animations: !!turn.animations?.length,
-          animation_count: turn.animations?.length || 0
+          animation_count: turn.animations?.length || 0,
+          routing: 'AnimationRouter'
         });
       }
       
       if (shouldDebugHCO && isHCO) {
-        console.log('🔍 HCO_DIRECT_START', {
+        console.log('🔍 HCO_ROUTER_START', {
           turn_index: i,
           result_type: turn.result_type,
           fast_break: turn.fast_break,
@@ -949,27 +952,17 @@ export async function animateGameTurns({ //hasBallAtStep
         });
       }
 
-      await playTurnAnimation({
-        scene,
-        simData,
-        playerSprites,
-        turnData: turn,
-        ballSprite,
-        onAction
-      });
+      // ✅ PHASE 2.5: Route standard HCO turns through AnimationRouter
+      // Ensure turn.index is set (AnimationRouter will use it for context)
+      turn.index = i;
       
-      // ✅ PHASE 2.2: Use extracted finalizeTurnAfterAnimation function
-      finalizeTurnAfterAnimation({
-        turn,
-        scene,
-        onUpdate,
-        possessionId,
-        turnIndex: i,
-        updateDebugScore
-      });
+      // AnimationRouter handles pre/post setup (prepareTurnForAnimation, finalizeTurnAfterAnimation)
+      // Note: prepareTurnForAnimation was already called at line 479, but AnimationRouter will call it again
+      // This is safe (idempotent) but we could optimize later by skipping the first call for HCO turns
+      await animationRouter.processTurn(turn);
 
       if (shouldDebugHCO && isHCO) {
-        console.log('🔍 HCO_DIRECT_END', {
+        console.log('🔍 HCO_ROUTER_END', {
           turn_index: i,
           result_type: turn.result_type,
           fast_break: turn.fast_break,
