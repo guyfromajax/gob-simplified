@@ -646,6 +646,18 @@ export class ShotAnimationSystem {
       console.log('🎬 ShotAnimationSystem: Calling handleDefensiveRebound');
       await this.handleDefensiveRebound(rebounderSprite, turnData);
     } else if (turnData.rebound_type === 'OREB') {
+      // ✅ DEBUG: Track OREB handling to see if putback is coming
+      const nextTurn = this.scene.simData?.turns?.[(this.scene.currentTurn || 0) + 1];
+      const nextNextTurn = this.scene.simData?.turns?.[(this.scene.currentTurn || 0) + 2];
+      console.log('🔍 [OREB HANDLING DEBUG]', {
+        turnIndex: this.scene.currentTurn,
+        rebounderId: turnData.rebounderId,
+        nextTurnResult: nextTurn?.result_type || null,
+        nextNextTurnResult: nextNextTurn?.result_type || null,
+        willSeePutback: nextTurn?.result_type === 'PUTBACK_MAKE' || nextTurn?.result_type === 'PUTBACK_MISS',
+        willSeePutbackAfterOREB: (nextTurn?.result_type === 'OREB' || nextTurn?.result_type === 'OREB_KICKOUT') && 
+                                  (nextNextTurn?.result_type === 'PUTBACK_MAKE' || nextNextTurn?.result_type === 'PUTBACK_MISS')
+      });
       console.log('🎬 ShotAnimationSystem: Calling handleOffensiveRebound');
       await this.handleOffensiveRebound(rebounderSprite, turnData);
     } else {
@@ -853,10 +865,20 @@ export class ShotAnimationSystem {
    * Handle offensive rebound
    */
   async handleOffensiveRebound(rebounderSprite, turnData) {
+    // ✅ DEBUG: Check what turns are coming next
+    const currentTurnIndex = this.scene.currentTurn || 0;
+    const nextTurn = this.scene.simData?.turns?.[currentTurnIndex + 1];
+    const nextNextTurn = this.scene.simData?.turns?.[currentTurnIndex + 2];
+    
     console.log('🎬 ShotAnimationSystem: Handling offensive rebound', {
       rebounderId: turnData.rebounderId,
       putback_attempt: turnData.putback_attempt,
-      events: turnData.events
+      events: turnData.events,
+      currentTurnIndex,
+      nextTurnResult: nextTurn?.result_type || null,
+      nextNextTurnResult: nextNextTurn?.result_type || null,
+      willSeePutbackTurn: nextTurn?.result_type === 'PUTBACK_MAKE' || nextTurn?.result_type === 'PUTBACK_MISS',
+      willSeeOREBTurn: nextTurn?.result_type === 'OREB' || nextTurn?.result_type === 'OREB_KICKOUT'
     });
     
     try {
@@ -864,6 +886,14 @@ export class ShotAnimationSystem {
       console.log('🎬 ShotAnimationSystem: TEMPORARY - Forcing all offensive rebounds to be putback attempts');
       await this.executePutbackAttempt(rebounderSprite, turnData);
       console.log('🎬 ShotAnimationSystem: executePutbackAttempt completed successfully');
+      
+      // ✅ DEBUG: After putback attempt, check if we should expect a PUTBACK_MAKE turn
+      const afterPutbackNextTurn = this.scene.simData?.turns?.[currentTurnIndex + 1];
+      console.log('🔍 [AFTER PUTBACK ATTEMPT]', {
+        currentTurnIndex,
+        nextTurnResult: afterPutbackNextTurn?.result_type || null,
+        expectingPutbackTurn: afterPutbackNextTurn?.result_type === 'PUTBACK_MAKE' || afterPutbackNextTurn?.result_type === 'PUTBACK_MISS'
+      });
     } catch (error) {
       console.error('🎬 ShotAnimationSystem: executePutbackAttempt failed', error);
       throw error;
