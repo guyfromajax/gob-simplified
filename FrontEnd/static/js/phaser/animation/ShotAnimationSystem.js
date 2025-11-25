@@ -597,28 +597,32 @@ export class ShotAnimationSystem {
         rebounderX: rebounderSprite.x,
         rebounderY: rebounderSprite.y
       });
-      
-      // Animate rebounder to the ball's bounce position
-      await new Promise((resolve) => {
-        this.scene.tweens.add({
-          targets: rebounderSprite,
-          x: ballBounceX,
-          y: ballBounceY,
-          duration: 400,
-          ease: 'Power2',
-          onComplete: () => {
-            // Attach ball to rebounder once they reach the bounce spot
-            this.ballController.attachToPlayer(rebounderSprite, {
-              offset: { x: 0, y: -10 }
-            });
-            resolve();
-          }
-        });
-      });
     }
 
-    // Animate players collapsing toward rebound spot (after rebounder gets the ball)
-    await this.animatePlayerCollapse(rebounderSprite, { x: ballBounceX, y: ballBounceY }, turnData);
+    // ✅ FIX: Animate rebounder and non-rebounders simultaneously
+    // Start both animations at the same time, then wait for both to complete
+    const rebounderPromise = new Promise((resolve) => {
+      this.scene.tweens.add({
+        targets: rebounderSprite,
+        x: ballBounceX,
+        y: ballBounceY,
+        duration: 400,
+        ease: 'Power2',
+        onComplete: () => {
+          // Attach ball to rebounder once they reach the bounce spot
+          this.ballController.attachToPlayer(rebounderSprite, {
+            offset: { x: 0, y: -10 }
+          });
+          resolve();
+        }
+      });
+    });
+
+    // Start non-rebounder animation at the same time
+    const nonRebounderPromise = this.animatePlayerCollapse(rebounderSprite, { x: ballBounceX, y: ballBounceY }, turnData);
+
+    // Wait for both animations to complete simultaneously
+    await Promise.all([rebounderPromise, nonRebounderPromise]);
 
     // Determine next action based on rebound type
     console.log('🎬 ShotAnimationSystem: Determining rebound action', {
