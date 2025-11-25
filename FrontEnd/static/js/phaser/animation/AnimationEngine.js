@@ -54,6 +54,7 @@ export class AnimationEngine {
     this.animationHandlers.set('SHOT_ATTEMPT', this.handleShotAttempt.bind(this));
     this.animationHandlers.set('REBOUND', this.handleRebound.bind(this));
     this.animationHandlers.set('PASS', this.handlePass.bind(this));
+    this.animationHandlers.set('HCO', this.handleDefault.bind(this)); // ✅ FIX: HCO setup turns route to DEFAULT
     this.animationHandlers.set('DEFAULT', this.handleDefault.bind(this));
   }
 
