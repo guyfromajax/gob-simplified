@@ -451,6 +451,55 @@ export class ShotAnimationSystem {
     // This matches the pattern in ballManager.js (line 626)
     this.ballController.onShotEnd();
     
+    // ✅ FIX: Handle inbound pass transition after made shot (like Fast Break does)
+    // Only for regular HCO made shots (not putback makes, which are handled separately)
+    if (!isPutbackMake && turnData.next_play_type === "BASELINE_INBOUND") {
+      // Show "It's Good!" announcement (like Fast Break)
+      const { showAnnouncement } = await import('../utils/announcements.js');
+      const shooterInfo = this.scene.playerInfo?.[turnData.shooter_id];
+      const shooterSprite = this.playerSprites[turnData.shooter_id];
+      const shooterTeamId = shooterSprite?.team_id;
+      
+      // Handle both new nested structure (object) and old flat structure (string)
+      const homeTeamField = this.scene.simData?.home_team;
+      const awayTeamField = this.scene.simData?.away_team;
+      const homeTeamName = typeof homeTeamField === 'object' ? homeTeamField?.name : homeTeamField;
+      const awayTeamName = typeof awayTeamField === 'object' ? awayTeamField?.name : awayTeamField;
+      const shooterTeamName = shooterTeamId === this.scene.simData?.home_team_id ? homeTeamName : awayTeamName;
+      
+      const shooterPlayerData = shooterInfo ? {
+        playerId: turnData.shooter_id,
+        photo: shooterSprite?.photo || null,
+        teamName: shooterTeamName
+      } : null;
+      
+      const isHomeOffense = shooterTeamId === this.scene.simData?.home_team_id;
+      const teamStyle = isHomeOffense ? 'home' : 'away';
+      showAnnouncement("It's Good!", teamStyle, shooterPlayerData);
+      
+      // Wait for announcement (like Fast Break)
+      await new Promise(resolve => this.scene.time.delayedCall(1000, resolve));
+      
+      // Call runInboundSetup (like Fast Break)
+      const { runInboundSetup } = await import('./turnAnimation.js');
+      const newOffenseSide = isHomeOffense ? "away" : "home";
+      const skipRetreat = turnData.next_defensive_setup === "FCP" || turnData.next_defensive_setup === "HCT";
+      const pressureType = skipRetreat ? turnData.next_defensive_setup : null;
+      
+      await runInboundSetup({
+        scene: this.scene,
+        ballSprite: this.ballController.ballSprite,
+        playerSprites: this.playerSprites,
+        newOffenseSide: newOffenseSide,
+        homeTeamId: this.scene.simData?.home_team_id,
+        awayTeamId: this.scene.simData?.away_team_id,
+        skipRetreat: skipRetreat,
+        pressureType: pressureType
+      });
+      
+      console.log(`🔍 MADE SHOT - Inbound setup completed for BASELINE_INBOUND`);
+    }
+    
     // ✅ DEBUG: Log completion of made shot
     console.log(`🔍 MADE SHOT COMPLETE - next_play_type: ${turnData.next_play_type || 'UNDEFINED'}`);
   }
