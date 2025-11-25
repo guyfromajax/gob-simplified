@@ -528,8 +528,12 @@ export class ShotAnimationSystem {
       shooter_id: turnData.shooter_id,
       shot_type: turnData.shot_type,
       next_play_type: turnData.next_play_type,
+      next_play_type_defined: turnData.next_play_type !== undefined,
+      next_play_type_value: turnData.next_play_type || 'UNDEFINED',
       possession_flips: turnData.possession_flips
     });
+    // ✅ Also log separately for easier reading
+    console.log(`🔍 MADE SHOT - next_play_type: ${turnData.next_play_type || 'UNDEFINED'} (${turnData.next_play_type !== undefined ? 'SET' : 'MISSING'})`);
     
     if (DebugFlags.SHOT_ANIMATION) {
       console.log('ShotAnimationSystem: Shot made', {
@@ -573,10 +577,14 @@ export class ShotAnimationSystem {
       turnIndex: this.scene.currentTurn,
       shooter_id: turnData.shooter_id,
       next_play_type: turnData.next_play_type,
+      next_play_type_defined: turnData.next_play_type !== undefined,
+      next_play_type_value: turnData.next_play_type || 'UNDEFINED',
       possession_flips: turnData.possession_flips,
       ballControllerState: this.ballController.getState(),
       stateMachineState: this.stateMachine?.currentState
     });
+    // ✅ Also log separately for easier reading
+    console.log(`🔍 MADE SHOT COMPLETE - next_play_type: ${turnData.next_play_type || 'UNDEFINED'} (${turnData.next_play_type !== undefined ? 'SET' : 'MISSING'})`);
   }
 
   /**
