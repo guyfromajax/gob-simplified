@@ -1317,12 +1317,13 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   initializeBallHolderState(scene);
 
   const fromInbound = scene._previousTurnWasInbound === true;
+  const fromOpeningTip = scene._previousTurnWasOpeningTip === true;
 
   scene.passInFlight = false;
   scene.rebounderId = null;
-  // Only clear ball attachment/ownership when NOT coming directly from an inbound,
-  // so the ball can carry over with the inbound receiver into HCO.
-  if (!fromInbound) {
+  // Only clear ball attachment/ownership when NOT coming directly from an inbound or opening tip,
+  // so the ball can carry over with the inbound receiver or tip winner into HCO.
+  if (!fromInbound && !fromOpeningTip) {
     // ✅ PHASE 4: Removed old ballDetached flag - BallController manages state internally
     clearPendingOwner(scene);
     // ✅ NEW (Step 1): Also clear simple ball holder state
@@ -1361,9 +1362,9 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   }
 
   if (ballSprite && scene?.tweens) {
-    // Always clear any stray tweens, but don't hide the ball if we're carrying over from inbound
+    // Always clear any stray tweens, but don't hide the ball if we're carrying over from inbound or opening tip
     scene.tweens.killTweensOf(ballSprite);
-    if (!fromInbound) {
+    if (!fromInbound && !fromOpeningTip) {
       ballSprite.setVisible(false);
     }
   }
@@ -1386,9 +1387,9 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   }
   
   let step0OwnerSprite = null;
-  // If we are coming directly from an inbound, the ball should already be attached
-  // to the inbound receiver, so we don't re-derive or re-attach at step 0.
-  if (!previousTurnWasShot && !fromInbound) {
+  // If we are coming directly from an inbound or opening tip, the ball should already be attached
+  // to the inbound receiver or tip winner, so we don't re-derive or re-attach at step 0.
+  if (!previousTurnWasShot && !fromInbound && !fromOpeningTip) {
     for (const anim of turnData.animations) {
       if (scene.skipToEnd || scene.stateMachine?.is(States.FastBreak)) break;
       if (anim.hasBallAtStep?.[0]) {
@@ -1461,9 +1462,12 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
     }
   }
 
-  // Clear inbound flag after applying pre-step setup
+  // Clear inbound and opening tip flags after applying pre-step setup
   if (scene._previousTurnWasInbound) {
     scene._previousTurnWasInbound = false;
+  }
+  if (scene._previousTurnWasOpeningTip) {
+    scene._previousTurnWasOpeningTip = false;
   }
 
   let eventsProcessed = false;
