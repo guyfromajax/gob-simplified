@@ -326,6 +326,13 @@ export async function animateGameTurns({ //hasBallAtStep
   ballSprite,
   onUpdate
 }) {
+  // 🔍 VERY OBVIOUS DEBUG: Confirm new code is running
+  console.log('🚨🚨🚨 NEW CODE VERSION - animateGameTurns STARTED 🚨🚨🚨', {
+    timestamp: Date.now(),
+    turnsCount: (simData.turns || []).length,
+    window_ROUTER_DEBUG: typeof window !== 'undefined' ? window.ROUTER_DEBUG : 'N/A'
+  });
+  
   // console.log('🎬 animateGameTurns: Starting animation system');
   const turns = simData.turns || [];
   if (scene) scene.simData = simData;
@@ -449,9 +456,24 @@ export async function animateGameTurns({ //hasBallAtStep
 
   // console.log('🎬 animateGameTurns: Starting turn processing loop', { totalTurns: turns.length });
   
+  // 🔍 VERY OBVIOUS DEBUG: Confirm we're in the turn processing loop
+  console.log('🚨🚨🚨 NEW CODE - Starting turn processing loop 🚨🚨🚨', {
+    totalTurns: turns.length,
+    window_ROUTER_DEBUG: typeof window !== 'undefined' ? window.ROUTER_DEBUG : 'N/A'
+  });
+  
   for (let i = 0; i < turns.length; i++) {
     const turn = turns[i];
     if (scene.skipToEnd) break;
+    
+    // 🔍 VERY OBVIOUS DEBUG: Log each turn being processed
+    if (typeof window !== 'undefined' && window.ROUTER_DEBUG) {
+      console.log('🚨🚨🚨 NEW CODE - Processing Turn', i, '🚨🚨🚨', {
+        result_type: turn.result_type,
+        fast_break: turn.fast_break,
+        turn_index: i
+      });
+    }
     
     // ✅ PHASE 2.2: Use extracted prepareTurnForAnimation function
     const { possessionId } = prepareTurnForAnimation({
