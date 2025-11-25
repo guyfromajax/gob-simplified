@@ -66,16 +66,6 @@ export async function runFreeThrowSequence(
     return;
   }
 
-  // ✅ OPTION 1 FIX: Ensure any lingering shot state is cleared before free throw
-  // This handles Shot (Make/Miss) → Free Throw transitions
-  // The shot should have already called onShotEnd(), but we clear it defensively here
-  const { getBallController } = await import('./BallControllerAdapter.js');
-  const ballController = getBallController();
-  if (ballController && ballController.isInFlight) {
-    console.log('🔍 freeThrow.js: Clearing lingering shot state before free throw');
-    ballController.onShotEnd();
-  }
-
   if (!scene.stateMachine?.is(States.FreeThrow)) {
     safeTransition(
       scene.stateMachine,
@@ -154,6 +144,14 @@ export async function runFreeThrowSequence(
   // More aggressive clearing to handle race conditions and inconsistent state
   const { getBallController, synchronizeBallState } = await import('./BallControllerAdapter.js');
   const ballController = getBallController();
+  
+  // ✅ OPTION 1 FIX: Ensure any lingering shot state is cleared before free throw
+  // This handles Shot (Make/Miss) → Free Throw transitions
+  // The shot should have already called onShotEnd(), but we clear it defensively here
+  if (ballController && ballController.isInFlight) {
+    console.log('🔍 freeThrow.js: Clearing lingering shot state before free throw');
+    ballController.onShotEnd();
+  }
   
   // ✅ PHASE 2.9: Use state synchronization helper for comprehensive state clearing
   synchronizeBallState(scene, {
