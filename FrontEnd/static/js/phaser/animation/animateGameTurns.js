@@ -726,6 +726,10 @@ export async function animateGameTurns({ //hasBallAtStep
       const wasOREB = previousTurnResult === "OREB" || previousTurnResult === "OREB_KICKOUT";
       const twoTurnsAgo = i > 1 ? turns[i - 2] : null;
       
+      const rebounderName = turn.rebounderId ? (playerSprites[turn.rebounderId]?.name || 'unknown') : null;
+      const previousShooterId = previousTurn?.shooter_id || null;
+      const previousShooterName = previousShooterId ? (playerSprites[previousShooterId]?.name || 'unknown') : null;
+      
       console.log('🔍 [PUTBACK/OREB PATH DEBUG]', {
         turnIndex: i,
         currentTurnResult: turn.result_type,
@@ -739,10 +743,16 @@ export async function animateGameTurns({ //hasBallAtStep
           ? 'HCO => MISS => Putback (embedded OREB)'
           : 'Direct Putback/OREB',
         rebounderId: turn.rebounderId,
+        rebounderName: rebounderName,
+        previousShooterId: previousShooterId,
+        previousShooterName: previousShooterName,
+        isOwnReboundPutback: turn.rebounderId === previousShooterId,
         next_play_type: turn.next_play_type,
         sceneCurrentTurn: scene.currentTurn,
         willProcessThisTurn: true
       });
+      // ✅ Also log separately for easier reading
+      console.log(`🔍 PUTBACK TURN: ${turn.result_type} - Rebounder: ${rebounderName || 'none'} (${turn.rebounderId || 'none'}) - Previous Shooter: ${previousShooterName || 'none'} (${previousShooterId || 'none'}) - Own Rebound Putback: ${turn.rebounderId === previousShooterId}`);
       
       // ✅ DEBUG: Check if ball controller state might be blocking this
       const { getBallController } = await import('./BallControllerAdapter.js');
