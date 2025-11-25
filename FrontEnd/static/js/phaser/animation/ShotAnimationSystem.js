@@ -63,21 +63,6 @@ export class ShotAnimationSystem {
     // ✅ DEBUG: Log shot attempt immediately - track shooter and shot details
     const isHCO = turnData.play_type === 'HCO' || turnData.playcall === 'HCO';
     const shooterName = this.playerSprites[turnData.shooter_id]?.name || 'unknown';
-    console.log('🏀 [SHOT ATTEMPT]', {
-      turnIndex: this.scene.currentTurn,
-      isHCO,
-      shooter_id: turnData.shooter_id,
-      shooter_name: shooterName,
-      shot_type: turnData.shot_type,
-      playcall: turnData.playcall,
-      play_type: turnData.play_type,
-      result_type: turnData.result_type, // This is the ACTUAL result from backend
-      isMake: turnData.result_type === 'MAKE',
-      isMiss: turnData.result_type === 'MISS',
-      shot_score: turnData.shot_score,
-      threshold: turnData.threshold
-    });
-    // ✅ Also log separately for easier reading
     console.log(`🏀 SHOT ATTEMPT: ${shooterName} (${turnData.shooter_id}) - Result: ${turnData.result_type} - HCO: ${isHCO}`);
     
     if (this.activeShot) {
@@ -98,22 +83,6 @@ export class ShotAnimationSystem {
       }
 
       // Validate shot data
-      console.log('🔍 ShotAnimationSystem: Validating shot data', {
-        result_type: turnData.result_type,
-        shooter_id: turnData.shooter_id,
-        player_id: turnData.player_id,
-        shot_type: turnData.shot_type,
-        allKeys: Object.keys(turnData),
-        // ✅ PRIORITY 2 FIX: Log next_play_type specifically to diagnose missing data
-        next_play_type: turnData.next_play_type,
-        hasNextPlayType: !!turnData.next_play_type,
-        rebound_type: turnData.rebound_type,
-        hasReboundType: !!turnData.rebound_type,
-        rebounderId: turnData.rebounderId,
-        hasRebounderId: !!turnData.rebounderId,
-        fullTurnData: turnData
-      });
-      
       if (!this.validateShotData(turnData)) {
         console.error('❌ ShotAnimationSystem: Shot data validation failed', {
           result_type: turnData.result_type,
@@ -125,8 +94,6 @@ export class ShotAnimationSystem {
         });
         throw new Error('Invalid shot data');
       }
-      
-      console.log('✅ ShotAnimationSystem: Shot data validation passed');
 
       // Execute complete shot sequence with player movement
       await this.executeCompleteShotSequence(turnData);
@@ -157,11 +124,6 @@ export class ShotAnimationSystem {
       ...turnData.animations.map(anim => anim.movement.length)
     );
     
-    console.log('🎬 ShotAnimationSystem: Starting complete shot sequence', {
-      maxSteps,
-      animationCount: turnData.animations.length
-    });
-    
     // 1. Setup: Move players to step 0 positions
     await this.runSetupTween(turnData, ballSprite, currentBallOwnerRef);
     
@@ -187,17 +149,8 @@ export class ShotAnimationSystem {
     const rimCoords = this.getRimCoordinates(turnData);
     
     // ✅ DEBUG: Log the result immediately when determined
-    console.log('🏀 [SHOT RESULT DETERMINED]', {
-      turnIndex: this.scene.currentTurn,
-      shooter_id: turnData.shooter_id,
-      shooter_name: this.playerSprites[turnData.shooter_id]?.name || 'unknown',
-      result_type: turnData.result_type,
-      isMake,
-      willAnimateAs: isMake ? 'MAKE' : 'MISS',
-      shot_type: turnData.shot_type,
-      shot_score: turnData.shot_score,
-      threshold: turnData.threshold
-    });
+    const shooterName = this.playerSprites[turnData.shooter_id]?.name || 'unknown';
+    console.log(`🏀 SHOT RESULT: ${shooterName} - ${turnData.result_type}`);
     
     if (isMake) {
       await this.handleMadeShot(rimCoords, turnData);
@@ -214,8 +167,6 @@ export class ShotAnimationSystem {
     
     const stepIndex = 0;
     const promises = [];
-    
-    console.log('🎬 ShotAnimationSystem: Running setup tween for step 0');
     
     for (const anim of turnData.animations) {
       if (this.scene.skipToEnd) break;
@@ -250,7 +201,6 @@ export class ShotAnimationSystem {
     }
     
     await Promise.all(promises);
-    console.log('✅ ShotAnimationSystem: Setup tween completed');
   }
   
   /**
@@ -258,8 +208,6 @@ export class ShotAnimationSystem {
    */
   async animatePlayerMovement(turnData, ballSprite, currentBallOwnerRef, maxSteps) {
     if (this.scene.skipToEnd) return;
-    
-    console.log('🎬 ShotAnimationSystem: Starting player movement animation');
     
     for (let stepIndex = 1; stepIndex < maxSteps; stepIndex++) {
       if (this.scene.skipToEnd) break;
@@ -386,14 +334,8 @@ export class ShotAnimationSystem {
       }
 
       // ==================== ANIMATE PLAYERS DURING SHOT ====================
-      console.log('🏃 Checking player positioning data:', {
-        defense_release: turnData.defense_release,
-        offense_getback: turnData.offense_getback
-      });
-      
       // Defenders releasing for fast break
       if (turnData.defense_release && turnData.defense_release.length > 0) {
-        console.log('🏃 Animating', turnData.defense_release.length, 'defenders releasing for fast break');
         turnData.defense_release.forEach(playerId => {
           const sprite = this.playerSprites[playerId];
           if (sprite) {
@@ -401,23 +343,13 @@ export class ShotAnimationSystem {
             const targetX = Phaser.Math.Between(45, 55);
             const targetPixel = gridToPixels(targetX, targetY, this.scene.game.config.width, this.scene.game.config.height);
             
-            console.log(`🏃 DEFENDER ${playerId} releasing: from (${sprite.x}, ${sprite.y}) → to (${targetPixel.x}, ${targetPixel.y})`);
-            
             this.scene.tweens.add({
               targets: sprite,
               x: targetPixel.x,
               y: targetPixel.y,
               duration: this.shotConfig.flightDuration,
-              ease: 'Power1',
-              onStart: () => {
-                console.log(`🏃 STARTED: Defender ${playerId} moving to fast break spot`);
-              },
-              onComplete: () => {
-                console.log(`🏃 COMPLETED: Defender ${playerId} reached fast break spot`);
-              }
+              ease: 'Power1'
             });
-          } else {
-            console.warn(`🏃 ⚠️ Defender sprite not found for player ${playerId}`);
           }
         });
       }
@@ -425,7 +357,6 @@ export class ShotAnimationSystem {
       // Offensive players getting back on defense
       if (turnData.offense_getback && turnData.offense_getback.length > 0) {
         const isHomeTeamShooting = turnData.offense_team === this.scene.homeTeamId;
-        console.log('🏃 Animating', turnData.offense_getback.length, 'offensive players getting back');
         
         turnData.offense_getback.forEach(playerId => {
           const sprite = this.playerSprites[playerId];
@@ -435,23 +366,13 @@ export class ShotAnimationSystem {
             const targetX = isHomeTeamShooting ? Phaser.Math.Between(40, 50) : Phaser.Math.Between(50, 60);
             const targetPixel = gridToPixels(targetX, targetY, this.scene.game.config.width, this.scene.game.config.height);
             
-            console.log(`🏃 OFFENSE ${playerId} getting back: from (${sprite.x}, ${sprite.y}) → to (${targetPixel.x}, ${targetPixel.y})`);
-            
             this.scene.tweens.add({
               targets: sprite,
               x: targetPixel.x,
               y: targetPixel.y,
               duration: this.shotConfig.flightDuration,
-              ease: 'Power1',
-              onStart: () => {
-                console.log(`🏃 STARTED: Offense ${playerId} getting back on defense`);
-              },
-              onComplete: () => {
-                console.log(`🏃 COMPLETED: Offense ${playerId} back on defense`);
-              }
+              ease: 'Power1'
             });
-          } else {
-            console.warn(`🏃 ⚠️ Offensive sprite not found for player ${playerId}`);
           }
         });
       }
@@ -496,44 +417,8 @@ export class ShotAnimationSystem {
     
     // ✅ DEBUG: Log made shot with shooter details
     const shooterName = this.playerSprites[turnData.shooter_id]?.name || 'unknown';
-    console.log('🏀 [ANIMATING MADE SHOT]', {
-      turnIndex: this.scene.currentTurn,
-      shooter_id: turnData.shooter_id,
-      shooter_name: shooterName,
-      result_type: turnData.result_type,
-      shot_type: turnData.shot_type,
-      isPutbackMake,
-      previousTurnResult,
-      wasOREB,
-      path: isPutbackMake && wasOREB 
-        ? 'HCO => MISS => OREB => Putback Make' 
-        : 'HCO => Make',
-      next_play_type: turnData.next_play_type,
-      possession_flips: turnData.possession_flips,
-      // ✅ Track if this shooter might get stats updated
-      shooterSprite: !!this.playerSprites[turnData.shooter_id]
-    });
-    // ✅ Also log separately for easier reading
-    console.log(`🏀 ANIMATING MADE SHOT: ${shooterName} (${turnData.shooter_id}) - Type: ${turnData.shot_type || 'unknown'} - Putback: ${isPutbackMake}`);
-    
-    console.log('🔍 [MADE SHOT PATH DEBUG]', {
-      turnIndex: this.scene.currentTurn,
-      currentTurnResult: turnData.result_type,
-      isPutbackMake,
-      previousTurnResult,
-      wasOREB,
-      path: isPutbackMake && wasOREB 
-        ? 'HCO => MISS => OREB => Putback Make' 
-        : 'HCO => Make',
-      shooter_id: turnData.shooter_id,
-      shot_type: turnData.shot_type,
-      next_play_type: turnData.next_play_type,
-      next_play_type_defined: turnData.next_play_type !== undefined,
-      next_play_type_value: turnData.next_play_type || 'UNDEFINED',
-      possession_flips: turnData.possession_flips
-    });
-    // ✅ Also log separately for easier reading
-    console.log(`🔍 MADE SHOT - next_play_type: ${turnData.next_play_type || 'UNDEFINED'} (${turnData.next_play_type !== undefined ? 'SET' : 'MISSING'})`);
+    const isPutbackMake = turnData.result_type === 'PUTBACK_MAKE';
+    console.log(`🏀 MADE SHOT: ${shooterName} - Putback: ${isPutbackMake} - next_play_type: ${turnData.next_play_type || 'UNDEFINED'}`);
     
     if (DebugFlags.SHOT_ANIMATION) {
       console.log('ShotAnimationSystem: Shot made', {
@@ -573,18 +458,7 @@ export class ShotAnimationSystem {
     this.ballController.onShotEnd();
     
     // ✅ DEBUG: Log completion of made shot
-    console.log('🔍 [MADE SHOT COMPLETE]', {
-      turnIndex: this.scene.currentTurn,
-      shooter_id: turnData.shooter_id,
-      next_play_type: turnData.next_play_type,
-      next_play_type_defined: turnData.next_play_type !== undefined,
-      next_play_type_value: turnData.next_play_type || 'UNDEFINED',
-      possession_flips: turnData.possession_flips,
-      ballControllerState: this.ballController.getState(),
-      stateMachineState: this.stateMachine?.currentState
-    });
-    // ✅ Also log separately for easier reading
-    console.log(`🔍 MADE SHOT COMPLETE - next_play_type: ${turnData.next_play_type || 'UNDEFINED'} (${turnData.next_play_type !== undefined ? 'SET' : 'MISSING'})`);
+    console.log(`🔍 MADE SHOT COMPLETE - next_play_type: ${turnData.next_play_type || 'UNDEFINED'}`);
   }
 
   /**
@@ -592,37 +466,10 @@ export class ShotAnimationSystem {
    */
   async handleMissedShot(rimCoords, turnData) {
     // ✅ DEBUG: Log missed shot with shooter details
-    const previousTurn = this.scene.simData?.turns?.[(this.scene.currentTurn || 0) - 1];
-    const previousTurnResult = previousTurn?.result_type;
     const shooterName = this.playerSprites[turnData.shooter_id]?.name || 'unknown';
     const rebounderName = turnData.rebounderId ? (this.playerSprites[turnData.rebounderId]?.name || 'unknown') : null;
     const isOwnRebound = turnData.rebounderId === turnData.shooter_id;
-    
-    console.log('🏀 [ANIMATING MISSED SHOT]', {
-      turnIndex: this.scene.currentTurn,
-      shooter_id: turnData.shooter_id,
-      shooter_name: shooterName,
-      result_type: turnData.result_type,
-      shot_type: turnData.shot_type,
-      previousTurnResult,
-      path: previousTurnResult === 'OREB' || previousTurnResult === 'OREB_KICKOUT'
-        ? 'HCO => MISS => OREB => Putback' 
-        : 'HCO => MISS',
-      rebound_type: turnData.rebound_type,
-      rebounderId: turnData.rebounderId,
-      rebounderName: rebounderName,
-      next_play_type: turnData.next_play_type,
-      // ✅ Track if shooter might get rebound (own rebound)
-      isOwnRebound: isOwnRebound
-    });
-    // ✅ Also log separately for easier reading
-    console.log(`🏀 ANIMATING MISSED SHOT: ${shooterName} (${turnData.shooter_id}) - Rebounder: ${rebounderName || 'none'} (${turnData.rebounderId || 'none'}) - Own Rebound: ${isOwnRebound}`);
-    console.log('ShotAnimationSystem: Shot missed', {
-      shooter_id: turnData.shooter_id,
-      shot_type: turnData.shot_type,
-      rebounderId: turnData.rebounderId,
-      rebound_type: turnData.rebound_type
-    });
+    console.log(`🏀 MISSED SHOT: ${shooterName} - Rebounder: ${rebounderName || 'none'} - Own Rebound: ${isOwnRebound}`);
 
     // Animate ball bounce from rim
     await this.animateBallBounce(rimCoords, turnData);
@@ -690,12 +537,6 @@ export class ShotAnimationSystem {
       ballBounceX = ballSprite.x;
       ballBounceY = ballSprite.y;
       
-      console.log('🎬 ShotAnimationSystem: Ball bounce position', {
-        ballX: ballBounceX,
-        ballY: ballBounceY,
-        rebounderX: rebounderSprite.x,
-        rebounderY: rebounderSprite.y
-      });
     }
 
     // ✅ FIX: Animate rebounder and non-rebounders simultaneously
