@@ -867,6 +867,18 @@ export async function animateGameTurns({ //hasBallAtStep
       debugEnabled ||
       Boolean(typeof window !== 'undefined' && window.ROUTER_DEBUG);
 
+    // 🔍 DIAGNOSTIC: Always log when window.ROUTER_DEBUG is set (moved outside block for visibility)
+    if (typeof window !== 'undefined' && window.ROUTER_DEBUG) {
+      console.log('🔍 [DIAGNOSTIC] Turn', i, {
+        shouldDebugHCO,
+        window_ROUTER_DEBUG: window.ROUTER_DEBUG,
+        fast_break: turn.fast_break,
+        result_type: turn.result_type,
+        DEBUG_FLOW,
+        debugEnabled
+      });
+    }
+
     // PossessionRunner removed - always use standard animation path
     {
       // ✅ Debug log for HCO turns after Fast Break defensive stop
@@ -874,13 +886,10 @@ export async function animateGameTurns({ //hasBallAtStep
       const wasDefensiveStop = previousTurn?.result_type === "DEFENSIVE_STOP" && previousTurn?.fast_break === true;
       const isHCO = !turn.fast_break && (turn.result_type === "MAKE" || turn.result_type === "MISS");
       
-      // 🔍 DIAGNOSTIC: Always log when window.ROUTER_DEBUG is set, to verify condition evaluation
+      // 🔍 DIAGNOSTIC: Log HCO-specific info
       if (typeof window !== 'undefined' && window.ROUTER_DEBUG) {
-        console.log('🔍 [DIAGNOSTIC] Turn', i, {
-          shouldDebugHCO,
+        console.log('🔍 [DIAGNOSTIC HCO] Turn', i, {
           isHCO,
-          fast_break: turn.fast_break,
-          result_type: turn.result_type,
           willLog: shouldDebugHCO && isHCO
         });
       }
