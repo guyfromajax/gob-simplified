@@ -94,6 +94,10 @@ export class AnimationRouter {
       DebugFlags.ANIMATION_ROUTER ||
       Boolean(typeof window !== 'undefined' && window.ROUTER_DEBUG);
 
+    // Check if this is a standard HCO turn (shot that's not a fast break)
+    // Defined outside try block so it's accessible in finally block
+    const isHCO = !turnData.fast_break && (turnData.result_type === "MAKE" || turnData.result_type === "MISS");
+
     try {
       // ✅ PHASE 2.3: Call prepareTurnForAnimation at the start
       // Extract turnIndex from turnData (will be set by prepareTurnForAnimation if not present)
@@ -110,9 +114,9 @@ export class AnimationRouter {
       
       // ✅ PHASE 2.3: Get turnIndex from prepared turn (prepareTurnForAnimation sets turn.index)
       turnIndex = turnData.index ?? turnIndex;
-
-      if (shouldLog) {
-        animationDebugLog('HCO_ROUTER_START', {
+      
+      if (shouldLog && isHCO) {
+        console.log('🔍 HCO_ROUTER_START', {
           result_type: turnData.result_type,
           turn_index: turnIndex,
           fast_break: turnData.fast_break,
@@ -181,8 +185,8 @@ export class AnimationRouter {
           turnIndex: turnIndex ?? turnData.index ?? null,
           updateDebugScore: this.updateDebugScore
         });
-        if (shouldLog) {
-          animationDebugLog('HCO_ROUTER_END', {
+        if (shouldLog && isHCO) {
+          console.log('🔍 HCO_ROUTER_END', {
             result_type: turnData.result_type,
             turn_index: turnIndex ?? turnData.index ?? null,
             fast_break: turnData.fast_break,
