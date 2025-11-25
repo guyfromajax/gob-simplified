@@ -14,7 +14,7 @@
 
 import AnimationEngine from './AnimationEngine.js';
 import { getBallController } from './BallControllerAdapter.js';
-import { DebugFlags } from '../utils/debugFlags.js';
+import { DebugFlags, animationDebugLog } from '../utils/debugFlags.js';
 import { prepareTurnForAnimation, finalizeTurnAfterAnimation } from './turnPreparation.js';
 
 export class AnimationRouter {
@@ -90,6 +90,10 @@ export class AnimationRouter {
     let turnIndex = null;
     let possessionId = null;
 
+    const shouldLog =
+      DebugFlags.ANIMATION_ROUTER ||
+      Boolean(typeof window !== 'undefined' && window.ROUTER_DEBUG);
+
     try {
       // ✅ PHASE 2.3: Call prepareTurnForAnimation at the start
       // Extract turnIndex from turnData (will be set by prepareTurnForAnimation if not present)
@@ -107,19 +111,32 @@ export class AnimationRouter {
       // ✅ PHASE 2.3: Get turnIndex from prepared turn (prepareTurnForAnimation sets turn.index)
       turnIndex = turnData.index ?? turnIndex;
 
-      console.log('🎬 AnimationRouter: Starting turn processing', {
-        result_type: turnData.result_type,
-        turn_index: turnIndex,
-        hasAnimationEngine: !!this.animationEngine,
-        hasBallController: !!this.ballController,
-        hasPlayerSprites: !!this.playerSprites
-      });
+      if (shouldLog) {
+        animationDebugLog('HCO_ROUTER_START', {
+          result_type: turnData.result_type,
+          turn_index: turnIndex,
+          fast_break: turnData.fast_break,
+          hasAnimations: !!turnData.animations?.length,
+          animationCount: turnData.animations?.length || 0,
+          currentBallOwner: this.ballController?.currentOwner?.playerId ?? null
+        });
+      } else {
+        console.log('🎬 AnimationRouter: Starting turn processing', {
+          result_type: turnData.result_type,
+          turn_index: turnIndex,
+          hasAnimationEngine: !!this.animationEngine,
+          hasBallController: !!this.ballController,
+          hasPlayerSprites: !!this.playerSprites
+        });
+      }
 
       // Note: HCO outlet pass step is now handled directly in ShotAnimationSystem.handleDefensiveRebound
       // using the same runDefensiveReboundSetup function that works for free throws
       
       // No state machine needed - just process the turn directly
-      console.log('🎯 AnimationRouter: Processing turn directly (no state machine)');
+      if (!shouldLog) {
+        console.log('🎯 AnimationRouter: Processing turn directly (no state machine)');
+      }
 
       // ✅ PHASE 2.1: Enhanced context object with all required parameters
       const context = {
@@ -131,14 +148,20 @@ export class AnimationRouter {
         turnIndex: turnIndex // ✅ PHASE 2.1: Add turnIndex to context
       };
       
-      console.log('🚀 AnimationRouter: Calling animationEngine.processTurn');
+      if (!shouldLog) {
+        console.log('🚀 AnimationRouter: Calling animationEngine.processTurn');
+      }
       await this.animationEngine.processTurn(turnData, context);
-      console.log('✅ AnimationRouter: animationEngine.processTurn completed');
+      if (!shouldLog) {
+        console.log('✅ AnimationRouter: animationEngine.processTurn completed');
+      }
 
       // Handle any queued turns
       await this.processQueue();
 
-      console.log('🎉 AnimationRouter: Turn processing completed successfully');
+      if (!shouldLog) {
+        console.log('🎉 AnimationRouter: Turn processing completed successfully');
+      }
 
     } catch (error) {
       console.error('❌ AnimationRouter: Error processing turn', {
@@ -158,6 +181,15 @@ export class AnimationRouter {
           turnIndex: turnIndex ?? turnData.index ?? null,
           updateDebugScore: this.updateDebugScore
         });
+        if (shouldLog) {
+          animationDebugLog('HCO_ROUTER_END', {
+            result_type: turnData.result_type,
+            turn_index: turnIndex ?? turnData.index ?? null,
+            fast_break: turnData.fast_break,
+            hasAnimations: !!turnData.animations?.length,
+            currentBallOwner: this.ballController?.currentOwner?.playerId ?? null
+          });
+        }
       } catch (finalizeError) {
         console.error('❌ AnimationRouter: Error in finalizeTurnAfterAnimation', {
           error: finalizeError.message,
