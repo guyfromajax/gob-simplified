@@ -874,6 +874,17 @@ export async function animateGameTurns({ //hasBallAtStep
       const wasDefensiveStop = previousTurn?.result_type === "DEFENSIVE_STOP" && previousTurn?.fast_break === true;
       const isHCO = !turn.fast_break && (turn.result_type === "MAKE" || turn.result_type === "MISS");
       
+      // 🔍 DIAGNOSTIC: Always log when window.ROUTER_DEBUG is set, to verify condition evaluation
+      if (typeof window !== 'undefined' && window.ROUTER_DEBUG) {
+        console.log('🔍 [DIAGNOSTIC] Turn', i, {
+          shouldDebugHCO,
+          isHCO,
+          fast_break: turn.fast_break,
+          result_type: turn.result_type,
+          willLog: shouldDebugHCO && isHCO
+        });
+      }
+      
       // Enhanced debug for HCO detection after defensive stop
       if (wasDefensiveStop) {
         console.log("🔍 HCO Detection After Defensive Stop:", {
