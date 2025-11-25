@@ -303,13 +303,17 @@ export class ShotAnimationSystem {
       isMake
     });
     
-    // Detach ball from shooter
-    console.log('🎯 ShotAnimationSystem: Detaching ball from shooter', {
+    // ✅ PRIORITY 1 FIX: Use BallController lifecycle method instead of direct detach
+    // This matches the pattern used in ballManager.js (line 233)
+    console.log('🎯 ShotAnimationSystem: Starting shot via lifecycle method', {
       shooterId: shotInfo.playerId,
       ballControllerState: this.ballController.getState()
     });
-    this.ballController.detachFromPlayer('shot', { keepVisible: true });
-    console.log('🎯 ShotAnimationSystem: Ball detached, new state:', this.ballController.getState());
+    this.ballController.onShotStart({ 
+      shooterId: shotInfo.playerId,
+      isPutback: turnData.result_type === 'PUTBACK_MAKE' || turnData.result_type === 'PUTBACK_MISS'
+    });
+    console.log('🎯 ShotAnimationSystem: Shot started, new state:', this.ballController.getState());
     
     // Animate ball flight
     await this.animateBallFlight(shooterSprite, rimCoords, turnData);
@@ -334,9 +338,12 @@ export class ShotAnimationSystem {
         shooterId: turnData.shooter_id
       });
 
-      // Position ball at shooter
-      ballSprite.setPosition(shooterSprite.x, shooterSprite.y - 10);
-      ballSprite.setVisible(true);
+      // ✅ PRIORITY 1 FIX: BallController manages ball position and visibility automatically
+      // onShotStart() already detached the ball, so we just need to ensure it's visible
+      // BallController will handle positioning during the tween
+      if (ballSprite) {
+        ballSprite.setVisible(true);
+      }
 
       // ==================== ANIMATE PLAYERS DURING SHOT ====================
       console.log('🏃 Checking player positioning data:', {
@@ -473,6 +480,10 @@ export class ShotAnimationSystem {
 
     // Wait for ball to go through rim
     await new Promise(resolve => setTimeout(resolve, 200));
+    
+    // ✅ PRIORITY 1 FIX: Call onShotEnd() to clear in-flight state
+    // This matches the pattern in ballManager.js (line 626)
+    this.ballController.onShotEnd();
   }
 
   /**
@@ -488,7 +499,13 @@ export class ShotAnimationSystem {
 
     // Animate ball bounce from rim
     await this.animateBallBounce(rimCoords, turnData);
+    
+    // ✅ PRIORITY 1 FIX: Call onShotEnd() to clear in-flight state before rebound
+    // This matches the pattern in ballManager.js (line 626)
+    // The ball is no longer in flight, so clear the state to allow attachment to rebounder
+    this.ballController.onShotEnd();
 
+    // ✅ PRIORITY 2 FIX: Add validation to ensure rebound_type is set
     // Check if this shot turn includes rebound data
     if (turnData.rebounderId && turnData.rebound_type) {
       console.log('🎬 ShotAnimationSystem: Handling embedded rebound', {
@@ -499,6 +516,14 @@ export class ShotAnimationSystem {
       // Handle the rebound within the shot turn
       await this.handleEmbeddedRebound(turnData);
     } else {
+      // ✅ PRIORITY 2 FIX: Add defensive logging when rebound data is missing
+      console.warn('🎬 ShotAnimationSystem: Rebound data missing, skipping embedded rebound', {
+        hasRebounderId: !!turnData.rebounderId,
+        hasReboundType: !!turnData.rebound_type,
+        rebounderId: turnData.rebounderId,
+        rebound_type: turnData.rebound_type,
+        note: 'This may cause DREB/outlet pass to be skipped'
+      });
       // Transition to REBOUNDING state (fallback)
       if (this.stateMachine) {
         this.stateMachine.transition(AnimationStates.REBOUNDING, {
@@ -716,10 +741,14 @@ export class ShotAnimationSystem {
       rebound_type: turnData.rebound_type
     });
     
+    // ✅ PRIORITY 2 FIX: Add defensive fallback for missing next_play_type
+    // Default to HCO if not specified (most common case for defensive rebounds)
+    const nextPlayType = turnData.next_play_type || 'HCO';
+    
     // Use the same defensive rebound setup for HCO, HCT, and FCP
     // Fast breaks handle outlet in their own turn
-    if (turnData.next_play_type === 'HCO' || turnData.next_play_type === 'HCT' || turnData.next_play_type === 'FCP') {
-      console.log(`🎬 ShotAnimationSystem: Defensive rebound leads to ${turnData.next_play_type} - using runDefensiveReboundSetup`);
+    if (nextPlayType === 'HCO' || nextPlayType === 'HCT' || nextPlayType === 'FCP') {
+      console.log(`🎬 ShotAnimationSystem: Defensive rebound leads to ${nextPlayType} - using runDefensiveReboundSetup`);
       
       try {
         // Import and use the same function that works for free throws
@@ -729,7 +758,7 @@ export class ShotAnimationSystem {
           ballSprite: this.ballController.ballSprite,
           playerSprites: this.playerSprites,
           rebounderId: turnData.rebounderId,
-          nextPlayType: turnData.next_play_type || "HCO"
+          nextPlayType: nextPlayType // Use the fallback value
         });
         console.log('✅ ShotAnimationSystem: runDefensiveReboundSetup completed successfully');
       } catch (error) {
@@ -737,7 +766,13 @@ export class ShotAnimationSystem {
         throw error; // Re-throw to trigger fallback
       }
     } else {
-      console.log('🎬 ShotAnimationSystem: Defensive rebound leads to Fast Break or other');
+      // ✅ PRIORITY 2 FIX: Add defensive logging for skipped outlet pass
+      console.warn('🎬 ShotAnimationSystem: Defensive rebound outlet pass skipped', {
+        nextPlayType: nextPlayType,
+        rebounderId: turnData.rebounderId,
+        reason: 'next_play_type is not HCO, HCT, or FCP',
+        note: 'Fast breaks handle outlet in their own turn sequence'
+      });
       // Handle other cases if needed
     }
   }
@@ -899,8 +934,12 @@ export class ShotAnimationSystem {
    */
   async executeOutletPass(passerSprite, receiverSprite) {
     return new Promise((resolve) => {
-      // Detach ball from passer
-      this.ballController.detachFromPlayer('outlet_pass', { keepVisible: true });
+      // ✅ PRIORITY 1 FIX: Use lifecycle method for pass instead of direct detach
+      // This matches the pattern used elsewhere in the codebase
+      this.ballController.onPassStart({ 
+        passerId: passerSprite.playerId,
+        receiverId: receiverSprite.playerId
+      });
       
       // Start ball flight
       this.ballController.startFlight({
@@ -917,8 +956,9 @@ export class ShotAnimationSystem {
         duration: 400,
         ease: 'Power2',
         onComplete: () => {
-          // Attach ball to receiver
-          this.ballController.endFlight(receiverSprite);
+          // ✅ PRIORITY 1 FIX: Use lifecycle method to complete pass
+          // This matches the pattern in ballTween.js (line 437)
+          this.ballController.onPassEnd(receiverSprite, { reason: 'outlet_pass' });
           resolve();
         },
         onUpdate: () => {
