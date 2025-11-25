@@ -60,6 +60,23 @@ export class ShotAnimationSystem {
    * Process a shot turn with complete player movement
    */
   async processShot(turnData) {
+    // ✅ DEBUG: Log shot attempt immediately - track shooter and shot details
+    const isHCO = turnData.play_type === 'HCO' || turnData.playcall === 'HCO';
+    console.log('🏀 [SHOT ATTEMPT]', {
+      turnIndex: this.scene.currentTurn,
+      isHCO,
+      shooter_id: turnData.shooter_id,
+      shooter_name: this.playerSprites[turnData.shooter_id]?.name || 'unknown',
+      shot_type: turnData.shot_type,
+      playcall: turnData.playcall,
+      play_type: turnData.play_type,
+      result_type: turnData.result_type, // This is the ACTUAL result from backend
+      isMake: turnData.result_type === 'MAKE',
+      isMiss: turnData.result_type === 'MISS',
+      shot_score: turnData.shot_score,
+      threshold: turnData.threshold
+    });
+    
     if (this.activeShot) {
       console.warn('ShotAnimationSystem: Already processing a shot, queuing...');
       this.shotQueue.push(turnData);
@@ -165,6 +182,19 @@ export class ShotAnimationSystem {
     // 4. Handle shot outcome
     const isMake = turnData.result_type === 'MAKE';
     const rimCoords = this.getRimCoordinates(turnData);
+    
+    // ✅ DEBUG: Log the result immediately when determined
+    console.log('🏀 [SHOT RESULT DETERMINED]', {
+      turnIndex: this.scene.currentTurn,
+      shooter_id: turnData.shooter_id,
+      shooter_name: this.playerSprites[turnData.shooter_id]?.name || 'unknown',
+      result_type: turnData.result_type,
+      isMake,
+      willAnimateAs: isMake ? 'MAKE' : 'MISS',
+      shot_type: turnData.shot_type,
+      shot_score: turnData.shot_score,
+      threshold: turnData.threshold
+    });
     
     if (isMake) {
       await this.handleMadeShot(rimCoords, turnData);
@@ -461,6 +491,25 @@ export class ShotAnimationSystem {
     const isPutbackMake = turnData.result_type === 'PUTBACK_MAKE';
     const wasOREB = previousTurnResult === 'OREB' || previousTurnResult === 'OREB_KICKOUT';
     
+    // ✅ DEBUG: Log made shot with shooter details
+    console.log('🏀 [ANIMATING MADE SHOT]', {
+      turnIndex: this.scene.currentTurn,
+      shooter_id: turnData.shooter_id,
+      shooter_name: this.playerSprites[turnData.shooter_id]?.name || 'unknown',
+      result_type: turnData.result_type,
+      shot_type: turnData.shot_type,
+      isPutbackMake,
+      previousTurnResult,
+      wasOREB,
+      path: isPutbackMake && wasOREB 
+        ? 'HCO => MISS => OREB => Putback Make' 
+        : 'HCO => Make',
+      next_play_type: turnData.next_play_type,
+      possession_flips: turnData.possession_flips,
+      // ✅ Track if this shooter might get stats updated
+      shooterSprite: !!this.playerSprites[turnData.shooter_id]
+    });
+    
     console.log('🔍 [MADE SHOT PATH DEBUG]', {
       turnIndex: this.scene.currentTurn,
       currentTurnResult: turnData.result_type,
@@ -528,6 +577,21 @@ export class ShotAnimationSystem {
    * Handle missed shot
    */
   async handleMissedShot(rimCoords, turnData) {
+    // ✅ DEBUG: Log missed shot with shooter details
+    console.log('🏀 [ANIMATING MISSED SHOT]', {
+      turnIndex: this.scene.currentTurn,
+      shooter_id: turnData.shooter_id,
+      shooter_name: this.playerSprites[turnData.shooter_id]?.name || 'unknown',
+      result_type: turnData.result_type,
+      shot_type: turnData.shot_type,
+      previousTurnResult: this.scene.simData?.turns?.[(this.scene.currentTurn || 0) - 1]?.result_type || null,
+      rebound_type: turnData.rebound_type,
+      rebounderId: turnData.rebounderId,
+      rebounderName: turnData.rebounderId ? (this.playerSprites[turnData.rebounderId]?.name || 'unknown') : null,
+      next_play_type: turnData.next_play_type,
+      // ✅ Track if shooter might get rebound (own rebound)
+      isOwnRebound: turnData.rebounderId === turnData.shooter_id
+    });
     console.log('ShotAnimationSystem: Shot missed', {
       shooter_id: turnData.shooter_id,
       shot_type: turnData.shot_type,
