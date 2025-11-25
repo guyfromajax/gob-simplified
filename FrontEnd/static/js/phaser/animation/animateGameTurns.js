@@ -895,8 +895,8 @@ export async function animateGameTurns({ //hasBallAtStep
         });
       }
       
-      if (shouldDebugHCO) {
-        animationDebugLog('HCO_DIRECT_START', {
+      if (shouldDebugHCO && isHCO) {
+        console.log('🔍 HCO_DIRECT_START', {
           turn_index: i,
           result_type: turn.result_type,
           fast_break: turn.fast_break,
@@ -926,8 +926,8 @@ export async function animateGameTurns({ //hasBallAtStep
         updateDebugScore
       });
 
-      if (shouldDebugHCO) {
-        animationDebugLog('HCO_DIRECT_END', {
+      if (shouldDebugHCO && isHCO) {
+        console.log('🔍 HCO_DIRECT_END', {
           turn_index: i,
           result_type: turn.result_type,
           fast_break: turn.fast_break,
