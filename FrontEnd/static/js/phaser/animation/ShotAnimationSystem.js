@@ -14,6 +14,7 @@
  * - No floating balls or teleports
  */
 
+import * as Phaser from "https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.esm.js";
 import { AnimationStates } from './SimplifiedStateMachine.js';
 import { DebugFlags } from '../utils/debugFlags.js';
 import { gridToPixels } from '../utils/gridToPixels.js';
