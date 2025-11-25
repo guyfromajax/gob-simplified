@@ -490,6 +490,14 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
     
     await new Promise(resolve => scene.time.delayedCall(1000, resolve));
     
+    // ✅ OPTION 1 FIX: Ensure onShotEnd() is called before transitioning to inbound pass
+    // This ensures ball state is cleared before inbound setup
+    const { getBallController } = await import('./BallControllerAdapter.js');
+    const ballController = getBallController();
+    if (ballController && ballController.isInFlight) {
+      ballController.onShotEnd();
+    }
+    
     // Inbound setup
     const newOffenseSide = isHomeOffense ? "away" : "home";
     const skipRetreat = turnData.next_defensive_setup === "FCP" || turnData.next_defensive_setup === "HCT";
