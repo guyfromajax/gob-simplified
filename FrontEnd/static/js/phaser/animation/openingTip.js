@@ -8,6 +8,7 @@ import { tweenPlayerTo } from "./ballTween.js";
 import { appendToTextScroll } from "../utils/textScroll.js";
 import { gridToPixels } from "../utils/gridToPixels.js";
 import { getPlayerDuration } from "./turnAnimation.js";
+import { attachBallToPlayer } from "./BallControllerAdapter.js";
 
 const INITIAL_HOLD_DURATION = 2000; // Hold starting positions for 2 seconds (reduced from 4 seconds)
 const BALL_JUMP_HEIGHT = 5; // Ball jumps higher than players
@@ -219,6 +220,19 @@ function animateConvergence(scene, playerSprites, animations, ballSprite, ballLa
         onComplete: () => {
             console.log("🏀 Ball landed at grid:", ballLandingCoords, "pixel:", { x: ballSprite.x, y: ballSprite.y });
             
+            // ✅ FIX: Attach ball to the tip winner (player whose end coords match ballLandingCoords)
+            // This matches the pattern used in inbound passes (IP → HCO transition)
+            // The player who converges to the ball landing spot is the tip winner
+            const tipWinnerSprite = findTipWinner(playerSprites, animations, ballLandingCoords, canvasWidth, canvasHeight);
+            if (tipWinnerSprite) {
+                console.log("🏀 Attaching ball to tip winner:", tipWinnerSprite.playerId);
+                attachBallToPlayer(scene, ballSprite, tipWinnerSprite);
+                // Set flag so first HCO turn knows ball is already attached (like _previousTurnWasInbound)
+                scene._previousTurnWasOpeningTip = true;
+            } else {
+                console.warn("⚠️ Could not find tip winner to attach ball to");
+            }
+            
             // Wait a moment before continuing
             scene.time.delayedCall(300, () => {
                 if (onComplete) onComplete();
@@ -227,5 +241,31 @@ function animateConvergence(scene, playerSprites, animations, ballSprite, ballLa
     });
     
     convergeTweens.push(ballTween);
+}
+
+/**
+ * Find the player who won the tip (player whose end coords match ballLandingCoords)
+ * @param {Object} playerSprites - Dictionary of player sprites
+ * @param {Array} animations - Opening tip animations
+ * @param {Object} ballLandingCoords - Ball landing coordinates {x, y}
+ * @param {number} canvasWidth - Canvas width
+ * @param {number} canvasHeight - Canvas height
+ * @returns {Object|null} Player sprite of tip winner, or null if not found
+ */
+function findTipWinner(playerSprites, animations, ballLandingCoords, canvasWidth, canvasHeight) {
+    // Find the player whose end coords match the ball landing spot
+    // The tip winner is the player who converges to the ball location
+    for (const anim of animations) {
+        if (anim.action === "CONVERGE_ON_BALL" && anim.end) {
+            // Check if this player's end coords match the ball landing spot
+            if (anim.end.x === ballLandingCoords.x && anim.end.y === ballLandingCoords.y) {
+                const winnerSprite = playerSprites[anim.playerId];
+                if (winnerSprite) {
+                    return winnerSprite;
+                }
+            }
+        }
+    }
+    return null;
 }
 
