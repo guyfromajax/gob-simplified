@@ -109,10 +109,23 @@ export class AnimationEngine {
     // ✅ DEBUG: Exclude non-shot result types from shot attempt detection
     // FOUL, FREE_THROW, TURNOVER, etc. should not be treated as shot attempts
     const nonShotResultTypes = new Set([
-      "FOUL", "FREE_THROW", "TURNOVER", "DEAD BALL", 
+      "FOUL", "FREE_THROW", "TURNOVER", "DEAD_BALL", 
       "SIDE_INBOUND", "BASELINE_INBOUND", "PUTBACK_MAKE", 
-      "PUTBACK_MISS", "OREB_KICKOUT", "OPENING_TIP"
+      "PUTBACK_MISS", "OREB_KICKOUT", "DEFENSIVE_STOP", "OPENING_TIP"
     ]);
+    
+    // 🔍 DEBUG: Log routing decision for FOUL and other non-shot types
+    if (turnData.result_type === "FOUL" || nonShotResultTypes.has(turnData.result_type)) {
+      const isInNonShotSet = nonShotResultTypes.has(turnData.result_type);
+      const isShotAttempt = this.isShotAttempt(turnData);
+      console.log('🔍 [ROUTING DEBUG]', {
+        result_type: turnData.result_type,
+        isInNonShotSet,
+        isShotAttempt,
+        willRouteToShot: !isInNonShotSet && isShotAttempt,
+        willRouteToDefault: isInNonShotSet || !isShotAttempt
+      });
+    }
     
     // Shot attempt detection (only if not a non-shot result type)
     if (!nonShotResultTypes.has(turnData.result_type) && this.isShotAttempt(turnData)) {
