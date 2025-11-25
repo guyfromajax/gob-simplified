@@ -253,13 +253,16 @@ export class AnimationEngine {
       // Fallback to existing system
       console.warn('AnimationEngine: ShotAnimationSystem not available, using fallback');
       const { playTurnAnimation } = await import('./turnAnimation.js');
+      // ✅ PHASE 2.1: Pass full context including turnIndex and onUpdate
       await playTurnAnimation({
         scene: this.scene,
         simData: context.simData,
         playerSprites: context.playerSprites,
         turnData: turnData,
         ballSprite: context.ballSprite,
-        onAction: context.onAction
+        onAction: context.onAction,
+        turnIndex: context.turnIndex, // ✅ PHASE 2.1: Pass turnIndex
+        onUpdate: context.onUpdate // ✅ PHASE 2.1: Pass onUpdate (for future use)
       });
     }
   }
@@ -280,13 +283,16 @@ export class AnimationEngine {
       // Fallback to existing system
       console.warn('AnimationEngine: ReboundAnimationSystem not available, using fallback');
       const { playTurnAnimation } = await import('./turnAnimation.js');
+      // ✅ PHASE 2.1: Pass full context including turnIndex and onUpdate
       await playTurnAnimation({
         scene: this.scene,
         simData: context.simData,
         playerSprites: context.playerSprites,
         turnData: turnData,
         ballSprite: context.ballSprite,
-        onAction: context.onAction
+        onAction: context.onAction,
+        turnIndex: context.turnIndex, // ✅ PHASE 2.1: Pass turnIndex
+        onUpdate: context.onUpdate // ✅ PHASE 2.1: Pass onUpdate (for future use)
       });
     }
   }
@@ -301,13 +307,16 @@ export class AnimationEngine {
       // Fallback to existing system
       console.warn('AnimationEngine: PassAnimationSystem not available, using fallback');
       const { playTurnAnimation } = await import('./turnAnimation.js');
+      // ✅ PHASE 2.1: Pass full context including turnIndex and onUpdate
       await playTurnAnimation({
         scene: this.scene,
         simData: context.simData,
         playerSprites: context.playerSprites,
         turnData: turnData,
         ballSprite: context.ballSprite,
-        onAction: context.onAction
+        onAction: context.onAction,
+        turnIndex: context.turnIndex, // ✅ PHASE 2.1: Pass turnIndex
+        onUpdate: context.onUpdate // ✅ PHASE 2.1: Pass onUpdate (for future use)
       });
     }
   }
@@ -316,13 +325,16 @@ export class AnimationEngine {
     console.log('AnimationEngine: Handling default animation');
     // Import and use existing turn animation handler for now
     const { playTurnAnimation } = await import('./turnAnimation.js');
+    // ✅ PHASE 2.1: Pass full context including turnIndex and onUpdate
     await playTurnAnimation({
       scene: this.scene,
       simData: context.simData,
       playerSprites: context.playerSprites,
       turnData: turnData,
       ballSprite: context.ballSprite,
-      onAction: context.onAction
+      onAction: context.onAction,
+      turnIndex: context.turnIndex, // ✅ PHASE 2.1: Pass turnIndex
+      onUpdate: context.onUpdate // ✅ PHASE 2.1: Pass onUpdate (for future use)
     });
   }
 

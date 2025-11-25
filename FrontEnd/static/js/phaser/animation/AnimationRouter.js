@@ -85,9 +85,20 @@ export class AnimationRouter {
     this.currentTurn = turnData;
 
     try {
+      // ✅ PHASE 2.1: Ensure turn.index is set (required for context)
+      const turnIndex = turnData.index ?? turnData.turnIndex ?? null;
+      if (turnIndex !== null) {
+        turnData.index = turnIndex;
+      }
+
+      // ✅ PHASE 2.1: Set scene.currentTurn before routing (required by playTurnAnimation)
+      if (turnIndex !== null) {
+        this.scene.currentTurn = turnIndex;
+      }
+
       console.log('🎬 AnimationRouter: Starting turn processing', {
         result_type: turnData.result_type,
-        turn_index: turnData.index,
+        turn_index: turnIndex,
         hasAnimationEngine: !!this.animationEngine,
         hasBallController: !!this.ballController,
         hasPlayerSprites: !!this.playerSprites
@@ -99,13 +110,14 @@ export class AnimationRouter {
       // No state machine needed - just process the turn directly
       console.log('🎯 AnimationRouter: Processing turn directly (no state machine)');
 
-      // Process the turn through the animation engine
+      // ✅ PHASE 2.1: Enhanced context object with all required parameters
       const context = {
         playerSprites: this.playerSprites,
         ballSprite: this.ballSprite,
         onUpdate: this.onUpdate,
         simData: this.scene.simData,
-        onAction: this.onAction // Pass onAction callback if provided
+        onAction: this.onAction, // Pass onAction callback if provided
+        turnIndex: turnIndex // ✅ PHASE 2.1: Add turnIndex to context
       };
       
       console.log('🚀 AnimationRouter: Calling animationEngine.processTurn');

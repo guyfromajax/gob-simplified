@@ -1287,8 +1287,18 @@ async function runInboundSetup({
 /**
  * Step-synchronized possession animation.
  * Each stepIndex is animated across all players, then the next step begins.
+ * 
+ * @param {Object} params - Animation parameters
+ * @param {Object} params.scene - Phaser scene
+ * @param {Object} params.simData - Simulation data
+ * @param {Object} params.playerSprites - Player sprite map
+ * @param {Object} params.turnData - Turn data object
+ * @param {Object} params.ballSprite - Ball sprite
+ * @param {Function} params.onAction - Action callback (optional)
+ * @param {number} params.turnIndex - Turn index (optional, uses scene.currentTurn if not provided)
+ * @param {Function} params.onUpdate - Update callback (optional, for future use)
  */
-export async function playTurnAnimation({ scene, simData, playerSprites, turnData, ballSprite, onAction }) {
+export async function playTurnAnimation({ scene, simData, playerSprites, turnData, ballSprite, onAction, turnIndex, onUpdate }) {
   // Guard: Skip if this is an opening tip, putback, or if animations is missing
   // Putback turns are handled by handleOrebTurn in animateGameTurns.js
   if (turnData.result_type === "OPENING_TIP" || 
