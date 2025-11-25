@@ -26,8 +26,8 @@ The ball animation system uses a unified architecture with **BallController** as
   
 - **WIP_GOB Integration** (`ballAnimationSimple.js`)
   - **Ball Holder State:** `scene.gameState.ballHolder` (string ID) - synchronized with BallController
-  - **Conditional Targets:** `getPlayerTweenTargets()` - includes ball in player tween when player has ball
-  - **Simple Movement:** `animateBallToPosition()`, `animateShotToRim()` - distance-based duration, arc support
+- **Conditional Targets:** `getPlayerTweenTargets()` - includes ball in player tween when player has ball
+- **Simple Movement:** `animateBallToPosition()`, `animateShotToRim()` - distance-based duration, arc support
 
 **Key Files:**
 - `BallController.js` - Core state management
