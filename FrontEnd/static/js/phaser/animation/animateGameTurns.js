@@ -1,5 +1,6 @@
 import { playTurnAnimation, runSideInboundSetup } from "./turnAnimation.js";
 import { onAction } from "./onAction.js";
+import { AnimationRouter } from "./AnimationRouter.js";
 import { runPass, REBOUND_DEBUG } from "./ballManager.js";
 import animationConfig from "./animation_config.js";
 import runFreeThrowSequence from "./freeThrow.js";
@@ -392,6 +393,16 @@ export async function animateGameTurns({ //hasBallAtStep
     });
   };
 
+  // ✅ PHASE 2.4: Initialize AnimationRouter for FCP/HCT foul turns (and future migrations)
+  const animationRouter = new AnimationRouter(
+    scene,
+    playerSprites,
+    ballSprite,
+    onUpdate,
+    onAction,
+    updateDebugScore // Pass updateDebugScore function
+  );
+
   if (DEBUG_FLOW || debugEnabled) {
     const stepCount = turns.reduce((acc, t) => {
       const turnSteps = (t.animations || []).reduce(
@@ -514,37 +525,25 @@ export async function animateGameTurns({ //hasBallAtStep
     if (turn.result_type === "FOUL") {
       // Check if this is an FCP or HCT foul with animations
       if ((turn.fcp_foul === true || turn.hct_foul === true) && turn.animations && turn.animations.length > 0) {
-        // FCP/HCT foul with animations - animate it like a standard turn
-        await playTurnAnimation({
-          scene,
-          simData,
-          playerSprites,
-          turnData: turn,
-          ballSprite,
-          onUpdate,
-          turnIndex: i,
-          onAction: async (action, sprite, timestamp) => {
-            if (DEBUG_FLOW || debugEnabled)
-              logVerbose(
-                `🎬 Action "${action}" fired at ${timestamp}ms for sprite:`,
-                sprite
-              );
-            if (onAction) onAction(action, sprite, timestamp);
-          },
-        });
-      }
-      
-      // Announce foul (visual effects now handled by announcement system)
-      announceFromTurnData(turn, 'end', scene.simData?.home_team_id, scene);
-      // Update scoreboard for all fouls (FCP or not)
-      if (onUpdate) {
-        try {
-          onUpdate(turn);
-        } catch (err) {
-          console.error('Scoreboard update failed:', err);
+        // ✅ PHASE 2.4: FCP/HCT foul with animations - route through AnimationRouter
+        // Ensure turn.index is set (AnimationRouter will use it for context)
+        turn.index = i;
+        // AnimationRouter handles pre/post setup (prepareTurnForAnimation, finalizeTurnAfterAnimation)
+        await animationRouter.processTurn(turn);
+      } else {
+        // Non-animated foul - just do announcements and updates
+        // Announce foul (visual effects now handled by announcement system)
+        announceFromTurnData(turn, 'end', scene.simData?.home_team_id, scene);
+        // Update scoreboard for all fouls (FCP or not)
+        if (onUpdate) {
+          try {
+            onUpdate(turn);
+          } catch (err) {
+            console.error('Scoreboard update failed:', err);
+          }
         }
+        updateDebugScore(turn, { turnIndex: i, possessionId });
       }
-      updateDebugScore(turn, { turnIndex: i, possessionId });
       continue;
     }
     
