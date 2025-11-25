@@ -1507,6 +1507,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
 
     const promises = [];
     let shotInfo = null;
+    let passInfo = null;
 
     for (const anim of turnData.animations) {
       if (scene.skipToEnd) break;
@@ -1548,6 +1549,33 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
         }
       }
 
+      // ✅ FIX: Detect passes in step loop (following shot pattern)
+      if (nextStep.action === "pass" && !passInfo) {
+        // Find receiver (player with action === "receive" at same step)
+        const receiverAnim = turnData.animations.find(otherAnim => {
+          if (otherAnim.playerId === anim.playerId) return false; // Skip passer
+          const otherMovement = otherAnim.movement;
+          if (!otherMovement || stepIndex >= otherMovement.length) return false;
+          const otherStep = otherMovement[stepIndex];
+          return otherStep?.action === "receive";
+        });
+        
+        if (receiverAnim) {
+          passInfo = {
+            passerId: anim.playerId,
+            receiverId: receiverAnim.playerId,
+            stepIndex,
+            timestamp: nextStep.timestamp
+          };
+          console.log('🏀 [PASS DETECTED]', {
+            passerId: passInfo.passerId,
+            receiverId: passInfo.receiverId,
+            stepIndex: passInfo.stepIndex,
+            timestamp: passInfo.timestamp
+          });
+        }
+      }
+
       if (nextStep.action === "shoot") {
         shotInfo = { step: nextStep, playerId: anim.playerId, stepIndex };
       }
@@ -1568,6 +1596,46 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
     }
 
     await Promise.all(promises);
+
+    // ✅ FIX: Handle passes explicitly (following shot pattern)
+    // This ensures passes animate smoothly instead of teleporting
+    if (passInfo) {
+      const passerSprite = playerSprites[passInfo.passerId];
+      const receiverSprite = playerSprites[passInfo.receiverId];
+      
+      if (passerSprite && receiverSprite) {
+        console.log('🏀 [PASS ANIMATION] Calling runPass', {
+          passerId: passInfo.passerId,
+          receiverId: passInfo.receiverId,
+          passerPos: { x: passerSprite.x, y: passerSprite.y },
+          receiverPos: { x: receiverSprite.x, y: receiverSprite.y }
+        });
+        
+        // Calculate pass duration based on distance (like fast break outlet passes)
+        const distance = Phaser.Math.Distance.Between(
+          passerSprite.x, passerSprite.y,
+          receiverSprite.x, receiverSprite.y
+        );
+        // Use same speed as fast break outlet passes (500ms default, or distance-based)
+        const passDuration = distance > 0 ? Math.max(300, Math.min(800, (distance / 350) * 1000)) : 500;
+        
+        await runPass(scene, {
+          fromId: passInfo.passerId,
+          toId: passInfo.receiverId,
+          duration: passDuration,
+          easing: "Sine.easeInOut"
+        });
+        
+        console.log('🏀 [PASS ANIMATION] runPass completed');
+      } else {
+        console.warn('⚠️ [PASS ANIMATION] Missing sprites', {
+          passerId: passInfo.passerId,
+          receiverId: passInfo.receiverId,
+          hasPasserSprite: !!passerSprite,
+          hasReceiverSprite: !!receiverSprite
+        });
+      }
+    }
 
     if (shotInfo) {
       currentBallOwnerRef.value = null;
