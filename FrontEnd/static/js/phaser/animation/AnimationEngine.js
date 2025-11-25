@@ -101,13 +101,21 @@ export class AnimationEngine {
       return this.animationHandlers.get('FAST_BREAK');
     }
 
-    // Specific result types
+    // Specific result types (check handlers map first)
     if (turnData.result_type && this.animationHandlers.has(turnData.result_type)) {
       return this.animationHandlers.get(turnData.result_type);
     }
 
-    // Shot attempt detection
-    if (this.isShotAttempt(turnData)) {
+    // ✅ DEBUG: Exclude non-shot result types from shot attempt detection
+    // FOUL, FREE_THROW, TURNOVER, etc. should not be treated as shot attempts
+    const nonShotResultTypes = new Set([
+      "FOUL", "FREE_THROW", "TURNOVER", "DEAD BALL", 
+      "SIDE_INBOUND", "BASELINE_INBOUND", "PUTBACK_MAKE", 
+      "PUTBACK_MISS", "OREB_KICKOUT", "OPENING_TIP"
+    ]);
+    
+    // Shot attempt detection (only if not a non-shot result type)
+    if (!nonShotResultTypes.has(turnData.result_type) && this.isShotAttempt(turnData)) {
       return this.animationHandlers.get('SHOT_ATTEMPT');
     }
 
