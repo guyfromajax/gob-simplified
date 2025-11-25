@@ -455,6 +455,27 @@ export class ShotAnimationSystem {
    * Handle made shot
    */
   async handleMadeShot(rimCoords, turnData) {
+    // ✅ DEBUG: Track made shot path to identify skipped turns
+    const previousTurn = this.scene.simData?.turns?.[(this.scene.currentTurn || 0) - 1];
+    const previousTurnResult = previousTurn?.result_type;
+    const isPutbackMake = turnData.result_type === 'PUTBACK_MAKE';
+    const wasOREB = previousTurnResult === 'OREB' || previousTurnResult === 'OREB_KICKOUT';
+    
+    console.log('🔍 [MADE SHOT PATH DEBUG]', {
+      turnIndex: this.scene.currentTurn,
+      currentTurnResult: turnData.result_type,
+      isPutbackMake,
+      previousTurnResult,
+      wasOREB,
+      path: isPutbackMake && wasOREB 
+        ? 'HCO => MISS => OREB => Putback Make' 
+        : 'HCO => Make',
+      shooter_id: turnData.shooter_id,
+      shot_type: turnData.shot_type,
+      next_play_type: turnData.next_play_type,
+      possession_flips: turnData.possession_flips
+    });
+    
     if (DebugFlags.SHOT_ANIMATION) {
       console.log('ShotAnimationSystem: Shot made', {
         shooter_id: turnData.shooter_id,
@@ -642,14 +663,18 @@ export class ShotAnimationSystem {
       const defense_rebounders = turnData.defense_rebounders || [];
       const all_rebounders = [...offense_rebounders, ...defense_rebounders];
       
-      // Convert ball bounce coords to grid for positioning
-      const bounceGridX = Math.round(ballBounceCoords.x / (this.scene.game.config.width / 100));
-      const bounceGridY = Math.round(ballBounceCoords.y / (this.scene.game.config.height / 100));
+      // ✅ FIX: Convert ball bounce coords (pixels) to grid coordinates correctly
+      // gridToPixels uses: pixelY = ((50 - gridY) / 50) * height
+      // So reverse: gridY = 50 - (pixelY / height) * 50
+      const bounceGridX = Math.round((ballBounceCoords.x / this.scene.game.config.width) * 100);
+      const bounceGridY = 50 - Math.round((ballBounceCoords.y / this.scene.game.config.height) * 50);
       
       console.log('🎬 ShotAnimationSystem: Animating non-rebounders to ball bounce', {
+        ballBounceCoordsPixels: { x: ballBounceCoords.x, y: ballBounceCoords.y },
         bounceGrid: { x: bounceGridX, y: bounceGridY },
         totalRebounders: all_rebounders.length,
-        rebounderId: turnData.rebounderId
+        rebounderId: turnData.rebounderId,
+        sceneDimensions: { width: this.scene.game.config.width, height: this.scene.game.config.height }
       });
       
       // Animate each player who was attempting the rebound (but didn't get it)

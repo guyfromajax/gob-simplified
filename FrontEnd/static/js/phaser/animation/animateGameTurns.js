@@ -164,6 +164,18 @@ async function handleOrebTurn(scene, { playerSprites, ballSprite, turnData, onUp
     
     // Handle putback make - run inbound setup
     if (turnData.result_type === "PUTBACK_MAKE") {
+      // ✅ DEBUG: Track putback make path
+      const previousTurn = scene.simData?.turns?.[(scene.currentTurn || 0) - 1];
+      console.log('🔍 [PUTBACK MAKE DEBUG]', {
+        turnIndex: scene.currentTurn,
+        rebounderId: rebounderId,
+        previousTurnResult: previousTurn?.result_type,
+        wasOREB: previousTurn?.result_type === 'OREB' || previousTurn?.result_type === 'OREB_KICKOUT',
+        next_play_type: turnData.next_play_type,
+        possession_flips: turnData.possession_flips,
+        willCallInbound: !turnData.possession_flips && turnData.next_play_type !== "FAST_BREAK"
+      });
+      
       const shooterTeamId = rebounderSprite.team_id;
       const homeTeamId = scene.simData?.home_team_id;
       const awayTeamId = scene.simData?.away_team_id;
@@ -232,6 +244,14 @@ async function handleOrebTurn(scene, { playerSprites, ballSprite, turnData, onUp
           // Otherwise, check current turn (might be a MISS with putback)
           missTurn = scene.simData?.turns?.[currentIndex];
         }
+        
+        // ✅ DEBUG: Track DREB after putback miss
+        console.log('🔍 [PUTBACK MISS => DREB DEBUG]', {
+          turnIndex: scene.currentTurn,
+          rebounderId: turnData.rebounderId,
+          next_play_type: turnData.next_play_type,
+          willCallRunDefensiveReboundSetup: turnData.rebound_type === "DREB" && turnData.next_play_type !== "FAST_BREAK"
+        });
         
         // ✅ PHASE 2.5: Use BallController lifecycle method for putback end
         const { getBallController } = await import('./BallControllerAdapter.js');
@@ -689,7 +709,25 @@ export async function animateGameTurns({ //hasBallAtStep
     }
 
     // Handle OREB turns (putback attempts and kickouts)
+    // ✅ DEBUG: Track putback/OREB path to identify skipped turns
     if (turn.result_type === "PUTBACK_MAKE" || turn.result_type === "PUTBACK_MISS" || turn.result_type === "OREB_KICKOUT") {
+      const previousTurn = i > 0 ? turns[i - 1] : null;
+      const previousTurnResult = previousTurn?.result_type;
+      const wasMISS = previousTurnResult === "MISS";
+      const wasOREB = previousTurnResult === "OREB" || previousTurnResult === "OREB_KICKOUT";
+      
+      console.log('🔍 [PUTBACK/OREB PATH DEBUG]', {
+        turnIndex: i,
+        currentTurnResult: turn.result_type,
+        previousTurnResult,
+        wasMISS,
+        wasOREB,
+        path: wasMISS && wasOREB 
+          ? 'HCO => MISS => OREB => Putback' 
+          : 'Direct Putback/OREB',
+        rebounderId: turn.rebounderId,
+        next_play_type: turn.next_play_type
+      });
       await handleOrebTurn(scene, { playerSprites, ballSprite, turnData: turn, onUpdate });
       announceFromTurnData(turn, 'end', scene.simData?.home_team_id, scene);
       if (onUpdate) {
