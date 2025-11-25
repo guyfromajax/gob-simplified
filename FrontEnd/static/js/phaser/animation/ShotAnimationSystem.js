@@ -409,12 +409,6 @@ export class ShotAnimationSystem {
    * Handle made shot
    */
   async handleMadeShot(rimCoords, turnData) {
-    // ✅ DEBUG: Track made shot path to identify skipped turns
-    const previousTurn = this.scene.simData?.turns?.[(this.scene.currentTurn || 0) - 1];
-    const previousTurnResult = previousTurn?.result_type;
-    const isPutbackMake = turnData.result_type === 'PUTBACK_MAKE';
-    const wasOREB = previousTurnResult === 'OREB' || previousTurnResult === 'OREB_KICKOUT';
-    
     // ✅ DEBUG: Log made shot with shooter details
     const shooterName = this.playerSprites[turnData.shooter_id]?.name || 'unknown';
     const isPutbackMake = turnData.result_type === 'PUTBACK_MAKE';
