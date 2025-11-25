@@ -1484,15 +1484,23 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
       scene._leanAnimationTriggered = true;
     }
 
-    updateBallOwnership({
-      scene,
-      ballSprite,
-      animations: turnData.animations,
-      playerSprites,
-      stepIndex,
-      offenseTeamId: scene.currentOffenseTeamId ?? turnData.possession_team_id,
-      currentBallOwnerRef
-    });
+    // ✅ FIX: Skip updateBallOwnership if a pass is happening at this step
+    // We'll handle the pass explicitly after movements complete (like shots)
+    const passHappeningAtThisStep = turnData.animations.some(
+      anim => anim.movement?.[stepIndex]?.action === "pass"
+    );
+    
+    if (!passHappeningAtThisStep) {
+      updateBallOwnership({
+        scene,
+        ballSprite,
+        animations: turnData.animations,
+        playerSprites,
+        stepIndex,
+        offenseTeamId: scene.currentOffenseTeamId ?? turnData.possession_team_id,
+        currentBallOwnerRef
+      });
+    }
 
     // Update active player displays in scoreboard
     if (!scene.skipToEnd) {
@@ -1571,7 +1579,18 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
             passerId: passInfo.passerId,
             receiverId: passInfo.receiverId,
             stepIndex: passInfo.stepIndex,
-            timestamp: passInfo.timestamp
+            timestamp: passInfo.timestamp,
+            passerPos: { x: sprite.x, y: sprite.y },
+            receiverPos: { x: playerSprites[receiverAnim.playerId]?.x, y: playerSprites[receiverAnim.playerId]?.y }
+          });
+        } else {
+          console.log('⚠️ [PASS DETECTED BUT NO RECEIVER]', {
+            passerId: anim.playerId,
+            stepIndex,
+            allActions: turnData.animations.map(a => ({
+              playerId: a.playerId,
+              stepAction: a.movement?.[stepIndex]?.action
+            }))
           });
         }
       }
@@ -1603,14 +1622,16 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
       const passerSprite = playerSprites[passInfo.passerId];
       const receiverSprite = playerSprites[passInfo.receiverId];
       
+      console.log('🏀 [PASS ANIMATION] About to call runPass', {
+        passInfo,
+        passerSprite: !!passerSprite,
+        receiverSprite: !!receiverSprite,
+        passerPos: passerSprite ? { x: passerSprite.x, y: passerSprite.y } : null,
+        receiverPos: receiverSprite ? { x: receiverSprite.x, y: receiverSprite.y } : null,
+        ballState: scene.gameState?.ballHolder || 'unknown'
+      });
+      
       if (passerSprite && receiverSprite) {
-        console.log('🏀 [PASS ANIMATION] Calling runPass', {
-          passerId: passInfo.passerId,
-          receiverId: passInfo.receiverId,
-          passerPos: { x: passerSprite.x, y: passerSprite.y },
-          receiverPos: { x: receiverSprite.x, y: receiverSprite.y }
-        });
-        
         // Calculate pass duration based on distance (like fast break outlet passes)
         const distance = Phaser.Math.Distance.Between(
           passerSprite.x, passerSprite.y,
@@ -1618,6 +1639,13 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
         );
         // Use same speed as fast break outlet passes (500ms default, or distance-based)
         const passDuration = distance > 0 ? Math.max(300, Math.min(800, (distance / 350) * 1000)) : 500;
+        
+        console.log('🏀 [PASS ANIMATION] Calling runPass NOW', {
+          fromId: passInfo.passerId,
+          toId: passInfo.receiverId,
+          duration: passDuration,
+          distance
+        });
         
         await runPass(scene, {
           fromId: passInfo.passerId,
@@ -1627,6 +1655,13 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
         });
         
         console.log('🏀 [PASS ANIMATION] runPass completed');
+      } else {
+        console.error('❌ [PASS ANIMATION] Missing sprites!', {
+          passerSprite: !!passerSprite,
+          receiverSprite: !!receiverSprite,
+          passerId: passInfo.passerId,
+          receiverId: passInfo.receiverId
+        });
       } else {
         console.warn('⚠️ [PASS ANIMATION] Missing sprites', {
           passerId: passInfo.passerId,
