@@ -111,11 +111,12 @@ export class AnimationEngine {
     const nonShotResultTypes = new Set([
       "FOUL", "FREE_THROW", "TURNOVER", "DEAD_BALL", 
       "SIDE_INBOUND", "BASELINE_INBOUND", "PUTBACK_MAKE", 
-      "PUTBACK_MISS", "OREB_KICKOUT", "DEFENSIVE_STOP", "OPENING_TIP"
+      "PUTBACK_MISS", "OREB_KICKOUT", "DEFENSIVE_STOP", "OPENING_TIP",
+      "HCO" // ✅ FIX: HCO turns are setup turns, not shot attempts
     ]);
     
-    // 🔍 DEBUG: Log routing decision for FOUL and other non-shot types
-    if (turnData.result_type === "FOUL" || nonShotResultTypes.has(turnData.result_type)) {
+    // 🔍 DEBUG: Log routing decision for FOUL, HCO, and other non-shot types
+    if (turnData.result_type === "FOUL" || turnData.result_type === "HCO" || nonShotResultTypes.has(turnData.result_type)) {
       const isInNonShotSet = nonShotResultTypes.has(turnData.result_type);
       const isShotAttempt = this.isShotAttempt(turnData);
       console.log('🔍 [ROUTING DEBUG]', {
@@ -123,7 +124,8 @@ export class AnimationEngine {
         isInNonShotSet,
         isShotAttempt,
         willRouteToShot: !isInNonShotSet && isShotAttempt,
-        willRouteToDefault: isInNonShotSet || !isShotAttempt
+        willRouteToDefault: isInNonShotSet || !isShotAttempt,
+        willRouteToHCO: turnData.result_type === "HCO"
       });
     }
     
