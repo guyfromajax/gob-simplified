@@ -1567,40 +1567,17 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
         }
       }
 
-      // ✅ FIX: Detect passes in step loop (following shot pattern)
-      if (nextStep.action === "pass" && !passInfo) {
-        // Find receiver (player with action === "receive" at same step)
-        const receiverAnim = turnData.animations.find(otherAnim => {
-          if (otherAnim.playerId === anim.playerId) return false; // Skip passer
-          const otherMovement = otherAnim.movement;
-          if (!otherMovement || stepIndex >= otherMovement.length) return false;
-          const otherStep = otherMovement[stepIndex];
-          return otherStep?.action === "receive";
-        });
-        
-        if (receiverAnim) {
-          passInfo = {
-            passerId: anim.playerId,
-            receiverId: receiverAnim.playerId,
-            stepIndex,
-            timestamp: nextStep.timestamp
-          };
+      // ✅ SCALABLE FIX: Use shared pass detection utility
+      // This ensures passes work consistently across all turn types
+      if (!passInfo) {
+        const { detectPassAtStep } = await import('./passDetection.js');
+        passInfo = detectPassAtStep(turnData.animations, stepIndex);
+        if (passInfo) {
           console.log('🏀 [PASS DETECTED]', {
             passerId: passInfo.passerId,
             receiverId: passInfo.receiverId,
             stepIndex: passInfo.stepIndex,
-            timestamp: passInfo.timestamp,
-            passerPos: { x: sprite.x, y: sprite.y },
-            receiverPos: { x: playerSprites[receiverAnim.playerId]?.x, y: playerSprites[receiverAnim.playerId]?.y }
-          });
-        } else {
-          console.log('⚠️ [PASS DETECTED BUT NO RECEIVER]', {
-            passerId: anim.playerId,
-            stepIndex,
-            allActions: turnData.animations.map(a => ({
-              playerId: a.playerId,
-              stepAction: a.movement?.[stepIndex]?.action
-            }))
+            timestamp: passInfo.timestamp
           });
         }
       }
@@ -1632,53 +1609,14 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
       const passerSprite = playerSprites[passInfo.passerId];
       const receiverSprite = playerSprites[passInfo.receiverId];
       
-      console.log('🏀 [PASS ANIMATION] About to call runPass', {
+      // ✅ SCALABLE FIX: Handle passes using shared utility
+      // This works for all turn types (HCO shots, fouls, turnovers, etc.)
+      const { handlePassAnimation } = await import('./passDetection.js');
+      await handlePassAnimation({
+        scene,
         passInfo,
-        passerSprite: !!passerSprite,
-        receiverSprite: !!receiverSprite,
-        passerPos: passerSprite ? { x: passerSprite.x, y: passerSprite.y } : null,
-        receiverPos: receiverSprite ? { x: receiverSprite.x, y: receiverSprite.y } : null,
-        ballState: scene.gameState?.ballHolder || 'unknown'
+        playerSprites
       });
-      
-      if (passerSprite && receiverSprite) {
-        // Calculate pass duration based on distance (like fast break outlet passes)
-        const distance = Phaser.Math.Distance.Between(
-          passerSprite.x, passerSprite.y,
-          receiverSprite.x, receiverSprite.y
-        );
-        // Use same speed as fast break outlet passes (500ms default, or distance-based)
-        const passDuration = distance > 0 ? Math.max(300, Math.min(800, (distance / 350) * 1000)) : 500;
-        
-        console.log('🏀 [PASS ANIMATION] Calling runPass NOW', {
-          fromId: passInfo.passerId,
-          toId: passInfo.receiverId,
-          duration: passDuration,
-          distance
-        });
-        
-        await runPass(scene, {
-          fromId: passInfo.passerId,
-          toId: passInfo.receiverId,
-          duration: passDuration,
-          easing: "Sine.easeInOut"
-        });
-        
-        // ✅ CRITICAL FIX: Keep passInFlight true for the NEXT step to prevent
-        // updateBallOwnership from teleporting the ball immediately after pass completes
-        // runPass() clears passInFlight in its finally block, but we need it to stay true
-        // for one more step iteration to prevent updateBallOwnership from interfering
-        // This matches fast break behavior - no updateBallOwnership during/after pass
-        scene.passInFlight = true;
-        console.log('🏀 [PASS ANIMATION] runPass completed, keeping passInFlight=true for next step');
-      } else {
-        console.error('❌ [PASS ANIMATION] Missing sprites!', {
-          passerSprite: !!passerSprite,
-          receiverSprite: !!receiverSprite,
-          passerId: passInfo.passerId,
-          receiverId: passInfo.receiverId
-        });
-      }
     } else {
       // Debug: log when we DON'T have passInfo but might expect one
       const hasPassAction = turnData.animations.some(anim => 

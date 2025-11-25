@@ -218,6 +218,11 @@ export class ShotAnimationSystem {
       const promises = [];
       let shotInfo = null;
       
+      // ✅ SCALABLE FIX: Use shared pass detection utility
+      // This ensures passes work for HCO shots, fouls, turnovers, etc.
+      const { detectPassAtStep, handlePassAnimation } = await import('./passDetection.js');
+      const passInfo = detectPassAtStep(turnData.animations, stepIndex);
+      
       for (const anim of turnData.animations) {
         if (this.scene.skipToEnd) break;
         const sprite = this.playerSprites[anim.playerId];
@@ -250,6 +255,14 @@ export class ShotAnimationSystem {
       }
       
       await Promise.all(promises);
+      
+      // ✅ SCALABLE FIX: Handle passes using shared utility
+      // This works for all turn types (shots, fouls, turnovers, etc.)
+      await handlePassAnimation({
+        scene: this.scene,
+        passInfo,
+        playerSprites: this.playerSprites
+      });
       
       // Handle shot if this step contains one
       if (shotInfo) {
