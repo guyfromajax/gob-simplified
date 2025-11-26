@@ -804,9 +804,20 @@ export async function animateGameTurns({ //hasBallAtStep
     
     // ✅ FIX: Check for FCP/HCT BEFORE TURNOVER to prevent FCP/HCT turns from being misrouted
     // FCP/HCT turns can have result_type === "TURNOVER" if there's a turnover during pressure
+    // Also check if previous turn was an FCP/HCT shot attempt - the next turn should inherit FCP/HCT context
+    const prevWasFCPHCTShotAttempt = previousTurn && 
+                                     (previousTurn.result_type === "MAKE" || previousTurn.result_type === "MISS") &&
+                                     (previousTurn.fcp_shot === true || previousTurn.hct_shot === true || 
+                                      previousTurn.next_defensive_setup === "FCP" || previousTurn.next_defensive_setup === "HCT");
+    const shouldInheritFCPHCT = prevWasFCPHCTShotAttempt && 
+                                 (previousTurn.next_defensive_setup === "FCP" || previousTurn.next_defensive_setup === "HCT") &&
+                                 !turn.fcp_shot && !turn.hct_shot && 
+                                 turn.next_defensive_setup !== "FCP" && turn.next_defensive_setup !== "HCT";
+    
     const isFCPHCT = turn.fcp_shot === true || turn.hct_shot === true || 
                      turn.next_defensive_setup === "FCP" || turn.next_defensive_setup === "HCT" ||
-                     turn.fcp_foul === true || turn.hct_foul === true;
+                     turn.fcp_foul === true || turn.hct_foul === true ||
+                     shouldInheritFCPHCT; // ✅ FIX: Inherit FCP/HCT context from previous shot attempt
     
     // ✅ DEBUG: Update the log if this turn after BASELINE_INBOUND is detected as FCP/HCT
     if (isAfterBaselineInboundWithFCPHCT) {
@@ -858,14 +869,20 @@ export async function animateGameTurns({ //hasBallAtStep
     }
     
     if (isFCPHCT) {
-      const pressureType = turn.fcp_shot || turn.fcp_foul || turn.next_defensive_setup === "FCP" ? 'FCP' : 'HCT';
+      // ✅ FIX: Determine pressure type - use inherited context if turn doesn't have flags
+      const pressureType = turn.fcp_shot || turn.fcp_foul || turn.next_defensive_setup === "FCP" || 
+                           (shouldInheritFCPHCT && previousTurn?.next_defensive_setup === "FCP") ? 'FCP' : 
+                           (turn.hct_shot || turn.hct_foul || turn.next_defensive_setup === "HCT" || 
+                            (shouldInheritFCPHCT && previousTurn?.next_defensive_setup === "HCT")) ? 'HCT' : 'FCP';
       
       // ✅ FIX: FCP/HCT shot attempts (fcp_shot/hct_shot with MAKE/MISS) should route through ShotAnimationSystem
       // FCP/HCT setup turns (FOUL, HCO, etc.) should route through playTurnAnimation
       // Also check if result_type is MAKE/MISS with FCP/HCT flags (next_defensive_setup or fcp_shot/hct_shot)
+      // OR if this turn should inherit FCP/HCT context from previous shot attempt
       const isFCPHCTShotAttempt = (turn.result_type === "MAKE" || turn.result_type === "MISS") &&
                                    (turn.fcp_shot === true || turn.hct_shot === true || 
-                                    turn.next_defensive_setup === "FCP" || turn.next_defensive_setup === "HCT");
+                                    turn.next_defensive_setup === "FCP" || turn.next_defensive_setup === "HCT" ||
+                                    shouldInheritFCPHCT);
       
       console.log('🔍 [FCP/HCT DETECTED - BEFORE TURNOVER CHECK]', {
         turn_index: i,
@@ -875,6 +892,9 @@ export async function animateGameTurns({ //hasBallAtStep
         fcp_foul: turn.fcp_foul,
         hct_foul: turn.hct_foul,
         next_defensive_setup: turn.next_defensive_setup,
+        shouldInheritFCPHCT: shouldInheritFCPHCT,
+        prevWasFCPHCTShotAttempt: prevWasFCPHCTShotAttempt,
+        previous_turn_next_defensive_setup: previousTurn?.next_defensive_setup,
         pressureType,
         isFCPHCT,
         isFCPHCTShotAttempt,
@@ -893,6 +913,44 @@ export async function animateGameTurns({ //hasBallAtStep
         turn.index = i;
         await animationRouter.processTurn(turn);
         // Note: announceFromTurnData, onUpdate, and updateDebugScore are handled by AnimationRouter
+        
+        // ✅ DEBUG: After FCP/HCT shot attempt completes, check what's next
+        const nextTurnIndex = i + 1;
+        const nextTurn = nextTurnIndex < turns.length ? turns[nextTurnIndex] : null;
+        const totalTurns = turns.length;
+        console.log('🔍 [AFTER FCP/HCT SHOT ATTEMPT]', {
+          current_turn_index: i,
+          current_turn_result_type: turn.result_type,
+          current_turn_next_defensive_setup: turn.next_defensive_setup,
+          total_turns_in_array: totalTurns,
+          next_turn_index: nextTurnIndex,
+          next_turn_exists: !!nextTurn,
+          next_turn_result_type: nextTurn?.result_type || null,
+          next_turn_fcp_shot: nextTurn?.fcp_shot || false,
+          next_turn_hct_shot: nextTurn?.hct_shot || false,
+          next_turn_next_defensive_setup: nextTurn?.next_defensive_setup || null,
+          next_turn_fcp_foul: nextTurn?.fcp_foul || false,
+          next_turn_hct_foul: nextTurn?.hct_foul || false,
+          will_continue_loop: nextTurnIndex < totalTurns
+        });
+        
+        // ✅ FIX: After FCP/HCT shot attempt, the next turn should be the FCP/HCT offense turn
+        // If the next turn doesn't have FCP/HCT flags but should (based on previous turn's next_defensive_setup),
+        // we need to detect it based on context. However, we can't modify the turn data here.
+        // Instead, we'll let the next iteration handle it, but we need to ensure the detection logic
+        // checks the previous turn's context.
+        
+        // Announce, update score, etc. are handled by AnimationRouter
+        announceFromTurnData(turn, 'end', scene.simData?.home_team_id, scene);
+        if (onUpdate) {
+          try {
+            onUpdate(turn);
+          } catch (err) {
+            console.error('Scoreboard update failed:', err);
+          }
+        }
+        updateDebugScore(turn, { turnIndex: i, possessionId });
+        
         continue;
       } else {
         // FCP/HCT setup turns (FOUL, HCO, etc.) route through playTurnAnimation
