@@ -262,6 +262,87 @@ Player animations already use the simplified approach:
 
 ---
 
+### Distance-Based Animation Speed System ✅ **COMPLETE** (January 2025)
+
+**Status:** Fully implemented and operational
+
+The animation system uses a unified distance-based duration calculation that ensures consistent speeds across all animations and respects game speed settings (Slow/Normal/Fast).
+
+**Architecture:**
+
+#### Core Functions
+
+- **`getPlayerDuration(sprite, targetX, targetY, isTransition = false)`** (`turnAnimation.js`)
+  - Calculates player movement duration based on distance from current sprite position to target
+  - Uses `getPlayerSpeed()` which checks `window.__GAME_SPEED` for dynamic speed settings
+  - Formula: `duration = (distance / speed) * 1000` (converts to milliseconds)
+  - Supports transition flag for longer movements (uses `MAX_TRANSITION_DURATION` = 3000ms cap)
+  - Default speed: 350 pixels/second (Normal preset)
+
+- **`getBallDuration(ballSprite, targetX, targetY)`** (`ballTween.js`)
+  - Calculates ball movement duration based on distance from current position to target
+  - Uses `getBallSpeed()` which checks `window.__GAME_SPEED` for dynamic speed settings
+  - Formula: `duration = (distance / speed) * 1000` (converts to milliseconds)
+  - Default speed: 350 pixels/second (Normal preset)
+  - Clamped between 50ms (minimum) and 1000ms (maximum)
+
+#### Game Speed Integration
+
+**Speed Presets** (`gameSpeedManager.js`):
+- **Slow**: 250 pixels/second
+- **Normal**: 350 pixels/second (default)
+- **Fast**: 450 pixels/second
+
+**How It Works**:
+1. User selects speed via UI buttons (Slow/Normal/Fast)
+2. `gameSpeedManager.setGameSpeed()` updates `window.__GAME_SPEED`
+3. `getPlayerSpeed()` and `getBallSpeed()` check `window.__GAME_SPEED` before falling back to defaults
+4. All duration calculations automatically use the current speed setting
+
+#### Where It's Used
+
+**Player Animations**:
+- ✅ HCO turn animations (`ShotAnimationSystem.animatePlayerMovement()`)
+- ✅ Transition animations (IP→HCO, DREB→HCO)
+- ✅ Inbound pass setup animations
+- ✅ Opening tip player movements
+- ✅ Free throw player movements
+- ✅ Fast break player movements
+
+**Ball Animations**:
+- ✅ Pass animations (`passDetection.js`)
+- ✅ Opening tip ball movements
+- ✅ All ball tweens via `getBallDuration()`
+
+#### Benefits
+
+- ✅ **Consistent Speeds**: All animations use the same distance-based calculation
+- ✅ **Game Speed Support**: Slow/Normal/Fast buttons work across all animations
+- ✅ **Smooth Transitions**: Distance-based calculation ensures smooth movement regardless of timestamp gaps
+- ✅ **No More "Stuck in Mud"**: Replaced slow timestamp-based calculations with responsive distance-based ones
+- ✅ **Unified System**: Single source of truth for duration calculations
+
+#### Migration History
+
+**Before (Bug 3 - Fixed January 2025)**:
+- `ShotAnimationSystem` used timestamp-based calculation: `(nextStep.timestamp - step.timestamp) * 3`
+- Hardcoded speeds in `passDetection.js` and `openingTip.js`
+- Game speed buttons had no effect
+- Inconsistent speeds between HCO and transitions
+
+**After (Fixed January 2025)**:
+- All animations use `getPlayerDuration()` or `getBallDuration()`
+- Game speed settings respected everywhere
+- Consistent speeds across all animation types
+
+**See:**
+- `docs/PHASE_2.5_BUG_LIST.md` - Bug 3 fix details
+- `docs/To Do/animation_speed_edge_cases.md` - Remaining edge cases
+
+---
+
+---
+
 ## Experimental Animation System - PossessionRunner
 
 > ⚠️ **IMPORTANT**: This section describes an **experimental animation system** (PossessionRunner) 
