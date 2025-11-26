@@ -774,10 +774,14 @@ export async function animateGameTurns({ //hasBallAtStep
     }
 
     // ✅ DEBUG: Check if previous turn was BASELINE_INBOUND with FCP/HCT setup
+    // OR if previous turn was a MAKE with next_play_type: "BASELINE_INBOUND" and FCP/HCT setup
+    // (because runInboundSetup is called inline from ShotAnimationSystem, not as a separate turn)
     const previousTurn = i > 0 ? turns[i - 1] : null;
     const prevWasBaselineInbound = previousTurn?.result_type === "BASELINE_INBOUND";
+    const prevWasMakeWithBaselineInbound = previousTurn?.result_type === "MAKE" && 
+                                           previousTurn?.next_play_type === "BASELINE_INBOUND";
     const prevHadFCPHCTSetup = previousTurn?.next_defensive_setup === "FCP" || previousTurn?.next_defensive_setup === "HCT";
-    const isAfterBaselineInboundWithFCPHCT = prevWasBaselineInbound && prevHadFCPHCTSetup;
+    const isAfterBaselineInboundWithFCPHCT = (prevWasBaselineInbound || prevWasMakeWithBaselineInbound) && prevHadFCPHCTSetup;
     
     // ✅ DEBUG: Log turns after BASELINE_INBOUND with FCP/HCT setup
     if (isAfterBaselineInboundWithFCPHCT) {
@@ -785,7 +789,9 @@ export async function animateGameTurns({ //hasBallAtStep
         turn_index: i,
         current_turn_result_type: turn.result_type,
         previous_turn_result_type: previousTurn?.result_type,
+        previous_turn_next_play_type: previousTurn?.next_play_type,
         previous_turn_next_defensive_setup: previousTurn?.next_defensive_setup,
+        previous_turn_was_make_with_baseline_inbound: prevWasMakeWithBaselineInbound,
         current_turn_fcp_shot: turn.fcp_shot,
         current_turn_hct_shot: turn.hct_shot,
         current_turn_next_defensive_setup: turn.next_defensive_setup,
