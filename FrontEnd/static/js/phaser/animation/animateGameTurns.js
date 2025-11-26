@@ -834,6 +834,22 @@ export async function animateGameTurns({ //hasBallAtStep
       const shouldBeFCPHCT = turn.fcp_shot === true || turn.hct_shot === true || 
                             turn.next_defensive_setup === "FCP" || turn.next_defensive_setup === "HCT" ||
                             turn.fcp_foul === true || turn.hct_foul === true;
+      
+      // ✅ DEBUG: Log ALL MAKE/MISS turns to see their FCP/HCT flags
+      console.log('🔍 [MAKE/MISS TURN CHECK]', {
+        turn_index: i,
+        result_type: turn.result_type,
+        fcp_shot: turn.fcp_shot,
+        hct_shot: turn.hct_shot,
+        next_defensive_setup: turn.next_defensive_setup,
+        fcp_foul: turn.fcp_foul,
+        hct_foul: turn.hct_foul,
+        shouldBeFCPHCT: shouldBeFCPHCT,
+        willBeDetectedAsFCPHCT: isFCPHCT,
+        previous_turn_result_type: previousTurn?.result_type,
+        previous_turn_next_defensive_setup: previousTurn?.next_defensive_setup
+      });
+      
       if (!shouldBeFCPHCT) {
         // Log turns that might be FCP/HCT but aren't flagged
         const prevHadFCPHCT = previousTurn?.next_defensive_setup === "FCP" || previousTurn?.next_defensive_setup === "HCT";
