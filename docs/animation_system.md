@@ -341,6 +341,100 @@ The animation system uses a unified distance-based duration calculation that ens
 
 ---
 
+### Shot Resolution Process ✅ **COMPLETE** (January 2025)
+
+**Status:** Fully unified and operational
+
+All made shots (HCO, Fast Break, Putback, Free Throw) now use a consistent resolution process that ensures the ball lands and holds at the correct rim coordinates.
+
+#### Rim Coordinates
+
+**Constants** (`courtConstants.js`):
+- **Home Rim**: `{ x: 91, y: 25 }` (grid coordinates)
+- **Away Rim**: `{ x: 9, y: 25 }` (grid coordinates)
+
+**Rule**: Teams shoot at their own basket
+- Home team shoots at home rim (x: 91)
+- Away team shoots at away rim (x: 9)
+
+#### Resolution Process
+
+**For All Made Shots** (HCO, Fast Break, Putback, Free Throw):
+
+1. **Ball Animation to Rim**
+   - Ball animates from shooter to rim coordinates using `animateBallFlight()` or `animateShotToRim()`
+   - Animation completes when ball reaches rim position
+   - Ball remains visible at rim coordinates
+
+2. **Rim Hold (1 Second)**
+   - Ball holds at rim coordinates for **1 second** (1000ms)
+   - Allows "It's Good!" announcement to display
+   - Ball stays visible during this hold period
+   - Implemented via `scene.time.delayedCall(1000, resolve)` or `wait(scene, 1000)`
+
+3. **State Cleanup**
+   - `ballController.onShotEnd()` is called to clear in-flight state
+   - Ball visibility is managed by the specific animation system
+   - HCO makes: Ball is explicitly hidden after 1 second hold
+   - Fast Break/Putback/Free Throw: Ball remains visible until next play begins
+
+4. **Transition to Next Play**
+   - Regular makes: Transition to inbound pass (BASELINE_INBOUND)
+   - AND-1 makes: Transition to free throw (FREE_THROW)
+   - Ball state is cleared before transition
+
+#### Implementation by Shot Type
+
+**HCO Made Shots** (`ShotAnimationSystem.js`):
+- Uses `animateBallFlight()` to animate ball to rim
+- `handleMadeShot()` holds ball at rim for 1 second
+- Ball is explicitly hidden after 1 second hold
+- Then calls `onShotEnd()` and transitions
+
+**Fast Break Made Shots** (`fastBreak.js`):
+- Uses `animateShotToRim()` to animate ball to rim
+- Shows announcement
+- Waits 1 second (ball remains visible at rim)
+- Calls `onShotEnd()` and transitions to inbound
+
+**Putback Made Shots** (`ballManager.js`):
+- Uses `animateShotToRim()` to animate ball to rim
+- Shows announcement
+- Waits 1 second (ball remains visible at rim)
+- Calls `onShotEnd()` and resolves
+
+**Free Throw Made Shots** (`freeThrow.js`):
+- Uses `animateShotToRim()` to animate ball to rim
+- Shows announcement
+- Waits `animationConfig.freeThrow.rimHoldMs` (typically 1000ms)
+- Ball remains visible at rim during hold
+- Calls `onShotEnd()` and continues to next attempt or ends
+
+#### Key Features
+
+- ✅ **Consistent Rim Hold**: All made shots hold at rim for 1 second
+- ✅ **Correct Rim Coordinates**: Home team at home rim, away team at away rim
+- ✅ **No Manual Repositioning**: Ball lands at exact final position of flight animation
+- ✅ **Smooth Transitions**: State cleanup before transitioning to next play
+- ✅ **Unified Behavior**: All shot types use the same resolution pattern
+
+#### Benefits
+
+- ✅ **Visual Consistency**: All made shots look the same (ball holds at rim)
+- ✅ **Correct Positioning**: Ball always lands at correct rim coordinates
+- ✅ **No Teleporting**: Ball stays at rim position throughout hold period
+- ✅ **Maintainable**: Single pattern for all shot types
+
+**Key Files:**
+- `ShotAnimationSystem.js` - HCO shot resolution
+- `fastBreak.js` - Fast break shot resolution
+- `ballManager.js` - Putback shot resolution
+- `freeThrow.js` - Free throw resolution
+- `courtConstants.js` - Rim coordinate constants
+
+**See:**
+- `FrontEnd/static/js/phaser/animation/courtConstants.js` - Rim coordinate definitions
+
 ---
 
 ## Experimental Animation System - PossessionRunner
