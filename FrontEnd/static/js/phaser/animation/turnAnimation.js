@@ -1540,6 +1540,18 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   }
 
   if (scene.skipToEnd || scene.stateMachine?.is(States.FastBreak)) {
+    // ✅ DEBUG: Log if FCP/HCT is being skipped due to skipToEnd or FastBreak state
+    if (isFCPHCT) {
+      const pressureType = turnData.fcp_shot || turnData.fcp_foul || turnData.next_defensive_setup === "FCP" ? 'FCP' : 'HCT';
+      console.error('❌ [FCP/HCT SKIPPED - EARLY EXIT]', {
+        turn_index: turnIndex,
+        pressureType,
+        result_type: turnData.result_type,
+        skipToEnd: scene.skipToEnd,
+        isFastBreak: scene.stateMachine?.is(States.FastBreak),
+        reason: scene.skipToEnd ? 'skipToEnd flag' : 'FastBreak state'
+      });
+    }
     return;
   }
 
