@@ -540,6 +540,13 @@ export class ShotAnimationSystem {
       // For AND-1 situations (next_play_type === "FREE_THROW"), let the free throw system handle the transition
       if (turnData.next_play_type === "BASELINE_INBOUND") {
         const { runInboundSetup } = await import('./turnAnimation.js');
+        // ✅ CRITICAL: After a made shot, possession flips:
+        // - Team that just scored (was on offense) is now on DEFENSE
+        // - Team that was on defense is now on OFFENSE
+        // - newOffenseSide is the team that is NOW on offense (the team that was defending)
+        // - The defensive team (team that just scored) will apply FCP/HCT pressure
+        // - Backend determines FCP/HCT based on the team that just scored (now on defense)
+        // - Frontend receives next_defensive_setup from backend, so we use the correct team's settings
         const newOffenseSide = isHomeOffense ? "away" : "home";
         const skipRetreat = turnData.next_defensive_setup === "FCP" || turnData.next_defensive_setup === "HCT";
         const pressureType = skipRetreat ? turnData.next_defensive_setup : null;

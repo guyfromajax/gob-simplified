@@ -874,62 +874,7 @@ export async function animateGameTurns({ //hasBallAtStep
       continue;
     }
     
-    // Check for FCP/HCT shots - route to standard shot animation
-    // ✅ FIX: Check for FCP/HCT setup turns (any result_type with fcp_shot/hct_shot flags or next_defensive_setup)
-    // This must come BEFORE the HCO routing check to catch FCP/HCT turns
-    const isFCPHCT = turn.fcp_shot === true || turn.hct_shot === true || 
-                     turn.next_defensive_setup === "FCP" || turn.next_defensive_setup === "HCT";
-    
-    if (isFCPHCT) {
-      const pressureType = turn.fcp_shot || turn.next_defensive_setup === "FCP" ? 'FCP' : 'HCT';
-      // ✅ DEBUG: Log FCP/HCT detection to verify it's catching setup turns
-      console.log('🔍 [FCP/HCT DETECTED]', {
-        turn_index: i,
-        result_type: turn.result_type,
-        fcp_shot: turn.fcp_shot,
-        hct_shot: turn.hct_shot,
-        next_defensive_setup: turn.next_defensive_setup,
-        pressureType,
-        isFCPHCT,
-        willRouteToPlayTurnAnimation: true
-      });
-      animationDebugLog(`${pressureType} SHOT TURN - routing to standard shot animation:`, {
-        result_type: turn.result_type,
-        turn_index: i,
-        fcp_shot: turn.fcp_shot,
-        hct_shot: turn.hct_shot,
-        next_defensive_setup: turn.next_defensive_setup
-      });
-      await playTurnAnimation({
-        scene,
-        simData,
-        playerSprites,
-        turnData: turn,
-        ballSprite,
-        onUpdate,
-        turnIndex: i,
-        onAction: async (action, sprite, timestamp) => {
-          if (DEBUG_FLOW || debugEnabled)
-            logVerbose(
-              `🎬 Action "${action}" fired at ${timestamp}ms for sprite:`,
-              sprite
-            );
-          if (onAction) onAction(action, sprite, timestamp);
-        },
-      });
-      
-      // Announce result (visual effects now handled by announcement/ballManager)
-      announceFromTurnData(turn, 'end', scene.simData?.home_team_id, scene);
-      if (onUpdate) {
-        try {
-          onUpdate(turn);
-        } catch (err) {
-          console.error('Scoreboard update failed:', err);
-        }
-      }
-      updateDebugScore(turn, { turnIndex: i, possessionId });
-      continue;
-    }
+    // ✅ REMOVED: FCP/HCT check moved to BEFORE TURNOVER check to prevent misrouting
     
     // Fast break shots now use the new system (same as HCO shots)
     if (turn.result_type === "MAKE" || turn.result_type === "MISS") {
