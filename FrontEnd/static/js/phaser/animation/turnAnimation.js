@@ -1448,6 +1448,20 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   const maxSteps = Math.max(
     ...turnData.animations.map(anim => anim.movement.length)
   );
+  
+  // ✅ DEBUG: Log FCP/HCT step count
+  if (isFCPHCT) {
+    const pressureType = turnData.fcp_shot || turnData.fcp_foul || turnData.next_defensive_setup === "FCP" ? 'FCP' : 'HCT';
+    console.log('🔍 [FCP/HCT STEP COUNT]', {
+      turn_index: turnIndex,
+      pressureType,
+      result_type: turnData.result_type,
+      maxSteps,
+      animation_count: turnData.animations?.length || 0,
+      movement_lengths: turnData.animations?.map(a => a.movement?.length || 0) || [],
+      will_loop: maxSteps > 1
+    });
+  }
 
   // ✅ Allow HCO turns even if state is FastBreak (can happen after defensive stop transition fails)
   // Check if this is an HCO turn (not fast_break and has animations) - if so, allow it
@@ -1594,9 +1608,33 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   }
 
   let eventsProcessed = false;
+  
+  // ✅ DEBUG: Log FCP/HCT step loop start
+  if (isFCPHCT) {
+    const pressureType = turnData.fcp_shot || turnData.fcp_foul || turnData.next_defensive_setup === "FCP" ? 'FCP' : 'HCT';
+    console.log('🔍 [FCP/HCT STEP LOOP START]', {
+      turn_index: turnIndex,
+      pressureType,
+      maxSteps,
+      will_execute: maxSteps > 1,
+      loop_range: maxSteps > 1 ? `stepIndex 1 to ${maxSteps - 1}` : 'NO LOOP (maxSteps <= 1)'
+    });
+  }
 
   for (let stepIndex = 1; stepIndex < maxSteps; stepIndex++) {
     if (scene.skipToEnd || scene.stateMachine?.is(States.FastBreak)) break;
+    
+    // ✅ DEBUG: Log FCP/HCT step execution
+    if (isFCPHCT && stepIndex === 1) {
+      const pressureType = turnData.fcp_shot || turnData.fcp_foul || turnData.next_defensive_setup === "FCP" ? 'FCP' : 'HCT';
+      console.log('🎬 [FCP/HCT STEP EXECUTING]', {
+        turn_index: turnIndex,
+        pressureType,
+        stepIndex,
+        maxSteps,
+        is_animating: true
+      });
+    }
 
     // Trigger lean meter animation at middle step
     if (scene._leanScoreToAnimate !== null && 
