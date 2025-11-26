@@ -766,6 +766,30 @@ export async function animateGameTurns({ //hasBallAtStep
                      turn.next_defensive_setup === "FCP" || turn.next_defensive_setup === "HCT" ||
                      turn.fcp_foul === true || turn.hct_foul === true;
     
+    // ✅ DEBUG: Log ALL turns to see which ones should be FCP/HCT but aren't being detected
+    if (turn.result_type === "MAKE" || turn.result_type === "MISS") {
+      const shouldBeFCPHCT = turn.fcp_shot === true || turn.hct_shot === true || 
+                            turn.next_defensive_setup === "FCP" || turn.next_defensive_setup === "HCT" ||
+                            turn.fcp_foul === true || turn.hct_foul === true;
+      if (!shouldBeFCPHCT) {
+        // Log turns that might be FCP/HCT but aren't flagged
+        const previousTurn = i > 0 ? turns[i - 1] : null;
+        const prevHadFCPHCT = previousTurn?.next_defensive_setup === "FCP" || previousTurn?.next_defensive_setup === "HCT";
+        if (prevHadFCPHCT) {
+          console.warn('⚠️ [FCP/HCT MISSING FLAGS]', {
+            turn_index: i,
+            result_type: turn.result_type,
+            fcp_shot: turn.fcp_shot,
+            hct_shot: turn.hct_shot,
+            next_defensive_setup: turn.next_defensive_setup,
+            previous_turn_next_defensive_setup: previousTurn?.next_defensive_setup,
+            should_have_fcp_hct_flags: true,
+            reason: 'Previous turn had FCP/HCT setup but this turn does not'
+          });
+        }
+      }
+    }
+    
     // ✅ DEBUG: Log when entering FCP/HCT instance
     if (isFCPHCT) {
       console.log('🚨🚨🚨 ENTERING FCP/HCT INSTANCE 🚨🚨🚨', {
