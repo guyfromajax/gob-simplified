@@ -1445,9 +1445,13 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   // Store a reference on the scene so other modules (e.g., runPass)
   // can update ball ownership consistently.
   scene.currentBallOwnerRef = currentBallOwnerRef;
-  const maxSteps = Math.max(
-    ...turnData.animations.map(anim => anim.movement.length)
-  );
+  const maxSteps = turnData.animations && turnData.animations.length > 0
+    ? Math.max(
+        ...turnData.animations
+          .filter(anim => anim.movement && Array.isArray(anim.movement))
+          .map(anim => anim.movement.length)
+      )
+    : 0;
   
   // ✅ DEBUG: Log FCP/HCT step count
   if (isFCPHCT) {

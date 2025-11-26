@@ -809,8 +809,10 @@ export async function animateGameTurns({ //hasBallAtStep
       
       // ✅ FIX: FCP/HCT shot attempts (fcp_shot/hct_shot with MAKE/MISS) should route through ShotAnimationSystem
       // FCP/HCT setup turns (FOUL, HCO, etc.) should route through playTurnAnimation
-      const isFCPHCTShotAttempt = (turn.fcp_shot === true || turn.hct_shot === true) && 
-                                   (turn.result_type === "MAKE" || turn.result_type === "MISS");
+      // Also check if result_type is MAKE/MISS with FCP/HCT flags (next_defensive_setup or fcp_shot/hct_shot)
+      const isFCPHCTShotAttempt = (turn.result_type === "MAKE" || turn.result_type === "MISS") &&
+                                   (turn.fcp_shot === true || turn.hct_shot === true || 
+                                    turn.next_defensive_setup === "FCP" || turn.next_defensive_setup === "HCT");
       
       console.log('🔍 [FCP/HCT DETECTED - BEFORE TURNOVER CHECK]', {
         turn_index: i,
