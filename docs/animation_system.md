@@ -1,6 +1,6 @@
 # Animation System Overview
 
-> **Last Updated:** December 2024
+> **Last Updated:** January 2025
 
 This document provides an overview of the front-end animation stack for **GOB**, including both the production system and experimental components.
 
@@ -122,6 +122,130 @@ The defender coordinate system uses a unified architecture with **`get_defender_
 
 ---
 
+### Unified Pass System ✅ **COMPLETE** (January 2025)
+
+**Status:** Fully unified and operational
+
+All pass animations now use a single, centralized system (`passDetection.js`) that provides consistent behavior across all pass types and turn scenarios.
+
+**Architecture:**
+- **`passDetection.js`** - Centralized pass detection and handling utility
+  - `detectPassAtStep()` - Detects passes from animation data by looking for `action: "pass"` and `action: "receive"` at the same step
+  - `handlePassAnimation()` - Executes pass animation using `runPass()` with distance-based duration calculation
+  - Sets `scene.passInFlight = true` to prevent `updateBallOwnership` from interfering
+  
+**Pass Types Unified:**
+1. **HCO Passes** - Passes within half-court offense turn animations
+   - Used by: `playTurnAnimation()`, `ShotAnimationSystem.animatePlayerMovement()`
+   - Detects passes from turn animation data automatically
+   
+2. **Fast Break Outlet Passes** - Outlet passes during fast break sequences
+   - Used by: `fastBreak.js` (via `passDetection.js`)
+   - Distance-based duration for smooth animation
+   
+3. **Side Inbound Passes** (SIDE_INBOUND)
+   - Used by: `runSideInboundSetup()`
+   - Checks `turnData.animations` for pass actions, falls back to hardcoded SF→PG if not found
+   
+4. **Baseline Inbound Passes** (BASELINE_INBOUND)
+   - Used by: `runInboundSetup()`
+   - Checks `turnData.animations` for pass actions, falls back to hardcoded SF→PG if not found
+   
+5. **Opening Tip → PG Pass**
+   - Used by: `openingTip.js`
+   - Automatically finds PG for tip winner's team and executes pass
+   - Uses synthetic `passInfo` since opening tip doesn't have animation data with pass actions
+   
+6. **DREB Outlet Passes** (Defensive Rebound → HCO)
+   - Used by: `runDefensiveReboundSetup()`
+   - Checks `turnData.animations` for pass actions, creates synthetic `passInfo` if not found
+   - Maintains backward compatibility with existing outlet pass logic
+
+**Key Features:**
+- ✅ Single source of truth for all pass animations
+- ✅ Consistent behavior across all pass types
+- ✅ Automatic pass detection from animation data
+- ✅ Fallback to hardcoded passes when animation data doesn't have pass actions
+- ✅ Distance-based duration calculation (300-800ms based on distance)
+- ✅ Prevents `updateBallOwnership` from teleporting ball during/after passes
+- ✅ Future-proof: When backend adds pass actions to animation data, passes work automatically
+
+**Benefits:**
+- ✅ **Consistency**: All passes animate the same way
+- ✅ **Maintainability**: Fix bugs or improve pass animation in one place
+- ✅ **Scalability**: Easy to add new pass types without duplicating code
+- ✅ **Future-proof**: Ready for dynamic inbound passes (when backend provides pass actions)
+- ✅ **Backward compatible**: Works with current hardcoded passes and future data-driven passes
+
+**Implementation Details:**
+- Pass detection looks for `action: "pass"` in one player's movement step
+- Finds corresponding `action: "receive"` in another player's movement at the same step
+- Calculates pass duration: `Math.max(300, Math.min(800, (distance / 350) * 1000))`
+- Uses `runPass()` from `ballTween.js` for actual animation
+- Sets `scene.passInFlight = true` to prevent ball ownership updates during pass
+
+**Key Files:**
+- `passDetection.js` - Core pass detection and handling
+- `turnAnimation.js` - Uses pass detection in step loop and inbound setups
+- `ShotAnimationSystem.js` - Uses pass detection in player movement animation
+- `openingTip.js` - Uses pass detection for tip winner → PG pass
+- `ballTween.js` - `runPass()` function (used by all passes)
+
+**See:**
+- `FrontEnd/static/js/phaser/animation/passDetection.js` - Complete implementation
+
+---
+
+### Animation Routing System ✅ **IN PROGRESS** (Phase 2.5 - January 2025)
+
+**Status:** Partially migrated - HCO turns (MAKE/MISS) now route through AnimationRouter
+
+The animation routing system provides a unified entry point for all turn animations, replacing scattered animation logic with a clean, centralized architecture.
+
+**Architecture:**
+- **`AnimationRouter`** (`AnimationRouter.js`) - Single entry point for all animations
+  - Handles pre/post setup via `prepareTurnForAnimation()` and `finalizeTurnAfterAnimation()`
+  - Manages turn queuing to prevent concurrent processing
+  - Integrates BallController and AnimationEngine
+  
+- **`AnimationEngine`** (`AnimationEngine.js`) - Routes turns to appropriate handlers
+  - Determines which handler to use based on turn type
+  - Handlers: `ShotAnimationSystem`, `ReboundAnimationSystem`, `PassAnimationSystem`, `FreeThrowAnimationSystem`, `HCOAnimationSystem`
+  - Fallback to `playTurnAnimation()` for legacy turn types
+  
+- **Specialized Animation Systems:**
+  - `ShotAnimationSystem` - Handles HCO shots (MAKE/MISS)
+  - `ReboundAnimationSystem` - Handles rebounds
+  - `PassAnimationSystem` - Handles inbound passes
+  - `FreeThrowAnimationSystem` - Handles free throws
+  - `HCOAnimationSystem` - Handles HCO outlet passes
+
+**Current Migration Status:**
+- ✅ **Phase 2.4**: FCP/HCT foul turns migrated (December 2024)
+- ✅ **Phase 2.5**: Standard HCO turns (MAKE/MISS) migrated (January 2025)
+- ⏳ **Pending**: Other turn types still use legacy `playTurnAnimation()` path
+
+**Benefits:**
+- ✅ Single entry point for all animations
+- ✅ Consistent pre/post setup across all turn types
+- ✅ Proper ball ownership handling via BallController
+- ✅ Easier to maintain and extend
+- ✅ Better error handling and debugging
+
+**Key Files:**
+- `AnimationRouter.js` - Main entry point
+- `AnimationEngine.js` - Turn routing logic
+- `turnPreparation.js` - Pre/post setup utilities
+- `ShotAnimationSystem.js` - HCO shot handler
+- `playTurnAnimation()` - Legacy handler (still used for non-migrated turn types)
+
+**See:**
+- `FRONTEND_ORCHESTRATION_CONSOLIDATION_PLAN.md` - Overall migration plan
+- `PHASE_2_INCREMENTAL_MIGRATION_PLAN.md` - Incremental migration strategy
+- `PHASE_2.5_BUG_FIX_PLAN.md` - HCO migration details
+
+---
+
 ### Player Animation System
 
 **Status:** Already using WIP_GOB approach
@@ -141,11 +265,13 @@ Player animations already use the simplified approach:
 ## Experimental Animation System - PossessionRunner
 
 > ⚠️ **IMPORTANT**: This section describes an **experimental animation system** (PossessionRunner) 
-> that is **currently disabled by default**. The production system uses the approach documented above. 
+> that is **currently DEPRECATED and disabled**. The production system uses the approach documented above. 
 > 
-> To enable PossessionRunner: `window.FEATURE_POSSESSION_RUNNER = true`
+> **Status:** PossessionRunner has been removed from production. The code still exists but is not used.
+> - `FEATURE_POSSESSION_RUNNER` flag always returns `false`
+> - All animation now uses the standard animation path
 > 
-> **For most development work, refer to the production system above.**
+> **For all development work, refer to the production system above.**
 
 This section gives incoming contributors a concise tour of the **experimental** front-end
 animation stack for **GOB**. It covers the architectural goals, the current
