@@ -893,11 +893,10 @@ export async function animateGameTurns({ //hasBallAtStep
       
       // ✅ FIX: FCP/HCT shot attempts (fcp_shot/hct_shot with MAKE/MISS) should route through ShotAnimationSystem
       // FCP/HCT setup turns (FOUL, HCO, etc.) should route through playTurnAnimation
-      // Also check if result_type is MAKE/MISS with FCP/HCT flags (next_defensive_setup or fcp_shot/hct_shot)
-      // OR if this turn should inherit FCP/HCT context from previous shot attempt
+      // NOTE: next_defensive_setup indicates what happens AFTER the shot (on inbound), not that this shot was during FCP/HCT
+      // Only fcp_shot/hct_shot flags indicate the shot itself was taken during FCP/HCT pressure
       const isFCPHCTShotAttempt = (turn.result_type === "MAKE" || turn.result_type === "MISS") &&
-                                   (turn.fcp_shot === true || turn.hct_shot === true || 
-                                    turn.next_defensive_setup === "FCP" || turn.next_defensive_setup === "HCT" ||
+                                   (turn.fcp_shot === true || turn.hct_shot === true ||
                                     shouldInheritFCPHCT);
       
       console.log('🔍 [FCP/HCT DETECTED - BEFORE TURNOVER CHECK]', {
