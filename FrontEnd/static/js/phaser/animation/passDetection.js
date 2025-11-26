@@ -74,13 +74,29 @@ export async function handlePassAnimation({ scene, passInfo, playerSprites }) {
     receiverPos: { x: receiverSprite.x, y: receiverSprite.y }
   });
   
-  // Calculate pass duration based on distance (like fast break outlet passes)
-  const distance = Phaser.Math.Distance.Between(
-    passerSprite.x, passerSprite.y,
-    receiverSprite.x, receiverSprite.y
+  // ✅ FIX: Use getBallDuration() to respect game speed settings
+  // Import getBallDuration from ballTween.js which uses getBallSpeed() that checks window.__GAME_SPEED
+  // Get ball sprite from scene (same way runPass gets it)
+  const ballSprite = scene.ballSprite;
+  
+  if (!ballSprite) {
+    console.warn('❌ [PASS ANIMATION] No ball sprite available for duration calculation');
+    // Fallback to default duration
+    await runPass(scene, {
+      fromId: passInfo.passerId,
+      toId: passInfo.receiverId,
+      duration: 500, // Default fallback
+      easing: "Sine.easeInOut"
+    });
+    return;
+  }
+  
+  const { getBallDuration } = await import('./ballTween.js');
+  const passDuration = getBallDuration(
+    ballSprite,
+    receiverSprite.x,
+    receiverSprite.y
   );
-  // Use same speed as fast break outlet passes (500ms default, or distance-based)
-  const passDuration = distance > 0 ? Math.max(300, Math.min(800, (distance / 350) * 1000)) : 500;
   
   await runPass(scene, {
     fromId: passInfo.passerId,
