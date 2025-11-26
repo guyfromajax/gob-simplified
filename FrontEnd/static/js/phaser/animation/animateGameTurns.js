@@ -806,6 +806,12 @@ export async function animateGameTurns({ //hasBallAtStep
     
     if (isFCPHCT) {
       const pressureType = turn.fcp_shot || turn.fcp_foul || turn.next_defensive_setup === "FCP" ? 'FCP' : 'HCT';
+      
+      // ✅ FIX: FCP/HCT shot attempts (fcp_shot/hct_shot with MAKE/MISS) should route through ShotAnimationSystem
+      // FCP/HCT setup turns (FOUL, HCO, etc.) should route through playTurnAnimation
+      const isFCPHCTShotAttempt = (turn.fcp_shot === true || turn.hct_shot === true) && 
+                                   (turn.result_type === "MAKE" || turn.result_type === "MISS");
+      
       console.log('🔍 [FCP/HCT DETECTED - BEFORE TURNOVER CHECK]', {
         turn_index: i,
         result_type: turn.result_type,
@@ -816,42 +822,59 @@ export async function animateGameTurns({ //hasBallAtStep
         next_defensive_setup: turn.next_defensive_setup,
         pressureType,
         isFCPHCT,
-        willRouteToPlayTurnAnimation: true
-      });
-      animationDebugLog(`${pressureType} SHOT TURN - routing to standard shot animation:`, {
-        result_type: turn.result_type,
-        turn_index: i,
-        fcp_shot: turn.fcp_shot,
-        hct_shot: turn.hct_shot,
-        next_defensive_setup: turn.next_defensive_setup
-      });
-      // ✅ DEBUG: Log FCP/HCT animation start
-      console.log('🎬 [FCP/HCT ANIMATION START]', {
-        turn_index: i,
-        pressureType,
-        result_type: turn.result_type,
-        has_animations: !!turn.animations?.length,
-        animation_count: turn.animations?.length || 0,
-        will_call_playTurnAnimation: true
+        isFCPHCTShotAttempt,
+        willRouteToShotSystem: isFCPHCTShotAttempt,
+        willRouteToPlayTurnAnimation: !isFCPHCTShotAttempt
       });
       
-      await playTurnAnimation({
-        scene,
-        simData,
-        playerSprites,
-        turnData: turn,
-        ballSprite,
-        onUpdate,
-        turnIndex: i,
-        onAction: async (action, sprite, timestamp) => {
-          if (DEBUG_FLOW || debugEnabled)
-            logVerbose(
-              `🎬 Action "${action}" fired at ${timestamp}ms for sprite:`,
-              sprite
-            );
-          if (onAction) onAction(action, sprite, timestamp);
-        },
-      });
+      if (isFCPHCTShotAttempt) {
+        // ✅ FIX: Route FCP/HCT shot attempts through AnimationRouter → ShotAnimationSystem
+        // This ensures they animate like regular shots but with FCP/HCT context
+        console.log('🎬 [FCP/HCT SHOT ATTEMPT] Routing through ShotAnimationSystem', {
+          turn_index: i,
+          pressureType,
+          result_type: turn.result_type
+        });
+        turn.index = i;
+        await animationRouter.processTurn(turn);
+        // Note: announceFromTurnData, onUpdate, and updateDebugScore are handled by AnimationRouter
+        continue;
+      } else {
+        // FCP/HCT setup turns (FOUL, HCO, etc.) route through playTurnAnimation
+        animationDebugLog(`${pressureType} SETUP TURN - routing to playTurnAnimation:`, {
+          result_type: turn.result_type,
+          turn_index: i,
+          fcp_shot: turn.fcp_shot,
+          hct_shot: turn.hct_shot,
+          next_defensive_setup: turn.next_defensive_setup
+        });
+        // ✅ DEBUG: Log FCP/HCT animation start
+        console.log('🎬 [FCP/HCT SETUP TURN] Routing through playTurnAnimation', {
+          turn_index: i,
+          pressureType,
+          result_type: turn.result_type,
+          has_animations: !!turn.animations?.length,
+          animation_count: turn.animations?.length || 0
+        });
+        
+        await playTurnAnimation({
+          scene,
+          simData,
+          playerSprites,
+          turnData: turn,
+          ballSprite,
+          onUpdate,
+          turnIndex: i,
+          onAction: async (action, sprite, timestamp) => {
+            if (DEBUG_FLOW || debugEnabled)
+              logVerbose(
+                `🎬 Action "${action}" fired at ${timestamp}ms for sprite:`,
+                sprite
+              );
+            if (onAction) onAction(action, sprite, timestamp);
+          },
+        });
+      }
       
       // ✅ DEBUG: Log FCP/HCT animation completion and outcome
       const nextTurn = i + 1 < turns.length ? turns[i + 1] : null;
