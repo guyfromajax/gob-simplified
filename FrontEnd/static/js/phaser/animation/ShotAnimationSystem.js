@@ -443,18 +443,24 @@ export class ShotAnimationSystem {
       });
     }
 
-    // ✅ FIX: Ball should land perfectly on rim coords for made shots
-    // No weird drop animation - just position ball at rim and hide it
+    // ✅ FIX: Ball is already at rim from animateBallFlight() - just hold it there
+    // Match the behavior of putback makes and free throws (no repositioning)
     const ballSprite = this.ballController.ballSprite;
     if (ballSprite) {
-      // Position ball exactly at rim coordinates
-      ballSprite.x = rimCoords.x;
-      ballSprite.y = rimCoords.y;
+      // Keep ball visible and hold at rim for 1 second (like putbacks/free throws)
+      ballSprite.setVisible(true);
       
-      // Hide ball after a brief moment (allows visual confirmation)
-      this.scene.time.delayedCall(100, () => {
-        ballSprite.setVisible(false);
+      // Hold ball at rim for 1 second (allows announcement to display)
+      await new Promise(resolve => {
+        if (this.scene.time?.delayedCall) {
+          this.scene.time.delayedCall(1000, resolve);
+        } else {
+          setTimeout(resolve, 1000);
+        }
       });
+      
+      // Hide ball after hold
+      ballSprite.setVisible(false);
     }
 
     // Transition to IDLE state (end of possession)
@@ -465,8 +471,7 @@ export class ShotAnimationSystem {
       });
     }
 
-    // Wait for ball to go through rim
-    await new Promise(resolve => setTimeout(resolve, 200));
+    // Ball hold already handled above (1 second), no additional delay needed
     
     // ✅ PRIORITY 1 FIX: Call onShotEnd() to clear in-flight state
     // This matches the pattern in ballManager.js (line 626)
