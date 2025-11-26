@@ -449,13 +449,9 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
   // Shoot the ball
   safeTransition(scene.stateMachine, States.ShotAttempt);
   
-  // Adjust rim position for made shots (1 grid unit closer to shooter)
-  const adjustedBasket = { ...basket };
-  if (turnData.result_type === "MAKE") {
-    adjustedBasket.x = isHomeOffense ? basket.x - 1 : basket.x + 1;
-  }
-  
-  const rimPx = gridToPixels(adjustedBasket.x, adjustedBasket.y, width, height);
+  // ✅ FIX: Use exact rim coordinates for all shots (matches putbacks and free throws)
+  // No adjustment needed - ball should land at exact rim position
+  const rimPx = gridToPixels(basket.x, basket.y, width, height);
   // ✅ STEP 3 MIGRATION: Use new animateShotToRim() helper instead of manual detach + animate
   // animateShotToRim() handles ball detachment and shot animation in one call
   // Arc support added for fast break shots

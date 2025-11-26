@@ -392,7 +392,7 @@ All made shots (HCO, Fast Break, Putback, Free Throw) now use a consistent resol
 - Then calls `onShotEnd()` and transitions
 
 **Fast Break Made Shots** (`fastBreak.js`):
-- Uses `animateShotToRim()` to animate ball to rim
+- Uses `animateShotToRim()` to animate ball to rim (exact rim coordinates, no adjustment)
 - Shows announcement
 - Waits 1 second (ball remains visible at rim)
 - Calls `onShotEnd()` and transitions to inbound
