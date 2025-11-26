@@ -355,12 +355,7 @@ export async function animateGameTurns({ //hasBallAtStep
   ballSprite,
   onUpdate
 }) {
-  // 🔍 VERY OBVIOUS DEBUG: Confirm new code is running
-  console.log('🚨🚨🚨 NEW CODE VERSION - animateGameTurns STARTED 🚨🚨🚨', {
-    timestamp: Date.now(),
-    turnsCount: (simData.turns || []).length,
-    window_ROUTER_DEBUG: typeof window !== 'undefined' ? window.ROUTER_DEBUG : 'N/A'
-  });
+  // Removed verbose startup log
   
   // console.log('🎬 animateGameTurns: Starting animation system');
   const turns = simData.turns || [];
@@ -485,24 +480,13 @@ export async function animateGameTurns({ //hasBallAtStep
 
   // console.log('🎬 animateGameTurns: Starting turn processing loop', { totalTurns: turns.length });
   
-  // 🔍 VERY OBVIOUS DEBUG: Confirm we're in the turn processing loop
-  console.log('🚨🚨🚨 NEW CODE - Starting turn processing loop 🚨🚨🚨', {
-    totalTurns: turns.length,
-    window_ROUTER_DEBUG: typeof window !== 'undefined' ? window.ROUTER_DEBUG : 'N/A'
-  });
+  // Removed verbose loop start log
   
   for (let i = 0; i < turns.length; i++) {
     const turn = turns[i];
     if (scene.skipToEnd) break;
     
-    // 🔍 VERY OBVIOUS DEBUG: Log each turn being processed
-    if (typeof window !== 'undefined' && window.ROUTER_DEBUG) {
-      console.log('🚨🚨🚨 NEW CODE - Processing Turn', i, '🚨🚨🚨', {
-        result_type: turn.result_type,
-        fast_break: turn.fast_break,
-        turn_index: i
-      });
-    }
+    // Removed verbose turn processing log
     
     // ✅ PHASE 2.2: Use extracted prepareTurnForAnimation function
     const { possessionId } = prepareTurnForAnimation({
@@ -849,11 +833,9 @@ export async function animateGameTurns({ //hasBallAtStep
       console.log('✅ [FCP/HCT ANIMATION COMPLETE]', {
         turn_index: i,
         pressureType,
-        result_type: turn.result_type,
-        outcome: turn.result_type, // This is the outcome of the FCP/HCT step
+        outcome: turn.result_type, // This is the outcome: HCO, SHOT, O_FOUL, D_FOUL, DEAD BALL, STEAL
         next_play_type: turn.next_play_type,
-        possession_flips: turn.possession_flips,
-        will_announce: true
+        possession_flips: turn.possession_flips
       });
       
       // Announce result (visual effects now handled by announcement/ballManager)
@@ -1093,46 +1075,14 @@ export async function animateGameTurns({ //hasBallAtStep
       // Ensure turn.index is set (AnimationRouter will use it for context)
       turn.index = i;
       
-      // ✅ DEBUG: Log before processing turn through AnimationRouter
-      const nextTurn = i + 1 < turns.length ? turns[i + 1] : null;
-      const nextNextTurn = i + 2 < turns.length ? turns[i + 2] : null;
-      console.log('🔍 [BEFORE PROCESS TURN]', {
-        turn_index: i,
-        result_type: turn.result_type,
-        fast_break: turn.fast_break,
-        isHCO,
-        previousTurnWasShot: scene._previousTurnWasShot === true,
-        previousTurnResult: i > 0 ? turns[i - 1]?.result_type : null,
-        nextTurnResult: nextTurn?.result_type || null,
-        nextNextTurnResult: nextNextTurn?.result_type || null,
-        willSeeOREB: nextTurn?.result_type === 'OREB' || nextTurn?.result_type === 'OREB_KICKOUT',
-        willSeePutback: nextTurn?.result_type === 'PUTBACK_MAKE' || nextTurn?.result_type === 'PUTBACK_MISS',
-        willSeePutbackAfterOREB: (nextTurn?.result_type === 'OREB' || nextTurn?.result_type === 'OREB_KICKOUT') && 
-                                  (nextNextTurn?.result_type === 'PUTBACK_MAKE' || nextNextTurn?.result_type === 'PUTBACK_MISS')
-      });
+      // Removed verbose before/after process turn logs
       
       // AnimationRouter handles pre/post setup (prepareTurnForAnimation, finalizeTurnAfterAnimation)
       // Note: prepareTurnForAnimation was already called at line 479, but AnimationRouter will call it again
       // This is safe (idempotent) but we could optimize later by skipping the first call for HCO turns
       await animationRouter.processTurn(turn);
 
-      // ✅ DEBUG: Log after processing turn
-      const nextTurnAfter = i + 1 < turns.length ? turns[i + 1] : null;
-      const nextNextTurnAfter = i + 2 < turns.length ? turns[i + 2] : null;
-      console.log('🔍 [AFTER PROCESS TURN]', {
-        turn_index: i,
-        result_type: turn.result_type,
-        fast_break: turn.fast_break,
-        isHCO,
-        previousTurnWasShot: scene._previousTurnWasShot === true,
-        nextTurnIndex: i + 1,
-        nextTurnResult: nextTurnAfter?.result_type || null,
-        nextNextTurnResult: nextNextTurnAfter?.result_type || null,
-        willProcessOREB: nextTurnAfter?.result_type === 'OREB' || nextTurnAfter?.result_type === 'OREB_KICKOUT',
-        willProcessPutback: nextTurnAfter?.result_type === 'PUTBACK_MAKE' || nextTurnAfter?.result_type === 'PUTBACK_MISS',
-        willProcessPutbackAfterOREB: (nextTurnAfter?.result_type === 'OREB' || nextTurnAfter?.result_type === 'OREB_KICKOUT') && 
-                                     (nextNextTurnAfter?.result_type === 'PUTBACK_MAKE' || nextNextTurnAfter?.result_type === 'PUTBACK_MISS')
-      });
+      // Removed verbose after process turn log
 
       if (shouldDebugHCO && isHCO) {
         console.log('🔍 HCO_ROUTER_END', {

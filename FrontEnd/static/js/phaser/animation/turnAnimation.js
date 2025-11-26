@@ -1700,13 +1700,11 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
       if (!passInfo) {
         const { detectPassAtStep } = await import('./passDetection.js');
         passInfo = detectPassAtStep(turnData.animations, stepIndex);
+        // Removed verbose pass detection log
+        // if (passInfo) {
+        //   console.log('🏀 [PASS DETECTED]', { ... });
+        // }
         if (passInfo) {
-          console.log('🏀 [PASS DETECTED]', {
-            passerId: passInfo.passerId,
-            receiverId: passInfo.receiverId,
-            stepIndex: passInfo.stepIndex,
-            timestamp: passInfo.timestamp
-          });
         }
       }
 
@@ -1750,14 +1748,10 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
       const hasPassAction = turnData.animations.some(anim => 
         anim.movement?.some(step => step.action === "pass")
       );
-      if (hasPassAction) {
-        console.log('⚠️ [PASS DEBUG] Pass action exists but passInfo is null', {
-          allActions: turnData.animations.map(a => ({
-            playerId: a.playerId,
-            actions: a.movement?.map(s => s.action) || []
-          }))
-        });
-      }
+      // Removed verbose pass debug warning
+      // if (hasPassAction) {
+      //   console.log('⚠️ [PASS DEBUG] Pass action exists but passInfo is null', { ... });
+      // }
     }
 
     if (shotInfo) {

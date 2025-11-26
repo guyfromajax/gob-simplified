@@ -404,7 +404,7 @@ export class AnimationEngine {
         this.playerSprites,
         gameStore
       );
-      console.log('AnimationEngine: ShotAnimationSystem initialized');
+      // Removed verbose initialization logs
       
       this.reboundSystem = new ReboundAnimationSystem(
         this.scene,
@@ -412,7 +412,6 @@ export class AnimationEngine {
         this.stateMachine,
         this.playerSprites
       );
-      console.log('AnimationEngine: ReboundAnimationSystem initialized');
       
       this.passSystem = new PassAnimationSystem(
         this.scene,
@@ -420,7 +419,6 @@ export class AnimationEngine {
         this.stateMachine,
         this.playerSprites
       );
-      console.log('AnimationEngine: PassAnimationSystem initialized');
       
       this.freeThrowSystem = new FreeThrowAnimationSystem(
         this.scene,
@@ -429,7 +427,6 @@ export class AnimationEngine {
         this.playerSprites,
         gameStore
       );
-      console.log('AnimationEngine: FreeThrowAnimationSystem initialized');
       
       this.hcoSystem = new HCOAnimationSystem(
         this.scene,
@@ -437,18 +434,9 @@ export class AnimationEngine {
         this.stateMachine,
         this.playerSprites
       );
-      console.log('AnimationEngine: HCOAnimationSystem initialized');
     }
     
-    console.log('AnimationEngine: Dependencies injected', {
-      hasBallController: !!this.ballController,
-      hasStateMachine: !!this.stateMachine,
-      hasPlayerSprites: !!this.playerSprites,
-      hasShotSystem: !!this.shotSystem,
-      hasReboundSystem: !!this.reboundSystem,
-      hasPassSystem: !!this.passSystem,
-      hasFreeThrowSystem: !!this.freeThrowSystem
-    });
+    // Removed verbose dependencies injected log
   }
 }
 
