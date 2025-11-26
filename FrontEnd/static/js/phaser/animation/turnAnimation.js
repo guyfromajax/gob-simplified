@@ -1617,7 +1617,13 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
       pressureType,
       maxSteps,
       will_execute: maxSteps > 1,
-      loop_range: maxSteps > 1 ? `stepIndex 1 to ${maxSteps - 1}` : 'NO LOOP (maxSteps <= 1)'
+      loop_range: maxSteps > 1 ? `stepIndex 1 to ${maxSteps - 1}` : 'NO LOOP (maxSteps <= 1)',
+      animation_details: turnData.animations?.map(a => ({
+        playerId: a.playerId,
+        movement_length: a.movement?.length || 0,
+        first_step_action: a.movement?.[0]?.action,
+        last_step_action: a.movement?.[a.movement.length - 1]?.action
+      })) || []
     });
   }
 
