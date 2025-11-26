@@ -817,6 +817,16 @@ export async function animateGameTurns({ //hasBallAtStep
         hct_shot: turn.hct_shot,
         next_defensive_setup: turn.next_defensive_setup
       });
+      // ✅ DEBUG: Log FCP/HCT animation start
+      console.log('🎬 [FCP/HCT ANIMATION START]', {
+        turn_index: i,
+        pressureType,
+        result_type: turn.result_type,
+        has_animations: !!turn.animations?.length,
+        animation_count: turn.animations?.length || 0,
+        will_call_playTurnAnimation: true
+      });
+      
       await playTurnAnimation({
         scene,
         simData,
@@ -833,6 +843,17 @@ export async function animateGameTurns({ //hasBallAtStep
             );
           if (onAction) onAction(action, sprite, timestamp);
         },
+      });
+      
+      // ✅ DEBUG: Log FCP/HCT animation completion and outcome
+      console.log('✅ [FCP/HCT ANIMATION COMPLETE]', {
+        turn_index: i,
+        pressureType,
+        result_type: turn.result_type,
+        outcome: turn.result_type, // This is the outcome of the FCP/HCT step
+        next_play_type: turn.next_play_type,
+        possession_flips: turn.possession_flips,
+        will_announce: true
       });
       
       // Announce result (visual effects now handled by announcement/ballManager)
