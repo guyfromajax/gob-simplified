@@ -776,8 +776,90 @@ export async function animateGameTurns({ //hasBallAtStep
       continue;
     }
 
+    // ✅ FIX: Check for FCP/HCT BEFORE TURNOVER to prevent FCP/HCT turns from being misrouted
+    // FCP/HCT turns can have result_type === "TURNOVER" if there's a turnover during pressure
+    const isFCPHCT = turn.fcp_shot === true || turn.hct_shot === true || 
+                     turn.next_defensive_setup === "FCP" || turn.next_defensive_setup === "HCT" ||
+                     turn.fcp_foul === true || turn.hct_foul === true;
+    
+    // ✅ DEBUG: Log when entering FCP/HCT instance
+    if (isFCPHCT) {
+      console.log('🚨🚨🚨 ENTERING FCP/HCT INSTANCE 🚨🚨🚨', {
+        turn_index: i,
+        result_type: turn.result_type,
+        fcp_shot: turn.fcp_shot,
+        hct_shot: turn.hct_shot,
+        fcp_foul: turn.fcp_foul,
+        hct_foul: turn.hct_foul,
+        next_defensive_setup: turn.next_defensive_setup,
+        willAnimate: true
+      });
+    }
+    
+    if (isFCPHCT) {
+      const pressureType = turn.fcp_shot || turn.fcp_foul || turn.next_defensive_setup === "FCP" ? 'FCP' : 'HCT';
+      console.log('🔍 [FCP/HCT DETECTED - BEFORE TURNOVER CHECK]', {
+        turn_index: i,
+        result_type: turn.result_type,
+        fcp_shot: turn.fcp_shot,
+        hct_shot: turn.hct_shot,
+        fcp_foul: turn.fcp_foul,
+        hct_foul: turn.hct_foul,
+        next_defensive_setup: turn.next_defensive_setup,
+        pressureType,
+        isFCPHCT,
+        willRouteToPlayTurnAnimation: true
+      });
+      animationDebugLog(`${pressureType} SHOT TURN - routing to standard shot animation:`, {
+        result_type: turn.result_type,
+        turn_index: i,
+        fcp_shot: turn.fcp_shot,
+        hct_shot: turn.hct_shot,
+        next_defensive_setup: turn.next_defensive_setup
+      });
+      await playTurnAnimation({
+        scene,
+        simData,
+        playerSprites,
+        turnData: turn,
+        ballSprite,
+        onUpdate,
+        turnIndex: i,
+        onAction: async (action, sprite, timestamp) => {
+          if (DEBUG_FLOW || debugEnabled)
+            logVerbose(
+              `🎬 Action "${action}" fired at ${timestamp}ms for sprite:`,
+              sprite
+            );
+          if (onAction) onAction(action, sprite, timestamp);
+        },
+      });
+      
+      // Announce result (visual effects now handled by announcement/ballManager)
+      announceFromTurnData(turn, 'end', scene.simData?.home_team_id, scene);
+      if (onUpdate) {
+        try {
+          onUpdate(turn);
+        } catch (err) {
+          console.error('Scoreboard update failed:', err);
+        }
+      }
+      updateDebugScore(turn, { turnIndex: i, possessionId });
+      continue;
+    }
+    
     if (turn.result_type === "TURNOVER") {
       // ✅ PHASE 2.6: Route TURNOVER through AnimationRouter
+      // ✅ DEBUG: Log TURNOVER detection to verify it's not catching FCP/HCT turns
+      console.log('🔍 [TURNOVER DETECTED]', {
+        turn_index: i,
+        result_type: turn.result_type,
+        fcp_shot: turn.fcp_shot,
+        hct_shot: turn.hct_shot,
+        next_defensive_setup: turn.next_defensive_setup,
+        isFCPHCT: false, // Should be false since we checked above
+        willRouteToRouter: true
+      });
       turn.index = i;
       await animationRouter.processTurn(turn);
       // Note: announceFromTurnData, onUpdate, and updateDebugScore are handled by AnimationRouter
