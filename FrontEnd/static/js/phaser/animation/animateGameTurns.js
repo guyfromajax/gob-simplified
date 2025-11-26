@@ -875,9 +875,12 @@ export async function animateGameTurns({ //hasBallAtStep
     }
     
     // Check for FCP/HCT shots - route to standard shot animation
-    // ✅ FIX: Check for FCP/HCT setup turns (result_type === "HCO" with fcp_shot/hct_shot flags or next_defensive_setup)
-    if (turn.fcp_shot === true || turn.hct_shot === true || 
-        (turn.result_type === "HCO" && (turn.fcp_shot === true || turn.hct_shot === true || turn.next_defensive_setup === "FCP" || turn.next_defensive_setup === "HCT"))) {
+    // ✅ FIX: Check for FCP/HCT setup turns (any result_type with fcp_shot/hct_shot flags or next_defensive_setup)
+    // This must come BEFORE the HCO routing check to catch FCP/HCT turns
+    const isFCPHCT = turn.fcp_shot === true || turn.hct_shot === true || 
+                     turn.next_defensive_setup === "FCP" || turn.next_defensive_setup === "HCT";
+    
+    if (isFCPHCT) {
       const pressureType = turn.fcp_shot || turn.next_defensive_setup === "FCP" ? 'FCP' : 'HCT';
       // ✅ DEBUG: Log FCP/HCT detection to verify it's catching setup turns
       console.log('🔍 [FCP/HCT DETECTED]', {
@@ -887,6 +890,7 @@ export async function animateGameTurns({ //hasBallAtStep
         hct_shot: turn.hct_shot,
         next_defensive_setup: turn.next_defensive_setup,
         pressureType,
+        isFCPHCT,
         willRouteToPlayTurnAnimation: true
       });
       animationDebugLog(`${pressureType} SHOT TURN - routing to standard shot animation:`, {
@@ -989,7 +993,10 @@ export async function animateGameTurns({ //hasBallAtStep
       // ✅ Debug log for HCO turns after Fast Break defensive stop
       const previousTurn = i > 0 ? turns[i - 1] : null;
       const wasDefensiveStop = previousTurn?.result_type === "DEFENSIVE_STOP" && previousTurn?.fast_break === true;
-      const isHCO = !turn.fast_break && (turn.result_type === "MAKE" || turn.result_type === "MISS");
+      // ✅ FIX: Exclude FCP/HCT turns from HCO routing (they should be handled by FCP/HCT check above)
+      const isFCPHCTTurn = turn.fcp_shot === true || turn.hct_shot === true || 
+                           turn.next_defensive_setup === "FCP" || turn.next_defensive_setup === "HCT";
+      const isHCO = !turn.fast_break && !isFCPHCTTurn && (turn.result_type === "MAKE" || turn.result_type === "MISS");
       
       // 🔍 DIAGNOSTIC: Log HCO-specific info
       if (typeof window !== 'undefined' && window.ROUTER_DEBUG) {
