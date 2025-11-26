@@ -830,12 +830,18 @@ export async function animateGameTurns({ //hasBallAtStep
       });
       
       // ✅ DEBUG: Log FCP/HCT animation completion and outcome
+      const nextTurn = i + 1 < turns.length ? turns[i + 1] : null;
       console.log('✅ [FCP/HCT ANIMATION COMPLETE]', {
         turn_index: i,
         pressureType,
         outcome: turn.result_type, // This is the outcome: HCO, SHOT, O_FOUL, D_FOUL, DEAD BALL, STEAL
         next_play_type: turn.next_play_type,
-        possession_flips: turn.possession_flips
+        possession_flips: turn.possession_flips,
+        next_turn_index: i + 1,
+        next_turn_result_type: nextTurn?.result_type || null,
+        next_turn_fcp_shot: nextTurn?.fcp_shot || false,
+        next_turn_hct_shot: nextTurn?.hct_shot || false,
+        next_turn_next_defensive_setup: nextTurn?.next_defensive_setup || null
       });
       
       // Announce result (visual effects now handled by announcement/ballManager)
