@@ -309,10 +309,26 @@ async function runSideInboundSetup({ scene, ballSprite, playerSprites, turnData 
 
   await Promise.all(promises);
 
+  // ✅ REFACTOR: Use passDetection.js for dynamic passes, fallback to hardcoded SF→PG
+  const { detectPassAtStep, handlePassAnimation } = await import('./passDetection.js');
+  
+  // Check if turnData has animations with pass actions
+  let passInfo = null;
+  if (turnData.animations && Array.isArray(turnData.animations) && turnData.animations.length > 0) {
+    // Find the step index where the pass happens (typically the last step after positioning)
+    const maxSteps = Math.max(...turnData.animations.map(anim => anim.movement?.length || 0));
+    // Check the last step for pass actions
+    if (maxSteps > 0) {
+      passInfo = detectPassAtStep(turnData.animations, maxSteps - 1);
+    }
+  }
+  
+  // Fallback to hardcoded SF→PG if no pass detected in animation data
   const sfSprite = offenseSprites["SF"];
   const pgSprite = offenseSprites["PG"];
   const sfId = offenseIds["SF"];
   const pgId = offenseIds["PG"];
+  
   if (sfSprite) {
     attachBallToPlayer(scene, ballSprite, sfSprite);
     animationDebugLog("ballAttach(SF)");
@@ -326,10 +342,23 @@ async function runSideInboundSetup({ scene, ballSprite, playerSprites, turnData 
     scene.events?.once('passEnd', () => animationDebugLog('passEnd'));
 
     animationDebugLog(`[sideInbound][passStart] sf:${sfId} pg:${pgId}`);
-    if (pgSprite && !scene.stateMachine?.is(States.FastBreak)) {
-      // Pass duration will be calculated by runPass based on distance
-      await runPass(scene, { fromId: sfId, toId: pgId, easing: ease });
+    
+    if (!scene.stateMachine?.is(States.FastBreak)) {
+      if (passInfo) {
+        // ✅ Use dynamic pass from animation data
+        console.log('🏀 [SIDE_INBOUND] Using dynamic pass from animation data', passInfo);
+        await handlePassAnimation({
+          scene,
+          passInfo,
+          playerSprites
+        });
+      } else if (pgSprite) {
+        // Fallback to hardcoded SF→PG pass
+        console.log('🏀 [SIDE_INBOUND] Using fallback hardcoded SF→PG pass');
+        await runPass(scene, { fromId: sfId, toId: pgId, easing: ease });
+      }
     }
+    
     animationDebugLog(`[sideInbound][passEnd] sf:${sfId} pg:${pgId}`);
     if (pgSprite) {
       animationDebugLog(`[sideInbound][pgAttach] sf:${sfId} pg:${pgId}`);
@@ -795,7 +824,8 @@ async function runInboundSetup({
   homeTeamId,
   awayTeamId,
   skipRetreat = false,  // Allow skipping retreat for FCP/HCT
-  pressureType = null   // "FCP" or "HCT" to determine defensive positioning
+  pressureType = null,   // "FCP" or "HCT" to determine defensive positioning
+  turnData = null        // ✅ NEW: Optional turnData for dynamic pass detection
 }) {
   animationDebugLog('runInboundSetup called:', {
     newOffenseSide,
@@ -1256,13 +1286,39 @@ async function runInboundSetup({
   animationDebugLog(`[inbound][passStart][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
   animationDebugLog(`[inbound][stateCheck] current state: ${scene.stateMachine?.state}, isFastBreak: ${scene.stateMachine?.is(States.FastBreak)}`);
   
+  // ✅ REFACTOR: Use passDetection.js for dynamic passes, fallback to hardcoded SF→PG
+  const { detectPassAtStep, handlePassAnimation } = await import('./passDetection.js');
+  
+  // Check if turnData has animations with pass actions
+  let passInfo = null;
+  if (turnData?.animations && Array.isArray(turnData.animations) && turnData.animations.length > 0) {
+    // Find the step index where the pass happens (typically the last step after positioning)
+    const maxSteps = Math.max(...turnData.animations.map(anim => anim.movement?.length || 0));
+    // Check the last step for pass actions
+    if (maxSteps > 0) {
+      passInfo = detectPassAtStep(turnData.animations, maxSteps - 1);
+    }
+  }
+  
   // Allow inbound pass regardless of current state (including FastBreak)
-  await runPass(scene, {
-    fromId: sfId,
-    toId: pgId,
-    duration: 500,
-    easing: "Sine.easeInOut"
-  });
+  if (passInfo) {
+    // ✅ Use dynamic pass from animation data
+    console.log('🏀 [BASELINE_INBOUND] Using dynamic pass from animation data', passInfo);
+    await handlePassAnimation({
+      scene,
+      passInfo,
+      playerSprites
+    });
+  } else {
+    // Fallback to hardcoded SF→PG pass
+    console.log('🏀 [BASELINE_INBOUND] Using fallback hardcoded SF→PG pass');
+    await runPass(scene, {
+      fromId: sfId,
+      toId: pgId,
+      duration: 500,
+      easing: "Sine.easeInOut"
+    });
+  }
   animationDebugLog(`[inbound][passEnd][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
   animationDebugLog(`[inbound][pgAttach][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
 

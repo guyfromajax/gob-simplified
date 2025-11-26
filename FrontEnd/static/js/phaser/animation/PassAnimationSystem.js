@@ -388,7 +388,8 @@ export class PassAnimationSystem {
           playerSprites: this.playerSprites,
           newOffenseSide: newOffenseSide,
           homeTeamId: this.scene.homeTeamId,
-          awayTeamId: this.scene.awayTeamId
+          awayTeamId: this.scene.awayTeamId,
+          turnData: turnData  // ✅ Pass turnData for dynamic pass detection
         });
       } else {
         // For side inbound passes (after dead balls/fouls), use runSideInboundSetup
