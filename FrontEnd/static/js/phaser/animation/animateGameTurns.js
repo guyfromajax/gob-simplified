@@ -613,6 +613,19 @@ export async function animateGameTurns({ //hasBallAtStep
     }
 
     if (turn.result_type === "BASELINE_INBOUND") {
+      // ✅ DEBUG: Log BASELINE_INBOUND with FCP/HCT setup
+      const hasFCPHCTSetup = turn.next_defensive_setup === "FCP" || turn.next_defensive_setup === "HCT";
+      if (hasFCPHCTSetup) {
+        console.log('🔍 [BASELINE_INBOUND WITH FCP/HCT SETUP]', {
+          turn_index: i,
+          result_type: turn.result_type,
+          next_defensive_setup: turn.next_defensive_setup,
+          will_setup_fcp_hct: true,
+          next_turn_index: i + 1,
+          next_turn_will_need_fcp_hct_flags: true
+        });
+      }
+      
       // console.log('🏀 Quarter start BASELINE_INBOUND detected, animating all players');
       
       // Animate all players to their positions using distance-based duration
@@ -760,11 +773,44 @@ export async function animateGameTurns({ //hasBallAtStep
       continue;
     }
 
+    // ✅ DEBUG: Check if previous turn was BASELINE_INBOUND with FCP/HCT setup
+    const previousTurn = i > 0 ? turns[i - 1] : null;
+    const prevWasBaselineInbound = previousTurn?.result_type === "BASELINE_INBOUND";
+    const prevHadFCPHCTSetup = previousTurn?.next_defensive_setup === "FCP" || previousTurn?.next_defensive_setup === "HCT";
+    const isAfterBaselineInboundWithFCPHCT = prevWasBaselineInbound && prevHadFCPHCTSetup;
+    
+    // ✅ DEBUG: Log turns after BASELINE_INBOUND with FCP/HCT setup
+    if (isAfterBaselineInboundWithFCPHCT) {
+      console.log('🔍 [AFTER BASELINE_INBOUND WITH FCP/HCT]', {
+        turn_index: i,
+        current_turn_result_type: turn.result_type,
+        previous_turn_result_type: previousTurn?.result_type,
+        previous_turn_next_defensive_setup: previousTurn?.next_defensive_setup,
+        current_turn_fcp_shot: turn.fcp_shot,
+        current_turn_hct_shot: turn.hct_shot,
+        current_turn_next_defensive_setup: turn.next_defensive_setup,
+        current_turn_fcp_foul: turn.fcp_foul,
+        current_turn_hct_foul: turn.hct_foul,
+        has_fcp_hct_flags: !!(turn.fcp_shot || turn.hct_shot || turn.next_defensive_setup === "FCP" || turn.next_defensive_setup === "HCT" || turn.fcp_foul || turn.hct_foul),
+        will_be_detected_as_fcp_hct: false // Will be updated below
+      });
+    }
+    
     // ✅ FIX: Check for FCP/HCT BEFORE TURNOVER to prevent FCP/HCT turns from being misrouted
     // FCP/HCT turns can have result_type === "TURNOVER" if there's a turnover during pressure
     const isFCPHCT = turn.fcp_shot === true || turn.hct_shot === true || 
                      turn.next_defensive_setup === "FCP" || turn.next_defensive_setup === "HCT" ||
                      turn.fcp_foul === true || turn.hct_foul === true;
+    
+    // ✅ DEBUG: Update the log if this turn after BASELINE_INBOUND is detected as FCP/HCT
+    if (isAfterBaselineInboundWithFCPHCT) {
+      console.log('🔍 [AFTER BASELINE_INBOUND WITH FCP/HCT] - Detection Result', {
+        turn_index: i,
+        isFCPHCT: isFCPHCT,
+        will_animate_as_fcp_hct: isFCPHCT,
+        will_skip_fcp_hct_animation: !isFCPHCT
+      });
+    }
     
     // ✅ DEBUG: Log ALL turns to see which ones should be FCP/HCT but aren't being detected
     if (turn.result_type === "MAKE" || turn.result_type === "MISS") {
@@ -773,7 +819,6 @@ export async function animateGameTurns({ //hasBallAtStep
                             turn.fcp_foul === true || turn.hct_foul === true;
       if (!shouldBeFCPHCT) {
         // Log turns that might be FCP/HCT but aren't flagged
-        const previousTurn = i > 0 ? turns[i - 1] : null;
         const prevHadFCPHCT = previousTurn?.next_defensive_setup === "FCP" || previousTurn?.next_defensive_setup === "HCT";
         if (prevHadFCPHCT) {
           console.warn('⚠️ [FCP/HCT MISSING FLAGS]', {
@@ -782,7 +827,9 @@ export async function animateGameTurns({ //hasBallAtStep
             fcp_shot: turn.fcp_shot,
             hct_shot: turn.hct_shot,
             next_defensive_setup: turn.next_defensive_setup,
+            previous_turn_result_type: previousTurn?.result_type,
             previous_turn_next_defensive_setup: previousTurn?.next_defensive_setup,
+            previous_turn_was_baseline_inbound: prevWasBaselineInbound,
             should_have_fcp_hct_flags: true,
             reason: 'Previous turn had FCP/HCT setup but this turn does not'
           });
