@@ -809,8 +809,17 @@ export async function animateGameTurns({ //hasBallAtStep
                                      (previousTurn.result_type === "MAKE" || previousTurn.result_type === "MISS") &&
                                      (previousTurn.fcp_shot === true || previousTurn.hct_shot === true || 
                                       previousTurn.next_defensive_setup === "FCP" || previousTurn.next_defensive_setup === "HCT");
-    const shouldInheritFCPHCT = prevWasFCPHCTShotAttempt && 
-                                 (previousTurn.next_defensive_setup === "FCP" || previousTurn.next_defensive_setup === "HCT") &&
+    // ✅ FIX: Also check if previous turn had FCP/HCT setup (HCO, FOUL, etc.) and this turn is a shot
+    // This handles press break shots where backend might not set fcp_shot/hct_shot flags
+    const prevHadFCPHCTSetup = previousTurn && 
+                               (previousTurn.next_defensive_setup === "FCP" || previousTurn.next_defensive_setup === "HCT" ||
+                                previousTurn.fcp_foul === true || previousTurn.hct_foul === true ||
+                                previousTurn.fcp_shot === true || previousTurn.hct_shot === true);
+    const isShotAfterFCPHCTSetup = prevHadFCPHCTSetup && 
+                                    (turn.result_type === "MAKE" || turn.result_type === "MISS") &&
+                                    !turn.fcp_shot && !turn.hct_shot;
+    
+    const shouldInheritFCPHCT = (prevWasFCPHCTShotAttempt || isShotAfterFCPHCTSetup) && 
                                  !turn.fcp_shot && !turn.hct_shot && 
                                  turn.next_defensive_setup !== "FCP" && turn.next_defensive_setup !== "HCT";
     
