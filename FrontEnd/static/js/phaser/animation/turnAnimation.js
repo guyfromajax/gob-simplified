@@ -1386,12 +1386,36 @@ async function runInboundSetup({
  * @param {Function} params.onUpdate - Update callback (optional, for future use)
  */
 export async function playTurnAnimation({ scene, simData, playerSprites, turnData, ballSprite, onAction, turnIndex, onUpdate }) {
+  // ✅ DEBUG: Log FCP/HCT detection in playTurnAnimation
+  const isFCPHCT = turnData.fcp_shot === true || turnData.hct_shot === true || 
+                   turnData.next_defensive_setup === "FCP" || turnData.next_defensive_setup === "HCT" ||
+                   turnData.fcp_foul === true || turnData.hct_foul === true;
+  if (isFCPHCT) {
+    const pressureType = turnData.fcp_shot || turnData.fcp_foul || turnData.next_defensive_setup === "FCP" ? 'FCP' : 'HCT';
+    console.log('🎬 [playTurnAnimation - FCP/HCT DETECTED]', {
+      turn_index: turnIndex,
+      pressureType,
+      result_type: turnData.result_type,
+      has_animations: !!turnData.animations?.length,
+      animation_count: turnData.animations?.length || 0,
+      will_animate: !!turnData.animations
+    });
+  }
+  
   // Guard: Skip if this is an opening tip, putback, or if animations is missing
   // Putback turns are handled by handleOrebTurn in animateGameTurns.js
   if (turnData.result_type === "OPENING_TIP" || 
       turnData.result_type === "PUTBACK_MAKE" || 
       turnData.result_type === "PUTBACK_MISS" ||
       !turnData.animations) {
+    if (isFCPHCT) {
+      console.error('❌ [FCP/HCT SKIPPED - NO ANIMATIONS]', {
+        turn_index: turnIndex,
+        result_type: turnData.result_type,
+        has_animations: false,
+        reason: 'Missing animations array'
+      });
+    }
     if (turnData.result_type === "PUTBACK_MAKE" || turnData.result_type === "PUTBACK_MISS") {
       console.warn('⚠️ playTurnAnimation called for putback turn - this should be handled by handleOrebTurn:', turnData.result_type);
     } else {
@@ -2103,6 +2127,23 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
         }
       }
     }
+  }
+  
+  // ✅ DEBUG: Log FCP/HCT animation completion in playTurnAnimation
+  const isFCPHCTComplete = turnData.fcp_shot === true || turnData.hct_shot === true || 
+                           turnData.next_defensive_setup === "FCP" || turnData.next_defensive_setup === "HCT" ||
+                           turnData.fcp_foul === true || turnData.hct_foul === true;
+  if (isFCPHCTComplete) {
+    const pressureType = turnData.fcp_shot || turnData.fcp_foul || turnData.next_defensive_setup === "FCP" ? 'FCP' : 'HCT';
+    console.log('✅ [playTurnAnimation - FCP/HCT COMPLETE]', {
+      turn_index: turnIndex,
+      pressureType,
+      result_type: turnData.result_type,
+      outcome: turnData.result_type, // This is the outcome of the FCP/HCT step
+      next_play_type: turnData.next_play_type,
+      possession_flips: turnData.possession_flips,
+      animation_completed: true
+    });
   }
 }
 
