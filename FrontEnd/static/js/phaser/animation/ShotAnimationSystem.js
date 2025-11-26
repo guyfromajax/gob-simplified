@@ -443,18 +443,17 @@ export class ShotAnimationSystem {
       });
     }
 
-    // Ball goes through rim (no bounce)
+    // ✅ FIX: Ball should land perfectly on rim coords for made shots
+    // No weird drop animation - just position ball at rim and hide it
     const ballSprite = this.ballController.ballSprite;
     if (ballSprite) {
-      // Animate ball going through rim
-      this.scene.tweens.add({
-        targets: ballSprite,
-        y: rimCoords.y + 20, // Slight drop through rim
-        duration: 200,
-        ease: 'Power2',
-        onComplete: () => {
-          ballSprite.setVisible(false);
-        }
+      // Position ball exactly at rim coordinates
+      ballSprite.x = rimCoords.x;
+      ballSprite.y = rimCoords.y;
+      
+      // Hide ball after a brief moment (allows visual confirmation)
+      this.scene.time.delayedCall(100, () => {
+        ballSprite.setVisible(false);
       });
     }
 
@@ -1228,7 +1227,9 @@ export class ShotAnimationSystem {
     // Get shooter sprite to determine team
     const shooterSprite = this.getShooterSprite(turnData);
     
-    // Determine which rim based on shooter's team (like the old system)
+    // Determine which rim based on shooter's team
+    // Home team shoots at HOME_RIM_COORDS (x: 91, y: 25)
+    // Away team shoots at AWAY_RIM_COORDS (x: 9, y: 25)
     const isHomeTeam = shooterSprite?.team === 'home';
     const gridRimCoords = isHomeTeam ? this.shotConfig.homeRim : this.shotConfig.awayRim;
     
@@ -1241,7 +1242,6 @@ export class ShotAnimationSystem {
     );
     
     // Return pixel coordinates for rim
-    
     return pixelRimCoords;
   }
 
