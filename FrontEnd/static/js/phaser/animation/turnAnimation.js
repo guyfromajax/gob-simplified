@@ -753,23 +753,54 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
     });
     if (DebugFlags?.OUTLET) animationDebugLog(outletLog);
     if (DebugFlags?.OUTLET) animationDebugLog('Starting outlet pass animation...');
-    await runPass(scene, {
-      fromId: rebounderId,
-      toId: outletReceiverId,
-      duration: animationConfig.outletSetup.passMs,
-      easing: animationConfig.outletSetup.easing,
-      onComplete: () => {
-        setPendingOwner(scene, outletReceiverId);
-        setCurrentOwner(scene, outletReceiverId);
-        outletLog.completedAt = Date.now();
-        console.log('🏀 runDefensiveReboundSetup: Outlet pass completed', {
-          from: rebounderId,
-          to: outletReceiverId
-        });
-        if (DebugFlags?.OUTLET) animationDebugLog(outletLog);
-        if (DebugFlags?.OUTLET) animationDebugLog('Outlet pass completed!');
+    
+    // ✅ REFACTOR: Use centralized passDetection.js system for consistency
+    // Check if turnData has animations with pass actions, otherwise create synthetic passInfo
+    const { detectPassAtStep, handlePassAnimation } = await import('./passDetection.js');
+    let passInfo = null;
+    
+    if (turnData?.animations && Array.isArray(turnData.animations) && turnData.animations.length > 0) {
+      // Check if there's a pass action in the animation data
+      const maxSteps = Math.max(...turnData.animations.map(anim => anim.movement?.length || 0));
+      if (maxSteps > 0) {
+        passInfo = detectPassAtStep(turnData.animations, maxSteps - 1);
       }
+    }
+    
+    if (passInfo) {
+      // ✅ Use dynamic pass from animation data
+      console.log('🏀 [DREB OUTLET] Using dynamic pass from animation data', passInfo);
+      await handlePassAnimation({
+        scene,
+        passInfo,
+        playerSprites
+      });
+    } else {
+      // Fallback: Create synthetic passInfo for hardcoded outlet pass
+      console.log('🏀 [DREB OUTLET] Using synthetic passInfo for hardcoded outlet pass');
+      const syntheticPassInfo = {
+        passerId: rebounderId,
+        receiverId: outletReceiverId,
+        stepIndex: 0,
+        timestamp: Date.now()
+      };
+      await handlePassAnimation({
+        scene,
+        passInfo: syntheticPassInfo,
+        playerSprites
+      });
+    }
+    
+    // Update ball ownership after pass completes
+    setPendingOwner(scene, outletReceiverId);
+    setCurrentOwner(scene, outletReceiverId);
+    outletLog.completedAt = Date.now();
+    console.log('🏀 runDefensiveReboundSetup: Outlet pass completed', {
+      from: rebounderId,
+      to: outletReceiverId
     });
+    if (DebugFlags?.OUTLET) animationDebugLog(outletLog);
+    if (DebugFlags?.OUTLET) animationDebugLog('Outlet pass completed!');
   } else {
     // Always log when outlet pass is skipped (not just when DebugFlags?.OUTLET is enabled)
     console.warn('🏀 runDefensiveReboundSetup: Outlet pass skipped', { 
