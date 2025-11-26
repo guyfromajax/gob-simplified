@@ -134,6 +134,7 @@ Manages individual possessions and turn-by-turn gameplay (2146 lines - the large
 - Executes micro-turns (individual actions within a possession)
 - Handles ball movement, passes, and player decisions
 - Manages defensive pressure and offensive states
+- Supports both man-to-man and zone defense strategies
 - Resolves turnovers, steals, and fouls
 - Coordinates with shot manager for shooting attempts
 
@@ -141,6 +142,10 @@ Manages individual possessions and turn-by-turn gameplay (2146 lines - the large
 - HCO (Half Court Offense) - Normal offense
 - FCP (Full Court Press) - Aggressive defense
 - HCT (Half Court Trap) - Trapping defense
+
+**Defensive Strategies:**
+- Man-to-Man Defense - Standard man-to-man coverage
+- Zone Defense (2-3, 3-2, 1-3-1) - Zone-based defensive positioning with automatic zone shifts based on ball location
 
 #### ShotManager (`BackEnd/models/shot_manager.py`)
 Handles all shooting mechanics and outcomes (1070 lines).
@@ -357,7 +362,7 @@ Teams can use custom offensive plays:
 - Plays stored in database
 - Define player movements and actions
 - Skeleton system for play execution
-- Defensive schemes to counter plays
+- Defensive schemes to counter plays (man-to-man, zone defense)
 
 #### Energy System
 Players have energy (NG attribute) that affects performance:
