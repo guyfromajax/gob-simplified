@@ -875,11 +875,26 @@ export async function animateGameTurns({ //hasBallAtStep
     }
     
     // Check for FCP/HCT shots - route to standard shot animation
-    if (turn.fcp_shot === true || turn.hct_shot === true) {
-      const pressureType = turn.fcp_shot ? 'FCP' : 'HCT';
+    // ✅ FIX: Check for FCP/HCT setup turns (result_type === "HCO" with fcp_shot/hct_shot flags or next_defensive_setup)
+    if (turn.fcp_shot === true || turn.hct_shot === true || 
+        (turn.result_type === "HCO" && (turn.fcp_shot === true || turn.hct_shot === true || turn.next_defensive_setup === "FCP" || turn.next_defensive_setup === "HCT"))) {
+      const pressureType = turn.fcp_shot || turn.next_defensive_setup === "FCP" ? 'FCP' : 'HCT';
+      // ✅ DEBUG: Log FCP/HCT detection to verify it's catching setup turns
+      console.log('🔍 [FCP/HCT DETECTED]', {
+        turn_index: i,
+        result_type: turn.result_type,
+        fcp_shot: turn.fcp_shot,
+        hct_shot: turn.hct_shot,
+        next_defensive_setup: turn.next_defensive_setup,
+        pressureType,
+        willRouteToPlayTurnAnimation: true
+      });
       animationDebugLog(`${pressureType} SHOT TURN - routing to standard shot animation:`, {
         result_type: turn.result_type,
-        turn_index: i
+        turn_index: i,
+        fcp_shot: turn.fcp_shot,
+        hct_shot: turn.hct_shot,
+        next_defensive_setup: turn.next_defensive_setup
       });
       await playTurnAnimation({
         scene,
