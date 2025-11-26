@@ -439,10 +439,16 @@ export async function updateBallOwnership(options) {
 
   // Check if pass is happening at this step (from turnAnimation.js logic)
   if (stepIndex !== undefined) {
-    const passHappening = animations.some(
-      anim => anim.movement?.[stepIndex]?.action === "pass"
-    );
+    // ✅ REFACTOR: Use unified passDetection.js for consistency
+    const { detectPassAtStep } = await import('./passDetection.js');
+    const passHappening = !!detectPassAtStep(animations, stepIndex);
     if (passHappening) return;
+    
+    // ✅ OLD CODE (commented out - replaced with unified passDetection.js):
+    // const passHappening = animations.some(
+    //   anim => anim.movement?.[stepIndex]?.action === "pass"
+    // );
+    // if (passHappening) return;
   }
 
   // Find player who should have ball at this step (unified logic)

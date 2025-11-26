@@ -1574,9 +1574,14 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
     // ✅ FIX: Skip updateBallOwnership if a pass is happening at this step OR
     // if a pass just completed (passInFlight is still true from previous step)
     // We'll handle the pass explicitly after movements complete (like shots)
-    const passHappeningAtThisStep = turnData.animations.some(
-      anim => anim.movement?.[stepIndex]?.action === "pass"
-    );
+    // ✅ REFACTOR: Use unified passDetection.js for consistency
+    const { detectPassAtStep } = await import('./passDetection.js');
+    const passHappeningAtThisStep = !!detectPassAtStep(turnData.animations, stepIndex);
+    
+    // ✅ OLD CODE (commented out - replaced with unified passDetection.js):
+    // const passHappeningAtThisStep = turnData.animations.some(
+    //   anim => anim.movement?.[stepIndex]?.action === "pass"
+    // );
     
     // ✅ CRITICAL FIX: Also skip if passInFlight is true (pass just completed)
     // This prevents updateBallOwnership from teleporting the ball immediately after runPass() completes
