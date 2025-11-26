@@ -777,16 +777,10 @@ export async function animateGameTurns({ //hasBallAtStep
     }
 
     if (turn.result_type === "TURNOVER") {
-      await handleTurnover(scene, { playerSprites, ballSprite, turnData: turn, onUpdate });
-      announceFromTurnData(turn, 'end', scene.simData?.home_team_id, scene);
-      if (onUpdate) {
-        try {
-          onUpdate(turn);
-        } catch (err) {
-          console.error('Scoreboard update failed:', err);
-        }
-      }
-      updateDebugScore(turn, { turnIndex: i, possessionId });
+      // ✅ PHASE 2.6: Route TURNOVER through AnimationRouter
+      turn.index = i;
+      await animationRouter.processTurn(turn);
+      // Note: announceFromTurnData, onUpdate, and updateDebugScore are handled by AnimationRouter
       continue;
     }
 
