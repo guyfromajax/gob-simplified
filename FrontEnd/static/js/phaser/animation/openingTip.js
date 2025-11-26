@@ -4,7 +4,7 @@
  */
 
 import * as Phaser from "https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.esm.js";
-import { tweenPlayerTo } from "./ballTween.js";
+import { tweenPlayerTo, getBallDuration } from "./ballTween.js";
 import { appendToTextScroll } from "../utils/textScroll.js";
 import { gridToPixels } from "../utils/gridToPixels.js";
 import { getPlayerDuration } from "./turnAnimation.js";
@@ -131,14 +131,9 @@ function animateJumpBall(scene, playerSprites, animations, ballSprite, onComplet
     const ballStartPixels = gridToPixels(ballStartCoords.x, ballStartCoords.y, canvasWidth, canvasHeight);
     const ballJumpPixels = gridToPixels(ballJumpCoords.x, ballJumpCoords.y, canvasWidth, canvasHeight);
     
-    // ✅ Use distance-based duration for ball (matches player speed system)
-    // Calculate distance from current ball position to jump position
-    const ballDistance = Phaser.Math.Distance.Between(
-        ballSprite.x, ballSprite.y,
-        ballJumpPixels.x, ballJumpPixels.y
-    );
-    // Use same speed as players (350 pixels/second default)
-    const ballJumpDuration = (ballDistance / 350) * 1000; // Convert to milliseconds
+    // ✅ FIX: Use getBallDuration() to respect game speed settings
+    // This ensures ball animations respect Slow/Normal/Fast speed buttons
+    const ballJumpDuration = getBallDuration(ballSprite, ballJumpPixels.x, ballJumpPixels.y);
     
     const ballTween = scene.tweens.add({
         targets: ballSprite,
@@ -202,14 +197,9 @@ function animateConvergence(scene, playerSprites, animations, ballSprite, ballLa
         pixelCoords: ballPixelCoords
     });
     
-    // ✅ Use distance-based duration for ball (matches player speed system)
-    // Calculate distance from current ball position to landing position
-    const ballConvergeDistance = Phaser.Math.Distance.Between(
-        ballSprite.x, ballSprite.y,
-        ballPixelCoords.x, ballPixelCoords.y
-    );
-    // Use same speed as players (350 pixels/second default)
-    const ballConvergeDuration = (ballConvergeDistance / 350) * 1000; // Convert to milliseconds
+    // ✅ FIX: Use getBallDuration() to respect game speed settings
+    // This ensures ball animations respect Slow/Normal/Fast speed buttons
+    const ballConvergeDuration = getBallDuration(ballSprite, ballPixelCoords.x, ballPixelCoords.y);
     
     const ballTween = scene.tweens.add({
         targets: ballSprite,

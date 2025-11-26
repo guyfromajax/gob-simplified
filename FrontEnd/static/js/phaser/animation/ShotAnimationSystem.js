@@ -20,6 +20,7 @@ import { DebugFlags } from '../utils/debugFlags.js';
 import { gridToPixels } from '../utils/gridToPixels.js';
 import { animateStep } from './animateStep.js';
 import { HOME_RIM_COORDS, AWAY_RIM_COORDS } from './courtConstants.js';
+import { getPlayerDuration } from './turnAnimation.js';
 
 export class ShotAnimationSystem {
   constructor(scene, ballController, stateMachine, playerSprites, gameStore) {
@@ -234,8 +235,16 @@ export class ShotAnimationSystem {
         const curr = movement[stepIndex];
         const step = prev;
         const nextStep = curr;
-        const rawDuration = (nextStep.timestamp - step.timestamp) * 3;
-        const duration = Math.min(1000, rawDuration); // Cap at 1 second
+        
+        // ✅ FIX: Use distance-based duration calculation (matches old system)
+        // This ensures consistent speeds, respects game speed settings, and matches transition animations
+        const { x: targetX, y: targetY } = gridToPixels(
+          nextStep.coords.x,
+          nextStep.coords.y,
+          this.scene.game.config.width,
+          this.scene.game.config.height
+        );
+        const duration = getPlayerDuration(sprite, targetX, targetY);
         
         if (nextStep.action === "shoot") {
           shotInfo = { step: nextStep, playerId: anim.playerId, stepIndex };

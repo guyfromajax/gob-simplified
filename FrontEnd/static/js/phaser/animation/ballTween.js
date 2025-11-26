@@ -53,7 +53,7 @@ function getBallSpeed() {
  * @param {number} targetY - Target Y position in pixels
  * @returns {number} Duration in milliseconds
  */
-function getBallDuration(ballSprite, targetX, targetY) {
+export function getBallDuration(ballSprite, targetX, targetY) {
   if (!ballSprite) return 300; // Default fallback if ball sprite doesn't exist
   
   const currentX = ballSprite.x;
