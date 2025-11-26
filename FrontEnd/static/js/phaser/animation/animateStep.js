@@ -535,21 +535,10 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
       });
     }
     
-    if (duration > 2000 || Math.hypot(sprite.x - targetX, sprite.y - targetY) > 500) {
-      // Removed verbose tween creation log
-      if (false) { // Disabled log
-        console.log('animateStep: Created tween', {
-          tweenId,
-          playerId: sprite?.playerId,
-          action: step.action,
-        duration,
-        distance: Math.hypot(sprite.x - targetX, sprite.y - targetY),
-        from: { x: sprite.x, y: sprite.y },
-        to: { x: targetX, y: targetY },
-        isPlaying: tween.isPlaying(),
-        isPaused: tween.isPaused ? tween.isPaused() : 'N/A'
-      });
-    }
+    // Removed verbose tween creation log
+    // if (duration > 2000 || Math.hypot(sprite.x - targetX, sprite.y - targetY) > 500) {
+    //   console.log('animateStep: Created tween', { ... });
+    // }
 
     if (scene.skipToEnd) {
       tween.stop();
