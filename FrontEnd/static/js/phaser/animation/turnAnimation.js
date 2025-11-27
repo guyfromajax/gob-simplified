@@ -1650,17 +1650,32 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   }
 
   for (let stepIndex = 1; stepIndex < maxSteps; stepIndex++) {
-    if (scene.skipToEnd || scene.stateMachine?.is(States.FastBreak)) break;
+    if (scene.skipToEnd || scene.stateMachine?.is(States.FastBreak)) {
+      // ✅ DEBUG: Log early exit for FCP/HCT
+      if (isFCPHCT) {
+        const pressureType = turnData.fcp_shot || turnData.fcp_foul || turnData.next_defensive_setup === "FCP" ? 'FCP' : 'HCT';
+        console.warn('⚠️ [FCP/HCT STEP LOOP EARLY EXIT]', {
+          turn_index: turnIndex,
+          pressureType,
+          stepIndex,
+          maxSteps,
+          skipToEnd: scene.skipToEnd,
+          isFastBreak: scene.stateMachine?.is(States.FastBreak)
+        });
+      }
+      break;
+    }
     
-    // ✅ DEBUG: Log FCP/HCT step execution
-    if (isFCPHCT && stepIndex === 1) {
+    // ✅ DEBUG: Log FCP/HCT step execution for ALL steps
+    if (isFCPHCT) {
       const pressureType = turnData.fcp_shot || turnData.fcp_foul || turnData.next_defensive_setup === "FCP" ? 'FCP' : 'HCT';
       console.log('🎬 [FCP/HCT STEP EXECUTING]', {
         turn_index: turnIndex,
         pressureType,
         stepIndex,
         maxSteps,
-        is_animating: true
+        is_animating: true,
+        will_complete: stepIndex < maxSteps - 1
       });
     }
 
@@ -1776,6 +1791,17 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
 
       if (nextStep.action === "shoot") {
         shotInfo = { step: nextStep, playerId: anim.playerId, stepIndex };
+        // ✅ DEBUG: Log shot detection in FCP/HCT
+        if (isFCPHCT) {
+          const pressureType = turnData.fcp_shot || turnData.fcp_foul || turnData.next_defensive_setup === "FCP" ? 'FCP' : 'HCT';
+          console.log('🏀 [FCP/HCT SHOT DETECTED]', {
+            turn_index: turnIndex,
+            pressureType,
+            stepIndex,
+            shooterId: anim.playerId,
+            result_type: turnData.result_type
+          });
+        }
       }
 
       const promise = animateStep({
@@ -1794,6 +1820,21 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
     }
 
     await Promise.all(promises);
+    
+    // ✅ DEBUG: Log step completion for FCP/HCT
+    if (isFCPHCT) {
+      const pressureType = turnData.fcp_shot || turnData.fcp_foul || turnData.next_defensive_setup === "FCP" ? 'FCP' : 'HCT';
+      console.log('✅ [FCP/HCT STEP COMPLETE]', {
+        turn_index: turnIndex,
+        pressureType,
+        stepIndex,
+        maxSteps,
+        has_shot: !!shotInfo,
+        has_pass: !!passInfo,
+        will_continue: stepIndex < maxSteps - 1,
+        next_step: stepIndex + 1
+      });
+    }
 
     // ✅ FIX: Handle passes explicitly (following shot pattern)
     // This ensures passes animate smoothly instead of teleporting
@@ -1818,6 +1859,19 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
       // if (hasPassAction) {
       //   console.log('⚠️ [PASS DEBUG] Pass action exists but passInfo is null', { ... });
       // }
+    }
+    
+    // ✅ DEBUG: Log step loop completion for FCP/HCT (after loop completes)
+    if (isFCPHCT) {
+      const pressureType = turnData.fcp_shot || turnData.fcp_foul || turnData.next_defensive_setup === "FCP" ? 'FCP' : 'HCT';
+      console.log('🏁 [FCP/HCT STEP LOOP FINISHED]', {
+        turn_index: turnIndex,
+        pressureType,
+        maxSteps,
+        completed_steps: maxSteps - 1,
+        has_shot: !!shotInfo,
+        has_pass: !!passInfo
+      });
     }
 
     if (shotInfo) {
