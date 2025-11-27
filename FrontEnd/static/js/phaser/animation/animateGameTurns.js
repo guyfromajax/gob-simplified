@@ -951,27 +951,49 @@ export async function animateGameTurns({ //hasBallAtStep
         willRouteToPlayTurnAnimation: isFCPHCTShotAttempt || (!isFCPHCTShotAttempt && isFCPHCT)
       });
       
-      // ✅ FIX: Route ALL FCP/HCT shot attempts through AnimationRouter (same as HCO)
-      // This ensures FCP/HCT shots use ShotAnimationSystem which properly starts tweens
+      // ✅ FIX: Route ALL FCP/HCT shot attempts through playTurnAnimation (matches FCP/HCT setup turns)
+      // ShotAnimationSystem doesn't handle FCP/HCT skeleton animations - it's designed for HCO shots
+      // playTurnAnimation properly animates the press break skeleton sequence, then handles the shot
       if (isFCPHCTShotAttempt) {
-        console.log('🎬 [FCP/HCT SHOT ATTEMPT] Routing through AnimationRouter (same as HCO)', {
+        console.log('🎬 [FCP/HCT SHOT ATTEMPT] Routing through playTurnAnimation', {
           turn_index: i,
           pressureType,
           result_type: turn.result_type,
           fcp_shot: turn.fcp_shot,
           hct_shot: turn.hct_shot,
           animation_count: turn.animations?.length || 0,
-          note: 'AnimationRouter → AnimationEngine → ShotAnimationSystem (same path as HCO shots)'
+          note: 'playTurnAnimation animates skeleton (press break) then handles shot via shootBall()'
         });
         
-        // Set turn.index for AnimationRouter context
-        turn.index = i;
+        await playTurnAnimation({
+          scene,
+          simData,
+          playerSprites,
+          turnData: turn,
+          ballSprite,
+          onUpdate,
+          turnIndex: i,
+          onAction: async (action, sprite, timestamp) => {
+            if (DEBUG_FLOW || debugEnabled)
+              logVerbose(
+                `🎬 Action "${action}" fired at ${timestamp}ms for sprite:`,
+                sprite
+              );
+          },
+        });
         
-        // Route through AnimationRouter like HCO shots
-        // AnimationRouter handles pre/post setup (prepareTurnForAnimation, finalizeTurnAfterAnimation)
-        // which includes announcements, onUpdate, and score updates
-        await animationRouter.processTurn(turn);
-        
+        // After skeleton animation and shot complete, handle shot result (announcements, score updates)
+        // Note: playTurnAnimation already handles made/missed shot logic (inbound setup, rebounds, etc.)
+        // We just need to handle announcements and score updates here
+        announceFromTurnData(turn, 'end', scene.simData?.home_team_id, scene);
+        if (onUpdate) {
+          try {
+            onUpdate(turn);
+          } catch (err) {
+            console.error('Scoreboard update failed:', err);
+          }
+        }
+        updateDebugScore(turn, { turnIndex: i, possessionId });
         continue;
       } else {
         // FCP/HCT setup turns (FOUL, HCO, etc.) route through playTurnAnimation
