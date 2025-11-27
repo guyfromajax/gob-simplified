@@ -1400,6 +1400,24 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
       animation_count: turnData.animations?.length || 0,
       will_animate: !!turnData.animations
     });
+    
+    // ✅ DEBUG: Log when we enter playTurnAnimation to animate FCP/HCT skeleton
+    const hasFCPHCTSkeleton = (turnData.result_type === "MAKE" || turnData.result_type === "MISS") &&
+                              (turnData.fcp_shot === true || turnData.hct_shot === true) &&
+                              turnData.animations && 
+                              turnData.animations.length > 0;
+    if (hasFCPHCTSkeleton) {
+      console.log('🚀 [ENTERING FCP/HCT SKELETON ANIMATION] Starting playTurnAnimation to animate FCP/HCT skeleton', {
+        turn_index: turnIndex,
+        pressureType,
+        result_type: turnData.result_type,
+        fcp_shot: turnData.fcp_shot,
+        hct_shot: turnData.hct_shot,
+        animation_count: turnData.animations?.length || 0,
+        movement_lengths: turnData.animations?.map(a => a.movement?.length || 0) || [],
+        has_skeleton: !!turnData.skeleton
+      });
+    }
   }
   
   // Guard: Skip if this is an opening tip, putback, or if animations is missing
