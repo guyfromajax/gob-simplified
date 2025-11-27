@@ -866,6 +866,22 @@ async function runInboundSetup({
     pressureType
   });
   
+  // ✅ SS&S: Set FCP/HCT state when pressureType is provided (called inline from ShotAnimationSystem)
+  // This ensures state is set even when runInboundSetup is called directly, not from a BASELINE_INBOUND turn
+  if (pressureType === "FCP" || pressureType === "HCT") {
+    scene.currentPressureType = pressureType;
+    scene.pressureSequenceActive = true;
+    console.log('🎯 [FCP/HCT STATE] Setting pressure type from runInboundSetup:', {
+      pressureType,
+      pressureSequenceActive: scene.pressureSequenceActive,
+      source: 'runInboundSetup (inline from ShotAnimationSystem)'
+    });
+  } else if (pressureType === null) {
+    // Clear state if no pressure (normal inbound)
+    scene.currentPressureType = null;
+    scene.pressureSequenceActive = false;
+  }
+  
   if (scene?.stateMachine?.is(States.FreeThrow)) {
     animationDebugLog('runInboundSetup blocked - FreeThrow state');
     return;
