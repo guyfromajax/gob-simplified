@@ -906,13 +906,20 @@ export async function animateGameTurns({ //hasBallAtStep
                            (turn.hct_shot || turn.hct_foul || turn.next_defensive_setup === "HCT" || 
                             (shouldInheritFCPHCT && previousTurn?.next_defensive_setup === "HCT")) ? 'HCT' : 'FCP';
       
-      // ✅ FIX: FCP/HCT shot attempts (fcp_shot/hct_shot with MAKE/MISS) should route through ShotAnimationSystem
+      // ✅ FIX: FCP/HCT shot attempts (fcp_shot/hct_shot with MAKE/MISS) should route through playTurnAnimation
+      // if they have skeleton animations (press break/trap break sequences), otherwise route through ShotAnimationSystem
       // FCP/HCT setup turns (FOUL, HCO, etc.) should route through playTurnAnimation
       // NOTE: next_defensive_setup indicates what happens AFTER the shot (on inbound), not that this shot was during FCP/HCT
       // Only fcp_shot/hct_shot flags indicate the shot itself was taken during FCP/HCT pressure
       const isFCPHCTShotAttempt = (turn.result_type === "MAKE" || turn.result_type === "MISS") &&
                                    (turn.fcp_shot === true || turn.hct_shot === true ||
                                     shouldInheritFCPHCT);
+      
+      // ✅ FIX: If FCP/HCT shot attempt has skeleton animations, route through playTurnAnimation to animate them
+      // Otherwise, route through ShotAnimationSystem for standard shot animation
+      const hasFCPHCTSkeletonAnimations = isFCPHCTShotAttempt && 
+                                         turn.animations && 
+                                         turn.animations.length > 0;
       
       console.log('🔍 [FCP/HCT DETECTED - BEFORE TURNOVER CHECK]', {
         turn_index: i,
@@ -938,16 +945,55 @@ export async function animateGameTurns({ //hasBallAtStep
       });
       
       if (isFCPHCTShotAttempt) {
-        // ✅ FIX: Route FCP/HCT shot attempts through AnimationRouter → ShotAnimationSystem
-        // This ensures they animate like regular shots but with FCP/HCT context
-        console.log('🎬 [FCP/HCT SHOT ATTEMPT] Routing through ShotAnimationSystem', {
-          turn_index: i,
-          pressureType,
-          result_type: turn.result_type
-        });
-        turn.index = i;
-        await animationRouter.processTurn(turn);
-        // Note: announceFromTurnData, onUpdate, and updateDebugScore are handled by AnimationRouter
+        if (hasFCPHCTSkeletonAnimations) {
+          // ✅ FIX: Route FCP/HCT shot attempts with skeleton animations through playTurnAnimation
+          // This animates the press break/trap break sequence, then handles the shot result
+          console.log('🎬 [FCP/HCT SHOT ATTEMPT WITH SKELETON] Routing through playTurnAnimation', {
+            turn_index: i,
+            pressureType,
+            result_type: turn.result_type,
+            animation_count: turn.animations?.length || 0
+          });
+          
+          await playTurnAnimation({
+            scene,
+            simData,
+            playerSprites,
+            turnData: turn,
+            ballSprite,
+            onUpdate,
+            turnIndex: i,
+            onAction: async (action, sprite, timestamp) => {
+              if (DEBUG_FLOW || debugEnabled)
+                logVerbose(
+                  `🎬 Action "${action}" fired at ${timestamp}ms for sprite:`,
+                  sprite
+                );
+            },
+          });
+          
+          // After skeleton animation completes, handle shot result (announcements, score updates)
+          announceFromTurnData(turn, 'end', scene.simData?.home_team_id, scene);
+          if (onUpdate) {
+            try {
+              onUpdate(turn);
+            } catch (err) {
+              console.error('Scoreboard update failed:', err);
+            }
+          }
+          updateDebugScore(turn, { turnIndex: i, possessionId });
+        } else {
+          // ✅ FIX: Route FCP/HCT shot attempts without skeleton animations through AnimationRouter → ShotAnimationSystem
+          // This ensures they animate like regular shots but with FCP/HCT context
+          console.log('🎬 [FCP/HCT SHOT ATTEMPT] Routing through ShotAnimationSystem', {
+            turn_index: i,
+            pressureType,
+            result_type: turn.result_type
+          });
+          turn.index = i;
+          await animationRouter.processTurn(turn);
+          // Note: announceFromTurnData, onUpdate, and updateDebugScore are handled by AnimationRouter
+        }
         
         // ✅ DEBUG: After FCP/HCT shot attempt completes, check what's next
         const nextTurnIndex = i + 1;
