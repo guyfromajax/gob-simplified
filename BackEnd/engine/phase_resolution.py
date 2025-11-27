@@ -1288,7 +1288,7 @@ def resolve_full_court_press_logic(game: "GameManager"):
     # Real FCP result calculation
     if (offenseScore + 500) > defenseScore:
         if offenseScore - defenseScore > 1000:
-            result_type = random.choices(["D_FOUL", "HCO", "SHOT"], weights=[0.5, 0.3, 0.2])[0]
+            result_type = random.choices(["D_FOUL", "HCO", "SHOT"], weights=[0.5, 0.5, 0.0])[0]
         else:
             result_type = "HCO"
     else:
@@ -1872,7 +1872,7 @@ def resolve_half_court_trap_logic(game: "GameManager"):
     # Real HCT result calculation
     if (offenseScore + 300) > defenseScore:
         if offenseScore - defenseScore > 1000:
-            result_type = random.choices(["D_FOUL", "HCO", "SHOT"], weights=[0.5, 0.3, 0.2])[0]
+            result_type = random.choices(["D_FOUL", "HCO", "SHOT"], weights=[0.5, 0.5, 0.0])[0]
         else:
             result_type = "HCO"
     else:
