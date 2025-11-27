@@ -162,18 +162,55 @@ export class ShotAnimationSystem {
       currentBallOwnerRef
     });
     
-    // 2. Determine ball owner at step 0
-    let step0OwnerSprite = null;
-    for (const anim of turnData.animations) {
-      if (anim.hasBallAtStep?.[0]) {
-        step0OwnerSprite = this.playerSprites[anim.playerId];
-        break;
-      }
+    // ✅ CRITICAL FIX: Match playTurnAnimation's ball attachment logic exactly
+    // Determine which player owns the ball at step 0
+    // BUT: Skip this if the previous turn was a shot (MAKE or MISS)
+    // After a shot, the ball should remain at the rim/bounce spot until the next turn's animation moves it
+    const previousTurnWasShot = this.scene._previousTurnWasShot === true;
+    if (previousTurnWasShot) {
+      console.log('🏀 ShotAnimationSystem: Skipping step 0 ball attachment - previous turn was a shot');
+      this.scene._previousTurnWasShot = false; // Clear the flag
     }
     
-    if (step0OwnerSprite) {
-      this.ballController.attachToPlayer(step0OwnerSprite);
-      currentBallOwnerRef.value = step0OwnerSprite;
+    // ✅ CRITICAL FIX: If we are coming directly from an inbound or opening tip, the ball should already be attached
+    // to the inbound receiver or tip winner, so we don't re-derive or re-attach at step 0.
+    // This is the key difference between HCO shots (don't come from inbound) and FCP/HCT shots (come from inbound)
+    let step0OwnerSprite = null;
+    if (!previousTurnWasShot && !fromInbound && !fromOpeningTip) {
+      for (const anim of turnData.animations) {
+        if (anim.hasBallAtStep?.[0]) {
+          step0OwnerSprite = this.playerSprites[anim.playerId];
+          break;
+        }
+      }
+      
+      if (step0OwnerSprite) {
+        const step0OwnerId = step0OwnerSprite.playerId;
+        const { setBallHolderId } = await import('./ballAnimationSimple.js');
+        this.ballController.attachToPlayer(step0OwnerSprite);
+        currentBallOwnerRef.value = step0OwnerSprite;
+        
+        // ✅ MATCH playTurnAnimation EXACTLY: Also set simple ball holder ID (WIP_GOB approach)
+        setBallHolderId(this.scene, step0OwnerId);
+      }
+    } else {
+      // Coming from inbound/tip or previous was shot - ball is already attached, don't re-attach
+      console.log('🏀 ShotAnimationSystem: Skipping step 0 ball attachment', {
+        previousTurnWasShot,
+        fromInbound,
+        fromOpeningTip,
+        reason: previousTurnWasShot ? 'previous turn was shot' : 
+                fromInbound ? 'coming from inbound' : 
+                'coming from opening tip'
+      });
+    }
+    
+    // ✅ MATCH playTurnAnimation EXACTLY: Clear inbound and opening tip flags after applying pre-step setup
+    if (this.scene._previousTurnWasInbound) {
+      this.scene._previousTurnWasInbound = false;
+    }
+    if (this.scene._previousTurnWasOpeningTip) {
+      this.scene._previousTurnWasOpeningTip = false;
     }
     
     // 3. Animate step-by-step player movement
