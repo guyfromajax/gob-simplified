@@ -1508,11 +1508,19 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
                                turnData.animations?.length > 0 &&
                                scene.stateMachine?.is(States.FastBreak);
   
-  if (scene.stateMachine?.is(States.FastBreak) && !isHCOAfterFastBreak) {
-    console.log("⚠️ playTurnAnimation: Skipping - state is FastBreak and turn is not HCO", {
+  // ✅ FIX: Allow FCP/HCT turns to proceed even if state is FastBreak
+  // FCP/HCT turns can occur after fast breaks (e.g., press break after fast break shot)
+  const isFCPHCTTurn = turnData.fcp_shot === true || turnData.hct_shot === true ||
+                       turnData.fcp_foul === true || turnData.hct_foul === true ||
+                       turnData.next_defensive_setup === "FCP" || turnData.next_defensive_setup === "HCT" ||
+                       scene.pressureSequenceActive;
+  
+  if (scene.stateMachine?.is(States.FastBreak) && !isHCOAfterFastBreak && !isFCPHCTTurn) {
+    console.log("⚠️ playTurnAnimation: Skipping - state is FastBreak and turn is not HCO or FCP/HCT", {
       result_type: turnData.result_type,
       fast_break: turnData.fast_break,
-      has_animations: !!turnData.animations?.length
+      has_animations: !!turnData.animations?.length,
+      isFCPHCTTurn
     });
     return;
   }
@@ -1591,7 +1599,14 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
     }
   }
 
-  if (scene.skipToEnd || scene.stateMachine?.is(States.FastBreak)) {
+  // ✅ FIX: Allow FCP/HCT turns to proceed even if state is FastBreak
+  // FCP/HCT turns can occur after fast breaks (e.g., press break after fast break shot)
+  const isFCPHCTTurnForEarlyExit = turnData.fcp_shot === true || turnData.hct_shot === true ||
+                                    turnData.fcp_foul === true || turnData.hct_foul === true ||
+                                    turnData.next_defensive_setup === "FCP" || turnData.next_defensive_setup === "HCT" ||
+                                    scene.pressureSequenceActive;
+  
+  if (scene.skipToEnd || (scene.stateMachine?.is(States.FastBreak) && !isFCPHCTTurnForEarlyExit)) {
     // ✅ DEBUG: Log if FCP/HCT is being skipped due to skipToEnd or FastBreak state
     if (isFCPHCT) {
       const pressureType = turnData.fcp_shot || turnData.fcp_foul || turnData.next_defensive_setup === "FCP" ? 'FCP' : 'HCT';
@@ -1666,7 +1681,14 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   }
 
   for (let stepIndex = 1; stepIndex < maxSteps; stepIndex++) {
-    if (scene.skipToEnd || scene.stateMachine?.is(States.FastBreak)) {
+    // ✅ FIX: Allow FCP/HCT turns to proceed even if state is FastBreak
+    // FCP/HCT turns can occur after fast breaks (e.g., press break after fast break shot)
+    const isFCPHCTTurnForStepLoop = turnData.fcp_shot === true || turnData.hct_shot === true ||
+                                     turnData.fcp_foul === true || turnData.hct_foul === true ||
+                                     turnData.next_defensive_setup === "FCP" || turnData.next_defensive_setup === "HCT" ||
+                                     scene.pressureSequenceActive;
+    
+    if (scene.skipToEnd || (scene.stateMachine?.is(States.FastBreak) && !isFCPHCTTurnForStepLoop)) {
       // ✅ DEBUG: Log early exit for FCP/HCT
       if (isFCPHCT) {
         const pressureType = turnData.fcp_shot || turnData.fcp_foul || turnData.next_defensive_setup === "FCP" ? 'FCP' : 'HCT';
