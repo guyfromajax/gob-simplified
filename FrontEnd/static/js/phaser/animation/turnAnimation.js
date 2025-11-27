@@ -1687,7 +1687,10 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
     maxSteps,
     will_enter_loop: maxSteps > 1,
     skipToEnd: scene.skipToEnd,
-    isFastBreak: scene.stateMachine?.is(States.FastBreak)
+    isFastBreak: scene.stateMachine?.is(States.FastBreak),
+    pressureSequenceActive: scene.pressureSequenceActive,
+    currentPressureType: scene.currentPressureType,
+    turnDataKeys: Object.keys(turnData).filter(k => k.includes('fcp') || k.includes('hct') || k.includes('defensive'))
   });
 
   for (let stepIndex = 1; stepIndex < maxSteps; stepIndex++) {
@@ -1706,7 +1709,20 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
                                      turnData.next_defensive_setup === "FCP" || turnData.next_defensive_setup === "HCT" ||
                                      scene.pressureSequenceActive;
     
-    if (scene.skipToEnd || (scene.stateMachine?.is(States.FastBreak) && !isFCPHCTTurnForStepLoop)) {
+    // ✅ DEBUG: Log the early exit check details
+    const willEarlyExit = scene.skipToEnd || (scene.stateMachine?.is(States.FastBreak) && !isFCPHCTTurnForStepLoop);
+    console.log('🔍 [EARLY EXIT CHECK]', {
+      stepIndex,
+      skipToEnd: scene.skipToEnd,
+      isFastBreak: scene.stateMachine?.is(States.FastBreak),
+      isFCPHCTTurnForStepLoop,
+      willEarlyExit,
+      reason: scene.skipToEnd ? 'skipToEnd' : 
+              (scene.stateMachine?.is(States.FastBreak) && !isFCPHCTTurnForStepLoop) ? 'FastBreak state and not FCP/HCT' : 
+              'none'
+    });
+    
+    if (willEarlyExit) {
       // ✅ DEBUG: Log early exit for FCP/HCT
       if (isFCPHCT) {
         const pressureType = turnData.fcp_shot || turnData.fcp_foul || turnData.next_defensive_setup === "FCP" ? 'FCP' : 'HCT';
@@ -1716,7 +1732,10 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
           stepIndex,
           maxSteps,
           skipToEnd: scene.skipToEnd,
-          isFastBreak: scene.stateMachine?.is(States.FastBreak)
+          isFastBreak: scene.stateMachine?.is(States.FastBreak),
+          isFCPHCTTurnForStepLoop,
+          pressureSequenceActive: scene.pressureSequenceActive,
+          currentPressureType: scene.currentPressureType
         });
       }
       break;
