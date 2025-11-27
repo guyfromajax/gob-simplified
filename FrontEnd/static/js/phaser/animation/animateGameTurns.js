@@ -887,9 +887,6 @@ export async function animateGameTurns({ //hasBallAtStep
         });
       }
       
-      // ✅ SS&S: Use scene state for pressure type (single source of truth)
-      const pressureType = scene.currentPressureType || (turn.fcp_shot || turn.fcp_foul || turn.next_defensive_setup === "FCP" ? 'FCP' : 'HCT');
-      
       console.log('🔍 [FCP/HCT DETECTED - STATE-BASED]', {
         turn_index: i,
         result_type: turn.result_type,
