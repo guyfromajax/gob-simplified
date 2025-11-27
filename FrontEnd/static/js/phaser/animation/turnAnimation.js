@@ -1403,9 +1403,12 @@ async function runInboundSetup({
  */
 export async function playTurnAnimation({ scene, simData, playerSprites, turnData, ballSprite, onAction, turnIndex, onUpdate }) {
   // ✅ DEBUG: Log FCP/HCT detection in playTurnAnimation
+  // ✅ FIX: Also check scene.pressureSequenceActive to match routing logic in animateGameTurns.js
+  // This ensures cleanup code runs for FCP/HCT setup turns that are routed based on state
   const isFCPHCT = turnData.fcp_shot === true || turnData.hct_shot === true || 
                    turnData.next_defensive_setup === "FCP" || turnData.next_defensive_setup === "HCT" ||
-                   turnData.fcp_foul === true || turnData.hct_foul === true;
+                   turnData.fcp_foul === true || turnData.hct_foul === true ||
+                   scene.pressureSequenceActive === true;
   if (isFCPHCT) {
     const pressureType = turnData.fcp_shot || turnData.fcp_foul || turnData.next_defensive_setup === "FCP" ? 'FCP' : 'HCT';
     console.log('🎬 [playTurnAnimation - FCP/HCT DETECTED]', {
