@@ -360,6 +360,13 @@ export async function animateGameTurns({ //hasBallAtStep
   // console.log('🎬 animateGameTurns: Starting animation system');
   const turns = simData.turns || [];
   if (scene) scene.simData = simData;
+  
+  // ✅ INITIALIZE FCP/HCT STATE TRACKING (SS&S Pattern: Scene-level state)
+  // This provides a single source of truth for pressure state, matching BallController pattern
+  if (!scene.currentPressureType) {
+    scene.currentPressureType = null; // "FCP" | "HCT" | null
+    scene.pressureSequenceActive = false; // Track if we're in a pressure sequence
+  }
   annotateFreeThrowTurns(turns);
   const allPlayers = simData.players || [];
   const debugEnabled = isAnimationDebugEnabled();
@@ -613,17 +620,23 @@ export async function animateGameTurns({ //hasBallAtStep
     }
 
     if (turn.result_type === "BASELINE_INBOUND") {
-      // ✅ DEBUG: Log BASELINE_INBOUND with FCP/HCT setup
+      // ✅ SET FCP/HCT STATE WHEN PRESSURE SETUP DETECTED (SS&S Pattern)
+      // This is the single source of truth for pressure state - replaces complex flag detection
       const hasFCPHCTSetup = turn.next_defensive_setup === "FCP" || turn.next_defensive_setup === "HCT";
       if (hasFCPHCTSetup) {
-        console.log('🔍 [BASELINE_INBOUND WITH FCP/HCT SETUP]', {
+        scene.currentPressureType = turn.next_defensive_setup; // "FCP" or "HCT"
+        scene.pressureSequenceActive = true;
+        console.log('🎯 [FCP/HCT STATE] Setting pressure type:', {
           turn_index: i,
+          pressureType: scene.currentPressureType,
+          pressureSequenceActive: scene.pressureSequenceActive,
           result_type: turn.result_type,
-          next_defensive_setup: turn.next_defensive_setup,
-          will_setup_fcp_hct: true,
-          next_turn_index: i + 1,
-          next_turn_will_need_fcp_hct_flags: true
+          next_defensive_setup: turn.next_defensive_setup
         });
+      } else {
+        // Clear state if no pressure setup (normal inbound)
+        scene.currentPressureType = null;
+        scene.pressureSequenceActive = false;
       }
       
       // console.log('🏀 Quarter start BASELINE_INBOUND detected, animating all players');
@@ -773,115 +786,62 @@ export async function animateGameTurns({ //hasBallAtStep
       continue;
     }
 
-    // ✅ DEBUG: Check if previous turn was BASELINE_INBOUND with FCP/HCT setup
-    // OR if previous turn was a MAKE with next_play_type: "BASELINE_INBOUND" and FCP/HCT setup
-    // (because runInboundSetup is called inline from ShotAnimationSystem, not as a separate turn)
+    // ✅ SS&S PATTERN: Simple state-based FCP/HCT detection (replaces complex flag inheritance)
+    // Use scene state as single source of truth - matches BallController pattern
     const previousTurn = i > 0 ? turns[i - 1] : null;
-    const prevWasBaselineInbound = previousTurn?.result_type === "BASELINE_INBOUND";
-    const prevWasMakeWithBaselineInbound = previousTurn?.result_type === "MAKE" && 
-                                           previousTurn?.next_play_type === "BASELINE_INBOUND";
-    const prevHadFCPHCTSetup = previousTurn?.next_defensive_setup === "FCP" || previousTurn?.next_defensive_setup === "HCT";
-    const isAfterBaselineInboundWithFCPHCT = (prevWasBaselineInbound || prevWasMakeWithBaselineInbound) && prevHadFCPHCTSetup;
     
-    // ✅ DEBUG: Log turns after BASELINE_INBOUND with FCP/HCT setup
-    if (isAfterBaselineInboundWithFCPHCT) {
-      console.log('🔍 [AFTER BASELINE_INBOUND WITH FCP/HCT]', {
+    // Simple check: if we're in a pressure sequence, check if this turn is part of it
+    const isFCPHCT = scene.pressureSequenceActive && 
+                     (turn.fcp_shot === true || turn.hct_shot === true ||
+                      turn.fcp_foul === true || turn.hct_foul === true ||
+                      turn.result_type === "MAKE" || turn.result_type === "MISS" ||
+                      turn.result_type === "HCO" || turn.result_type === "TURNOVER" ||
+                      turn.next_defensive_setup === "FCP" || turn.next_defensive_setup === "HCT");
+    
+    // ✅ DEBUG: Log state-based detection
+    if (scene.pressureSequenceActive) {
+      console.log('🎯 [FCP/HCT STATE] Checking turn with active pressure sequence', {
         turn_index: i,
-        current_turn_result_type: turn.result_type,
-        previous_turn_result_type: previousTurn?.result_type,
-        previous_turn_next_play_type: previousTurn?.next_play_type,
-        previous_turn_next_defensive_setup: previousTurn?.next_defensive_setup,
-        previous_turn_was_make_with_baseline_inbound: prevWasMakeWithBaselineInbound,
-        current_turn_fcp_shot: turn.fcp_shot,
-        current_turn_hct_shot: turn.hct_shot,
-        current_turn_next_defensive_setup: turn.next_defensive_setup,
-        current_turn_fcp_foul: turn.fcp_foul,
-        current_turn_hct_foul: turn.hct_foul,
-        has_fcp_hct_flags: !!(turn.fcp_shot || turn.hct_shot || turn.next_defensive_setup === "FCP" || turn.next_defensive_setup === "HCT" || turn.fcp_foul || turn.hct_foul),
-        will_be_detected_as_fcp_hct: false // Will be updated below
-      });
-    }
-    
-    // ✅ FIX: Check for FCP/HCT BEFORE TURNOVER to prevent FCP/HCT turns from being misrouted
-    // FCP/HCT turns can have result_type === "TURNOVER" if there's a turnover during pressure
-    // Also check if previous turn was an FCP/HCT shot attempt - the next turn should inherit FCP/HCT context
-    // ✅ FIX: Check if previous turn had FCP/HCT setup (HCO, FOUL, etc.) and this turn is a shot
-    // This handles press break shots where backend might not set fcp_shot/hct_shot flags
-    // NOTE: Do NOT check if previous turn was an FCP/HCT shot attempt - after a shot attempt, pressure ends
-    const prevHadFCPHCTSetupForShot = previousTurn && 
-                                      (previousTurn.next_defensive_setup === "FCP" || previousTurn.next_defensive_setup === "HCT" ||
-                                       previousTurn.fcp_foul === true || previousTurn.hct_foul === true) &&
-                                      // Exclude previous turns that were shot attempts - pressure ends after shot
-                                      !(previousTurn.fcp_shot === true || previousTurn.hct_shot === true ||
-                                        ((previousTurn.result_type === "MAKE" || previousTurn.result_type === "MISS") &&
-                                         (previousTurn.fcp_shot === true || previousTurn.hct_shot === true)));
-    const isShotAfterFCPHCTSetup = prevHadFCPHCTSetupForShot && 
-                                   (turn.result_type === "MAKE" || turn.result_type === "MISS") &&
-                                   !turn.fcp_shot && !turn.hct_shot;
-    
-    // ✅ FIX: If turn is a shot with next_defensive_setup FCP/HCT and previous turn had FCP/HCT setup,
-    // treat it as an FCP/HCT shot attempt (even if it has next_defensive_setup, since that's for the inbound)
-    const isShotWithFCPHCTNextSetup = (turn.result_type === "MAKE" || turn.result_type === "MISS") &&
-                                      (turn.next_defensive_setup === "FCP" || turn.next_defensive_setup === "HCT") &&
-                                      prevHadFCPHCTSetupForShot &&
-                                      !turn.fcp_shot && !turn.hct_shot;
-    
-    const shouldInheritFCPHCT = (isShotAfterFCPHCTSetup || isShotWithFCPHCTNextSetup) && 
-                                 !turn.fcp_shot && !turn.hct_shot;
-    
-    const isFCPHCT = turn.fcp_shot === true || turn.hct_shot === true || 
-                     turn.next_defensive_setup === "FCP" || turn.next_defensive_setup === "HCT" ||
-                     turn.fcp_foul === true || turn.hct_foul === true ||
-                     shouldInheritFCPHCT; // ✅ FIX: Inherit FCP/HCT context from previous shot attempt
-    
-    // ✅ DEBUG: Update the log if this turn after BASELINE_INBOUND is detected as FCP/HCT
-    if (isAfterBaselineInboundWithFCPHCT) {
-      console.log('🔍 [AFTER BASELINE_INBOUND WITH FCP/HCT] - Detection Result', {
-        turn_index: i,
-        isFCPHCT: isFCPHCT,
-        will_animate_as_fcp_hct: isFCPHCT,
-        will_skip_fcp_hct_animation: !isFCPHCT
-      });
-    }
-    
-    // ✅ DEBUG: Log ALL turns to see which ones should be FCP/HCT but aren't being detected
-    if (turn.result_type === "MAKE" || turn.result_type === "MISS") {
-      const shouldBeFCPHCT = turn.fcp_shot === true || turn.hct_shot === true || 
-                            turn.next_defensive_setup === "FCP" || turn.next_defensive_setup === "HCT" ||
-                            turn.fcp_foul === true || turn.hct_foul === true;
-      
-      // ✅ DEBUG: Log ALL MAKE/MISS turns to see their FCP/HCT flags
-      console.log('🔍 [MAKE/MISS TURN CHECK]', {
-        turn_index: i,
+        currentPressureType: scene.currentPressureType,
+        pressureSequenceActive: scene.pressureSequenceActive,
         result_type: turn.result_type,
         fcp_shot: turn.fcp_shot,
         hct_shot: turn.hct_shot,
-        next_defensive_setup: turn.next_defensive_setup,
         fcp_foul: turn.fcp_foul,
         hct_foul: turn.hct_foul,
-        shouldBeFCPHCT: shouldBeFCPHCT,
+        next_defensive_setup: turn.next_defensive_setup,
+        isFCPHCT: isFCPHCT
+      });
+    }
+    
+    // ✅ DEBUG: Log state-based detection for MAKE/MISS turns
+    if (turn.result_type === "MAKE" || turn.result_type === "MISS") {
+      const hasFCPHCTFlags = turn.fcp_shot === true || turn.hct_shot === true || 
+                            turn.next_defensive_setup === "FCP" || turn.next_defensive_setup === "HCT" ||
+                            turn.fcp_foul === true || turn.hct_foul === true;
+      
+      console.log('🔍 [MAKE/MISS TURN CHECK - STATE-BASED]', {
+        turn_index: i,
+        result_type: turn.result_type,
+        currentPressureType: scene.currentPressureType,
+        pressureSequenceActive: scene.pressureSequenceActive,
+        hasFCPHCTFlags: hasFCPHCTFlags,
         willBeDetectedAsFCPHCT: isFCPHCT,
-        previous_turn_result_type: previousTurn?.result_type,
-        previous_turn_next_defensive_setup: previousTurn?.next_defensive_setup
+        fcp_shot: turn.fcp_shot,
+        hct_shot: turn.hct_shot,
+        next_defensive_setup: turn.next_defensive_setup
       });
       
-      if (!shouldBeFCPHCT) {
-        // Log turns that might be FCP/HCT but aren't flagged
-        const prevHadFCPHCT = previousTurn?.next_defensive_setup === "FCP" || previousTurn?.next_defensive_setup === "HCT";
-        if (prevHadFCPHCT) {
-          console.warn('⚠️ [FCP/HCT MISSING FLAGS]', {
-            turn_index: i,
-            result_type: turn.result_type,
-            fcp_shot: turn.fcp_shot,
-            hct_shot: turn.hct_shot,
-            next_defensive_setup: turn.next_defensive_setup,
-            previous_turn_result_type: previousTurn?.result_type,
-            previous_turn_next_defensive_setup: previousTurn?.next_defensive_setup,
-            previous_turn_was_baseline_inbound: prevWasBaselineInbound,
-            should_have_fcp_hct_flags: true,
-            reason: 'Previous turn had FCP/HCT setup but this turn does not'
-          });
-        }
+      // Warn if we're in a pressure sequence but turn doesn't have flags (shouldn't happen)
+      if (scene.pressureSequenceActive && !hasFCPHCTFlags && !isFCPHCT) {
+        console.warn('⚠️ [FCP/HCT STATE MISMATCH]', {
+          turn_index: i,
+          result_type: turn.result_type,
+          currentPressureType: scene.currentPressureType,
+          pressureSequenceActive: scene.pressureSequenceActive,
+          hasFCPHCTFlags: false,
+          reason: 'Pressure sequence active but turn has no FCP/HCT flags and not detected as FCP/HCT'
+        });
       }
     }
     
@@ -900,19 +860,17 @@ export async function animateGameTurns({ //hasBallAtStep
     }
     
     if (isFCPHCT) {
-      // ✅ FIX: Determine pressure type - use inherited context if turn doesn't have flags
-      const pressureType = turn.fcp_shot || turn.fcp_foul || turn.next_defensive_setup === "FCP" || 
-                           (shouldInheritFCPHCT && previousTurn?.next_defensive_setup === "FCP") ? 'FCP' : 
-                           (turn.hct_shot || turn.hct_foul || turn.next_defensive_setup === "HCT" || 
-                            (shouldInheritFCPHCT && previousTurn?.next_defensive_setup === "HCT")) ? 'HCT' : 'FCP';
+      // ✅ SS&S: Use scene state for pressure type (single source of truth)
+      // Fallback to turn flags if state not set yet (shouldn't happen, but safety check)
+      const pressureType = scene.currentPressureType || 
+                           (turn.fcp_shot || turn.fcp_foul || turn.next_defensive_setup === "FCP" ? 'FCP' : 'HCT');
       
-      // ✅ FIX: ALL FCP/HCT shot attempts should route through playTurnAnimation
-      // This matches HCO's approach: playTurnAnimation handles skeleton animations AND the shot via shootBall()
-      // Even if backend fails to provide skeleton animations, playTurnAnimation can still handle the shot
-      // ✅ FIX: Also check next_defensive_setup for shot attempts (backend may not set fcp_shot/hct_shot flags)
-      const isFCPHCTShotAttempt = (turn.result_type === "MAKE" || turn.result_type === "MISS") &&
+      // ✅ SS&S: Simple state-based shot attempt detection
+      // If we're in a pressure sequence and this is a shot, it's an FCP/HCT shot attempt
+      const isFCPHCTShotAttempt = scene.pressureSequenceActive && 
+                                   (turn.result_type === "MAKE" || turn.result_type === "MISS") &&
                                    (turn.fcp_shot === true || turn.hct_shot === true ||
-                                    turn.next_defensive_setup === "FCP" || turn.next_defensive_setup === "HCT");
+                                    scene.currentPressureType === "FCP" || scene.currentPressureType === "HCT");
       
       // ✅ DEBUG: Log when we determine we'll use FCP/HCT skeleton
       if (isFCPHCTShotAttempt) {
@@ -929,26 +887,22 @@ export async function animateGameTurns({ //hasBallAtStep
         });
       }
       
-      console.log('🔍 [FCP/HCT DETECTED - BEFORE TURNOVER CHECK]', {
+      // ✅ SS&S: Use scene state for pressure type (single source of truth)
+      const pressureType = scene.currentPressureType || (turn.fcp_shot || turn.fcp_foul || turn.next_defensive_setup === "FCP" ? 'FCP' : 'HCT');
+      
+      console.log('🔍 [FCP/HCT DETECTED - STATE-BASED]', {
         turn_index: i,
         result_type: turn.result_type,
+        currentPressureType: scene.currentPressureType,
+        pressureSequenceActive: scene.pressureSequenceActive,
         fcp_shot: turn.fcp_shot,
         hct_shot: turn.hct_shot,
         fcp_foul: turn.fcp_foul,
         hct_foul: turn.hct_foul,
         next_defensive_setup: turn.next_defensive_setup,
-        shouldInheritFCPHCT: shouldInheritFCPHCT,
-        prevHadFCPHCTSetupForShot: prevHadFCPHCTSetupForShot,
-        isShotAfterFCPHCTSetup: isShotAfterFCPHCTSetup,
-        isShotWithFCPHCTNextSetup: isShotWithFCPHCTNextSetup,
-        previous_turn_result_type: previousTurn?.result_type,
-        previous_turn_next_defensive_setup: previousTurn?.next_defensive_setup,
-        previous_turn_fcp_shot: previousTurn?.fcp_shot,
-        previous_turn_hct_shot: previousTurn?.hct_shot,
         pressureType,
         isFCPHCT,
-        isFCPHCTShotAttempt,
-        willRouteToPlayTurnAnimation: isFCPHCTShotAttempt || (!isFCPHCTShotAttempt && isFCPHCT)
+        isFCPHCTShotAttempt
       });
       
       // ✅ FIX: Route ALL FCP/HCT shot attempts through playTurnAnimation (matches FCP/HCT setup turns)
@@ -1032,6 +986,27 @@ export async function animateGameTurns({ //hasBallAtStep
         });
       }
       
+      // ✅ SS&S: Clear pressure state when sequence completes
+      // Clear state when: shot attempt completes, foul occurs, turnover occurs, or transition to HCO
+      const shouldClearPressureState = 
+        (turn.result_type === "MAKE" || turn.result_type === "MISS") || // Shot attempt completed
+        (turn.result_type === "HCO" && !turn.fcp_shot && !turn.hct_shot) || // Pressure broken, transition to HCO
+        turn.fcp_foul === true || turn.hct_foul === true || // Foul occurred
+        turn.result_type === "TURNOVER"; // Turnover occurred
+      
+      if (shouldClearPressureState && scene.pressureSequenceActive) {
+        console.log('🎯 [FCP/HCT STATE] Clearing pressure state - sequence completed', {
+          turn_index: i,
+          result_type: turn.result_type,
+          previousPressureType: scene.currentPressureType,
+          reason: turn.result_type === "MAKE" || turn.result_type === "MISS" ? 'shot completed' :
+                  turn.result_type === "HCO" ? 'pressure broken' :
+                  turn.fcp_foul || turn.hct_foul ? 'foul occurred' : 'turnover occurred'
+        });
+        scene.currentPressureType = null;
+        scene.pressureSequenceActive = false;
+      }
+      
       // ✅ DEBUG: Log FCP/HCT animation completion and outcome
       const nextTurn = i + 1 < turns.length ? turns[i + 1] : null;
       console.log('✅ [FCP/HCT ANIMATION COMPLETE]', {
@@ -1044,7 +1019,8 @@ export async function animateGameTurns({ //hasBallAtStep
         next_turn_result_type: nextTurn?.result_type || null,
         next_turn_fcp_shot: nextTurn?.fcp_shot || false,
         next_turn_hct_shot: nextTurn?.hct_shot || false,
-        next_turn_next_defensive_setup: nextTurn?.next_defensive_setup || null
+        next_turn_next_defensive_setup: nextTurn?.next_defensive_setup || null,
+        pressureStateCleared: shouldClearPressureState
       });
       
       // ✅ DEBUG: Explicitly log next turn FCP/HCT status for visibility
