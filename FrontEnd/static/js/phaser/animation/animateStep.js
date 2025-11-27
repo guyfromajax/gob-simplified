@@ -191,12 +191,27 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
     }
 
     // Filter out any null/invalid targets before creating tween
-    const validTargets = tweenTargets.filter(target => 
+    let validTargets = tweenTargets.filter(target => 
       target && 
       target.scene && 
       target.active !== false && 
       !target.destroyed
     );
+    
+    // ✅ CRITICAL FIX: Remove ball from targets if it's already being tweened
+    // If ball is in targets but has active tweens, Phaser won't start the new tween
+    if (ballSprite && validTargets.includes(ballSprite)) {
+      const ballActiveTweens = scene.tweens?.getTweensOf ? scene.tweens.getTweensOf(ballSprite) : [];
+      if (ballActiveTweens.length > 0) {
+        console.warn('🔍 [TWEEN CONFLICT] Ball has active tweens, removing from targets', {
+          playerId: sprite?.playerId,
+          action: step.action,
+          ballActiveTweensCount: ballActiveTweens.length,
+          ballActiveTweenIds: ballActiveTweens.map(t => t._animateStepId || 'no-id')
+        });
+        validTargets = validTargets.filter(t => t !== ballSprite && t !== scene.ballShadowSprite);
+      }
+    }
 
     // If no valid targets, resolve immediately
     if (validTargets.length === 0) {
@@ -416,6 +431,22 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
       });
     }
     
+    // ✅ DEBUG: Log tween targets before creation
+    const ballInTargets = validTargets.includes(ballSprite);
+    const ballHasActiveTween = ballSprite && scene.tweens?.getTweensOf ? scene.tweens.getTweensOf(ballSprite).length > 0 : false;
+    if (ballInTargets || ballHasActiveTween) {
+      console.log('🔍 [TWEEN TARGETS DEBUG]', {
+        playerId: sprite?.playerId,
+        action: step.action,
+        validTargetsCount: validTargets.length,
+        ballInTargets,
+        ballHasActiveTween,
+        ballHolderId: getBallHolderId(scene),
+        passInFlight: scene.passInFlight,
+        ballControllerInFlight: scene.ballController?.isInFlight
+      });
+    }
+    
     tween = scene.tweens.add(tweenConfig);
     tween._animateStepId = tweenId;
     
@@ -430,6 +461,21 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
       clearTimeout(timeoutId);
       resolve();
       return;
+    }
+    
+    // ✅ DEBUG: Check if tween started immediately
+    const tweenStartedImmediately = typeof tween.isPlaying === 'function' ? tween.isPlaying() : null;
+    const tweenProgressImmediately = tween.progress || 0;
+    if (tweenStartedImmediately === false || tweenProgressImmediately === 0) {
+      console.warn('🔍 [TWEEN START CHECK] Tween created but not playing immediately', {
+        playerId: sprite?.playerId,
+        action: step.action,
+        tweenStartedImmediately,
+        tweenProgressImmediately,
+        validTargetsCount: validTargets.length,
+        ballInTargets,
+        ballHasActiveTween
+      });
     }
     
     // Ensure tween starts immediately (Phaser tweens should auto-start, but verify)
