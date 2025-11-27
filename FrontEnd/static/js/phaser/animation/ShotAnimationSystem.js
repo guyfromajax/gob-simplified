@@ -284,15 +284,26 @@ export class ShotAnimationSystem {
     for (let stepIndex = 1; stepIndex < maxSteps; stepIndex++) {
       if (this.scene.skipToEnd) break;
       
-      // Update ball ownership for this step
-      this.updateBallOwnership(turnData, ballSprite, currentBallOwnerRef, stepIndex);
+      // ✅ FIX: Match playTurnAnimation - detect pass BEFORE updateBallOwnership
+      // This prevents updateBallOwnership from teleporting ball during pass animations
+      const { detectPassAtStep, handlePassAnimation } = await import('./passDetection.js');
+      const passHappeningAtThisStep = !!detectPassAtStep(turnData.animations, stepIndex);
+      
+      // ✅ FIX: Match playTurnAnimation - skip updateBallOwnership if pass is happening
+      // or if pass just completed (passInFlight is still true from previous step)
+      if (!passHappeningAtThisStep && !this.scene.passInFlight) {
+        this.updateBallOwnership(turnData, ballSprite, currentBallOwnerRef, stepIndex);
+      } else if (this.scene.passInFlight && !passHappeningAtThisStep) {
+        // Pass just completed, clear the flag now that we've skipped updateBallOwnership
+        this.scene.passInFlight = false;
+        console.log('🏀 [PASS ANIMATION] Cleared passInFlight after skipping updateBallOwnership');
+      }
       
       const promises = [];
       let shotInfo = null;
       
       // ✅ SCALABLE FIX: Use shared pass detection utility
       // This ensures passes work for HCO shots, fouls, turnovers, etc.
-      const { detectPassAtStep, handlePassAnimation } = await import('./passDetection.js');
       const passInfo = detectPassAtStep(turnData.animations, stepIndex);
       
       for (const anim of turnData.animations) {
