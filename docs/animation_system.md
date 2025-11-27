@@ -196,6 +196,98 @@ All pass animations now use a single, centralized system (`passDetection.js`) th
 
 ---
 
+### State Tracking System ✅ **CORE COMPONENT** (January 2025)
+
+**Status:** Fundamental architectural pattern - used throughout animation system
+
+State tracking is a **core component** of the animation system, following the SS&S principle of single source of truth. This pattern ensures reliable state management across turns and operations.
+
+**Core Principles:**
+
+1. **Single Source of Truth**: One place tracks state (no scattered flags or duplicate state)
+2. **Lifecycle Methods**: Explicit state transitions (start/end methods)
+3. **Scene-Level State**: Track cross-turn context on scene object
+4. **State Clearing**: Always clear state before transitions
+
+**Architecture:**
+
+#### BallController (Ball State)
+- **Purpose**: Single source of truth for ball ownership and flight state
+- **State Tracked**: `isAttached`, `isInFlight`, `isMoving`, `reason`, `currentOwner`
+- **Lifecycle Methods**: `onShotStart()`, `onShotEnd()`, `onPassStart()`, `onPassEnd()`, `onPutbackStart()`, `onPutbackEnd()`
+- **Location**: `BallController.js`
+
+**Example:**
+```javascript
+// BallController tracks ball state
+ballController.onShotStart(); // Set isInFlight = true
+// ... shot animation ...
+ballController.onShotEnd(); // Clear state before next operation
+```
+
+#### Scene-Level State (Cross-Turn Context)
+- **Purpose**: Track state that persists across multiple turns
+- **Pattern**: Store on `scene` object for easy access and debugging
+
+**Examples:**
+- `scene.currentPressureType` - Tracks FCP/HCT pressure sequences ("FCP" | "HCT" | null)
+- `scene.pressureSequenceActive` - Boolean flag for active pressure sequence
+- `scene.currentOffenseTeamId` - Current offensive team
+- `scene.gameState.ballHolder` - Ball holder ID (synchronized with BallController)
+
+**Example (FCP/HCT State Tracking):**
+```javascript
+// Set state when pressure setup detected
+if (turn.next_defensive_setup === "FCP" || turn.next_defensive_setup === "HCT") {
+  scene.currentPressureType = turn.next_defensive_setup;
+  scene.pressureSequenceActive = true;
+}
+
+// Use state for routing (simple check, no complex flag inheritance)
+const isFCPHCT = scene.pressureSequenceActive && 
+                 (turn.fcp_shot || turn.hct_shot || turn.fcp_foul || turn.hct_foul);
+
+// Clear state when sequence completes
+if (turn.result_type === "HCO" && !turn.fcp_shot && !turn.hct_shot) {
+  scene.currentPressureType = null;
+  scene.pressureSequenceActive = false;
+}
+```
+
+**Benefits:**
+- ✅ **Simple**: One state variable instead of complex flag detection
+- ✅ **Reliable**: Doesn't depend on backend flags being present
+- ✅ **Maintainable**: Easy to debug (check scene state)
+- ✅ **Consistent**: Same pattern everywhere (matches BallController)
+- ✅ **SS&S Aligned**: Single source of truth, scalable, sustainable
+
+**State Clearing Pattern:**
+Always clear state **before** transitioning to next operation:
+
+```javascript
+// ✅ CORRECT
+await completeCurrentOperation();
+this.ballController.onShotEnd(); // Clear state
+await handleNextOperation();
+
+// ❌ WRONG
+await completeCurrentOperation();
+await handleNextOperation(); // State not cleared!
+this.ballController.onShotEnd(); // Too late!
+```
+
+**Key Files:**
+- `BallController.js` - Ball state management
+- `animateGameTurns.js` - Scene-level state tracking (FCP/HCT, offense team)
+- `ballAnimationSimple.js` - Ball holder state synchronization
+
+**See:**
+- `UNIVERSAL_STATE_CLEARING_PATTERN.md` - Detailed state clearing patterns
+- `FCP_HCT_STATE_TRACKING_PROPOSAL.md` - FCP/HCT state tracking implementation
+- `Historical/BALL_ANIMATION_SYSTEM_REFACTORING_PLAN.md` - BallController state management
+
+---
+
 ### Animation Routing System ✅ **IN PROGRESS** (Phase 2.5 - January 2025)
 
 **Status:** Partially migrated - HCO turns (MAKE/MISS) now route through AnimationRouter
