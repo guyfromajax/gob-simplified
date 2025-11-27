@@ -115,18 +115,52 @@ export class ShotAnimationSystem {
    */
   async executeCompleteShotSequence(turnData) {
     const ballSprite = this.ballController.ballSprite;
+    
+    // ✅ MATCH playTurnAnimation EXACTLY: Initialize ball holder state
+    const { initializeBallHolderState, clearBallHolder } = await import('./ballAnimationSimple.js');
+    const { clearPendingOwner } = await import('./BallControllerAdapter.js');
+    initializeBallHolderState(this.scene);
+    
+    // ✅ MATCH playTurnAnimation EXACTLY: Reset scene flags
+    const fromInbound = this.scene._previousTurnWasInbound === true;
+    const fromOpeningTip = this.scene._previousTurnWasOpeningTip === true;
+    this.scene.passInFlight = false;
+    this.scene.rebounderId = null;
+    
+    // ✅ MATCH playTurnAnimation EXACTLY: Clear ball state (if not from inbound/tip)
+    if (!fromInbound && !fromOpeningTip) {
+      clearPendingOwner(this.scene);
+      clearBallHolder(this.scene);
+    }
+    
     const currentBallOwnerRef = { value: null };
     
-    // Store reference on scene for other modules
+    // ✅ MATCH playTurnAnimation EXACTLY: Store reference on scene
     this.scene.currentBallOwnerRef = currentBallOwnerRef;
     
-    // Get maximum steps across all animations
-    const maxSteps = Math.max(
-      ...turnData.animations.map(anim => anim.movement.length)
-    );
+    // ✅ MATCH playTurnAnimation EXACTLY: Calculate maxSteps (with same filtering)
+    const maxSteps = turnData.animations && turnData.animations.length > 0
+      ? Math.max(
+          ...turnData.animations
+            .filter(anim => anim.movement && Array.isArray(anim.movement))
+            .map(anim => anim.movement.length)
+        )
+      : 0;
     
     // 1. Setup: Move players to step 0 positions
     await this.runSetupTween(turnData, ballSprite, currentBallOwnerRef);
+    
+    // ✅ MATCH playTurnAnimation EXACTLY: Update ball ownership at step 0
+    const { updateBallOwnership } = await import('./BallControllerAdapter.js');
+    updateBallOwnership({
+      scene: this.scene,
+      ballSprite,
+      animations: turnData.animations,
+      playerSprites: this.playerSprites,
+      stepIndex: 0,
+      offenseTeamId: this.scene.currentOffenseTeamId ?? turnData.possession_team_id,
+      currentBallOwnerRef
+    });
     
     // 2. Determine ball owner at step 0
     let step0OwnerSprite = null;
@@ -250,14 +284,19 @@ export class ShotAnimationSystem {
           shotInfo = { step: nextStep, playerId: anim.playerId, stepIndex };
         }
         
+        // ✅ FIX: Match playTurnAnimation's animateStep call signature exactly
+        // Pass step (prev) and nextStep (curr) separately, plus stepIndex
+        // This ensures animateStep can properly calculate positions and handle actions
         const promise = animateStep({
           scene: this.scene,
           sprite,
-          step: nextStep,
+          step: prev,  // Previous step (for position calculation)
+          nextStep: curr,  // Current step (for action checking)
           duration,
           ballSprite,
           currentBallOwnerRef,
-          onAction: null // We'll handle actions separately
+          onAction: null, // We'll handle actions separately
+          stepIndex  // Pass stepIndex to identify first step
         });
         
         promises.push(promise);
