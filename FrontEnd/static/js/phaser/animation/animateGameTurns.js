@@ -909,11 +909,13 @@ export async function animateGameTurns({ //hasBallAtStep
       // ✅ FIX: FCP/HCT shot attempts (fcp_shot/hct_shot with MAKE/MISS) should route through playTurnAnimation
       // if they have skeleton animations (press break/trap break sequences), otherwise route through ShotAnimationSystem
       // FCP/HCT setup turns (FOUL, HCO, etc.) should route through playTurnAnimation
-      // NOTE: next_defensive_setup indicates what happens AFTER the shot (on inbound), not that this shot was during FCP/HCT
-      // Only fcp_shot/hct_shot flags indicate the shot itself was taken during FCP/HCT pressure
+      // NOTE: If a shot has next_defensive_setup FCP/HCT, it's likely a press break/trap break shot
+      // (they broke the pressure and shot, and now FCP/HCT will be applied on the inbound)
       const isFCPHCTShotAttempt = (turn.result_type === "MAKE" || turn.result_type === "MISS") &&
                                    (turn.fcp_shot === true || turn.hct_shot === true ||
-                                    shouldInheritFCPHCT);
+                                    shouldInheritFCPHCT ||
+                                    // If shot has next_defensive_setup FCP/HCT, treat as FCP/HCT shot attempt
+                                    (turn.next_defensive_setup === "FCP" || turn.next_defensive_setup === "HCT"));
       
       // ✅ FIX: If FCP/HCT shot attempt has skeleton animations, route through playTurnAnimation to animate them
       // Otherwise, route through ShotAnimationSystem for standard shot animation
