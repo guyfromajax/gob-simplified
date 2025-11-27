@@ -913,6 +913,20 @@ export async function animateGameTurns({ //hasBallAtStep
                                        turn.animations && 
                                        turn.animations.length > 0;
       
+      // ✅ DEBUG: Log when we determine we'll use FCP/HCT skeleton
+      if (isFCPHCTShotWithSkeleton) {
+        console.log('🎯 [FCP/HCT SKELETON DETECTED] Will animate FCP/HCT skeleton for this turn', {
+          turn_index: i,
+          pressureType,
+          result_type: turn.result_type,
+          fcp_shot: turn.fcp_shot,
+          hct_shot: turn.hct_shot,
+          animation_count: turn.animations?.length || 0,
+          has_skeleton: !!turn.skeleton,
+          will_route_to_playTurnAnimation: true
+        });
+      }
+      
       // ✅ FCP/HCT shot attempts without skeleton animations route through ShotAnimationSystem
       const isFCPHCTShotAttempt = (turn.result_type === "MAKE" || turn.result_type === "MISS") &&
                                    (turn.fcp_shot === true || turn.hct_shot === true) &&
