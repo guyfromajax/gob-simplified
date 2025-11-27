@@ -1880,6 +1880,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
     // ✅ DEBUG: Log step completion for FCP/HCT
     if (isFCPHCT) {
       const pressureType = turnData.fcp_shot || turnData.fcp_foul || turnData.next_defensive_setup === "FCP" ? 'FCP' : 'HCT';
+      const willContinue = stepIndex < maxSteps - 1;
       console.log('✅ [FCP/HCT STEP COMPLETE]', {
         turn_index: turnIndex,
         pressureType,
@@ -1887,9 +1888,22 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
         maxSteps,
         has_shot: !!shotInfo,
         has_pass: !!passInfo,
-        will_continue: stepIndex < maxSteps - 1,
-        next_step: stepIndex + 1
+        will_continue: willContinue,
+        next_step: stepIndex + 1,
+        loop_condition: `stepIndex (${stepIndex}) < maxSteps (${maxSteps})`,
+        loop_will_continue: stepIndex < maxSteps
       });
+      
+      // ✅ DEBUG: Log if loop should continue
+      if (!willContinue) {
+        console.log('🛑 [FCP/HCT LOOP ENDING]', {
+          turn_index: turnIndex,
+          pressureType,
+          stepIndex,
+          maxSteps,
+          reason: stepIndex >= maxSteps - 1 ? 'Reached maxSteps - 1' : 'Unknown'
+        });
+      }
     }
 
     // ✅ FIX: Handle passes explicitly (following shot pattern)
@@ -1897,6 +1911,19 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
     if (passInfo) {
       const passerSprite = playerSprites[passInfo.passerId];
       const receiverSprite = playerSprites[passInfo.receiverId];
+      
+      // ✅ DEBUG: Log pass handling for FCP/HCT
+      if (isFCPHCT) {
+        const pressureType = turnData.fcp_shot || turnData.fcp_foul || turnData.next_defensive_setup === "FCP" ? 'FCP' : 'HCT';
+        console.log('🏀 [FCP/HCT PASS HANDLING]', {
+          turn_index: turnIndex,
+          pressureType,
+          stepIndex,
+          maxSteps,
+          will_continue_after_pass: stepIndex < maxSteps - 1,
+          next_step: stepIndex + 1
+        });
+      }
       
       // ✅ SCALABLE FIX: Handle passes using shared utility
       // This works for all turn types (HCO shots, fouls, turnovers, etc.)
@@ -1906,6 +1933,19 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
         passInfo,
         playerSprites
       });
+      
+      // ✅ DEBUG: Log pass completion for FCP/HCT
+      if (isFCPHCT) {
+        const pressureType = turnData.fcp_shot || turnData.fcp_foul || turnData.next_defensive_setup === "FCP" ? 'FCP' : 'HCT';
+        console.log('✅ [FCP/HCT PASS COMPLETE]', {
+          turn_index: turnIndex,
+          pressureType,
+          stepIndex,
+          maxSteps,
+          will_continue: stepIndex < maxSteps - 1,
+          next_step: stepIndex + 1
+        });
+      }
     } else {
       // Debug: log when we DON'T have passInfo but might expect one
       const hasPassAction = turnData.animations.some(anim => 
