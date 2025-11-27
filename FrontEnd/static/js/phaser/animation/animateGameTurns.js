@@ -983,9 +983,9 @@ export async function animateGameTurns({ //hasBallAtStep
       );
       
       // ✅ SS&S: Clear pressure state when sequence completes
-      // Clear state when: shot attempt completes, foul occurs, turnover occurs, OR transition to HCO (next turn isn't FCP/HCT)
+      // Clear state when: shot attempt completes (and next turn isn't FCP/HCT), foul occurs, turnover occurs, OR transition to HCO (next turn isn't FCP/HCT)
       const shouldClearPressureState = 
-        (turn.result_type === "MAKE" || turn.result_type === "MISS") || // Shot attempt completed
+        ((turn.result_type === "MAKE" || turn.result_type === "MISS") && !nextTurnIsFCPHCT) || // Shot attempt completed, but next turn isn't FCP/HCT
         (turn.result_type === "HCO" && !nextTurnIsFCPHCT) || // Pressure broken, transition to HCO (next turn isn't FCP/HCT)
         turn.fcp_foul === true || turn.hct_foul === true || // Foul occurred
         turn.result_type === "TURNOVER"; // Turnover occurred
