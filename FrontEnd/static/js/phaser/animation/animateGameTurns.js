@@ -491,6 +491,18 @@ export async function animateGameTurns({ //hasBallAtStep
   
   for (let i = 0; i < turns.length; i++) {
     const turn = turns[i];
+    
+    // ✅ DEBUG: Log state at start of each turn (to trace state persistence)
+    if (i > 0 && (turn.result_type === "MAKE" || turn.result_type === "MISS")) {
+      console.log('🔍 [TURN START - STATE CHECK]', {
+        turn_index: i,
+        result_type: turn.result_type,
+        currentPressureType: scene.currentPressureType,
+        pressureSequenceActive: scene.pressureSequenceActive,
+        previous_turn_index: i - 1,
+        previous_turn_result_type: turns[i - 1]?.result_type
+      });
+    }
     if (scene.skipToEnd) break;
     
     // Removed verbose turn processing log
