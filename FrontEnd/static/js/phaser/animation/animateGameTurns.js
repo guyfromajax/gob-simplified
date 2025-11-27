@@ -1227,11 +1227,12 @@ export async function animateGameTurns({ //hasBallAtStep
       const previousTurn = i > 0 ? turns[i - 1] : null;
       const wasDefensiveStop = previousTurn?.result_type === "DEFENSIVE_STOP" && previousTurn?.fast_break === true;
       // ✅ FIX: Exclude FCP/HCT turns from HCO routing (they should be handled by FCP/HCT check above)
-      // Include inherited FCP/HCT context to prevent FCP/HCT shot attempts from being routed as HCO
+      // ✅ SS&S: Use state-based detection to prevent FCP/HCT shot attempts from being routed as HCO
+      // Check both turn flags and scene state (state-based detection)
       const isFCPHCTTurn = turn.fcp_shot === true || turn.hct_shot === true || 
                            turn.next_defensive_setup === "FCP" || turn.next_defensive_setup === "HCT" ||
                            turn.fcp_foul === true || turn.hct_foul === true ||
-                           shouldInheritFCPHCT; // ✅ FIX: Include inherited context
+                           scene.pressureSequenceActive; // ✅ SS&S: Use scene state instead of inheritance logic
       const isHCO = !turn.fast_break && !isFCPHCTTurn && (turn.result_type === "MAKE" || turn.result_type === "MISS");
       
       // ✅ DEBUG: Log when entering HCO instance (with fireworks emoji)
