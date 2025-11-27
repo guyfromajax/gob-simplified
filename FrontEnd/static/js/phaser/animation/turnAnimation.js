@@ -1761,6 +1761,24 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
       // The sprite's current position (sprite.x, sprite.y) is where it actually is,
       // which may be from the end of the previous turn or from a previous step
       const duration = getPlayerDuration(sprite, targetX, targetY);
+      
+      // ✅ DEBUG: Log player movement animation for FCP/HCT
+      if (isFCPHCT) {
+        const pressureType = turnData.fcp_shot || turnData.fcp_foul || turnData.next_defensive_setup === "FCP" ? 'FCP' : 'HCT';
+        const distance = Phaser.Math.Distance.Between(sprite.x, sprite.y, targetX, targetY);
+        console.log('👟 [FCP/HCT PLAYER MOVEMENT]', {
+          turn_index: turnIndex,
+          pressureType,
+          stepIndex,
+          playerId: anim.playerId,
+          action: nextStep.action,
+          currentPos: { x: sprite.x, y: sprite.y },
+          targetPos: { x: targetX, y: targetY },
+          distance,
+          duration,
+          will_animate: duration > 0
+        });
+      }
 
       DEBUG && animationDebugLog('[turn]', turnData?.id, step.timestamp, nextStep.timestamp, duration, {
         currentPos: { x: sprite.x, y: sprite.y },
@@ -1950,7 +1968,32 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
         isAudible = true;
       }
       
+      // ✅ DEBUG: Log before calling shootBall for FCP/HCT
+      if (isFCPHCT) {
+        const pressureType = turnData.fcp_shot || turnData.fcp_foul || turnData.next_defensive_setup === "FCP" ? 'FCP' : 'HCT';
+        console.log('🏀 [FCP/HCT ABOUT TO SHOOT] Calling shootBall', {
+          turn_index: turnIndex,
+          pressureType,
+          stepIndex: shotInfo.stepIndex,
+          shooterId: shotInfo.playerId,
+          result_type: turnData.result_type,
+          fromCoords: shootParams.fromCoords
+        });
+      }
+      
       const shotResult = await shootBall(shootParams);
+      
+      // ✅ DEBUG: Log after shootBall returns for FCP/HCT
+      if (isFCPHCT) {
+        const pressureType = turnData.fcp_shot || turnData.fcp_foul || turnData.next_defensive_setup === "FCP" ? 'FCP' : 'HCT';
+        console.log('🏀 [FCP/HCT SHOOT COMPLETE] shootBall returned', {
+          turn_index: turnIndex,
+          pressureType,
+          result_type: turnData.result_type,
+          ballSpot: shotResult?.grid,
+          will_handle_made_miss: true
+        });
+      }
       
       // Clear audible text after shot animation completes
       if (isAudible && typeof window.updateActivePlayersDisplay === 'function') {
