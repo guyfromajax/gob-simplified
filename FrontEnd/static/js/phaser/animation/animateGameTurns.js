@@ -805,16 +805,16 @@ export async function animateGameTurns({ //hasBallAtStep
     // ✅ FIX: Check for FCP/HCT BEFORE TURNOVER to prevent FCP/HCT turns from being misrouted
     // FCP/HCT turns can have result_type === "TURNOVER" if there's a turnover during pressure
     // Also check if previous turn was an FCP/HCT shot attempt - the next turn should inherit FCP/HCT context
-    const prevWasFCPHCTShotAttempt = previousTurn && 
-                                     (previousTurn.result_type === "MAKE" || previousTurn.result_type === "MISS") &&
-                                     (previousTurn.fcp_shot === true || previousTurn.hct_shot === true || 
-                                      previousTurn.next_defensive_setup === "FCP" || previousTurn.next_defensive_setup === "HCT");
-    // ✅ FIX: Also check if previous turn had FCP/HCT setup (HCO, FOUL, etc.) and this turn is a shot
+    // ✅ FIX: Check if previous turn had FCP/HCT setup (HCO, FOUL, etc.) and this turn is a shot
     // This handles press break shots where backend might not set fcp_shot/hct_shot flags
+    // NOTE: Do NOT check if previous turn was an FCP/HCT shot attempt - after a shot attempt, pressure ends
     const prevHadFCPHCTSetupForShot = previousTurn && 
                                       (previousTurn.next_defensive_setup === "FCP" || previousTurn.next_defensive_setup === "HCT" ||
-                                       previousTurn.fcp_foul === true || previousTurn.hct_foul === true ||
-                                       previousTurn.fcp_shot === true || previousTurn.hct_shot === true);
+                                       previousTurn.fcp_foul === true || previousTurn.hct_foul === true) &&
+                                      // Exclude previous turns that were shot attempts - pressure ends after shot
+                                      !(previousTurn.fcp_shot === true || previousTurn.hct_shot === true ||
+                                        ((previousTurn.result_type === "MAKE" || previousTurn.result_type === "MISS") &&
+                                         (previousTurn.fcp_shot === true || previousTurn.hct_shot === true)));
     const isShotAfterFCPHCTSetup = prevHadFCPHCTSetupForShot && 
                                    (turn.result_type === "MAKE" || turn.result_type === "MISS") &&
                                    !turn.fcp_shot && !turn.hct_shot;
@@ -826,7 +826,7 @@ export async function animateGameTurns({ //hasBallAtStep
                                       prevHadFCPHCTSetupForShot &&
                                       !turn.fcp_shot && !turn.hct_shot;
     
-    const shouldInheritFCPHCT = (prevWasFCPHCTShotAttempt || isShotAfterFCPHCTSetup || isShotWithFCPHCTNextSetup) && 
+    const shouldInheritFCPHCT = (isShotAfterFCPHCTSetup || isShotWithFCPHCTNextSetup) && 
                                  !turn.fcp_shot && !turn.hct_shot;
     
     const isFCPHCT = turn.fcp_shot === true || turn.hct_shot === true || 
