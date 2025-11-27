@@ -2027,38 +2027,56 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
           ballController.onShotEnd();
         }
         
-        // Check if there's a free throw coming (AND-1 or technical foul)
-        // In turn-by-turn mode, check turnData.free_throws_remaining
-        // In batch mode, check next turn in array
-        const nextTurn = simData?.turns?.[scene.currentTurn + 1];
-        const hasPendingFreeThrow =
-          nextTurn?.result_type === "FREE_THROW" ||
-          (turnData.free_throws_remaining && turnData.free_throws_remaining > 0);
+        // ✅ CRITICAL FIX: For FCP/HCT shot attempts, DON'T call runInboundSetup() here
+        // The main loop in animateGameTurns.js will handle the next turn (FCP/HCT press break sequence)
+        // runInboundSetup() is only needed for non-FCP/HCT shots (HCO shots)
+        // FCP/HCT shots should let the main loop process the next turn, which will be the FCP/HCT press break
+        const isFCPHCTShot = isFCPHCT && (turnData.fcp_shot === true || turnData.hct_shot === true);
         
-        if (!hasPendingFreeThrow && !hasPutbackMake) {
-          const shooterTeamIsHome =
-            String(shooterTeamId) === String(homeTeamId);
-          const newOffenseSide = shooterTeamIsHome ? "away" : "home";
-          
-          // Check if FCP/HCT is coming next - if so, skip retreat animation
-          const skipRetreat = turnData.next_defensive_setup === "FCP" || turnData.next_defensive_setup === "HCT";
-          const pressureType = skipRetreat ? turnData.next_defensive_setup : null;
-          if (skipRetreat) {
-            // Skip defensive retreat for FCP/HCT
-          }
-          
-          const releaseGuard = createTransitionGuard(scene.stateMachine, [States.Rebound]);
-          await runInboundSetup({
-            scene,
-            ballSprite,
-            playerSprites,
-            newOffenseSide,
-            homeTeamId,
-            awayTeamId,
-            skipRetreat,
+        if (isFCPHCTShot) {
+          // For FCP/HCT shot attempts, skip runInboundSetup() - let main loop handle next turn
+          const pressureType = turnData.fcp_shot || turnData.fcp_foul || turnData.next_defensive_setup === "FCP" ? 'FCP' : 'HCT';
+          console.log('🏀 [FCP/HCT MADE SHOT] Skipping runInboundSetup - main loop will handle next turn (FCP/HCT press break)', {
+            turn_index: turnIndex,
             pressureType,
+            result_type: turnData.result_type,
+            next_defensive_setup: turnData.next_defensive_setup
           });
-          releaseGuard?.();
+        } else {
+          // For non-FCP/HCT shots (HCO shots), call runInboundSetup() as before
+          // Check if there's a free throw coming (AND-1 or technical foul)
+          // In turn-by-turn mode, check turnData.free_throws_remaining
+          // In batch mode, check next turn in array
+          const nextTurn = simData?.turns?.[scene.currentTurn + 1];
+          const hasPendingFreeThrow =
+            nextTurn?.result_type === "FREE_THROW" ||
+            (turnData.free_throws_remaining && turnData.free_throws_remaining > 0);
+          
+          if (!hasPendingFreeThrow && !hasPutbackMake) {
+            const shooterTeamIsHome =
+              String(shooterTeamId) === String(homeTeamId);
+            const newOffenseSide = shooterTeamIsHome ? "away" : "home";
+            
+            // Check if FCP/HCT is coming next - if so, skip retreat animation
+            const skipRetreat = turnData.next_defensive_setup === "FCP" || turnData.next_defensive_setup === "HCT";
+            const pressureType = skipRetreat ? turnData.next_defensive_setup : null;
+            if (skipRetreat) {
+              // Skip defensive retreat for FCP/HCT
+            }
+            
+            const releaseGuard = createTransitionGuard(scene.stateMachine, [States.Rebound]);
+            await runInboundSetup({
+              scene,
+              ballSprite,
+              playerSprites,
+              newOffenseSide,
+              homeTeamId,
+              awayTeamId,
+              skipRetreat,
+              pressureType,
+            });
+            releaseGuard?.();
+          }
         }
       } else if (ballSpot) {
         const rebounderId =
