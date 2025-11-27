@@ -970,11 +970,23 @@ export async function animateGameTurns({ //hasBallAtStep
         });
       }
       
+      // ✅ DEBUG: Log FCP/HCT animation completion and outcome
+      const nextTurn = i + 1 < turns.length ? turns[i + 1] : null;
+      
+      // ✅ FIX: Only clear pressure state when next turn doesn't have FCP/HCT flags
+      // Don't clear on current turn's result_type === "HCO" - that's just the outcome, not the end of sequence
+      // The sequence ends when the NEXT turn doesn't have FCP/HCT flags
+      const nextTurnIsFCPHCT = nextTurn && (
+        nextTurn.fcp_shot === true || nextTurn.hct_shot === true ||
+        nextTurn.fcp_foul === true || nextTurn.hct_foul === true ||
+        nextTurn.next_defensive_setup === "FCP" || nextTurn.next_defensive_setup === "HCT"
+      );
+      
       // ✅ SS&S: Clear pressure state when sequence completes
-      // Clear state when: shot attempt completes, foul occurs, turnover occurs, or transition to HCO
+      // Clear state when: shot attempt completes, foul occurs, turnover occurs, OR transition to HCO (next turn isn't FCP/HCT)
       const shouldClearPressureState = 
         (turn.result_type === "MAKE" || turn.result_type === "MISS") || // Shot attempt completed
-        (turn.result_type === "HCO" && !turn.fcp_shot && !turn.hct_shot) || // Pressure broken, transition to HCO
+        (turn.result_type === "HCO" && !nextTurnIsFCPHCT) || // Pressure broken, transition to HCO (next turn isn't FCP/HCT)
         turn.fcp_foul === true || turn.hct_foul === true || // Foul occurred
         turn.result_type === "TURNOVER"; // Turnover occurred
       
@@ -983,16 +995,15 @@ export async function animateGameTurns({ //hasBallAtStep
           turn_index: i,
           result_type: turn.result_type,
           previousPressureType: scene.currentPressureType,
+          nextTurnIsFCPHCT,
+          nextTurnResultType: nextTurn?.result_type || null,
           reason: turn.result_type === "MAKE" || turn.result_type === "MISS" ? 'shot completed' :
-                  turn.result_type === "HCO" ? 'pressure broken' :
+                  turn.result_type === "HCO" ? `pressure broken (next turn is not FCP/HCT: ${!nextTurnIsFCPHCT})` :
                   turn.fcp_foul || turn.hct_foul ? 'foul occurred' : 'turnover occurred'
         });
         scene.currentPressureType = null;
         scene.pressureSequenceActive = false;
       }
-      
-      // ✅ DEBUG: Log FCP/HCT animation completion and outcome
-      const nextTurn = i + 1 < turns.length ? turns[i + 1] : null;
       console.log('✅ [FCP/HCT ANIMATION COMPLETE]', {
         turn_index: i,
         pressureType,
