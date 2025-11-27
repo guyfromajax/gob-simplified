@@ -1693,6 +1693,26 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
     turnDataKeys: Object.keys(turnData).filter(k => k.includes('fcp') || k.includes('hct') || k.includes('defensive'))
   });
 
+  // ✅ CRITICAL FIX: Kill all ball tweens before starting step loop
+  // Lingering ball tweens from previous shots/passes can block the tween manager
+  // This is especially important for FCP/HCT turns that come after shots
+  if (ballSprite && scene.tweens) {
+    const ballActiveTweens = scene.tweens.getTweensOf ? scene.tweens.getTweensOf(ballSprite) : [];
+    if (ballActiveTweens.length > 0) {
+      console.warn('🔧 [BALL TWEEN CLEANUP] Killing lingering ball tweens before step loop', {
+        ballActiveTweensCount: ballActiveTweens.length,
+        ballActiveTweenIds: ballActiveTweens.map(t => t._animateStepId || 'no-id'),
+        isFCPHCT: isFCPHCT,
+        pressureType: scene.currentPressureType
+      });
+      scene.tweens.killTweensOf(ballSprite);
+      // Also kill ball shadow tweens if they exist
+      if (scene.ballShadowSprite) {
+        scene.tweens.killTweensOf(scene.ballShadowSprite);
+      }
+    }
+  }
+
   for (let stepIndex = 1; stepIndex < maxSteps; stepIndex++) {
     // ✅ DEBUG: Log at the very start of each loop iteration
     console.log('🔍 [LOOP ITERATION START]', {
