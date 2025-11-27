@@ -909,8 +909,10 @@ export async function animateGameTurns({ //hasBallAtStep
       // ✅ FIX: ALL FCP/HCT shot attempts should route through playTurnAnimation
       // This matches HCO's approach: playTurnAnimation handles skeleton animations AND the shot via shootBall()
       // Even if backend fails to provide skeleton animations, playTurnAnimation can still handle the shot
+      // ✅ FIX: Also check next_defensive_setup for shot attempts (backend may not set fcp_shot/hct_shot flags)
       const isFCPHCTShotAttempt = (turn.result_type === "MAKE" || turn.result_type === "MISS") &&
-                                   (turn.fcp_shot === true || turn.hct_shot === true);
+                                   (turn.fcp_shot === true || turn.hct_shot === true ||
+                                    turn.next_defensive_setup === "FCP" || turn.next_defensive_setup === "HCT");
       
       // ✅ DEBUG: Log when we determine we'll use FCP/HCT skeleton
       if (isFCPHCTShotAttempt) {
