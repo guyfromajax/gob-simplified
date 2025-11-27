@@ -315,7 +315,41 @@ The animation routing system provides a unified entry point for all turn animati
 **Current Migration Status:**
 - ✅ **Phase 2.4**: FCP/HCT foul turns migrated (December 2024)
 - ✅ **Phase 2.5**: Standard HCO turns (MAKE/MISS) migrated (January 2025)
+- ✅ **Phase 2.6**: FCP/HCT shot attempts migrated (January 2025) - Same structure as HCO shots!
 - ⏳ **Pending**: Other turn types still use legacy `playTurnAnimation()` path
+
+**Current Routing Flow:**
+
+**✅ Migrated (through AnimationRouter):**
+1. **HCO shots (MAKE/MISS)** → `AnimationRouter` → `AnimationEngine` → `ShotAnimationSystem`
+   - Standard half-court offense shots
+   - Handles player movement, ball flight, rebounds, and DREB outlet passes
+   
+2. **FCP/HCT shots (MAKE/MISS)** → `AnimationRouter` → `AnimationEngine` → `ShotAnimationSystem`
+   - FCP/HCT shot attempts (press break + shot)
+   - **Same structure as HCO shots**: skeleton animation + shot
+   - Both loop through `turnData.animations` steps, handle passes, then shoot
+   
+3. **FCP/HCT fouls** → `AnimationRouter` → `AnimationEngine` → `handleDefault()` → `playTurnAnimation()`
+   - Fouls that occur during FCP/HCT pressure sequences
+
+**✅ Migrated (through AnimationRouter):**
+3. **FCP/HCT shots** → `AnimationRouter` → `AnimationEngine` → `ShotAnimationSystem`
+   - **Why**: FCP/HCT shots are structured identically to HCO shots
+   - Both use skeleton animations from `turnData.animations` array
+   - Both loop through steps, handle passes, then shoot
+   - `ShotAnimationSystem` handles both identically
+   - **Status**: ✅ Migrated (January 2025)
+
+**⏳ Not Yet Migrated (direct calls):**
+   
+2. **FCP/HCT setup turns** → `playTurnAnimation()` directly
+   - Setup turns that establish FCP/HCT pressure (before shot attempts)
+   - Animate press/trap setup sequences
+   
+3. **Fast Break** → `runFastBreakSequence()` directly
+4. **OREB shot attempts** → `handleOrebTurn()` directly
+5. **Other turn types** → Various direct handlers
 
 **Benefits:**
 - ✅ Single entry point for all animations
@@ -329,7 +363,7 @@ The animation routing system provides a unified entry point for all turn animati
 - `AnimationEngine.js` - Turn routing logic
 - `turnPreparation.js` - Pre/post setup utilities
 - `ShotAnimationSystem.js` - HCO shot handler
-- `playTurnAnimation()` - Legacy handler (still used for non-migrated turn types)
+- `playTurnAnimation()` - Legacy handler (still used for FCP/HCT and non-migrated turn types)
 
 **See:**
 - `FRONTEND_ORCHESTRATION_CONSOLIDATION_PLAN.md` - Overall migration plan
