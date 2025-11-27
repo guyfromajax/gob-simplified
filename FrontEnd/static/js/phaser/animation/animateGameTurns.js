@@ -914,49 +914,23 @@ export async function animateGameTurns({ //hasBallAtStep
         isFCPHCTShotAttempt
       });
       
-      // ✅ FIX: Route ALL FCP/HCT shot attempts through playTurnAnimation (matches FCP/HCT setup turns)
-      // ShotAnimationSystem doesn't handle FCP/HCT skeleton animations - it's designed for HCO shots
-      // playTurnAnimation properly animates the press break skeleton sequence, then handles the shot
+      // ✅ FIX: Route FCP/HCT shot attempts through AnimationRouter (same as HCO shots)
+      // FCP/HCT shots are structured the same as HCO shots: skeleton animation + shot
+      // ShotAnimationSystem handles both identically - both loop through skeleton steps, handle passes, then shoot
       if (isFCPHCTShotAttempt) {
-        console.log('🎬 [FCP/HCT SHOT ATTEMPT] Routing through playTurnAnimation', {
+        console.log('🎬 [FCP/HCT SHOT ATTEMPT] Routing through AnimationRouter → ShotAnimationSystem', {
           turn_index: i,
           pressureType,
           result_type: turn.result_type,
           fcp_shot: turn.fcp_shot,
           hct_shot: turn.hct_shot,
           animation_count: turn.animations?.length || 0,
-          note: 'playTurnAnimation animates skeleton (press break) then handles shot via shootBall()'
+          note: 'FCP/HCT shots use same structure as HCO shots: skeleton animation + shot'
         });
         
-        await playTurnAnimation({
-          scene,
-          simData,
-          playerSprites,
-          turnData: turn,
-          ballSprite,
-          onUpdate,
-          turnIndex: i,
-          onAction: async (action, sprite, timestamp) => {
-            if (DEBUG_FLOW || debugEnabled)
-              logVerbose(
-                `🎬 Action "${action}" fired at ${timestamp}ms for sprite:`,
-                sprite
-              );
-          },
-        });
-        
-        // After skeleton animation and shot complete, handle shot result (announcements, score updates)
-        // Note: playTurnAnimation already handles made/missed shot logic (inbound setup, rebounds, etc.)
-        // We just need to handle announcements and score updates here
-        announceFromTurnData(turn, 'end', scene.simData?.home_team_id, scene);
-        if (onUpdate) {
-          try {
-            onUpdate(turn);
-          } catch (err) {
-            console.error('Scoreboard update failed:', err);
-          }
-        }
-        updateDebugScore(turn, { turnIndex: i, possessionId });
+        turn.index = i;
+        await animationRouter.processTurn(turn);
+        // Note: announceFromTurnData, onUpdate, and updateDebugScore are handled by AnimationRouter
         continue;
       } else {
         // FCP/HCT setup turns (FOUL, HCO, etc.) route through playTurnAnimation
