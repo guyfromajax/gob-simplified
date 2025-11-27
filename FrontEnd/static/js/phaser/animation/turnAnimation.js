@@ -1676,11 +1676,29 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
         movement_length: a.movement?.length || 0,
         first_step_action: a.movement?.[0]?.action,
         last_step_action: a.movement?.[a.movement.length - 1]?.action
-      })) || []
+      })) || [],
+      skipToEnd: scene.skipToEnd,
+      isFastBreak: scene.stateMachine?.is(States.FastBreak)
     });
   }
 
+  // ✅ DEBUG: Log immediately before loop starts
+  console.log('🔍 [BEFORE STEP LOOP]', {
+    maxSteps,
+    will_enter_loop: maxSteps > 1,
+    skipToEnd: scene.skipToEnd,
+    isFastBreak: scene.stateMachine?.is(States.FastBreak)
+  });
+
   for (let stepIndex = 1; stepIndex < maxSteps; stepIndex++) {
+    // ✅ DEBUG: Log at the very start of each loop iteration
+    console.log('🔍 [LOOP ITERATION START]', {
+      stepIndex,
+      maxSteps,
+      condition: `${stepIndex} < ${maxSteps} = ${stepIndex < maxSteps}`,
+      skipToEnd: scene.skipToEnd,
+      isFastBreak: scene.stateMachine?.is(States.FastBreak)
+    });
     // ✅ FIX: Allow FCP/HCT turns to proceed even if state is FastBreak
     // FCP/HCT turns can occur after fast breaks (e.g., press break after fast break shot)
     const isFCPHCTTurnForStepLoop = turnData.fcp_shot === true || turnData.hct_shot === true ||
