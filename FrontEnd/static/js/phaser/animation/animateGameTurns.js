@@ -1259,6 +1259,17 @@ export async function animateGameTurns({ //hasBallAtStep
                            shouldInheritFCPHCT; // ✅ FIX: Include inherited context
       const isHCO = !turn.fast_break && !isFCPHCTTurn && (turn.result_type === "MAKE" || turn.result_type === "MISS");
       
+      // ✅ DEBUG: Log when entering HCO instance (with fireworks emoji)
+      if (isHCO) {
+        console.log('🎆🎆🎆 ENTERING HCO INSTANCE 🎆🎆🎆', {
+          turn_index: i,
+          result_type: turn.result_type,
+          fast_break: turn.fast_break,
+          isFCPHCTTurn: isFCPHCTTurn,
+          willRouteToAnimationRouter: true
+        });
+      }
+      
       // 🔍 DIAGNOSTIC: Log HCO-specific info
       if (typeof window !== 'undefined' && window.ROUTER_DEBUG) {
         console.log('🔍 [DIAGNOSTIC HCO] Turn', i, {
