@@ -2027,56 +2027,73 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
           ballController.onShotEnd();
         }
         
-        // ✅ CRITICAL FIX: For FCP/HCT shot attempts, DON'T call runInboundSetup() here
-        // The main loop in animateGameTurns.js will handle the next turn (FCP/HCT press break sequence)
-        // runInboundSetup() is only needed for non-FCP/HCT shots (HCO shots)
-        // FCP/HCT shots should let the main loop process the next turn, which will be the FCP/HCT press break
-        const isFCPHCTShot = isFCPHCT && (turnData.fcp_shot === true || turnData.hct_shot === true);
+        // ✅ FIX: Match HCO's approach - call runInboundSetup() if next_play_type is BASELINE_INBOUND
+        // This works for both HCO shots and FCP/HCT shots
+        // For AND-1 situations (next_play_type === "FREE_THROW"), let the free throw system handle the transition
+        const nextTurn = simData?.turns?.[scene.currentTurn + 1];
+        const hasPendingFreeThrow =
+          nextTurn?.result_type === "FREE_THROW" ||
+          (turnData.free_throws_remaining && turnData.free_throws_remaining > 0);
         
-        if (isFCPHCTShot) {
-          // For FCP/HCT shot attempts, skip runInboundSetup() - let main loop handle next turn
-          const pressureType = turnData.fcp_shot || turnData.fcp_foul || turnData.next_defensive_setup === "FCP" ? 'FCP' : 'HCT';
-          console.log('🏀 [FCP/HCT MADE SHOT] Skipping runInboundSetup - main loop will handle next turn (FCP/HCT press break)', {
-            turn_index: turnIndex,
-            pressureType,
-            result_type: turnData.result_type,
-            next_defensive_setup: turnData.next_defensive_setup
-          });
-        } else {
-          // For non-FCP/HCT shots (HCO shots), call runInboundSetup() as before
-          // Check if there's a free throw coming (AND-1 or technical foul)
-          // In turn-by-turn mode, check turnData.free_throws_remaining
-          // In batch mode, check next turn in array
-          const nextTurn = simData?.turns?.[scene.currentTurn + 1];
-          const hasPendingFreeThrow =
-            nextTurn?.result_type === "FREE_THROW" ||
-            (turnData.free_throws_remaining && turnData.free_throws_remaining > 0);
+        if (!hasPendingFreeThrow && !hasPutbackMake && turnData.next_play_type === "BASELINE_INBOUND") {
+          // ✅ CRITICAL: After a made shot, possession flips:
+          // - Team that just scored (was on offense) is now on DEFENSE
+          // - Team that was on defense is now on OFFENSE
+          // - newOffenseSide is the team that is NOW on offense (the team that was defending)
+          // - The defensive team (team that just scored) will apply FCP/HCT pressure
+          // - Backend determines FCP/HCT based on the team that just scored (now on defense)
+          // - Frontend receives next_defensive_setup from backend, so we use the correct team's settings
+          const shooterTeamIsHome =
+            String(shooterTeamId) === String(homeTeamId);
+          const newOffenseSide = shooterTeamIsHome ? "away" : "home";
           
-          if (!hasPendingFreeThrow && !hasPutbackMake) {
-            const shooterTeamIsHome =
-              String(shooterTeamId) === String(homeTeamId);
-            const newOffenseSide = shooterTeamIsHome ? "away" : "home";
-            
-            // Check if FCP/HCT is coming next - if so, skip retreat animation
-            const skipRetreat = turnData.next_defensive_setup === "FCP" || turnData.next_defensive_setup === "HCT";
-            const pressureType = skipRetreat ? turnData.next_defensive_setup : null;
-            if (skipRetreat) {
-              // Skip defensive retreat for FCP/HCT
-            }
-            
-            const releaseGuard = createTransitionGuard(scene.stateMachine, [States.Rebound]);
-            await runInboundSetup({
-              scene,
-              ballSprite,
-              playerSprites,
-              newOffenseSide,
-              homeTeamId,
-              awayTeamId,
+          // Check if FCP/HCT is coming next - if so, skip retreat animation
+          const skipRetreat = turnData.next_defensive_setup === "FCP" || turnData.next_defensive_setup === "HCT";
+          const pressureType = skipRetreat ? turnData.next_defensive_setup : null;
+          
+          // ✅ DEBUG: Log inbound setup for FCP/HCT shots
+          if (isFCPHCT) {
+            const fcpHctType = turnData.fcp_shot || turnData.fcp_foul || turnData.next_defensive_setup === "FCP" ? 'FCP' : 'HCT';
+            console.log('🏀 [FCP/HCT MADE SHOT] Calling runInboundSetup (matching HCO approach)', {
+              turn_index: turnIndex,
+              fcpHctType,
+              result_type: turnData.result_type,
+              next_play_type: turnData.next_play_type,
+              next_defensive_setup: turnData.next_defensive_setup,
               skipRetreat,
               pressureType,
+              newOffenseSide
             });
-            releaseGuard?.();
           }
+          
+          const releaseGuard = createTransitionGuard(scene.stateMachine, [States.Rebound]);
+          await runInboundSetup({
+            scene,
+            ballSprite,
+            playerSprites,
+            newOffenseSide,
+            homeTeamId,
+            awayTeamId,
+            skipRetreat,
+            pressureType,
+          });
+          releaseGuard?.();
+          
+          if (isFCPHCT) {
+            console.log('🏀 [FCP/HCT MADE SHOT] Inbound setup completed - next turn should be FCP/HCT press break');
+          }
+        } else if (isFCPHCT && !hasPendingFreeThrow && !hasPutbackMake) {
+          // ✅ DEBUG: Log when we skip runInboundSetup for FCP/HCT (e.g., if next_play_type is not BASELINE_INBOUND)
+          const fcpHctType = turnData.fcp_shot || turnData.fcp_foul || turnData.next_defensive_setup === "FCP" ? 'FCP' : 'HCT';
+          console.log('🏀 [FCP/HCT MADE SHOT] Skipping runInboundSetup', {
+            turn_index: turnIndex,
+            fcpHctType,
+            result_type: turnData.result_type,
+            next_play_type: turnData.next_play_type,
+            hasPendingFreeThrow,
+            hasPutbackMake,
+            reason: 'next_play_type is not BASELINE_INBOUND or has pending free throw/putback'
+          });
         }
       } else if (ballSpot) {
         const rebounderId =
