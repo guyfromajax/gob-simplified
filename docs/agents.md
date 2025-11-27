@@ -1,6 +1,8 @@
 
 # 🧠 GOB Agents Reference (`agents.md`)
 
+MACRO OBJECTIVE: We need to build a game engine that is simple, stable, and scalable (SS&S). Use the SS&S lens in every projet you undertake, every file you build, and evey solution you develop. That is the most important component to building this game engine.
+
 This file documents key game engine agents, roles, and architectural logic used by the Geeked Out Basketball simulation engine. It exists to help Codex, collaborators, and future developers reason about the system consistently.
 
 ---
@@ -30,6 +32,24 @@ Each team has 5 active players:
 ---
 
 ## 🧩 Core Animation System
+
+### State Tracking (Core SS&S Pattern)
+**State tracking is a fundamental component of the animation system.** Use single source of truth pattern for any state that persists across turns or operations.
+
+**Principles:**
+- **Single Source of Truth**: One place tracks state (e.g., `BallController` for ball state, `scene.currentPressureType` for FCP/HCT)
+- **Lifecycle Methods**: Use explicit state transitions (e.g., `onShotStart()`, `onShotEnd()`)
+- **Scene-Level State**: Track cross-turn context on scene object (e.g., `scene.currentPressureType`, `scene.currentOffenseTeamId`)
+- **State Clearing**: Always clear state before transitions (prevents stale state bugs)
+
+**Examples:**
+- `BallController` - Single source of truth for ball ownership and flight state
+- `scene.currentPressureType` - Tracks FCP/HCT pressure sequences
+- `scene.gameState.ballHolder` - Tracks which player has the ball
+
+**See:** `animation_system.md` for detailed state tracking patterns and examples.
+
+---
 
 ### `capture_halfcourt_animation()`
 Backend method that builds the animation packet for each turn.
