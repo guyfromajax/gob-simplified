@@ -281,6 +281,23 @@ export class ShotAnimationSystem {
   async animatePlayerMovement(turnData, ballSprite, currentBallOwnerRef, maxSteps) {
     if (this.scene.skipToEnd) return;
     
+    // ✅ CRITICAL FIX: Kill all ball tweens before starting step loop
+    // Lingering ball tweens from previous shots/passes can block the tween manager
+    if (ballSprite && this.scene.tweens) {
+      const ballActiveTweens = this.scene.tweens.getTweensOf ? this.scene.tweens.getTweensOf(ballSprite) : [];
+      if (ballActiveTweens.length > 0) {
+        console.warn('🔧 [BALL TWEEN CLEANUP] Killing lingering ball tweens before step loop (ShotAnimationSystem)', {
+          ballActiveTweensCount: ballActiveTweens.length,
+          ballActiveTweenIds: ballActiveTweens.map(t => t._animateStepId || 'no-id')
+        });
+        this.scene.tweens.killTweensOf(ballSprite);
+        // Also kill ball shadow tweens if they exist
+        if (this.scene.ballShadowSprite) {
+          this.scene.tweens.killTweensOf(this.scene.ballShadowSprite);
+        }
+      }
+    }
+    
     for (let stepIndex = 1; stepIndex < maxSteps; stepIndex++) {
       if (this.scene.skipToEnd) break;
       
