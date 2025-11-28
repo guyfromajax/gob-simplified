@@ -492,6 +492,42 @@ export async function animateGameTurns({ //hasBallAtStep
   for (let i = 0; i < turns.length; i++) {
     const turn = turns[i];
     
+    // ✅ HARDCODED FIX: If we're in an active pressure sequence and current turn is a shot attempt,
+    // convert it to FOUL - PRESS! setup turn (matches OREB/Free Throw pattern)
+    // This handles the case where backend generates a shot attempt instead of setup turn after made HCO shot
+    if (scene.pressureSequenceActive && 
+        (scene.currentPressureType === "FCP" || scene.currentPressureType === "HCT") &&
+        (turn.result_type === "MAKE" || turn.result_type === "MISS") &&
+        !turn.fcp_shot && !turn.hct_shot && 
+        !turn.fcp_foul && !turn.hct_foul &&
+        turn.next_defensive_setup !== "FCP" && turn.next_defensive_setup !== "HCT") {
+      console.log('🔧 [HARDCODED FIX] Converting turn from shot attempt to FOUL - PRESS! setup turn', {
+        turn_index: i,
+        current_turn_result_type_before: turn.result_type,
+        current_turn_result_type_after: 'FOUL',
+        pressureSequenceActive: scene.pressureSequenceActive,
+        currentPressureType: scene.currentPressureType,
+        reason: 'Backend generated shot attempt instead of setup turn - hardcoding to match working pattern'
+      });
+      
+      // Convert current turn to FOUL - PRESS! setup turn
+      turn.result_type = "FOUL";
+      if (scene.currentPressureType === "FCP") {
+        turn.fcp_foul = true;
+        turn.hct_foul = false;
+      } else {
+        turn.fcp_foul = false;
+        turn.hct_foul = true;
+      }
+      // Keep next_defensive_setup so it's detected as FCP/HCT
+      turn.next_defensive_setup = scene.currentPressureType;
+      // Remove shot attempt flags
+      turn.fcp_shot = false;
+      turn.hct_shot = false;
+      // Set text to match working pattern
+      turn.text = (turn.text || '') + (turn.text ? ' ' : '') + 'PRESS!';
+    }
+    
     // ✅ DEBUG: Log state at start of each turn (to trace state persistence)
     if (i > 0 && (turn.result_type === "MAKE" || turn.result_type === "MISS")) {
       console.log('🔍 [TURN START - STATE CHECK]', {
@@ -1427,60 +1463,6 @@ export async function animateGameTurns({ //hasBallAtStep
       // Note: prepareTurnForAnimation was already called at line 479, but AnimationRouter will call it again
       // This is safe (idempotent) but we could optimize later by skipping the first call for HCO turns
       await animationRouter.processTurn(turn);
-
-      // ✅ HARDCODED FIX: After made HCO shot with FCP/HCT setup, convert next turn to FOUL - PRESS! setup turn
-      // This matches the working pattern: OREB Putback and Free Throw both have FOUL - PRESS! as next turn
-      // ✅ CRITICAL: Check scene.pressureSequenceActive as fallback (set by runInboundSetup)
-      const hasFCPHCTSetup = (turn.next_defensive_setup === "FCP" || turn.next_defensive_setup === "HCT") ||
-                             (scene.pressureSequenceActive && (scene.currentPressureType === "FCP" || scene.currentPressureType === "HCT"));
-      
-      if (turn.result_type === "MAKE") {
-        const nextTurn = i + 1 < turns.length ? turns[i + 1] : null;
-        console.log('🔍 [HARDCODE CHECK] Checking if hardcode should run', {
-          turn_index: i,
-          result_type: turn.result_type,
-          next_defensive_setup: turn.next_defensive_setup,
-          pressureSequenceActive: scene.pressureSequenceActive,
-          currentPressureType: scene.currentPressureType,
-          hasFCPHCTSetup,
-          hasNextTurn: !!nextTurn,
-          nextTurnResultType: nextTurn?.result_type,
-          willRunHardcode: hasFCPHCTSetup && 
-                          nextTurn && (nextTurn.result_type === "MAKE" || nextTurn.result_type === "MISS")
-        });
-      }
-      
-      if (turn.result_type === "MAKE" && hasFCPHCTSetup) {
-        const nextTurn = i + 1 < turns.length ? turns[i + 1] : null;
-        if (nextTurn && (nextTurn.result_type === "MAKE" || nextTurn.result_type === "MISS")) {
-          console.log('🔧 [HARDCODED FIX] Converting next turn from shot attempt to FOUL - PRESS! setup turn', {
-            current_turn_index: i,
-            current_result_type: turn.result_type,
-            current_next_defensive_setup: turn.next_defensive_setup,
-            next_turn_index: i + 1,
-            next_turn_result_type_before: nextTurn.result_type,
-            next_turn_result_type_after: 'FOUL',
-            reason: 'Backend generated shot attempt instead of setup turn - hardcoding to match working pattern'
-          });
-          
-          // Convert next turn to FOUL - PRESS! setup turn
-          nextTurn.result_type = "FOUL";
-          if (turn.next_defensive_setup === "FCP") {
-            nextTurn.fcp_foul = true;
-            nextTurn.hct_foul = false;
-          } else {
-            nextTurn.fcp_foul = false;
-            nextTurn.hct_foul = true;
-          }
-          // Keep next_defensive_setup so it's detected as FCP/HCT
-          nextTurn.next_defensive_setup = turn.next_defensive_setup;
-          // Remove shot attempt flags
-          nextTurn.fcp_shot = false;
-          nextTurn.hct_shot = false;
-          // Set text to match working pattern
-          nextTurn.text = (nextTurn.text || '') + (nextTurn.text ? ' ' : '') + 'PRESS!';
-        }
-      }
 
       // Removed verbose after process turn log
 
