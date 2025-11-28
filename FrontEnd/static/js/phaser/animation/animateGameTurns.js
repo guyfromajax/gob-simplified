@@ -807,10 +807,10 @@ export async function animateGameTurns({ //hasBallAtStep
     // Backend only sets next_defensive_setup to "FCP" or "HCT" if the defensive team has those settings enabled
     // 
     // ✅ CRITICAL FIX: next_defensive_setup indicates the NEXT turn's setup, not the current turn's
-    // - For BASELINE_INBOUND: Use next_defensive_setup to detect FCP/HCT setup turns
-    // - For MAKE/MISS: Only use fcp_shot/hct_shot flags (next_defensive_setup is for the NEXT turn)
+    // - For BASELINE_INBOUND: Use next_defensive_setup to detect FCP/HCT setup turns (result_type === "BASELINE_INBOUND")
+    // - For MAKE/MISS: NEVER use next_defensive_setup (it's for the NEXT turn) - only use fcp_shot/hct_shot flags
     // - For other outcomes: Use fcp_foul/hct_foul flags or next_defensive_setup if it's a setup turn
-    const isBaselineInbound = turn.next_play_type === "BASELINE_INBOUND";
+    const isBaselineInbound = turn.result_type === "BASELINE_INBOUND"; // ✅ FIX: Check result_type, not next_play_type
     const hasExplicitFCPHCTFlags = turn.fcp_shot === true || turn.hct_shot === true ||
                                    turn.fcp_foul === true || turn.hct_foul === true ||
                                    (isBaselineInbound && (turn.next_defensive_setup === "FCP" || turn.next_defensive_setup === "HCT"));
@@ -1112,6 +1112,40 @@ export async function animateGameTurns({ //hasBallAtStep
       }
       updateDebugScore(turn, { turnIndex: i, possessionId });
       
+      // ✅ HARDCODED FIX: After made FCP/HCT shot, convert next turn to FOUL - PRESS! setup turn
+      // This matches the working pattern: OREB Putback and Free Throw both have FOUL - PRESS! as next turn
+      if (turn.result_type === "MAKE" && 
+          (turn.next_defensive_setup === "FCP" || turn.next_defensive_setup === "HCT") &&
+          nextTurn && 
+          (nextTurn.result_type === "MAKE" || nextTurn.result_type === "MISS")) {
+        console.log('🔧 [HARDCODED FIX] Converting next turn from shot attempt to FOUL - PRESS! setup turn', {
+          current_turn_index: i,
+          current_result_type: turn.result_type,
+          current_next_defensive_setup: turn.next_defensive_setup,
+          next_turn_index: i + 1,
+          next_turn_result_type_before: nextTurn.result_type,
+          next_turn_result_type_after: 'FOUL',
+          reason: 'Backend generated shot attempt instead of setup turn - hardcoding to match working pattern'
+        });
+        
+        // Convert next turn to FOUL - PRESS! setup turn
+        nextTurn.result_type = "FOUL";
+        if (turn.next_defensive_setup === "FCP") {
+          nextTurn.fcp_foul = true;
+          nextTurn.hct_foul = false;
+        } else {
+          nextTurn.fcp_foul = false;
+          nextTurn.hct_foul = true;
+        }
+        // Keep next_defensive_setup so it's detected as FCP/HCT
+        nextTurn.next_defensive_setup = turn.next_defensive_setup;
+        // Remove shot attempt flags
+        nextTurn.fcp_shot = false;
+        nextTurn.hct_shot = false;
+        // Set text to match working pattern
+        nextTurn.text = (nextTurn.text || '') + (nextTurn.text ? ' ' : '') + 'PRESS!';
+      }
+      
       // ✅ DEBUG: Explicitly log next turn FCP/HCT status for visibility
       if (nextTurn) {
         const nextIsFCPHCT = nextTurn.fcp_shot === true || nextTurn.hct_shot === true || 
@@ -1123,6 +1157,8 @@ export async function animateGameTurns({ //hasBallAtStep
           next_turn_has_fcp_hct_flags: nextIsFCPHCT,
           next_turn_fcp_shot: nextTurn.fcp_shot || false,
           next_turn_hct_shot: nextTurn.hct_shot || false,
+          next_turn_fcp_foul: nextTurn.fcp_foul || false,
+          next_turn_hct_foul: nextTurn.hct_foul || false,
           next_turn_next_defensive_setup: nextTurn.next_defensive_setup || null,
           will_be_detected_as_fcp_hct: nextIsFCPHCT
         });
