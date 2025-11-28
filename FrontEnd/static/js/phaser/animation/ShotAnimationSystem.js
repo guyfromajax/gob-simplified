@@ -224,7 +224,15 @@ export class ShotAnimationSystem {
     const shooterName = this.playerSprites[turnData.shooter_id]?.name || 'unknown';
     console.log(`🏀 SHOT RESULT: ${shooterName} - ${turnData.result_type}`);
     
+    // ✅ VERY LOUD LOG: Impossible to miss when a shot is made
     if (isMake) {
+      console.log('🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯');
+      console.log('🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯');
+      console.log(`🎯🎯🎯🎯🎯 SHOT MADE BY: ${shooterName.toUpperCase()} 🎯🎯🎯🎯🎯`);
+      console.log(`🎯🎯🎯🎯🎯 RESULT: ${turnData.result_type} 🎯🎯🎯🎯🎯`);
+      console.log(`🎯🎯🎯🎯🎯 SHOOTER ID: ${turnData.shooter_id} 🎯🎯🎯🎯🎯`);
+      console.log('🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯');
+      console.log('🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯');
       await this.handleMadeShot(rimCoords, turnData);
     } else {
       await this.handleMissedShot(rimCoords, turnData);
