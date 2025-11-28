@@ -377,11 +377,10 @@ This approach is more practical than organizing by "turn types" vs "outcomes" be
 12. DEFENSIVE_STOP ✅ (January 2025)
 13. STEAL (standalone turn) ✅ (January 2025)
 
-**⏳ Event-Based Animations (May Not Need Routing):**
-- STEAL events - Uses `runPass()` utility directly
-  - **Decision needed**: Is STEAL a turn type or just an event?
-- DEFENSIVE_STOP - Uses `runDefensiveStopTransition()` utility directly
-  - **Decision needed**: Should this be routed or remain as utility?
+**✅ Event-Based Animations (Resolved):**
+- ✅ **STEAL** (standalone turn) - Migrated to AnimationRouter (January 2025)
+- ✅ **STEAL events** (inline) - Handled inline (not standalone turns, no routing needed)
+- ✅ **DEFENSIVE_STOP** - Migrated to AnimationRouter (January 2025)
 
 **✅ Utility Functions (Fine to Call Directly):**
 - `shootBall()`, `runPass()`, `animateRebound()`, `runInboundSetup()`, etc.
@@ -392,12 +391,16 @@ This approach is more practical than organizing by "turn types" vs "outcomes" be
 - DEAD BALL, Non-animated FOUL
 - These don't need routing - they're just announcements
 
-### Result
+### Result ✅
 
-**After Phase 2.6 completion, ALL turn-level animations will route through `AnimationRouter`**, except:
-- Event-based animations (STEAL, DEFENSIVE_STOP) - if they're not turn types
+**Phase 2.6 is COMPLETE!** All turn-level animations now route through `AnimationRouter`, except:
+- Event-based animations (STEAL events within turns) - handled inline
 - Utility functions (called within handlers)
 - Announcement-only turns (no animation)
 
-**The entire animation system will be unified through `AnimationRouter` as the single entry point for all turn-level animations.**
+**The entire animation system is now unified through `AnimationRouter` as the single entry point for all turn-level animations.** ✅
+
+**Remaining Work:**
+- **Cleanup:** Remove legacy FAST_BREAK detection (line 1104) - duplicate of new detection
+- **Future Enhancement:** Migrate FCP/HCT setup turns to AnimationRouter (optional, current implementation works)
 
