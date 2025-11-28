@@ -1049,6 +1049,20 @@ export async function animateGameTurns({ //hasBallAtStep
         pressureStateCleared: shouldClearPressureState
       });
       
+      // ✅ CRITICAL FIX: Replicate OREB putback flow exactly
+      // After playTurnAnimation() completes for FCP/HCT, call the same functions that OREB calls
+      // This provides the natural delay that allows the tween manager to fully process all tweens
+      // before the next turn starts
+      announceFromTurnData(turn, 'end', scene.simData?.home_team_id, scene);
+      if (onUpdate) {
+        try {
+          onUpdate(turn);
+        } catch (err) {
+          console.error('Scoreboard update failed:', err);
+        }
+      }
+      updateDebugScore(turn, { turnIndex: i, possessionId });
+      
       // ✅ DEBUG: Explicitly log next turn FCP/HCT status for visibility
       if (nextTurn) {
         const nextIsFCPHCT = nextTurn.fcp_shot === true || nextTurn.hct_shot === true || 
