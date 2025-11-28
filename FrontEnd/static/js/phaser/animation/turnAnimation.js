@@ -2265,6 +2265,17 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
       );
       
       if (turnData.result_type === "MAKE") {
+        // ✅ VERY LOUD LOG: Impossible to miss when a shot is made
+        const shooterSprite = playerSprites[turnData.shooter_id];
+        const shooterName = shooterSprite?.name || turnData.shooter_id || 'unknown';
+        console.log('🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯');
+        console.log('🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯');
+        console.log(`🎯🎯🎯🎯🎯 SHOT MADE BY: ${shooterName.toUpperCase()} 🎯🎯🎯🎯🎯`);
+        console.log(`🎯🎯🎯🎯🎯 RESULT: ${turnData.result_type} 🎯🎯🎯🎯🎯`);
+        console.log(`🎯🎯🎯🎯🎯 SHOOTER ID: ${turnData.shooter_id} 🎯🎯🎯🎯🎯`);
+        console.log('🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯');
+        console.log('🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯');
+        
         // Visual effects for AND-1 now handled in ballManager.js when "And 1!" is announced
         
         // ✅ OPTION 1 FIX: Ensure onShotEnd() is called before transitioning to next operation
