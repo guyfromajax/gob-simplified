@@ -467,6 +467,14 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
     const tweenStartedImmediately = typeof tween.isPlaying === 'function' ? tween.isPlaying() : null;
     const tweenProgressImmediately = tween.progress || 0;
     if (tweenStartedImmediately === false || tweenProgressImmediately === 0) {
+      // Check scene and tween manager state
+      const scenePaused = scene.scene?.isPaused ? scene.scene.isPaused() : 'N/A';
+      const tweenManagerState = scene.tweens ? {
+        totalTweens: typeof scene.tweens.getAll === 'function' ? scene.tweens.getAll().length : 'N/A',
+        isPaused: typeof scene.tweens.isPaused === 'function' ? scene.tweens.isPaused() : 'N/A',
+        timeScale: scene.tweens.timeScale ?? 'N/A'
+      } : null;
+      
       console.warn('🔍 [TWEEN START CHECK] Tween created but not playing immediately', {
         playerId: sprite?.playerId,
         action: step.action,
@@ -474,7 +482,9 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
         tweenProgressImmediately,
         validTargetsCount: validTargets.length,
         ballInTargets,
-        ballHasActiveTween
+        ballHasActiveTween,
+        scenePaused,
+        tweenManagerState
       });
     }
     
