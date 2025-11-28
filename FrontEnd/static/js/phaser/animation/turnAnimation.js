@@ -1383,6 +1383,41 @@ async function runInboundSetup({
 
   scene.isInboundSetup = false;
   scene.passInFlight = false;
+  
+  // ✅ CRITICAL FIX: Add delay after runInboundSetup() completes when setting up FCP/HCT
+  // This gives the tween manager time to fully process all completed tweens before the next turn starts
+  // This is especially important after made HCO shots, where the next turn starts immediately
+  // Free throws work because they have additional processing after inboundSetup() that naturally delays the next turn
+  if (pressureType === "FCP" || pressureType === "HCT") {
+    if (scene.tweens) {
+      const tweenManagerState = {
+        totalTweens: scene.tweens.getAll ? scene.tweens.getAll().length : 'N/A',
+        isPaused: scene.tweens.isPaused ? scene.tweens.isPaused() : 'N/A',
+        timeScale: scene.tweens.timeScale ?? 'N/A'
+      };
+      
+      if (tweenManagerState.totalTweens > 0 || tweenManagerState.totalTweens === 'N/A') {
+        console.log('🔧 [FCP/HCT POST-INBOUND DELAY] Waiting 50ms for tween manager to settle after runInboundSetup()', {
+          tweenManagerState,
+          pressureType,
+          source: 'runInboundSetup completion'
+        });
+        await new Promise(resolve => {
+          if (scene.time && scene.time.delayedCall) {
+            scene.time.delayedCall(50, resolve);
+          } else {
+            setTimeout(resolve, 50);
+          }
+        });
+        console.log('🔧 [FCP/HCT POST-INBOUND DELAY COMPLETE] Tween manager state after delay', {
+          totalTweens: scene.tweens.getAll ? scene.tweens.getAll().length : 'N/A',
+          isPaused: scene.tweens.isPaused ? scene.tweens.isPaused() : 'N/A',
+          timeScale: scene.tweens.timeScale ?? 'N/A'
+        });
+      }
+    }
+  }
+  
   // ✅ PHASE 4: Removed old ballDetached flag - BallController manages state internally
 }
 
