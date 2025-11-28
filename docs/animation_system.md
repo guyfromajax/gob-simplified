@@ -286,6 +286,171 @@ this.ballController.onShotEnd(); // Too late!
 - `FCP_HCT_STATE_TRACKING_PROPOSAL.md` - FCP/HCT state tracking implementation
 - `Historical/BALL_ANIMATION_SYSTEM_REFACTORING_PLAN.md` - BallController state management
 
+#### Multi-Turn Sequence State Tracking Pattern ✅ **REPLICABLE** (January 2025)
+
+**Purpose**: Track state across multiple turns for sequences that span multiple turns (e.g., FCP/HCT pressure sequences, HCO sequences with fouls/turnovers, Fast Break sequences, OREB putback sequences).
+
+**Current Implementation**: FCP/HCT pressure sequences (January 2025)
+
+**Pattern Overview**:
+
+1. **State Initialization**: Set scene-level state when sequence begins
+2. **State Detection**: Use scene state + turn flags to detect sequence turns
+3. **State Persistence**: Keep state active across multiple turns in sequence
+4. **State Clearing**: Clear state when sequence completes (not on intermediate turns)
+
+**FCP/HCT Implementation Example**:
+
+```javascript
+// 1. STATE INITIALIZATION (in animateGameTurns.js)
+// Set state when pressure setup detected (BASELINE_INBOUND with next_defensive_setup)
+if (turn.next_play_type === "BASELINE_INBOUND" && 
+    (turn.next_defensive_setup === "FCP" || turn.next_defensive_setup === "HCT")) {
+  scene.currentPressureType = turn.next_defensive_setup; // "FCP" or "HCT"
+  scene.pressureSequenceActive = true;
+}
+
+// Also set state when runInboundSetup() is called inline (for made shots)
+// This happens in turnAnimation.js when a made shot sets up the next FCP/HCT turn
+if (pressureType) {
+  scene.currentPressureType = pressureType;
+  scene.pressureSequenceActive = true;
+}
+
+// 2. STATE DETECTION (in animateGameTurns.js)
+// Detect FCP/HCT turns using explicit flags OR scene state
+const hasExplicitFCPHCTFlags = turn.fcp_shot === true || turn.hct_shot === true ||
+                               turn.fcp_foul === true || turn.hct_foul === true ||
+                               (isBaselineInbound && (turn.next_defensive_setup === "FCP" || turn.next_defensive_setup === "HCT"));
+
+// For press break outcomes, detect using scene state
+const isPressBreakOutcome = (turn.result_type === "HCO" || turn.result_type === "TURNOVER") && 
+                            scene.pressureSequenceActive;
+
+// For press break shot attempts, detect using scene state
+const isPressBreakShotAttempt = scene.pressureSequenceActive && 
+                                 (turn.result_type === "MAKE" || turn.result_type === "MISS");
+
+const isFCPHCT = hasExplicitFCPHCTFlags || isPressBreakOutcome || isPressBreakShotAttempt;
+
+// 3. STATE PERSISTENCE (in animateGameTurns.js)
+// Don't clear state on intermediate turns (e.g., made shot that sets up next FCP/HCT turn)
+const isSettingUpNextFCPHCT = (turn.result_type === "MAKE" || turn.result_type === "MISS") &&
+                              (turn.next_defensive_setup === "FCP" || turn.next_defensive_setup === "HCT");
+const shouldClearPressureState = 
+  ((turn.result_type === "MAKE" || turn.result_type === "MISS") && !nextTurnIsFCPHCT && !isSettingUpNextFCPHCT) ||
+  (turn.result_type === "HCO" && !nextTurnIsFCPHCT) ||
+  turn.fcp_foul === true || turn.hct_foul === true ||
+  turn.result_type === "TURNOVER";
+
+// 4. STATE CLEARING (in animateGameTurns.js)
+// Only clear when sequence actually completes
+if (shouldClearPressureState && scene.pressureSequenceActive) {
+  scene.currentPressureType = null;
+  scene.pressureSequenceActive = false;
+}
+```
+
+**Key Design Decisions**:
+
+1. **Scene-Level State**: Store on `scene` object for easy access and debugging
+   - `scene.currentPressureType` - Type of pressure ("FCP" | "HCT" | null)
+   - `scene.pressureSequenceActive` - Boolean flag for active sequence
+
+2. **Multi-Source Detection**: Use explicit flags OR scene state
+   - Explicit flags: `fcp_shot`, `hct_shot`, `fcp_foul`, `hct_foul`, `next_defensive_setup`
+   - Scene state: `scene.pressureSequenceActive` for press break outcomes/shot attempts
+
+3. **State Persistence**: Don't clear state on intermediate turns
+   - Made shot that sets up next FCP/HCT turn: Keep state active
+   - Press break shot attempt: Keep state active (detected via scene state)
+   - Only clear when sequence completes (HCO transition, foul, turnover)
+
+4. **Detection Logic**: Three-part detection
+   - Explicit flags (for setup turns and explicit FCP/HCT outcomes)
+   - Press break outcomes (HCO/TURNOVER during active sequence)
+   - Press break shot attempts (MAKE/MISS during active sequence)
+
+**Replication Guide for Other Use Cases**:
+
+**For HCO Sequences with Fouls/Turnovers**:
+```javascript
+// 1. Initialize state when HCO sequence begins
+scene.hcoSequenceActive = true;
+scene.hcoSequenceType = "HCO"; // Could track specific HCO type
+
+// 2. Detect HCO sequence turns
+const isHCOSequence = scene.hcoSequenceActive && 
+                     (turn.result_type === "MAKE" || turn.result_type === "MISS" ||
+                      turn.result_type === "HCO" || turn.o_foul === true ||
+                      turn.result_type === "TURNOVER");
+
+// 3. Persist state across multiple turns
+// Don't clear on intermediate turns (e.g., foul during HCO sequence)
+
+// 4. Clear state when sequence completes
+if (turn.result_type === "DREB" || turn.result_type === "OREB") {
+  scene.hcoSequenceActive = false;
+  scene.hcoSequenceType = null;
+}
+```
+
+**For Fast Break Sequences**:
+```javascript
+// 1. Initialize state when fast break begins
+scene.fastBreakSequenceActive = true;
+
+// 2. Detect fast break sequence turns
+const isFastBreakSequence = scene.fastBreakSequenceActive && 
+                            (turn.result_type === "FAST_BREAK" ||
+                             turn.result_type === "MAKE" || turn.result_type === "MISS" ||
+                             turn.fast_break_foul === true || turn.result_type === "TURNOVER");
+
+// 3. Persist state across multiple turns
+// Don't clear on intermediate turns
+
+// 4. Clear state when sequence completes
+if (turn.result_type === "HCO" || turn.result_type === "DREB") {
+  scene.fastBreakSequenceActive = false;
+}
+```
+
+**For OREB Putback Sequences**:
+```javascript
+// 1. Initialize state when OREB occurs
+scene.orebSequenceActive = true;
+
+// 2. Detect OREB sequence turns
+const isOREBSequence = scene.orebSequenceActive && 
+                      (turn.result_type === "OREB" ||
+                       turn.result_type === "MAKE" || turn.result_type === "MISS" ||
+                       turn.oreb_foul === true || turn.result_type === "TURNOVER");
+
+// 3. Persist state across multiple turns
+// Don't clear on intermediate turns
+
+// 4. Clear state when sequence completes
+if (turn.result_type === "DREB" || turn.result_type === "HCO") {
+  scene.orebSequenceActive = false;
+}
+```
+
+**Benefits of This Pattern**:
+- ✅ **Simple Detection**: One scene state variable instead of complex flag inheritance
+- ✅ **Reliable**: Doesn't depend on backend flags being present on every turn
+- ✅ **Maintainable**: Easy to debug (check scene state in console)
+- ✅ **Scalable**: Easy to extend to other multi-turn sequences
+- ✅ **SS&S Aligned**: Single source of truth, scalable, sustainable
+
+**Key Files**:
+- `animateGameTurns.js` - FCP/HCT state tracking implementation
+- `turnAnimation.js` - State initialization via `runInboundSetup()`
+
+**Future Work**:
+- Replicate pattern for HCO sequences with fouls/turnovers
+- Replicate pattern for Fast Break sequences
+- Replicate pattern for OREB putback sequences
+
 ---
 
 ### Animation Routing System ✅ **IN PROGRESS** (Phase 2.5 - January 2025)
