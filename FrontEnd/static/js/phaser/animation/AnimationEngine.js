@@ -241,6 +241,13 @@ export class AnimationEngine {
   async handleFreeThrow(turnData, context) {
     console.log('AnimationEngine: Handling free throw with new FreeThrowAnimationSystem');
     
+    // ✅ PHASE 2.6: Update active player display (moved from animateGameTurns.js)
+    const { getBallHandlerIdFromTurn, updateActivePlayers } = await import('../utils/activePlayerDisplay.js');
+    const shooterId = getBallHandlerIdFromTurn(turnData, 0);
+    if (shooterId && context.playerSprites) {
+      updateActivePlayers(shooterId, null, this.scene.simData?.home_team_id, context.playerSprites);
+    }
+    
     // Use new free throw animation system if available
     if (this.freeThrowSystem) {
       await this.freeThrowSystem.processFreeThrow(turnData);
@@ -256,6 +263,13 @@ export class AnimationEngine {
         ftContext: turnData.ftContext
       });
     }
+    
+    // ✅ PHASE 2.6: Display free throw result text (moved from animateGameTurns.js)
+    const { appendToTextScroll } = await import('../utils/textScroll.js');
+    appendToTextScroll(turnData.text || "Free throw attempt");
+    
+    // Note: onUpdate is already called inside runFreeThrowSequence for each FT attempt
+    // Do NOT call it again here or stats will be double counted
   }
 
   async handleSideInbound(turnData, context) {
@@ -358,14 +372,31 @@ export class AnimationEngine {
 
   async handleFastBreak(turnData, context) {
     console.log('AnimationEngine: Handling fast break');
+    
+    // ✅ PHASE 2.6: Update active player display (moved from animateGameTurns.js)
+    const { getBallHandlerIdFromTurn, getDefenderIdFromTurn, updateActivePlayers } = await import('../utils/activePlayerDisplay.js');
+    const ballHandlerId = getBallHandlerIdFromTurn(turnData, 0);
+    const defenderId = getDefenderIdFromTurn(turnData);
+    if (ballHandlerId && context.playerSprites) {
+      updateActivePlayers(ballHandlerId, defenderId, this.scene.simData?.home_team_id, context.playerSprites);
+    }
+    
     // Import and use existing fast break handler for now
     const { runFastBreakSequence } = await import('./fastBreak.js');
     await runFastBreakSequence(this.scene, {
       playerSprites: context.playerSprites,
       ballSprite: context.ballSprite,
       turnData: turnData,
-      onUpdate: context.onUpdate
+      onUpdate: context.onUpdate,
+      turnIndex: context.turnIndex // ✅ PHASE 2.6: Pass turnIndex from context
     });
+    
+    // ✅ PHASE 2.6: Set flag if this was a shot turn (moved from animateGameTurns.js)
+    if (turnData.result_type === "MAKE" || turnData.result_type === "MISS") {
+      this.scene._previousTurnWasShot = true;
+    }
+    
+    // Note: Announcements and score updates are handled by AnimationRouter (finalizeTurnAfterAnimation)
   }
 
   async handleShotAttempt(turnData, context) {

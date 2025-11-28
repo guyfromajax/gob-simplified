@@ -557,22 +557,13 @@ export async function animateGameTurns({ //hasBallAtStep
     if (DEBUG_FLOW || debugEnabled) logVerbose(`🔁 Turn ${i + 1}`, turn);
 
     if (turn.result_type === "FREE_THROW") {
-      // Update active player display for free throw
-      const { getBallHandlerIdFromTurn, updateActivePlayers } = await import('../utils/activePlayerDisplay.js');
-      const shooterId = getBallHandlerIdFromTurn(turn, 0);
-      if (shooterId) {
-        updateActivePlayers(shooterId, null, scene.simData?.home_team_id, playerSprites);
-      }
-      
-      await runFreeThrowSequence(scene, { playerSprites, ballSprite, turnData: turn, onUpdate, ftContext: turn.ftContext });
-      
-      // Display free throw result text
-      appendToTextScroll(turn.text || "Free throw attempt");
-      
-      // NOTE: onUpdate is already called inside runFreeThrowSequence for each FT attempt
-      // Do NOT call it again here or stats will be double counted
-      
-      updateDebugScore(turn, { turnIndex: i, possessionId });
+      // ✅ PHASE 2.6: Route FREE_THROW through AnimationRouter
+      // Active player display, free throw sequence, and text scroll are handled by handler
+      // AnimationRouter handles pre/post setup (prepareTurnForAnimation, finalizeTurnAfterAnimation)
+      turn.index = i;
+      await animationRouter.processTurn(turn);
+      // Note: onUpdate and updateDebugScore handled by AnimationRouter
+      // Note: onUpdate is already called inside runFreeThrowSequence for each FT attempt
       continue;
     }
 
@@ -1211,35 +1202,17 @@ export async function animateGameTurns({ //hasBallAtStep
     
     // ✅ REMOVED: FCP/HCT check moved to BEFORE TURNOVER check to prevent misrouting
     
-    // Fast break shots now use the new system (same as HCO shots)
-    if (turn.result_type === "MAKE" || turn.result_type === "MISS") {
-      if (turn.fast_break === true) {
-        
-        // Update active player display for fast break
-        const { getBallHandlerIdFromTurn, getDefenderIdFromTurn, updateActivePlayers } = await import('../utils/activePlayerDisplay.js');
-        const ballHandlerId = getBallHandlerIdFromTurn(turn, 0);
-        const defenderId = getDefenderIdFromTurn(turn);
-        if (ballHandlerId) {
-          updateActivePlayers(ballHandlerId, defenderId, scene.simData?.home_team_id, playerSprites);
-        }
-        
-        await runFastBreakSequence(scene, { playerSprites, ballSprite, turnData: turn, onUpdate, turnIndex: i });
-        if (onUpdate) {
-          try {
-            onUpdate(turn);
-          } catch (err) {
-            console.error('Scoreboard update failed:', err);
-          }
-        }
-        updateDebugScore(turn, { turnIndex: i, possessionId });
-        
-        // Set flag if this was a shot turn (MAKE or MISS) so the next turn knows to skip step 0 ball attachment
-        if (turn.result_type === "MAKE" || turn.result_type === "MISS") {
-          scene._previousTurnWasShot = true;
-        }
-        
-        continue;
-      }
+    // ✅ PHASE 2.6: Fast break shots now route through AnimationRouter (same as HCO shots)
+    // Fast break detection happens in AnimationEngine.determineHandler() (checks fast_break flag or result_type === "FAST_BREAK")
+    // Active player display, fast break sequence, and _previousTurnWasShot flag are handled by handler
+    // AnimationRouter handles pre/post setup (prepareTurnForAnimation, finalizeTurnAfterAnimation)
+    // Note: Fast break shots (MAKE/MISS with fast_break === true) are detected in AnimationEngine and routed to handleFastBreak()
+    // This check is kept here for explicit fast break turns (result_type === "FAST_BREAK")
+    if (turn.result_type === "FAST_BREAK" || (turn.result_type === "MAKE" || turn.result_type === "MISS") && turn.fast_break === true) {
+      turn.index = i;
+      await animationRouter.processTurn(turn);
+      // Note: Announcements, onUpdate, and updateDebugScore handled by AnimationRouter
+      continue;
     }
 
     const shooterName = turn.shooter || "";
