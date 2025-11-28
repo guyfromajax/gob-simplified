@@ -803,11 +803,14 @@ export async function animateGameTurns({ //hasBallAtStep
     const previousTurn = i > 0 ? turns[i - 1] : null;
     
     // Simple check: if we're in a pressure sequence, check if this turn is part of it
+    // ✅ FIX: Only detect as FCP/HCT if turn has explicit FCP/HCT flags OR is a transition to HCO
+    // Don't detect regular HCO shots (MAKE/MISS) as FCP/HCT just because pressure state is active
+    // FCP/HCT shots should only be detected via fcp_shot/hct_shot flags (SHOT was removed from backend)
     const isFCPHCT = scene.pressureSequenceActive && 
                      (turn.fcp_shot === true || turn.hct_shot === true ||
                       turn.fcp_foul === true || turn.hct_foul === true ||
-                      turn.result_type === "MAKE" || turn.result_type === "MISS" ||
-                      turn.result_type === "HCO" || turn.result_type === "TURNOVER" ||
+                      turn.result_type === "HCO" || // HCT/FCP press break that transitions to HCO
+                      turn.result_type === "TURNOVER" || // Turnover during pressure
                       turn.next_defensive_setup === "FCP" || turn.next_defensive_setup === "HCT");
     
     // ✅ DEBUG: Log state-based detection
