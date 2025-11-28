@@ -2375,6 +2375,21 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
           
           if (isFCPHCT) {
             console.log('🏀 [FCP/HCT MADE SHOT] Inbound setup completed - next turn should be FCP/HCT press break');
+            
+            // ✅ CRITICAL FIX: Replicate OREB putback flow exactly
+            // Call the same functions that OREB calls right after runInboundSetup() completes
+            // This provides the natural delay that allows the tween manager to fully process all tweens
+            // before the next turn starts
+            const { announceFromTurnData } = await import('../utils/announcements.js');
+            announceFromTurnData(turnData, 'end', scene.simData?.home_team_id, scene);
+            if (onUpdate) {
+              try {
+                onUpdate(turnData);
+              } catch (err) {
+                console.error('Scoreboard update failed:', err);
+              }
+            }
+            // Note: updateDebugScore is not available in playTurnAnimation, but it's called in animateGameTurns after this returns
           }
         } else if (isFCPHCT && !hasPendingFreeThrow && !hasPutbackMake) {
           // ✅ DEBUG: Log when we skip runInboundSetup for FCP/HCT (e.g., if next_play_type is not BASELINE_INBOUND)
