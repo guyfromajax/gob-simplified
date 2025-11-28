@@ -134,10 +134,14 @@ class TurnManager:
 
         return payload
 
-    def setup_baseline_inbound(self):
+    def setup_baseline_inbound(self, next_defensive_setup=None):
         """
         Prepare coordinates for a baseline inbound following a made shot.
         The opposing team gets the ball and starts their possession from the baseline.
+
+        Args:
+            next_defensive_setup: Optional defensive pressure type ("FCP" or "HCT") 
+                                  that will be applied after the inbound pass.
 
         Returns a payload describing offensive and defensive destination
         coordinates which the front-end can use to animate the inbound
@@ -224,6 +228,10 @@ class TurnManager:
             "possession_team_id": offense_team.team_id,
             "quarter": self.game.quarter,
         }
+        
+        # Include next_defensive_setup if provided (for FCP/HCT pressure)
+        if next_defensive_setup:
+            payload["next_defensive_setup"] = next_defensive_setup
 
         return payload
 
