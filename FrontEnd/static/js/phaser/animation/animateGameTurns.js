@@ -1283,8 +1283,18 @@ export async function animateGameTurns({ //hasBallAtStep
       }
     }
 
+    // ✅ PHASE 2.6: Handle STEAL - route through AnimationRouter
+    // STEAL can be either a standalone turn type (result_type === "STEAL") or an event within a turn
+    // Only route standalone STEAL turns through AnimationRouter; events are handled inline
     const stealEvent = turn.events?.find(e => e.event_type === "STEAL");
-    if (!scene.stateMachine?.is(States.FastBreak) && (turn.result_type === "STEAL" || stealEvent)) {
+    if (!scene.stateMachine?.is(States.FastBreak) && turn.result_type === "STEAL") {
+      // Standalone STEAL turn - route through AnimationRouter
+      turn.index = i;
+      await animationRouter.processTurn(turn);
+      // Note: Pass animation, possession change, announcements, and score updates handled by handler
+      continue;
+    } else if (!scene.stateMachine?.is(States.FastBreak) && stealEvent) {
+      // STEAL event within another turn - handle inline (not a standalone turn)
       const ballHandlerId = playerMap[turn.ball_handler] ?? turn.ball_handler;
       const stealerRaw =
         turn.stealerId ||
