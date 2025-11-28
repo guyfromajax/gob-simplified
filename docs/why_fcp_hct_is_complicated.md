@@ -124,15 +124,15 @@ Turn 3: (After shot)
 **HCO Shot Flow:**
 ```
 AnimationRouter → AnimationEngine → ShotAnimationSystem
-→ Move players
+→ Move players (skeleton steps if present)
 → Shoot ball
 → Handle rebound
 → Done!
 ```
 
-**FCP/HCT Shot Flow:**
+**FCP/HCT Shot Flow (Updated January 2025):**
 ```
-Direct call to playTurnAnimation()
+AnimationRouter → AnimationEngine → ShotAnimationSystem
 → Loop through skeleton steps (3-4 steps)
   → Step 1: Move players, pass ball
   → Step 2: Move players, pass ball
@@ -141,6 +141,16 @@ Direct call to playTurnAnimation()
 → Handle rebound
 → Done!
 ```
+
+**FCP/HCT Setup Flow (Non-Shot Outcomes):**
+```
+Direct call to playTurnAnimation()
+→ Loop through skeleton steps
+→ Handle outcome (FOUL, TURNOVER, HCO transition)
+→ Done!
+```
+
+**Note:** FCP/HCT shot attempts now use the same routing as HCO shots (AnimationRouter → ShotAnimationSystem) because they have identical structure. Only non-shot outcomes (fouls, turnovers, HCO transitions) use `playTurnAnimation()` directly.
 
 ---
 
@@ -158,19 +168,22 @@ Direct call to playTurnAnimation()
 
 ---
 
-## Why We Still Use playTurnAnimation()
+## Current Routing (Updated January 2025)
 
-**playTurnAnimation() is like a Swiss Army knife:**
-- Can do everything: skeleton animation, passes, shots, rebounds
-- Handles complex multi-step sequences
-- Tracks state across steps
-- Works for FCP/HCT, Fast Break, and other complex plays
+**FCP/HCT Shot Attempts:**
+- Route through `AnimationRouter → ShotAnimationSystem` (same as HCO shots)
+- `ShotAnimationSystem` handles skeleton animations + shot
+- Unified code path for all shot attempts
 
-**ShotAnimationSystem is like a specialized tool:**
-- Great at ONE thing: simple shots
-- Can't handle skeletons
-- Can't handle complex sequences
-- Perfect for HCO shots (which don't need skeletons)
+**FCP/HCT Setup Turns (Non-Shot Outcomes):**
+- Route through `playTurnAnimation()` directly
+- Handles skeleton animations + outcome (FOUL, TURNOVER, HCO transition)
+- No shot involved, so doesn't use `ShotAnimationSystem`
+
+**Why This Works:**
+- `ShotAnimationSystem` can handle skeleton animations (it loops through `turnData.animations` just like `playTurnAnimation()`)
+- FCP/HCT shots have identical structure to HCO shots: skeleton → shot
+- Unified routing simplifies the codebase and ensures consistent behavior
 
 ---
 
@@ -178,10 +191,10 @@ Direct call to playTurnAnimation()
 
 **FCP/HCT is complicated because:**
 
-1. ✅ **Multi-phase sequences** - Setup → Skeleton → Shot
+1. ✅ **Multi-phase sequences** - Setup → Skeleton → Shot/Outcome
 2. ✅ **Skeleton animations** - Multi-step press break sequences
 3. ✅ **State persistence** - Needs to remember "we're in FCP mode" across turns
-4. ✅ **Complex routing** - Can't use simple ShotAnimationSystem, needs playTurnAnimation()
+4. ✅ **Dual routing** - Shot attempts use `ShotAnimationSystem`, setup turns use `playTurnAnimation()`
 5. ✅ **Multiple outcomes** - Can result in shot, turnover, foul, or transition to HCO
 
 **HCO shots are simple because:**
@@ -194,10 +207,12 @@ Direct call to playTurnAnimation()
 
 ---
 
-## The Future
+## Current Status (January 2025)
 
-Eventually, we might:
-- Create a specialized `FCPHCTAnimationSystem` that handles skeletons + shots
-- Migrate FCP/HCT to use AnimationRouter
-- But for now, playTurnAnimation() works and handles everything correctly!
+✅ **FCP/HCT shot attempts** now route through `AnimationRouter → ShotAnimationSystem` (unified with HCO shots)
+✅ **FCP/HCT setup turns** route through `playTurnAnimation()` (for non-shot outcomes)
+✅ **State tracking** implemented on scene level (`scene.currentPressureType`, `scene.pressureSequenceActive`)
+✅ **Backend** generates correct turn sequence (BASELINE_INBOUND → FCP/HCT setup turn)
+
+The system is now streamlined and working correctly!
 
