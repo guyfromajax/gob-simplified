@@ -820,7 +820,13 @@ export async function animateGameTurns({ //hasBallAtStep
     const isPressBreakOutcome = (turn.result_type === "HCO" || turn.result_type === "TURNOVER") && 
                                 scene.pressureSequenceActive;
     
-    const isFCPHCT = hasExplicitFCPHCTFlags || isPressBreakOutcome;
+    // ✅ CRITICAL FIX: Detect MAKE/MISS turns as FCP/HCT if we're in an active pressure sequence
+    // This handles press break shot attempts (even though SHOT was removed from FCP/HCT outcomes,
+    // the press break can still result in a shot attempt)
+    const isPressBreakShotAttempt = scene.pressureSequenceActive && 
+                                     (turn.result_type === "MAKE" || turn.result_type === "MISS");
+    
+    const isFCPHCT = hasExplicitFCPHCTFlags || isPressBreakOutcome || isPressBreakShotAttempt;
     
     // ✅ DEBUG: Log state-based detection
     if (scene.pressureSequenceActive) {
