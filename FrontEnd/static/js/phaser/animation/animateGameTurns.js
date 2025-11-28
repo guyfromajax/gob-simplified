@@ -1430,8 +1430,27 @@ export async function animateGameTurns({ //hasBallAtStep
 
       // ✅ HARDCODED FIX: After made HCO shot with FCP/HCT setup, convert next turn to FOUL - PRESS! setup turn
       // This matches the working pattern: OREB Putback and Free Throw both have FOUL - PRESS! as next turn
-      if (turn.result_type === "MAKE" && 
-          (turn.next_defensive_setup === "FCP" || turn.next_defensive_setup === "HCT")) {
+      // ✅ CRITICAL: Check scene.pressureSequenceActive as fallback (set by runInboundSetup)
+      const hasFCPHCTSetup = (turn.next_defensive_setup === "FCP" || turn.next_defensive_setup === "HCT") ||
+                             (scene.pressureSequenceActive && (scene.currentPressureType === "FCP" || scene.currentPressureType === "HCT"));
+      
+      if (turn.result_type === "MAKE") {
+        const nextTurn = i + 1 < turns.length ? turns[i + 1] : null;
+        console.log('🔍 [HARDCODE CHECK] Checking if hardcode should run', {
+          turn_index: i,
+          result_type: turn.result_type,
+          next_defensive_setup: turn.next_defensive_setup,
+          pressureSequenceActive: scene.pressureSequenceActive,
+          currentPressureType: scene.currentPressureType,
+          hasFCPHCTSetup,
+          hasNextTurn: !!nextTurn,
+          nextTurnResultType: nextTurn?.result_type,
+          willRunHardcode: hasFCPHCTSetup && 
+                          nextTurn && (nextTurn.result_type === "MAKE" || nextTurn.result_type === "MISS")
+        });
+      }
+      
+      if (turn.result_type === "MAKE" && hasFCPHCTSetup) {
         const nextTurn = i + 1 < turns.length ? turns[i + 1] : null;
         if (nextTurn && (nextTurn.result_type === "MAKE" || nextTurn.result_type === "MISS")) {
           console.log('🔧 [HARDCODED FIX] Converting next turn from shot attempt to FOUL - PRESS! setup turn', {
