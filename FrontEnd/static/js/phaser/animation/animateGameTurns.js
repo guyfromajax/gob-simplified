@@ -901,11 +901,13 @@ export async function animateGameTurns({ //hasBallAtStep
       
       // ✅ SS&S: Simple state-based shot attempt detection
       // If we're in a pressure sequence and this is a shot, it's an FCP/HCT shot attempt
-      // ✅ FIX: Require explicit fcp_shot/hct_shot flags (SHOT was removed from backend options)
-      // Don't use scene.currentPressureType as fallback - that can incorrectly detect non-shot turns
-      const isFCPHCTShotAttempt = scene.pressureSequenceActive && 
-                                   (turn.result_type === "MAKE" || turn.result_type === "MISS") &&
-                                   (turn.fcp_shot === true || turn.hct_shot === true);
+      // ✅ CRITICAL FIX: Use isPressBreakShotAttempt (scene state) OR explicit flags
+      // Since SHOT was removed from FCP/HCT outcomes, press break shot attempts won't have fcp_shot/hct_shot flags
+      // But they should still be detected as shot attempts if we're in an active pressure sequence
+      const isFCPHCTShotAttempt = (scene.pressureSequenceActive && 
+                                    (turn.result_type === "MAKE" || turn.result_type === "MISS") &&
+                                    (turn.fcp_shot === true || turn.hct_shot === true)) ||
+                                   isPressBreakShotAttempt;
       
       // ✅ DEBUG: Log when we determine we'll use FCP/HCT skeleton
       if (isFCPHCTShotAttempt) {
