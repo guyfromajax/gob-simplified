@@ -528,39 +528,69 @@ OREB putback and Free Throw don't generate separate BASELINE_INBOUND turns, so `
 
 ---
 
-### Animation Routing System ✅ **IN PROGRESS** (Phase 2.5 - January 2025)
+### Animation Routing System ✅ **COMPLETE** (Phase 2.6 - January 2025)
 
-**Status:** Partially migrated - HCO turns (MAKE/MISS) now route through AnimationRouter
+**Status:** Fully migrated - All turn-level animations now route through AnimationRouter
 
-The animation routing system provides a unified entry point for all turn animations, replacing scattered animation logic with a clean, centralized architecture.
+The animation routing system provides a **unified, predictable architecture** for all turn animations, replacing scattered animation logic with a clean, centralized pattern. This is a **significant SS&S achievement** that simplifies the codebase, improves stability, and enables scalable extension.
 
-**Architecture:**
-- **`AnimationRouter`** (`AnimationRouter.js`) - Single entry point for all animations
-  - Handles pre/post setup via `prepareTurnForAnimation()` and `finalizeTurnAfterAnimation()`
-  - Manages turn queuing to prevent concurrent processing
-  - Integrates BallController and AnimationEngine
-  
-- **`AnimationEngine`** (`AnimationEngine.js`) - Routes turns to appropriate handlers
-  - Determines which handler to use based on turn type
-  - Handlers: `ShotAnimationSystem`, `ReboundAnimationSystem`, `PassAnimationSystem`, `FreeThrowAnimationSystem`, `HCOAnimationSystem`
-  - Fallback to `playTurnAnimation()` for legacy turn types
-  
-- **Specialized Animation Systems:**
-  - `ShotAnimationSystem` - Handles HCO shots (MAKE/MISS)
-  - `ReboundAnimationSystem` - Handles rebounds
-  - `PassAnimationSystem` - Handles inbound passes
-  - `FreeThrowAnimationSystem` - Handles free throws
-  - `HCOAnimationSystem` - Handles HCO outlet passes
+**Architecture Pattern:**
 
-**Current Migration Status:**
+```
+animateGameTurns.js (detection)
+    ↓
+AnimationRouter (single entry point)
+    ↓
+AnimationEngine (routing logic)
+    ↓
+Specialized Handlers (execution)
+```
+
+**Core Components:**
+
+1. **`AnimationRouter`** (`AnimationRouter.js`) - **Single entry point for all animations**
+   - Handles pre/post setup via `prepareTurnForAnimation()` and `finalizeTurnAfterAnimation()`
+   - Manages turn queuing to prevent concurrent processing
+   - Integrates BallController and AnimationEngine
+   - Provides consistent error handling and state management
+   
+2. **`AnimationEngine`** (`AnimationEngine.js`) - **Routes turns to appropriate handlers**
+   - Determines which handler to use based on turn type via `determineHandler()`
+   - Maintains a registry of handlers (`animationHandlers` Map)
+   - Handlers: `ShotAnimationSystem`, `handleFreeThrow()`, `handleFastBreak()`, `handlePutback()`, `handleOpeningTip()`, `handleDefensiveStop()`, `handleSteal()`, `handleTurnover()`, `handleSideInbound()`, `handleBaselineInbound()`, `handleDefault()` (for HCO setup turns)
+   - Fallback to `playTurnAnimation()` for legacy turn types (if needed)
+   
+3. **Specialized Handlers** - **Execute turn-specific animations**
+   - `ShotAnimationSystem` - Handles HCO and FCP/HCT shots (MAKE/MISS)
+   - `handleFreeThrow()` - Handles free throw sequences
+   - `handleFastBreak()` - Handles fast break sequences
+   - `handlePutback()` - Handles putback attempts and OREB kickouts
+   - `handleOpeningTip()` - Handles opening tip sequences
+   - `handleDefensiveStop()` - Handles defensive stop transitions
+   - `handleSteal()` - Handles steal animations
+   - `handleTurnover()` - Handles turnover animations
+   - `handleSideInbound()` - Handles side inbound passes
+   - `handleBaselineInbound()` - Handles baseline inbound passes (with FCP/HCT state tracking)
+   - `handleDefault()` - Handles HCO setup turns via `playTurnAnimation()`
+
+**Migration Status:**
 - ✅ **Phase 2.4**: FCP/HCT foul turns migrated (December 2024)
 - ✅ **Phase 2.5**: Standard HCO turns (MAKE/MISS) migrated (January 2025)
-- ✅ **Phase 2.6**: FCP/HCT shot attempts migrated (January 2025) - Same structure as HCO shots!
-- ⏳ **Pending**: Other turn types still use legacy `playTurnAnimation()` path
+- ✅ **Phase 2.6**: All remaining turn types migrated (January 2025)
+  - ✅ SIDE_INBOUND
+  - ✅ BASELINE_INBOUND
+  - ✅ HCO setup turns
+  - ✅ FREE_THROW
+  - ✅ FAST_BREAK
+  - ✅ PUTBACK_MAKE/PUTBACK_MISS/OREB_KICKOUT
+  - ✅ OPENING_TIP
+  - ✅ DEFENSIVE_STOP
+  - ✅ STEAL (standalone turn type)
 
-**Current Routing Flow:**
+**Complete Routing Flow:**
 
-**✅ Migrated (through AnimationRouter):**
+**All Turn Types Now Route Through AnimationRouter:**
+
 1. **HCO shots (MAKE/MISS)** → `AnimationRouter` → `AnimationEngine` → `ShotAnimationSystem`
    - Standard half-court offense shots
    - Handles player movement, ball flight, rebounds, and DREB outlet passes
@@ -572,43 +602,75 @@ The animation routing system provides a unified entry point for all turn animati
    
 3. **FCP/HCT fouls** → `AnimationRouter` → `AnimationEngine` → `handleDefault()` → `playTurnAnimation()`
    - Fouls that occur during FCP/HCT pressure sequences
-
-**✅ Migrated (through AnimationRouter):**
-3. **FCP/HCT shots** → `AnimationRouter` → `AnimationEngine` → `ShotAnimationSystem`
-   - **Why**: FCP/HCT shots are structured identically to HCO shots
-   - Both use skeleton animations from `turnData.animations` array
-   - Both loop through steps, handle passes, then shoot
-   - `ShotAnimationSystem` handles both identically
-   - **Status**: ✅ Migrated (January 2025)
-
-**⏳ Not Yet Migrated (direct calls):**
    
-2. **FCP/HCT setup turns** → `playTurnAnimation()` directly
+4. **FCP/HCT setup turns** → `AnimationRouter` → `AnimationEngine` → `handleDefault()` → `playTurnAnimation()`
    - Setup turns that establish FCP/HCT pressure (before shot attempts)
    - Animate press/trap setup sequences
    
-3. **Fast Break** → `runFastBreakSequence()` directly
-4. **OREB shot attempts** → `handleOrebTurn()` directly
-5. **Other turn types** → Various direct handlers
+5. **FREE_THROW** → `AnimationRouter` → `AnimationEngine` → `handleFreeThrow()`
+   - Free throw sequences with active player display updates
+   
+6. **FAST_BREAK** → `AnimationRouter` → `AnimationEngine` → `handleFastBreak()`
+   - Fast break sequences with outlet passes and shot attempts
+   
+7. **PUTBACK_MAKE/PUTBACK_MISS/OREB_KICKOUT** → `AnimationRouter` → `AnimationEngine` → `handlePutback()`
+   - Putback shot attempts and OREB kickout passes
+   
+8. **OPENING_TIP** → `AnimationRouter` → `AnimationEngine` → `handleOpeningTip()`
+   - Opening tip sequences with state transitions
+   
+9. **DEFENSIVE_STOP** → `AnimationRouter` → `AnimationEngine` → `handleDefensiveStop()`
+   - Defensive stop transitions (Fast Break or standard)
+   
+10. **STEAL** (standalone turn) → `AnimationRouter` → `AnimationEngine` → `handleSteal()`
+    - Steal pass animations and possession changes
+    
+11. **TURNOVER** → `AnimationRouter` → `AnimationEngine` → `handleTurnover()`
+    - Turnover animations
+    
+12. **SIDE_INBOUND** → `AnimationRouter` → `AnimationEngine` → `handleSideInbound()`
+    - Side inbound pass sequences
+    
+13. **BASELINE_INBOUND** → `AnimationRouter` → `AnimationEngine` → `handleBaselineInbound()`
+    - Baseline inbound pass sequences with FCP/HCT state tracking
+    
+14. **HCO setup turns** → `AnimationRouter` → `AnimationEngine` → `handleDefault()` → `playTurnAnimation()`
+    - HCO setup turns (not shot attempts)
 
-**Benefits:**
-- ✅ Single entry point for all animations
-- ✅ Consistent pre/post setup across all turn types
-- ✅ Proper ball ownership handling via BallController
-- ✅ Easier to maintain and extend
-- ✅ Better error handling and debugging
+**Predictable Architecture Benefits:**
+
+**Simple:**
+- ✅ **Single Pattern**: All animations follow the same flow: detection → AnimationRouter → AnimationEngine → handler
+- ✅ **Clear Separation**: `animateGameTurns.js` only detects and routes, handlers execute
+- ✅ **One Mental Model**: "Find the turn type → route through AnimationRouter → handler executes"
+
+**Stable:**
+- ✅ **Centralized Routing**: All routing logic in one place (`AnimationEngine.determineHandler()`)
+- ✅ **Consistent Error Handling**: AnimationRouter provides uniform error handling
+- ✅ **Isolated Handlers**: Bugs in one handler don't affect others
+- ✅ **Easier Testing**: Can test routing separately from execution
+
+**Scalable:**
+- ✅ **Easy Extension**: Adding new turn types requires only adding a handler to `AnimationEngine`
+- ✅ **No Core Changes**: New turn types don't require modifying `animateGameTurns.js`
+- ✅ **Clear Extension Points**: Handlers are isolated and can be refactored independently
+- ✅ **Future-Proof**: Ready for new animation systems (e.g., `ReboundAnimationSystem`, `PassAnimationSystem`)
+
+**Code Reduction:**
+- ✅ **~500 lines removed** from `animateGameTurns.js` (from ~1400 to ~900 lines)
+- ✅ **Eliminated duplicate logic** (announcements, score updates, state transitions)
+- ✅ **Consistent pre/post setup** across all turn types
 
 **Key Files:**
-- `AnimationRouter.js` - Main entry point
-- `AnimationEngine.js` - Turn routing logic
+- `AnimationRouter.js` - Main entry point (single source of truth for routing)
+- `AnimationEngine.js` - Turn routing logic and handler registry
 - `turnPreparation.js` - Pre/post setup utilities
-- `ShotAnimationSystem.js` - HCO shot handler
-- `playTurnAnimation()` - Legacy handler (still used for FCP/HCT and non-migrated turn types)
+- `ShotAnimationSystem.js` - Shot handler (HCO and FCP/HCT)
+- `animateGameTurns.js` - Turn detection and routing (simplified)
+- Handler files - Specialized execution logic
 
 **See:**
-- `FRONTEND_ORCHESTRATION_CONSOLIDATION_PLAN.md` - Overall migration plan
-- `PHASE_2_INCREMENTAL_MIGRATION_PLAN.md` - Incremental migration strategy
-- `PHASE_2.5_BUG_FIX_PLAN.md` - HCO migration details
+- `docs/PHASE_2.6_MIGRATION_PLAN_REVISED.md` - Complete migration plan and status
 
 ---
 
