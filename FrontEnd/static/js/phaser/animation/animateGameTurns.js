@@ -19,7 +19,7 @@ import { getCurrentOwner, getPendingOwner } from "./BallControllerAdapter.js";
 // import { updatePlaycallDisplay } from "../utils/playcallDisplay.js"; // ✅ Used by prepareTurnForAnimation (called by AnimationRouter)
 // import { updateStrategyBars } from "../utils/strategyBars.js"; // ✅ Used by prepareTurnForAnimation (called by AnimationRouter)
 // import { updatePlaycallCenter, animateLeanMeter, parseLeanScoreFromText } from "../ui/playcallCenter.js"; // ✅ Used by prepareTurnForAnimation (called by AnimationRouter)
-// import { prepareTurnForAnimation, finalizeTurnAfterAnimation } from "./turnPreparation.js"; // ✅ Now called by AnimationRouter, not directly here
+import { prepareTurnForAnimation, finalizeTurnAfterAnimation } from "./turnPreparation.js"; // ✅ RESTORED: Needed for outlet passes (sets scene.currentTurn before routing)
 import { announceFromTurnData } from "../utils/announcements.js";
 import {
   animationDebugLog,
@@ -513,19 +513,16 @@ export async function animateGameTurns({ //hasBallAtStep
     
     // Removed verbose turn processing log
     
-    // ✅ PHASE 2.6 COMPLETE: prepareTurnForAnimation is now called by AnimationRouter for all routed turns
-    // This duplicate call was causing prepareTurnForAnimation to run twice for most turns
-    // AnimationRouter handles pre/post setup (prepareTurnForAnimation, finalizeTurnAfterAnimation)
-    // For non-routed turns (DEAD BALL, non-animated FOUL), they don't need preparation
-    // const { possessionId } = prepareTurnForAnimation({
-    //   turn,
-    //   scene,
-    //   turnIndex: i,
-    //   homeTeamId: scene.simData?.home_team_id
-    // });
-    
-    // ✅ Get possessionId from turn data (used for updateDebugScore)
-    const possessionId = turn.possession_id ?? turn.possessionId ?? turn.possessionID ?? null;
+    // ✅ RESTORED: prepareTurnForAnimation must be called BEFORE routing to ensure scene.currentTurn is set
+    // This is critical for outlet passes which happen during embedded rebounds in shot turns
+    // AnimationRouter also calls prepareTurnForAnimation, but it's idempotent (safe to call twice)
+    // The early call ensures scene.currentTurn is set before any embedded rebound handling
+    const { possessionId } = prepareTurnForAnimation({
+      turn,
+      scene,
+      turnIndex: i,
+      homeTeamId: scene.simData?.home_team_id
+    });
     
     const animations = turn.animations || [];
     const shouldLogLegacySteps =
