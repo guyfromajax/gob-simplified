@@ -205,9 +205,13 @@ class GameManager:
             self.text_log.append("Baseline inbound after made shot")
             
             # ✅ CRITICAL: Preserve offensive_state for the next API call
-            # After BASELINE_INBOUND, the next turn should be the FCP/HCT setup turn (FOUL/HCO/TURNOVER)
-            # We need to ensure offensive_state remains "FCP" or "HCT" so the next API call generates the setup turn
-            if next_defensive_setup in ["FCP", "HCT"]:
+            # After BASELINE_INBOUND, preserve offensive_state for all pressure types (FCP, HCT, or HCO)
+            # This ensures consistency across all three cases:
+            # - FCP: Next API call generates FCP setup turn (FOUL/HCO/TURNOVER)
+            # - HCT: Next API call generates HCT setup turn (FOUL/HCO/TURNOVER)
+            # - HCO: Next API call generates regular HCO turn (no pressure)
+            # This matches the pattern used in OREB putback and Free Throw flows
+            if next_defensive_setup:
                 self.game_state["offensive_state"] = next_defensive_setup
 
         # Update team stats after each turn
