@@ -190,6 +190,20 @@ class GameManager:
             # Reset offensive state to HCO after side inbound (FCP/HCT only apply after made shots)
             self.game_state["offensive_state"] = "HCO"
 
+        # If the turn ended with a made shot and next_play_type is BASELINE_INBOUND,
+        # prepare a baseline inbound sequence and append its payload so the front end can animate it.
+        # This ensures the frontend receives a separate BASELINE_INBOUND turn (like OREB putback makes do)
+        # which allows proper FCP/HCT setup turn generation in the next API call.
+        if (
+            result.get("result_type") == "MAKE" 
+            and result.get("next_play_type") == "BASELINE_INBOUND"
+        ):
+            # Get next_defensive_setup from the made shot turn (FCP/HCT pressure type)
+            next_defensive_setup = result.get("next_defensive_setup")
+            inbound_payload = self.turn_manager.setup_baseline_inbound(next_defensive_setup=next_defensive_setup)
+            self.turns.append(inbound_payload)
+            self.text_log.append("Baseline inbound after made shot")
+
         # Update team stats after each turn
         self.update_team_stats()
 
