@@ -802,16 +802,19 @@ export async function animateGameTurns({ //hasBallAtStep
     // Use scene state as single source of truth - matches BallController pattern
     const previousTurn = i > 0 ? turns[i - 1] : null;
     
-    // Simple check: if we're in a pressure sequence, check if this turn is part of it
-    // ✅ FIX: Only detect as FCP/HCT if turn has explicit FCP/HCT flags OR is a transition to HCO
-    // Don't detect regular HCO shots (MAKE/MISS) as FCP/HCT just because pressure state is active
-    // FCP/HCT shots should only be detected via fcp_shot/hct_shot flags (SHOT was removed from backend)
-    const isFCPHCT = scene.pressureSequenceActive && 
-                     (turn.fcp_shot === true || turn.hct_shot === true ||
-                      turn.fcp_foul === true || turn.hct_foul === true ||
-                      turn.result_type === "HCO" || // HCT/FCP press break that transitions to HCO
-                      turn.result_type === "TURNOVER" || // Turnover during pressure
-                      turn.next_defensive_setup === "FCP" || turn.next_defensive_setup === "HCT");
+    // ✅ SS&S: Only detect FCP/HCT if turn has explicit defensive setup flags or FCP/HCT outcome flags
+    // The source of truth is the turn data (next_defensive_setup from backend), not scene state
+    // Backend only sets next_defensive_setup to "FCP" or "HCT" if the defensive team has those settings enabled
+    const hasExplicitFCPHCTFlags = turn.fcp_shot === true || turn.hct_shot === true ||
+                                   turn.fcp_foul === true || turn.hct_foul === true ||
+                                   turn.next_defensive_setup === "FCP" || turn.next_defensive_setup === "HCT";
+    
+    // For HCO/TURNOVER outcomes, only detect as FCP/HCT if we're in an active pressure sequence
+    // (these are press break outcomes, not regular HCO shots)
+    const isPressBreakOutcome = (turn.result_type === "HCO" || turn.result_type === "TURNOVER") && 
+                                scene.pressureSequenceActive;
+    
+    const isFCPHCT = hasExplicitFCPHCTFlags || isPressBreakOutcome;
     
     // ✅ DEBUG: Log state-based detection
     if (scene.pressureSequenceActive) {
@@ -875,10 +878,14 @@ export async function animateGameTurns({ //hasBallAtStep
     }
     
     if (isFCPHCT) {
-      // ✅ SS&S: Use scene state for pressure type (single source of truth)
-      // Fallback to turn flags if state not set yet (shouldn't happen, but safety check)
-      const pressureType = scene.currentPressureType || 
-                           (turn.fcp_shot || turn.fcp_foul || turn.next_defensive_setup === "FCP" ? 'FCP' : 'HCT');
+      // ✅ SS&S: Use turn.next_defensive_setup as primary source (calculated by backend from defensive team's strategy settings)
+      // Fallback to scene state (set from previous turn's next_defensive_setup) for subsequent turns in sequence
+      // Final fallback to turn flags if neither is available
+      const pressureType = turn.next_defensive_setup === "FCP" || turn.next_defensive_setup === "HCT" 
+                           ? turn.next_defensive_setup  // Backend calculation (source of truth)
+                           : scene.currentPressureType ||  // Scene state (from previous turn)
+                           (turn.fcp_shot || turn.fcp_foul ? 'FCP' : 
+                            turn.hct_shot || turn.hct_foul ? 'HCT' : null);
       
       // ✅ SS&S: Simple state-based shot attempt detection
       // If we're in a pressure sequence and this is a shot, it's an FCP/HCT shot attempt

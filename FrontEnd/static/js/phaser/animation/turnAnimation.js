@@ -1663,6 +1663,29 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
     scene._previousTurnWasOpeningTip = false;
   }
 
+  // ✅ SIMPLER FIX: For FCP/HCT turns, run setup tween to move players to step 0 positions
+  // This matches ShotAnimationSystem's approach and gives tween manager time to settle
+  // after runInboundSetup() completes
+  if (isFCPHCT && !scene.skipToEnd && maxSteps > 1) {
+    const pressureType = turnData.fcp_shot || turnData.fcp_foul || turnData.next_defensive_setup === "FCP" ? 'FCP' : 'HCT';
+    console.log('🔧 [FCP/HCT SETUP TWEEN] Moving players to step 0 positions before skeleton animation', {
+      turn_index: turnIndex,
+      pressureType,
+      maxSteps,
+      animation_count: turnData.animations?.length || 0
+    });
+    
+    await runSetupTween({
+      scene,
+      ballSprite,
+      animations: turnData.animations,
+      playerSprites,
+      currentBallOwnerRef
+    });
+    
+    console.log('✅ [FCP/HCT SETUP TWEEN COMPLETE] Players positioned at step 0, starting skeleton animation');
+  }
+
   let eventsProcessed = false;
   
   // ✅ DEBUG: Log FCP/HCT step loop start
