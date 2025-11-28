@@ -203,6 +203,12 @@ class GameManager:
             inbound_payload = self.turn_manager.setup_baseline_inbound(next_defensive_setup=next_defensive_setup)
             self.turns.append(inbound_payload)
             self.text_log.append("Baseline inbound after made shot")
+            
+            # ✅ CRITICAL: Preserve offensive_state for the next API call
+            # After BASELINE_INBOUND, the next turn should be the FCP/HCT setup turn (FOUL/HCO/TURNOVER)
+            # We need to ensure offensive_state remains "FCP" or "HCT" so the next API call generates the setup turn
+            if next_defensive_setup in ["FCP", "HCT"]:
+                self.game_state["offensive_state"] = next_defensive_setup
 
         # Update team stats after each turn
         self.update_team_stats()
