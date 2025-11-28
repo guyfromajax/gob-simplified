@@ -167,46 +167,6 @@ export class AnimationRouter {
         console.log('🎉 AnimationRouter: Turn processing completed successfully');
       }
 
-      // ✅ CRITICAL FIX: Add delay after processing for FCP/HCT turns (before finalization)
-      // This matches the natural delay that other flows have (OREB, Free Throw, Fast Break)
-      // After a made shot, if the next turn will be FCP/HCT, we need to give the tween manager
-      // time to fully process all tweens from runInboundSetup() before the next turn starts
-      const isMadeShot = turnData.result_type === "MAKE" || turnData.result_type === "MISS";
-      const nextTurnIsFCPHCT = turnData.next_defensive_setup === "FCP" || turnData.next_defensive_setup === "HCT" ||
-                               this.scene.pressureSequenceActive === true;
-      
-      if (isMadeShot && nextTurnIsFCPHCT && this.scene.tweens) {
-        const tweenManagerState = {
-          totalTweens: this.scene.tweens.getAll ? this.scene.tweens.getAll().length : 'N/A',
-          isPaused: this.scene.tweens.isPaused ? this.scene.tweens.isPaused() : 'N/A',
-          timeScale: this.scene.tweens.timeScale ?? 'N/A'
-        };
-        
-        console.log('🔧 [FCP/HCT POST-PROCESSING DELAY] Waiting 100ms before finalization for FCP/HCT next turn', {
-          turnIndex: turnData.index,
-          result_type: turnData.result_type,
-          next_defensive_setup: turnData.next_defensive_setup,
-          pressureSequenceActive: this.scene.pressureSequenceActive,
-          tweenManagerState
-        });
-        
-        // Use a slightly longer delay (100ms) to ensure tween manager is fully ready
-        // This matches the natural delay from announceFromTurnData/onUpdate in other flows
-        await new Promise(resolve => {
-          if (this.scene.time && this.scene.time.delayedCall) {
-            this.scene.time.delayedCall(100, resolve);
-          } else {
-            setTimeout(resolve, 100);
-          }
-        });
-        
-        console.log('🔧 [FCP/HCT POST-PROCESSING DELAY COMPLETE] Tween manager state after delay', {
-          totalTweens: this.scene.tweens.getAll ? this.scene.tweens.getAll().length : 'N/A',
-          isPaused: this.scene.tweens.isPaused ? this.scene.tweens.isPaused() : 'N/A',
-          timeScale: this.scene.tweens.timeScale ?? 'N/A'
-        });
-      }
-
     } catch (error) {
       console.error('❌ AnimationRouter: Error processing turn', {
         error: error.message,
