@@ -1,7 +1,51 @@
 # FCP/HCT Animation Skip Diagnosis
 
 ## Problem
-FCP/HCT non-shot outcomes (HCO transitions, fouls, turnovers) are skipping animations even after removing SHOT as an option.
+FCP/HCT animations are skipping inconsistently. Some instances animate correctly (after OREB Putback, Free Throw), while others fail (after HCO shots).
+
+## Current Pattern (2025-01-XX)
+
+### ✅ Working: After Made OREB Putback
+- **Next turn**: `FOUL - PRESS!` (FCP/HCT setup turn)
+- **Routes to**: `playTurnAnimation()`
+- **Has**: `🔧 [FCP/HCT SETUP TWEEN]` → `🔧 [FCP/HCT TWEEN CLEANUP]` → skeleton animation works ✅
+
+### ✅ Working: After Made Free Throw
+- **Next turn**: `FOUL - PRESS!` (FCP/HCT setup turn)
+- **Routes to**: `playTurnAnimation()`
+- **Has**: `🔧 [FCP/HCT SETUP TWEEN]` → `🔧 [FCP/HCT TWEEN CLEANUP]` → skeleton animation works ✅
+
+### ❌ Failing: After Made HCO Shot
+- **Next turn**: `MISS` (FCP/HCT shot attempt) - **⚠️ BUG: Should be setup turn or skeleton animation, not shot attempt**
+- **Routes to**: `ShotAnimationSystem` (via `AnimationRouter`)
+- **Has**: `🔧 [FCP/HCT TWEEN CLEANUP]` but **NO** `🔧 [FCP/HCT SETUP TWEEN]` → skeleton animation fails ❌
+
+### Root Cause Analysis
+
+**The Issue:**
+- **Setup turns** (FOUL, HCO transition) route to `playTurnAnimation()` which runs `runSetupTween()` before the step loop → ✅ works
+- **Shot attempts** (MISS/MAKE) route to `ShotAnimationSystem` which should run `runSetupTween()` but it's either:
+  - Not executing
+  - Not completing
+  - Not being waited for properly
+  → ❌ fails
+
+**Key Question:**
+Why is the next turn after a made HCO shot a `MISS` (shot attempt) instead of a `FOUL - PRESS!` (setup turn) or FCP/HCT skeleton animation turn (HCO/FOUL/TURNOVER)?
+
+**Possible Causes:**
+1. **Backend Issue**: Backend is generating a shot attempt instead of an FCP/HCT setup/skeleton turn
+2. **Frontend Detection Issue**: Frontend is misidentifying the FCP/HCT setup/skeleton turn as a shot attempt
+3. **Missing Turn**: Backend is skipping the FCP/HCT setup turn and going straight to a shot attempt
+
+**Debug Logging Added:**
+- `🔍 [NEXT TURN AFTER MADE SHOT]` - Logs what the backend sends as the next turn after a made shot
+- This will help identify if the backend is generating the wrong turn type
+
+---
+
+## Previous Problem (Fixed)
+FCP/HCT non-shot outcomes (HCO transitions, fouls, turnovers) were skipping animations even after removing SHOT as an option.
 
 ## Root Cause Analysis
 
