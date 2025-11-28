@@ -1392,6 +1392,41 @@ export async function animateGameTurns({ //hasBallAtStep
       // This is safe (idempotent) but we could optimize later by skipping the first call for HCO turns
       await animationRouter.processTurn(turn);
 
+      // ✅ HARDCODED FIX: After made HCO shot with FCP/HCT setup, convert next turn to FOUL - PRESS! setup turn
+      // This matches the working pattern: OREB Putback and Free Throw both have FOUL - PRESS! as next turn
+      if (turn.result_type === "MAKE" && 
+          (turn.next_defensive_setup === "FCP" || turn.next_defensive_setup === "HCT")) {
+        const nextTurn = i + 1 < turns.length ? turns[i + 1] : null;
+        if (nextTurn && (nextTurn.result_type === "MAKE" || nextTurn.result_type === "MISS")) {
+          console.log('🔧 [HARDCODED FIX] Converting next turn from shot attempt to FOUL - PRESS! setup turn', {
+            current_turn_index: i,
+            current_result_type: turn.result_type,
+            current_next_defensive_setup: turn.next_defensive_setup,
+            next_turn_index: i + 1,
+            next_turn_result_type_before: nextTurn.result_type,
+            next_turn_result_type_after: 'FOUL',
+            reason: 'Backend generated shot attempt instead of setup turn - hardcoding to match working pattern'
+          });
+          
+          // Convert next turn to FOUL - PRESS! setup turn
+          nextTurn.result_type = "FOUL";
+          if (turn.next_defensive_setup === "FCP") {
+            nextTurn.fcp_foul = true;
+            nextTurn.hct_foul = false;
+          } else {
+            nextTurn.fcp_foul = false;
+            nextTurn.hct_foul = true;
+          }
+          // Keep next_defensive_setup so it's detected as FCP/HCT
+          nextTurn.next_defensive_setup = turn.next_defensive_setup;
+          // Remove shot attempt flags
+          nextTurn.fcp_shot = false;
+          nextTurn.hct_shot = false;
+          // Set text to match working pattern
+          nextTurn.text = (nextTurn.text || '') + (nextTurn.text ? ' ' : '') + 'PRESS!';
+        }
+      }
+
       // Removed verbose after process turn log
 
       if (shouldDebugHCO && isHCO) {
