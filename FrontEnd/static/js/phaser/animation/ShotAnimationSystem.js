@@ -306,6 +306,73 @@ export class ShotAnimationSystem {
       }
     }
     
+    // ✅ CRITICAL FIX: For FCP/HCT skeleton animations, kill ALL player sprite tweens
+    // and add a small delay to allow the tween manager to settle after runInboundSetup()
+    // This fixes the race condition where skeleton animation tweens don't progress
+    // This matches the cleanup in playTurnAnimation for FCP/HCT turns
+    const isFCPHCT = turnData.fcp_shot === true || turnData.hct_shot === true || 
+                     turnData.next_defensive_setup === "FCP" || turnData.next_defensive_setup === "HCT" ||
+                     turnData.fcp_foul === true || turnData.hct_foul === true ||
+                     this.scene.pressureSequenceActive === true;
+    
+    if (isFCPHCT && this.scene.tweens && this.playerSprites) {
+      let totalPlayerTweensKilled = 0;
+      const playerTweenDetails = [];
+      
+      // Kill tweens on all player sprites
+      for (const [playerId, sprite] of Object.entries(this.playerSprites)) {
+        if (sprite && this.scene.tweens.getTweensOf) {
+          const playerTweens = this.scene.tweens.getTweensOf(sprite);
+          if (playerTweens.length > 0) {
+            totalPlayerTweensKilled += playerTweens.length;
+            playerTweenDetails.push({
+              playerId,
+              tweenCount: playerTweens.length,
+              tweenIds: playerTweens.map(t => t._animateStepId || 'no-id')
+            });
+            this.scene.tweens.killTweensOf(sprite);
+          }
+        }
+      }
+      
+      // Log tween manager state before FCP/HCT skeleton animation
+      const tweenManagerState = {
+        totalTweens: this.scene.tweens.getAll ? this.scene.tweens.getAll().length : 'N/A',
+        isPaused: this.scene.tweens.isPaused ? this.scene.tweens.isPaused() : 'N/A',
+        timeScale: this.scene.tweens.timeScale ?? 'N/A'
+      };
+      
+      console.log('🔧 [FCP/HCT TWEEN CLEANUP] Killed player sprite tweens before skeleton animation (ShotAnimationSystem)', {
+        totalPlayerTweensKilled,
+        playerTweenDetails,
+        tweenManagerState,
+        pressureType: this.scene.currentPressureType
+      });
+      
+      // Add a small delay (50ms) to allow the tween manager to settle
+      // This is the key fix for the race condition where skeleton animation tweens
+      // are created immediately after runInboundSetup() but don't progress
+      if (totalPlayerTweensKilled > 0 || tweenManagerState.totalTweens > 0) {
+        console.log('🔧 [FCP/HCT TWEEN SETTLE] Waiting 50ms for tween manager to settle (ShotAnimationSystem)', {
+          totalPlayerTweensKilled,
+          remainingTweens: tweenManagerState.totalTweens,
+          pressureType: this.scene.currentPressureType
+        });
+        await new Promise(resolve => {
+          if (this.scene.time && this.scene.time.delayedCall) {
+            this.scene.time.delayedCall(50, resolve);
+          } else {
+            setTimeout(resolve, 50);
+          }
+        });
+        console.log('🔧 [FCP/HCT TWEEN SETTLE COMPLETE] Tween manager state after delay (ShotAnimationSystem)', {
+          totalTweens: this.scene.tweens.getAll ? this.scene.tweens.getAll().length : 'N/A',
+          isPaused: this.scene.tweens.isPaused ? this.scene.tweens.isPaused() : 'N/A',
+          timeScale: this.scene.tweens.timeScale ?? 'N/A'
+        });
+      }
+    }
+    
     for (let stepIndex = 1; stepIndex < maxSteps; stepIndex++) {
       if (this.scene.skipToEnd) break;
       
