@@ -404,6 +404,70 @@ export class AnimationEngine {
     // Note: Announcements and score updates are handled by AnimationRouter (finalizeTurnAfterAnimation)
   }
 
+  async handlePutback(turnData, context) {
+    console.log('AnimationEngine: Handling putback/OREB kickout', {
+      result_type: turnData.result_type,
+      rebounderId: turnData.rebounderId
+    });
+    
+    // ✅ PHASE 2.6: Use existing handleOrebTurn function (moved from animateGameTurns.js)
+    // handleOrebTurn handles PUTBACK_MAKE, PUTBACK_MISS, and OREB_KICKOUT
+    const { handleOrebTurn } = await import('./animateGameTurns.js');
+    await handleOrebTurn(this.scene, {
+      playerSprites: context.playerSprites,
+      ballSprite: context.ballSprite,
+      turnData: turnData,
+      onUpdate: context.onUpdate
+    });
+    
+    // Note: Announcements and score updates are handled by AnimationRouter (finalizeTurnAfterAnimation)
+  }
+
+  async handleOpeningTip(turnData, context) {
+    console.log('AnimationEngine: Handling opening tip');
+    
+    // ✅ PHASE 2.6: Validate opening tip timing (moved from animateGameTurns.js)
+    const turnQuarter = turnData.quarter ?? this.scene.quarter ?? 1;
+    const turnIndex = context.turnIndex ?? 0;
+    const isQ1Start = turnQuarter === 1 && turnIndex === 0;
+    const isOTStart = turnQuarter > 4 && turnIndex === 0;
+    
+    if (!isQ1Start && !isOTStart) {
+      console.error('⚠️ OPENING_TIP detected mid-game! This should not happen.', {
+        turnIndex: turnIndex,
+        quarter: turnQuarter,
+        sceneQuarter: this.scene.quarter,
+        turn: turnData
+      });
+      // Skip opening tip if it's not at the start of Q1 or OT
+      return;
+    }
+    
+    // ✅ PHASE 2.6: Run opening tip sequence (moved from animateGameTurns.js)
+    const { runOpeningTipSequence } = await import('./openingTip.js');
+    await new Promise(resolve => {
+      runOpeningTipSequence(this.scene, {
+        playerSprites: context.playerSprites,
+        ballSprite: context.ballSprite,
+        turnData: turnData,
+        onComplete: resolve
+      });
+    });
+    
+    // ✅ PHASE 2.6: Transition to HalfCourt state (moved from animateGameTurns.js)
+    const { States, safeTransition } = await import('../state/gameStateMachine.js');
+    const { getCurrentOwner, getPendingOwner } = await import('./BallControllerAdapter.js');
+    if (this.scene.stateMachine && !this.scene.stateMachine.is(States.HalfCourt)) {
+      safeTransition(this.scene.stateMachine, States.HalfCourt, {
+        reason: 'opening_tip_complete',
+        currentOwnerId: getCurrentOwner(this.scene),
+        pendingOwnerId: getPendingOwner(this.scene)
+      });
+    }
+    
+    // Note: Announcements and score updates are handled by AnimationRouter (finalizeTurnAfterAnimation)
+  }
+
   async handleShotAttempt(turnData, context) {
     console.log('AnimationEngine: Handling shot attempt with new ShotAnimationSystem', {
       hasShotSystem: !!this.shotSystem,
