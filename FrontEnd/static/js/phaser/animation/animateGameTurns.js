@@ -1000,8 +1000,12 @@ export async function animateGameTurns({ //hasBallAtStep
       
       // ✅ SS&S: Clear pressure state when sequence completes
       // Clear state when: shot attempt completes (and next turn isn't FCP/HCT), foul occurs, turnover occurs, OR transition to HCO (next turn isn't FCP/HCT)
+      // ✅ CRITICAL FIX: Don't clear state on MADE/MISS if turn has next_defensive_setup === "FCP"/"HCT"
+      // This means the made shot is setting up the next FCP/HCT turn (via runInboundSetup), so keep state active
+      const isSettingUpNextFCPHCT = (turn.result_type === "MAKE" || turn.result_type === "MISS") &&
+                                     (turn.next_defensive_setup === "FCP" || turn.next_defensive_setup === "HCT");
       const shouldClearPressureState = 
-        ((turn.result_type === "MAKE" || turn.result_type === "MISS") && !nextTurnIsFCPHCT) || // Shot attempt completed, but next turn isn't FCP/HCT
+        ((turn.result_type === "MAKE" || turn.result_type === "MISS") && !nextTurnIsFCPHCT && !isSettingUpNextFCPHCT) || // Shot attempt completed, but next turn isn't FCP/HCT AND not setting up next FCP/HCT
         (turn.result_type === "HCO" && !nextTurnIsFCPHCT) || // Pressure broken, transition to HCO (next turn isn't FCP/HCT)
         turn.fcp_foul === true || turn.hct_foul === true || // Foul occurred
         turn.result_type === "TURNOVER"; // Turnover occurred
@@ -1013,7 +1017,10 @@ export async function animateGameTurns({ //hasBallAtStep
           previousPressureType: scene.currentPressureType,
           nextTurnIsFCPHCT,
           nextTurnResultType: nextTurn?.result_type || null,
-          reason: turn.result_type === "MAKE" || turn.result_type === "MISS" ? 'shot completed' :
+          isSettingUpNextFCPHCT,
+          next_defensive_setup: turn.next_defensive_setup,
+          reason: turn.result_type === "MAKE" || turn.result_type === "MISS" ? 
+                  (isSettingUpNextFCPHCT ? 'shot completed but setting up next FCP/HCT (keeping state)' : 'shot completed') :
                   turn.result_type === "HCO" ? `pressure broken (next turn is not FCP/HCT: ${!nextTurnIsFCPHCT})` :
                   turn.fcp_foul || turn.hct_foul ? 'foul occurred' : 'turnover occurred'
         });
