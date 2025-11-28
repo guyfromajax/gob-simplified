@@ -1,106 +1,134 @@
-# OpenDevin: Fix Inconsistent FCP/HCT Animation Skipping
+# OpenDevin: Fix FCP/HCT Animation Skipping After Made HCO Shots
 
 ## Objective
 
-Fix inconsistent FCP/HCT (Full Court Press / Half Court Trap) **skeleton animation** behavior where **some instances animate correctly** but **others skip visually** and seamlessly default to HCO (Half Court Offense).
-
-**Important:** FCP/HCT **setup turns work correctly** - players animate to their press/trap positions. The issue is with the **skeleton animation** (press break/trap break sequence) that comes **after** the setup.
+Fix FCP/HCT (Full Court Press / Half Court Trap) skeleton animations that **skip visually** after made HCO (Half Court Offense) shots. The animations work correctly after made Free Throws, OREB putbacks, and Fast Break shots, but consistently fail after made HCO shots.
 
 ## The Bug
 
-**Symptom:** FCP/HCT skeleton animations are detected and routed correctly, but **inconsistently**:
-- ✅ **Working instances:** Skeleton animations play visually (players move through press break steps, passes animate), completes normally
-- ❌ **Skipped instances:** Skeleton animation tweens created but never progress (`tweenProgress: 0`), timeout after 5 seconds, code completes, seamlessly transitions to HCO
+**Symptom:** After a made HCO shot:
+1. ✅ `runInboundSetup()` is called and completes (with 50ms delay)
+2. ✅ FCP/HCT state is set correctly (`scene.pressureSequenceActive = true`)
+3. ✅ Next turn is detected as FCP/HCT shot attempt
+4. ✅ Routes to `AnimationRouter → ShotAnimationSystem`
+5. ❌ **`ShotAnimationSystem` doesn't execute** - no logs appear, tweens don't start, animation skips
 
 **Key Characteristics:**
-- **ONLY affects FCP/HCT skeleton animations** (not setup turns, not shot attempts, not HCO, not fast breaks)
-- **Setup turns work fine** - players correctly animate to FCP/HCT defensive positions
-- **Inconsistent** - some skeleton animations work, some don't (suggests timing/race condition)
-- **No visual glitch** - skipped animations complete code-wise, transition is seamless
-- **Tweens report as "playing"** but progress stays at 0
+- **ONLY affects FCP/HCT animations after made HCO shots**
+- ✅ Works after made Free Throws (has event emissions/state transitions after `runInboundSetup()`)
+- ✅ Works after made OREB putbacks (has `announceFromTurnData`, `onUpdate`, `updateDebugScore` after `runInboundSetup()`)
+- ✅ Works after made Fast Break shots (has `announceFromTurnData`, `onUpdate`, `updateDebugScore` after `runInboundSetup()`)
+- ❌ Fails after made HCO shots (`ShotAnimationSystem.handleMadeShot()` returns immediately after `runInboundSetup()`)
 
 ## Critical Context
 
-### FCP/HCT Flow
-1. Made shot → `runInboundSetup()` called inline (creates 10+ tweens for player positioning + inbound pass)
-2. `runInboundSetup()` completes (Promise resolves)
-3. **FCP/HCT setup turn:** Players animate to press/trap positions ✅ (THIS WORKS)
-4. **Immediately after setup:** FCP/HCT skeleton animation turn starts (`playTurnAnimation()`)
-5. Step loop creates new tweens for skeleton animation (press break/trap break sequence)
-6. **Problem:** Skeleton animation tweens don't progress (timeout after 5 seconds) ❌
+### Flow Comparison
 
-### Why This Suggests Timing Issue
-- FCP/HCT skeleton animation starts **immediately** after setup turn completes (which itself comes after `runInboundSetup()`)
-- Setup turn creates tweens for player positioning, then skeleton animation tries to create new tweens
-- **Inconsistent behavior** = sometimes tween manager is ready for skeleton animation, sometimes it's not
-- Other animation types (HCO, fast breaks) don't have this immediate sequence: setup → skeleton animation
+| Flow | Handler | After `runInboundSetup()` | Next Turn Delay | Result |
+|------|---------|---------------------------|-----------------|--------|
+| **Made OREB Putback** | `handleOrebTurn()` | `announceFromTurnData()`<br>`onUpdate()`<br>`updateDebugScore()` | ✅ Natural delay | ✅ Works |
+| **Made HCO Shot** | `ShotAnimationSystem.handleMadeShot()` | Returns immediately | ❌ No delay | ❌ Fails |
+| **Made Free Throw** | `runFreeThrowSequence()` | Event emissions<br>State transitions | ✅ Natural delay | ✅ Works |
+| **Made Fast Break Shot** | `animateFastBreakShot()` | Returns to `runFastBreakSequence()`<br>Then: `announceFromTurnData()`<br>`onUpdate()`<br>`updateDebugScore()` | ✅ Natural delay | ✅ Works |
+
+### The Problem
+
+**HCO Shot flow is unique:**
+- After `runInboundSetup()` completes, `ShotAnimationSystem.handleMadeShot()` returns immediately
+- Next turn starts right away (no additional processing delay)
+- `ShotAnimationSystem.processShot()` is called but doesn't execute (no logs appear)
+- Tweens are created but don't start (`tweenProgress: 0`)
+
+**Other flows work because:**
+- They have natural delays from additional processing (announcements, events, state transitions)
+- This gives the tween manager time to fully process `runInboundSetup()` tweens before the next turn starts
 
 ### What We've Tried (Didn't Work)
-1. Kill lingering ball tweens before step loop
-2. Remove ball from tween targets if it has active tweens
-3. Fix early exit conditions
-4. State tracking refactor
-5. Pressure state clearing fixes
+
+1. ✅ Added 50ms delay after `runInboundSetup()` completes (built into `runInboundSetup()` itself)
+2. ✅ Added player tween cleanup to `ShotAnimationSystem.animatePlayerMovement()` (matches `playTurnAnimation`)
+3. ✅ Added ball tween cleanup before step loop
+4. ✅ State tracking refactor
+5. ✅ Pressure state clearing fixes
+
+**Current State:**
+- `runInboundSetup()` has built-in 50ms delay for FCP/HCT
+- `ShotAnimationSystem.animatePlayerMovement()` has player tween cleanup (kills all player tweens + 50ms delay)
+- But `ShotAnimationSystem.processShot()` doesn't execute (no logs appear)
 
 ## Files to Focus On
 
-1. **`FrontEnd/static/js/phaser/animation/turnAnimation.js`**
-   - `playTurnAnimation()` - Line 1404 (FCP/HCT setup turn handler)
-   - `runInboundSetup()` - Line 850 (creates many tweens, called before FCP/HCT)
+1. **`FrontEnd/static/js/phaser/animation/ShotAnimationSystem.js`**
+   - `processShot()` - Line 63 (entry point, should log `🏀 SHOT ATTEMPT` but doesn't)
+   - `handleMadeShot()` - Line 612 (calls `runInboundSetup()` at line 733, returns immediately)
+   - `animatePlayerMovement()` - Line 289 (has cleanup, but never reached)
 
-2. **`FrontEnd/static/js/phaser/animation/animateStep.js`**
-   - `animateStep()` - Line 35 (creates individual step tweens)
+2. **`FrontEnd/static/js/phaser/animation/AnimationEngine.js`**
+   - `handleShotAttempt()` - Line 323 (calls `this.shotSystem.processShot(turnData)`)
 
-3. **`FrontEnd/static/js/phaser/animation/ShotAnimationSystem.js`**
-   - `handleMadeShot()` - Line 537 (calls `runInboundSetup()` inline at line 658)
+3. **`FrontEnd/static/js/phaser/animation/turnAnimation.js`**
+   - `runInboundSetup()` - Line 850 (creates many tweens, has 50ms delay for FCP/HCT)
 
 ## What to Investigate
 
-**Primary Hypothesis: Timing/Race Condition**
-- `runInboundSetup()` completes, but Phaser's tween manager hasn't finished internal cleanup
-- Starting new tweens immediately causes conflicts
-- **Test:** Compare tween manager state (`scene.tweens.getAll().length`, `isPaused()`, `timeScale`) for working vs skipped instances
-- **Test:** Add small delay after `runInboundSetup()` completes, see if animations work consistently
+**Primary Hypothesis: `ShotAnimationSystem.processShot()` Not Executing**
+- `AnimationEngine.handleShotAttempt()` calls `this.shotSystem.processShot(turnData)`
+- But no logs appear from `processShot()` (should log `🏀 SHOT ATTEMPT` at line 67)
+- This suggests either:
+  1. `processShot()` isn't being called (but we see the log from `AnimationEngine`)
+  2. `processShot()` is failing silently before the first log
+  3. `processShot()` is being called but execution is blocked somehow
 
-**Secondary Checks:**
-- Is `scene.tweens.isPaused()` true when skeleton animation tweens are created?
-- Is `scene.tweens.timeScale` 0 or non-1?
-- How many active tweens exist when skeleton animation starts? (working vs skipped)
-- Timing: How long between setup turn completion and skeleton animation start?
-- Are setup turn tweens still active when skeleton animation starts?
+**Debugging Steps:**
+1. Add logging at the very start of `processShot()` to confirm it's being called
+2. Check if `this.shotSystem` is null/undefined in `AnimationEngine`
+3. Check if `turnData` is valid when passed to `processShot()`
+4. Check if there's an error being caught and swallowed
+5. Compare working flows (Free Throw, OREB, Fast Break) to see what's different
+
+**Secondary Hypothesis: Tween Manager Not Ready**
+- Even with cleanup and delays, tween manager might not be ready
+- Check tween manager state when `processShot()` is called:
+  - `scene.tweens.getAll().length`
+  - `scene.tweens.isPaused()`
+  - `scene.tweens.timeScale`
+- Compare to working flows
 
 ## Expected Fix
 
-**Goal:** Make ALL FCP/HCT animations work consistently (not just some).
+**Goal:** Make FCP/HCT animations work consistently after made HCO shots.
 
 **Approach:**
-1. Compare working vs skipped skeleton animation instances to find the difference
-2. Identify what makes working skeleton animations work
-3. Ensure all instances have those conditions (likely: wait for setup turn tweens to complete, or wait for tween manager to be ready)
+1. Confirm `processShot()` is being called (add logging)
+2. If called but not executing, find what's blocking it
+3. If executing but tweens not starting, investigate tween manager state
+4. Ensure consistent behavior with other flows (add natural delay or ensure tween manager is ready)
 
 **Success Criteria:**
-- All FCP/HCT skeleton animations play visually (setup already works)
+- `ShotAnimationSystem.processShot()` executes (logs appear)
+- FCP/HCT skeleton animations play visually after made HCO shots
 - No timeouts occur
-- Skeleton animation tweens progress from 0 to 1
-- Consistent behavior (no more "sometimes works, sometimes doesn't")
+- Consistent behavior (matches Free Throw, OREB, Fast Break flows)
 
-## Current Logs (Skipped Instance)
+## Current Logs (Failed Instance)
 
 ```
-🔍 [BEFORE STEP LOOP] { maxSteps: 8, will_enter_loop: true }
-🔍 [LOOP ITERATION START] { stepIndex: 1, maxSteps: 8 }
-🔍 [TWEEN START CHECK] Tween created but not playing immediately {
-  tweenStartedImmediately: true,      // Reports as playing
-  tweenProgressImmediately: 0,        // But progress is 0
-  validTargetsCount: 1,
-  ballInTargets: false,
-  ballHasActiveTween: true
-}
-animateStep: Timeout - forcing resolve { 
-  tweenProgress: 0,                   // Still 0 after 5 seconds
-  tweenActive: true,
-  distanceToTarget: 159.96
-}
+🎯🎯🎯 SHOT MADE BY: CARLTON BONNER 🎯🎯🎯
+🏀 [FCP/HCT MADE SHOT] Calling runInboundSetup (matching HCO approach)
+🔧 [FCP/HCT POST-INBOUND DELAY] Waiting 50ms for tween manager to settle
+🔧 [FCP/HCT POST-INBOUND DELAY COMPLETE] Tween manager state after delay
+✅ [playTurnAnimation - FCP/HCT COMPLETE]
+✅ [FCP/HCT ANIMATION COMPLETE]
+
+🎬 Turn 14: MISS - [Base Post Play] ...
+🚨🚨🚨 ENTERING FCP/HCT INSTANCE 🚨🚨🚨
+🎬 [FCP/HCT SHOT ATTEMPT] Routing through AnimationRouter → ShotAnimationSystem
+🎬 AnimationRouter: Starting turn processing
+🎯 AnimationRouter: Processing turn directly (no state machine)
+🚀 AnimationRouter: Calling animationEngine.processTurn
+🎬 AnimationEngine: Processing turn MISS
+🎯 AnimationEngine: Using handler for MISS
+AnimationEngine: Handling shot attempt with new ShotAnimationSystem
 ```
 
-**Missing:** No logs showing tween manager state (paused, timeScale, total tweens) - need to add this.
+**Missing:** No logs from `ShotAnimationSystem.processShot()` - should see `🏀 SHOT ATTEMPT` log but don't.

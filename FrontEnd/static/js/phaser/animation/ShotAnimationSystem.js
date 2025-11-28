@@ -62,6 +62,14 @@ export class ShotAnimationSystem {
    */
   async processShot(turnData) {
     // ✅ DEBUG: Log shot attempt immediately - track shooter and shot details
+    console.log('🎬 [ShotAnimationSystem.processShot] ENTERING', {
+      result_type: turnData.result_type,
+      shooter_id: turnData.shooter_id,
+      turn_index: turnData.index,
+      hasPlayerSprites: !!this.playerSprites,
+      playerSpritesCount: this.playerSprites ? Object.keys(this.playerSprites).length : 0
+    });
+    
     const isHCO = turnData.play_type === 'HCO' || turnData.playcall === 'HCO';
     const shooterName = this.playerSprites[turnData.shooter_id]?.name || 'unknown';
     console.log(`🏀 SHOT ATTEMPT: ${shooterName} (${turnData.shooter_id}) - Result: ${turnData.result_type} - HCO: ${isHCO}`);
@@ -287,7 +295,18 @@ export class ShotAnimationSystem {
    * Animate player movement step by step
    */
   async animatePlayerMovement(turnData, ballSprite, currentBallOwnerRef, maxSteps) {
-    if (this.scene.skipToEnd) return;
+    console.log('🎬 [ShotAnimationSystem.animatePlayerMovement] ENTERING', {
+      maxSteps,
+      result_type: turnData.result_type,
+      skipToEnd: this.scene.skipToEnd,
+      hasBallSprite: !!ballSprite,
+      hasTweens: !!this.scene.tweens
+    });
+    
+    if (this.scene.skipToEnd) {
+      console.log('⚠️ [ShotAnimationSystem.animatePlayerMovement] Skipping - skipToEnd is true');
+      return;
+    }
     
     // ✅ CRITICAL FIX: Kill all ball tweens before starting step loop
     // Lingering ball tweens from previous shots/passes can block the tween manager
@@ -314,6 +333,19 @@ export class ShotAnimationSystem {
                      turnData.next_defensive_setup === "FCP" || turnData.next_defensive_setup === "HCT" ||
                      turnData.fcp_foul === true || turnData.hct_foul === true ||
                      this.scene.pressureSequenceActive === true;
+    
+    console.log('🔍 [ShotAnimationSystem.animatePlayerMovement] FCP/HCT Check', {
+      isFCPHCT,
+      fcp_shot: turnData.fcp_shot,
+      hct_shot: turnData.hct_shot,
+      next_defensive_setup: turnData.next_defensive_setup,
+      fcp_foul: turnData.fcp_foul,
+      hct_foul: turnData.hct_foul,
+      pressureSequenceActive: this.scene.pressureSequenceActive,
+      currentPressureType: this.scene.currentPressureType,
+      hasTweens: !!this.scene.tweens,
+      hasPlayerSprites: !!this.playerSprites
+    });
     
     if (isFCPHCT && this.scene.tweens && this.playerSprites) {
       let totalPlayerTweensKilled = 0;

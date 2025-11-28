@@ -321,11 +321,21 @@ export class AnimationEngine {
   }
 
   async handleShotAttempt(turnData, context) {
-    console.log('AnimationEngine: Handling shot attempt with new ShotAnimationSystem');
+    console.log('AnimationEngine: Handling shot attempt with new ShotAnimationSystem', {
+      hasShotSystem: !!this.shotSystem,
+      result_type: turnData.result_type,
+      turn_index: turnData.index
+    });
     
     // Use new shot animation system if available
     if (this.shotSystem) {
+      console.log('🎬 [AnimationEngine] Calling ShotAnimationSystem.processShot()', {
+        result_type: turnData.result_type,
+        shooter_id: turnData.shooter_id,
+        turn_index: turnData.index
+      });
       await this.shotSystem.processShot(turnData);
+      console.log('✅ [AnimationEngine] ShotAnimationSystem.processShot() completed');
     } else {
       // Fallback to existing system
       console.warn('AnimationEngine: ShotAnimationSystem not available, using fallback');
