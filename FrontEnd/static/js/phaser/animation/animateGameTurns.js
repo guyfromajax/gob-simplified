@@ -1,21 +1,26 @@
-import { playTurnAnimation, runSideInboundSetup } from "./turnAnimation.js";
+import { playTurnAnimation } from "./turnAnimation.js";
+// ✅ PHASE 2.6 COMPLETE: Legacy imports no longer needed (all routes through AnimationRouter)
+// import { runSideInboundSetup } from "./turnAnimation.js"; // ✅ Now handled by AnimationEngine.handleSideInbound()
 import { onAction } from "./onAction.js";
 import { AnimationRouter } from "./AnimationRouter.js";
 import { runPass, REBOUND_DEBUG } from "./ballManager.js";
 import animationConfig from "./animation_config.js";
-import runFreeThrowSequence from "./freeThrow.js";
-import runFastBreakSequence from "./fastBreak.js";
-import { runOpeningTipSequence } from "./openingTip.js";
+// ✅ PHASE 2.6 COMPLETE: Legacy imports no longer needed (all routes through AnimationRouter)
+// import runFreeThrowSequence from "./freeThrow.js"; // ✅ Now handled by AnimationEngine.handleFreeThrow()
+// import runFastBreakSequence from "./fastBreak.js"; // ✅ Now handled by AnimationEngine.handleFastBreak()
+// import { runOpeningTipSequence } from "./openingTip.js"; // ✅ Now handled by AnimationEngine.handleOpeningTip()
 import { animateStep } from "./animateStep.js";
-import { handleTurnover } from "./turnoverAdapter.js";
+// ✅ PHASE 2.6 COMPLETE: Legacy imports no longer needed (all routes through AnimationRouter)
+// import { handleTurnover } from "./turnoverAdapter.js"; // ✅ Now handled by AnimationEngine.handleTurnover()
 import { States } from "../state/gameStateMachine.js";
 import { appendToTextScroll } from "../utils/textScroll.js";
 import { getCurrentOwner, getPendingOwner } from "./BallControllerAdapter.js";
-import { updatePlaycallDisplay } from "../utils/playcallDisplay.js";
+// ✅ PHASE 2.6 COMPLETE: These are now handled by AnimationRouter via turnPreparation.js
+// import { updatePlaycallDisplay } from "../utils/playcallDisplay.js"; // ✅ Used by prepareTurnForAnimation (called by AnimationRouter)
+// import { updateStrategyBars } from "../utils/strategyBars.js"; // ✅ Used by prepareTurnForAnimation (called by AnimationRouter)
+// import { updatePlaycallCenter, animateLeanMeter, parseLeanScoreFromText } from "../ui/playcallCenter.js"; // ✅ Used by prepareTurnForAnimation (called by AnimationRouter)
+// import { prepareTurnForAnimation, finalizeTurnAfterAnimation } from "./turnPreparation.js"; // ✅ Now called by AnimationRouter, not directly here
 import { announceFromTurnData } from "../utils/announcements.js";
-import { updateStrategyBars } from "../utils/strategyBars.js";
-import { updatePlaycallCenter, animateLeanMeter, parseLeanScoreFromText } from "../ui/playcallCenter.js";
-import { prepareTurnForAnimation, finalizeTurnAfterAnimation } from "./turnPreparation.js";
 import {
   animationDebugLog,
   animationDebugWarn,
@@ -508,13 +513,19 @@ export async function animateGameTurns({ //hasBallAtStep
     
     // Removed verbose turn processing log
     
-    // ✅ PHASE 2.2: Use extracted prepareTurnForAnimation function
-    const { possessionId } = prepareTurnForAnimation({
-      turn,
-      scene,
-      turnIndex: i,
-      homeTeamId: scene.simData?.home_team_id
-    });
+    // ✅ PHASE 2.6 COMPLETE: prepareTurnForAnimation is now called by AnimationRouter for all routed turns
+    // This duplicate call was causing prepareTurnForAnimation to run twice for most turns
+    // AnimationRouter handles pre/post setup (prepareTurnForAnimation, finalizeTurnAfterAnimation)
+    // For non-routed turns (DEAD BALL, non-animated FOUL), they don't need preparation
+    // const { possessionId } = prepareTurnForAnimation({
+    //   turn,
+    //   scene,
+    //   turnIndex: i,
+    //   homeTeamId: scene.simData?.home_team_id
+    // });
+    
+    // ✅ Get possessionId from turn data (used for updateDebugScore)
+    const possessionId = turn.possession_id ?? turn.possessionId ?? turn.possessionID ?? null;
     
     const animations = turn.animations || [];
     const shouldLogLegacySteps =
