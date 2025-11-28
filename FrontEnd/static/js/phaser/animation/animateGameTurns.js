@@ -640,47 +640,13 @@ export async function animateGameTurns({ //hasBallAtStep
       continue;
     }
 
+    // ✅ PHASE 2.6: Handle DEFENSIVE_STOP - route through AnimationRouter
     if (turn.result_type === "DEFENSIVE_STOP") {
-      // Check if this is a Fast Break defensive stop - if so, route to Fast Break animation
-      // so outlet pass can animate before showing the stop
-      if (turn.fast_break === true) {
-        // Fast Break defensive stop - route to Fast Break animation sequence
-        // This will animate outlet pass (if applicable) then defensive stop
-        try {
-          // Import the named export directly (not the default wrapper)
-          const { runFastBreakSequence } = await import('./fastBreak.js');
-          await runFastBreakSequence({ scene, turnData: turn, playerSprites, ballSprite, turnIndex: i });
-        } catch (err) {
-          console.warn('DEFENSIVE_STOP (Fast Break): animation failed, falling back to text only', err);
-        }
-        appendToTextScroll(turn.text || "Fast Break! Defense stops the break!");
-        if (onUpdate) {
-          try {
-            onUpdate(turn);
-          } catch (err) {
-            console.error('Scoreboard update failed:', err);
-          }
-        }
-        updateDebugScore(turn, { turnIndex: i, possessionId });
-        continue;
-      }
-      
-      // Non-Fast Break defensive stop - use standard defensive stop transition
-      try {
-        const { runDefensiveStopTransition } = await import('./turnAnimation.js');
-        await runDefensiveStopTransition({ scene, playerSprites, ballSprite });
-      } catch (err) {
-        console.warn('DEFENSIVE_STOP: transition animation failed, falling back to text only', err);
-      }
-      appendToTextScroll(turn.text || "Defense stops the break!");
-      if (onUpdate) {
-        try {
-          onUpdate(turn);
-        } catch (err) {
-          console.error('Scoreboard update failed:', err);
-        }
-      }
-      updateDebugScore(turn, { turnIndex: i, possessionId });
+      // Fast Break defensive stop routes to handleFastBreak(), non-Fast Break uses handleDefensiveStop()
+      // Text scroll, announcements, and score updates are handled by handler
+      turn.index = i;
+      await animationRouter.processTurn(turn);
+      // Note: onUpdate and updateDebugScore handled by AnimationRouter
       continue;
     }
 

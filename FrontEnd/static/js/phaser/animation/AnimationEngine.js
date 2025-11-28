@@ -61,6 +61,9 @@ export class AnimationEngine {
     this.animationHandlers.set('PUTBACK_MISS', this.handlePutback.bind(this));
     this.animationHandlers.set('OREB_KICKOUT', this.handlePutback.bind(this));
     this.animationHandlers.set('OPENING_TIP', this.handleOpeningTip.bind(this));
+    // ✅ PHASE 2.6: Add handlers for DEFENSIVE_STOP and STEAL
+    this.animationHandlers.set('DEFENSIVE_STOP', this.handleDefensiveStop.bind(this));
+    this.animationHandlers.set('STEAL', this.handleSteal.bind(this));
   }
 
   /**
@@ -463,6 +466,97 @@ export class AnimationEngine {
         currentOwnerId: getCurrentOwner(this.scene),
         pendingOwnerId: getPendingOwner(this.scene)
       });
+    }
+    
+    // Note: Announcements and score updates are handled by AnimationRouter (finalizeTurnAfterAnimation)
+  }
+
+  async handleDefensiveStop(turnData, context) {
+    console.log('AnimationEngine: Handling defensive stop', {
+      result_type: turnData.result_type,
+      fast_break: turnData.fast_break
+    });
+    
+    // ✅ PHASE 2.6: Check if this is a Fast Break defensive stop (moved from animateGameTurns.js)
+    if (turnData.fast_break === true) {
+      // Fast Break defensive stop - route to Fast Break animation sequence
+      // This will animate outlet pass (if applicable) then defensive stop
+      const { runFastBreakSequence } = await import('./fastBreak.js');
+      await runFastBreakSequence(this.scene, {
+        playerSprites: context.playerSprites,
+        ballSprite: context.ballSprite,
+        turnData: turnData,
+        onUpdate: context.onUpdate,
+        turnIndex: context.turnIndex
+      });
+    } else {
+      // Non-Fast Break defensive stop - use standard defensive stop transition
+      const { runDefensiveStopTransition } = await import('./turnAnimation.js');
+      await runDefensiveStopTransition({
+        scene: this.scene,
+        playerSprites: context.playerSprites,
+        ballSprite: context.ballSprite
+      });
+    }
+    
+    // ✅ PHASE 2.6: Display text (moved from animateGameTurns.js)
+    const { appendToTextScroll } = await import('../utils/textScroll.js');
+    appendToTextScroll(turnData.text || (turnData.fast_break ? "Fast Break! Defense stops the break!" : "Defense stops the break!"));
+    
+    // Note: onUpdate and updateDebugScore are handled by AnimationRouter (finalizeTurnAfterAnimation)
+  }
+
+  async handleSteal(turnData, context) {
+    console.log('AnimationEngine: Handling steal', {
+      result_type: turnData.result_type,
+      ball_handler: turnData.ball_handler,
+      stealerId: turnData.stealerId || turnData.stealer_id
+    });
+    
+    // ✅ PHASE 2.6: Handle steal animation (moved from animateGameTurns.js)
+    const { States } = await import('../state/gameStateMachine.js');
+    if (this.scene.stateMachine?.is(States.FastBreak)) {
+      // Skip steal animation if in FastBreak state
+      return;
+    }
+    
+    // Get player IDs
+    const allPlayers = this.scene.simData?.players || [];
+    const playerMap = Object.fromEntries(
+      allPlayers.map(p => [p.name, p.playerId])
+    );
+    const ballHandlerId = playerMap[turnData.ball_handler] ?? turnData.ball_handler;
+    const stealEvent = turnData.events?.find(e => e.event_type === "STEAL");
+    const stealerRaw =
+      turnData.stealerId ||
+      turnData.stealer_id ||
+      stealEvent?.stealerId ||
+      stealEvent?.stealer_id;
+    const stealerId = stealerRaw ?? playerMap[turnData.stealer_name];
+    
+    if (ballHandlerId != null && stealerId != null) {
+      const { runPass } = await import('./ballManager.js');
+      const animationConfig = (await import('./animation_config.js')).default;
+      const cfg = animationConfig.steal || {};
+      
+      if (this.scene.__activePass) {
+        console.warn('Active pass tween detected before steal; cancelling previous tween');
+      }
+      
+      await runPass(this.scene, {
+        fromId: ballHandlerId,
+        toId: stealerId,
+        duration: cfg.duration,
+        easing: cfg.easing
+      });
+      
+      // Visual effects handled by announcement system
+      const defenderSprite = context.playerSprites[stealerId];
+      // runPass reattaches the ball after the tween resolves, so only emit
+      // possession change once that handoff has finished.
+      if (!this.scene.stateMachine?.is(States.FastBreak) && defenderSprite) {
+        this.scene.events?.emit?.('possessionChange', { offenseTeamId: defenderSprite.team_id });
+      }
     }
     
     // Note: Announcements and score updates are handled by AnimationRouter (finalizeTurnAfterAnimation)
