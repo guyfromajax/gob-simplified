@@ -617,81 +617,34 @@ export async function animateGameTurns({ //hasBallAtStep
     }
 
     if (turn.result_type === "SIDE_INBOUND") {
+      // ✅ PHASE 2.6: Route SIDE_INBOUND through AnimationRouter
+      // AnimationRouter handles pre/post setup (prepareTurnForAnimation, finalizeTurnAfterAnimation)
+      // Handler will check FastBreak state internally
       if (!scene.stateMachine?.is(States.FastBreak)) {
-        await runSideInboundSetup({ scene, ballSprite, playerSprites, turnData: turn });
-      }
-      if (onUpdate) {
-        try {
-          onUpdate(turn);
-        } catch (err) {
-          console.error('Scoreboard update failed:', err);
+        turn.index = i;
+        await animationRouter.processTurn(turn);
+        // Note: onUpdate and updateDebugScore handled by AnimationRouter
+      } else {
+        // FastBreak state - skip animation but still do announcements/updates
+        if (onUpdate) {
+          try {
+            onUpdate(turn);
+          } catch (err) {
+            console.error('Scoreboard update failed:', err);
+          }
         }
+        updateDebugScore(turn, { turnIndex: i, possessionId });
       }
-      updateDebugScore(turn, { turnIndex: i, possessionId });
       continue;
     }
 
     if (turn.result_type === "BASELINE_INBOUND") {
-      // ✅ SET FCP/HCT STATE WHEN PRESSURE SETUP DETECTED (SS&S Pattern)
-      // This is the single source of truth for pressure state - replaces complex flag detection
-      const hasFCPHCTSetup = turn.next_defensive_setup === "FCP" || turn.next_defensive_setup === "HCT";
-      if (hasFCPHCTSetup) {
-        scene.currentPressureType = turn.next_defensive_setup; // "FCP" or "HCT"
-        scene.pressureSequenceActive = true;
-        console.log('🎯 [FCP/HCT STATE] Setting pressure type:', {
-          turn_index: i,
-          pressureType: scene.currentPressureType,
-          pressureSequenceActive: scene.pressureSequenceActive,
-          result_type: turn.result_type,
-          next_defensive_setup: turn.next_defensive_setup
-        });
-      } else {
-        // Clear state if no pressure setup (normal inbound)
-        scene.currentPressureType = null;
-        scene.pressureSequenceActive = false;
-      }
-      
-      // console.log('🏀 Quarter start BASELINE_INBOUND detected, animating all players');
-      
-      // Animate all players to their positions using distance-based duration
-      // This ensures consistent speed matching HCO step movements
-      const { tweenPlayerTo } = await import('./ballTween.js');
-      const { gridToPixels } = await import('../utils/gridToPixels.js');
-      const { getPlayerDuration } = await import('./turnAnimation.js');
-      
-      await Promise.all(
-        (turn.animations || []).map(anim => {
-          const sprite = playerSprites[anim.playerId];
-          if (!sprite || !anim.movement || anim.movement.length < 2) return Promise.resolve();
-          
-          const endStep = anim.movement[anim.movement.length - 1];
-          const endPixels = gridToPixels(endStep.coords.x, endStep.coords.y, scene.game.config.width, scene.game.config.height);
-          
-          // Use distance-based duration for consistent speed (not transition - should match inbound setup speed)
-          const duration = getPlayerDuration(sprite, endPixels.x, endPixels.y, false);
-          
-          // tweenPlayerTo returns a Promise that resolves when complete
-          return tweenPlayerTo(scene, sprite, endPixels, { duration, easing: 'Linear' });
-        })
-      );
-      
-      
-      // Transition to HalfCourt state
-      const { safeTransition } = await import('../state/gameStateMachine.js');
-      safeTransition(scene.stateMachine, States.HalfCourt, 'after quarter start inbound');
-      
-      appendToTextScroll(turn.text || "Inbound pass");
-      if (onUpdate) {
-        try {
-          onUpdate(turn);
-        } catch (err) {
-          console.error('Scoreboard update failed:', err);
-        }
-      }
-      updateDebugScore(turn, { turnIndex: i, possessionId });
-      // Mark that previous turn was inbound so HCO pre-step setup can use uncapped durations
-      scene._previousTurnWasInbound = true;
-      // console.log('🏀 Continuing to next turn after BASELINE_INBOUND');
+      // ✅ PHASE 2.6: Route BASELINE_INBOUND through AnimationRouter
+      // FCP/HCT state tracking, player animations, and state transitions are handled by handler
+      // AnimationRouter handles pre/post setup (prepareTurnForAnimation, finalizeTurnAfterAnimation)
+      turn.index = i;
+      await animationRouter.processTurn(turn);
+      // Note: onUpdate and updateDebugScore handled by AnimationRouter
       continue;
     }
 
@@ -1296,6 +1249,25 @@ export async function animateGameTurns({ //hasBallAtStep
     );
 
     const shooterId = playerMap[shooterName];
+
+    // ✅ PHASE 2.6: Handle HCO setup turns (result_type === "HCO" but not shot attempts)
+    // These are setup turns that establish HCO offense, not shot attempts (MAKE/MISS)
+    // Exclude FCP/HCT turns (they're handled above) and shot attempts (handled below)
+    const isFCPHCTTurnForHCO = turn.fcp_shot === true || turn.hct_shot === true || 
+                               turn.next_defensive_setup === "FCP" || turn.next_defensive_setup === "HCT" ||
+                               turn.fcp_foul === true || turn.hct_foul === true ||
+                               scene.pressureSequenceActive;
+    const isHCOSetupTurn = turn.result_type === "HCO" && 
+                           !(turn.result_type === "MAKE" || turn.result_type === "MISS") &&
+                           !isFCPHCTTurnForHCO;
+    if (isHCOSetupTurn) {
+      // ✅ PHASE 2.6: Route HCO setup turns through AnimationRouter
+      // AnimationEngine routes HCO to handleDefault() which calls playTurnAnimation()
+      turn.index = i;
+      await animationRouter.processTurn(turn);
+      // Note: Announcements and score updates handled by AnimationRouter
+      continue;
+    }
 
     const shouldDebugHCO =
       DEBUG_FLOW ||

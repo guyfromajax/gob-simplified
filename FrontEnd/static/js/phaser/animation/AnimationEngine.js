@@ -261,6 +261,13 @@ export class AnimationEngine {
   async handleSideInbound(turnData, context) {
     console.log('AnimationEngine: Handling side inbound with new PassAnimationSystem');
     
+    // ✅ PHASE 2.6: Check FastBreak state (matches original logic in animateGameTurns.js)
+    const { States } = await import('../state/gameStateMachine.js');
+    if (this.scene.stateMachine?.is(States.FastBreak)) {
+      console.log('AnimationEngine: Skipping SIDE_INBOUND animation - state is FastBreak');
+      return;
+    }
+    
     if (this.passSystem) {
       await this.passSystem.processPass(turnData, context);
       console.log('AnimationEngine: PassAnimationSystem completed for SIDE_INBOUND');
@@ -278,22 +285,63 @@ export class AnimationEngine {
   }
 
   async handleBaselineInbound(turnData, context) {
-    console.log('AnimationEngine: Handling baseline inbound with new PassAnimationSystem');
+    console.log('AnimationEngine: Handling baseline inbound');
     
-    if (this.passSystem) {
-      await this.passSystem.processPass(turnData, context);
-      console.log('AnimationEngine: PassAnimationSystem completed for BASELINE_INBOUND');
-    } else {
-      console.warn('AnimationEngine: PassAnimationSystem not available, using fallback');
-      // Fallback to old system - use the same logic as side inbound for now
-      const { runSideInboundSetup } = await import('./turnAnimation.js');
-      await runSideInboundSetup({
-        scene: this.scene,
-        ballSprite: context.ballSprite,
-        playerSprites: context.playerSprites,
-        turnData: turnData
+    // ✅ PHASE 2.6: Set FCP/HCT state when pressure setup detected (moved from animateGameTurns.js)
+    // This is the single source of truth for pressure state - replaces complex flag detection
+    const hasFCPHCTSetup = turnData.next_defensive_setup === "FCP" || turnData.next_defensive_setup === "HCT";
+    if (hasFCPHCTSetup) {
+      this.scene.currentPressureType = turnData.next_defensive_setup; // "FCP" or "HCT"
+      this.scene.pressureSequenceActive = true;
+      console.log('🎯 [FCP/HCT STATE] Setting pressure type:', {
+        pressureType: this.scene.currentPressureType,
+        pressureSequenceActive: this.scene.pressureSequenceActive,
+        result_type: turnData.result_type,
+        next_defensive_setup: turnData.next_defensive_setup
       });
+    } else {
+      // Clear state if no pressure setup (normal inbound)
+      this.scene.currentPressureType = null;
+      this.scene.pressureSequenceActive = false;
     }
+    
+    // ✅ PHASE 2.6: Animate all players to their positions using distance-based duration
+    // This ensures consistent speed matching HCO step movements
+    // (moved from animateGameTurns.js)
+    const { tweenPlayerTo } = await import('./ballTween.js');
+    const { gridToPixels } = await import('../utils/gridToPixels.js');
+    const { getPlayerDuration } = await import('./turnAnimation.js');
+    
+    await Promise.all(
+      (turnData.animations || []).map(anim => {
+        const sprite = context.playerSprites[anim.playerId];
+        if (!sprite || !anim.movement || anim.movement.length < 2) return Promise.resolve();
+        
+        const endStep = anim.movement[anim.movement.length - 1];
+        const endPixels = gridToPixels(
+          endStep.coords.x, 
+          endStep.coords.y, 
+          this.scene.game.config.width, 
+          this.scene.game.config.height
+        );
+        
+        // Use distance-based duration for consistent speed (not transition - should match inbound setup speed)
+        const duration = getPlayerDuration(sprite, endPixels.x, endPixels.y, false);
+        
+        // tweenPlayerTo returns a Promise that resolves when complete
+        return tweenPlayerTo(this.scene, sprite, endPixels, { duration, easing: 'Linear' });
+      })
+    );
+    
+    // ✅ PHASE 2.6: Transition to HalfCourt state (moved from animateGameTurns.js)
+    const { safeTransition } = await import('../state/gameStateMachine.js');
+    const { States } = await import('../state/gameStateMachine.js');
+    safeTransition(this.scene.stateMachine, States.HalfCourt, 'after quarter start inbound');
+    
+    // ✅ PHASE 2.6: Mark that previous turn was inbound so HCO pre-step setup can use uncapped durations
+    this.scene._previousTurnWasInbound = true;
+    
+    // Note: Announcements and score updates are handled by AnimationRouter (finalizeTurnAfterAnimation)
   }
 
   async handleTurnover(turnData, context) {
