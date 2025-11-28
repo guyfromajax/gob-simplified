@@ -926,6 +926,9 @@ class ShotManager:
             pressure_type = self.game.turn_manager.determine_defensive_pressure_type()
             self.game_state["offensive_state"] = pressure_type
             result["next_defensive_setup"] = pressure_type
+            # ✅ FIX: Set next_play_type for made fast break shots (matches HCO makes pattern)
+            # After a made shot, possession flips and the other team gets a baseline inbound
+            result["next_play_type"] = "BASELINE_INBOUND"
         else:
             # Fast break shot missed
             if defender:

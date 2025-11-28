@@ -451,6 +451,81 @@ if (turn.result_type === "DREB" || turn.result_type === "HCO") {
 - Replicate pattern for Fast Break sequences
 - Replicate pattern for OREB putback sequences
 
+#### Backend State Preservation Pattern ✅ **CRITICAL** (January 2025)
+
+**Purpose**: Ensure the backend generates the correct turn sequence by preserving `offensive_state` after generating intermediate turns (e.g., BASELINE_INBOUND).
+
+**Why This Matters**:
+After a made shot, the backend generates a separate BASELINE_INBOUND turn. To ensure the next API call generates the correct follow-up turn (FCP/HCT setup turn or regular HCO turn), the backend must preserve `offensive_state` after generating the BASELINE_INBOUND turn.
+
+**The Pattern**:
+
+1. **Made Shot Sets State**: When a shot is made, the backend sets `offensive_state` based on defensive pressure type:
+   ```python
+   # In shot_manager.py (HCO makes)
+   pressure_type = self.game.turn_manager.determine_defensive_pressure_type()  # "FCP", "HCT", or "HCO"
+   self.game_state["offensive_state"] = pressure_type
+   result["next_defensive_setup"] = pressure_type
+   ```
+
+2. **Generate BASELINE_INBOUND Turn**: After the made shot, generate a separate BASELINE_INBOUND turn:
+   ```python
+   # In game_manager.py
+   if (result.get("result_type") == "MAKE" and 
+       result.get("next_play_type") == "BASELINE_INBOUND"):
+       next_defensive_setup = result.get("next_defensive_setup")
+       inbound_payload = self.turn_manager.setup_baseline_inbound(next_defensive_setup=next_defensive_setup)
+       self.turns.append(inbound_payload)
+   ```
+
+3. **Preserve State for Next API Call**: After generating BASELINE_INBOUND, preserve `offensive_state` so the next API call generates the correct turn:
+   ```python
+   # In game_manager.py (CRITICAL)
+   if next_defensive_setup:
+       self.game_state["offensive_state"] = next_defensive_setup
+   ```
+
+**Complete Flow Example**:
+
+**HCO Make → FCP Setup**:
+1. Made shot sets `offensive_state = "FCP"` and `next_defensive_setup = "FCP"`
+2. Backend generates BASELINE_INBOUND turn with `next_defensive_setup = "FCP"`
+3. Backend preserves `offensive_state = "FCP"` after generating BASELINE_INBOUND
+4. Next API call sees `offensive_state == "FCP"` → Generates FCP setup turn (FOUL/HCO/TURNOVER)
+
+**HCO Make → HCO (No Pressure)**:
+1. Made shot sets `offensive_state = "HCO"` and `next_defensive_setup = "HCO"`
+2. Backend generates BASELINE_INBOUND turn with `next_defensive_setup = "HCO"`
+3. Backend preserves `offensive_state = "HCO"` after generating BASELINE_INBOUND
+4. Next API call sees `offensive_state == "HCO"` → Generates regular HCO turn
+
+**Consistency Across All Made Shot Types**:
+
+This pattern is used consistently across all made shot types:
+
+- **OREB Putback**: Sets `offensive_state = pressure_type` in `resolve_offensive_rebound_turn()` → Preserved automatically
+- **Free Throw**: Sets `offensive_state = pressure_type` in `resolve_free_throw_logic()` → Preserved automatically
+- **HCO Make**: Sets `offensive_state = pressure_type` in `shot_manager.py` → **Now explicitly preserved** in `game_manager.py` after BASELINE_INBOUND
+
+**Why HCO Makes Needed Explicit Preservation**:
+
+OREB putback and Free Throw don't generate separate BASELINE_INBOUND turns, so `offensive_state` is preserved automatically. HCO makes generate a separate BASELINE_INBOUND turn, so we must explicitly preserve `offensive_state` after generating it.
+
+**Benefits**:
+- ✅ **Consistent Pattern**: Same behavior across all made shot types (HCO, OREB, Free Throw)
+- ✅ **Correct Turn Generation**: Next API call generates the correct follow-up turn
+- ✅ **SS&S Aligned**: Explicit state preservation, no reliance on defaults
+- ✅ **Maintainable**: Clear, uniform logic that's easy to understand and debug
+
+**Key Files**:
+- `BackEnd/models/game_manager.py` - State preservation after BASELINE_INBOUND generation
+- `BackEnd/models/shot_manager.py` - Initial state setting for HCO makes
+- `BackEnd/models/turn_manager.py` - State setting for OREB putbacks
+- `BackEnd/engine/phase_resolution.py` - State setting for Free Throws
+
+**See**:
+- `docs/FCP_HCT_FLOW_COMPARISON.md` - Comparison of made shot flows
+
 ---
 
 ### Animation Routing System ✅ **IN PROGRESS** (Phase 2.5 - January 2025)
