@@ -1813,6 +1813,25 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
               'none'
     });
     
+    // ✅ CRITICAL FIX: Kill ball tweens at the start of EACH step iteration
+    // Passes within the step loop can leave lingering ball tweens that block subsequent steps
+    if (ballSprite && scene.tweens && !willEarlyExit) {
+      const ballActiveTweens = scene.tweens.getTweensOf ? scene.tweens.getTweensOf(ballSprite) : [];
+      if (ballActiveTweens.length > 0) {
+        console.warn('🔧 [BALL TWEEN CLEANUP - STEP ITERATION] Killing lingering ball tweens at start of step', {
+          stepIndex,
+          ballActiveTweensCount: ballActiveTweens.length,
+          ballActiveTweenIds: ballActiveTweens.map(t => t._animateStepId || 'no-id'),
+          isFCPHCT: isFCPHCT,
+          pressureType: scene.currentPressureType
+        });
+        scene.tweens.killTweensOf(ballSprite);
+        if (scene.ballShadowSprite) {
+          scene.tweens.killTweensOf(scene.ballShadowSprite);
+        }
+      }
+    }
+    
     if (willEarlyExit) {
       // ✅ DEBUG: Log early exit for FCP/HCT
       if (isFCPHCT) {
