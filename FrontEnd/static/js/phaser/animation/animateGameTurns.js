@@ -44,8 +44,9 @@ const NON_STANDARD_RESULTS = new Set([
 
 /**
  * Handle offensive rebound turns (putbacks and kickouts)
+ * ✅ PHASE 2.6: Exported for use by AnimationEngine handler
  */
-async function handleOrebTurn(scene, { playerSprites, ballSprite, turnData, onUpdate }) {
+export async function handleOrebTurn(scene, { playerSprites, ballSprite, turnData, onUpdate }) {
   const { shootBall } = await import('./ballManager.js');
   const { animateKickoutReset } = await import('./ballManager.js');
   const { runInboundSetup } = await import('./turnAnimation.js');
@@ -683,7 +684,7 @@ export async function animateGameTurns({ //hasBallAtStep
       continue;
     }
 
-    // Handle OREB turns (putback attempts and kickouts)
+    // ✅ PHASE 2.6: Handle OREB turns (putback attempts and kickouts) - route through AnimationRouter
     // ✅ DEBUG: Track putback/OREB path to identify skipped turns
     if (turn.result_type === "PUTBACK_MAKE" || turn.result_type === "PUTBACK_MISS" || turn.result_type === "OREB_KICKOUT") {
       const previousTurn = i > 0 ? turns[i - 1] : null;
@@ -729,16 +730,11 @@ export async function animateGameTurns({ //hasBallAtStep
         rebounderId: turn.rebounderId
       });
       
-      await handleOrebTurn(scene, { playerSprites, ballSprite, turnData: turn, onUpdate });
-      announceFromTurnData(turn, 'end', scene.simData?.home_team_id, scene);
-      if (onUpdate) {
-        try {
-          onUpdate(turn);
-        } catch (err) {
-          console.error('Scoreboard update failed:', err);
-        }
-      }
-      updateDebugScore(turn, { turnIndex: i, possessionId });
+      // ✅ PHASE 2.6: Route through AnimationRouter
+      // handleOrebTurn, announcements, and score updates are handled by handler
+      turn.index = i;
+      await animationRouter.processTurn(turn);
+      // Note: Announcements, onUpdate, and updateDebugScore handled by AnimationRouter
       continue;
     }
 
@@ -1112,23 +1108,13 @@ export async function animateGameTurns({ //hasBallAtStep
 
     // Opening tip at start of Q1 and OT ONLY
     // Guard against opening tip appearing mid-game (should only happen at Q1 or OT start)
+    // ✅ PHASE 2.6: Handle OPENING_TIP - route through AnimationRouter
     if (turn.result_type === "OPENING_TIP") {
       const turnQuarter = turn.quarter ?? scene.quarter ?? 1;
       const isQ1Start = turnQuarter === 1 && i === 0;
       const isOTStart = turnQuarter > 4 && i === 0;
       
-      if (!isQ1Start && !isOTStart) {
-        console.error('⚠️ OPENING_TIP detected mid-game! This should not happen.', {
-          turnIndex: i,
-          quarter: turnQuarter,
-          sceneQuarter: scene.quarter,
-          turn: turn
-        });
-        // Skip opening tip if it's not at the start of Q1 or OT
-        continue;
-      }
-      
-      animationDebugLog('OPENING TIP DETECTED - routing to runOpeningTipSequence:', {
+      animationDebugLog('OPENING TIP DETECTED - routing through AnimationRouter:', {
         result_type: turn.result_type,
         winner: turn.winner,
         home_wins: turn.home_wins,
@@ -1137,34 +1123,12 @@ export async function animateGameTurns({ //hasBallAtStep
         isQ1Start,
         isOTStart
       });
-      await new Promise(resolve => {
-        runOpeningTipSequence(scene, {
-          playerSprites,
-          ballSprite,
-          turnData: turn,
-          onComplete: resolve
-        });
-      });
       
-      // Transition to HalfCourt state after opening tip completes
-      // This ensures the next turn (first possession) starts in correct state
-      if (scene.stateMachine && !scene.stateMachine.is(States.HalfCourt)) {
-        const { safeTransition } = await import('../state/gameStateMachine.js');
-        safeTransition(scene.stateMachine, States.HalfCourt, {
-          reason: 'opening_tip_complete',
-          currentOwnerId: getCurrentOwner(scene),
-          pendingOwnerId: getPendingOwner(scene)
-        });
-      }
-      
-      if (onUpdate) {
-        try {
-          onUpdate(turn);
-        } catch (err) {
-          console.error('Scoreboard update failed:', err);
-        }
-      }
-      updateDebugScore(turn, { turnIndex: i, possessionId });
+      // ✅ PHASE 2.6: Route through AnimationRouter
+      // runOpeningTipSequence, state transition, announcements, and score updates are handled by handler
+      turn.index = i;
+      await animationRouter.processTurn(turn);
+      // Note: Validation, opening tip sequence, state transition, onUpdate, and updateDebugScore handled by AnimationRouter
       continue;
     }
 
