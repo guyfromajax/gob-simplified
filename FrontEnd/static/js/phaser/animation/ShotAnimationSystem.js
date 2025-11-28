@@ -1087,25 +1087,34 @@ export class ShotAnimationSystem {
       try {
         // Import and use the same function that works for free throws
         const { runDefensiveReboundSetup } = await import('./turnAnimation.js');
+        // ✅ CRITICAL FIX: Pass turnData so runDefensiveReboundSetup can detect outlet pass from animation data
         await runDefensiveReboundSetup({
           scene: this.scene,
           ballSprite: this.ballController.ballSprite,
           playerSprites: this.playerSprites,
           rebounderId: turnData.rebounderId,
-          nextPlayType: nextPlayType
+          nextPlayType: nextPlayType,
+          turnData: turnData // ✅ FIX: Pass turnData to enable outlet pass detection from animation data
         });
         console.log('✅ ShotAnimationSystem: runDefensiveReboundSetup completed successfully');
       } catch (error) {
         console.error('❌ ShotAnimationSystem: runDefensiveReboundSetup failed', error);
         throw error; // Re-throw to trigger fallback
       }
+    } else if (nextPlayType === 'FAST_BREAK') {
+      // ✅ FIX: Fast Break outlet passes are handled in the Fast Break sequence itself
+      // But we should still log that we're skipping outlet pass here
+      console.log('🎬 ShotAnimationSystem: Defensive rebound leads to FAST_BREAK - outlet pass handled in Fast Break sequence', {
+        rebounderId: turnData.rebounderId,
+        note: 'Fast Break sequence (fastBreak.js) will handle outlet pass in animateOutletPhase()'
+      });
     } else {
       // ✅ PRIORITY 2 FIX: Add defensive logging for skipped outlet pass
       console.warn('🎬 ShotAnimationSystem: Defensive rebound outlet pass skipped', {
         nextPlayType: nextPlayType,
         rebounderId: turnData.rebounderId,
-        reason: 'next_play_type is not HCO, HCT, or FCP',
-        note: 'Fast breaks handle outlet in their own turn sequence'
+        reason: 'next_play_type is not HCO, HCT, FCP, or FAST_BREAK',
+        note: 'Unknown next play type - outlet pass may be skipped'
       });
       // Handle other cases if needed
     }
