@@ -1098,40 +1098,6 @@ export async function animateGameTurns({ //hasBallAtStep
       continue;
     }
 
-    // Debug fast break routing
-    // NOTE: next_play_type indicates what the NEXT turn will be, not this turn
-    // Only route to fast break if THIS turn is actually a fast break
-    if (turn.fast_break === true || turn.result_type === "FAST_BREAK") {
-      animationDebugLog('FAST BREAK TURN DETECTED - routing to runFastBreakSequence:', {
-        fast_break: turn.fast_break,
-        result_type: turn.result_type,
-        next_play_type: turn.next_play_type,
-        turn_index: i
-      });
-      
-      // Update active player display for fast break
-      const { getBallHandlerIdFromTurn, getDefenderIdFromTurn, updateActivePlayers } = await import('../utils/activePlayerDisplay.js');
-      const ballHandlerId = getBallHandlerIdFromTurn(turn, 0);
-      const defenderId = getDefenderIdFromTurn(turn);
-      if (ballHandlerId) {
-        updateActivePlayers(ballHandlerId, defenderId, scene.simData?.home_team_id, playerSprites);
-      }
-      
-      await runFastBreakSequence(scene, { playerSprites, ballSprite, turnData: turn, onUpdate, turnIndex: i });
-      announceFromTurnData(turn, 'end', scene.simData?.home_team_id, scene);
-      if (onUpdate) {
-        try {
-          onUpdate(turn);
-        } catch (err) {
-          console.error('Scoreboard update failed:', err);
-        }
-      }
-      updateDebugScore(turn, { turnIndex: i, possessionId });
-      continue;
-    }
-    
-    // ✅ REMOVED: FCP/HCT check moved to BEFORE TURNOVER check to prevent misrouting
-    
     // ✅ PHASE 2.6: Fast break shots now route through AnimationRouter (same as HCO shots)
     // Fast break detection happens in AnimationEngine.determineHandler() (checks fast_break flag or result_type === "FAST_BREAK")
     // Active player display, fast break sequence, and _previousTurnWasShot flag are handled by handler
