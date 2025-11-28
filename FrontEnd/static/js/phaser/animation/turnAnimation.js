@@ -890,6 +890,21 @@ async function runInboundSetup({
   animationDebugLog('runInboundSetup proceeding - not blocked by FreeThrow state');
   scene.isInboundSetup = true;
   if (!scene.stateMachine?.is(States.Inbound)) {
+    // ✅ FIX: If coming from HalfCourt (e.g., after a made shot), transition through Turnover first
+    // This matches the pattern in runSideInboundSetup() and prevents "Invalid transition: HalfCourt -> Inbound" warning
+    if (scene.stateMachine?.is(States.HalfCourt)) {
+      safeTransition(
+        scene.stateMachine,
+        States.Turnover,
+        {
+          stepIndex: 0,
+          currentOwnerId: getCurrentOwner(scene),
+          pendingOwnerId: getPendingOwner(scene),
+        },
+        ["stepIndex"]
+      );
+    }
+    
     safeTransition(
       scene.stateMachine,
       States.Inbound,
