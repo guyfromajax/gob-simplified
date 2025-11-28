@@ -820,11 +820,13 @@ export async function animateGameTurns({ //hasBallAtStep
     const isPressBreakOutcome = (turn.result_type === "HCO" || turn.result_type === "TURNOVER") && 
                                 scene.pressureSequenceActive;
     
-    // ✅ CRITICAL FIX: Detect MAKE/MISS turns as FCP/HCT if we're in an active pressure sequence
-    // This handles press break shot attempts (even though SHOT was removed from FCP/HCT outcomes,
-    // the press break can still result in a shot attempt)
+    // ✅ CRITICAL FIX: Only detect shot attempts as FCP/HCT if they have explicit flags
+    // Since SHOT was removed from FCP/HCT outcomes in the backend, regular shots should NOT
+    // be detected as FCP/HCT just because pressureSequenceActive is true
+    // Only detect as FCP/HCT if: explicit flags OR press break outcome (HCO/TURNOVER)
     const isPressBreakShotAttempt = scene.pressureSequenceActive && 
-                                     (turn.result_type === "MAKE" || turn.result_type === "MISS");
+                                     (turn.result_type === "MAKE" || turn.result_type === "MISS") &&
+                                     (turn.fcp_shot === true || turn.hct_shot === true); // Require explicit flags
     
     const isFCPHCT = hasExplicitFCPHCTFlags || isPressBreakOutcome || isPressBreakShotAttempt;
     
@@ -889,6 +891,29 @@ export async function animateGameTurns({ //hasBallAtStep
       });
     }
     
+    // ✅ CRITICAL DEBUG: Log next turn after made shots to see if backend is generating FCP/HCT setup turn
+    if ((turn.result_type === "MAKE" || turn.result_type === "MISS") && turn.next_defensive_setup) {
+      const nextTurn = i + 1 < turns.length ? turns[i + 1] : null;
+      console.log('🔍 [NEXT TURN AFTER MADE SHOT]', {
+        current_turn_index: i,
+        current_result_type: turn.result_type,
+        current_next_defensive_setup: turn.next_defensive_setup,
+        next_turn_index: nextTurn ? i + 1 : 'NO NEXT TURN',
+        next_turn_result_type: nextTurn?.result_type || 'NO NEXT TURN',
+        next_turn_next_defensive_setup: nextTurn?.next_defensive_setup || 'NO NEXT TURN',
+        next_turn_fcp_shot: nextTurn?.fcp_shot || false,
+        next_turn_hct_shot: nextTurn?.hct_shot || false,
+        next_turn_fcp_foul: nextTurn?.fcp_foul || false,
+        next_turn_hct_foul: nextTurn?.hct_foul || false,
+        next_turn_next_play_type: nextTurn?.next_play_type || 'NO NEXT TURN',
+        expected_next_turn: 'Should be BASELINE_INBOUND setup turn or FCP/HCT skeleton animation (HCO/FOUL/TURNOVER)',
+        actual_next_turn: nextTurn ? `${nextTurn.result_type} (${nextTurn.next_play_type || 'no next_play_type'})` : 'NO NEXT TURN',
+        issue: nextTurn && nextTurn.result_type === "MAKE" || nextTurn?.result_type === "MISS" ? 
+               '❌ BUG: Next turn is a shot attempt, should be FCP/HCT setup or skeleton animation' : 
+               nextTurn ? '✅ Next turn looks correct' : '⚠️ No next turn'
+      });
+    }
+    
     if (isFCPHCT) {
       // ✅ SS&S: Use turn.next_defensive_setup as primary source (calculated by backend from defensive team's strategy settings)
       // Fallback to scene state (set from previous turn's next_defensive_setup) for subsequent turns in sequence
@@ -900,14 +925,11 @@ export async function animateGameTurns({ //hasBallAtStep
                             turn.hct_shot || turn.hct_foul ? 'HCT' : null);
       
       // ✅ SS&S: Simple state-based shot attempt detection
-      // If we're in a pressure sequence and this is a shot, it's an FCP/HCT shot attempt
-      // ✅ CRITICAL FIX: Use isPressBreakShotAttempt (scene state) OR explicit flags
-      // Since SHOT was removed from FCP/HCT outcomes, press break shot attempts won't have fcp_shot/hct_shot flags
-      // But they should still be detected as shot attempts if we're in an active pressure sequence
-      const isFCPHCTShotAttempt = (scene.pressureSequenceActive && 
-                                    (turn.result_type === "MAKE" || turn.result_type === "MISS") &&
-                                    (turn.fcp_shot === true || turn.hct_shot === true)) ||
-                                   isPressBreakShotAttempt;
+      // Since SHOT was removed from FCP/HCT outcomes in the backend, only detect shot attempts
+      // as FCP/HCT if they have explicit fcp_shot/hct_shot flags
+      // Regular shots during an active pressure sequence should NOT be detected as FCP/HCT
+      const isFCPHCTShotAttempt = (turn.result_type === "MAKE" || turn.result_type === "MISS") &&
+                                   (turn.fcp_shot === true || turn.hct_shot === true);
       
       // ✅ DEBUG: Log when we determine we'll use FCP/HCT skeleton
       if (isFCPHCTShotAttempt) {
@@ -939,23 +961,50 @@ export async function animateGameTurns({ //hasBallAtStep
         isFCPHCTShotAttempt
       });
       
-      // ✅ FIX: Route FCP/HCT shot attempts through AnimationRouter (same as HCO shots)
-      // FCP/HCT shots are structured the same as HCO shots: skeleton animation + shot
-      // ShotAnimationSystem handles both identically - both loop through skeleton steps, handle passes, then shoot
+      // ✅ CRITICAL FIX: Route ALL FCP/HCT turns (setup AND shot attempts) through playTurnAnimation
+      // playTurnAnimation has runSetupTween() which moves players to step 0 before skeleton animation
+      // This is why setup turns work but shot attempts fail (they were routing to ShotAnimationSystem)
+      // Both setup turns and shot attempts need the same setup tween logic
       if (isFCPHCTShotAttempt) {
-        console.log('🎬 [FCP/HCT SHOT ATTEMPT] Routing through AnimationRouter → ShotAnimationSystem', {
+        console.log('🎬 [FCP/HCT SHOT ATTEMPT] Routing through playTurnAnimation (not ShotAnimationSystem)', {
           turn_index: i,
           pressureType,
           result_type: turn.result_type,
           fcp_shot: turn.fcp_shot,
           hct_shot: turn.hct_shot,
           animation_count: turn.animations?.length || 0,
-          note: 'FCP/HCT shots use same structure as HCO shots: skeleton animation + shot'
+          note: 'FCP/HCT shot attempts need runSetupTween() which playTurnAnimation provides'
         });
         
-        turn.index = i;
-        await animationRouter.processTurn(turn);
-        // Note: announceFromTurnData, onUpdate, and updateDebugScore are handled by AnimationRouter
+        // Route to playTurnAnimation (same as setup turns) - it handles shots via shootBall()
+        await playTurnAnimation({
+          scene,
+          simData,
+          playerSprites,
+          turnData: turn,
+          ballSprite,
+          onUpdate,
+          turnIndex: i,
+          onAction: async (action, sprite, timestamp) => {
+            if (DEBUG_FLOW || debugEnabled)
+              logVerbose(
+                `🎬 Action "${action}" fired at ${timestamp}ms for sprite:`,
+                sprite
+              );
+            if (onAction) onAction(action, sprite, timestamp);
+          },
+        });
+        
+        // Call the same functions that OREB calls after playTurnAnimation completes
+        announceFromTurnData(turn, 'end', scene.simData?.home_team_id, scene);
+        if (onUpdate) {
+          try {
+            onUpdate(turn);
+          } catch (err) {
+            console.error('Scoreboard update failed:', err);
+          }
+        }
+        updateDebugScore(turn, { turnIndex: i, possessionId });
         continue;
       } else {
         // FCP/HCT setup turns (FOUL, HCO, etc.) route through playTurnAnimation
