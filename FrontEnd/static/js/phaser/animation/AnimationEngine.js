@@ -56,6 +56,11 @@ export class AnimationEngine {
     this.animationHandlers.set('PASS', this.handlePass.bind(this));
     this.animationHandlers.set('HCO', this.handleDefault.bind(this)); // ✅ FIX: HCO setup turns route to DEFAULT
     this.animationHandlers.set('DEFAULT', this.handleDefault.bind(this));
+    // ✅ PHASE 2.6: Add handlers for PUTBACK and OPENING_TIP
+    this.animationHandlers.set('PUTBACK_MAKE', this.handlePutback.bind(this));
+    this.animationHandlers.set('PUTBACK_MISS', this.handlePutback.bind(this));
+    this.animationHandlers.set('OREB_KICKOUT', this.handlePutback.bind(this));
+    this.animationHandlers.set('OPENING_TIP', this.handleOpeningTip.bind(this));
   }
 
   /**
