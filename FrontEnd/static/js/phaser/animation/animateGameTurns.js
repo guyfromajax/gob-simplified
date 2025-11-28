@@ -805,9 +805,15 @@ export async function animateGameTurns({ //hasBallAtStep
     // ✅ SS&S: Only detect FCP/HCT if turn has explicit defensive setup flags or FCP/HCT outcome flags
     // The source of truth is the turn data (next_defensive_setup from backend), not scene state
     // Backend only sets next_defensive_setup to "FCP" or "HCT" if the defensive team has those settings enabled
+    // 
+    // ✅ CRITICAL FIX: next_defensive_setup indicates the NEXT turn's setup, not the current turn's
+    // - For BASELINE_INBOUND: Use next_defensive_setup to detect FCP/HCT setup turns
+    // - For MAKE/MISS: Only use fcp_shot/hct_shot flags (next_defensive_setup is for the NEXT turn)
+    // - For other outcomes: Use fcp_foul/hct_foul flags or next_defensive_setup if it's a setup turn
+    const isBaselineInbound = turn.next_play_type === "BASELINE_INBOUND";
     const hasExplicitFCPHCTFlags = turn.fcp_shot === true || turn.hct_shot === true ||
                                    turn.fcp_foul === true || turn.hct_foul === true ||
-                                   turn.next_defensive_setup === "FCP" || turn.next_defensive_setup === "HCT";
+                                   (isBaselineInbound && (turn.next_defensive_setup === "FCP" || turn.next_defensive_setup === "HCT"));
     
     // For HCO/TURNOVER outcomes, only detect as FCP/HCT if we're in an active pressure sequence
     // (these are press break outcomes, not regular HCO shots)
