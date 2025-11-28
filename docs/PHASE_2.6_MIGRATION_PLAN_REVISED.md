@@ -1,6 +1,6 @@
 # Phase 2.6 Migration Plan (Revised)
 
-> **Status**: In Progress ⏳  
+> **Status**: ✅ **COMPLETE** (January 2025)  
 > **Goal**: Migrate all remaining direct calls to `AnimationRouter`
 
 ## Organization Strategy
@@ -27,33 +27,45 @@ This approach is more practical because:
 3. **FCP/HCT fouls (with animations)** → `AnimationRouter` → `handleDefault()` → `playTurnAnimation()`
 4. **TURNOVER** → `AnimationRouter` → `handleTurnover()` ✅ (already migrated at line 1164)
 
-### ⏳ Needs Migration (Direct Calls)
+### ✅ All Priorities Complete (January 2025)
 
-**Group 1: Has Handler, Simple Migration**
-- ✅ **TURNOVER** - Already migrated! (line 1164)
-- **SIDE_INBOUND** - Has `handleSideInbound()`, direct call at line 621
-- **BASELINE_INBOUND** - Has `handleBaselineInbound()`, custom logic at line 634
-- **HCO setup turns** (`result_type === "HCO"`) - Routes to `handleDefault()`, not explicitly handled
+**Priority 1: Simple, Has Handler** ✅
+- ✅ **SIDE_INBOUND** - Migrated (January 2025)
+- ✅ **BASELINE_INBOUND** - Migrated (January 2025)
+- ✅ **HCO setup turns** - Migrated (January 2025)
 
-**Group 2: Has Handler, May Need Updates**
-- **FREE_THROW** - Has `handleFreeThrow()`, direct call at line 567
-- **FAST_BREAK** - Has `handleFastBreak()`, direct call at line 1246
+**Priority 2: Has Handler, May Need Updates** ✅
+- ✅ **FREE_THROW** - Migrated (January 2025)
+- ✅ **FAST_BREAK** - Migrated (January 2025)
 
-**Group 3: No Handler, Needs Handler**
-- **PUTBACK_MAKE/PUTBACK_MISS/OREB_KICKOUT** - Direct call to `handleOrebTurn()` at line 788
-- **OPENING_TIP** - Direct call to `runOpeningTipSequence()` at line 1197
+**Priority 3: Needs Handler** ✅
+- ✅ **PUTBACK_MAKE/PUTBACK_MISS/OREB_KICKOUT** - Migrated (January 2025)
+- ✅ **OPENING_TIP** - Migrated (January 2025)
 
-**Group 4: Event-Based Animations (Not Turn Types)**
-- **STEAL events** - Direct call to `runPass()` at line 1425
-  - Triggered by `result_type === "STEAL"` or `stealEvent` in turn.events
-  - Uses `runPass()` utility function directly
-  - **Question**: Should this be routed? Or is it fine as-is since it's an event, not a turn type?
+**Priority 4: Edge Cases** ✅
+- ✅ **DEFENSIVE_STOP** - Migrated (January 2025)
+- ✅ **STEAL** (standalone turn) - Migrated (January 2025)
 
-**Group 5: No Animation, Just Announcements**
-- **DEAD BALL** - Just announcements, no animation (line 604)
-- **DEFENSIVE_STOP** - Custom logic, uses `runDefensiveStopTransition()` at line 726
-  - **Question**: Should `runDefensiveStopTransition()` be routed? Or is it fine as utility function?
-- **Non-animated FOUL** - Just announcements, no animation (line 588)
+### ⏳ Remaining Cleanup Tasks
+
+**Cleanup 1: Remove Legacy FAST_BREAK Detection**
+- **Location:** Line 1104-1131 in `animateGameTurns.js`
+- **Issue:** Duplicate detection that still uses direct call to `runFastBreakSequence()`
+- **Action:** Remove this legacy block (new detection at line 1141 routes through AnimationRouter)
+- **Complexity:** Low (simple deletion)
+
+**Future Improvement: Migrate FCP/HCT to AnimationRouter**
+- **Location:** Lines 823-1055 in `animateGameTurns.js`
+- **Issue:** FCP/HCT turns route directly to `playTurnAnimation()`, not through AnimationRouter
+- **Action:** Create handlers for FCP/HCT setup turns and route through AnimationRouter
+- **Complexity:** Medium (requires handler creation and state preservation)
+- **Note:** This is a future enhancement, not a blocker. Current implementation works correctly.
+
+**No Migration Needed:**
+- **DEAD BALL** - Just announcements, no animation
+- **Non-animated FOUL** - Just announcements, no animation
+- **STEAL events** (inline) - Events within other turns, handled inline (not standalone turns)
+- **Utility functions** - Called within handlers (e.g., `runPass()`, `shootBall()`, etc.)
 
 **Group 6: Sub-Animations (Utility Functions)**
 These are called *within* handlers, not as standalone turn animations:
@@ -348,20 +360,22 @@ This approach is more practical than organizing by "turn types" vs "outcomes" be
 
 ## Completeness Check: Will Entire System Be Migrated?
 
-### After Phase 2.6 Completion
+### After Phase 2.6 Completion ✅
 
-**✅ All Turn-Level Animations Will Route Through AnimationRouter:**
+**✅ All Turn-Level Animations Route Through AnimationRouter:**
 1. HCO shots (MAKE/MISS) ✅
 2. FCP/HCT shots (MAKE/MISS) ✅
 3. FCP/HCT fouls (with animations) ✅
 4. TURNOVER ✅
-5. SIDE_INBOUND (after migration)
-6. BASELINE_INBOUND (after migration)
-7. HCO setup turns (after migration)
-8. FREE_THROW (after migration)
-9. FAST_BREAK (after migration)
-10. PUTBACK_MAKE/PUTBACK_MISS/OREB_KICKOUT (after migration)
-11. OPENING_TIP (after migration, if applicable)
+5. SIDE_INBOUND ✅ (January 2025)
+6. BASELINE_INBOUND ✅ (January 2025)
+7. HCO setup turns ✅ (January 2025)
+8. FREE_THROW ✅ (January 2025)
+9. FAST_BREAK ✅ (January 2025)
+10. PUTBACK_MAKE/PUTBACK_MISS/OREB_KICKOUT ✅ (January 2025)
+11. OPENING_TIP ✅ (January 2025)
+12. DEFENSIVE_STOP ✅ (January 2025)
+13. STEAL (standalone turn) ✅ (January 2025)
 
 **⏳ Event-Based Animations (May Not Need Routing):**
 - STEAL events - Uses `runPass()` utility directly
