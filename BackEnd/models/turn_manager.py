@@ -1977,8 +1977,10 @@ class TurnManager:
         if passer:
             # ✅ COMMENTED OUT: Assist debug logs (cluttering transition debugging)
             # logging.info(f"🎯 ASSIST DEBUG: passer_pos={passer_pos}, passer={get_name_safe(passer)}, shooter={get_name_safe(shooter)}")
+            pass  # Debug logging commented out
         else:
             # logging.info(f"🎯 ASSIST DEBUG: No passer found (passer_pos={passer_pos}, shooter={get_name_safe(shooter)})")
+            pass  # Debug logging commented out
 
         return {
             "shooter": shooter,
