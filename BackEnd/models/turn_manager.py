@@ -356,23 +356,23 @@ class TurnManager:
             self.update_clock_and_possession(result)
             self.logger.log_turn_result(result)
             
-            # Update offensive_state based on next_play_type (only if it's a valid state value)
-            # Valid state values: "HCO", "FCP", "HCT", "FAST_BREAK", "FREE_THROW"
-            # Turn types (not valid): "BASELINE_INBOUND", "SIDE_INBOUND"
-            # This prevents invalid states like offensive_state = "BASELINE_INBOUND"
+            # ✅ REMOVED: Overwrite logic that was causing transition bugs
             # 
-            # IMPORTANT: Only update if next_play_type is explicitly set AND is a valid state.
-            # Don't overwrite if offensive_state was already set correctly (e.g., FREE_THROW for AND-1).
-            # Only update if the current offensive_state doesn't match the intended next_play_type.
-            next_play = result.get("next_play_type")
-            valid_states = {"HCO", "FCP", "HCT", "FAST_BREAK", "FREE_THROW"}
-            current_state = self.game.game_state.get("offensive_state")
-            
-            if next_play and next_play in valid_states:
-                # Only update if next_play_type differs from current state
-                # This preserves states that were explicitly set earlier (e.g., FREE_THROW for AND-1)
-                if current_state != next_play:
-                    self.game.game_state["offensive_state"] = next_play
+            # Rationale: Handlers (shot_manager, phase_resolution, etc.) are the source of truth for offensive_state.
+            # They explicitly set offensive_state when needed (e.g., "FREE_THROW" for AND-1, "FAST_BREAK" for steals).
+            # 
+            # next_play_type is informational only (for frontend display/logging), not for routing.
+            # If a handler doesn't set offensive_state, that's a bug in the handler, not something we should patch here.
+            # 
+            # This restores the previous transition system behavior where handlers control state transitions.
+            # 
+            # Examples of handlers setting offensive_state:
+            # - shot_manager.py line 351: Sets "FREE_THROW" for AND-1
+            # - shot_manager.py line 372: Sets pressure_type for made shots
+            # - shot_manager.py line 405: Sets "FREE_THROW" for missed shots with fouls
+            # - phase_resolution.py line 585: Sets pressure_type after free throw
+            # - phase_resolution.py line 698: Sets "FAST_BREAK" for steals
+            # - phase_resolution.py line 714: Sets "HCO" for dead ball turnovers
                 
         finally:
             if state == "FAST_BREAK":
