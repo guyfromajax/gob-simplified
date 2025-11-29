@@ -311,9 +311,10 @@ class ShotManager:
             # Debug logging for assist tracking
             if passer:
                 passer.record_stat("AST")
-                logging.info(f"🎯 ASSIST: {get_name_safe(passer)} credited with AST for assist to {get_name_safe(shooter)} (HCO shot)")
+                # ✅ COMMENTED OUT: Assist logs (cluttering transition debugging)
+                # logging.info(f"🎯 ASSIST: {get_name_safe(passer)} credited with AST for assist to {get_name_safe(shooter)} (HCO shot)")
             else:
-                logging.info(f"🎯 ASSIST: No passer found for shooter {get_name_safe(shooter)}, no assist awarded")
+                # logging.info(f"🎯 ASSIST: No passer found for shooter {get_name_safe(shooter)}, no assist awarded")
             stats = ["FGM", "3PTM"] if is_three else ["FGM"]
             points = 3 if is_three else 2
             
@@ -516,7 +517,8 @@ class ShotManager:
                 self.game_state["last_rebound"] = stat
                 rebounder.record_stat(stat)
                 # Debug: Log when initial rebound stat is recorded
-                logging.info(f"🏀 Initial Rebound: {get_name_safe(rebounder)} credited with {stat} (initial shot miss)")
+                # ✅ COMMENTED OUT: Initial rebound log (cluttering transition debugging)
+                # logging.info(f"🏀 Initial Rebound: {get_name_safe(rebounder)} credited with {stat} (initial shot miss)")
                 text += f"...{get_name_safe(rebounder)} grabs the rebound."
                 result["rebounderId"] = getattr(rebounder, "player_id", None)
                 result["rebound_type"] = stat
@@ -602,14 +604,15 @@ class ShotManager:
                         release_player = def_team.lineup.get(release_pos)
                         if release_player:
                             self.game_state["last_release_player"] = release_player
-                            logging.info(f"🏀 FAST_BREAK determined during shot: defense_release_list={defense_release_list}, release_player_ids={release_player_ids}, release_player_stored={getattr(release_player, 'player_id', None)}, shooter={get_name_safe(shooter)}")
+                            # ✅ COMMENTED OUT: Fast break debug logs (cluttering transition debugging)
+                            # logging.info(f"🏀 FAST_BREAK determined during shot: defense_release_list={defense_release_list}, release_player_ids={release_player_ids}, release_player_stored={getattr(release_player, 'player_id', None)}, shooter={get_name_safe(shooter)}")
                         else:
-                            logging.warning(f"⚠️ FAST_BREAK determined but release_player not found at position {release_pos}")
+                            # logging.warning(f"⚠️ FAST_BREAK determined but release_player not found at position {release_pos}")
                     else:
                         next_play_type = "HCO"
                         # Clear release player if not doing fast break
                         self.game_state["last_release_player"] = None
-                        logging.info(f"🏀 HCO determined during shot: no defense_release_list, shooter={get_name_safe(shooter)}")
+                        # logging.info(f"🏀 HCO determined during shot: no defense_release_list, shooter={get_name_safe(shooter)}")
                     
                     self.game_state["offensive_state"] = next_play_type
                     result["next_play_type"] = next_play_type

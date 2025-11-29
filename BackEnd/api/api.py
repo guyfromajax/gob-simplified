@@ -641,16 +641,18 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                         gm.home_team.strategy_settings = dict(request.strategy_settings)  # Use dict() constructor for safety
                         new_hct = request.strategy_settings.get('hc_trap', 'MISSING')
                         new_fcp = request.strategy_settings.get('fc_press', 'MISSING')
-                        logging.warning(f"🔧 [STRATEGY SETTINGS] Updated home team (IN MEMORY) - HCT: {old_hct} → {new_hct}, FCP: {old_fcp} → {new_fcp}")
-                        logging.warning(f"   - Full strategy_settings: {gm.home_team.strategy_settings}")
+                        # ✅ COMMENTED OUT: Strategy settings logs (cluttering transition debugging)
+                        # logging.warning(f"🔧 [STRATEGY SETTINGS] Updated home team (IN MEMORY) - HCT: {old_hct} → {new_hct}, FCP: {old_fcp} → {new_fcp}")
+                        # logging.warning(f"   - Full strategy_settings: {gm.home_team.strategy_settings}")
                     elif request.user_team_side == "away":
                         old_hct = gm.away_team.strategy_settings.get('hc_trap', 'MISSING') if hasattr(gm.away_team, 'strategy_settings') and gm.away_team.strategy_settings else 'MISSING'
                         old_fcp = gm.away_team.strategy_settings.get('fc_press', 'MISSING') if hasattr(gm.away_team, 'strategy_settings') and gm.away_team.strategy_settings else 'MISSING'
                         gm.away_team.strategy_settings = dict(request.strategy_settings)  # Use dict() constructor for safety
                         new_hct = request.strategy_settings.get('hc_trap', 'MISSING')
                         new_fcp = request.strategy_settings.get('fc_press', 'MISSING')
-                        logging.warning(f"🔧 [STRATEGY SETTINGS] Updated away team (IN MEMORY) - HCT: {old_hct} → {new_hct}, FCP: {old_fcp} → {new_fcp}")
-                        logging.warning(f"   - Full strategy_settings: {gm.away_team.strategy_settings}")
+                        # ✅ COMMENTED OUT: Strategy settings logs (cluttering transition debugging)
+                        # logging.warning(f"🔧 [STRATEGY SETTINGS] Updated away team (IN MEMORY) - HCT: {old_hct} → {new_hct}, FCP: {old_fcp} → {new_fcp}")
+                        # logging.warning(f"   - Full strategy_settings: {gm.away_team.strategy_settings}")
             except Exception as e:
                 logging.error(f"❌ [STRATEGY SETTINGS] Error updating strategy_settings: {e}", exc_info=True)
         if gm is None:
