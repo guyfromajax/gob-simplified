@@ -1765,6 +1765,7 @@ class TurnManager:
                         # All criteria met: last pass to shooter within 5 steps
                         # ✅ COMMENTED OUT: Assist debug logs (cluttering transition debugging)
                         # logging.info(f"🎯 ASSIST DEBUG: Found passer_pos={passer_pos}, shooter_pos={shooter_pos}, steps_from_shot={steps_from_shot}")
+                        pass  # Criteria met, passer_pos already set correctly
                     else:
                         # logging.info(f"🎯 ASSIST DEBUG: Pass found but too far from shot (steps_from_shot={steps_from_shot}, max=5)")
                         passer_pos = None  # Pass too far, no assist
