@@ -872,26 +872,6 @@ export async function animateGameTurns({ //hasBallAtStep
       
       // ✅ DEBUG: Explicitly log next turn FCP/HCT status for visibility
       if (nextTurn) {
-        const nextIsFCPHCT = nextTurn.fcp_shot === true || nextTurn.hct_shot === true || 
-                            nextTurn.next_defensive_setup === "FCP" || nextTurn.next_defensive_setup === "HCT" ||
-                            nextTurn.fcp_foul === true || nextTurn.hct_foul === true;
-        console.log('🔍 [NEXT TURN FCP/HCT STATUS]', {
-          next_turn_index: i + 1,
-          next_turn_result_type: nextTurn.result_type,
-          next_turn_has_fcp_hct_flags: nextIsFCPHCT,
-          next_turn_fcp_shot: nextTurn.fcp_shot || false,
-          next_turn_hct_shot: nextTurn.hct_shot || false,
-          next_turn_fcp_foul: nextTurn.fcp_foul || false,
-          next_turn_hct_foul: nextTurn.hct_foul || false,
-          next_turn_next_defensive_setup: nextTurn.next_defensive_setup || null,
-          will_be_detected_as_fcp_hct: nextIsFCPHCT
-        });
-      } else {
-        console.log('🔍 [NEXT TURN FCP/HCT STATUS]', {
-          next_turn_index: i + 1,
-          status: 'NO NEXT TURN (end of turns array)'
-        });
-      }
       
       // Announce result (visual effects now handled by announcement/ballManager)
       announceFromTurnData(turn, 'end', scene.simData?.home_team_id, scene);

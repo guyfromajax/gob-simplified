@@ -23,7 +23,6 @@ const BALL_JUMP_HEIGHT = 5; // Ball jumps higher than players
  * @param {Function} params.onComplete - Callback when animation finishes
  */
 export function runOpeningTipSequence(scene, { playerSprites, ballSprite, turnData, onComplete }) {
-    console.log("🏀 Running opening tip sequence:", turnData);
     
     // Removed pre-animation text append to avoid duplicate message
     // if (turnData.text) {
@@ -42,7 +41,7 @@ export function runOpeningTipSequence(scene, { playerSprites, ballSprite, turnDa
         animateJumpBall(scene, playerSprites, animations, ballSprite, () => {
             // Step 3: Ball and players converge
             animateConvergence(scene, playerSprites, animations, ballSprite, ballLandingCoords, () => {
-                console.log("✅ Opening tip sequence complete");
+                // Opening tip sequence complete
                 if (onComplete) onComplete();
             });
         });
@@ -53,7 +52,6 @@ export function runOpeningTipSequence(scene, { playerSprites, ballSprite, turnDa
  * Step 0: Position all players at their starting positions
  */
 function positionPlayersAtStart(scene, playerSprites, animations, ballSprite) {
-    console.log("🏀 Positioning players at opening tip starting positions");
     
     const canvasWidth = scene.game.config.width;
     const canvasHeight = scene.game.config.height;
@@ -76,12 +74,6 @@ function positionPlayersAtStart(scene, playerSprites, animations, ballSprite) {
     ballSprite.y = ballPixelCoords.y;
     ballSprite.setVisible(true);
     
-    console.log("✅ All players positioned for opening tip", {
-        totalPlayers: animations.length,
-        ballGridCoords: ballStartCoords,
-        ballPixelCoords: ballPixelCoords,
-        canvasSize: { width: canvasWidth, height: canvasHeight }
-    });
 }
 
 /**
@@ -238,7 +230,6 @@ function animateConvergence(scene, playerSprites, animations, ballSprite, ballLa
                 if (pgSprite && pgId) {
                     // Wait a moment for ball attachment to settle, then pass to PG
                     scene.time.delayedCall(300, async () => {
-                        console.log("🏀 [OPENING TIP] Passing from tip winner to PG using centralized pass system");
                         const { handlePassAnimation } = await import('./passDetection.js');
                         const syntheticPassInfo = {
                             passerId: tipWinnerSprite.playerId,
@@ -251,7 +242,6 @@ function animateConvergence(scene, playerSprites, animations, ballSprite, ballLa
                             passInfo: syntheticPassInfo,
                             playerSprites
                         });
-                        console.log("🏀 [OPENING TIP] Pass to PG completed");
                         if (onComplete) onComplete();
                     });
                 } else {

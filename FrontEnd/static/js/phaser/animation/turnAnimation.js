@@ -1480,12 +1480,6 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
                        scene.pressureSequenceActive;
   
   if (scene.stateMachine?.is(States.FastBreak) && !isHCOAfterFastBreak && !isFCPHCTTurn) {
-    console.log("⚠️ playTurnAnimation: Skipping - state is FastBreak and turn is not HCO or FCP/HCT", {
-      result_type: turnData.result_type,
-      fast_break: turnData.fast_break,
-      has_animations: !!turnData.animations?.length,
-      isFCPHCTTurn
-    });
     return;
   }
   
@@ -1571,18 +1565,6 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
                                     scene.pressureSequenceActive;
   
   if (scene.skipToEnd || (scene.stateMachine?.is(States.FastBreak) && !isFCPHCTTurnForEarlyExit)) {
-    // ✅ DEBUG: Log if FCP/HCT is being skipped due to skipToEnd or FastBreak state
-    if (isFCPHCT) {
-      const pressureType = turnData.fcp_shot || turnData.fcp_foul || turnData.next_defensive_setup === "FCP" ? 'FCP' : 'HCT';
-      console.error('❌ [FCP/HCT SKIPPED - EARLY EXIT]', {
-        turn_index: turnIndex,
-        pressureType,
-        result_type: turnData.result_type,
-        skipToEnd: scene.skipToEnd,
-        isFastBreak: scene.stateMachine?.is(States.FastBreak),
-        reason: scene.skipToEnd ? 'skipToEnd flag' : 'FastBreak state'
-      });
-    }
     return;
   }
 
@@ -1628,14 +1610,6 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   // This matches ShotAnimationSystem's approach and gives tween manager time to settle
   // after runInboundSetup() completes
   if (isFCPHCT && !scene.skipToEnd && maxSteps > 1) {
-    const pressureType = turnData.fcp_shot || turnData.fcp_foul || turnData.next_defensive_setup === "FCP" ? 'FCP' : 'HCT';
-    console.log('🔧 [FCP/HCT SETUP TWEEN] Moving players to step 0 positions before skeleton animation', {
-      turn_index: turnIndex,
-      pressureType,
-      maxSteps,
-      animation_count: turnData.animations?.length || 0
-    });
-    
     await runSetupTween({
       scene,
       ballSprite,
@@ -1643,42 +1617,9 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
       playerSprites,
       currentBallOwnerRef
     });
-    
-    console.log('✅ [FCP/HCT SETUP TWEEN COMPLETE] Players positioned at step 0, starting skeleton animation');
   }
 
   let eventsProcessed = false;
-  
-  // ✅ DEBUG: Log FCP/HCT step loop start
-  if (isFCPHCT) {
-    const pressureType = turnData.fcp_shot || turnData.fcp_foul || turnData.next_defensive_setup === "FCP" ? 'FCP' : 'HCT';
-    console.log('🔍 [FCP/HCT STEP LOOP START]', {
-      turn_index: turnIndex,
-      pressureType,
-      maxSteps,
-      will_execute: maxSteps > 1,
-      loop_range: maxSteps > 1 ? `stepIndex 1 to ${maxSteps - 1}` : 'NO LOOP (maxSteps <= 1)',
-      animation_details: turnData.animations?.map(a => ({
-        playerId: a.playerId,
-        movement_length: a.movement?.length || 0,
-        first_step_action: a.movement?.[0]?.action,
-        last_step_action: a.movement?.[a.movement.length - 1]?.action
-      })) || [],
-      skipToEnd: scene.skipToEnd,
-      isFastBreak: scene.stateMachine?.is(States.FastBreak)
-    });
-  }
-
-  // ✅ DEBUG: Log immediately before loop starts
-  console.log('🔍 [BEFORE STEP LOOP]', {
-    maxSteps,
-    will_enter_loop: maxSteps > 1,
-    skipToEnd: scene.skipToEnd,
-    isFastBreak: scene.stateMachine?.is(States.FastBreak),
-    pressureSequenceActive: scene.pressureSequenceActive,
-    currentPressureType: scene.currentPressureType,
-    turnDataKeys: Object.keys(turnData).filter(k => k.includes('fcp') || k.includes('hct') || k.includes('defensive'))
-  });
 
   // ✅ CRITICAL FIX: Kill all ball tweens before starting step loop
   // Lingering ball tweens from previous shots/passes can block the tween manager
@@ -1686,12 +1627,6 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   if (ballSprite && scene.tweens) {
     const ballActiveTweens = scene.tweens.getTweensOf ? scene.tweens.getTweensOf(ballSprite) : [];
     if (ballActiveTweens.length > 0) {
-      console.warn('🔧 [BALL TWEEN CLEANUP] Killing lingering ball tweens before step loop', {
-        ballActiveTweensCount: ballActiveTweens.length,
-        ballActiveTweenIds: ballActiveTweens.map(t => t._animateStepId || 'no-id'),
-        isFCPHCT: isFCPHCT,
-        pressureType: scene.currentPressureType
-      });
       scene.tweens.killTweensOf(ballSprite);
       // Also kill ball shadow tweens if they exist
       if (scene.ballShadowSprite) {
@@ -1705,7 +1640,6 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   // This fixes the race condition where skeleton animation tweens don't progress
   if (isFCPHCT && scene.tweens && playerSprites) {
     let totalPlayerTweensKilled = 0;
-    const playerTweenDetails = [];
     
     // Kill tweens on all player sprites
     for (const [playerId, sprite] of Object.entries(playerSprites)) {
@@ -1713,11 +1647,6 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
         const playerTweens = scene.tweens.getTweensOf(sprite);
         if (playerTweens.length > 0) {
           totalPlayerTweensKilled += playerTweens.length;
-          playerTweenDetails.push({
-            playerId,
-            tweenCount: playerTweens.length,
-            tweenIds: playerTweens.map(t => t._animateStepId || 'no-id')
-          });
           scene.tweens.killTweensOf(sprite);
         }
       }
@@ -1730,23 +1659,10 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
       timeScale: scene.tweens.timeScale ?? 'N/A'
     };
     
-    console.log('🔧 [FCP/HCT TWEEN CLEANUP] Killed player sprite tweens before skeleton animation', {
-      totalPlayerTweensKilled,
-      playerTweenDetails,
-      tweenManagerState,
-      pressureType: scene.currentPressureType,
-      turn_index: turnIndex
-    });
-    
     // Add a small delay (50ms) to allow the tween manager to settle
     // This is the key fix for the race condition where skeleton animation tweens
     // are created immediately after runInboundSetup() but don't progress
     if (totalPlayerTweensKilled > 0 || tweenManagerState.totalTweens > 0) {
-      console.log('🔧 [FCP/HCT TWEEN SETTLE] Waiting 50ms for tween manager to settle', {
-        totalPlayerTweensKilled,
-        remainingTweens: tweenManagerState.totalTweens,
-        pressureType: scene.currentPressureType
-      });
       await new Promise(resolve => {
         if (scene.time && scene.time.delayedCall) {
           scene.time.delayedCall(50, resolve);
@@ -1754,29 +1670,10 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
           setTimeout(resolve, 50);
         }
       });
-      
-      // Log tween manager state after delay
-      const postDelayState = {
-        totalTweens: scene.tweens.getAll ? scene.tweens.getAll().length : 'N/A',
-        isPaused: scene.tweens.isPaused ? scene.tweens.isPaused() : 'N/A',
-        timeScale: scene.tweens.timeScale ?? 'N/A'
-      };
-      console.log('🔧 [FCP/HCT TWEEN SETTLE COMPLETE] Tween manager state after delay', {
-        postDelayState,
-        pressureType: scene.currentPressureType
-      });
     }
   }
 
   for (let stepIndex = 1; stepIndex < maxSteps; stepIndex++) {
-    // ✅ DEBUG: Log at the very start of each loop iteration
-    console.log('🔍 [LOOP ITERATION START]', {
-      stepIndex,
-      maxSteps,
-      condition: `${stepIndex} < ${maxSteps} = ${stepIndex < maxSteps}`,
-      skipToEnd: scene.skipToEnd,
-      isFastBreak: scene.stateMachine?.is(States.FastBreak)
-    });
     // ✅ FIX: Allow FCP/HCT turns to proceed even if state is FastBreak
     // FCP/HCT turns can occur after fast breaks (e.g., press break after fast break shot)
     const isFCPHCTTurnForStepLoop = turnData.fcp_shot === true || turnData.hct_shot === true ||
@@ -1784,31 +1681,13 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
                                      turnData.next_defensive_setup === "FCP" || turnData.next_defensive_setup === "HCT" ||
                                      scene.pressureSequenceActive;
     
-    // ✅ DEBUG: Log the early exit check details
     const willEarlyExit = scene.skipToEnd || (scene.stateMachine?.is(States.FastBreak) && !isFCPHCTTurnForStepLoop);
-    console.log('🔍 [EARLY EXIT CHECK]', {
-      stepIndex,
-      skipToEnd: scene.skipToEnd,
-      isFastBreak: scene.stateMachine?.is(States.FastBreak),
-      isFCPHCTTurnForStepLoop,
-      willEarlyExit,
-      reason: scene.skipToEnd ? 'skipToEnd' : 
-              (scene.stateMachine?.is(States.FastBreak) && !isFCPHCTTurnForStepLoop) ? 'FastBreak state and not FCP/HCT' : 
-              'none'
-    });
     
     // ✅ CRITICAL FIX: Kill ball tweens at the start of EACH step iteration
     // Passes within the step loop can leave lingering ball tweens that block subsequent steps
     if (ballSprite && scene.tweens && !willEarlyExit) {
       const ballActiveTweens = scene.tweens.getTweensOf ? scene.tweens.getTweensOf(ballSprite) : [];
       if (ballActiveTweens.length > 0) {
-        console.warn('🔧 [BALL TWEEN CLEANUP - STEP ITERATION] Killing lingering ball tweens at start of step', {
-          stepIndex,
-          ballActiveTweensCount: ballActiveTweens.length,
-          ballActiveTweenIds: ballActiveTweens.map(t => t._animateStepId || 'no-id'),
-          isFCPHCT: isFCPHCT,
-          pressureType: scene.currentPressureType
-        });
         scene.tweens.killTweensOf(ballSprite);
         if (scene.ballShadowSprite) {
           scene.tweens.killTweensOf(scene.ballShadowSprite);
@@ -1817,35 +1696,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
     }
     
     if (willEarlyExit) {
-      // ✅ DEBUG: Log early exit for FCP/HCT
-      if (isFCPHCT) {
-        const pressureType = turnData.fcp_shot || turnData.fcp_foul || turnData.next_defensive_setup === "FCP" ? 'FCP' : 'HCT';
-        console.warn('⚠️ [FCP/HCT STEP LOOP EARLY EXIT]', {
-          turn_index: turnIndex,
-          pressureType,
-          stepIndex,
-          maxSteps,
-          skipToEnd: scene.skipToEnd,
-          isFastBreak: scene.stateMachine?.is(States.FastBreak),
-          isFCPHCTTurnForStepLoop,
-          pressureSequenceActive: scene.pressureSequenceActive,
-          currentPressureType: scene.currentPressureType
-        });
-      }
       break;
-    }
-    
-    // ✅ DEBUG: Log FCP/HCT step execution for ALL steps
-    if (isFCPHCT) {
-      const pressureType = turnData.fcp_shot || turnData.fcp_foul || turnData.next_defensive_setup === "FCP" ? 'FCP' : 'HCT';
-      console.log('🎬 [FCP/HCT STEP EXECUTING]', {
-        turn_index: turnIndex,
-        pressureType,
-        stepIndex,
-        maxSteps,
-        is_animating: true,
-        will_complete: stepIndex < maxSteps - 1
-      });
     }
 
     // Trigger lean meter animation at middle step
@@ -1931,23 +1782,6 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
       // which may be from the end of the previous turn or from a previous step
       const duration = getPlayerDuration(sprite, targetX, targetY);
       
-      // ✅ DEBUG: Log player movement animation for FCP/HCT
-      if (isFCPHCT) {
-        const pressureType = turnData.fcp_shot || turnData.fcp_foul || turnData.next_defensive_setup === "FCP" ? 'FCP' : 'HCT';
-        const distance = Phaser.Math.Distance.Between(sprite.x, sprite.y, targetX, targetY);
-        console.log('👟 [FCP/HCT PLAYER MOVEMENT]', {
-          turn_index: turnIndex,
-          pressureType,
-          stepIndex,
-          playerId: anim.playerId,
-          action: nextStep.action,
-          currentPos: { x: sprite.x, y: sprite.y },
-          targetPos: { x: targetX, y: targetY },
-          distance,
-          duration,
-          will_animate: duration > 0
-        });
-      }
 
       DEBUG && animationDebugLog('[turn]', turnData?.id, step.timestamp, nextStep.timestamp, duration, {
         currentPos: { x: sprite.x, y: sprite.y },
@@ -1978,17 +1812,6 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
 
       if (nextStep.action === "shoot") {
         shotInfo = { step: nextStep, playerId: anim.playerId, stepIndex };
-        // ✅ DEBUG: Log shot detection in FCP/HCT
-        if (isFCPHCT) {
-          const pressureType = turnData.fcp_shot || turnData.fcp_foul || turnData.next_defensive_setup === "FCP" ? 'FCP' : 'HCT';
-          console.log('🏀 [FCP/HCT SHOT DETECTED]', {
-            turn_index: turnIndex,
-            pressureType,
-            stepIndex,
-            shooterId: anim.playerId,
-            result_type: turnData.result_type
-          });
-        }
       }
 
       const promise = animateStep({
@@ -2007,54 +1830,12 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
     }
 
     await Promise.all(promises);
-    
-    // ✅ DEBUG: Log step completion for FCP/HCT
-    if (isFCPHCT) {
-      const pressureType = turnData.fcp_shot || turnData.fcp_foul || turnData.next_defensive_setup === "FCP" ? 'FCP' : 'HCT';
-      const willContinue = stepIndex < maxSteps - 1;
-      console.log('✅ [FCP/HCT STEP COMPLETE]', {
-        turn_index: turnIndex,
-        pressureType,
-        stepIndex,
-        maxSteps,
-        has_shot: !!shotInfo,
-        has_pass: !!passInfo,
-        will_continue: willContinue,
-        next_step: stepIndex + 1,
-        loop_condition: `stepIndex (${stepIndex}) < maxSteps (${maxSteps})`,
-        loop_will_continue: stepIndex < maxSteps
-      });
-      
-      // ✅ DEBUG: Log if loop should continue
-      if (!willContinue) {
-        console.log('🛑 [FCP/HCT LOOP ENDING]', {
-          turn_index: turnIndex,
-          pressureType,
-          stepIndex,
-          maxSteps,
-          reason: stepIndex >= maxSteps - 1 ? 'Reached maxSteps - 1' : 'Unknown'
-        });
-      }
-    }
 
     // ✅ FIX: Handle passes explicitly (following shot pattern)
     // This ensures passes animate smoothly instead of teleporting
     if (passInfo) {
       const passerSprite = playerSprites[passInfo.passerId];
       const receiverSprite = playerSprites[passInfo.receiverId];
-      
-      // ✅ DEBUG: Log pass handling for FCP/HCT
-      if (isFCPHCT) {
-        const pressureType = turnData.fcp_shot || turnData.fcp_foul || turnData.next_defensive_setup === "FCP" ? 'FCP' : 'HCT';
-        console.log('🏀 [FCP/HCT PASS HANDLING]', {
-          turn_index: turnIndex,
-          pressureType,
-          stepIndex,
-          maxSteps,
-          will_continue_after_pass: stepIndex < maxSteps - 1,
-          next_step: stepIndex + 1
-        });
-      }
       
       // ✅ SCALABLE FIX: Handle passes using shared utility
       // This works for all turn types (HCO shots, fouls, turnovers, etc.)
@@ -2064,19 +1845,6 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
         passInfo,
         playerSprites
       });
-      
-      // ✅ DEBUG: Log pass completion for FCP/HCT
-      if (isFCPHCT) {
-        const pressureType = turnData.fcp_shot || turnData.fcp_foul || turnData.next_defensive_setup === "FCP" ? 'FCP' : 'HCT';
-        console.log('✅ [FCP/HCT PASS COMPLETE]', {
-          turn_index: turnIndex,
-          pressureType,
-          stepIndex,
-          maxSteps,
-          will_continue: stepIndex < maxSteps - 1,
-          next_step: stepIndex + 1
-        });
-      }
     } else {
       // Debug: log when we DON'T have passInfo but might expect one
       const hasPassAction = turnData.animations.some(anim => 
@@ -2086,19 +1854,6 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
       // if (hasPassAction) {
       //   console.log('⚠️ [PASS DEBUG] Pass action exists but passInfo is null', { ... });
       // }
-    }
-    
-    // ✅ DEBUG: Log step loop completion for FCP/HCT (after loop completes)
-    if (isFCPHCT) {
-      const pressureType = turnData.fcp_shot || turnData.fcp_foul || turnData.next_defensive_setup === "FCP" ? 'FCP' : 'HCT';
-      console.log('🏁 [FCP/HCT STEP LOOP FINISHED]', {
-        turn_index: turnIndex,
-        pressureType,
-        maxSteps,
-        completed_steps: maxSteps - 1,
-        has_shot: !!shotInfo,
-        has_pass: !!passInfo
-      });
     }
 
     if (shotInfo) {
@@ -2177,32 +1932,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
         isAudible = true;
       }
       
-      // ✅ DEBUG: Log before calling shootBall for FCP/HCT
-      if (isFCPHCT) {
-        const pressureType = turnData.fcp_shot || turnData.fcp_foul || turnData.next_defensive_setup === "FCP" ? 'FCP' : 'HCT';
-        console.log('🏀 [FCP/HCT ABOUT TO SHOOT] Calling shootBall', {
-          turn_index: turnIndex,
-          pressureType,
-          stepIndex: shotInfo.stepIndex,
-          shooterId: shotInfo.playerId,
-          result_type: turnData.result_type,
-          fromCoords: shootParams.fromCoords
-        });
-      }
-      
       const shotResult = await shootBall(shootParams);
-      
-      // ✅ DEBUG: Log after shootBall returns for FCP/HCT
-      if (isFCPHCT) {
-        const pressureType = turnData.fcp_shot || turnData.fcp_foul || turnData.next_defensive_setup === "FCP" ? 'FCP' : 'HCT';
-        console.log('🏀 [FCP/HCT SHOOT COMPLETE] shootBall returned', {
-          turn_index: turnIndex,
-          pressureType,
-          result_type: turnData.result_type,
-          ballSpot: shotResult?.grid,
-          will_handle_made_miss: true
-        });
-      }
       
       // Clear audible text after shot animation completes
       if (isAudible && typeof window.updateActivePlayersDisplay === 'function') {
@@ -2271,21 +2001,6 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
           const skipRetreat = turnData.next_defensive_setup === "FCP" || turnData.next_defensive_setup === "HCT";
           const pressureType = skipRetreat ? turnData.next_defensive_setup : null;
           
-          // ✅ DEBUG: Log inbound setup for FCP/HCT shots
-          if (isFCPHCT) {
-            const fcpHctType = turnData.fcp_shot || turnData.fcp_foul || turnData.next_defensive_setup === "FCP" ? 'FCP' : 'HCT';
-            console.log('🏀 [FCP/HCT MADE SHOT] Calling runInboundSetup (matching HCO approach)', {
-              turn_index: turnIndex,
-              fcpHctType,
-              result_type: turnData.result_type,
-              next_play_type: turnData.next_play_type,
-              next_defensive_setup: turnData.next_defensive_setup,
-              skipRetreat,
-              pressureType,
-              newOffenseSide
-            });
-          }
-          
           const releaseGuard = createTransitionGuard(scene.stateMachine, [States.Rebound]);
           await runInboundSetup({
             scene,
@@ -2300,8 +2015,6 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
           releaseGuard?.();
           
           if (isFCPHCT) {
-            console.log('🏀 [FCP/HCT MADE SHOT] Inbound setup completed - next turn should be FCP/HCT press break');
-            
             // ✅ CRITICAL FIX: Replicate OREB putback flow exactly
             // Call the same functions that OREB calls right after runInboundSetup() completes
             // This provides the natural delay that allows the tween manager to fully process all tweens
@@ -2317,18 +2030,6 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
             }
             // Note: updateDebugScore is not available in playTurnAnimation, but it's called in animateGameTurns after this returns
           }
-        } else if (isFCPHCT && !hasPendingFreeThrow && !hasPutbackMake) {
-          // ✅ DEBUG: Log when we skip runInboundSetup for FCP/HCT (e.g., if next_play_type is not BASELINE_INBOUND)
-          const fcpHctType = turnData.fcp_shot || turnData.fcp_foul || turnData.next_defensive_setup === "FCP" ? 'FCP' : 'HCT';
-          console.log('🏀 [FCP/HCT MADE SHOT] Skipping runInboundSetup', {
-            turn_index: turnIndex,
-            fcpHctType,
-            result_type: turnData.result_type,
-            next_play_type: turnData.next_play_type,
-            hasPendingFreeThrow,
-            hasPutbackMake,
-            reason: 'next_play_type is not BASELINE_INBOUND or has pending free throw/putback'
-          });
         }
       } else if (ballSpot) {
         const rebounderId =
@@ -2566,23 +2267,6 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
         }
       }
     }
-  }
-  
-  // ✅ DEBUG: Log FCP/HCT animation completion in playTurnAnimation
-  const isFCPHCTComplete = turnData.fcp_shot === true || turnData.hct_shot === true || 
-                           turnData.next_defensive_setup === "FCP" || turnData.next_defensive_setup === "HCT" ||
-                           turnData.fcp_foul === true || turnData.hct_foul === true;
-  if (isFCPHCTComplete) {
-    const pressureType = turnData.fcp_shot || turnData.fcp_foul || turnData.next_defensive_setup === "FCP" ? 'FCP' : 'HCT';
-    console.log('✅ [playTurnAnimation - FCP/HCT COMPLETE]', {
-      turn_index: turnIndex,
-      pressureType,
-      result_type: turnData.result_type,
-      outcome: turnData.result_type, // This is the outcome of the FCP/HCT step
-      next_play_type: turnData.next_play_type,
-      possession_flips: turnData.possession_flips,
-      animation_completed: true
-    });
   }
 }
 
