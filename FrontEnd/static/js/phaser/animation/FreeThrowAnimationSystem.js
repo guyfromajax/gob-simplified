@@ -377,12 +377,13 @@ export class FreeThrowAnimationSystem {
 
     // Use existing bounce system for authentic basketball feel
     const rimGridCoords = this.getRimGridCoordinates(turnData);
-    await this.animateBallBounceFromRim(rimGridCoords, turnData);
+    const miss = await this.animateBallBounceFromRim(rimGridCoords, turnData);
 
     // Check if this is the final free throw
     if (ftContext.attempt >= ftContext.total) {
       // Final free throw missed - execute rebound system
-      await this.handleFinalMissedFreeThrow(turnData);
+      // ✅ FIX: Pass the bounce result so we don't bounce twice
+      await this.handleFinalMissedFreeThrow(turnData, miss);
     } else {
       // More free throws to come - stay in POSSESSION
       if (this.stateMachine) {
@@ -485,13 +486,16 @@ export class FreeThrowAnimationSystem {
 
   /**
    * Handle final missed free throw - execute rebound system
+   * @param {Object} turnData - Turn data
+   * @param {Object} miss - Bounce result from animateBallBounceFromRim (contains grid coordinates)
    */
-  async handleFinalMissedFreeThrow(turnData) {
+  async handleFinalMissedFreeThrow(turnData, miss) {
     if (DebugFlags.FREE_THROW_ANIMATION) {
       console.log('FreeThrowAnimationSystem: Final free throw missed - executing rebound system', {
         shooter_id: turnData.shooter_id,
         rebounderId: turnData.rebounderId,
-        rebound_type: turnData.rebound_type
+        rebound_type: turnData.rebound_type,
+        bounceSpot: miss?.grid
       });
     }
 
@@ -503,14 +507,18 @@ export class FreeThrowAnimationSystem {
       });
     }
 
+    // ✅ FIX: Use the bounce result from handleMissedFreeThrow instead of bouncing again
+    // The ball has already bounced to the bounce spot, now players animate to it
+    if (!miss || !miss.grid) {
+      // Fallback: if miss wasn't passed, get it (shouldn't happen)
+      const rimGridCoords = this.getRimGridCoordinates(turnData);
+      miss = await this.animateBallBounceFromRim(rimGridCoords, turnData);
+    }
+    
     // Execute rebound system using existing system
     const { animateRebound } = await import('./ballManager.js');
     
-    // Get the bounce spot from the previous bounce
-    const rimGridCoords = this.getRimGridCoordinates(turnData);
-    const miss = await this.animateBallBounceFromRim(rimGridCoords, turnData);
-    
-    // Execute the rebound animation
+    // Execute the rebound animation - ball is already at bounce spot, players animate to it
     await animateRebound({
       scene: this.scene,
       ballSprite: this.ballController.ballSprite,
@@ -518,7 +526,8 @@ export class FreeThrowAnimationSystem {
       animations: [],
       rebounderId: turnData.rebounderId || turnData.rebounder_player_id,
       ballSpot: miss.grid,
-      shooterId: turnData.shooter_id
+      shooterId: turnData.shooter_id,
+      preserveBallPosition: true  // ✅ FIX: Ball is already at bounce spot, don't move it
     });
 
     // Handle defensive rebound setup if needed
