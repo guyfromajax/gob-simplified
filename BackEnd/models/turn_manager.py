@@ -258,10 +258,24 @@ class TurnManager:
         # STEP 1: Set strategy calls (tempo + aggression)
         self.set_strategy_calls()
 
+        # ✅ DEBUG: Log offensive_state transition (previous turn → current turn)
+        # This is the critical transition point where offensive_state determines routing
         state = self.game.game_state.get("offensive_state", "HCO")
         turn_num = self.game.micro_turn_count
         from BackEnd.constants import DEBUG
         time_remaining = self.game.game_state.get("clock", "N/A")
+        
+        # Get previous turn's offensive_state (if available from game_state history)
+        # Note: We can't easily get previous turn's state here, but we log what we have
+        import logging
+        logging.info(f"🔄 [OFFENSIVE_STATE TRANSITION] Turn #{turn_num}", {
+            "turn_number": turn_num,
+            "current_offensive_state": state,
+            "time_remaining": time_remaining,
+            "offense_team": self.game.offense_team.name,
+            "defense_team": self.game.defense_team.name,
+            "note": "This is the offensive_state that determines routing for this turn"
+        })
         
         # Create debug string for frontend display
         debug_turn_start = f"***** RUN TURN, turn number: {turn_num}, time remaining: {time_remaining}, offensive state: {state} *****"
@@ -355,6 +369,24 @@ class TurnManager:
         try:
             self.update_clock_and_possession(result)
             self.logger.log_turn_result(result)
+            
+            # ✅ DEBUG: Log offensive_state after handler execution (current turn → next turn)
+            # This shows what offensive_state will be for the NEXT turn
+            final_state = self.game.game_state.get("offensive_state", "HCO")
+            next_play_type = result.get("next_play_type", "None")
+            result_type = result.get("result_type", "N/A")
+            import logging
+            logging.info(f"🔄 [OFFENSIVE_STATE TRANSITION] Turn #{turn_num} Complete", {
+                "turn_number": turn_num,
+                "result_type": result_type,
+                "previous_offensive_state": state,  # State at start of this turn
+                "next_offensive_state": final_state,  # State for next turn (set by handler)
+                "next_play_type": next_play_type,  # Informational only
+                "offense_team": self.game.offense_team.name,
+                "defense_team": self.game.defense_team.name,
+                "state_changed": state != final_state,
+                "note": "next_offensive_state is what will be used to route the NEXT turn"
+            })
             
             # ✅ REMOVED: Overwrite logic that was causing transition bugs
             # 
