@@ -41,28 +41,26 @@ export function triggerNegativeAction(scene, playerId, actionType = 'foul', skip
   console.log(`💥 Triggering ${actionType} effect for player ${playerId}`);
   
   // Helper function to apply tint (handles both single sprites and containers)
-  const applyTintToSprite = (target, tint, alpha) => {
+  // ✅ FIX: Removed opacity reduction - it was sticking and making sprites invisible
+  const applyTintToSprite = (target, tint) => {
     if (target.type === 'Container') {
       // For containers, apply to all children
       target.list.forEach(child => {
         if (child.setTint) {
           child.setTint(tint);
         }
-        if (child.setAlpha) {
-          child.setAlpha(alpha);
-        }
+        // Removed setAlpha - keep sprites at full opacity
       });
     } else if (target.setTint) {
       // For single sprites
       target.setTint(tint);
-      target.setAlpha(alpha);
+      // Removed setAlpha - keep sprites at full opacity
     }
   };
   
   // Store original state
   const originalState = {
     tints: [],
-    alphas: [],
     isContainer: sprite.type === 'Container'
   };
   
@@ -70,15 +68,13 @@ export function triggerNegativeAction(scene, playerId, actionType = 'foul', skip
     // Store original state of children
     sprite.list.forEach(child => {
       originalState.tints.push(child.tint || 0xffffff);
-      originalState.alphas.push(child.alpha || 1.0);
     });
   } else {
     originalState.tints.push(sprite.tint || 0xffffff);
-    originalState.alphas.push(sprite.alpha || 1.0);
   }
   
-  // Apply red tint
-  applyTintToSprite(sprite, config.tint, 1.0 - config.tintAlpha);
+  // Apply red tint (without opacity reduction)
+  applyTintToSprite(sprite, config.tint);
   
   // Add red screen flash effect (skip for AND-1 to avoid mixing with green flash)
   if (!skipScreenFlash) {
@@ -107,7 +103,7 @@ export function triggerNegativeAction(scene, playerId, actionType = 'foul', skip
   
   // Shake/pulse animations removed - rely on announcement system + screen flash + sprite tint
   
-  // Restore original tint and alpha after duration
+  // Restore original tint after duration (no alpha restoration needed - we never changed it)
   scene.time.delayedCall(config.duration, () => {
     if (originalState.isContainer) {
       // Restore container children
@@ -115,18 +111,14 @@ export function triggerNegativeAction(scene, playerId, actionType = 'foul', skip
         if (child.clearTint) {
           child.clearTint();
         }
-        if (child.setAlpha && originalState.alphas[index] !== undefined) {
-          child.setAlpha(originalState.alphas[index]);
-        }
+        // No alpha restoration - we never changed it
       });
     } else {
       // Restore single sprite
       if (sprite.clearTint) {
         sprite.clearTint();
       }
-      if (sprite.setAlpha && originalState.alphas[0] !== undefined) {
-        sprite.setAlpha(originalState.alphas[0]);
-      }
+      // No alpha restoration - we never changed it
     }
   });
 }
