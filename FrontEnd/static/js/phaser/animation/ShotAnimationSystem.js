@@ -334,18 +334,6 @@ export class ShotAnimationSystem {
                      turnData.fcp_foul === true || turnData.hct_foul === true ||
                      this.scene.pressureSequenceActive === true;
     
-    console.log('🔍 [ShotAnimationSystem.animatePlayerMovement] FCP/HCT Check', {
-      isFCPHCT,
-      fcp_shot: turnData.fcp_shot,
-      hct_shot: turnData.hct_shot,
-      next_defensive_setup: turnData.next_defensive_setup,
-      fcp_foul: turnData.fcp_foul,
-      hct_foul: turnData.hct_foul,
-      pressureSequenceActive: this.scene.pressureSequenceActive,
-      currentPressureType: this.scene.currentPressureType,
-      hasTweens: !!this.scene.tweens,
-      hasPlayerSprites: !!this.playerSprites
-    });
     
     if (isFCPHCT && this.scene.tweens && this.playerSprites) {
       let totalPlayerTweensKilled = 0;
@@ -374,33 +362,16 @@ export class ShotAnimationSystem {
         timeScale: this.scene.tweens.timeScale ?? 'N/A'
       };
       
-      console.log('🔧 [FCP/HCT TWEEN CLEANUP] Killed player sprite tweens before skeleton animation (ShotAnimationSystem)', {
-        totalPlayerTweensKilled,
-        playerTweenDetails,
-        tweenManagerState,
-        pressureType: this.scene.currentPressureType
-      });
-      
       // Add a small delay (50ms) to allow the tween manager to settle
       // This is the key fix for the race condition where skeleton animation tweens
       // are created immediately after runInboundSetup() but don't progress
       if (totalPlayerTweensKilled > 0 || tweenManagerState.totalTweens > 0) {
-        console.log('🔧 [FCP/HCT TWEEN SETTLE] Waiting 50ms for tween manager to settle (ShotAnimationSystem)', {
-          totalPlayerTweensKilled,
-          remainingTweens: tweenManagerState.totalTweens,
-          pressureType: this.scene.currentPressureType
-        });
         await new Promise(resolve => {
           if (this.scene.time && this.scene.time.delayedCall) {
             this.scene.time.delayedCall(50, resolve);
           } else {
             setTimeout(resolve, 50);
           }
-        });
-        console.log('🔧 [FCP/HCT TWEEN SETTLE COMPLETE] Tween manager state after delay (ShotAnimationSystem)', {
-          totalTweens: this.scene.tweens.getAll ? this.scene.tweens.getAll().length : 'N/A',
-          isPaused: this.scene.tweens.isPaused ? this.scene.tweens.isPaused() : 'N/A',
-          timeScale: this.scene.tweens.timeScale ?? 'N/A'
         });
       }
     }

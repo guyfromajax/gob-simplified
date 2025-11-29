@@ -608,7 +608,7 @@ class TurnManager:
         #         rebounder_deltas = deltas[rebounder_id].get("stats", {})
         #         logging.info(f"🏀 Free Throw Turn Result: rebound_type={result.get('rebound_type')}, rebounderId={rebounder_id}, deltas={rebounder_deltas}")
         #     else:
-                logging.warn(f"⚠️ Free Throw Rebound Missing in Deltas: rebound_type={result.get('rebound_type')}, rebounderId={rebounder_id}, deltas_keys={list(deltas.keys())}")
+        #         logging.warn(f"⚠️ Free Throw Rebound Missing in Deltas: rebound_type={result.get('rebound_type')}, rebounderId={rebounder_id}, deltas_keys={list(deltas.keys())}")
         
         # Include current energy levels for all active players (for frontend fatigue display)
         player_energy = {}

@@ -114,20 +114,6 @@ export class AnimationEngine {
                      turnData.next_defensive_setup === "FCP" || turnData.next_defensive_setup === "HCT" ||
                      turnData.fcp_foul === true || turnData.hct_foul === true;
     
-    // ✅ DEBUG: Log FCP/HCT routing decision
-    if (isFCPHCT) {
-      const pressureType = turnData.fcp_shot || turnData.fcp_foul || turnData.next_defensive_setup === "FCP" ? 'FCP' : 'HCT';
-      console.log('🔍 [FCP/HCT ROUTING] AnimationEngine determining handler', {
-        result_type: turnData.result_type,
-        pressureType,
-        fcp_shot: turnData.fcp_shot,
-        hct_shot: turnData.hct_shot,
-        fcp_foul: turnData.fcp_foul,
-        hct_foul: turnData.hct_foul,
-        next_defensive_setup: turnData.next_defensive_setup,
-        has_animations: !!turnData.animations?.length
-      });
-    }
     
     // Fast break detection (highest priority)
     // ✅ FIX: Also check next_play_type === "FAST_BREAK" for turns after DREB
@@ -135,9 +121,6 @@ export class AnimationEngine {
     if (turnData.fast_break === true || 
         turnData.result_type === "FAST_BREAK" ||
         turnData.next_play_type === "FAST_BREAK") {
-      if (isFCPHCT) {
-        console.log('⚠️ [FCP/HCT ROUTING] Fast break detected - routing to FAST_BREAK handler');
-      }
       console.log('⚡ [FAST BREAK DETECTED]', {
         fast_break: turnData.fast_break,
         result_type: turnData.result_type,
@@ -152,9 +135,6 @@ export class AnimationEngine {
     // Specific result types (check handlers map first)
     if (turnData.result_type && this.animationHandlers.has(turnData.result_type)) {
       const handler = this.animationHandlers.get(turnData.result_type);
-      if (isFCPHCT) {
-        console.log('✅ [FCP/HCT ROUTING] Found specific handler for', turnData.result_type, '→', handler.name || 'handler');
-      }
       return handler;
     }
 
@@ -178,47 +158,24 @@ export class AnimationEngine {
       const willRouteToShot = !isInNonShotSet && isShotAttempt;
       const willRouteToDefault = isInNonShotSet || !isShotAttempt;
       
-      if (isFCPHCT || turnData.result_type === "STEAL" || turnData.result_type === "DEAD_BALL") {
-        console.log('🔍 [ROUTING DEBUG]', {
-          result_type: turnData.result_type,
-          isInNonShotSet,
-          isShotAttempt,
-          willRouteToShot,
-          willRouteToDefault,
-          willRouteToHCO: turnData.result_type === "HCO",
-          isFCPHCT
-        });
-      }
     }
     
     // Shot attempt detection (only if not a non-shot result type)
     if (!nonShotResultTypes.has(turnData.result_type) && this.isShotAttempt(turnData)) {
-      if (isFCPHCT) {
-        console.log('✅ [FCP/HCT ROUTING] Routing to SHOT_ATTEMPT handler');
-      }
       return this.animationHandlers.get('SHOT_ATTEMPT');
     }
 
     // Rebound detection
     if (this.isRebound(turnData)) {
-      if (isFCPHCT) {
-        console.log('✅ [FCP/HCT ROUTING] Routing to REBOUND handler');
-      }
       return this.animationHandlers.get('REBOUND');
     }
 
     // Pass detection
     if (this.isPass(turnData)) {
-      if (isFCPHCT) {
-        console.log('✅ [FCP/HCT ROUTING] Routing to PASS handler');
-      }
       return this.animationHandlers.get('PASS');
     }
 
     // Default handler
-    if (isFCPHCT) {
-      console.log('✅ [FCP/HCT ROUTING] Routing to DEFAULT handler (playTurnAnimation)');
-    }
     return this.animationHandlers.get('DEFAULT');
   }
 
@@ -327,7 +284,6 @@ export class AnimationEngine {
     if (hasFCPHCTSetup) {
       this.scene.currentPressureType = turnData.next_defensive_setup; // "FCP" or "HCT"
       this.scene.pressureSequenceActive = true;
-      console.log('🎯 [FCP/HCT STATE] Setting pressure type:', {
         pressureType: this.scene.currentPressureType,
         pressureSequenceActive: this.scene.pressureSequenceActive,
         result_type: turnData.result_type,
