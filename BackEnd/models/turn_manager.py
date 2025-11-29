@@ -265,17 +265,22 @@ class TurnManager:
         from BackEnd.constants import DEBUG
         time_remaining = self.game.game_state.get("clock", "N/A")
         
-        # Get previous turn's offensive_state (if available from game_state history)
-        # Note: We can't easily get previous turn's state here, but we log what we have
+        # Get previous turn's offensive_state (stored in game_state for tracking)
+        previous_state = self.game.game_state.get("_previous_offensive_state", "N/A (first turn)")
         import logging
-        logging.info(f"🔄 [OFFENSIVE_STATE TRANSITION] Turn #{turn_num}", {
+        logging.info(f"🔄 [OFFENSIVE_STATE TRANSITION] Turn #{turn_num} - BEFORE ROUTING", {
             "turn_number": turn_num,
+            "previous_offensive_state": previous_state,
             "current_offensive_state": state,
             "time_remaining": time_remaining,
             "offense_team": self.game.offense_team.name,
             "defense_team": self.game.defense_team.name,
+            "transition": f"{previous_state} → {state}",
             "note": "This is the offensive_state that determines routing for this turn"
         })
+        
+        # Store current state as previous for next turn
+        self.game.game_state["_previous_offensive_state"] = state
         
         # Create debug string for frontend display
         debug_turn_start = f"***** RUN TURN, turn number: {turn_num}, time remaining: {time_remaining}, offensive state: {state} *****"
@@ -376,15 +381,29 @@ class TurnManager:
             next_play_type = result.get("next_play_type", "None")
             result_type = result.get("result_type", "N/A")
             import logging
+            logging.info(f"🔄 [OFFENSIVE_STATE TRANSITION] Turn #{turn_num} - AFTER HANDLER", {
+                "turn_number": turn_num,
+                "result_type": result_type,
+                "current_offensive_state": state,  # State used for routing this turn
+                "next_offensive_state": final_state,  # State that will be used for next turn
+                "next_play_type": next_play_type,  # Informational only (not used for routing)
+                "transition": f"{state} → {final_state}",
+                "state_changed": state != final_state,
+                "offense_team": self.game.offense_team.name,
+                "defense_team": self.game.defense_team.name,
+                "note": "Handler may have changed offensive_state for next turn"
+            })
+            # Note: Keeping this log for backward compatibility, but the detailed log above is more useful
             logging.info(f"🔄 [OFFENSIVE_STATE TRANSITION] Turn #{turn_num} Complete", {
                 "turn_number": turn_num,
                 "result_type": result_type,
                 "previous_offensive_state": state,  # State at start of this turn
                 "next_offensive_state": final_state,  # State for next turn (set by handler)
-                "next_play_type": next_play_type,  # Informational only
+                "next_play_type": next_play_type,  # Informational only (not used for routing)
+                "transition": f"{state} → {final_state}",
+                "state_changed": state != final_state,
                 "offense_team": self.game.offense_team.name,
                 "defense_team": self.game.defense_team.name,
-                "state_changed": state != final_state,
                 "note": "next_offensive_state is what will be used to route the NEXT turn"
             })
             

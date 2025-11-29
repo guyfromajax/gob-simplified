@@ -490,9 +490,18 @@ if (turn.result_type === "DREB" || turn.result_type === "HCO") {
 
 **Debugging**:
 - Debug logs are added at transition points in `turn_manager.py`:
-  - **Before routing**: Logs `current_offensive_state` (what state is being used to route this turn)
-  - **After handler**: Logs `next_offensive_state` (what state will be used to route the next turn)
-- Look for `🔄 [OFFENSIVE_STATE TRANSITION]` in logs to trace state changes
+  - **Before routing** (`🔄 [OFFENSIVE_STATE TRANSITION] Turn #X - BEFORE ROUTING`):
+    - `previous_offensive_state`: The state from the previous turn
+    - `current_offensive_state`: The state being used to route this turn
+    - `transition`: Shows the transition (e.g., `"HCO → FREE_THROW"`)
+  - **After handler** (`🔄 [OFFENSIVE_STATE TRANSITION] Turn #X - AFTER HANDLER`):
+    - `current_offensive_state`: The state that was used to route this turn
+    - `next_offensive_state`: The state that will be used to route the next turn (set by handler)
+    - `transition`: Shows the transition (e.g., `"FREE_THROW → HCO"`)
+    - `state_changed`: Boolean indicating if the handler changed the state
+    - `next_play_type`: Informational only (not used for routing)
+- Look for `🔄 [OFFENSIVE_STATE TRANSITION]` in logs to trace state changes across turns
+- The logs show the complete flow: `previous → current → next` for each turn
 
 ---
 
