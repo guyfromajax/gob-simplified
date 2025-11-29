@@ -118,12 +118,16 @@ export class AnimationEngine {
     // Fast break detection (highest priority)
     // ✅ FIX: Only check fast_break flag and result_type - next_play_type indicates what comes NEXT, not what this turn is
     // The backend should set fast_break=true on the actual fast break turn, not rely on next_play_type
+    // ✅ CRITICAL: Check fast_break flag FIRST, even for DEFENSIVE_STOP turns (fast break defensive stops have fast_break=true)
     if (turnData.fast_break === true || 
         turnData.result_type === "FAST_BREAK") {
       console.log('⚡ [FAST BREAK DETECTED]', {
         fast_break: turnData.fast_break,
         result_type: turnData.result_type,
         next_play_type: turnData.next_play_type,
+        has_roles: !!turnData.roles,
+        has_outlet_passer: !!turnData.roles?.outlet_passer,
+        has_outlet_receiver: !!turnData.roles?.outlet_receiver,
         reason: turnData.fast_break === true ? 'fast_break flag' :
                 turnData.result_type === "FAST_BREAK" ? 'result_type' :
                 'unknown'
