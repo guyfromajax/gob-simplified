@@ -744,8 +744,15 @@ export async function animateGameTurns({ //hasBallAtStep
     
     const isFCPHCT = hasExplicitFCPHCTFlags || isPressBreakOutcome || isPressBreakShotAttempt;
     
+    // ✅ FIX: Skip FCP/HCT check if this is a FOUL that was already handled by AnimationRouter
+    // FCP/HCT fouls (both Full Court Press and Half Court Trap) with animations are routed through 
+    // AnimationRouter (line 586), which calls playTurnAnimation. We don't want to route them again 
+    // through the FCP/HCT check below, which would cause duplicate skeleton animations.
+    const isFCPHCTFoulAlreadyHandled = turn.result_type === "FOUL" && 
+                                        (turn.fcp_foul === true || turn.hct_foul === true) && 
+                                        turn.animations && turn.animations.length > 0;
     
-    if (isFCPHCT) {
+    if (isFCPHCT && !isFCPHCTFoulAlreadyHandled) {
       // ✅ SS&S: Use turn.next_defensive_setup as primary source (calculated by backend from defensive team's strategy settings)
       // Fallback to scene state (set from previous turn's next_defensive_setup) for subsequent turns in sequence
       // Final fallback to turn flags if neither is available
