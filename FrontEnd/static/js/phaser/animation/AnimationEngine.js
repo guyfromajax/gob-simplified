@@ -144,6 +144,17 @@ export class AnimationEngine {
 
     // Specific result types (check handlers map first)
     if (turnData.result_type && this.animationHandlers.has(turnData.result_type)) {
+      // ✅ DEBUG: Log when routing to specific handler (especially DEFENSIVE_STOP)
+      if (turnData.result_type === "DEFENSIVE_STOP") {
+        console.log('🛑 [DEFENSIVE_STOP ROUTING] Routing to DEFENSIVE_STOP handler', {
+          fast_break: turnData.fast_break,
+          fast_break_type: typeof turnData.fast_break,
+          has_roles: !!turnData.roles,
+          outlet_passer: turnData.roles?.outlet_passer,
+          outlet_receiver: turnData.roles?.outlet_receiver,
+          full_turnData_keys: Object.keys(turnData)
+        });
+      }
       const handler = this.animationHandlers.get(turnData.result_type);
       return handler;
     }
@@ -461,13 +472,20 @@ export class AnimationEngine {
   }
 
   async handleDefensiveStop(turnData, context) {
+    // ✅ DEBUG: Log full turnData to verify fast_break flag is present
+    console.log('🛑 [DEFENSIVE_STOP DEBUG] Full turnData received:', JSON.stringify(turnData, null, 2));
     console.log('AnimationEngine: Handling defensive stop', {
       result_type: turnData.result_type,
-      fast_break: turnData.fast_break
+      fast_break: turnData.fast_break,
+      fast_break_type: typeof turnData.fast_break,
+      has_roles: !!turnData.roles,
+      outlet_passer: turnData.roles?.outlet_passer,
+      outlet_receiver: turnData.roles?.outlet_receiver
     });
     
     // ✅ PHASE 2.6: Check if this is a Fast Break defensive stop (moved from animateGameTurns.js)
-    if (turnData.fast_break === true) {
+    // ✅ FIX: Also check for string "true" in case JSON serialization converts boolean to string
+    if (turnData.fast_break === true || turnData.fast_break === "true") {
       // Fast Break defensive stop - route to Fast Break animation sequence
       // This will animate outlet pass (if applicable) then defensive stop
       const { runFastBreakSequence } = await import('./fastBreak.js');
