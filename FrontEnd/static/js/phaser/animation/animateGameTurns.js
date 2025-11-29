@@ -872,17 +872,9 @@ export async function animateGameTurns({ //hasBallAtStep
       
       // ✅ DEBUG: Explicitly log next turn FCP/HCT status for visibility
       if (nextTurn) {
-      
-      // Announce result (visual effects now handled by announcement/ballManager)
-      announceFromTurnData(turn, 'end', scene.simData?.home_team_id, scene);
-      if (onUpdate) {
-        try {
-          onUpdate(turn);
-        } catch (err) {
-          console.error('Scoreboard update failed:', err);
-        }
+        // Debug logging can be added here if needed
       }
-      updateDebugScore(turn, { turnIndex: i, possessionId });
+      
       continue;
     }
     
