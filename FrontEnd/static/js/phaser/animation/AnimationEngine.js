@@ -284,6 +284,7 @@ export class AnimationEngine {
     if (hasFCPHCTSetup) {
       this.scene.currentPressureType = turnData.next_defensive_setup; // "FCP" or "HCT"
       this.scene.pressureSequenceActive = true;
+      console.log('🎯 [FCP/HCT SETUP DETECTED]', {
         pressureType: this.scene.currentPressureType,
         pressureSequenceActive: this.scene.pressureSequenceActive,
         result_type: turnData.result_type,
