@@ -544,6 +544,28 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
     const newOffenseSide = isHomeOffense ? "away" : "home";
     const skipRetreat = turnData.next_defensive_setup === "FCP" || turnData.next_defensive_setup === "HCT";
     const pressureType = skipRetreat ? turnData.next_defensive_setup : null;
+    
+    // ✅ FIX: Update offense team ID before calling runInboundSetup to ensure possession flip is tracked
+    // After a Fast Break MAKE, possession flips - the team that was on defense is now on offense
+    // Use possession_team_id from turnData if available (authoritative backend value), otherwise calculate from newOffenseSide
+    const newOffenseTeamId = turnData.possession_team_id || 
+      (newOffenseSide === "home" 
+        ? scene.simData?.home_team_id 
+        : scene.simData?.away_team_id);
+    if (newOffenseTeamId && turnData.possession_flips !== false) {
+      scene.currentOffenseTeamId = newOffenseTeamId;
+      scene.offenseTeamId = newOffenseTeamId;
+      // Emit possession change event to update other systems
+      scene.events?.emit('possessionChange', { offenseTeamId: newOffenseTeamId });
+      console.log('⚡ [FAST BREAK MAKE] Updated offense team ID after possession flip', {
+        previousOffenseSide: isHomeOffense ? 'home' : 'away',
+        newOffenseSide,
+        newOffenseTeamId,
+        possession_team_id: turnData.possession_team_id,
+        possession_flips: turnData.possession_flips
+      });
+    }
+    
     await runInboundSetup({ 
       scene, 
       ballSprite, 
