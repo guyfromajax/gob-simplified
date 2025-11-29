@@ -1107,12 +1107,20 @@ export async function animateGameTurns({ //hasBallAtStep
     }
 
     // ✅ PHASE 2.6: Fast break shots now route through AnimationRouter (same as HCO shots)
-    // Fast break detection happens in AnimationEngine.determineHandler() (checks fast_break flag or result_type === "FAST_BREAK")
+    // Fast break detection happens in AnimationEngine.determineHandler() (checks fast_break flag, result_type === "FAST_BREAK", or next_play_type === "FAST_BREAK")
     // Active player display, fast break sequence, and _previousTurnWasShot flag are handled by handler
     // AnimationRouter handles pre/post setup (prepareTurnForAnimation, finalizeTurnAfterAnimation)
     // Note: Fast break shots (MAKE/MISS with fast_break === true) are detected in AnimationEngine and routed to handleFastBreak()
     // This check is kept here for explicit fast break turns (result_type === "FAST_BREAK")
-    if (turn.result_type === "FAST_BREAK" || (turn.result_type === "MAKE" || turn.result_type === "MISS") && turn.fast_break === true) {
+    // ✅ FIX: Also check next_play_type === "FAST_BREAK" for turns after DREB
+    if (turn.result_type === "FAST_BREAK" || 
+        (turn.result_type === "MAKE" || turn.result_type === "MISS") && (turn.fast_break === true || turn.next_play_type === "FAST_BREAK")) {
+      console.log('⚡ [FAST BREAK ROUTING] Routing to AnimationRouter', {
+        turn_index: i,
+        result_type: turn.result_type,
+        fast_break: turn.fast_break,
+        next_play_type: turn.next_play_type
+      });
       turn.index = i;
       await animationRouter.processTurn(turn);
       // Note: Announcements, onUpdate, and updateDebugScore handled by AnimationRouter
@@ -1176,7 +1184,9 @@ export async function animateGameTurns({ //hasBallAtStep
                            turn.next_defensive_setup === "FCP" || turn.next_defensive_setup === "HCT" ||
                            turn.fcp_foul === true || turn.hct_foul === true ||
                            scene.pressureSequenceActive; // ✅ SS&S: Use scene state instead of inheritance logic
-      const isHCO = !turn.fast_break && !isFCPHCTTurn && (turn.result_type === "MAKE" || turn.result_type === "MISS");
+      // ✅ FIX: Exclude Fast Break from HCO routing (check both fast_break flag and next_play_type)
+      const isFastBreak = turn.fast_break === true || turn.next_play_type === "FAST_BREAK";
+      const isHCO = !isFastBreak && !isFCPHCTTurn && (turn.result_type === "MAKE" || turn.result_type === "MISS");
       
       // ✅ DEBUG: Log when entering HCO instance (with fireworks emoji)
       if (isHCO) {

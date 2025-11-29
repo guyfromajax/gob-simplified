@@ -130,10 +130,22 @@ export class AnimationEngine {
     }
     
     // Fast break detection (highest priority)
-    if (turnData.fast_break === true || turnData.result_type === "FAST_BREAK") {
+    // ✅ FIX: Also check next_play_type === "FAST_BREAK" for turns after DREB
+    // After a DREB, the next turn may have next_play_type === "FAST_BREAK" but fast_break flag not set yet
+    if (turnData.fast_break === true || 
+        turnData.result_type === "FAST_BREAK" ||
+        turnData.next_play_type === "FAST_BREAK") {
       if (isFCPHCT) {
         console.log('⚠️ [FCP/HCT ROUTING] Fast break detected - routing to FAST_BREAK handler');
       }
+      console.log('⚡ [FAST BREAK DETECTED]', {
+        fast_break: turnData.fast_break,
+        result_type: turnData.result_type,
+        next_play_type: turnData.next_play_type,
+        reason: turnData.fast_break === true ? 'fast_break flag' :
+                turnData.result_type === "FAST_BREAK" ? 'result_type' :
+                'next_play_type'
+      });
       return this.animationHandlers.get('FAST_BREAK');
     }
 
