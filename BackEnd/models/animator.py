@@ -1399,12 +1399,6 @@ class Animator:
                 zone_coords_for_check = zone_boundaries.get(def_pos, [])
                 is_guarding_bh = ball_handler_coords and _point_in_zone(ball_handler_coords, zone_coords_for_check, False)
                 
-                # 🐛 DEBUG: Log coordinate flow for ball handler's defender
-                if is_guarding_bh and is_away_offense:
-                    # ✅ COMMENTED OUT: Zone defense debug logs (cluttering transition debugging)
-                    # logging.warning(f"🔍 [ZONE DEFENSE DEBUG] Step {step_index}, Defender {def_pos} guarding BH")
-                    # logging.warning(f"   - is_away_offense: {is_away_offense}")
-                
                 # ✅ IMPORTANT: assign_all_zone_defenders returns coords in HOME orientation
                 # (assign_bh_defender_coords now returns home orientation when away team has ball)
                 # (assign_non_bh_defender_coords returns home orientation directly)
