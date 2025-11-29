@@ -356,9 +356,13 @@ class TurnManager:
             self.update_clock_and_possession(result)
             self.logger.log_turn_result(result)
             
-            # Update offensive_state based on next_play_type (e.g., after FCP/HCT)
+            # Update offensive_state based on next_play_type (only if it's a valid state value)
+            # Valid state values: "HCO", "FCP", "HCT", "FAST_BREAK", "FREE_THROW"
+            # Turn types (not valid): "BASELINE_INBOUND", "SIDE_INBOUND"
+            # This prevents invalid states like offensive_state = "BASELINE_INBOUND"
             next_play = result.get("next_play_type")
-            if next_play:
+            valid_states = {"HCO", "FCP", "HCT", "FAST_BREAK", "FREE_THROW"}
+            if next_play and next_play in valid_states:
                 self.game.game_state["offensive_state"] = next_play
                 
         finally:
