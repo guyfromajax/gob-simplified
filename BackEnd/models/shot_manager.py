@@ -315,6 +315,7 @@ class ShotManager:
                 # logging.info(f"🎯 ASSIST: {get_name_safe(passer)} credited with AST for assist to {get_name_safe(shooter)} (HCO shot)")
             else:
                 # logging.info(f"🎯 ASSIST: No passer found for shooter {get_name_safe(shooter)}, no assist awarded")
+                pass  # Debug logging commented out
             stats = ["FGM", "3PTM"] if is_three else ["FGM"]
             points = 3 if is_three else 2
             
@@ -608,6 +609,7 @@ class ShotManager:
                             # logging.info(f"🏀 FAST_BREAK determined during shot: defense_release_list={defense_release_list}, release_player_ids={release_player_ids}, release_player_stored={getattr(release_player, 'player_id', None)}, shooter={get_name_safe(shooter)}")
                         else:
                             # logging.warning(f"⚠️ FAST_BREAK determined but release_player not found at position {release_pos}")
+                            pass  # Debug logging commented out
                     else:
                         next_play_type = "HCO"
                         # Clear release player if not doing fast break
