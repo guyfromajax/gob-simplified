@@ -871,11 +871,6 @@ async function runInboundSetup({
   if (pressureType === "FCP" || pressureType === "HCT") {
     scene.currentPressureType = pressureType;
     scene.pressureSequenceActive = true;
-    console.log('🎯 [FCP/HCT STATE] Setting pressure type from runInboundSetup:', {
-      pressureType,
-      pressureSequenceActive: scene.pressureSequenceActive,
-      source: 'runInboundSetup (inline from ShotAnimationSystem)'
-    });
   } else if (pressureType === null) {
     // Clear state if no pressure (normal inbound)
     scene.currentPressureType = null;
@@ -1425,35 +1420,6 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
                    turnData.next_defensive_setup === "FCP" || turnData.next_defensive_setup === "HCT" ||
                    turnData.fcp_foul === true || turnData.hct_foul === true ||
                    scene.pressureSequenceActive === true;
-  if (isFCPHCT) {
-    const pressureType = turnData.fcp_shot || turnData.fcp_foul || turnData.next_defensive_setup === "FCP" ? 'FCP' : 'HCT';
-    console.log('🎬 [playTurnAnimation - FCP/HCT DETECTED]', {
-      turn_index: turnIndex,
-      pressureType,
-      result_type: turnData.result_type,
-      has_animations: !!turnData.animations?.length,
-      animation_count: turnData.animations?.length || 0,
-      will_animate: !!turnData.animations
-    });
-    
-    // ✅ DEBUG: Log when we enter playTurnAnimation to animate FCP/HCT skeleton
-    const hasFCPHCTSkeleton = (turnData.result_type === "MAKE" || turnData.result_type === "MISS") &&
-                              (turnData.fcp_shot === true || turnData.hct_shot === true) &&
-                              turnData.animations && 
-                              turnData.animations.length > 0;
-    if (hasFCPHCTSkeleton) {
-      console.log('🚀 [ENTERING FCP/HCT SKELETON ANIMATION] Starting playTurnAnimation to animate FCP/HCT skeleton', {
-        turn_index: turnIndex,
-        pressureType,
-        result_type: turnData.result_type,
-        fcp_shot: turnData.fcp_shot,
-        hct_shot: turnData.hct_shot,
-        animation_count: turnData.animations?.length || 0,
-        movement_lengths: turnData.animations?.map(a => a.movement?.length || 0) || [],
-        has_skeleton: !!turnData.skeleton
-      });
-    }
-  }
   
   // Guard: Skip if this is an opening tip, putback, or if animations is missing
   // Putback turns are handled by handleOrebTurn in animateGameTurns.js
@@ -1461,14 +1427,6 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
       turnData.result_type === "PUTBACK_MAKE" || 
       turnData.result_type === "PUTBACK_MISS" ||
       !turnData.animations) {
-    if (isFCPHCT) {
-      console.error('❌ [FCP/HCT SKIPPED - NO ANIMATIONS]', {
-        turn_index: turnIndex,
-        result_type: turnData.result_type,
-        has_animations: false,
-        reason: 'Missing animations array'
-      });
-    }
     if (turnData.result_type === "PUTBACK_MAKE" || turnData.result_type === "PUTBACK_MISS") {
       console.warn('⚠️ playTurnAnimation called for putback turn - this should be handled by handleOrebTurn:', turnData.result_type);
     } else {
@@ -1506,19 +1464,6 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
       )
     : 0;
   
-  // ✅ DEBUG: Log FCP/HCT step count
-  if (isFCPHCT) {
-    const pressureType = turnData.fcp_shot || turnData.fcp_foul || turnData.next_defensive_setup === "FCP" ? 'FCP' : 'HCT';
-    console.log('🔍 [FCP/HCT STEP COUNT]', {
-      turn_index: turnIndex,
-      pressureType,
-      result_type: turnData.result_type,
-      maxSteps,
-      animation_count: turnData.animations?.length || 0,
-      movement_lengths: turnData.animations?.map(a => a.movement?.length || 0) || [],
-      will_loop: maxSteps > 1
-    });
-  }
 
   // ✅ Allow HCO turns even if state is FastBreak (can happen after defensive stop transition fails)
   // Check if this is an HCO turn (not fast_break and has animations) - if so, allow it
