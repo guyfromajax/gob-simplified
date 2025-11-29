@@ -27,7 +27,20 @@ export async function runFastBreakSequence({
   ballSprite,
   turnIndex = null,
 }) {
-  if (!scene || !turnData || scene.skipToEnd) return;
+  console.log('⚡ [runFastBreakSequence] ENTERING', {
+    has_scene: !!scene,
+    has_turnData: !!turnData,
+    skipToEnd: scene?.skipToEnd,
+    result_type: turnData?.result_type,
+    has_roles: !!turnData?.roles,
+    outlet_passer: turnData?.roles?.outlet_passer,
+    outlet_receiver: turnData?.roles?.outlet_receiver
+  });
+  
+  if (!scene || !turnData || scene.skipToEnd) {
+    console.log('⚡ [runFastBreakSequence] EARLY RETURN - missing scene/turnData or skipToEnd');
+    return;
+  }
   if (!scene.ballSprite) scene.ballSprite = ballSprite;
   
   const width = scene.game.config.width;
@@ -41,6 +54,7 @@ export async function runFastBreakSequence({
   }
   
   const currentState = scene.stateMachine?.state;
+  console.log('⚡ [runFastBreakSequence] Current state:', currentState);
   
   // ✅ Check current state before transitioning - avoid invalid transitions
   // For defensive stops after HCO, we're already in HalfCourt, so transition to FastBreak directly
@@ -49,13 +63,16 @@ export async function runFastBreakSequence({
     // Only transition to FastBreakOutlet if we have outlet pass and we're not already in Fast Break state
     // Check if we can transition (must be coming from Rebound or OutletSetup)
     if (currentState === States.Rebound || currentState === States.OutletSetup) {
+      console.log('⚡ [runFastBreakSequence] Transitioning to FastBreakOutlet');
       safeTransition(scene.stateMachine, States.FastBreakOutlet);
     } else {
       // Coming from HalfCourt (defensive stop scenario) - go directly to FastBreak
+      console.log('⚡ [runFastBreakSequence] Transitioning to FastBreak (from HalfCourt)');
       safeTransition(scene.stateMachine, States.FastBreak);
     }
   } else if (currentState !== States.FastBreak && currentState !== States.FastBreakOutlet) {
     // No outlet pass or already in Fast Break state - just ensure we're in FastBreak
+    console.log('⚡ [runFastBreakSequence] Transitioning to FastBreak (no outlet pass)');
     safeTransition(scene.stateMachine, States.FastBreak);
   }
   
@@ -65,15 +82,25 @@ export async function runFastBreakSequence({
   // PHASE 1: OUTLET PASS (if applicable) - WITHOUT moving receiver toward basket
   // ============================================================================
   if (turnData.roles?.outlet_passer && turnData.roles?.outlet_receiver) {
+    console.log('⚡ [runFastBreakSequence] Starting outlet pass phase');
     await animateOutletPhase(scene, turnData, playerSprites, ballSprite, width, height);
+    console.log('⚡ [runFastBreakSequence] Outlet pass phase completed');
     
     // Transition to FastBreak state after outlet (only if not already there)
     if (scene.stateMachine?.state !== States.FastBreak) {
       safeTransition(scene.stateMachine, States.FastBreak);
     }
+  } else {
+    console.log('⚡ [runFastBreakSequence] Skipping outlet pass - missing outlet_passer or outlet_receiver', {
+      outlet_passer: turnData.roles?.outlet_passer,
+      outlet_receiver: turnData.roles?.outlet_receiver
+    });
   }
   
-  if (scene.skipToEnd) return;
+  if (scene.skipToEnd) {
+    console.log('⚡ [runFastBreakSequence] EARLY RETURN - skipToEnd after outlet pass');
+    return;
+  }
   
   // ============================================================================
   // PHASE 2: FAST BREAK RESOLUTION - Check result BEFORE moving toward basket
@@ -97,18 +124,24 @@ export async function runFastBreakSequence({
     // Shot attempt scenario - move shooter toward basket now
     console.log("🏀 Fast Break - Routing to SHOT animation");
     await animateFastBreakShot(scene, turnData, playerSprites, ballSprite, width, height);
+    console.log("🏀 Fast Break - SHOT animation completed");
   } else {
     // Defensive stop, foul, turnover, or steal - position for defensive stop (outlet receiver hasn't moved too far)
     console.log("🏀 Fast Break - Routing to DEFENSIVE_STOP animation");
     await animateDefensiveStop(scene, turnData, playerSprites, ballSprite, width, height);
+    console.log("🏀 Fast Break - DEFENSIVE_STOP animation completed");
   }
   
-  if (scene.skipToEnd) return;
+  if (scene.skipToEnd) {
+    console.log('⚡ [runFastBreakSequence] EARLY RETURN - skipToEnd after Phase 2');
+    return;
+  }
   
   // ============================================================================
   // PHASE 3: CLEANUP & STATE TRANSITIONS
   // ============================================================================
   scene.events?.emit("fb:end");
+  console.log('⚡ [runFastBreakSequence] COMPLETED - all phases finished');
 }
 
 /**

@@ -391,7 +391,8 @@ export class ShotAnimationSystem {
       } else if (this.scene.passInFlight && !passHappeningAtThisStep) {
         // Pass just completed, clear the flag now that we've skipped updateBallOwnership
         this.scene.passInFlight = false;
-        console.log('🏀 [PASS ANIMATION] Cleared passInFlight after skipping updateBallOwnership');
+        // ✅ COMMENTED OUT: Pass animation logs (cluttering console)
+        // console.log('🏀 [PASS ANIMATION] Cleared passInFlight after skipping updateBallOwnership');
       }
       
       const promises = [];
@@ -489,23 +490,26 @@ export class ShotAnimationSystem {
     const rimCoords = this.getRimCoordinates(turnData);
     const isMake = turnData.result_type === 'MAKE';
     
-    console.log('🎯 ShotAnimationSystem: Handling shot at step', {
-      stepIndex: shotInfo.stepIndex,
-      shooterId: shotInfo.playerId,
-      isMake
-    });
+    // ✅ COMMENTED OUT: Verbose shot handling logs (cluttering console)
+    // console.log('🎯 ShotAnimationSystem: Handling shot at step', {
+    //   stepIndex: shotInfo.stepIndex,
+    //   shooterId: shotInfo.playerId,
+    //   isMake
+    // });
     
     // ✅ PRIORITY 1 FIX: Use BallController lifecycle method instead of direct detach
     // This matches the pattern used in ballManager.js (line 233)
-    console.log('🎯 ShotAnimationSystem: Starting shot via lifecycle method', {
-      shooterId: shotInfo.playerId,
-      ballControllerState: this.ballController.getState()
-    });
+    // ✅ COMMENTED OUT: Verbose shot handling logs (cluttering console)
+    // console.log('🎯 ShotAnimationSystem: Starting shot via lifecycle method', {
+    //   shooterId: shotInfo.playerId,
+    //   ballControllerState: this.ballController.getState()
+    // });
     this.ballController.onShotStart({ 
       shooterId: shotInfo.playerId,
       isPutback: turnData.result_type === 'PUTBACK_MAKE' || turnData.result_type === 'PUTBACK_MISS'
     });
-    console.log('🎯 ShotAnimationSystem: Shot started, new state:', this.ballController.getState());
+    // ✅ COMMENTED OUT: Verbose shot handling logs (cluttering console)
+    // console.log('🎯 ShotAnimationSystem: Shot started, new state:', this.ballController.getState());
     
     // Animate ball flight
     await this.animateBallFlight(shooterSprite, rimCoords, turnData);
@@ -524,11 +528,12 @@ export class ShotAnimationSystem {
         return;
       }
 
-      console.log('🎯 ShotAnimationSystem: Starting ball flight', {
-        from: { x: shooterSprite.x, y: shooterSprite.y },
-        to: rimCoords,
-        shooterId: turnData.shooter_id
-      });
+      // ✅ COMMENTED OUT: Verbose shot handling logs (cluttering console)
+      // console.log('🎯 ShotAnimationSystem: Starting ball flight', {
+      //   from: { x: shooterSprite.x, y: shooterSprite.y },
+      //   to: rimCoords,
+      //   shooterId: turnData.shooter_id
+      // });
 
       // ✅ PRIORITY 1 FIX: BallController manages ball position and visibility automatically
       // onShotStart() already detached the ball, so we just need to ensure it's visible
@@ -776,10 +781,11 @@ export class ShotAnimationSystem {
     // ✅ PRIORITY 2 FIX: Add validation to ensure rebound_type is set
     // Check if this shot turn includes rebound data
     if (turnData.rebounderId && turnData.rebound_type) {
-      console.log('🎬 ShotAnimationSystem: Handling embedded rebound', {
-        rebounderId: turnData.rebounderId,
-        rebound_type: turnData.rebound_type
-      });
+      // ✅ COMMENTED OUT: Verbose rebound logs (cluttering console)
+      // console.log('🎬 ShotAnimationSystem: Handling embedded rebound', {
+      //   rebounderId: turnData.rebounderId,
+      //   rebound_type: turnData.rebound_type
+      // });
       
       // Handle the rebound within the shot turn
       await this.handleEmbeddedRebound(turnData);
@@ -806,10 +812,11 @@ export class ShotAnimationSystem {
    * Handle rebound that's embedded within a shot turn
    */
   async handleEmbeddedRebound(turnData) {
-    console.log('🎬 ShotAnimationSystem: Processing embedded rebound', {
-      rebounderId: turnData.rebounderId,
-      rebound_type: turnData.rebound_type
-    });
+    // ✅ COMMENTED OUT: Verbose rebound logs (cluttering console)
+    // console.log('🎬 ShotAnimationSystem: Processing embedded rebound', {
+    //   rebounderId: turnData.rebounderId,
+    //   rebound_type: turnData.rebound_type
+    // });
 
     // Get the rebounder sprite
     const rebounderSprite = this.playerSprites[turnData.rebounderId];
@@ -859,12 +866,13 @@ export class ShotAnimationSystem {
     await Promise.all([rebounderPromise, nonRebounderPromise]);
 
     // Determine next action based on rebound type
-    console.log('🎬 ShotAnimationSystem: Determining rebound action', {
-      rebound_type: turnData.rebound_type,
-      isDREB: turnData.rebound_type === 'DREB',
-      isOREB: turnData.rebound_type === 'OREB',
-      allKeys: Object.keys(turnData)
-    });
+    // ✅ COMMENTED OUT: Verbose rebound logs (cluttering console)
+    // console.log('🎬 ShotAnimationSystem: Determining rebound action', {
+    //   rebound_type: turnData.rebound_type,
+    //   isDREB: turnData.rebound_type === 'DREB',
+    //   isOREB: turnData.rebound_type === 'OREB',
+    //   allKeys: Object.keys(turnData)
+    // });
     
     if (turnData.rebound_type === 'DREB') {
       console.log('🎬 ShotAnimationSystem: Calling handleDefensiveRebound');
@@ -919,13 +927,14 @@ export class ShotAnimationSystem {
       const bounceGridX = Math.round((ballBounceCoords.x / this.scene.game.config.width) * 100);
       const bounceGridY = 50 - Math.round((ballBounceCoords.y / this.scene.game.config.height) * 50);
       
-      console.log('🎬 ShotAnimationSystem: Animating non-rebounders to ball bounce', {
-        ballBounceCoordsPixels: { x: ballBounceCoords.x, y: ballBounceCoords.y },
-        bounceGrid: { x: bounceGridX, y: bounceGridY },
-        totalRebounders: all_rebounders.length,
-        rebounderId: turnData.rebounderId,
-        sceneDimensions: { width: this.scene.game.config.width, height: this.scene.game.config.height }
-      });
+      // ✅ COMMENTED OUT: Verbose rebound logs (cluttering console)
+      // console.log('🎬 ShotAnimationSystem: Animating non-rebounders to ball bounce', {
+      //   ballBounceCoordsPixels: { x: ballBounceCoords.x, y: ballBounceCoords.y },
+      //   bounceGrid: { x: bounceGridX, y: bounceGridY },
+      //   totalRebounders: all_rebounders.length,
+      //   rebounderId: turnData.rebounderId,
+      //   sceneDimensions: { width: this.scene.game.config.width, height: this.scene.game.config.height }
+      // });
       
       // Animate each player who was attempting the rebound (but didn't get it)
       all_rebounders.forEach(playerId => {
@@ -1018,14 +1027,15 @@ export class ShotAnimationSystem {
    */
   async handleDefensiveRebound(rebounderSprite, turnData) {
     // ✅ PRIORITY 2 FIX: Enhanced logging to diagnose missing next_play_type
-    console.log('🎬 ShotAnimationSystem: Handling defensive rebound', {
-      rebounderId: turnData.rebounderId,
-      next_play_type: turnData.next_play_type,
-      rebound_type: turnData.rebound_type,
-      hasNextPlayType: !!turnData.next_play_type,
-      turnDataKeys: Object.keys(turnData),
-      fullTurnData: turnData // Log full object to see what's actually present
-    });
+    // ✅ COMMENTED OUT: Verbose rebound logs (cluttering console)
+    // console.log('🎬 ShotAnimationSystem: Handling defensive rebound', {
+    //   rebounderId: turnData.rebounderId,
+    //   next_play_type: turnData.next_play_type,
+    //   rebound_type: turnData.rebound_type,
+    //   hasNextPlayType: !!turnData.next_play_type,
+    //   turnDataKeys: Object.keys(turnData),
+    //   fullTurnData: turnData // Log full object to see what's actually present
+    // });
     
     // ✅ PRIORITY 2 FIX: Validate next_play_type is present (no fallback - must be correct)
     if (!turnData.next_play_type) {
@@ -1369,14 +1379,15 @@ export class ShotAnimationSystem {
     const bounceX = bounceGridX * (this.scene.game.config.width / 100);
     const bounceY = bounceGridY * (this.scene.game.config.height / 100);
     
-    console.log('🎯 ShotAnimationSystem: Bounce variance calculation', {
-      rimGrid: { x: rimGridX, y: rimGridY },
-      isHomeTeam,
-      xVariance,
-      yVariance,
-      bounceGrid: { x: bounceGridX, y: bounceGridY },
-      bouncePixels: { x: bounceX, y: bounceY }
-    });
+    // ✅ COMMENTED OUT: Verbose bounce calculation logs (cluttering console)
+    // console.log('🎯 ShotAnimationSystem: Bounce variance calculation', {
+    //   rimGrid: { x: rimGridX, y: rimGridY },
+    //   isHomeTeam,
+    //   xVariance,
+    //   yVariance,
+    //   bounceGrid: { x: bounceGridX, y: bounceGridY },
+    //   bouncePixels: { x: bounceX, y: bounceY }
+    // });
 
     return { x: bounceX, y: bounceY };
   }

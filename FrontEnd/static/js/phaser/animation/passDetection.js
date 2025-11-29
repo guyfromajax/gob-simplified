@@ -67,12 +67,13 @@ export async function handlePassAnimation({ scene, passInfo, playerSprites }) {
     return;
   }
   
-  console.log('🏀 [PASS ANIMATION] Calling runPass', {
-    fromId: passInfo.passerId,
-    toId: passInfo.receiverId,
-    passerPos: { x: passerSprite.x, y: passerSprite.y },
-    receiverPos: { x: receiverSprite.x, y: receiverSprite.y }
-  });
+  // ✅ COMMENTED OUT: Pass animation logs (cluttering console)
+  // console.log('🏀 [PASS ANIMATION] Calling runPass', {
+  //   fromId: passInfo.passerId,
+  //   toId: passInfo.receiverId,
+  //   passerPos: { x: passerSprite.x, y: passerSprite.y },
+  //   receiverPos: { x: receiverSprite.x, y: receiverSprite.y }
+  // });
   
   // ✅ FIX: Use getBallDuration() to respect game speed settings
   // Import getBallDuration from ballTween.js which uses getBallSpeed() that checks window.__GAME_SPEED
@@ -109,7 +110,8 @@ export async function handlePassAnimation({ scene, passInfo, playerSprites }) {
   // updateBallOwnership from teleporting the ball immediately after pass completes
   // This matches fast break behavior - no updateBallOwnership during/after pass
   scene.passInFlight = true;
-  console.log('🏀 [PASS ANIMATION] runPass completed, keeping passInFlight=true for next step');
+  // ✅ COMMENTED OUT: Pass animation logs (cluttering console)
+  // console.log('🏀 [PASS ANIMATION] runPass completed, keeping passInFlight=true for next step');
 }
 
 

@@ -69,20 +69,22 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
                             anim.movement?.some(m => m.action === 'shoot' && m.timestamp > step.timestamp)
                           ));
       
-      console.warn('animateStep: Timeout - forcing resolve', {
-        playerId: sprite?.playerId,
-        action: step.action,
-        duration,
-        timeoutMs,
-        tweenActive: tween?.isPlaying !== false,
-        tweenProgress: tween?.progress,
-        spritePos: { x: sprite.x, y: sprite.y },
-        targetPos: { x: targetX, y: targetY },
-        distanceToTarget: distance,
-        tweenManagerState,
-        scenePaused: scene.scene?.isPaused(),
-        skipToEnd: scene.skipToEnd,
-        isBeforeShot,
+      // ✅ COMMENTED OUT: Timeout logs (cluttering console)
+      // console.warn('animateStep: Timeout - forcing resolve', {
+      //   playerId: sprite?.playerId,
+      //   action: step.action,
+      //   duration,
+      //   timeoutMs,
+      //   tweenActive: tween?.isPlaying !== false,
+      //   tweenProgress: tween?.progress,
+      //   spritePos: { x: sprite.x, y: sprite.y },
+      //   targetPos: { x: targetX, y: targetY },
+      //   distanceToTarget: distance,
+      //   tweenManagerState,
+      //   scenePaused: scene.scene?.isPaused(),
+      //   skipToEnd: scene.skipToEnd,
+      //   isBeforeShot,
+      // });
         stepTimestamp: step.timestamp
       });
       if (tween) {
@@ -475,17 +477,18 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
         timeScale: scene.tweens.timeScale ?? 'N/A'
       } : null;
       
-      console.warn('🔍 [TWEEN START CHECK] Tween created but not playing immediately', {
-        playerId: sprite?.playerId,
-        action: step.action,
-        tweenStartedImmediately,
-        tweenProgressImmediately,
-        validTargetsCount: validTargets.length,
-        ballInTargets,
-        ballHasActiveTween,
-        scenePaused,
-        tweenManagerState
-      });
+      // ✅ COMMENTED OUT: Tween start check logs (cluttering console)
+      // console.warn('🔍 [TWEEN START CHECK] Tween created but not playing immediately', {
+      //   playerId: sprite?.playerId,
+      //   action: step.action,
+      //   tweenStartedImmediately,
+      //   tweenProgressImmediately,
+      //   validTargetsCount: validTargets.length,
+      //   ballInTargets,
+      //   ballHasActiveTween,
+      //   scenePaused,
+      //   tweenManagerState
+      // });
     }
     
     // Ensure tween starts immediately (Phaser tweens should auto-start, but verify)
