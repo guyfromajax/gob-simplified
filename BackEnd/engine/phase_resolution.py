@@ -417,10 +417,18 @@ def resolve_fast_break_logic(game: "GameManager"):
             "fast_break": True,  # ✅ Mark as Fast Break so frontend routes to Fast Break animation
         }
         
-        # Debug logging for outlet pass roles
+        # ✅ DEBUG: Log fast break defensive stop result to verify data is being set correctly
         import logging
-        # ✅ COMMENTED OUT: Fast break defensive stop logs (cluttering transition debugging)
-        # logging.warning(f"🏀 Fast Break DEFENSIVE_STOP roles - outlet_passer={fb_roles.get('outlet_passer')}, outlet_receiver={fb_roles.get('outlet_receiver')}, rebounder={getattr(game_state.get('last_rebounder'), 'player_id', None) if game_state.get('last_rebounder') else None}, ball_handler={getattr(fb_roles.get('ball_handler'), 'player_id', None) if fb_roles.get('ball_handler') else None}")
+        logging.warning(f"🏀 [FAST BREAK DEBUG] DEFENSIVE_STOP result created:", {
+            "result_type": result.get("result_type"),
+            "fast_break": result.get("fast_break"),
+            "has_roles": "roles" in result,
+            "outlet_passer": fb_roles.get("outlet_passer"),
+            "outlet_receiver": fb_roles.get("outlet_receiver"),
+            "ball_handler_id": getattr(ball_handler, "player_id", None) if ball_handler else None,
+            "has_animations": len(animations) > 0 if animations else False,
+            "animation_count": len(animations) if animations else 0
+        })
         
         if hold_up:
             result["hold_up"] = True
@@ -499,10 +507,18 @@ def resolve_fast_break_logic(game: "GameManager"):
     turn_result["roles"] = fb_roles
     turn_result["fast_break"] = True  # ✅ Add fast_break flag for frontend routing
     
-    # Debug logging for outlet pass roles
+    # ✅ DEBUG: Log fast break result (MAKE/MISS/TURNOVER/FOUL) to verify data is being set correctly
     import logging
-    # ✅ COMMENTED OUT: Fast break roles logs (cluttering transition debugging)
-    # logging.warning(f"🏀 Fast Break roles - outlet_passer={fb_roles.get('outlet_passer')}, outlet_receiver={fb_roles.get('outlet_receiver')}, rebounder={getattr(game_state.get('last_rebounder'), 'player_id', None) if game_state.get('last_rebounder') else None}, ball_handler={getattr(fb_roles.get('ball_handler'), 'player_id', None) if fb_roles.get('ball_handler') else None}")
+    logging.warning(f"🏀 [FAST BREAK DEBUG] {turn_result.get('result_type')} result created:", {
+        "result_type": turn_result.get("result_type"),
+        "fast_break": turn_result.get("fast_break"),
+        "has_roles": "roles" in turn_result,
+        "outlet_passer": fb_roles.get("outlet_passer"),
+        "outlet_receiver": fb_roles.get("outlet_receiver"),
+        "ball_handler_id": getattr(fb_roles.get("ball_handler"), "player_id", None) if fb_roles.get("ball_handler") else None,
+        "has_animations": len(turn_result.get("animations", [])) > 0,
+        "animation_count": len(turn_result.get("animations", []))
+    })
     if hold_up:
         turn_result["hold_up"] = True
         turn_result["stopper_id"] = stopper_id
