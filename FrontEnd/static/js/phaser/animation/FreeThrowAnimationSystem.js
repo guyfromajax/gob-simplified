@@ -638,11 +638,22 @@ export class FreeThrowAnimationSystem {
   determineFreeThrowContext(turnData) {
     const ftContext = turnData.ftContext || {};
     
+    // ✅ FIX: Support both naming conventions (ftIndex/ftTotal from annotateFreeThrowTurns, attempt/total from backend)
+    // annotateFreeThrowTurns sets ftIndex/ftTotal, but we were looking for attempt/total
+    const attempt = ftContext.ftIndex || ftContext.attempt || 1;
+    const total = ftContext.ftTotal || ftContext.total || 1;
+    
+    // ✅ FIX: Also use free_throws_remaining from backend as a safety check
+    // free_throws_remaining is AFTER this shot, so if it's > 0, this is NOT the final FT
+    // This ensures we never trigger inbound pass between free throw attempts
+    const hasMoreFreeThrows = turnData.free_throws_remaining !== undefined && turnData.free_throws_remaining > 0;
+    const isFinal = !hasMoreFreeThrows && (attempt >= total);
+    
     return {
-      attempt: ftContext.attempt || 1,
-      total: ftContext.total || 1,
+      attempt: attempt,
+      total: total,
       type: ftContext.type || 'single',
-      isFinal: (ftContext.attempt || 1) >= (ftContext.total || 1)
+      isFinal: isFinal
     };
   }
 
