@@ -112,6 +112,32 @@ async def get_all_plays():
     return {"plays": plays}
 
 
+@router.get("/api/play/{play_name}")
+async def get_play_by_name(play_name: str):
+    """
+    Get a specific play by name (URL decoded).
+    
+    Args:
+        play_name: Play name (URL encoded, will be decoded)
+        
+    Returns:
+        dict: Play document
+    """
+    try:
+        from urllib.parse import unquote
+        decoded_name = unquote(play_name)
+        play = plays_collection.find_one({"name": decoded_name})
+        if not play:
+            raise HTTPException(status_code=404, detail=f"Play '{decoded_name}' not found")
+        
+        play["_id"] = str(play["_id"])
+        return play
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 @router.get("/api/plays/{play_id}")
 async def get_play(play_id: str):
     """
