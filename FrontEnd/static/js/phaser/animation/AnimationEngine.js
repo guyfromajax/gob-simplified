@@ -119,16 +119,23 @@ export class AnimationEngine {
     // ✅ FIX: Only check fast_break flag and result_type - next_play_type indicates what comes NEXT, not what this turn is
     // The backend should set fast_break=true on the actual fast break turn, not rely on next_play_type
     // ✅ CRITICAL: Check fast_break flag FIRST, even for DEFENSIVE_STOP turns (fast break defensive stops have fast_break=true)
-    if (turnData.fast_break === true || 
-        turnData.result_type === "FAST_BREAK") {
+    // ✅ FIX: Also check for string "true" in case JSON serialization converts boolean to string
+    const isFastBreak = turnData.fast_break === true || 
+                        turnData.fast_break === "true" ||
+                        turnData.result_type === "FAST_BREAK";
+    
+    if (isFastBreak) {
       console.log('⚡ [FAST BREAK DETECTED]', {
         fast_break: turnData.fast_break,
+        fast_break_type: typeof turnData.fast_break,
         result_type: turnData.result_type,
         next_play_type: turnData.next_play_type,
         has_roles: !!turnData.roles,
         has_outlet_passer: !!turnData.roles?.outlet_passer,
         has_outlet_receiver: !!turnData.roles?.outlet_receiver,
-        reason: turnData.fast_break === true ? 'fast_break flag' :
+        outlet_passer: turnData.roles?.outlet_passer,
+        outlet_receiver: turnData.roles?.outlet_receiver,
+        reason: turnData.fast_break === true || turnData.fast_break === "true" ? 'fast_break flag' :
                 turnData.result_type === "FAST_BREAK" ? 'result_type' :
                 'unknown'
       });
@@ -351,7 +358,15 @@ export class AnimationEngine {
   }
 
   async handleFastBreak(turnData, context) {
-    console.log('AnimationEngine: Handling fast break');
+    console.log('⚡ AnimationEngine: Handling fast break', {
+      result_type: turnData.result_type,
+      fast_break: turnData.fast_break,
+      has_roles: !!turnData.roles,
+      outlet_passer: turnData.roles?.outlet_passer,
+      outlet_receiver: turnData.roles?.outlet_receiver,
+      has_animations: !!turnData.animations,
+      animation_count: turnData.animations?.length || 0
+    });
     
     // ✅ PHASE 2.6: Update active player display (moved from animateGameTurns.js)
     const { getBallHandlerIdFromTurn, getDefenderIdFromTurn, updateActivePlayers } = await import('../utils/activePlayerDisplay.js');
@@ -362,6 +377,7 @@ export class AnimationEngine {
     }
     
     // Import and use existing fast break handler for now
+    console.log('⚡ About to call runFastBreakSequence');
     const { runFastBreakSequence } = await import('./fastBreak.js');
     await runFastBreakSequence(this.scene, {
       playerSprites: context.playerSprites,
@@ -370,6 +386,7 @@ export class AnimationEngine {
       onUpdate: context.onUpdate,
       turnIndex: context.turnIndex // ✅ PHASE 2.6: Pass turnIndex from context
     });
+    console.log('⚡ runFastBreakSequence completed');
     
     // ✅ PHASE 2.6: Set flag if this was a shot turn (moved from animateGameTurns.js)
     if (turnData.result_type === "MAKE" || turnData.result_type === "MISS") {
