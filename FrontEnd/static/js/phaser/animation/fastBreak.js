@@ -38,7 +38,14 @@ export async function runFastBreakSequence({
   });
   
   if (!scene || !turnData || scene.skipToEnd) {
-    console.log('⚡ [runFastBreakSequence] EARLY RETURN - missing scene/turnData or skipToEnd');
+    console.log('⚡ [runFastBreakSequence] EARLY RETURN - missing scene/turnData or skipToEnd', {
+      scene_is_falsy: !scene,
+      turnData_is_falsy: !turnData,
+      skipToEnd_is_true: scene?.skipToEnd === true,
+      scene_value: scene ? 'present' : 'missing',
+      turnData_value: turnData ? 'present' : 'missing',
+      skipToEnd_value: scene?.skipToEnd
+    });
     return;
   }
   if (!scene.ballSprite) scene.ballSprite = ballSprite;

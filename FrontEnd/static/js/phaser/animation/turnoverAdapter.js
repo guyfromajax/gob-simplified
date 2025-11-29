@@ -57,7 +57,7 @@ export async function handleTurnover(scene, { playerSprites, ballSprite, turnDat
   }
 
   if (liveBall) {
-    await runFastBreakSequence(scene, { playerSprites, ballSprite, turnData, onUpdate });
+    await runFastBreakSequence({ scene, playerSprites, ballSprite, turnData });
     return;
   }
 
