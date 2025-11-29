@@ -284,6 +284,8 @@ class TurnManager:
         
         # Create debug string for frontend display
         debug_turn_start = f"***** RUN TURN, turn number: {turn_num}, time remaining: {time_remaining}, offensive state: {state} *****"
+        # ✅ KEEP: Turn header log (user requested to keep these)
+        logging.info(debug_turn_start)
         # if state in ["HCO", "HALF_COURT"]:
         #     print(f"{self.game.offense_team.name}: {self.game.game_state['current_playcall']}")
         #     print(f"{self.game.defense_team.name}: {self.game.game_state['defense_playcall']}")
@@ -551,66 +553,62 @@ class TurnManager:
                     
                     # ✅ Debug logging for assists on made shots
                     if "AST" in diff and result.get("result_type") in ["MAKE", "MISS"]:
-                        logging.info(f"🎯 ASSIST DELTA: {get_name_safe(player)} has AST in deltas: {diff}, result_type={result.get('result_type')}")
+                        # ✅ COMMENTED OUT: Assist/rebound debug logs (cluttering transition debugging)
+                        # logging.info(f"🎯 ASSIST DELTA: {get_name_safe(player)} has AST in deltas: {diff}, result_type={result.get('result_type')}")
                     
-                    # ✅ Debug logging for free throw rebounds
-                    if result.get("result_type") == "FREE_THROW" and ("OREB" in diff or "DREB" in diff):
-                        logging.info(f"🏀 Free Throw Turn Deltas: {get_name_safe(player)} has rebound in deltas: {diff}")
+                    # ✅ COMMENTED OUT: Free throw rebound debug logs
+                    # if result.get("result_type") == "FREE_THROW" and ("OREB" in diff or "DREB" in diff):
+                    #     logging.info(f"🏀 Free Throw Turn Deltas: {get_name_safe(player)} has rebound in deltas: {diff}")
         
-        # ✅ Additional debug logging for FREE_THROW turns to check if rebound stats were recorded
-        if result.get("result_type") == "FREE_THROW" and result.get("rebound_type"):
-            rebounder_id = result.get("rebounderId")
-            logging.info(f"🏀 Free Throw Turn - rebound_type={result.get('rebound_type')}, rebounderId={rebounder_id}")
-            if rebounder_id:
-                # Check if rebounder exists in deltas
-                if rebounder_id in deltas:
-                    logging.info(f"🏀 Free Throw Turn - Rebounder {rebounder_id} found in deltas: {deltas[rebounder_id]}")
-                else:
-                    logging.warning(f"⚠️ Free Throw Turn - Rebounder {rebounder_id} NOT found in deltas. Available player_ids: {list(deltas.keys())}")
-                    # Check if rebounder exists in pre_stats (might be from previous turn)
-                    if rebounder_id in pre_stats:
-                        prev_reb = pre_stats[rebounder_id].get(result.get("rebound_type"), 0)
-                        # Find the player object to check current stats
-                        for team in (self.game.home_team, self.game.away_team):
-                            for player in team.get_all_players():
-                                if player.player_id == rebounder_id:
-                                    current_reb = player.stats["game"].get(result.get("rebound_type"), 0)
-                                    logging.warning(f"⚠️ Free Throw Turn - Rebounder stats mismatch: prev={prev_reb}, current={current_reb}, should_diff={current_reb - prev_reb}, player_name={get_name_safe(player)}")
-                                    # If there's a diff but it's not in deltas, this is a bug
-                                    if current_reb != prev_reb:
-                                        expected_diff = {result.get("rebound_type"): current_reb - prev_reb}
-                                        logging.error(f"❌ Free Throw Turn - Rebound stat recorded but NOT in deltas! Expected: {expected_diff}, Player: {get_name_safe(player)}")
-                                    break
-                    else:
-                        logging.warning(f"⚠️ Free Throw Turn - Rebounder {rebounder_id} not found in pre_stats")
+        # ✅ COMMENTED OUT: Free throw rebound debug logging
+        # if result.get("result_type") == "FREE_THROW" and result.get("rebound_type"):
+        #     rebounder_id = result.get("rebounderId")
+        #     logging.info(f"🏀 Free Throw Turn - rebound_type={result.get('rebound_type')}, rebounderId={rebounder_id}")
+        #     if rebounder_id:
+        #         if rebounder_id in deltas:
+        #             logging.info(f"🏀 Free Throw Turn - Rebounder {rebounder_id} found in deltas: {deltas[rebounder_id]}")
+        #         else:
+        #             logging.warning(f"⚠️ Free Throw Turn - Rebounder {rebounder_id} NOT found in deltas. Available player_ids: {list(deltas.keys())}")
+        #             if rebounder_id in pre_stats:
+        #                 prev_reb = pre_stats[rebounder_id].get(result.get("rebound_type"), 0)
+        #                 for team in (self.game.home_team, self.game.away_team):
+        #                     for player in team.get_all_players():
+        #                         if player.player_id == rebounder_id:
+        #                             current_reb = player.stats["game"].get(result.get("rebound_type"), 0)
+        #                             logging.warning(f"⚠️ Free Throw Turn - Rebounder stats mismatch: prev={prev_reb}, current={current_reb}, should_diff={current_reb - prev_reb}, player_name={get_name_safe(player)}")
+        #                             if current_reb != prev_reb:
+        #                                 expected_diff = {result.get("rebound_type"): current_reb - prev_reb}
+        #                                 logging.error(f"❌ Free Throw Turn - Rebound stat recorded but NOT in deltas! Expected: {expected_diff}, Player: {get_name_safe(player)}")
+        #                             break
+        #             else:
+        #                 logging.warning(f"⚠️ Free Throw Turn - Rebounder {rebounder_id} not found in pre_stats")
         
         result["deltas"] = deltas
         
-        # ✅ Debug logging for assists - check if AST is in deltas after a made shot
-        if result.get("result_type") == "MAKE":
-            # Check if any player has AST in deltas
-            has_ast_in_deltas = any("AST" in delta.get("stats", {}) for delta in deltas.values())
-            if has_ast_in_deltas:
-                ast_players = []
-                for pid, delta in deltas.items():
-                    if "AST" in delta.get("stats", {}):
-                        for team in (self.game.home_team, self.game.away_team):
-                            player = team.get_player_by_id(pid)
-                            if player:
-                                ast_players.append(get_name_safe(player))
-                                break
-                logging.info(f"🎯 ASSIST CHECK: Made shot - AST found in deltas for: {', '.join(ast_players) if ast_players else 'unknown'}")
-            else:
-                delta_summary = {pid: list(d.get("stats", {}).keys()) for pid, d in deltas.items()}
-                logging.warning(f"⚠️ ASSIST CHECK: Made shot - NO AST found in deltas! Deltas: {delta_summary}")
+        # ✅ COMMENTED OUT: Assist debug logging
+        # if result.get("result_type") == "MAKE":
+        #     has_ast_in_deltas = any("AST" in delta.get("stats", {}) for delta in deltas.values())
+        #     if has_ast_in_deltas:
+        #         ast_players = []
+        #         for pid, delta in deltas.items():
+        #             if "AST" in delta.get("stats", {}):
+        #                 for team in (self.game.home_team, self.game.away_team):
+        #                     player = team.get_player_by_id(pid)
+        #                     if player:
+        #                         ast_players.append(get_name_safe(player))
+        #                         break
+        #         logging.info(f"🎯 ASSIST CHECK: Made shot - AST found in deltas for: {', '.join(ast_players) if ast_players else 'unknown'}")
+        #     else:
+        #         delta_summary = {pid: list(d.get("stats", {}).keys()) for pid, d in deltas.items()}
+        #         logging.warning(f"⚠️ ASSIST CHECK: Made shot - NO AST found in deltas! Deltas: {delta_summary}")
         
-        # ✅ Debug logging for free throw rebound deltas
-        if result.get("result_type") == "FREE_THROW" and result.get("rebound_type"):
-            rebounder_id = result.get("rebounderId")
-            if rebounder_id and rebounder_id in deltas:
-                rebounder_deltas = deltas[rebounder_id].get("stats", {})
-                logging.info(f"🏀 Free Throw Turn Result: rebound_type={result.get('rebound_type')}, rebounderId={rebounder_id}, deltas={rebounder_deltas}")
-            else:
+        # ✅ COMMENTED OUT: Free throw rebound deltas debug logging
+        # if result.get("result_type") == "FREE_THROW" and result.get("rebound_type"):
+        #     rebounder_id = result.get("rebounderId")
+        #     if rebounder_id and rebounder_id in deltas:
+        #         rebounder_deltas = deltas[rebounder_id].get("stats", {})
+        #         logging.info(f"🏀 Free Throw Turn Result: rebound_type={result.get('rebound_type')}, rebounderId={rebounder_id}, deltas={rebounder_deltas}")
+        #     else:
                 logging.warn(f"⚠️ Free Throw Rebound Missing in Deltas: rebound_type={result.get('rebound_type')}, rebounderId={rebounder_id}, deltas_keys={list(deltas.keys())}")
         
         # Include current energy levels for all active players (for frontend fatigue display)
@@ -693,10 +691,11 @@ class TurnManager:
             if play_doc:
                 chosen_play_type = play_doc.get("play_type", "motion")
                 user_focus = play_doc.get("play_focus", "inside")
-                logging.info(f"🎯 User override play details: {chosen_playcall} (type={chosen_play_type}, focus={user_focus})")
+                # ✅ COMMENTED OUT: User override logs (cluttering transition debugging)
+            # logging.info(f"🎯 User override play details: {chosen_playcall} (type={chosen_play_type}, focus={user_focus})")
             else:
                 # Fallback if play not found
-                logging.warning(f"⚠️ Play '{chosen_playcall}' not found in database, using fallback")
+                # logging.warning(f"⚠️ Play '{chosen_playcall}' not found in database, using fallback")
                 chosen_play_type = "motion"
                 user_focus = "inside"
             
@@ -704,7 +703,8 @@ class TurnManager:
             if user_defense:
                 chosen_defense = user_defense
                 self.game.game_state["user_defense_override"] = None  # Clear after use
-                logging.info(f"🎮 Using user defense override: {chosen_defense}")
+                # ✅ COMMENTED OUT: User defense override logs (cluttering transition debugging)
+                # logging.info(f"🎮 Using user defense override: {chosen_defense}")
             else:
                 defense_setting = self.game.defense_team.strategy_settings.get("defense", 2)
                 chosen_defense = random.choice(STRATEGY_CALL_DICTS["defense"][defense_setting])
@@ -728,7 +728,8 @@ class TurnManager:
         if user_defense:
             chosen_defense = user_defense
             self.game.game_state["user_defense_override"] = None  # Clear after use
-            logging.info(f"🎮 Using user defense override: {chosen_defense}")
+            # ✅ COMMENTED OUT: User defense override logs (cluttering transition debugging)
+            # logging.info(f"🎮 Using user defense override: {chosen_defense}")
         else:
             # No override, choose defense normally (will be set below)
             chosen_defense = None
@@ -884,9 +885,10 @@ class TurnManager:
         
         # 🐛 DEBUG: Log strategy settings being used
         import logging
-        logging.warning(f"🔧 [SET STRATEGY CALLS] Offense: {self.game.offense_team.name}, Defense: {self.game.defense_team.name}")
-        logging.warning(f"   - Offense strategy_settings: {self.game.offense_team.strategy_settings}")
-        logging.warning(f"   - Defense strategy_settings: {self.game.defense_team.strategy_settings}")
+        # ✅ COMMENTED OUT: Strategy settings logs (cluttering transition debugging)
+        # logging.warning(f"🔧 [SET STRATEGY CALLS] Offense: {self.game.offense_team.name}, Defense: {self.game.defense_team.name}")
+        # logging.warning(f"   - Offense strategy_settings: {self.game.offense_team.strategy_settings}")
+        # logging.warning(f"   - Defense strategy_settings: {self.game.defense_team.strategy_settings}")
         
         # Ensure strategy_calls dictionaries exist
         if not hasattr(self.game.offense_team, 'strategy_calls') or not self.game.offense_team.strategy_calls:
@@ -1627,7 +1629,8 @@ class TurnManager:
         tempo_call = off_team.strategy_calls["tempo_call"]
         
         # Log lineup state to diagnose KeyError
-        logging.info(f"🏀 assign_roles: offense_team={off_team.name} ({'HOME' if off_team.is_home_team else 'AWAY'}), offense_lineup_keys={list(off_lineup.keys()) if off_lineup else 'EMPTY'}, defense_team={def_team.name} ({'HOME' if def_team.is_home_team else 'AWAY'}), defense_lineup_keys={list(def_lineup.keys()) if def_lineup else 'EMPTY'}")
+        # ✅ COMMENTED OUT: assign_roles log (cluttering transition debugging)
+        # logging.info(f"🏀 assign_roles: offense_team={off_team.name} ({'HOME' if off_team.is_home_team else 'AWAY'}), offense_lineup_keys={list(off_lineup.keys()) if off_lineup else 'EMPTY'}, defense_team={def_team.name} ({'HOME' if def_team.is_home_team else 'AWAY'}), defense_lineup_keys={list(def_lineup.keys()) if def_lineup else 'EMPTY'}")
 
         # --- Step 1: Pick scene based on playcall
         from BackEnd.playcall_skeletons.outside_skeletons import OUTSIDE_SCENES
@@ -1748,7 +1751,8 @@ class TurnManager:
                                     # This is the last pass to the shooter (we're searching backwards)
                                     last_pass_step_index = step_index
                                     passer_pos = pos
-                                    logging.info(f"🎯 ASSIST DEBUG: Found pass to shooter! passer_pos={passer_pos}, shooter_pos={shooter_pos}, step_index={step_index}, shot_step_index={shot_step_index}")
+                                    # ✅ COMMENTED OUT: Assist debug logs (cluttering transition debugging)
+                                    # logging.info(f"🎯 ASSIST DEBUG: Found pass to shooter! passer_pos={passer_pos}, shooter_pos={shooter_pos}, step_index={step_index}, shot_step_index={shot_step_index}")
                                     break
                             
                             # If we found a pass, stop searching (we want the LAST pass to the shooter)
@@ -1760,12 +1764,13 @@ class TurnManager:
                     steps_from_shot = shot_step_index - last_pass_step_index
                     if steps_from_shot <= 5:
                         # All criteria met: last pass to shooter within 5 steps
-                        logging.info(f"🎯 ASSIST DEBUG: Found passer_pos={passer_pos}, shooter_pos={shooter_pos}, steps_from_shot={steps_from_shot}")
+                        # ✅ COMMENTED OUT: Assist debug logs (cluttering transition debugging)
+                        # logging.info(f"🎯 ASSIST DEBUG: Found passer_pos={passer_pos}, shooter_pos={shooter_pos}, steps_from_shot={steps_from_shot}")
                     else:
-                        logging.info(f"🎯 ASSIST DEBUG: Pass found but too far from shot (steps_from_shot={steps_from_shot}, max=5)")
+                        # logging.info(f"🎯 ASSIST DEBUG: Pass found but too far from shot (steps_from_shot={steps_from_shot}, max=5)")
                         passer_pos = None  # Pass too far, no assist
                 else:
-                    logging.warning(f"⚠️ ASSIST DEBUG: No pass to shooter found in last 5 steps (shooter_pos={shooter_pos}, shot_step_index={shot_step_index}, search_start={search_start}, total_steps={len(steps)})")
+                    # logging.warning(f"⚠️ ASSIST DEBUG: No pass to shooter found in last 5 steps (shooter_pos={shooter_pos}, shot_step_index={shot_step_index}, search_start={search_start}, total_steps={len(steps)})")
                     passer_pos = None  # No pass found, no assist
             
             # print(f"🎯 ASSIST DEBUG: Final passer_pos={passer_pos}")
@@ -1862,7 +1867,8 @@ class TurnManager:
         
         # Override passer if it conflicts with shooter/screener
         if passer_pos in [shooter_pos, screener_pos]:
-            logging.info(f"🎯 ASSIST DEBUG: Passer conflicts with shooter/screener, setting to None (passer_pos={passer_pos}, shooter_pos={shooter_pos}, screener_pos={screener_pos})")
+            # ✅ COMMENTED OUT: Assist debug logs (cluttering transition debugging)
+            # logging.info(f"🎯 ASSIST DEBUG: Passer conflicts with shooter/screener, setting to None (passer_pos={passer_pos}, shooter_pos={shooter_pos}, screener_pos={screener_pos})")
             passer_pos = None
 
         # Determine shot defender based on defense type
@@ -1969,9 +1975,10 @@ class TurnManager:
         
         # Debug logging for passer assignment
         if passer:
-            logging.info(f"🎯 ASSIST DEBUG: passer_pos={passer_pos}, passer={get_name_safe(passer)}, shooter={get_name_safe(shooter)}")
+            # ✅ COMMENTED OUT: Assist debug logs (cluttering transition debugging)
+            # logging.info(f"🎯 ASSIST DEBUG: passer_pos={passer_pos}, passer={get_name_safe(passer)}, shooter={get_name_safe(shooter)}")
         else:
-            logging.info(f"🎯 ASSIST DEBUG: No passer found (passer_pos={passer_pos}, shooter={get_name_safe(shooter)})")
+            # logging.info(f"🎯 ASSIST DEBUG: No passer found (passer_pos={passer_pos}, shooter={get_name_safe(shooter)})")
 
         return {
             "shooter": shooter,
@@ -2122,15 +2129,16 @@ class TurnManager:
         
         # 🐛 DEBUG: Log strategy settings being used
         import logging
-        logging.warning(f"🛡️ [DEFENSIVE PRESSURE] {def_team.name} - HCT={hct_value}, FCP={fcp_value}")
-        logging.warning(f"   - Full strategy_settings: {def_team.strategy_settings}")
-        logging.warning(f"   - HCT type: {type(hct_value)}, FCP type: {type(fcp_value)}")
-        logging.warning(f"   - HCT == 0: {hct_value == 0}, FCP == 0: {fcp_value == 0}")
+        # ✅ COMMENTED OUT: Defensive pressure logs (cluttering transition debugging)
+        # logging.warning(f"🛡️ [DEFENSIVE PRESSURE] {def_team.name} - HCT={hct_value}, FCP={fcp_value}")
+        # logging.warning(f"   - Full strategy_settings: {def_team.strategy_settings}")
+        # logging.warning(f"   - HCT type: {type(hct_value)}, FCP type: {type(fcp_value)}")
+        # logging.warning(f"   - HCT == 0: {hct_value == 0}, FCP == 0: {fcp_value == 0}")
         
         # If both are 0, default to HCO (no pressure)
         # CRITICAL: Check for 0 explicitly - if user set both to 0, they want NO pressure
         if hct_value == 0 and fcp_value == 0:
-            logging.warning(f"   - ✅ Both HCT and FCP are 0, returning HCO (no pressure)")
+            # logging.warning(f"   - ✅ Both HCT and FCP are 0, returning HCO (no pressure)")
             return "HCO"
         
         # Remove any strategy with value 0 from consideration

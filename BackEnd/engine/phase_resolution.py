@@ -266,7 +266,8 @@ def resolve_fast_break_logic(game: "GameManager"):
                 fb_roles["outlet_receiver"] = getattr(ball_handler, "player_id", None)
                 
                 import logging
-                logging.warning(f"🏀 Fast Break outlet pass: outlet_passer={get_name_safe(rebounder)} (rebounder), outlet_receiver={get_name_safe(ball_handler)} (release player)")
+                # ✅ COMMENTED OUT: Fast break outlet pass logs (cluttering transition debugging)
+                # logging.warning(f"🏀 Fast Break outlet pass: outlet_passer={get_name_safe(rebounder)} (rebounder), outlet_receiver={get_name_safe(ball_handler)} (release player)")
             else:
                 fb_roles["outlet_passer"] = None
                 fb_roles["outlet_receiver"] = None
@@ -283,7 +284,8 @@ def resolve_fast_break_logic(game: "GameManager"):
                 fb_roles["outlet_receiver"] = getattr(ball_handler, "player_id", None)
                 
                 import logging
-                logging.warning(f"⚠️ Fast Break outlet pass (FALLBACK - no release player): outlet_passer={get_name_safe(rebounder)} (rebounder), outlet_receiver={get_name_safe(ball_handler)} (random)")
+                # ✅ COMMENTED OUT: Fast break outlet pass logs (cluttering transition debugging)
+                # logging.warning(f"⚠️ Fast Break outlet pass (FALLBACK - no release player): outlet_passer={get_name_safe(rebounder)} (rebounder), outlet_receiver={get_name_safe(ball_handler)} (random)")
             else:
                 fb_roles["outlet_passer"] = None
                 fb_roles["outlet_receiver"] = None
@@ -417,7 +419,8 @@ def resolve_fast_break_logic(game: "GameManager"):
         
         # Debug logging for outlet pass roles
         import logging
-        logging.warning(f"🏀 Fast Break DEFENSIVE_STOP roles - outlet_passer={fb_roles.get('outlet_passer')}, outlet_receiver={fb_roles.get('outlet_receiver')}, rebounder={getattr(game_state.get('last_rebounder'), 'player_id', None) if game_state.get('last_rebounder') else None}, ball_handler={getattr(fb_roles.get('ball_handler'), 'player_id', None) if fb_roles.get('ball_handler') else None}")
+        # ✅ COMMENTED OUT: Fast break defensive stop logs (cluttering transition debugging)
+        # logging.warning(f"🏀 Fast Break DEFENSIVE_STOP roles - outlet_passer={fb_roles.get('outlet_passer')}, outlet_receiver={fb_roles.get('outlet_receiver')}, rebounder={getattr(game_state.get('last_rebounder'), 'player_id', None) if game_state.get('last_rebounder') else None}, ball_handler={getattr(fb_roles.get('ball_handler'), 'player_id', None) if fb_roles.get('ball_handler') else None}")
         
         if hold_up:
             result["hold_up"] = True
@@ -498,7 +501,8 @@ def resolve_fast_break_logic(game: "GameManager"):
     
     # Debug logging for outlet pass roles
     import logging
-    logging.warning(f"🏀 Fast Break roles - outlet_passer={fb_roles.get('outlet_passer')}, outlet_receiver={fb_roles.get('outlet_receiver')}, rebounder={getattr(game_state.get('last_rebounder'), 'player_id', None) if game_state.get('last_rebounder') else None}, ball_handler={getattr(fb_roles.get('ball_handler'), 'player_id', None) if fb_roles.get('ball_handler') else None}")
+    # ✅ COMMENTED OUT: Fast break roles logs (cluttering transition debugging)
+    # logging.warning(f"🏀 Fast Break roles - outlet_passer={fb_roles.get('outlet_passer')}, outlet_receiver={fb_roles.get('outlet_receiver')}, rebounder={getattr(game_state.get('last_rebounder'), 'player_id', None) if game_state.get('last_rebounder') else None}, ball_handler={getattr(fb_roles.get('ball_handler'), 'player_id', None) if fb_roles.get('ball_handler') else None}")
     if hold_up:
         turn_result["hold_up"] = True
         turn_result["stopper_id"] = stopper_id
@@ -618,9 +622,10 @@ def resolve_free_throw_logic(game):
             rebounder.record_stat(stat)
             
             # Debug logging for free throw rebounds
-            logging.info(f"🏀 Free Throw Rebound: {get_name_safe(rebounder)} credited with {stat} (Free Throw miss)")
+            # ✅ COMMENTED OUT: Free throw rebound logs (cluttering transition debugging)
+            # logging.info(f"🏀 Free Throw Rebound: {get_name_safe(rebounder)} credited with {stat} (Free Throw miss)")
             rebounder_game_reb = rebounder.stats["game"].get(stat, 0)
-            logging.info(f"🏀 Free Throw Rebound: {get_name_safe(rebounder)} now has {rebounder_game_reb} {stat} (game total)")
+            # logging.info(f"🏀 Free Throw Rebound: {get_name_safe(rebounder)} now has {rebounder_game_reb} {stat} (game total)")
 
             if rebound_team == def_team:
                 possession_flips = True

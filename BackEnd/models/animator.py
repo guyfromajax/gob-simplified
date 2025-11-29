@@ -1401,8 +1401,9 @@ class Animator:
                 
                 # 🐛 DEBUG: Log coordinate flow for ball handler's defender
                 if is_guarding_bh and is_away_offense:
-                    logging.warning(f"🔍 [ZONE DEFENSE DEBUG] Step {step_index}, Defender {def_pos} guarding BH")
-                    logging.warning(f"   - is_away_offense: {is_away_offense}")
+                    # ✅ COMMENTED OUT: Zone defense debug logs (cluttering transition debugging)
+                    # logging.warning(f"🔍 [ZONE DEFENSE DEBUG] Step {step_index}, Defender {def_pos} guarding BH")
+                    # logging.warning(f"   - is_away_offense: {is_away_offense}")
                     logging.warning(f"   - BH coords: {ball_handler_coords}")
                     logging.warning(f"   - Def coords BEFORE flip: {def_coords}")
                     logging.warning(f"   - Def coords x < 50 (away side)? {def_coords.get('x', 50) < 50}")
