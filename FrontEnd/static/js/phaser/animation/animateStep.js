@@ -84,9 +84,8 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
       //   scenePaused: scene.scene?.isPaused(),
       //   skipToEnd: scene.skipToEnd,
       //   isBeforeShot,
+      //   stepTimestamp: step.timestamp
       // });
-        stepTimestamp: step.timestamp
-      });
       if (tween) {
         scene.tweens?.killTweensOf(tween);
       }
