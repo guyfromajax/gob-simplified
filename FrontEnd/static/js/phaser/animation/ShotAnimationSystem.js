@@ -720,7 +720,10 @@ export class ShotAnimationSystem {
       
       // ✅ FIX: Only call runInboundSetup if next_play_type is BASELINE_INBOUND
       // For AND-1 situations (next_play_type === "FREE_THROW"), let the free throw system handle the transition
-      if (turnData.next_play_type === "BASELINE_INBOUND") {
+      // ✅ CRITICAL: Also check possession_flips flag to prevent AND-1 from flipping possession
+      const shouldFlipPossession = turnData.next_play_type === "BASELINE_INBOUND" && 
+                                   (turnData.possession_flips !== false);
+      if (shouldFlipPossession) {
         const { runInboundSetup } = await import('./turnAnimation.js');
         // ✅ CRITICAL: After a made shot, possession flips:
         // - Team that just scored (was on offense) is now on DEFENSE
