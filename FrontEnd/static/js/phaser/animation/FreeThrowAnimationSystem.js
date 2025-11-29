@@ -307,6 +307,17 @@ export class FreeThrowAnimationSystem {
    * Handle made free throw
    */
   async handleMadeFreeThrow(turnData, ftContext) {
+    // ✅ DEBUG: Log free throw context to diagnose inbound pass issue
+    console.log('🏀 [FREE THROW DEBUG] handleMadeFreeThrow', {
+      shooter_id: turnData.shooter_id,
+      attempt: ftContext.attempt,
+      total: ftContext.total,
+      isFinal: ftContext.isFinal,
+      free_throws_remaining: turnData.free_throws_remaining,
+      ftContext_keys: Object.keys(turnData.ftContext || {}),
+      ftContext_full: turnData.ftContext
+    });
+    
     if (DebugFlags.FREE_THROW_ANIMATION) {
       console.log('FreeThrowAnimationSystem: Free throw made', {
         shooter_id: turnData.shooter_id,
@@ -344,7 +355,8 @@ export class FreeThrowAnimationSystem {
     }
 
     // Check if this is the final free throw
-    if (ftContext.attempt >= ftContext.total) {
+    // ✅ FIX: Use ftContext.isFinal instead of recalculating, as it includes the free_throws_remaining safety check
+    if (ftContext.isFinal) {
       // Final free throw made - execute inbound pass
       await this.handleFinalMadeFreeThrow(turnData);
     } else {
@@ -380,7 +392,8 @@ export class FreeThrowAnimationSystem {
     const miss = await this.animateBallBounceFromRim(rimGridCoords, turnData);
 
     // Check if this is the final free throw
-    if (ftContext.attempt >= ftContext.total) {
+    // ✅ FIX: Use ftContext.isFinal instead of recalculating, as it includes the free_throws_remaining safety check
+    if (ftContext.isFinal) {
       // Final free throw missed - execute rebound system
       // ✅ FIX: Pass the bounce result so we don't bounce twice
       await this.handleFinalMissedFreeThrow(turnData, miss);
