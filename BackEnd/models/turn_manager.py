@@ -397,7 +397,8 @@ class TurnManager:
             })
             # ✅ DEBUG: Log fast break data if present (to verify it's being preserved)
             if result.get("fast_break") or result.get("result_type") == "DEFENSIVE_STOP":
-                logging.warning(f"🏀 [FAST BREAK DEBUG] Turn #{turn_num} result before return:", {
+                import json
+                debug_data = {
                     "result_type": result.get("result_type"),
                     "fast_break": result.get("fast_break"),
                     "has_roles": "roles" in result,
@@ -406,7 +407,8 @@ class TurnManager:
                     "ball_handler_id": getattr(result.get("ball_handler"), "player_id", None) if result.get("ball_handler") else None,
                     "has_animations": len(result.get("animations", [])) > 0,
                     "animation_count": len(result.get("animations", []))
-                })
+                }
+                logging.warning(f"🏀 [FAST BREAK DEBUG] Turn #{turn_num} result before return: {json.dumps(debug_data, default=str)}")
             
             # Note: Keeping this log for backward compatibility, but the detailed log above is more useful
             logging.info(f"🔄 [OFFENSIVE_STATE TRANSITION] Turn #{turn_num} Complete", {
