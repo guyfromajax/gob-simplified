@@ -686,7 +686,16 @@ def resolve_turnover_logic(roles, game, turnover_type="DEAD BALL"):
     ball_handler = roles["ball_handler"]
     defender = roles.get("defender")
     ball_handler.record_stat("TO")
-    turnover_type = random.choice(["STEAL", "DEAD BALL"])
+    # ✅ FIX: Only use random choice if turnover_type is not explicitly provided
+    # This respects the actual turnover type instead of always randomizing
+    if turnover_type == "DEAD BALL" and defender:
+        # If defender is present, could be either STEAL or DEAD BALL
+        # Use random choice only when both are possible
+        turnover_type = random.choice(["STEAL", "DEAD BALL"])
+    elif turnover_type == "DEAD BALL":
+        # No defender, must be DEAD BALL
+        turnover_type = "DEAD BALL"
+    # If turnover_type is already "STEAL", keep it as STEAL
     game_state["last_turnover_player"] = ball_handler
 
     # Pre-compute IDs/names for logging and return payload
@@ -1390,9 +1399,30 @@ def resolve_full_court_press_logic(game: "GameManager"):
         roles["foul_player"] = foul_player
         # Check for foul out
         check_and_handle_foul_out(foul_player, game_state, def_team)
-        # For now, treat as non-shooting foul (FCP happens before shot attempt)
-        # This will trigger side inbound or bonus free throws via existing logic
         result_type = "FOUL"
+        # ✅ FIX: Check bonus status for defensive fouls in FCP (per game_flows.md)
+        # Defensive fouls should route to FREE_THROW if in bonus, otherwise HCO
+        if def_team.team_fouls >= 10:
+            # Double bonus (10+ fouls): 2 free throws
+            game_state["offensive_state"] = "FREE_THROW"
+            game_state["free_throws"] = 2
+            game_state["free_throws_remaining"] = 2
+            game_state["one_and_one"] = False
+            game_state["last_ball_handler"] = roles["ball_handler"]
+            game_state["shooter"] = roles["ball_handler"]
+        elif def_team.team_fouls >= 5:
+            # Bonus (5-9 fouls): 1 & 1 free throws
+            game_state["offensive_state"] = "FREE_THROW"
+            game_state["free_throws"] = 2  # Maximum possible (if front end is made)
+            game_state["free_throws_remaining"] = 1  # Start with 1 (front end)
+            game_state["one_and_one"] = True
+            game_state["last_ball_handler"] = roles["ball_handler"]
+            game_state["shooter"] = roles["ball_handler"]
+        else:
+            # Less than 5 fouls: possession change, side inbound
+            game_state["offensive_state"] = "HCO"
+            game_state["free_throws"] = 0
+            game_state["free_throws_remaining"] = 0
         # text = "PRESS! Defensive foul"
     elif result_type == "O_FOUL":
         game_state["foul_team"] = "OFFENSE"
@@ -1971,6 +2001,29 @@ def resolve_half_court_trap_logic(game: "GameManager"):
         # Check for foul out
         check_and_handle_foul_out(foul_player, game_state, def_team)
         result_type = "FOUL"
+        # ✅ FIX: Check bonus status for defensive fouls in HCT (per game_flows.md)
+        # Defensive fouls should route to FREE_THROW if in bonus, otherwise HCO
+        if def_team.team_fouls >= 10:
+            # Double bonus (10+ fouls): 2 free throws
+            game_state["offensive_state"] = "FREE_THROW"
+            game_state["free_throws"] = 2
+            game_state["free_throws_remaining"] = 2
+            game_state["one_and_one"] = False
+            game_state["last_ball_handler"] = roles["ball_handler"]
+            game_state["shooter"] = roles["ball_handler"]
+        elif def_team.team_fouls >= 5:
+            # Bonus (5-9 fouls): 1 & 1 free throws
+            game_state["offensive_state"] = "FREE_THROW"
+            game_state["free_throws"] = 2  # Maximum possible (if front end is made)
+            game_state["free_throws_remaining"] = 1  # Start with 1 (front end)
+            game_state["one_and_one"] = True
+            game_state["last_ball_handler"] = roles["ball_handler"]
+            game_state["shooter"] = roles["ball_handler"]
+        else:
+            # Less than 5 fouls: possession change, side inbound
+            game_state["offensive_state"] = "HCO"
+            game_state["free_throws"] = 0
+            game_state["free_throws_remaining"] = 0
     elif result_type == "O_FOUL":
         game_state["foul_team"] = "OFFENSE"
         # Select the foul player and increment their fouls
