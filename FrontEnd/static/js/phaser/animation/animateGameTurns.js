@@ -752,7 +752,13 @@ export async function animateGameTurns({ //hasBallAtStep
                                         (turn.fcp_foul === true || turn.hct_foul === true) && 
                                         turn.animations && turn.animations.length > 0;
     
-    if (isFCPHCT && !isFCPHCTFoulAlreadyHandled) {
+    // ✅ FIX: Skip FCP/HCT check for MAKE/MISS turns that don't have explicit fcp_shot/hct_shot flags
+    // These should be routed as regular HCO shots, not FCP/HCT shots. The pressureSequenceActive state
+    // is for tracking the sequence, not for routing individual shot attempts.
+    const isMakeMissWithoutExplicitFlags = (turn.result_type === "MAKE" || turn.result_type === "MISS") &&
+                                            !turn.fcp_shot && !turn.hct_shot;
+    
+    if (isFCPHCT && !isFCPHCTFoulAlreadyHandled && !isMakeMissWithoutExplicitFlags) {
       // ✅ SS&S: Use turn.next_defensive_setup as primary source (calculated by backend from defensive team's strategy settings)
       // Fallback to scene state (set from previous turn's next_defensive_setup) for subsequent turns in sequence
       // Final fallback to turn flags if neither is available
