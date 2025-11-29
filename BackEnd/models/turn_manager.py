@@ -628,10 +628,6 @@ class TurnManager:
         result["defense_tempo_call"] = self.game.defense_team.strategy_calls.get("tempo_call", "normal")
         result["defense_aggression_call"] = self.game.defense_team.strategy_calls.get("aggression_call", "normal")
         
-        from BackEnd.constants import DEBUG
-        if DEBUG:
-            print(f"📤 TURN RESULT - Sending to frontend: offense_tempo={result['offense_tempo_call']}, offense_aggr={result['offense_aggression_call']}, defense_tempo={result['defense_tempo_call']}, defense_aggr={result['defense_aggression_call']}")
-
         # Reconcile player point totals with the authoritative team score.
         # Clients should treat ``turn.score`` and ``turn.deltas`` as canonical
         # and never re-apply ``turn.points`` to avoid double counting. To guard
