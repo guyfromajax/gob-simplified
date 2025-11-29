@@ -1413,13 +1413,42 @@ async function runInboundSetup({
  * @param {Function} params.onUpdate - Update callback (optional, for future use)
  */
 export async function playTurnAnimation({ scene, simData, playerSprites, turnData, ballSprite, onAction, turnIndex, onUpdate }) {
-  // ✅ DEBUG: Log FCP/HCT detection in playTurnAnimation
-  // ✅ FIX: Also check scene.pressureSequenceActive to match routing logic in animateGameTurns.js
-  // This ensures cleanup code runs for FCP/HCT setup turns that are routed based on state
+  // ✅ DEBUG: Log entry to playTurnAnimation for FCP/HCT turns to track duplicate calls
   const isFCPHCT = turnData.fcp_shot === true || turnData.hct_shot === true || 
                    turnData.next_defensive_setup === "FCP" || turnData.next_defensive_setup === "HCT" ||
                    turnData.fcp_foul === true || turnData.hct_foul === true ||
                    scene.pressureSequenceActive === true;
+  
+  if (isFCPHCT) {
+    // ✅ FIX: Prevent duplicate calls to playTurnAnimation for the same FCP/HCT turn
+    // This applies to both Full Court Press (FCP) and Half Court Trap (HCT) animations
+    // to prevent the skeleton animation from running multiple times
+    const turnId = turnData.id || turnData.turn_id || `turn_${turnIndex}`;
+    const playAnimationKey = `_fcpHctPlayAnimation_${turnId}`;
+    
+    if (scene[playAnimationKey]) {
+      console.warn('⚠️ [FCP/HCT DEBUG] DUPLICATE playTurnAnimation call detected - skipping', {
+        result_type: turnData.result_type,
+        turnIndex: turnIndex,
+        turnId: turnId,
+        stackTrace: new Error().stack?.split('\n').slice(1, 4).join('\n')
+      });
+      return; // Exit early to prevent duplicate animation
+    }
+    
+    scene[playAnimationKey] = true; // Mark as in progress
+    console.warn('🎬 [FCP/HCT DEBUG] playTurnAnimation called', {
+      result_type: turnData.result_type,
+      fcp_shot: turnData.fcp_shot,
+      hct_shot: turnData.hct_shot,
+      fcp_foul: turnData.fcp_foul,
+      hct_foul: turnData.hct_foul,
+      next_defensive_setup: turnData.next_defensive_setup,
+      pressureSequenceActive: scene.pressureSequenceActive,
+      turnIndex: turnIndex,
+      turnId: turnId
+    });
+  }
   
   // Guard: Skip if this is an opening tip, putback, or if animations is missing
   // Putback turns are handled by handleOrebTurn in animateGameTurns.js
@@ -1606,17 +1635,33 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
     scene._previousTurnWasOpeningTip = false;
   }
 
-  // ✅ SIMPLER FIX: For FCP/HCT turns, run setup tween to move players to step 0 positions
-  // This matches ShotAnimationSystem's approach and gives tween manager time to settle
-  // after runInboundSetup() completes
+  // ✅ SIMPLER FIX: For FCP/HCT turns (both Full Court Press and Half Court Trap), run setup tween 
+  // to move players to step 0 positions. This matches ShotAnimationSystem's approach and gives tween 
+  // manager time to settle after runInboundSetup() completes.
+  // ✅ FIX: Add guard to prevent multiple calls to runSetupTween for the same turn (prevents duplicate skeleton animations)
   if (isFCPHCT && !scene.skipToEnd && maxSteps > 1) {
-    await runSetupTween({
-      scene,
-      ballSprite,
-      animations: turnData.animations,
-      playerSprites,
-      currentBallOwnerRef
-    });
+    const setupTweenKey = `_fcpHctSetupTween_${turnData.id || turnIndex || 'unknown'}`;
+    if (!scene[setupTweenKey]) {
+      scene[setupTweenKey] = true; // Mark as in progress
+      console.warn('🎬 [FCP/HCT DEBUG] Calling runSetupTween', {
+        result_type: turnData.result_type,
+        turnIndex: turnIndex,
+        maxSteps: maxSteps
+      });
+      await runSetupTween({
+        scene,
+        ballSprite,
+        animations: turnData.animations,
+        playerSprites,
+        currentBallOwnerRef
+      });
+      // Don't clear the flag - keep it set to prevent duplicate calls
+    } else {
+      console.warn('⚠️ [FCP/HCT DEBUG] Skipping duplicate runSetupTween call', {
+        result_type: turnData.result_type,
+        turnIndex: turnIndex
+      });
+    }
   }
 
   let eventsProcessed = false;
