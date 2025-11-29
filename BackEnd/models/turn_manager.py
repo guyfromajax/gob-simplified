@@ -360,10 +360,19 @@ class TurnManager:
             # Valid state values: "HCO", "FCP", "HCT", "FAST_BREAK", "FREE_THROW"
             # Turn types (not valid): "BASELINE_INBOUND", "SIDE_INBOUND"
             # This prevents invalid states like offensive_state = "BASELINE_INBOUND"
+            # 
+            # IMPORTANT: Only update if next_play_type is explicitly set AND is a valid state.
+            # Don't overwrite if offensive_state was already set correctly (e.g., FREE_THROW for AND-1).
+            # Only update if the current offensive_state doesn't match the intended next_play_type.
             next_play = result.get("next_play_type")
             valid_states = {"HCO", "FCP", "HCT", "FAST_BREAK", "FREE_THROW"}
+            current_state = self.game.game_state.get("offensive_state")
+            
             if next_play and next_play in valid_states:
-                self.game.game_state["offensive_state"] = next_play
+                # Only update if next_play_type differs from current state
+                # This preserves states that were explicitly set earlier (e.g., FREE_THROW for AND-1)
+                if current_state != next_play:
+                    self.game.game_state["offensive_state"] = next_play
                 
         finally:
             if state == "FAST_BREAK":
