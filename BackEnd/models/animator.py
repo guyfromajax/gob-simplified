@@ -1404,9 +1404,6 @@ class Animator:
                     # ✅ COMMENTED OUT: Zone defense debug logs (cluttering transition debugging)
                     # logging.warning(f"🔍 [ZONE DEFENSE DEBUG] Step {step_index}, Defender {def_pos} guarding BH")
                     # logging.warning(f"   - is_away_offense: {is_away_offense}")
-                    logging.warning(f"   - BH coords: {ball_handler_coords}")
-                    logging.warning(f"   - Def coords BEFORE flip: {def_coords}")
-                    logging.warning(f"   - Def coords x < 50 (away side)? {def_coords.get('x', 50) < 50}")
                 
                 # ✅ IMPORTANT: assign_all_zone_defenders returns coords in HOME orientation
                 # (assign_bh_defender_coords now returns home orientation when away team has ball)
@@ -1417,12 +1414,6 @@ class Animator:
                 if is_away_offense:
                     def_coords_before_flip = def_coords.copy()
                     def_coords = get_away_player_coords(def_coords)
-                    
-                    # 🐛 DEBUG: Log coordinate flow for ball handler's defender
-                    if is_guarding_bh:
-                        logging.warning(f"   - Def coords AFTER flip: {def_coords}")
-                        logging.warning(f"   - Flip result x < 50 (away side)? {def_coords.get('x', 50) < 50}")
-                        logging.warning(f"   - Expected: x < 50 (away side), Actual: x={def_coords.get('x')}")
                 
                 # Get timestamp
                 if step_index < len(skeleton_steps):
