@@ -419,7 +419,8 @@ def resolve_fast_break_logic(game: "GameManager"):
         
         # ✅ DEBUG: Log fast break defensive stop result to verify data is being set correctly
         import logging
-        logging.warning(f"🏀 [FAST BREAK DEBUG] DEFENSIVE_STOP result created:", {
+        import json
+        debug_data = {
             "result_type": result.get("result_type"),
             "fast_break": result.get("fast_break"),
             "has_roles": "roles" in result,
@@ -428,7 +429,8 @@ def resolve_fast_break_logic(game: "GameManager"):
             "ball_handler_id": getattr(ball_handler, "player_id", None) if ball_handler else None,
             "has_animations": len(animations) > 0 if animations else False,
             "animation_count": len(animations) if animations else 0
-        })
+        }
+        logging.warning(f"🏀 [FAST BREAK DEBUG] DEFENSIVE_STOP result created: {json.dumps(debug_data, default=str)}")
         
         if hold_up:
             result["hold_up"] = True
@@ -509,7 +511,8 @@ def resolve_fast_break_logic(game: "GameManager"):
     
     # ✅ DEBUG: Log fast break result (MAKE/MISS/TURNOVER/FOUL) to verify data is being set correctly
     import logging
-    logging.warning(f"🏀 [FAST BREAK DEBUG] {turn_result.get('result_type')} result created:", {
+    import json
+    debug_data = {
         "result_type": turn_result.get("result_type"),
         "fast_break": turn_result.get("fast_break"),
         "has_roles": "roles" in turn_result,
@@ -518,7 +521,8 @@ def resolve_fast_break_logic(game: "GameManager"):
         "ball_handler_id": getattr(fb_roles.get("ball_handler"), "player_id", None) if fb_roles.get("ball_handler") else None,
         "has_animations": len(turn_result.get("animations", [])) > 0,
         "animation_count": len(turn_result.get("animations", []))
-    })
+    }
+    logging.warning(f"🏀 [FAST BREAK DEBUG] {turn_result.get('result_type')} result created: {json.dumps(debug_data, default=str)}")
     if hold_up:
         turn_result["hold_up"] = True
         turn_result["stopper_id"] = stopper_id
