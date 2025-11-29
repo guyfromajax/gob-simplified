@@ -390,11 +390,11 @@ export class AnimationEngine {
     // Import and use existing fast break handler for now
     console.log('⚡ About to call runFastBreakSequence');
     const { runFastBreakSequence } = await import('./fastBreak.js');
-    await runFastBreakSequence(this.scene, {
+    await runFastBreakSequence({
+      scene: this.scene,
+      turnData: turnData,
       playerSprites: context.playerSprites,
       ballSprite: context.ballSprite,
-      turnData: turnData,
-      onUpdate: context.onUpdate,
       turnIndex: context.turnIndex // ✅ PHASE 2.6: Pass turnIndex from context
     });
     console.log('⚡ runFastBreakSequence completed');
@@ -489,7 +489,8 @@ export class AnimationEngine {
       // Fast Break defensive stop - route to Fast Break animation sequence
       // This will animate outlet pass (if applicable) then defensive stop
       const { runFastBreakSequence } = await import('./fastBreak.js');
-      await runFastBreakSequence(this.scene, {
+      await runFastBreakSequence({
+        scene: this.scene,
         playerSprites: context.playerSprites,
         ballSprite: context.ballSprite,
         turnData: turnData,
