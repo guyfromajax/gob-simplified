@@ -451,6 +451,51 @@ if (turn.result_type === "DREB" || turn.result_type === "HCO") {
 - Replicate pattern for Fast Break sequences
 - Replicate pattern for OREB putback sequences
 
+#### Offensive State Values ✅ **REFERENCE** (January 2025)
+
+**Purpose**: `offensive_state` is the **routing state** that determines which logic function handles each turn in the backend.
+
+**All Possible Values**:
+
+1. **`"HCO"`** - Half Court Offense (default)
+   - **When set**: Default state, regular half-court possessions, after side inbounds, after turnovers (dead ball), after defensive stops
+   - **Routes to**: `resolve_half_court_offense()` in `turn_manager.py`
+   - **Set by**: Default initialization, `game_manager.py` (after side inbound), `phase_resolution.py` (after turnovers, defensive stops), `shot_manager.py` (after missed fast break shots)
+
+2. **`"FREE_THROW"`** - Free Throw Situation
+   - **When set**: AND-1 situations, shooting fouls, bonus free throws
+   - **Routes to**: `resolve_free_throw()` in `turn_manager.py`
+   - **Set by**: `shot_manager.py` (AND-1, shooting fouls), `phase_resolution.py` (bonus free throws)
+
+3. **`"FAST_BREAK"`** - Fast Break Situation
+   - **When set**: After defensive rebounds with defense release, after steals with fast break chance
+   - **Routes to**: `resolve_fast_break_logic()` in `phase_resolution.py`
+   - **Set by**: `shot_manager.py` (after DREB with defense release), `phase_resolution.py` (after steals with fast break chance)
+
+4. **`"FCP"`** - Full Court Press
+   - **When set**: After made shots when defense applies full court press
+   - **Routes to**: `resolve_full_court_press_logic()` in `phase_resolution.py`
+   - **Set by**: `shot_manager.py` (made shots), `turn_manager.py` (OREB putbacks), `phase_resolution.py` (after free throws)
+
+5. **`"HCT"`** - Half Court Trap
+   - **When set**: After made shots when defense applies half court trap
+   - **Routes to**: `resolve_half_court_trap_logic()` in `phase_resolution.py`
+   - **Set by**: `shot_manager.py` (made shots), `turn_manager.py` (OREB putbacks), `phase_resolution.py` (after free throws)
+
+**Important Notes**:
+- `offensive_state` is **persistent** across API calls (stored in `game_state`)
+- `offensive_state` is **NOT** set on every turn - it's only set when the state needs to change
+- If `offensive_state` is not set, it defaults to `"HCO"` (line 261 in `turn_manager.py`)
+- `offensive_state` is the **single source of truth** for routing - handlers set it, `turn_manager.py` reads it
+
+**Debugging**:
+- Debug logs are added at transition points in `turn_manager.py`:
+  - **Before routing**: Logs `current_offensive_state` (what state is being used to route this turn)
+  - **After handler**: Logs `next_offensive_state` (what state will be used to route the next turn)
+- Look for `🔄 [OFFENSIVE_STATE TRANSITION]` in logs to trace state changes
+
+---
+
 #### Backend State Preservation Pattern ✅ **CRITICAL** (January 2025)
 
 **Purpose**: Ensure the backend generates the correct turn sequence by preserving `offensive_state` after generating intermediate turns (e.g., BASELINE_INBOUND).
