@@ -729,9 +729,10 @@ export async function animateGameTurns({ //hasBallAtStep
                                    turn.fcp_foul === true || turn.hct_foul === true ||
                                    (isBaselineInbound && (turn.next_defensive_setup === "FCP" || turn.next_defensive_setup === "HCT"));
     
-    // For HCO/TURNOVER outcomes, only detect as FCP/HCT if we're in an active pressure sequence
+    // For HCO/TURNOVER/STEAL outcomes, only detect as FCP/HCT if we're in an active pressure sequence
     // (these are press break outcomes, not regular HCO shots)
-    const isPressBreakOutcome = (turn.result_type === "HCO" || turn.result_type === "TURNOVER") && 
+    // ✅ FIX: Include STEAL in press break outcomes - FCP/HCT STEAL turns should show skeleton animation
+    const isPressBreakOutcome = (turn.result_type === "HCO" || turn.result_type === "TURNOVER" || turn.result_type === "STEAL") && 
                                 scene.pressureSequenceActive;
     
     // ✅ CRITICAL FIX: Only detect shot attempts as FCP/HCT if they have explicit flags
@@ -1100,9 +1101,11 @@ export async function animateGameTurns({ //hasBallAtStep
     // ✅ PHASE 2.6: Handle STEAL - route through AnimationRouter
     // STEAL can be either a standalone turn type (result_type === "STEAL") or an event within a turn
     // Only route standalone STEAL turns through AnimationRouter; events are handled inline
+    // ✅ FIX: Skip STEAL routing if it's an FCP/HCT STEAL (will be handled by FCP/HCT check below)
     const stealEvent = turn.events?.find(e => e.event_type === "STEAL");
-    if (!scene.stateMachine?.is(States.FastBreak) && turn.result_type === "STEAL") {
-      // Standalone STEAL turn - route through AnimationRouter
+    const isFCPHCTSteal = turn.result_type === "STEAL" && scene.pressureSequenceActive;
+    if (!scene.stateMachine?.is(States.FastBreak) && turn.result_type === "STEAL" && !isFCPHCTSteal) {
+      // Standalone STEAL turn (not FCP/HCT) - route through AnimationRouter
       turn.index = i;
       await animationRouter.processTurn(turn);
       // Note: Pass animation, possession change, announcements, and score updates handled by handler
