@@ -1800,8 +1800,14 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
     }
 
     // Get offense team ID to separate offensive and defensive players
-    // ✅ CONSOLIDATED: Use scene.offenseTeamId as single source of truth (kept in sync by PossessionManager)
-    const offenseTeamId = scene.offenseTeamId ?? turnData.possession_team_id;
+    // ✅ ROBUST: Use comprehensive resolver to ensure offenseTeamId is always defined
+    const { resolveOffenseTeamId } = await import('../utils/offenseTeamIdResolver.js');
+    const offenseTeamId = resolveOffenseTeamId({
+      scene,
+      turnData,
+      playerSprites,
+      passInfo
+    });
     
     // ✅ DEBUG: Log team ID comparison to diagnose sync issues
     if (passInfo && stepIndex === passInfo.stepIndex) {
@@ -1885,7 +1891,8 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
 
       // ✅ FIX: Separate offensive and defensive players for synchronized pass animation
       // Determine if player is on offense or defense
-      // ✅ FIX: Ensure offenseTeamId is valid before comparison, and handle case where it might be undefined
+      // ✅ ROBUST: offenseTeamId should always be defined (resolved by resolveOffenseTeamId)
+      // If it's still null (pre-opening tip or data corruption), default to false (defensive)
       const isOffensivePlayer = offenseTeamId ? String(sprite.team_id) === String(offenseTeamId) : false;
       
       // ✅ DEBUG: Log player classification for pass steps

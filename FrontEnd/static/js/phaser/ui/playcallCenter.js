@@ -13,7 +13,7 @@
 export function updatePlaycallCenter(turnData, homeTeamId) {
   if (!turnData) return;
 
-  const offenseTeamId = turnData.possession_team_id || turnData.starting_possession_team_id;
+  const offenseTeamId = turnData.possession_team_id;
   const isHomeOffense = homeTeamId && String(offenseTeamId) === String(homeTeamId);
 
   // Get playcall center

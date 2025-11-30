@@ -258,7 +258,7 @@ export function showAnnouncement(text, team = 'home', playerData = null) {
  */
 export function announceFromTurnData(turnData, timing = 'start', homeTeamId = null, scene = null) {
   // Determine which team triggered the event
-  const offenseTeamId = turnData.possession_team_id || turnData.starting_possession_team_id;
+  const offenseTeamId = turnData.possession_team_id;
   const isHomeTeamEvent = homeTeamId && String(offenseTeamId) === String(homeTeamId);
   const offenseTeam = isHomeTeamEvent ? 'home' : 'away';
   const defenseTeam = isHomeTeamEvent ? 'away' : 'home';
