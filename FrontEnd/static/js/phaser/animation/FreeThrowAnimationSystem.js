@@ -477,10 +477,21 @@ export class FreeThrowAnimationSystem {
     const isHomeOffense = turnData.possession_team_id === this.scene.simData?.home_team_id;
     const newOffenseSide = isHomeOffense ? 'home' : 'away';
     
+    // ✅ FIX: Check for FCP/HCT setup after free throw (same logic as freeThrow.js)
+    // This ensures pressureSequenceActive is set so subsequent STEAL turns are recognized as FCP/HCT
+    const skipRetreat = turnData.next_defensive_setup === "FCP" || turnData.next_defensive_setup === "HCT";
+    const pressureType = skipRetreat ? turnData.next_defensive_setup : null;
+    if (skipRetreat) {
+      console.log(`🎯 [FCP/HCT DETECTED] ${turnData.next_defensive_setup} detected after FT - setting pressure state`);
+    }
+    
     console.log('FreeThrowAnimationSystem: Executing inbound pass after final made free throw', {
       possession_team_id: turnData.possession_team_id,
       newOffenseSide,
-      home_team_id: this.scene.simData?.home_team_id
+      home_team_id: this.scene.simData?.home_team_id,
+      next_defensive_setup: turnData.next_defensive_setup,
+      pressureType,
+      skipRetreat
     });
     
     await runInboundSetup({
@@ -489,7 +500,10 @@ export class FreeThrowAnimationSystem {
       playerSprites: this.playerSprites,
       newOffenseSide: newOffenseSide,
       homeTeamId: this.scene.simData?.home_team_id,
-      awayTeamId: this.scene.simData?.away_team_id
+      awayTeamId: this.scene.simData?.away_team_id,
+      skipRetreat,
+      pressureType,
+      turnData: turnData
     });
 
     if (DebugFlags.FREE_THROW_ANIMATION) {
