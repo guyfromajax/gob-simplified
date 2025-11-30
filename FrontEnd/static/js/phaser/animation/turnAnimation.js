@@ -1757,8 +1757,10 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
     // if a pass just completed (passInFlight is still true from previous step)
     // We'll handle the pass explicitly after movements complete (like shots)
     // ✅ REFACTOR: Use unified passDetection.js for consistency
+    // ✅ FIX: Detect pass early to determine animation sequence (reused below)
     const { detectPassAtStep } = await import('./passDetection.js');
-    const passHappeningAtThisStep = !!detectPassAtStep(turnData.animations, stepIndex);
+    const passInfo = detectPassAtStep(turnData.animations, stepIndex);
+    const passHappeningAtThisStep = !!passInfo;
     
     // ✅ OLD CODE (commented out - replaced with unified passDetection.js):
     // const passHappeningAtThisStep = turnData.animations.some(
@@ -1797,10 +1799,15 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
       }
     }
 
-    const promises = [];
+    // Get offense team ID to separate offensive and defensive players
+    const offenseTeamId = scene.currentOffenseTeamId ?? turnData.possession_team_id;
+    
+    const offensivePromises = [];
+    const defensivePromises = [];
+    let passerPromise = null;
     let shotInfo = null;
-    let passInfo = null;
 
+    // Separate offensive and defensive players
     for (const anim of turnData.animations) {
       if (scene.skipToEnd) break;
       const sprite = playerSprites[anim.playerId];
@@ -1842,19 +1849,6 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
         }
       }
 
-      // ✅ SCALABLE FIX: Use shared pass detection utility
-      // This ensures passes work consistently across all turn types
-      if (!passInfo) {
-        const { detectPassAtStep } = await import('./passDetection.js');
-        passInfo = detectPassAtStep(turnData.animations, stepIndex);
-        // Removed verbose pass detection log
-        // if (passInfo) {
-        //   console.log('🏀 [PASS DETECTED]', { ... });
-        // }
-        if (passInfo) {
-        }
-      }
-
       if (nextStep.action === "shoot") {
         shotInfo = { step: nextStep, playerId: anim.playerId, stepIndex };
       }
@@ -1871,34 +1865,66 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
         stepIndex  // Pass stepIndex to identify first step
       });
 
-      promises.push(promise);
+      // ✅ FIX: Separate offensive and defensive players for synchronized pass animation
+      // Determine if player is on offense or defense
+      const isOffensivePlayer = offenseTeamId && String(sprite.team_id) === String(offenseTeamId);
+      
+      if (isOffensivePlayer) {
+        offensivePromises.push(promise);
+        // Track passer's promise separately so we can wait for it before starting pass
+        if (passInfo && anim.playerId === passInfo.passerId) {
+          passerPromise = promise;
+        }
+      } else {
+        defensivePromises.push(promise);
+      }
     }
 
-    await Promise.all(promises);
+    // ✅ FIX: Phase 1 - Start all offensive players animating, wait for passer if there's a pass
+    // This maintains the existing behavior where pass doesn't start until passer reaches their spot
+    // All offensive players start animating simultaneously, but we only wait for the passer
+    if (passInfo && passerPromise) {
+      // Wait for passer to complete before starting pass animation
+      // Other offensive players continue animating in the background
+      await passerPromise;
+    } else if (offensivePromises.length > 0) {
+      // No pass, wait for all offensive players to complete
+      await Promise.all(offensivePromises);
+    }
 
-    // ✅ FIX: Handle passes explicitly (following shot pattern)
-    // This ensures passes animate smoothly instead of teleporting
+    // ✅ FIX: Phase 2 - Animate pass and defensive players in parallel
+    // This creates the natural feel of defensive players moving while ball is in the air
+    // Other offensive players (non-passer) continue animating from Phase 1
+    const passAndDefensePromises = [];
+    
     if (passInfo) {
-      const passerSprite = playerSprites[passInfo.passerId];
-      const receiverSprite = playerSprites[passInfo.receiverId];
-      
-      // ✅ SCALABLE FIX: Handle passes using shared utility
-      // This works for all turn types (HCO shots, fouls, turnovers, etc.)
+      // Add pass animation to the parallel batch
       const { handlePassAnimation } = await import('./passDetection.js');
-      await handlePassAnimation({
-        scene,
-        passInfo,
-        playerSprites
-      });
-    } else {
-      // Debug: log when we DON'T have passInfo but might expect one
-      const hasPassAction = turnData.animations.some(anim => 
-        anim.movement?.some(step => step.action === "pass")
+      passAndDefensePromises.push(
+        handlePassAnimation({
+          scene,
+          passInfo,
+          playerSprites
+        })
       );
-      // Removed verbose pass debug warning
-      // if (hasPassAction) {
-      //   console.log('⚠️ [PASS DEBUG] Pass action exists but passInfo is null', { ... });
-      // }
+    }
+    
+    // Add all defensive player movements to the parallel batch
+    passAndDefensePromises.push(...defensivePromises);
+    
+    // Animate pass and defensive players simultaneously
+    if (passAndDefensePromises.length > 0) {
+      await Promise.all(passAndDefensePromises);
+    }
+    
+    // ✅ FIX: Wait for any remaining offensive players (non-passer) to complete
+    // This ensures all offensive players finish their movements
+    // Note: If there was no pass, we already waited for all offensive players above
+    if (passInfo && passerPromise) {
+      const remainingOffensivePromises = offensivePromises.filter(p => p !== passerPromise);
+      if (remainingOffensivePromises.length > 0) {
+        await Promise.all(remainingOffensivePromises);
+      }
     }
 
     if (shotInfo) {
