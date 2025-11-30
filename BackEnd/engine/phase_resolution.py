@@ -590,6 +590,8 @@ def resolve_free_throw_logic(game):
                     "shooter_pos": shooter_pos,
                     "offense_team_id": off_team.team_id,
                     "no_lane": game_state.get("no_lane", False),
+                    "free_throws_remaining": game_state["free_throws_remaining"],  # ✅ FIX: Include free_throws_remaining so frontend knows more FTs remain
+                    "one_and_one": False,  # ✅ FIX: Include one_and_one flag (now False since second FT is unlocked)
                 }
             else:
                 # Missed front end → dead ball, rebound
