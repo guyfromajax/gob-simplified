@@ -17,6 +17,7 @@ import ReboundAnimationSystem from './ReboundAnimationSystem.js';
 import PassAnimationSystem from './PassAnimationSystem.js';
 import FreeThrowAnimationSystem from './FreeThrowAnimationSystem.js';
 import HCOAnimationSystem from './HCOAnimationSystem.js';
+import { PressureAnimationSystem } from './PressureAnimationSystem.js';
 import gameStore from '../../state/gameStore.js';
 
 export class AnimationEngine {
@@ -34,6 +35,7 @@ export class AnimationEngine {
     this.passSystem = null; // Will be initialized after dependencies are injected
     this.freeThrowSystem = null; // Will be initialized after dependencies are injected
     this.hcoSystem = null; // Will be initialized after dependencies are injected
+    this.pressureSystem = null; // Will be initialized after dependencies are injected
     
     // Initialize default handlers
     this.initializeDefaultHandlers();
@@ -64,6 +66,8 @@ export class AnimationEngine {
     // ✅ PHASE 2.6: Add handlers for DEFENSIVE_STOP and STEAL
     this.animationHandlers.set('DEFENSIVE_STOP', this.handleDefensiveStop.bind(this));
     this.animationHandlers.set('STEAL', this.handleSteal.bind(this));
+    // ✅ PHASE 1: Add handler for PRESSURE (FCP/HCT)
+    this.animationHandlers.set('PRESSURE', this.handlePressure.bind(this));
   }
 
   /**
@@ -140,6 +144,44 @@ export class AnimationEngine {
                 'unknown'
       });
       return this.animationHandlers.get('FAST_BREAK');
+    }
+
+    // ✅ PHASE 1: FCP/HCT detection (pressure defense)
+    // Check for explicit FCP/HCT flags or active pressure sequence
+    const isBaselineInbound = turnData.result_type === "BASELINE_INBOUND";
+    const hasExplicitFCPHCTFlags = turnData.fcp_shot === true || turnData.hct_shot === true ||
+                                   turnData.fcp_foul === true || turnData.hct_foul === true ||
+                                   (isBaselineInbound && (turnData.next_defensive_setup === "FCP" || turnData.next_defensive_setup === "HCT"));
+    
+    // For press break outcomes, check if we're in an active pressure sequence
+    const isPressBreakOutcome = (turnData.result_type === "HCO" || turnData.result_type === "TURNOVER" || 
+                                 turnData.result_type === "STEAL" || turnData.result_type === "DEAD_BALL" ||
+                                 turnData.result_type === "DEAD_BALL_TURNOVER" ||
+                                 (turnData.result_type === "FOUL" && !turnData.fcp_foul && !turnData.hct_foul)) && 
+                                this.scene.pressureSequenceActive;
+    
+    // For shot attempts, only detect as FCP/HCT if they have explicit flags
+    const isPressBreakShotAttempt = this.scene.pressureSequenceActive && 
+                                     (turnData.result_type === "MAKE" || turnData.result_type === "MISS") &&
+                                     (turnData.fcp_shot === true || turnData.hct_shot === true);
+    
+    const isFCPHCT = hasExplicitFCPHCTFlags || isPressBreakOutcome || isPressBreakShotAttempt;
+    
+    if (isFCPHCT) {
+      console.log('🎬 [PRESSURE DETECTED]', {
+        result_type: turnData.result_type,
+        fcp_shot: turnData.fcp_shot,
+        hct_shot: turnData.hct_shot,
+        fcp_foul: turnData.fcp_foul,
+        hct_foul: turnData.hct_foul,
+        next_defensive_setup: turnData.next_defensive_setup,
+        pressureSequenceActive: this.scene.pressureSequenceActive,
+        reason: hasExplicitFCPHCTFlags ? 'explicit flags' :
+                isPressBreakOutcome ? 'press break outcome' :
+                isPressBreakShotAttempt ? 'press break shot attempt' :
+                'unknown'
+      });
+      return this.animationHandlers.get('PRESSURE');
     }
 
     // Specific result types (check handlers map first)
@@ -570,6 +612,40 @@ export class AnimationEngine {
     // Note: Announcements and score updates are handled by AnimationRouter (finalizeTurnAfterAnimation)
   }
 
+  async handlePressure(turnData, context) {
+    console.log('🎬 AnimationEngine: Handling pressure (FCP/HCT) with PressureAnimationSystem', {
+      hasPressureSystem: !!this.pressureSystem,
+      result_type: turnData.result_type,
+      fcp_shot: turnData.fcp_shot,
+      hct_shot: turnData.hct_shot,
+      turn_index: turnData.index
+    });
+    
+    // Use new pressure animation system if available
+    if (this.pressureSystem) {
+      console.log('🎬 [AnimationEngine] Calling PressureAnimationSystem.processPressure()', {
+        result_type: turnData.result_type,
+        turn_index: turnData.index
+      });
+      await this.pressureSystem.processPressure(turnData);
+      console.log('✅ [AnimationEngine] PressureAnimationSystem.processPressure() completed');
+    } else {
+      // Fallback to existing system
+      console.warn('AnimationEngine: PressureAnimationSystem not available, using fallback');
+      const { playTurnAnimation } = await import('./turnAnimation.js');
+      await playTurnAnimation({
+        scene: this.scene,
+        simData: context.simData,
+        playerSprites: context.playerSprites,
+        turnData: turnData,
+        ballSprite: context.ballSprite,
+        onAction: context.onAction,
+        turnIndex: context.turnIndex,
+        onUpdate: context.onUpdate
+      });
+    }
+  }
+
   async handleShotAttempt(turnData, context) {
     console.log('AnimationEngine: Handling shot attempt with new ShotAnimationSystem', {
       hasShotSystem: !!this.shotSystem,
@@ -742,6 +818,15 @@ export class AnimationEngine {
         this.ballController,
         this.stateMachine,
         this.playerSprites
+      );
+      
+      // ✅ PHASE 1: Initialize PressureAnimationSystem
+      this.pressureSystem = new PressureAnimationSystem(
+        this.scene,
+        this.ballController,
+        this.stateMachine,
+        this.playerSprites,
+        gameStore
       );
     }
     
