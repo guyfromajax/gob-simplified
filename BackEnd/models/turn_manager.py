@@ -369,8 +369,10 @@ class TurnManager:
             # Add EV to result for frontend display
             result["ev"] = ev
 
-        # Record possession team before any potential flip
-        result["starting_possession_team_id"] = self.game.offense_team.team_id
+        # ✅ CONSOLIDATED: Set possession_team_id BEFORE any potential flip
+        # This represents the team on offense DURING this turn (for animations)
+        # The frontend will handle possession flips via possession_flips flag
+        result["possession_team_id"] = self.game.offense_team.team_id
 
         # STEP 4: Final updates (clock, logs, animation)
         try:
@@ -458,7 +460,8 @@ class TurnManager:
                 )
             else:
                 result["animations"] = []  # No animation possible (e.g., free throw or turnover with no roles)
-        result["possession_team_id"] = self.game.offense_team.team_id
+        # ✅ REMOVED: possession_team_id is now set BEFORE update_clock_and_possession (line 373)
+        # This ensures it represents the team on offense DURING the turn, not after any flips
 
         if "roles" in result:
             result["roles"] = convert_players(result["roles"])

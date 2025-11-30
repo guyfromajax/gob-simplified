@@ -38,7 +38,7 @@ export function updatePlaycallDisplay(turnData, homeTeamId) {
   const defensivePlayFocus = turnData.defensive_play_focus || getPlayFocus(defensivePlaycall);
   
   // Determine which team is on offense
-  const offenseTeamId = turnData.possession_team_id || turnData.starting_possession_team_id;
+  const offenseTeamId = turnData.possession_team_id;
   const isHomeOnOffense = String(offenseTeamId) === String(homeTeamId);
   
   // Display playcalls based on possession

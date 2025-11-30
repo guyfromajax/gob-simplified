@@ -1,5 +1,6 @@
 export interface TurnData {
-  starting_possession_team_id?: string;
+  // ✅ CONSOLIDATED: starting_possession_team_id removed - use possession_team_id instead
+  // possession_team_id represents the team on offense DURING the turn (set before any flips)
   possession_team_id?: string;
   result_type: string;
   ball_handler?: string;

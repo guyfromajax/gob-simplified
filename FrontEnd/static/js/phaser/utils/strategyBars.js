@@ -32,7 +32,7 @@ export function updateStrategyBars(turnData, homeTeamId) {
   // Get tempo and aggression values from turn data
   // These come from the offensive and defensive teams' strategy settings
   
-  const offenseTeamId = turnData.possession_team_id || turnData.starting_possession_team_id;
+  const offenseTeamId = turnData.possession_team_id;
   const isHomeOnOffense = homeTeamId && String(offenseTeamId) === String(homeTeamId);
   
   // Determine which team is offense/defense using actual calls (slow/normal/fast, passive/normal/aggressive)

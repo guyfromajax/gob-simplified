@@ -485,8 +485,6 @@ export function normalizeTurn(turn = {}, simData = {}, options = {}) {
     options?.offenseTeamId ??
     turn?.possession_team_id ??
     turn?.possessionTeamId ??
-    turn?.starting_possession_team_id ??
-    turn?.startingPossessionTeamId ??
     null;
   const defenseTeamId =
     options?.defenseTeamId ??
@@ -611,8 +609,7 @@ export function normalizeTurn(turn = {}, simData = {}, options = {}) {
     defenseTeamId,
     homeTeamId: simData?.home_team_id ?? simData?.homeTeamId ?? null,
     awayTeamId: simData?.away_team_id ?? simData?.awayTeamId ?? null,
-    startingOffenseTeamId:
-      turn?.starting_possession_team_id ?? turn?.startingPossessionTeamId ?? null,
+    startingOffenseTeamId: offenseTeamId, // ✅ CONSOLIDATED: Same as offenseTeamId (possession_team_id represents team DURING the turn)
     fastBreak: fastBreak ? true : undefined,
     secondaryBreak: secondaryBreak ? true : undefined,
     resultType: turn?.result_type ?? turn?.resultType ?? null,
