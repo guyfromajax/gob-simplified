@@ -1,7 +1,7 @@
-# FCP/HCT Streamlining Plan: Route Through AnimationRouter
+# FCP/HCT Streamlining Plan: Route Through Same System as HCO
 
 ## Goal
-Streamline FCP/HCT animation execution to match HCO's stable structure by routing through AnimationRouter, eliminating duplicate code paths and ensuring consistent preparation/finalization.
+**SS&S Approach**: FCP/HCT skeletons are different data (press break sequences), but use the same animation system as HCO. Route FCP/HCT through the same handlers as HCO, eliminating the need for a separate PressureAnimationSystem.
 
 ## Current State Analysis
 
@@ -61,26 +61,26 @@ animateGameTurns.js (line 764)
 
 ## Migration Plan
 
-### Phase 1: Create PressureAnimationSystem Handler
+### Phase 1: Remove PressureAnimationSystem ✅ **COMPLETE**
 
-**Goal**: Create a structured handler for FCP/HCT (similar to ShotAnimationSystem for HCO)
+**Goal**: Remove unnecessary separate system - FCP/HCT uses same animation system as HCO
 
-**Steps**:
-1. Create `FrontEnd/static/js/phaser/animation/PressureAnimationSystem.js`
-   - Similar structure to `ShotAnimationSystem.js`
-   - Handles FCP/HCT skeleton animation
-   - Handles all result types (MAKE/MISS, FOUL, TURNOVER, STEAL, DEAD_BALL, HCO)
-   - Reuses `playTurnAnimation()` logic for skeleton animation
-   - Structured result handling (like `ShotAnimationSystem.processShot()`)
+**Key Insight**: 
+- FCP/HCT skeletons are different data (press break sequences vs playcall sequences)
+- But the animation system (`playTurnAnimation()`) is the same
+- Backend provides different skeleton data, frontend just animates it
 
-2. Register handler in `AnimationEngine.js`
-   - Add `PRESSURE` handler to `animationHandlers` map
-   - Update `determineHandler()` to detect FCP/HCT and return PRESSURE handler
+**Steps Completed**:
+1. ✅ Removed `PressureAnimationSystem.js` - not needed
+2. ✅ Removed `PRESSURE` handler from `AnimationEngine.js`
+3. ✅ Removed FCP/HCT detection from `determineHandler()` - let normal routing work
+4. ✅ FCP/HCT shots now route to `SHOT_ATTEMPT` handler (same as HCO)
+5. ✅ FCP/HCT other results route to their respective handlers (FOUL, TURNOVER, etc.)
 
 **Benefits**:
-- Structured result handling (can be applied to HCO later)
-- Consistent with HCO's ShotAnimationSystem pattern
-- Easier to extend for new result types
+- ✅ No code duplication - reuses existing systems
+- ✅ Simpler architecture - one less system to maintain
+- ✅ SS&S aligned - building a system, not isolated features
 
 ---
 
