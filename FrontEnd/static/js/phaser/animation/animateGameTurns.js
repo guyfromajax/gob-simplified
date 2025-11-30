@@ -587,26 +587,24 @@ export async function animateGameTurns({ //hasBallAtStep
         turn.index = i;
         // AnimationRouter handles pre/post setup (prepareTurnForAnimation, finalizeTurnAfterAnimation)
         await animationRouter.processTurn(turn);
+        continue;
       } else if (isOffensiveFoulDuringPressure) {
         // ✅ FIX: Offensive foul during FCP/HCT - route through FCP/HCT detection block to show skeleton
         // Don't continue here, let it fall through to FCP/HCT detection block (line 762)
+        // This will ensure playTurnAnimation is called to show the FCP skeleton
       } else {
         // Non-animated foul - just do announcements and updates
-      // Announce foul (visual effects now handled by announcement system)
-      announceFromTurnData(turn, 'end', scene.simData?.home_team_id, scene);
-      // Update scoreboard for all fouls (FCP or not)
-      if (onUpdate) {
-        try {
-          onUpdate(turn);
-        } catch (err) {
-          console.error('Scoreboard update failed:', err);
+        // Announce foul (visual effects now handled by announcement system)
+        announceFromTurnData(turn, 'end', scene.simData?.home_team_id, scene);
+        // Update scoreboard for all fouls (FCP or not)
+        if (onUpdate) {
+          try {
+            onUpdate(turn);
+          } catch (err) {
+            console.error('Scoreboard update failed:', err);
+          }
         }
-      }
-      updateDebugScore(turn, { turnIndex: i, possessionId });
-      continue;
-      }
-      // ✅ FIX: Don't continue for offensive fouls during pressure - let them fall through to FCP/HCT detection
-      if (!isOffensiveFoulDuringPressure) {
+        updateDebugScore(turn, { turnIndex: i, possessionId });
         continue;
       }
     }
@@ -616,6 +614,7 @@ export async function animateGameTurns({ //hasBallAtStep
       // If so, route through FCP/HCT detection block to show skeleton animation
       if (scene.pressureSequenceActive) {
         // Don't continue here - let it fall through to FCP/HCT detection block (line 762)
+        // This will ensure playTurnAnimation is called to show the FCP skeleton
         // The FCP/HCT block will handle the skeleton animation and announcements
       } else {
         // DEAD BALL turnover (not during pressure) - visual effects handled by announcement system
@@ -1129,6 +1128,10 @@ export async function animateGameTurns({ //hasBallAtStep
       await animationRouter.processTurn(turn);
       // Note: Pass animation, possession change, announcements, and score updates handled by handler
       continue;
+    } else if (isFCPHCTSteal) {
+      // ✅ FIX: FCP/HCT STEAL - don't route through AnimationRouter, let it fall through to FCP/HCT detection block
+      // This will ensure playTurnAnimation is called to show the FCP skeleton
+      // Don't continue here - let it fall through to FCP/HCT detection block (line 762)
     } else if (!scene.stateMachine?.is(States.FastBreak) && stealEvent) {
       // STEAL event within another turn - handle inline (not a standalone turn)
       const ballHandlerId = playerMap[turn.ball_handler] ?? turn.ball_handler;
