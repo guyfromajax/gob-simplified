@@ -1,6 +1,6 @@
-# 45 Transitions in Registry
+# 51 Transitions in Registry
 
-This is a human-readable list of all 45 transitions for comparison with your list.
+This is a human-readable list of all 51 transitions for comparison with your list.
 
 ## Opening Tip Transitions (1)
 1. **Opening Tip → HCO**
@@ -18,7 +18,7 @@ This is a human-readable list of all 45 transitions for comparison with your lis
 5. **Side Inbound Pass → HCO**
    - Side Inbound Pass Complete
 
-## HCO Transitions (8)
+## HCO Transitions (7)
 6. **HCO → Inbound Pass (PC)**
    - Made Shot, No Foul
 7. **HCO → Free Throw**
@@ -41,7 +41,7 @@ This is a human-readable list of all 45 transitions for comparison with your lis
     - Dead Ball Turnover
     - Missed Shot, Offensive Foul
 
-## OREB Transitions (9)
+## OREB Transitions (8)
 13. **OREB → Inbound Pass (PC)**
     - Made Shot, No Foul
 14. **OREB → Free Throw**
@@ -147,7 +147,18 @@ This is a human-readable list of all 45 transitions for comparison with your lis
 
 ---
 
-**Total: 45 transitions**
+**Total: 51 transitions**
+
+Breakdown:
+- Opening Tip: 1
+- Inbound Pass: 3
+- Side Inbound Pass: 1
+- HCO: 7
+- OREB: 8
+- Free Throw: 7
+- Fast Break: 8
+- FCP: 8
+- HCT: 8
 
 Note: FCP and HCT have identical transition patterns but are counted separately as requested.
 
