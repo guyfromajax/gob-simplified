@@ -332,7 +332,7 @@ export class FreeThrowAnimationSystem {
       // Keep ball visible during hold
       ballSprite.setVisible(true);
       
-      // Hold ball in rim for 1 second
+      // Hold ball at rim for 1 second (no sliding down for non-final free throws)
       await new Promise(resolve => {
         if (this.scene.time?.delayedCall) {
           this.scene.time.delayedCall(1000, resolve);
@@ -340,18 +340,12 @@ export class FreeThrowAnimationSystem {
           setTimeout(resolve, 1000);
         }
       });
-
-      // Then animate ball going through rim
-      this.scene.tweens.add({
-        targets: ballSprite,
-        y: ballSprite.y + 20, // Slight drop through rim
-        duration: 200,
-        ease: 'Power2',
-        onComplete: () => {
-          // Keep ball visible after going through rim
-          ballSprite.setVisible(true);
-        }
-      });
+      
+      // For non-final free throws, just hide the ball after the hold
+      // (no slide animation - ball stays at rim coords)
+      if (!ftContext.isFinal) {
+        ballSprite.setVisible(false);
+      }
     }
 
     // Check if this is the final free throw
@@ -370,9 +364,6 @@ export class FreeThrowAnimationSystem {
       });
       }
     }
-
-    // Wait for ball to go through rim
-    await new Promise(resolve => setTimeout(resolve, 200));
   }
 
   /**
@@ -469,12 +460,27 @@ export class FreeThrowAnimationSystem {
       });
     }
 
+    // ✅ FIX: Flip possession BEFORE inbound pass (matches fastBreak.js pattern)
+    // After final free throw is made, possession flips - the team that was on defense is now on offense
+    // Use possession_team_id from turnData (authoritative backend value)
+    const newOffenseTeamId = turnData.possession_team_id;
+    if (newOffenseTeamId && turnData.possession_flips !== false) {
+      this.scene.offenseTeamId = newOffenseTeamId;
+      // Emit possession change event to update other systems
+      this.scene.events?.emit('possessionChange', { offenseTeamId: newOffenseTeamId });
+      console.log('🏀 [FREE THROW MAKE] Updated offense team ID after possession flip', {
+        newOffenseTeamId,
+        possession_team_id: turnData.possession_team_id,
+        possession_flips: turnData.possession_flips
+      });
+    }
+
     // Execute inbound pass using the existing system
     // The key is to use the correct possession_team_id to prevent double possession flips
     const { runInboundSetup } = await import('./turnAnimation.js');
     
-    // Determine the new offense side based on possession_team_id (this should be correct after possession flip)
-    const isHomeOffense = turnData.possession_team_id === this.scene.simData?.home_team_id;
+    // Determine the new offense side based on possession_team_id (now correctly set above)
+    const isHomeOffense = newOffenseTeamId === this.scene.simData?.home_team_id;
     const newOffenseSide = isHomeOffense ? 'home' : 'away';
     
     // ✅ FIX: Check for FCP/HCT setup after free throw (same logic as freeThrow.js)
