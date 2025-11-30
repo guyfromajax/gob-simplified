@@ -12,7 +12,8 @@ observability and validation capabilities.
 """
 
 from typing import Dict, Optional, List, Tuple
-from BackEnd.utils.transition_registry import TurnType, get_turn_type_from_offensive_state
+from BackEnd.utils.transition_registry import TurnType, get_transitions_from
+from BackEnd.utils.transition_validator import get_turn_type_from_offensive_state
 
 
 def detect_instigating_event(
