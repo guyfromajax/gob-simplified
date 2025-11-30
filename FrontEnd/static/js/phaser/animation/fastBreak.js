@@ -553,7 +553,6 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
         ? scene.simData?.home_team_id 
         : scene.simData?.away_team_id);
     if (newOffenseTeamId && turnData.possession_flips !== false) {
-      scene.currentOffenseTeamId = newOffenseTeamId;
       scene.offenseTeamId = newOffenseTeamId;
       // Emit possession change event to update other systems
       scene.events?.emit('possessionChange', { offenseTeamId: newOffenseTeamId });

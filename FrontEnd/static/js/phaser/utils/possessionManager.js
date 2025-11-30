@@ -61,8 +61,8 @@ export class PossessionManager {
       });
 
       // Update the offense team
-      this.currentOffenseTeamId = offenseTeamId;
-      this.scene.offenseTeamId = offenseTeamId;
+      this.currentOffenseTeamId = offenseTeamId; // Internal state for PossessionManager
+      this.scene.offenseTeamId = offenseTeamId; // Single source of truth for scene
 
       // Record in history for debugging
       this.changeHistory.push({

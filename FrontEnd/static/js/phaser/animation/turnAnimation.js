@@ -243,7 +243,7 @@ async function runSideInboundSetup({ scene, ballSprite, playerSprites, turnData 
   }
 
   const { ball_spot, oDestinations = {}, dDestinations = {}, possession_team_id } = turnData;
-  const offenseTeamId = scene.currentOffenseTeamId ?? possession_team_id;
+  const offenseTeamId = scene.offenseTeamId ?? possession_team_id;
 
   const width = scene.game.config.width;
   const height = scene.game.config.height;
@@ -1612,7 +1612,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
     animations: turnData.animations,
     playerSprites,
     stepIndex: 0,
-    offenseTeamId: scene.currentOffenseTeamId ?? turnData.possession_team_id,
+    offenseTeamId: scene.offenseTeamId ?? turnData.possession_team_id,
     currentBallOwnerRef
   });
 
@@ -1778,7 +1778,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
         animations: turnData.animations,
         playerSprites,
         stepIndex,
-        offenseTeamId: scene.currentOffenseTeamId ?? turnData.possession_team_id,
+        offenseTeamId: scene.offenseTeamId ?? turnData.possession_team_id,
         currentBallOwnerRef
       });
     } else if (scene.passInFlight && !passHappeningAtThisStep) {
@@ -1800,7 +1800,25 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
     }
 
     // Get offense team ID to separate offensive and defensive players
-    const offenseTeamId = scene.currentOffenseTeamId ?? turnData.possession_team_id;
+    // ✅ CONSOLIDATED: Use scene.offenseTeamId as single source of truth (kept in sync by PossessionManager)
+    const offenseTeamId = scene.offenseTeamId ?? turnData.possession_team_id;
+    
+    // ✅ DEBUG: Log team ID comparison to diagnose sync issues
+    if (passInfo && stepIndex === passInfo.stepIndex) {
+      console.log('🔍 [PASS SYNC DEBUG] Team ID comparison:', {
+        stepIndex,
+        offenseTeamId,
+        sceneOffenseTeamId: scene.offenseTeamId,
+        turnDataPossessionTeamId: turnData.possession_team_id,
+        homeTeamId: scene.simData?.home_team_id,
+        awayTeamId: scene.simData?.away_team_id,
+        passInfo: {
+          passerId: passInfo.passerId,
+          receiverId: passInfo.receiverId,
+          stepIndex: passInfo.stepIndex
+        }
+      });
+    }
     
     const offensivePromises = [];
     const defensivePromises = [];
@@ -1867,7 +1885,20 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
 
       // ✅ FIX: Separate offensive and defensive players for synchronized pass animation
       // Determine if player is on offense or defense
-      const isOffensivePlayer = offenseTeamId && String(sprite.team_id) === String(offenseTeamId);
+      // ✅ FIX: Ensure offenseTeamId is valid before comparison, and handle case where it might be undefined
+      const isOffensivePlayer = offenseTeamId ? String(sprite.team_id) === String(offenseTeamId) : false;
+      
+      // ✅ DEBUG: Log player classification for pass steps
+      if (passInfo && stepIndex === passInfo.stepIndex && (anim.playerId === passInfo.passerId || anim.playerId === passInfo.receiverId)) {
+        console.log('🔍 [PASS SYNC DEBUG] Player classification:', {
+          playerId: anim.playerId,
+          spriteTeamId: sprite.team_id,
+          offenseTeamId,
+          isOffensivePlayer,
+          isPasser: anim.playerId === passInfo.passerId,
+          isReceiver: anim.playerId === passInfo.receiverId
+        });
+      }
       
       if (isOffensivePlayer) {
         offensivePromises.push(promise);
