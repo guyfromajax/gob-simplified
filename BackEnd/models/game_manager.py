@@ -8,7 +8,9 @@ from copy import deepcopy
 import random
 
 from BackEnd.utils.stat_updater import update_game_stats
-from BackEnd.utils.transition_validator import validate_transition
+from BackEnd.utils.transition_validator import validate_transition, get_turn_type_from_offensive_state
+from BackEnd.utils.transition_event_detector import detect_instigating_event, validate_event_matches_transition
+from BackEnd.utils.transition_registry import TurnType
 import logging
 
 class GameManager:
@@ -260,6 +262,61 @@ class GameManager:
                         "current_result_type": result.get("result_type"),
                     }
                 )
+            
+            # ✅ OPTIONAL: Enhanced event detection and validation
+            # This provides additional observability but is not required for game functionality
+            try:
+                # Detect the instigating event
+                detected_event = detect_instigating_event(
+                    result=result,
+                    game_state=self.game_state,
+                    previous_offensive_state=previous_offensive_state
+                )
+                
+                # If we can determine turn types, validate the event matches the transition
+                from_turn_type = None
+                if from_result.get("result_type") in ["BASELINE_INBOUND", "SIDE_INBOUND"]:
+                    from_turn_type = TurnType.INBOUND_PASS if from_result.get("result_type") == "BASELINE_INBOUND" else TurnType.SIDE_INBOUND_PASS
+                elif from_result.get("result_type") in ["PUTBACK_MAKE", "PUTBACK_MISS", "KICKOUT"]:
+                    from_turn_type = TurnType.OREB
+                else:
+                    if previous_offensive_state:
+                        from_turn_type = get_turn_type_from_offensive_state(previous_offensive_state)
+                
+                to_turn_type = get_turn_type_from_offensive_state(to_offensive_state)
+                
+                if from_turn_type and to_turn_type and detected_event:
+                    event_valid, event_error = validate_event_matches_transition(
+                        detected_event=detected_event,
+                        from_turn_type=from_turn_type,
+                        to_turn_type=to_turn_type,
+                        possession_change=possession_changed
+                    )
+                    
+                    if not event_valid and event_error:
+                        logging.warning(
+                            f"⚠️ [EVENT VALIDATION] {event_error}",
+                            extra={
+                                "turn_number": self.macro_turn_count,
+                                "detected_event": detected_event,
+                                "from_turn_type": from_turn_type.value,
+                                "to_turn_type": to_turn_type.value,
+                                "possession_change": possession_changed,
+                            }
+                        )
+                    elif detected_event:
+                        # Log successful event detection (info level, not warning)
+                        logging.debug(
+                            f"✅ [EVENT DETECTION] Turn #{self.macro_turn_count}: {detected_event} → {from_turn_type.value} -> {to_turn_type.value}",
+                            extra={
+                                "turn_number": self.macro_turn_count,
+                                "detected_event": detected_event,
+                                "transition": f"{from_turn_type.value} -> {to_turn_type.value}",
+                            }
+                        )
+            except Exception as e:
+                # Don't let event detection break the game
+                logging.debug(f"Event detection failed (non-critical): {e}")
 
         # Log steal-to-score sequences if applicable
         self._log_steal_to_points(result)
