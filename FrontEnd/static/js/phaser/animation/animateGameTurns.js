@@ -577,13 +577,19 @@ export async function animateGameTurns({ //hasBallAtStep
     }
 
     if (turn.result_type === "FOUL") {
-      // Check if this is an FCP or HCT foul with animations
-      if ((turn.fcp_foul === true || turn.hct_foul === true) && turn.animations && turn.animations.length > 0) {
+      // ✅ FIX: Check if this is an FCP/HCT foul (defensive foul with explicit flags) or offensive foul during pressure
+      const isFCPHCTFoulWithAnimations = (turn.fcp_foul === true || turn.hct_foul === true) && turn.animations && turn.animations.length > 0;
+      const isOffensiveFoulDuringPressure = !turn.fcp_foul && !turn.hct_foul && scene.pressureSequenceActive;
+      
+      if (isFCPHCTFoulWithAnimations) {
         // ✅ PHASE 2.4: FCP/HCT foul with animations - route through AnimationRouter
         // Ensure turn.index is set (AnimationRouter will use it for context)
         turn.index = i;
         // AnimationRouter handles pre/post setup (prepareTurnForAnimation, finalizeTurnAfterAnimation)
         await animationRouter.processTurn(turn);
+      } else if (isOffensiveFoulDuringPressure) {
+        // ✅ FIX: Offensive foul during FCP/HCT - route through FCP/HCT detection block to show skeleton
+        // Don't continue here, let it fall through to FCP/HCT detection block (line 762)
       } else {
         // Non-animated foul - just do announcements and updates
       // Announce foul (visual effects now handled by announcement system)
@@ -597,23 +603,34 @@ export async function animateGameTurns({ //hasBallAtStep
         }
       }
       updateDebugScore(turn, { turnIndex: i, possessionId });
-      }
       continue;
+      }
+      // ✅ FIX: Don't continue for offensive fouls during pressure - let them fall through to FCP/HCT detection
+      if (!isOffensiveFoulDuringPressure) {
+        continue;
+      }
     }
     
     if (turn.result_type === "DEAD BALL") {
-      // DEAD BALL turnover (from FCP/HCT) - visual effects handled by announcement system
-      // Announce turnover
-      announceFromTurnData(turn, 'end', scene.simData?.home_team_id, scene);
-      if (onUpdate) {
-        try {
-          onUpdate(turn);
-        } catch (err) {
-          console.error('Scoreboard update failed:', err);
+      // ✅ FIX: Check if this is a DEAD BALL during FCP/HCT pressure sequence
+      // If so, route through FCP/HCT detection block to show skeleton animation
+      if (scene.pressureSequenceActive) {
+        // Don't continue here - let it fall through to FCP/HCT detection block (line 762)
+        // The FCP/HCT block will handle the skeleton animation and announcements
+      } else {
+        // DEAD BALL turnover (not during pressure) - visual effects handled by announcement system
+        // Announce turnover
+        announceFromTurnData(turn, 'end', scene.simData?.home_team_id, scene);
+        if (onUpdate) {
+          try {
+            onUpdate(turn);
+          } catch (err) {
+            console.error('Scoreboard update failed:', err);
+          }
         }
+        updateDebugScore(turn, { turnIndex: i, possessionId });
+        continue;
       }
-      updateDebugScore(turn, { turnIndex: i, possessionId });
-      continue;
     }
 
     if (turn.result_type === "SIDE_INBOUND") {
@@ -729,10 +746,12 @@ export async function animateGameTurns({ //hasBallAtStep
                                    turn.fcp_foul === true || turn.hct_foul === true ||
                                    (isBaselineInbound && (turn.next_defensive_setup === "FCP" || turn.next_defensive_setup === "HCT"));
     
-    // For HCO/TURNOVER/STEAL outcomes, only detect as FCP/HCT if we're in an active pressure sequence
+    // For HCO/TURNOVER/STEAL/DEAD BALL/FOUL outcomes, only detect as FCP/HCT if we're in an active pressure sequence
     // (these are press break outcomes, not regular HCO shots)
-    // ✅ FIX: Include STEAL in press break outcomes - FCP/HCT STEAL turns should show skeleton animation
-    const isPressBreakOutcome = (turn.result_type === "HCO" || turn.result_type === "TURNOVER" || turn.result_type === "STEAL") && 
+    // ✅ FIX: Include STEAL, DEAD BALL, and offensive FOUL in press break outcomes - FCP/HCT turns should show skeleton animation
+    const isPressBreakOutcome = (turn.result_type === "HCO" || turn.result_type === "TURNOVER" || 
+                                 turn.result_type === "STEAL" || turn.result_type === "DEAD BALL" ||
+                                 (turn.result_type === "FOUL" && !turn.fcp_foul && !turn.hct_foul)) && 
                                 scene.pressureSequenceActive;
     
     // ✅ CRITICAL FIX: Only detect shot attempts as FCP/HCT if they have explicit flags
