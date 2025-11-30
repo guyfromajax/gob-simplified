@@ -272,14 +272,17 @@ export function announceFromTurnData(turnData, timing = 'start', homeTeamId = nu
     
     // Check multiple ways FCP/HCT can be indicated
     // Note: Don't return after these - shots from Press/Trap should also announce results
+    // ✅ FIX: Also check next_defensive_setup for inbound passes that set up FCP/HCT
     if (turnData.offensive_state === 'FCP' || turnData.fcp_foul || 
-        turnData.result_type === 'FCP' || turnData.text?.includes('PRESS!')) {
+        turnData.result_type === 'FCP' || turnData.text?.includes('PRESS!') ||
+        turnData.next_defensive_setup === 'FCP') {
       showAnnouncement("Press!", 'defense');
       // Don't return - may have shot result to announce later
     }
     
     if (turnData.offensive_state === 'HCT' || turnData.hct_foul || 
-        turnData.result_type === 'HCT' || turnData.text?.includes('TRAP!')) {
+        turnData.result_type === 'HCT' || turnData.text?.includes('TRAP!') ||
+        turnData.next_defensive_setup === 'HCT') {
       showAnnouncement("Trap!", 'defense');
       // Don't return - may have shot result to announce later
     }
