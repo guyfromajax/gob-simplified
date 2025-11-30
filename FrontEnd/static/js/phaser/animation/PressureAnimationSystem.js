@@ -1,43 +1,24 @@
 /**
  * PressureAnimationSystem - FCP/HCT Animation Handler
  * 
- * Handles Full Court Press (FCP) and Half Court Trap (HCT) animations using
- * a structured approach similar to ShotAnimationSystem.
+ * SS&S Approach: Thin wrapper that handles ONLY the unique FCP/HCT skeleton animation.
+ * Result handling is delegated to existing systems (ShotAnimationSystem, etc.) to avoid duplication.
  * 
  * Key Benefits:
- * - Single system for all FCP/HCT result types
- * - Consistent skeleton animation
- * - Structured result handling (can be applied to HCO later)
+ * - Reuses existing systems for result handling (no code duplication)
+ * - Handles only the unique skeleton animation for FCP/HCT
  * - Routes through AnimationRouter (same as HCO)
  * 
- * Result Types Handled:
- * - MAKE/MISS (shot attempts during pressure)
- * - FOUL (defensive and offensive)
- * - TURNOVER/STEAL/DEAD_BALL
- * - HCO (press break to HCO)
+ * Architecture:
+ * 1. Sets up pressure state (currentPressureType, pressureSequenceActive)
+ * 2. Animates skeleton via playTurnAnimation()
+ * 3. Routes to existing systems for result handling:
+ *    - ShotAnimationSystem for MAKE/MISS
+ *    - AnimationRouter handlers for FOUL, TURNOVER, etc.
+ * 4. Clears pressure state when sequence completes
  */
 
-import { playTurnAnimation, runInboundSetup } from './turnAnimation.js';
-import { announceFromTurnData } from '../utils/announcements.js';
-
-/**
- * PressureAnimationSystem - FCP/HCT Animation Handler
- * 
- * Handles Full Court Press (FCP) and Half Court Trap (HCT) animations using
- * a structured approach similar to ShotAnimationSystem.
- * 
- * Key Benefits:
- * - Single system for all FCP/HCT result types
- * - Consistent skeleton animation
- * - Structured result handling (can be applied to HCO later)
- * - Routes through AnimationRouter (same as HCO)
- * 
- * Result Types Handled:
- * - MAKE/MISS (shot attempts during pressure)
- * - FOUL (defensive and offensive)
- * - TURNOVER/STEAL/DEAD_BALL
- * - HCO (press break to HCO)
- */
+import { playTurnAnimation } from './turnAnimation.js';
 
 export class PressureAnimationSystem {
   constructor(scene, ballController, stateMachine, playerSprites, gameStore) {
@@ -47,9 +28,21 @@ export class PressureAnimationSystem {
     this.playerSprites = playerSprites;
     this.gameStore = gameStore;
     
+    // Reference to other systems (injected by AnimationEngine)
+    this.shotSystem = null; // Will be injected
+    this.animationEngine = null; // Will be injected
+    
     // Active pressure tracking
     this.activePressure = null;
     this.pressureQueue = [];
+  }
+  
+  /**
+   * Inject dependencies on other systems (called by AnimationEngine)
+   */
+  injectDependencies(shotSystem, animationEngine) {
+    this.shotSystem = shotSystem;
+    this.animationEngine = animationEngine;
   }
 
   /**
@@ -123,19 +116,22 @@ export class PressureAnimationSystem {
 
   /**
    * Execute complete pressure sequence with skeleton animation
+   * 
+   * SS&S: Only handles skeleton animation. Result handling is delegated to existing systems.
    */
   async executeCompletePressureSequence(turnData, pressureType) {
-    // Step 1: Animate skeleton (player movements)
+    // Step 1: Animate skeleton (player movements) - this is the unique FCP/HCT behavior
     await this.animateSkeleton(turnData, pressureType);
     
-    // Step 2: Handle result based on result_type
-    await this.handleResult(turnData, pressureType);
+    // Step 2: Route to existing systems for result handling (no duplication)
+    await this.routeToExistingSystem(turnData, pressureType);
   }
 
   /**
    * Animate the pressure skeleton (player movements)
    * 
-   * This reuses playTurnAnimation() which handles:
+   * This is the ONLY unique behavior for FCP/HCT - the skeleton animation.
+   * Reuses playTurnAnimation() which handles:
    * - runSetupTween() (step 0 positioning)
    * - Step-by-step player movements
    * - Pass animations
@@ -156,134 +152,39 @@ export class PressureAnimationSystem {
       playerSprites: this.playerSprites,
       turnData: turnData,
       ballSprite: this.ballController.ballSprite,
-      onUpdate: null, // Will be handled in handleResult
+      onUpdate: null, // Will be handled by routed system
       turnIndex: turnData.index
     });
   }
 
   /**
-   * Handle result based on result_type
+   * Route to existing systems for result handling (SS&S: reuse, don't duplicate)
    * 
-   * Structured result handling (similar to ShotAnimationSystem.processShot())
+   * For shot attempts: Route to ShotAnimationSystem (reuses existing shot handling)
+   * For other results: Let AnimationRouter handle them (they're already set up)
    */
-  async handleResult(turnData, pressureType) {
+  async routeToExistingSystem(turnData, pressureType) {
     const resultType = turnData.result_type;
     
-    console.log('🎬 [PressureAnimationSystem] Handling result', {
+    console.log('🎬 [PressureAnimationSystem] Routing to existing system', {
       resultType,
       pressureType
     });
     
-    switch (resultType) {
-      case 'MAKE':
-      case 'MISS':
-        await this.handleShotResult(turnData, pressureType);
-        break;
-        
-      case 'FOUL':
-        await this.handleFoulResult(turnData, pressureType);
-        break;
-        
-      case 'TURNOVER':
-      case 'STEAL':
-      case 'DEAD_BALL':
-      case 'DEAD_BALL_TURNOVER':
-        await this.handleTurnoverResult(turnData, pressureType);
-        break;
-        
-      case 'HCO':
-        await this.handleHCOResult(turnData, pressureType);
-        break;
-        
-      default:
-        console.warn('PressureAnimationSystem: Unknown result type', resultType);
-        // Default: just show announcement
-        announceFromTurnData(turnData, 'end', this.scene.simData?.home_team_id, this.scene);
+    // For shot attempts, route to ShotAnimationSystem (reuse existing system)
+    if (resultType === 'MAKE' || resultType === 'MISS') {
+      if (this.shotSystem) {
+        console.log('🎬 [PressureAnimationSystem] Routing shot result to ShotAnimationSystem');
+        // Note: ShotAnimationSystem will handle announcements, rebounds, transitions, etc.
+        // We don't duplicate that logic here
+        await this.shotSystem.processShot(turnData);
+      } else {
+        console.warn('PressureAnimationSystem: ShotSystem not available, result handling may be incomplete');
+      }
     }
-  }
-
-  /**
-   * Handle shot result (MAKE/MISS during pressure)
-   * 
-   * For shot attempts, we need to:
-   * 1. Animate the shot (reuse ShotAnimationSystem logic if available)
-   * 2. Handle rebound if MISS
-   * 3. Handle transition (inbound pass if MAKE, or free throw if AND-1)
-   */
-  async handleShotResult(turnData, pressureType) {
-    console.log('🎬 [PressureAnimationSystem] Handling shot result', {
-      result_type: turnData.result_type,
-      shooter_id: turnData.shooter_id
-    });
-    
-    // TODO: For now, shot animation is handled inline in playTurnAnimation
-    // In the future, we can extract this to reuse ShotAnimationSystem logic
-    // For Phase 1, we'll rely on playTurnAnimation's existing shot handling
-    
-    // Show announcement
-    announceFromTurnData(turnData, 'end', this.scene.simData?.home_team_id, this.scene);
-    
-    // Handle transition based on next_play_type
-    if (turnData.next_play_type === 'BASELINE_INBOUND' && turnData.possession_flips !== false) {
-      // Made shot - transition to inbound pass
-      await runInboundSetup({
-        scene: this.scene,
-        simData: this.scene.simData,
-        playerSprites: this.playerSprites,
-        turnData: turnData,
-        ballSprite: this.ballController.ballSprite,
-        pressureType: turnData.next_defensive_setup === 'FCP' || turnData.next_defensive_setup === 'HCT' 
-          ? turnData.next_defensive_setup 
-          : null
-      });
-    }
-    // For AND-1 (next_play_type === 'FREE_THROW'), let the free throw system handle it
-  }
-
-  /**
-   * Handle foul result (defensive or offensive foul during pressure)
-   */
-  async handleFoulResult(turnData, pressureType) {
-    console.log('🎬 [PressureAnimationSystem] Handling foul result', {
-      fcp_foul: turnData.fcp_foul,
-      hct_foul: turnData.hct_foul
-    });
-    
-    // Show announcement
-    announceFromTurnData(turnData, 'end', this.scene.simData?.home_team_id, this.scene);
-    
-    // Foul handling is typically done by the backend
-    // Frontend just needs to show the announcement and transition
-    // The next turn will be a FREE_THROW or HCO (side inbound)
-  }
-
-  /**
-   * Handle turnover result (STEAL, DEAD_BALL, etc.)
-   */
-  async handleTurnoverResult(turnData, pressureType) {
-    console.log('🎬 [PressureAnimationSystem] Handling turnover result', {
-      result_type: turnData.result_type
-    });
-    
-    // Show announcement
-    announceFromTurnData(turnData, 'end', this.scene.simData?.home_team_id, this.scene);
-    
-    // Turnover handling is typically done by the backend
-    // Frontend just needs to show the announcement
-    // The next turn will be an HCO for the stealing team
-  }
-
-  /**
-   * Handle HCO result (press break to HCO)
-   */
-  async handleHCOResult(turnData, pressureType) {
-    console.log('🎬 [PressureAnimationSystem] Handling HCO result (press break)');
-    
-    // Show announcement
-    announceFromTurnData(turnData, 'end', this.scene.simData?.home_team_id, this.scene);
-    
-    // HCO result means the offense broke the press
-    // The next turn will be a regular HCO shot attempt
+    // For other results (FOUL, TURNOVER, STEAL, HCO, etc.):
+    // AnimationRouter's finalizeTurnAfterAnimation() will handle announcements
+    // No need to duplicate that logic here
   }
 
   /**

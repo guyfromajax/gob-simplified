@@ -822,6 +822,9 @@ export class AnimationEngine {
         this.playerSprites,
         gameStore
       );
+      
+      // ✅ SS&S: Inject dependencies so PressureAnimationSystem can reuse existing systems
+      this.pressureSystem.injectDependencies(this.shotSystem, this);
     }
     
     // Removed verbose dependencies injected log
