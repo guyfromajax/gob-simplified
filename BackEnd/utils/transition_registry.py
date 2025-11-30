@@ -60,7 +60,7 @@ class Transition:
         return hash((self.from_turn, self.to_turn, self.possession_change))
 
 
-# Registry of all valid transitions (43 total pairs)
+# Registry of all valid transitions (51 total pairs)
 TRANSITION_REGISTRY: List[Transition] = [
     # Opening Tip Transitions (1)
     Transition(TurnType.OPENING_TIP, TurnType.HCO, ["Opening Tip"]),
@@ -73,7 +73,7 @@ TRANSITION_REGISTRY: List[Transition] = [
     # Side Inbound Pass Transitions (1)
     Transition(TurnType.SIDE_INBOUND_PASS, TurnType.HCO, ["Side Inbound Pass Complete"]),
     
-    # HCO Transitions (8)
+    # HCO Transitions (7)
     Transition(TurnType.HCO, TurnType.INBOUND_PASS, ["Made Shot, No Foul"], possession_change=True),
     Transition(TurnType.HCO, TurnType.FREE_THROW, [
         "Made Shot, Foul",
@@ -99,7 +99,7 @@ TRANSITION_REGISTRY: List[Transition] = [
         "Missed Shot, Offensive Foul"
     ], possession_change=True),
     
-    # OREB Transitions (9)
+    # OREB Transitions (8)
     Transition(TurnType.OREB, TurnType.INBOUND_PASS, ["Made Shot, No Foul"], possession_change=True),
     Transition(TurnType.OREB, TurnType.FREE_THROW, [
         "Made Shot, Foul",
@@ -164,8 +164,8 @@ TRANSITION_REGISTRY: List[Transition] = [
         "Dead Ball Turnover"
     ], possession_change=True),
     
-    # FCP/HCT Transitions (8)
-    # Note: FCP and HCT share the same transition patterns
+    # FCP Transitions (8)
+    # Note: FCP and HCT share the same transition patterns but are counted separately
     Transition(TurnType.FCP, TurnType.HCO, ["Press/Trap Break, HCO next step"]),
     Transition(TurnType.HCT, TurnType.HCO, ["Press/Trap Break, HCO next step"]),
     Transition(TurnType.FCP, TurnType.INBOUND_PASS, ["Press/Trap Break, Made Shot Attempt, No Foul"]),
@@ -278,9 +278,9 @@ def validate_transition_registry() -> Tuple[bool, List[str]]:
     """
     issues = []
     
-    # Check total count (should be 43)
-    if len(TRANSITION_REGISTRY) != 43:
-        issues.append(f"Expected 43 transitions, found {len(TRANSITION_REGISTRY)}")
+    # Check total count (should be 51)
+    if len(TRANSITION_REGISTRY) != 51:
+        issues.append(f"Expected 51 transitions, found {len(TRANSITION_REGISTRY)}")
     
     # Check for duplicates
     seen = set()
