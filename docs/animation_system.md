@@ -1621,3 +1621,135 @@ This overview should help new developers orient themselves quickly. Dive into
 the files listed above, keep `DEBUG_ANIM` running, and feel free to expand this
 document as the migration advances.
 
+---
+
+## Defensive Player + Pass Animation Synchronization Fix ✅ **COMPLETE** (January 2025)
+
+**Status:** Fixed and operational
+
+### Problem
+Defensive players were not consistently animating in sync with pass animations during HCO steps. The pass would animate, but defensive players would either:
+- Move before the pass started (defense moved first, then pass animated)
+- Not move at all during the pass
+- Move inconsistently (worked for away team but not home team, or vice versa)
+
+This made the game feel unorganic, as players would move while the ball was already in the air, rather than defensive players reacting to the pass.
+
+### Root Cause
+The issue was caused by **inconsistent `offenseTeamId` resolution**, which led to incorrect player classification:
+
+1. **Redundant Variables**: The codebase had both `scene.offenseTeamId` and `scene.currentOffenseTeamId`, which could get out of sync
+2. **Undefined offenseTeamId**: When both `scene.offenseTeamId` and `turnData.possession_team_id` were undefined/null, all players (including the passer) were misclassified as defensive
+3. **Passer Misclassification**: When the passer was misclassified as defensive:
+   - `passerPromise` was never set (passer went into `defensivePromises` instead of `offensivePromises`)
+   - Code waited for ALL offensive players to finish before starting pass
+   - Defensive players finished their animations before the pass started
+   - Result: Pass animation started AFTER defensive players finished, breaking sync
+
+### Solution
+
+#### 1. Consolidated to Single `offenseTeamId` Variable
+- **Removed**: `scene.currentOffenseTeamId` (redundant)
+- **Kept**: `scene.offenseTeamId` as single source of truth
+- **Updated**: All references to use `scene.offenseTeamId` only
+- **Files**: `turnAnimation.js`, `ShotAnimationSystem.js`, `fastBreak.js`, `possessionManager.js`, `ballManager.js`, `turnoverAdapter.js`, `animateGameTurns.js`
+
+#### 2. Created Robust `offenseTeamId` Resolver
+- **New File**: `FrontEnd/static/js/phaser/utils/offenseTeamIdResolver.js`
+- **Comprehensive Fallback Chain**:
+  1. `turnData.possession_team_id` (backend guarantee - always set)
+  2. `scene.offenseTeamId` (scene state - kept in sync by PossessionManager)
+  3. Derive from `passInfo` - find passer's `team_id` from `playerSprites`
+  4. Derive from animations - find ball handler's `team_id` from `playerSprites`
+  5. Derive from `simData` - use `home_team_id` or `away_team_id`
+  6. Last resort: `simData.home_team_id` (with warning)
+- **Ensures**: `offenseTeamId` is **always defined** (except pre-opening tip)
+
+#### 3. Consolidated Backend Variables
+- **Removed**: `starting_possession_team_id` (redundant)
+- **Updated**: `possession_team_id` now set **BEFORE** `update_clock_and_possession` (represents team on offense DURING the turn)
+- **Result**: Single source of truth for possession team ID
+
+#### 4. Synchronized Pass and Defense Animation
+- **Phase 1**: Offensive players move (wait for passer to reach spot)
+- **Phase 2**: Pass animation + defensive players animate **in parallel**
+- **Phase 3**: Wait for any remaining offensive players (non-passer)
+- **Files**: `turnAnimation.js` (line 1885-1924), `ShotAnimationSystem.js` (line 428-450)
+
+### Implementation Details
+
+**Player Classification Logic**:
+```javascript
+// ✅ ROBUST: offenseTeamId should always be defined (resolved by resolveOffenseTeamId)
+const offenseTeamId = resolveOffenseTeamId({
+  scene,
+  turnData,
+  playerSprites,
+  passInfo
+});
+
+const isOffensivePlayer = offenseTeamId ? String(sprite.team_id) === String(offenseTeamId) : false;
+```
+
+**Animation Sequencing**:
+```javascript
+// Phase 1: Offensive players move (wait for passer if there's a pass)
+if (passInfo && passerPromise) {
+  await passerPromise; // Wait for passer to reach spot
+} else if (offensivePromises.length > 0) {
+  await Promise.all(offensivePromises);
+}
+
+// Phase 2: Pass animation + defensive players in parallel
+const passAndDefensePromises = [];
+if (passInfo) {
+  passAndDefensePromises.push(handlePassAnimation({ scene, passInfo, playerSprites }));
+}
+passAndDefensePromises.push(...defensivePromises);
+await Promise.all(passAndDefensePromises); // Animate pass and defense simultaneously
+
+// Phase 3: Wait for remaining offensive players
+const remainingOffensivePromises = offensivePromises.filter(p => p !== passerPromise);
+if (remainingOffensivePromises.length > 0) {
+  await Promise.all(remainingOffensivePromises);
+}
+```
+
+### Benefits
+
+1. **Consistent Synchronization**: Defensive players now always animate in sync with pass animations
+2. **Organic Feel**: Defensive players move while the ball is in the air, creating natural defensive reactions
+3. **Reliable Classification**: `offenseTeamId` is always defined, ensuring correct player classification
+4. **Simplified Codebase**: Single `offenseTeamId` variable instead of multiple redundant variables
+5. **Better Maintainability**: Centralized resolver ensures consistent behavior
+
+### Files Modified
+
+**Frontend**:
+- `FrontEnd/static/js/phaser/utils/offenseTeamIdResolver.js` (new)
+- `FrontEnd/static/js/phaser/animation/turnAnimation.js`
+- `FrontEnd/static/js/phaser/animation/ShotAnimationSystem.js`
+- `FrontEnd/static/js/phaser/utils/possessionManager.js`
+- `FrontEnd/static/js/phaser/animation/fastBreak.js`
+- `FrontEnd/static/js/phaser/animation/ballManager.js`
+- `FrontEnd/static/js/phaser/animation/turnoverAdapter.js`
+- `FrontEnd/static/js/phaser/animation/animateGameTurns.js`
+- `FrontEnd/static/js/phaser/utils/announcements.js`
+- `FrontEnd/static/js/phaser/ui/playcallCenter.js`
+- `FrontEnd/static/js/phaser/utils/strategyBars.js`
+- `FrontEnd/static/js/phaser/utils/playcallDisplay.js`
+- `FrontEnd/static/js/phaser/animation/possession/normalizeTurn.js`
+- `FrontEnd/static/js/types.d.ts`
+
+**Backend**:
+- `BackEnd/models/turn_manager.py`
+
+### Testing
+
+- ✅ Defensive players animate in sync with pass animations
+- ✅ Works consistently for both home and away team on offense
+- ✅ Works for both zone and man defense
+- ✅ Pass animation starts after passer reaches spot (maintains existing behavior)
+- ✅ All offensive players complete their movements
+- ✅ No regression in other animation systems
+
