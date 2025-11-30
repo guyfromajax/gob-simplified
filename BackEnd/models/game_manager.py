@@ -8,6 +8,8 @@ from copy import deepcopy
 import random
 
 from BackEnd.utils.stat_updater import update_game_stats
+from BackEnd.utils.transition_validator import validate_transition
+import logging
 
 class GameManager:
     def __init__(self, home_team_name, away_team_name, home_strategy_settings=None, away_strategy_settings=None, home_team_attributes=None, away_team_attributes=None, home_scouting_data=None, away_scouting_data=None, home_plays_data=None, away_plays_data=None, mode="single"):
@@ -146,6 +148,11 @@ class GameManager:
         # Increment macro turn counter
         self.macro_turn_count += 1
         
+        # Track previous turn result for transition validation
+        # Get the last turn result (before this turn executes)
+        previous_result = self.turns[-1] if self.turns else None
+        previous_offensive_state = self.game_state.get("_previous_offensive_state")
+        
         # print("Starting new turn")
         # print(f"offense_team: {self.offense_team}")
         result = self.turn_manager.run_micro_turn()
@@ -216,6 +223,43 @@ class GameManager:
 
         # Update team stats after each turn
         self.update_team_stats()
+
+        # ✅ TRANSITION VALIDATION: Validate the transition from previous turn to current turn
+        # This is non-blocking - just logs warnings for debugging
+        # Note: We validate the transition from the PREVIOUS turn to THIS turn's outcome
+        # (not from batched turns like OREBs/inbounds, which are part of the same sequence)
+        if previous_result and len(self.turns) > 1:
+            # Use the result from BEFORE this turn started (the actual previous turn)
+            from_result = previous_result
+            
+            # Get the offensive_state that was set for the NEXT turn (after this turn completes)
+            to_offensive_state = self.game_state.get("offensive_state", "HCO")
+            
+            # Determine if possession changed in THIS turn
+            # (not counting batched turns, as those are part of the same sequence)
+            possession_changed = result.get("possession_flips", False)
+            
+            # Validate the transition
+            is_valid, error_msg = validate_transition(
+                from_result=from_result,
+                to_offensive_state=to_offensive_state,
+                possession_changed=possession_changed,
+                game_state=self.game_state
+            )
+            
+            if not is_valid and error_msg:
+                logging.warning(
+                    f"⚠️ [TRANSITION VALIDATION] Invalid transition detected in turn #{self.macro_turn_count}: {error_msg}",
+                    extra={
+                        "turn_number": self.macro_turn_count,
+                        "from_result_type": from_result.get("result_type"),
+                        "from_result_text": from_result.get("text", "")[:50],
+                        "to_offensive_state": to_offensive_state,
+                        "possession_changed": possession_changed,
+                        "previous_offensive_state": previous_offensive_state,
+                        "current_result_type": result.get("result_type"),
+                    }
+                )
 
         # Log steal-to-score sequences if applicable
         self._log_steal_to_points(result)
