@@ -113,12 +113,6 @@ export class AnimationEngine {
    * Determine which handler to use for a turn
    */
   determineHandler(turnData) {
-    // ✅ DEBUG: Check for FCP/HCT flags
-    const isFCPHCT = turnData.fcp_shot === true || turnData.hct_shot === true || 
-                     turnData.next_defensive_setup === "FCP" || turnData.next_defensive_setup === "HCT" ||
-                     turnData.fcp_foul === true || turnData.hct_foul === true;
-    
-    
     // Fast break detection (highest priority)
     // ✅ FIX: Only check fast_break flag and result_type - next_play_type indicates what comes NEXT, not what this turn is
     // The backend should set fast_break=true on the actual fast break turn, not rely on next_play_type
