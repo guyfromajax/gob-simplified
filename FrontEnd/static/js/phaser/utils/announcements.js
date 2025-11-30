@@ -272,17 +272,22 @@ export function announceFromTurnData(turnData, timing = 'start', homeTeamId = nu
     
     // Check multiple ways FCP/HCT can be indicated
     // Note: Don't return after these - shots from Press/Trap should also announce results
-    // ✅ FIX: Also check next_defensive_setup for inbound passes that set up FCP/HCT
+    // ✅ FIX: Only announce when pressure is actually active, not when it's just being set up
+    // next_defensive_setup indicates what will happen NEXT, not what's happening NOW
+    // Only check next_defensive_setup for BASELINE_INBOUND turns (inbound passes that set up pressure)
+    // For all other turns (HCO, MAKE, MISS, etc.), only check actual pressure flags (fcp_shot, hct_shot, fcp_foul, hct_foul)
+    const isInboundSettingUpPressure = turnData.result_type === 'BASELINE_INBOUND';
+    
     if (turnData.offensive_state === 'FCP' || turnData.fcp_foul || 
         turnData.result_type === 'FCP' || turnData.text?.includes('PRESS!') ||
-        turnData.next_defensive_setup === 'FCP') {
+        turnData.fcp_shot === true || (isInboundSettingUpPressure && turnData.next_defensive_setup === 'FCP')) {
       showAnnouncement("Press!", 'defense');
       // Don't return - may have shot result to announce later
     }
     
     if (turnData.offensive_state === 'HCT' || turnData.hct_foul || 
         turnData.result_type === 'HCT' || turnData.text?.includes('TRAP!') ||
-        turnData.next_defensive_setup === 'HCT') {
+        turnData.hct_shot === true || (isInboundSettingUpPressure && turnData.next_defensive_setup === 'HCT')) {
       showAnnouncement("Trap!", 'defense');
       // Don't return - may have shot result to announce later
     }
