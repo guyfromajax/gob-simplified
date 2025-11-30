@@ -643,13 +643,16 @@ export class FreeThrowAnimationSystem {
     
     // Backend provides: ftContext from annotateFreeThrowTurns
     // New system expects: ftContext with attempt/total structure
+    // ✅ FIX: Do NOT set isFinal here - let determineFreeThrowContext() be the single source of truth
+    // isFinal must be calculated using free_throws_remaining, not just ftIndex/ftTotal
     
     const ftContext = backendData.ftContext || {};
     const adaptedFtContext = {
       attempt: ftContext.ftIndex || 1,
       total: ftContext.ftTotal || 1,
       type: ftContext.bonusType || 'single',
-      isFinal: (ftContext.ftIndex || 1) >= (ftContext.ftTotal || 1)
+      // ✅ FIX: Do not set isFinal here - it will be calculated correctly in determineFreeThrowContext()
+      // based on free_throws_remaining from backend
     };
     
     return {
@@ -670,11 +673,19 @@ export class FreeThrowAnimationSystem {
     const attempt = ftContext.ftIndex || ftContext.attempt || 1;
     const total = ftContext.ftTotal || ftContext.total || 1;
     
-    // ✅ FIX: Also use free_throws_remaining from backend as a safety check
-    // free_throws_remaining is AFTER this shot, so if it's > 0, this is NOT the final FT
-    // This ensures we never trigger inbound pass between free throw attempts
-    const hasMoreFreeThrows = turnData.free_throws_remaining !== undefined && turnData.free_throws_remaining > 0;
-    const isFinal = !hasMoreFreeThrows && (attempt >= total);
+    // ✅ FIX: free_throws_remaining is the AUTHORITATIVE source for determining if this is the final FT
+    // free_throws_remaining is AFTER this shot, so:
+    // - If free_throws_remaining > 0: More FTs remain, this is NOT final
+    // - If free_throws_remaining === 0: No more FTs remain, this IS final
+    // - If free_throws_remaining is undefined: Fall back to ftIndex/ftTotal (batch mode)
+    let isFinal;
+    if (turnData.free_throws_remaining !== undefined) {
+      // Turn-by-turn mode: Use free_throws_remaining as authoritative
+      isFinal = turnData.free_throws_remaining === 0;
+    } else {
+      // Batch mode: Fall back to ftIndex/ftTotal (legacy support)
+      isFinal = (attempt >= total);
+    }
     
     return {
       attempt: attempt,
