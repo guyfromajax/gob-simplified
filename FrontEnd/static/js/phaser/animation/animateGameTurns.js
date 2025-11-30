@@ -728,6 +728,11 @@ export async function animateGameTurns({ //hasBallAtStep
       continue;
     }
 
+    // ✅ COMMENTED OUT: FCP/HCT now routes through AnimationRouter (same as HCO)
+    // FCP/HCT skeletons are different data (press break sequences), but use the same animation system
+    // They now route to SHOT_ATTEMPT handler (for MAKE/MISS) or their respective handlers (FOUL, TURNOVER, etc.)
+    // This block is kept for reference in case we need to revert
+    /*
     // ✅ SS&S PATTERN: Simple state-based FCP/HCT detection (replaces complex flag inheritance)
     // Use scene state as single source of truth - matches BallController pattern
     const previousTurn = i > 0 ? turns[i - 1] : null;
@@ -909,6 +914,7 @@ export async function animateGameTurns({ //hasBallAtStep
       
       continue;
     }
+    */
     
     if (turn.result_type === "TURNOVER") {
       // ✅ PHASE 2.6: Route TURNOVER through AnimationRouter
