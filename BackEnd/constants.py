@@ -205,6 +205,8 @@ HOME_RIM_COORDS = {"x": 90, "y": 25}
 AWAY_RIM_COORDS = {"x": 10, "y": 25}
 HOME_TOP_KEY = {"x": 64, "y": 25}
 AWAY_TOP_KEY = {"x": 36, "y": 25}
+HOME_INBOUND_LEFT = {"x": 97, "y": 20}  # Home team inbounding from left side (under away basket)
+AWAY_INBOUND_LEFT = {"x": 3, "y": 20}   # Away team inbounding from left side (under home basket)
 #comment for push
 
 RIM_COORDS = HOME_RIM_COORDS
