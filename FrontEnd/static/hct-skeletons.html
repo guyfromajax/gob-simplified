@@ -1556,6 +1556,10 @@
                   location: currentStep.pos_actions[pos].location,
                   action: currentStep.pos_actions[pos].action
                 };
+                // Include opp flag if it exists (for opposite side of court)
+                if (currentStep.pos_actions[pos].opp !== undefined) {
+                  currentStepAssignments[pos].opp = currentStep.pos_actions[pos].opp;
+                }
                 // Track ball handler
                 if (BALL_HANDLING_ACTIONS.includes(currentStep.pos_actions[pos].action)) {
                   currentBallHandler = pos;
@@ -1574,6 +1578,10 @@
                     location: prevStep.pos_actions[pos].location,
                     action: prevStep.pos_actions[pos].action
                   };
+                  // Include opp flag if it exists (for opposite side of court)
+                  if (prevStep.pos_actions[pos].opp !== undefined) {
+                    previousStepAssignments[pos].opp = prevStep.pos_actions[pos].opp;
+                  }
                 }
               });
             }
@@ -1583,12 +1591,16 @@
           const lastStep = variantData.steps[variantData.steps.length - 1];
           if (lastStep && lastStep.pos_actions) {
             POSITIONS.forEach(pos => {
-              if (lastStep.pos_actions[pos]) {
-                previousStepAssignments[pos] = {
-                  location: lastStep.pos_actions[pos].location,
-                  action: lastStep.pos_actions[pos].action
-                };
-              }
+                if (lastStep.pos_actions[pos]) {
+                  previousStepAssignments[pos] = {
+                    location: lastStep.pos_actions[pos].location,
+                    action: lastStep.pos_actions[pos].action
+                  };
+                  // Include opp flag if it exists (for opposite side of court)
+                  if (lastStep.pos_actions[pos].opp !== undefined) {
+                    previousStepAssignments[pos].opp = lastStep.pos_actions[pos].opp;
+                  }
+                }
             });
           }
         }
@@ -2083,6 +2095,10 @@
             location: step.pos_actions[pos].location,
             action: step.pos_actions[pos].action
           };
+          // Include opp flag if it exists (for opposite side of court)
+          if (step.pos_actions[pos].opp !== undefined) {
+            currentStepAssignments[pos].opp = step.pos_actions[pos].opp;
+          }
           
           // Track ball handler
           if (BALL_HANDLING_ACTIONS.includes(step.pos_actions[pos].action)) {
@@ -2223,6 +2239,10 @@
               location: assignment.location,
               action: assignment.action
             };
+            // Include opp flag if it exists (for opposite side of court)
+            if (assignment.opp !== undefined) {
+              stepData.pos_actions[pos].opp = assignment.opp;
+            }
           }
         });
         
@@ -3791,6 +3811,10 @@
               location: assignment.location,
               action: assignment.action
             };
+            // Include opp flag if it exists (for opposite side of court)
+            if (assignment.opp !== undefined) {
+              stepData.pos_actions[pos].opp = assignment.opp;
+            }
           }
         });
         
