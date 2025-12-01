@@ -1234,6 +1234,7 @@
     let draggedPlayer = null;
     let draggedPlayerOriginalLocation = null;
     let nearestSnapPoint = null;
+    let nearestSnapPointIsOpposite = false;
     let hoveredSprite = null; // The sprite currently being hovered over during drag
     
     // Offset tracking (position -> boolean)
@@ -2442,18 +2443,20 @@
           // Get the location of the hovered sprite by finding its position on court
           const hoveredIcon = document.querySelector(`.player-icon.${hoveredSprite}`);
           const hoveredLocation = getLocationFromIcon(hoveredIcon);
+          const hoveredAssignment = currentStepAssignments[hoveredSprite];
+          const hoveredIsOpposite = hoveredAssignment?.opp === true;
           
-          console.log('hoveredLocation from icon:', hoveredLocation);
+          console.log('hoveredLocation from icon:', hoveredLocation, 'isOpposite:', hoveredIsOpposite);
           
           if (hoveredLocation) {
-            console.log(`✓ Dropping on occupied sprite ${hoveredSprite} at ${hoveredLocation}`);
-            handleDrop(hoveredLocation);
+            console.log(`✓ Dropping on occupied sprite ${hoveredSprite} at ${hoveredLocation} (opp: ${hoveredIsOpposite})`);
+            handleDrop(hoveredLocation, hoveredIsOpposite);
           } else {
             console.log('✗ Could not determine hovered sprite location');
           }
         } else if (nearestSnapPoint) {
-          console.log(`✓ Dropping on empty space at ${nearestSnapPoint}`);
-          handleDrop(nearestSnapPoint);
+          console.log(`✓ Dropping on empty space at ${nearestSnapPoint} (opposite: ${nearestSnapPointIsOpposite})`);
+          handleDrop(nearestSnapPoint, nearestSnapPointIsOpposite);
         } else {
           console.log('✗ No drop target found');
         }
@@ -2461,6 +2464,7 @@
         draggedPlayer = null;
         draggedPlayerOriginalLocation = null;
         nearestSnapPoint = null;
+        nearestSnapPointIsOpposite = false;
         hoveredSprite = null;
       });
 
@@ -2534,33 +2538,49 @@
           courtY_grid: y.toFixed(1)
         });
         
-        nearestSnapPoint = findNearestLocation(x, y);
-        highlightSnapPoint(nearestSnapPoint);
+        const nearestResult = findNearestLocation(x, y);
+        nearestSnapPoint = nearestResult.location;
+        nearestSnapPointIsOpposite = nearestResult.isOpposite;
+        highlightSnapPoint(nearestSnapPoint, nearestSnapPointIsOpposite);
       });
     }
 
     function findNearestLocation(mouseX, mouseY) {
       let nearestLoc = null;
       let minDist = Infinity;
+      let isOpposite = false;
       
       console.log('Finding nearest to:', { mouseX: mouseX.toFixed(1), mouseY: mouseY.toFixed(1) });
       
       Object.entries(HCO_STRING_SPOTS).forEach(([loc, coords]) => {
-        // Mouse is already in grid coordinates, compare directly
+        // Check regular position
         const dist = Math.sqrt(Math.pow(mouseX - coords.x, 2) + Math.pow(mouseY - coords.y, 2));
         
-        if (dist < 10) { // Only log nearby locations
-          console.log(`  ${loc}: grid(${coords.x}, ${coords.y}) → dist: ${dist.toFixed(1)}`);
+        // Check mirrored position (left side)
+        const mirroredX = 100 - coords.x;
+        const mirroredDist = Math.sqrt(Math.pow(mouseX - mirroredX, 2) + Math.pow(mouseY - coords.y, 2));
+        
+        if (dist < 10 || mirroredDist < 10) { // Only log nearby locations
+          console.log(`  ${loc}: grid(${coords.x}, ${coords.y}) → dist: ${dist.toFixed(1)}, mirrored(${mirroredX}, ${coords.y}) → dist: ${mirroredDist.toFixed(1)}`);
         }
         
+        // Check if regular position is closer
         if (dist < minDist) {
           minDist = dist;
           nearestLoc = loc;
+          isOpposite = false;
+        }
+        
+        // Check if mirrored position is closer
+        if (mirroredDist < minDist) {
+          minDist = mirroredDist;
+          nearestLoc = loc;
+          isOpposite = true;
         }
       });
       
-      console.log(`Nearest: ${nearestLoc} (dist: ${minDist.toFixed(1)})`);
-      return nearestLoc;
+      console.log(`Nearest: ${nearestLoc} (dist: ${minDist.toFixed(1)}, isOpposite: ${isOpposite})`);
+      return { location: nearestLoc, isOpposite: isOpposite };
     }
 
     function showSnapPoints() {
@@ -2570,12 +2590,23 @@
       if (ballDragActive) return;
       
       Object.entries(HCO_STRING_SPOTS).forEach(([loc, coords]) => {
+        // Regular snap point (right side)
         const snapPoint = document.createElement('div');
         snapPoint.className = 'snap-point';
         snapPoint.dataset.location = loc;
+        snapPoint.dataset.opposite = 'false';
         snapPoint.style.left = `${coords.x}%`;
         snapPoint.style.top = `${(50 - coords.y) * 2}%`;
         container.appendChild(snapPoint);
+        
+        // Mirrored snap point (left side)
+        const mirroredSnapPoint = document.createElement('div');
+        mirroredSnapPoint.className = 'snap-point';
+        mirroredSnapPoint.dataset.location = loc;
+        mirroredSnapPoint.dataset.opposite = 'true';
+        mirroredSnapPoint.style.left = `${100 - coords.x}%`;
+        mirroredSnapPoint.style.top = `${(50 - coords.y) * 2}%`;
+        container.appendChild(mirroredSnapPoint);
       });
     }
 
@@ -2583,9 +2614,11 @@
       document.querySelectorAll('.snap-point').forEach(point => point.remove());
     }
 
-    function highlightSnapPoint(location) {
+    function highlightSnapPoint(location, isOpposite) {
       document.querySelectorAll('.snap-point').forEach(point => {
-        if (point.dataset.location === location) {
+        const pointLocation = point.dataset.location;
+        const pointIsOpposite = point.dataset.opposite === 'true';
+        if (pointLocation === location && pointIsOpposite === isOpposite) {
           point.classList.add('active');
         } else {
           point.classList.remove('active');
@@ -2593,18 +2626,19 @@
       });
     }
 
-    function handleDrop(newLocation) {
+    function handleDrop(newLocation, isOpposite = false) {
       if (!draggedPlayer || !newLocation) return;
       
       // Check if we're in review mode and user is making a change
       checkForDivergence();
       
-      // Check if location is occupied
-      const occupyingPlayer = findPlayerAtLocation(newLocation);
+      // Check if location is occupied (check both regular and opposite side)
+      const occupyingPlayer = findPlayerAtLocation(newLocation, isOpposite);
       
       console.log('handleDrop:', {
         draggedPlayer,
         newLocation,
+        isOpposite,
         occupyingPlayer,
         currentAssignments: currentStepAssignments
       });
@@ -2614,6 +2648,13 @@
         currentStepAssignments[draggedPlayer] = {};
       }
       currentStepAssignments[draggedPlayer].location = newLocation;
+      currentStepAssignments[draggedPlayer].opp = isOpposite;
+      
+      // Update the opposite checkbox in the dashboard
+      const oppositeCheckbox = document.getElementById(`dashboard-opposite-${draggedPlayer}`);
+      if (oppositeCheckbox) {
+        oppositeCheckbox.checked = isOpposite;
+      }
       
       if (occupyingPlayer && occupyingPlayer !== draggedPlayer) {
         // Location occupied - mark for offset positioning
@@ -2666,9 +2707,10 @@
       }
     }
 
-    function findPlayerAtLocation(location) {
+    function findPlayerAtLocation(location, isOpposite = false) {
       // Find any player currently at this location by checking currentStepAssignments
-      console.log(`findPlayerAtLocation(${location}), currentStepAssignments:`, currentStepAssignments);
+      // Must match both location AND opp flag
+      console.log(`findPlayerAtLocation(${location}, isOpposite: ${isOpposite}), currentStepAssignments:`, currentStepAssignments);
       
       for (const pos of POSITIONS) {
         if (pos === draggedPlayer) continue; // Skip the player being dragged
@@ -2677,8 +2719,14 @@
         console.log(`  Checking ${pos}:`, assignment);
         
         if (assignment && assignment.location === location) {
-          console.log(`✓ Found player ${pos} at ${location}`);
-          return pos;
+          // Check if opp flag matches (both must be true or both must be false/undefined)
+          const assignmentIsOpposite = assignment.opp === true;
+          if (assignmentIsOpposite === isOpposite) {
+            console.log(`✓ Found player ${pos} at ${location} (opp: ${isOpposite})`);
+            return pos;
+          } else {
+            console.log(`  Location matches but opp flag differs: ${pos} has opp=${assignmentIsOpposite}, looking for opp=${isOpposite}`);
+          }
         }
       }
       
