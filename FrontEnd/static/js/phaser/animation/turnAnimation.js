@@ -1648,13 +1648,13 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
         turnIndex: turnIndex,
         maxSteps: maxSteps
       });
-      await runSetupTween({
-        scene,
-        ballSprite,
-        animations: turnData.animations,
-        playerSprites,
-        currentBallOwnerRef
-      });
+    await runSetupTween({
+      scene,
+      ballSprite,
+      animations: turnData.animations,
+      playerSprites,
+      currentBallOwnerRef
+    });
       // Don't clear the flag - keep it set to prevent duplicate calls
     } else {
       console.warn('⚠️ [FCP/HCT DEBUG] Skipping duplicate runSetupTween call', {
@@ -1894,7 +1894,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
       // ✅ ROBUST: offenseTeamId should always be defined (resolved by resolveOffenseTeamId)
       // If it's still null (pre-opening tip or data corruption), default to false (defensive)
       const isOffensivePlayer = offenseTeamId ? String(sprite.team_id) === String(offenseTeamId) : false;
-      
+
       // ✅ DEBUG: Log player classification for pass steps
       if (passInfo && stepIndex === passInfo.stepIndex && (anim.playerId === passInfo.passerId || anim.playerId === passInfo.receiverId)) {
         console.log('🔍 [PASS SYNC DEBUG] Player classification:', {
@@ -1940,9 +1940,9 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
       const { handlePassAnimation } = await import('./passDetection.js');
       passAndDefensePromises.push(
         handlePassAnimation({
-          scene,
-          passInfo,
-          playerSprites
+        scene,
+        passInfo,
+        playerSprites
         })
       );
     }
