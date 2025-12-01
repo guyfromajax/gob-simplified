@@ -854,6 +854,12 @@
 
     <!-- Step 1: Start Building -->
     <div id="step1" class="step-container">
+      <div class="step1-row">
+        <div class="form-group">
+          <label for="skeleton-name">Skeleton Name</label>
+          <input type="text" id="skeleton-name" placeholder="Enter skeleton name...">
+        </div>
+      </div>
       <div class="step1-button-wrapper">
         <button id="submit-play-btn" type="button">Start Building HCT Skeletons</button>
       </div>
@@ -1135,9 +1141,10 @@
       }
     };
 
-    // FCP Skeleton state with variants support
+    // HCT Skeleton state with variants support
     let playState = {
       skeletonId: null, // For editing existing skeletons
+      name: "", // Skeleton name
       variants: {
         shot: {
           currentVersionIndex: 0,
@@ -1276,10 +1283,11 @@
         skeletons.forEach(skeleton => {
           const option = document.createElement('option');
           option.value = skeleton._id;
-          option.textContent = `HCT Skeleton (${Object.keys(skeleton.variants || {}).length} variants)`;
+          const skeletonName = skeleton.name || skeleton.play || 'Unnamed Skeleton';
+          option.textContent = `${skeletonName} (${Object.keys(skeleton.variants || {}).length} variants)`;
           option.dataset.playData = JSON.stringify(skeleton);
           select.appendChild(option);
-          console.log(`📂 Added option: HCT Skeleton ${skeleton._id}`);
+          console.log(`📂 Added option: ${skeletonName} ${skeleton._id}`);
         });
         
         console.log('📂 Dropdown populated successfully');
@@ -1303,6 +1311,13 @@
       
       // Populate playState
       playState.skeletonId = skeletonData._id;
+      playState.name = skeletonData.name || skeletonData.play || 'Unnamed Skeleton';
+      
+      // Populate name field if we're going back to step 1
+      const nameInput = document.getElementById('skeleton-name');
+      if (nameInput) {
+        nameInput.value = playState.name;
+      }
       
       // Load all variants
       const variants = skeletonData.variants || {};
@@ -2379,6 +2394,18 @@
     function startBuilding() {
       console.log('🏀 startBuilding() called');
       
+      // Get skeleton name from input
+      const nameInput = document.getElementById('skeleton-name');
+      const skeletonName = nameInput ? nameInput.value.trim() : '';
+      
+      if (!skeletonName) {
+        alert('Please enter a skeleton name before starting.');
+        return;
+      }
+      
+      // Store name in playState
+      playState.name = skeletonName;
+      
       // Hide step 1, show step 2
       const step1 = document.getElementById('step1');
       const step2 = document.getElementById('step2');
@@ -2389,7 +2416,7 @@
       
       step1.classList.add('hidden');
       step2.classList.remove('hidden');
-      document.getElementById('page-title').textContent = 'HCT Skeleton Builder - Building Skeletons';
+      document.getElementById('page-title').textContent = `HCT Skeleton Builder - ${skeletonName}`;
       document.getElementById('page-title').classList.add('step2-title');
       
       // Skip formation selection, go straight to building
@@ -3950,6 +3977,8 @@
       
       // Build HCT skeleton data with all variants
       const skeletonData = {
+        name: playState.name || 'Unnamed HCT Skeleton',
+        play: playState.name || 'Unnamed HCT Skeleton', // Also include 'play' field for compatibility
         variants: {
           shot: buildVariantVersions('shot'),
           hco: buildVariantVersions('hco'),
@@ -4012,8 +4041,9 @@
       const action = wasUpdate ? 'updated in' : 'saved to';
       const emoji = wasUpdate ? '🔄' : '✅';
       
+      const skeletonName = playData.name || playData.play || 'Skeleton';
       document.getElementById('success-play-name').textContent = 
-        `${emoji} Play "${playData.name}" has been ${action} the database!`;
+        `${emoji} HCT Skeleton "${skeletonName}" has been ${action} the database!`;
 
       document.getElementById('json-output').textContent = JSON.stringify(playData, null, 2);
     }
