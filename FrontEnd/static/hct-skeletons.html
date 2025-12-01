@@ -1340,9 +1340,9 @@
                   steps: v.steps || []
                 };
               });
-            } else if (skeletons[variant].steps) {
+            } else if (variants[variant].steps) {
               // Old format: single steps array - migrate to v1
-              versionsObj.v1 = { steps: skeletons[variant].steps };
+              versionsObj.v1 = { steps: variants[variant].steps };
               // Create empty v2-v6
               for (let i = 2; i <= 6; i++) {
                 versionsObj[`v${i}`] = { steps: [] };
