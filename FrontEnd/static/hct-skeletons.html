@@ -3108,6 +3108,7 @@
             currentStepAssignments[pos] = {};
           }
           currentStepAssignments[pos].opp = e.target.checked;
+          console.log(`[OPP CHECKBOX] ${pos}: checkbox changed to ${e.target.checked}, currentStepAssignments[${pos}].opp = ${currentStepAssignments[pos].opp}`);
           renderCourtVisualization();
         });
         
@@ -3782,10 +3783,15 @@
       // Populate pos_actions
       POSITIONS.forEach(pos => {
         const assignment = currentStepAssignments[pos];
-        stepData.pos_actions[pos] = {
-          location: assignment.location,
-          action: assignment.action
-        };
+        if (assignment) {
+          stepData.pos_actions[pos] = {
+            location: assignment.location,
+            action: assignment.action
+          };
+          // ✅ FIX: Always include opp field (default to false if not set)
+          stepData.pos_actions[pos].opp = assignment.opp !== undefined ? assignment.opp : false;
+          console.log(`[SUBMIT STEP] ${pos}: location=${assignment.location}, action=${assignment.action}, opp=${stepData.pos_actions[pos].opp}`);
+        }
       });
 
       // Add to current variant's steps
@@ -3923,10 +3929,9 @@
               location: assignment.location,
               action: assignment.action
             };
-            // Include opp flag if it exists (for opposite side of court)
-            if (assignment.opp !== undefined) {
-              stepData.pos_actions[pos].opp = assignment.opp;
-            }
+            // ✅ FIX: Always include opp field (default to false if not set)
+            stepData.pos_actions[pos].opp = assignment.opp !== undefined ? assignment.opp : false;
+            console.log(`[COMPLETE PLAY] ${pos}: opp=${stepData.pos_actions[pos].opp}`);
           }
         });
         
