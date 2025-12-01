@@ -3270,6 +3270,14 @@
       // Remove icons for positions that no longer exist
       Object.values(existingIcons).forEach(icon => icon.remove());
 
+      // Helper function to apply opposite side mirroring (reusable for ball positioning)
+      const applyOppositeMirrorForCoords = (coords, opp) => {
+        if (opp === true) {
+          return { x: 100 - coords.x, y: coords.y };
+        }
+        return { x: coords.x, y: coords.y };
+      };
+
       // Handle ball sprite positioning
       let ballIcon = container.querySelector('.ball-icon');
       
@@ -3290,11 +3298,13 @@
           const [receiverPos, receiverAssignment] = receiver;
           const receiverCoords = HCO_STRING_SPOTS[receiverAssignment.location];
           const receiverOffset = positionOffsets[receiverPos];
-          const receiverActualCoords = receiverOffset ? OFFSET_SPOTS[receiverAssignment.location] : receiverCoords;
+          const receiverBaseCoords = receiverOffset ? OFFSET_SPOTS[receiverAssignment.location] : receiverCoords;
           
-          if (receiverActualCoords) {
-            finalBallLeft = `${receiverActualCoords.x}%`;
-            finalBallTop = `${(50 - receiverActualCoords.y) * 2}%`;
+          if (receiverBaseCoords) {
+            // Apply opp mirroring to receiver coordinates
+            const receiverFinalCoords = applyOppositeMirrorForCoords(receiverBaseCoords, receiverAssignment.opp);
+            finalBallLeft = `${receiverFinalCoords.x}%`;
+            finalBallTop = `${(50 - receiverFinalCoords.y) * 2}%`;
             currentBallHandler = receiverPos;
           }
         }
@@ -3313,11 +3323,13 @@
         if (handlerAssignment && handlerAssignment.location) {
           const handlerCoords = HCO_STRING_SPOTS[handlerAssignment.location];
           const handlerOffset = positionOffsets[currentBallHandler];
-          const handlerActualCoords = handlerOffset ? OFFSET_SPOTS[handlerAssignment.location] : handlerCoords;
+          const handlerBaseCoords = handlerOffset ? OFFSET_SPOTS[handlerAssignment.location] : handlerCoords;
           
-          if (handlerActualCoords) {
-            finalBallLeft = `${handlerActualCoords.x}%`;
-            finalBallTop = `${(50 - handlerActualCoords.y) * 2}%`;
+          if (handlerBaseCoords) {
+            // Apply opp mirroring to handler coordinates
+            const handlerFinalCoords = applyOppositeMirrorForCoords(handlerBaseCoords, handlerAssignment.opp);
+            finalBallLeft = `${handlerFinalCoords.x}%`;
+            finalBallTop = `${(50 - handlerFinalCoords.y) * 2}%`;
           }
         }
       }
