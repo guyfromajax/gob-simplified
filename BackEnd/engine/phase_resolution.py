@@ -690,6 +690,12 @@ def resolve_free_throw_logic(game):
         # Add next_defensive_setup if final FT was made
         if game_state["free_throws_remaining"] <= 0:
             result["next_defensive_setup"] = game_state.get("offensive_state", "HCO")
+            # ✅ FIX: Set possession_team_id when possession flips (after final made FT)
+            if possession_flips:
+                # After made FT, possession flips - defense becomes offense
+                result["possession_team_id"] = def_team.team_id
+            else:
+                result["possession_team_id"] = off_team.team_id
     else:
         # Add rebounder information for missed free throws
         if game_state.get("last_rebounder"):
@@ -2039,6 +2045,17 @@ def apply_opposite_side_logic(skeleton_data, is_away_offense):
     """
     if not skeleton_data or "steps" not in skeleton_data:
         return skeleton_data
+    
+    # ✅ DEBUG: Check if skeleton has any opp fields
+    opp_count = 0
+    for step in skeleton_data.get("steps", [])[:1]:  # Check first step only
+        for pos, action in step.get("pos_actions", {}).items():
+            if action.get("opp", False):
+                opp_count += 1
+    if opp_count > 0:
+        logging.warning(f"  🔍 [apply_opposite_side_logic] Found {opp_count} positions with opp=True in first step")
+    else:
+        logging.warning(f"  ⚠️ [apply_opposite_side_logic] No positions with opp=True found in skeleton!")
     
     from BackEnd.utils.shared import get_away_player_coords
     from BackEnd.constants import HCO_STRING_SPOTS
