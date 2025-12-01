@@ -840,44 +840,56 @@ class Animator:
                 timestamp = step.get("timestamp", 0)
                 
                 # Handle both coords and location formats
+                has_opp = pos_action.get("opp", False)
+                coords_from_location = False
+                
                 if "coords" in pos_action:
                     coords = pos_action.get("coords", {"x": 50, "y": 25})
-                    # Coords already exist - this means apply_opposite_side_logic already handled flipping
-                    # for FCP/HCT skeletons, so don't flip again here
+                    # Coords already exist - these should have been set by apply_opposite_side_logic()
+                    # Trust them for now, but log to verify
+                    if (is_fcp or is_hct) and has_opp:
+                        logging.warning(f"  🔍 [OPP] Position {position}: opp=True, coords exist (from apply_opposite_side_logic): {coords}, is_away_offense={is_away_offense}")
                     coords_already_flipped = True
                 elif "location" in pos_action:
                     # Convert location string to coordinates using HCO_STRING_SPOTS
                     location = pos_action.get("location", "key")
                     coords = HCO_STRING_SPOTS.get(location, {"x": 50, "y": 25})
+                    coords_from_location = True
                     coords_already_flipped = False
+                    if (is_fcp or is_hct):
+                        logging.warning(f"  🔍 [OPP] Position {position}: location={location}, initial coords={coords}, opp={has_opp}, is_away_offense={is_away_offense}")
                 else:
                     coords = {"x": 50, "y": 25}
                     coords_already_flipped = False
                 
-                # ✅ FIX: Handle "opp" field for FCP/HCT skeletons
+                # ✅ FIX: Handle "opp" field for FCP/HCT skeletons when location exists (coords need to be calculated)
                 # Players with opp=True should be on the opposite side of the court
-                if (is_fcp or is_hct) and pos_action.get("opp", False):
+                if (is_fcp or is_hct) and has_opp and coords_from_location:
                     # Player with opp=True should be on opposite side (defensive side)
                     if is_away_offense:
                         # Away team offense - ball handlers go to home side (defensive side)
-                        # No coordinate flip needed - they stay on home side
+                        # No coordinate flip needed - they stay on home side (HCO_STRING_SPOTS are in home orientation)
+                        logging.warning(f"  ✅ [OPP] Position {position}: opp=True, away offense, staying on home side: {coords}")
                         pass
                     else:
                         # Home team offense - ball handlers go to away side (defensive side)
                         # Flip coordinates to away side
+                        original_coords = coords.copy()
                         coords = get_away_player_coords(coords)
                         coords_already_flipped = True
-                elif (is_fcp or is_hct) and not pos_action.get("opp", False):
+                        logging.warning(f"  ✅ [OPP] Position {position}: opp=True, home offense, flipped from {original_coords} to {coords}")
+                elif (is_fcp or is_hct) and not has_opp and coords_from_location:
                     # Player without opp field stays on same side as normal offense
                     if is_away_offense:
                         # Away team offense - outlet players go to away side (offensive side)
-                        # Flip coordinates to away side
-                        if not coords_already_flipped:
-                            coords = get_away_player_coords(coords)
-                            coords_already_flipped = True
+                        # Flip coordinates to away side (normal away team flip)
+                        # This will happen in the normal away team flip logic below
+                        logging.warning(f"  ✅ [OPP] Position {position}: opp=False, away offense, will flip in normal logic: {coords}")
+                        pass
                     else:
                         # Home team offense - outlet players stay on home side (offensive side)
                         # No coordinate flip needed
+                        logging.warning(f"  ✅ [OPP] Position {position}: opp=False, home offense, staying on home side: {coords}")
                         pass
                 
                 # Apply coordinate flipping for AWAY team (HCO_STRING_SPOTS are in home orientation)
