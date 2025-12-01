@@ -1283,7 +1283,7 @@
         skeletons.forEach(skeleton => {
           const option = document.createElement('option');
           option.value = skeleton._id;
-          const skeletonName = skeleton.name || skeleton.play || 'Unnamed Skeleton';
+          const skeletonName = skeleton.field || skeleton.name || skeleton.play || 'Unnamed Skeleton';
           option.textContent = `${skeletonName} (${Object.keys(skeleton.variants || {}).length} variants)`;
           option.dataset.playData = JSON.stringify(skeleton);
           select.appendChild(option);
@@ -1311,7 +1311,7 @@
       
       // Populate playState
       playState.skeletonId = skeletonData._id;
-      playState.name = skeletonData.name || skeletonData.play || 'Unnamed Skeleton';
+      playState.name = skeletonData.field || skeletonData.name || skeletonData.play || 'Unnamed Skeleton';
       
       // Populate name field if we're going back to step 1
       const nameInput = document.getElementById('skeleton-name');
@@ -3977,6 +3977,7 @@
       
       // Build HCT skeleton data with all variants
       const skeletonData = {
+        field: playState.name || 'Unnamed HCT Skeleton',
         name: playState.name || 'Unnamed HCT Skeleton',
         play: playState.name || 'Unnamed HCT Skeleton', // Also include 'play' field for compatibility
         variants: {
