@@ -307,6 +307,22 @@ export async function runFreeThrowSequence(
             scene_simData: scene.simData
           });
           
+          // ✅ FIX: Flip possession BEFORE inbound setup
+          // After final free throw is made, possession flips - the team that was on defense is now on offense
+          const newOffenseTeamId = turnData.possession_team_id;
+          if (newOffenseTeamId && possessionChanged) {
+            scene.offenseTeamId = newOffenseTeamId;
+            // Emit possession change event BEFORE inbound setup
+            scene.events?.emit?.("possessionChange", {
+              offenseTeamId: newOffenseTeamId,
+            });
+            console.log('🏀 [FREE THROW MAKE] Flipped possession before inbound setup', {
+              newOffenseTeamId,
+              possession_team_id: turnData.possession_team_id,
+              old_offense_team_id: turnData.offense_team_id
+            });
+          }
+          
           // Check if FCP/HCT is coming next - if so, skip retreat animation
           const skipRetreat = turnData.next_defensive_setup === "FCP" || turnData.next_defensive_setup === "HCT";
           const pressureType = skipRetreat ? turnData.next_defensive_setup : null;
@@ -314,6 +330,7 @@ export async function runFreeThrowSequence(
             console.log(`${turnData.next_defensive_setup} detected after FT - skipping defensive retreat to midcourt`);
           }
           
+          // Now call inboundSetup with the correct offense team (already flipped above)
           await inboundSetup({
             scene,
             ballSprite,
@@ -323,9 +340,6 @@ export async function runFreeThrowSequence(
             awayTeamId: scene.simData?.away_team_id,
             skipRetreat,
             pressureType,
-          });
-          scene.events?.emit?.("possessionChange", {
-            offenseTeamId: turnData.possession_team_id,
           });
           nextStateResolved = States.Inbound;
         } else {
