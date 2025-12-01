@@ -1324,32 +1324,48 @@
           // All variants have version structure
           const versions = variants[variant].versions || [];
           
-          // Convert versions array to object format
-          const versionsObj = {};
-          if (versions.length > 0) {
-            // Has version array structure (new format)
-            versions.forEach(v => {
-              versionsObj[v.version] = {
-                steps: v.steps || []
-              };
+          // Convert to array format (handle both old object format and new array format)
+          let versionsArray = [];
+          
+          if (Array.isArray(versions)) {
+            // New format: already an array
+            versionsArray = versions.map(v => ({
+              steps: v.steps || [],
+              complete: v.complete || false,
+              currentStep: v.currentStep || 1
+            }));
+          } else if (typeof versions === 'object') {
+            // Old format: object with v1, v2, etc. keys - convert to array
+            const versionKeys = Object.keys(versions).sort((a, b) => {
+              const aNum = parseInt(a.replace('v', ''));
+              const bNum = parseInt(b.replace('v', ''));
+              return aNum - bNum;
             });
+            versionsArray = versionKeys.map(key => ({
+              steps: versions[key].steps || [],
+              complete: versions[key].complete || false,
+              currentStep: versions[key].currentStep || 1
+            }));
           } else if (variants[variant].steps) {
-            // Old format: single steps array - migrate to v1
-            versionsObj.v1 = { steps: variants[variant].steps };
-            // Create empty v2-v6
-            for (let i = 2; i <= 6; i++) {
-              versionsObj[`v${i}`] = { steps: [] };
-            }
+            // Very old format: single steps array - migrate to first version
+            versionsArray = [
+              { steps: variants[variant].steps, complete: false, currentStep: 1 },
+              ...Array(5).fill(null).map(() => ({ steps: [], complete: false, currentStep: 1 }))
+            ];
           } else {
-            // No data - create empty versions
-            for (let i = 1; i <= 6; i++) {
-              versionsObj[`v${i}`] = { steps: [] };
-            }
+            // No data - create empty versions array
+            versionsArray = Array(6).fill(null).map(() => ({ steps: [], complete: false, currentStep: 1 }));
           }
+          
+          // Ensure we have exactly 6 versions
+          while (versionsArray.length < 6) {
+            versionsArray.push({ steps: [], complete: false, currentStep: 1 });
+          }
+          versionsArray = versionsArray.slice(0, 6);
           
           playState.variants[variant] = {
             currentVersionIndex: 0,
-            versions: versionsObj
+            versions: versionsArray
           };
         }
       });
