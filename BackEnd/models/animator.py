@@ -854,10 +854,37 @@ class Animator:
                     coords = {"x": 50, "y": 25}
                     coords_already_flipped = False
                 
+                # ✅ FIX: Handle "opp" field for FCP/HCT skeletons
+                # Players with opp=True should be on the opposite side of the court
+                if (is_fcp or is_hct) and pos_action.get("opp", False):
+                    # Player with opp=True should be on opposite side (defensive side)
+                    if is_away_offense:
+                        # Away team offense - ball handlers go to home side (defensive side)
+                        # No coordinate flip needed - they stay on home side
+                        pass
+                    else:
+                        # Home team offense - ball handlers go to away side (defensive side)
+                        # Flip coordinates to away side
+                        coords = get_away_player_coords(coords)
+                        coords_already_flipped = True
+                elif (is_fcp or is_hct) and not pos_action.get("opp", False):
+                    # Player without opp field stays on same side as normal offense
+                    if is_away_offense:
+                        # Away team offense - outlet players go to away side (offensive side)
+                        # Flip coordinates to away side
+                        if not coords_already_flipped:
+                            coords = get_away_player_coords(coords)
+                            coords_already_flipped = True
+                    else:
+                        # Home team offense - outlet players stay on home side (offensive side)
+                        # No coordinate flip needed
+                        pass
+                
                 # Apply coordinate flipping for AWAY team (HCO_STRING_SPOTS are in home orientation)
                 # Home team uses coords as-is to attack home basket (x=90)
                 # Away team needs to flip to attack away basket (x=10)
-                # is_away_offense calculated once at function start (line 755) for consistency
+                # is_away_offense calculated once at function start (line 809) for consistency
+                # Only flip if not already flipped by opp logic above
                 if is_away_offense and not coords_already_flipped:
                     coords = get_away_player_coords(coords)
                 
