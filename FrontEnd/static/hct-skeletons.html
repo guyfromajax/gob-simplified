@@ -855,7 +855,7 @@
     <!-- Step 1: Start Building -->
     <div id="step1" class="step-container">
       <div class="step1-button-wrapper">
-        <button id="submit-play-btn" onclick="startBuilding()">Start Building HCT Skeletons</button>
+        <button id="submit-play-btn" type="button" onclick="startBuilding()">Start Building HCT Skeletons</button>
       </div>
     </div>
 
@@ -2298,27 +2298,44 @@
     }
 
     function startBuilding() {
+      console.log('🏀 startBuilding() called');
+      
       // Hide step 1, show step 2
-      document.getElementById('step1').classList.add('hidden');
-      document.getElementById('step2').classList.remove('hidden');
+      const step1 = document.getElementById('step1');
+      const step2 = document.getElementById('step2');
+      if (!step1 || !step2) {
+        console.error('❌ step1 or step2 elements not found');
+        return;
+      }
+      
+      step1.classList.add('hidden');
+      step2.classList.remove('hidden');
       document.getElementById('page-title').textContent = 'HCT Skeleton Builder - Building Skeletons';
       document.getElementById('page-title').classList.add('step2-title');
       
       // Skip formation selection, go straight to building
-      document.getElementById('formation-selection').classList.add('hidden');
-      document.getElementById('build-buttons').classList.remove('hidden');
+      const formationSelection = document.getElementById('formation-selection');
+      const buildButtons = document.getElementById('build-buttons');
+      if (formationSelection) formationSelection.classList.add('hidden');
+      if (buildButtons) buildButtons.classList.remove('hidden');
       
       // Initialize first step with HCT starting positions
+      console.log('🏀 Calling initializeFirstStep()');
       initializeFirstStep();
       
       // Update variant info display
       updateVariantInfo();
       
       // Enable the action button
-      document.getElementById('action-btn').disabled = false;
+      const actionBtn = document.getElementById('action-btn');
+      if (actionBtn) actionBtn.disabled = false;
+      
+      console.log('🏀 startBuilding() completed');
     }
 
     function initializeFirstStep() {
+      console.log('🏀 initializeFirstStep() called');
+      
       // Set initial step positions for HCT skeleton builder
       // Home team is on offense, inbounding from left side (under away basket), moving toward home basket
       // PG: lower bird (away team side of court)
@@ -2334,12 +2351,27 @@
         "C": { location: "lower apex", action: "drift", opp: false }
       };
       
+      console.log('🏀 currentStepAssignments set:', currentStepAssignments);
+      
       // Set ball handler (SF has the ball for inbound)
       currentBallHandler = "SF";
       
       // Render the court and dashboard
-      renderPositionDashboard();
-      renderCourtVisualization();
+      console.log('🏀 Calling renderPositionDashboard()');
+      try {
+        renderPositionDashboard();
+        console.log('✅ renderPositionDashboard() completed');
+      } catch (error) {
+        console.error('❌ Error in renderPositionDashboard():', error);
+      }
+      
+      console.log('🏀 Calling renderCourtVisualization()');
+      try {
+        renderCourtVisualization();
+        console.log('✅ renderCourtVisualization() completed');
+      } catch (error) {
+        console.error('❌ Error in renderCourtVisualization():', error);
+      }
     }
 
     function handlePlayTypeChange() {
@@ -2994,12 +3026,14 @@
         return;
       }
       
-      // Update dashboard to reflect current state
+      // Update dashboard to reflect current state (only if dashboard exists)
+      // Note: renderPositionDashboard() should be called first to create the selects
       POSITIONS.forEach(pos => {
         const locationSelect = document.getElementById(`dashboard-location-${pos}`);
         const actionSelect = document.getElementById(`dashboard-action-${pos}`);
         const assignment = currentStepAssignments[pos];
         
+        // Only update if selects exist (dashboard has been rendered)
         if (locationSelect && assignment) {
           locationSelect.value = assignment.location || '';
         }
@@ -3845,6 +3879,9 @@
       document.getElementById('json-output').textContent = JSON.stringify(playData, null, 2);
     }
 
+    // Make startBuilding globally accessible
+    window.startBuilding = startBuilding;
+    
     // Start
     window.addEventListener('DOMContentLoaded', init);
   </script>
