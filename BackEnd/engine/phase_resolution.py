@@ -1077,10 +1077,6 @@ def resolve_half_court_offense_logic(game):
         play_type = game.game_state.get("offense_play_type")  # 'motion' or 'set_play'
         focus = game.game_state.get("offense_play_focus")     # 'inside' | 'attack' | 'outside'
         type_label = "Motion" if play_type == "motion" else ("Set" if play_type == "set_play" else None)
-        print("Inside try statement")
-        print(f"type_label: {type_label}")
-        print(f"focus: {focus}")
-        print(f"shot_result, i.e. rt = {shot_result.get('result_type')}")    
         if type_label and focus in ["inside", "attack", "outside"]:
             pc = off_team.scouting_data["offense"]["Playcalls"]
             rt = shot_result.get("result_type")
@@ -1348,9 +1344,9 @@ def resolve_full_court_press_logic(game: "GameManager"):
     from BackEnd.models.animator import Animator
     import logging
     animator = Animator(game)
-    logging.info(f"🔍 [FCP] Getting skeleton for result_type={result_type}")
+    logging.warning(f"🔍 [FCP] Getting skeleton for result_type={result_type}")
     skeleton = get_skeleton_for_turn(result_type, "FCP", game) or {}
-    logging.info(f"🔍 [FCP] Retrieved skeleton: has_steps={bool(skeleton.get('steps'))}, step_count={len(skeleton.get('steps', []))}")
+    logging.warning(f"🔍 [FCP] Retrieved skeleton: has_steps={bool(skeleton.get('steps'))}, step_count={len(skeleton.get('steps', []))}")
     animations = []
     
     # Handle SHOT result - execute actual shot resolution
@@ -1381,12 +1377,12 @@ def resolve_full_court_press_logic(game: "GameManager"):
         shot_result["text"] = "PRESS! " + shot_result.get("text", "")
         
         # Generate animations from skeleton for the pass, then rely on standard shot animation
-        logging.info(f"🔍 [FCP SHOT] Getting skeleton for SHOT variant")
+        logging.warning(f"🔍 [FCP SHOT] Getting skeleton for SHOT variant")
         skeleton = get_skeleton_for_turn("SHOT", "FCP", game) or {}
-        logging.info(f"🔍 [FCP SHOT] Retrieved skeleton: has_steps={bool(skeleton.get('steps'))}, step_count={len(skeleton.get('steps', []))}")
+        logging.warning(f"🔍 [FCP SHOT] Retrieved skeleton: has_steps={bool(skeleton.get('steps'))}, step_count={len(skeleton.get('steps', []))}")
         
         if skeleton and "steps" in skeleton:
-            logging.info(f"🔍 [FCP SHOT] Converting skeleton to animations...")
+            logging.warning(f"🔍 [FCP SHOT] Converting skeleton to animations...")
             animations = animator.skeleton_to_animations(
                 skeleton, 
                 off_lineup, 
@@ -1394,10 +1390,10 @@ def resolve_full_court_press_logic(game: "GameManager"):
                 add_defenders=True,
                 is_fcp=True
             )
-            logging.info(f"🔍 [FCP SHOT] Generated {len(animations)} animations")
+            logging.warning(f"🔍 [FCP SHOT] Generated {len(animations)} animations")
             if animations:
                 shot_result["animations"] = animations
-                logging.info(f"✅ [FCP SHOT] Added animations to shot_result")
+                logging.warning(f"✅ [FCP SHOT] Added animations to shot_result")
             else:
                 logging.warning(f"⚠️ [FCP SHOT] No animations generated from skeleton!")
         else:
@@ -1421,9 +1417,9 @@ def resolve_full_court_press_logic(game: "GameManager"):
     # (skeleton keys use D_FOUL/O_FOUL, not FOUL)
     from BackEnd.models.animator import Animator
     animator = Animator(game)
-    logging.info(f"🔍 [FCP] Getting skeleton for result_type={result_type} (before result_type change)")
+    logging.warning(f"🔍 [FCP] Getting skeleton for result_type={result_type} (before result_type change)")
     skeleton = get_skeleton_for_turn(result_type, "FCP", game) or {}
-    logging.info(f"🔍 [FCP] Retrieved skeleton: has_steps={bool(skeleton.get('steps'))}, step_count={len(skeleton.get('steps', []))}")
+    logging.warning(f"🔍 [FCP] Retrieved skeleton: has_steps={bool(skeleton.get('steps'))}, step_count={len(skeleton.get('steps', []))}")
     
     # Handle foul results - use standard foul types for frontend
     if result_type == "D_FOUL":
@@ -1490,7 +1486,7 @@ def resolve_full_court_press_logic(game: "GameManager"):
         def_scouting["defense"]["FCP"]["success"] += 1
     
     if skeleton and "steps" in skeleton:
-        logging.info(f"🔍 [FCP] Converting skeleton to animations (result_type={result_type})...")
+        logging.warning(f"🔍 [FCP] Converting skeleton to animations (result_type={result_type})...")
         animations = animator.skeleton_to_animations(
             skeleton, 
             off_lineup, 
@@ -1498,10 +1494,10 @@ def resolve_full_court_press_logic(game: "GameManager"):
             add_defenders=True,
             is_fcp=True
         )
-        logging.info(f"🔍 [FCP] Generated {len(animations)} animations")
+        logging.warning(f"🔍 [FCP] Generated {len(animations)} animations")
         if animations:
             shot_result["animations"] = animations
-            logging.info(f"✅ [FCP] Added {len(animations)} animations to shot_result")
+            logging.warning(f"✅ [FCP] Added {len(animations)} animations to shot_result")
         else:
             logging.warning(f"⚠️ [FCP] No animations generated from skeleton!")
     else:
@@ -2153,12 +2149,12 @@ def resolve_half_court_trap_logic(game: "GameManager"):
         from BackEnd.models.animator import Animator
         import logging
         animator = Animator(game)
-        logging.info(f"🔍 [HCT SHOT] Getting skeleton for SHOT variant")
+        logging.warning(f"🔍 [HCT SHOT] Getting skeleton for SHOT variant")
         skeleton = get_skeleton_for_turn("SHOT", "HCT", game) or {}
-        logging.info(f"🔍 [HCT SHOT] Retrieved skeleton: has_steps={bool(skeleton.get('steps'))}, step_count={len(skeleton.get('steps', []))}")
+        logging.warning(f"🔍 [HCT SHOT] Retrieved skeleton: has_steps={bool(skeleton.get('steps'))}, step_count={len(skeleton.get('steps', []))}")
         
         if skeleton and "steps" in skeleton:
-            logging.info(f"🔍 [HCT SHOT] Converting skeleton to animations...")
+            logging.warning(f"🔍 [HCT SHOT] Converting skeleton to animations...")
             animations = animator.skeleton_to_animations(
                 skeleton, 
                 off_lineup, 
@@ -2167,10 +2163,10 @@ def resolve_half_court_trap_logic(game: "GameManager"):
                 is_fcp=False,
                 is_hct=True
             )
-            logging.info(f"🔍 [HCT SHOT] Generated {len(animations)} animations")
+            logging.warning(f"🔍 [HCT SHOT] Generated {len(animations)} animations")
             if animations:
                 shot_result["animations"] = animations
-                logging.info(f"✅ [HCT SHOT] Added animations to shot_result")
+                logging.warning(f"✅ [HCT SHOT] Added animations to shot_result")
             else:
                 logging.warning(f"⚠️ [HCT SHOT] No animations generated from skeleton!")
         else:
@@ -2196,9 +2192,9 @@ def resolve_half_court_trap_logic(game: "GameManager"):
     import logging
     if animator is None:
         animator = Animator(game)
-    logging.info(f"🔍 [HCT] Getting skeleton for result_type={result_type} (before result_type change)")
+    logging.warning(f"🔍 [HCT] Getting skeleton for result_type={result_type} (before result_type change)")
     skeleton = get_skeleton_for_turn(result_type, "HCT", game) or {}
-    logging.info(f"🔍 [HCT] Retrieved skeleton: has_steps={bool(skeleton.get('steps'))}, step_count={len(skeleton.get('steps', []))}")
+    logging.warning(f"🔍 [HCT] Retrieved skeleton: has_steps={bool(skeleton.get('steps'))}, step_count={len(skeleton.get('steps', []))}")
     
     # Handle foul results - use standard foul types for frontend (same as FCP)
     if result_type == "D_FOUL":
@@ -2262,7 +2258,7 @@ def resolve_half_court_trap_logic(game: "GameManager"):
         def_scouting["defense"]["HCT"]["success"] += 1
     
     if skeleton and "steps" in skeleton:
-        logging.info(f"🔍 [HCT] Converting skeleton to animations (result_type={result_type})...")
+        logging.warning(f"🔍 [HCT] Converting skeleton to animations (result_type={result_type})...")
         animations = animator.skeleton_to_animations(
             skeleton, 
             off_lineup, 
@@ -2271,10 +2267,10 @@ def resolve_half_court_trap_logic(game: "GameManager"):
             is_fcp=False,
             is_hct=True
         )
-        logging.info(f"🔍 [HCT] Generated {len(animations)} animations")
+        logging.warning(f"🔍 [HCT] Generated {len(animations)} animations")
         if animations:
             shot_result["animations"] = animations
-            logging.info(f"✅ [HCT] Added {len(animations)} animations to shot_result")
+            logging.warning(f"✅ [HCT] Added {len(animations)} animations to shot_result")
         else:
             logging.warning(f"⚠️ [HCT] No animations generated from skeleton!")
     else:
