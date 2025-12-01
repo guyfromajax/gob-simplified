@@ -29,6 +29,8 @@ if client:
     franchises_collection = db["franchises"]
     plays_collection = db["plays"]
     defenses_collection = db["defenses"]
+    fcp_skeletons_collection = db["fcp_skeletons"]
+    hct_skeletons_collection = db["hct_skeletons"]
 else:
     import mongomock
     client = mongomock.MongoClient()
@@ -42,5 +44,7 @@ else:
     franchises_collection = db["franchises"]
     plays_collection = db["plays"]
     defenses_collection = db["defenses"]
+    fcp_skeletons_collection = db["fcp_skeletons"]
+    hct_skeletons_collection = db["hct_skeletons"]
 
 
