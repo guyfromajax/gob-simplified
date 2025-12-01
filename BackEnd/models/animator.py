@@ -843,6 +843,10 @@ class Animator:
                 has_opp = pos_action.get("opp", False)
                 coords_from_location = False
                 
+                # ✅ DEBUG: Log if we find opp field in skeleton
+                if (is_fcp or is_hct) and has_opp and step == steps[0]:  # Only log for first step to avoid spam
+                    logging.warning(f"  🔍 [OPP DEBUG] Found opp=True in skeleton for position {position}, step 0")
+                
                 if "coords" in pos_action:
                     coords = pos_action.get("coords", {"x": 50, "y": 25})
                     # Coords already exist - these should have been set by apply_opposite_side_logic()
