@@ -855,7 +855,7 @@
     <!-- Step 1: Start Building -->
     <div id="step1" class="step-container">
       <div class="step1-button-wrapper">
-        <button id="submit-play-btn" type="button" onclick="startBuilding()">Start Building HCT Skeletons</button>
+        <button id="submit-play-btn" type="button">Start Building HCT Skeletons</button>
       </div>
     </div>
 
@@ -3910,8 +3910,9 @@
       document.getElementById('json-output').textContent = JSON.stringify(playData, null, 2);
     }
 
-    // Make startBuilding globally accessible
+    // Make functions globally accessible (for debugging)
     window.startBuilding = startBuilding;
+    window.attachEventListeners = attachEventListeners;
     
     // Start
     window.addEventListener('DOMContentLoaded', init);
