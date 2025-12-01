@@ -2257,6 +2257,10 @@
                     location: prevAssignment.location,
                     action: prevAssignment.action
                   };
+                  // ✅ FIX: Copy opp field from previous assignment
+                  if (prevAssignment.opp !== undefined) {
+                    currentStepAssignments[pos].opp = prevAssignment.opp;
+                  }
                 }
               }
             });
