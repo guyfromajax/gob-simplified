@@ -3768,8 +3768,20 @@
     function submitStep() {
       const variantData = getCurrentVariantData();
       
+      // ✅ FIX: Check if current step has shoot action - if so, it's automatically the final step
+      let hasShoot = false;
+      for (const pos of POSITIONS) {
+        const assignment = currentStepAssignments[pos];
+        if (assignment && assignment.action === 'shoot') {
+          hasShoot = true;
+          break;
+        }
+      }
+      
       // Validate step before submitting
-      const validation = validateCurrentStep(false); // Not final step
+      // If step has shoot action, treat it as final step (for shot variant)
+      const isFinalStep = hasShoot && currentVariant === 'shot';
+      const validation = validateCurrentStep(isFinalStep);
       if (!validation.valid) {
         const errorMsg = "Cannot add step - please fix these errors:\n\n" + 
                         validation.errors.join('\n');
