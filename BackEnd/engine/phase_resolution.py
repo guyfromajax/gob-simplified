@@ -2069,6 +2069,16 @@ def apply_opposite_side_logic(skeleton_data, is_away_offense):
             "events": step.get("events", [])
         }
         
+        # ✅ FIX: Determine ball handler position (usually PG, or first position with ball)
+        # For FCP/HCT, ball handler should be on opposite side
+        ball_handler_pos = None
+        for pos, action in step.get("pos_actions", {}).items():
+            if action.get("has_ball") or pos == "PG":  # PG is usually ball handler
+                ball_handler_pos = pos
+                break
+        if not ball_handler_pos:
+            ball_handler_pos = "PG"  # Default to PG if no ball handler found
+        
         for position, action_data in step["pos_actions"].items():
             modified_action = action_data.copy()
             
@@ -2076,6 +2086,11 @@ def apply_opposite_side_logic(skeleton_data, is_away_offense):
             location_key = action_data.get("location") or action_data.get("spot", "key")
             spot_coords = HCO_STRING_SPOTS.get(location_key, {"x": 64, "y": 25})
             has_opp = action_data.get("opp", False)
+            
+            # ✅ FIX: If no opp field, assume ball handler (PG) should be on opposite side
+            if not has_opp and position == ball_handler_pos:
+                has_opp = True
+                logging.warning(f"  🔍 [apply_opposite_side_logic] Position {position} is ball handler, treating as opp=True")
             
             # Check if this offensive player should be on opposite side
             if has_opp:
