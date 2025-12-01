@@ -1601,8 +1601,14 @@ def get_fcp_skeleton(result_type, game_context=None):
     
     # Try to get skeleton from MongoDB
     try:
+        logging.warning(f"🔍 [FCP] Attempting to retrieve skeleton from MongoDB for result_type={result_type}, variant={variant_name}")
         # Get all FCP skeletons (for now, we'll use the first one - can be enhanced later)
         skeleton_doc = fcp_skeletons_collection.find_one({})
+        
+        if skeleton_doc:
+            logging.warning(f"🔍 [FCP] Found skeleton_doc in MongoDB: _id={skeleton_doc.get('_id')}, name={skeleton_doc.get('name')}, has_variants={'variants' in skeleton_doc}")
+        else:
+            logging.warning(f"⚠️ [FCP] No skeleton_doc found in MongoDB collection")
         
         if skeleton_doc and "variants" in skeleton_doc:
             variants = skeleton_doc.get("variants", {})
@@ -1622,9 +1628,9 @@ def get_fcp_skeleton(result_type, game_context=None):
                         # Check that steps exists, is a list, and has at least one step
                         if steps and isinstance(steps, list) and len(steps) > 0:
                             non_empty_versions.append(v)
-                            logging.debug(f"  ✓ Version {idx} has {len(steps)} steps")
+                            logging.warning(f"  ✓ Version {idx} has {len(steps)} steps")
                         else:
-                            logging.debug(f"  ✗ Version {idx} is empty or invalid (steps: {type(steps).__name__ if steps else 'None'})")
+                            logging.warning(f"  ✗ Version {idx} is empty or invalid (steps: {type(steps).__name__ if steps else 'None'})")
                     
                     if non_empty_versions:
                         # Randomly select one non-empty version
@@ -1639,14 +1645,14 @@ def get_fcp_skeleton(result_type, game_context=None):
                             is_away_offense = game_context.offense_team.team_id == game_context.away_team.team_id
                             skeleton_data = apply_opposite_side_logic(skeleton_data, is_away_offense)
                         
-                        logging.debug(f"✅ Selected FCP {variant_name} skeleton from MongoDB (version with {len(selected_steps)} steps, {len(non_empty_versions)}/{len(versions)} versions available)")
+                        logging.warning(f"✅ Selected FCP {variant_name} skeleton from MongoDB (version with {len(selected_steps)} steps, {len(non_empty_versions)}/{len(versions)} versions available)")
                         return skeleton_data
                     else:
-                        logging.debug(f"⚠️ No non-empty versions for FCP {variant_name} (checked {len(versions)} versions), falling back to hardcoded")
+                        logging.warning(f"⚠️ No non-empty versions for FCP {variant_name} (checked {len(versions)} versions), falling back to hardcoded")
             else:
-                logging.debug(f"⚠️ Variant {variant_name} not found in FCP skeleton, falling back to hardcoded")
+                logging.warning(f"⚠️ Variant {variant_name} not found in FCP skeleton, falling back to hardcoded")
         else:
-            logging.debug("⚠️ No FCP skeletons in MongoDB, falling back to hardcoded")
+            logging.warning("⚠️ No FCP skeletons in MongoDB, falling back to hardcoded")
     except Exception as e:
         logging.warning(f"⚠️ Error loading FCP skeleton from MongoDB: {e}, falling back to hardcoded")
     
@@ -1717,9 +1723,9 @@ def get_hct_skeleton(result_type, game_context=None):
                         # Check that steps exists, is a list, and has at least one step
                         if steps and isinstance(steps, list) and len(steps) > 0:
                             non_empty_versions.append(v)
-                            logging.debug(f"  ✓ Version {idx} has {len(steps)} steps")
+                            logging.warning(f"  ✓ Version {idx} has {len(steps)} steps")
                         else:
-                            logging.debug(f"  ✗ Version {idx} is empty or invalid (steps: {type(steps).__name__ if steps else 'None'})")
+                            logging.warning(f"  ✗ Version {idx} is empty or invalid (steps: {type(steps).__name__ if steps else 'None'})")
                     
                     if non_empty_versions:
                         # Randomly select one non-empty version
@@ -1734,14 +1740,14 @@ def get_hct_skeleton(result_type, game_context=None):
                             is_away_offense = game_context.offense_team.team_id == game_context.away_team.team_id
                             skeleton_data = apply_opposite_side_logic(skeleton_data, is_away_offense)
                         
-                        logging.debug(f"✅ Selected HCT {variant_name} skeleton from MongoDB (version with {len(selected_steps)} steps, {len(non_empty_versions)}/{len(versions)} versions available)")
+                        logging.warning(f"✅ Selected HCT {variant_name} skeleton from MongoDB (version with {len(selected_steps)} steps, {len(non_empty_versions)}/{len(versions)} versions available)")
                         return skeleton_data
                     else:
-                        logging.debug(f"⚠️ No non-empty versions for HCT {variant_name} (checked {len(versions)} versions), falling back to hardcoded")
+                        logging.warning(f"⚠️ No non-empty versions for HCT {variant_name} (checked {len(versions)} versions), falling back to hardcoded")
             else:
-                logging.debug(f"⚠️ Variant {variant_name} not found in HCT skeleton, falling back to hardcoded")
+                logging.warning(f"⚠️ Variant {variant_name} not found in HCT skeleton, falling back to hardcoded")
         else:
-            logging.debug("⚠️ No HCT skeletons in MongoDB, falling back to hardcoded")
+            logging.warning("⚠️ No HCT skeletons in MongoDB, falling back to hardcoded")
     except Exception as e:
         logging.warning(f"⚠️ Error loading HCT skeleton from MongoDB: {e}, falling back to hardcoded")
     
