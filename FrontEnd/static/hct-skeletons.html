@@ -1024,7 +1024,8 @@
       "upper midCorner", "lower midCorner", "upper corner", "lower corner",
       "upper highPost", "lower highPost", "upper midPost", "lower midPost",
       "upper lowPost", "lower lowPost", "topLane", "midLane",
-      "upper apex", "lower apex", "upper midBaseline", "lower midBaseline",
+      "upper apex", "lower apex", "upper bird", "lower bird",
+      "upper midBaseline", "lower midBaseline",
       "deep key", "deep lower wing", "deep lower baseline", "deep upper wing", "deep upper baseline",
       "inbound_left", "inbound_right"
     ];
@@ -1050,6 +1051,8 @@
       "midLane": {"x": 80, "y": 25},
       "upper apex": {"x": 80, "y": 36},
       "lower apex": {"x": 80, "y": 15},
+      "upper bird": {"x": 85, "y": 36},
+      "lower bird": {"x": 85, "y": 15},
       "upper midBaseline": {"x": 89, "y": 36},
       "lower midBaseline": {"x": 89, "y": 15},
       "deep key": {"x": 57, "y": 25},
@@ -2915,6 +2918,33 @@
         posLabel.textContent = pos;
         row.appendChild(posLabel);
 
+        // Location container (dropdown + opposite checkbox)
+        const locationContainer = document.createElement('div');
+        locationContainer.style.display = 'flex';
+        locationContainer.style.flexDirection = 'column';
+        locationContainer.style.gap = '4px';
+        
+        // Opposite checkbox
+        const oppositeCheckbox = document.createElement('input');
+        oppositeCheckbox.type = 'checkbox';
+        oppositeCheckbox.id = `dashboard-opposite-${pos}`;
+        oppositeCheckbox.style.width = 'auto';
+        oppositeCheckbox.style.margin = '0';
+        const oppositeLabel = document.createElement('label');
+        oppositeLabel.htmlFor = `dashboard-opposite-${pos}`;
+        oppositeLabel.textContent = 'Opposite';
+        oppositeLabel.style.fontSize = '0.75rem';
+        oppositeLabel.style.color = '#FFD700';
+        oppositeLabel.style.cursor = 'pointer';
+        
+        const checkboxWrapper = document.createElement('div');
+        checkboxWrapper.style.display = 'flex';
+        checkboxWrapper.style.alignItems = 'center';
+        checkboxWrapper.style.gap = '4px';
+        checkboxWrapper.appendChild(oppositeCheckbox);
+        checkboxWrapper.appendChild(oppositeLabel);
+        locationContainer.appendChild(checkboxWrapper);
+        
         // Location dropdown
         const locationSelect = document.createElement('select');
         locationSelect.id = `dashboard-location-${pos}`;
@@ -2926,22 +2956,35 @@
           locationSelect.appendChild(option);
         });
         
-        // Pre-populate location from current or previous step
+        // Pre-populate location and opposite checkbox from current or previous step
         const assignment = currentStepAssignments[pos];
         const prevAssignment = previousStepAssignments[pos];
         
         if (assignment && assignment.location) {
           locationSelect.value = assignment.location;
+          oppositeCheckbox.checked = assignment.opp === true;
         } else if (playState.currentStep > 1 && prevAssignment && prevAssignment.location) {
           // Step 2+: Pre-populate with previous step's location (just UI, don't modify data)
           locationSelect.value = prevAssignment.location;
+          oppositeCheckbox.checked = prevAssignment.opp === true;
         }
         
         // Handle location change
         locationSelect.addEventListener('change', (e) => {
           handleDashboardLocationChange(pos, e.target.value);
         });
-        row.appendChild(locationSelect);
+        
+        // Handle opposite checkbox change
+        oppositeCheckbox.addEventListener('change', (e) => {
+          if (!currentStepAssignments[pos]) {
+            currentStepAssignments[pos] = {};
+          }
+          currentStepAssignments[pos].opp = e.target.checked;
+          renderCourtVisualization();
+        });
+        
+        locationContainer.appendChild(locationSelect);
+        row.appendChild(locationContainer);
 
         // Action dropdown
         const actionSelect = document.createElement('select');
@@ -3013,11 +3056,15 @@
         delete newOffsets[pos];
       }
       
-      // Update assignment
+      // Update assignment (preserve opp flag if it exists)
       if (!currentStepAssignments[pos]) {
         currentStepAssignments[pos] = {};
       }
+      const existingOpp = currentStepAssignments[pos].opp;
       currentStepAssignments[pos].location = newLocation;
+      if (existingOpp !== undefined) {
+        currentStepAssignments[pos].opp = existingOpp;
+      }
       
       // Update dashboard and court visualization
       renderPositionDashboard();
@@ -3107,26 +3154,40 @@
             hasOffsetCoords: !!OFFSET_SPOTS[assignment.location]
           });
           
+          // Helper function to apply opposite side mirroring
+          const applyOppositeMirror = (x, y) => {
+            if (assignment.opp === true) {
+              return { x: 100 - x, y: y };
+            }
+            return { x: x, y: y };
+          };
+          
           if (isOffset) {
             const offsetCoords = OFFSET_SPOTS[assignment.location];
             if (offsetCoords) {
-              targetLeft = `${offsetCoords.x}%`;
-              targetTop = `${(50 - offsetCoords.y) * 2}%`;
+              const finalCoords = applyOppositeMirror(offsetCoords.x, offsetCoords.y);
+              targetLeft = `${finalCoords.x}%`;
+              targetTop = `${(50 - finalCoords.y) * 2}%`;
               console.log(`✓ USING OFFSET COORDS for ${pos} at ${assignment.location}`, {
                 original: coords,
                 offset: offsetCoords,
+                final: finalCoords,
+                opp: assignment.opp,
                 targetLeft,
                 targetTop
               });
             } else {
               // Fallback if offset coords don't exist
-              targetLeft = `${coords.x}%`;
-              targetTop = `${(50 - coords.y) * 2}%`;
+              const finalCoords = applyOppositeMirror(coords.x, coords.y);
+              targetLeft = `${finalCoords.x}%`;
+              targetTop = `${(50 - finalCoords.y) * 2}%`;
               console.log(`✗ NO OFFSET_SPOTS for ${assignment.location}, using original`);
             }
           } else {
-            targetLeft = `${coords.x}%`;
-            targetTop = `${(50 - coords.y) * 2}%`;
+            // Check if player is on opposite side of court
+            const finalCoords = applyOppositeMirror(coords.x, coords.y);
+            targetLeft = `${finalCoords.x}%`;
+            targetTop = `${(50 - finalCoords.y) * 2}%`;
           }
 
           let icon = existingIcons[pos];
