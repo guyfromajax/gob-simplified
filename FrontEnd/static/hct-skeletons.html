@@ -1128,10 +1128,10 @@
     const FORMATIONS = {
       "Standard": {
         "PG": {"location": "lower apex", "action": "handle_ball", "opp": true},
-        "SG": {"location": "deep upper wing", "action": "drift", "opp": true},
+        "SG": {"location": "deep upper wing", "action": "stationary", "opp": true},
         "SF": {"location": "inbound_left", "action": "handle_ball", "opp": false},
-        "PF": {"location": "upper wing", "action": "drift", "opp": false},
-        "C": {"location": "lower apex", "action": "drift", "opp": false}
+        "PF": {"location": "upper wing", "action": "stationary", "opp": false},
+        "C": {"location": "lower apex", "action": "stationary", "opp": false}
       }
     };
 
@@ -2373,10 +2373,10 @@
       // C: lower apex (home team side)
       currentStepAssignments = {
         "PG": { location: "lower bird", action: "handle_ball", opp: true },
-        "SG": { location: "upper wing", action: "drift", opp: true },
+        "SG": { location: "upper wing", action: "stationary", opp: true },
         "SF": { location: "inbound_left", action: "handle_ball", opp: false },
-        "PF": { location: "upper wing", action: "drift", opp: false },
-        "C": { location: "lower apex", action: "drift", opp: false }
+        "PF": { location: "upper wing", action: "stationary", opp: false },
+        "C": { location: "lower apex", action: "stationary", opp: false }
       };
       
       console.log('🏀 currentStepAssignments set:', currentStepAssignments);
@@ -3007,23 +3007,19 @@
           actionSelect.appendChild(option);
         });
         
-        // Pre-populate action from current step or default for Step 2+
+        // Pre-populate action from current step or previous step
         if (assignment && assignment.action) {
           actionSelect.value = assignment.action;
-        } else if (playState.currentStep > 1 && prevAssignment && prevAssignment.location) {
-          // Step 2+: Pre-populate with smart defaults (just UI, don't modify data)
-          let defaultAction = 'stationary';
-          
-          // Ball handler gets "handle_ball"
+        } else if (playState.currentStep > 1 && prevAssignment && prevAssignment.action) {
+          // Step 2+: Use previous step's action (carry over)
+          actionSelect.value = prevAssignment.action;
+        } else if (playState.currentStep === 1) {
+          // Step 1: Default to stationary for non-ball handlers, handle_ball for ball handler
           if (pos === currentBallHandler) {
-            defaultAction = 'handle_ball';
+            actionSelect.value = 'handle_ball';
+          } else {
+            actionSelect.value = 'stationary';
           }
-          // Players at post positions get "post_up"
-          else if (prevAssignment.location === 'upper lowPost' || prevAssignment.location === 'lower lowPost') {
-            defaultAction = 'post_up';
-          }
-          
-          actionSelect.value = defaultAction;
         }
         
         // Handle action change
@@ -3687,22 +3683,16 @@
         POSITIONS.forEach(pos => {
           const prevAssignment = previousStepAssignments[pos];
           if (prevAssignment && prevAssignment.location) {
-            // Determine default action
-            let defaultAction = 'stationary';
-            
-            // Ball handler gets "handle_ball"
-            if (pos === currentBallHandler) {
-              defaultAction = 'handle_ball';
-            }
-            // Players at post positions get "post_up"
-            else if (prevAssignment.location === 'upper lowPost' || prevAssignment.location === 'lower lowPost') {
-              defaultAction = 'post_up';
-            }
-            
+            // Carry over all values from previous step: location, action, and opp
             currentStepAssignments[pos] = {
               location: prevAssignment.location,
-              action: defaultAction
+              action: prevAssignment.action || 'stationary' // Use previous action, fallback to stationary
             };
+            
+            // Include opp flag if it exists
+            if (prevAssignment.opp !== undefined) {
+              currentStepAssignments[pos].opp = prevAssignment.opp;
+            }
             
             // Preserve offset status from previous step
             if (previousOffsets[pos]) {
