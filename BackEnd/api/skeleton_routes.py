@@ -29,7 +29,7 @@ def serve_hct_skeletons_builder():
 
 class SkeletonCreate(BaseModel):
     variants: Dict[str, Any]
-    field: Optional[str] = None
+    name: Optional[str] = None
     _id: Optional[str] = None
 
 
