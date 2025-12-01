@@ -868,19 +868,19 @@
         <!-- Variant Tabs -->
       <div id="variant-tabs-container" class="variant-tabs-container">
         <div class="variant-tabs">
-          <div class="variant-tab active" data-variant="press_break_shot" onclick="switchVariant('press_break_shot')">
+          <div class="variant-tab active" data-variant="shot" onclick="switchVariant('shot')">
             <span class="status-indicator not-started"></span>
-            Press Break: Shot
+            Shot
           </div>
-          <div class="variant-tab" data-variant="press_break_hco" onclick="switchVariant('press_break_hco')">
+          <div class="variant-tab" data-variant="hco" onclick="switchVariant('hco')">
             <span class="status-indicator not-started"></span>
-            Press Break: HCO
+            HCO
           </div>
-          <div class="variant-tab" data-variant="offensive_foul" onclick="switchVariant('offensive_foul')">
+          <div class="variant-tab" data-variant="o_foul" onclick="switchVariant('o_foul')">
             <span class="status-indicator not-started"></span>
             Offensive Foul
           </div>
-          <div class="variant-tab" data-variant="defensive_foul" onclick="switchVariant('defensive_foul')">
+          <div class="variant-tab" data-variant="d_foul" onclick="switchVariant('d_foul')">
             <span class="status-indicator not-started"></span>
             Defensive Foul
           </div>
@@ -1150,7 +1150,7 @@
     let playState = {
       skeletonId: null, // For editing existing skeletons
       variants: {
-        press_break_shot: {
+        shot: {
           currentVersion: 'v1',
           versions: {
             v1: { steps: [], complete: false, currentStep: 1 },
@@ -1161,7 +1161,7 @@
             v6: { steps: [], complete: false, currentStep: 1 }
           }
         },
-        press_break_hco: {
+        hco: {
           currentVersion: 'v1',
           versions: {
             v1: { steps: [], complete: false, currentStep: 1 },
@@ -1172,7 +1172,7 @@
             v6: { steps: [], complete: false, currentStep: 1 }
           }
         },
-        offensive_foul: {
+        o_foul: {
           currentVersion: 'v1',
           versions: {
             v1: { steps: [], complete: false, currentStep: 1 },
@@ -1183,7 +1183,7 @@
             v6: { steps: [], complete: false, currentStep: 1 }
           }
         },
-        defensive_foul: {
+        d_foul: {
           currentVersion: 'v1',
           versions: {
             v1: { steps: [], complete: false, currentStep: 1 },
@@ -1220,7 +1220,7 @@
     };
 
     // Current variant being edited
-    let currentVariant = 'press_break_shot';
+    let currentVariant = 'shot';
     
     // Helper to get current variant data
     function getCurrentVariantData() {
@@ -1315,7 +1315,7 @@
       
       // Load all variants
       const variants = skeletonData.variants || {};
-      ['press_break_shot', 'press_break_hco', 'offensive_foul', 'defensive_foul', 'dead_ball_turnover', 'steal'].forEach(variant => {
+      ['shot', 'hco', 'o_foul', 'd_foul', 'dead_ball_turnover', 'steal'].forEach(variant => {
         if (variants[variant]) {
           // All variants have version structure
           const versions = variants[variant].versions || [];
@@ -1352,7 +1352,7 @@
       });
       
       // Start editing
-      currentVariant = 'press_break_shot';
+      currentVariant = 'shot';
       
       // Hide load section, show step 2
       document.getElementById('load-play-section').classList.add('hidden');
@@ -1667,10 +1667,10 @@
     function updateVariantInfo() {
       const variantData = getCurrentVariantData();
       const variantNames = {
-        press_break_shot: 'Press Break: Shot',
-        press_break_hco: 'Press Break: HCO',
-        offensive_foul: 'Offensive Foul',
-        defensive_foul: 'Defensive Foul',
+        shot: 'Shot',
+        hco: 'HCO',
+        o_foul: 'Offensive Foul',
+        d_foul: 'Defensive Foul',
         dead_ball_turnover: 'Dead Ball Turnover',
         steal: 'Steal'
       };
@@ -3676,10 +3676,10 @@
       // Build FCP skeleton data with all variants
       const skeletonData = {
         variants: {
-          press_break_shot: buildVariantVersions('press_break_shot'),
-          press_break_hco: buildVariantVersions('press_break_hco'),
-          offensive_foul: buildVariantVersions('offensive_foul'),
-          defensive_foul: buildVariantVersions('defensive_foul'),
+          shot: buildVariantVersions('shot'),
+          hco: buildVariantVersions('hco'),
+          o_foul: buildVariantVersions('o_foul'),
+          d_foul: buildVariantVersions('d_foul'),
           dead_ball_turnover: buildVariantVersions('dead_ball_turnover'),
           steal: buildVariantVersions('steal')
         }
