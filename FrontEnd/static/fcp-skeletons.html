@@ -1816,13 +1816,13 @@
         errors.push(`❌ ${receivers[0]} is receiving but no one is passing!`);
       }
       
-      // Rule 4: Final step must have shoot
-      if (isFinalStep && shooters.length === 0) {
+      // Rule 4: Final step must have shoot (only for shot variant)
+      if (isFinalStep && shooters.length === 0 && currentVariant === 'shot') {
         errors.push("❌ Final step must have a 'shoot' action!");
       }
       
-      // Rule 5: Shoot can only be in final step
-      if (!isFinalStep && shooters.length > 0) {
+      // Rule 5: Shoot can only be in final step (only for shot variant)
+      if (currentVariant === 'shot' && !isFinalStep && shooters.length > 0) {
         errors.push(`❌ ${shooters[0]} has 'shoot' action but this is not the final step! Shoot only allowed in final step.`);
       }
       
@@ -2231,14 +2231,16 @@
           return;
         }
         
-        // Check that last existing step has shoot
-        const lastStep = variantData.steps[variantData.steps.length - 1];
-        const lastStepActions = lastStep.pos_actions || {};
-        const hasShoot = Object.values(lastStepActions).some(action => action.action === "shoot");
-        
-        if (!hasShoot) {
-          alert("Cannot finish variant - final step must have a 'shoot' action!");
-          return;
+        // Check that last existing step has shoot (only for shot variant)
+        if (currentVariant === 'shot') {
+          const lastStep = variantData.steps[variantData.steps.length - 1];
+          const lastStepActions = lastStep.pos_actions || {};
+          const hasShoot = Object.values(lastStepActions).some(action => action.action === "shoot");
+          
+          if (!hasShoot) {
+            alert("Cannot finish variant - final step must have a 'shoot' action!");
+            return;
+          }
         }
       }
       
@@ -3519,8 +3521,10 @@
         }
       }
 
-      if (hasShoot) {
-        // Shot assigned - this is the final step
+      // For shot variant, require shoot action to finish
+      // For other variants, allow finishing without shoot
+      if (hasShoot && currentVariant === 'shot') {
+        // Shot assigned - this is the final step (shot variant only)
         actionBtn.disabled = true;
         actionBtn.textContent = 'Shot = Final Step';
         completeVariantBtn.disabled = false;
