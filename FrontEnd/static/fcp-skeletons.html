@@ -868,13 +868,13 @@
       <!-- Variant Tabs -->
       <div id="variant-tabs-container" class="variant-tabs-container">
         <div class="variant-tabs">
-          <div class="variant-tab active" data-variant="shot" onclick="switchVariant('shot')">
-            <span class="status-indicator not-started"></span>
-            Shot
-          </div>
-          <div class="variant-tab" data-variant="hco" onclick="switchVariant('hco')">
+          <div class="variant-tab active" data-variant="hco" onclick="switchVariant('hco')">
             <span class="status-indicator not-started"></span>
             HCO
+          </div>
+          <div class="variant-tab" data-variant="shot" onclick="switchVariant('shot')">
+            <span class="status-indicator not-started"></span>
+            Shot
           </div>
           <div class="variant-tab" data-variant="o_foul" onclick="switchVariant('o_foul')">
             <span class="status-indicator not-started"></span>
@@ -938,11 +938,7 @@
           <label for="formation-select">Starting Formation</label>
           <select id="formation-select">
             <option value="">-- Select Formation --</option>
-            <option value="3-2">3-2</option>
-            <option value="4-1">4-1</option>
-            <option value="5-0">5-0</option>
-            <option value="Screen Entry">Screen Entry</option>
-            <option value="Custom">Custom</option>
+            <option value="Standard">Standard</option>
           </select>
         </div>
       </div>
@@ -1130,33 +1126,12 @@
 
     // Formation presets for Step 1
     const FORMATIONS = {
-      "3-2": {
-        "PG": {"location": "key", "action": "handle_ball"},
-        "SG": {"location": "upper wing", "action": "get_open"},
-        "SF": {"location": "lower wing", "action": "get_open"},
-        "PF": {"location": "lower lowPost", "action": "get_open"},
-        "C": {"location": "upper lowPost", "action": "get_open"}
-      },
-      "4-1": {
-        "PG": {"location": "upper midWing", "action": "handle_ball"},
-        "SG": {"location": "lower midWing", "action": "get_open"},
-        "SF": {"location": "upper midCorner", "action": "get_open"},
-        "PF": {"location": "lower midCorner", "action": "get_open"},
-        "C": {"location": "upper lowPost", "action": "get_open"}
-      },
-      "5-0": {
-        "PG": {"location": "key", "action": "handle_ball"},
-        "SG": {"location": "upper wing", "action": "get_open"},
-        "SF": {"location": "lower wing", "action": "get_open"},
-        "PF": {"location": "lower corner", "action": "get_open"},
-        "C": {"location": "upper corner", "action": "get_open"}
-      },
-      "Screen Entry": {
-        "PG": {"location": "key", "action": "handle_ball"},
-        "SG": {"location": "upper lowPost", "action": "get_open"},
-        "SF": {"location": "lower lowPost", "action": "get_open"},
-        "PF": {"location": "lower apex", "action": "get_open"},
-        "C": {"location": "upper apex", "action": "get_open"}
+      "Standard": {
+        "PG": {"location": "lower bird", "action": "handle_ball", "opp": true},
+        "SG": {"location": "upper wing", "action": "drift", "opp": true},
+        "SF": {"location": "inbound_left", "action": "handle_ball", "opp": false},
+        "PF": {"location": "upper wing", "action": "drift", "opp": false},
+        "C": {"location": "lower apex", "action": "drift", "opp": false}
       }
     };
 
@@ -1234,7 +1209,7 @@
     };
 
     // Current variant being edited
-    let currentVariant = 'shot';
+    let currentVariant = 'hco';
     
     // Helper to get current variant data
     function getCurrentVariantData() {
@@ -1329,7 +1304,7 @@
       
       // Load all variants
       const variants = skeletonData.variants || {};
-      ['shot', 'hco', 'o_foul', 'd_foul', 'dead_ball_turnover', 'steal'].forEach(variant => {
+      ['hco', 'shot', 'o_foul', 'd_foul', 'dead_ball_turnover', 'steal'].forEach(variant => {
         if (variants[variant]) {
           // All variants have version structure
           const versions = variants[variant].versions || [];
@@ -1365,7 +1340,7 @@
       });
       
       // Start editing
-      currentVariant = 'shot';
+      currentVariant = 'hco';
       
       // Hide load section, show step 2
       document.getElementById('load-play-section').classList.add('hidden');
@@ -1663,7 +1638,7 @@
     }
 
     function updateVariantTabs() {
-      ['shot', 'hco', 'o_foul', 'd_foul', 'dead_ball_turnover', 'steal'].forEach(variant => {
+      ['hco', 'shot', 'o_foul', 'd_foul', 'dead_ball_turnover', 'steal'].forEach(variant => {
         const tab = document.querySelector(`.variant-tab[data-variant="${variant}"]`);
         const indicator = tab.querySelector('.status-indicator');
         const variantData = playState.variants[variant];
@@ -2415,6 +2390,10 @@
           location: assignment.location,
           action: assignment.action
         };
+        // Include opp flag if it exists (for opposite side of court)
+        if (assignment.opp !== undefined) {
+          currentStepAssignments[pos].opp = assignment.opp;
+        }
       });
 
       // Update ball handler
