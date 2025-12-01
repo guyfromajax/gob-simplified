@@ -2282,10 +2282,10 @@
               location: assignment.location,
               action: assignment.action
             };
-            // Include opp flag if it exists (for opposite side of court)
-            if (assignment.opp !== undefined) {
-              stepData.pos_actions[pos].opp = assignment.opp;
-            }
+            // ✅ FIX: Always include opp field (default to false if not set)
+            // This ensures opp is always saved, even if checkbox wasn't explicitly checked
+            stepData.pos_actions[pos].opp = assignment.opp !== undefined ? assignment.opp : false;
+            console.log(`[SAVE STEP] ${pos}: location=${assignment.location}, action=${assignment.action}, opp=${stepData.pos_actions[pos].opp}`);
           }
         });
         
