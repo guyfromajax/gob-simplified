@@ -2265,10 +2265,11 @@
 
     // Initialize
     function init() {
-      console.log('🏀 HCT Skeleton Builder');
+      console.log('🏀 HCT Skeleton Builder - Initializing...');
       attachEventListeners();
       setupCourtDropZone();
       loadAvailablePlays();
+      console.log('✅ HCT Skeleton Builder - Initialization complete');
       
       // Add keyboard shortcut for quick save (Ctrl+S)
       document.addEventListener('keydown', (e) => {
@@ -2292,9 +2293,39 @@
     }
 
     function attachEventListeners() {
+      console.log('🏀 attachEventListeners() called');
+      
+      // Step 1: Start Building button
+      const startBuildingBtn = document.getElementById('submit-play-btn');
+      console.log('🏀 Looking for submit-play-btn:', startBuildingBtn);
+      if (startBuildingBtn) {
+        // Remove any existing onclick handler
+        startBuildingBtn.removeAttribute('onclick');
+        startBuildingBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          console.log('🏀 Button clicked, calling startBuilding()');
+          if (typeof startBuilding === 'function') {
+            startBuilding();
+          } else {
+            console.error('❌ startBuilding is not a function:', typeof startBuilding);
+          }
+        });
+        console.log('✅ Event listener attached to submit-play-btn');
+      } else {
+        console.error('❌ submit-play-btn not found');
+      }
+      
       // Step 2 controls
-      document.getElementById('formation-select').addEventListener('change', handleFormationSelect);
-      document.getElementById('action-btn').addEventListener('click', handleActionButton);
+      const formationSelect = document.getElementById('formation-select');
+      if (formationSelect) {
+        formationSelect.addEventListener('change', handleFormationSelect);
+      }
+      
+      const actionBtn = document.getElementById('action-btn');
+      if (actionBtn) {
+        actionBtn.addEventListener('click', handleActionButton);
+      }
     }
 
     function startBuilding() {
