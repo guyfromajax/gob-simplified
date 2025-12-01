@@ -898,12 +898,12 @@
         <div id="version-selector" style="display: block; margin-top: 15px; text-align: center;">
           <label style="font-size: 0.9rem; color: #FFD700; margin-right: 10px;">Version:</label>
           <select id="version-select" onchange="switchVersion()" style="padding: 5px 10px; font-size: 0.9rem;">
-            <option value="v1">v1</option>
-            <option value="v2">v2</option>
-            <option value="v3">v3</option>
-            <option value="v4">v4</option>
-            <option value="v5">v5</option>
-            <option value="v6">v6</option>
+            <option value="0">v1</option>
+            <option value="1">v2</option>
+            <option value="2">v3</option>
+            <option value="3">v4</option>
+            <option value="4">v5</option>
+            <option value="5">v6</option>
           </select>
           <span id="version-info" style="margin-left: 15px; font-size: 0.85rem; opacity: 0.7;">(Version 1 of 6)</span>
         </div>
@@ -1140,70 +1140,70 @@
       skeletonId: null, // For editing existing skeletons
       variants: {
         shot: {
-          currentVersion: 'v1',
-          versions: {
-            v1: { steps: [], complete: false, currentStep: 1 },
-            v2: { steps: [], complete: false, currentStep: 1 },
-            v3: { steps: [], complete: false, currentStep: 1 },
-            v4: { steps: [], complete: false, currentStep: 1 },
-            v5: { steps: [], complete: false, currentStep: 1 },
-            v6: { steps: [], complete: false, currentStep: 1 }
-          }
+          currentVersionIndex: 0,
+          versions: [
+            { steps: [], complete: false, currentStep: 1 },
+            { steps: [], complete: false, currentStep: 1 },
+            { steps: [], complete: false, currentStep: 1 },
+            { steps: [], complete: false, currentStep: 1 },
+            { steps: [], complete: false, currentStep: 1 },
+            { steps: [], complete: false, currentStep: 1 }
+          ]
         },
         hco: {
-          currentVersion: 'v1',
-          versions: {
-            v1: { steps: [], complete: false, currentStep: 1 },
-            v2: { steps: [], complete: false, currentStep: 1 },
-            v3: { steps: [], complete: false, currentStep: 1 },
-            v4: { steps: [], complete: false, currentStep: 1 },
-            v5: { steps: [], complete: false, currentStep: 1 },
-            v6: { steps: [], complete: false, currentStep: 1 }
-          }
+          currentVersionIndex: 0,
+          versions: [
+            { steps: [], complete: false, currentStep: 1 },
+            { steps: [], complete: false, currentStep: 1 },
+            { steps: [], complete: false, currentStep: 1 },
+            { steps: [], complete: false, currentStep: 1 },
+            { steps: [], complete: false, currentStep: 1 },
+            { steps: [], complete: false, currentStep: 1 }
+          ]
         },
         o_foul: {
-          currentVersion: 'v1',
-          versions: {
-            v1: { steps: [], complete: false, currentStep: 1 },
-            v2: { steps: [], complete: false, currentStep: 1 },
-            v3: { steps: [], complete: false, currentStep: 1 },
-            v4: { steps: [], complete: false, currentStep: 1 },
-            v5: { steps: [], complete: false, currentStep: 1 },
-            v6: { steps: [], complete: false, currentStep: 1 }
-          }
+          currentVersionIndex: 0,
+          versions: [
+            { steps: [], complete: false, currentStep: 1 },
+            { steps: [], complete: false, currentStep: 1 },
+            { steps: [], complete: false, currentStep: 1 },
+            { steps: [], complete: false, currentStep: 1 },
+            { steps: [], complete: false, currentStep: 1 },
+            { steps: [], complete: false, currentStep: 1 }
+          ]
         },
         d_foul: {
-          currentVersion: 'v1',
-          versions: {
-            v1: { steps: [], complete: false, currentStep: 1 },
-            v2: { steps: [], complete: false, currentStep: 1 },
-            v3: { steps: [], complete: false, currentStep: 1 },
-            v4: { steps: [], complete: false, currentStep: 1 },
-            v5: { steps: [], complete: false, currentStep: 1 },
-            v6: { steps: [], complete: false, currentStep: 1 }
-          }
+          currentVersionIndex: 0,
+          versions: [
+            { steps: [], complete: false, currentStep: 1 },
+            { steps: [], complete: false, currentStep: 1 },
+            { steps: [], complete: false, currentStep: 1 },
+            { steps: [], complete: false, currentStep: 1 },
+            { steps: [], complete: false, currentStep: 1 },
+            { steps: [], complete: false, currentStep: 1 }
+          ]
         },
         dead_ball_turnover: {
-          currentVersion: 'v1',
-          versions: {
-            v1: { steps: [], complete: false, currentStep: 1 },
-            v2: { steps: [], complete: false, currentStep: 1 },
-            v3: { steps: [], complete: false, currentStep: 1 },
-            v4: { steps: [], complete: false, currentStep: 1 },
-            v5: { steps: [], complete: false, currentStep: 1 },
-            v6: { steps: [], complete: false, currentStep: 1 }
-          }
+          currentVersionIndex: 0,
+          versions: [
+            { steps: [], complete: false, currentStep: 1 },
+            { steps: [], complete: false, currentStep: 1 },
+            { steps: [], complete: false, currentStep: 1 },
+            { steps: [], complete: false, currentStep: 1 },
+            { steps: [], complete: false, currentStep: 1 },
+            { steps: [], complete: false, currentStep: 1 }
+          ]
         },
         steal: {
-          currentVersion: 'v1',
-          versions: {
-            v1: { steps: [], complete: false, currentStep: 1 },
-            v2: { steps: [], complete: false, currentStep: 1 },
-            v3: { steps: [], complete: false, currentStep: 1 },
-            v4: { steps: [], complete: false, currentStep: 1 },
-            v5: { steps: [], complete: false, currentStep: 1 },
-            v6: { steps: [], complete: false, currentStep: 1 }
-          }
+          currentVersionIndex: 0,
+          versions: [
+            { steps: [], complete: false, currentStep: 1 },
+            { steps: [], complete: false, currentStep: 1 },
+            { steps: [], complete: false, currentStep: 1 },
+            { steps: [], complete: false, currentStep: 1 },
+            { steps: [], complete: false, currentStep: 1 },
+            { steps: [], complete: false, currentStep: 1 }
+          ]
         }
       }
     };
@@ -1214,8 +1214,9 @@
     // Helper to get current variant data
     function getCurrentVariantData() {
       const variant = playState.variants[currentVariant];
-      // All variants have versions structure
-      return variant.versions[variant.currentVersion];
+      // All variants have versions array structure
+      const versionIndex = variant.currentVersionIndex || 0;
+      return variant.versions[versionIndex];
     }
 
     // Current step assignments (position -> {location, action})
@@ -1310,32 +1311,48 @@
           // All variants have version structure
           const versions = variants[variant].versions || [];
           
-          // Convert versions array to object format
-          const versionsObj = {};
-          if (versions.length > 0) {
-            // Has version array structure (new format)
-            versions.forEach(v => {
-              versionsObj[v.version] = {
-                steps: v.steps || []
-              };
+          // Convert to array format (handle both old object format and new array format)
+          let versionsArray = [];
+          
+          if (Array.isArray(versions)) {
+            // New format: already an array
+            versionsArray = versions.map(v => ({
+              steps: v.steps || [],
+              complete: v.complete || false,
+              currentStep: v.currentStep || 1
+            }));
+          } else if (typeof versions === 'object') {
+            // Old format: object with v1, v2, etc. keys - convert to array
+            const versionKeys = Object.keys(versions).sort((a, b) => {
+              const aNum = parseInt(a.replace('v', ''));
+              const bNum = parseInt(b.replace('v', ''));
+              return aNum - bNum;
             });
+            versionsArray = versionKeys.map(key => ({
+              steps: versions[key].steps || [],
+              complete: versions[key].complete || false,
+              currentStep: versions[key].currentStep || 1
+            }));
           } else if (variants[variant].steps) {
-            // Old format: single steps array - migrate to v1
-            versionsObj.v1 = { steps: variants[variant].steps };
-            // Create empty v2-v6
-            for (let i = 2; i <= 6; i++) {
-              versionsObj[`v${i}`] = { steps: [] };
-            }
+            // Very old format: single steps array - migrate to first version
+            versionsArray = [
+              { steps: variants[variant].steps, complete: false, currentStep: 1 },
+              ...Array(5).fill(null).map(() => ({ steps: [], complete: false, currentStep: 1 }))
+            ];
           } else {
-            // No data - create empty versions
-            for (let i = 1; i <= 6; i++) {
-              versionsObj[`v${i}`] = { steps: [] };
-            }
+            // No data - create empty versions array
+            versionsArray = Array(6).fill(null).map(() => ({ steps: [], complete: false, currentStep: 1 }));
           }
           
+          // Ensure we have exactly 6 versions
+          while (versionsArray.length < 6) {
+            versionsArray.push({ steps: [], complete: false, currentStep: 1 });
+          }
+          versionsArray = versionsArray.slice(0, 6);
+          
           playState.variants[variant] = {
-            currentVersion: 'v1',
-            versions: versionsObj
+            currentVersionIndex: 0,
+            versions: versionsArray
           };
         }
       });
@@ -1401,9 +1418,9 @@
       const versionSelect = document.getElementById('version-select');
       versionSelector.style.display = 'block';
       
-      // Set to current version for this variant
+      // Set to current version index for this variant
       const variantData = playState.variants[variant];
-      versionSelect.value = variantData.currentVersion;
+      versionSelect.value = variantData.currentVersionIndex || 0;
       updateVersionDropdown(); // Update dropdown with version info
       updateVersionInfo();
       
@@ -1419,13 +1436,13 @@
     
     function switchVersion() {
       const versionSelect = document.getElementById('version-select');
-      const newVersion = versionSelect.value;
+      const newVersionIndex = parseInt(versionSelect.value);
       
       // Save current version's work
       saveVariantProgress();
       
-      // Update current version for this variant
-      playState.variants[currentVariant].currentVersion = newVersion;
+      // Update current version index for this variant
+      playState.variants[currentVariant].currentVersionIndex = newVersionIndex;
       
       // Load the new version
       loadVariantForEditing(currentVariant, false);
@@ -1441,28 +1458,29 @@
     function updateVersionInfo() {
       const versionInfo = document.getElementById('version-info');
       const versionSelect = document.getElementById('version-select');
-      const versionNum = versionSelect.value.replace('v', '');
-      versionInfo.textContent = `(Version ${versionNum} of 6)`;
+      const versionIndex = parseInt(versionSelect.value) || 0;
+      const versionNum = versionIndex + 1;
+      const totalVersions = playState.variants[currentVariant]?.versions?.length || 6;
+      versionInfo.textContent = `(Version ${versionNum} of ${totalVersions})`;
     }
 
     function updateVersionDropdown() {
       const versionSelect = document.getElementById('version-select');
       if (!versionSelect) return;
 
-      // All variants have versions for HCT skeletons
-
+      // All variants have versions array for HCT skeletons
       const variantData = playState.variants[currentVariant];
-      if (!variantData || !variantData.versions) return;
+      if (!variantData || !variantData.versions || !Array.isArray(variantData.versions)) return;
 
-      // Update each option in the dropdown
-      ['v1', 'v2', 'v3', 'v4', 'v5', 'v6'].forEach(version => {
-        const option = versionSelect.querySelector(`option[value="${version}"]`);
-        if (!option) return;
+      // Update each option in the dropdown (0-5 indices)
+      for (let i = 0; i < 6; i++) {
+        const option = versionSelect.querySelector(`option[value="${i}"]`);
+        if (!option) continue;
 
-        const versionData = variantData.versions[version];
+        const versionData = variantData.versions[i];
         if (!versionData || !versionData.steps || versionData.steps.length === 0) {
           // Version doesn't exist - just show version number
-          option.textContent = version;
+          option.textContent = `v${i + 1}`;
         } else {
           // Version exists - find shooter and location from final step
           const finalStep = versionData.steps[versionData.steps.length - 1];
@@ -1480,13 +1498,13 @@
           }
 
           if (shooterPos && shooterLocation) {
-            option.textContent = `${version} (exists, shooter: ${shooterPos}, location: ${shooterLocation})`;
+            option.textContent = `v${i + 1} (exists, shooter: ${shooterPos}, location: ${shooterLocation})`;
           } else {
             // Version exists but no shooter found in final step
-            option.textContent = `${version} (exists)`;
+            option.textContent = `v${i + 1} (exists)`;
           }
         }
-      });
+      }
     }
 
     function saveVariantProgress() {
@@ -3890,32 +3908,19 @@
 
     function buildVariantVersions(variantName) {
       /**
-       * Dynamically build versions array for a variant.
-       * Only includes versions that exist in playState.
-       * This makes the system flexible - variants can have any number of versions.
+       * Build versions array for a variant.
+       * Versions are already stored as an array in playState.
        */
       const variant = playState.variants[variantName];
-      if (!variant || !variant.versions) {
+      if (!variant || !variant.versions || !Array.isArray(variant.versions)) {
         return { versions: [] };
       }
       
-      // Build array from all versions that exist
-      const versionsArray = [];
-      for (const versionKey in variant.versions) {
-        if (variant.versions.hasOwnProperty(versionKey)) {
-          versionsArray.push({
-            version: versionKey,
-            steps: variant.versions[versionKey].steps || []
-          });
-        }
-      }
-      
-      // Sort by version name (v1, v2, v3, ...)
-      versionsArray.sort((a, b) => {
-        const aNum = parseInt(a.version.replace('v', ''));
-        const bNum = parseInt(b.version.replace('v', ''));
-        return aNum - bNum;
-      });
+      // Build array from versions array (already in correct order)
+      const versionsArray = variant.versions.map((versionData, index) => ({
+        steps: versionData.steps || [],
+        complete: versionData.complete || false
+      }));
       
       return { versions: versionsArray };
     }
@@ -3929,13 +3934,14 @@
         // Copy each version of HCO to corresponding version of other variants
         for (const otherVariantName of otherVariants) {
           const otherVariant = playState.variants[otherVariantName];
-          for (const versionKey in hcoVariant.versions) {
-            if (hcoVariant.versions.hasOwnProperty(versionKey)) {
-              const hcoVersion = hcoVariant.versions[versionKey];
+          // Ensure both have versions arrays
+          if (Array.isArray(hcoVariant.versions) && Array.isArray(otherVariant.versions)) {
+            for (let i = 0; i < hcoVariant.versions.length && i < otherVariant.versions.length; i++) {
+              const hcoVersion = hcoVariant.versions[i];
               // Deep clone the steps
-              otherVariant.versions[versionKey].steps = JSON.parse(JSON.stringify(hcoVersion.steps));
-              otherVariant.versions[versionKey].currentStep = hcoVersion.currentStep;
-              otherVariant.versions[versionKey].complete = hcoVersion.complete;
+              otherVariant.versions[i].steps = JSON.parse(JSON.stringify(hcoVersion.steps || []));
+              otherVariant.versions[i].currentStep = hcoVersion.currentStep || 1;
+              otherVariant.versions[i].complete = hcoVersion.complete || false;
             }
           }
         }
