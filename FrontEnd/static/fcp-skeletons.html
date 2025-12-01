@@ -1744,12 +1744,42 @@
         const stepItem = document.createElement('div');
         stepItem.style.cssText = 'display: flex; align-items: center; justify-content: space-between; padding: 10px; background: rgba(255,255,255,0.05); border-radius: 6px; border: 1px solid rgba(255,215,0,0.2);';
         
+        // ✅ FIX: Build position/location/action info (same as HCT)
+        const posActions = step.pos_actions || {};
+        const positionInfo = [];
+        
+        POSITIONS.forEach(pos => {
+          const actionData = posActions[pos];
+          if (actionData && actionData.location) {
+            let info = `${pos}/${actionData.location}`;
+            
+            // Add (opp) if opp flag is true
+            if (actionData.opp === true) {
+              info += ' (opp)';
+            }
+            
+            // Add action abbreviation if it's one of the displayable actions
+            const action = actionData.action;
+            if (action === 'handle_ball') {
+              info += '/HB';
+            } else if (action === 'pass') {
+              info += '/P';
+            } else if (action === 'receive') {
+              info += '/R';
+            } else if (action === 'screen') {
+              info += '/S';
+            }
+            
+            positionInfo.push(info);
+          }
+        });
+        
         const stepInfo = document.createElement('div');
-        stepInfo.style.cssText = 'flex: 1;';
+        stepInfo.style.cssText = 'flex: 1; display: flex; align-items: center; flex-wrap: wrap; gap: 10px;';
         stepInfo.innerHTML = `
           <strong style="color: #FFD700;">Step ${index + 1}</strong>
-          <span style="margin-left: 15px; opacity: 0.7;">Timestamp: ${step.timestamp}ms</span>
-          <span style="margin-left: 15px; opacity: 0.7;">Players: ${Object.keys(step.pos_actions || {}).length}</span>
+          <span style="opacity: 0.7;">Timestamp: ${step.timestamp}ms</span>
+          <span style="opacity: 0.7; margin-left: 10px;">${positionInfo.join(', ')}</span>
         `;
         
         const deleteBtn = document.createElement('button');
@@ -1775,9 +1805,15 @@
       
       // Delete this step and all subsequent steps
       variantData.steps = steps.slice(0, stepIndex);
-      variantData.currentStep = stepIndex + 1;
       
-      // Reload variant to show updated steps
+      // ✅ FIX: Set currentStep to the last remaining step (or 1 if no steps left)
+      if (variantData.steps.length > 0) {
+        variantData.currentStep = variantData.steps.length; // Show last remaining step
+      } else {
+        variantData.currentStep = 1; // No steps left, start at step 1
+      }
+      
+      // Reload variant to show updated steps (this will load the last remaining step's data)
       loadVariantForEditing(currentVariant, false);
       
       // Update displays
@@ -3576,7 +3612,8 @@
       // For other variants, allow finishing without shoot
       if (hasShoot && currentVariant === 'shot') {
         // Shot assigned - this is the final step (shot variant only)
-        actionBtn.disabled = true;
+        // ✅ FIX: Enable button so user can save the final shot step
+        actionBtn.disabled = false;
         actionBtn.textContent = 'Shot = Final Step';
         completeVariantBtn.disabled = false;
         completeVariantBtn.style.opacity = '1';
@@ -3601,8 +3638,8 @@
     function handleActionButton() {
       const actionBtn = document.getElementById('action-btn');
       
-      // Only submit step if all positions are complete
-      if (actionBtn.textContent === 'Add Step') {
+      // Submit step if button is enabled and shows "Add Step" or "Shot = Final Step"
+      if (actionBtn.textContent === 'Add Step' || actionBtn.textContent === 'Shot = Final Step') {
         submitStep();
       }
     }
