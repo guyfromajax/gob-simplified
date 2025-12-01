@@ -1330,35 +1330,34 @@
         if (variants[variant]) {
           // All variants have version structure
           const versions = variants[variant].versions || [];
-            
-            // Convert versions array to object format
-            const versionsObj = {};
-            if (versions.length > 0) {
-              // Has version array structure (new format)
-              versions.forEach(v => {
-                versionsObj[v.version] = {
-                  steps: v.steps || []
-                };
-              });
-            } else if (variants[variant].steps) {
-              // Old format: single steps array - migrate to v1
-              versionsObj.v1 = { steps: variants[variant].steps };
-              // Create empty v2-v6
-              for (let i = 2; i <= 6; i++) {
-                versionsObj[`v${i}`] = { steps: [] };
-              }
-            } else {
-              // No data - create empty versions
-              for (let i = 1; i <= 6; i++) {
-                versionsObj[`v${i}`] = { steps: [] };
-              }
+          
+          // Convert versions array to object format
+          const versionsObj = {};
+          if (versions.length > 0) {
+            // Has version array structure (new format)
+            versions.forEach(v => {
+              versionsObj[v.version] = {
+                steps: v.steps || []
+              };
+            });
+          } else if (variants[variant].steps) {
+            // Old format: single steps array - migrate to v1
+            versionsObj.v1 = { steps: variants[variant].steps };
+            // Create empty v2-v6
+            for (let i = 2; i <= 6; i++) {
+              versionsObj[`v${i}`] = { steps: [] };
             }
-            
-            playState.variants[variant] = {
-              currentVersion: 'v1',
-              versions: versionsObj
-            };
+          } else {
+            // No data - create empty versions
+            for (let i = 1; i <= 6; i++) {
+              versionsObj[`v${i}`] = { steps: [] };
+            }
           }
+          
+          playState.variants[variant] = {
+            currentVersion: 'v1',
+            versions: versionsObj
+          };
         }
       });
       
