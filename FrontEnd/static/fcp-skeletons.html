@@ -865,7 +865,7 @@
         <div class="step-subheader" id="play-summary" style="margin: 0;"></div>
       </div>
 
-        <!-- Variant Tabs -->
+      <!-- Variant Tabs -->
       <div id="variant-tabs-container" class="variant-tabs-container">
         <div class="variant-tabs">
           <div class="variant-tab active" data-variant="shot" onclick="switchVariant('shot')">
@@ -921,6 +921,14 @@
           <button onclick="toggleCompletionStatus()" class="btn-success" id="completion-btn">
             ✓ Mark as Complete
           </button>
+        </div>
+      </div>
+
+      <!-- Step List Display -->
+      <div id="steps-list-container" class="step-container" style="margin-top: 15px; padding: 15px;">
+        <h3 style="color: #FFD700; margin-bottom: 10px;">Steps for Current Variant</h3>
+        <div id="steps-list" style="display: flex; flex-direction: column; gap: 8px;">
+          <!-- Steps will be populated dynamically -->
         </div>
       </div>
 
@@ -1017,7 +1025,8 @@
       "upper highPost", "lower highPost", "upper midPost", "lower midPost",
       "upper lowPost", "lower lowPost", "topLane", "midLane",
       "upper apex", "lower apex", "upper midBaseline", "lower midBaseline",
-      "deep key", "deep lower wing", "deep lower baseline", "deep upper wing", "deep upper baseline"
+      "deep key", "deep lower wing", "deep lower baseline", "deep upper wing", "deep upper baseline",
+      "inbound_left", "inbound_right"
     ];
 
     // Court coordinates (from HCO_STRING_SPOTS in constants.py)
@@ -1047,7 +1056,9 @@
       "deep lower wing": {"x": 57, "y": 15},
       "deep lower baseline": {"x": 57, "y": 5},
       "deep upper wing": {"x": 57, "y": 35},
-      "deep upper baseline": {"x": 57, "y": 45}
+      "deep upper baseline": {"x": 57, "y": 45},
+      "inbound_left": {"x": 3, "y": 20},   // Away team inbounding from left (under home basket)
+      "inbound_right": {"x": 97, "y": 20}  // Home team inbounding from left (under away basket)
     };
 
     // Offset positions for collision handling
@@ -1226,7 +1237,7 @@
     function getCurrentVariantData() {
       const variant = playState.variants[currentVariant];
       // All variants have versions structure
-      return variant.versions[variant.currentVersion];
+        return variant.versions[variant.currentVersion];
     }
 
     // Current step assignments (position -> {location, action})
@@ -1410,13 +1421,13 @@
       // Show version selector for all variants
       const versionSelector = document.getElementById('version-selector');
       const versionSelect = document.getElementById('version-select');
-      versionSelector.style.display = 'block';
-      
-      // Set to current version for this variant
-      const variantData = playState.variants[variant];
-      versionSelect.value = variantData.currentVersion;
-      updateVersionDropdown(); // Update dropdown with version info
-      updateVersionInfo();
+        versionSelector.style.display = 'block';
+        
+        // Set to current version for this variant
+        const variantData = playState.variants[variant];
+        versionSelect.value = variantData.currentVersion;
+        updateVersionDropdown(); // Update dropdown with version info
+        updateVersionInfo();
       
       // Load new variant with reset to Step 1
       loadVariantForEditing(variant, true);
@@ -1460,8 +1471,7 @@
       const versionSelect = document.getElementById('version-select');
       if (!versionSelect) return;
 
-      // Only update if we're on a variant that has versions
-      if (currentVariant === 'successful') return;
+      // All variants have versions for FCP skeletons
 
       const variantData = playState.variants[currentVariant];
       if (!variantData || !variantData.versions) return;
@@ -1519,15 +1529,7 @@
       currentBallHandler = null;
       hasAlreadyDiverged = false; // Reset divergence tracking
       
-      // If variant has no steps, auto-copy from successful
-      if (variant !== 'successful' && variantData.steps.length === 0) {
-        const successfulSteps = playState.variants.successful.steps;
-        if (successfulSteps.length > 0) {
-          // Auto-clone from successful as starting point
-          variantData.steps = JSON.parse(JSON.stringify(successfulSteps));
-          variantData.currentStep = 1; // Start at Step 1 for review/edit
-        }
-      }
+      // No auto-copy logic for FCP skeletons (no "successful" variant)
       
       // Set currentStep for this variant
       if (variantData.steps.length > 0) {
@@ -1647,7 +1649,7 @@
     }
 
     function updateVariantTabs() {
-      ['successful', 'mid_play_change', 'contested', 'broken'].forEach(variant => {
+      ['shot', 'hco', 'o_foul', 'd_foul', 'dead_ball_turnover', 'steal'].forEach(variant => {
         const tab = document.querySelector(`.variant-tab[data-variant="${variant}"]`);
         const indicator = tab.querySelector('.status-indicator');
         const variantData = playState.variants[variant];
@@ -1693,6 +1695,73 @@
         completionBtn.classList.remove('btn-secondary');
         completionBtn.classList.add('btn-success');
       }
+      
+      // Update steps list
+      renderStepsList();
+    }
+    
+    function renderStepsList() {
+      const stepsListContainer = document.getElementById('steps-list');
+      if (!stepsListContainer) return;
+      
+      const variantData = getCurrentVariantData();
+      const steps = variantData.steps || [];
+      
+      // Clear existing list
+      stepsListContainer.innerHTML = '';
+      
+      if (steps.length === 0) {
+        stepsListContainer.innerHTML = '<p style="opacity: 0.6; font-style: italic;">No steps yet. Add your first step below.</p>';
+        return;
+      }
+      
+      // Create step items
+      steps.forEach((step, index) => {
+        const stepItem = document.createElement('div');
+        stepItem.style.cssText = 'display: flex; align-items: center; justify-content: space-between; padding: 10px; background: rgba(255,255,255,0.05); border-radius: 6px; border: 1px solid rgba(255,215,0,0.2);';
+        
+        const stepInfo = document.createElement('div');
+        stepInfo.style.cssText = 'flex: 1;';
+        stepInfo.innerHTML = `
+          <strong style="color: #FFD700;">Step ${index + 1}</strong>
+          <span style="margin-left: 15px; opacity: 0.7;">Timestamp: ${step.timestamp}ms</span>
+          <span style="margin-left: 15px; opacity: 0.7;">Players: ${Object.keys(step.pos_actions || {}).length}</span>
+        `;
+        
+        const deleteBtn = document.createElement('button');
+        deleteBtn.textContent = '🗑️ Delete';
+        deleteBtn.style.cssText = 'padding: 6px 12px; font-size: 0.85rem; margin: 0; width: auto; min-width: 80px; background: linear-gradient(135deg, #dc3545, #c82333);';
+        deleteBtn.onclick = () => deleteStep(index);
+        
+        stepItem.appendChild(stepInfo);
+        stepItem.appendChild(deleteBtn);
+        stepsListContainer.appendChild(stepItem);
+      });
+    }
+    
+    function deleteStep(stepIndex) {
+      const variantData = getCurrentVariantData();
+      const steps = variantData.steps || [];
+      
+      if (stepIndex < 0 || stepIndex >= steps.length) return;
+      
+      if (!confirm(`Delete Step ${stepIndex + 1} and all subsequent steps (${steps.length - stepIndex} total)? This cannot be undone.`)) {
+        return;
+      }
+      
+      // Delete this step and all subsequent steps
+      variantData.steps = steps.slice(0, stepIndex);
+      variantData.currentStep = stepIndex + 1;
+      
+      // Reload variant to show updated steps
+      loadVariantForEditing(currentVariant, false);
+      
+      // Update displays
+      updateVariantInfo();
+      renderPositionDashboard();
+      renderCourtVisualization();
+      
+      console.log(`✅ Deleted step ${stepIndex + 1} and all subsequent steps`);
     }
 
     // ==================== VALIDATION FUNCTIONS ====================
@@ -2235,11 +2304,18 @@
       document.getElementById('page-title').textContent = 'FCP Skeleton Builder - Building Skeletons';
       document.getElementById('page-title').classList.add('step2-title');
       
+      // Skip formation selection, go straight to building
+      document.getElementById('formation-selection').classList.add('hidden');
+      document.getElementById('build-buttons').classList.remove('hidden');
+      
       // Initialize first step with FCP starting positions
       initializeFirstStep();
       
       // Update variant info display
       updateVariantInfo();
+      
+      // Enable the action button
+      document.getElementById('action-btn').disabled = false;
     }
 
     function initializeFirstStep() {
@@ -2257,8 +2333,9 @@
       // Set ball handler
       currentBallHandler = "PG";
       
-      // Render the court
-      renderCourt();
+      // Render the court and dashboard
+      renderPositionDashboard();
+      renderCourtVisualization();
     }
 
     function handlePlayTypeChange() {
@@ -3673,6 +3750,27 @@
     }
 
     async function savePlayToDatabase() {
+      // ✅ AUTO-SAVE: If saving HCO variant, copy it to all other variants
+      if (currentVariant === 'hco') {
+        const hcoVariant = playState.variants.hco;
+        const otherVariants = ['shot', 'o_foul', 'd_foul', 'dead_ball_turnover', 'steal'];
+        
+        // Copy each version of HCO to corresponding version of other variants
+        for (const otherVariantName of otherVariants) {
+          const otherVariant = playState.variants[otherVariantName];
+          for (const versionKey in hcoVariant.versions) {
+            if (hcoVariant.versions.hasOwnProperty(versionKey)) {
+              const hcoVersion = hcoVariant.versions[versionKey];
+              // Deep clone the steps
+              otherVariant.versions[versionKey].steps = JSON.parse(JSON.stringify(hcoVersion.steps));
+              otherVariant.versions[versionKey].currentStep = hcoVersion.currentStep;
+              otherVariant.versions[versionKey].complete = hcoVersion.complete;
+            }
+          }
+        }
+        console.log('✅ Auto-saved HCO variant to all 5 other variants');
+      }
+      
       // Build FCP skeleton data with all variants
       const skeletonData = {
         variants: {
@@ -3696,7 +3794,7 @@
           headers: {
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify(playData)
+          body: JSON.stringify(skeletonData)
         });
 
         if (!response.ok) {

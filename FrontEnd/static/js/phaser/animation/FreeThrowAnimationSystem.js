@@ -340,12 +340,12 @@ export class FreeThrowAnimationSystem {
           setTimeout(resolve, 1000);
         }
       });
-      
+
       // For non-final free throws, just hide the ball after the hold
       // (no slide animation - ball stays at rim coords)
       if (!ftContext.isFinal) {
         ballSprite.setVisible(false);
-      }
+        }
     }
 
     // Check if this is the final free throw
@@ -547,7 +547,7 @@ export class FreeThrowAnimationSystem {
       const rimGridCoords = this.getRimGridCoordinates(turnData);
       miss = await this.animateBallBounceFromRim(rimGridCoords, turnData);
     }
-    
+
     // Execute rebound system using existing system
     const { animateRebound } = await import('./ballManager.js');
     
