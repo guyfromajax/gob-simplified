@@ -1556,7 +1556,76 @@ def get_skeleton_for_turn(result_type, turn_type, game_context=None):
 
 
 def get_fcp_skeleton(result_type, game_context=None):
-    """Get FCP skeleton filtered by result_type"""
+    """
+    Get FCP skeleton from MongoDB based on result_type.
+    Maps result_type to variant name and randomly selects from available versions.
+    
+    Args:
+        result_type: One of "O_FOUL", "D_FOUL", "DEAD_BALL_TURNOVER", "STEAL", "SHOT", "HCO"
+        game_context: Game context object for opposite side logic
+    
+    Returns:
+        dict: Skeleton with steps, or fallback to old hardcoded system
+    """
+    import random
+    import logging
+    from BackEnd.db import fcp_skeletons_collection
+    
+    # Map result_type to variant name
+    variant_map = {
+        "O_FOUL": "o_foul",
+        "D_FOUL": "d_foul",
+        "DEAD_BALL_TURNOVER": "dead_ball_turnover",
+        "STEAL": "steal",
+        "SHOT": "shot",
+        "HCO": "hco"
+    }
+    
+    variant_name = variant_map.get(result_type, "hco")  # Default to hco
+    
+    # Try to get skeleton from MongoDB
+    try:
+        # Get all FCP skeletons (for now, we'll use the first one - can be enhanced later)
+        skeleton_doc = fcp_skeletons_collection.find_one({})
+        
+        if skeleton_doc and "variants" in skeleton_doc:
+            variants = skeleton_doc.get("variants", {})
+            variant_data = variants.get(variant_name)
+            
+            if variant_data and "versions" in variant_data:
+                versions = variant_data["versions"]
+                
+                # Filter to only non-empty versions
+                non_empty_versions = [
+                    v for v in versions 
+                    if v.get("steps") and len(v.get("steps", [])) > 0
+                ]
+                
+                if non_empty_versions:
+                    # Randomly select one non-empty version
+                    selected_version = random.choice(non_empty_versions)
+                    skeleton_data = {
+                        "steps": selected_version.get("steps", [])
+                    }
+                    
+                    # Apply opposite side logic if game context is provided
+                    if game_context:
+                        is_away_offense = game_context.offense_team.team_id == game_context.away_team.team_id
+                        skeleton_data = apply_opposite_side_logic(skeleton_data, is_away_offense)
+                    
+                    logging.debug(f"✅ Selected FCP {variant_name} skeleton from MongoDB ({len(non_empty_versions)} versions available)")
+                    return skeleton_data
+                else:
+                    logging.debug(f"⚠️ No non-empty versions for FCP {variant_name}, falling back to hardcoded")
+            else:
+                logging.debug(f"⚠️ Variant {variant_name} not found in FCP skeleton, falling back to hardcoded")
+        else:
+            logging.debug("⚠️ No FCP skeletons in MongoDB, falling back to hardcoded")
+    except Exception as e:
+        logging.warning(f"⚠️ Error loading FCP skeleton from MongoDB: {e}, falling back to hardcoded")
+    
+    # Fallback to old hardcoded system
+    from BackEnd.playcall_skeletons.fcp_skeletons import FCP_SKELETONS_DICT, FCP_1
     end_timestamp = FCP_SKELETONS_DICT.get(result_type, 1200)  # Default to HCO timestamp
     
     skeleton_data = {
@@ -1572,14 +1641,81 @@ def get_fcp_skeleton(result_type, game_context=None):
 
 
 def get_hct_skeleton(result_type, game_context=None):
-    """Get HCT skeleton filtered by result_type"""
+    """
+    Get HCT skeleton from MongoDB based on result_type.
+    Maps result_type to variant name and randomly selects from available versions.
+    
+    Args:
+        result_type: One of "O_FOUL", "D_FOUL", "DEAD_BALL_TURNOVER", "STEAL", "SHOT", "HCO"
+        game_context: Game context object for opposite side logic
+    
+    Returns:
+        dict: Skeleton with steps, or fallback to old hardcoded system
+    """
+    import random
+    import logging
+    from BackEnd.db import hct_skeletons_collection
+    
+    # Map result_type to variant name
+    variant_map = {
+        "O_FOUL": "o_foul",
+        "D_FOUL": "d_foul",
+        "DEAD_BALL_TURNOVER": "dead_ball_turnover",
+        "STEAL": "steal",
+        "SHOT": "shot",
+        "HCO": "hco"
+    }
+    
+    variant_name = variant_map.get(result_type, "hco")  # Default to hco
+    
+    # Try to get skeleton from MongoDB
+    try:
+        # Get all HCT skeletons (for now, we'll use the first one - can be enhanced later)
+        skeleton_doc = hct_skeletons_collection.find_one({})
+        
+        if skeleton_doc and "variants" in skeleton_doc:
+            variants = skeleton_doc.get("variants", {})
+            variant_data = variants.get(variant_name)
+            
+            if variant_data and "versions" in variant_data:
+                versions = variant_data["versions"]
+                
+                # Filter to only non-empty versions
+                non_empty_versions = [
+                    v for v in versions 
+                    if v.get("steps") and len(v.get("steps", [])) > 0
+                ]
+                
+                if non_empty_versions:
+                    # Randomly select one non-empty version
+                    selected_version = random.choice(non_empty_versions)
+                    skeleton_data = {
+                        "steps": selected_version.get("steps", [])
+                    }
+                    
+                    # Apply opposite side logic if game context is provided
+                    if game_context:
+                        is_away_offense = game_context.offense_team.team_id == game_context.away_team.team_id
+                        skeleton_data = apply_opposite_side_logic(skeleton_data, is_away_offense)
+                    
+                    logging.debug(f"✅ Selected HCT {variant_name} skeleton from MongoDB ({len(non_empty_versions)} versions available)")
+                    return skeleton_data
+                else:
+                    logging.debug(f"⚠️ No non-empty versions for HCT {variant_name}, falling back to hardcoded")
+            else:
+                logging.debug(f"⚠️ Variant {variant_name} not found in HCT skeleton, falling back to hardcoded")
+        else:
+            logging.debug("⚠️ No HCT skeletons in MongoDB, falling back to hardcoded")
+    except Exception as e:
+        logging.warning(f"⚠️ Error loading HCT skeleton from MongoDB: {e}, falling back to hardcoded")
+    
+    # Fallback to old hardcoded system
     from BackEnd.playcall_skeletons.hct_skeletons import HCT_SCENES, HCT_SKELETONS_DICT
     
     # Get the appropriate end timestamp for this result type
     end_timestamp = HCT_SKELETONS_DICT.get(result_type, 1200)
     
     # Randomly select an HCT scene
-    import random
     selected_scene = random.choice(HCT_SCENES)
     
     # Filter steps by timestamp
