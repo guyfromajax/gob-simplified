@@ -3108,6 +3108,7 @@
       POSITIONS.forEach(pos => {
         const locationSelect = document.getElementById(`dashboard-location-${pos}`);
         const actionSelect = document.getElementById(`dashboard-action-${pos}`);
+        const oppositeCheckbox = document.getElementById(`dashboard-opposite-${pos}`);
         const assignment = currentStepAssignments[pos];
         
         // Only update if selects exist (dashboard has been rendered)
@@ -3116,6 +3117,9 @@
         }
         if (actionSelect && assignment) {
           actionSelect.value = assignment.action || '';
+        }
+        if (oppositeCheckbox && assignment) {
+          oppositeCheckbox.checked = assignment.opp === true;
         }
       });
 
