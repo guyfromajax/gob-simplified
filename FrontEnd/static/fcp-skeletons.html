@@ -1330,35 +1330,34 @@
         if (variants[variant]) {
           // All variants have version structure
           const versions = variants[variant].versions || [];
-            
-            // Convert versions array to object format
-            const versionsObj = {};
-            if (versions.length > 0) {
-              // Has version array structure (new format)
-              versions.forEach(v => {
-                versionsObj[v.version] = {
-                  steps: v.steps || []
-                };
-              });
-            } else if (skeletons[variant].steps) {
-              // Old format: single steps array - migrate to v1
-              versionsObj.v1 = { steps: skeletons[variant].steps };
-              // Create empty v2-v6
-              for (let i = 2; i <= 6; i++) {
-                versionsObj[`v${i}`] = { steps: [] };
-              }
-            } else {
-              // No data - create empty versions
-              for (let i = 1; i <= 6; i++) {
-                versionsObj[`v${i}`] = { steps: [] };
-              }
+          
+          // Convert versions array to object format
+          const versionsObj = {};
+          if (versions.length > 0) {
+            // Has version array structure (new format)
+            versions.forEach(v => {
+              versionsObj[v.version] = {
+                steps: v.steps || []
+              };
+            });
+          } else if (variants[variant].steps) {
+            // Old format: single steps array - migrate to v1
+            versionsObj.v1 = { steps: variants[variant].steps };
+            // Create empty v2-v6
+            for (let i = 2; i <= 6; i++) {
+              versionsObj[`v${i}`] = { steps: [] };
             }
-            
-            playState.variants[variant] = {
-              currentVersion: 'v1',
-              versions: versionsObj
-            };
+          } else {
+            // No data - create empty versions
+            for (let i = 1; i <= 6; i++) {
+              versionsObj[`v${i}`] = { steps: [] };
+            }
           }
+          
+          playState.variants[variant] = {
+            currentVersion: 'v1',
+            versions: versionsObj
+          };
         }
       });
       
@@ -3366,55 +3365,6 @@
       } else {
         submitBtn.disabled = !(name && type);
       }
-    }
-
-    // submitPlay removed - use startBuilding() instead
-
-      // Show step 2, hide step 1
-      document.getElementById('step1').classList.add('hidden');
-      document.getElementById('step2').classList.remove('hidden');
-      
-      // Show back button
-      showBackButton();
-
-      // Update summary
-      let summaryText = `${playState.name} | ${playState.type}`;
-      if (playState.focus) {
-        summaryText += ` | ${playState.focus}`;
-      }
-      document.getElementById('play-summary').textContent = summaryText;
-
-      // Reset current step assignments
-      currentStepAssignments = {};
-      previousStepAssignments = {};
-      selectedPosition = null;
-      currentFormation = null;
-      positionOffsets = {};
-      newOffsets = {};
-      currentBallHandler = null; // Reset ball handler for new play
-      
-      // Show formation selection, hide build buttons
-      document.getElementById('formation-selection').classList.remove('hidden');
-      document.getElementById('build-buttons').classList.add('hidden');
-      document.getElementById('formation-select').value = '';
-      
-      // Update variant tabs
-      updateVariantTabs();
-      updateVariantInfo();
-      
-      // Hide clone button for successful variant
-      document.getElementById('clone-btn').style.display = 'none';
-      
-      // Show animation preview section (initially will be empty)
-      const animSection = document.getElementById('animation-preview-section');
-      if (animSection) {
-        animSection.style.display = 'block';
-        updateAnimationVariantDropdown();
-      }
-      
-      // Initialize dashboard and court
-      renderPositionDashboard();
-      renderCourtVisualization();
     }
 
 
