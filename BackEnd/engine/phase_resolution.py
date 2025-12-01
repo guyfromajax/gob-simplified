@@ -2332,4 +2332,5 @@ def resolve_half_court_trap_logic(game: "GameManager"):
         "defender_id": getattr(roles["defender"], "player_id", None) if roles["defender"] else None  # For steal announcements
     }
     
+    logging.warning(f"✅ [HCT] Returning result with {len(animations)} animations, result_type={result_type}")
     return result
