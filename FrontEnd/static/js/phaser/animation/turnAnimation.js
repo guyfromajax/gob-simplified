@@ -858,20 +858,29 @@ async function runInboundSetup({
   pressureType = null,   // "FCP" or "HCT" to determine defensive positioning
   turnData = null        // ✅ NEW: Optional turnData for dynamic pass detection
 }) {
-  // ✅ CRITICAL: Verify scene.offenseTeamId matches newOffenseSide
-  // If they don't match, log a warning and use newOffenseSide as source of truth
+  // ✅ CRITICAL: ALWAYS set scene.offenseTeamId to match newOffenseSide BEFORE doing anything else
+  // This ensures that any code that reads scene.offenseTeamId will get the correct value
   const expectedOffenseTeamId = newOffenseSide === "home" ? homeTeamId : awayTeamId;
-  if (scene.offenseTeamId && scene.offenseTeamId !== expectedOffenseTeamId) {
-    console.warn('⚠️ [INBOUND SETUP] scene.offenseTeamId mismatch!', {
-      scene_offenseTeamId: scene.offenseTeamId,
-      expectedOffenseTeamId,
+  if (!expectedOffenseTeamId) {
+    console.error('❌ [INBOUND SETUP] Cannot determine expectedOffenseTeamId!', {
+      newOffenseSide,
+      homeTeamId,
+      awayTeamId
+    });
+  }
+  
+  // Force update scene.offenseTeamId to match newOffenseSide (source of truth)
+  if (scene.offenseTeamId !== expectedOffenseTeamId) {
+    console.warn('⚠️ [INBOUND SETUP] Correcting scene.offenseTeamId mismatch!', {
+      old_scene_offenseTeamId: scene.offenseTeamId,
+      new_scene_offenseTeamId: expectedOffenseTeamId,
       newOffenseSide,
       homeTeamId,
       awayTeamId,
       stackTrace: new Error().stack?.split('\n').slice(1, 6)
     });
-    // Force update scene.offenseTeamId to match newOffenseSide
     scene.offenseTeamId = expectedOffenseTeamId;
+    // Emit event to notify other systems
     scene.events?.emit?.('possessionChange', { offenseTeamId: expectedOffenseTeamId });
   }
   
