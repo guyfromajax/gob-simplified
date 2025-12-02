@@ -85,10 +85,60 @@ export function prepareTurnForAnimation({ turn, scene, turnIndex, homeTeamId }) 
 }
 
 /**
+ * Universal Turn Transition Handler
+ * 
+ * Handles possession flips and state transitions for ALL turn types.
+ * This is the single source of truth for turn-to-turn transitions.
+ * 
+ * Backend provides authoritative transition data:
+ * - possession_flips: bool - Whether possession changes
+ * - possession_team_id: string - New offense team (AFTER flip)
+ * - next_play_type: string - What comes next ("HCO", "FAST_BREAK", "BASELINE_INBOUND", etc.)
+ * 
+ * This function runs AFTER animation completes, ensuring possession is updated
+ * before the next turn begins.
+ * 
+ * @param {Object} scene - Phaser scene
+ * @param {Object} turnData - Turn data from backend
+ */
+function handleTurnTransition(scene, turnData) {
+  // ✅ UNIVERSAL POSSESSION FLIP HANDLER
+  // Works for ALL turn types: FREE_THROW, FOUL, STEAL, DEAD_BALL, HCO, MAKE/MISS, etc.
+  if (turnData.possession_flips && turnData.possession_team_id) {
+    const previousOffenseTeamId = scene.offenseTeamId;
+    
+    // Only flip if actually changing (avoid duplicate events)
+    if (previousOffenseTeamId !== turnData.possession_team_id) {
+      scene.offenseTeamId = turnData.possession_team_id;
+      scene.events?.emit('possessionChange', { 
+        offenseTeamId: turnData.possession_team_id 
+      });
+      console.log('🔄 [UNIVERSAL TRANSITION] Possession flipped', {
+        from: previousOffenseTeamId,
+        to: turnData.possession_team_id,
+        result_type: turnData.result_type,
+        next_play_type: turnData.next_play_type
+      });
+    } else {
+      console.log('🔄 [UNIVERSAL TRANSITION] Possession flip requested but already correct', {
+        current: previousOffenseTeamId,
+        requested: turnData.possession_team_id,
+        result_type: turnData.result_type
+      });
+    }
+  }
+  
+  // Note: next_play_type transitions are handled by the turn-by-turn loop
+  // The next turn will be the appropriate type (BASELINE_INBOUND, HCO, FAST_BREAK, etc.)
+  // We just need to ensure possession is correct before it starts
+}
+
+/**
  * Finalize a turn after animation by performing cleanup and updates.
  * 
  * This function handles all the cleanup that happens after calling playTurnAnimation,
  * including:
+ * - Universal turn transition (possession flips, state updates)
  * - Setting scene._previousTurnWasShot flag for shot turns
  * - Calling onUpdate callback
  * - Updating debug score
@@ -110,6 +160,10 @@ export function finalizeTurnAfterAnimation({
   turnIndex,
   updateDebugScore 
 }) {
+  // ✅ UNIVERSAL TRANSITION HANDLER - Handle possession flips and state transitions
+  // This runs FIRST to ensure possession is correct before other finalization steps
+  handleTurnTransition(scene, turn);
+  
   // ✅ DEBUG: Log finalization
   console.log('🔍 [FINALIZING TURN]', {
     turnIndex: turnIndex ?? turn.index,
