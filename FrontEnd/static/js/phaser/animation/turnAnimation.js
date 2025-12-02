@@ -1484,42 +1484,8 @@ async function runInboundSetup({
  * @param {Function} params.onUpdate - Update callback (optional, for future use)
  */
 export async function playTurnAnimation({ scene, simData, playerSprites, turnData, ballSprite, onAction, turnIndex, onUpdate }) {
-  // ✅ DEBUG: Log entry to playTurnAnimation for FCP/HCT turns to track duplicate calls
-  const isFCPHCT = turnData.fcp_shot === true || turnData.hct_shot === true || 
-                   turnData.next_defensive_setup === "FCP" || turnData.next_defensive_setup === "HCT" ||
-                   turnData.fcp_foul === true || turnData.hct_foul === true ||
-                   scene.pressureSequenceActive === true;
-  
-  if (isFCPHCT) {
-    // ✅ FIX: Prevent duplicate calls to playTurnAnimation for the same FCP/HCT turn
-    // This applies to both Full Court Press (FCP) and Half Court Trap (HCT) animations
-    // to prevent the skeleton animation from running multiple times
-    const turnId = turnData.id || turnData.turn_id || `turn_${turnIndex}`;
-    const playAnimationKey = `_fcpHctPlayAnimation_${turnId}`;
-    
-    if (scene[playAnimationKey]) {
-      console.warn('⚠️ [FCP/HCT DEBUG] DUPLICATE playTurnAnimation call detected - skipping', {
-        result_type: turnData.result_type,
-        turnIndex: turnIndex,
-        turnId: turnId,
-        stackTrace: new Error().stack?.split('\n').slice(1, 4).join('\n')
-      });
-      return; // Exit early to prevent duplicate animation
-    }
-    
-    scene[playAnimationKey] = true; // Mark as in progress
-    console.warn('🎬 [FCP/HCT DEBUG] playTurnAnimation called', {
-      result_type: turnData.result_type,
-      fcp_shot: turnData.fcp_shot,
-      hct_shot: turnData.hct_shot,
-      fcp_foul: turnData.fcp_foul,
-      hct_foul: turnData.hct_foul,
-      next_defensive_setup: turnData.next_defensive_setup,
-      pressureSequenceActive: scene.pressureSequenceActive,
-      turnIndex: turnIndex,
-      turnId: turnId
-    });
-  }
+  // ✅ REMOVED: Special FCP/HCT duplicate prevention - FCP/HCT now routes through AnimationRouter (same as HCO)
+  // AnimationRouter handles duplicate prevention, so no special handling needed here
   
   // Guard: Skip if this is an opening tip, putback, or if animations is missing
   // Putback turns are handled by handleOrebTurn in animateGameTurns.js
@@ -1572,14 +1538,8 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
                                turnData.animations?.length > 0 &&
                                scene.stateMachine?.is(States.FastBreak);
   
-  // ✅ FIX: Allow FCP/HCT turns to proceed even if state is FastBreak
-  // FCP/HCT turns can occur after fast breaks (e.g., press break after fast break shot)
-  const isFCPHCTTurn = turnData.fcp_shot === true || turnData.hct_shot === true ||
-                       turnData.fcp_foul === true || turnData.hct_foul === true ||
-                       turnData.next_defensive_setup === "FCP" || turnData.next_defensive_setup === "HCT" ||
-                       scene.pressureSequenceActive;
-  
-  if (scene.stateMachine?.is(States.FastBreak) && !isHCOAfterFastBreak && !isFCPHCTTurn) {
+  // ✅ REMOVED: Special FCP/HCT FastBreak check - FCP/HCT now routes through AnimationRouter (same as HCO)
+  if (scene.stateMachine?.is(States.FastBreak) && !isHCOAfterFastBreak) {
     return;
   }
   
@@ -1657,14 +1617,9 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
     }
   }
 
-  // ✅ FIX: Allow FCP/HCT turns to proceed even if state is FastBreak
-  // FCP/HCT turns can occur after fast breaks (e.g., press break after fast break shot)
-  const isFCPHCTTurnForEarlyExit = turnData.fcp_shot === true || turnData.hct_shot === true ||
-                                    turnData.fcp_foul === true || turnData.hct_foul === true ||
-                                    turnData.next_defensive_setup === "FCP" || turnData.next_defensive_setup === "HCT" ||
-                                    scene.pressureSequenceActive;
-  
-  if (scene.skipToEnd || (scene.stateMachine?.is(States.FastBreak) && !isFCPHCTTurnForEarlyExit)) {
+  // ✅ REMOVED: Special FCP/HCT FastBreak check - FCP/HCT now routes through AnimationRouter (same as HCO)
+  // AnimationRouter handles routing, so no special state checks needed here
+  if (scene.skipToEnd || scene.stateMachine?.is(States.FastBreak)) {
     return;
   }
 
@@ -1706,34 +1661,8 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
     scene._previousTurnWasOpeningTip = false;
   }
 
-  // ✅ SIMPLER FIX: For FCP/HCT turns (both Full Court Press and Half Court Trap), run setup tween 
-  // to move players to step 0 positions. This matches ShotAnimationSystem's approach and gives tween 
-  // manager time to settle after runInboundSetup() completes.
-  // ✅ FIX: Add guard to prevent multiple calls to runSetupTween for the same turn (prevents duplicate skeleton animations)
-  if (isFCPHCT && !scene.skipToEnd && maxSteps > 1) {
-    const setupTweenKey = `_fcpHctSetupTween_${turnData.id || turnIndex || 'unknown'}`;
-    if (!scene[setupTweenKey]) {
-      scene[setupTweenKey] = true; // Mark as in progress
-      console.warn('🎬 [FCP/HCT DEBUG] Calling runSetupTween', {
-        result_type: turnData.result_type,
-        turnIndex: turnIndex,
-        maxSteps: maxSteps
-      });
-    await runSetupTween({
-      scene,
-      ballSprite,
-      animations: turnData.animations,
-      playerSprites,
-      currentBallOwnerRef
-    });
-      // Don't clear the flag - keep it set to prevent duplicate calls
-    } else {
-      console.warn('⚠️ [FCP/HCT DEBUG] Skipping duplicate runSetupTween call', {
-        result_type: turnData.result_type,
-        turnIndex: turnIndex
-      });
-    }
-  }
+  // ✅ REMOVED: Special FCP/HCT setup tween - FCP/HCT now routes through ShotAnimationSystem (same as HCO)
+  // ShotAnimationSystem.runSetupTween() handles setup for all skeleton animations, including FCP/HCT
 
   let eventsProcessed = false;
 
@@ -1751,53 +1680,12 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
     }
   }
 
-  // ✅ CRITICAL FIX: For FCP/HCT skeleton animations, kill ALL player sprite tweens
-  // and add a small delay to allow the tween manager to settle after runInboundSetup()
-  // This fixes the race condition where skeleton animation tweens don't progress
-  if (isFCPHCT && scene.tweens && playerSprites) {
-    let totalPlayerTweensKilled = 0;
-    
-    // Kill tweens on all player sprites
-    for (const [playerId, sprite] of Object.entries(playerSprites)) {
-      if (sprite && scene.tweens.getTweensOf) {
-        const playerTweens = scene.tweens.getTweensOf(sprite);
-        if (playerTweens.length > 0) {
-          totalPlayerTweensKilled += playerTweens.length;
-          scene.tweens.killTweensOf(sprite);
-        }
-      }
-    }
-    
-    // Log tween manager state before FCP/HCT skeleton animation
-    const tweenManagerState = {
-      totalTweens: scene.tweens.getAll ? scene.tweens.getAll().length : 'N/A',
-      isPaused: scene.tweens.isPaused ? scene.tweens.isPaused() : 'N/A',
-      timeScale: scene.tweens.timeScale ?? 'N/A'
-    };
-    
-    // Add a small delay (50ms) to allow the tween manager to settle
-    // This is the key fix for the race condition where skeleton animation tweens
-    // are created immediately after runInboundSetup() but don't progress
-    if (totalPlayerTweensKilled > 0 || tweenManagerState.totalTweens > 0) {
-      await new Promise(resolve => {
-        if (scene.time && scene.time.delayedCall) {
-          scene.time.delayedCall(50, resolve);
-        } else {
-          setTimeout(resolve, 50);
-        }
-      });
-    }
-  }
+  // ✅ REMOVED: Special FCP/HCT tween cleanup - FCP/HCT now uses exact same path as HCO
+  // ShotAnimationSystem handles all skeleton animations identically
 
   for (let stepIndex = 1; stepIndex < maxSteps; stepIndex++) {
-    // ✅ FIX: Allow FCP/HCT turns to proceed even if state is FastBreak
-    // FCP/HCT turns can occur after fast breaks (e.g., press break after fast break shot)
-    const isFCPHCTTurnForStepLoop = turnData.fcp_shot === true || turnData.hct_shot === true ||
-                                     turnData.fcp_foul === true || turnData.hct_foul === true ||
-                                     turnData.next_defensive_setup === "FCP" || turnData.next_defensive_setup === "HCT" ||
-                                     scene.pressureSequenceActive;
-    
-    const willEarlyExit = scene.skipToEnd || (scene.stateMachine?.is(States.FastBreak) && !isFCPHCTTurnForStepLoop);
+    // ✅ REMOVED: Special FCP/HCT FastBreak check - FCP/HCT now routes through AnimationRouter (same as HCO)
+    const willEarlyExit = scene.skipToEnd || scene.stateMachine?.is(States.FastBreak);
     
     // ✅ CRITICAL FIX: Kill ball tweens at the start of EACH step iteration
     // Passes within the step loop can leave lingering ball tweens that block subsequent steps
@@ -2194,22 +2082,8 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
           });
           releaseGuard?.();
           
-          if (isFCPHCT) {
-            // ✅ CRITICAL FIX: Replicate OREB putback flow exactly
-            // Call the same functions that OREB calls right after runInboundSetup() completes
-            // This provides the natural delay that allows the tween manager to fully process all tweens
-            // before the next turn starts
-            const { announceFromTurnData } = await import('../utils/announcements.js');
-            announceFromTurnData(turnData, 'end', scene.simData?.home_team_id, scene);
-            if (onUpdate) {
-              try {
-                onUpdate(turnData);
-              } catch (err) {
-                console.error('Scoreboard update failed:', err);
-              }
-            }
-            // Note: updateDebugScore is not available in playTurnAnimation, but it's called in animateGameTurns after this returns
-          }
+          // ✅ REMOVED: Special FCP/HCT handling - FCP/HCT now routes through AnimationRouter (same as HCO)
+          // AnimationRouter handles announcements and updates via finalizeTurnAfterAnimation
         }
       } else if (ballSpot) {
         const rebounderId =
