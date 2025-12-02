@@ -460,18 +460,19 @@ export class FreeThrowAnimationSystem {
       });
     }
 
-    // ✅ FIX: Flip possession BEFORE inbound pass (matches fastBreak.js pattern)
+    // ✅ CRITICAL FIX: Flip possession FIRST, then calculate newOffenseSide
     // After final free throw is made, possession flips - the team that was on defense is now on offense
     // Use possession_team_id from turnData (authoritative backend value)
     const newOffenseTeamId = turnData.possession_team_id;
     if (newOffenseTeamId && turnData.possession_flips !== false) {
       this.scene.offenseTeamId = newOffenseTeamId;
-      // Emit possession change event to update other systems
+      // Emit possession change event IMMEDIATELY to update all systems
       this.scene.events?.emit('possessionChange', { offenseTeamId: newOffenseTeamId });
-      console.log('🏀 [FREE THROW MAKE] Updated offense team ID after possession flip', {
+      console.log('🏀 [FREE THROW MAKE] Flipped possession BEFORE calculating newOffenseSide', {
         newOffenseTeamId,
         possession_team_id: turnData.possession_team_id,
-        possession_flips: turnData.possession_flips
+        possession_flips: turnData.possession_flips,
+        scene_offenseTeamId_after_flip: this.scene.offenseTeamId
       });
     }
 
@@ -479,8 +480,10 @@ export class FreeThrowAnimationSystem {
     // The key is to use the correct possession_team_id to prevent double possession flips
     const { runInboundSetup } = await import('./turnAnimation.js');
     
-    // Determine the new offense side based on possession_team_id (now correctly set above)
-    const isHomeOffense = newOffenseTeamId === this.scene.simData?.home_team_id;
+    // Determine the new offense side using the UPDATED scene.offenseTeamId
+    // Use the UPDATED scene.offenseTeamId (or fallback to possession_team_id)
+    const finalOffenseTeamId = this.scene.offenseTeamId || turnData.possession_team_id;
+    const isHomeOffense = finalOffenseTeamId === this.scene.simData?.home_team_id;
     const newOffenseSide = isHomeOffense ? 'home' : 'away';
     
     // ✅ FIX: Check for FCP/HCT setup after free throw (same logic as freeThrow.js)
