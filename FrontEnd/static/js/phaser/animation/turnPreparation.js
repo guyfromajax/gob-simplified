@@ -98,12 +98,23 @@ export function prepareTurnForAnimation({ turn, scene, turnIndex, homeTeamId }) 
  * This function runs AFTER animation completes, ensuring possession is updated
  * before the next turn begins.
  * 
+ * EXCEPTION: FREE_THROW possession flips happen DURING animation (before inbound pass),
+ * so they set scene._possessionAlreadyFlipped to skip double-flipping here.
+ * 
  * @param {Object} scene - Phaser scene
  * @param {Object} turnData - Turn data from backend
  */
 function handleTurnTransition(scene, turnData) {
+  // ✅ EXCEPTION: Skip if FREE_THROW already flipped possession during animation
+  // FREE_THROW flips BEFORE inbound (during animation), not after
+  if (turnData.result_type === "FREE_THROW" && scene._possessionAlreadyFlipped) {
+    console.log('🔄 [UNIVERSAL TRANSITION] Skipping possession flip - already handled during FREE_THROW animation');
+    scene._possessionAlreadyFlipped = false; // Clear flag
+    return;
+  }
+  
   // ✅ UNIVERSAL POSSESSION FLIP HANDLER
-  // Works for ALL turn types: FREE_THROW, FOUL, STEAL, DEAD_BALL, HCO, MAKE/MISS, etc.
+  // Works for ALL turn types: FOUL, STEAL, DEAD_BALL, HCO, MAKE/MISS, etc.
   if (turnData.possession_flips && turnData.possession_team_id) {
     const previousOffenseTeamId = scene.offenseTeamId;
     
