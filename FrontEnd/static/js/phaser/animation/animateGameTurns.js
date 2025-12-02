@@ -1031,17 +1031,13 @@ export async function animateGameTurns({ //hasBallAtStep
       // ✅ Debug log for HCO turns after Fast Break defensive stop
       const previousTurn = i > 0 ? turns[i - 1] : null;
       const wasDefensiveStop = previousTurn?.result_type === "DEFENSIVE_STOP" && previousTurn?.fast_break === true;
-      // ✅ FIX: Exclude FCP/HCT turns from HCO routing (they should be handled by FCP/HCT check above)
-      // ✅ SS&S: Use state-based detection to prevent FCP/HCT shot attempts from being routed as HCO
-      // Check both turn flags and scene state (state-based detection)
-      const isFCPHCTTurn = turn.fcp_shot === true || turn.hct_shot === true || 
-                           turn.next_defensive_setup === "FCP" || turn.next_defensive_setup === "HCT" ||
-                           turn.fcp_foul === true || turn.hct_foul === true ||
-                           scene.pressureSequenceActive; // ✅ SS&S: Use scene state instead of inheritance logic
+      // ✅ CRITICAL FIX: DO NOT exclude FCP/HCT from routing through AnimationRouter
+      // FCP/HCT shot attempts (MAKE/MISS with fcp_shot/hct_shot flags) should route through AnimationRouter
+      // same as HCO - AnimationEngine.determineHandler() will route them to SHOT_ATTEMPT handler
       // ✅ FIX: Exclude Fast Break from HCO routing - only check fast_break flag for current turn
       // next_play_type indicates what comes NEXT, not what this turn is (e.g., HCO miss → fast break)
       const isFastBreak = turn.fast_break === true;
-      const isHCO = !isFastBreak && !isFCPHCTTurn && (turn.result_type === "MAKE" || turn.result_type === "MISS");
+      const isHCO = !isFastBreak && (turn.result_type === "MAKE" || turn.result_type === "MISS");
       
       // ✅ DEBUG: Log when entering HCO instance (with fireworks emoji)
       if (isHCO) {
