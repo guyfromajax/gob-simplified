@@ -460,30 +460,31 @@ export class FreeThrowAnimationSystem {
       });
     }
 
-    // ✅ CRITICAL FIX: Flip possession FIRST, then calculate newOffenseSide
-    // After final free throw is made, possession flips - the team that was on defense is now on offense
-    // Use possession_team_id from turnData (authoritative backend value)
-    const newOffenseTeamId = turnData.possession_team_id;
-    if (newOffenseTeamId && turnData.possession_flips !== false) {
-      this.scene.offenseTeamId = newOffenseTeamId;
-      // Emit possession change event IMMEDIATELY to update all systems
-      this.scene.events?.emit('possessionChange', { offenseTeamId: newOffenseTeamId });
-      console.log('🏀 [FREE THROW MAKE] Flipped possession BEFORE calculating newOffenseSide', {
-        newOffenseTeamId,
-        possession_team_id: turnData.possession_team_id,
-        possession_flips: turnData.possession_flips,
-        scene_offenseTeamId_after_flip: this.scene.offenseTeamId
-      });
+    // ✅ EXCEPTION: Free throws need possession flip BEFORE inbound (not after animation)
+    // because inbound happens DURING free throw sequence, not after
+    // Use universal transition pattern but execute it early
+    if (turnData.possession_team_id && turnData.possession_flips !== false) {
+      const previousOffenseTeamId = this.scene.offenseTeamId;
+      if (previousOffenseTeamId !== turnData.possession_team_id) {
+        this.scene.offenseTeamId = turnData.possession_team_id;
+        this.scene.events?.emit('possessionChange', { 
+          offenseTeamId: turnData.possession_team_id 
+        });
+        console.log('🔄 [FREE THROW TRANSITION] Possession flipped before inbound', {
+          from: previousOffenseTeamId,
+          to: turnData.possession_team_id,
+          result_type: 'FREE_THROW'
+        });
+        // Mark as already flipped so universal handler doesn't double-flip
+        this.scene._possessionAlreadyFlipped = true;
+      }
     }
-
+    
     // Execute inbound pass using the existing system
-    // The key is to use the correct possession_team_id to prevent double possession flips
     const { runInboundSetup } = await import('./turnAnimation.js');
     
-    // Determine the new offense side using the UPDATED scene.offenseTeamId
-    // Use the UPDATED scene.offenseTeamId (or fallback to possession_team_id)
-    const finalOffenseTeamId = this.scene.offenseTeamId || turnData.possession_team_id;
-    const isHomeOffense = finalOffenseTeamId === this.scene.simData?.home_team_id;
+    // Calculate newOffenseSide using possession_team_id (authoritative backend value)
+    const isHomeOffense = turnData.possession_team_id === this.scene.simData?.home_team_id;
     const newOffenseSide = isHomeOffense ? 'home' : 'away';
     
     // ✅ FIX: Check for FCP/HCT setup after free throw (same logic as freeThrow.js)
