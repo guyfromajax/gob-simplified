@@ -858,8 +858,27 @@ async function runInboundSetup({
   pressureType = null,   // "FCP" or "HCT" to determine defensive positioning
   turnData = null        // ✅ NEW: Optional turnData for dynamic pass detection
 }) {
+  // ✅ CRITICAL: Verify scene.offenseTeamId matches newOffenseSide
+  // If they don't match, log a warning and use newOffenseSide as source of truth
+  const expectedOffenseTeamId = newOffenseSide === "home" ? homeTeamId : awayTeamId;
+  if (scene.offenseTeamId && scene.offenseTeamId !== expectedOffenseTeamId) {
+    console.warn('⚠️ [INBOUND SETUP] scene.offenseTeamId mismatch!', {
+      scene_offenseTeamId: scene.offenseTeamId,
+      expectedOffenseTeamId,
+      newOffenseSide,
+      homeTeamId,
+      awayTeamId,
+      stackTrace: new Error().stack?.split('\n').slice(1, 6)
+    });
+    // Force update scene.offenseTeamId to match newOffenseSide
+    scene.offenseTeamId = expectedOffenseTeamId;
+    scene.events?.emit?.('possessionChange', { offenseTeamId: expectedOffenseTeamId });
+  }
+  
   animationDebugLog('runInboundSetup called:', {
     newOffenseSide,
+    scene_offenseTeamId: scene.offenseTeamId,
+    expectedOffenseTeamId,
     currentState: scene.stateMachine?.state,
     isFreeThrow: scene?.stateMachine?.is(States.FreeThrow),
     skipRetreat,
