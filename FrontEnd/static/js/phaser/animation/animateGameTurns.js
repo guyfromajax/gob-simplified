@@ -1033,12 +1033,14 @@ export async function animateGameTurns({ //hasBallAtStep
       const isFastBreak = turn.fast_break === true;
       const isHCO = !isFastBreak && (turn.result_type === "MAKE" || turn.result_type === "MISS");
       
-      // ✅ DEBUG: Log when entering HCO instance (with fireworks emoji)
+      // ✅ DEBUG: Log when entering shot instance (HCO or FCP/HCT)
       if (isHCO) {
-        console.log('🎆🎆🎆 ENTERING HCO INSTANCE 🎆🎆🎆', {
+        console.log('🎆🎆🎆 ENTERING SHOT INSTANCE 🎆🎆🎆', {
           turn_index: i,
           result_type: turn.result_type,
           fast_break: turn.fast_break,
+          fcp_shot: turn.fcp_shot,
+          hct_shot: turn.hct_shot,
           willRouteToAnimationRouter: true
         });
       }
