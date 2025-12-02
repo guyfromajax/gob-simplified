@@ -577,26 +577,16 @@ export async function animateGameTurns({ //hasBallAtStep
     }
 
     if (turn.result_type === "FOUL") {
-      // ✅ FIX: Check if this is an FCP/HCT foul (defensive foul with explicit flags) or offensive foul during pressure
-      const isFCPHCTFoulWithAnimations = (turn.fcp_foul === true || turn.hct_foul === true) && turn.animations && turn.animations.length > 0;
-      const isOffensiveFoulDuringPressure = !turn.fcp_foul && !turn.hct_foul && scene.pressureSequenceActive;
-      
-      if (isFCPHCTFoulWithAnimations) {
-        // ✅ PHASE 2.4: FCP/HCT foul with animations - route through AnimationRouter
-        // Ensure turn.index is set (AnimationRouter will use it for context)
+      // ✅ FIX: Route ALL fouls with animations through AnimationRouter
+      // This includes FCP/HCT fouls (fcp_foul/hct_foul flags) and regular HCO fouls (when we add them)
+      if (turn.animations && turn.animations.length > 0) {
+        // Foul with animations - route through AnimationRouter
         turn.index = i;
-        // AnimationRouter handles pre/post setup (prepareTurnForAnimation, finalizeTurnAfterAnimation)
         await animationRouter.processTurn(turn);
         continue;
-      } else if (isOffensiveFoulDuringPressure) {
-        // ✅ FIX: Offensive foul during FCP/HCT - route through FCP/HCT detection block to show skeleton
-        // Don't continue here, let it fall through to FCP/HCT detection block (line 762)
-        // This will ensure playTurnAnimation is called to show the FCP skeleton
       } else {
         // Non-animated foul - just do announcements and updates
-        // Announce foul (visual effects now handled by announcement system)
         announceFromTurnData(turn, 'end', scene.simData?.home_team_id, scene);
-        // Update scoreboard for all fouls (FCP or not)
         if (onUpdate) {
           try {
             onUpdate(turn);
@@ -610,15 +600,15 @@ export async function animateGameTurns({ //hasBallAtStep
     }
     
     if (turn.result_type === "DEAD BALL") {
-      // ✅ FIX: Check if this is a DEAD BALL during FCP/HCT pressure sequence
-      // If so, route through FCP/HCT detection block to show skeleton animation
-      if (scene.pressureSequenceActive) {
-        // Don't continue here - let it fall through to FCP/HCT detection block (line 762)
-        // This will ensure playTurnAnimation is called to show the FCP skeleton
-        // The FCP/HCT block will handle the skeleton animation and announcements
+      // ✅ FIX: Route ALL dead ball with animations through AnimationRouter
+      // This includes FCP/HCT dead ball turnovers and regular HCO dead ball (when we add them)
+      if (turn.animations && turn.animations.length > 0) {
+        // Dead ball with animations - route through AnimationRouter
+        turn.index = i;
+        await animationRouter.processTurn(turn);
+        continue;
       } else {
-        // DEAD BALL turnover (not during pressure) - visual effects handled by announcement system
-        // Announce turnover
+        // Dead ball without animations - just do announcements and updates
         announceFromTurnData(turn, 'end', scene.simData?.home_team_id, scene);
         if (onUpdate) {
           try {
@@ -989,23 +979,27 @@ export async function animateGameTurns({ //hasBallAtStep
 
     const shooterId = playerMap[shooterName];
 
-    // ✅ PHASE 2.6: Handle HCO setup turns (result_type === "HCO" but not shot attempts)
-    // These are setup turns that establish HCO offense, not shot attempts (MAKE/MISS)
-    // Exclude FCP/HCT turns (they're handled above) and shot attempts (handled below)
-    const isFCPHCTTurnForHCO = turn.fcp_shot === true || turn.hct_shot === true || 
-                               turn.next_defensive_setup === "FCP" || turn.next_defensive_setup === "HCT" ||
-                               turn.fcp_foul === true || turn.hct_foul === true ||
-                               scene.pressureSequenceActive;
-    const isHCOSetupTurn = turn.result_type === "HCO" && 
-                           !(turn.result_type === "MAKE" || turn.result_type === "MISS") &&
-                           !isFCPHCTTurnForHCO;
-    if (isHCOSetupTurn) {
-      // ✅ PHASE 2.6: Route HCO setup turns through AnimationRouter
-      // AnimationEngine routes HCO to handleDefault() which calls playTurnAnimation()
-      turn.index = i;
-      await animationRouter.processTurn(turn);
-      // Note: Announcements and score updates handled by AnimationRouter
-      continue;
+    // ✅ FIX: Route ALL HCO result_type turns with animations through AnimationRouter
+    // This includes FCP/HCT → HCO transitions (press break) and regular HCO setup turns
+    if (turn.result_type === "HCO") {
+      if (turn.animations && turn.animations.length > 0) {
+        // HCO with animations - route through AnimationRouter
+        turn.index = i;
+        await animationRouter.processTurn(turn);
+        continue;
+      } else {
+        // HCO without animations - just do announcements and updates
+        announceFromTurnData(turn, 'end', scene.simData?.home_team_id, scene);
+        if (onUpdate) {
+          try {
+            onUpdate(turn);
+          } catch (err) {
+            console.error('Scoreboard update failed:', err);
+          }
+        }
+        updateDebugScore(turn, { turnIndex: i, possessionId });
+        continue;
+      }
     }
 
     const shouldDebugHCO =
@@ -1118,23 +1112,18 @@ export async function animateGameTurns({ //hasBallAtStep
       }
     }
 
-    // ✅ PHASE 2.6: Handle STEAL - route through AnimationRouter
-    // STEAL can be either a standalone turn type (result_type === "STEAL") or an event within a turn
-    // Only route standalone STEAL turns through AnimationRouter; events are handled inline
-    // ✅ FIX: Skip STEAL routing if it's an FCP/HCT STEAL (will be handled by FCP/HCT check below)
-    const stealEvent = turn.events?.find(e => e.event_type === "STEAL");
-    const isFCPHCTSteal = turn.result_type === "STEAL" && scene.pressureSequenceActive;
-    if (!scene.stateMachine?.is(States.FastBreak) && turn.result_type === "STEAL" && !isFCPHCTSteal) {
-      // Standalone STEAL turn (not FCP/HCT) - route through AnimationRouter
-      turn.index = i;
-      await animationRouter.processTurn(turn);
-      // Note: Pass animation, possession change, announcements, and score updates handled by handler
-      continue;
-    } else if (isFCPHCTSteal) {
-      // ✅ FIX: FCP/HCT STEAL - don't route through AnimationRouter, let it fall through to FCP/HCT detection block
-      // This will ensure playTurnAnimation is called to show the FCP skeleton
-      // Don't continue here - let it fall through to FCP/HCT detection block (line 762)
-    } else if (!scene.stateMachine?.is(States.FastBreak) && stealEvent) {
+    // ✅ FIX: Route ALL steals with animations through AnimationRouter
+    // This includes FCP/HCT steals and regular HCO steals (when we add them)
+    if (turn.result_type === "STEAL") {
+      if (turn.animations && turn.animations.length > 0) {
+        // Steal with animations - route through AnimationRouter
+        turn.index = i;
+        await animationRouter.processTurn(turn);
+        continue;
+      } else {
+        // Steal without animations - check if it's a steal event within another turn
+        const stealEvent = turn.events?.find(e => e.event_type === "STEAL");
+        if (!scene.stateMachine?.is(States.FastBreak) && stealEvent) {
       // STEAL event within another turn - handle inline (not a standalone turn)
       const ballHandlerId = playerMap[turn.ball_handler] ?? turn.ball_handler;
       const stealerRaw =
@@ -1155,13 +1144,16 @@ export async function animateGameTurns({ //hasBallAtStep
           easing: cfg.easing
         });
         
-        // Visual effects handled by announcement system
-        const defenderSprite = playerSprites[stealerId];
-        // runPass reattaches the ball after the tween resolves, so only emit
-        // possession change once that handoff has finished.
-        if (!scene.stateMachine?.is(States.FastBreak) && defenderSprite) {
-          scene.events?.emit?.('possessionChange', { offenseTeamId: defenderSprite.team_id });
+          // Visual effects handled by announcement system
+          const defenderSprite = playerSprites[stealerId];
+          // runPass reattaches the ball after the tween resolves, so only emit
+          // possession change once that handoff has finished.
+          if (!scene.stateMachine?.is(States.FastBreak) && defenderSprite) {
+            scene.events?.emit?.('possessionChange', { offenseTeamId: defenderSprite.team_id });
+          }
         }
+        // Steal event handled inline - continue to next turn
+        continue;
       }
     }
     if (scene.skipToEnd) {
