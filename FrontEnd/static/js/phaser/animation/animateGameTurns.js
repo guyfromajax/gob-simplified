@@ -1124,32 +1124,33 @@ export async function animateGameTurns({ //hasBallAtStep
         // Steal without animations - check if it's a steal event within another turn
         const stealEvent = turn.events?.find(e => e.event_type === "STEAL");
         if (!scene.stateMachine?.is(States.FastBreak) && stealEvent) {
-      // STEAL event within another turn - handle inline (not a standalone turn)
-      const ballHandlerId = playerMap[turn.ball_handler] ?? turn.ball_handler;
-      const stealerRaw =
-        turn.stealerId ||
-        turn.stealer_id ||
-        stealEvent?.stealerId ||
-        stealEvent?.stealer_id;
-      const stealerId = stealerRaw ?? playerMap[turn.stealer_name];
-      if (ballHandlerId != null && stealerId != null) {
-        const cfg = animationConfig.steal || {};
-        if (scene.__activePass) {
-          animationDebugWarn('Active pass tween detected before steal; cancelling previous tween');
-        }
-        await runPass(scene, {
-          fromId: ballHandlerId,
-          toId: stealerId,
-          duration: cfg.duration,
-          easing: cfg.easing
-        });
-        
-          // Visual effects handled by announcement system
-          const defenderSprite = playerSprites[stealerId];
-          // runPass reattaches the ball after the tween resolves, so only emit
-          // possession change once that handoff has finished.
-          if (!scene.stateMachine?.is(States.FastBreak) && defenderSprite) {
-            scene.events?.emit?.('possessionChange', { offenseTeamId: defenderSprite.team_id });
+          // STEAL event within another turn - handle inline (not a standalone turn)
+          const ballHandlerId = playerMap[turn.ball_handler] ?? turn.ball_handler;
+          const stealerRaw =
+            turn.stealerId ||
+            turn.stealer_id ||
+            stealEvent?.stealerId ||
+            stealEvent?.stealer_id;
+          const stealerId = stealerRaw ?? playerMap[turn.stealer_name];
+          if (ballHandlerId != null && stealerId != null) {
+            const cfg = animationConfig.steal || {};
+            if (scene.__activePass) {
+              animationDebugWarn('Active pass tween detected before steal; cancelling previous tween');
+            }
+            await runPass(scene, {
+              fromId: ballHandlerId,
+              toId: stealerId,
+              duration: cfg.duration,
+              easing: cfg.easing
+            });
+            
+            // Visual effects handled by announcement system
+            const defenderSprite = playerSprites[stealerId];
+            // runPass reattaches the ball after the tween resolves, so only emit
+            // possession change once that handoff has finished.
+            if (!scene.stateMachine?.is(States.FastBreak) && defenderSprite) {
+              scene.events?.emit?.('possessionChange', { offenseTeamId: defenderSprite.team_id });
+            }
           }
         }
         // Steal event handled inline - continue to next turn
