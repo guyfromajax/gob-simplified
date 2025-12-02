@@ -1039,7 +1039,6 @@ export async function animateGameTurns({ //hasBallAtStep
           turn_index: i,
           result_type: turn.result_type,
           fast_break: turn.fast_break,
-          isFCPHCTTurn: isFCPHCTTurn,
           willRouteToAnimationRouter: true
         });
       }
