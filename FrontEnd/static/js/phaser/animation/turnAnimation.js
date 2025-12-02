@@ -1161,14 +1161,55 @@ async function runInboundSetup({
   const rimPx = gridToPixels(rimGrid.x, rimGrid.y, width, height);
   const spotPx = gridToPixels(ballSpot.x, ballSpot.y, width, height);
 
-  const pgDestPx = gridToPixels(inboundDest.PG.x, inboundDest.PG.y, width, height);
-  animationDebugLog(`inboundDest assigned for PG: (${pgDestPx.x},${pgDestPx.y})`);
-  const sgDestPx = gridToPixels(inboundDest.SG.x, inboundDest.SG.y, width, height);
-  animationDebugLog(`inboundDest assigned for SG: (${sgDestPx.x},${sgDestPx.y})`);
-  const pfDestPx = gridToPixels(inboundDest.PF.x, inboundDest.PF.y, width, height);
-  animationDebugLog(`inboundDest assigned for PF: (${pfDestPx.x},${pfDestPx.y})`);
-  const cDestPx = gridToPixels(inboundDest.C.x, inboundDest.C.y, width, height);
-  animationDebugLog(`inboundDest assigned for C: (${cDestPx.x},${cDestPx.y})`);
+  // ✅ ENHANCEMENT: For FCP/HCT, try to use step 0 positions from next turn's skeleton
+  // This positions offensive players in their press-break formation from the start
+  let useSkeletonPositions = false;
+  let skeletonPositions = {};
+  
+  if (skipRetreat && pressureType && scene.simData?.turns && typeof scene.currentTurn === 'number') {
+    const nextTurnIndex = scene.currentTurn + 1;
+    const nextTurn = scene.simData.turns[nextTurnIndex];
+    
+    if (nextTurn?.animations && Array.isArray(nextTurn.animations) && nextTurn.animations.length > 0) {
+      // Extract step 0 positions from next turn's animations
+      for (const anim of nextTurn.animations) {
+        const firstStep = anim.movement?.[0];
+        if (firstStep?.coords && anim.playerId) {
+          const info = scene.playerInfo?.[anim.playerId];
+          if (info && info.pos) {
+            skeletonPositions[info.pos] = firstStep.coords;
+          }
+        }
+      }
+      
+      // Only use skeleton positions if we have positions for key players (SF and PG at minimum)
+      if (skeletonPositions.SF && skeletonPositions.PG) {
+        useSkeletonPositions = true;
+        console.log('✅ [FCP/HCT INBOUND] Using skeleton step 0 positions for offensive players', {
+          pressureType,
+          positions: Object.keys(skeletonPositions)
+        });
+      }
+    }
+  }
+  
+  // Use skeleton positions if available, otherwise fall back to baseline inbound positions
+  const pgDest = useSkeletonPositions && skeletonPositions.PG ? skeletonPositions.PG : inboundDest.PG;
+  const sgDest = useSkeletonPositions && skeletonPositions.SG ? skeletonPositions.SG : inboundDest.SG;
+  const pfDest = useSkeletonPositions && skeletonPositions.PF ? skeletonPositions.PF : inboundDest.PF;
+  const cDest = useSkeletonPositions && skeletonPositions.C ? skeletonPositions.C : inboundDest.C;
+  const sfDest = useSkeletonPositions && skeletonPositions.SF ? skeletonPositions.SF : ballSpot;
+
+  const pgDestPx = gridToPixels(pgDest.x, pgDest.y, width, height);
+  animationDebugLog(`inboundDest assigned for PG: (${pgDestPx.x},${pgDestPx.y}) ${useSkeletonPositions ? '[SKELETON]' : '[BASELINE]'}`);
+  const sgDestPx = gridToPixels(sgDest.x, sgDest.y, width, height);
+  animationDebugLog(`inboundDest assigned for SG: (${sgDestPx.x},${sgDestPx.y}) ${useSkeletonPositions ? '[SKELETON]' : '[BASELINE]'}`);
+  const pfDestPx = gridToPixels(pfDest.x, pfDest.y, width, height);
+  animationDebugLog(`inboundDest assigned for PF: (${pfDestPx.x},${pfDestPx.y}) ${useSkeletonPositions ? '[SKELETON]' : '[BASELINE]'}`);
+  const cDestPx = gridToPixels(cDest.x, cDest.y, width, height);
+  animationDebugLog(`inboundDest assigned for C: (${cDestPx.x},${cDestPx.y}) ${useSkeletonPositions ? '[SKELETON]' : '[BASELINE]'}`);
+  const sfDestPx = gridToPixels(sfDest.x, sfDest.y, width, height);
+  animationDebugLog(`inboundDest assigned for SF: (${sfDestPx.x},${sfDestPx.y}) ${useSkeletonPositions ? '[SKELETON]' : '[BASELINE]'}`);
 
   if (scene.tweens) {
     scene.tweens.killTweensOf(ballSprite);
@@ -1184,17 +1225,19 @@ async function runInboundSetup({
   animationDebugLog(`[inbound][rimHoldEnd][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
   animationDebugLog(`[inbound][ballTweenStart][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
   let ballTween;
+  // Use SF's destination for ball position (SF receives inbound pass)
+  const ballDestPx = useSkeletonPositions ? sfDestPx : spotPx;
   if (animationConfig.enableBallTween) {
     // ✅ STEP 3 MIGRATION: Use new animateBallToPosition() instead of tweenBallTo()
     // animateBallToPosition() gets ballSprite from scene.ballSprite internally
-    ballTween = animateBallToPosition(scene, spotPx, {
+    ballTween = animateBallToPosition(scene, ballDestPx, {
       duration: 500,
       easing: "Sine.easeInOut"
     }).then(() => {
       animationDebugLog(`[inbound][ballTweenEnd][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
     });
   } else {
-    ballSprite.setPosition(spotPx.x, spotPx.y);
+    ballSprite.setPosition(ballDestPx.x, ballDestPx.y);
     animationDebugLog(`[inbound][ballTweenEnd][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
     ballTween = Promise.resolve();
   }
@@ -1202,11 +1245,11 @@ async function runInboundSetup({
   const sfTween = new Promise((resolve) => {
     // Use distance-based duration for consistent speed (same as HCO step movements)
     // Use regular speed (not transition) for inbound setup - should be faster
-    const sfDuration = getPlayerDuration(sfSprite, spotPx.x, spotPx.y, false);
+    const sfDuration = getPlayerDuration(sfSprite, sfDestPx.x, sfDestPx.y, false);
     scene.tweens.add({
       targets: sfSprite,
-      x: spotPx.x,
-      y: spotPx.y,
+      x: sfDestPx.x,
+      y: sfDestPx.y,
       duration: sfDuration,
       ease: "Linear", // Match HCO step movements for consistent feel
       onComplete: () => {
