@@ -4024,6 +4024,27 @@
         }
       };
 
+      // ✅ FIX: Check for existing skeleton by name if skeletonId not set
+      // This ensures all variants with the same name stay in the same document
+      if (!playState.skeletonId && skeletonData.name) {
+        try {
+          const checkResponse = await fetch('/api/hct-skeletons');
+          if (checkResponse.ok) {
+            const existingSkeletons = await checkResponse.json();
+            const existingSkeleton = existingSkeletons.find(s => 
+              (s.name === skeletonData.name) || (s.play === skeletonData.name)
+            );
+            if (existingSkeleton && existingSkeleton._id) {
+              playState.skeletonId = existingSkeleton._id;
+              skeletonData._id = existingSkeleton._id;
+              console.log(`✅ Found existing skeleton with name "${skeletonData.name}", using _id: ${existingSkeleton._id}`);
+            }
+          }
+        } catch (error) {
+          console.warn('Could not check for existing skeletons:', error);
+        }
+      }
+      
       // If editing existing skeleton, include _id
       if (playState.skeletonId) {
         skeletonData._id = playState.skeletonId;
