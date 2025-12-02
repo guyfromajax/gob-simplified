@@ -271,57 +271,45 @@ export async function runFreeThrowSequence(
             },
             ["shotResult"]
           );
+          // ✅ CRITICAL FIX: Flip possession FIRST, then calculate newOffenseSide
+          // After final free throw is made, possession flips - the team that was on defense is now on offense
+          const newOffenseTeamId = turnData.possession_team_id;
+          if (newOffenseTeamId && possessionChanged) {
+            scene.offenseTeamId = newOffenseTeamId;
+            // Emit possession change event IMMEDIATELY to update all systems
+            scene.events?.emit?.("possessionChange", {
+              offenseTeamId: newOffenseTeamId,
+            });
+            console.log('🏀 [FREE THROW MAKE] Flipped possession BEFORE calculating newOffenseSide', {
+              newOffenseTeamId,
+              possession_team_id: turnData.possession_team_id,
+              old_offense_team_id: turnData.offense_team_id,
+              scene_offenseTeamId_after_flip: scene.offenseTeamId
+            });
+          }
+          
+          // Now calculate newOffenseSide using the UPDATED scene.offenseTeamId
           const resolveOffenseSide =
             helpers.getOffenseSide ||
             ((scene, teamId) =>
               teamId === scene.simData?.home_team_id ? "home" : "away");
           
-          // Try using possession_team_id directly (this should be the correct team after possession flip)
-          const newOffenseSide = resolveOffenseSide(scene, turnData.possession_team_id);
-          
-          // Also calculate what we think it should be for comparison
-          const expectedNewOffenseTeamId = possessionChanged 
-            ? (turnData.offense_team_id === scene.simData?.home_team_id 
-                ? scene.simData?.away_team_id 
-                : scene.simData?.home_team_id)
-            : turnData.offense_team_id;
-          const expectedNewOffenseSide = resolveOffenseSide(scene, expectedNewOffenseTeamId);
+          // Use the UPDATED scene.offenseTeamId (or fallback to possession_team_id)
+          const finalOffenseTeamId = scene.offenseTeamId || turnData.possession_team_id;
+          const newOffenseSide = resolveOffenseSide(scene, finalOffenseTeamId);
           
           animationDebugLog('Final free throw made - inbound setup:', {
             possession_flips: possessionChanged,
             original_offense_team_id: turnData.offense_team_id,
             possession_team_id: turnData.possession_team_id,
+            scene_offenseTeamId: scene.offenseTeamId,
+            finalOffenseTeamId,
             newOffenseSide,
-            expectedNewOffenseTeamId,
-            expectedNewOffenseSide,
             home_team_id: scene.simData?.home_team_id,
             away_team_id: scene.simData?.away_team_id,
             shooter_team_id: turnData.shooter_team_id,
-            all_turnData_keys: Object.keys(turnData),
             next_defensive_setup: turnData.next_defensive_setup
           });
-          
-          // Let's also check what the current scene offense team is
-          animationDebugLog('Scene offense team info:', {
-            scene_offenseTeamId: scene.offenseTeamId,
-            scene_simData: scene.simData
-          });
-          
-          // ✅ FIX: Flip possession BEFORE inbound setup
-          // After final free throw is made, possession flips - the team that was on defense is now on offense
-          const newOffenseTeamId = turnData.possession_team_id;
-          if (newOffenseTeamId && possessionChanged) {
-            scene.offenseTeamId = newOffenseTeamId;
-            // Emit possession change event BEFORE inbound setup
-            scene.events?.emit?.("possessionChange", {
-              offenseTeamId: newOffenseTeamId,
-            });
-            console.log('🏀 [FREE THROW MAKE] Flipped possession before inbound setup', {
-              newOffenseTeamId,
-              possession_team_id: turnData.possession_team_id,
-              old_offense_team_id: turnData.offense_team_id
-            });
-          }
           
           // Check if FCP/HCT is coming next - if so, skip retreat animation
           const skipRetreat = turnData.next_defensive_setup === "FCP" || turnData.next_defensive_setup === "HCT";
@@ -330,7 +318,7 @@ export async function runFreeThrowSequence(
             console.log(`${turnData.next_defensive_setup} detected after FT - skipping defensive retreat to midcourt`);
           }
           
-          // Now call inboundSetup with the correct offense team (already flipped above)
+          // Now call inboundSetup with the correct offense team (possession already flipped above)
           await inboundSetup({
             scene,
             ballSprite,
