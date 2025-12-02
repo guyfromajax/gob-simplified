@@ -1812,6 +1812,9 @@
         variantData.currentStep = 1; // No steps left, start at step 1
       }
       
+      // Reset divergence flag since we're viewing an existing step now
+      hasAlreadyDiverged = false;
+      
       // Reload variant to show updated steps (this will load the last remaining step's data)
       loadVariantForEditing(currentVariant, false);
       
@@ -1819,6 +1822,7 @@
       updateVariantInfo();
       renderPositionDashboard();
       renderCourtVisualization();
+      validateActionButton(); // Update button states
       
       console.log(`✅ Deleted step ${stepIndex + 1} and all subsequent steps`);
     }
@@ -1972,18 +1976,13 @@
     }
     
     function updateStepReviewButtons() {
-      const variantData = getCurrentVariantData();
+      // ✅ FIX: Always show build buttons, never show review buttons
+      // After deleting steps, user can either modify and "Add Step" or "Finish Variant & Save"
       const reviewButtons = document.getElementById('review-buttons');
       const buildButtons = document.getElementById('build-buttons');
       
-      // Show review buttons if we're on an existing step (not past the end)
-      if (variantData.currentStep <= variantData.steps.length) {
-        reviewButtons.classList.remove('hidden');
-        buildButtons.classList.add('hidden');
-      } else {
-        reviewButtons.classList.add('hidden');
-        buildButtons.classList.remove('hidden');
-      }
+      reviewButtons.classList.add('hidden');
+      buildButtons.classList.remove('hidden');
     }
 
     function keepStep() {
@@ -3655,6 +3654,9 @@
         return;
       }
       
+      const variantData = getCurrentVariantData();
+      const isViewingExistingStep = variantData.currentStep <= variantData.steps.length;
+      
       // Check if any player has shoot action (final step)
       // NOTE: "drive" is NOT a turn-ender - only "shoot" is
       let hasShoot = false;
@@ -3676,11 +3678,16 @@
         }
       }
 
-      // For shot variant, require shoot action to finish
-      // For other variants, allow finishing without shoot
-      if (hasShoot && currentVariant === 'shot') {
+      // ✅ FIX: If viewing existing step, disable "Add Step" unless changes were made
+      if (isViewingExistingStep && !hasAlreadyDiverged) {
+        // Viewing existing step with no changes - disable "Add Step"
+        actionBtn.textContent = 'Add Step';
+        actionBtn.disabled = true;
+        completeVariantBtn.disabled = false;
+        completeVariantBtn.style.opacity = '1';
+        completeVariantBtn.style.boxShadow = 'none';
+      } else if (hasShoot && currentVariant === 'shot') {
         // Shot assigned - this is the final step (shot variant only)
-        // ✅ FIX: Enable button so user can save the final shot step
         actionBtn.disabled = false;
         actionBtn.textContent = 'Shot = Final Step';
         completeVariantBtn.disabled = false;
