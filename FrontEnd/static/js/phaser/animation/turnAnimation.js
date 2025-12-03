@@ -1224,6 +1224,21 @@ async function runInboundSetup({
     }
   }
   
+  // ✅ FIX: Skip inbound pass animation for FCP/HCT - skeleton includes it in steps 0-1
+  // Just position players and return - skeleton animation will handle the pass
+  if (skipRetreat && pressureType) {
+    console.log('🎯 [FCP/HCT SETUP] Skipping inbound pass - skeleton will handle it', {
+      pressureType,
+      useSkeletonPositions,
+      newOffenseSide,
+      note: 'Players positioned, but no pass animation - skeleton steps 0-1 will animate the pass'
+    });
+    
+    // Position players for pressure setup but don't animate the inbound pass
+    // The FCP/HCT skeleton animation (next turn) will handle the pass in its steps 0-1
+    return;
+  }
+
   // Use skeleton positions if available, otherwise fall back to baseline inbound positions
   const pgDest = useSkeletonPositions && skeletonPositions.PG ? skeletonPositions.PG : inboundDest.PG;
   const sgDest = useSkeletonPositions && skeletonPositions.SG ? skeletonPositions.SG : inboundDest.SG;
@@ -1231,21 +1246,17 @@ async function runInboundSetup({
   const cDest = useSkeletonPositions && skeletonPositions.C ? skeletonPositions.C : inboundDest.C;
   const sfDest = useSkeletonPositions && skeletonPositions.SF ? skeletonPositions.SF : ballSpot;
 
-  // 🔍 DEBUG: Log offensive player destinations for FCP/HCT setup
-  if (skipRetreat && pressureType) {
-    console.log('🔍 [FCP/HCT SETUP] Offensive player destinations:', {
-      pressureType,
-      useSkeletonPositions,
-      newOffenseSide,
-      positions: {
-        PG: { grid: pgDest, source: useSkeletonPositions ? 'skeleton' : 'baseline' },
-        SG: { grid: sgDest, source: useSkeletonPositions ? 'skeleton' : 'baseline' },
-        SF: { grid: sfDest, source: useSkeletonPositions ? 'skeleton' : 'baseline' },
-        PF: { grid: pfDest, source: useSkeletonPositions ? 'skeleton' : 'baseline' },
-        C: { grid: cDest, source: useSkeletonPositions ? 'skeleton' : 'baseline' }
-      }
-    });
-  }
+  // 🔍 DEBUG: Log offensive player destinations (HCO only now - FCP/HCT returns above)
+  console.log('🔍 [HCO INBOUND] Offensive player destinations:', {
+    newOffenseSide,
+    positions: {
+      PG: { grid: pgDest, source: 'baseline' },
+      SG: { grid: sgDest, source: 'baseline' },
+      SF: { grid: sfDest, source: 'baseline' },
+      PF: { grid: pfDest, source: 'baseline' },
+      C: { grid: cDest, source: 'baseline' }
+    }
+  });
 
   const pgDestPx = gridToPixels(pgDest.x, pgDest.y, width, height);
   animationDebugLog(`inboundDest assigned for PG: (${pgDestPx.x},${pgDestPx.y}) ${useSkeletonPositions ? '[SKELETON]' : '[BASELINE]'}`);
