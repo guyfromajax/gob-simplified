@@ -577,6 +577,18 @@ export async function animateGameTurns({ //hasBallAtStep
     }
 
     if (turn.result_type === "FOUL") {
+      // ✅ DEBUG: Log FOUL routing decision
+      console.log('🔍 [FOUL ROUTING]', {
+        turn_index: i,
+        has_animations: !!turn.animations?.length,
+        animation_count: turn.animations?.length || 0,
+        fcp_foul: turn.fcp_foul,
+        hct_foul: turn.hct_foul,
+        foul_team: turn.foul_team,
+        pressureSequenceActive: scene.pressureSequenceActive,
+        will_route_to_router: !!(turn.animations && turn.animations.length > 0)
+      });
+      
       // ✅ FIX: Route ALL fouls with animations through AnimationRouter
       // This includes FCP/HCT fouls (fcp_foul/hct_foul flags) and regular HCO fouls (when we add them)
       if (turn.animations && turn.animations.length > 0) {
@@ -600,6 +612,17 @@ export async function animateGameTurns({ //hasBallAtStep
     }
     
     if (turn.result_type === "DEAD BALL") {
+      // ✅ DEBUG: Log DEAD BALL routing decision
+      console.log('🔍 [DEAD_BALL ROUTING]', {
+        turn_index: i,
+        has_animations: !!turn.animations?.length,
+        animation_count: turn.animations?.length || 0,
+        pressureSequenceActive: scene.pressureSequenceActive,
+        possession_flips: turn.possession_flips,
+        possession_team_id: turn.possession_team_id,
+        will_route_to_router: !!(turn.animations && turn.animations.length > 0)
+      });
+      
       // ✅ FIX: Route ALL dead ball with animations through AnimationRouter
       // This includes FCP/HCT dead ball turnovers and regular HCO dead ball (when we add them)
       if (turn.animations && turn.animations.length > 0) {
@@ -979,9 +1002,21 @@ export async function animateGameTurns({ //hasBallAtStep
 
     const shooterId = playerMap[shooterName];
 
-    // ✅ FIX: Route ALL HCO result_type turns with animations through AnimationRouter
-    // This includes FCP/HCT → HCO transitions (press break) and regular HCO setup turns
+    // ✅ DEBUG: Log HCO routing decision
     if (turn.result_type === "HCO") {
+      console.log('🔍 [HCO RESULT_TYPE ROUTING]', {
+        turn_index: i,
+        has_animations: !!turn.animations?.length,
+        animation_count: turn.animations?.length || 0,
+        pressureSequenceActive: scene.pressureSequenceActive,
+        next_defensive_setup: turn.next_defensive_setup,
+        fcp_shot: turn.fcp_shot,
+        hct_shot: turn.hct_shot,
+        will_route_to_router: !!(turn.animations && turn.animations.length > 0)
+      });
+      
+      // ✅ FIX: Route ALL HCO result_type turns with animations through AnimationRouter
+      // This includes FCP/HCT → HCO transitions (press break) and regular HCO setup turns
       if (turn.animations && turn.animations.length > 0) {
         // HCO with animations - route through AnimationRouter
         turn.index = i;
@@ -1113,9 +1148,21 @@ export async function animateGameTurns({ //hasBallAtStep
       }
     }
 
-    // ✅ FIX: Route ALL steals with animations through AnimationRouter
-    // This includes FCP/HCT steals and regular HCO steals (when we add them)
+    // ✅ DEBUG: Log STEAL routing decision
     if (turn.result_type === "STEAL") {
+      console.log('🔍 [STEAL ROUTING]', {
+        turn_index: i,
+        has_animations: !!turn.animations?.length,
+        animation_count: turn.animations?.length || 0,
+        pressureSequenceActive: scene.pressureSequenceActive,
+        possession_flips: turn.possession_flips,
+        possession_team_id: turn.possession_team_id,
+        next_play_type: turn.next_play_type,
+        will_route_to_router: !!(turn.animations && turn.animations.length > 0)
+      });
+      
+      // ✅ FIX: Route ALL steals with animations through AnimationRouter
+      // This includes FCP/HCT steals and regular HCO steals (when we add them)
       if (turn.animations && turn.animations.length > 0) {
         // Steal with animations - route through AnimationRouter
         turn.index = i;
