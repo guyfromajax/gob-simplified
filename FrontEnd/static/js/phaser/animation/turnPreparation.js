@@ -105,6 +105,15 @@ export function prepareTurnForAnimation({ turn, scene, turnIndex, homeTeamId }) 
  * @param {Object} turnData - Turn data from backend
  */
 function handleTurnTransition(scene, turnData) {
+  // ✅ DEBUG: Always log transition handler entry
+  console.log('🔍 [UNIVERSAL TRANSITION] Entry', {
+    result_type: turnData.result_type,
+    possession_flips: turnData.possession_flips,
+    possession_team_id: turnData.possession_team_id,
+    current_scene_offenseTeamId: scene.offenseTeamId,
+    _possessionAlreadyFlipped: scene._possessionAlreadyFlipped
+  });
+  
   // ✅ EXCEPTION: Skip if FREE_THROW already flipped possession during animation
   // FREE_THROW flips BEFORE inbound (during animation), not after
   if (turnData.result_type === "FREE_THROW" && scene._possessionAlreadyFlipped) {
@@ -124,19 +133,25 @@ function handleTurnTransition(scene, turnData) {
       scene.events?.emit('possessionChange', { 
         offenseTeamId: turnData.possession_team_id 
       });
-      console.log('🔄 [UNIVERSAL TRANSITION] Possession flipped', {
+      console.log('✅ [UNIVERSAL TRANSITION] Possession flipped', {
         from: previousOffenseTeamId,
         to: turnData.possession_team_id,
         result_type: turnData.result_type,
         next_play_type: turnData.next_play_type
       });
     } else {
-      console.log('🔄 [UNIVERSAL TRANSITION] Possession flip requested but already correct', {
+      console.log('⚠️ [UNIVERSAL TRANSITION] Possession flip requested but already correct', {
         current: previousOffenseTeamId,
         requested: turnData.possession_team_id,
         result_type: turnData.result_type
       });
     }
+  } else {
+    console.log('⏭️ [UNIVERSAL TRANSITION] No possession flip needed', {
+      possession_flips: turnData.possession_flips,
+      possession_team_id: turnData.possession_team_id,
+      result_type: turnData.result_type
+    });
   }
   
   // Note: next_play_type transitions are handled by the turn-by-turn loop

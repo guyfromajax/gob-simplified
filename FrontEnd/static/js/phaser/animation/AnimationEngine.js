@@ -659,7 +659,15 @@ export class AnimationEngine {
   }
 
   async handleDefault(turnData, context) {
-    console.log('AnimationEngine: Handling default animation');
+    console.log('🔍 [DEFAULT HANDLER] Entry', {
+      result_type: turnData.result_type,
+      has_animations: !!turnData.animations?.length,
+      animation_count: turnData.animations?.length || 0,
+      fcp_foul: turnData.fcp_foul,
+      hct_foul: turnData.hct_foul,
+      pressureSequenceActive: this.scene.pressureSequenceActive
+    });
+    
     // ✅ PHASE 2.3: Note: Pre/post setup is handled by AnimationRouter
     // This handler only needs to call playTurnAnimation with the provided context
     // Import and use existing turn animation handler for now
@@ -674,6 +682,10 @@ export class AnimationEngine {
       onAction: context.onAction,
       turnIndex: context.turnIndex, // ✅ PHASE 2.1: Pass turnIndex
       onUpdate: context.onUpdate // ✅ PHASE 2.1: Pass onUpdate (for future use)
+    });
+    
+    console.log('✅ [DEFAULT HANDLER] playTurnAnimation completed', {
+      result_type: turnData.result_type
     });
   }
 

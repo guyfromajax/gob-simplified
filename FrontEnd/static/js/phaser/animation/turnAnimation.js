@@ -1484,8 +1484,19 @@ async function runInboundSetup({
  * @param {Function} params.onUpdate - Update callback (optional, for future use)
  */
 export async function playTurnAnimation({ scene, simData, playerSprites, turnData, ballSprite, onAction, turnIndex, onUpdate }) {
-  // ✅ REMOVED: Special FCP/HCT duplicate prevention - FCP/HCT now routes through AnimationRouter (same as HCO)
-  // AnimationRouter handles duplicate prevention, so no special handling needed here
+  
+  // ✅ DEBUG: Log playTurnAnimation entry
+  console.log('🔍 [playTurnAnimation] Entry', {
+    turn_index: turnIndex,
+    result_type: turnData.result_type,
+    has_animations: !!turnData.animations?.length,
+    animation_count: turnData.animations?.length || 0,
+    fcp_shot: turnData.fcp_shot,
+    hct_shot: turnData.hct_shot,
+    fcp_foul: turnData.fcp_foul,
+    hct_foul: turnData.hct_foul,
+    pressureSequenceActive: scene.pressureSequenceActive
+  });
   
   // Guard: Skip if this is an opening tip, putback, or if animations is missing
   // Putback turns are handled by handleOrebTurn in animateGameTurns.js
