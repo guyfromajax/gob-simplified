@@ -156,6 +156,9 @@ class TurnManager:
 
         self.logger.log("baselineInbound:start")
 
+        # Define ball spot for inbounder (used in payload regardless of pressure type)
+        inbound_spot_home = {"x": 50, "y": 25}  # Center baseline
+
         # ✅ NEW: Use skeleton step 0 positions for FCP/HCT setup
         # This ensures players start in their press-break formation (extracted from skeletons)
         if next_defensive_setup == "FCP":
@@ -176,11 +179,16 @@ class TurnManager:
                 o_dest_home[pos] = coords.copy()
                 self.logger.log(f"destAssigned:{pos}")
             
+            # For FCP/HCT, ball spot should be at SF's inbound location (inbound_left or inbound_right)
+            # SF is always the inbounder for FCP/HCT
+            sf_location = setup_locations.get("SF", "inbound_left")
+            inbound_spot_home = HCO_STRING_SPOTS.get(sf_location, {"x": 50, "y": 25})
+            
             # Flip offensive coordinates if the away team has possession
             o_dest = getAwayTeamCoords(o_dest_home.copy()) if is_away_offense else o_dest_home
         else:
             # Use random baseline positions for normal HCO inbound (no pressure)
-            inbound_spot_home = {"x": 50, "y": 25}  # Center baseline
+            # inbound_spot_home already defined above
 
             # Destination ranges for other offensive players (home orientation).
             home_ranges = {
