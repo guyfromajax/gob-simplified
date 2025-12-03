@@ -315,16 +315,14 @@ export class AnimationEngine {
     if (hasFCPHCTSetup) {
       this.scene.currentPressureType = turnData.next_defensive_setup; // "FCP" or "HCT"
       this.scene.pressureSequenceActive = true;
-      console.log('🎯 [FCP/HCT SETUP DETECTED] Positioning players, then skeleton will handle pass', {
+      console.log('🎯 [FCP/HCT SETUP DETECTED] Positioning players and animating inbound pass', {
         pressureType: this.scene.currentPressureType,
         pressureSequenceActive: this.scene.pressureSequenceActive,
         result_type: turnData.result_type,
         next_defensive_setup: turnData.next_defensive_setup
       });
-      
-      // ✅ FIX: Position players for FCP/HCT setup, but don't animate the pass
-      // The skeleton will handle the pass in its steps 0-1
-      // This creates the "beat" where SF holds the ball before passing
+      // ✅ NEW APPROACH: Animate the inbound pass HERE (using skeleton step 0 positions)
+      // Skeleton will start from old step 1 (after the pass is complete)
     } else {
       // Clear state if no pressure setup (normal inbound)
       this.scene.currentPressureType = null;
@@ -359,12 +357,9 @@ export class AnimationEngine {
       })
     );
     
-    // ✅ FIX: For FCP/HCT, players are now positioned - return before animating pass
-    // Skeleton animation will handle the pass in its steps 0-1
-    if (hasFCPHCTSetup) {
-      console.log('✅ [FCP/HCT SETUP] Players positioned at step 0, skipping pass animation');
-      return;
-    }
+    // ✅ NEW APPROACH: For FCP/HCT, continue to animate the inbound pass (don't skip)
+    // Players are now at skeleton step 0 positions, pass animation creates the hold beat
+    // Skeleton will start from old step 1 (new step 0) after this turn completes
     
     // ✅ PHASE 2.6: Transition to HalfCourt state (moved from animateGameTurns.js)
     const { safeTransition } = await import('../state/gameStateMachine.js');

@@ -155,9 +155,29 @@ HCO_STRING_SPOTS = {
     "deep lower baseline": {"x": 57, "y": 5},
     "deep upper wing": {"x": 57, "y": 35},
     "deep upper baseline": {"x": 57, "y": 45},
-    # Inbound positions (for FCP/HCT skeletons after made baskets),  # Center of baseline
+    # Inbound positions (for FCP/HCT skeletons after made baskets)
     "inbound_left": {"x": 3, "y": 25},    # Left of center baseline
     "inbound_right": {"x": 97, "y": 25}    # Right of center baseline
+}
+
+# FCP/HCT setup positions (step 0 extracted from skeletons)
+# These positions are used during BASELINE_INBOUND setup before skeleton animation
+# All FCP variants use the same starting positions
+FCP_SETUP_POSITIONS = {
+    "PG": "lower bird",
+    "SG": "upper midBaseline",
+    "SF": "inbound_left",
+    "PF": "deep key",
+    "C": "key"
+}
+
+# All HCT variants use the same starting positions
+HCT_SETUP_POSITIONS = {
+    "PG": "lower bird",
+    "SG": "upper highPost",
+    "SF": "inbound_left",
+    "PF": "deep upper wing",
+    "C": "deep lower wing"
 }
 
 # Offset positions for collision handling (when two players at same spot)

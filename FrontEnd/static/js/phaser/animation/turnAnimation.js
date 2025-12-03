@@ -1224,19 +1224,15 @@ async function runInboundSetup({
     }
   }
   
-  // ✅ FIX: Skip inbound pass animation for FCP/HCT - skeleton includes it in steps 0-1
-  // Just position players and return - skeleton animation will handle the pass
+  // ✅ NEW APPROACH: Don't skip inbound pass for FCP/HCT anymore
+  // Players are positioned at skeleton step 0 locations (from backend setup positions)
+  // We'll animate the inbound pass here, then skeleton starts from old step 1
   if (skipRetreat && pressureType) {
-    console.log('🎯 [FCP/HCT SETUP] Skipping inbound pass - skeleton will handle it', {
+    console.log('🎯 [FCP/HCT SETUP] Animating inbound pass from skeleton step 0 positions', {
       pressureType,
-      useSkeletonPositions,
       newOffenseSide,
-      note: 'Players positioned, but no pass animation - skeleton steps 0-1 will animate the pass'
+      note: 'Players at step 0 positions, animating pass, then skeleton continues from old step 1'
     });
-    
-    // Position players for pressure setup but don't animate the inbound pass
-    // The FCP/HCT skeleton animation (next turn) will handle the pass in its steps 0-1
-    return;
   }
 
   // Use skeleton positions if available, otherwise fall back to baseline inbound positions
