@@ -2226,8 +2226,25 @@
     async function finishVariantAndSave() {
       const variantData = getCurrentVariantData();
       
-      // Auto-submit current step if it has any assignments
+      // ✅ FIX: Do NOT auto-submit current step
+      // User uses "Add Step" to save steps, "Finish Variant & Save" only saves the skeleton
+      // Warn if there are unsaved assignments
       if (Object.keys(currentStepAssignments).length > 0) {
+        const hasUnsaved = POSITIONS.some(pos => {
+          const assignment = currentStepAssignments[pos];
+          return assignment && (assignment.location || assignment.action);
+        });
+        
+        if (hasUnsaved) {
+          if (!confirm('You have unsaved assignments in the current step. These will NOT be saved.\n\nClick "Add Step" first if you want to save them.\n\nContinue without saving current step?')) {
+            return;
+          }
+        }
+        console.log('ℹ️ Current step assignments NOT saved (use "Add Step" to save steps)');
+      }
+      
+      // OLD CODE (removed): Auto-submit current step if it has any assignments
+      if (false && Object.keys(currentStepAssignments).length > 0) {
         // Validate as final step
         const validation = validateCurrentStep(true); // This IS the final step
         if (!validation.valid) {
