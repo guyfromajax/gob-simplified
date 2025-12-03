@@ -32,7 +32,19 @@ import {
 
 export const PLAYER_TWEEN_DEBUG = false;
 
-export function animateStep({ scene, sprite, step, duration, ballSprite, currentBallOwnerRef, onAction, stepIndex = null, nextStep = null }) {
+export function animateStep({ scene, sprite, step, duration, ballSprite, currentBallOwnerRef, onAction, stepIndex = null, nextStep = null, turnData = null }) {
+  // 🔍 DEBUG: Log step entry for FCP/HCT skeleton animations
+  const isFCPHCT = turnData?.play_type === 'FCP' || turnData?.play_type === 'HCT';
+  if (isFCPHCT && stepIndex !== null) {
+    const info = scene.playerInfo?.[sprite?.playerId];
+    console.log(`🔍 [${turnData.play_type} STEP ${stepIndex}] ${info?.pos || 'UNKNOWN'} (${sprite?.playerId?.substring(0, 8)}) animating:`, {
+      from: { x: sprite.x, y: sprite.y },
+      to: step.coords,
+      action: step.action,
+      has_ball: step.has_ball
+    });
+  }
+
   if (scene.skipToEnd) return Promise.resolve();
   return new Promise((resolve) => {
     let tween = null;
