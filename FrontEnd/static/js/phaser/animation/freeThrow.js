@@ -271,34 +271,20 @@ export async function runFreeThrowSequence(
             },
             ["shotResult"]
           );
-          // ✅ EXCEPTION: Free throws need possession flip BEFORE inbound (not after animation)
-          // because inbound happens DURING free throw sequence, not after
-          // Use universal transition pattern but execute it early
-          if (turnData.possession_team_id && possessionChanged) {
-            const previousOffenseTeamId = scene.offenseTeamId;
-            if (previousOffenseTeamId !== turnData.possession_team_id) {
-              scene.offenseTeamId = turnData.possession_team_id;
-              scene.events?.emit?.("possessionChange", {
-                offenseTeamId: turnData.possession_team_id,
-              });
-              console.log('🔄 [FREE THROW TRANSITION] Possession flipped before inbound', {
-                from: previousOffenseTeamId,
-                to: turnData.possession_team_id,
-                result_type: 'FREE_THROW'
-              });
-              // Mark as already flipped so universal handler doesn't double-flip
-              scene._possessionAlreadyFlipped = true;
-            }
-          }
+          // ✅ MATCH HCO PATTERN: Don't explicitly flip possession here
+          // Instead, calculate newOffenseSide and let runInboundSetup enforce it via defensive check
+          // This matches how HCO MAKE works (ShotAnimationSystem.handleMadeShot line 776)
           
-          // Calculate newOffenseSide using possession_team_id (authoritative backend value)
-          const resolveOffenseSide =
-            helpers.getOffenseSide ||
-            ((scene, teamId) =>
-              teamId === scene.simData?.home_team_id ? "home" : "away");
+          // Calculate newOffenseSide directly from possession_team_id (authoritative backend value)
+          // Backend sets possession_team_id to the NEW offense team (team that was on defense)
+          const newOffenseSide = turnData.possession_team_id === scene.simData?.home_team_id ? "home" : "away";
           
-          // Use possession_team_id directly (backend already calculated the new offense team)
-          const newOffenseSide = resolveOffenseSide(scene, turnData.possession_team_id);
+          console.log('🔄 [FREE THROW INBOUND] Calculated newOffenseSide from possession_team_id', {
+            possession_team_id: turnData.possession_team_id,
+            newOffenseSide,
+            home_team_id: scene.simData?.home_team_id,
+            current_scene_offenseTeamId: scene.offenseTeamId
+          });
           
           animationDebugLog('Final free throw made - inbound setup:', {
             possession_flips: possessionChanged,
