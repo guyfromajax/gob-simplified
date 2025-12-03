@@ -356,7 +356,7 @@ export class ShotAnimationSystem {
       });
       
       // ✅ Removed excessive pass sync logging
-      if (false) {
+      if (false && passInfo && stepIndex === passInfo.stepIndex) {
         console.log('🔍 [PASS SYNC DEBUG] Team ID comparison (ShotAnimationSystem):', {
           stepIndex,
           offenseTeamId,

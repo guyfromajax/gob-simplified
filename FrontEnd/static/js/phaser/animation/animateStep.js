@@ -436,7 +436,7 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
     const ballInTargets = validTargets.includes(ballSprite);
     const ballHasActiveTween = ballSprite && scene.tweens?.getTweensOf ? scene.tweens.getTweensOf(ballSprite).length > 0 : false;
     if (ballInTargets || ballHasActiveTween) {
-      if (false) console.log('🔍 [TWEEN TARGETS DEBUG]', {
+      if (false && stepIndex > 0) console.log('🔍 [TWEEN TARGETS DEBUG]', {
         playerId: sprite?.playerId,
         action: step.action,
         validTargetsCount: validTargets.length,

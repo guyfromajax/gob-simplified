@@ -7,17 +7,11 @@
  */
 
 export function triggerNegativeAction(scene, playerId, actionType = 'foul', skipScreenFlash = false) {
-  console.log(`💥 triggerNegativeAction called:`, { playerId, actionType, skipScreenFlash, hasPlayerSprites: !!scene.playerSprites });
-  
   const sprite = scene.playerSprites?.[playerId];
   if (!sprite) {
     console.warn(`⚠️ Cannot trigger negative action: sprite not found for ${playerId}`);
-    console.log(`Available sprites:`, Object.keys(scene.playerSprites || {}));
     return;
   }
-  
-  console.log(`💥 Sprite type:`, sprite.constructor.name, `Has setTint:`, typeof sprite.setTint, `Has tint:`, typeof sprite.tint);
-  console.log(`💥 Sprite object keys:`, Object.keys(sprite));
   
   const isFoul = actionType === 'foul';
   const config = isFoul ? {
@@ -37,8 +31,6 @@ export function triggerNegativeAction(scene, playerId, actionType = 'foul', skip
     iconSize: '48px',    // Much larger text
     animation: 'shake'   // Shake effect
   };
-  
-  console.log(`💥 Triggering ${actionType} effect for player ${playerId}`);
   
   // Helper function to apply tint (handles both single sprites and containers)
   // ✅ FIX: Removed opacity reduction - it was sticking and making sprites invisible
