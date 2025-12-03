@@ -157,7 +157,9 @@ class TurnManager:
         self.logger.log("baselineInbound:start")
 
         # Define ball spot for inbounder (used in payload regardless of pressure type)
-        inbound_spot_home = {"x": 50, "y": 25}  # Center baseline
+        # ✅ FIX: Inbound spot should be at edge of baseline, not center court
+        # Home orientation uses left baseline (x=3), away uses right baseline (x=97 after flip)
+        inbound_spot_home = {"x": 3, "y": 25}  # Left baseline (home orientation)
 
         # ✅ NEW: Use skeleton step 0 positions for FCP/HCT setup
         # This ensures players start in their press-break formation (extracted from skeletons)
