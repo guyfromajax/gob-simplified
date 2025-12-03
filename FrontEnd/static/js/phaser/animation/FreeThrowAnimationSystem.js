@@ -460,23 +460,24 @@ export class FreeThrowAnimationSystem {
       });
     }
 
-    // ✅ MATCH HCO PATTERN: Don't explicitly flip possession here
-    // Instead, calculate newOffenseSide and let runInboundSetup enforce it via defensive check
-    // This matches how HCO MAKE works (ShotAnimationSystem.handleMadeShot line 776)
+    // ✅ EXACT HCO PATTERN: Use shooter sprite to determine newOffenseSide
+    // Copied from ShotAnimationSystem.handleMadeShot line 725-776
+    const shooterSprite = this.playerSprites[turnData.shooter_id];
+    const shooterTeamId = shooterSprite?.team_id;
+    const isHomeOffense = shooterTeamId === this.scene.simData?.home_team_id;
+    // After made shot/FT, possession flips to opposite team
+    const newOffenseSide = isHomeOffense ? 'away' : 'home';
+    
+    console.log('🔄 [FREE THROW INBOUND] Calculated newOffenseSide from shooter sprite', {
+      shooter_id: turnData.shooter_id,
+      shooterTeamId,
+      isHomeOffense,
+      newOffenseSide,
+      home_team_id: this.scene.simData?.home_team_id
+    });
     
     // Execute inbound pass using the existing system
     const { runInboundSetup } = await import('./turnAnimation.js');
-    
-    // Calculate newOffenseSide directly from possession_team_id (authoritative backend value)
-    // Backend sets possession_team_id to the NEW offense team (team that was on defense)
-    const newOffenseSide = turnData.possession_team_id === this.scene.simData?.home_team_id ? 'home' : 'away';
-    
-    console.log('🔄 [FREE THROW INBOUND] Calculated newOffenseSide from possession_team_id', {
-      possession_team_id: turnData.possession_team_id,
-      newOffenseSide,
-      home_team_id: this.scene.simData?.home_team_id,
-      current_scene_offenseTeamId: this.scene.offenseTeamId
-    });
     
     // ✅ FIX: Check for FCP/HCT setup after free throw (same logic as freeThrow.js)
     // This ensures pressureSequenceActive is set so subsequent STEAL turns are recognized as FCP/HCT
