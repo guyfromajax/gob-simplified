@@ -1427,6 +1427,21 @@ def resolve_full_court_press_logic(game: "GameManager"):
     skeleton = get_skeleton_for_turn(result_type, "FCP", game) or {}
     logging.warning(f"🔍 [FCP] Retrieved skeleton: has_steps={bool(skeleton.get('steps'))}, step_count={len(skeleton.get('steps', []))}")
     
+    # 🔍 DEBUG: Log full skeleton structure for comparison with frontend animation
+    if skeleton and skeleton.get('steps'):
+        logging.warning("=" * 80)
+        logging.warning(f"🔍 [FCP FULL SKELETON] result_type={result_type}, variant={skeleton.get('variant', 'unknown')}")
+        for step_idx, step in enumerate(skeleton.get('steps', [])):
+            logging.warning(f"  📍 STEP {step_idx}:")
+            for pos, action_data in step.get('pos_actions', {}).items():
+                location = action_data.get('location', 'N/A')
+                coords = action_data.get('coords', 'N/A')
+                action = action_data.get('action', 'N/A')
+                has_ball = action_data.get('has_ball', False)
+                opp = action_data.get('opp', False)
+                logging.warning(f"    {pos}: location={location}, coords={coords}, action={action}, has_ball={has_ball}, opp={opp}")
+        logging.warning("=" * 80)
+    
     # Handle foul results - use standard foul types for frontend
     if result_type == "D_FOUL":
         game_state["foul_team"] = "DEFENSE"
@@ -2264,6 +2279,21 @@ def resolve_half_court_trap_logic(game: "GameManager"):
     logging.warning(f"🔍 [HCT] Getting skeleton for result_type={result_type} (before result_type change)")
     skeleton = get_skeleton_for_turn(result_type, "HCT", game) or {}
     logging.warning(f"🔍 [HCT] Retrieved skeleton: has_steps={bool(skeleton.get('steps'))}, step_count={len(skeleton.get('steps', []))}")
+    
+    # 🔍 DEBUG: Log full skeleton structure for comparison with frontend animation
+    if skeleton and skeleton.get('steps'):
+        logging.warning("=" * 80)
+        logging.warning(f"🔍 [HCT FULL SKELETON] result_type={result_type}, variant={skeleton.get('variant', 'unknown')}")
+        for step_idx, step in enumerate(skeleton.get('steps', [])):
+            logging.warning(f"  📍 STEP {step_idx}:")
+            for pos, action_data in step.get('pos_actions', {}).items():
+                location = action_data.get('location', 'N/A')
+                coords = action_data.get('coords', 'N/A')
+                action = action_data.get('action', 'N/A')
+                has_ball = action_data.get('has_ball', False)
+                opp = action_data.get('opp', False)
+                logging.warning(f"    {pos}: location={location}, coords={coords}, action={action}, has_ball={has_ball}, opp={opp}")
+        logging.warning("=" * 80)
     
     # Handle foul results - use standard foul types for frontend (same as FCP)
     if result_type == "D_FOUL":
