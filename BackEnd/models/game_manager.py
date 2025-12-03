@@ -194,6 +194,12 @@ class GameManager:
             (result.get("result_type") == "FOUL" and self.game_state.get("free_throws_remaining", 0) == 0)
             or result.get("result_type") == "DEAD BALL"
         ):
+            # ✅ FIX: Flip possession BEFORE setup_side_inbound so correct team inbounds
+            # Dead ball turnovers and offensive fouls always flip possession
+            if result.get("possession_flips"):
+                self.switch_possession()
+                logging.info(f"🔄 Flipped possession before SIP: {self.offense_team.name} now has ball")
+            
             inbound_payload = self.turn_manager.setup_side_inbound()
             self.turns.append(inbound_payload)
             # Reset offensive state to HCO after side inbound (FCP/HCT only apply after made shots)
