@@ -1104,7 +1104,13 @@ export class ShotAnimationSystem {
     // Use the same defensive rebound setup for HCO, HCT, and FCP
     // Fast breaks handle outlet in their own turn
     if (nextPlayType === 'HCO' || nextPlayType === 'HCT' || nextPlayType === 'FCP') {
-      console.log(`🎬 ShotAnimationSystem: Defensive rebound leads to ${nextPlayType} - using runDefensiveReboundSetup`);
+      console.log(`🎬 ShotAnimationSystem: Defensive rebound leads to ${nextPlayType} - using runDefensiveReboundSetup`, {
+        nextPlayType,
+        rebounderId: turnData.rebounderId,
+        fcp_shot: turnData.fcp_shot,
+        hct_shot: turnData.hct_shot,
+        note: 'Should execute outlet step (PG to rebounder, others down court)'
+      });
       
       try {
         // Import and use the same function that works for free throws
