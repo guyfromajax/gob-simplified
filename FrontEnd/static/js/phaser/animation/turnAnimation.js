@@ -1505,17 +1505,38 @@ async function runInboundSetup({
 export async function playTurnAnimation({ scene, simData, playerSprites, turnData, ballSprite, onAction, turnIndex, onUpdate }) {
   
   // ✅ DEBUG: Log playTurnAnimation entry
+  const isFCPHCT = turnData?.play_type === 'FCP' || turnData?.play_type === 'HCT';
   console.log('🔍 [playTurnAnimation] Entry', {
     turn_index: turnIndex,
     result_type: turnData.result_type,
+    play_type: turnData.play_type,
     has_animations: !!turnData.animations?.length,
     animation_count: turnData.animations?.length || 0,
     fcp_shot: turnData.fcp_shot,
     hct_shot: turnData.hct_shot,
     fcp_foul: turnData.fcp_foul,
     hct_foul: turnData.hct_foul,
-    pressureSequenceActive: scene.pressureSequenceActive
+    pressureSequenceActive: scene.pressureSequenceActive,
+    isFCPHCT
   });
+  
+  // 🔍 DEBUG: Log full animation structure for FCP/HCT turns
+  if (isFCPHCT && turnData.animations) {
+    console.log("=".repeat(80));
+    console.log(`🔍 [${turnData.play_type} FULL ANIMATIONS] result_type=${turnData.result_type}`);
+    
+    for (const anim of turnData.animations) {
+      const info = scene.playerInfo?.[anim.playerId];
+      const pos = info?.pos || 'UNKNOWN';
+      console.log(`  🏃 Player: ${pos} (${anim.playerId?.substring(0, 8)})`);
+      
+      for (let stepIdx = 0; stepIdx < (anim.movement?.length || 0); stepIdx++) {
+        const step = anim.movement[stepIdx];
+        console.log(`    📍 STEP ${stepIdx}: coords=${JSON.stringify(step.coords)}, action=${step.action}, has_ball=${step.has_ball || false}, timestamp=${step.timestamp}`);
+      }
+    }
+    console.log("=".repeat(80));
+  }
   
   // Guard: Skip if this is an opening tip, putback, or if animations is missing
   // Putback turns are handled by handleOrebTurn in animateGameTurns.js
