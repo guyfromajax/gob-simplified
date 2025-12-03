@@ -1644,8 +1644,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   let step0OwnerSprite = null;
   // If we are coming directly from an inbound or opening tip, the ball should already be attached
   // to the inbound receiver or tip winner, so we don't re-derive or re-attach at step 0.
-  // ✅ FIX: For FCP/HCT, ALWAYS find step 0 owner (even after shots) - SF needs ball at inbound spot
-  if ((!previousTurnWasShot || isFCPHCT) && !fromInbound && !fromOpeningTip) {
+  if (!previousTurnWasShot && !fromInbound && !fromOpeningTip) {
     for (const anim of turnData.animations) {
       if (scene.skipToEnd || scene.stateMachine?.is(States.FastBreak)) break;
       if (anim.hasBallAtStep?.[0]) {
