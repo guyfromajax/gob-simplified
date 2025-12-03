@@ -315,16 +315,16 @@ export class AnimationEngine {
     if (hasFCPHCTSetup) {
       this.scene.currentPressureType = turnData.next_defensive_setup; // "FCP" or "HCT"
       this.scene.pressureSequenceActive = true;
-      console.log('🎯 [FCP/HCT SETUP DETECTED] Skipping inbound pass - skeleton will handle it', {
+      console.log('🎯 [FCP/HCT SETUP DETECTED] Positioning players, then skeleton will handle pass', {
         pressureType: this.scene.currentPressureType,
         pressureSequenceActive: this.scene.pressureSequenceActive,
         result_type: turnData.result_type,
         next_defensive_setup: turnData.next_defensive_setup
       });
       
-      // ✅ FIX: Skip inbound pass animation for FCP/HCT - their skeletons include it in steps 0-1
-      // Just set state and return - skeleton animation will handle the pass
-      return;
+      // ✅ FIX: Position players for FCP/HCT setup, but don't animate the pass
+      // The skeleton will handle the pass in its steps 0-1
+      // This creates the "beat" where SF holds the ball before passing
     } else {
       // Clear state if no pressure setup (normal inbound)
       this.scene.currentPressureType = null;
