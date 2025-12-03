@@ -110,20 +110,16 @@ function handleTurnTransition(scene, turnData) {
     result_type: turnData.result_type,
     possession_flips: turnData.possession_flips,
     possession_team_id: turnData.possession_team_id,
-    current_scene_offenseTeamId: scene.offenseTeamId,
-    _possessionAlreadyFlipped: scene._possessionAlreadyFlipped
+    current_scene_offenseTeamId: scene.offenseTeamId
   });
   
-  // ✅ EXCEPTION: Skip if FREE_THROW already flipped possession during animation
-  // FREE_THROW flips BEFORE inbound (during animation), not after
-  if (turnData.result_type === "FREE_THROW" && scene._possessionAlreadyFlipped) {
-    console.log('🔄 [UNIVERSAL TRANSITION] Skipping possession flip - already handled during FREE_THROW animation');
-    scene._possessionAlreadyFlipped = false; // Clear flag
-    return;
-  }
-  
   // ✅ UNIVERSAL POSSESSION FLIP HANDLER
-  // Works for ALL turn types: FOUL, STEAL, DEAD_BALL, HCO, MAKE/MISS, etc.
+  // Works for ALL turn types: FREE_THROW, FOUL, STEAL, DEAD_BALL, HCO, MAKE/MISS, etc.
+  // 
+  // Note: For turns that call runInboundSetup (MAKE, FREE_THROW), the defensive check
+  // in runInboundSetup (line 861-876) already forced scene.offenseTeamId to match newOffenseSide.
+  // This handler serves as confirmation and handles turns that DON'T call runInboundSetup
+  // (STEAL, DEAD_BALL, FOUL, etc.)
   if (turnData.possession_flips && turnData.possession_team_id) {
     const previousOffenseTeamId = scene.offenseTeamId;
     
@@ -140,7 +136,7 @@ function handleTurnTransition(scene, turnData) {
         next_play_type: turnData.next_play_type
       });
     } else {
-      console.log('⚠️ [UNIVERSAL TRANSITION] Possession flip requested but already correct', {
+      console.log('✅ [UNIVERSAL TRANSITION] Possession already correct (likely set by runInboundSetup)', {
         current: previousOffenseTeamId,
         requested: turnData.possession_team_id,
         result_type: turnData.result_type

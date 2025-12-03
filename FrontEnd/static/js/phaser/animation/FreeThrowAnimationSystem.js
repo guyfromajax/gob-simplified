@@ -460,32 +460,23 @@ export class FreeThrowAnimationSystem {
       });
     }
 
-    // ✅ EXCEPTION: Free throws need possession flip BEFORE inbound (not after animation)
-    // because inbound happens DURING free throw sequence, not after
-    // Use universal transition pattern but execute it early
-    if (turnData.possession_team_id && turnData.possession_flips !== false) {
-      const previousOffenseTeamId = this.scene.offenseTeamId;
-      if (previousOffenseTeamId !== turnData.possession_team_id) {
-        this.scene.offenseTeamId = turnData.possession_team_id;
-        this.scene.events?.emit('possessionChange', { 
-          offenseTeamId: turnData.possession_team_id 
-        });
-        console.log('🔄 [FREE THROW TRANSITION] Possession flipped before inbound', {
-          from: previousOffenseTeamId,
-          to: turnData.possession_team_id,
-          result_type: 'FREE_THROW'
-        });
-        // Mark as already flipped so universal handler doesn't double-flip
-        this.scene._possessionAlreadyFlipped = true;
-      }
-    }
+    // ✅ MATCH HCO PATTERN: Don't explicitly flip possession here
+    // Instead, calculate newOffenseSide and let runInboundSetup enforce it via defensive check
+    // This matches how HCO MAKE works (ShotAnimationSystem.handleMadeShot line 776)
     
     // Execute inbound pass using the existing system
     const { runInboundSetup } = await import('./turnAnimation.js');
     
-    // Calculate newOffenseSide using possession_team_id (authoritative backend value)
-    const isHomeOffense = turnData.possession_team_id === this.scene.simData?.home_team_id;
-    const newOffenseSide = isHomeOffense ? 'home' : 'away';
+    // Calculate newOffenseSide directly from possession_team_id (authoritative backend value)
+    // Backend sets possession_team_id to the NEW offense team (team that was on defense)
+    const newOffenseSide = turnData.possession_team_id === this.scene.simData?.home_team_id ? 'home' : 'away';
+    
+    console.log('🔄 [FREE THROW INBOUND] Calculated newOffenseSide from possession_team_id', {
+      possession_team_id: turnData.possession_team_id,
+      newOffenseSide,
+      home_team_id: this.scene.simData?.home_team_id,
+      current_scene_offenseTeamId: this.scene.offenseTeamId
+    });
     
     // ✅ FIX: Check for FCP/HCT setup after free throw (same logic as freeThrow.js)
     // This ensures pressureSequenceActive is set so subsequent STEAL turns are recognized as FCP/HCT
