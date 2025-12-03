@@ -57,6 +57,7 @@ export class AnimationEngine {
     this.animationHandlers.set('HCO', this.handleDefault.bind(this)); // ✅ HCO with animations uses skeleton
     this.animationHandlers.set('FOUL', this.handleDefault.bind(this)); // ✅ FOUL with animations uses skeleton
     this.animationHandlers.set('DEAD_BALL', this.handleDefault.bind(this)); // ✅ DEAD_BALL with animations uses skeleton
+    this.animationHandlers.set('DEAD BALL', this.handleDefault.bind(this)); // ✅ FIX: Backend sends "DEAD BALL" with space, not underscore
     this.animationHandlers.set('STEAL', this.handleSteal.bind(this)); // ✅ STEAL uses hybrid handler (skeleton + steal action)
     this.animationHandlers.set('DEFAULT', this.handleDefault.bind(this));
     // ✅ PHASE 2.6: Add handlers for PUTBACK and OPENING_TIP
