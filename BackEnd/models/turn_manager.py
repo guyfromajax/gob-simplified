@@ -156,32 +156,53 @@ class TurnManager:
 
         self.logger.log("baselineInbound:start")
 
-        # Baseline spot for the inbounder (PG). These coordinates assume the
-        # home team is on offense. They will be mirrored if the away team has
-        # the ball.
-        inbound_spot_home = {"x": 50, "y": 25}  # Center baseline
+        # ✅ NEW: Use skeleton step 0 positions for FCP/HCT setup
+        # This ensures players start in their press-break formation (extracted from skeletons)
+        if next_defensive_setup == "FCP":
+            from BackEnd.constants import FCP_SETUP_POSITIONS, HCO_STRING_SPOTS
+            setup_locations = FCP_SETUP_POSITIONS
+        elif next_defensive_setup == "HCT":
+            from BackEnd.constants import HCT_SETUP_POSITIONS, HCO_STRING_SPOTS
+            setup_locations = HCT_SETUP_POSITIONS
+        else:
+            setup_locations = None
 
-        # Destination ranges for other offensive players (home orientation).
-        home_ranges = {
-            "SG": {"x": (52, 56), "y": (22, 28)},
-            "SF": {"x": (54, 58), "y": (18, 32)},
-            "PF": {"x": (54, 58), "y": (30, 36)},
-            "C":  {"x": (54, 58), "y": (14, 20)},
-        }
+        if setup_locations:
+            # Convert location strings to coordinates (home orientation)
+            from BackEnd.constants import HCO_STRING_SPOTS
+            o_dest_home = {}
+            for pos, location in setup_locations.items():
+                coords = HCO_STRING_SPOTS.get(location, {"x": 50, "y": 25})
+                o_dest_home[pos] = coords.copy()
+                self.logger.log(f"destAssigned:{pos}")
+            
+            # Flip offensive coordinates if the away team has possession
+            o_dest = getAwayTeamCoords(o_dest_home.copy()) if is_away_offense else o_dest_home
+        else:
+            # Use random baseline positions for normal HCO inbound (no pressure)
+            inbound_spot_home = {"x": 50, "y": 25}  # Center baseline
 
-        o_dest_home = {}
-        for pos, ranges in home_ranges.items():
-            o_dest_home[pos] = {
-                "x": random.randint(*ranges["x"]),
-                "y": random.randint(*ranges["y"]),
+            # Destination ranges for other offensive players (home orientation).
+            home_ranges = {
+                "SG": {"x": (52, 56), "y": (22, 28)},
+                "SF": {"x": (54, 58), "y": (18, 32)},
+                "PF": {"x": (54, 58), "y": (30, 36)},
+                "C":  {"x": (54, 58), "y": (14, 20)},
             }
-            self.logger.log(f"destAssigned:{pos}")
 
-        # Inbounder (PG) stays at the inbound spot
-        o_dest_home["PG"] = inbound_spot_home.copy()
+            o_dest_home = {}
+            for pos, ranges in home_ranges.items():
+                o_dest_home[pos] = {
+                    "x": random.randint(*ranges["x"]),
+                    "y": random.randint(*ranges["y"]),
+                }
+                self.logger.log(f"destAssigned:{pos}")
 
-        # Flip offensive coordinates if the away team has possession
-        o_dest = getAwayTeamCoords(o_dest_home.copy()) if is_away_offense else o_dest_home
+            # Inbounder (PG) stays at the inbound spot
+            o_dest_home["PG"] = inbound_spot_home.copy()
+
+            # Flip offensive coordinates if the away team has possession
+            o_dest = getAwayTeamCoords(o_dest_home.copy()) if is_away_offense else o_dest_home
 
         # Determine ball-handler (PG) coordinates in actual orientation
         bh_coords = o_dest["PG"]
