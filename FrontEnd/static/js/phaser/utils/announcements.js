@@ -257,6 +257,16 @@ export function showAnnouncement(text, team = 'home', playerData = null) {
  * @param {Object} scene - Optional scene object for accessing player data
  */
 export function announceFromTurnData(turnData, timing = 'start', homeTeamId = null, scene = null) {
+  // 🔍 DEBUG: Log all announcement calls to track duplicates
+  console.log('📢 [ANNOUNCEMENT CALL]', {
+    result_type: turnData?.result_type,
+    play_type: turnData?.play_type,
+    timing: timing,
+    text: turnData?.text?.substring(0, 50) || 'N/A',
+    turn_index: turnData?.turn_index || turnData?.index,
+    caller: new Error().stack.split('\n')[2]?.trim() // Show caller
+  });
+
   // Determine which team triggered the event
   const offenseTeamId = turnData.possession_team_id;
   const isHomeTeamEvent = homeTeamId && String(offenseTeamId) === String(homeTeamId);
