@@ -196,9 +196,13 @@ class GameManager:
         ):
             # ✅ FIX: Flip possession BEFORE setup_side_inbound so correct team inbounds
             # Dead ball turnovers and offensive fouls always flip possession
+            logging.warning(f"🔍 [SIP SETUP] Checking possession flip: result_type={result.get('result_type')}, possession_flips={result.get('possession_flips')}, current_offense={self.offense_team.name}")
             if result.get("possession_flips"):
+                old_offense = self.offense_team.name
                 self.switch_possession()
-                logging.info(f"🔄 Flipped possession before SIP: {self.offense_team.name} now has ball")
+                logging.warning(f"🔄 [SIP] Flipped possession before SIP: {old_offense} → {self.offense_team.name}")
+            else:
+                logging.warning(f"⏭️ [SIP] No possession flip needed (possession_flips={result.get('possession_flips')})")
             
             inbound_payload = self.turn_manager.setup_side_inbound()
             self.turns.append(inbound_payload)
