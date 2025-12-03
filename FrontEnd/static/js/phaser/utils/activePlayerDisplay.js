@@ -15,7 +15,7 @@ export function getDefenderIdFromTurn(turnData) {
   
   // Debug: Log what we're receiving
   if (turnData.defender_id || turnData.defender) {
-    if (false) console.log('🛡️ DEFENDER DATA:', {
+    if (false && defenderId) console.log('🛡️ DEFENDER DATA:', {
       defender_id: turnData.defender_id,
       defender: turnData.defender,
       defender_type: typeof turnData.defender,
