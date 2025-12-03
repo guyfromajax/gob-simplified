@@ -307,12 +307,16 @@ export class AnimationEngine {
     if (hasFCPHCTSetup) {
       this.scene.currentPressureType = turnData.next_defensive_setup; // "FCP" or "HCT"
       this.scene.pressureSequenceActive = true;
-      console.log('🎯 [FCP/HCT SETUP DETECTED]', {
+      console.log('🎯 [FCP/HCT SETUP DETECTED] Skipping inbound pass - skeleton will handle it', {
         pressureType: this.scene.currentPressureType,
         pressureSequenceActive: this.scene.pressureSequenceActive,
         result_type: turnData.result_type,
         next_defensive_setup: turnData.next_defensive_setup
       });
+      
+      // ✅ FIX: Skip inbound pass animation for FCP/HCT - their skeletons include it in steps 0-1
+      // Just set state and return - skeleton animation will handle the pass
+      return;
     } else {
       // Clear state if no pressure setup (normal inbound)
       this.scene.currentPressureType = null;
