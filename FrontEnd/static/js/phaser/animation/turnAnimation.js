@@ -1231,6 +1231,22 @@ async function runInboundSetup({
   const cDest = useSkeletonPositions && skeletonPositions.C ? skeletonPositions.C : inboundDest.C;
   const sfDest = useSkeletonPositions && skeletonPositions.SF ? skeletonPositions.SF : ballSpot;
 
+  // 🔍 DEBUG: Log offensive player destinations for FCP/HCT setup
+  if (skipRetreat && pressureType) {
+    console.log('🔍 [FCP/HCT SETUP] Offensive player destinations:', {
+      pressureType,
+      useSkeletonPositions,
+      newOffenseSide,
+      positions: {
+        PG: { grid: pgDest, source: useSkeletonPositions ? 'skeleton' : 'baseline' },
+        SG: { grid: sgDest, source: useSkeletonPositions ? 'skeleton' : 'baseline' },
+        SF: { grid: sfDest, source: useSkeletonPositions ? 'skeleton' : 'baseline' },
+        PF: { grid: pfDest, source: useSkeletonPositions ? 'skeleton' : 'baseline' },
+        C: { grid: cDest, source: useSkeletonPositions ? 'skeleton' : 'baseline' }
+      }
+    });
+  }
+
   const pgDestPx = gridToPixels(pgDest.x, pgDest.y, width, height);
   animationDebugLog(`inboundDest assigned for PG: (${pgDestPx.x},${pgDestPx.y}) ${useSkeletonPositions ? '[SKELETON]' : '[BASELINE]'}`);
   const sgDestPx = gridToPixels(sgDest.x, sgDest.y, width, height);
