@@ -1421,11 +1421,18 @@ def resolve_full_court_press_logic(game: "GameManager"):
     
     # Generate animations from skeleton BEFORE changing result_type
     # (skeleton keys use D_FOUL/O_FOUL, not FOUL)
+    # ✅ FIX: Skeleton already retrieved at line 1354 for STEAL/FOUL/DEAD_BALL
+    # Only SHOT result retrieves a different skeleton (SHOT variant)
+    # Skip duplicate retrieval to avoid double animations
     from BackEnd.models.animator import Animator
     animator = Animator(game)
-    logging.warning(f"🔍 [FCP] Getting skeleton for result_type={result_type} (before result_type change)")
-    skeleton = get_skeleton_for_turn(result_type, "FCP", game) or {}
-    logging.warning(f"🔍 [FCP] Retrieved skeleton: has_steps={bool(skeleton.get('steps'))}, step_count={len(skeleton.get('steps', []))}")
+    
+    if not skeleton or not skeleton.get('steps'):
+        logging.warning(f"🔍 [FCP] Getting skeleton for result_type={result_type} (not yet retrieved)")
+        skeleton = get_skeleton_for_turn(result_type, "FCP", game) or {}
+        logging.warning(f"🔍 [FCP] Retrieved skeleton: has_steps={bool(skeleton.get('steps'))}, step_count={len(skeleton.get('steps', []))}")
+    else:
+        logging.warning(f"✅ [FCP] Skeleton already retrieved (has {len(skeleton.get('steps', []))} steps), skipping duplicate retrieval")
     
     # 🔍 DEBUG: Log full skeleton structure for comparison with frontend animation
     if skeleton and skeleton.get('steps'):
@@ -2272,13 +2279,20 @@ def resolve_half_court_trap_logic(game: "GameManager"):
     }
     
     # Generate animations from skeleton BEFORE changing result_type
+    # ✅ FIX: Skeleton already retrieved earlier for STEAL/FOUL/DEAD_BALL
+    # Only SHOT result retrieves a different skeleton (SHOT variant)
+    # Skip duplicate retrieval to avoid double animations
     from BackEnd.models.animator import Animator
     import logging
     if animator is None:
         animator = Animator(game)
-    logging.warning(f"🔍 [HCT] Getting skeleton for result_type={result_type} (before result_type change)")
-    skeleton = get_skeleton_for_turn(result_type, "HCT", game) or {}
-    logging.warning(f"🔍 [HCT] Retrieved skeleton: has_steps={bool(skeleton.get('steps'))}, step_count={len(skeleton.get('steps', []))}")
+    
+    if not skeleton or not skeleton.get('steps'):
+        logging.warning(f"🔍 [HCT] Getting skeleton for result_type={result_type} (not yet retrieved)")
+        skeleton = get_skeleton_for_turn(result_type, "HCT", game) or {}
+        logging.warning(f"🔍 [HCT] Retrieved skeleton: has_steps={bool(skeleton.get('steps'))}, step_count={len(skeleton.get('steps', []))}")
+    else:
+        logging.warning(f"✅ [HCT] Skeleton already retrieved (has {len(skeleton.get('steps', []))} steps), skipping duplicate retrieval")
     
     # 🔍 DEBUG: Log full skeleton structure for comparison with frontend animation
     if skeleton and skeleton.get('steps'):
