@@ -57,7 +57,7 @@ export class AnimationEngine {
     this.animationHandlers.set('HCO', this.handleDefault.bind(this)); // ✅ HCO with animations uses skeleton
     this.animationHandlers.set('FOUL', this.handleDefault.bind(this)); // ✅ FOUL with animations uses skeleton
     this.animationHandlers.set('DEAD_BALL', this.handleDefault.bind(this)); // ✅ DEAD_BALL with animations uses skeleton
-    this.animationHandlers.set('STEAL', this.handleDefault.bind(this)); // ✅ STEAL with animations uses skeleton
+    this.animationHandlers.set('STEAL', this.handleSteal.bind(this)); // ✅ STEAL uses hybrid handler (skeleton + steal action)
     this.animationHandlers.set('DEFAULT', this.handleDefault.bind(this));
     // ✅ PHASE 2.6: Add handlers for PUTBACK and OPENING_TIP
     this.animationHandlers.set('PUTBACK_MAKE', this.handlePutback.bind(this));
@@ -517,16 +517,42 @@ export class AnimationEngine {
   }
 
   async handleSteal(turnData, context) {
-    console.log('AnimationEngine: Handling steal', {
+    console.log('🔍 [STEAL HANDLER] Entry', {
       result_type: turnData.result_type,
-      ball_handler: turnData.ball_handler,
-      stealerId: turnData.stealerId || turnData.stealer_id
+      has_animations: !!turnData.animations?.length,
+      animation_count: turnData.animations?.length || 0,
+      stealer_id: turnData.stealer_id || turnData.stealerId,
+      victim_id: turnData.victim_id
     });
     
-    // ✅ PHASE 2.6: Handle steal animation (moved from animateGameTurns.js)
+    // ✅ HYBRID APPROACH: Parallels shot attempt handling
+    // 1. Play skeleton animation (if exists) - shows press break sequence
+    // 2. Animate steal result action - ball changes hands
+    // 3. Universal transition handles possession flip
+    
+    // STEP 1: Play skeleton animation (FCP/HCT press break sequence)
+    if (turnData.animations && turnData.animations.length > 0) {
+      console.log('✅ [STEAL HANDLER] Playing skeleton animation');
+      const { playTurnAnimation } = await import('./turnAnimation.js');
+      await playTurnAnimation({
+        scene: this.scene,
+        simData: context.simData,
+        playerSprites: context.playerSprites,
+        turnData: turnData,
+        ballSprite: context.ballSprite,
+        onAction: context.onAction,
+        turnIndex: context.turnIndex,
+        onUpdate: context.onUpdate
+      });
+      console.log('✅ [STEAL HANDLER] Skeleton animation completed');
+    }
+    
+    // STEP 2: Animate steal result action (ball changes hands)
+    // This happens AFTER skeleton animation (like shot result after skeleton)
     const { States } = await import('../state/gameStateMachine.js');
     if (this.scene.stateMachine?.is(States.FastBreak)) {
-      // Skip steal animation if in FastBreak state
+      // Skip steal action animation if in FastBreak state
+      console.log('⏭️ [STEAL HANDLER] Skipping steal action - FastBreak state');
       return;
     }
     
@@ -545,6 +571,11 @@ export class AnimationEngine {
     const stealerId = stealerRaw ?? playerMap[turnData.stealer_name];
     
     if (ballHandlerId != null && stealerId != null) {
+      console.log('✅ [STEAL HANDLER] Animating steal action (ball changes hands)', {
+        from: ballHandlerId,
+        to: stealerId
+      });
+      
       const { runPass } = await import('./ballManager.js');
       const animationConfig = (await import('./animation_config.js')).default;
       const cfg = animationConfig.steal || {};
@@ -560,16 +591,11 @@ export class AnimationEngine {
         easing: cfg.easing
       });
       
-      // Visual effects handled by announcement system
-      const defenderSprite = context.playerSprites[stealerId];
-      // runPass reattaches the ball after the tween resolves, so only emit
-      // possession change once that handoff has finished.
-      if (!this.scene.stateMachine?.is(States.FastBreak) && defenderSprite) {
-        this.scene.events?.emit?.('possessionChange', { offenseTeamId: defenderSprite.team_id });
-      }
+      console.log('✅ [STEAL HANDLER] Steal action completed');
     }
     
-    // Note: Announcements and score updates are handled by AnimationRouter (finalizeTurnAfterAnimation)
+    // STEP 3: Possession flip handled by universal transition in finalizeTurnAfterAnimation
+    // Note: Don't emit possessionChange here - universal handler does it based on backend data
   }
 
   async handleShotAttempt(turnData, context) {
