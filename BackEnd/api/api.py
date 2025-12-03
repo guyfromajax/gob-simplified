@@ -1427,7 +1427,14 @@ def simulate_turn_endpoint(request: TurnSimulationRequest):
 
 
 @app.get("/roster/{team_name}")
-def get_team_roster(team_name: str, tournament_id: str | None = None):
+def get_team_roster(team_name: str, tournament_id: str | None = None, response: Response = None):
+    # ✅ FIX: Add cache-busting headers to ensure browser fetches fresh player data
+    # This ensures updated player attributes (year, jersey, height, etc.) show up immediately
+    if response:
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+    
     # print(f"🔍 Endpoint hit: GET /roster/{team_name}")
     if tournament_id:
         print(f"🔍 Tournament ID provided but ignored: {tournament_id}")
