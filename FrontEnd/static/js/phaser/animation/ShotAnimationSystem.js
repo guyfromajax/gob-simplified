@@ -230,8 +230,10 @@ export class ShotAnimationSystem {
     
     // ✅ DEBUG: Log the result immediately when determined
     const shooterName = this.playerSprites[turnData.shooter_id]?.name || 'unknown';
-    // Shot result logged above, removed excessive celebration logs
-    if (isMade) {
+    console.log(`🏀 SHOT RESULT: ${shooterName} - ${turnData.result_type}`);
+    
+    // Execute make or miss handling
+    if (isMake) {
       await this.handleMadeShot(rimCoords, turnData);
     } else {
       await this.handleMissedShot(rimCoords, turnData);
