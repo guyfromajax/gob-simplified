@@ -263,7 +263,7 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
     
     // 🔍 DEBUG: Log pass timing for HCO entry
     if (nextStep && nextStep.action === 'pass') {
-      console.log('🔍 [PASS TIMING DEBUG]', {
+      if (false) console.log('🔍 [PASS TIMING DEBUG]', {
         playerId: sprite?.playerId,
         action: nextStep.action,
         stepIndex,
@@ -304,7 +304,7 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
           }
           // 🔍 DEBUG: Log when pass is triggered in onStart
           if (currentAction === 'pass') {
-            console.log('🔍 [PASS TIMING DEBUG] Pass triggered in onStart (not delayed)', {
+            if (false) console.log('🔍 [PASS TIMING DEBUG] Pass triggered in onStart (not delayed)', {
               playerId: sprite?.playerId,
               timestamp: nextStep?.timestamp || step.timestamp,
               stepIndex,
@@ -315,7 +315,7 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
           await startPromise;
         } else if (currentAction === 'pass' && shouldDelayPass) {
           // 🔍 DEBUG: Log when pass is being delayed
-          console.log('🔍 [PASS TIMING DEBUG] Pass delayed - will trigger in onComplete', {
+          if (false) console.log('🔍 [PASS TIMING DEBUG] Pass delayed - will trigger in onComplete', {
             playerId: sprite?.playerId,
             timestamp: nextStep?.timestamp || step.timestamp,
             stepIndex
@@ -360,7 +360,7 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
         const currentAction = nextStep ? nextStep.action : step.action;
         if (shouldDelayPass && currentAction && onAction) {
           // 🔍 DEBUG: Log when delayed pass is triggered
-          console.log('🔍 [PASS TIMING DEBUG] Delayed pass triggered in onComplete', {
+          if (false) console.log('🔍 [PASS TIMING DEBUG] Delayed pass triggered in onComplete', {
             playerId: sprite?.playerId,
             timestamp: nextStep?.timestamp || step.timestamp,
             stepIndex,
@@ -436,7 +436,7 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
     const ballInTargets = validTargets.includes(ballSprite);
     const ballHasActiveTween = ballSprite && scene.tweens?.getTweensOf ? scene.tweens.getTweensOf(ballSprite).length > 0 : false;
     if (ballInTargets || ballHasActiveTween) {
-      console.log('🔍 [TWEEN TARGETS DEBUG]', {
+      if (false) console.log('🔍 [TWEEN TARGETS DEBUG]', {
         playerId: sprite?.playerId,
         action: step.action,
         validTargetsCount: validTargets.length,
