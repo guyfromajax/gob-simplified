@@ -1527,7 +1527,10 @@ def resolve_full_court_press_logic(game: "GameManager"):
             next_play_type = "HCO"
             game_state["offensive_state"] = "HCO"
     elif result_type == "HCO":
+        # ✅ SS&S: Match Fast Break pattern - set offensive_state when transitioning to HCO
+        # This prevents duplicate FCP turns (offensive_state must change from "FCP" to "HCO")
         next_play_type = "HCO"
+        game_state["offensive_state"] = "HCO"
     # For DEAD BALL, O_FOUL, D_FOUL: next_play_type stays None (will use side inbound → HCO)
     
     # Calculate time elapsed for FCP phase
@@ -2360,7 +2363,10 @@ def resolve_half_court_trap_logic(game: "GameManager"):
             next_play_type = "HCO"
             game_state["offensive_state"] = "HCO"
     elif result_type == "HCO":
+        # ✅ SS&S: Match Fast Break pattern - set offensive_state when transitioning to HCO
+        # This prevents duplicate HCT turns (offensive_state must change from "HCT" to "HCO")
         next_play_type = "HCO"
+        game_state["offensive_state"] = "HCO"
     # For DEAD BALL, O_FOUL, D_FOUL: next_play_type stays None (will use side inbound → HCO)
     
     # Calculate time elapsed for HCT phase
