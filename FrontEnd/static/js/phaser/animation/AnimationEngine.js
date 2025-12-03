@@ -54,16 +54,18 @@ export class AnimationEngine {
     this.animationHandlers.set('SHOT_ATTEMPT', this.handleShotAttempt.bind(this));
     this.animationHandlers.set('REBOUND', this.handleRebound.bind(this));
     this.animationHandlers.set('PASS', this.handlePass.bind(this));
-    this.animationHandlers.set('HCO', this.handleDefault.bind(this)); // ✅ FIX: HCO setup turns route to DEFAULT
+    this.animationHandlers.set('HCO', this.handleDefault.bind(this)); // ✅ HCO with animations uses skeleton
+    this.animationHandlers.set('FOUL', this.handleDefault.bind(this)); // ✅ FOUL with animations uses skeleton
+    this.animationHandlers.set('DEAD_BALL', this.handleDefault.bind(this)); // ✅ DEAD_BALL with animations uses skeleton
+    this.animationHandlers.set('STEAL', this.handleDefault.bind(this)); // ✅ STEAL with animations uses skeleton
     this.animationHandlers.set('DEFAULT', this.handleDefault.bind(this));
     // ✅ PHASE 2.6: Add handlers for PUTBACK and OPENING_TIP
     this.animationHandlers.set('PUTBACK_MAKE', this.handlePutback.bind(this));
     this.animationHandlers.set('PUTBACK_MISS', this.handlePutback.bind(this));
     this.animationHandlers.set('OREB_KICKOUT', this.handlePutback.bind(this));
     this.animationHandlers.set('OPENING_TIP', this.handleOpeningTip.bind(this));
-    // ✅ PHASE 2.6: Add handlers for DEFENSIVE_STOP and STEAL
+    // ✅ PHASE 2.6: Add handler for DEFENSIVE_STOP
     this.animationHandlers.set('DEFENSIVE_STOP', this.handleDefensiveStop.bind(this));
-    this.animationHandlers.set('STEAL', this.handleSteal.bind(this));
   }
 
   /**
