@@ -154,7 +154,11 @@ HCO_STRING_SPOTS = {
     "deep lower wing": {"x": 57, "y": 15},
     "deep lower baseline": {"x": 57, "y": 5},
     "deep upper wing": {"x": 57, "y": 35},
-    "deep upper baseline": {"x": 57, "y": 45}
+    "deep upper baseline": {"x": 57, "y": 45},
+    # Inbound positions (for FCP/HCT skeletons after made baskets)
+    "inbound_center": {"x": 50, "y": 25},  # Center of baseline
+    "inbound_left": {"x": 48, "y": 25},    # Left of center baseline
+    "inbound_right": {"x": 52, "y": 25}    # Right of center baseline
 }
 
 # Offset positions for collision handling (when two players at same spot)
