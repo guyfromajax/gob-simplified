@@ -1189,35 +1189,38 @@ async function runInboundSetup({
   const rimPx = gridToPixels(rimGrid.x, rimGrid.y, width, height);
   const spotPx = gridToPixels(ballSpot.x, ballSpot.y, width, height);
 
-  // ✅ ENHANCEMENT: For FCP/HCT, try to use step 0 positions from next turn's skeleton
+  // ✅ SS&S: For FCP/HCT, use step 0 positions from backend-provided skeleton data
+  // Backend includes offense_setup_positions in BASELINE_INBOUND turn when next_defensive_setup is FCP/HCT
   // This positions offensive players in their press-break formation from the start
   let useSkeletonPositions = false;
   let skeletonPositions = {};
   
-  if (skipRetreat && pressureType && scene.simData?.turns && typeof scene.currentTurn === 'number') {
-    const nextTurnIndex = scene.currentTurn + 1;
-    const nextTurn = scene.simData.turns[nextTurnIndex];
+  if (skipRetreat && pressureType && turnData?.offense_setup_positions) {
+    // Backend provided skeleton step 0 positions - convert to coords format
+    const posActions = turnData.offense_setup_positions;
     
-    if (nextTurn?.animations && Array.isArray(nextTurn.animations) && nextTurn.animations.length > 0) {
-      // Extract step 0 positions from next turn's animations
-      for (const anim of nextTurn.animations) {
-        const firstStep = anim.movement?.[0];
-        if (firstStep?.coords && anim.playerId) {
-          const info = scene.playerInfo?.[anim.playerId];
-          if (info && info.pos) {
-            skeletonPositions[info.pos] = firstStep.coords;
-          }
+    for (const [pos, actionData] of Object.entries(posActions)) {
+      if (actionData.location) {
+        // Convert location string to coords (using HCO_STRING_SPOTS)
+        const { HCO_STRING_SPOTS } = await import('../../utils/courtPositions.js');
+        const coords = HCO_STRING_SPOTS[actionData.location];
+        if (coords) {
+          skeletonPositions[pos] = coords;
         }
+      } else if (actionData.coords) {
+        // Already has coords (from apply_opposite_side_logic)
+        skeletonPositions[pos] = actionData.coords;
       }
-      
-      // Only use skeleton positions if we have positions for key players (SF and PG at minimum)
-      if (skeletonPositions.SF && skeletonPositions.PG) {
-        useSkeletonPositions = true;
-        console.log('✅ [FCP/HCT INBOUND] Using skeleton step 0 positions for offensive players', {
-          pressureType,
-          positions: Object.keys(skeletonPositions)
-        });
-      }
+    }
+    
+    // Only use skeleton positions if we have positions for key players (SF and PG at minimum)
+    if (skeletonPositions.SF && skeletonPositions.PG) {
+      useSkeletonPositions = true;
+      console.log('✅ [FCP/HCT INBOUND] Using skeleton step 0 positions from backend', {
+        pressureType,
+        positions: Object.keys(skeletonPositions),
+        source: 'turnData.offense_setup_positions'
+      });
     }
   }
   

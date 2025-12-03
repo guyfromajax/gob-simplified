@@ -232,6 +232,20 @@ class TurnManager:
         # Include next_defensive_setup if provided (for FCP/HCT pressure)
         if next_defensive_setup:
             payload["next_defensive_setup"] = next_defensive_setup
+            
+            # ✅ SS&S: Include skeleton step 0 positions for offense positioning
+            # This allows frontend to position offensive players in their press-break formation
+            # during inbound setup, eliminating the jank of baseline → skeleton movement
+            from BackEnd.engine.phase_resolution import get_skeleton_for_turn
+            skeleton = get_skeleton_for_turn("HCO", next_defensive_setup, self.game)
+            
+            if skeleton and "steps" in skeleton and len(skeleton.get("steps", [])) > 0:
+                # Extract step 0 pos_actions for offensive player positioning
+                step_0 = skeleton["steps"][0]
+                if "pos_actions" in step_0 and step_0["pos_actions"]:
+                    payload["offense_setup_positions"] = step_0["pos_actions"]
+                    import logging
+                    logging.warning(f"✅ [BASELINE_INBOUND] Including {len(step_0['pos_actions'])} skeleton step 0 positions for {next_defensive_setup} setup")
 
         return payload
 
