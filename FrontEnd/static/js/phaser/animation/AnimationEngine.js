@@ -146,19 +146,26 @@ export class AnimationEngine {
 
     // Specific result types (check handlers map first)
     if (turnData.result_type && this.animationHandlers.has(turnData.result_type)) {
-      // ✅ DEBUG: Log when routing to specific handler (especially DEFENSIVE_STOP)
-      if (turnData.result_type === "DEFENSIVE_STOP") {
-        console.log('🛑 [DEFENSIVE_STOP ROUTING] Routing to DEFENSIVE_STOP handler', {
-          fast_break: turnData.fast_break,
-          fast_break_type: typeof turnData.fast_break,
-          has_roles: !!turnData.roles,
-          outlet_passer: turnData.roles?.outlet_passer,
-          outlet_receiver: turnData.roles?.outlet_receiver,
-          full_turnData_keys: Object.keys(turnData)
+      // ✅ DEBUG: Log when routing to specific handler (especially DEFENSIVE_STOP and DEAD_BALL)
+      if (turnData.result_type === "DEFENSIVE_STOP" || turnData.result_type === "DEAD_BALL" || turnData.result_type === "DEAD BALL") {
+        console.log(`🔍 [${turnData.result_type} ROUTING] Found in handlers map, routing to specific handler`, {
+          result_type: turnData.result_type,
+          has_animations: !!turnData.animations?.length,
+          handler_exists: this.animationHandlers.has(turnData.result_type)
         });
       }
       const handler = this.animationHandlers.get(turnData.result_type);
       return handler;
+    }
+    
+    // ✅ DEBUG: Log when result_type NOT found in handlers map
+    if (turnData.result_type === "DEAD_BALL" || turnData.result_type === "DEAD BALL") {
+      console.warn(`⚠️ [${turnData.result_type} ROUTING] NOT found in handlers map!`, {
+        result_type: turnData.result_type,
+        has_animations: !!turnData.animations?.length,
+        handlers_keys: Array.from(this.animationHandlers.keys()),
+        will_fall_through_to_shot_detection: true
+      });
     }
 
     // ✅ DEBUG: Exclude non-shot result types from shot attempt detection
