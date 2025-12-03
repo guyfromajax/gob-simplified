@@ -1631,7 +1631,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   // Determine which player owns the ball at step 0
   // BUT: Skip this if the previous turn was a shot (MAKE or MISS)
   // EXCEPT: For FCP/HCT, we NEED step 0 ball attachment (SF holds ball at inbound spot)
-  const isFCPHCT = turnData?.play_type === 'FCP' || turnData?.play_type === 'HCT';
+  // isFCPHCT already declared above
   const previousTurnWasShot = scene._previousTurnWasShot === true;
   if (previousTurnWasShot && !isFCPHCT) {
     console.log('🏀 playTurnAnimation: Skipping step 0 ball attachment - previous turn was a shot (HCO only)');
