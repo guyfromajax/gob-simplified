@@ -230,17 +230,8 @@ export class ShotAnimationSystem {
     
     // ✅ DEBUG: Log the result immediately when determined
     const shooterName = this.playerSprites[turnData.shooter_id]?.name || 'unknown';
-    console.log(`🏀 SHOT RESULT: ${shooterName} - ${turnData.result_type}`);
-    
-    // ✅ VERY LOUD LOG: Impossible to miss when a shot is made
-    if (isMake) {
-      console.log('🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯');
-      console.log('🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯');
-      console.log(`🎯🎯🎯🎯🎯 SHOT MADE BY: ${shooterName.toUpperCase()} 🎯🎯🎯🎯🎯`);
-      console.log(`🎯🎯🎯🎯🎯 RESULT: ${turnData.result_type} 🎯🎯🎯🎯🎯`);
-      console.log(`🎯🎯🎯🎯🎯 SHOOTER ID: ${turnData.shooter_id} 🎯🎯🎯🎯🎯`);
-      console.log('🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯');
-      console.log('🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯');
+    // Shot result logged above, removed excessive celebration logs
+    if (isMade) {
       await this.handleMadeShot(rimCoords, turnData);
     } else {
       await this.handleMissedShot(rimCoords, turnData);
@@ -364,8 +355,8 @@ export class ShotAnimationSystem {
         passInfo
       });
       
-      // ✅ DEBUG: Log team ID comparison to diagnose sync issues
-      if (passInfo && stepIndex === passInfo.stepIndex) {
+      // ✅ Removed excessive pass sync logging
+      if (false) {
         console.log('🔍 [PASS SYNC DEBUG] Team ID comparison (ShotAnimationSystem):', {
           stepIndex,
           offenseTeamId,

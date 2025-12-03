@@ -1781,7 +1781,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
     
     // ✅ DEBUG: Log team ID comparison to diagnose sync issues
     if (passInfo && stepIndex === passInfo.stepIndex) {
-      console.log('🔍 [PASS SYNC DEBUG] Team ID comparison:', {
+      if (false) console.log('🔍 [PASS SYNC DEBUG] Team ID comparison:', {
         stepIndex,
         offenseTeamId,
         sceneOffenseTeamId: scene.offenseTeamId,
@@ -1867,7 +1867,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
 
       // ✅ DEBUG: Log player classification for pass steps
       if (passInfo && stepIndex === passInfo.stepIndex && (anim.playerId === passInfo.passerId || anim.playerId === passInfo.receiverId)) {
-        console.log('🔍 [PASS SYNC DEBUG] Player classification:', {
+        if (false) console.log('🔍 [PASS SYNC DEBUG] Player classification:', {
           playerId: anim.playerId,
           spriteTeamId: sprite.team_id,
           offenseTeamId,
