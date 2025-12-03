@@ -359,6 +359,13 @@ export class AnimationEngine {
       })
     );
     
+    // ✅ FIX: For FCP/HCT, players are now positioned - return before animating pass
+    // Skeleton animation will handle the pass in its steps 0-1
+    if (hasFCPHCTSetup) {
+      console.log('✅ [FCP/HCT SETUP] Players positioned at step 0, skipping pass animation');
+      return;
+    }
+    
     // ✅ PHASE 2.6: Transition to HalfCourt state (moved from animateGameTurns.js)
     const { safeTransition } = await import('../state/gameStateMachine.js');
     const { States } = await import('../state/gameStateMachine.js');
