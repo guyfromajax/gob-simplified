@@ -1381,6 +1381,10 @@ class TurnManager:
                 # Check for defensive pressure opportunity (FCP/HCT) after putback make
                 pressure_type = self.determine_defensive_pressure_type()
                 game_state["offensive_state"] = pressure_type
+                # ✅ SS&S Pattern A: Set next_play_type so backend creates BASELINE_INBOUND turn
+                # This ensures putback makes follow same pattern as HCO/FT/Fast Break makes
+                next_play_type = "BASELINE_INBOUND"
+                next_defensive_setup = pressure_type
                 
                 shooter_team_id = getattr(rebounder, "team_id", None) or off_team.team_id
                 # print(f"🏀 PUTBACK_MAKE: shooter={get_name_safe(rebounder)} team_id={shooter_team_id} off_team={off_team.name}")
