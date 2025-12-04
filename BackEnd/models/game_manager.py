@@ -187,6 +187,15 @@ class GameManager:
                 self.game_state["pending_oreb"] = None
                 break
 
+        # ✅ FIX 3: Backend flip for DREB → HCO (Pattern B)
+        # Handle possession flips for DREB transitions that go directly to HCO (not through inbound)
+        # This includes: MISS with DREB → HCO, STEAL → HCO
+        if result.get("next_play_type") == "HCO" and result.get("possession_flips"):
+            old_offense = self.offense_team.name
+            self.switch_possession()
+            result["possession_flips"] = False
+            logging.warning(f"🔄 [DREB→HCO] Flipped possession before HCO: {old_offense} → {self.offense_team.name}")
+
         # If the turn ended with a dead-ball turnover or a non-shooting foul
         # that does not result in free throws, prepare a sideline inbound
         # sequence and append its payload so the front end can animate it.
