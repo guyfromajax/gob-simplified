@@ -3,7 +3,14 @@ from pymongo import MongoClient
 from dotenv import load_dotenv
 from pymongo.errors import PyMongoError
 
-load_dotenv()
+# ✅ LOCAL DEV: Load .env.local if it exists (dev), otherwise use .env (Railway)
+# This allows local dev to use different MongoDB (local or Atlas) without affecting Railway
+if os.path.exists(".env.local"):
+    load_dotenv(".env.local")
+    print("🔧 [LOCAL DEV] Loaded .env.local")
+else:
+    load_dotenv()  # Load .env or use Railway env vars
+    print("☁️ [RAILWAY/PROD] Loaded .env or system environment")
 
 MONGO_URI = os.environ.get("MONGO_URI")
 

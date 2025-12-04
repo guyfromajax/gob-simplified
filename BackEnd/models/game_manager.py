@@ -205,28 +205,6 @@ class GameManager:
             result["possession_flips"] = False
             logging.warning(f"🔄 [DREB→FB] Flipped possession before Fast Break: {old_offense} → {self.offense_team.name}")
 
-        # ✅ FIX 2: Backend flip for Made Shots → BASELINE_INBOUND (Pattern A)
-        # Check LAST turn (handles OREB putback makes from while loop above)
-        last_turn = self.turns[-1] if self.turns else None
-        if last_turn and last_turn.get("next_play_type") == "BASELINE_INBOUND":
-            # Flip possession BEFORE creating BASELINE_INBOUND so correct team inbounds
-            if last_turn.get("possession_flips"):
-                old_offense = self.offense_team.name
-                self.switch_possession()
-                last_turn["possession_flips"] = False
-                logging.warning(f"🔄 [MAKE→BIP] Flipped possession before BASELINE_INBOUND: {old_offense} → {self.offense_team.name}")
-            
-            # Create BASELINE_INBOUND turn with correct offense_team (after flip)
-            next_defensive_setup = last_turn.get("next_defensive_setup")
-            logging.warning(f"✅ [BIP CREATE] Creating BASELINE_INBOUND turn, offense_team={self.offense_team.name}, next_defensive_setup={next_defensive_setup}")
-            inbound_payload = self.turn_manager.setup_baseline_inbound(next_defensive_setup=next_defensive_setup)
-            self.turns.append(inbound_payload)
-            self.text_log.append("Baseline inbound after made shot")
-            
-            # Preserve offensive_state for next API call
-            if next_defensive_setup:
-                self.game_state["offensive_state"] = next_defensive_setup
-
         # If the turn ended with a dead-ball turnover or a non-shooting foul
         # that does not result in free throws, prepare a sideline inbound
         # sequence and append its payload so the front end can animate it.

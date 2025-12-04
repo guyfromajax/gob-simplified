@@ -1,4 +1,11 @@
 
+# Environment files (contain secrets)
 .env
+.env.local
+.env.railway
+
+# Example/template files (safe to commit)
+!.env.railway.example
+
 __pycache__/
 *.pyc
