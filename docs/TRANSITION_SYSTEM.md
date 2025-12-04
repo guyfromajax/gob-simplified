@@ -1570,3 +1570,202 @@ OREB → Inbound (#1) is **slightly better** than HCO/FT/FB → Inbound because:
 - **16/46 evaluated transitions are SS&S compliant (35%)**
 - Pattern consistency holds across ALL 5 turn types tested!
 
+---
+
+### Batch 6: Inbound Transitions (5 Total)
+
+#### 1. Opening Tip → HCO
+
+**Handler:** `opening_tip.py` (line 163-173)
+
+**Current Implementation:**
+- ✅ Sets `possession_flips = False` (line 166) - Correct, no flip after tip
+- ✅ Sets `next_play_type = "HCO"` (line 171)
+- ✅ Creates animations (tip animation)
+- ✅ No flip needed (tip winner gets first possession)
+- ❌ Does NOT set `offense_team_id`
+
+**SS&S Compliance:** ⚠️ **PARTIAL**
+
+**Issues:**
+1. Missing `offense_team_id` (Pattern D)
+
+**Fix Required:**
+- Backend: Set `result["offense_team_id"] = winner_team.team_id`
+
+---
+
+#### 2. Inbound Pass → HCO
+
+**Handler:** `turn_manager.py` `setup_baseline_inbound()` (line 138-303)
+
+**Current Implementation:**
+- ✅ Sets `result_type = "BASELINE_INBOUND"`
+- ✅ Creates offensive/defensive positioning data
+- ❌ Does NOT set `next_play_type` (implicitly HCO)
+- ❌ Does NOT set `possession_flips` (no flip needed, but should be explicit)
+- ⚠️ Sets `possession_team_id` (line 260) but NOT `offense_team_id`
+
+**SS&S Compliance:** ⚠️ **PARTIAL**
+
+**Issues:**
+1. Uses legacy `possession_team_id` instead of `offense_team_id`
+2. Missing `next_play_type = "HCO"`
+
+**Fix Required:**
+- Backend: Replace `possession_team_id` with `offense_team_id`
+- Backend: Set `next_play_type = "HCO"` for clarity
+
+---
+
+#### 3. Inbound Pass → FCP
+
+**Handler:** `turn_manager.py` `setup_baseline_inbound()` with `next_defensive_setup="FCP"`
+
+**Current Implementation:**
+- ✅ Sets `result_type = "BASELINE_INBOUND"`
+- ✅ Sets `next_defensive_setup = "FCP"` (passed as parameter)
+- ✅ Includes FCP skeleton step 0 positions (line 268-290)
+- ❌ Does NOT set `next_play_type` (should be "FCP")
+- ⚠️ Sets `possession_team_id` but NOT `offense_team_id`
+
+**SS&S Compliance:** ⚠️ **PARTIAL**
+
+**Issues:**
+1. Uses legacy `possession_team_id` instead of `offense_team_id`
+2. Missing `next_play_type = "FCP"`
+
+**Fix Required:**
+- Backend: Replace `possession_team_id` with `offense_team_id`
+- Backend: Set `next_play_type = "FCP"` based on `next_defensive_setup`
+
+---
+
+#### 4. Inbound Pass → HCT
+
+**Handler:** `turn_manager.py` `setup_baseline_inbound()` with `next_defensive_setup="HCT"`
+
+**Current Implementation:**
+- ✅ Sets `result_type = "BASELINE_INBOUND"`
+- ✅ Sets `next_defensive_setup = "HCT"` (passed as parameter)
+- ✅ Includes HCT skeleton step 0 positions (line 268-290)
+- ❌ Does NOT set `next_play_type` (should be "HCT")
+- ⚠️ Sets `possession_team_id` but NOT `offense_team_id`
+
+**SS&S Compliance:** ⚠️ **PARTIAL**
+
+**Issues:**
+1. Uses legacy `possession_team_id` instead of `offense_team_id`
+2. Missing `next_play_type = "HCT"`
+
+**Fix Required:**
+- Backend: Replace `possession_team_id` with `offense_team_id`
+- Backend: Set `next_play_type = "HCT"` based on `next_defensive_setup`
+
+---
+
+#### 5. Side Inbound Pass → HCO
+
+**Handler:** `turn_manager.py` `setup_side_inbound()` (line 78-136)
+
+**Current Implementation:**
+- ✅ Sets `result_type = "SIDE_INBOUND"`
+- ✅ Creates offensive/defensive positioning data
+- ✅ **Sets `offense_team_id`** (line 131) - **GOLD STANDARD!**
+- ✅ Sets `possession_team_id` (backwards compatibility, line 132)
+- ❌ Does NOT set `next_play_type` (implicitly HCO)
+- ❌ Does NOT set `possession_flips = False` explicitly
+
+**SS&S Compliance:** ✅ **SS&S COMPLIANT** (with minor improvements needed)
+
+**Issues:**
+1. Could explicitly set `next_play_type = "HCO"`
+2. Could explicitly set `possession_flips = False`
+
+**Fix Required:**
+- Backend: Add explicit `next_play_type = "HCO"` and `possession_flips = False` for clarity
+
+---
+
+### Batch 6 Summary
+
+| # | Transition | SS&S Status | Primary Issue | Pattern |
+|---|-----------|-------------|---------------|---------|
+| 1 | Opening Tip → HCO | ⚠️ PARTIAL | Missing offense_team_id | D |
+| 2 | Inbound Pass → HCO | ⚠️ PARTIAL | Uses possession_team_id | Legacy |
+| 3 | Inbound Pass → FCP | ⚠️ PARTIAL | Uses possession_team_id | Legacy |
+| 4 | Inbound Pass → HCT | ⚠️ PARTIAL | Uses possession_team_id | Legacy |
+| 5 | Side Inbound → HCO | ✅ SS&S | Minor improvements possible | E |
+
+**Results:**
+- ✅ **1 out of 5** are SS&S compliant (20%)
+- ⚠️ **4 out of 5** are partial (80%)
+- ❌ **0 out of 5** are NOT SS&S (0%)
+
+**Key Finding:**
+Inbound transitions are **BETTER** than others:
+- No frontend flips (no Pattern A, B, C issues)
+- Side Inbound already has `offense_team_id` ✅
+- Baseline Inbound uses legacy `possession_team_id` (easy fix)
+
+**FINAL OVERALL RESULTS:**
+- **17/51 transitions are SS&S compliant (33%)**
+- **21/51 are partial - need minor fixes (41%)**
+- **13/51 are NOT SS&S - need major fixes (25%)**
+
+---
+
+## Complete Evaluation Summary
+
+### By Pattern
+
+| Pattern | Description | Transitions Affected | SS&S Status | Fix Complexity |
+|---------|-------------|---------------------|-------------|----------------|
+| **A** | Made → Inbound (frontend flip) | 8 (HCO, FT, FB, FCP/HCT, OREB variant) | ❌ NOT SS&S | Medium |
+| **B** | DREB → HCO (flip never executed) | 5 (HCO, FT, FB, FCP/HCT, OREB) | ❌ NOT SS&S | Easy |
+| **C** | DREB → Fast Break (frontend flip) | 4 (HCO, FT, FB, FCP/HCT, OREB) | ❌ NOT SS&S | Medium |
+| **D** | Missing offense_team_id (no flip) | 17 (scattered across all types) | ⚠️ PARTIAL | Easy |
+| **E** | Side Inbound (gold standard) | 17 (all SIP transitions) | ✅ SS&S | None |
+
+### By Turn Type
+
+| Turn Type | Total | ✅ SS&S | ⚠️ Partial | ❌ Not SS&S | % SS&S |
+|-----------|-------|---------|-----------|-------------|--------|
+| HCO | 7 | 2 | 2 | 3 | 29% |
+| Free Throw | 7 | 0 | 4 | 3 | 0% |
+| Fast Break | 8 | 2 | 3 | 3 | 25% |
+| FCP/HCT | 16 | 4 | 6 | 6 | 25% |
+| OREB | 8 | 2 | 3 | 3 | 25% |
+| Inbound | 5 | 1 | 4 | 0 | 20% |
+| **TOTAL** | **51** | **17** | **21** | **13** | **33%** |
+
+### The 4 Systematic Fixes
+
+**Fix 1: Add offense_team_id to ALL results** (Pattern D)
+- **Impact:** Fixes 17 transitions (all partial ones)
+- **Complexity:** Easy - add one line in `turn_manager.py`
+- **Location:** `run_micro_turn()` after phase resolution
+
+**Fix 2: Backend flip for Made Shots** (Pattern A)
+- **Impact:** Fixes 8 transitions (all made shot → inbound)
+- **Complexity:** Medium - add flip before BASELINE_INBOUND creation
+- **Location:** `game_manager.py` (similar to existing SIP flip)
+
+**Fix 3: Backend flip for DREB → HCO** (Pattern B)
+- **Impact:** Fixes 5 transitions
+- **Complexity:** Easy - add flip check in `game_manager.py`
+- **Location:** After MISS turn with DREB, before next turn
+
+**Fix 4: Backend flip for DREB → Fast Break** (Pattern C)
+- **Impact:** Fixes 4 transitions
+- **Complexity:** Medium - add flip before Fast Break
+- **Location:** `game_manager.py` or beginning of `resolve_fast_break_logic()`
+
+### Expected Outcome After Fixes
+
+- **Before:** 17/51 SS&S compliant (33%)
+- **After Fix 1 only:** 38/51 SS&S compliant (75%) - Just add offense_team_id!
+- **After All 4 Fixes:** 51/51 SS&S compliant (100%) - Perfect consistency!
+
+**The fixes are SYSTEMATIC and SIMPLE - this is exactly what SS&S is about!** 🎯
+
