@@ -1645,9 +1645,11 @@ class TurnManager:
         seconds = self.game.game_state["time_remaining"] % 60
         self.game.game_state["clock"] = f"{minutes}:{seconds:02d}"
 
-        # 🔁 Flip possession if flagged
-        if result.get("possession_flips"):
-            self.game.switch_possession()
+        # ✅ REMOVED: Possession flips now handled in game_manager (Fixes 2-4)
+        # This old flip caused double-flipping with the new system
+        # Fixes 2-4 in game_manager.py handle all possession flips BEFORE creating next turns
+        # if result.get("possession_flips"):
+        #     self.game.switch_possession()
 
     def _reconcile_player_points(self, result):
         """Ensure summed player PTS match the official team score.
