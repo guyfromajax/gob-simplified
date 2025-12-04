@@ -559,7 +559,8 @@ class TurnManager:
         from BackEnd.constants import DEBUG
         
         # Create debug string for frontend display
-        debug_turn_result = f"Turn {turn_num} RESULT: {result_type} | Next: {next_play_type} | Defense Setup: {next_defensive_setup} | Possession Flips: {possession_flips}"
+        offense_team_id = result.get("offense_team_id", "None")
+        debug_turn_result = f"Turn {turn_num} RESULT: {result_type} | Offense: {offense_team_id} | Next: {next_play_type} | Defense Setup: {next_defensive_setup} | Possession Flips: {possession_flips}"
         
         if DEBUG:
             print(debug_turn_result)
