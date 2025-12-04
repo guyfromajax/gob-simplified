@@ -104,7 +104,7 @@ export class AnimationRouter {
       turnIndex = turnData.index ?? turnData.turnIndex ?? null;
       
       const homeTeamId = this.scene.simData?.home_team_id;
-      const { possessionId: prepPossessionId } = prepareTurnForAnimation({
+      const { possessionId: prepPossessionId } = await prepareTurnForAnimation({
         turn: turnData,
         scene: this.scene,
         turnIndex: turnIndex ?? 0, // Use 0 as fallback if not provided (prepareTurnForAnimation will set it)
@@ -184,7 +184,7 @@ export class AnimationRouter {
           willFinalize: true
         });
         
-        finalizeTurnAfterAnimation({
+        await finalizeTurnAfterAnimation({
           turn: turnData,
           scene: this.scene,
           onUpdate: this.onUpdate,

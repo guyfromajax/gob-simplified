@@ -32,7 +32,7 @@ import { announceFromTurnData } from "../utils/announcements.js";
  * @param {string} params.homeTeamId - Home team ID
  * @returns {Object} Prepared turn object with calculated properties
  */
-export function prepareTurnForAnimation({ turn, scene, turnIndex, homeTeamId }) {
+export async function prepareTurnForAnimation({ turn, scene, turnIndex, homeTeamId }) {
   // Set scene.currentTurn (required by playTurnAnimation)
   scene.currentTurn = turnIndex;
   
@@ -189,7 +189,7 @@ function handleTurnTransition(scene, turnData) {
  * @param {number} params.turnIndex - Turn index (optional, for debug score)
  * @param {Function} params.updateDebugScore - Debug score update function (optional)
  */
-export function finalizeTurnAfterAnimation({ 
+export async function finalizeTurnAfterAnimation({ 
   turn, 
   scene, 
   onUpdate, 
