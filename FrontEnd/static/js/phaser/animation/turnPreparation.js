@@ -122,8 +122,9 @@ function handleTurnTransition(scene, turnData) {
   // ✅ DEBUG: Always log transition handler entry
   console.log('🔍 [UNIVERSAL TRANSITION] Entry', {
     result_type: turnData.result_type,
+    offense_team_id: turnData.offense_team_id,
+    possession_team_id: turnData.possession_team_id,  // Legacy, for comparison
     possession_flips: turnData.possession_flips,
-    possession_team_id: turnData.possession_team_id,
     current_scene_offenseTeamId: scene.offenseTeamId
   });
   
