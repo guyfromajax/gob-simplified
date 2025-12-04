@@ -869,20 +869,10 @@ async function runInboundSetup({
     });
   }
   
-  // Force update scene.offenseTeamId to match newOffenseSide (source of truth)
-  if (scene.offenseTeamId !== expectedOffenseTeamId) {
-    console.warn('⚠️ [INBOUND SETUP] Correcting scene.offenseTeamId mismatch!', {
-      old_scene_offenseTeamId: scene.offenseTeamId,
-      new_scene_offenseTeamId: expectedOffenseTeamId,
-      newOffenseSide,
-      homeTeamId,
-      awayTeamId,
-      stackTrace: new Error().stack?.split('\n').slice(1, 6)
-    });
-    scene.offenseTeamId = expectedOffenseTeamId;
-    // Emit event to notify other systems
-    scene.events?.emit?.('possessionChange', { offenseTeamId: expectedOffenseTeamId });
-  }
+  // ✅ SS&S: Possession flip removed from frontend (Fix 2 - Pattern A)
+  // Backend now flips possession before creating BASELINE_INBOUND turn
+  // Frontend just reads offense_team_id from turnData (handled by universal transition in turnPreparation.js)
+  // This defensive check is no longer needed - backend is authoritative
   
   animationDebugLog('runInboundSetup called:', {
     newOffenseSide,
