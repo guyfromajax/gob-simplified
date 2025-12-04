@@ -196,6 +196,139 @@ if not is_valid:
 
 ---
 
+## Ideal SS&S Transition Structure
+
+### Core Principles
+
+1. **Single Source of Truth** - Each piece of data has one authoritative source
+2. **Backend Authority** - Backend determines all routing, possession, and game state
+3. **Frontend Display** - Frontend reads and displays, doesn't make decisions
+4. **Clear Separation** - Backend = logic and state, Frontend = presentation
+5. **Consistent Pattern** - All 51 transitions follow the same pattern
+
+### SS&S Transition Pattern
+
+**Backend Responsibilities (Authoritative):**
+1. ✅ Execute turn logic (shot, pass, foul, etc.)
+2. ✅ Determine outcome (`result_type`, points, stats, etc.)
+3. ✅ **Flip possession if needed** (`switch_possession()` if `possession_flips=True`)
+4. ✅ Set next turn routing (`next_play_type`, `next_defensive_setup`, `offensive_state`)
+5. ✅ Create animation data (`animations[]`, active player IDs)
+6. ✅ Set authoritative offense team (`offense_team_id = game.offense_team.team_id` **AFTER flip**)
+7. ✅ Validate transition
+8. ✅ Return complete turn data to frontend
+
+**Frontend Responsibilities (Display Only):**
+1. ✅ Read `offense_team_id` from turn data
+2. ✅ Set `scene.offenseTeamId = turnData.offense_team_id` (simple assignment, no flip logic)
+3. ✅ Emit `possessionChange` event if value changed
+4. ✅ Animate turn using `animations[]` data
+5. ✅ Update UI (scoreboard, playcall display, etc.)
+6. ✅ Manage scene state (`currentPressureType`, context flags, FSM)
+7. ✅ Route to next turn based on `result_type`
+
+**❌ Frontend Does NOT:**
+- ❌ Flip possession (backend already did it)
+- ❌ Decide next turn type (backend provides it)
+- ❌ Calculate scores/stats (backend provides them)
+- ❌ Determine pressure type (backend provides it)
+
+### Ideal Turn Data Structure
+
+**Required Fields (ALL transitions):**
+```python
+{
+    # Core identification
+    "result_type": str,              # "MAKE", "MISS", "FOUL", "FREE_THROW", etc.
+    "offense_team_id": str,          # ✅ SS&S: Team on offense DURING this turn (AFTER flip if applicable)
+    
+    # Routing (if applicable)
+    "next_play_type": str | None,   # "BASELINE_INBOUND", "HCO", "FAST_BREAK", "FREE_THROW", "SIDE_INBOUND"
+    "next_defensive_setup": str | None,  # "FCP", "HCT", "HCO", None
+    
+    # Animation
+    "animations": list,              # Player movements, actions, coords
+    "text": str,                     # Turn description
+    
+    # Game state
+    "quarter": int,
+    "time_elapsed": int,
+    "score": dict,                   # {home_team: X, away_team: Y}
+    
+    # Stats (if applicable)
+    "points": int | None,            # Points scored this turn
+    "scoring_team": str | None,      # Team that scored
+    "deltas": dict,                  # Player stat changes
+    
+    # Lineups & energy
+    "home_lineup": dict,
+    "away_lineup": dict,
+    "player_energy": dict,
+    
+    # Turn-specific fields (varies by result_type)
+    # ... shooter_id, rebounder_id, stealer_id, etc.
+}
+```
+
+**Internal Backend Fields (NOT sent to frontend):**
+```python
+{
+    "possession_flips": bool,        # ✅ Internal flag - tells backend to call switch_possession()
+    "offensive_state": str,          # ✅ Internal routing state - persists across API calls
+}
+```
+
+### SS&S Possession Flow
+
+**Backend (Single Location):**
+```python
+# In game_manager.py, after turn completes:
+if result.get("possession_flips"):
+    self.switch_possession()        # ✅ Flip possession internally
+    result["possession_flips"] = False  # Clear flag (internal only)
+
+# Set offense_team_id AFTER flip (authoritative)
+result["offense_team_id"] = self.game.offense_team.team_id
+```
+
+**Frontend (Simple Display):**
+```javascript
+// In turnPreparation.js handleTurnTransition():
+if (turnData.offense_team_id) {
+    scene.offenseTeamId = turnData.offense_team_id;  // ✅ Simple assignment
+    if (scene.offenseTeamId !== previousOffenseTeamId) {
+        scene.events.emit('possessionChange', { offenseTeamId: scene.offenseTeamId });
+    }
+}
+```
+
+### Benefits of SS&S Pattern
+
+**Simple:**
+- ✅ Backend flips in ONE place (`game_manager.py`)
+- ✅ Frontend reads ONE field (`offense_team_id`)
+- ✅ No complex flip logic scattered across files
+
+**Stable:**
+- ✅ No double flips (backend flips once, frontend just displays)
+- ✅ No missed flips (backend always sets `offense_team_id`)
+- ✅ Single source of truth (no conflicts)
+
+**Scalable:**
+- ✅ Easy to add new turn types (follow same pattern)
+- ✅ Easy to test (backend logic isolated)
+- ✅ Easy to debug (one place to check possession logic)
+
+### Deviation Detection
+
+**To identify non-SS&S transitions, check if:**
+1. ❌ Frontend flips possession (instead of just reading `offense_team_id`)
+2. ❌ Backend doesn't set `offense_team_id`
+3. ❌ Possession flip happens in handler (instead of `game_manager.py`)
+4. ❌ Frontend makes routing decisions (instead of reading `next_play_type`)
+
+---
+
 ## Current State (After Revert)
 
 **Current Approach**: Decentralized - Each handler directly sets `game_state["offensive_state"]`:
