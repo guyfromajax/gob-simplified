@@ -1425,6 +1425,7 @@ class TurnManager:
                     "time_elapsed": oreb_event.get("timeElapsed", 3),
                     "points": oreb_event.get("points", 2),
                     "scoring_team": off_team.name,
+                    "offense_team_id": off_team.team_id,  # ✅ SS&S: Add offense_team_id to all results
                     "next_play_type": "BASELINE_INBOUND",  # ✅ FIX 2: Create BASELINE_INBOUND turn (Pattern A)
                     "next_defensive_setup": pressure_type,
                     "animations": [],  # Putbacks use simple animation, not skeleton
@@ -1470,6 +1471,7 @@ class TurnManager:
                     "text": text,
                     "possession_flips": possession_flips,  # Will be updated based on rebound type
                     "time_elapsed": oreb_event.get("timeElapsed", 3),
+                    "offense_team_id": off_team.team_id,  # ✅ SS&S: Add offense_team_id to all results
                     "animations": [],
                     "rebounderId": getattr(rebounder, "player_id", None),
                     "quarter": self.game.quarter,
@@ -1601,6 +1603,7 @@ class TurnManager:
                 "text": text,
                 "possession_flips": False,
                 "time_elapsed": oreb_event.get("timeElapsed", 2),
+                "offense_team_id": self.game.offense_team.team_id,  # ✅ SS&S: Add offense_team_id to all results
                 "animations": [],
                 "rebounderId": getattr(rebounder, "player_id", None),
                 "pgId": getattr(pg, "player_id", None) if pg else None,
