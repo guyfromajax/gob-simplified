@@ -164,6 +164,7 @@ def execute_opening_tip(game):
         "text": text,
         "time_elapsed": time_elapsed,
         "possession_flips": False,
+        "offense_team_id": offense_team.team_id,  # ✅ SS&S: Add offense_team_id (critical for game start!)
         "animations": animations,
         "ball_landing_coords": ball_landing_coords,
         "home_wins": home_wins,
