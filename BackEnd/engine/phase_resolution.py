@@ -204,6 +204,7 @@ def resolve_non_shooting_foul(roles, game):
         "possession_flips": False,
         "time_elapsed": time_elapsed,
         "offense_team_id": game.offense_team.team_id,  # ✅ SS&S: Add offense_team_id to all results
+        "current_turn": "HCO",  # ✅ SS&S: Standalone fouls occur in HCO context
         "foul_player_id": getattr(foul_player, "player_id", None) if foul_player else None,
         "foul_team": game_state.get("foul_team"),
         "foul_count": foul_out_info["foul_count"],
@@ -413,10 +414,12 @@ def resolve_fast_break_logic(game: "GameManager"):
             "possession_flips": False,
             "time_elapsed": 3,
             "animations": animations,
+            "current_turn": "FAST_BREAK",  # ✅ SS&S: Explicit turn type
             "next_play_type": "HCO",
+            "next_turn": "HCO",  # ✅ SS&S: Explicit next turn
             "offense_team_id": off_team.team_id,  # ✅ FIX: Add offense_team_id (possession doesn't flip, same team continues)
             "roles": fb_roles,  # ✅ Include roles so frontend can animate outlet pass
-            "fast_break": True,  # ✅ Mark as Fast Break so frontend routes to Fast Break animation
+            "fast_break": True,  # Legacy flag for backwards compatibility
         }
         
         # ✅ DEBUG: Log fast break defensive stop result to verify data is being set correctly
@@ -681,6 +684,7 @@ def resolve_free_throw_logic(game):
         "shooter_id": getattr(shooter, "player_id", None),
         "shooter_pos": shooter_pos,
         "offense_team_id": off_team.team_id,
+        "current_turn": "FREE_THROW",  # ✅ SS&S: Explicit turn type
         "no_lane": game_state.get("no_lane", False),
         "free_throws_remaining": game_state["free_throws_remaining"],  # For frontend to know if final FT
         "one_and_one": game_state.get("one_and_one", False),  # For frontend 1&1 display
@@ -694,6 +698,7 @@ def resolve_free_throw_logic(game):
             result["next_defensive_setup"] = game_state.get("offensive_state", "HCO")
             # ✅ FIX 2: Set next_play_type so backend creates BASELINE_INBOUND turn (Pattern A)
             result["next_play_type"] = "BASELINE_INBOUND"
+            result["next_turn"] = "BASELINE_INBOUND"  # ✅ SS&S: Explicit next turn
     else:
         # Add rebounder information for missed free throws
         if game_state.get("last_rebounder"):
@@ -772,6 +777,7 @@ def resolve_turnover_logic(roles, game, turnover_type="DEAD BALL"):
         "time_elapsed": random.randint(3, 8),
         "possession_flips": True,  # Let the turn loop handle the flip
         "offense_team_id": game.offense_team.team_id,  # ✅ SS&S: Add offense_team_id to all results
+        "current_turn": "HCO",  # ✅ SS&S: Standalone turnovers occur in HCO context
         "victim_id": victim_id,
         "victim_name": victim_name,
     }
@@ -1547,7 +1553,9 @@ def resolve_full_court_press_logic(game: "GameManager"):
     result = {
         "result_type": result_type,
         "text": text,
+        "current_turn": "FCP",  # ✅ SS&S: Explicit turn type
         "next_play_type": next_play_type,
+        "next_turn": next_play_type,  # ✅ SS&S: Explicit next turn (HCO, FAST_BREAK, or None)
         "ball_handler": roles["ball_handler"],
         "defender": roles["defender"],
         "shooter": roles["shooter"],
@@ -1560,8 +1568,6 @@ def resolve_full_court_press_logic(game: "GameManager"):
         "skeleton": skeleton,
         "animations": animations,
         "roles": roles,
-        "fcp_turn": True,  # ✅ FIX: Flag ALL FCP turns (not just fouls)
-        "fcp_foul": result_type == "FOUL",  # Legacy flag for backwards compatibility
         "foul_team": game_state.get("foul_team"),  # Include foul_team for frontend announcement
         "foul_player_id": getattr(roles.get("foul_player"), "player_id", None) if roles.get("foul_player") else None,  # For foul announcements
         "victim_id": getattr(roles["ball_handler"], "player_id", None),  # For turnover announcements
@@ -2340,7 +2346,9 @@ def resolve_half_court_trap_logic(game: "GameManager"):
     result = {
         "result_type": result_type,
         "text": text,
+        "current_turn": "HCT",  # ✅ SS&S: Explicit turn type
         "next_play_type": next_play_type,
+        "next_turn": next_play_type,  # ✅ SS&S: Explicit next turn (HCO, FAST_BREAK, or None)
         "ball_handler": roles["ball_handler"],
         "defender": roles["defender"],
         "shooter": roles["shooter"],
@@ -2353,8 +2361,6 @@ def resolve_half_court_trap_logic(game: "GameManager"):
         "skeleton": skeleton,
         "animations": animations,
         "roles": roles,
-        "hct_turn": True,  # ✅ FIX: Flag ALL HCT turns (not just fouls)
-        "hct_foul": result_type == "FOUL",  # Legacy flag for backwards compatibility
         "foul_team": game_state.get("foul_team"),  # Include foul_team for frontend announcement
         "foul_player_id": getattr(roles.get("foul_player"), "player_id", None) if roles.get("foul_player") else None,  # For foul announcements
         "victim_id": getattr(roles["ball_handler"], "player_id", None),  # For turnover announcements

@@ -129,6 +129,8 @@ class TurnManager:
             "oDestinations": o_dest,
             "dDestinations": d_dest,
             "offense_team_id": offense_team.team_id,  # ✅ SS&S: Team on offense during this turn
+            "current_turn": "SIDE_INBOUND",  # ✅ SS&S: Explicit turn type
+            "next_turn": "HCO",  # ✅ SS&S: Always transitions to HCO after side inbound
             "possession_team_id": offense_team.team_id,  # ✅ TODO: Remove (backwards compatibility)
             "quarter": self.game.quarter,
         }
@@ -258,8 +260,10 @@ class TurnManager:
             "oDestinations": o_dest,
             "dDestinations": d_dest,
             "offense_team_id": offense_team.team_id,  # ✅ SS&S: Use offense_team_id (not possession_team_id)
+            "current_turn": "BASELINE_INBOUND",  # ✅ SS&S: Explicit turn type
             "quarter": self.game.quarter,
             "next_play_type": next_defensive_setup if next_defensive_setup else "HCO",  # ✅ Explicit routing
+            "next_turn": next_defensive_setup if next_defensive_setup else "HCO",  # ✅ SS&S: Explicit next turn
         }
         
         # Include next_defensive_setup if provided (for FCP/HCT pressure)
@@ -420,6 +424,15 @@ class TurnManager:
         # This represents the team on offense DURING this turn (for animations)
         result["offense_team_id"] = self.game.offense_team.team_id
         # ✅ REMOVED: possession_team_id (fully migrated to offense_team_id in SS&S refactor)
+        
+        # ✅ SS&S: Set current_turn based on offensive_state
+        # This explicitly identifies what type of turn this is
+        state = self.game.game_state.get("offensive_state", "HCO")
+        result["current_turn"] = state  # HCO, FCP, HCT, FAST_BREAK, FREE_THROW, or OREB
+        
+        # ✅ SS&S: Copy next_play_type to next_turn for explicit naming
+        if "next_play_type" in result and result["next_play_type"]:
+            result["next_turn"] = result["next_play_type"]
 
         # STEP 4: Final updates (clock, logs, animation)
         try:
@@ -1427,7 +1440,9 @@ class TurnManager:
                     "points": oreb_event.get("points", 2),
                     "scoring_team": off_team.name,
                     "offense_team_id": off_team.team_id,  # ✅ SS&S: Add offense_team_id to all results
+                    "current_turn": "OREB",  # ✅ SS&S: Explicit turn type
                     "next_play_type": "BASELINE_INBOUND",  # ✅ FIX 2: Create BASELINE_INBOUND turn (Pattern A)
+                    "next_turn": "BASELINE_INBOUND",  # ✅ SS&S: Explicit next turn
                     "next_defensive_setup": pressure_type,
                     "animations": [],  # Putbacks use simple animation, not skeleton
                     "rebounderId": getattr(rebounder, "player_id", None),
@@ -1473,6 +1488,7 @@ class TurnManager:
                     "possession_flips": possession_flips,  # Will be updated based on rebound type
                     "time_elapsed": oreb_event.get("timeElapsed", 3),
                     "offense_team_id": off_team.team_id,  # ✅ SS&S: Add offense_team_id to all results
+                    "current_turn": "OREB",  # ✅ SS&S: Explicit turn type
                     "animations": [],
                     "rebounderId": getattr(rebounder, "player_id", None),
                     "quarter": self.game.quarter,
@@ -1605,6 +1621,8 @@ class TurnManager:
                 "possession_flips": False,
                 "time_elapsed": oreb_event.get("timeElapsed", 2),
                 "offense_team_id": self.game.offense_team.team_id,  # ✅ SS&S: Add offense_team_id to all results
+                "current_turn": "OREB",  # ✅ SS&S: Explicit turn type
+                "next_turn": "HCO",  # ✅ SS&S: Kickouts continue to HCO
                 "animations": [],
                 "rebounderId": getattr(rebounder, "player_id", None),
                 "pgId": getattr(pg, "player_id", None) if pg else None,

@@ -165,11 +165,13 @@ def execute_opening_tip(game):
         "time_elapsed": time_elapsed,
         "possession_flips": False,
         "offense_team_id": offense_team.team_id,  # ✅ SS&S: Add offense_team_id (critical for game start!)
+        "current_turn": "OPENING_TIP",  # ✅ SS&S: Explicit turn type
         "animations": animations,
         "ball_landing_coords": ball_landing_coords,
         "home_wins": home_wins,
         "winner": winner_name,
         "next_play_type": "HCO",
+        "next_turn": "HCO",  # ✅ SS&S: Explicit next turn type
         "quarter": game.quarter,  # Add quarter field for frontend filtering
     }
     

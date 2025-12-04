@@ -1510,10 +1510,8 @@ async function runInboundSetup({
 export async function playTurnAnimation({ scene, simData, playerSprites, turnData, ballSprite, onAction, turnIndex, onUpdate }) {
   
   // ✅ DEBUG: Log playTurnAnimation entry
-  // ✅ FIX: Check for new fcp_turn/hct_turn flags (not just fcp_foul/hct_foul)
-  const isFCPHCT = turnData?.play_type === 'FCP' || turnData?.play_type === 'HCT' || 
-                   turnData?.fcp_turn || turnData?.hct_turn ||
-                   turnData?.fcp_foul || turnData?.hct_foul;
+  // ✅ SS&S: Use current_turn to detect FCP/HCT (replaces fragmented flags)
+  const isFCPHCT = turnData?.current_turn === 'FCP' || turnData?.current_turn === 'HCT';
   console.log('🔍 [playTurnAnimation] Entry', {
     turn_index: turnIndex,
     result_type: turnData.result_type,
