@@ -125,7 +125,7 @@ export class AnimationRouter {
           currentBallOwner: this.ballController?.currentOwner?.playerId ?? null
         });
       } else {
-        console.log('🎬 AnimationRouter: Starting turn processing', {
+        if (false) console.log('[AnimationRouter]', {
           result_type: turnData.result_type,
           turn_index: turnIndex,
           hasAnimationEngine: !!this.animationEngine,
@@ -139,7 +139,7 @@ export class AnimationRouter {
       
       // No state machine needed - just process the turn directly
       if (!shouldLog) {
-        console.log('🎯 AnimationRouter: Processing turn directly (no state machine)');
+        // Processing (log removed)
       }
 
       // ✅ PHASE 2.1: Enhanced context object with all required parameters
@@ -153,18 +153,18 @@ export class AnimationRouter {
       };
       
       if (!shouldLog) {
-        console.log('🚀 AnimationRouter: Calling animationEngine.processTurn');
+        // Calling engine (log removed)
       }
       await this.animationEngine.processTurn(turnData, context);
       if (!shouldLog) {
-        console.log('✅ AnimationRouter: animationEngine.processTurn completed');
+        // Completed (log removed)
       }
 
       // Handle any queued turns
       await this.processQueue();
 
       if (!shouldLog) {
-        console.log('🎉 AnimationRouter: Turn processing completed successfully');
+        // Success (log removed)
       }
 
     } catch (error) {

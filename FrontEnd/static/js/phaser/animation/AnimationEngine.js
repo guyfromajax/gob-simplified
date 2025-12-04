@@ -86,15 +86,15 @@ export class AnimationEngine {
     this.isProcessing = true;
 
     try {
-      console.log('🎬 AnimationEngine: Processing turn', turnData.result_type);
+      // Processing (log removed)
 
       // Determine the appropriate handler
       const handler = this.determineHandler(turnData);
-      console.log('🎯 AnimationEngine: Using handler for', turnData.result_type);
+      // Handler routing (log removed)
       
       // Execute the animation
       await handler(turnData, context);
-      console.log('✅ AnimationEngine: Completed', turnData.result_type);
+      // Completed (log removed)
 
     } catch (error) {
       console.error('❌ AnimationEngine: Error processing turn', {
@@ -281,7 +281,7 @@ export class AnimationEngine {
   }
 
   async handleSideInbound(turnData, context) {
-    console.log('AnimationEngine: Handling side inbound with new PassAnimationSystem');
+    // Side inbound handler (log removed)
     
     // ✅ PHASE 2.6: Check FastBreak state (matches original logic in animateGameTurns.js)
     const { States } = await import('../state/gameStateMachine.js');
@@ -307,7 +307,7 @@ export class AnimationEngine {
   }
 
   async handleBaselineInbound(turnData, context) {
-    console.log('AnimationEngine: Handling baseline inbound');
+    // Baseline inbound handler (log removed)
     
     // ✅ PHASE 2.6: Set FCP/HCT state when pressure setup detected (moved from animateGameTurns.js)
     // This is the single source of truth for pressure state - replaces complex flag detection
@@ -424,7 +424,7 @@ export class AnimationEngine {
   }
 
   async handlePutback(turnData, context) {
-    console.log('AnimationEngine: Handling putback/OREB kickout', {
+    if (false) console.log('[Putback Handler]', {
       result_type: turnData.result_type,
       rebounderId: turnData.rebounderId
     });
@@ -443,7 +443,7 @@ export class AnimationEngine {
   }
 
   async handleOpeningTip(turnData, context) {
-    console.log('AnimationEngine: Handling opening tip');
+    // Opening tip handler (log removed)
     
     // ✅ PHASE 2.6: Validate opening tip timing (moved from animateGameTurns.js)
     const turnQuarter = turnData.quarter ?? this.scene.quarter ?? 1;
@@ -613,7 +613,7 @@ export class AnimationEngine {
   }
 
   async handleShotAttempt(turnData, context) {
-    console.log('AnimationEngine: Handling shot attempt with new ShotAnimationSystem', {
+    if (false) console.log('[Shot Handler]', {
       hasShotSystem: !!this.shotSystem,
       result_type: turnData.result_type,
       turn_index: turnData.index
@@ -621,13 +621,13 @@ export class AnimationEngine {
     
     // Use new shot animation system if available
     if (this.shotSystem) {
-      console.log('🎬 [AnimationEngine] Calling ShotAnimationSystem.processShot()', {
+      if (false) console.log('[Calling Shot System]', {
         result_type: turnData.result_type,
         shooter_id: turnData.shooter_id,
         turn_index: turnData.index
       });
       await this.shotSystem.processShot(turnData);
-      console.log('✅ [AnimationEngine] ShotAnimationSystem.processShot() completed');
+      // Shot system completed (log removed)
     } else {
       // Fallback to existing system
       console.warn('AnimationEngine: ShotAnimationSystem not available, using fallback');
@@ -701,7 +701,7 @@ export class AnimationEngine {
   }
 
   async handleDefault(turnData, context) {
-    console.log('🔍 [DEFAULT HANDLER] Entry', {
+    if (false) console.log('[Default Handler]', {
       result_type: turnData.result_type,
       has_animations: !!turnData.animations?.length,
       animation_count: turnData.animations?.length || 0,
@@ -726,7 +726,7 @@ export class AnimationEngine {
       onUpdate: context.onUpdate // ✅ PHASE 2.1: Pass onUpdate (for future use)
     });
     
-    console.log('✅ [DEFAULT HANDLER] playTurnAnimation completed', {
+    if (false) console.log('[Default Complete]', {
       result_type: turnData.result_type
     });
   }

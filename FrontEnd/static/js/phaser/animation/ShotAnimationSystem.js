@@ -61,8 +61,8 @@ export class ShotAnimationSystem {
    * Process a shot turn with complete player movement
    */
   async processShot(turnData) {
-    // ✅ DEBUG: Log shot attempt immediately - track shooter and shot details
-    console.log('🎬 [ShotAnimationSystem.processShot] ENTERING', {
+    // Shot processing (debug log removed)
+    if (false) console.log('[Shot Debug]', {
       result_type: turnData.result_type,
       shooter_id: turnData.shooter_id,
       turn_index: turnData.index,
@@ -288,7 +288,7 @@ export class ShotAnimationSystem {
    * Animate player movement step by step
    */
   async animatePlayerMovement(turnData, ballSprite, currentBallOwnerRef, maxSteps) {
-    console.log('🎬 [ShotAnimationSystem.animatePlayerMovement] ENTERING', {
+    if (false) console.log('[Player Movement Debug]', {
       maxSteps,
       result_type: turnData.result_type,
       skipToEnd: this.scene.skipToEnd,
@@ -425,9 +425,10 @@ export class ShotAnimationSystem {
         // If it's still null (pre-opening tip or data corruption), default to false (defensive)
         const isOffensivePlayer = offenseTeamId ? String(sprite.team_id) === String(offenseTeamId) : false;
         
-        // ✅ DEBUG: Log player classification for pass steps
-        if (passInfo && stepIndex === passInfo.stepIndex && (anim.playerId === passInfo.passerId || anim.playerId === passInfo.receiverId)) {
-          console.log('🔍 [PASS SYNC DEBUG] Player classification (ShotAnimationSystem):', {
+        // Pass sync classification (debug removed for cleaner logs)
+        if (false && passInfo && stepIndex === passInfo.stepIndex && (anim.playerId === passInfo.passerId || anim.playerId === passInfo.receiverId)) {
+          // Debug log removed
+          const debug = {
             playerId: anim.playerId,
             spriteTeamId: sprite.team_id,
             offenseTeamId,
