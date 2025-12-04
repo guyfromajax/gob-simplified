@@ -211,6 +211,14 @@ async function runSetupTween({ scene, ballSprite, animations, playerSprites, cur
 async function runSideInboundSetup({ scene, ballSprite, playerSprites, turnData }) {
   if (!turnData || scene?.skipToEnd || scene?.stateMachine?.is(States.FreeThrow) || scene?.stateMachine?.is(States.FastBreak)) return;
 
+  // ✅ DEBUG: Check SIP offense_team_id vs scene state
+  console.log('🔍 [SIP DEBUG]', {
+    turnData_offense_team_id: turnData.offense_team_id,
+    scene_offenseTeamId: scene.offenseTeamId,
+    result_type: turnData.result_type,
+    mismatch: turnData.offense_team_id !== scene.offenseTeamId
+  });
+
   scene.isInboundSetup = true;
   
   // Allow transition from HalfCourt (after fouls) or other states
