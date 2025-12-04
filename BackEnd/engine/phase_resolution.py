@@ -690,12 +690,8 @@ def resolve_free_throw_logic(game):
         # Add next_defensive_setup if final FT was made
         if game_state["free_throws_remaining"] <= 0:
             result["next_defensive_setup"] = game_state.get("offensive_state", "HCO")
-            # ✅ FIX: Set possession_team_id when possession flips (after final made FT)
-            if possession_flips:
-                # After made FT, possession flips - defense becomes offense
-                result["possession_team_id"] = def_team.team_id
-            else:
-                result["possession_team_id"] = off_team.team_id
+            # ✅ FIX 2: Set next_play_type so backend creates BASELINE_INBOUND turn (Pattern A)
+            result["next_play_type"] = "BASELINE_INBOUND"
     else:
         # Add rebounder information for missed free throws
         if game_state.get("last_rebounder"):

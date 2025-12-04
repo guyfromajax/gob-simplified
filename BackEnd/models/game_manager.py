@@ -229,18 +229,29 @@ class GameManager:
             # Reset offensive state to HCO after side inbound (FCP/HCT only apply after made shots)
             self.game_state["offensive_state"] = "HCO"
 
-        # If the turn ended with a made shot and next_play_type is BASELINE_INBOUND,
-        # prepare a baseline inbound sequence and append its payload so the front end can animate it.
-        # This ensures the frontend receives a separate BASELINE_INBOUND turn (like OREB putback makes do)
-        # which allows proper FCP/HCT setup turn generation in the next API call.
-        if (
-            result.get("result_type") == "MAKE" 
-            and result.get("next_play_type") == "BASELINE_INBOUND"
-        ):
-            # Get next_defensive_setup from the made shot turn (FCP/HCT pressure type)
-            next_defensive_setup = result.get("next_defensive_setup")
+        # ✅ FIX 2: Backend flip for Made Shots → Inbound (Pattern A)
+        # Create BASELINE_INBOUND turns for ALL made shots (HCO, FT, FB, FCP/HCT, OREB)
+        # Check LAST turn (handles OREB putbacks which append in while loop above)
+        last_turn = self.turns[-1] if self.turns else None
+        if last_turn and last_turn.get("next_play_type") == "BASELINE_INBOUND":
+            # ✅ Flip possession BEFORE creating BASELINE_INBOUND (gold standard pattern)
+            if last_turn.get("possession_flips"):
+                old_offense = self.offense_team.name
+                self.switch_possession()
+                last_turn["possession_flips"] = False  # Clear flag
+                logging.warning(f"🔄 [MAKE→BIP] Flipped possession before BASELINE_INBOUND: {old_offense} → {self.offense_team.name}")
+            
+            # Get next_defensive_setup from the made shot turn
+            next_defensive_setup = last_turn.get("next_defensive_setup")
+            logging.warning(f"✅ [BIP CREATE] Creating BASELINE_INBOUND, next_defensive_setup={next_defensive_setup}, offense_team={self.offense_team.name}")
+            
             inbound_payload = self.turn_manager.setup_baseline_inbound(next_defensive_setup=next_defensive_setup)
             self.turns.append(inbound_payload)
+            self.text_log.append("Baseline inbound after made shot")
+            
+            # Preserve offensive_state for next API call
+            if next_defensive_setup:
+                self.game_state["offensive_state"] = next_defensive_setup
             self.text_log.append("Baseline inbound after made shot")
             
             # ✅ CRITICAL: Preserve offensive_state for the next API call
