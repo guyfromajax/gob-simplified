@@ -214,11 +214,8 @@ export function finalizeTurnAfterAnimation({
   
   // Show announcements for shot results and rebounds (after animation)
   const homeTeamId = scene.simData?.home_team_id;
-  // ✅ FIX: Make this idempotent too (in case called multiple times)
-  if (!turn._endAnnouncementsShown) {
-    announceFromTurnData(turn, 'end', homeTeamId, scene);
-    turn._endAnnouncementsShown = true;
-  }
+  // No flag needed - finalizeTurnAfterAnimation is only called once per turn
+  announceFromTurnData(turn, 'end', homeTeamId, scene);
   
   // Call onUpdate callback if provided
   if (onUpdate) {
