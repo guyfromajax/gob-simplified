@@ -1560,7 +1560,8 @@ def resolve_full_court_press_logic(game: "GameManager"):
         "skeleton": skeleton,
         "animations": animations,
         "roles": roles,
-        "fcp_foul": True,  # Flag to indicate this FOUL has FCP animations
+        "fcp_turn": True,  # ✅ FIX: Flag ALL FCP turns (not just fouls)
+        "fcp_foul": result_type == "FOUL",  # Legacy flag for backwards compatibility
         "foul_team": game_state.get("foul_team"),  # Include foul_team for frontend announcement
         "foul_player_id": getattr(roles.get("foul_player"), "player_id", None) if roles.get("foul_player") else None,  # For foul announcements
         "victim_id": getattr(roles["ball_handler"], "player_id", None),  # For turnover announcements
@@ -2352,7 +2353,8 @@ def resolve_half_court_trap_logic(game: "GameManager"):
         "skeleton": skeleton,
         "animations": animations,
         "roles": roles,
-        "hct_foul": True if result_type == "FOUL" else False,  # Flag for HCT fouls with animations
+        "hct_turn": True,  # ✅ FIX: Flag ALL HCT turns (not just fouls)
+        "hct_foul": result_type == "FOUL",  # Legacy flag for backwards compatibility
         "foul_team": game_state.get("foul_team"),  # Include foul_team for frontend announcement
         "foul_player_id": getattr(roles.get("foul_player"), "player_id", None) if roles.get("foul_player") else None,  # For foul announcements
         "victim_id": getattr(roles["ball_handler"], "player_id", None),  # For turnover announcements
