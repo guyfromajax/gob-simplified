@@ -50,7 +50,8 @@ export async function handleTurnover(scene, { playerSprites, ballSprite, turnDat
     console.warn(`🔄 No victim_id found in turnData:`, turnData);
   }
 
-  const offenseId = turnData?.possession_team_id;
+  // ✅ FIX: Use offense_team_id (SS&S possession system) instead of possession_team_id
+  const offenseId = turnData?.offense_team_id;
   if (offenseId != null) {
     scene.offenseTeamId = offenseId;
     scene.events?.emit?.("possessionChange", { offenseTeamId: offenseId });

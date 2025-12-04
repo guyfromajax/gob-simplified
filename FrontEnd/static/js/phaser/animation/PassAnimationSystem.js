@@ -378,8 +378,9 @@ export class PassAnimationSystem {
         // For baseline inbound passes (after made shots), use runInboundSetup
         // Baseline inbound (log removed)
         
-        // Determine the new offense side based on possession_team_id
-        const isHomeOffense = turnData.possession_team_id === this.scene.homeTeamId;
+        // ✅ FIX: Use offense_team_id (SS&S possession system) instead of possession_team_id
+        // Backend now only sends offense_team_id (possession_team_id removed in SS&S refactor)
+        const isHomeOffense = turnData.offense_team_id === this.scene.homeTeamId;
         const newOffenseSide = isHomeOffense ? 'home' : 'away';
         
         await runInboundSetup({
@@ -439,8 +440,8 @@ export class PassAnimationSystem {
     const courtWidth = this.scene.game.config.width;
     const courtHeight = this.scene.game.config.height;
     
-    // Determine inbound side
-    const isHomeTeam = turnData.possession_team_id === this.scene.homeTeamId;
+    // ✅ FIX: Use offense_team_id (SS&S possession system)
+    const isHomeTeam = turnData.offense_team_id === this.scene.homeTeamId;
     const inboundX = isHomeTeam ? 50 : courtWidth - 50; // Near baseline
     const inboundY = courtHeight / 2; // Middle of court
     
@@ -452,7 +453,8 @@ export class PassAnimationSystem {
    */
   calculateFastBreakPosition(receiverSprite, turnData) {
     // Move receiver further down court for fast break
-    const isHomeTeam = turnData.possession_team_id === this.scene.homeTeamId;
+    // ✅ FIX: Use offense_team_id (SS&S possession system)
+    const isHomeTeam = turnData.offense_team_id === this.scene.homeTeamId;
     const fastBreakX = isHomeTeam ? 
       Math.min(receiverSprite.x + 40, this.passConfig.courtBounds.maxX) :
       Math.max(receiverSprite.x - 40, this.passConfig.courtBounds.minX);
