@@ -606,3 +606,196 @@ Note: **(PC)** indicates possession change
 
 **Note:** FCP and HCT have identical transition patterns but are counted separately.
 
+---
+
+## SS&S Transition Evaluation
+
+### Batch 1: HCO Transitions (7 Total)
+
+#### 1. HCO → Inbound Pass (PC) - Made Shot, No Foul
+
+**Handler:** `shot_manager.py` `resolve_shot()` (line 337-379)
+
+**Current Implementation:**
+- ✅ Sets `possession_flips = True` (line 337)
+- ✅ Sets `next_play_type = "BASELINE_INBOUND"` (line 379)
+- ✅ Sets `next_defensive_setup` = pressure type (line 376)
+- ✅ Creates animations via animator
+- ❌ Backend does NOT flip possession (no `switch_possession()` call)
+- ❌ Backend does NOT set `offense_team_id`
+- ❌ **Frontend flips possession** in `runInboundSetup()` (turnAnimation.js line 872-884)
+
+**SS&S Compliance:** ❌ **NOT SS&S**
+
+**Issues:**
+1. Possession flip happens in frontend (line 872-884 in turnAnimation.js)
+2. Frontend calculates `newOffenseSide` and updates `scene.offenseTeamId`
+3. No authoritative `offense_team_id` from backend
+4. Frontend makes routing decision instead of just displaying
+
+**Fix Required:**
+- Backend: Flip possession in `game_manager.py` before creating BASELINE_INBOUND turn
+- Backend: Set `result["offense_team_id"]` AFTER flip
+- Frontend: Read `offense_team_id` and display (remove flip logic from runInboundSetup)
+
+---
+
+#### 2. HCO → Free Throw - Made/Missed Shot with Foul
+
+**Handlers:** 
+- `shot_manager.py` `resolve_shot()` (AND-1, line 341-369)
+- `phase_resolution.py` `resolve_non_shooting_foul()` (bonus fouls, line 166-183)
+
+**Current Implementation (AND-1):**
+- ✅ Sets `possession_flips = False` (line 342) - Correct, no flip for AND-1
+- ✅ Sets `offensive_state = "FREE_THROW"` (line 353)
+- ✅ Sets `next_play_type = "FREE_THROW"` (line 357)
+- ✅ No possession flip needed (offense keeps ball)
+- ❌ Does NOT set `offense_team_id`
+
+**SS&S Compliance:** ⚠️ **PARTIAL**
+
+**Issues:**
+1. Missing `offense_team_id` in result
+
+**Fix Required:**
+- Backend: Set `result["offense_team_id"] = off_team.team_id` (no flip needed)
+
+---
+
+#### 3. HCO → OREB - Missed Shot, OREB
+
+**Handler:** `shot_manager.py` `resolve_shot()` (line 575-582)
+
+**Current Implementation:**
+- ✅ Sets `possession_flips = False` (line 576) - Correct, no flip for OREB
+- ✅ Sets `pending_oreb` (line 578) - Triggers OREB turn creation
+- ✅ OREB turn flipped in `game_manager.py` (line 176-178) if putback makes
+- ❌ Does NOT set `offense_team_id`
+
+**SS&S Compliance:** ⚠️ **PARTIAL**
+
+**Issues:**
+1. Missing `offense_team_id` in result
+2. OREB turn possession flip is in `game_manager.py` ✅ but original MISS turn doesn't have `offense_team_id`
+
+**Fix Required:**
+- Backend: Set `result["offense_team_id"] = off_team.team_id` on MISS turn
+
+---
+
+#### 4. HCO → HCO (PC) - Missed Shot DREB, Steal
+
+**Handlers:**
+- `shot_manager.py` `resolve_shot()` (DREB, line 586-619)
+- `phase_resolution.py` `resolve_turnover_logic()` (Steal)
+
+**Current Implementation:**
+- ✅ Sets `possession_flips = True` (line 586)
+- ✅ Sets `next_play_type = "HCO"` (line 619 for DREB)
+- ❌ Backend does NOT flip possession in `game_manager.py`
+- ❌ Does NOT set `offense_team_id`
+- ❌ **No possession flip executed anywhere!**
+
+**SS&S Compliance:** ❌ **NOT SS&S**
+
+**Issues:**
+1. Possession flip flag set but NEVER executed (backend or frontend)
+2. No `offense_team_id` set
+3. Next turn will have wrong offense team
+
+**Fix Required:**
+- Backend: Add possession flip in `game_manager.py` for DREB → HCO transitions
+- Backend: Set `offense_team_id` AFTER flip
+
+---
+
+#### 5. HCO → Fast Break (PC) - Missed Shot DREB, Steal
+
+**Handlers:**
+- `shot_manager.py` `resolve_shot()` (DREB with release, line 586-625)
+- `phase_resolution.py` `resolve_turnover_logic()` (Steal with fast break)
+
+**Current Implementation:**
+- ✅ Sets `possession_flips = True` (line 586)
+- ✅ Sets `next_play_type = "FAST_BREAK"` (line 618)
+- ✅ Sets `offensive_state = "FAST_BREAK"` (line 617)
+- ❌ Backend does NOT flip possession in `game_manager.py`
+- ❌ Does NOT set `offense_team_id`
+- ❌ **Frontend flips possession** in `fastBreak.js` (line 548-563)
+
+**SS&S Compliance:** ❌ **NOT SS&S**
+
+**Issues:**
+1. Possession flip happens in frontend (fastBreak.js line 548-563)
+2. No authoritative `offense_team_id` from backend
+3. Frontend makes routing decision
+
+**Fix Required:**
+- Backend: Flip possession in `game_manager.py` for DREB → FAST_BREAK transitions
+- Backend: Set `offense_team_id` AFTER flip
+- Frontend: Remove flip logic from fastBreak.js
+
+---
+
+#### 6. HCO → Side Inbound Pass - Non-Shooting Foul (No Bonus)
+
+**Handler:** `phase_resolution.py` `resolve_non_shooting_foul()` (line 185-186)
+
+**Current Implementation:**
+- ✅ Sets `possession_flips` based on foul type (offensive vs defensive)
+- ✅ Sets `offensive_state = "HCO"` (line 186)
+- ✅ **Backend flips in `game_manager.py`** (line 200-205) before SIP
+- ✅ Clears `possession_flips = False` after flip (line 204)
+- ✅ SIP turn has `offense_team_id` (turn_manager.py line 131)
+
+**SS&S Compliance:** ✅ **SS&S COMPLIANT**
+
+**No issues found!** This is the gold standard pattern.
+
+---
+
+#### 7. HCO → Side Inbound Pass (PC) - Offensive Foul, Dead Ball
+
+**Handlers:**
+- `phase_resolution.py` `resolve_non_shooting_foul()` (offensive fouls)
+- `phase_resolution.py` `resolve_turnover_logic()` (dead ball)
+
+**Current Implementation:**
+- ✅ Sets `possession_flips = True`
+- ✅ Sets `offensive_state = "HCO"` (line 191)
+- ✅ **Backend flips in `game_manager.py`** (line 200-205) before SIP
+- ✅ Clears `possession_flips = False` after flip (line 204)
+- ✅ SIP turn has `offense_team_id` (turn_manager.py line 131)
+
+**SS&S Compliance:** ✅ **SS&S COMPLIANT**
+
+**No issues found!** This is the gold standard pattern.
+
+---
+
+### Batch 1 Summary
+
+| # | Transition | SS&S Status | Primary Issue |
+|---|-----------|-------------|---------------|
+| 1 | HCO → Inbound Pass (PC) | ❌ NOT SS&S | Frontend flips possession |
+| 2 | HCO → Free Throw | ⚠️ PARTIAL | Missing offense_team_id |
+| 3 | HCO → OREB | ⚠️ PARTIAL | Missing offense_team_id |
+| 4 | HCO → HCO (PC) | ❌ NOT SS&S | Possession flip NEVER executed |
+| 5 | HCO → Fast Break (PC) | ❌ NOT SS&S | Frontend flips possession |
+| 6 | HCO → Side Inbound (No PC) | ✅ SS&S | None |
+| 7 | HCO → Side Inbound (PC) | ✅ SS&S | None |
+
+**Results:**
+- ✅ **2 out of 7** are SS&S compliant (29%)
+- ⚠️ **2 out of 7** are partial (29%)
+- ❌ **3 out of 7** are NOT SS&S (43%)
+
+**Key Finding:** 
+**Side Inbound transitions (#6, #7) are the ONLY SS&S-compliant transitions.** They flip possession in `game_manager.py` (single location) and set `offense_team_id` on the SIP turn. This is the gold standard pattern that should be replicated for ALL transitions.
+
+**Common Issues:**
+1. **Missing `offense_team_id`** - 5 out of 7 transitions don't set it
+2. **Frontend possession flips** - 2 transitions flip in frontend (runInboundSetup, fastBreak.js)
+3. **Missing possession flip** - 1 transition sets flag but never executes flip (#4)
+
