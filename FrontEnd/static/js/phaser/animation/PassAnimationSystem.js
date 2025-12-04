@@ -70,7 +70,7 @@ export class PassAnimationSystem {
    * Process a pass turn
    */
   async processPass(turnData, context = {}) {
-    console.log('🎬 PassAnimationSystem: Starting pass processing', {
+    if (false) console.log('[Pass Processing]', {
       result_type: turnData.result_type,
       activePass: !!this.activePass
     });
@@ -84,7 +84,7 @@ export class PassAnimationSystem {
     this.activePass = turnData;
     
     try {
-      console.log('PassAnimationSystem: Processing pass', {
+      if (false) console.log('[Processing]', {
         passer_id: turnData.passer_id,
         receiver_id: turnData.receiver_id,
         pass_type: turnData.pass_type,
@@ -99,7 +99,7 @@ export class PassAnimationSystem {
 
       // Handle different pass types
       if (turnData.result_type === 'SIDE_INBOUND' || turnData.result_type === 'BASELINE_INBOUND') {
-        console.log('🎬 PassAnimationSystem: Processing inbound pass with positioning data');
+        // Processing inbound (log removed)
         await this.executeInboundSequence(turnData, context);
       } else {
         // Regular pass logic
@@ -357,7 +357,7 @@ export class PassAnimationSystem {
    * Execute inbound pass sequence using positioning data
    */
   async executeInboundSequence(turnData, context = {}) {
-    console.log('🎬 PassAnimationSystem: Executing inbound sequence', {
+    if (false) console.log('[Inbound Sequence]', {
       result_type: turnData.result_type,
       oDestinations: turnData.oDestinations,
       dDestinations: turnData.dDestinations,
@@ -369,14 +369,14 @@ export class PassAnimationSystem {
     try {
       // For now, we'll use the old system's inbound logic as a fallback
       // This ensures we get working animations while we develop the new system
-      console.log('🔄 PassAnimationSystem: Using fallback inbound animation');
+      // Fallback (log removed)
       
       // Import and use the correct inbound setup based on type
       const { runSideInboundSetup, runInboundSetup } = await import('./turnAnimation.js');
       
       if (turnData.result_type === 'BASELINE_INBOUND') {
         // For baseline inbound passes (after made shots), use runInboundSetup
-        console.log('🎯 PassAnimationSystem: Using runInboundSetup for baseline inbound');
+        // Baseline inbound (log removed)
         
         // Determine the new offense side based on possession_team_id
         const isHomeOffense = turnData.possession_team_id === this.scene.homeTeamId;
@@ -393,7 +393,7 @@ export class PassAnimationSystem {
         });
       } else {
         // For side inbound passes (after dead balls/fouls), use runSideInboundSetup
-        console.log('🎯 PassAnimationSystem: Using runSideInboundSetup for side inbound');
+        // Side inbound (log removed)
         await runSideInboundSetup({
           scene: this.scene,
           ballSprite: context.ballSprite,
@@ -402,7 +402,7 @@ export class PassAnimationSystem {
         });
       }
       
-      console.log('✅ PassAnimationSystem: Inbound sequence completed');
+      // Completed (log removed)
       
     } catch (error) {
       console.error('❌ PassAnimationSystem: Inbound sequence failed', error);

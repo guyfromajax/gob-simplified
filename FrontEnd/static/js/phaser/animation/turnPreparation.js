@@ -125,7 +125,7 @@ export async function prepareTurnForAnimation({ turn, scene, turnIndex, homeTeam
  */
 function handleTurnTransition(scene, turnData) {
   // ✅ DEBUG: Always log transition handler entry
-  console.log('🔍 [UNIVERSAL TRANSITION] Entry', {
+  if (false) console.log('[Transition]', {
     result_type: turnData.result_type,
     offense_team_id: turnData.offense_team_id,
     possession_team_id: turnData.possession_team_id,  // Legacy, for comparison
@@ -146,13 +146,13 @@ function handleTurnTransition(scene, turnData) {
       scene.events?.emit('possessionChange', { 
         offenseTeamId: newOffenseTeamId 
       });
-      console.log('🔄 [UNIVERSAL TRANSITION] Offense team updated', {
+      if (false) console.log('[Offense Updated]', {
         from: previousOffenseTeamId,
         to: newOffenseTeamId,
         result_type: turnData.result_type
       });
     } else {
-      console.log('✅ [UNIVERSAL TRANSITION] Offense team unchanged', {
+      if (false) console.log('[Offense Unchanged]', {
         offenseTeamId: scene.offenseTeamId,
         result_type: turnData.result_type
       });
@@ -202,7 +202,7 @@ export async function finalizeTurnAfterAnimation({
   handleTurnTransition(scene, turn);
   
   // ✅ DEBUG: Log finalization
-  console.log('🔍 [FINALIZING TURN]', {
+  if (false) console.log('[Finalizing]', {
     turnIndex: turnIndex ?? turn.index,
     result_type: turn.result_type,
     willSetPreviousTurnWasShot: turn.result_type === "MAKE" || turn.result_type === "MISS",
@@ -212,7 +212,7 @@ export async function finalizeTurnAfterAnimation({
   // Set flag if this was a shot turn (MAKE or MISS) so the next turn knows to skip step 0 ball attachment
   if (turn.result_type === "MAKE" || turn.result_type === "MISS") {
     scene._previousTurnWasShot = true;
-    console.log('🔍 [SET _previousTurnWasShot]', {
+    if (false) console.log('[Previous Turn Shot]', {
       turnIndex: turnIndex ?? turn.index,
       result_type: turn.result_type
     });
@@ -249,7 +249,7 @@ export async function finalizeTurnAfterAnimation({
   if (onUpdate) {
     try {
       onUpdate(turn);
-      console.log('🔍 [CALLED onUpdate]', {
+      if (false) console.log('[onUpdate]', {
         turnIndex: turnIndex ?? turn.index,
         result_type: turn.result_type
       });
