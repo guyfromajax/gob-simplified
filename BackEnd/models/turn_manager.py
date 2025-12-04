@@ -414,10 +414,10 @@ class TurnManager:
             # Add EV to result for frontend display
             result["ev"] = ev
 
-        # ✅ CONSOLIDATED: Set possession_team_id BEFORE any potential flip
+        # ✅ SS&S: Set offense_team_id (single source of truth)
         # This represents the team on offense DURING this turn (for animations)
-        # The frontend will handle possession flips via possession_flips flag
-        result["possession_team_id"] = self.game.offense_team.team_id
+        result["offense_team_id"] = self.game.offense_team.team_id
+        result["possession_team_id"] = self.game.offense_team.team_id  # ✅ TODO: Remove (backwards compatibility)
 
         # STEP 4: Final updates (clock, logs, animation)
         try:
