@@ -718,6 +718,11 @@ class TurnManager:
         if not result.get("text") or result.get("text").strip() == "":
             result["text"] = "No text in this turn"
 
+        # ✅ FIX 1: Add offense_team_id to ALL results (SS&S possession system)
+        # This is the authoritative team on offense DURING this turn (before any possession flips)
+        # Frontend reads this value and displays it (no flip logic in frontend)
+        result["offense_team_id"] = self.game.offense_team.team_id
+
         # print(f"inside run_micro_turn result: {result}")
         
         return result
