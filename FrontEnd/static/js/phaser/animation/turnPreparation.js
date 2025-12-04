@@ -125,12 +125,12 @@ export async function prepareTurnForAnimation({ turn, scene, turnIndex, homeTeam
  */
 function handleTurnTransition(scene, turnData) {
   // ✅ DEBUG: Always log transition handler entry
-  if (false) console.log('[Transition]', {
+  console.log('🔍 [UNIVERSAL TRANSITION]', {
     result_type: turnData.result_type,
     offense_team_id: turnData.offense_team_id,
-    possession_team_id: turnData.possession_team_id,  // Legacy, for comparison
     possession_flips: turnData.possession_flips,
-    current_scene_offenseTeamId: scene.offenseTeamId
+    current_scene_offenseTeamId: scene.offenseTeamId,
+    text_preview: turnData.text?.substring(0, 30)
   });
   
   // ✅ SS&S: Backend provides offense_team_id for each turn (single source of truth)
