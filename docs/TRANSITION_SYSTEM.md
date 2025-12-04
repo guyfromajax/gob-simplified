@@ -970,3 +970,202 @@ Note: **(PC)** indicates possession change
 
 **Transitions #5, #6, #7** involve fouls AFTER FT misses during rebound scramble - these are complex edge cases that are hard to trace. They may or may not be SS&S compliant.
 
+---
+
+### Batch 3: Fast Break Transitions (8 Total)
+
+#### 1. Fast Break → HCO - Defensive Stop
+
+**Handler:** `phase_resolution.py` `resolve_fast_break_logic()` (line 393-418)
+
+**Current Implementation:**
+- ✅ Sets `possession_flips = False` (line 412) - Correct, no flip for defensive stop
+- ✅ Sets `next_play_type = "HCO"` (line 415)
+- ✅ Sets `offensive_state = "HCO"` (line 395)
+- ✅ No flip needed (offense keeps ball after defensive stop)
+- ❌ Does NOT set `offense_team_id`
+
+**SS&S Compliance:** ⚠️ **PARTIAL**
+
+**Issues:**
+1. Missing `offense_team_id`
+
+**Fix Required:**
+- Backend: Set `result["offense_team_id"] = off_team.team_id`
+
+---
+
+#### 2. Fast Break → Inbound Pass (PC) - Made Shot, No Foul
+
+**Handler:** `shot_manager.py` `resolve_fast_break_shot()` (line 929-936)
+
+**Current Implementation:**
+- ✅ Sets `possession_flips = True` (line 929)
+- ✅ Sets `next_play_type = "BASELINE_INBOUND"` (line 936)
+- ✅ Sets `next_defensive_setup` = pressure type (line 933)
+- ❌ Backend does NOT flip possession
+- ❌ Does NOT set `offense_team_id`
+- ❌ **Frontend flips possession** in `fastBreak.js` (line 548-563)
+
+**SS&S Compliance:** ❌ **NOT SS&S**
+
+**Issues:**
+- **IDENTICAL to HCO → Inbound Pass** (Pattern A)
+- Frontend flips, no authoritative `offense_team_id`
+
+**Fix Required:**
+- Same as Pattern A (backend flip before BASELINE_INBOUND)
+
+---
+
+#### 3. Fast Break → Free Throw - Fouls
+
+**Handler:** `shot_manager.py` `resolve_fast_break_shot()` (AND-1), `phase_resolution.py` (non-shooting fouls)
+
+**Current Implementation:**
+- ✅ Sets `possession_flips = False` for AND-1
+- ✅ Sets `offensive_state = "FREE_THROW"`
+- ❌ Does NOT set `offense_team_id`
+
+**SS&S Compliance:** ⚠️ **PARTIAL**
+
+**Issues:**
+- **IDENTICAL to HCO → Free Throw** (Pattern D)
+- Missing `offense_team_id`
+
+**Fix Required:**
+- Backend: Set `result["offense_team_id"] = off_team.team_id`
+
+---
+
+#### 4. Fast Break → OREB - Missed Shot, OREB
+
+**Handler:** `shot_manager.py` `resolve_fast_break_shot()` (line 986-996)
+
+**Current Implementation:**
+- ✅ Sets `possession_flips = False` (line 991)
+- ✅ Sets `pending_oreb` (line 993-996)
+- ❌ Does NOT set `offense_team_id`
+
+**SS&S Compliance:** ⚠️ **PARTIAL**
+
+**Issues:**
+- **IDENTICAL to HCO → OREB** (Pattern D)
+- Missing `offense_team_id`
+
+**Fix Required:**
+- Backend: Set `result["offense_team_id"] = off_team.team_id`
+
+---
+
+#### 5. Fast Break → HCO (PC) - Missed Shot DREB, Steal
+
+**Handler:** `shot_manager.py` `resolve_fast_break_shot()` (line 1003-1008)
+
+**Current Implementation:**
+- ✅ Sets `possession_flips = True` (line 1003)
+- ✅ Sets `next_play_type = "HCO"` (line 1008)
+- ✅ Sets `offensive_state = "HCO"` (line 1005)
+- ❌ Backend does NOT flip possession in `game_manager.py`
+- ❌ Does NOT set `offense_team_id`
+- ❌ **No possession flip executed!**
+
+**SS&S Compliance:** ❌ **NOT SS&S**
+
+**Issues:**
+- **IDENTICAL to HCO → HCO** (Pattern B)
+- Flip flag set but never executed
+
+**Fix Required:**
+- Same as Pattern B (backend flip before HCO)
+
+---
+
+#### 6. Fast Break → Fast Break (PC) - Missed Shot DREB, Steal
+
+**Handler:** `phase_resolution.py` `resolve_fast_break_logic()` (STEAL with fast break chance, line 392-464)
+
+**Current Implementation:**
+- Steals in fast break can trigger another fast break
+- Would set `possession_flips = True` (steal always flips)
+- Would set `next_play_type = "FAST_BREAK"`
+- ❌ Backend does NOT flip possession
+- ❌ Does NOT set `offense_team_id`
+- ❌ **Frontend flips** (if it reaches fastBreak.js)
+
+**SS&S Compliance:** ❌ **NOT SS&S**
+
+**Issues:**
+- **IDENTICAL to Pattern C** (DREB → Fast Break)
+- Frontend flips possession
+
+**Fix Required:**
+- Same as Pattern C (backend flip before Fast Break)
+
+---
+
+#### 7. Fast Break → Side Inbound Pass - Non-Shooting Foul (No Bonus)
+
+**Handler:** `phase_resolution.py` `resolve_fast_break_logic()` → `resolve_non_shooting_foul()`
+
+**Current Implementation:**
+- Routes through Fast Break logic → foul handler
+- Would use standard non-shooting foul logic
+- ✅ Should use Side Inbound gold standard pattern
+- ✅ Backend flips in `game_manager.py` (line 200-205)
+- ✅ SIP has `offense_team_id`
+
+**SS&S Compliance:** ✅ **LIKELY SS&S**
+
+**Issues:**
+- None (uses gold standard SIP pattern)
+
+---
+
+#### 8. Fast Break → Side Inbound Pass (PC) - Offensive Foul, Dead Ball
+
+**Handler:** `phase_resolution.py` `resolve_fast_break_logic()` (line 471-490)
+
+**Current Implementation:**
+- ✅ Routes to `resolve_non_shooting_foul()` or `resolve_turnover_logic()`
+- ✅ Should use Side Inbound gold standard pattern
+- ✅ Backend flips in `game_manager.py` (line 200-205)
+- ✅ SIP has `offense_team_id`
+
+**SS&S Compliance:** ✅ **LIKELY SS&S**
+
+**Issues:**
+- None (uses gold standard SIP pattern)
+
+---
+
+### Batch 3 Summary
+
+| # | Transition | SS&S Status | Primary Issue | Pattern |
+|---|-----------|-------------|---------------|---------|
+| 1 | FB → HCO | ⚠️ PARTIAL | Missing offense_team_id | D |
+| 2 | FB → Inbound Pass (PC) | ❌ NOT SS&S | Frontend flips | A |
+| 3 | FB → Free Throw | ⚠️ PARTIAL | Missing offense_team_id | D |
+| 4 | FB → OREB | ⚠️ PARTIAL | Missing offense_team_id | D |
+| 5 | FB → HCO (PC) | ❌ NOT SS&S | Flip never executed | B |
+| 6 | FB → Fast Break (PC) | ❌ NOT SS&S | Frontend flips | C |
+| 7 | FB → Side Inbound (No PC) | ✅ LIKELY SS&S | None | E |
+| 8 | FB → Side Inbound (PC) | ✅ LIKELY SS&S | None | E |
+
+**Results:**
+- ✅ **2 out of 8** are SS&S compliant (25%)
+- ⚠️ **3 out of 8** are partial (38%)
+- ❌ **3 out of 8** are NOT SS&S (38%)
+
+**Key Finding:**
+**Fast Break transitions are IDENTICAL to HCO/FT patterns!**
+- Same Pattern A: Made shots flip in frontend
+- Same Pattern B: DREB → HCO never flips
+- Same Pattern C: DREB → Fast Break flips in frontend
+- Same Pattern D: Missing `offense_team_id`
+- Same Pattern E: Side Inbound works perfectly ✅
+
+**Overall Progress:**
+- **6/22 evaluated transitions are SS&S compliant (27%)**
+- All compliant transitions use Side Inbound gold standard pattern
+
