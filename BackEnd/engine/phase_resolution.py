@@ -203,6 +203,7 @@ def resolve_non_shooting_foul(roles, game):
         "text": text,
         "possession_flips": False,
         "time_elapsed": time_elapsed,
+        "offense_team_id": game.offense_team.team_id,  # ✅ SS&S: Add offense_team_id to all results
         "foul_player_id": getattr(foul_player, "player_id", None) if foul_player else None,
         "foul_team": game_state.get("foul_team"),
         "foul_count": foul_out_info["foul_count"],
@@ -770,6 +771,7 @@ def resolve_turnover_logic(roles, game, turnover_type="DEAD BALL"):
         "text": text,
         "time_elapsed": random.randint(3, 8),
         "possession_flips": True,  # Let the turn loop handle the flip
+        "offense_team_id": game.offense_team.team_id,  # ✅ SS&S: Add offense_team_id to all results
         "victim_id": victim_id,
         "victim_name": victim_name,
     }
