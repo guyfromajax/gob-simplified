@@ -71,21 +71,26 @@ export function prepareTurnForAnimation({ turn, scene, turnIndex, homeTeamId }) 
     scene._leanScoreToAnimate = null;
   }
   
-  // Show announcement for turn start events (Fast Break, Press, Trap)
-  // ✅ FIX: Make this idempotent - only announce once even if called multiple times
-  // Prevents double "Press!" and "Trap!" when turn goes through both paths
-  console.log('🔍 [ANNOUNCE FLAG CHECK]', {
-    result_type: turn.result_type,
-    flag_value: turn._startAnnouncementsShown,
-    will_announce: !turn._startAnnouncementsShown
-  });
-  
-  if (!turn._startAnnouncementsShown) {
-    announceFromTurnData(turn, 'start', homeTeamId, scene);
-    turn._startAnnouncementsShown = true;
-    console.log('✅ [ANNOUNCE FLAG SET] Flag now true, future calls will skip');
-  } else {
-    console.log('⏭️ [ANNOUNCE FLAG SKIP] Already announced, skipping duplicate');
+  // ✅ SS&S: Use central announcement dispatcher
+  // Check turn context and announce appropriately
+  if (!turn._contextAnnouncementsShown) {
+    const { announceGameEvent } = await import('../utils/gameAnnouncements.js');
+    
+    // Context announcements (situation being entered)
+    if (turn.fast_break) {
+      announceGameEvent('FAST_BREAK', turn, scene);
+    }
+    
+    // Pressure announcements (only for BASELINE_INBOUND setting up pressure)
+    if (turn.result_type === 'BASELINE_INBOUND') {
+      if (turn.next_defensive_setup === 'FCP') {
+        announceGameEvent('PRESSURE_FCP', turn, scene);
+      } else if (turn.next_defensive_setup === 'HCT') {
+        announceGameEvent('PRESSURE_HCT', turn, scene);
+      }
+    }
+    
+    turn._contextAnnouncementsShown = true;
   }
   
   // Calculate possession ID (used for post-animation cleanup)
@@ -213,10 +218,32 @@ export function finalizeTurnAfterAnimation({
     });
   }
   
-  // Show announcements for shot results and rebounds (after animation)
+  // ✅ SS&S: Use central announcement dispatcher for result announcements
+  const { announceGameEvent } = await import('../utils/gameAnnouncements.js');
   const homeTeamId = scene.simData?.home_team_id;
-  // No flag needed - finalizeTurnAfterAnimation is only called once per turn
-  announceFromTurnData(turn, 'end', homeTeamId, scene);
+  
+  // Route to appropriate announcement based on result_type
+  if (turn.result_type === 'FOUL') {
+    // Non-shooting fouls (shooting fouls announced in ballManager)
+    const isShootingFoul = turn.text?.includes('AND-1') || 
+                          (turn.text?.includes('fouls') && turn.text?.includes('on the shot'));
+    if (!isShootingFoul) {
+      const foulTeam = turn.foul_team || 'OFFENSE';
+      const eventType = foulTeam === 'OFFENSE' ? 'FOUL_OFFENSIVE' : 'FOUL_DEFENSIVE';
+      announceGameEvent(eventType, turn, scene, { foulerId: turn.foul_player_id });
+    }
+  } else if (turn.result_type === 'STEAL') {
+    announceGameEvent('STEAL', turn, scene, { 
+      stealerId: turn.stealer_id || turn.defender_id,
+      victimId: turn.victim_id 
+    });
+  } else if (turn.result_type === 'DEAD BALL' || turn.result_type === 'TURNOVER') {
+    announceGameEvent('TURNOVER', turn, scene, { 
+      victimId: turn.victim_id,
+      turnoverType: turn.turnover_type 
+    });
+  }
+  // Note: MAKE, MISS, FREE_THROW, REBOUND announced in their respective animation systems (ballManager, FreeThrowAnimationSystem)
   
   // Call onUpdate callback if provided
   if (onUpdate) {

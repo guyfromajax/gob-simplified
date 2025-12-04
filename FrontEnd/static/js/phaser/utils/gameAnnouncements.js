@@ -1,0 +1,340 @@
+/**
+ * SS&S Game Announcement System
+ * 
+ * Central dispatcher for ALL game announcements.
+ * Replaces scattered announcement calls across multiple files.
+ * 
+ * Usage:
+ *   announceGameEvent('SHOT_MAKE', turnData, scene);
+ *   announceGameEvent('REBOUND', turnData, scene, { rebounderId: '...' });
+ *   announceGameEvent('PRESSURE_FCP', turnData, scene);
+ */
+
+import { showAnnouncement, showAndOneAnnouncement } from './announcements.js';
+import { triggerFoulEffect, triggerTurnoverEffect, triggerMadeShotFlash } from '../animation/negativeActionEffects.js';
+
+/**
+ * Central game event announcement dispatcher
+ * 
+ * @param {string} eventType - Type of event to announce
+ * @param {Object} turnData - Turn data from backend
+ * @param {Object} scene - Phaser scene
+ * @param {Object} context - Additional context (rebounderId, shooterId, etc.)
+ */
+export function announceGameEvent(eventType, turnData, scene, context = {}) {
+  console.log('📢 [GAME ANNOUNCEMENT]', {
+    eventType,
+    result_type: turnData?.result_type,
+    turn_index: turnData?.index
+  });
+
+  // Get team context
+  const homeTeamId = scene?.simData?.home_team_id;
+  const offenseTeamId = turnData?.offense_team_id || scene?.offenseTeamId;
+  const isHomeOffense = homeTeamId && String(offenseTeamId) === String(homeTeamId);
+  const offenseTeam = isHomeOffense ? 'home' : 'away';
+  const defenseTeam = isHomeOffense ? 'away' : 'home';
+
+  // Route to appropriate announcement handler
+  switch (eventType) {
+    // ========== SHOT RESULTS ==========
+    case 'SHOT_MAKE':
+      handleShotMakeAnnouncement(turnData, scene, context, offenseTeam);
+      break;
+
+    case 'SHOT_MAKE_AND_ONE':
+      handleAndOneAnnouncement(turnData, scene, context, offenseTeam);
+      break;
+
+    // ========== FREE THROW RESULTS ==========
+    case 'FT_MAKE':
+      handleFreeThrowMakeAnnouncement(turnData, scene, context, offenseTeam);
+      break;
+
+    case 'FT_MISS':
+      // FT misses are silent unless it's for special cases
+      // Last FT miss is silent (rebound announcement takes priority)
+      break;
+
+    // ========== REBOUNDS ==========
+    case 'REBOUND':
+      handleReboundAnnouncement(turnData, scene, context);
+      break;
+
+    // ========== FOULS ==========
+    case 'FOUL_SHOOTING':
+      handleShootingFoulAnnouncement(turnData, scene, context);
+      break;
+
+    case 'FOUL_OFFENSIVE':
+      handleOffensiveFoulAnnouncement(turnData, scene, context, defenseTeam);
+      break;
+
+    case 'FOUL_DEFENSIVE':
+      handleDefensiveFoulAnnouncement(turnData, scene, context, offenseTeam);
+      break;
+
+    // ========== TURNOVERS ==========
+    case 'STEAL':
+      handleStealAnnouncement(turnData, scene, context, defenseTeam);
+      break;
+
+    case 'TURNOVER':
+      handleTurnoverAnnouncement(turnData, scene, context, offenseTeam);
+      break;
+
+    // ========== PRESSURE SYSTEMS ==========
+    case 'PRESSURE_FCP':
+      showAnnouncement("Press!", 'defense');
+      break;
+
+    case 'PRESSURE_HCT':
+      showAnnouncement("Trap!", 'defense');
+      break;
+
+    // ========== FAST BREAK ==========
+    case 'FAST_BREAK':
+      showAnnouncement("Fast Break!", offenseTeam);
+      break;
+
+    case 'DEFENSIVE_STOP':
+      // Get stopper data if available
+      const stopperId = context.stopperId || turnData.stopper_id;
+      let stopperData = null;
+      if (scene && stopperId) {
+        const stopperSprite = scene.playerSprites?.[stopperId];
+        if (stopperSprite) {
+          stopperData = {
+            playerId: stopperId,
+            photo: stopperSprite.photo || null,
+            teamName: stopperSprite.team_id
+          };
+        }
+      }
+      showAnnouncement("Great Stop!", defenseTeam, stopperData);
+      break;
+
+    // ========== SPECIAL EVENTS ==========
+    case 'DOUBLE_TEAM':
+      showAnnouncement("DOUBLE TEAM!", 'neutral', null);
+      break;
+
+    default:
+      console.warn(`⚠️ Unknown announcement event type: ${eventType}`);
+  }
+}
+
+// ========== INDIVIDUAL ANNOUNCEMENT HANDLERS ==========
+
+function handleShotMakeAnnouncement(turnData, scene, context, offenseTeam) {
+  const shooterId = context.shooterId || turnData.shooter_id;
+  let playerData = null;
+
+  if (scene && shooterId) {
+    const shooterSprite = scene.playerSprites?.[shooterId];
+    if (shooterSprite) {
+      playerData = {
+        playerId: shooterId,
+        photo: shooterSprite.photo || null,
+        teamName: shooterSprite.team_id
+      };
+    }
+  }
+
+  showAnnouncement("It's Good!", offenseTeam, playerData);
+}
+
+function handleAndOneAnnouncement(turnData, scene, context, offenseTeam) {
+  const shooterId = context.shooterId || turnData.shooter_id;
+  const foulerId = context.foulerId || turnData.foul_player_id;
+
+  let shooterData = null;
+  let foulerData = null;
+
+  if (scene && shooterId) {
+    const shooterSprite = scene.playerSprites?.[shooterId];
+    if (shooterSprite) {
+      shooterData = {
+        playerId: shooterId,
+        photo: shooterSprite.photo || null,
+        teamName: shooterSprite.team_id
+      };
+    }
+  }
+
+  if (scene && foulerId) {
+    const foulerSprite = scene.playerSprites?.[foulerId];
+    if (foulerSprite) {
+      foulerData = {
+        playerId: foulerId,
+        photo: foulerSprite.photo || null,
+        teamName: foulerSprite.team_id
+      };
+    }
+  }
+
+  if (shooterData && foulerData) {
+    showAndOneAnnouncement(offenseTeam, shooterData, foulerData);
+  } else {
+    // Fallback to simple announcement
+    showAnnouncement("It's Good! And 1!", offenseTeam, shooterData);
+  }
+}
+
+function handleFreeThrowMakeAnnouncement(turnData, scene, context, offenseTeam) {
+  const shooterId = context.shooterId || turnData.shooter_id;
+  let playerData = null;
+
+  if (scene && shooterId) {
+    const shooterSprite = scene.playerSprites?.[shooterId];
+    if (shooterSprite) {
+      playerData = {
+        playerId: shooterId,
+        photo: shooterSprite.photo || null,
+        teamName: shooterSprite.team_id
+      };
+    }
+  }
+
+  // Show "It's Good!" for FT makes (same as regular shots)
+  showAnnouncement("It's Good!", offenseTeam, playerData);
+}
+
+function handleReboundAnnouncement(turnData, scene, context) {
+  const rebounderId = context.rebounderId || turnData.rebounderId || turnData.rebounder_id;
+  if (!rebounderId || !scene) return;
+
+  const rebounderSprite = scene.playerSprites?.[rebounderId];
+  if (!rebounderSprite) return;
+
+  const rebounderTeam = rebounderSprite.team; // "home" or "away"
+  const playerData = {
+    playerId: rebounderId,
+    photo: rebounderSprite.photo || null,
+    teamName: rebounderSprite.team_id
+  };
+
+  showAnnouncement("Rebound!", rebounderTeam, playerData);
+}
+
+function handleShootingFoulAnnouncement(turnData, scene, context) {
+  const foulerId = context.foulerId || turnData.foul_player_id;
+  let playerData = null;
+
+  if (scene && foulerId) {
+    const foulerSprite = scene.playerSprites?.[foulerId];
+    if (foulerSprite) {
+      playerData = {
+        playerId: foulerId,
+        photo: foulerSprite.photo || null,
+        teamName: foulerSprite.team_id
+      };
+    }
+  }
+
+  showAnnouncement("Shooting Foul!", 'neutral', playerData);
+}
+
+function handleOffensiveFoulAnnouncement(turnData, scene, context, defenseTeam) {
+  const foulerId = context.foulerId || turnData.foul_player_id;
+  let playerData = null;
+
+  if (scene && foulerId) {
+    const foulerSprite = scene.playerSprites?.[foulerId];
+    if (foulerSprite) {
+      playerData = {
+        playerId: foulerId,
+        photo: foulerSprite.photo || null,
+        teamName: foulerSprite.team_id
+      };
+    }
+  }
+
+  showAnnouncement("OFFENSIVE FOUL!", defenseTeam, playerData);
+
+  // Trigger visual effect
+  if (scene && foulerId) {
+    triggerFoulEffect(scene, foulerId);
+  }
+}
+
+function handleDefensiveFoulAnnouncement(turnData, scene, context, offenseTeam) {
+  const foulerId = context.foulerId || turnData.foul_player_id;
+  let playerData = null;
+
+  if (scene && foulerId) {
+    const foulerSprite = scene.playerSprites?.[foulerId];
+    if (foulerSprite) {
+      playerData = {
+        playerId: foulerId,
+        photo: foulerSprite.photo || null,
+        teamName: foulerSprite.team_id
+      };
+    }
+  }
+
+  showAnnouncement("DEFENSIVE FOUL!", offenseTeam, playerData);
+
+  // Trigger visual effect
+  if (scene && foulerId) {
+    triggerFoulEffect(scene, foulerId);
+  }
+}
+
+function handleStealAnnouncement(turnData, scene, context, defenseTeam) {
+  const stealerId = context.stealerId || turnData.stealer_id || turnData.defender_id;
+  let playerData = null;
+
+  if (scene && stealerId) {
+    const stealerSprite = scene.playerSprites?.[stealerId];
+    if (stealerSprite) {
+      playerData = {
+        playerId: stealerId,
+        photo: stealerSprite.photo || null,
+        teamName: stealerSprite.team_id
+      };
+    }
+  }
+
+  showAnnouncement("STEAL!", defenseTeam, playerData);
+
+  // Trigger visual effect on victim
+  const victimId = context.victimId || turnData.victim_id;
+  if (scene && victimId) {
+    triggerTurnoverEffect(scene, victimId);
+  }
+}
+
+function handleTurnoverAnnouncement(turnData, scene, context, offenseTeam) {
+  const victimId = context.victimId || turnData.victim_id;
+  let playerData = null;
+
+  if (scene && victimId) {
+    const victimSprite = scene.playerSprites?.[victimId];
+    if (victimSprite) {
+      playerData = {
+        playerId: victimId,
+        photo: victimSprite.photo || null,
+        teamName: victimSprite.team_id
+      };
+    }
+  }
+
+  // Determine turnover type
+  const turnoverType = context.turnoverType || turnData.turnover_type;
+  const typeMap = {
+    "TRAVEL": "TRAVEL!",
+    "DOUBLE_DRIBBLE": "DOUBLE DRIBBLE!",
+    "OUT_OF_BOUNDS": "OUT OF BOUNDS!",
+    "BAD_PASS": "BAD PASS!"
+  };
+  
+  const turnoverText = typeMap[turnoverType] || "TURNOVER!";
+  showAnnouncement(turnoverText, offenseTeam, playerData);
+
+  // Trigger visual effect
+  if (scene && victimId) {
+    triggerTurnoverEffect(scene, victimId);
+  }
+}
+
