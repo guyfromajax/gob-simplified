@@ -2218,7 +2218,7 @@ def resolve_half_court_trap_logic(game: "GameManager"):
             if animations:
                 shot_result["animations"] = animations
                 logging.warning(f"✅ [HCT SHOT] Added animations to shot_result")
-        else:
+            else:
                 logging.warning(f"⚠️ [HCT SHOT] No animations generated from skeleton!")
         else:
             logging.warning(f"⚠️ [HCT SHOT] Skeleton has no steps!")
