@@ -426,17 +426,6 @@ export class ShotAnimationSystem {
         const isOffensivePlayer = offenseTeamId ? String(sprite.team_id) === String(offenseTeamId) : false;
         
         // Pass sync classification (debug removed for cleaner logs)
-        if (false && passInfo && stepIndex === passInfo.stepIndex && (anim.playerId === passInfo.passerId || anim.playerId === passInfo.receiverId)) {
-          // Debug log removed
-          const debug = {
-            playerId: anim.playerId,
-            spriteTeamId: sprite.team_id,
-            offenseTeamId,
-            isOffensivePlayer,
-            isPasser: anim.playerId === passInfo.passerId,
-            isReceiver: anim.playerId === passInfo.receiverId
-          });
-        }
         
         if (isOffensivePlayer) {
           offensivePromises.push(promise);
