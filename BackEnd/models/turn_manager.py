@@ -128,7 +128,8 @@ class TurnManager:
             "ball_spot": getAwayTeamCoords({"tmp": inbound_spot_home})["tmp"] if is_away_offense else inbound_spot_home,
             "oDestinations": o_dest,
             "dDestinations": d_dest,
-            "possession_team_id": offense_team.team_id,
+            "offense_team_id": offense_team.team_id,  # ✅ SS&S: Team on offense during this turn
+            "possession_team_id": offense_team.team_id,  # ✅ TODO: Remove (backwards compatibility)
             "quarter": self.game.quarter,
         }
 
