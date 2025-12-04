@@ -362,10 +362,10 @@ export class AnimationEngine {
     // Skeleton will start from old step 1 (new step 0) after this turn completes
     
     // ✅ FIX: Animate the inbound pass after positioning players
-    // This was missing! The comment said "animate inbound pass HERE" but no code was calling it
-    if (this.passAnimationSystem) {
-      await this.passAnimationSystem.executeInboundSequence(turnData, context);
-    }
+    // Use PassAnimationSystem directly since this.passSystem might not be initialized
+    const { PassAnimationSystem: PassSys } = await import('./PassAnimationSystem.js');
+    const passSystem = this.passSystem || new PassSys(this.scene, null, null, context.playerSprites);
+    await passSystem.executeInboundSequence(turnData, context);
     
     // ✅ PHASE 2.6: Transition to HalfCourt state (moved from animateGameTurns.js)
     const { safeTransition } = await import('../state/gameStateMachine.js');
