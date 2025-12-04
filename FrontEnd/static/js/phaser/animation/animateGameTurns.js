@@ -517,7 +517,7 @@ export async function animateGameTurns({ //hasBallAtStep
     // This is critical for outlet passes which happen during embedded rebounds in shot turns
     // AnimationRouter also calls prepareTurnForAnimation, but it's idempotent (safe to call twice)
     // The early call ensures scene.currentTurn is set before any embedded rebound handling
-    const { possessionId } = prepareTurnForAnimation({
+    const { possessionId } = await prepareTurnForAnimation({
       turn,
       scene,
       turnIndex: i,
