@@ -642,7 +642,8 @@ export class FreeThrowAnimationSystem {
    */
   getRimCoordinates(turnData) {
     // Determine which rim based on team
-    const isHomeTeam = turnData.possession_team_id === this.scene.homeTeamId;
+    // ✅ FIX: Use offense_team_id (SS&S possession system)
+    const isHomeTeam = turnData.offense_team_id === this.scene.homeTeamId;
     return isHomeTeam ? this.ftConfig.homeRim : this.ftConfig.awayRim;
   }
 

@@ -2166,9 +2166,10 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
           });
           
           const rebounderSprite = playerSprites[rebounderId];
+          // ✅ FIX: Use offense_team_id (SS&S possession system)
           const isDreb = turnData.rebound_type
             ? turnData.rebound_type === "DREB"
-            : rebounderSprite?.team_id !== turnData.possession_team_id;
+            : rebounderSprite?.team_id !== turnData.offense_team_id;
           // ✅ Skip DREB setup if next play is Fast Break - player advancement happens in outlet phase
           if (isDreb && !turnData.fast_break && turnData.next_play_type !== "FAST_BREAK") {
             // Find the MISS turn that led to this DREB
