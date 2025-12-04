@@ -1427,26 +1427,7 @@ def resolve_full_court_press_logic(game: "GameManager"):
     animator = Animator(game)
     
     if not skeleton or not skeleton.get('steps'):
-        logging.warning(f"🔍 [FCP] Getting skeleton for result_type={result_type} (not yet retrieved)")
         skeleton = get_skeleton_for_turn(result_type, "FCP", game) or {}
-        logging.warning(f"🔍 [FCP] Retrieved skeleton: has_steps={bool(skeleton.get('steps'))}, step_count={len(skeleton.get('steps', []))}")
-    else:
-        logging.warning(f"✅ [FCP] Skeleton already retrieved (has {len(skeleton.get('steps', []))} steps), skipping duplicate retrieval")
-    
-    # 🔍 DEBUG: Log full skeleton structure for comparison with frontend animation
-    if skeleton and skeleton.get('steps'):
-        logging.warning("=" * 80)
-        logging.warning(f"🔍 [FCP FULL SKELETON] result_type={result_type}, variant={skeleton.get('variant', 'unknown')}")
-        for step_idx, step in enumerate(skeleton.get('steps', [])):
-            logging.warning(f"  📍 STEP {step_idx}:")
-            for pos, action_data in step.get('pos_actions', {}).items():
-                location = action_data.get('location', 'N/A')
-                coords = action_data.get('coords', 'N/A')
-                action = action_data.get('action', 'N/A')
-                has_ball = action_data.get('has_ball', False)
-                opp = action_data.get('opp', False)
-                logging.warning(f"    {pos}: location={location}, coords={coords}, action={action}, has_ball={has_ball}, opp={opp}")
-        logging.warning("=" * 80)
     
     # Handle foul results - use standard foul types for frontend
     if result_type == "D_FOUL":
@@ -1634,14 +1615,8 @@ def get_fcp_skeleton(result_type, game_context=None):
     
     # Try to get skeleton from MongoDB
     try:
-        logging.warning(f"🔍 [FCP] Attempting to retrieve skeleton from MongoDB for result_type={result_type}, variant={variant_name}")
         # Get all FCP skeletons (for now, we'll use the first one - can be enhanced later)
         skeleton_doc = fcp_skeletons_collection.find_one({})
-        
-        if skeleton_doc:
-            logging.warning(f"🔍 [FCP] Found skeleton_doc in MongoDB: _id={skeleton_doc.get('_id')}, name={skeleton_doc.get('name')}, has_variants={'variants' in skeleton_doc}")
-        else:
-            logging.warning(f"⚠️ [FCP] No skeleton_doc found in MongoDB collection")
         
         if skeleton_doc and "variants" in skeleton_doc:
             variants = skeleton_doc.get("variants", {})
@@ -1661,7 +1636,6 @@ def get_fcp_skeleton(result_type, game_context=None):
                         # Check that steps exists, is a list, and has at least one step
                         if steps and isinstance(steps, list) and len(steps) > 0:
                             non_empty_versions.append(v)
-                            logging.warning(f"  ✓ Version {idx} has {len(steps)} steps")
                         # Version validation (spam removed)
                 
                 if non_empty_versions:
@@ -1677,7 +1651,6 @@ def get_fcp_skeleton(result_type, game_context=None):
                         is_away_offense = game_context.offense_team.team_id == game_context.away_team.team_id
                         skeleton_data = apply_opposite_side_logic(skeleton_data, is_away_offense)
                     
-                    logging.warning(f"✅ Selected FCP {variant_name} skeleton from MongoDB (version with {len(selected_steps)} steps, {len(non_empty_versions)}/{len(versions)} versions available)")
                     return skeleton_data
                 else:
                     logging.warning(f"⚠️ No non-empty versions for FCP {variant_name} (checked {len(versions)} versions), falling back to hardcoded")
@@ -1755,7 +1728,6 @@ def get_hct_skeleton(result_type, game_context=None):
                         # Check that steps exists, is a list, and has at least one step
                         if steps and isinstance(steps, list) and len(steps) > 0:
                             non_empty_versions.append(v)
-                            logging.warning(f"  ✓ Version {idx} has {len(steps)} steps")
                         # Version validation (spam removed)
                 
                 if non_empty_versions:
@@ -1771,7 +1743,6 @@ def get_hct_skeleton(result_type, game_context=None):
                         is_away_offense = game_context.offense_team.team_id == game_context.away_team.team_id
                         skeleton_data = apply_opposite_side_logic(skeleton_data, is_away_offense)
                     
-                    logging.warning(f"✅ Selected HCT {variant_name} skeleton from MongoDB (version with {len(selected_steps)} steps, {len(non_empty_versions)}/{len(versions)} versions available)")
                     return skeleton_data
                 else:
                     logging.warning(f"⚠️ No non-empty versions for HCT {variant_name} (checked {len(versions)} versions), falling back to hardcoded")
@@ -2251,27 +2222,7 @@ def resolve_half_court_trap_logic(game: "GameManager"):
         animator = Animator(game)
     
     if not skeleton or not skeleton.get('steps'):
-        logging.warning(f"🔍 [HCT] Getting skeleton for result_type={result_type} (not yet retrieved)")
         skeleton = get_skeleton_for_turn(result_type, "HCT", game) or {}
-        logging.warning(f"🔍 [HCT] Retrieved skeleton: has_steps={bool(skeleton.get('steps'))}, step_count={len(skeleton.get('steps', []))}")
-    else:
-        logging.warning(f"✅ [HCT] Skeleton already retrieved (has {len(skeleton.get('steps', []))} steps), skipping duplicate retrieval")
-    
-    # 🔍 DEBUG: Log full skeleton structure for comparison with frontend animation
-    if skeleton and skeleton.get('steps'):
-        logging.warning("=" * 80)
-        logging.warning(f"🔍 [HCT FULL SKELETON] result_type={result_type}, variant={skeleton.get('variant', 'unknown')}")
-        for step_idx, step in enumerate(skeleton.get('steps', [])):
-            logging.warning(f"  📍 STEP {step_idx}:")
-            for pos, action_data in step.get('pos_actions', {}).items():
-                location = action_data.get('location', 'N/A')
-                coords = action_data.get('coords', 'N/A')
-                action = action_data.get('action', 'N/A')
-                has_ball = action_data.get('has_ball', False)
-                opp = action_data.get('opp', False)
-                logging.warning(f"    {pos}: location={location}, coords={coords}, action={action}, has_ball={has_ball}, opp={opp}")
-        logging.warning("=" * 80)
-    
     # Handle foul results - use standard foul types for frontend (same as FCP)
     if result_type == "D_FOUL":
         game_state["foul_team"] = "DEFENSE"
