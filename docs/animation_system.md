@@ -1,8 +1,66 @@
 # Animation System Overview
 
-> **Last Updated:** January 2025
+> **Last Updated:** December 2024
 
 This document provides an overview of the front-end animation stack for **GOB**, including both the production system and experimental components.
+
+---
+
+## SS&S Core Systems (December 2024)
+
+### Possession Management System ✅ **SS&S**
+
+**Single Source of Truth:** Each turn's `offense_team_id` field
+
+**Backend Responsibility:**
+- Sets `result["offense_team_id"] = game.offense_team.team_id` (team on offense DURING this turn)
+- Uses `possession_flips` as INTERNAL flag (tells backend when to call `switch_possession()`)
+- After turn completes, calls `game.switch_possession()` if `possession_flips=True`
+- Next turn automatically has correct `game.offense_team` (updated state)
+
+**Frontend Responsibility:**
+- Reads `turnData.offense_team_id` from each turn
+- Sets `scene.offenseTeamId = turnData.offense_team_id` (simple assignment, no flip logic)
+- Emits `possessionChange` event if value changes
+
+**Benefits:**
+- ✅ No double flips (backend flips once, frontend just displays)
+- ✅ No confusion (one value, one source)
+- ✅ Works for ALL turn types (HCO, FCP, HCT, FREE_THROW, etc.)
+
+**See:** `turnPreparation.js` - `handleTurnTransition()` function
+
+---
+
+### Announcement System ✅ **SS&S**
+
+**Timing-Based Separation:**
+
+**timing='start'** - Context announcements (situation being entered):
+- "Press!" - FCP pressure applied (BASELINE_INBOUND with `next_defensive_setup='FCP'`)
+- "Trap!" - HCT pressure applied (BASELINE_INBOUND with `next_defensive_setup='HCT'`)
+- "Fast Break!" - Fast break initiated
+
+**timing='end'** - Result announcements (outcome of turn):
+- "It's Good!" - Made shot (ballManager.js, when ball reaches rim)
+- "STEAL!" - Steal occurred
+- "TRAVEL!" / "OUT OF BOUNDS!" / etc. - Turnover types
+- "OFFENSIVE FOUL!" / "DEFENSIVE FOUL!" - Foul types
+- "Rebound!" - Defensive rebound (ballManager.js, when ball reaches rebounder)
+
+**Idempotent Design:**
+- `prepareTurnForAnimation()` may be called multiple times (animateGameTurns + AnimationRouter)
+- Uses `turn._startAnnouncementsShown` and `turn._endAnnouncementsShown` flags
+- First call: Shows announcements, sets flag
+- Subsequent calls: Skips announcements (already shown)
+
+**Benefits:**
+- ✅ No duplicate announcements (flags prevent)
+- ✅ Clear separation (context at start, result at end)
+- ✅ Works across all turn types
+
+**See:** `turnPreparation.js` - `prepareTurnForAnimation()` and `finalizeTurnAfterAnimation()`  
+**See:** `announcements.js` - `announceFromTurnData()` function
 
 ---
 
