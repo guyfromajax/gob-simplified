@@ -98,6 +98,7 @@ class GameManager:
         self.game_state["defense_team"] = defense_team.name
         
         print(f"Opening tip winner: {offense_team.name}")
+        logging.warning(f"🏀 [OPENING TIP] Winner: {offense_team.name}, offense_team_id={offense_team.team_id}, defense_team={defense_team.name}")
 
     
     def _init_game_state(self):
