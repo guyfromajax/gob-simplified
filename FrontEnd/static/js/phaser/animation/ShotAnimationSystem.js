@@ -1112,6 +1112,21 @@ export class ShotAnimationSystem {
         note: 'Should execute outlet step (PG to rebounder, others down court)'
       });
       
+      // ✅ FIX: Announce rebound before outlet animation
+      // ballManager only announces rebounds for its own rebound positioning code
+      // Outlet pass system needs to announce too
+      const { showAnnouncement } = await import('../utils/announcements.js');
+      const rebounderSprite = this.playerSprites[turnData.rebounderId];
+      if (rebounderSprite) {
+        const rebounderTeam = rebounderSprite.team; // "home" or "away"
+        const playerData = {
+          playerId: turnData.rebounderId,
+          photo: rebounderSprite.photo || null,
+          teamName: rebounderSprite.team_id
+        };
+        showAnnouncement("Rebound!", rebounderTeam, playerData);
+      }
+      
       try {
         // Import and use the same function that works for free throws
         const { runDefensiveReboundSetup } = await import('./turnAnimation.js');
