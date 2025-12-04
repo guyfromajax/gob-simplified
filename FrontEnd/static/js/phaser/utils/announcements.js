@@ -288,16 +288,15 @@ export function announceFromTurnData(turnData, timing = 'start', homeTeamId = nu
     // For all other turns (HCO, MAKE, MISS, etc.), only check actual pressure flags (fcp_shot, hct_shot, fcp_foul, hct_foul)
     const isInboundSettingUpPressure = turnData.result_type === 'BASELINE_INBOUND';
     
-    if (turnData.offensive_state === 'FCP' || turnData.fcp_foul || 
-        turnData.result_type === 'FCP' || turnData.text?.includes('PRESS!') ||
-        turnData.fcp_shot === true || (isInboundSettingUpPressure && turnData.next_defensive_setup === 'FCP')) {
+    // ✅ SS&S: Only announce pressure context ONCE when it's first applied (BASELINE_INBOUND)
+    // Don't re-announce for every subsequent turn in the pressure sequence
+    // Removed text.includes('PRESS!') and text.includes('TRAP!') checks to prevent duplicates
+    if (isInboundSettingUpPressure && turnData.next_defensive_setup === 'FCP') {
       showAnnouncement("Press!", 'defense');
       // Don't return - may have shot result to announce later
     }
     
-    if (turnData.offensive_state === 'HCT' || turnData.hct_foul || 
-        turnData.result_type === 'HCT' || turnData.text?.includes('TRAP!') ||
-        turnData.hct_shot === true || (isInboundSettingUpPressure && turnData.next_defensive_setup === 'HCT')) {
+    if (isInboundSettingUpPressure && turnData.next_defensive_setup === 'HCT') {
       showAnnouncement("Trap!", 'defense');
       // Don't return - may have shot result to announce later
     }
