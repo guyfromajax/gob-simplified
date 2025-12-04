@@ -357,6 +357,14 @@ export class FreeThrowAnimationSystem {
     // Check if this is the final free throw
     // ✅ FIX: Use ftContext.isFinal instead of recalculating, as it includes the free_throws_remaining safety check
     if (ftContext.isFinal) {
+      // ✅ SS&S: Announce pressure if next_defensive_setup is FCP/HCT
+      // (No BASELINE_INBOUND turn is created for FTs, so announce here)
+      if (turnData.next_defensive_setup === 'FCP') {
+        announceGameEvent('PRESSURE_FCP', turnData, this.scene);
+      } else if (turnData.next_defensive_setup === 'HCT') {
+        announceGameEvent('PRESSURE_HCT', turnData, this.scene);
+      }
+      
       // Final free throw made - execute inbound pass
       await this.handleFinalMadeFreeThrow(turnData);
     } else {
