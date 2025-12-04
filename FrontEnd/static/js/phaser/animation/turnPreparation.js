@@ -72,7 +72,12 @@ export function prepareTurnForAnimation({ turn, scene, turnIndex, homeTeamId }) 
   }
   
   // Show announcement for turn start events (Fast Break, Press, Trap)
-  announceFromTurnData(turn, 'start', homeTeamId, scene);
+  // ✅ FIX: Make this idempotent - only announce once even if called multiple times
+  // Prevents double "Press!" and "Trap!" when turn goes through both paths
+  if (!turn._startAnnouncementsShown) {
+    announceFromTurnData(turn, 'start', homeTeamId, scene);
+    turn._startAnnouncementsShown = true;
+  }
   
   // Calculate possession ID (used for post-animation cleanup)
   const possessionId =
@@ -205,7 +210,11 @@ export function finalizeTurnAfterAnimation({
   
   // Show announcements for shot results and rebounds (after animation)
   const homeTeamId = scene.simData?.home_team_id;
-  announceFromTurnData(turn, 'end', homeTeamId, scene);
+  // ✅ FIX: Make this idempotent too (in case called multiple times)
+  if (!turn._endAnnouncementsShown) {
+    announceFromTurnData(turn, 'end', homeTeamId, scene);
+    turn._endAnnouncementsShown = true;
+  }
   
   // Call onUpdate callback if provided
   if (onUpdate) {
