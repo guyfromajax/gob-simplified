@@ -215,8 +215,8 @@ export class HCOAnimationSystem {
       // Move 20-30 grid spots toward new offense basket (authentic basketball)
       const distance = Phaser.Math.Between(20, 30);
       
-      // Determine direction based on new offense team
-      const newOffenseTeam = turnData.possession_team_id === this.scene.homeTeamId ? 'home' : 'away';
+      // ✅ FIX: Use offense_team_id (SS&S possession system)
+      const newOffenseTeam = turnData.offense_team_id === this.scene.homeTeamId ? 'home' : 'away';
       const direction = newOffenseTeam === "home" ? 1 : -1;
       
       const targetGrid = {

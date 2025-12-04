@@ -419,7 +419,7 @@ class TurnManager:
         # ✅ SS&S: Set offense_team_id (single source of truth)
         # This represents the team on offense DURING this turn (for animations)
         result["offense_team_id"] = self.game.offense_team.team_id
-        result["possession_team_id"] = self.game.offense_team.team_id  # ✅ TODO: Remove (backwards compatibility)
+        # ✅ REMOVED: possession_team_id (fully migrated to offense_team_id in SS&S refactor)
 
         # STEP 4: Final updates (clock, logs, animation)
         try:
