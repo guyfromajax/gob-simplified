@@ -1659,8 +1659,7 @@ def get_fcp_skeleton(result_type, game_context=None):
                         if steps and isinstance(steps, list) and len(steps) > 0:
                             non_empty_versions.append(v)
                             logging.warning(f"  ✓ Version {idx} has {len(steps)} steps")
-                        else:
-                            logging.warning(f"  ✗ Version {idx} is empty or invalid (steps: {type(steps).__name__ if steps else 'None'})")
+                        # Version validation (spam removed)
                     
                     if non_empty_versions:
                         # Randomly select one non-empty version
@@ -1673,19 +1672,7 @@ def get_fcp_skeleton(result_type, game_context=None):
                         # Apply opposite side logic if game context is provided
                         if game_context:
                             is_away_offense = game_context.offense_team.team_id == game_context.away_team.team_id
-                            logging.warning(f"  🔍 [FCP] Applying opposite side logic, is_away_offense={is_away_offense}")
                             skeleton_data = apply_opposite_side_logic(skeleton_data, is_away_offense)
-                            # Log a sample step to verify coords were set
-                            if skeleton_data.get("steps"):
-                                sample_step = skeleton_data["steps"][0] if skeleton_data["steps"] else {}
-                                sample_pos_actions = sample_step.get("pos_actions", {})
-                                for pos, action in list(sample_pos_actions.items())[:2]:  # Log first 2 positions
-                                    has_opp = action.get("opp", False)
-                                    has_coords = "coords" in action
-                                    has_location = "location" in action
-                                    logging.warning(f"    Sample: {pos} - opp={has_opp}, has_coords={has_coords}, has_location={has_location}, coords={action.get('coords') if has_coords else 'N/A'}")
-                        else:
-                            logging.warning(f"  ⚠️ [FCP] No game_context provided, skipping apply_opposite_side_logic")
                         
                         logging.warning(f"✅ Selected FCP {variant_name} skeleton from MongoDB (version with {len(selected_steps)} steps, {len(non_empty_versions)}/{len(versions)} versions available)")
                         return skeleton_data
@@ -1766,8 +1753,7 @@ def get_hct_skeleton(result_type, game_context=None):
                         if steps and isinstance(steps, list) and len(steps) > 0:
                             non_empty_versions.append(v)
                             logging.warning(f"  ✓ Version {idx} has {len(steps)} steps")
-                        else:
-                            logging.warning(f"  ✗ Version {idx} is empty or invalid (steps: {type(steps).__name__ if steps else 'None'})")
+                        # Version validation (spam removed)
                     
                     if non_empty_versions:
                         # Randomly select one non-empty version
@@ -1780,19 +1766,7 @@ def get_hct_skeleton(result_type, game_context=None):
                         # Apply opposite side logic if game context is provided
                         if game_context:
                             is_away_offense = game_context.offense_team.team_id == game_context.away_team.team_id
-                            logging.warning(f"  🔍 [HCT] Applying opposite side logic, is_away_offense={is_away_offense}")
                             skeleton_data = apply_opposite_side_logic(skeleton_data, is_away_offense)
-                            # Log a sample step to verify coords were set
-                            if skeleton_data.get("steps"):
-                                sample_step = skeleton_data["steps"][0] if skeleton_data["steps"] else {}
-                                sample_pos_actions = sample_step.get("pos_actions", {})
-                                for pos, action in list(sample_pos_actions.items())[:2]:  # Log first 2 positions
-                                    has_opp = action.get("opp", False)
-                                    has_coords = "coords" in action
-                                    has_location = "location" in action
-                                    logging.warning(f"    Sample: {pos} - opp={has_opp}, has_coords={has_coords}, has_location={has_location}, coords={action.get('coords') if has_coords else 'N/A'}")
-                        else:
-                            logging.warning(f"  ⚠️ [HCT] No game_context provided, skipping apply_opposite_side_logic")
                         
                         logging.warning(f"✅ Selected HCT {variant_name} skeleton from MongoDB (version with {len(selected_steps)} steps, {len(non_empty_versions)}/{len(versions)} versions available)")
                         return skeleton_data
@@ -2070,16 +2044,7 @@ def apply_opposite_side_logic(skeleton_data, is_away_offense):
     if not skeleton_data or "steps" not in skeleton_data:
         return skeleton_data
     
-    # ✅ DEBUG: Check if skeleton has any opp fields
-    opp_count = 0
-    for step in skeleton_data.get("steps", [])[:1]:  # Check first step only
-        for pos, action in step.get("pos_actions", {}).items():
-            if action.get("opp", False):
-                opp_count += 1
-    if opp_count > 0:
-        logging.warning(f"  🔍 [apply_opposite_side_logic] Found {opp_count} positions with opp=True in first step")
-    else:
-        logging.warning(f"  ⚠️ [apply_opposite_side_logic] No positions with opp=True found in skeleton!")
+    # Opp field handling (debug logs removed for cleaner output)
     
     from BackEnd.utils.shared import get_away_player_coords
     from BackEnd.constants import HCO_STRING_SPOTS
@@ -2114,11 +2079,9 @@ def apply_opposite_side_logic(skeleton_data, is_away_offense):
             # ✅ FIX: If no opp field, assume ball handler (PG) should be on opposite side
             if not has_opp and position == ball_handler_pos:
                 has_opp = True
-                logging.warning(f"  🔍 [apply_opposite_side_logic] Position {position} is ball handler, treating as opp=True")
             
             # Check if this offensive player should be on opposite side
             if has_opp:
-                logging.warning(f"  🔍 [apply_opposite_side_logic] Position {position} has opp=True, location={location_key}, initial_coords={spot_coords}, is_away_offense={is_away_offense}")
                 # Offensive player with opp=True should be on opposite side (defensive side)
                 if is_away_offense:
                     # Away team offense - ball handlers go to home side (defensive side)
@@ -2141,8 +2104,6 @@ def apply_opposite_side_logic(skeleton_data, is_away_offense):
             
             # Update the spot coordinates in the action data
             modified_action["coords"] = spot_coords
-            if has_opp:
-                logging.warning(f"  ✅ [apply_opposite_side_logic] Position {position} final coords={spot_coords}")
             modified_step["pos_actions"][position] = modified_action
         
         modified_skeleton["steps"].append(modified_step)
