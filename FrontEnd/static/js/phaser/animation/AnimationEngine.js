@@ -361,6 +361,12 @@ export class AnimationEngine {
     // Players are now at skeleton step 0 positions, pass animation creates the hold beat
     // Skeleton will start from old step 1 (new step 0) after this turn completes
     
+    // ✅ FIX: Animate the inbound pass after positioning players
+    // This was missing! The comment said "animate inbound pass HERE" but no code was calling it
+    if (this.passAnimationSystem) {
+      await this.passAnimationSystem.executeInboundSequence(turnData, context);
+    }
+    
     // ✅ PHASE 2.6: Transition to HalfCourt state (moved from animateGameTurns.js)
     const { safeTransition } = await import('../state/gameStateMachine.js');
     const { States } = await import('../state/gameStateMachine.js');
