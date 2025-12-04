@@ -74,9 +74,18 @@ export function prepareTurnForAnimation({ turn, scene, turnIndex, homeTeamId }) 
   // Show announcement for turn start events (Fast Break, Press, Trap)
   // ✅ FIX: Make this idempotent - only announce once even if called multiple times
   // Prevents double "Press!" and "Trap!" when turn goes through both paths
+  console.log('🔍 [ANNOUNCE FLAG CHECK]', {
+    result_type: turn.result_type,
+    flag_value: turn._startAnnouncementsShown,
+    will_announce: !turn._startAnnouncementsShown
+  });
+  
   if (!turn._startAnnouncementsShown) {
     announceFromTurnData(turn, 'start', homeTeamId, scene);
     turn._startAnnouncementsShown = true;
+    console.log('✅ [ANNOUNCE FLAG SET] Flag now true, future calls will skip');
+  } else {
+    console.log('⏭️ [ANNOUNCE FLAG SKIP] Already announced, skipping duplicate');
   }
   
   // Calculate possession ID (used for post-animation cleanup)
