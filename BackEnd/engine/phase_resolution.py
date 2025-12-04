@@ -413,6 +413,7 @@ def resolve_fast_break_logic(game: "GameManager"):
             "time_elapsed": 3,
             "animations": animations,
             "next_play_type": "HCO",
+            "offense_team_id": off_team.team_id,  # ✅ FIX: Add offense_team_id (possession doesn't flip, same team continues)
             "roles": fb_roles,  # ✅ Include roles so frontend can animate outlet pass
             "fast_break": True,  # ✅ Mark as Fast Break so frontend routes to Fast Break animation
         }
