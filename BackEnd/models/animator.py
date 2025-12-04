@@ -848,9 +848,6 @@ class Animator:
                 if "coords" in pos_action:
                     coords = pos_action.get("coords", {"x": 50, "y": 25})
                     # Coords already exist - these should have been set by apply_opposite_side_logic()
-                    # Trust them for now, but log to verify
-                    if (is_fcp or is_hct) and has_opp:
-                        logging.warning(f"  🔍 [OPP] Position {position}: opp=True, coords exist (from apply_opposite_side_logic): {coords}, is_away_offense={is_away_offense}")
                     coords_already_flipped = True
                 elif "location" in pos_action:
                     # Convert location string to coordinates using HCO_STRING_SPOTS
