@@ -127,39 +127,34 @@ function handleTurnTransition(scene, turnData) {
     current_scene_offenseTeamId: scene.offenseTeamId
   });
   
-  // ✅ UNIVERSAL POSSESSION FLIP HANDLER
-  // Works for ALL turn types: FREE_THROW, FOUL, STEAL, DEAD_BALL, HCO, MAKE/MISS, etc.
-  // 
-  // Note: For turns that call runInboundSetup (MAKE, FREE_THROW), the defensive check
-  // in runInboundSetup (line 861-876) already forced scene.offenseTeamId to match newOffenseSide.
-  // This handler serves as confirmation and handles turns that DON'T call runInboundSetup
-  // (STEAL, DEAD_BALL, FOUL, etc.)
-  if (turnData.possession_flips && turnData.possession_team_id) {
+  // ✅ SS&S: Backend provides offense_team_id for each turn (single source of truth)
+  // Frontend just sets scene.offenseTeamId to that value (no flip logic, just assignment)
+  // Each turn knows its offense team, frontend displays it
+  if (turnData.offense_team_id) {
     const previousOffenseTeamId = scene.offenseTeamId;
+    const newOffenseTeamId = turnData.offense_team_id;
     
-    // Only flip if actually changing (avoid duplicate events)
-    if (previousOffenseTeamId !== turnData.possession_team_id) {
-      scene.offenseTeamId = turnData.possession_team_id;
+    // Update if different (avoid duplicate events)
+    if (previousOffenseTeamId !== newOffenseTeamId) {
+      scene.offenseTeamId = newOffenseTeamId;
       scene.events?.emit('possessionChange', { 
-        offenseTeamId: turnData.possession_team_id 
+        offenseTeamId: newOffenseTeamId 
       });
-      console.log('✅ [UNIVERSAL TRANSITION] Possession flipped', {
+      console.log('🔄 [UNIVERSAL TRANSITION] Offense team updated', {
         from: previousOffenseTeamId,
-        to: turnData.possession_team_id,
-        result_type: turnData.result_type,
-        next_play_type: turnData.next_play_type
+        to: newOffenseTeamId,
+        result_type: turnData.result_type
       });
     } else {
-      console.log('✅ [UNIVERSAL TRANSITION] Possession already correct (likely set by runInboundSetup)', {
-        current: previousOffenseTeamId,
-        requested: turnData.possession_team_id,
+      console.log('✅ [UNIVERSAL TRANSITION] Offense team unchanged', {
+        offenseTeamId: scene.offenseTeamId,
         result_type: turnData.result_type
       });
     }
   } else {
-    console.log('⏭️ [UNIVERSAL TRANSITION] No possession flip needed', {
-      possession_flips: turnData.possession_flips,
-      possession_team_id: turnData.possession_team_id,
+    // No offense_team_id provided - keep current (shouldn't happen in normal flow)
+    console.warn('⚠️ [UNIVERSAL TRANSITION] No offense_team_id provided, keeping current', {
+      current_offenseTeamId: scene.offenseTeamId,
       result_type: turnData.result_type
     });
   }
