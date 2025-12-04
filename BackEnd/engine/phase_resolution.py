@@ -1522,7 +1522,7 @@ def resolve_full_court_press_logic(game: "GameManager"):
         if animations:
             shot_result["animations"] = animations
             logging.warning(f"✅ [FCP] Added {len(animations)} animations to shot_result")
-    else:
+        else:
             logging.warning(f"⚠️ [FCP] No animations generated from skeleton!")
     else:
         logging.warning(f"⚠️ [FCP] Skeleton has no steps! skeleton={bool(skeleton)}, has_steps={skeleton.get('steps') if skeleton else False}")
@@ -2344,7 +2344,7 @@ def resolve_half_court_trap_logic(game: "GameManager"):
         if animations:
             shot_result["animations"] = animations
             logging.warning(f"✅ [HCT] Added {len(animations)} animations to shot_result")
-    else:
+        else:
             logging.warning(f"⚠️ [HCT] No animations generated from skeleton!")
     else:
         logging.warning(f"⚠️ [HCT] Skeleton has no steps! skeleton={bool(skeleton)}, has_steps={skeleton.get('steps') if skeleton else False}")
