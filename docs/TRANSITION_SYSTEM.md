@@ -1368,3 +1368,205 @@ Note: **(PC)** indicates possession change
 - Pattern consistency holds across 4 turn types (HCO, FT, Fast Break, FCP/HCT)
 - All compliant transitions use Side Inbound pattern ✅
 
+---
+
+### Batch 5: OREB Transitions (8 Total)
+
+#### 1. OREB → Inbound Pass (PC) - Putback Made, No Foul
+
+**Handler:** `turn_manager.py` `resolve_offensive_rebound_turn()` (line 1372-1442)
+
+**Current Implementation:**
+- ✅ Sets `possession_flips = True` (line 1374)
+- ✅ Sets `next_defensive_setup` = pressure type (line 1418)
+- ❌ Does NOT set `next_play_type` (should be "BASELINE_INBOUND")
+- ✅ Backend flips in `game_manager.py` (line 176-178) during OREB while loop
+- ❌ Does NOT set `offense_team_id`
+- ❌ **Frontend calls `runInboundSetup()` directly** in `handleOrebTurn()` (animateGameTurns.js line 172-214)
+
+**SS&S Compliance:** ❌ **NOT SS&S**
+
+**Issues:**
+- Frontend handles inbound directly (should create BASELINE_INBOUND turn)
+- Backend flips in OREB loop (correct location!) but before PUTBACK_MAKE turn is created
+- Missing `offense_team_id`
+- **Pattern A variant** - similar issue but flip is in backend (better than HCO/FT/FB)
+
+**Fix Required:**
+- Backend: Set `next_play_type = "BASELINE_INBOUND"` on PUTBACK_MAKE
+- Backend: Set `offense_team_id` AFTER flip (in game_manager after OREB loop)
+- Frontend: Remove `runInboundSetup()` call from handleOrebTurn
+
+---
+
+#### 2. OREB → Free Throw - Putback Foul
+
+**Handler:** `turn_manager.py` `resolve_offensive_rebound_turn()` (handles fouls during putbacks)
+
+**Current Implementation:**
+- Would route to standard foul logic
+- ✅ Sets `offensive_state = "FREE_THROW"` for shooting fouls
+- ❌ Does NOT set `offense_team_id`
+
+**SS&S Compliance:** ⚠️ **PARTIAL**
+
+**Issues:**
+- **IDENTICAL to Pattern D**
+- Missing `offense_team_id`
+
+**Fix Required:**
+- Backend: Set `result["offense_team_id"] = off_team.team_id`
+
+---
+
+#### 3. OREB → HCO - Kickout Pass
+
+**Handler:** `turn_manager.py` `resolve_offensive_rebound_turn()` (line 1540-1570, kickout logic)
+
+**Current Implementation:**
+- ✅ Sets `possession_flips = False` - Correct, no flip for kickout
+- ✅ Sets result_type = "OREB_KICKOUT"
+- ❌ Does NOT set `next_play_type` (implicitly HCO)
+- ❌ Does NOT set `offense_team_id`
+
+**SS&S Compliance:** ⚠️ **PARTIAL**
+
+**Issues:**
+- **Pattern D** - Missing `offense_team_id`, no flip needed
+
+**Fix Required:**
+- Backend: Set `result["offense_team_id"] = off_team.team_id`
+- Backend: Set `next_play_type = "HCO"` for clarity
+
+---
+
+#### 4. OREB → HCO (PC) - Putback Missed, DREB
+
+**Handler:** `turn_manager.py` `resolve_offensive_rebound_turn()` (line 1444-1520, putback miss rebound logic)
+
+**Current Implementation:**
+- ✅ Sets `possession_flips = True` (if DREB, line 1504)
+- ✅ Sets `next_play_type = "HCO"` (line 1517)
+- ❌ Backend does NOT flip possession in `game_manager.py`
+- ❌ Does NOT set `offense_team_id`
+- ❌ **No flip executed!**
+
+**SS&S Compliance:** ❌ **NOT SS&S**
+
+**Issues:**
+- **IDENTICAL to Pattern B**
+- Flip flag set but never executed
+
+**Fix Required:**
+- Same as Pattern B (backend flip before HCO)
+
+---
+
+#### 5. OREB → Fast Break (PC) - Putback Missed, DREB → Fast Break
+
+**Handler:** `turn_manager.py` `resolve_offensive_rebound_turn()` (putback miss with fast break)
+
+**Current Implementation:**
+- ✅ Sets `possession_flips = True` (if DREB)
+- ✅ Would set `next_play_type = "FAST_BREAK"` (if fast break triggered)
+- ❌ Backend does NOT flip possession
+- ❌ Does NOT set `offense_team_id`
+- ❌ **Frontend flips** (if reaches fastBreak.js)
+
+**SS&S Compliance:** ❌ **NOT SS&S**
+
+**Issues:**
+- **IDENTICAL to Pattern C**
+- Frontend flips possession
+
+**Fix Required:**
+- Same as Pattern C (backend flip before Fast Break)
+
+---
+
+#### 6. OREB → OREB - Putback Missed, OREB
+
+**Handler:** `turn_manager.py` `resolve_offensive_rebound_turn()` (consecutive OREB logic)
+
+**Current Implementation:**
+- ✅ Sets `pending_oreb` again (triggers another OREB turn)
+- ✅ Sets `possession_flips = False` - Correct, offense keeps ball
+- ✅ OREB while loop processes consecutive OREBs (game_manager.py line 166-188)
+- ❌ Does NOT set `offense_team_id`
+
+**SS&S Compliance:** ⚠️ **PARTIAL**
+
+**Issues:**
+- **Pattern D** - Missing `offense_team_id`, no flip needed
+
+**Fix Required:**
+- Backend: Set `result["offense_team_id"] = off_team.team_id`
+
+---
+
+#### 7. OREB → Side Inbound Pass (PC) - Putback Foul (Offensive)
+
+**Handler:** `turn_manager.py` (putback foul logic) → `resolve_non_shooting_foul()`
+
+**Current Implementation:**
+- Would route to standard offensive foul logic
+- ✅ Sets `possession_flips = True`
+- ✅ Backend flips in `game_manager.py` (line 200-205)
+- ✅ SIP has `offense_team_id`
+
+**SS&S Compliance:** ✅ **SS&S COMPLIANT**
+
+**Issues:**
+- None (uses gold standard)
+
+---
+
+#### 8. OREB → Side Inbound Pass - Putback Foul (Defensive, No Bonus)
+
+**Handler:** `turn_manager.py` (putback foul logic) → `resolve_non_shooting_foul()`
+
+**Current Implementation:**
+- Would route to standard defensive foul (no bonus) logic
+- ✅ Sets `possession_flips` based on foul type
+- ✅ Backend flips in `game_manager.py` (if needed)
+- ✅ SIP has `offense_team_id`
+
+**SS&S Compliance:** ✅ **SS&S COMPLIANT**
+
+**Issues:**
+- None (uses gold standard)
+
+---
+
+### Batch 5 Summary
+
+| # | Transition | SS&S Status | Primary Issue | Pattern |
+|---|-----------|-------------|---------------|---------|
+| 1 | OREB → Inbound (PC) | ❌ NOT SS&S | Frontend handles inbound | A variant |
+| 2 | OREB → Free Throw | ⚠️ PARTIAL | Missing offense_team_id | D |
+| 3 | OREB → HCO (Kickout) | ⚠️ PARTIAL | Missing offense_team_id | D |
+| 4 | OREB → HCO (PC) | ❌ NOT SS&S | Flip never executed | B |
+| 5 | OREB → Fast Break (PC) | ❌ NOT SS&S | Frontend flips | C |
+| 6 | OREB → OREB | ⚠️ PARTIAL | Missing offense_team_id | D |
+| 7 | OREB → Side Inbound (PC) | ✅ SS&S | None | E |
+| 8 | OREB → Side Inbound | ✅ SS&S | None | E |
+
+**Results:**
+- ✅ **2 out of 8** are SS&S compliant (25%)
+- ⚠️ **3 out of 8** are partial (38%)
+- ❌ **3 out of 8** are NOT SS&S (38%)
+
+**Key Finding:**
+**OREB transitions match the same 5 patterns!**
+- Pattern A variant: Putback makes flip in backend (OREB loop) but frontend handles inbound
+- Same Pattern B, C, D, E as all other turn types
+
+**Special Note:**
+OREB → Inbound (#1) is **slightly better** than HCO/FT/FB → Inbound because:
+- Backend DOES flip possession (in OREB loop, line 176-178) ✅
+- But frontend still handles inbound directly (should be BASELINE_INBOUND turn) ❌
+
+**Overall Progress:**
+- **16/46 evaluated transitions are SS&S compliant (35%)**
+- Pattern consistency holds across ALL 5 turn types tested!
+
