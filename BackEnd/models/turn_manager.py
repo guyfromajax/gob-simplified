@@ -257,8 +257,9 @@ class TurnManager:
             "ball_spot": getAwayTeamCoords({"tmp": inbound_spot_home})["tmp"] if is_away_offense else inbound_spot_home,
             "oDestinations": o_dest,
             "dDestinations": d_dest,
-            "possession_team_id": offense_team.team_id,
+            "offense_team_id": offense_team.team_id,  # ✅ SS&S: Use offense_team_id (not possession_team_id)
             "quarter": self.game.quarter,
+            "next_play_type": next_defensive_setup if next_defensive_setup else "HCO",  # ✅ Explicit routing
         }
         
         # Include next_defensive_setup if provided (for FCP/HCT pressure)
@@ -1420,6 +1421,7 @@ class TurnManager:
                     "time_elapsed": oreb_event.get("timeElapsed", 3),
                     "points": oreb_event.get("points", 2),
                     "scoring_team": off_team.name,
+                    "next_play_type": "BASELINE_INBOUND",  # ✅ FIX 2: Create BASELINE_INBOUND turn (Pattern A)
                     "next_defensive_setup": pressure_type,
                     "animations": [],  # Putbacks use simple animation, not skeleton
                     "rebounderId": getattr(rebounder, "player_id", None),
