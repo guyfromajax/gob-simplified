@@ -799,3 +799,174 @@ Note: **(PC)** indicates possession change
 2. **Frontend possession flips** - 2 transitions flip in frontend (runInboundSetup, fastBreak.js)
 3. **Missing possession flip** - 1 transition sets flag but never executes flip (#4)
 
+---
+
+### Batch 2: Free Throw Transitions (7 Total)
+
+#### 1. Free Throw → Inbound Pass (PC) - Final FT Made
+
+**Handler:** `phase_resolution.py` `resolve_free_throw_logic()` (line 691-698)
+
+**Current Implementation:**
+- ✅ Sets `next_defensive_setup` = pressure type (line 692)
+- ✅ Sets `possession_team_id` = new offense team (line 696-698)
+- ❌ Does NOT set `next_play_type` (should be "BASELINE_INBOUND")
+- ❌ Backend does NOT flip possession
+- ❌ Backend does NOT set `offense_team_id`
+- ❌ **Frontend flips possession** in `FreeThrowAnimationSystem.handleFinalMadeFreeThrow()` (line 477-523)
+- ❌ **Frontend calls `runInboundSetup()` directly** (line 513)
+
+**SS&S Compliance:** ❌ **NOT SS&S**
+
+**Issues:**
+1. Frontend handles inbound pass (should be BASELINE_INBOUND turn)
+2. Frontend flips possession (calculates newOffenseSide from shooter sprite)
+3. No authoritative `offense_team_id` from backend
+4. Duplicates HCO made shot pattern (same frontend code path)
+
+**Fix Required:**
+- Same as HCO → Inbound Pass (use gold standard pattern)
+
+---
+
+#### 2. Free Throw → OREB - Final FT Missed, OREB
+
+**Handler:** `phase_resolution.py` `resolve_free_throw_logic()` (line 640-644, sets pending_oreb)
+
+**Current Implementation:**
+- ✅ Sets `pending_oreb` via rebound logic
+- ✅ Sets `possession_flips = False` (no flip for OREB)
+- ✅ OREB turn created in `game_manager.py` (line 169)
+- ✅ OREB turn flipped in `game_manager.py` (line 176-178) if putback makes
+- ❌ Does NOT set `offense_team_id`
+
+**SS&S Compliance:** ⚠️ **PARTIAL**
+
+**Issues:**
+1. Missing `offense_team_id` in FREE_THROW result
+
+**Fix Required:**
+- Backend: Set `result["offense_team_id"] = off_team.team_id`
+
+---
+
+#### 3. Free Throw → HCO (PC) - Final FT Missed, DREB
+
+**Handler:** `phase_resolution.py` `resolve_free_throw_logic()` (line 616-650, rebound logic)
+
+**Current Implementation:**
+- ✅ Sets `possession_flips = True` (via rebound logic)
+- ✅ Sets `next_play_type = "HCO"` (line 706)
+- ❌ Backend does NOT flip possession in `game_manager.py`
+- ❌ Does NOT set `offense_team_id`
+- ❌ **No possession flip executed anywhere!**
+
+**SS&S Compliance:** ❌ **NOT SS&S**
+
+**Issues:**
+1. Possession flip flag set but NEVER executed (same as HCO → HCO)
+2. No `offense_team_id` set
+3. Next turn will have wrong offense team
+
+**Fix Required:**
+- Backend: Add possession flip in `game_manager.py` for DREB → HCO transitions
+- Backend: Set `offense_team_id` AFTER flip
+
+---
+
+#### 4. Free Throw → Fast Break (PC) - Final FT Missed, DREB
+
+**Handler:** `phase_resolution.py` `resolve_free_throw_logic()` (line 616-650, rebound logic with fast break)
+
+**Current Implementation:**
+- ✅ Sets `possession_flips = True`
+- ✅ Sets `next_play_type = "FAST_BREAK"` (would be set by rebound logic)
+- ❌ Backend does NOT flip possession in `game_manager.py`
+- ❌ Does NOT set `offense_team_id`
+- ❌ **Frontend flips possession** in `fastBreak.js`
+
+**SS&S Compliance:** ❌ **NOT SS&S**
+
+**Issues:**
+1. Possession flip happens in frontend (same as HCO → Fast Break)
+2. No authoritative `offense_team_id`
+
+**Fix Required:**
+- Backend: Flip possession in `game_manager.py` before Fast Break
+- Backend: Set `offense_team_id` AFTER flip
+- Frontend: Remove flip logic from fastBreak.js
+
+---
+
+#### 5. Free Throw → Side Inbound Pass - Final FT Missed, Defensive Foul (No Bonus)
+
+**Handler:** `phase_resolution.py` (FT miss → rebound → foul detection)
+
+**Current Implementation:**
+- ⚠️ This transition path is **complex** - FT misses, then foul is detected during rebound
+- Would need to trace through rebound → foul logic
+- Likely routes to `resolve_non_shooting_foul()` → Side Inbound
+
+**SS&S Compliance:** ⚠️ **NEEDS INVESTIGATION**
+
+**Issues:**
+- Complex multi-step path, hard to trace
+
+---
+
+#### 6. Free Throw → Free Throw (PC) - Final FT Missed, Defensive Foul (Bonus)
+
+**Handler:** Same as #5, but routes to FREE_THROW instead of Side Inbound
+
+**Current Implementation:**
+- ⚠️ This transition path is **complex** - FT miss → rebound → foul → bonus check
+- Would route to FREE_THROW if team fouls >= 5
+
+**SS&S Compliance:** ⚠️ **NEEDS INVESTIGATION**
+
+**Issues:**
+- Complex multi-step path, hard to trace
+
+---
+
+#### 7. Free Throw → Side Inbound Pass (PC) - Final FT Missed, Offensive Foul
+
+**Handler:** Same as #5/#6, but offensive foul instead of defensive
+
+**Current Implementation:**
+- ⚠️ This transition path is **complex** - FT miss → rebound → offensive foul
+- Would route to Side Inbound with `possession_flips=True`
+- **If** it reaches `game_manager.py` line 200-205, would flip correctly
+
+**SS&S Compliance:** ⚠️ **POSSIBLY SS&S** (if it reaches SIP setup logic)
+
+**Issues:**
+- Hard to verify without tracing full path
+
+---
+
+### Batch 2 Summary
+
+| # | Transition | SS&S Status | Primary Issue |
+|---|-----------|-------------|---------------|
+| 1 | FT → Inbound Pass (PC) | ❌ NOT SS&S | Frontend flips possession |
+| 2 | FT → OREB | ⚠️ PARTIAL | Missing offense_team_id |
+| 3 | FT → HCO (PC) | ❌ NOT SS&S | Possession flip NEVER executed |
+| 4 | FT → Fast Break (PC) | ❌ NOT SS&S | Frontend flips possession |
+| 5 | FT → Side Inbound (No PC) | ⚠️ NEEDS INVESTIGATION | Complex multi-step path |
+| 6 | FT → Free Throw (PC) | ⚠️ NEEDS INVESTIGATION | Complex multi-step path |
+| 7 | FT → Side Inbound (PC) | ⚠️ POSSIBLY SS&S | Hard to verify |
+
+**Results:**
+- ✅ **0 out of 7** are SS&S compliant (0%)
+- ⚠️ **4 out of 7** need investigation or are partial (57%)
+- ❌ **3 out of 7** are clearly NOT SS&S (43%)
+
+**Key Finding:**
+**Free Throw transitions mirror HCO transitions** - same issues:
+1. Final FT makes flip in frontend (same as HCO makes)
+2. DREB → HCO/Fast Break never flip (same as HCO)
+3. Missing `offense_team_id` throughout
+
+**Transitions #5, #6, #7** involve fouls AFTER FT misses during rebound scramble - these are complex edge cases that are hard to trace. They may or may not be SS&S compliant.
+
