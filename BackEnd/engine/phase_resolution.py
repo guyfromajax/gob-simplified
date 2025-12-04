@@ -1664,9 +1664,9 @@ def get_fcp_skeleton(result_type, game_context=None):
                 if non_empty_versions:
                     # Randomly select one non-empty version
                     selected_version = random.choice(non_empty_versions)
-                        selected_steps = selected_version.get("steps", [])
+                    selected_steps = selected_version.get("steps", [])
                     skeleton_data = {
-                            "steps": selected_steps
+                        "steps": selected_steps
                     }
                     
                     # Apply opposite side logic if game context is provided
@@ -1674,10 +1674,10 @@ def get_fcp_skeleton(result_type, game_context=None):
                         is_away_offense = game_context.offense_team.team_id == game_context.away_team.team_id
                         skeleton_data = apply_opposite_side_logic(skeleton_data, is_away_offense)
                     
-                        logging.warning(f"✅ Selected FCP {variant_name} skeleton from MongoDB (version with {len(selected_steps)} steps, {len(non_empty_versions)}/{len(versions)} versions available)")
+                    logging.warning(f"✅ Selected FCP {variant_name} skeleton from MongoDB (version with {len(selected_steps)} steps, {len(non_empty_versions)}/{len(versions)} versions available)")
                     return skeleton_data
                 else:
-                        logging.warning(f"⚠️ No non-empty versions for FCP {variant_name} (checked {len(versions)} versions), falling back to hardcoded")
+                    logging.warning(f"⚠️ No non-empty versions for FCP {variant_name} (checked {len(versions)} versions), falling back to hardcoded")
             else:
                 logging.warning(f"⚠️ Variant {variant_name} not found in FCP skeleton, falling back to hardcoded")
         else:
@@ -1758,9 +1758,9 @@ def get_hct_skeleton(result_type, game_context=None):
                 if non_empty_versions:
                     # Randomly select one non-empty version
                     selected_version = random.choice(non_empty_versions)
-                        selected_steps = selected_version.get("steps", [])
+                    selected_steps = selected_version.get("steps", [])
                     skeleton_data = {
-                            "steps": selected_steps
+                        "steps": selected_steps
                     }
                     
                     # Apply opposite side logic if game context is provided
@@ -1768,10 +1768,10 @@ def get_hct_skeleton(result_type, game_context=None):
                         is_away_offense = game_context.offense_team.team_id == game_context.away_team.team_id
                         skeleton_data = apply_opposite_side_logic(skeleton_data, is_away_offense)
                     
-                        logging.warning(f"✅ Selected HCT {variant_name} skeleton from MongoDB (version with {len(selected_steps)} steps, {len(non_empty_versions)}/{len(versions)} versions available)")
+                    logging.warning(f"✅ Selected HCT {variant_name} skeleton from MongoDB (version with {len(selected_steps)} steps, {len(non_empty_versions)}/{len(versions)} versions available)")
                     return skeleton_data
                 else:
-                        logging.warning(f"⚠️ No non-empty versions for HCT {variant_name} (checked {len(versions)} versions), falling back to hardcoded")
+                    logging.warning(f"⚠️ No non-empty versions for HCT {variant_name} (checked {len(versions)} versions), falling back to hardcoded")
             else:
                 logging.warning(f"⚠️ Variant {variant_name} not found in HCT skeleton, falling back to hardcoded")
         else:
