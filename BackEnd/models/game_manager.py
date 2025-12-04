@@ -200,7 +200,9 @@ class GameManager:
             if result.get("possession_flips"):
                 old_offense = self.offense_team.name
                 self.switch_possession()
-                logging.warning(f"🔄 [SIP] Flipped possession before SIP: {old_offense} → {self.offense_team.name}")
+                # ✅ FIX: Clear possession_flips flag after flipping to prevent frontend double flip
+                result["possession_flips"] = False
+                logging.warning(f"🔄 [SIP] Flipped possession before SIP: {old_offense} → {self.offense_team.name}, set possession_flips=False")
             else:
                 logging.warning(f"⏭️ [SIP] No possession flip needed (possession_flips={result.get('possession_flips')})")
             
