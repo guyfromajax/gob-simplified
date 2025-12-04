@@ -1169,3 +1169,202 @@ Note: **(PC)** indicates possession change
 - **6/22 evaluated transitions are SS&S compliant (27%)**
 - All compliant transitions use Side Inbound gold standard pattern
 
+---
+
+### Batch 4: FCP/HCT Transitions (16 Total - 8 Each)
+
+**Note:** FCP and HCT have identical transition patterns, so evaluating together.
+
+#### 1. FCP/HCT → HCO - Press Break, HCO Next Step
+
+**Handler:** `phase_resolution.py` `resolve_full_court_press_logic()` / `resolve_half_court_trap_logic()` (line 1551-1555 / 2412-2416)
+
+**Current Implementation:**
+- ✅ Sets `possession_flips = False` - Correct, no flip when breaking press
+- ✅ Sets `result_type = "HCO"` 
+- ✅ Sets `next_play_type = "HCO"` (line 1554)
+- ✅ Sets `offensive_state = "HCO"` (line 1555)
+- ✅ No flip needed (offense keeps ball)
+- ❌ Does NOT set `offense_team_id`
+
+**SS&S Compliance:** ⚠️ **PARTIAL**
+
+**Issues:**
+1. Missing `offense_team_id` (Pattern D)
+
+**Fix Required:**
+- Backend: Set `result["offense_team_id"] = off_team.team_id`
+
+---
+
+#### 2. FCP/HCT → Inbound Pass (PC) - Press Break, Made Shot
+
+**Handler:** `phase_resolution.py` FCP/HCT logic → `shot_manager.py` `resolve_shot()`
+
+**Current Implementation:**
+- ✅ Shot resolved same as HCO (uses `shot_manager.resolve_shot()`)
+- ✅ Sets `possession_flips = True`
+- ✅ Sets `next_play_type = "BASELINE_INBOUND"`
+- ❌ Backend does NOT flip possession
+- ❌ Does NOT set `offense_team_id`
+- ❌ **Frontend flips** (same code path as HCO/FT/Fast Break)
+
+**SS&S Compliance:** ❌ **NOT SS&S**
+
+**Issues:**
+- **IDENTICAL to Pattern A** (all made shots)
+
+**Fix Required:**
+- Same as Pattern A (backend flip before BASELINE_INBOUND)
+
+---
+
+#### 3. FCP/HCT → Free Throw - Fouls
+
+**Handler:** `phase_resolution.py` FCP/HCT logic → foul handlers
+
+**Current Implementation:**
+- Routes to standard foul logic
+- ✅ Sets `offensive_state = "FREE_THROW"` for shooting fouls
+- ❌ Does NOT set `offense_team_id`
+
+**SS&S Compliance:** ⚠️ **PARTIAL**
+
+**Issues:**
+- **IDENTICAL to Pattern D**
+- Missing `offense_team_id`
+
+**Fix Required:**
+- Backend: Set `result["offense_team_id"] = off_team.team_id`
+
+---
+
+#### 4. FCP/HCT → OREB - Press Break, Missed Shot, OREB
+
+**Handler:** `phase_resolution.py` FCP/HCT logic → `shot_manager.py` (rebound logic)
+
+**Current Implementation:**
+- Shot resolved same as HCO
+- ✅ Sets `pending_oreb`
+- ✅ Sets `possession_flips = False`
+- ❌ Does NOT set `offense_team_id`
+
+**SS&S Compliance:** ⚠️ **PARTIAL**
+
+**Issues:**
+- **IDENTICAL to Pattern D**
+- Missing `offense_team_id`
+
+**Fix Required:**
+- Backend: Set `result["offense_team_id"] = off_team.team_id`
+
+---
+
+#### 5. FCP/HCT → HCO (PC) - Press Break, Missed Shot DREB / Steal
+
+**Handler:** `phase_resolution.py` FCP/HCT logic (line 1542-1555 / 2403-2416)
+
+**Current Implementation:**
+- ✅ Sets `possession_flips = True` (STEAL, line 1540 / 2401)
+- ✅ Sets `next_play_type = "HCO"` (line 1549 / 2410)
+- ✅ Sets `offensive_state = "HCO"` (line 1550 / 2411)
+- ❌ Backend does NOT flip possession
+- ❌ Does NOT set `offense_team_id`
+- ❌ **No flip executed!**
+
+**SS&S Compliance:** ❌ **NOT SS&S**
+
+**Issues:**
+- **IDENTICAL to Pattern B**
+- Flip flag set but never executed
+
+**Fix Required:**
+- Same as Pattern B (backend flip before HCO)
+
+---
+
+#### 6. FCP/HCT → Fast Break (PC) - Steal → Fast Break
+
+**Handler:** `phase_resolution.py` FCP/HCT logic (line 1544-1547 / 2405-2408)
+
+**Current Implementation:**
+- ✅ Sets `possession_flips = True` (STEAL, line 1540 / 2401)
+- ✅ Sets `next_play_type = "FAST_BREAK"` (line 1546 / 2407)
+- ✅ Sets `offensive_state = "FAST_BREAK"` (line 1547 / 2408)
+- ❌ Backend does NOT flip possession
+- ❌ Does NOT set `offense_team_id`
+- ❌ **Frontend flips**
+
+**SS&S Compliance:** ❌ **NOT SS&S**
+
+**Issues:**
+- **IDENTICAL to Pattern C**
+- Frontend flips possession
+
+**Fix Required:**
+- Same as Pattern C (backend flip before Fast Break)
+
+---
+
+#### 7. FCP/HCT → Side Inbound Pass - Non-Shooting Foul (No Bonus)
+
+**Handler:** `phase_resolution.py` FCP/HCT logic → `resolve_non_shooting_foul()`
+
+**Current Implementation:**
+- Routes to standard non-shooting foul logic
+- ✅ Uses Side Inbound gold standard pattern
+- ✅ Backend flips in `game_manager.py` (line 200-205)
+- ✅ SIP has `offense_team_id`
+
+**SS&S Compliance:** ✅ **SS&S COMPLIANT**
+
+**Issues:**
+- None (uses gold standard)
+
+---
+
+#### 8. FCP/HCT → Side Inbound Pass (PC) - Offensive Foul, Dead Ball
+
+**Handler:** `phase_resolution.py` FCP/HCT logic (line 1537-1540 / 2398-2401)
+
+**Current Implementation:**
+- ✅ Sets `possession_flips = True` (line 1538-1540 / 2399-2401)
+- ✅ Routes to Side Inbound via `game_manager.py` (line 193-212)
+- ✅ Backend flips in `game_manager.py` (line 200-205)
+- ✅ SIP has `offense_team_id`
+
+**SS&S Compliance:** ✅ **SS&S COMPLIANT**
+
+**Issues:**
+- None (uses gold standard)
+
+---
+
+### Batch 4 Summary
+
+| # | Transition | SS&S Status | Primary Issue | Pattern |
+|---|-----------|-------------|---------------|---------|
+| 1 | FCP/HCT → HCO | ⚠️ PARTIAL | Missing offense_team_id | D |
+| 2 | FCP/HCT → Inbound (PC) | ❌ NOT SS&S | Frontend flips | A |
+| 3 | FCP/HCT → Free Throw | ⚠️ PARTIAL | Missing offense_team_id | D |
+| 4 | FCP/HCT → OREB | ⚠️ PARTIAL | Missing offense_team_id | D |
+| 5 | FCP/HCT → HCO (PC) | ❌ NOT SS&S | Flip never executed | B |
+| 6 | FCP/HCT → Fast Break (PC) | ❌ NOT SS&S | Frontend flips | C |
+| 7 | FCP/HCT → Side Inbound | ✅ SS&S | None | E |
+| 8 | FCP/HCT → Side Inbound (PC) | ✅ SS&S | None | E |
+
+**Count: 8 FCP + 8 HCT = 16 transitions total**
+
+**Results (16 transitions):**
+- ✅ **4 out of 16** are SS&S compliant (25%) - Side Inbound only
+- ⚠️ **6 out of 16** are partial (38%)
+- ❌ **6 out of 16** are NOT SS&S (38%)
+
+**Key Finding:**
+**FCP/HCT transitions are IDENTICAL to HCO/FT/Fast Break!** Same 5 patterns, same issues.
+
+**Overall Progress:**
+- **10/38 evaluated transitions are SS&S compliant (26%)**
+- Pattern consistency holds across 4 turn types (HCO, FT, Fast Break, FCP/HCT)
+- All compliant transitions use Side Inbound pattern ✅
+
