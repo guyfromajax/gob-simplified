@@ -1562,16 +1562,8 @@ def resolve_full_court_press_logic(game: "GameManager"):
     if result_type == "HCO":
         game_state["pressure_phase_time"] = fcp_time_elapsed
     
-    # ✅ SS&S: Always set possession_team_id (single source of truth for possession)
-    # Backend flips possession internally, then tells frontend who has it
-    # Frontend just sets scene.offenseTeamId = possession_team_id (no flip logic)
-    if possession_flips:
-        # Possession flipped - defense becomes offense
-        possession_team_id = def_team.team_id
-    else:
-        # Possession stays - offense keeps it
-        possession_team_id = off_team.team_id
-    
+    # ✅ SS&S: Set offense_team_id (team on offense DURING this turn)
+    # Backend calls switch_possession() after turn if needed, so next turn has correct offense_team
     result = {
         "result_type": result_type,
         "text": text,
@@ -1581,8 +1573,8 @@ def resolve_full_court_press_logic(game: "GameManager"):
         "shooter": roles["shooter"],
         "passer": "",
         "screener": "",
-        "possession_flips": possession_flips,  # ✅ TODO: Remove this flag once frontend only uses possession_team_id
-        "possession_team_id": possession_team_id,  # ✅ NEW: Single source of truth for possession
+        "offense_team_id": off_team.team_id,  # ✅ SS&S: Team on offense DURING this turn
+        "possession_flips": possession_flips,  # ✅ Backend internal flag (tells backend when to call switch_possession)
         "time_elapsed": fcp_time_elapsed,  # Time spent in FCP phase
         "events": [],
         "skeleton": skeleton,
@@ -2431,16 +2423,8 @@ def resolve_half_court_trap_logic(game: "GameManager"):
     if result_type == "HCO":
         game_state["pressure_phase_time"] = hct_time_elapsed
     
-    # ✅ SS&S: Always set possession_team_id (single source of truth for possession)
-    # Backend flips possession internally, then tells frontend who has it
-    # Frontend just sets scene.offenseTeamId = possession_team_id (no flip logic)
-    if possession_flips:
-        # Possession flipped - defense becomes offense
-        possession_team_id = def_team.team_id
-    else:
-        # Possession stays - offense keeps it
-        possession_team_id = off_team.team_id
-    
+    # ✅ SS&S: Set offense_team_id (team on offense DURING this turn)
+    # Backend calls switch_possession() after turn if needed, so next turn has correct offense_team
     result = {
         "result_type": result_type,
         "text": text,
@@ -2450,8 +2434,8 @@ def resolve_half_court_trap_logic(game: "GameManager"):
         "shooter": roles["shooter"],
         "passer": "",
         "screener": "",
-        "possession_flips": possession_flips,  # ✅ TODO: Remove this flag once frontend only uses possession_team_id
-        "possession_team_id": possession_team_id,  # ✅ NEW: Single source of truth for possession
+        "offense_team_id": off_team.team_id,  # ✅ SS&S: Team on offense DURING this turn
+        "possession_flips": possession_flips,  # ✅ Backend internal flag (tells backend when to call switch_possession)
         "time_elapsed": hct_time_elapsed,  # Time spent in HCT phase
         "events": [],
         "skeleton": skeleton,
