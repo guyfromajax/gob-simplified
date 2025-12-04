@@ -843,9 +843,7 @@ class Animator:
                 has_opp = pos_action.get("opp", False)
                 coords_from_location = False
                 
-                # ✅ DEBUG: Log if we find opp field in skeleton
-                if (is_fcp or is_hct) and has_opp and step == steps[0]:  # Only log for first step to avoid spam
-                    logging.warning(f"  🔍 [OPP DEBUG] Found opp=True in skeleton for position {position}, step 0")
+                # Opp field handling (debug logs removed)
                 
                 if "coords" in pos_action:
                     coords = pos_action.get("coords", {"x": 50, "y": 25})
@@ -860,8 +858,6 @@ class Animator:
                     coords = HCO_STRING_SPOTS.get(location, {"x": 50, "y": 25})
                     coords_from_location = True
                     coords_already_flipped = False
-                    if (is_fcp or is_hct):
-                        logging.warning(f"  🔍 [OPP] Position {position}: location={location}, initial coords={coords}, opp={has_opp}, is_away_offense={is_away_offense}")
                 else:
                     coords = {"x": 50, "y": 25}
                     coords_already_flipped = False
@@ -873,15 +869,12 @@ class Animator:
                     if is_away_offense:
                         # Away team offense - ball handlers go to home side (defensive side)
                         # No coordinate flip needed - they stay on home side (HCO_STRING_SPOTS are in home orientation)
-                        logging.warning(f"  ✅ [OPP] Position {position}: opp=True, away offense, staying on home side: {coords}")
                         pass
                     else:
                         # Home team offense - ball handlers go to away side (defensive side)
                         # Flip coordinates to away side
-                        original_coords = coords.copy()
                         coords = get_away_player_coords(coords)
                         coords_already_flipped = True
-                        logging.warning(f"  ✅ [OPP] Position {position}: opp=True, home offense, flipped from {original_coords} to {coords}")
                 elif (is_fcp or is_hct) and not has_opp and coords_from_location:
                     # Player without opp field stays on same side as normal offense
                     if is_away_offense:
@@ -893,7 +886,6 @@ class Animator:
                     else:
                         # Home team offense - outlet players stay on home side (offensive side)
                         # No coordinate flip needed
-                        logging.warning(f"  ✅ [OPP] Position {position}: opp=False, home offense, staying on home side: {coords}")
                         pass
                 
                 # Apply coordinate flipping for AWAY team (HCO_STRING_SPOTS are in home orientation)
