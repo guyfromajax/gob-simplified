@@ -326,6 +326,12 @@ export class FreeThrowAnimationSystem {
       });
     }
 
+    // ✅ SS&S: Announce FT make using central dispatcher
+    const { announceGameEvent } = await import('../utils/gameAnnouncements.js');
+    announceGameEvent('FT_MAKE', turnData, this.scene, { 
+      shooterId: turnData.shooter_id 
+    });
+
     // Ball holds in rim for 1 second (authentic basketball feel)
     const ballSprite = this.ballController.ballSprite;
     if (ballSprite) {
