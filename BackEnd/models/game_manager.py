@@ -208,7 +208,9 @@ class GameManager:
             old_offense = self.offense_team.name
             self.switch_possession()
             result["possession_flips"] = False
-            logging.warning(f"🔄 [DREB→HCO] Flipped possession before HCO: {old_offense} → {self.offense_team.name}")
+            # ✅ CRITICAL FIX: Update offense_team_id AFTER flip (was set to old team in turn_manager)
+            result["offense_team_id"] = self.offense_team.team_id
+            logging.warning(f"🔄 [DREB→HCO] Flipped possession before HCO: {old_offense} → {self.offense_team.name}, updated offense_team_id={result['offense_team_id']}")
 
         # ✅ FIX 4: Backend flip for DREB → Fast Break (Pattern C)
         # Handle possession flips for DREB transitions that go to Fast Break
@@ -217,7 +219,9 @@ class GameManager:
             old_offense = self.offense_team.name
             self.switch_possession()
             result["possession_flips"] = False
-            logging.warning(f"🔄 [DREB→FB] Flipped possession before Fast Break: {old_offense} → {self.offense_team.name}")
+            # ✅ CRITICAL FIX: Update offense_team_id AFTER flip (was set to old team in turn_manager)
+            result["offense_team_id"] = self.offense_team.team_id
+            logging.warning(f"🔄 [DREB→FB] Flipped possession before Fast Break: {old_offense} → {self.offense_team.name}, updated offense_team_id={result['offense_team_id']}")
 
         # If the turn ended with a dead-ball turnover or a non-shooting foul
         # that does not result in free throws, prepare a sideline inbound
