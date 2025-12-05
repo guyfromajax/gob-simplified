@@ -367,6 +367,12 @@ export class PassAnimationSystem {
         const isHomeOffense = turnData.offense_team_id === this.scene.homeTeamId;
         const newOffenseSide = isHomeOffense ? 'home' : 'away';
         
+        // ✅ FIX: Check if FCP/HCT is next to skip defensive retreat
+        // If we skip retreat, defensive players go directly to press positions
+        // Otherwise, they retreat to midcourt and will be positioned by the HCT/FCP turn's runSetupTween
+        const skipRetreat = turnData.next_defensive_setup === "FCP" || turnData.next_defensive_setup === "HCT";
+        const pressureType = skipRetreat ? turnData.next_defensive_setup : null;
+        
         await runInboundSetup({
           scene: this.scene,
           ballSprite: context.ballSprite,
@@ -374,6 +380,8 @@ export class PassAnimationSystem {
           newOffenseSide: newOffenseSide,
           homeTeamId: this.scene.homeTeamId,
           awayTeamId: this.scene.awayTeamId,
+          skipRetreat: skipRetreat,
+          pressureType: pressureType,
           turnData: turnData  // ✅ Pass turnData for dynamic pass detection
         });
       } else {
