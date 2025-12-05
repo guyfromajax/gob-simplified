@@ -1240,17 +1240,7 @@ async function runInboundSetup({
   const cDest = useSkeletonPositions && skeletonPositions.C ? skeletonPositions.C : inboundDest.C;
   const sfDest = useSkeletonPositions && skeletonPositions.SF ? skeletonPositions.SF : ballSpot;
 
-  // 🔍 DEBUG: Log offensive player destinations (HCO only now - FCP/HCT returns above)
-  console.log('🔍 [HCO INBOUND] Offensive player destinations:', {
-    newOffenseSide,
-    positions: {
-      PG: { grid: pgDest, source: 'baseline' },
-      SG: { grid: sgDest, source: 'baseline' },
-      SF: { grid: sfDest, source: 'baseline' },
-      PF: { grid: pfDest, source: 'baseline' },
-      C: { grid: cDest, source: 'baseline' }
-    }
-  });
+  // Offensive player destinations logging removed (spam)
 
   const pgDestPx = gridToPixels(pgDest.x, pgDest.y, width, height);
   animationDebugLog(`inboundDest assigned for PG: (${pgDestPx.x},${pgDestPx.y}) ${useSkeletonPositions ? '[SKELETON]' : '[BASELINE]'}`);
@@ -1526,23 +1516,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
     isFCPHCT
   });
   
-  // 🔍 DEBUG: Log full animation structure for FCP/HCT turns
-  if (isFCPHCT && turnData.animations) {
-    console.log("=".repeat(80));
-    console.log(`🔍 [${turnData.play_type} FULL ANIMATIONS] result_type=${turnData.result_type}`);
-    
-    for (const anim of turnData.animations) {
-      const info = scene.playerInfo?.[anim.playerId];
-      const pos = info?.pos || 'UNKNOWN';
-      console.log(`  🏃 Player: ${pos} (${anim.playerId?.substring(0, 8)})`);
-      
-      for (let stepIdx = 0; stepIdx < (anim.movement?.length || 0); stepIdx++) {
-        const step = anim.movement[stepIdx];
-        console.log(`    📍 STEP ${stepIdx}: coords=${JSON.stringify(step.coords)}, action=${step.action}, has_ball=${step.has_ball || false}, timestamp=${step.timestamp}`);
-      }
-    }
-    console.log("=".repeat(80));
-  }
+  // Animation structure logging removed (spam)
   
   // Guard: Skip if this is an opening tip, putback, or if animations is missing
   // Putback turns are handled by handleOrebTurn in animateGameTurns.js

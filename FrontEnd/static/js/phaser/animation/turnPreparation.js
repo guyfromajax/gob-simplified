@@ -39,6 +39,15 @@ export async function prepareTurnForAnimation({ turn, scene, turnIndex, homeTeam
   // Set turn.index (required for context)
   turn.index = turnIndex;
   
+  // ✅ FIX (Bug 1): Update offense_team_id BEFORE turn executes (not after)
+  // SIP and other turns need correct offense_team_id at START, not END
+  if (turn.offense_team_id && turn.offense_team_id !== scene.offenseTeamId) {
+    scene.offenseTeamId = turn.offense_team_id;
+    scene.events?.emit('possessionChange', { 
+      offenseTeamId: turn.offense_team_id 
+    });
+  }
+  
   // Update playcall display before animating the turn
   updatePlaycallDisplay(turn, homeTeamId);
   
