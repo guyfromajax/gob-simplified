@@ -1187,17 +1187,40 @@ async function runInboundSetup({
     // Backend provided skeleton step 0 positions - convert to coords format
     const posActions = turnData.offense_setup_positions;
     
+    // ✅ FIX: Helper function to flip coordinates for away team offense
+    const flipCoords = (coords) => {
+      return { x: 101 - coords.x, y: coords.y };
+    };
+    
     for (const [pos, actionData] of Object.entries(posActions)) {
-      if (actionData.location) {
+      // ✅ FIX: Check coords first (has opp logic applied by backend), then fall back to location
+      if (actionData.coords) {
+        // Backend already applied opp logic and coordinate flipping - use as-is
+        skeletonPositions[pos] = actionData.coords;
+      } else if (actionData.location) {
         // Convert location string to coords (using HCO_STRING_SPOTS)
         const { HCO_STRING_SPOTS } = await import('../../utils/courtPositions.js');
-        const coords = HCO_STRING_SPOTS[actionData.location];
+        let coords = HCO_STRING_SPOTS[actionData.location];
         if (coords) {
+          // ✅ FIX: Apply opp logic if opp field is set
+          const hasOpp = actionData.opp === true;
+          if (hasOpp) {
+            // Player with opp=True should be on opposite side (defensive side)
+            if (!isAwayOffense) {
+              // Home team offense - ball handlers go to away side (defensive side)
+              coords = flipCoords(coords);
+            }
+            // Away team offense - ball handlers stay on home side (no flip needed)
+          } else {
+            // Player without opp field stays on same side as normal offense
+            if (isAwayOffense) {
+              // Away team offense - outlet players go to away side (offensive side)
+              coords = flipCoords(coords);
+            }
+            // Home team offense - outlet players stay on home side (no flip needed)
+          }
           skeletonPositions[pos] = coords;
         }
-      } else if (actionData.coords) {
-        // Already has coords (from apply_opposite_side_logic)
-        skeletonPositions[pos] = actionData.coords;
       }
     }
     
