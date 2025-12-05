@@ -244,6 +244,15 @@ export class ShotAnimationSystem {
    * Move all players to their step 0 positions
    */
   async runSetupTween(turnData, ballSprite, currentBallOwnerRef) {
+    console.log('📍 [SETUP TWEEN] Starting runSetupTween', {
+      result_type: turnData.result_type,
+      current_turn: turnData.current_turn,
+      next_defensive_setup: turnData.next_defensive_setup,
+      animation_count: turnData.animations?.length || 0,
+      previousTurnWasInbound: this.scene._previousTurnWasInbound,
+      previousTurnWasOpeningTip: this.scene._previousTurnWasOpeningTip
+    });
+    
     if (this.scene.skipToEnd) return;
     
     const stepIndex = 0;
@@ -754,33 +763,19 @@ export class ShotAnimationSystem {
       // ✅ FIX: Only call runInboundSetup if next_play_type is BASELINE_INBOUND
       // For AND-1 situations (next_play_type === "FREE_THROW"), let the free throw system handle the transition
       // ✅ CRITICAL: Also check possession_flips flag to prevent AND-1 from flipping possession
+      // ✅ FIX: Don't call runInboundSetup() here if next_play_type === "BASELINE_INBOUND"
+      // The BASELINE_INBOUND turn will handle the inbound setup via AnimationEngine.handleBaselineInbound()
+      // Calling it here causes double inbound passes and double setup animations
       const shouldFlipPossession = turnData.next_play_type === "BASELINE_INBOUND" && 
                                    (turnData.possession_flips !== false);
       if (shouldFlipPossession) {
-        const { runInboundSetup } = await import('./turnAnimation.js');
-        // ✅ CRITICAL: After a made shot, possession flips:
-        // - Team that just scored (was on offense) is now on DEFENSE
-        // - Team that was on defense is now on OFFENSE
-        // - newOffenseSide is the team that is NOW on offense (the team that was defending)
-        // - The defensive team (team that just scored) will apply FCP/HCT pressure
-        // - Backend determines FCP/HCT based on the team that just scored (now on defense)
-        // - Frontend receives next_defensive_setup from backend, so we use the correct team's settings
-        const newOffenseSide = isHomeOffense ? "away" : "home";
-        const skipRetreat = turnData.next_defensive_setup === "FCP" || turnData.next_defensive_setup === "HCT";
-        const pressureType = skipRetreat ? turnData.next_defensive_setup : null;
-        
-        await runInboundSetup({
-          scene: this.scene,
-          ballSprite: this.ballController.ballSprite,
-          playerSprites: this.playerSprites,
-          newOffenseSide: newOffenseSide,
-          homeTeamId: this.scene.simData?.home_team_id,
-          awayTeamId: this.scene.simData?.away_team_id,
-          skipRetreat: skipRetreat,
-          pressureType: pressureType
+        console.log('🚫 [DOUBLE INBOUND PREVENTION] Skipping runInboundSetup() in handleMadeShot() - BASELINE_INBOUND turn will handle it', {
+          next_play_type: turnData.next_play_type,
+          next_defensive_setup: turnData.next_defensive_setup,
+          reason: 'BASELINE_INBOUND turn will execute runInboundSetup() via AnimationEngine.handleBaselineInbound()'
         });
-        
-        console.log(`🔍 MADE SHOT - Inbound setup completed for BASELINE_INBOUND`);
+        // ✅ REMOVED: runInboundSetup() call - BASELINE_INBOUND turn handles it
+        // This prevents double inbound passes and double setup animations
       }
     }
     

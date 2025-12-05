@@ -1,8 +1,174 @@
 # Animation System Overview
 
-> **Last Updated:** December 2024
+> **Last Updated:** January 2025
 
 This document provides an overview of the front-end animation stack for **GOB**, including both the production system and experimental components.
+
+---
+
+## Turn Data Structure: Three Data Buckets
+
+Every turn result from the backend contains data organized into **three distinct buckets**:
+
+### Bucket 1: Standard/Universal Fields ✅ **Always Present**
+
+**Set by:** `turn_manager.py` (lines 423-650) - Added to ALL results after phase resolution
+
+**Core Identification:**
+- `result_type` - "MAKE", "MISS", "FOUL", "FREE_THROW", "HCO", "FAST_BREAK", etc.
+- `offense_team_id` - Team on offense DURING this turn (SS&S single source of truth)
+- `current_turn` - "HCO", "FCP", "HCT", "FAST_BREAK", "FREE_THROW", "OREB"
+- `next_turn` - Next turn type (copied from `next_play_type`)
+- `turn_count` - Micro turn counter
+
+**Game State:**
+- `score` - {home_team: X, away_team: Y} (authoritative)
+- `time_elapsed` - Seconds elapsed in this turn
+- `text` - Human-readable description for play-by-play
+- `quarter` - Current quarter number
+
+**Lineups & Stats:**
+- `home_lineup` / `away_lineup` - Serialized lineup data
+- `team_stats` - Scouting data (offense/defense ratings)
+- `team_totals` - Cumulative team stats
+- `deltas` - Player stat changes from this turn
+- `player_energy` - Current NG (Nerve/Game) levels
+- `team_plays` - Play effectiveness data
+
+**Strategy:**
+- `offensive_playcall` / `defensive_playcall` - Play names
+- `offensive_play_type` / `defensive_play_type` - Play types
+- `offense_tempo_call` / `defense_tempo_call` - Tempo settings
+- `offense_aggression_call` / `defense_aggression_call` - Aggression settings
+- `ev` - Expected value score
+
+**Debug:**
+- `debug_turn_start` - Debug string for turn start
+- `debug_turn_result` - Debug string for turn result
+
+**Purpose:** Provides core game state, routing information, and universal context needed by the frontend for every turn.
+
+---
+
+### Bucket 2: Bespoke/Turn-Specific Fields ⚠️ **Conditional**
+
+**Set by:** Handlers (`shot_manager.py`, `phase_resolution.py`, `turn_manager.py`) - Added only when relevant
+
+**Shot Results (MAKE/MISS):**
+- `shooter`, `shooter_id`, `shooter_pos` - Shooter information
+- `ball_handler`, `passer`, `screener`, `defender` - Participant names
+- `points`, `scoring_team` - Scoring data (if made)
+- `next_play_type` - "BASELINE_INBOUND", "HCO", "FAST_BREAK", "FREE_THROW", etc.
+- `next_defensive_setup` - "FCP", "HCT", "HCO", None
+- `free_throws_remaining`, `has_and_one` - Free throw data (if foul)
+- `intended_shooter_pos`, `intended_shooter_id` - For audible/hot read popup
+- `foul_player_id`, `foul_team` - Foul information (if shooting foul)
+- `is_three_pointer`, `is_and_one` - Shot context flags
+
+**Free Throw Results:**
+- `shooter`, `shooter_id`, `shooter_pos` - Shooter information
+- `points`, `scoring_team` - Scoring data (if made)
+- `free_throws_remaining` - Remaining attempts
+- `one_and_one`, `no_lane` - Free throw context
+- `attempts` - ["MAKE", "MISS"] array
+- `rebounder_id`, `rebound_type` - Rebound data (if missed)
+
+**Foul Results:**
+- `ball_handler`, `defender` - Participant names
+- `foul_player_id`, `foul_team`, `foul_count` - Foul information
+- `fouled_out`, `foul_out_player` - Foul out data (if applicable)
+- `fcp_foul`, `hct_foul` - Pressure foul flags
+
+**Turnover Results:**
+- `ball_handler`, `victim_id`, `victim_name` - Turnover victim
+- `stealer_id`, `stealer_name`, `defender_id` - Steal information (if STEAL)
+
+**Fast Break Results:**
+- `fast_break` - true flag
+- `roles` - {outlet_passer, outlet_receiver} - Fast break roles
+
+**FCP/HCT Results:**
+- `fcp_foul` / `hct_foul` - Pressure foul flags
+- `fcp_shot` / `hct_shot` - Pressure shot flags
+- `skeleton` - Skeleton data for press break sequences
+- `roles` - Player roles for pressure sequences
+
+**Inbound Pass Results:**
+- `oDestinations` / `dDestinations` - Offensive/defensive player positions
+- `ball_spot` - Inbound spot coordinates
+- `offense_setup_positions` - FCP/HCT skeleton step 0 positions
+
+**OREB Results:**
+- `rebounder_id` - Player who secured rebound
+- `rebound_type` - "OREB"
+- Putback/kickout data (varies by outcome)
+
+**Purpose:** Provides turn-specific data needed for animations, announcements, and UI updates. Only present when relevant to the turn type.
+
+---
+
+### Bucket 3: Animation Data ✅ **Always Present (but may be empty)**
+
+**Set by:** `Animator` class (`animator.py`) - Created in `turn_manager.py` (lines 512-522)
+
+**Always Included:**
+- `animations[]` - Array of per-player movement tracks
+  - Each animation contains:
+    - `playerId` - Player identifier
+    - `movement[]` - Array of movement steps
+      - Each step: `coords` (x, y), `action`, `timestamp`, `has_ball`
+  - May be empty array `[]` if no animation (e.g., some free throws, turnovers)
+
+**Conditional:**
+- `events[]` - High-level events array
+  - Event types: `PUTBACK_ATTEMPT`, `KICKOUT_RESET`, `STEAL`, `FAST_BREAK_START`, etc.
+  - Only present when relevant events occur
+- `roles{}` - Player roles dictionary
+  - Keys: `ball_handler`, `rebounder`, `outlet_receiver`, `outlet_passer`, `shooter`, etc.
+  - Only present when roles are assigned
+
+**Purpose:** Provides all data needed to animate the turn visually. The `animations[]` array is always present (even if empty), while `events[]` and `roles{}` are conditional.
+
+---
+
+### Data Flow Pattern
+
+```
+1. Handler (shot_manager.py, phase_resolution.py, etc.)
+   ↓ Creates result dict with Bucket 2 (bespoke fields)
+   
+2. turn_manager.py::run_micro_turn()
+   ↓ Adds Bucket 1 (standard fields) to result
+   ↓ Calls Animator to create Bucket 3 (animation data)
+   
+3. Result serialized to JSON
+   ↓ Sent to frontend
+   
+4. Frontend receives complete turn data
+   ↓ Uses all three buckets for routing, animation, and UI updates
+```
+
+---
+
+### Key Design Principles
+
+1. **Bucket 1 (Standard):** Single source of truth for game state, routing, and universal context
+2. **Bucket 2 (Bespoke):** Handler-specific data - only present when relevant
+3. **Bucket 3 (Animation):** Always present structure, but contents vary by turn type
+
+**Benefits:**
+- ✅ Clear separation of concerns (universal vs. turn-specific vs. animation)
+- ✅ Frontend can always rely on Bucket 1 being present
+- ✅ Handlers only add what they need (no bloated data)
+- ✅ Animation data structure is consistent (even if empty)
+
+**See:**
+- `BackEnd/models/turn_manager.py` - Standard fields (Bucket 1)
+- `BackEnd/models/shot_manager.py` - Shot-specific fields (Bucket 2)
+- `BackEnd/engine/phase_resolution.py` - FCP/HCT/Free Throw fields (Bucket 2)
+- `BackEnd/models/animator.py` - Animation data creation (Bucket 3)
+- `docs/turn_data_structure.md` - Detailed field reference
+- `docs/UNIFIED_DATA_STRUCTURE_ANALYSIS.md` - Analysis of data structure patterns
 
 ---
 
@@ -900,10 +1066,10 @@ All detections follow this pattern:
     - Routes to: `AnimationRouter` → `handleDefault()` → `playTurnAnimation()`
     - Notes: Excludes FCP/HCT turns and shot attempts; only detects pure HCO setup turns
 
-14. **HCO Shots (MAKE/MISS)** (Line 1192-1284)
-    - Detection: `!turn.fast_break && !isFCPHCTTurn && (turn.result_type === "MAKE" || turn.result_type === "MISS")`
-    - Routes to: `AnimationRouter` → `handleShotAttempt()` → `ShotAnimationSystem`
-    - Notes: Excludes fast breaks and FCP/HCT turns; standard half-court offense shots
+14. **HCO Shots (MAKE/MISS)** (Line 1068-1153)
+    - Detection: `const isHCO = !isFastBreak && (turn.result_type === "MAKE" || turn.result_type === "MISS")`
+    - Routes to: `AnimationRouter` → `AnimationEngine` → `handleShotAttempt()` → `ShotAnimationSystem`
+    - Notes: Uses `result_type` check directly (not `current_turn === "HCO"`). Excludes fast breaks and FCP/HCT turns. Standard half-court offense shots.
 
 15. **STEAL (Standalone Turn)** (Line 1290)
     - Detection: `!scene.stateMachine?.is(States.FastBreak) && turn.result_type === "STEAL"`
@@ -935,29 +1101,29 @@ All detections follow this pattern:
 | `FAST_BREAK` (explicit) | 1141 | ✅ Yes | `handleFastBreak()` |
 | `MAKE`/`MISS` (fast_break) | 1141 | ✅ Yes | `handleFastBreak()` |
 | `HCO` (setup turn) | 1156 | ✅ Yes | `handleDefault()` → `playTurnAnimation()` |
-| `MAKE`/`MISS` (HCO shot) | 1192 | ✅ Yes | `handleShotAttempt()` → `ShotAnimationSystem` |
+| `MAKE`/`MISS` (HCO shot) | 1069 | ✅ Yes | `handleShotAttempt()` → `ShotAnimationSystem` |
 | `STEAL` (standalone) | 1290 | ✅ Yes | `handleSteal()` |
 | `STEAL` (event) | 1296 | ❌ No | Direct to `runPass()` |
 
 **Detection by Flag/Property:**
 
 **By `result_type`:**
-- `FREE_THROW` → Line 560
-- `FOUL` → Line 571
-- `DEAD BALL` → Line 596
-- `SIDE_INBOUND` → Line 611
-- `BASELINE_INBOUND` → Line 633
-- `DEFENSIVE_STOP` → Line 644
-- `PUTBACK_MAKE` → Line 655
-- `PUTBACK_MISS` → Line 655
-- `OREB_KICKOUT` → Line 655
-- `TURNOVER` → Line 1057
-- `OPENING_TIP` → Line 1078
-- `FAST_BREAK` → Line 1141
-- `HCO` → Line 1156 (setup turns only)
-- `MAKE` → Line 1141 (fast break) or 1192 (HCO) or 707 (FCP/HCT)
-- `MISS` → Line 1141 (fast break) or 1192 (HCO) or 707 (FCP/HCT)
-- `STEAL` → Line 1290
+- `FREE_THROW` → Line 568
+- `FOUL` → Line 579
+- `DEAD BALL` → Line 614
+- `SIDE_INBOUND` → Line 648
+- `BASELINE_INBOUND` → Line 670
+- `DEFENSIVE_STOP` → Line 681
+- `PUTBACK_MAKE` → Line 692
+- `PUTBACK_MISS` → Line 692
+- `OREB_KICKOUT` → Line 692
+- `TURNOVER` → Line 932
+- `OPENING_TIP` → Line 953
+- `FAST_BREAK` → Line 984
+- `HCO` → Line 1006 (result_type check only, not routing)
+- `MAKE` → Line 984 (fast break) or 1069 (HCO) or 812 (FCP/HCT)
+- `MISS` → Line 984 (fast break) or 1069 (HCO) or 812 (FCP/HCT)
+- `STEAL` → Line 1157
 
 **By Flag:**
 - `turn.fast_break === true` → Line 1104 (legacy) or 1141 (new)
@@ -997,29 +1163,29 @@ The order of detections is **critical** because:
 3. **State dependencies:** Some detections depend on state set by previous detections (e.g., FCP/HCT uses `scene.pressureSequenceActive`)
 
 **Current Order (as executed):**
-1. FREE_THROW
-2. FOUL
-3. DEAD BALL
-4. SIDE_INBOUND
-5. BASELINE_INBOUND
-6. DEFENSIVE_STOP
-7. PUTBACK_MAKE/MISS/OREB_KICKOUT
-8. FCP/HCT (complex detection)
-9. TURNOVER
-10. OPENING_TIP
-11. FAST_BREAK (legacy - should be removed)
-12. FAST_BREAK (new)
-13. HCO setup turns
-14. HCO shots (MAKE/MISS)
-15. STEAL (standalone)
-16. STEAL (event)
+1. FREE_THROW (Line 568)
+2. FOUL (Line 579)
+3. DEAD BALL (Line 614)
+4. SIDE_INBOUND (Line 648)
+5. BASELINE_INBOUND (Line 670)
+6. DEFENSIVE_STOP (Line 681)
+7. PUTBACK_MAKE/MISS/OREB_KICKOUT (Line 692)
+8. FCP/HCT (complex detection, Line 707-928)
+9. TURNOVER (Line 932)
+10. OPENING_TIP (Line 953)
+11. FAST_BREAK (Line 984)
+12. HCO result_type check (Line 1006 - debug only, not routing)
+13. HCO shots (MAKE/MISS) (Line 1069 - uses `result_type` check, not `current_turn`)
+14. STEAL (standalone) (Line 1157)
+15. STEAL (event) (Line 1178)
 
-**Future Improvements:**
+**Important Notes:**
 
-1. **Migrate FCP/HCT to AnimationRouter:** Currently routes directly to `playTurnAnimation()`
-2. **Remove legacy FAST_BREAK detection:** Line 1104 should be removed
-3. **Consolidate STEAL handling:** Consider routing STEAL events through AnimationRouter
-4. **Document detection order:** Add comments explaining why order matters
+1. **HCO Routing:** Uses `result_type === "MAKE" || result_type === "MISS"` check (not `current_turn === "HCO"`). This is more permissive and catches all HCO shots, including those where `current_turn` might not be set correctly.
+
+2. **FCP/HCT Routing:** Currently routes directly to `playTurnAnimation()` (not through AnimationRouter). This is historical implementation - could be migrated in future phase.
+
+3. **Detection Order Matters:** Early exits prevent double processing. Later detections exclude turns already handled (e.g., HCO detection excludes FCP/HCT).
 
 ---
 

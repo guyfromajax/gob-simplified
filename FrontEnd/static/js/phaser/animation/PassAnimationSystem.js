@@ -357,26 +357,22 @@ export class PassAnimationSystem {
    * Execute inbound pass sequence using positioning data
    */
   async executeInboundSequence(turnData, context = {}) {
-    if (false) console.log('[Inbound Sequence]', {
+    console.log('📍 [PASS ANIMATION SYSTEM] executeInboundSequence called', {
       result_type: turnData.result_type,
-      oDestinations: turnData.oDestinations,
-      dDestinations: turnData.dDestinations,
-      ball_spot: turnData.ball_spot,
-      possession_team_id: turnData.possession_team_id,
-      fullTurnData: turnData
+      next_defensive_setup: turnData.next_defensive_setup,
+      has_oDestinations: !!turnData.oDestinations,
+      has_dDestinations: !!turnData.dDestinations
     });
 
     try {
-      // For now, we'll use the old system's inbound logic as a fallback
-      // This ensures we get working animations while we develop the new system
-      // Fallback (log removed)
-      
       // Import and use the correct inbound setup based on type
       const { runSideInboundSetup, runInboundSetup } = await import('./turnAnimation.js');
       
       if (turnData.result_type === 'BASELINE_INBOUND') {
-        // For baseline inbound passes (after made shots), use runInboundSetup
-        // Baseline inbound (log removed)
+        console.log('📍 [PASS ANIMATION SYSTEM] Calling runInboundSetup for BASELINE_INBOUND', {
+          next_defensive_setup: turnData.next_defensive_setup,
+          offense_team_id: turnData.offense_team_id
+        });
         
         // ✅ FIX: Use offense_team_id (SS&S possession system) instead of possession_team_id
         // Backend now only sends offense_team_id (possession_team_id removed in SS&S refactor)
@@ -392,6 +388,8 @@ export class PassAnimationSystem {
           awayTeamId: this.scene.awayTeamId,
           turnData: turnData  // ✅ Pass turnData for dynamic pass detection
         });
+        
+        console.log('📍 [PASS ANIMATION SYSTEM] runInboundSetup completed for BASELINE_INBOUND');
       } else {
         // For side inbound passes (after dead balls/fouls), use runSideInboundSetup
         // Side inbound (log removed)
