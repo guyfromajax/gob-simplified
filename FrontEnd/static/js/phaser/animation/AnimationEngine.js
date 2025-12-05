@@ -578,11 +578,15 @@ export class AnimationEngine {
         turnIndex: context.turnIndex,
         onUpdate: context.onUpdate
       });
-      console.log('✅ [STEAL HANDLER] Skeleton animation completed');
+      console.log('✅ [STEAL HANDLER] Skeleton animation completed - steal action included in skeleton');
+      
+      // ✅ FIX (Bug 3): Skeleton animation includes steal action in final step
+      // Skip Step 2 to avoid double animation and double announcement
+      return;
     }
     
     // STEP 2: Animate steal result action (ball changes hands)
-    // This happens AFTER skeleton animation (like shot result after skeleton)
+    // ✅ Only runs if NO skeleton (standalone steal without press break sequence)
     const { States } = await import('../state/gameStateMachine.js');
     if (this.scene.stateMachine?.is(States.FastBreak)) {
       // Skip steal action animation if in FastBreak state
