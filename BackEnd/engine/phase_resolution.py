@@ -2075,7 +2075,7 @@ def apply_opposite_side_logic(skeleton_data, is_away_offense):
             
             # ✅ DEBUG: Log final step PG coordinates
             if step_is_final and position == "PG":
-                logging.warning(f"🔍 [OPP LOGIC] Step {step_idx} (FINAL) PG: location={location_key}, opp={has_opp}, original_opp={original_opp}, coords_before_flip={spot_coords}")
+                logging.warning(f"🔍 [OPP LOGIC] Step {step_idx} (FINAL) PG: location={location_key}, opp={has_opp}, opp_key_exists={opp_key_exists}, coords_before_flip={spot_coords}")
             
             # Check if this offensive player should be on opposite side
             if has_opp:
