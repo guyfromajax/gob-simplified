@@ -451,8 +451,6 @@ def simulate_quarter(
         minutes = gm.game_state["time_remaining"] // 60
         seconds = gm.game_state["time_remaining"] % 60
         gm.game_state["clock"] = f"{minutes}:{seconds:02d}"
-            import traceback
-            traceback.print_exc()
 
     # TURN-BY-TURN MODE: If enabled, skip the full simulation loop
     # Frontend will call /api/simulate-turn repeatedly instead
