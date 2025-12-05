@@ -182,6 +182,29 @@ export async function handleOrebTurn(scene, { playerSprites, ballSprite, turnDat
         willCallInbound: !turnData.possession_flips && turnData.next_play_type !== "FAST_BREAK"
       });
       
+      // ✅ FIX: Don't call runInboundSetup() here if next_play_type === "BASELINE_INBOUND"
+      // The BASELINE_INBOUND turn will handle the inbound setup via AnimationEngine.handleBaselineInbound()
+      // Calling it here causes double inbound passes and double setup animations
+      if (turnData.next_play_type === "BASELINE_INBOUND") {
+        console.log('🚫 [DOUBLE INBOUND PREVENTION] Skipping runInboundSetup() in handleOrebTurn() - BASELINE_INBOUND turn will handle it', {
+          next_play_type: turnData.next_play_type,
+          next_defensive_setup: turnData.next_defensive_setup,
+          reason: 'BASELINE_INBOUND turn will execute runInboundSetup() via AnimationEngine.handleBaselineInbound()'
+        });
+        
+        // ✅ FIX: Call onPutbackEnd() to clear putback state (still needed even if skipping inbound setup)
+        const { getBallController } = await import('./BallControllerAdapter.js');
+        const ballController = getBallController();
+        if (ballController) {
+          ballController.onPutbackEnd();
+          console.log('🔍 [PUTBACK MAKE] Called onPutbackEnd() (skipping inbound setup - BASELINE_INBOUND will handle it)');
+        }
+        
+        // ✅ REMOVED: runInboundSetup() call - BASELINE_INBOUND turn handles it
+        // This prevents double inbound passes and double setup animations
+        return;
+      }
+      
       const shooterTeamId = rebounderSprite.team_id;
       const homeTeamId = scene.simData?.home_team_id;
       const awayTeamId = scene.simData?.away_team_id;

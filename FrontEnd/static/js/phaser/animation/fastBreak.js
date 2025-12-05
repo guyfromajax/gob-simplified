@@ -540,7 +540,21 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
       ballController.onShotEnd();
     }
     
-    // Inbound setup
+    // ✅ FIX: Don't call runInboundSetup() here if next_play_type === "BASELINE_INBOUND"
+    // The BASELINE_INBOUND turn will handle the inbound setup via AnimationEngine.handleBaselineInbound()
+    // Calling it here causes double inbound passes and double setup animations
+    if (turnData.next_play_type === "BASELINE_INBOUND") {
+      console.log('🚫 [DOUBLE INBOUND PREVENTION] Skipping runInboundSetup() in fastBreak.js - BASELINE_INBOUND turn will handle it', {
+        next_play_type: turnData.next_play_type,
+        next_defensive_setup: turnData.next_defensive_setup,
+        reason: 'BASELINE_INBOUND turn will execute runInboundSetup() via AnimationEngine.handleBaselineInbound()'
+      });
+      // ✅ REMOVED: runInboundSetup() call - BASELINE_INBOUND turn handles it
+      // This prevents double inbound passes and double setup animations
+      return;
+    }
+    
+    // Inbound setup (only for non-BASELINE_INBOUND cases)
     const newOffenseSide = isHomeOffense ? "away" : "home";
     const skipRetreat = turnData.next_defensive_setup === "FCP" || turnData.next_defensive_setup === "HCT";
     const pressureType = skipRetreat ? turnData.next_defensive_setup : null;

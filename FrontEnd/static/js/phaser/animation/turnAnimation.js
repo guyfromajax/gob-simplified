@@ -2135,38 +2135,21 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
           nextTurn?.result_type === "FREE_THROW" ||
           (turnData.free_throws_remaining && turnData.free_throws_remaining > 0);
         
+        // ✅ FIX: Don't call runInboundSetup() here if next_play_type === "BASELINE_INBOUND"
+        // The BASELINE_INBOUND turn will handle the inbound setup via AnimationEngine.handleBaselineInbound()
+        // Calling it here causes double inbound passes and double setup animations
         if (!hasPendingFreeThrow && !hasPutbackMake && turnData.next_play_type === "BASELINE_INBOUND") {
-          // ✅ CRITICAL: After a made shot, possession flips:
-          // - Team that just scored (was on offense) is now on DEFENSE
-          // - Team that was on defense is now on OFFENSE
-          // - newOffenseSide is the team that is NOW on offense (the team that was defending)
-          // - The defensive team (team that just scored) will apply FCP/HCT pressure
-          // - Backend determines FCP/HCT based on the team that just scored (now on defense)
-          // - Frontend receives next_defensive_setup from backend, so we use the correct team's settings
-          const shooterTeamIsHome =
-            String(shooterTeamId) === String(homeTeamId);
-          const newOffenseSide = shooterTeamIsHome ? "away" : "home";
-          
-          // Check if FCP/HCT is coming next - if so, skip retreat animation
-          const skipRetreat = turnData.next_defensive_setup === "FCP" || turnData.next_defensive_setup === "HCT";
-          const pressureType = skipRetreat ? turnData.next_defensive_setup : null;
-          
-          const releaseGuard = createTransitionGuard(scene.stateMachine, [States.Rebound]);
-          await runInboundSetup({
-            scene,
-            ballSprite,
-            playerSprites,
-            newOffenseSide,
-            homeTeamId,
-            awayTeamId,
-            skipRetreat,
-            pressureType,
+          console.log('🚫 [DOUBLE INBOUND PREVENTION] Skipping runInboundSetup() in playTurnAnimation() - BASELINE_INBOUND turn will handle it', {
+            next_play_type: turnData.next_play_type,
+            next_defensive_setup: turnData.next_defensive_setup,
+            reason: 'BASELINE_INBOUND turn will execute runInboundSetup() via AnimationEngine.handleBaselineInbound()'
           });
-          releaseGuard?.();
-          
-          // ✅ REMOVED: Special FCP/HCT handling - FCP/HCT now routes through AnimationRouter (same as HCO)
-          // AnimationRouter handles announcements and updates via finalizeTurnAfterAnimation
+          // ✅ REMOVED: runInboundSetup() call - BASELINE_INBOUND turn handles it
+          // This prevents double inbound passes and double setup animations
         }
+        
+        // ✅ REMOVED: Special FCP/HCT handling - FCP/HCT now routes through AnimationRouter (same as HCO)
+        // AnimationRouter handles announcements and updates via finalizeTurnAfterAnimation
       } else if (ballSpot) {
         const rebounderId =
           turnData.rebounder_player_id ||
