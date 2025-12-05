@@ -325,8 +325,8 @@ def simulate_quarter(
         minutes = gm.game_state["time_remaining"] // 60
         seconds = gm.game_state["time_remaining"] % 60
         gm.game_state["clock"] = f"{minutes}:{seconds:02d}"
-    elif q == 2 or q == 3:
-        # Q2/Q3: Losing team from opening tip gets possession via inbound pass
+    elif q == 2:
+        # Q2: Team that didn't win opening tip gets possession via BASELINE_INBOUND
         opening_tip_winner = gm.game_state.get("opening_tip_winner", "home")
         if opening_tip_winner == "home":
             gm.offense_team = gm.away_team
@@ -335,23 +335,40 @@ def simulate_quarter(
             gm.offense_team = gm.home_team
             gm.defense_team = gm.away_team
         
+        # Ensure strategy calls are set before creating inbound turn
+        gm.turn_manager.set_strategy_calls()
+        
         # Check for defensive pressure on the inbound
         pressure_type = gm.turn_manager.determine_defensive_pressure_type()
         gm.game_state["offensive_state"] = pressure_type
+        
+        # Determine next defensive setup (FCP/HCT/HCO)
+        next_defensive_setup = pressure_type if pressure_type in ["FCP", "HCT"] else None
+        
         print(f"🏀 Q{q} start: {gm.offense_team.name} gets possession (lost opening tip) - Defense: {pressure_type}")
         
-        # Create quarter start inbound pass turn
-        from BackEnd.utils.quarter_start import create_quarter_start_inbound
-        inbound_turn = create_quarter_start_inbound(gm)
+        # Create proper BASELINE_INBOUND turn using turn_manager
+        inbound_payload = gm.turn_manager.setup_baseline_inbound(next_defensive_setup=next_defensive_setup)
+        
+        # Build complete BASELINE_INBOUND turn
+        inbound_turn = {
+            **inbound_payload,
+            "text": f"Start of Q{q}: {gm.offense_team.name} inbounds the ball.",
+            "time_elapsed": 4,
+            "possession_flips": False,
+            "quarter": q,
+        }
+        
         gm.turns.append(inbound_turn)
         gm.text_log.append(inbound_turn["text"])
+        
         # Update clock
         gm.game_state["time_remaining"] -= inbound_turn["time_elapsed"]
         minutes = gm.game_state["time_remaining"] // 60
         seconds = gm.game_state["time_remaining"] % 60
         gm.game_state["clock"] = f"{minutes}:{seconds:02d}"
-    elif q == 4:
-        # Q4: Winning team from opening tip gets possession via inbound pass
+    elif q == 3:
+        # Q3: Opening tip winner gets possession via BASELINE_INBOUND
         opening_tip_winner = gm.game_state.get("opening_tip_winner", "home")
         if opening_tip_winner == "home":
             gm.offense_team = gm.home_team
@@ -366,25 +383,74 @@ def simulate_quarter(
         # Check for defensive pressure on the inbound
         pressure_type = gm.turn_manager.determine_defensive_pressure_type()
         gm.game_state["offensive_state"] = pressure_type
+        
+        # Determine next defensive setup (FCP/HCT/HCO)
+        next_defensive_setup = pressure_type if pressure_type in ["FCP", "HCT"] else None
+        
         print(f"🏀 Q{q} start: {gm.offense_team.name} gets possession (won opening tip) - Defense: {pressure_type}")
         
-        # Create quarter start inbound pass turn
-        print(f"🔵 DEBUG: About to create Q{q} inbound turn")
-        try:
-            from BackEnd.utils.quarter_start import create_quarter_start_inbound
-            print(f"🔵 DEBUG: Import successful")
-            inbound_turn = create_quarter_start_inbound(gm)
-            print(f"🔵 DEBUG: Inbound turn created - {inbound_turn.get('text')}")
-            gm.turns.append(inbound_turn)
-            gm.text_log.append(inbound_turn["text"])
-            # Update clock
-            gm.game_state["time_remaining"] -= inbound_turn["time_elapsed"]
-            minutes = gm.game_state["time_remaining"] // 60
-            seconds = gm.game_state["time_remaining"] % 60
-            gm.game_state["clock"] = f"{minutes}:{seconds:02d}"
-            print(f"🔵 DEBUG: Q{q} inbound turn successfully added to game")
-        except Exception as e:
-            print(f"🔴 ERROR creating Q{q} inbound: {e}")
+        # Create proper BASELINE_INBOUND turn using turn_manager
+        inbound_payload = gm.turn_manager.setup_baseline_inbound(next_defensive_setup=next_defensive_setup)
+        
+        # Build complete BASELINE_INBOUND turn
+        inbound_turn = {
+            **inbound_payload,
+            "text": f"Start of Q{q}: {gm.offense_team.name} inbounds the ball.",
+            "time_elapsed": 4,
+            "possession_flips": False,
+            "quarter": q,
+        }
+        
+        gm.turns.append(inbound_turn)
+        gm.text_log.append(inbound_turn["text"])
+        
+        # Update clock
+        gm.game_state["time_remaining"] -= inbound_turn["time_elapsed"]
+        minutes = gm.game_state["time_remaining"] // 60
+        seconds = gm.game_state["time_remaining"] % 60
+        gm.game_state["clock"] = f"{minutes}:{seconds:02d}"
+    elif q == 4:
+        # Q4: Team that didn't win opening tip gets possession via BASELINE_INBOUND
+        opening_tip_winner = gm.game_state.get("opening_tip_winner", "home")
+        if opening_tip_winner == "home":
+            gm.offense_team = gm.away_team
+            gm.defense_team = gm.home_team
+        else:
+            gm.offense_team = gm.home_team
+            gm.defense_team = gm.away_team
+        
+        # Ensure strategy calls are set before creating inbound turn
+        gm.turn_manager.set_strategy_calls()
+        
+        # Check for defensive pressure on the inbound
+        pressure_type = gm.turn_manager.determine_defensive_pressure_type()
+        gm.game_state["offensive_state"] = pressure_type
+        
+        # Determine next defensive setup (FCP/HCT/HCO)
+        next_defensive_setup = pressure_type if pressure_type in ["FCP", "HCT"] else None
+        
+        print(f"🏀 Q{q} start: {gm.offense_team.name} gets possession (lost opening tip) - Defense: {pressure_type}")
+        
+        # Create proper BASELINE_INBOUND turn using turn_manager
+        inbound_payload = gm.turn_manager.setup_baseline_inbound(next_defensive_setup=next_defensive_setup)
+        
+        # Build complete BASELINE_INBOUND turn
+        inbound_turn = {
+            **inbound_payload,
+            "text": f"Start of Q{q}: {gm.offense_team.name} inbounds the ball.",
+            "time_elapsed": 4,
+            "possession_flips": False,
+            "quarter": q,
+        }
+        
+        gm.turns.append(inbound_turn)
+        gm.text_log.append(inbound_turn["text"])
+        
+        # Update clock
+        gm.game_state["time_remaining"] -= inbound_turn["time_elapsed"]
+        minutes = gm.game_state["time_remaining"] // 60
+        seconds = gm.game_state["time_remaining"] % 60
+        gm.game_state["clock"] = f"{minutes}:{seconds:02d}"
             import traceback
             traceback.print_exc()
 
