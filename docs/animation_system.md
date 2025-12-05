@@ -1271,6 +1271,148 @@ All handlers follow this pattern:
 
 ---
 
+## BASELINE_INBOUND (BIP) and Player Setup After Made Shots
+
+After a made shot (HCO MAKE, PUTBACK_MAKE, Fast Break MAKE, Free Throw MAKE), the next turn is always `BASELINE_INBOUND`. This turn handles player positioning and inbound pass animation before transitioning to the next offensive sequence (HCO, HCT, or FCP).
+
+### Process Overview
+
+**Location:** `AnimationEngine.handleBaselineInbound()` → `PassAnimationSystem.executeInboundSequence()` → `runInboundSetup()`
+
+**Flow:**
+1. Made shot turn completes (shot animation, celebration, etc.)
+2. `BASELINE_INBOUND` turn is created by backend
+3. Frontend routes to `AnimationEngine.handleBaselineInbound()`
+4. Players are positioned based on next turn type
+5. Inbound pass is executed
+6. Next turn (HCO/HCT/FCP) begins with players already in position
+
+### Three Next Turn Scenarios
+
+#### 1. BASELINE_INBOUND → HCO (Normal Inbound)
+
+**Backend Setup:**
+- `turn_manager.py` `setup_baseline_inbound()` with `next_defensive_setup=None`
+- Creates random baseline positions for offensive players (PG, SG, SF, PF, C)
+- PG is the inbounder (stays at inbound spot)
+- Defensive players retreat to midcourt
+
+**Frontend Execution:**
+- `runInboundSetup()` called with `skipRetreat=false`
+- **Defensive players:** Animate to midcourt (x: 45 or 55) - retreat animation
+- **Offensive players:** Animate to random baseline positions from `oDestinations`
+- **Inbound pass:** SF → PG (hardcoded fallback, or dynamic from `turnData.animations`)
+
+**Key Code:**
+- `turnAnimation.js` lines 1031-1078: Defensive retreat animation
+- `turnAnimation.js` lines 1220-1224: Offensive player positioning (uses `inboundDest`)
+
+---
+
+#### 2. BASELINE_INBOUND → HCT (Half Court Trap)
+
+**Backend Setup:**
+- `turn_manager.py` `setup_baseline_inbound()` with `next_defensive_setup="HCT"`
+- Retrieves HCT skeleton step 0 via `get_skeleton_for_turn("HCO", "HCT", game)`
+- Extracts `pos_actions` from step 0 and includes in `offense_setup_positions`
+- Applies `apply_opposite_side_logic()` to skeleton (handles `opp` field)
+- SF is the inbounder (uses `inbound_left` location from `HCT_SETUP_POSITIONS`)
+
+**Frontend Execution:**
+- `runInboundSetup()` called with `skipRetreat=true`, `pressureType="HCT"`
+- **Defensive players:** Animate directly to HCT trap positions (no retreat)
+  - Positions: PG at x=60, SG/SF at x=55, PF/C at x=45 (home orientation)
+  - Flipped for away team defense
+- **Offensive players:** Animate to skeleton step 0 positions from `offense_setup_positions`
+  - **Critical:** Frontend checks `coords` field first (has `opp` logic applied)
+  - Falls back to `location` field if `coords` missing
+  - Applies `opp` logic when using `location`:
+    - `opp=True`: Flip coords for home offense (ball handlers go to away side)
+    - `opp=False`: Flip coords for away offense (outlet players go to away side)
+- **Inbound pass:** SF → PG (from skeleton step 0 positions)
+
+**Key Code:**
+- `turnAnimation.js` lines 1186-1225: Skeleton position conversion with `opp` logic
+- `turnAnimation.js` lines 1079-1128: HCT defensive positioning
+- `BackEnd/engine/phase_resolution.py` `apply_opposite_side_logic()`: Backend `opp` handling
+
+**Important Notes:**
+- `opp` field determines which players go to opposite side (defensive side)
+- Ball handlers (usually PG) have `opp=True` and go to opposite side
+- Outlet players have `opp=False` and stay on normal offense side
+- Coordinate flipping formula: `x = 101 - x` for away team offense
+
+---
+
+#### 3. BASELINE_INBOUND → FCP (Full Court Press)
+
+**Backend Setup:**
+- `turn_manager.py` `setup_baseline_inbound()` with `next_defensive_setup="FCP"`
+- Retrieves FCP skeleton step 0 via `get_skeleton_for_turn("HCO", "FCP", game)`
+- Extracts `pos_actions` from step 0 and includes in `offense_setup_positions`
+- Applies `apply_opposite_side_logic()` to skeleton (handles `opp` field)
+- SF is the inbounder (uses `inbound_left` location from `FCP_SETUP_POSITIONS`)
+
+**Frontend Execution:**
+- `runInboundSetup()` called with `skipRetreat=true`, `pressureType="FCP"`
+- **Defensive players:** Animate directly to FCP press positions (no retreat)
+  - Positions: PG at x=80, SG/SF at x=73, PF/C at x=37/35 (home orientation)
+  - Flipped for away team defense
+- **Offensive players:** Animate to skeleton step 0 positions from `offense_setup_positions`
+  - **Critical:** Frontend checks `coords` field first (has `opp` logic applied)
+  - Falls back to `location` field if `coords` missing
+  - Applies `opp` logic when using `location` (same as HCT)
+- **Inbound pass:** SF → PG (from skeleton step 0 positions)
+
+**Key Code:**
+- `turnAnimation.js` lines 1186-1225: Skeleton position conversion with `opp` logic
+- `turnAnimation.js` lines 1079-1128: FCP defensive positioning
+- `BackEnd/engine/phase_resolution.py` `apply_opposite_side_logic()`: Backend `opp` handling
+
+**Important Notes:**
+- Same `opp` logic as HCT (ball handlers vs outlet players)
+- FCP positions are more aggressive (deeper in offensive zone)
+- `inbound_left` vs `inbound_right` determined by offense team:
+  - Home offense: Uses `inbound_left` (x=3) - correct
+  - Away offense: Backend flips to `inbound_right` (x=97) via coordinate flipping
+
+---
+
+### Coordinate System and `opp` Field
+
+**Home Orientation:**
+- `HCO_STRING_SPOTS` coordinates are in home team orientation
+- Home team attacks right basket (x=91), away team attacks left basket (x=9)
+- Midcourt is x=50
+
+**Opposite Side Logic (`opp` field):**
+- **Purpose:** Determines which offensive players go to opposite side (defensive side) during press break
+- **`opp=True`:** Ball handlers (usually PG) - go to opposite side to break press
+- **`opp=False`:** Outlet players (SG, SF, PF, C) - stay on normal offense side
+- **Backend:** `apply_opposite_side_logic()` converts locations to coords and stores in `coords` field
+- **Frontend:** Prioritizes `coords` field (backend-applied logic), falls back to `location` with manual `opp` application
+
+**Coordinate Flipping:**
+- Formula: `x = 101 - x` (flips around midcourt)
+- Applied for:
+  - Away team offense (normal flip)
+  - Home team offense with `opp=True` (ball handlers go to away side)
+  - Away team offense with `opp=False` (outlet players go to away side)
+
+### Key Functions
+
+**Backend:**
+- `turn_manager.py` `setup_baseline_inbound()`: Creates BASELINE_INBOUND turn data
+- `phase_resolution.py` `get_skeleton_for_turn()`: Retrieves FCP/HCT skeleton
+- `phase_resolution.py` `apply_opposite_side_logic()`: Applies `opp` field logic
+
+**Frontend:**
+- `AnimationEngine.handleBaselineInbound()`: Routes BASELINE_INBOUND turns
+- `PassAnimationSystem.executeInboundSequence()`: Handles inbound pass execution
+- `turnAnimation.js` `runInboundSetup()`: Positions players and executes inbound pass
+
+---
+
 ### 4. `handleTurnover()`
 **Registered for:** `TURNOVER`  
 **Location:** `AnimationEngine.js` line 369  
