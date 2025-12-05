@@ -2059,20 +2059,23 @@ def apply_opposite_side_logic(skeleton_data, is_away_offense):
             # Get the spot coordinates (MongoDB skeletons use "location", old skeletons use "spot")
             location_key = action_data.get("location") or action_data.get("spot", "key")
             spot_coords = HCO_STRING_SPOTS.get(location_key, {"x": 64, "y": 25})
+            
+            # ✅ FIX: Check if opp key EXISTS (not just its value)
+            # If opp key doesn't exist, we need to infer it
+            # If opp key exists (even if False), we respect the explicit value
+            opp_key_exists = "opp" in action_data
             has_opp = action_data.get("opp", False)
             original_opp = has_opp
             
-            # ✅ FIX: If no opp field, assume ball handler (PG) should be on opposite side
-            # ✅ DEBUG: But NOT for final step (PG receiving pass on offense side when breaking to HCO)
-            if not has_opp and position == ball_handler_pos:
-                # Check if this is final step - if so, PG should NOT have opp=True
-                # (Final step means breaking to HCO, PG should be on offense side)
-                if step_is_final:
-                    logging.warning(f"🔍 [OPP LOGIC] Step {step_idx}/{total_steps-1} (FINAL): PG is ball handler but final step - keeping opp=False (should be on offense side)")
-                    has_opp = False  # Keep as False for final step
-                else:
-                    has_opp = True
-                    logging.warning(f"🔍 [OPP LOGIC] Step {step_idx}/{total_steps-1}: PG is ball handler, setting opp=True (was {original_opp})")
+            # ✅ FIX: Only infer opp=True if the opp key doesn't exist AND this is the ball handler
+            # If opp key exists (even if False), respect the explicit value
+            if not opp_key_exists and position == ball_handler_pos:
+                # Opp key doesn't exist - infer that ball handler should be on opposite side
+                has_opp = True
+                logging.warning(f"🔍 [OPP LOGIC] Step {step_idx}/{total_steps-1}: PG is ball handler, opp key missing - inferring opp=True")
+            elif opp_key_exists:
+                # Opp key exists - respect the explicit value (True or False)
+                logging.warning(f"🔍 [OPP LOGIC] Step {step_idx}/{total_steps-1}: {position} has explicit opp={has_opp} - respecting value")
             
             # ✅ DEBUG: Log final step PG coordinates
             if step_is_final and position == "PG":
