@@ -1124,27 +1124,32 @@ export async function animateGameTurns({ //hasBallAtStep
       }
 
       // ✅ PHASE 2.5: Route standard HCO turns through AnimationRouter
-      // Ensure turn.index is set (AnimationRouter will use it for context)
-      turn.index = i;
-      
-      // Removed verbose before/after process turn logs
-      
-      // AnimationRouter handles pre/post setup (prepareTurnForAnimation, finalizeTurnAfterAnimation)
-      // Note: prepareTurnForAnimation was already called at line 479, but AnimationRouter will call it again
-      // This is safe (idempotent) but we could optimize later by skipping the first call for HCO turns
-      await animationRouter.processTurn(turn);
+      // ✅ FIX (Bug 3 REAL FIX): Only route if isHCO (was executing for ALL turns!)
+      if (isHCO) {
+        // Ensure turn.index is set (AnimationRouter will use it for context)
+        turn.index = i;
+        
+        // Removed verbose before/after process turn logs
+        
+        // AnimationRouter handles pre/post setup (prepareTurnForAnimation, finalizeTurnAfterAnimation)
+        // Note: prepareTurnForAnimation was already called at line 479, but AnimationRouter will call it again
+        // This is safe (idempotent) but we could optimize later by skipping the first call for HCO turns
+        await animationRouter.processTurn(turn);
 
-      // Removed verbose after process turn log
+        // Removed verbose after process turn log
 
-      if (shouldDebugHCO && isHCO) {
-        console.log('🔍 HCO_ROUTER_END', {
-          turn_index: i,
-          result_type: turn.result_type,
-          fast_break: turn.fast_break,
-          currentBallOwner: scene.ballController?.currentOwner?.playerId ?? null,
-          previousTurnWasShot: scene._previousTurnWasShot === true,
-          state: scene.stateMachine?.state
-        });
+        if (shouldDebugHCO) {
+          console.log('🔍 HCO_ROUTER_END', {
+            turn_index: i,
+            result_type: turn.result_type,
+            fast_break: turn.fast_break,
+            currentBallOwner: scene.ballController?.currentOwner?.playerId ?? null,
+            previousTurnWasShot: scene._previousTurnWasShot === true,
+            state: scene.stateMachine?.state
+          });
+        }
+        
+        continue;  // ✅ Skip rest of loop after processing HCO
       }
     }
 
