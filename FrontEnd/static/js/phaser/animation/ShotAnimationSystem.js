@@ -244,15 +244,6 @@ export class ShotAnimationSystem {
    * Move all players to their step 0 positions
    */
   async runSetupTween(turnData, ballSprite, currentBallOwnerRef) {
-    console.log('📍 [SETUP TWEEN] Starting runSetupTween', {
-      result_type: turnData.result_type,
-      current_turn: turnData.current_turn,
-      next_defensive_setup: turnData.next_defensive_setup,
-      animation_count: turnData.animations?.length || 0,
-      previousTurnWasInbound: this.scene._previousTurnWasInbound,
-      previousTurnWasOpeningTip: this.scene._previousTurnWasOpeningTip
-    });
-    
     if (this.scene.skipToEnd) return;
     
     const stepIndex = 0;
@@ -769,11 +760,6 @@ export class ShotAnimationSystem {
       const shouldFlipPossession = turnData.next_play_type === "BASELINE_INBOUND" && 
                                    (turnData.possession_flips !== false);
       if (shouldFlipPossession) {
-        console.log('🚫 [DOUBLE INBOUND PREVENTION] Skipping runInboundSetup() in handleMadeShot() - BASELINE_INBOUND turn will handle it', {
-          next_play_type: turnData.next_play_type,
-          next_defensive_setup: turnData.next_defensive_setup,
-          reason: 'BASELINE_INBOUND turn will execute runInboundSetup() via AnimationEngine.handleBaselineInbound()'
-        });
         // ✅ REMOVED: runInboundSetup() call - BASELINE_INBOUND turn handles it
         // This prevents double inbound passes and double setup animations
       }

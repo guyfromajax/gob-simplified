@@ -357,23 +357,11 @@ export class PassAnimationSystem {
    * Execute inbound pass sequence using positioning data
    */
   async executeInboundSequence(turnData, context = {}) {
-    console.log('📍 [PASS ANIMATION SYSTEM] executeInboundSequence called', {
-      result_type: turnData.result_type,
-      next_defensive_setup: turnData.next_defensive_setup,
-      has_oDestinations: !!turnData.oDestinations,
-      has_dDestinations: !!turnData.dDestinations
-    });
-
     try {
       // Import and use the correct inbound setup based on type
       const { runSideInboundSetup, runInboundSetup } = await import('./turnAnimation.js');
       
       if (turnData.result_type === 'BASELINE_INBOUND') {
-        console.log('📍 [PASS ANIMATION SYSTEM] Calling runInboundSetup for BASELINE_INBOUND', {
-          next_defensive_setup: turnData.next_defensive_setup,
-          offense_team_id: turnData.offense_team_id
-        });
-        
         // ✅ FIX: Use offense_team_id (SS&S possession system) instead of possession_team_id
         // Backend now only sends offense_team_id (possession_team_id removed in SS&S refactor)
         const isHomeOffense = turnData.offense_team_id === this.scene.homeTeamId;
@@ -388,8 +376,6 @@ export class PassAnimationSystem {
           awayTeamId: this.scene.awayTeamId,
           turnData: turnData  // ✅ Pass turnData for dynamic pass detection
         });
-        
-        console.log('📍 [PASS ANIMATION SYSTEM] runInboundSetup completed for BASELINE_INBOUND');
       } else {
         // For side inbound passes (after dead balls/fouls), use runSideInboundSetup
         // Side inbound (log removed)
