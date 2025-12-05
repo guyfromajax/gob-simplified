@@ -412,22 +412,27 @@ class GameManager:
         if result.get("next_play_type"):
             return result["next_play_type"]
         
-        # For results without explicit next_play_type, determine based on result_type:
-        # - FOUL (non-shooting, no bonus) → SIDE_INBOUND
-        # - DEAD BALL → SIDE_INBOUND
-        # - STEAL → Already sets next_play_type
-        # - MISS (with pending_oreb) → Game manager creates OREB turn
+        # For results without explicit next_play_type, determine based on result_type and game state:
         
+        # Check if offensive_state was set to FREE_THROW (defensive foul in bonus)
+        if self.game_state.get("offensive_state") == "FREE_THROW":
+            return "FREE_THROW"
+        
+        # Check for pending OREB (miss with offensive rebound)
+        if self.game_state.get("pending_oreb"):
+            return "OREB"
+        
+        # FOUL results (non-shooting or no bonus)
         if result_type == "FOUL":
-            # Non-shooting foul or shooting foul not in bonus → SIDE_INBOUND
-            # (Shooting fouls in bonus already set next_play_type = "FREE_THROW")
-            if self.game_state.get("free_throws_remaining", 0) == 0:
-                return "SIDE_INBOUND"
-            else:
+            # Check if free throws were awarded (shooting foul or bonus)
+            if self.game_state.get("free_throws_remaining", 0) > 0:
                 return "FREE_THROW"
+            else:
+                # Non-shooting foul or defensive foul without bonus
+                return "SIDE_INBOUND"
         
+        # DEAD BALL turnovers → SIDE_INBOUND
         if result_type == "DEAD BALL":
-            # Dead ball turnovers → SIDE_INBOUND
             return "SIDE_INBOUND"
         
         # Default to HCO if no explicit routing
