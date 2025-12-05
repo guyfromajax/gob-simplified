@@ -2078,18 +2078,6 @@ def apply_opposite_side_logic(skeleton_data, is_away_offense):
             # If opp key doesn't exist → assume False
             # If opp key exists → use its explicit value (True or False)
             has_opp = action_data.get("opp", False)  # Defaults to False if key doesn't exist
-            opp_key_exists = "opp" in action_data
-            
-            # ✅ DEBUG: Log opp value handling
-            if position == "PG":
-                if opp_key_exists:
-                    logging.warning(f"🔍 [OPP LOGIC] Step {step_idx}/{total_steps-1}: PG has explicit opp={has_opp} - using explicit value")
-                else:
-                    logging.warning(f"🔍 [OPP LOGIC] Step {step_idx}/{total_steps-1}: PG has no opp key - defaulting to opp=False")
-            
-            # ✅ DEBUG: Log final step PG coordinates
-            if step_is_final and position == "PG":
-                logging.warning(f"🔍 [OPP LOGIC] Step {step_idx} (FINAL) PG: location={location_key}, opp={has_opp}, opp_key_exists={opp_key_exists}, coords_before_flip={spot_coords}")
             
             # Check if this offensive player should be on opposite side
             if has_opp:
@@ -2115,20 +2103,6 @@ def apply_opposite_side_logic(skeleton_data, is_away_offense):
             
             # Update the spot coordinates in the action data
             modified_action["coords"] = spot_coords
-            
-            # ✅ DEBUG: Log final step PG after coordinate calculation
-            if step_is_final and position == "PG":
-                logging.warning(f"🔍 [OPP LOGIC] Step {step_idx} (FINAL) PG AFTER: coords={spot_coords}, opp={has_opp}, is_away_offense={is_away_offense}")
-                # Check if coords are on correct side
-                x = spot_coords.get("x", 50)
-                if is_away_offense:
-                    is_on_offense_side = x < 50
-                    expected_side = "offense side (x < 50)"
-                else:
-                    is_on_offense_side = x > 50
-                    expected_side = "offense side (x > 50)"
-                logging.warning(f"🔍 [OPP LOGIC] Step {step_idx} (FINAL) PG SIDE CHECK: x={x}, on_offense_side={is_on_offense_side}, expected={expected_side}")
-            
             modified_step["pos_actions"][position] = modified_action
         
         modified_skeleton["steps"].append(modified_step)

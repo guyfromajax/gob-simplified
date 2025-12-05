@@ -862,40 +862,27 @@ class Animator:
                 
                 # ✅ FIX: Handle "opp" field for FCP/HCT skeletons when location exists (coords need to be calculated)
                 # Players with opp=True should be on the opposite side of the court
-                # ✅ DEBUG: Check if this is final step (for HCO variant, final step PG should be on offense side)
-                is_final_step = step_idx == total_steps - 1
-                
                 if (is_fcp or is_hct) and has_opp and coords_from_location:
                     # Player with opp=True should be on opposite side (defensive side)
                     if is_away_offense:
                         # Away team offense - ball handlers go to home side (defensive side)
                         # No coordinate flip needed - they stay on home side (HCO_STRING_SPOTS are in home orientation)
-                        if is_final_step and position == "PG":
-                            logging.warning(f"🔍 [ANIMATOR] Step {step_idx}/{total_steps-1} (FINAL) PG: opp=True, away offense, staying on home side (defensive side) - coords={coords}")
                         pass
                     else:
                         # Home team offense - ball handlers go to away side (defensive side)
                         # Flip coordinates to away side
-                        if is_final_step and position == "PG":
-                            logging.warning(f"🔍 [ANIMATOR] Step {step_idx}/{total_steps-1} (FINAL) PG: opp=True, home offense, flipping to away side - coords before={coords}")
                         coords = get_away_player_coords(coords)
                         coords_already_flipped = True
-                        if is_final_step and position == "PG":
-                            logging.warning(f"🔍 [ANIMATOR] Step {step_idx}/{total_steps-1} (FINAL) PG: coords after flip={coords}")
                 elif (is_fcp or is_hct) and not has_opp and coords_from_location:
                     # Player without opp field stays on same side as normal offense
                     if is_away_offense:
                         # Away team offense - outlet players go to away side (offensive side)
                         # Flip coordinates to away side (normal away team flip)
                         # This will happen in the normal away team flip logic below
-                        if is_final_step and position == "PG":
-                            logging.warning(f"🔍 [ANIMATOR] Step {step_idx}/{total_steps-1} (FINAL) PG: opp=False, away offense, will flip in normal logic - coords={coords}")
                         pass
                     else:
                         # Home team offense - outlet players stay on home side (offensive side)
                         # No coordinate flip needed
-                        if is_final_step and position == "PG":
-                            logging.warning(f"🔍 [ANIMATOR] Step {step_idx}/{total_steps-1} (FINAL) PG: opp=False, home offense, staying on home side (offense side) - coords={coords}")
                         pass
                 
                 # Apply coordinate flipping for AWAY team (HCO_STRING_SPOTS are in home orientation)
