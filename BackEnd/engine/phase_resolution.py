@@ -2030,10 +2030,14 @@ def apply_opposite_side_logic(skeleton_data, is_away_offense):
     from BackEnd.utils.shared import get_away_player_coords
     from BackEnd.constants import HCO_STRING_SPOTS
     
-    modified_skeleton = {"steps": []}
-    total_steps = len(skeleton_data["steps"])
+    steps = skeleton_data.get("steps", [])
+    if not steps or len(steps) == 0:
+        return skeleton_data
     
-    for step_idx, step in enumerate(skeleton_data["steps"]):
+    modified_skeleton = {"steps": []}
+    total_steps = len(steps)
+    
+    for step_idx, step in enumerate(steps):
         modified_step = {
             "timestamp": step["timestamp"],
             "pos_actions": {},
