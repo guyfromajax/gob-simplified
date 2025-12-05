@@ -2031,8 +2031,9 @@ def apply_opposite_side_logic(skeleton_data, is_away_offense):
     from BackEnd.constants import HCO_STRING_SPOTS
     
     modified_skeleton = {"steps": []}
+    total_steps = len(skeleton_data["steps"])
     
-    for step in skeleton_data["steps"]:
+    for step_idx, step in enumerate(skeleton_data["steps"]):
         modified_step = {
             "timestamp": step["timestamp"],
             "pos_actions": {},
@@ -2049,6 +2050,9 @@ def apply_opposite_side_logic(skeleton_data, is_away_offense):
         if not ball_handler_pos:
             ball_handler_pos = "PG"  # Default to PG if no ball handler found
         
+        # ✅ DEBUG: Check if this is final step
+        step_is_final = step_idx == total_steps - 1
+        
         for position, action_data in step["pos_actions"].items():
             modified_action = action_data.copy()
             
@@ -2056,10 +2060,23 @@ def apply_opposite_side_logic(skeleton_data, is_away_offense):
             location_key = action_data.get("location") or action_data.get("spot", "key")
             spot_coords = HCO_STRING_SPOTS.get(location_key, {"x": 64, "y": 25})
             has_opp = action_data.get("opp", False)
+            original_opp = has_opp
             
             # ✅ FIX: If no opp field, assume ball handler (PG) should be on opposite side
+            # ✅ DEBUG: But NOT for final step (PG receiving pass on offense side when breaking to HCO)
             if not has_opp and position == ball_handler_pos:
-                has_opp = True
+                # Check if this is final step - if so, PG should NOT have opp=True
+                # (Final step means breaking to HCO, PG should be on offense side)
+                if step_is_final:
+                    logging.warning(f"🔍 [OPP LOGIC] Step {step_idx}/{total_steps-1} (FINAL): PG is ball handler but final step - keeping opp=False (should be on offense side)")
+                    has_opp = False  # Keep as False for final step
+                else:
+                    has_opp = True
+                    logging.warning(f"🔍 [OPP LOGIC] Step {step_idx}/{total_steps-1}: PG is ball handler, setting opp=True (was {original_opp})")
+            
+            # ✅ DEBUG: Log final step PG coordinates
+            if step_is_final and position == "PG":
+                logging.warning(f"🔍 [OPP LOGIC] Step {step_idx} (FINAL) PG: location={location_key}, opp={has_opp}, original_opp={original_opp}, coords_before_flip={spot_coords}")
             
             # Check if this offensive player should be on opposite side
             if has_opp:
@@ -2085,6 +2102,20 @@ def apply_opposite_side_logic(skeleton_data, is_away_offense):
             
             # Update the spot coordinates in the action data
             modified_action["coords"] = spot_coords
+            
+            # ✅ DEBUG: Log final step PG after coordinate calculation
+            if step_is_final and position == "PG":
+                logging.warning(f"🔍 [OPP LOGIC] Step {step_idx} (FINAL) PG AFTER: coords={spot_coords}, opp={has_opp}, is_away_offense={is_away_offense}")
+                # Check if coords are on correct side
+                x = spot_coords.get("x", 50)
+                if is_away_offense:
+                    is_on_offense_side = x < 50
+                    expected_side = "offense side (x < 50)"
+                else:
+                    is_on_offense_side = x > 50
+                    expected_side = "offense side (x > 50)"
+                logging.warning(f"🔍 [OPP LOGIC] Step {step_idx} (FINAL) PG SIDE CHECK: x={x}, on_offense_side={is_on_offense_side}, expected={expected_side}")
+            
             modified_step["pos_actions"][position] = modified_action
         
         modified_skeleton["steps"].append(modified_step)
