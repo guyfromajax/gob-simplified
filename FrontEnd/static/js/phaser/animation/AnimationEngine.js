@@ -307,13 +307,6 @@ export class AnimationEngine {
   }
 
   async handleBaselineInbound(turnData, context) {
-    console.log('📍 [BASELINE_INBOUND] Starting handleBaselineInbound', {
-      result_type: turnData.result_type,
-      next_defensive_setup: turnData.next_defensive_setup,
-      has_animations: !!turnData.animations?.length,
-      animation_count: turnData.animations?.length || 0
-    });
-    
     // ✅ PHASE 2.6: Set FCP/HCT state when pressure setup detected (moved from animateGameTurns.js)
     // This is the single source of truth for pressure state - replaces complex flag detection
     const hasFCPHCTSetup = turnData.next_defensive_setup === "FCP" || turnData.next_defensive_setup === "HCT";
@@ -368,14 +361,9 @@ export class AnimationEngine {
     
     // ✅ FIX: Animate the inbound pass after positioning players
     // Use PassAnimationSystem directly since this.passSystem might not be initialized
-    console.log('📍 [BASELINE_INBOUND] About to execute inbound pass via PassAnimationSystem', {
-      result_type: turnData.result_type,
-      next_defensive_setup: turnData.next_defensive_setup
-    });
     const { PassAnimationSystem: PassSys } = await import('./PassAnimationSystem.js');
     const passSystem = this.passSystem || new PassSys(this.scene, null, null, context.playerSprites);
     await passSystem.executeInboundSequence(turnData, context);
-    console.log('📍 [BASELINE_INBOUND] Inbound pass completed');
     
     // ✅ PHASE 2.6: Transition to HalfCourt state (moved from animateGameTurns.js)
     const { safeTransition } = await import('../state/gameStateMachine.js');

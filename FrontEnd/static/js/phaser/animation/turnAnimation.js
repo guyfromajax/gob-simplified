@@ -866,16 +866,6 @@ async function runInboundSetup({
   pressureType = null,   // "FCP" or "HCT" to determine defensive positioning
   turnData = null        // ✅ NEW: Optional turnData for dynamic pass detection
 }) {
-  console.log('📍 [RUN INBOUND SETUP] Starting runInboundSetup', {
-    newOffenseSide,
-    skipRetreat,
-    pressureType,
-    result_type: turnData?.result_type,
-    next_defensive_setup: turnData?.next_defensive_setup,
-    has_offense_setup_positions: !!turnData?.offense_setup_positions,
-    stack_trace: new Error().stack.split('\n').slice(1, 4).join(' -> ')
-  });
-  
   // ✅ CRITICAL: ALWAYS set scene.offenseTeamId to match newOffenseSide BEFORE doing anything else
   // This ensures that any code that reads scene.offenseTeamId will get the correct value
   const expectedOffenseTeamId = newOffenseSide === "home" ? homeTeamId : awayTeamId;
@@ -1225,20 +1215,6 @@ async function runInboundSetup({
   // ✅ NEW APPROACH: Don't skip inbound pass for FCP/HCT anymore
   // Players are positioned at skeleton step 0 locations (from backend setup positions)
   // We'll animate the inbound pass here, then skeleton starts from old step 1
-  if (skipRetreat && pressureType) {
-    console.log('🎯 [FCP/HCT SETUP] Animating inbound pass from skeleton step 0 positions', {
-      pressureType,
-      newOffenseSide,
-      note: 'Players at step 0 positions, animating pass, then skeleton continues from old step 1'
-    });
-  }
-  
-  console.log('📍 [RUN INBOUND SETUP] About to execute inbound pass animation', {
-    pressureType,
-    useSkeletonPositions,
-    has_sfSprite: !!sfSprite,
-    has_pgSprite: !!pgSprite
-  });
 
   // Use skeleton positions if available, otherwise fall back to baseline inbound positions
   const pgDest = useSkeletonPositions && skeletonPositions.PG ? skeletonPositions.PG : inboundDest.PG;
@@ -1282,12 +1258,6 @@ async function runInboundSetup({
 
   ballSprite.setPosition(rimPx.x, rimPx.y);
   ballSprite.setVisible(true);
-  console.log('📍 [RUN INBOUND SETUP] Executing inbound pass animation', {
-    pressureType,
-    from: sfId,
-    to: pgId,
-    newOffenseSide
-  });
   animationDebugLog(`[inbound][rimHoldEnd][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
   animationDebugLog(`[inbound][ballTweenStart][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
   let ballTween;
@@ -1432,8 +1402,6 @@ async function runInboundSetup({
     pfTween,
     cTween
   ]);
-  
-  console.log('📍 [RUN INBOUND SETUP] Player positioning completed, about to execute inbound pass');
 
   animationDebugLog(`[inbound][ballAttach][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
   attachBallToPlayer(scene, ballSprite, sfSprite);
@@ -1489,11 +1457,6 @@ async function runInboundSetup({
   }
   animationDebugLog(`[inbound][passEnd][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
   animationDebugLog(`[inbound][pgAttach][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
-  
-  console.log('📍 [RUN INBOUND SETUP] Inbound pass completed, runInboundSetup finished', {
-    pressureType,
-    newOffenseSide
-  });
 
   if (scene.stateMachine?.is(States.Inbound))
     safeTransition(
@@ -2139,11 +2102,6 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
         // The BASELINE_INBOUND turn will handle the inbound setup via AnimationEngine.handleBaselineInbound()
         // Calling it here causes double inbound passes and double setup animations
         if (!hasPendingFreeThrow && !hasPutbackMake && turnData.next_play_type === "BASELINE_INBOUND") {
-          console.log('🚫 [DOUBLE INBOUND PREVENTION] Skipping runInboundSetup() in playTurnAnimation() - BASELINE_INBOUND turn will handle it', {
-            next_play_type: turnData.next_play_type,
-            next_defensive_setup: turnData.next_defensive_setup,
-            reason: 'BASELINE_INBOUND turn will execute runInboundSetup() via AnimationEngine.handleBaselineInbound()'
-          });
           // ✅ REMOVED: runInboundSetup() call - BASELINE_INBOUND turn handles it
           // This prevents double inbound passes and double setup animations
         }
