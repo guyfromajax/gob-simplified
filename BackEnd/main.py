@@ -368,14 +368,14 @@ def simulate_quarter(
         seconds = gm.game_state["time_remaining"] % 60
         gm.game_state["clock"] = f"{minutes}:{seconds:02d}"
     elif q == 3:
-        # Q3: Opening tip winner gets possession via BASELINE_INBOUND
+        # Q3: Team that did NOT win opening tip gets possession via BASELINE_INBOUND
         opening_tip_winner = gm.game_state.get("opening_tip_winner", "home")
         if opening_tip_winner == "home":
-            gm.offense_team = gm.home_team
-            gm.defense_team = gm.away_team
-        else:
             gm.offense_team = gm.away_team
             gm.defense_team = gm.home_team
+        else:
+            gm.offense_team = gm.home_team
+            gm.defense_team = gm.away_team
         
         # Ensure strategy calls are set before creating inbound turn
         gm.turn_manager.set_strategy_calls()
@@ -387,7 +387,7 @@ def simulate_quarter(
         # Determine next defensive setup (FCP/HCT/HCO)
         next_defensive_setup = pressure_type if pressure_type in ["FCP", "HCT"] else None
         
-        print(f"🏀 Q{q} start: {gm.offense_team.name} gets possession (won opening tip) - Defense: {pressure_type}")
+        print(f"🏀 Q{q} start: {gm.offense_team.name} gets possession (lost opening tip) - Defense: {pressure_type}")
         
         # Create proper BASELINE_INBOUND turn using turn_manager
         inbound_payload = gm.turn_manager.setup_baseline_inbound(next_defensive_setup=next_defensive_setup)
@@ -410,14 +410,14 @@ def simulate_quarter(
         seconds = gm.game_state["time_remaining"] % 60
         gm.game_state["clock"] = f"{minutes}:{seconds:02d}"
     elif q == 4:
-        # Q4: Team that didn't win opening tip gets possession via BASELINE_INBOUND
+        # Q4: Opening tip winner gets possession via BASELINE_INBOUND
         opening_tip_winner = gm.game_state.get("opening_tip_winner", "home")
         if opening_tip_winner == "home":
-            gm.offense_team = gm.away_team
-            gm.defense_team = gm.home_team
-        else:
             gm.offense_team = gm.home_team
             gm.defense_team = gm.away_team
+        else:
+            gm.offense_team = gm.away_team
+            gm.defense_team = gm.home_team
         
         # Ensure strategy calls are set before creating inbound turn
         gm.turn_manager.set_strategy_calls()
@@ -429,7 +429,7 @@ def simulate_quarter(
         # Determine next defensive setup (FCP/HCT/HCO)
         next_defensive_setup = pressure_type if pressure_type in ["FCP", "HCT"] else None
         
-        print(f"🏀 Q{q} start: {gm.offense_team.name} gets possession (lost opening tip) - Defense: {pressure_type}")
+        print(f"🏀 Q{q} start: {gm.offense_team.name} gets possession (won opening tip) - Defense: {pressure_type}")
         
         # Create proper BASELINE_INBOUND turn using turn_manager
         inbound_payload = gm.turn_manager.setup_baseline_inbound(next_defensive_setup=next_defensive_setup)
