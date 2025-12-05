@@ -1413,6 +1413,142 @@ After a made shot (HCO MAKE, PUTBACK_MAKE, Fast Break MAKE, Free Throw MAKE), th
 
 ---
 
+## Quarter Start Possession Logic and BASELINE_INBOUND Turns ✅ **COMPLETE** (January 2025)
+
+**Status:** Fully implemented and tested
+
+### Quarter Start Possession Pattern
+
+**Q1 (First Quarter):**
+- **Start Type:** Opening Tip
+- **Possession:** Winner of opening tip gets possession
+- **Turn Type:** `OPENING_TIP` → Transitions to HCO
+- **Location:** `BackEnd/utils/opening_tip.py` `execute_opening_tip()`
+- **Frontend:** `AnimationEngine.handleOpeningTip()` → `openingTip.js`
+
+**Q2 (Second Quarter):**
+- **Start Type:** BASELINE_INBOUND
+- **Possession:** Team that did **NOT** win opening tip gets possession
+- **Turn Type:** `BASELINE_INBOUND` → Transitions to HCO/HCT/FCP (based on defensive pressure)
+- **Location:** `BackEnd/main.py` lines 328-369
+- **Frontend:** `AnimationEngine.handleBaselineInbound()` (same as post-shot BIP)
+
+**Q3 (Third Quarter):**
+- **Start Type:** BASELINE_INBOUND
+- **Possession:** Team that did **NOT** win opening tip gets possession (same as Q2)
+- **Turn Type:** `BASELINE_INBOUND` → Transitions to HCO/HCT/FCP (based on defensive pressure)
+- **Location:** `BackEnd/main.py` lines 370-411
+- **Frontend:** `AnimationEngine.handleBaselineInbound()` (same as post-shot BIP)
+
+**Q4 (Fourth Quarter):**
+- **Start Type:** BASELINE_INBOUND
+- **Possession:** Opening tip **winner** gets possession
+- **Turn Type:** `BASELINE_INBOUND` → Transitions to HCO/HCT/FCP (based on defensive pressure)
+- **Location:** `BackEnd/main.py` lines 412-453
+- **Frontend:** `AnimationEngine.handleBaselineInbound()` (same as post-shot BIP)
+
+**Overtime Quarters (OT1, OT2, OT3, etc.):**
+- **Start Type:** Opening Tip
+- **Possession:** Winner of opening tip gets possession
+- **Turn Type:** `OPENING_TIP` → Transitions to HCO
+- **Location:** `BackEnd/main.py` lines 318-327
+- **Frontend:** `AnimationEngine.handleOpeningTip()` → `openingTip.js`
+- **Note:** **Every overtime quarter** (even if there are multiple overtimes) always starts with an opening tip, not a BASELINE_INBOUND.
+
+### Possession Logic Summary
+
+**Pattern:**
+- **Q1:** Opening tip winner
+- **Q2:** Team that did NOT win opening tip
+- **Q3:** Team that did NOT win opening tip (same as Q2)
+- **Q4:** Opening tip winner (back to Q1 team)
+- **OT1, OT2, OT3, etc.:** Opening tip winner (new tip each OT)
+
+**Storage:**
+- Opening tip winner stored in `game_state["opening_tip_winner"]` as `"home"` or `"away"`
+- Set by: `BackEnd/utils/opening_tip.py` `execute_opening_tip()` line 78
+- Used by: `BackEnd/main.py` `simulate_quarter()` for Q2/Q3/Q4 possession determination
+
+### Quarter Start BASELINE_INBOUND Implementation
+
+**Backend (`BackEnd/main.py`):**
+
+For Q2, Q3, and Q4:
+1. **Determine Possession:** Based on `opening_tip_winner` from game state
+2. **Set Offense/Defense Teams:** Update `game.offense_team` and `game.defense_team`
+3. **Check Defensive Pressure:** Call `turn_manager.determine_defensive_pressure_type()` to check for FCP/HCT
+4. **Create BASELINE_INBOUND Turn:** Use `turn_manager.setup_baseline_inbound()` with `next_defensive_setup` parameter
+5. **Build Complete Turn:** Add `text`, `time_elapsed`, `possession_flips`, `quarter` fields
+6. **Append to Turns:** Add to `game.turns` array
+7. **Update Clock:** Subtract `time_elapsed` from `time_remaining`
+
+**Key Code:**
+```python
+# Q2 example (BackEnd/main.py lines 328-369)
+elif q == 2:
+    # Determine possession (team that did NOT win opening tip)
+    opening_tip_winner = gm.game_state.get("opening_tip_winner", "home")
+    if opening_tip_winner == "home":
+        gm.offense_team = gm.away_team
+        gm.defense_team = gm.home_team
+    else:
+        gm.offense_team = gm.home_team
+        gm.defense_team = gm.away_team
+    
+    # Check for defensive pressure
+    pressure_type = gm.turn_manager.determine_defensive_pressure_type()
+    next_defensive_setup = pressure_type if pressure_type in ["FCP", "HCT"] else None
+    
+    # Create BASELINE_INBOUND turn
+    inbound_payload = gm.turn_manager.setup_baseline_inbound(next_defensive_setup=next_defensive_setup)
+    inbound_turn = {
+        **inbound_payload,
+        "text": f"Start of Q{q}: {gm.offense_team.name} inbounds the ball.",
+        "time_elapsed": 4,
+        "possession_flips": False,
+        "quarter": q,
+    }
+    gm.turns.append(inbound_turn)
+```
+
+**Frontend:**
+
+Quarter start BASELINE_INBOUND turns are handled identically to post-shot BASELINE_INBOUND turns:
+- Same routing: `AnimationEngine.handleBaselineInbound()`
+- Same execution: `PassAnimationSystem.executeInboundSequence()` → `runInboundSetup()`
+- Same player positioning logic (HCO/HCT/FCP based on `next_defensive_setup`)
+- Same inbound pass animation
+
+**No Special Handling Required:**
+- Quarter start BIPs use the exact same code path as post-shot BIPs
+- Frontend cannot distinguish between quarter start BIPs and post-shot BIPs (and doesn't need to)
+- All BIPs are unified through the same `BASELINE_INBOUND` turn type
+
+### Benefits
+
+- ✅ **Unified System:** Quarter starts use the same BASELINE_INBOUND system as post-shot inbounds
+- ✅ **Consistent Frontend Handling:** No special-case code needed for quarter starts
+- ✅ **SS&S Aligned:** Single source of truth for all BASELINE_INBOUND turns
+- ✅ **Defensive Pressure Support:** Q2/Q3/Q4 can start with FCP/HCT pressure (same as post-shot)
+- ✅ **Proper Possession Logic:** Follows standard basketball rules (alternating possession pattern)
+
+### Key Files
+
+**Backend:**
+- `BackEnd/main.py` lines 318-453: Quarter start logic (Q1 opening tip, Q2/Q3/Q4 BASELINE_INBOUND)
+- `BackEnd/utils/opening_tip.py`: Opening tip execution and winner storage
+- `BackEnd/models/turn_manager.py` `setup_baseline_inbound()`: BASELINE_INBOUND turn creation
+
+**Frontend:**
+- `FrontEnd/static/js/phaser/animation/AnimationEngine.js` `handleBaselineInbound()`: Routes all BASELINE_INBOUND turns
+- `FrontEnd/static/js/phaser/animation/PassAnimationSystem.js` `executeInboundSequence()`: Executes inbound passes
+- `FrontEnd/static/js/phaser/animation/turnAnimation.js` `runInboundSetup()`: Positions players and handles inbound pass
+
+**Tests:**
+- `tests/test_quarter_starts.py`: Comprehensive tests for Q2/Q3/Q4 quarter starts
+
+---
+
 ### 4. `handleTurnover()`
 **Registered for:** `TURNOVER`  
 **Location:** `AnimationEngine.js` line 369  
