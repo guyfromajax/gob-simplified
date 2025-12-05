@@ -329,47 +329,33 @@ export class AnimationEngine {
       this.scene.pressureSequenceActive = false;
     }
     
-    // ✅ FIX: Position players using oDestinations (BASELINE_INBOUND uses destinations, not animations)
-    // For FCP/HCT, backend includes offense_setup_positions from skeleton step 0
+    // ✅ PHASE 2.6: Animate all players to their positions using distance-based duration
+    // This ensures consistent speed matching HCO step movements
+    // (moved from animateGameTurns.js)
     const { tweenPlayerTo } = await import('./ballTween.js');
     const { gridToPixels } = await import('../utils/gridToPixels.js');
     const { getPlayerDuration } = await import('./turnAnimation.js');
     
-    // Use offense_setup_positions if available (FCP/HCT), otherwise use oDestinations (normal inbound)
-    const offensePositions = turnData.offense_setup_positions || turnData.oDestinations || {};
-    const defensePositions = turnData.dDestinations || {};
-    
-    const positionPromises = [];
-    
-    // Position offensive players
-    for (const [playerId, sprite] of Object.entries(context.playerSprites)) {
-      const playerInfo = this.scene.playerInfo?.[playerId];
-      if (!playerInfo) continue;
-      
-      const isOffense = sprite.team_id === turnData.offense_team_id;
-      const positions = isOffense ? offensePositions : defensePositions;
-      const targetPos = positions[playerInfo.pos];
-      
-      if (targetPos) {
-        // Convert location string to coords if needed
-        let coords = targetPos;
-        if (targetPos.location) {
-          const { HCO_STRING_SPOTS } = await import('../utils/courtPositions.js');
-          coords = HCO_STRING_SPOTS[targetPos.location] || targetPos.coords || { x: 50, y: 25 };
-        } else if (targetPos.coords) {
-          coords = targetPos.coords;
-        }
+    await Promise.all(
+      (turnData.animations || []).map(anim => {
+        const sprite = context.playerSprites[anim.playerId];
+        if (!sprite || !anim.movement || anim.movement.length < 2) return Promise.resolve();
         
-        const endPixels = gridToPixels(coords.x, coords.y, this.scene.game.config.width, this.scene.game.config.height);
+        const endStep = anim.movement[anim.movement.length - 1];
+        const endPixels = gridToPixels(
+          endStep.coords.x, 
+          endStep.coords.y, 
+          this.scene.game.config.width, 
+          this.scene.game.config.height
+        );
+        
+        // Use distance-based duration for consistent speed (not transition - should match inbound setup speed)
         const duration = getPlayerDuration(sprite, endPixels.x, endPixels.y, false);
         
-        positionPromises.push(
-          tweenPlayerTo(this.scene, sprite, endPixels, { duration, easing: 'Linear' })
-        );
-      }
-    }
-    
-    await Promise.all(positionPromises);
+        // tweenPlayerTo returns a Promise that resolves when complete
+        return tweenPlayerTo(this.scene, sprite, endPixels, { duration, easing: 'Linear' });
+      })
+    );
     
     // ✅ NEW APPROACH: For FCP/HCT, continue to animate the inbound pass (don't skip)
     // Players are now at skeleton step 0 positions, pass animation creates the hold beat
