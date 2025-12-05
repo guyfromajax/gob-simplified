@@ -2057,7 +2057,17 @@ def apply_opposite_side_logic(skeleton_data, is_away_offense):
         # ✅ DEBUG: Check if this is final step
         step_is_final = step_idx == total_steps - 1
         
-        for position, action_data in step["pos_actions"].items():
+        pos_actions = step.get("pos_actions", {})
+        if not pos_actions:
+            # Skip steps with no pos_actions
+            modified_skeleton["steps"].append(modified_step)
+            continue
+        
+        for position, action_data in pos_actions.items():
+            if not isinstance(action_data, dict):
+                # Skip invalid action_data
+                continue
+                
             modified_action = action_data.copy()
             
             # Get the spot coordinates (MongoDB skeletons use "location", old skeletons use "spot")
