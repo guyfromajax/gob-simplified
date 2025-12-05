@@ -307,6 +307,21 @@ export async function runFreeThrowSequence(
             console.log(`${turnData.next_defensive_setup} detected after FT - skipping defensive retreat to midcourt`);
           }
           
+          // ✅ FIX: Don't call inboundSetup() here if next_play_type === "BASELINE_INBOUND"
+          // The BASELINE_INBOUND turn will handle the inbound setup via AnimationEngine.handleBaselineInbound()
+          // Calling it here causes double inbound passes and double setup animations
+          if (turnData.next_play_type === "BASELINE_INBOUND") {
+            console.log('🚫 [DOUBLE INBOUND PREVENTION] Skipping inboundSetup() in freeThrow.js - BASELINE_INBOUND turn will handle it', {
+              next_play_type: turnData.next_play_type,
+              next_defensive_setup: turnData.next_defensive_setup,
+              reason: 'BASELINE_INBOUND turn will execute runInboundSetup() via AnimationEngine.handleBaselineInbound()'
+            });
+            // ✅ REMOVED: inboundSetup() call - BASELINE_INBOUND turn handles it
+            // This prevents double inbound passes and double setup animations
+            nextStateResolved = States.Inbound;
+            return;
+          }
+          
           // Now call inboundSetup with the correct offense team (possession already flipped above)
           await inboundSetup({
             scene,
