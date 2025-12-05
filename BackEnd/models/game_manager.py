@@ -159,6 +159,12 @@ class GameManager:
         # print("Starting new turn")
         # print(f"offense_team: {self.offense_team}")
         result = self.turn_manager.run_micro_turn()
+        
+        # ✅ SS&S: Centralized next_turn determination (single source of truth)
+        # Sets explicit next_turn based on result and conditions
+        # This ensures ALL turns have accurate next_turn (no None values)
+        result["next_turn"] = self.determine_next_turn(result)
+        
         self.turns.append(result)
         self.text_log.append(result["text"])
 
@@ -170,6 +176,10 @@ class GameManager:
             oreb_turn = self.turn_manager.resolve_offensive_rebound_turn()
             if oreb_turn:
                 # print(f"📦 OREB turn created: {oreb_turn.get('result_type')} - {oreb_turn.get('text')}")
+                
+                # ✅ SS&S: Set next_turn for OREB turns (same centralized logic)
+                oreb_turn["next_turn"] = self.determine_next_turn(oreb_turn)
+                
                 self.turns.append(oreb_turn)
                 self.text_log.append(oreb_turn["text"])
                 
@@ -372,6 +382,56 @@ class GameManager:
         # print(f"result: {result}")
 
         return result
+
+    def determine_next_turn(self, result):
+        """
+        Centralized function to determine next turn type based on current result.
+        Single source of truth for all 51 turn-to-turn transitions.
+        
+        Uses transition registry from TRANSITION_SYSTEM.md as reference.
+        
+        Returns: str - Next turn type ("HCO", "BASELINE_INBOUND", "SIDE_INBOUND", etc.)
+        """
+        current = result.get("current_turn")
+        result_type = result.get("result_type")
+        
+        # OPENING_TIP → HCO (always)
+        if current == "OPENING_TIP":
+            return "HCO"
+        
+        # BASELINE_INBOUND → FCP/HCT/HCO (based on next_defensive_setup)
+        if current == "BASELINE_INBOUND":
+            return result.get("next_defensive_setup", "HCO")
+        
+        # SIDE_INBOUND → HCO (always)
+        if current == "SIDE_INBOUND":
+            return "HCO"
+        
+        # HCO, OREB, FAST_BREAK, FCP, HCT → Multiple options based on result_type
+        # These already set next_play_type in their handlers, so use that
+        if result.get("next_play_type"):
+            return result["next_play_type"]
+        
+        # For results without explicit next_play_type, determine based on result_type:
+        # - FOUL (non-shooting, no bonus) → SIDE_INBOUND
+        # - DEAD BALL → SIDE_INBOUND
+        # - STEAL → Already sets next_play_type
+        # - MISS (with pending_oreb) → Game manager creates OREB turn
+        
+        if result_type == "FOUL":
+            # Non-shooting foul or shooting foul not in bonus → SIDE_INBOUND
+            # (Shooting fouls in bonus already set next_play_type = "FREE_THROW")
+            if self.game_state.get("free_throws_remaining", 0) == 0:
+                return "SIDE_INBOUND"
+            else:
+                return "FREE_THROW"
+        
+        if result_type == "DEAD BALL":
+            # Dead ball turnovers → SIDE_INBOUND
+            return "SIDE_INBOUND"
+        
+        # Default to HCO if no explicit routing
+        return "HCO"
 
     def switch_possession(self):
         self.offense_team, self.defense_team = self.defense_team, self.offense_team
