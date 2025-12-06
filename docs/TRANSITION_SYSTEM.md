@@ -606,6 +606,38 @@ Note: **(PC)** indicates possession change
 
 **Note:** FCP and HCT have identical transition patterns but are counted separately.
 
+### Timeout Transitions (2)
+52. **Timeout → SIP**
+   - All non-Free Throw instnces
+53. **Timeout → Free Throw**
+   - Shooting Foul or Bonus FT instances
+54. **Timeout → BIP**
+   - Start of 2nd, 3rd, or 4th quarter
+
+#Timeout Transition Details
+
+**✅ COMPLETE** - See `master_game_doc.md` for full timeout system documentation.
+
+**Summary:**
+- Timeouts can be initiated by: user button press, computer logic, player foul-out, or quarter end
+- Timeout turns use standard turn structure with `result_type: "TIMEOUT"`
+- Game state persists through timeout (scores, clock, fouls, timeouts, lineups, stats)
+- Unified timeout resume architecture works for all game modes (single, tournament, franchise)
+- System uses database as single source of truth for timeout state
+- Mode-specific document access handles different storage locations automatically
+
+**Key Implementation:**
+- Backend: `restore_timeout_resume_state()` and `apply_timeout_resume_state_to_gm()` functions
+- Frontend: Auto-starts game on timeout resume, scoreboard displays immediately
+- Works regardless of memory state (game in memory or loaded from DB)
+
+#### Timeout Button Functionality
+-Timeout button design & placement: green button, placed in the same row as the Game Speed, Pause, and Skip To end buttons, placed to the right of the Skip To End button
+-The button should only be live and pressable during BIP and SIP turns, it should be deactivated in every other instance
+-When teh button is deactivated, reduce it's brightness by reducing its opacity
+-Add a 2 second pause in each BIP and SIP turn -- this pause should begin when all players reach their spot for the BIP or SIP turn, and the ball should be placed with the player placed OOB for the offense team during this turn -- he is the player who will throw the inbound pass when the turn goes live
+-When the Timeout button is live and pressable, place a horizontal progress bar below it. It should be the same length as teh Timeout button and 50% of the height. Give it a thin green border and orange fill. When the button goes live, it should be fully filled, and it's fill should decrease horizontally, from right to left, in proportion to teh 2 seconds it's live. So with one second remaining, it should be 50% horizontally filled, with the fill being fro teh left side to the horizontal middle.
+
 ---
 
 ## SS&S Transition Evaluation

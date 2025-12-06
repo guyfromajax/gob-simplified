@@ -1,8 +1,9 @@
-# Animation System Overview
+# Master Game Documentation
 
-> **Last Updated:** January 2025
+> **Last Updated:** January 2025  
+> **Previously:** `animation_system.md`
 
-This document provides an overview of the front-end animation stack for **GOB**, including both the production system and experimental components.
+This document provides comprehensive documentation of the **GOB** game system, including animation, transitions, game flows, and system architecture.
 
 ---
 
@@ -1677,27 +1678,71 @@ games_collection.update_one({"_id": game_id}, {"$set": db_summary}, upsert=True)
 1. **User navigates to lineup screen** (with `resume_from_timeout=true` URL parameter)
 2. **User makes lineup/game plan changes** (or keeps current settings)
 3. **User navigates back to court** (with `resume_from_timeout=true` flag)
-4. **Backend loads game from database** (not from memory, ensures latest state)
-5. **Backend restores all game state** (scores, clock, fouls, timeouts, lineups)
-6. **Backend creates initial turn** (SIP, Free Throw, or BIP based on `timeout_next_play_type`)
-7. **Frontend auto-starts game** (bypasses pre-game buttons)
-8. **Game continues** with correct state and next turn
+4. **Backend uses unified timeout resume system** (works for all modes and memory states)
+5. **Backend restores timeout state from database** (single source of truth)
+6. **Backend applies state to GameManager** (whether in memory or newly loaded)
+7. **Backend creates initial turn** (SIP, Free Throw, or BIP based on `timeout_next_play_type`)
+8. **Frontend auto-starts game** (bypasses pre-game buttons)
+9. **Game continues** with correct state and next turn
 
-**Key Code (`BackEnd/api/api.py` `simulate_quarter_endpoint()`):**
+### Unified Timeout Resume Architecture (Structural Fix - January 2025)
+
+The timeout resume system uses a unified architecture that works consistently across all game modes and memory states.
+
+**Core Principle:** Always use the database as the single source of truth for timeout state, regardless of whether the game is in memory or not.
+
+**Two Helper Functions:**
+
+1. **`restore_timeout_resume_state()`** - Loads timeout state from the correct document location based on game mode:
+   - **Single Game**: `games_collection` document
+   - **Tournament Game**: Nested in `tournaments_collection.games.{round}.{game_id}` (with fallback to `games_collection`)
+   - **Franchise Game**: Nested in `franchises_collection.games.week_{week}.{game_id}` (with fallback to `games_collection`)
+
+2. **`apply_timeout_resume_state_to_gm()`** - Applies restored state to GameManager instance:
+   - Restores `timeout_next_play_type` to `gm.game_state`
+   - Restores `clock` and `time_remaining`
+   - Works for both in-memory and newly-loaded games
+
+**Unified Flow (`BackEnd/api/api.py` `simulate_quarter_endpoint()`):**
+
 ```python
-# If resuming from timeout, force reload from DB (even if game is in memory)
-if request.resume_from_timeout and gm is not None and gm.game_id == game_id:
-    logging.info(f"🚨 TIMEOUT RESUME: Forcing reload of game {game_id} from DB to ensure latest state.")
-    del ongoing_games[game_id] # Remove from memory to force reload
-    gm = None # Set to None so the loading logic above re-fetches from DB
+# Step 1: Early state loading (before checking memory state)
+timeout_saved_state = None
+if request.resume_from_timeout:
+    timeout_saved_state = restore_timeout_resume_state(game_id, request, games_collection)
+    # This function handles mode-specific document locations automatically
 
-# Restore game state from database
-if should_restore_stats:
-    # Restore team-level stats (score, fouls, totals, points by quarter, timeouts)
-    # Restore clock and time_remaining
-    # Restore opening_tip_winner
-    # Restore timeout_next_play_type
+# Step 2: Apply to in-memory game (if exists)
+if timeout_saved_state and gm is not None:
+    apply_timeout_resume_state_to_gm(gm, timeout_saved_state)
+
+# Step 3: If game not in memory, load from DB
+if gm is None:
+    # ... load game from DB ...
+    # Step 4: Apply timeout state to newly loaded game
+    if timeout_saved_state:
+        apply_timeout_resume_state_to_gm(gm, timeout_saved_state)
+
+# Step 5: Continue with simulate_quarter()
+simulate_quarter(gm, ..., resume_from_timeout=request.resume_from_timeout)
 ```
+
+**Key Benefits:**
+- **Single code path** for all modes (single, tournament, franchise)
+- **Works regardless of memory state** (game in memory or not)
+- **Mode-specific document access** (checks correct location for each mode)
+- **Less fragile** (no assumptions about memory state)
+- **Consistent behavior** across all game modes
+
+**Mode-Specific Document Access:**
+
+The system automatically determines the correct document location:
+
+- **Single Mode**: Checks `games_collection` only
+- **Tournament Mode**: Checks nested structure first (`tournaments.games.{round}.{game_id}`), then falls back to `games_collection`
+- **Franchise Mode**: Checks nested structure first (`franchises.games.week_{week}.{game_id}`), then falls back to `games_collection`
+
+This ensures timeout state is found regardless of where the game document is stored, while maintaining the database as the single source of truth.
 
 ### Scoreboard Display Immediacy System
 
