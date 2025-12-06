@@ -839,7 +839,15 @@ async function init() {
       if (modeParam) params.set('mode', modeParam);
       params.set('quarter', String(quarter));
       params.set('period', periodLabel);
-      if (quarter > 1 && currentGameId) params.set('game_id', currentGameId);
+      
+      // ✅ TIMEOUT: Check for resume_from_timeout BEFORE game_id check (needed for Q1 timeouts)
+      const resumeFromTimeout = urlParams.get('resume_from_timeout');
+      
+      // ✅ CRITICAL FIX: Pass game_id for quarter breaks (Q2+) OR timeout resumes (Q1)
+      // Quarter breaks: quarter > 1 → passes game_id
+      // Timeout in Q1: resumeFromTimeout → passes game_id (this was missing!)
+      // New Q1 game: neither condition → doesn't pass game_id
+      if (currentGameId && (quarter > 1 || resumeFromTimeout)) params.set('game_id', currentGameId);
       
       // ✅ Preserve clock time if present (from foul out navigation)
       const clock = urlParams.get('clock');
@@ -857,7 +865,6 @@ async function init() {
       if (startingPossession) params.set('starting_possession', startingPossession);
       
       // ✅ TIMEOUT: Carry forward resume_from_timeout flag
-      const resumeFromTimeout = urlParams.get('resume_from_timeout');
       if (resumeFromTimeout) params.set('resume_from_timeout', resumeFromTimeout);
       
       if (DEBUG) {
@@ -893,7 +900,16 @@ async function init() {
       if (modeParam) params.set('mode', modeParam);
       params.set('quarter', String(quarter));
       params.set('period', periodLabel);
-      if (quarter > 1 && currentGameId) params.set('game_id', currentGameId);
+      
+      // ✅ TIMEOUT: Check for resume_from_timeout BEFORE game_id check (needed for Q1 timeouts)
+      const resumeFromTimeout = urlParams.get('resume_from_timeout');
+      
+      // ✅ CRITICAL FIX: Pass game_id for quarter breaks (Q2+) OR timeout resumes (Q1)
+      // Quarter breaks: quarter > 1 → passes game_id
+      // Timeout in Q1: resumeFromTimeout → passes game_id (this was missing!)
+      // New Q1 game: neither condition → doesn't pass game_id
+      if (currentGameId && (quarter > 1 || resumeFromTimeout)) params.set('game_id', currentGameId);
+      
       ['PG','SG','SF','PF','C'].forEach(pos => {
         const id = lineup[pos];
         if (id) params.set(`${myTeamSide}_${pos.toLowerCase()}`, id);
@@ -906,7 +922,6 @@ async function init() {
       if (startingPossession) params.set('starting_possession', startingPossession);
       
       // ✅ TIMEOUT: Carry forward resume_from_timeout flag
-      const resumeFromTimeout = urlParams.get('resume_from_timeout');
       if (resumeFromTimeout) params.set('resume_from_timeout', resumeFromTimeout);
 
       if (DEBUG) {
