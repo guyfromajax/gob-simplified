@@ -1795,30 +1795,40 @@ The timeout resume system uses a unified architecture that works consistently ac
 **Unified Flow (`BackEnd/api/api.py` `simulate_quarter_endpoint()`):**
 
 ```python
-# Step 1: Check if we should look for timeout state
-# Only check for existing games (not new game starts)
-should_check_timeout = game_id and not (request.quarter == 1 and not gm)
-
-if should_check_timeout:
+# Step 1: Always check database for timeout state if game_id exists
+# Don't skip Q1 - we could be resuming from a timeout in Q1!
+# The database is the source of truth - if timeout_next_play_type exists, we're resuming
+if game_id:
     # Step 2: Load timeout state from database (single source of truth)
     timeout_saved_state = restore_timeout_resume_state(game_id, request, games_collection)
+else:
+    timeout_saved_state = None  # No game_id = brand new game
+
+# Step 3: Validate and apply timeout state (if found)
+if timeout_saved_state:
+    # Validate quarter match to prevent stale data from affecting new games
+    saved_quarter = timeout_saved_state.get("quarter", 0)
+    timeout_next_play_type = timeout_saved_state.get("timeout_next_play_type")
     
-    if timeout_saved_state:
-        # Step 3: Apply to in-memory game (if exists)
-        if gm is not None:
-            apply_timeout_resume_state_to_gm(gm, timeout_saved_state)
-        # Step 4: Set resume_from_timeout flag for simulate_quarter()
+    if timeout_next_play_type and saved_quarter == request.quarter:
+        # Valid timeout state - apply it
         request.resume_from_timeout = True
+        if gm is not None:
+            # Step 4a: Apply to in-memory game (if exists)
+            apply_timeout_resume_state_to_gm(gm, timeout_saved_state)
+        # Step 4b: If game not in memory, will apply after DB load (see Step 6)
+    else:
+        # Stale timeout data (quarter mismatch) - ignore it
+        timeout_saved_state = None
 
 # Step 5: If game not in memory, load from DB
 if gm is None:
     # ... load game from DB ...
-    # Step 6: Apply timeout state to newly loaded game (if found)
+    # Step 6: Apply timeout state to newly loaded game (if found and valid)
     if timeout_saved_state:
-        # Validate quarter matches (prevent stale data)
-        if timeout_saved_state.get("timeout_next_play_type") and saved_quarter == request.quarter:
-            apply_timeout_resume_state_to_gm(gm, timeout_saved_state)
-            request.resume_from_timeout = True
+        # Quarter validation already done in Step 3
+        apply_timeout_resume_state_to_gm(gm, timeout_saved_state)
+        request.resume_from_timeout = True
 
 # Step 7: Continue with simulate_quarter()
 simulate_quarter(gm, ..., resume_from_timeout=request.resume_from_timeout)
@@ -1827,10 +1837,11 @@ simulate_quarter(gm, ..., resume_from_timeout=request.resume_from_timeout)
 **Key Benefits:**
 - **Single code path** for all modes (single, tournament, franchise)
 - **Works regardless of memory state** (game in memory or not)
+- **Works for all quarters** (including Q1 timeout resumes, even if game was evicted from memory)
 - **Mode-specific document access** (checks correct location for each mode)
-- **Less fragile** (no assumptions about memory state)
+- **Less fragile** (no assumptions about memory state or quarter)
 - **Consistent behavior** across all game modes
-- **New game protection** (doesn't check timeout state for new games)
+- **New game protection** (only checks timeout state if game_id exists)
 - **Stale data prevention** (validates quarter match before using timeout state)
 
 **Mode-Specific Document Access:**
