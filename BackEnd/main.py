@@ -279,6 +279,12 @@ def simulate_quarter(
     # Reuse the same pattern as quarter breaks - preserve all game state
     # Create the appropriate initial turn based on timeout_next_play_type
     if resume_from_timeout:
+        # ✅ TIMEOUT: Clear old turns from before timeout (same as quarter breaks clear turns)
+        # This prevents old turns (like opening tip) from being returned to frontend
+        if len(gm.turns) > 0:
+            logging.info(f"🧹 TIMEOUT RESUME: Clearing {len(gm.turns)} stale turns from before timeout")
+            gm.turns = []
+        
         timeout_next_play_type = gm.game_state.get("timeout_next_play_type")
         logging.info(f"✅ TIMEOUT RESUME: Skipping ALL quarter start logic (opening tip/inbounds) - timeout_next_play_type={timeout_next_play_type}")
         
