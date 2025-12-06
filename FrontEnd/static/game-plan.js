@@ -117,6 +117,28 @@ async function loadSettings() {
   try {
     let mode = modeParam || 'single';
     
+    // ✅ TIMEOUT: Check for game_plan_settings in URL params first (same as quarter breaks)
+    // This allows pre-populating settings when resuming from timeout
+    const gamePlanSettingsParam = urlParams.get('game_plan_settings');
+    if (gamePlanSettingsParam) {
+      try {
+        currentSettings = JSON.parse(gamePlanSettingsParam);
+        console.log('✅ Loaded game plan settings from URL params (timeout resume):', currentSettings);
+        // Update UI with loaded values
+        for (const [key, sliderId] of Object.entries(strategySliders)) {
+          const slider = document.getElementById(sliderId);
+          const valueDisplay = document.getElementById(`value-${sliderId.replace('slider-', '')}`);
+          const value = currentSettings.strategy_settings[key] || 2;
+          if (slider) slider.value = value;
+          if (valueDisplay) valueDisplay.textContent = value;
+        }
+        return; // Skip further loading if we got settings from URL
+      } catch (e) {
+        console.error('Error parsing game_plan_settings from URL:', e);
+        // Fall through to normal loading
+      }
+    }
+    
     // For single game mode, use localStorage (persist by team, not matchup)
     if (mode === 'single') {
       const storageKey = `gameplan_${teamName}`;
@@ -289,6 +311,10 @@ function navigateToCourt() {
   const startingPossession = urlParams.get('starting_possession');
   if (startWithInbound) params.set('start_with_inbound', startWithInbound);
   if (startingPossession) params.set('starting_possession', startingPossession);
+  
+  // ✅ TIMEOUT: Carry forward resume_from_timeout flag
+  const resumeFromTimeout = urlParams.get('resume_from_timeout');
+  if (resumeFromTimeout) params.set('resume_from_timeout', resumeFromTimeout);
   
   if (DEBUG) params.set('debug', '1');
   
