@@ -1059,6 +1059,8 @@ export function createGameScene(Phaser) {
           if (typeof turn.score[awayTeam] === 'number') liveScore[awayTeam] = turn.score[awayTeam];
         }
 
+        // ✅ TIMEOUT: Update fouls from turn data (same pattern as scores, timeouts, clock)
+        // Check multiple possible keys for foul data
         const homeF = turn.homeFouls ?? turn.home_team_fouls ?? turn.fouls?.home;
         const awayF = turn.awayFouls ?? turn.away_team_fouls ?? turn.fouls?.away;
         if (typeof homeF === 'number') liveHomeFouls = homeF;

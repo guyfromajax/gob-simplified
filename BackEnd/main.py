@@ -292,6 +292,10 @@ def simulate_quarter(
         if timeout_next_play_type == "SIDE_INBOUND":
             # Create SIP turn (same pattern as quarter breaks create BIP turns)
             logging.info(f"✅ TIMEOUT RESUME: Creating SIP turn")
+            # ✅ TIMEOUT: Reset offensive_state to HCO to ensure SIP transitions to HCO (not FCP/HCT)
+            # This prevents defensive pressure from before timeout from carrying over
+            gm.game_state["offensive_state"] = "HCO"
+            logging.info(f"✅ TIMEOUT RESUME: Reset offensive_state to HCO (was: {gm.game_state.get('offensive_state', 'unknown')})")
             gm.turn_manager.set_strategy_calls()  # Ensure strategy calls are set
             sip_turn = gm.turn_manager.setup_side_inbound()
             gm.turns.append(sip_turn)
