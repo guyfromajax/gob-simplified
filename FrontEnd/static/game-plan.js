@@ -284,6 +284,9 @@ async function saveSettings() {
 }
 
 function navigateToCourt() {
+  // ✅ EXACT SAME CODE as set-lineup.js working re-entry path (lines 829-871)
+  const currentGameId = urlParams.get('game_id') ||
+    (typeof localStorage !== 'undefined' ? localStorage.getItem('game_id') : null);
   const params = new URLSearchParams();
   params.set('home', homeTeam);
   params.set('away', awayTeam);
@@ -297,18 +300,24 @@ function navigateToCourt() {
   if (modeParam) params.set('mode', modeParam);
   params.set('quarter', String(quarter));
   params.set('period', periodLabel);
-  if (quarter > 1 && gameId) params.set('game_id', gameId);
+  if (quarter > 1 && currentGameId) params.set('game_id', currentGameId);
   
   // ✅ Preserve clock time if present (from foul out navigation)
   const clock = urlParams.get('clock');
   if (clock) params.set('clock', clock);
   
-  // Add lineup params (using same pattern as set-lineup.js)
-  if (pgId) params.set(`${myTeamSide}_pg`, pgId);
-  if (sgId) params.set(`${myTeamSide}_sg`, sgId);
-  if (sfId) params.set(`${myTeamSide}_sf`, sfId);
-  if (pfId) params.set(`${myTeamSide}_pf`, pfId);
-  if (cId) params.set(`${myTeamSide}_c`, cId);
+  // Build lineup object from URL params (matching set-lineup.js pattern)
+  const lineup = {};
+  if (pgId) lineup['PG'] = pgId;
+  if (sgId) lineup['SG'] = sgId;
+  if (sfId) lineup['SF'] = sfId;
+  if (pfId) lineup['PF'] = pfId;
+  if (cId) lineup['C'] = cId;
+  
+  ['PG','SG','SF','PF','C'].forEach(pos => {
+    const id = lineup[pos];
+    if (id) params.set(`${myTeamSide}_${pos.toLowerCase()}`, id);
+  });
   
   // Carry forward start_with_inbound and starting_possession if present (from Sim to 4th Quarter)
   const startWithInbound = urlParams.get('start_with_inbound');
@@ -320,8 +329,13 @@ function navigateToCourt() {
   const resumeFromTimeout = urlParams.get('resume_from_timeout');
   if (resumeFromTimeout) params.set('resume_from_timeout', resumeFromTimeout);
   
-  if (DEBUG) params.set('debug', '1');
-  
+  if (DEBUG) {
+    params.set('debug', '1');
+    // optional: params.set('debug_flow', '1');
+  }
+  if (DEBUG) {
+    console.debug('🔀 Redirecting to court.html (bypassing game plan)', { home: homeTeam, away: awayTeam, gameId: currentGameId });
+  }
   window.location.href = `/court.html?${params.toString()}`;
 }
 
