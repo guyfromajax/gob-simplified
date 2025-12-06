@@ -2,13 +2,15 @@
 const urlParams = new URLSearchParams(window.location.search);
 
 // ✅ DEBUG: Log URL params when game-plan page loads
-console.log('🔍 [GAME-PLAN] PAGE LOAD - URL params:', {
+const pageLoadParams = {
   fullUrl: window.location.href,
   game_id: urlParams.get('game_id'),
   resume_from_timeout: urlParams.get('resume_from_timeout'),
   quarter: urlParams.get('quarter'),
   allParams: Object.fromEntries(urlParams.entries())
-});
+};
+console.log('🔍 [GAME-PLAN] PAGE LOAD - URL params:', pageLoadParams);
+console.warn('⚠️ [GAME-PLAN] PAGE LOAD CHECK - game_id:', pageLoadParams.game_id, 'resume_from_timeout:', pageLoadParams.resume_from_timeout);
 
 const homeTeam = urlParams.get('home');
 const awayTeam = urlParams.get('away');
@@ -310,22 +312,38 @@ function navigateToCourt() {
   const currentUrlParams = new URLSearchParams(window.location.search);
   console.log('🚀 [GAME-PLAN] Current URL params:', Object.fromEntries(currentUrlParams.entries()));
   
-  // ✅ EXACT SAME CODE as set-lineup.js working re-entry path (lines 827-871)
+  // ✅ CRITICAL FIX: Read ALL params directly from URL (SS&S - single source of truth)
+  // Don't rely on module-level variables which might be stale
   const currentGameId = currentUrlParams.get('game_id') ||
     (typeof localStorage !== 'undefined' ? localStorage.getItem('game_id') : null);
   const params = new URLSearchParams();
-  params.set('home', homeTeam);
-  params.set('away', awayTeam);
-  if (homeId) params.set('home_id', homeId);
-  if (awayId) params.set('away_id', awayId);
-  if (myTeamSide) params.set('my_team', myTeamSide);
-  if (userTeamIdParam) params.set('user_team_id', userTeamIdParam);
-  if (franchiseId) params.set('franchise_id', franchiseId);
-  if (weekParam) params.set('week', weekParam);
-  if (tournamentId) params.set('tournament_id', tournamentId);
-  if (modeParam) params.set('mode', modeParam);
-  params.set('quarter', String(quarter));
-  params.set('period', periodLabel);
+  
+  // Read all params directly from current URL
+  const currentHomeTeam = currentUrlParams.get('home');
+  const currentAwayTeam = currentUrlParams.get('away');
+  const currentHomeId = currentUrlParams.get('home_id');
+  const currentAwayId = currentUrlParams.get('away_id');
+  const currentMyTeamSide = currentUrlParams.get('my_team');
+  const currentUserTeamId = currentUrlParams.get('user_team_id');
+  const currentFranchiseId = currentUrlParams.get('franchise_id');
+  const currentWeekParam = currentUrlParams.get('week');
+  const currentTournamentId = currentUrlParams.get('tournament_id');
+  const currentModeParam = currentUrlParams.get('mode');
+  const currentQuarter = parseInt(currentUrlParams.get('quarter'), 10) || 1;
+  const currentPeriodLabel = currentUrlParams.get('period') || `Q${currentQuarter}`;
+  
+  params.set('home', currentHomeTeam);
+  params.set('away', currentAwayTeam);
+  if (currentHomeId) params.set('home_id', currentHomeId);
+  if (currentAwayId) params.set('away_id', currentAwayId);
+  if (currentMyTeamSide) params.set('my_team', currentMyTeamSide);
+  if (currentUserTeamId) params.set('user_team_id', currentUserTeamId);
+  if (currentFranchiseId) params.set('franchise_id', currentFranchiseId);
+  if (currentWeekParam) params.set('week', currentWeekParam);
+  if (currentTournamentId) params.set('tournament_id', currentTournamentId);
+  if (currentModeParam) params.set('mode', currentModeParam);
+  params.set('quarter', String(currentQuarter));
+  params.set('period', currentPeriodLabel);
   
   // ✅ TIMEOUT: Check for resume_from_timeout BEFORE game_id check (needed for Q1 timeouts)
   const resumeFromTimeout = currentUrlParams.get('resume_from_timeout');
@@ -333,11 +351,11 @@ function navigateToCourt() {
   // ✅ DEBUG: Log timeout resume state
   console.log('🔍 [GAME-PLAN] navigateToCourt() timeout state:', {
     currentGameId,
-    quarter,
+    currentQuarter,
     resumeFromTimeout,
     urlGameId: currentUrlParams.get('game_id'),
     localStorageGameId: typeof localStorage !== 'undefined' ? localStorage.getItem('game_id') : null,
-    willPassGameId: currentGameId && (quarter > 1 || resumeFromTimeout)
+    willPassGameId: currentGameId && (currentQuarter > 1 || resumeFromTimeout)
   });
   
   // ✅ CRITICAL FIX: Pass game_id for quarter breaks (Q2+) OR timeout resumes (Q1)
@@ -350,9 +368,9 @@ function navigateToCourt() {
   } else {
     console.warn('⚠️ [GAME-PLAN] NOT passing game_id:', {
       hasCurrentGameId: !!currentGameId,
-      quarter,
+      currentQuarter,
       resumeFromTimeout,
-      reason: !currentGameId ? 'no currentGameId' : (quarter === 1 && !resumeFromTimeout ? 'Q1 without timeout' : 'unknown')
+      reason: !currentGameId ? 'no currentGameId' : (currentQuarter === 1 && !resumeFromTimeout ? 'Q1 without timeout' : 'unknown')
     });
   }
   
@@ -362,15 +380,21 @@ function navigateToCourt() {
   
   // Build lineup object from URL params (matching set-lineup.js pattern)
   const lineup = {};
-  if (pgId) lineup['PG'] = pgId;
-  if (sgId) lineup['SG'] = sgId;
-  if (sfId) lineup['SF'] = sfId;
-  if (pfId) lineup['PF'] = pfId;
-  if (cId) lineup['C'] = cId;
+  const currentPgId = currentMyTeamSide ? currentUrlParams.get(`${currentMyTeamSide}_pg`) : null;
+  const currentSgId = currentMyTeamSide ? currentUrlParams.get(`${currentMyTeamSide}_sg`) : null;
+  const currentSfId = currentMyTeamSide ? currentUrlParams.get(`${currentMyTeamSide}_sf`) : null;
+  const currentPfId = currentMyTeamSide ? currentUrlParams.get(`${currentMyTeamSide}_pf`) : null;
+  const currentCId = currentMyTeamSide ? currentUrlParams.get(`${currentMyTeamSide}_c`) : null;
+  
+  if (currentPgId) lineup['PG'] = currentPgId;
+  if (currentSgId) lineup['SG'] = currentSgId;
+  if (currentSfId) lineup['SF'] = currentSfId;
+  if (currentPfId) lineup['PF'] = currentPfId;
+  if (currentCId) lineup['C'] = currentCId;
   
   ['PG','SG','SF','PF','C'].forEach(pos => {
     const id = lineup[pos];
-    if (id) params.set(`${myTeamSide}_${pos.toLowerCase()}`, id);
+    if (id && currentMyTeamSide) params.set(`${currentMyTeamSide}_${pos.toLowerCase()}`, id);
   });
   
   // Carry forward start_with_inbound and starting_possession if present (from Sim to 4th Quarter)
@@ -407,8 +431,12 @@ async function navigateBack() {
   // Save settings quietly before navigating back to lineup
   await saveSettingsQuietly();
   
+  // ✅ CRITICAL FIX: Read URL params directly from window.location.search
+  // Don't rely on module-level urlParams which might be stale
+  const currentUrlParams = new URLSearchParams(window.location.search);
+  
   // Go back to lineup selection
-  const currentGameId = urlParams.get('game_id') ||
+  const currentGameId = currentUrlParams.get('game_id') ||
     (typeof localStorage !== 'undefined' ? localStorage.getItem('game_id') : null);
   const params = new URLSearchParams();
   params.set('home', homeTeam);
@@ -425,14 +453,14 @@ async function navigateBack() {
   params.set('period', periodLabel);
   
   // ✅ TIMEOUT: Check for resume_from_timeout BEFORE game_id check (needed for Q1 timeouts)
-  const resumeFromTimeout = urlParams.get('resume_from_timeout');
+  const resumeFromTimeout = currentUrlParams.get('resume_from_timeout');
   
   // ✅ DEBUG: Log timeout resume state
   console.log('🔍 [GAME-PLAN] navigateBack() timeout state:', {
     currentGameId,
     quarter,
     resumeFromTimeout,
-    urlGameId: urlParams.get('game_id'),
+    urlGameId: currentUrlParams.get('game_id'),
     localStorageGameId: typeof localStorage !== 'undefined' ? localStorage.getItem('game_id') : null,
     willPassGameId: currentGameId && (quarter > 1 || resumeFromTimeout)
   });
