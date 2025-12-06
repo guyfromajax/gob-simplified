@@ -225,7 +225,7 @@ async function handleTimeoutButtonClick() {
         
         // Navigate to lineup screen (will be handled by timeout popup)
         // For now, we'll show a popup and navigate
-        showTimeoutPopup(result, gameId, scene);
+        await showTimeoutPopup(result, gameId, scene);
         
     } catch (error) {
         console.error('❌ TIMEOUT: Error calling timeout', error);
@@ -236,7 +236,7 @@ async function handleTimeoutButtonClick() {
 /**
  * Show timeout popup and navigate to lineup screen
  */
-function showTimeoutPopup(timeoutResult, gameId, scene) {
+async function showTimeoutPopup(timeoutResult, gameId, scene) {
     // Get team info from scene - try multiple sources
     const homeTeam = scene.simData?.home_team?.name || 
                      scene.simData?.home_team_id || 
@@ -255,16 +255,64 @@ function showTimeoutPopup(timeoutResult, gameId, scene) {
     const homeTeamFallback = urlParams.get('home');
     const awayTeamFallback = urlParams.get('away');
     const myTeamSideFallback = urlParams.get('my_team');
+    const homeId = urlParams.get('home_id');
+    const awayId = urlParams.get('away_id');
+    const userTeamIdParam = urlParams.get('user_team_id');
+    const franchiseId = urlParams.get('franchise_id');
+    const weekParam = urlParams.get('week');
+    const tournamentId = urlParams.get('tournament_id');
+    const modeParam = urlParams.get('mode') || 'single';
     
     // Build URL for lineup screen
     const params = new URLSearchParams();
     params.set('game_id', gameId);
     params.set('home', homeTeam || homeTeamFallback || '');
     params.set('away', awayTeam || awayTeamFallback || '');
+    if (homeId) params.set('home_id', homeId);
+    if (awayId) params.set('away_id', awayId);
     params.set('my_team', myTeamSide || myTeamSideFallback || 'home');
+    if (userTeamIdParam) params.set('user_team_id', userTeamIdParam);
+    if (franchiseId) params.set('franchise_id', franchiseId);
+    if (weekParam) params.set('week', weekParam);
+    if (tournamentId) params.set('tournament_id', tournamentId);
+    if (modeParam) params.set('mode', modeParam);
     params.set('resume_from_timeout', 'true');
     params.set('quarter', scene.simData?.quarter || scene.quarter || 1);
     params.set('period', scene.simData?.period_label || scene.periodLabel || 'Q1');
+    
+    try {
+        // ✅ TIMEOUT: Get current lineup from scene (same as quarter breaks)
+        // The scene stores the current lineup in homeLineup and awayLineup
+        const homeLineup = scene.homeLineup || {};
+        const awayLineup = scene.awayLineup || {};
+        
+        // Pass lineup params to preserve current lineup (same pattern as quarter breaks)
+        ['PG', 'SG', 'SF', 'PF', 'C'].forEach(pos => {
+            const homePlayerId = homeLineup[pos];
+            const awayPlayerId = awayLineup[pos];
+            if (homePlayerId) params.set(`home_${pos.toLowerCase()}`, homePlayerId);
+            if (awayPlayerId) params.set(`away_${pos.toLowerCase()}`, awayPlayerId);
+        });
+        
+        // ✅ TIMEOUT: Fetch current game plan settings (same as quarter breaks)
+        const teamId = myTeamSide === 'home' ? homeId : awayId;
+        if (teamId && modeParam === 'single') {
+            const gameplanParams = new URLSearchParams();
+            gameplanParams.set('mode', 'single');
+            gameplanParams.set('game_id', gameId);
+            gameplanParams.set('team_id', teamId);
+            
+            const gameplanRes = await fetch(`/api/gameplan?${gameplanParams.toString()}`);
+            if (gameplanRes.ok) {
+                const gameplanData = await gameplanRes.json();
+                // Pass game plan settings as URL param (JSON string) - same pattern as quarter breaks
+                params.set('game_plan_settings', JSON.stringify(gameplanData));
+            }
+        }
+    } catch (error) {
+        console.error('❌ TIMEOUT: Error fetching lineup/game plan:', error);
+        // Continue navigation even if fetch fails
+    }
     
     // Navigate to lineup screen
     window.location.href = `/static/set-lineup.html?${params.toString()}`;
