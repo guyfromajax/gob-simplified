@@ -793,15 +793,21 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                 logging.error(f"❌ [STRATEGY SETTINGS] Error updating strategy_settings: {e}", exc_info=True)
         
         # ✅ TIMEOUT RESUME: Unified state restoration (works for all modes and all paths)
-        # ALWAYS check database for timeout state - don't rely on URL parameter
-        # Database state is the single source of truth (timeout_next_play_type persists in DB)
-        # URL parameter is just for navigation convenience, but DB check is what matters
+        # Only check database for timeout state if we have a game_id (existing game, not new game start)
+        # New game starts (Q1 with no game_id or new game_id) should NOT check for timeout state
         timeout_saved_state = None
-        logging.info(f"🔍 TIMEOUT RESUME CHECK: Checking DB for timeout state (game_id={game_id}, mode={request.mode}, URL resume_from_timeout={request.resume_from_timeout})")
+        logging.info(f"🔍 TIMEOUT RESUME CHECK: Checking if we should look for timeout state (game_id={game_id}, quarter={request.quarter}, mode={request.mode}, URL resume_from_timeout={request.resume_from_timeout})")
         
-        # Always check database for timeout state (regardless of URL parameter)
-        # This makes the system robust - even if URL parameter is lost, we still detect timeout resume
-        timeout_saved_state = restore_timeout_resume_state(game_id, request, games_collection)
+        # Only check for timeout state if:
+        # 1. We have a game_id (existing game, not brand new game)
+        # 2. We're not starting a fresh Q1 (new game start = opening tip, not timeout resume)
+        should_check_timeout = game_id and not (request.quarter == 1 and not gm)
+        
+        if should_check_timeout:
+            logging.info(f"🔍 TIMEOUT RESUME: Checking DB for timeout state (existing game)")
+            timeout_saved_state = restore_timeout_resume_state(game_id, request, games_collection)
+        else:
+            logging.info(f"🔍 TIMEOUT RESUME: Skipping timeout check (new game start or no game_id)")
         
         if timeout_saved_state:
             logging.info(f"✅ TIMEOUT RESUME: Found timeout state in DB, timeout_next_play_type={timeout_saved_state.get('timeout_next_play_type')}")
