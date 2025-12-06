@@ -286,10 +286,19 @@ def simulate_quarter(
             gm.turns = []
         
         timeout_next_play_type = gm.game_state.get("timeout_next_play_type")
-        logging.info(f"✅ TIMEOUT RESUME: Skipping ALL quarter start logic (opening tip/inbounds) - timeout_next_play_type={timeout_next_play_type}")
+        
+        # ✅ QUARTER BREAK: If timeout_next_play_type is missing/None, this is NOT a timeout resume
+        # This handles cases where resume_from_timeout flag was incorrectly preserved across quarter boundaries
+        # or stale timeout state exists in DB without valid next_play_type
+        if not timeout_next_play_type:
+            logging.warning(f"⚠️ QUARTER BREAK: resume_from_timeout=True but timeout_next_play_type is None - treating as normal quarter start (quarter {q})")
+            # Fall through to normal quarter initialization below
+            resume_from_timeout = False  # Clear flag to prevent timeout resume logic
+        else:
+            logging.info(f"✅ TIMEOUT RESUME: Skipping ALL quarter start logic (opening tip/inbounds) - timeout_next_play_type={timeout_next_play_type}")
         
         # Create the appropriate initial turn based on timeout_next_play_type
-        if timeout_next_play_type == "SIDE_INBOUND":
+        if resume_from_timeout and timeout_next_play_type == "SIDE_INBOUND":
             # Create SIP turn (same pattern as quarter breaks create BIP turns)
             logging.info(f"✅ TIMEOUT RESUME: Creating SIP turn with offense team: {gm.offense_team.name} (team_id: {gm.offense_team.team_id})")
             # ✅ TIMEOUT: Reset offensive_state to HCO to ensure SIP transitions to HCO (not FCP/HCT)
@@ -307,16 +316,16 @@ def simulate_quarter(
                 seconds = gm.game_state["time_remaining"] % 60
                 gm.game_state["clock"] = f"{minutes}:{seconds:02d}"
             logging.info(f"✅ TIMEOUT RESUME: SIP turn created with offense team: {gm.offense_team.name} (team_id: {gm.offense_team.team_id}), total turns: {len(gm.turns)}")
-        elif timeout_next_play_type == "FREE_THROW":
+        elif resume_from_timeout and timeout_next_play_type == "FREE_THROW":
             # Free throw turn will be created by simulate_macro_turn (first call from frontend)
             logging.info(f"✅ TIMEOUT RESUME: Will create FREE_THROW turn via /api/simulate-turn")
             pass
-        elif timeout_next_play_type == "BASELINE_INBOUND":
+        elif resume_from_timeout and timeout_next_play_type == "BASELINE_INBOUND":
             # BIP turn will be created by simulate_macro_turn (first call from frontend)
             logging.info(f"✅ TIMEOUT RESUME: Will create BASELINE_INBOUND turn via /api/simulate-turn")
             pass
-        else:
-            # Fallback: If timeout_next_play_type is missing or unexpected, default to SIP
+        elif resume_from_timeout:
+            # Fallback: If timeout_next_play_type is unexpected, default to SIP
             logging.warning(f"⚠️ TIMEOUT RESUME: timeout_next_play_type={timeout_next_play_type} is unexpected, defaulting to SIDE_INBOUND")
             gm.turn_manager.set_strategy_calls()
             sip_turn = gm.turn_manager.setup_side_inbound()
@@ -328,25 +337,27 @@ def simulate_quarter(
                 seconds = gm.game_state["time_remaining"] % 60
                 gm.game_state["clock"] = f"{minutes}:{seconds:02d}"
         
-        # ✅ TIMEOUT: Clear timeout state from memory
-        gm.game_state.pop("timeout_next_play_type", None)
-        gm.game_state.pop("timeout_offense_team_id", None)  # Also clear possession team
-        
-        # ✅ TIMEOUT: Clear timeout state from database after resume (defensive cleanup)
-        # This prevents stale timeout state from affecting future games
-        if game_id:
-            try:
-                from BackEnd.db import games_collection
-                games_collection.update_one(
-                    {"_id": game_id},
-                    {"$unset": {"timeout_next_play_type": "", "timeout_offense_team_id": ""}}
-                )
-                logging.info(f"🧹 TIMEOUT RESUME: Cleared timeout state from database for game_id={game_id}")
-            except Exception as e:
-                logging.warning(f"⚠️ TIMEOUT RESUME: Failed to clear timeout state from DB: {e}")
-                # Non-critical - game continues normally
-        
-        return gm  # Early return - skip all quarter initialization
+        # ✅ TIMEOUT: Only clear timeout state and return early if we actually handled a timeout resume
+        if resume_from_timeout:
+            # ✅ TIMEOUT: Clear timeout state from memory
+            gm.game_state.pop("timeout_next_play_type", None)
+            gm.game_state.pop("timeout_offense_team_id", None)  # Also clear possession team
+            
+            # ✅ TIMEOUT: Clear timeout state from database after resume (defensive cleanup)
+            # This prevents stale timeout state from affecting future games
+            if game_id:
+                try:
+                    from BackEnd.db import games_collection
+                    games_collection.update_one(
+                        {"_id": game_id},
+                        {"$unset": {"timeout_next_play_type": "", "timeout_offense_team_id": ""}}
+                    )
+                    logging.info(f"🧹 TIMEOUT RESUME: Cleared timeout state from database for game_id={game_id}")
+                except Exception as e:
+                    logging.warning(f"⚠️ TIMEOUT RESUME: Failed to clear timeout state from DB: {e}")
+                    # Non-critical - game continues normally
+
+            return gm  # Early return - skip all quarter initialization
 
     period_label = f"Q{q}" if q <= 4 else f"OT{q - 4}"
     gm.game_state["period_label"] = period_label
