@@ -1,5 +1,15 @@
 // Parse URL parameters
 const urlParams = new URLSearchParams(window.location.search);
+
+// ✅ DEBUG: Log URL params when game-plan page loads
+console.log('🔍 [GAME-PLAN] PAGE LOAD - URL params:', {
+  fullUrl: window.location.href,
+  game_id: urlParams.get('game_id'),
+  resume_from_timeout: urlParams.get('resume_from_timeout'),
+  quarter: urlParams.get('quarter'),
+  allParams: Object.fromEntries(urlParams.entries())
+});
+
 const homeTeam = urlParams.get('home');
 const awayTeam = urlParams.get('away');
 const homeId = urlParams.get('home_id');
@@ -294,10 +304,14 @@ async function saveSettings() {
 function navigateToCourt() {
   console.log('🚀 [GAME-PLAN] navigateToCourt() CALLED');
   console.log('🚀 [GAME-PLAN] Current URL:', window.location.href);
-  console.log('🚀 [GAME-PLAN] Current URL params:', Object.fromEntries(urlParams.entries()));
+  
+  // ✅ CRITICAL FIX: Read URL params directly from window.location.search
+  // Don't rely on module-level urlParams which might be stale
+  const currentUrlParams = new URLSearchParams(window.location.search);
+  console.log('🚀 [GAME-PLAN] Current URL params:', Object.fromEntries(currentUrlParams.entries()));
   
   // ✅ EXACT SAME CODE as set-lineup.js working re-entry path (lines 827-871)
-  const currentGameId = urlParams.get('game_id') ||
+  const currentGameId = currentUrlParams.get('game_id') ||
     (typeof localStorage !== 'undefined' ? localStorage.getItem('game_id') : null);
   const params = new URLSearchParams();
   params.set('home', homeTeam);
@@ -314,14 +328,14 @@ function navigateToCourt() {
   params.set('period', periodLabel);
   
   // ✅ TIMEOUT: Check for resume_from_timeout BEFORE game_id check (needed for Q1 timeouts)
-  const resumeFromTimeout = urlParams.get('resume_from_timeout');
+  const resumeFromTimeout = currentUrlParams.get('resume_from_timeout');
   
   // ✅ DEBUG: Log timeout resume state
   console.log('🔍 [GAME-PLAN] navigateToCourt() timeout state:', {
     currentGameId,
     quarter,
     resumeFromTimeout,
-    urlGameId: urlParams.get('game_id'),
+    urlGameId: currentUrlParams.get('game_id'),
     localStorageGameId: typeof localStorage !== 'undefined' ? localStorage.getItem('game_id') : null,
     willPassGameId: currentGameId && (quarter > 1 || resumeFromTimeout)
   });
@@ -343,7 +357,7 @@ function navigateToCourt() {
   }
   
   // ✅ Preserve clock time if present (from foul out navigation)
-  const clock = urlParams.get('clock');
+  const clock = currentUrlParams.get('clock');
   if (clock) params.set('clock', clock);
   
   // Build lineup object from URL params (matching set-lineup.js pattern)
@@ -360,8 +374,8 @@ function navigateToCourt() {
   });
   
   // Carry forward start_with_inbound and starting_possession if present (from Sim to 4th Quarter)
-  const startWithInbound = urlParams.get('start_with_inbound');
-  const startingPossession = urlParams.get('starting_possession');
+  const startWithInbound = currentUrlParams.get('start_with_inbound');
+  const startingPossession = currentUrlParams.get('starting_possession');
   if (startWithInbound) params.set('start_with_inbound', startWithInbound);
   if (startingPossession) params.set('starting_possession', startingPossession);
   
