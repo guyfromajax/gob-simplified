@@ -1736,6 +1736,13 @@ games_collection.update_one(
 - Frontend checks database as fallback if URL parameter is missing (`bootGame.js` lines 825-841)
 - This provides resilience if URL parameter is lost during navigation
 
+**Critical Frontend Pattern (game-plan.js):**
+- `navigateToCourt()` reads ALL URL params directly from `window.location.search` when called
+- Does NOT rely on module-level variables that might be stale (especially after async delays)
+- This ensures `game_id` and `resume_from_timeout` are always current when navigating to court
+- Same pattern as working lineup path (`set-lineup.js`) - direct reads from URL
+- Prevents params from being lost during navigation chain: lineup → game-plan → court
+
 #### LocalStorage (Frontend State Only)
 
 **Purpose:** LocalStorage is used for frontend convenience, not business logic.
