@@ -210,6 +210,12 @@ export function createGameScene(Phaser) {
       const resumeFromTimeout = timeoutUrlParams.get('resume_from_timeout') === 'true';
       if (resumeFromTimeout) {
         payload.resume_from_timeout = true;
+        console.log('🔍 TIMEOUT RESUME: Setting resume_from_timeout=true in payload', payload);
+      } else {
+        console.log('🔍 TIMEOUT RESUME: resume_from_timeout not in URL or not true', {
+          url: window.location.search,
+          resumeFromTimeout: resumeFromTimeout
+        });
       }
       if (DEBUG_FLOW) {
         console.log('[gameScene] request payload', {
