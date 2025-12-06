@@ -231,10 +231,20 @@ class GameManager:
             foul_out_player_id = foul_out_player_data.get("player_id") if isinstance(foul_out_player_data, dict) else None
             if foul_out_player_id:
                 for team in [self.home_team, self.away_team]:
-                    for player in team.get_all_players():
-                        if player.player_id == foul_out_player_id:
+                    # Try get_all_players() first (returns all roster players)
+                    players = team.get_all_players() if hasattr(team, 'get_all_players') else []
+                    for player in players:
+                        if hasattr(player, 'player_id') and player.player_id == foul_out_player_id:
                             foul_out_player = player
                             break
+                    if foul_out_player:
+                        break
+                    # Fallback: check lineup players
+                    if not foul_out_player:
+                        for player in team.lineup.values():
+                            if player and hasattr(player, 'player_id') and player.player_id == foul_out_player_id:
+                                foul_out_player = player
+                                break
                     if foul_out_player:
                         break
             

@@ -1358,7 +1358,7 @@ def simulate_turn_endpoint(request: TurnSimulationRequest):
     
     # ✅ TIMEOUT: Check if last turn is a TIMEOUT turn (user-initiated or foul out)
     # If so, return it immediately without simulating a new turn
-    if gm.turns and gm.turns[-1].get("result_type") == "TIMEOUT":
+    if gm.turns and isinstance(gm.turns[-1], dict) and gm.turns[-1].get("result_type") == "TIMEOUT":
         timeout_turn = gm.turns[-1]
         logging.info(f"⏸️ TIMEOUT: Returning existing TIMEOUT turn (reason: {timeout_turn.get('timeout_reason')})")
         # Remove the TIMEOUT turn from turns so next API call can simulate the actual next turn
@@ -1387,25 +1387,6 @@ def simulate_turn_endpoint(request: TurnSimulationRequest):
                 gm.away_team.name: gm.away_team.get_team_game_stats()
             }
         }
-    
-    # ✅ TIMEOUT: If resuming from timeout and no turns exist, create the initial turn
-    # This handles the case where simulate_quarter skipped initialization
-    if not gm.turns and gm.game_state.get("timeout_next_play_type"):
-        timeout_next_play_type = gm.game_state.get("timeout_next_play_type")
-        logging.info(f"✅ TIMEOUT RESUME: Creating initial turn based on timeout_next_play_type: {timeout_next_play_type}")
-        if timeout_next_play_type == "SIDE_INBOUND":
-            # Create SIP turn
-            gm.turn_manager.set_strategy_calls()
-            sip_turn = gm.turn_manager.setup_side_inbound()
-            gm.turns.append(sip_turn)
-            gm.text_log.append(sip_turn["text"])
-            # Update clock (SIP takes 4 seconds)
-            gm.game_state["time_remaining"] -= 4
-            minutes = gm.game_state["time_remaining"] // 60
-            seconds = gm.game_state["time_remaining"] % 60
-            gm.game_state["clock"] = f"{minutes}:{seconds:02d}"
-        # For FREE_THROW and BASELINE_INBOUND, simulate_macro_turn will create them
-        gm.game_state.pop("timeout_next_play_type", None)  # Clear flag
     
     # Simulate ONE turn
     try:
@@ -1503,8 +1484,11 @@ def simulate_turn_endpoint(request: TurnSimulationRequest):
         return response_data
         
     except Exception as e:
+        import traceback
+        error_trace = traceback.format_exc()
         logging.exception(f"Failed to simulate turn for game {game_id}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logging.error(f"Full traceback:\n{error_trace}")
+        raise HTTPException(status_code=500, detail=f"{str(e)}\n\nFull traceback:\n{error_trace}")
 
 
 @app.post("/api/call-timeout")

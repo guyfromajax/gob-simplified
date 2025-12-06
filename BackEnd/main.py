@@ -277,11 +277,30 @@ def simulate_quarter(
 
     # ✅ TIMEOUT: If resuming from timeout, skip all quarter initialization
     # Reuse the same pattern as quarter breaks - preserve all game state
-    # The next turn will be created by the first /api/simulate-turn call
+    # Create the appropriate initial turn based on timeout_next_play_type
     if resume_from_timeout:
         logging.info(f"✅ TIMEOUT RESUME: Skipping ALL quarter start logic (opening tip/inbounds) - game will continue with next turn via /api/simulate-turn")
-        # Don't create the initial turn here - let the first /api/simulate-turn call create it
-        # This matches the pattern used for quarter breaks
+        # Create the appropriate initial turn based on timeout_next_play_type
+        timeout_next_play_type = gm.game_state.get("timeout_next_play_type")
+        if timeout_next_play_type == "SIDE_INBOUND":
+            # Create SIP turn
+            gm.turn_manager.set_strategy_calls()  # Ensure strategy calls are set
+            sip_turn = gm.turn_manager.setup_side_inbound()
+            gm.turns.append(sip_turn)
+            gm.text_log.append(sip_turn.get("text", "Side inbound"))
+            # Update clock (SIP takes 4 seconds)
+            if gm.game_state.get("time_remaining", 0) > 4:
+                gm.game_state["time_remaining"] -= 4
+                minutes = gm.game_state["time_remaining"] // 60
+                seconds = gm.game_state["time_remaining"] % 60
+                gm.game_state["clock"] = f"{minutes}:{seconds:02d}"
+        elif timeout_next_play_type == "FREE_THROW":
+            # Free throw turn will be created by simulate_macro_turn (first call from frontend)
+            pass
+        elif timeout_next_play_type == "BASELINE_INBOUND":
+            # BIP turn will be created by simulate_macro_turn (first call from frontend)
+            pass
+        gm.game_state.pop("timeout_next_play_type", None)  # Clear flag
         return gm  # Early return - skip all quarter initialization
 
     period_label = f"Q{q}" if q <= 4 else f"OT{q - 4}"
