@@ -204,13 +204,13 @@ export function createGameScene(Phaser) {
 
       // ✅ NEW GAME DETECTION: Determine if this is a truly new game
       // New game if: no game_id, OR Q1 with no game_id in URL and not resuming from timeout
-      const urlParams = new URLSearchParams(window.location.search);
-      const urlGameId = urlParams.get('game_id');
-      const resumeFromTimeout = urlParams.get('resume_from_timeout') === 'true';
-      const isNewGame = !this.gameId || 
+      const timeoutUrlParams = new URLSearchParams(window.location.search);
+      const urlGameId = timeoutUrlParams.get('game_id');
+      const resumeFromTimeout = timeoutUrlParams.get('resume_from_timeout') === 'true';
+      const isNewGameStart = !this.gameId || 
                         (this.quarter === 1 && !urlGameId && !resumeFromTimeout);
       
-      if (isNewGame) {
+      if (isNewGameStart) {
         // Clear stale game_id for new game
         console.log('🆕 NEW GAME: Clearing stale game_id for new game start');
         this.gameId = null;
@@ -221,7 +221,7 @@ export function createGameScene(Phaser) {
       
       const payload = { home_team: homeTeam, away_team: awayTeam, quarter: this.quarter };
       // Only pass game_id if we have one AND it's not a new game
-      if (this.gameId && !isNewGame) {
+      if (this.gameId && !isNewGameStart) {
         payload.game_id = this.gameId;
       }
       
