@@ -1059,10 +1059,14 @@ export function createGameScene(Phaser) {
           if (typeof turn.score[awayTeam] === 'number') liveScore[awayTeam] = turn.score[awayTeam];
         }
 
-        // ✅ TIMEOUT: Update fouls from turn data (same pattern as scores, timeouts, clock)
-        // Check multiple possible keys for foul data
-        const homeF = turn.homeFouls ?? turn.home_team_fouls ?? turn.fouls?.home;
-        const awayF = turn.awayFouls ?? turn.away_team_fouls ?? turn.fouls?.away;
+        // ✅ TIMEOUT: Update fouls from turn data (exact same pattern as scores)
+        if (turn.homeFouls !== undefined || turn.awayFouls !== undefined) {
+          if (typeof turn.homeFouls === 'number') liveHomeFouls = turn.homeFouls;
+          if (typeof turn.awayFouls === 'number') liveAwayFouls = turn.awayFouls;
+        }
+        // Also check alternative keys (for turn data)
+        const homeF = turn.home_team_fouls ?? turn.fouls?.home;
+        const awayF = turn.away_team_fouls ?? turn.fouls?.away;
         if (typeof homeF === 'number') liveHomeFouls = homeF;
         if (typeof awayF === 'number') liveAwayFouls = awayF;
 
