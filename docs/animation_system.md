@@ -1549,6 +1549,501 @@ Quarter start BASELINE_INBOUND turns are handled identically to post-shot BASELI
 
 ---
 
+## Timeout System ✅ **COMPLETE** (January 2025)
+
+The timeout system allows game pauses for strategic adjustments, lineup changes, and game plan modifications. Timeouts are treated as standard game turns and integrate seamlessly with the existing transition system.
+
+### Overview
+
+**Timeout Turn Type:** `TIMEOUT`
+
+**Timeout Reasons:**
+- `"USER"` - User-initiated timeout (via timeout button)
+- `"COMPUTER"` - AI-initiated timeout (future feature)
+- `"FOUL_OUT"` - Player fouls out (automatic timeout)
+- `"QUARTER_END"` - Quarter end timeout (currently not used, quarter transitions are seamless)
+
+**Key Features:**
+- Timeouts are standard game turns (same data structure and flow)
+- Game state persists across timeout (scores, clock, fouls, timeouts, lineups)
+- Lineup and game plan screens pre-populated with current settings
+- Scoreboard displays immediately on timeout resume
+- Uses same transition system as other game flows
+
+### Transition Flow and Integration
+
+**Timeout Turn Creation:**
+
+1. **User-Initiated Timeout:**
+   - User presses timeout button during SIP/BIP turn (2.5-second pause window)
+   - Frontend calls `/api/call-timeout` endpoint
+   - Backend creates `TIMEOUT` turn via `turn_manager.setup_timeout_turn()`
+   - `TIMEOUT` turn appended to `gm.turns` array
+
+2. **Foul-Out Timeout:**
+   - Player fouls out during shot resolution
+   - `result["fouled_out"] = True` set in `shot_manager.py`
+   - `game_manager.simulate_macro_turn()` detects `fouled_out` flag
+   - Creates `TIMEOUT` turn with `timeout_reason="FOUL_OUT"`
+
+**Timeout Turn Payload:**
+
+```python
+{
+    "result_type": "TIMEOUT",
+    "current_turn": "TIMEOUT",
+    "timeout_reason": "USER" | "COMPUTER" | "FOUL_OUT" | "QUARTER_END",
+    "next_play_type": "SIDE_INBOUND" | "FREE_THROW" | "BASELINE_INBOUND",
+    "next_turn": "SIDE_INBOUND" | "FREE_THROW" | "BASELINE_INBOUND",
+    "offense_team_id": game.offense_team.team_id,
+    "quarter": game.quarter,
+    "text": "Timeout called by [Team Name]",
+    "time_elapsed": 0,  # Timeouts don't consume game time
+    "possession_flips": False,
+    "timeout_calling_team": {
+        "name": calling_team.name,
+        "team_id": calling_team.team_id
+    },
+    "home_team_timeouts": gm.home_team.timeouts,
+    "away_team_timeouts": gm.away_team.timeouts
+}
+```
+
+**Next Play Type Determination:**
+
+The `next_play_type` in the timeout turn determines what happens after the timeout:
+
+1. **`"SIDE_INBOUND"` (Default):**
+   - Used when timeout is called during active play
+   - Team that had possession gets the ball back
+   - Creates SIP turn after timeout resume
+
+2. **`"FREE_THROW"`:**
+   - Used when timeout is called during free throw sequence
+   - Free throw sequence continues after timeout resume
+
+3. **`"BASELINE_INBOUND"`:**
+   - Used when timeout is called at quarter start (Q2/Q3/Q4)
+   - Quarter start BIP turn continues after timeout resume
+
+**Transition System Integration:**
+
+Timeouts use the same centralized transition system as all other turns:
+
+**Backend (`BackEnd/models/game_manager.py` `determine_next_turn()`):**
+```python
+# TIMEOUT → SIP/Free Throw/BIP (based on next_play_type in timeout turn)
+if current == "TIMEOUT":
+    return result.get("next_play_type", "SIDE_INBOUND")
+```
+
+**Frontend (`FrontEnd/static/js/phaser/animation/animateGameTurns.js`):**
+```javascript
+if (turn.result_type === "TIMEOUT") {
+    turn.index = i;
+    await animationRouter.processTurn(turn);
+    console.log('⏸️ TIMEOUT: Stopping animation loop - user will navigate to lineup screen');
+    break; // Exit the loop - don't process any more turns
+}
+```
+
+**Key Point:** Timeouts are routed through `AnimationRouter.processTurn()` just like all other turn types, ensuring consistent handling and data flow.
+
+### Data Persistence System
+
+**Game State Persistence:**
+
+When a timeout is called, the game state is saved to the database using the same pattern as quarter breaks and foul-out instances:
+
+**Backend (`BackEnd/api/api.py` `call_timeout_endpoint()`):**
+```python
+# Save game state to database (reuse existing persistence pattern)
+db_summary = summarize_game_state(gm, exclude_animations=True)
+games_collection.update_one({"_id": game_id}, {"$set": db_summary}, upsert=True)
+```
+
+**Persisted Data:**
+- Scores (`score` object)
+- Clock (`clock` string, `time_remaining` seconds)
+- Team fouls (`team_fouls` object)
+- Team timeouts (`team_timeouts` object)
+- Quarter number
+- Lineups (`home_lineup`, `away_lineup`)
+- Player stats (box score)
+- Game state flags (`timeout_next_play_type`, `offensive_state`, etc.)
+
+**Resume Flow:**
+
+1. **User navigates to lineup screen** (with `resume_from_timeout=true` URL parameter)
+2. **User makes lineup/game plan changes** (or keeps current settings)
+3. **User navigates back to court** (with `resume_from_timeout=true` flag)
+4. **Backend loads game from database** (not from memory, ensures latest state)
+5. **Backend restores all game state** (scores, clock, fouls, timeouts, lineups)
+6. **Backend creates initial turn** (SIP, Free Throw, or BIP based on `timeout_next_play_type`)
+7. **Frontend auto-starts game** (bypasses pre-game buttons)
+8. **Game continues** with correct state and next turn
+
+**Key Code (`BackEnd/api/api.py` `simulate_quarter_endpoint()`):**
+```python
+# If resuming from timeout, force reload from DB (even if game is in memory)
+if request.resume_from_timeout and gm is not None and gm.game_id == game_id:
+    logging.info(f"🚨 TIMEOUT RESUME: Forcing reload of game {game_id} from DB to ensure latest state.")
+    del ongoing_games[game_id] # Remove from memory to force reload
+    gm = None # Set to None so the loading logic above re-fetches from DB
+
+# Restore game state from database
+if should_restore_stats:
+    # Restore team-level stats (score, fouls, totals, points by quarter, timeouts)
+    # Restore clock and time_remaining
+    # Restore opening_tip_winner
+    # Restore timeout_next_play_type
+```
+
+### Scoreboard Display Immediacy System
+
+**Problem:** Scoreboard items (scores, fouls, timeouts, clock) need to display immediately when resuming from timeout, not wait for the next turn to complete.
+
+**Solution:** Direct DOM updates with team object priority.
+
+**Initial Value Extraction (`FrontEnd/static/js/phaser/gameScene.js`):**
+
+All scoreboard items check team objects first (authoritative source), then fall back to game object:
+
+```javascript
+// Scores: Check team objects first (same pattern as timeouts)
+const homeScoreFromData = homeTeamObj?.score ?? simData.score?.[homeTeam];
+const awayScoreFromData = awayTeamObj?.score ?? simData.score?.[awayTeam];
+
+// Fouls: Check team objects first (same pattern as timeouts)
+const homeFoulsFromData = homeTeamObj?.team_fouls ?? simData.fouls?.home;
+const awayFoulsFromData = awayTeamObj?.team_fouls ?? simData.fouls?.away;
+
+// Timeouts: Check team objects first (already working)
+const homeTimeoutsFromData = homeTeamObj?.timeouts ?? simData.timeouts?.home ?? simData.home_team_timeouts;
+const awayTimeoutsFromData = awayTeamObj?.timeouts ?? simData.timeouts?.away ?? simData.away_team_timeouts;
+```
+
+**Immediate DOM Update (`FrontEnd/static/js/phaser/gameScene.js` `updateScoreboard()`):**
+
+All scoreboard items use direct DOM manipulation (consistent pattern):
+
+```javascript
+// Direct DOM updates for all scoreboard items (consistent pattern)
+if (homeScoreEl) homeScoreEl.textContent = liveScore[homeTeam];
+if (awayScoreEl) awayScoreEl.textContent = liveScore[awayTeam];
+if (homeFoulsEl) homeFoulsEl.textContent = `F: ${liveHomeFouls}`;
+if (awayFoulsEl) awayFoulsEl.textContent = `F: ${liveAwayFouls}`;
+if (homeTolEl) homeTolEl.textContent = `TOL: ${liveHomeTimeouts}`;
+if (awayTolEl) awayTolEl.textContent = `TOL: ${liveAwayTimeouts}`;
+if (clockEl) clockEl.textContent = liveClock;
+if (quarterEl) quarterEl.textContent = livePeriodLabel;
+```
+
+**Initial Call (`FrontEnd/static/js/phaser/gameScene.js`):**
+
+When resuming from timeout, `updateScoreboard()` is called with initial values:
+
+```javascript
+updateScoreboard({
+    score: liveScore,
+    homeFouls: liveHomeFouls,
+    awayFouls: liveAwayFouls,
+    homeTimeouts: liveHomeTimeouts,
+    awayTimeouts: liveAwayTimeouts,
+    clock: liveClock,
+    quarter: liveQuarter,
+    period_label: livePeriodLabel,
+});
+```
+
+**Why Team Objects First?**
+
+Turn data provides values from team objects:
+- `turn.homeFouls` = `self.game.home_team.team_fouls` (from team object)
+- `turn.home_team_timeouts` = `getattr(gm.home_team, 'timeouts', 5)` (from team object)
+- `turn.score` = `game.score.get(team_name, 0)` (from game object, but team objects also have `score`)
+
+Checking team objects first ensures consistency with how turn data provides these values.
+
+### Lineup and Game Plan Pre-Population
+
+**Lineup Pre-Population:**
+
+When navigating to the lineup screen during a timeout, the current lineup is fetched and pre-populated:
+
+**Backend (`BackEnd/api/api.py` `/api/game/{game_id}/lineup` endpoint):**
+```python
+@app.get("/api/game/{game_id}/lineup")
+def get_game_lineup(game_id: str):
+    # Returns current lineups for both teams
+    return {
+        "home_lineup": gm.home_lineup,
+        "away_lineup": gm.away_lineup
+    }
+```
+
+**Frontend (`FrontEnd/static/js/phaser/utils/timeoutButtonManager.js` `showTimeoutPopup()`):**
+```javascript
+// Fetch current lineup for both teams
+const lineupResponse = await fetch(`/api/game/${gameId}/lineup`);
+const lineupData = await lineupResponse.json();
+homeLineup = lineupData.home_lineup || {};
+awayLineup = lineupData.away_lineup || {};
+
+// Add lineup params to URL
+Object.entries(homeLineup).forEach(([pos, playerId]) => {
+    params.set(`home_${pos.toLowerCase()}`, playerId);
+});
+Object.entries(awayLineup).forEach(([pos, playerId]) => {
+    params.set(`away_${pos.toLowerCase()}`, playerId);
+});
+```
+
+**Frontend (`FrontEnd/static/set-lineup.js` `restoreLineupFromUrl()`):**
+```javascript
+function restoreLineupFromUrl() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const positions = ['PG', 'SG', 'SF', 'PF', 'C'];
+    
+    positions.forEach(pos => {
+        const homeId = urlParams.get(`home_${pos.toLowerCase()}`);
+        const awayId = urlParams.get(`away_${pos.toLowerCase()}`);
+        if (homeId) {
+            // Pre-populate home lineup slot
+            document.querySelector(`#home-${pos.toLowerCase()}`).value = homeId;
+        }
+        if (awayId) {
+            // Pre-populate away lineup slot
+            document.querySelector(`#away_${pos.toLowerCase()}`).value = awayId;
+        }
+    });
+}
+```
+
+**Game Plan Pre-Population:**
+
+Current game plan settings are fetched and passed to the game plan screen:
+
+**Frontend (`FrontEnd/static/js/phaser/utils/timeoutButtonManager.js` `showTimeoutPopup()`):**
+```javascript
+// Fetch current game plan settings for the user's team
+const gpResponse = await fetch(`/api/gameplan?${gpParams.toString()}`);
+gamePlanSettings = await gpResponse.json();
+
+// Add game plan settings to URL
+if (gamePlanSettings) {
+    params.set('game_plan_settings', JSON.stringify(gamePlanSettings));
+}
+```
+
+**Frontend (`FrontEnd/static/game-plan.js` `loadSettings()`):**
+```javascript
+function loadSettings() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const gamePlanSettingsParam = urlParams.get('game_plan_settings');
+    
+    if (gamePlanSettingsParam) {
+        // Parse and apply game plan settings from URL
+        const settings = JSON.parse(gamePlanSettingsParam);
+        // Apply settings to form
+    }
+}
+```
+
+### Timeout Button Functionality
+
+**Feature Flag:**
+
+The timeout button is controlled by a feature flag for easy enabling/disabling:
+
+**Location:** `FrontEnd/static/js/phaser/utils/timeoutButtonManager.js`
+
+```javascript
+const ENABLE_TIMEOUT_BUTTON = true; // Feature flag for modularity
+```
+
+**Button State:**
+
+- **Live:** Button is enabled and clickable (during 2.5-second pause window)
+- **Dead:** Button is disabled with reduced opacity (all other times)
+
+**Button Initialization:**
+
+```javascript
+function initTimeoutButton() {
+    if (!ENABLE_TIMEOUT_BUTTON) {
+        // Hide button if feature is disabled
+        return;
+    }
+    
+    const button = document.getElementById('timeout-btn');
+    if (!button) return;
+    
+    // Set initial state (dead)
+    updateTimeoutButtonState(false, 'Initial state');
+    
+    // Attach click listener
+    button.addEventListener('click', handleTimeoutButtonClick);
+}
+```
+
+**2.5-Second Pause Window:**
+
+The timeout button is live during a mandatory 2.5-second pause at the start of SIP and BIP turns:
+
+**Location:** `FrontEnd/static/js/phaser/animation/turnAnimation.js`
+
+```javascript
+// In runSideInboundSetup() and runInboundSetup()
+if (ENABLE_TIMEOUT_BUTTON && isTimeoutEligible) {
+    // Start 2.5-second pause (button becomes live immediately)
+    await startTimeoutPause(scene);
+    
+    // Position players (happens in parallel with pause)
+    await Promise.all(playerPromises);
+    
+    // Mark players positioned (if pause already complete, button stays live)
+    markPlayersPositioned();
+    
+    // Mark inbound pass started (button becomes dead, hide progress bar)
+    markInboundPassStarted();
+}
+```
+
+**Progress Bar:**
+
+A visual countdown progress bar appears during the 2.5-second pause:
+
+- **Appearance:** Orange fill with green border
+- **Animation:** Starts full width, reduces proportionally to time remaining
+- **Visibility:** Only visible when button is live
+
+**Timeout Eligibility:**
+
+The button is live for all SIP and BIP turns if:
+- The turn is a SIP or BIP turn
+- The team has timeouts remaining (checked via `/api/call-timeout` endpoint)
+
+**Timeout Button Click Handler:**
+
+```javascript
+async function handleTimeoutButtonClick() {
+    // Get game context from scene
+    const gameId = scene.gameId || scene.simData?.game_id;
+    const myTeamSide = scene.userTeamSide || urlParams.get('my_team');
+    
+    // Call timeout API
+    const response = await fetch('/api/call-timeout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            game_id: gameId,
+            calling_team: myTeamSide, // 'home' or 'away'
+        }),
+    });
+    
+    // Navigate to lineup screen
+    await showTimeoutPopup(result, gameId, scene);
+}
+```
+
+**Animation Freezing:**
+
+When timeout button is pressed, all animations are immediately paused:
+
+**Location:** `FrontEnd/static/js/phaser/animation/AnimationEngine.js`
+
+```javascript
+async handleTimeout(turnData, context) {
+    // Pause all tweens immediately when timeout is called
+    if (this.scene.tweens) {
+        this.scene.tweens.pauseAll();
+    }
+    // Set flag to stop the main animation loop
+    this.scene.timeoutCalled = true;
+    
+    // Show timeout popup and navigate to lineup screen
+    await showTimeoutPopup(timeoutResult, gameId, this.scene);
+}
+```
+
+**Location:** `FrontEnd/static/js/phaser/animation/animateGameTurns.js`
+
+```javascript
+if (turn.result_type === "TIMEOUT") {
+    turn.index = i;
+    await animationRouter.processTurn(turn);
+    console.log('⏸️ TIMEOUT: Stopping animation loop');
+    break; // Exit the loop - don't process any more turns
+}
+```
+
+### Comparison: Timeout vs Quarter Break vs Foul Out
+
+**Similarities:**
+
+All three flows use the same core systems:
+- **Data Persistence:** Same `summarize_game_state()` and database save/load pattern
+- **Resume Flow:** Same `resume_from_timeout` / `resume_from_foul_out` flag pattern
+- **Auto-Start:** Same pre-game button bypass logic
+- **State Restoration:** Same game state restoration from database
+- **Lineup Pre-Population:** Same lineup fetching and URL parameter passing
+
+**Differences:**
+
+| Feature | Timeout | Quarter Break | Foul Out |
+|---------|---------|--------------|----------|
+| **Turn Type** | `TIMEOUT` | `BASELINE_INBOUND` | `TIMEOUT` (with `timeout_reason="FOUL_OUT"`) |
+| **Next Turn** | SIP (default) | BIP (quarter start) | SIP (default) |
+| **Timeout Count** | Reduced by 1 | Not affected | Not affected |
+| **User Initiation** | User presses button | Automatic (quarter ends) | Automatic (player fouls out) |
+| **Animation Freeze** | Yes (immediate pause) | No (seamless transition) | Yes (immediate pause) |
+| **Pre-Game Buttons** | Hidden (auto-start) | Hidden (auto-start) | Hidden (auto-start) |
+| **Initial Turn Creation** | In `simulate_quarter()` | In `simulate_quarter()` | In `simulate_quarter()` |
+| **Offensive State Reset** | Yes (reset to HCO for SIP) | No (preserved) | Yes (reset to HCO for SIP) |
+
+**Key Implementation Details:**
+
+1. **Timeout Resume:**
+   - Clears `gm.turns` before creating SIP turn (prevents old turns from being returned)
+   - Resets `offensive_state` to `"HCO"` (prevents FCP/HCT from carrying over)
+   - Creates SIP turn directly in `simulate_quarter()` (same pattern as quarter breaks create BIP turns)
+
+2. **Quarter Break:**
+   - Creates BIP turn directly in `simulate_quarter()` (quarter start logic)
+   - Preserves `offensive_state` (defensive pressure can carry over to quarter start)
+   - No timeout count reduction
+
+3. **Foul Out:**
+   - Same as timeout (creates `TIMEOUT` turn with `timeout_reason="FOUL_OUT"`)
+   - No timeout count reduction
+   - Includes `foul_out_player` data in timeout turn payload
+
+### Key Files
+
+**Backend:**
+- `BackEnd/models/turn_manager.py` `setup_timeout_turn()`: Creates timeout turn payload
+- `BackEnd/models/game_manager.py` `determine_next_turn()`: Routes TIMEOUT → next turn
+- `BackEnd/api/api.py` `call_timeout_endpoint()`: Handles user-initiated timeouts
+- `BackEnd/api/api.py` `simulate_quarter_endpoint()`: Handles timeout resume flow
+- `BackEnd/main.py` `simulate_quarter()`: Creates initial turn after timeout resume
+- `BackEnd/utils/shared.py` `summarize_game_state()`: Saves game state to database
+
+**Frontend:**
+- `FrontEnd/static/js/phaser/utils/timeoutButtonManager.js`: Timeout button logic and state management
+- `FrontEnd/static/js/phaser/animation/AnimationEngine.js` `handleTimeout()`: Handles timeout turn
+- `FrontEnd/static/js/phaser/animation/animateGameTurns.js`: Stops animation loop on timeout
+- `FrontEnd/static/js/phaser/gameScene.js`: Scoreboard immediate update logic
+- `FrontEnd/static/js/phaser/bootGame.js`: Auto-start logic for timeout resume
+- `FrontEnd/static/set-lineup.js` `restoreLineupFromUrl()`: Pre-populates lineup from URL
+- `FrontEnd/static/game-plan.js` `loadSettings()`: Pre-populates game plan from URL
+- `FrontEnd/static/court.html`: Timeout button and progress bar HTML/CSS
+
+**Tests:**
+- `tests/test_timeout_functionality.py`: Comprehensive tests for timeout system
+
+---
+
 ### 4. `handleTurnover()`
 **Registered for:** `TURNOVER`  
 **Location:** `AnimationEngine.js` line 369  
