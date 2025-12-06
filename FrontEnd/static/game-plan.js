@@ -1,3 +1,6 @@
+// ✅ CRITICAL DEBUG: Alert at very top to confirm script is loading
+alert('game-plan.js LOADED - Check console for URL params');
+
 // Parse URL parameters
 const urlParams = new URLSearchParams(window.location.search);
 
