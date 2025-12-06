@@ -247,12 +247,16 @@ async function saveSettingsQuietly() {
 }
 
 async function saveSettings() {
+  console.log('🚀 [GAME-PLAN] saveSettings() CALLED');
+  console.log('🚀 [GAME-PLAN] saveSettings() - Current URL:', window.location.href);
   try {
     // Validate offense settings
     if (!validateOffenseSettings()) {
+      console.warn('⚠️ [GAME-PLAN] saveSettings() - Validation failed');
       showModal("At least one Offense setting must be above 'Never'. Please increase any Offense slider.");
       return;
     }
+    console.log('✅ [GAME-PLAN] saveSettings() - Validation passed, saving...');
     
     // Save the settings
     const saved = await saveSettingsQuietly();
@@ -266,14 +270,18 @@ async function saveSettings() {
     
     // Redirect based on where user came from
     setTimeout(() => {
+      console.log('🚀 [GAME-PLAN] saveSettings() - About to navigate (after 500ms delay)');
       const urlParams = new URLSearchParams(window.location.search);
       const from = urlParams.get('from') || 'lineup';
+      console.log('🚀 [GAME-PLAN] saveSettings() - from param:', from);
       
       if (from === 'command_center') {
         // Return to command center
+        console.log('🚀 [GAME-PLAN] saveSettings() - Navigating to command center');
         navigateToCommandCenter();
       } else {
         // Go to court.html (start game)
+        console.log('🚀 [GAME-PLAN] saveSettings() - About to call navigateToCourt()');
         navigateToCourt();
       }
     }, 500);
@@ -519,7 +527,13 @@ async function init() {
   }
   
   if (btnSave) {
-    btnSave.addEventListener('click', saveSettings);
+    console.log('🔍 [GAME-PLAN] init() - btnSave found, adding click listener');
+    btnSave.addEventListener('click', () => {
+      console.log('🚀 [GAME-PLAN] btnSave CLICKED! About to call saveSettings()');
+      saveSettings();
+    });
+  } else {
+    console.error('❌ [GAME-PLAN] init() - btnSave NOT FOUND!');
   }
   
   if (btnPlaybooks) {
