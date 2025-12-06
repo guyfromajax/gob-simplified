@@ -68,6 +68,16 @@ function buildQuery(params = {}) {
 }
 
 const urlParams = new URLSearchParams(window.location.search);
+
+// ✅ DEBUG: Log URL params when court.html loads (to see what game-plan passed)
+console.log('🔍 [BOOTGAME] Court page loaded with URL params:', {
+  fullUrl: window.location.href,
+  game_id: urlParams.get('game_id'),
+  resume_from_timeout: urlParams.get('resume_from_timeout'),
+  quarter: urlParams.get('quarter'),
+  allParams: Object.fromEntries(urlParams.entries())
+});
+
 const tournamentId = urlParams.get('tournament_id');
 const homeTeam = urlParams.get('home');
 const awayTeam = urlParams.get('away');
