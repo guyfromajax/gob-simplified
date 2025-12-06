@@ -816,8 +816,29 @@ function initGame() {
   
   // ✅ TIMEOUT + QUARTER BREAKS: Hide pre-game buttons if resuming (timeout) or continuing (quarter > 1)
   // This matches the quarter break flow where buttons are hidden and game auto-starts
-  const resumeFromTimeout = urlParams.get('resume_from_timeout') === 'true';
+  let resumeFromTimeout = urlParams.get('resume_from_timeout') === 'true';
   const isQuarterBreak = quarter > 1 && gameId; // Quarter breaks: Q2, Q3, Q4 with existing game
+  
+  // ✅ RESILIENCE: Check database for timeout state as fallback (if URL param missing but gameId exists)
+  // This makes the system robust - even if URL param is lost, we can still detect timeout resume
+  // Only checks DB if URL param is missing (fast path: URL param works → no DB call)
+  if (!resumeFromTimeout && gameId && quarter === 1) {
+    // Lightweight check: If URL param missing but we have gameId in Q1, check DB for timeout state
+    // This is a fallback - URL param is still primary source for navigation
+    try {
+      const response = await fetch(`/api/game/${gameId}?quarter=${quarter}`);
+      if (response.ok) {
+        const gameData = await response.json();
+        if (gameData.timeout_next_play_type) {
+          console.log('✅ TIMEOUT RESUME: Detected timeout state in DB (URL param was missing)');
+          resumeFromTimeout = true;
+        }
+      }
+    } catch (error) {
+      console.warn('⚠️ Could not check DB for timeout state (non-critical):', error);
+      // Non-critical - user can still click "Play Quarter" button
+    }
+  }
   
   if (resumeFromTimeout || isQuarterBreak) {
     const preGameContainer = document.querySelector('.pre-game-container');
