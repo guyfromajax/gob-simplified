@@ -284,6 +284,10 @@ async function saveSettings() {
 }
 
 function navigateToCourt() {
+  console.log('🚀 [GAME-PLAN] navigateToCourt() CALLED');
+  console.log('🚀 [GAME-PLAN] Current URL:', window.location.href);
+  console.log('🚀 [GAME-PLAN] Current URL params:', Object.fromEntries(urlParams.entries()));
+  
   // ✅ EXACT SAME CODE as set-lineup.js working re-entry path (lines 827-871)
   const currentGameId = urlParams.get('game_id') ||
     (typeof localStorage !== 'undefined' ? localStorage.getItem('game_id') : null);
@@ -360,10 +364,21 @@ function navigateToCourt() {
     params.set('debug', '1');
     // optional: params.set('debug_flow', '1');
   }
+  
+  // ✅ DEBUG: Log final URL before navigation
+  const finalUrl = `/court.html?${params.toString()}`;
+  console.log('🔍 [GAME-PLAN] navigateToCourt() FINAL URL:', finalUrl);
+  console.log('🔍 [GAME-PLAN] navigateToCourt() URL params:', {
+    game_id: params.get('game_id'),
+    resume_from_timeout: params.get('resume_from_timeout'),
+    quarter: params.get('quarter'),
+    allParams: Object.fromEntries(params.entries())
+  });
+  
   if (DEBUG) {
     console.debug('🔀 Redirecting to court.html (bypassing game plan)', { home: homeTeam, away: awayTeam, gameId: currentGameId });
   }
-  window.location.href = `/court.html?${params.toString()}`;
+  window.location.href = finalUrl;
 }
 
 async function navigateBack() {
