@@ -284,7 +284,7 @@ async function saveSettings() {
 }
 
 function navigateToCourt() {
-  // ✅ EXACT SAME CODE as set-lineup.js working re-entry path (lines 829-871)
+  // ✅ EXACT SAME CODE as set-lineup.js working re-entry path (lines 827-871)
   const currentGameId = urlParams.get('game_id') ||
     (typeof localStorage !== 'undefined' ? localStorage.getItem('game_id') : null);
   const params = new URLSearchParams();
