@@ -807,7 +807,7 @@ async function handleSimFullGame() {
   }
 }
 
-function initGame() {
+async function initGame() {
   const playBtn = document.querySelector('.play-button');
   const simFullBtn = document.querySelector('.sim-full-game-button');
   const sim4Btn = document.querySelector('.sim-to-fourth-button');
@@ -886,7 +886,9 @@ function initGame() {
 }
 
 // console.log('🚨 BOOTGAME: JavaScript is loading and executing!');
-initGame();
+initGame().catch(error => {
+  console.error('Error initializing game:', error);
+});
 updateOffsets();
 // console.log('🚨 BOOTGAME: Initialization complete!');
 
