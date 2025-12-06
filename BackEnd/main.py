@@ -291,7 +291,7 @@ def simulate_quarter(
         # Create the appropriate initial turn based on timeout_next_play_type
         if timeout_next_play_type == "SIDE_INBOUND":
             # Create SIP turn (same pattern as quarter breaks create BIP turns)
-            logging.info(f"✅ TIMEOUT RESUME: Creating SIP turn")
+            logging.info(f"✅ TIMEOUT RESUME: Creating SIP turn with offense team: {gm.offense_team.name} (team_id: {gm.offense_team.team_id})")
             # ✅ TIMEOUT: Reset offensive_state to HCO to ensure SIP transitions to HCO (not FCP/HCT)
             # This prevents defensive pressure from before timeout from carrying over
             gm.game_state["offensive_state"] = "HCO"
@@ -306,7 +306,7 @@ def simulate_quarter(
                 minutes = gm.game_state["time_remaining"] // 60
                 seconds = gm.game_state["time_remaining"] % 60
                 gm.game_state["clock"] = f"{minutes}:{seconds:02d}"
-            logging.info(f"✅ TIMEOUT RESUME: SIP turn created and added to gm.turns (total turns: {len(gm.turns)})")
+            logging.info(f"✅ TIMEOUT RESUME: SIP turn created with offense team: {gm.offense_team.name} (team_id: {gm.offense_team.team_id}), total turns: {len(gm.turns)}")
         elif timeout_next_play_type == "FREE_THROW":
             # Free throw turn will be created by simulate_macro_turn (first call from frontend)
             logging.info(f"✅ TIMEOUT RESUME: Will create FREE_THROW turn via /api/simulate-turn")

@@ -1357,14 +1357,12 @@ class TurnManager:
         game_state = game.game_state
         
         # Determine next_play_type based on game state
-        # Priority: Free Throw > Quarter Start > Side Inbound
+        # Timeouts always resume with SIP (Side Inbound Pass), except when free throws are pending
+        # Quarter breaks are handled separately in simulate_quarter() and use BIP (Baseline Inbound Pass)
         if game_state.get("free_throws_remaining", 0) > 0:
             next_play_type = "FREE_THROW"
-        elif game_state.get("quarter") in [2, 3, 4] and len(game.turns) == 0:
-            # Quarter start (Q2/Q3/Q4) - will be BASELINE_INBOUND
-            next_play_type = "BASELINE_INBOUND"
         else:
-            # Default: Side Inbound Pass
+            # Always SIP for timeout resume (quarter breaks handled separately)
             next_play_type = "SIDE_INBOUND"
         
         # Store next_play_type in game_state for resume
