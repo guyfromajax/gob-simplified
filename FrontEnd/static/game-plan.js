@@ -351,6 +351,8 @@ async function navigateBack() {
   await saveSettingsQuietly();
   
   // Go back to lineup selection
+  const currentGameId = urlParams.get('game_id') ||
+    (typeof localStorage !== 'undefined' ? localStorage.getItem('game_id') : null);
   const params = new URLSearchParams();
   params.set('home', homeTeam);
   params.set('away', awayTeam);
@@ -365,6 +367,15 @@ async function navigateBack() {
   params.set('quarter', String(quarter));
   params.set('period', periodLabel);
   
+  // ✅ TIMEOUT: Check for resume_from_timeout BEFORE game_id check (needed for Q1 timeouts)
+  const resumeFromTimeout = urlParams.get('resume_from_timeout');
+  
+  // ✅ CRITICAL FIX: Pass game_id for quarter breaks (Q2+) OR timeout resumes (Q1)
+  // Quarter breaks: quarter > 1 → passes game_id
+  // Timeout in Q1: resumeFromTimeout → passes game_id (this was missing!)
+  // New Q1 game: neither condition → doesn't pass game_id
+  if (currentGameId && (quarter > 1 || resumeFromTimeout)) params.set('game_id', currentGameId);
+  
   // Pass lineup params back to preserve lineup when navigating back
   if (myTeamSide) {
     if (pgId) params.set(`${myTeamSide}_pg`, pgId);
@@ -376,6 +387,9 @@ async function navigateBack() {
   } else {
     console.warn('[navigateBack] myTeamSide not set, cannot pass lineup params');
   }
+  
+  // ✅ TIMEOUT: Carry forward resume_from_timeout flag
+  if (resumeFromTimeout) params.set('resume_from_timeout', resumeFromTimeout);
   
   window.location.href = `/static/set-lineup.html?${params.toString()}`;
 }
