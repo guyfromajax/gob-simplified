@@ -59,7 +59,11 @@ export async function handleOrebTurn(scene, { playerSprites, ballSprite, turnDat
   
   appendToTextScroll(turnData.text);
   
-  const rebounderId = turnData.rebounderId || turnData.ball_handler?.player_id;
+  // ✅ FIX: Use shooter/ball_handler for putback shooter (like HCO shots use shooter_id)
+  // Don't use rebounderId - it gets overwritten with the NEXT rebounder when rebound data is added
+  // turnData.shooter and turnData.ball_handler are set by backend to the O Rebounder (putback shooter)
+  // turnData.rebounderId is initially the putback shooter but gets overwritten with next rebounder
+  const rebounderId = turnData.shooter || turnData.ball_handler?.player_id || turnData.rebounderId;
   const rebounderSprite = playerSprites[rebounderId];
   
   
