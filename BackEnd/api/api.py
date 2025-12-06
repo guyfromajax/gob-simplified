@@ -666,6 +666,29 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                         # logging.warning(f"   - Full strategy_settings: {gm.away_team.strategy_settings}")
             except Exception as e:
                 logging.error(f"❌ [STRATEGY SETTINGS] Error updating strategy_settings: {e}", exc_info=True)
+        
+        # ✅ TIMEOUT FIX: If resuming from timeout and game is in memory, restore timeout_next_play_type from DB
+        # This ensures timeout_next_play_type is correct even if game_state was reset or game was recreated
+        # This fixes tournament mode where game might be in memory but timeout_next_play_type is missing
+        if gm is not None and request.resume_from_timeout and games_collection is not None:
+            try:
+                saved = games_collection.find_one({"_id": game_id})
+                if saved:
+                    # Restore timeout_next_play_type from saved document
+                    if "timeout_next_play_type" in saved:
+                        gm.game_state["timeout_next_play_type"] = saved["timeout_next_play_type"]
+                        logging.info(f"🔄 TIMEOUT RESUME (IN MEMORY): Restored timeout_next_play_type from DB: {saved['timeout_next_play_type']}")
+                    else:
+                        logging.warning(f"⚠️ TIMEOUT RESUME (IN MEMORY): timeout_next_play_type not found in saved document")
+                    
+                    # Also restore clock and time_remaining for consistency
+                    if "clock" in saved:
+                        gm.game_state["clock"] = saved["clock"]
+                    if "time_remaining" in saved:
+                        gm.game_state["time_remaining"] = saved["time_remaining"]
+            except Exception as e:
+                logging.error(f"❌ TIMEOUT RESUME: Error restoring timeout_next_play_type from DB: {e}", exc_info=True)
+        
         if gm is None:
             logging.warning(
                 "simulate_quarter_endpoint unknown game_id=%s; active=%s",
