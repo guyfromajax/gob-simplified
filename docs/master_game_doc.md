@@ -1570,6 +1570,8 @@ The timeout system allows game pauses for strategic adjustments, lineup changes,
 - Lineup and game plan screens pre-populated with current settings
 - Scoreboard displays immediately on timeout resume
 - Uses same transition system as other game flows
+- Database is single source of truth for timeout state
+- Works consistently across all game modes (single, tournament, franchise)
 
 ### Transition Flow and Integration
 
@@ -1612,20 +1614,19 @@ The timeout system allows game pauses for strategic adjustments, lineup changes,
 
 **Next Play Type Determination:**
 
-The `next_play_type` in the timeout turn determines what happens after the timeout:
+The `next_play_type` in the timeout turn is **always** `"SIDE_INBOUND"` (except when free throws are pending):
 
-1. **`"SIDE_INBOUND"` (Default):**
-   - Used when timeout is called during active play
-   - Team that had possession gets the ball back
+1. **`"SIDE_INBOUND"` (Always for timeouts):**
+   - Timeouts always resume with SIP (Side Inbound Pass)
+   - Team that had possession when timeout was called gets the ball back
    - Creates SIP turn after timeout resume
+   - SIP transitions to HCO (defense calls play in HCO)
 
-2. **`"FREE_THROW"`:**
+2. **`"FREE_THROW"` (Special case):**
    - Used when timeout is called during free throw sequence
    - Free throw sequence continues after timeout resume
 
-3. **`"BASELINE_INBOUND"`:**
-   - Used when timeout is called at quarter start (Q2/Q3/Q4)
-   - Quarter start BIP turn continues after timeout resume
+**Note:** Quarter breaks (Q2/Q3/Q4) use BIP (Baseline Inbound Pass), but this is handled separately in `simulate_quarter()` and is not part of the timeout system.
 
 **Transition System Integration:**
 
@@ -1650,40 +1651,123 @@ if (turn.result_type === "TIMEOUT") {
 
 **Key Point:** Timeouts are routed through `AnimationRouter.processTurn()` just like all other turn types, ensuring consistent handling and data flow.
 
-### Data Persistence System
+### Game Start and Resume Transitions
 
-**Game State Persistence:**
+The system handles different transition types based on game state:
 
-When a timeout is called, the game state is saved to the database using the same pattern as quarter breaks and foul-out instances:
+#### 1. **Game Start (Q1) and Overtime**
+- **Initial Turn:** Opening Tip
+- **Location:** `BackEnd/main.py` `simulate_quarter()` (lines 392-401)
+- **Logic:** Q1 or any OT period → creates opening tip turn
+- **Data:** No special state needed (new game)
 
-**Backend (`BackEnd/api/api.py` `call_timeout_endpoint()`):**
+#### 2. **Quarter Break Returns (Q2, Q3, Q4)**
+- **Initial Turn:** BASELINE_INBOUND (BIP)
+- **Location:** `BackEnd/main.py` `simulate_quarter()` (lines 402-443, 444-468, 469-493)
+- **Logic:** Quarter break → creates BIP turn with correct possession team
+- **Data:** Uses `opening_tip_winner` from game_state to determine possession
+- **Note:** Not part of timeout system - handled separately
+
+#### 3. **Timeout Returns**
+- **Initial Turn:** SIDE_INBOUND (SIP)
+- **Location:** `BackEnd/main.py` `simulate_quarter()` (lines 281-332)
+- **Logic:** Timeout resume → creates SIP turn with team that had possession
+- **Data:** Restores `timeout_next_play_type` and `timeout_offense_team_id` from database
+
+#### 4. **Player Foul Out Returns**
+- **Initial Turn:** SIDE_INBOUND (SIP)
+- **Location:** Same as timeout returns (uses timeout system)
+- **Logic:** Foul out resume → creates SIP turn (same pattern as timeout)
+- **Data:** Uses same timeout resume system
+
+### Data Management: Database, LocalStorage, and URL
+
+#### Database (Single Source of Truth)
+
+**When Timeout is Called (`BackEnd/api/api.py` `call_timeout_endpoint()`):**
 ```python
-# Save game state to database (reuse existing persistence pattern)
+# Save timeout state to database
+gm.game_state["timeout_next_play_type"] = "SIDE_INBOUND"  # Always SIP (except free throws)
+gm.game_state["timeout_offense_team_id"] = gm.offense_team.team_id  # Capture possession team
+
 db_summary = summarize_game_state(gm, exclude_animations=True)
 games_collection.update_one({"_id": game_id}, {"$set": db_summary}, upsert=True)
 ```
 
-**Persisted Data:**
-- Scores (`score` object)
-- Clock (`clock` string, `time_remaining` seconds)
-- Team fouls (`team_fouls` object)
-- Team timeouts (`team_timeouts` object)
-- Quarter number
-- Lineups (`home_lineup`, `away_lineup`)
-- Player stats (box score)
-- Game state flags (`timeout_next_play_type`, `offensive_state`, etc.)
+**Persisted Timeout Data:**
+- `timeout_next_play_type`: Always `"SIDE_INBOUND"` (or `"FREE_THROW"` if free throws pending)
+- `timeout_offense_team_id`: Team that had possession when timeout was called
+- `clock`: Current game clock
+- `time_remaining`: Time remaining in seconds
+- All other game state (scores, fouls, timeouts, lineups, player stats)
 
-**Resume Flow:**
+**When Timeout Resumes (`BackEnd/main.py` `simulate_quarter()`):**
+```python
+# After creating SIP turn, clear timeout state from database
+games_collection.update_one(
+    {"_id": game_id},
+    {"$unset": {"timeout_next_play_type": "", "timeout_offense_team_id": ""}}
+)
+```
+
+**Database Access by Mode:**
+- **Single Game:** `games_collection` document
+- **Tournament Game:** Nested in `tournaments_collection.games.{round}.{game_id}` (with fallback to `games_collection`)
+- **Franchise Game:** Nested in `franchises_collection.games.week_{week}.{game_id}` (with fallback to `games_collection`)
+
+#### URL Parameters (Navigation Only)
+
+**Purpose:** URL parameters are used for navigation/routing, not business logic. Database is the source of truth.
+
+**Timeout Flow:**
+1. **Timeout Called:** Frontend navigates to lineup screen with `resume_from_timeout=true` in URL
+2. **Lineup Screen:** Carries forward `resume_from_timeout=true` in URL
+3. **Game Plan Screen:** Carries forward `resume_from_timeout=true` in URL
+4. **Court Return:** Carries forward `resume_from_timeout=true` in URL
+
+**URL Parameters Used:**
+- `resume_from_timeout=true`: Navigation flag (convenience, not source of truth)
+- `game_id`: Game identifier
+- `quarter`: Quarter number
+- `mode`: Game mode (single/tournament/franchise)
+- Lineup parameters: `home_pg`, `home_sg`, etc.
+
+**Frontend Resilience:**
+- Frontend checks database as fallback if URL parameter is missing (`bootGame.js` lines 825-841)
+- This provides resilience if URL parameter is lost during navigation
+
+#### LocalStorage (Frontend State Only)
+
+**Purpose:** LocalStorage is used for frontend convenience, not business logic.
+
+**Stored Data:**
+- `game_id`: Current game identifier (for navigation)
+- `game_home`: Home team name (for matchup validation)
+- `game_away`: Away team name (for matchup validation)
+- `franchise_id`: Franchise identifier (if applicable)
+- `franchise_week`: Current week (if applicable)
+
+**New Game Detection:**
+- Frontend clears `game_id` from localStorage when starting a new game (`gameScene.js` lines 213-220)
+- Prevents stale `game_id` from being passed to backend for new games
+
+**Note:** LocalStorage is not used for timeout state - database is the source of truth.
+
+### Resume Flow
 
 1. **User navigates to lineup screen** (with `resume_from_timeout=true` URL parameter)
 2. **User makes lineup/game plan changes** (or keeps current settings)
-3. **User navigates back to court** (with `resume_from_timeout=true` flag)
-4. **Backend uses unified timeout resume system** (works for all modes and memory states)
-5. **Backend restores timeout state from database** (single source of truth)
+3. **User navigates back to court** (with `resume_from_timeout=true` flag in URL)
+4. **Backend checks database for timeout state** (single source of truth, regardless of URL parameter)
+5. **Backend restores timeout state from database:**
+   - `timeout_next_play_type` → Always `"SIDE_INBOUND"` (or `"FREE_THROW"`)
+   - `timeout_offense_team_id` → Restores possession team
+   - `clock` and `time_remaining` → Restores game clock
 6. **Backend applies state to GameManager** (whether in memory or newly loaded)
-7. **Backend creates initial turn** (SIP, Free Throw, or BIP based on `timeout_next_play_type`)
-8. **Frontend auto-starts game** (bypasses pre-game buttons)
-9. **Game continues** with correct state and next turn
+7. **Backend creates SIP turn** with correct possession team
+8. **Backend clears timeout state from database** (defensive cleanup)
+9. **Frontend auto-starts game** (bypasses pre-game buttons)
+10. **Game continues** with SIP → HCO transition
 
 ### Unified Timeout Resume Architecture (Structural Fix - January 2025)
 
@@ -1693,37 +1777,50 @@ The timeout resume system uses a unified architecture that works consistently ac
 
 **Two Helper Functions:**
 
-1. **`restore_timeout_resume_state()`** - Loads timeout state from the correct document location based on game mode:
+1. **`restore_timeout_resume_state()`** (`BackEnd/api/api.py` lines 296-395)
+   - Loads timeout state from the correct document location based on game mode
    - **Single Game**: `games_collection` document
    - **Tournament Game**: Nested in `tournaments_collection.games.{round}.{game_id}` (with fallback to `games_collection`)
    - **Franchise Game**: Nested in `franchises_collection.games.week_{week}.{game_id}` (with fallback to `games_collection`)
+   - Validates that `timeout_next_play_type` exists in saved document
+   - Returns saved document with timeout state, or `None` if not found
 
-2. **`apply_timeout_resume_state_to_gm()`** - Applies restored state to GameManager instance:
+2. **`apply_timeout_resume_state_to_gm()`** (`BackEnd/api/api.py` lines 397-430)
+   - Applies restored state to GameManager instance
    - Restores `timeout_next_play_type` to `gm.game_state`
+   - Restores `timeout_offense_team_id` and flips possession if needed
    - Restores `clock` and `time_remaining`
    - Works for both in-memory and newly-loaded games
 
 **Unified Flow (`BackEnd/api/api.py` `simulate_quarter_endpoint()`):**
 
 ```python
-# Step 1: Early state loading (before checking memory state)
-timeout_saved_state = None
-if request.resume_from_timeout:
+# Step 1: Check if we should look for timeout state
+# Only check for existing games (not new game starts)
+should_check_timeout = game_id and not (request.quarter == 1 and not gm)
+
+if should_check_timeout:
+    # Step 2: Load timeout state from database (single source of truth)
     timeout_saved_state = restore_timeout_resume_state(game_id, request, games_collection)
-    # This function handles mode-specific document locations automatically
+    
+    if timeout_saved_state:
+        # Step 3: Apply to in-memory game (if exists)
+        if gm is not None:
+            apply_timeout_resume_state_to_gm(gm, timeout_saved_state)
+        # Step 4: Set resume_from_timeout flag for simulate_quarter()
+        request.resume_from_timeout = True
 
-# Step 2: Apply to in-memory game (if exists)
-if timeout_saved_state and gm is not None:
-    apply_timeout_resume_state_to_gm(gm, timeout_saved_state)
-
-# Step 3: If game not in memory, load from DB
+# Step 5: If game not in memory, load from DB
 if gm is None:
     # ... load game from DB ...
-    # Step 4: Apply timeout state to newly loaded game
+    # Step 6: Apply timeout state to newly loaded game (if found)
     if timeout_saved_state:
-        apply_timeout_resume_state_to_gm(gm, timeout_saved_state)
+        # Validate quarter matches (prevent stale data)
+        if timeout_saved_state.get("timeout_next_play_type") and saved_quarter == request.quarter:
+            apply_timeout_resume_state_to_gm(gm, timeout_saved_state)
+            request.resume_from_timeout = True
 
-# Step 5: Continue with simulate_quarter()
+# Step 7: Continue with simulate_quarter()
 simulate_quarter(gm, ..., resume_from_timeout=request.resume_from_timeout)
 ```
 
@@ -1733,6 +1830,8 @@ simulate_quarter(gm, ..., resume_from_timeout=request.resume_from_timeout)
 - **Mode-specific document access** (checks correct location for each mode)
 - **Less fragile** (no assumptions about memory state)
 - **Consistent behavior** across all game modes
+- **New game protection** (doesn't check timeout state for new games)
+- **Stale data prevention** (validates quarter match before using timeout state)
 
 **Mode-Specific Document Access:**
 
@@ -1743,6 +1842,24 @@ The system automatically determines the correct document location:
 - **Franchise Mode**: Checks nested structure first (`franchises.games.week_{week}.{game_id}`), then falls back to `games_collection`
 
 This ensures timeout state is found regardless of where the game document is stored, while maintaining the database as the single source of truth.
+
+**Timeout State Cleanup:**
+
+After resuming from timeout, the system clears timeout state from both memory and database:
+
+```python
+# Clear from memory
+gm.game_state.pop("timeout_next_play_type", None)
+gm.game_state.pop("timeout_offense_team_id", None)
+
+# Clear from database (defensive cleanup)
+games_collection.update_one(
+    {"_id": game_id},
+    {"$unset": {"timeout_next_play_type": "", "timeout_offense_team_id": ""}}
+)
+```
+
+This prevents stale timeout state from affecting future games.
 
 ### Scoreboard Display Immediacy System
 
