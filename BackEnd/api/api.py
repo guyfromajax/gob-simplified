@@ -1297,12 +1297,12 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
     # Return frontend summary WITH animations for real-time play
     turns = frontend_summary.get("turns", [])
     
-    # ✅ TIMEOUT: If resuming from timeout, return empty turns array (don't animate existing turns)
-    # The next /api/simulate-turn call will create the SIP turn
+    # ✅ TIMEOUT: Return the SIP turn that was created in simulate_quarter() (same pattern as quarter breaks)
+    # simulate_quarter() already created the SIP turn and added it to gm.turns when resume_from_timeout=True
+    # We should return it just like we return BIP turns for quarter breaks
     if request.resume_from_timeout:
-        turns = []  # Empty - don't return existing turns as "initial turns"
-        logging.info(f"✅ TIMEOUT RESUME: Returning empty turns array (will create SIP via /api/simulate-turn)")
-        frontend_summary["turns"] = turns  # Update turns in summary
+        logging.info(f"✅ TIMEOUT RESUME: Returning SIP turn from simulate_quarter() (turns count: {len(turns)})")
+        # Turns array already contains the SIP turn created in simulate_quarter() - no need to override
     
     logger.debug(
         "simulate_quarter_endpoint turns len=%s first=%s",
