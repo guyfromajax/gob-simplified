@@ -355,29 +355,35 @@ function navigateToCourt() {
   // ✅ TIMEOUT: Check for resume_from_timeout BEFORE game_id check (needed for Q1 timeouts)
   const resumeFromTimeout = currentUrlParams.get('resume_from_timeout');
   
+  // ✅ QUARTER BREAK: Only preserve resume_from_timeout if we're in Q1 (timeout resumes only happen in Q1)
+  // Quarter breaks (Q2, Q3, Q4) should NEVER have resume_from_timeout=true
+  // This prevents stale timeout flags from being carried across quarter boundaries
+  const shouldPreserveTimeoutFlag = resumeFromTimeout && currentQuarter === 1;
+  
   // ✅ DEBUG: Log timeout resume state
   console.log('🔍 [GAME-PLAN] navigateToCourt() timeout state:', {
     currentGameId,
     currentQuarter,
     resumeFromTimeout,
+    shouldPreserveTimeoutFlag,
     urlGameId: currentUrlParams.get('game_id'),
     localStorageGameId: typeof localStorage !== 'undefined' ? localStorage.getItem('game_id') : null,
-    willPassGameId: currentGameId && (currentQuarter > 1 || resumeFromTimeout)
+    willPassGameId: currentGameId && (currentQuarter > 1 || shouldPreserveTimeoutFlag)
   });
   
   // ✅ CRITICAL FIX: Pass game_id for quarter breaks (Q2+) OR timeout resumes (Q1)
   // Quarter breaks: quarter > 1 → passes game_id
-  // Timeout in Q1: resumeFromTimeout → passes game_id (this was missing!)
+  // Timeout in Q1: shouldPreserveTimeoutFlag → passes game_id (this was missing!)
   // New Q1 game: neither condition → doesn't pass game_id
-  if (currentGameId && (quarter > 1 || resumeFromTimeout)) {
+  if (currentGameId && (currentQuarter > 1 || shouldPreserveTimeoutFlag)) {
     params.set('game_id', currentGameId);
     console.log('✅ [GAME-PLAN] Passing game_id to court:', currentGameId);
   } else {
     console.warn('⚠️ [GAME-PLAN] NOT passing game_id:', {
       hasCurrentGameId: !!currentGameId,
       currentQuarter,
-      resumeFromTimeout,
-      reason: !currentGameId ? 'no currentGameId' : (currentQuarter === 1 && !resumeFromTimeout ? 'Q1 without timeout' : 'unknown')
+      shouldPreserveTimeoutFlag,
+      reason: !currentGameId ? 'no currentGameId' : (currentQuarter === 1 && !shouldPreserveTimeoutFlag ? 'Q1 without timeout' : 'unknown')
     });
   }
   
@@ -410,8 +416,14 @@ function navigateToCourt() {
   if (startWithInbound) params.set('start_with_inbound', startWithInbound);
   if (startingPossession) params.set('starting_possession', startingPossession);
   
-  // ✅ TIMEOUT: Carry forward resume_from_timeout flag
-  if (resumeFromTimeout) params.set('resume_from_timeout', resumeFromTimeout);
+  // ✅ TIMEOUT: Only carry forward resume_from_timeout flag if we're in Q1 (timeout resumes only happen in Q1)
+  // Quarter breaks (Q2, Q3, Q4) should NEVER have this flag
+  if (shouldPreserveTimeoutFlag) {
+    params.set('resume_from_timeout', resumeFromTimeout);
+    console.log('✅ [GAME-PLAN] Preserving resume_from_timeout for Q1 timeout resume');
+  } else if (resumeFromTimeout && currentQuarter > 1) {
+    console.warn('⚠️ [GAME-PLAN] Clearing stale resume_from_timeout flag for quarter break (Q' + currentQuarter + ')');
+  }
   
   if (DEBUG) {
     params.set('debug', '1');
@@ -462,29 +474,35 @@ async function navigateBack() {
   // ✅ TIMEOUT: Check for resume_from_timeout BEFORE game_id check (needed for Q1 timeouts)
   const resumeFromTimeout = currentUrlParams.get('resume_from_timeout');
   
+  // ✅ QUARTER BREAK: Only preserve resume_from_timeout if we're in Q1 (timeout resumes only happen in Q1)
+  // Quarter breaks (Q2, Q3, Q4) should NEVER have resume_from_timeout=true
+  // This prevents stale timeout flags from being carried across quarter boundaries
+  const shouldPreserveTimeoutFlag = resumeFromTimeout && quarter === 1;
+  
   // ✅ DEBUG: Log timeout resume state
   console.log('🔍 [GAME-PLAN] navigateBack() timeout state:', {
     currentGameId,
     quarter,
     resumeFromTimeout,
+    shouldPreserveTimeoutFlag,
     urlGameId: currentUrlParams.get('game_id'),
     localStorageGameId: typeof localStorage !== 'undefined' ? localStorage.getItem('game_id') : null,
-    willPassGameId: currentGameId && (quarter > 1 || resumeFromTimeout)
+    willPassGameId: currentGameId && (quarter > 1 || shouldPreserveTimeoutFlag)
   });
   
   // ✅ CRITICAL FIX: Pass game_id for quarter breaks (Q2+) OR timeout resumes (Q1)
   // Quarter breaks: quarter > 1 → passes game_id
-  // Timeout in Q1: resumeFromTimeout → passes game_id (this was missing!)
+  // Timeout in Q1: shouldPreserveTimeoutFlag → passes game_id (this was missing!)
   // New Q1 game: neither condition → doesn't pass game_id
-  if (currentGameId && (quarter > 1 || resumeFromTimeout)) {
+  if (currentGameId && (quarter > 1 || shouldPreserveTimeoutFlag)) {
     params.set('game_id', currentGameId);
     console.log('✅ [GAME-PLAN] Passing game_id to lineup:', currentGameId);
   } else {
     console.warn('⚠️ [GAME-PLAN] NOT passing game_id to lineup:', {
       hasCurrentGameId: !!currentGameId,
       quarter,
-      resumeFromTimeout,
-      reason: !currentGameId ? 'no currentGameId' : (quarter === 1 && !resumeFromTimeout ? 'Q1 without timeout' : 'unknown')
+      shouldPreserveTimeoutFlag,
+      reason: !currentGameId ? 'no currentGameId' : (quarter === 1 && !shouldPreserveTimeoutFlag ? 'Q1 without timeout' : 'unknown')
     });
   }
   
@@ -500,8 +518,14 @@ async function navigateBack() {
     console.warn('[navigateBack] myTeamSide not set, cannot pass lineup params');
   }
   
-  // ✅ TIMEOUT: Carry forward resume_from_timeout flag
-  if (resumeFromTimeout) params.set('resume_from_timeout', resumeFromTimeout);
+  // ✅ TIMEOUT: Only carry forward resume_from_timeout flag if we're in Q1 (timeout resumes only happen in Q1)
+  // Quarter breaks (Q2, Q3, Q4) should NEVER have this flag
+  if (shouldPreserveTimeoutFlag) {
+    params.set('resume_from_timeout', resumeFromTimeout);
+    console.log('✅ [GAME-PLAN] Preserving resume_from_timeout for Q1 timeout resume');
+  } else if (resumeFromTimeout && quarter > 1) {
+    console.warn('⚠️ [GAME-PLAN] Clearing stale resume_from_timeout flag for quarter break (Q' + quarter + ')');
+  }
   
   window.location.href = `/static/set-lineup.html?${params.toString()}`;
 }

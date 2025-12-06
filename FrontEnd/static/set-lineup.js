@@ -843,11 +843,16 @@ async function init() {
       // ✅ TIMEOUT: Check for resume_from_timeout BEFORE game_id check (needed for Q1 timeouts)
       const resumeFromTimeout = urlParams.get('resume_from_timeout');
       
+      // ✅ QUARTER BREAK: Only preserve resume_from_timeout if we're in Q1 (timeout resumes only happen in Q1)
+      // Quarter breaks (Q2, Q3, Q4) should NEVER have resume_from_timeout=true
+      // This prevents stale timeout flags from being carried across quarter boundaries
+      const shouldPreserveTimeoutFlag = resumeFromTimeout && quarter === 1;
+      
       // ✅ CRITICAL FIX: Pass game_id for quarter breaks (Q2+) OR timeout resumes (Q1)
       // Quarter breaks: quarter > 1 → passes game_id
-      // Timeout in Q1: resumeFromTimeout → passes game_id (this was missing!)
+      // Timeout in Q1: shouldPreserveTimeoutFlag → passes game_id (this was missing!)
       // New Q1 game: neither condition → doesn't pass game_id
-      if (currentGameId && (quarter > 1 || resumeFromTimeout)) params.set('game_id', currentGameId);
+      if (currentGameId && (quarter > 1 || shouldPreserveTimeoutFlag)) params.set('game_id', currentGameId);
       
       // ✅ Preserve clock time if present (from foul out navigation)
       const clock = urlParams.get('clock');
@@ -864,8 +869,14 @@ async function init() {
       if (startWithInbound) params.set('start_with_inbound', startWithInbound);
       if (startingPossession) params.set('starting_possession', startingPossession);
       
-      // ✅ TIMEOUT: Carry forward resume_from_timeout flag
-      if (resumeFromTimeout) params.set('resume_from_timeout', resumeFromTimeout);
+      // ✅ TIMEOUT: Only carry forward resume_from_timeout flag if we're in Q1 (timeout resumes only happen in Q1)
+      // Quarter breaks (Q2, Q3, Q4) should NEVER have this flag
+      if (shouldPreserveTimeoutFlag) {
+        params.set('resume_from_timeout', resumeFromTimeout);
+        console.log('✅ [SET-LINEUP] Preserving resume_from_timeout for Q1 timeout resume');
+      } else if (resumeFromTimeout && quarter > 1) {
+        console.warn('⚠️ [SET-LINEUP] Clearing stale resume_from_timeout flag for quarter break (Q' + quarter + ')');
+      }
       
       if (DEBUG) {
         params.set('debug', '1');
@@ -904,11 +915,16 @@ async function init() {
       // ✅ TIMEOUT: Check for resume_from_timeout BEFORE game_id check (needed for Q1 timeouts)
       const resumeFromTimeout = urlParams.get('resume_from_timeout');
       
+      // ✅ QUARTER BREAK: Only preserve resume_from_timeout if we're in Q1 (timeout resumes only happen in Q1)
+      // Quarter breaks (Q2, Q3, Q4) should NEVER have resume_from_timeout=true
+      // This prevents stale timeout flags from being carried across quarter boundaries
+      const shouldPreserveTimeoutFlag = resumeFromTimeout && quarter === 1;
+      
       // ✅ CRITICAL FIX: Pass game_id for quarter breaks (Q2+) OR timeout resumes (Q1)
       // Quarter breaks: quarter > 1 → passes game_id
-      // Timeout in Q1: resumeFromTimeout → passes game_id (this was missing!)
+      // Timeout in Q1: shouldPreserveTimeoutFlag → passes game_id (this was missing!)
       // New Q1 game: neither condition → doesn't pass game_id
-      if (currentGameId && (quarter > 1 || resumeFromTimeout)) params.set('game_id', currentGameId);
+      if (currentGameId && (quarter > 1 || shouldPreserveTimeoutFlag)) params.set('game_id', currentGameId);
       
       ['PG','SG','SF','PF','C'].forEach(pos => {
         const id = lineup[pos];
@@ -921,8 +937,14 @@ async function init() {
       if (startWithInbound) params.set('start_with_inbound', startWithInbound);
       if (startingPossession) params.set('starting_possession', startingPossession);
       
-      // ✅ TIMEOUT: Carry forward resume_from_timeout flag
-      if (resumeFromTimeout) params.set('resume_from_timeout', resumeFromTimeout);
+      // ✅ TIMEOUT: Only carry forward resume_from_timeout flag if we're in Q1 (timeout resumes only happen in Q1)
+      // Quarter breaks (Q2, Q3, Q4) should NEVER have this flag
+      if (shouldPreserveTimeoutFlag) {
+        params.set('resume_from_timeout', resumeFromTimeout);
+        console.log('✅ [SET-LINEUP] Preserving resume_from_timeout for Q1 timeout resume');
+      } else if (resumeFromTimeout && quarter > 1) {
+        console.warn('⚠️ [SET-LINEUP] Clearing stale resume_from_timeout flag for quarter break (Q' + quarter + ')');
+      }
 
       if (DEBUG) {
         params.set('debug', '1');

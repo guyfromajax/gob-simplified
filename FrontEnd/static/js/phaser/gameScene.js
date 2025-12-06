@@ -1517,6 +1517,10 @@ export function createGameScene(Phaser) {
           params.set('game_id', this.gameId);
           params.set('quarter', nextQ);
           params.set('period', `Q${nextQ}`);
+          // ✅ QUARTER BREAK: Clear resume_from_timeout when navigating to new quarter
+          // Quarter breaks (Q2, Q3, Q4) should NEVER have resume_from_timeout=true
+          // Only timeout resumes within the SAME quarter should have this flag
+          params.delete('resume_from_timeout');
           if (this.gameId && typeof localStorage !== 'undefined') {
             localStorage.setItem('game_id', this.gameId);
           }
