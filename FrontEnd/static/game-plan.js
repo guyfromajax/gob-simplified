@@ -299,7 +299,11 @@ function navigateToCourt() {
   params.set('period', periodLabel);
   if (quarter > 1 && gameId) params.set('game_id', gameId);
   
-  // Add lineup params
+  // ✅ Preserve clock time if present (from foul out navigation)
+  const clock = urlParams.get('clock');
+  if (clock) params.set('clock', clock);
+  
+  // Add lineup params (using same pattern as set-lineup.js)
   if (pgId) params.set(`${myTeamSide}_pg`, pgId);
   if (sgId) params.set(`${myTeamSide}_sg`, sgId);
   if (sfId) params.set(`${myTeamSide}_sf`, sfId);
