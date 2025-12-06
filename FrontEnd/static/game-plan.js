@@ -304,11 +304,31 @@ function navigateToCourt() {
   // ✅ TIMEOUT: Check for resume_from_timeout BEFORE game_id check (needed for Q1 timeouts)
   const resumeFromTimeout = urlParams.get('resume_from_timeout');
   
+  // ✅ DEBUG: Log timeout resume state
+  console.log('🔍 [GAME-PLAN] navigateToCourt() timeout state:', {
+    currentGameId,
+    quarter,
+    resumeFromTimeout,
+    urlGameId: urlParams.get('game_id'),
+    localStorageGameId: typeof localStorage !== 'undefined' ? localStorage.getItem('game_id') : null,
+    willPassGameId: currentGameId && (quarter > 1 || resumeFromTimeout)
+  });
+  
   // ✅ CRITICAL FIX: Pass game_id for quarter breaks (Q2+) OR timeout resumes (Q1)
   // Quarter breaks: quarter > 1 → passes game_id
   // Timeout in Q1: resumeFromTimeout → passes game_id (this was missing!)
   // New Q1 game: neither condition → doesn't pass game_id
-  if (currentGameId && (quarter > 1 || resumeFromTimeout)) params.set('game_id', currentGameId);
+  if (currentGameId && (quarter > 1 || resumeFromTimeout)) {
+    params.set('game_id', currentGameId);
+    console.log('✅ [GAME-PLAN] Passing game_id to court:', currentGameId);
+  } else {
+    console.warn('⚠️ [GAME-PLAN] NOT passing game_id:', {
+      hasCurrentGameId: !!currentGameId,
+      quarter,
+      resumeFromTimeout,
+      reason: !currentGameId ? 'no currentGameId' : (quarter === 1 && !resumeFromTimeout ? 'Q1 without timeout' : 'unknown')
+    });
+  }
   
   // ✅ Preserve clock time if present (from foul out navigation)
   const clock = urlParams.get('clock');
@@ -370,11 +390,31 @@ async function navigateBack() {
   // ✅ TIMEOUT: Check for resume_from_timeout BEFORE game_id check (needed for Q1 timeouts)
   const resumeFromTimeout = urlParams.get('resume_from_timeout');
   
+  // ✅ DEBUG: Log timeout resume state
+  console.log('🔍 [GAME-PLAN] navigateBack() timeout state:', {
+    currentGameId,
+    quarter,
+    resumeFromTimeout,
+    urlGameId: urlParams.get('game_id'),
+    localStorageGameId: typeof localStorage !== 'undefined' ? localStorage.getItem('game_id') : null,
+    willPassGameId: currentGameId && (quarter > 1 || resumeFromTimeout)
+  });
+  
   // ✅ CRITICAL FIX: Pass game_id for quarter breaks (Q2+) OR timeout resumes (Q1)
   // Quarter breaks: quarter > 1 → passes game_id
   // Timeout in Q1: resumeFromTimeout → passes game_id (this was missing!)
   // New Q1 game: neither condition → doesn't pass game_id
-  if (currentGameId && (quarter > 1 || resumeFromTimeout)) params.set('game_id', currentGameId);
+  if (currentGameId && (quarter > 1 || resumeFromTimeout)) {
+    params.set('game_id', currentGameId);
+    console.log('✅ [GAME-PLAN] Passing game_id to lineup:', currentGameId);
+  } else {
+    console.warn('⚠️ [GAME-PLAN] NOT passing game_id to lineup:', {
+      hasCurrentGameId: !!currentGameId,
+      quarter,
+      resumeFromTimeout,
+      reason: !currentGameId ? 'no currentGameId' : (quarter === 1 && !resumeFromTimeout ? 'Q1 without timeout' : 'unknown')
+    });
+  }
   
   // Pass lineup params back to preserve lineup when navigating back
   if (myTeamSide) {
