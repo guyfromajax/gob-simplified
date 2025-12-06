@@ -337,7 +337,7 @@ def restore_timeout_resume_state(game_id: str, request: QuarterSimulationRequest
                 logging.warning(f"⚠️ TIMEOUT RESUME: Error loading from tournament nested structure: {e}")
             
             # Fallback to games_collection if not found in nested structure
-            if not saved and games_collection:
+            if not saved and games_collection is not None:
                 saved = games_collection.find_one({"_id": game_id})
                 if saved:
                     logging.info(f"✅ TIMEOUT RESUME: Found game in games_collection (tournament fallback)")
@@ -363,14 +363,14 @@ def restore_timeout_resume_state(game_id: str, request: QuarterSimulationRequest
                 logging.warning(f"⚠️ TIMEOUT RESUME: Error loading from franchise nested structure: {e}")
             
             # Fallback to games_collection if not found in nested structure
-            if not saved and games_collection:
+            if not saved and games_collection is not None:
                 saved = games_collection.find_one({"_id": game_id})
                 if saved:
                     logging.info(f"✅ TIMEOUT RESUME: Found game in games_collection (franchise fallback)")
         
         else:
             # Single game mode: Check games_collection
-            if games_collection:
+            if games_collection is not None:
                 saved = games_collection.find_one({"_id": game_id})
                 if saved:
                     logging.info(f"✅ TIMEOUT RESUME: Found game in games_collection (single mode)")
@@ -1687,6 +1687,10 @@ async def call_timeout_endpoint(request: CallTimeoutRequest):
     # Store next_play_type in game_state for resume
     gm.game_state["timeout_next_play_type"] = timeout_turn.get("next_play_type", "SIDE_INBOUND")
     logging.info(f"✅ TIMEOUT: Stored next_play_type '{gm.game_state['timeout_next_play_type']}' to game_state for resume")
+    
+    # ✅ TIMEOUT: Capture possession team at time of timeout (for correct SIP team on resume)
+    gm.game_state["timeout_offense_team_id"] = gm.offense_team.team_id
+    logging.info(f"✅ TIMEOUT: Captured possession team '{gm.offense_team.name}' (team_id: {gm.offense_team.team_id}) for resume")
     
     # Append the TIMEOUT turn to the game manager's turns list
     gm.turns.append(timeout_turn)
