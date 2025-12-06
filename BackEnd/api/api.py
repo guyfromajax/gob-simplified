@@ -297,16 +297,81 @@ def restore_timeout_resume_state(game_id: str, request: QuarterSimulationRequest
     """
     Unified function to restore timeout resume state from DB.
     Always loads from DB (single source of truth) regardless of memory state.
+    Handles all three game modes with correct document locations:
+    - Single Game: games_collection doc
+    - Tournament Game: nested in tournament collection doc (with fallback to games_collection)
+    - Franchise Game: nested in franchise collection doc (with fallback to games_collection)
     Returns saved document with timeout state, or None if not found.
-    Works for all modes (single, tournament, franchise).
     """
-    if not request.resume_from_timeout or not games_collection:
+    if not request.resume_from_timeout:
         return None
     
+    saved = None
+    
     try:
-        saved = games_collection.find_one({"_id": game_id})
+        # Determine which document location to check based on mode
+        if request.mode == "tournament" and request.tournament_id:
+            # Tournament mode: Check nested structure first, then fallback to games_collection
+            try:
+                from BackEnd.db import tournaments_collection
+                from bson import ObjectId
+                
+                tournament_doc = tournaments_collection.find_one({"_id": ObjectId(request.tournament_id)})
+                if tournament_doc:
+                    # Extract round_key from saved game or use default
+                    # Try to find the game in any round
+                    games = tournament_doc.get("games", {})
+                    for round_key, round_games in games.items():
+                        if isinstance(round_games, dict):
+                            game_data = round_games.get(str(game_id)) or round_games.get(ObjectId(game_id))
+                            if game_data:
+                                saved = game_data
+                                logging.info(f"✅ TIMEOUT RESUME: Found game in tournament nested structure (round: {round_key})")
+                                break
+            except Exception as e:
+                logging.warning(f"⚠️ TIMEOUT RESUME: Error loading from tournament nested structure: {e}")
+            
+            # Fallback to games_collection if not found in nested structure
+            if not saved and games_collection:
+                saved = games_collection.find_one({"_id": game_id})
+                if saved:
+                    logging.info(f"✅ TIMEOUT RESUME: Found game in games_collection (tournament fallback)")
+        
+        elif request.mode == "franchise" and request.franchise_id:
+            # Franchise mode: Check nested structure first, then fallback to games_collection
+            try:
+                from BackEnd.db import franchises_collection
+                from bson import ObjectId
+                
+                franchise_doc = franchises_collection.find_one({"_id": ObjectId(request.franchise_id)})
+                if franchise_doc:
+                    # Try to find the game in any week
+                    games = franchise_doc.get("games", {})
+                    for week_key, week_games in games.items():
+                        if isinstance(week_games, dict):
+                            game_data = week_games.get(str(game_id)) or week_games.get(ObjectId(game_id))
+                            if game_data:
+                                saved = game_data
+                                logging.info(f"✅ TIMEOUT RESUME: Found game in franchise nested structure (week: {week_key})")
+                                break
+            except Exception as e:
+                logging.warning(f"⚠️ TIMEOUT RESUME: Error loading from franchise nested structure: {e}")
+            
+            # Fallback to games_collection if not found in nested structure
+            if not saved and games_collection:
+                saved = games_collection.find_one({"_id": game_id})
+                if saved:
+                    logging.info(f"✅ TIMEOUT RESUME: Found game in games_collection (franchise fallback)")
+        
+        else:
+            # Single game mode: Check games_collection
+            if games_collection:
+                saved = games_collection.find_one({"_id": game_id})
+                if saved:
+                    logging.info(f"✅ TIMEOUT RESUME: Found game in games_collection (single mode)")
+        
         if not saved:
-            logging.warning(f"⚠️ TIMEOUT RESUME: Game {game_id} not found in DB")
+            logging.warning(f"⚠️ TIMEOUT RESUME: Game {game_id} not found in any document location (mode: {request.mode})")
             return None
         
         # Validate that timeout_next_play_type exists
@@ -317,7 +382,7 @@ def restore_timeout_resume_state(game_id: str, request: QuarterSimulationRequest
         logging.info(
             f"✅ TIMEOUT RESUME: Loaded state from DB - "
             f"timeout_next_play_type={saved.get('timeout_next_play_type')}, "
-            f"quarter={saved.get('quarter')}, clock={saved.get('clock')}"
+            f"quarter={saved.get('quarter')}, clock={saved.get('clock')}, mode={request.mode}"
         )
         return saved
     except Exception as e:
