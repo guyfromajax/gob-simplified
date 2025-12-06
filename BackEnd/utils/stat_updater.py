@@ -104,7 +104,21 @@ def apply_stats_from_summary(summary: Dict[str, Any], game_id: str, tournament_i
     """
     token = f"{tournament_id}:{game_id}" if tournament_id else str(game_id)
 
+    # Get box_score from top level or build from team objects
     box_score = summary.get("box_score", {})
+    if not box_score:
+        # Build box_score from team objects (new structure)
+        home_team_obj = summary.get("home_team", {})
+        away_team_obj = summary.get("away_team", {})
+        if home_team_obj and isinstance(home_team_obj, dict):
+            home_team_name = home_team_obj.get("name")
+            if home_team_name and "box_score" in home_team_obj:
+                box_score[home_team_name] = home_team_obj.get("box_score", {})
+        if away_team_obj and isinstance(away_team_obj, dict):
+            away_team_name = away_team_obj.get("name")
+            if away_team_name and "box_score" in away_team_obj:
+                box_score[away_team_name] = away_team_obj.get("box_score", {})
+    
     players = summary.get("players", [])
     team_map = {
         "home": summary.get("home_team"),
@@ -116,8 +130,17 @@ def apply_stats_from_summary(summary: Dict[str, Any], game_id: str, tournament_i
         query_pid = ObjectId(raw_pid) if ObjectId.is_valid(raw_pid) else raw_pid
         team_side = p.get("team")
         pos = p.get("pos")
-        team_name = team_map.get(team_side)
-        if not raw_pid or not team_name:
+        team_obj = team_map.get(team_side)
+        if not raw_pid or not team_obj:
+            continue
+        
+        # Extract team name from team object (handle both dict and string for backward compatibility)
+        if isinstance(team_obj, dict):
+            team_name = team_obj.get("name")
+        else:
+            team_name = team_obj  # Backward compatibility: if it's already a string
+        
+        if not team_name:
             continue
         stat_block = box_score.get(team_name, {}).get(pos, {})
         inc_fields: Dict[str, Any] = {}
