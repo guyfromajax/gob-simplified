@@ -1070,7 +1070,12 @@ export function createGameScene(Phaser) {
         if (typeof homeF === 'number') liveHomeFouls = homeF;
         if (typeof awayF === 'number') liveAwayFouls = awayF;
 
-        // Update timeouts from turn data
+        // ✅ TIMEOUT: Update timeouts from turn data (exact same pattern as scores and fouls)
+        if (turn.homeTimeouts !== undefined || turn.awayTimeouts !== undefined) {
+          if (typeof turn.homeTimeouts === 'number') liveHomeTimeouts = turn.homeTimeouts;
+          if (typeof turn.awayTimeouts === 'number') liveAwayTimeouts = turn.awayTimeouts;
+        }
+        // Also check alternative keys (for turn data)
         const homeT = turn.home_team_timeouts ?? turn.timeouts?.home;
         const awayT = turn.away_team_timeouts ?? turn.timeouts?.away;
         if (typeof homeT === 'number') liveHomeTimeouts = homeT;
@@ -1162,6 +1167,8 @@ export function createGameScene(Phaser) {
         score: liveScore,  // Pass scores so updateScoreboard can update them
         homeFouls: liveHomeFouls,
         awayFouls: liveAwayFouls,
+        homeTimeouts: liveHomeTimeouts,  // ✅ TIMEOUT: Pass timeouts for immediate update
+        awayTimeouts: liveAwayTimeouts,
         clock: liveClock,
         quarter: liveQuarter,
         period_label: livePeriodLabel,
