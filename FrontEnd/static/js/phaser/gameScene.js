@@ -1015,9 +1015,12 @@ export function createGameScene(Phaser) {
 
       // Live scoreboard state - force to 0 for new games
       // Only use persisted scores if continuing an existing game
+      // ✅ TIMEOUT RESUME: Check team objects first (same pattern as timeouts) for consistency
+      const homeScoreFromData = homeTeamObj?.score ?? simData.score?.[homeTeam];
+      const awayScoreFromData = awayTeamObj?.score ?? simData.score?.[awayTeam];
       const liveScore = {
-        [homeTeam]: isNewGame ? 0 : (simData.score?.[homeTeam] ?? 0),
-        [awayTeam]: isNewGame ? 0 : (simData.score?.[awayTeam] ?? 0),
+        [homeTeam]: isNewGame ? 0 : (homeScoreFromData ?? 0),
+        [awayTeam]: isNewGame ? 0 : (awayScoreFromData ?? 0),
       };
       
         // Explicitly reset scoreboard UI for new games
@@ -1029,8 +1032,11 @@ export function createGameScene(Phaser) {
           if (homeTolEl) homeTolEl.textContent = 'TOL: 5';
           if (awayTolEl) awayTolEl.textContent = 'TOL: 5';
         }
-      let liveHomeFouls = simData.fouls?.home ?? 0;
-      let liveAwayFouls = simData.fouls?.away ?? 0;
+      // ✅ TIMEOUT RESUME: Check team objects first (same pattern as timeouts) for consistency
+      const homeFoulsFromData = homeTeamObj?.team_fouls ?? simData.fouls?.home;
+      const awayFoulsFromData = awayTeamObj?.team_fouls ?? simData.fouls?.away;
+      let liveHomeFouls = typeof homeFoulsFromData === 'number' ? homeFoulsFromData : 0;
+      let liveAwayFouls = typeof awayFoulsFromData === 'number' ? awayFoulsFromData : 0;
       // Extract timeouts from nested team objects or flat structure, default to 5 for new games
       const homeTimeoutsFromData = homeTeamObj?.timeouts ?? simData.timeouts?.home ?? simData.home_team_timeouts;
       const awayTimeoutsFromData = awayTeamObj?.timeouts ?? simData.timeouts?.away ?? simData.away_team_timeouts;
