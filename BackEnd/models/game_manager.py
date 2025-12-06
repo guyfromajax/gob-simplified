@@ -223,6 +223,31 @@ class GameManager:
             result["offense_team_id"] = self.offense_team.team_id
             logging.warning(f"🔄 [DREB→FB] Flipped possession before Fast Break: {old_offense} → {self.offense_team.name}, updated offense_team_id={result['offense_team_id']}")
 
+        # ✅ TIMEOUT: Check for foul out and create timeout turn
+        if result.get("fouled_out"):
+            foul_out_player_data = result.get("foul_out_player", {})
+            # Find the actual player object
+            foul_out_player = None
+            foul_out_player_id = foul_out_player_data.get("player_id") if isinstance(foul_out_player_data, dict) else None
+            if foul_out_player_id:
+                for team in [self.home_team, self.away_team]:
+                    for player in team.get_all_players():
+                        if player.player_id == foul_out_player_id:
+                            foul_out_player = player
+                            break
+                    if foul_out_player:
+                        break
+            
+            # Create timeout turn
+            timeout_turn = self.turn_manager.setup_timeout_turn(
+                timeout_reason="FOUL_OUT",
+                calling_team=None,
+                foul_out_player=foul_out_player
+            )
+            self.turns.append(timeout_turn)
+            self.text_log.append(timeout_turn["text"])
+            logging.info(f"⏸️ TIMEOUT: Created timeout turn for foul out - {foul_out_player_data.get('name', 'Unknown')}")
+
         # If the turn ended with a dead-ball turnover or a non-shooting foul
         # that does not result in free throws, prepare a sideline inbound
         # sequence and append its payload so the front end can animate it.
@@ -415,6 +440,10 @@ class GameManager:
         if current == "SIDE_INBOUND":
             return "HCO"
         
+        # TIMEOUT → SIP/Free Throw/BIP (based on next_play_type in timeout turn)
+        if current == "TIMEOUT":
+            return result.get("next_play_type", "SIDE_INBOUND")
+        
         # HCO, OREB, FAST_BREAK, FCP, HCT → Multiple options based on result_type
         # These already set next_play_type in their handlers, so use that
         if result.get("next_play_type"):
@@ -555,6 +584,11 @@ class GameManager:
         # Delegate aggregation to each team, which sums over all players
         self.home_team.update_team_stats()
         self.away_team.update_team_stats()
+        # ✅ TIMEOUT: Update team timeout counts in game_state
+        self.game_state["team_timeouts"] = {
+            self.home_team.name: getattr(self.home_team, 'timeouts', 5),
+            self.away_team.name: getattr(self.away_team, 'timeouts', 5),
+        }
 
     def print_game_statistics(self):
         """Print all game statistics including defense score stats."""

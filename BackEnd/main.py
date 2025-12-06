@@ -212,6 +212,7 @@ def simulate_quarter(
     start_with_inbound: bool = False,
     starting_possession: str | None = None,
     turn_by_turn_mode: bool = False,
+    resume_from_timeout: bool = False,
 ):
     """Simulate a single quarter on an existing ``GameManager``.
 
@@ -273,6 +274,15 @@ def simulate_quarter(
 
     q = gm.quarter
     gm.game_state["quarter"] = q
+
+    # ✅ TIMEOUT: If resuming from timeout, skip all quarter initialization
+    # Reuse the same pattern as quarter breaks - preserve all game state
+    # The next turn will be created by the first /api/simulate-turn call
+    if resume_from_timeout:
+        logging.info(f"✅ TIMEOUT RESUME: Skipping ALL quarter start logic (opening tip/inbounds) - game will continue with next turn via /api/simulate-turn")
+        # Don't create the initial turn here - let the first /api/simulate-turn call create it
+        # This matches the pattern used for quarter breaks
+        return gm  # Early return - skip all quarter initialization
 
     period_label = f"Q{q}" if q <= 4 else f"OT{q - 4}"
     gm.game_state["period_label"] = period_label

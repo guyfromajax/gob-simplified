@@ -837,6 +837,19 @@ function initGame() {
     console.error('Play Quarter button not found!');
   }
   
+  // ✅ TIMEOUT: Auto-start if resuming from timeout
+  const resumeFromTimeout = urlParams.get('resume_from_timeout') === 'true';
+  if (resumeFromTimeout && gameId && homeTeam && awayTeam) {
+    console.log('⏸️ TIMEOUT RESUME: Auto-starting game from timeout');
+    // Hide pre-game buttons immediately
+    const preGameContainer = document.querySelector('.pre-game-container');
+    if (preGameContainer) {
+      preGameContainer.style.display = 'none';
+    }
+    // Auto-start the game
+    handleButtonClick(true);
+  }
+  
   if (simFullBtn) {
     simFullBtn.addEventListener('click', handleSimFullGame);
   }

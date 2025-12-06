@@ -1341,6 +1341,96 @@ class TurnManager:
     def resolve_turnover(self):
         return resolve_turnover_logic(self.game)
     
+    def setup_timeout_turn(self, timeout_reason="USER", calling_team=None, foul_out_player=None):
+        """
+        Create a TIMEOUT turn payload.
+        
+        Args:
+            timeout_reason: "USER", "COMPUTER", "FOUL_OUT", or "QUARTER_END"
+            calling_team: Team object that called the timeout (for USER/COMPUTER)
+            foul_out_player: Player object that fouled out (for FOUL_OUT)
+        
+        Returns:
+            dict: Timeout turn payload with next_play_type determined based on game state
+        """
+        game = self.game
+        game_state = game.game_state
+        
+        # Determine next_play_type based on game state
+        # Priority: Free Throw > Quarter Start > Side Inbound
+        if game_state.get("free_throws_remaining", 0) > 0:
+            next_play_type = "FREE_THROW"
+        elif game_state.get("quarter") in [2, 3, 4] and len(game.turns) == 0:
+            # Quarter start (Q2/Q3/Q4) - will be BASELINE_INBOUND
+            next_play_type = "BASELINE_INBOUND"
+        else:
+            # Default: Side Inbound Pass
+            next_play_type = "SIDE_INBOUND"
+        
+        # Store next_play_type in game_state for resume
+        game_state["timeout_next_play_type"] = next_play_type
+        
+        # Build timeout turn payload
+        payload = {
+            "result_type": "TIMEOUT",
+            "current_turn": "TIMEOUT",
+            "timeout_reason": timeout_reason,
+            "next_play_type": next_play_type,
+            "next_turn": next_play_type,
+            "offense_team_id": game.offense_team.team_id,
+            "quarter": game.quarter,
+            "text": self._get_timeout_text(timeout_reason, calling_team, foul_out_player),
+            "time_elapsed": 0,  # Timeouts don't consume game time
+            "possession_flips": False,
+        }
+        
+        # Add timeout calling team info
+        if calling_team:
+            payload["timeout_calling_team"] = {
+                "name": calling_team.name,
+                "team_id": calling_team.team_id,
+            }
+            # Reduce timeout count if user or computer called it
+            if timeout_reason in ["USER", "COMPUTER"]:
+                if calling_team.timeouts > 0:
+                    calling_team.timeouts -= 1
+                    import logging
+                    logging.info(f"⏸️ TIMEOUT: {calling_team.name} called timeout. Remaining: {calling_team.timeouts}")
+        
+        # Add foul out player info
+        if foul_out_player:
+            payload["foul_out_player"] = {
+                "name": getattr(foul_out_player, "name", "Unknown"),
+                "player_id": getattr(foul_out_player, "player_id", None),
+                "team": getattr(foul_out_player, "team", None),
+            }
+        
+        # Add current timeout counts for frontend display
+        payload["home_team_timeouts"] = getattr(game.home_team, 'timeouts', 5)
+        payload["away_team_timeouts"] = getattr(game.away_team, 'timeouts', 5)
+        
+        return payload
+    
+    def _get_timeout_text(self, timeout_reason, calling_team, foul_out_player):
+        """Generate timeout announcement text."""
+        if timeout_reason == "FOUL_OUT":
+            player_name = getattr(foul_out_player, "name", "Unknown") if foul_out_player else "Unknown"
+            return f"{player_name} has fouled out! Timeout called for lineup adjustment."
+        elif timeout_reason == "USER":
+            team_name = calling_team.name if calling_team else "Team"
+            return f"{team_name} calls a timeout!"
+        elif timeout_reason == "COMPUTER":
+            team_name = calling_team.name if calling_team else "Team"
+            return f"{team_name} calls a timeout!"
+        elif timeout_reason == "QUARTER_END":
+            return "End of quarter timeout."
+        else:
+            return "Timeout called."
+    
+    def can_call_timeout(self, team):
+        """Check if a team has timeouts remaining."""
+        return getattr(team, 'timeouts', 5) > 0
+
     def resolve_offensive_rebound_turn(self):
         """
         Process an offensive rebound as a separate turn.

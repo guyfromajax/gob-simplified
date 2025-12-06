@@ -67,6 +67,8 @@ export class AnimationEngine {
     this.animationHandlers.set('OPENING_TIP', this.handleOpeningTip.bind(this));
     // ✅ PHASE 2.6: Add handler for DEFENSIVE_STOP
     this.animationHandlers.set('DEFENSIVE_STOP', this.handleDefensiveStop.bind(this));
+    // ✅ TIMEOUT: Add handler for TIMEOUT turns
+    this.animationHandlers.set('TIMEOUT', this.handleTimeout.bind(this));
   }
 
   /**
@@ -444,6 +446,36 @@ export class AnimationEngine {
     });
     
     // Note: Announcements and score updates are handled by AnimationRouter (finalizeTurnAfterAnimation)
+  }
+
+  async handleTimeout(turnData, context) {
+    console.log('⏸️ AnimationEngine: Handling timeout', {
+      timeout_reason: turnData.timeout_reason,
+      foul_out_player: turnData.foul_out_player,
+      calling_team: turnData.timeout_calling_team
+    });
+    
+    // ✅ TIMEOUT: Pause all tweens immediately when timeout is called
+    if (this.scene.tweens) {
+      this.scene.tweens.pauseAll();
+      console.log('⏸️ AnimationEngine: Paused all tweens for timeout');
+    }
+    // ✅ TIMEOUT: Set a flag to stop the main animation loop
+    this.scene.timeoutCalled = true;
+    
+    // ✅ TIMEOUT: Show timeout popup and navigate to lineup screen
+    // The timeout button manager will handle the navigation
+    // For now, we'll just log - the actual navigation happens when button is clicked
+    // For foul-out timeouts, we might want to show a different popup
+    if (turnData.timeout_reason === 'FOUL_OUT') {
+      console.log('⏸️ TIMEOUT: Foul out timeout - player fouled out');
+      // Could show a special popup here if needed
+    }
+    
+    // Append timeout text to text scroll
+    if (turnData.text && this.scene.events) {
+      this.scene.events.emit('textScroll', turnData.text);
+    }
   }
 
   async handleOpeningTip(turnData, context) {
