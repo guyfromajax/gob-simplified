@@ -293,6 +293,59 @@ def save_game_to_nested_structure(mode: str, doc_id: str, game_id: str, game_dat
             print(f"❌ Error saving game to franchise doc: {e}")
             traceback.print_exc()
 
+def restore_timeout_resume_state(game_id: str, request: QuarterSimulationRequest, games_collection) -> dict | None:
+    """
+    Unified function to restore timeout resume state from DB.
+    Always loads from DB (single source of truth) regardless of memory state.
+    Returns saved document with timeout state, or None if not found.
+    Works for all modes (single, tournament, franchise).
+    """
+    if not request.resume_from_timeout or not games_collection:
+        return None
+    
+    try:
+        saved = games_collection.find_one({"_id": game_id})
+        if not saved:
+            logging.warning(f"⚠️ TIMEOUT RESUME: Game {game_id} not found in DB")
+            return None
+        
+        # Validate that timeout_next_play_type exists
+        if "timeout_next_play_type" not in saved:
+            logging.error(f"❌ TIMEOUT RESUME: timeout_next_play_type missing from saved game {game_id}")
+            return None
+        
+        logging.info(
+            f"✅ TIMEOUT RESUME: Loaded state from DB - "
+            f"timeout_next_play_type={saved.get('timeout_next_play_type')}, "
+            f"quarter={saved.get('quarter')}, clock={saved.get('clock')}"
+        )
+        return saved
+    except Exception as e:
+        logging.error(f"❌ TIMEOUT RESUME: Error loading from DB: {e}", exc_info=True)
+        return None
+
+def apply_timeout_resume_state_to_gm(gm: "GameManager", saved: dict):
+    """
+    Apply restored timeout state to GameManager.
+    Called after gm is loaded/created.
+    Works for all modes (single, tournament, franchise).
+    """
+    if not saved or not gm:
+        return
+    
+    # Restore critical timeout state
+    if "timeout_next_play_type" in saved:
+        gm.game_state["timeout_next_play_type"] = saved["timeout_next_play_type"]
+        logging.info(f"🔄 TIMEOUT RESUME: Applied timeout_next_play_type={saved['timeout_next_play_type']}")
+    
+    if "clock" in saved:
+        gm.game_state["clock"] = saved["clock"]
+        logging.info(f"🔄 TIMEOUT RESUME: Applied clock={saved['clock']}")
+    
+    if "time_remaining" in saved:
+        gm.game_state["time_remaining"] = saved["time_remaining"]
+        logging.info(f"🔄 TIMEOUT RESUME: Applied time_remaining={saved['time_remaining']}")
+
 # 4. Routes
 @app.get("/")
 def root():
@@ -667,27 +720,18 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
             except Exception as e:
                 logging.error(f"❌ [STRATEGY SETTINGS] Error updating strategy_settings: {e}", exc_info=True)
         
-        # ✅ TIMEOUT FIX: If resuming from timeout and game is in memory, restore timeout_next_play_type from DB
-        # This ensures timeout_next_play_type is correct even if game_state was reset or game was recreated
-        # This fixes tournament mode where game might be in memory but timeout_next_play_type is missing
-        if gm is not None and request.resume_from_timeout and games_collection is not None:
-            try:
-                saved = games_collection.find_one({"_id": game_id})
-                if saved:
-                    # Restore timeout_next_play_type from saved document
-                    if "timeout_next_play_type" in saved:
-                        gm.game_state["timeout_next_play_type"] = saved["timeout_next_play_type"]
-                        logging.info(f"🔄 TIMEOUT RESUME (IN MEMORY): Restored timeout_next_play_type from DB: {saved['timeout_next_play_type']}")
-                    else:
-                        logging.warning(f"⚠️ TIMEOUT RESUME (IN MEMORY): timeout_next_play_type not found in saved document")
-                    
-                    # Also restore clock and time_remaining for consistency
-                    if "clock" in saved:
-                        gm.game_state["clock"] = saved["clock"]
-                    if "time_remaining" in saved:
-                        gm.game_state["time_remaining"] = saved["time_remaining"]
-            except Exception as e:
-                logging.error(f"❌ TIMEOUT RESUME: Error restoring timeout_next_play_type from DB: {e}", exc_info=True)
+        # ✅ TIMEOUT RESUME: Unified state restoration (works for all modes and all paths)
+        # Always load timeout state from DB first (single source of truth)
+        # This ensures timeout_next_play_type is correct regardless of memory state
+        timeout_saved_state = None
+        if request.resume_from_timeout:
+            timeout_saved_state = restore_timeout_resume_state(game_id, request, games_collection)
+            if not timeout_saved_state:
+                logging.error(f"❌ TIMEOUT RESUME: Failed to load state from DB for game_id={game_id}")
+                # Continue anyway - simulate_quarter() will handle missing timeout_next_play_type
+            elif gm is not None:
+                # Game is in memory - apply timeout state now (before simulate_quarter)
+                apply_timeout_resume_state_to_gm(gm, timeout_saved_state)
         
         if gm is None:
             logging.warning(
@@ -964,18 +1008,18 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                             gm.home_team.timeouts = 5  # New game starts with 5 timeouts
                             gm.away_team.timeouts = 5  # New game starts with 5 timeouts
                         
-                        # ✅ TIMEOUT: Restore clock and time_remaining from saved document
-                        if "clock" in saved:
-                            gm.game_state["clock"] = saved["clock"]
-                            logging.info(f"🔄 Clock restored: {saved['clock']}")
-                        if "time_remaining" in saved:
-                            gm.game_state["time_remaining"] = saved["time_remaining"]
-                            logging.info(f"🔄 Time remaining restored: {saved['time_remaining']} seconds")
-                        
-                        # ✅ TIMEOUT: Restore timeout_next_play_type
-                        if "timeout_next_play_type" in saved:
-                            gm.game_state["timeout_next_play_type"] = saved["timeout_next_play_type"]
-                            logging.info(f"🔄 timeout_next_play_type restored: {saved['timeout_next_play_type']}")
+                        # ✅ TIMEOUT RESUME: Apply unified timeout state restoration (if resuming from timeout)
+                        # This uses the state we loaded earlier from DB (single source of truth)
+                        if timeout_saved_state:
+                            apply_timeout_resume_state_to_gm(gm, timeout_saved_state)
+                        else:
+                            # Not resuming from timeout - restore clock/time_remaining normally
+                            if "clock" in saved:
+                                gm.game_state["clock"] = saved["clock"]
+                                logging.info(f"🔄 Clock restored: {saved['clock']}")
+                            if "time_remaining" in saved:
+                                gm.game_state["time_remaining"] = saved["time_remaining"]
+                                logging.info(f"🔄 Time remaining restored: {saved['time_remaining']} seconds")
                         
                         # Restore opening_tip_winner for Q2-Q4 possession logic
                         # Only restore if this is NOT a new Q1 game (opening tip hasn't happened yet for new games)
