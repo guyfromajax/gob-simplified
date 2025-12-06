@@ -32,19 +32,8 @@ if (typeof window !== 'undefined') {
   window.animation_config = window.animation_config || {};
 }
 
-function updateScoreboardScores({ home, away }) {
-  const homeScoreEl = document.getElementById('home-score');
-  const awayScoreEl = document.getElementById('away-score');
-  if (homeScoreEl) homeScoreEl.textContent = home;
-  if (awayScoreEl) awayScoreEl.textContent = away;
-}
-
-if (typeof on === 'function' && typeof emit === 'function') {
-  on('score:update', updateScoreboardScores);
-  // Note: Score initialization moved to after variable declarations
-} else {
-  // Note: Score initialization moved to after variable declarations
-}
+// ✅ REFACTOR: Removed event system for scores - now using direct DOM updates in gameScene.js
+// This matches the pattern used for fouls, timeouts, and clock (consistent approach)
 
 function getMode({ tournamentId, franchiseId }) {
   if (tournamentId) return 'tournament';
@@ -104,12 +93,12 @@ let gameId =
 
 // Initialize scoreboard scores
 // Only reset to 0-0 for fresh Q1 games; for resumed games, loadGameStats.js sets accumulated scores
+// ✅ REFACTOR: Direct DOM update (same pattern as other scoreboard items)
 if (quarter === 1 && !gameId) {
-  if (typeof emit === 'function') {
-    emit('score:update', { home: 0, away: 0 });
-  } else {
-    updateScoreboardScores({ home: 0, away: 0 });
-  }
+  const homeScoreEl = document.getElementById('home-score');
+  const awayScoreEl = document.getElementById('away-score');
+  if (homeScoreEl) homeScoreEl.textContent = 0;
+  if (awayScoreEl) awayScoreEl.textContent = 0;
 }
 
 // Load game plan settings (async function to be called before game starts)
@@ -231,7 +220,11 @@ function resetGameContext() {
     localStorage.removeItem('game_id');
   }
   gameStore.reset();
-  updateScoreboardScores({ home: 0, away: 0 });
+  // ✅ REFACTOR: Direct DOM update (same pattern as other scoreboard items)
+  const homeScoreEl = document.getElementById('home-score');
+  const awayScoreEl = document.getElementById('away-score');
+  if (homeScoreEl) homeScoreEl.textContent = 0;
+  if (awayScoreEl) awayScoreEl.textContent = 0;
 }
 
 

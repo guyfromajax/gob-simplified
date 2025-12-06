@@ -349,6 +349,8 @@ export function createGameScene(Phaser) {
       if (homeLogoEl) homeLogoEl.src = `/static/images/homepage-logos/${encodeURIComponent(homeTeam)}.png`;
       if (awayLogoEl) awayLogoEl.src = `/static/images/homepage-logos/${encodeURIComponent(awayTeam)}.png`;
 
+      const homeScoreEl = document.getElementById('home-score');
+      const awayScoreEl = document.getElementById('away-score');
       const homeFoulsEl = document.getElementById('home-fouls');
       const awayFoulsEl = document.getElementById('away-fouls');
       const homeTolEl = document.getElementById('home-tol');
@@ -1018,16 +1020,15 @@ export function createGameScene(Phaser) {
         [awayTeam]: isNewGame ? 0 : (simData.score?.[awayTeam] ?? 0),
       };
       
-      // Explicitly reset scoreboard UI for new games
-      if (isNewGame) {
-        emit('score:update', {
-          home: 0,
-          away: 0,
-        });
-        // Initialize timeout display for new games
-        if (homeTolEl) homeTolEl.textContent = 'TOL: 5';
-        if (awayTolEl) awayTolEl.textContent = 'TOL: 5';
-      }
+        // Explicitly reset scoreboard UI for new games
+        if (isNewGame) {
+          // ✅ REFACTOR: Direct DOM updates (same as other scoreboard items)
+          if (homeScoreEl) homeScoreEl.textContent = 0;
+          if (awayScoreEl) awayScoreEl.textContent = 0;
+          // Initialize timeout display for new games
+          if (homeTolEl) homeTolEl.textContent = 'TOL: 5';
+          if (awayTolEl) awayTolEl.textContent = 'TOL: 5';
+        }
       let liveHomeFouls = simData.fouls?.home ?? 0;
       let liveAwayFouls = simData.fouls?.away ?? 0;
       // Extract timeouts from nested team objects or flat structure, default to 5 for new games
@@ -1046,6 +1047,9 @@ export function createGameScene(Phaser) {
       const updateScoreboard = (turn = {}) => {
         const prevHome = liveScore[homeTeam];
         const prevAway = liveScore[awayTeam];
+        
+        // ✅ TIMEOUT: Track if we're updating from initial values (not a turn)
+        const isInitialUpdate = turn.score && !turn.index && !turn.result_type;
 
         // ``turn.score`` is authoritative. ``turn.points`` may appear in the
         // payload for context but must **not** be re-applied here to avoid
@@ -1074,6 +1078,9 @@ export function createGameScene(Phaser) {
           livePeriodLabel = turn.quarter > 4 ? `OT${turn.quarter - 4}` : `Q${turn.quarter}`;
         }
 
+        // ✅ REFACTOR: Direct DOM updates for all scoreboard items (consistent pattern)
+        if (homeScoreEl) homeScoreEl.textContent = liveScore[homeTeam];
+        if (awayScoreEl) awayScoreEl.textContent = liveScore[awayTeam];
         if (homeFoulsEl) homeFoulsEl.textContent = `F: ${liveHomeFouls}`;
         if (awayFoulsEl) awayFoulsEl.textContent = `F: ${liveAwayFouls}`;
         if (homeTolEl) homeTolEl.textContent = `TOL: ${liveHomeTimeouts}`;
@@ -1121,12 +1128,8 @@ export function createGameScene(Phaser) {
           });
         }
 
-        if (liveScore[homeTeam] !== prevHome || liveScore[awayTeam] !== prevAway) {
-          emit('score:update', {
-            home: liveScore[homeTeam],
-            away: liveScore[awayTeam],
-          });
-        }
+        // ✅ REFACTOR: Scores now use direct DOM updates (same as fouls/timeouts/clock)
+        // No need for event system - scores are updated directly above with other scoreboard items
 
         if (turn.text && turn.index !== this.lastTurnShown) {
           if (typeof window !== 'undefined' && window.TEXT_SCROLL_ENABLED) {
@@ -1148,8 +1151,9 @@ export function createGameScene(Phaser) {
       };
 
       // Show cumulative state immediately
+      // ✅ TIMEOUT: updateScoreboard() now handles initial score updates (same system as other items)
       updateScoreboard({
-        score: liveScore,
+        score: liveScore,  // Pass scores so updateScoreboard can update them
         homeFouls: liveHomeFouls,
         awayFouls: liveAwayFouls,
         clock: liveClock,
