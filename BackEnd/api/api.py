@@ -794,32 +794,41 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
         
         # ✅ TIMEOUT RESUME: Unified state restoration (works for all modes and all paths)
         # Only check database for timeout state if we have a game_id (existing game, not new game start)
-        # New game starts (Q1 with no game_id or new game_id) should NOT check for timeout state
+        # Always check database for timeout state if we have a game_id
+        # The database is the source of truth - if timeout_next_play_type exists, we're resuming from timeout
+        # Validation (quarter match, etc.) happens later when applying the state
         timeout_saved_state = None
         logging.info(f"🔍 TIMEOUT RESUME CHECK: Checking if we should look for timeout state (game_id={game_id}, quarter={request.quarter}, mode={request.mode}, URL resume_from_timeout={request.resume_from_timeout})")
         
-        # Only check for timeout state if:
-        # 1. We have a game_id (existing game, not brand new game)
-        # 2. We're not starting a fresh Q1 (new game start = opening tip, not timeout resume)
-        should_check_timeout = game_id and not (request.quarter == 1 and not gm)
-        
-        if should_check_timeout:
-            logging.info(f"🔍 TIMEOUT RESUME: Checking DB for timeout state (existing game)")
+        # Check for timeout state if we have a game_id (existing game)
+        # Don't skip Q1 - we could be resuming from a timeout in Q1!
+        # The restore_timeout_resume_state function will validate quarter match to prevent stale data
+        if game_id:
+            logging.info(f"🔍 TIMEOUT RESUME: Checking DB for timeout state (game_id exists)")
             timeout_saved_state = restore_timeout_resume_state(game_id, request, games_collection)
         else:
-            logging.info(f"🔍 TIMEOUT RESUME: Skipping timeout check (new game start or no game_id)")
+            logging.info(f"🔍 TIMEOUT RESUME: Skipping timeout check (no game_id - brand new game)")
         
         if timeout_saved_state:
-            logging.info(f"✅ TIMEOUT RESUME: Found timeout state in DB, timeout_next_play_type={timeout_saved_state.get('timeout_next_play_type')}")
-            # Override request.resume_from_timeout to ensure simulate_quarter() handles timeout resume
-            request.resume_from_timeout = True
-            logging.info(f"✅ TIMEOUT RESUME: Detected timeout state in DB, setting resume_from_timeout=True for simulate_quarter()")
-            if gm is not None:
-                # Game is in memory - apply timeout state now (before simulate_quarter)
-                logging.info(f"🔍 TIMEOUT RESUME: Applying state to in-memory game")
-                apply_timeout_resume_state_to_gm(gm, timeout_saved_state)
+            # Validate quarter match to prevent stale data from affecting new games
+            saved_quarter = timeout_saved_state.get("quarter", 0)
+            timeout_next_play_type = timeout_saved_state.get("timeout_next_play_type")
+            
+            if timeout_next_play_type and saved_quarter == request.quarter:
+                logging.info(f"✅ TIMEOUT RESUME: Found valid timeout state in DB, timeout_next_play_type={timeout_next_play_type}, quarter={saved_quarter}")
+                # Override request.resume_from_timeout to ensure simulate_quarter() handles timeout resume
+                request.resume_from_timeout = True
+                logging.info(f"✅ TIMEOUT RESUME: Detected valid timeout state in DB, setting resume_from_timeout=True for simulate_quarter()")
+                if gm is not None:
+                    # Game is in memory - apply timeout state now (before simulate_quarter)
+                    logging.info(f"🔍 TIMEOUT RESUME: Applying state to in-memory game")
+                    apply_timeout_resume_state_to_gm(gm, timeout_saved_state)
+                else:
+                    logging.info(f"🔍 TIMEOUT RESUME: Game not in memory, will apply after DB load")
             else:
-                logging.info(f"🔍 TIMEOUT RESUME: Game not in memory, will apply after DB load")
+                # Stale timeout data (quarter mismatch or missing next_play_type) - ignore it
+                logging.warning(f"⚠️ TIMEOUT RESUME: Found timeout state but quarter mismatch or missing next_play_type - treating as normal game (saved_quarter={saved_quarter}, requested_quarter={request.quarter}, next_play_type={timeout_next_play_type})")
+                timeout_saved_state = None  # Clear invalid timeout state
         else:
             if request.resume_from_timeout:
                 logging.warning(f"⚠️ TIMEOUT RESUME: URL has resume_from_timeout=true but no timeout state found in DB for game_id={game_id}")
