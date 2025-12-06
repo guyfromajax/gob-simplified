@@ -193,7 +193,25 @@ async function handleTimeoutButtonClick() {
     
     // Get game ID and team info from scene
     const gameId = scene.gameId || scene.simData?.game_id;
-    const myTeamSide = scene.myTeamSide || (scene.simData?.user_team_side === 'home' ? 'home' : 'away');
+    // ✅ TIMEOUT: Use scene.userTeamSide (set in init()) or fallback to URL param
+    // scene.userTeamSide is the authoritative source (set from bootGame.js data.userTeamSide)
+    // URL param 'my_team' is the fallback (set when navigating to court.html)
+    const urlParams = new URLSearchParams(window.location.search);
+    const myTeamSide = scene.userTeamSide || urlParams.get('my_team');
+    
+    // Log for debugging
+    console.log('⏸️ TIMEOUT: Determining calling team', {
+      sceneUserTeamSide: scene.userTeamSide,
+      urlParamMyTeam: urlParams.get('my_team'),
+      simDataUserTeamSide: scene.simData?.user_team_side,
+      finalMyTeamSide: myTeamSide
+    });
+    
+    if (!myTeamSide) {
+        console.error('❌ TIMEOUT: Cannot determine user team side (myTeamSide is undefined)');
+        alert('Cannot determine your team for this game. Please return and relaunch.');
+        return;
+    }
     
     if (!gameId) {
         console.error('❌ TIMEOUT: Cannot determine game ID');
