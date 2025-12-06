@@ -1103,12 +1103,19 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                         
                         # ✅ TIMEOUT RESUME: Apply unified timeout state restoration (if resuming from timeout)
                         # This uses the state we loaded earlier from DB (single source of truth)
-                        # If timeout state exists in DB, we're resuming from timeout (regardless of URL parameter)
+                        # Only apply if we actually found timeout state and quarter matches (not stale data)
                         if timeout_saved_state:
-                            apply_timeout_resume_state_to_gm(gm, timeout_saved_state)
-                            # Override request.resume_from_timeout to ensure simulate_quarter() handles timeout resume
-                            request.resume_from_timeout = True
-                            logging.info(f"✅ TIMEOUT RESUME: Detected timeout state in DB, setting resume_from_timeout=True for simulate_quarter()")
+                            # Validate that this is actually a timeout resume (not stale data from previous game)
+                            # Check that timeout_next_play_type exists and quarter matches
+                            saved_quarter = saved.get("quarter", 0)
+                            if timeout_saved_state.get("timeout_next_play_type") and saved_quarter == request.quarter:
+                                apply_timeout_resume_state_to_gm(gm, timeout_saved_state)
+                                # Override request.resume_from_timeout to ensure simulate_quarter() handles timeout resume
+                                request.resume_from_timeout = True
+                                logging.info(f"✅ TIMEOUT RESUME: Detected valid timeout state in DB (quarter matches), setting resume_from_timeout=True for simulate_quarter()")
+                            else:
+                                logging.warning(f"⚠️ TIMEOUT RESUME: Found timeout state but quarter mismatch or missing next_play_type - treating as normal game (saved_quarter={saved_quarter}, requested_quarter={request.quarter})")
+                                timeout_saved_state = None  # Clear invalid timeout state
                         else:
                             # Not resuming from timeout - restore clock/time_remaining normally
                             if "clock" in saved:
