@@ -103,6 +103,8 @@ ongoing_games: dict[str, GameManager] = {}
 class TurnSimulationRequest(BaseModel):
     game_id: str
     # Optional user overrides for this specific turn
+    offense_override: str | None = None  # e.g., "Inside", "Attack", "Outside"
+    defense_override: str | None = None  # e.g., "Zone", "Man"
 
 
 class CallTimeoutRequest(BaseModel):
