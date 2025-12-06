@@ -1301,7 +1301,12 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
     # simulate_quarter() already created the SIP turn and added it to gm.turns when resume_from_timeout=True
     # We should return it just like we return BIP turns for quarter breaks
     if request.resume_from_timeout:
-        logging.info(f"✅ TIMEOUT RESUME: Returning SIP turn from simulate_quarter() (turns count: {len(turns)})")
+        logging.info(f"✅ TIMEOUT RESUME: Returning turns from simulate_quarter() (turns count: {len(turns)})")
+        if turns:
+            first_turn = turns[0]
+            logging.info(f"✅ TIMEOUT RESUME: First turn result_type={first_turn.get('result_type')}, current_turn={first_turn.get('current_turn')}, quarter={first_turn.get('quarter')}")
+        else:
+            logging.error(f"🚨 TIMEOUT RESUME: No turns returned! This should not happen - SIP turn should have been created in simulate_quarter()")
         # Turns array already contains the SIP turn created in simulate_quarter() - no need to override
     
     logger.debug(
