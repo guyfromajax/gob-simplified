@@ -202,12 +202,30 @@ export function createGameScene(Phaser) {
         console.log("🔢 Quarter:", this.quarter, "Game ID:", this.gameId);
       }
 
+      // ✅ NEW GAME DETECTION: Determine if this is a truly new game
+      // New game if: no game_id, OR Q1 with no game_id in URL and not resuming from timeout
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlGameId = urlParams.get('game_id');
+      const resumeFromTimeout = urlParams.get('resume_from_timeout') === 'true';
+      const isNewGame = !this.gameId || 
+                        (this.quarter === 1 && !urlGameId && !resumeFromTimeout);
+      
+      if (isNewGame) {
+        // Clear stale game_id for new game
+        console.log('🆕 NEW GAME: Clearing stale game_id for new game start');
+        this.gameId = null;
+        if (typeof localStorage !== 'undefined') {
+          localStorage.removeItem('game_id');
+        }
+      }
+      
       const payload = { home_team: homeTeam, away_team: awayTeam, quarter: this.quarter };
-      if (this.gameId) payload.game_id = this.gameId;
+      // Only pass game_id if we have one AND it's not a new game
+      if (this.gameId && !isNewGame) {
+        payload.game_id = this.gameId;
+      }
       
       // ✅ TIMEOUT: Add resume_from_timeout flag if present in URL
-      const timeoutUrlParams = new URLSearchParams(window.location.search);
-      const resumeFromTimeout = timeoutUrlParams.get('resume_from_timeout') === 'true';
       if (resumeFromTimeout) {
         payload.resume_from_timeout = true;
         console.log('🔍 TIMEOUT RESUME: Setting resume_from_timeout=true in payload', payload);

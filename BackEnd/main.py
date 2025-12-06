@@ -328,7 +328,24 @@ def simulate_quarter(
                 seconds = gm.game_state["time_remaining"] % 60
                 gm.game_state["clock"] = f"{minutes}:{seconds:02d}"
         
-        gm.game_state.pop("timeout_next_play_type", None)  # Clear flag
+        # ✅ TIMEOUT: Clear timeout state from memory
+        gm.game_state.pop("timeout_next_play_type", None)
+        gm.game_state.pop("timeout_offense_team_id", None)  # Also clear possession team
+        
+        # ✅ TIMEOUT: Clear timeout state from database after resume (defensive cleanup)
+        # This prevents stale timeout state from affecting future games
+        if game_id:
+            try:
+                from BackEnd.db import games_collection
+                games_collection.update_one(
+                    {"_id": game_id},
+                    {"$unset": {"timeout_next_play_type": "", "timeout_offense_team_id": ""}}
+                )
+                logging.info(f"🧹 TIMEOUT RESUME: Cleared timeout state from database for game_id={game_id}")
+            except Exception as e:
+                logging.warning(f"⚠️ TIMEOUT RESUME: Failed to clear timeout state from DB: {e}")
+                # Non-critical - game continues normally
+        
         return gm  # Early return - skip all quarter initialization
 
     period_label = f"Q{q}" if q <= 4 else f"OT{q - 4}"
