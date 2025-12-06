@@ -1,6 +1,3 @@
-// ✅ CRITICAL DEBUG: Alert at very top to confirm script is loading
-alert('game-plan.js LOADED - Check console for URL params');
-
 // Parse URL parameters
 const urlParams = new URLSearchParams(window.location.search);
 
@@ -312,10 +309,6 @@ async function saveSettings() {
 }
 
 function navigateToCourt() {
-  // ✅ CRITICAL DEBUG: Alert to confirm function is called (can't be filtered/cleared)
-  console.error('🚀🚀🚀 [GAME-PLAN] navigateToCourt() CALLED 🚀🚀🚀');
-  alert('navigateToCourt() CALLED - Check console for URL params');
-  
   console.log('🚀 [GAME-PLAN] navigateToCourt() CALLED');
   console.log('🚀 [GAME-PLAN] Current URL:', window.location.href);
   
