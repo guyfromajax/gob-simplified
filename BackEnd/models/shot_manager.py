@@ -1021,6 +1021,7 @@ class ShotManager:
                 # Force HCO after defensive rebound from missed fast break shot
                 text += " -- entering half court."
                 self.game_state["offensive_state"] = "HCO"
+                result["next_play_type"] = "HCO"  # ✅ FIX: Set next_play_type so game_manager can detect DREB→HCO transition
                 self.game_state["last_rebounder"] = rebounder
                 self.game_state["last_rebound"] = "DREB"
 
