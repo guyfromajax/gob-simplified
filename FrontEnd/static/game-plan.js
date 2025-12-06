@@ -12,6 +12,11 @@ const pageLoadParams = {
 console.log('🔍 [GAME-PLAN] PAGE LOAD - URL params:', pageLoadParams);
 console.warn('⚠️ [GAME-PLAN] PAGE LOAD CHECK - game_id:', pageLoadParams.game_id, 'resume_from_timeout:', pageLoadParams.resume_from_timeout);
 
+// ✅ CRITICAL DEBUG: Alert if params are missing (can't be filtered/cleared)
+if (!pageLoadParams.game_id || !pageLoadParams.resume_from_timeout) {
+  console.error('❌ [GAME-PLAN] CRITICAL: game_id or resume_from_timeout is MISSING on page load!', pageLoadParams);
+}
+
 const homeTeam = urlParams.get('home');
 const awayTeam = urlParams.get('away');
 const homeId = urlParams.get('home_id');
@@ -304,13 +309,19 @@ async function saveSettings() {
 }
 
 function navigateToCourt() {
+  // ✅ CRITICAL DEBUG: Alert to confirm function is called (can't be filtered/cleared)
+  console.error('🚀🚀🚀 [GAME-PLAN] navigateToCourt() CALLED 🚀🚀🚀');
+  alert('navigateToCourt() CALLED - Check console for URL params');
+  
   console.log('🚀 [GAME-PLAN] navigateToCourt() CALLED');
   console.log('🚀 [GAME-PLAN] Current URL:', window.location.href);
   
   // ✅ CRITICAL FIX: Read URL params directly from window.location.search
   // Don't rely on module-level urlParams which might be stale
   const currentUrlParams = new URLSearchParams(window.location.search);
-  console.log('🚀 [GAME-PLAN] Current URL params:', Object.fromEntries(currentUrlParams.entries()));
+  const currentParamsObj = Object.fromEntries(currentUrlParams.entries());
+  console.log('🚀 [GAME-PLAN] Current URL params:', currentParamsObj);
+  console.error('🚀🚀🚀 [GAME-PLAN] navigateToCourt() - game_id:', currentUrlParams.get('game_id'), 'resume_from_timeout:', currentUrlParams.get('resume_from_timeout'));
   
   // ✅ CRITICAL FIX: Read ALL params directly from URL (SS&S - single source of truth)
   // Don't rely on module-level variables which might be stale
