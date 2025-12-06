@@ -821,6 +821,19 @@ function initGame() {
   
   console.log('Initializing game buttons:', { playBtn, simFullBtn, sim4Btn });
   
+  // ✅ TIMEOUT + QUARTER BREAKS: Hide pre-game buttons if resuming (timeout) or continuing (quarter > 1)
+  // This matches the quarter break flow where buttons are hidden and game auto-starts
+  const resumeFromTimeout = urlParams.get('resume_from_timeout') === 'true';
+  const isQuarterBreak = quarter > 1 && gameId; // Quarter breaks: Q2, Q3, Q4 with existing game
+  
+  if (resumeFromTimeout || isQuarterBreak) {
+    const preGameContainer = document.querySelector('.pre-game-container');
+    if (preGameContainer) {
+      console.log(`🎮 Hiding pre-game container (${resumeFromTimeout ? 'timeout resume' : 'quarter break'})`);
+      preGameContainer.classList.add('hidden');
+    }
+  }
+  
   if (playBtn) {
     console.log('Adding click listener to Play Quarter button');
     playBtn.addEventListener('click', async () => {
@@ -837,16 +850,11 @@ function initGame() {
     console.error('Play Quarter button not found!');
   }
   
-  // ✅ TIMEOUT: Auto-start if resuming from timeout
-  const resumeFromTimeout = urlParams.get('resume_from_timeout') === 'true';
-  if (resumeFromTimeout && gameId && homeTeam && awayTeam) {
-    console.log('⏸️ TIMEOUT RESUME: Auto-starting game from timeout');
-    // Hide pre-game buttons immediately
-    const preGameContainer = document.querySelector('.pre-game-container');
-    if (preGameContainer) {
-      preGameContainer.style.display = 'none';
-    }
-    // Auto-start the game
+  // ✅ TIMEOUT + QUARTER BREAKS: Auto-start if resuming from timeout OR continuing quarter break
+  // This matches the quarter break flow where game auto-starts immediately
+  if ((resumeFromTimeout || isQuarterBreak) && gameId && homeTeam && awayTeam) {
+    console.log(`⏸️ AUTO-START: ${resumeFromTimeout ? 'Timeout resume' : 'Quarter break'} - auto-starting game`);
+    // Auto-start the game (same as clicking "Play Quarter" button)
     handleButtonClick(true);
   }
   
