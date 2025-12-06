@@ -303,7 +303,9 @@ def restore_timeout_resume_state(game_id: str, request: QuarterSimulationRequest
     - Franchise Game: nested in franchise collection doc (with fallback to games_collection)
     Returns saved document with timeout state, or None if not found.
     """
+    logging.info(f"🔍 restore_timeout_resume_state: Called with game_id={game_id}, resume_from_timeout={request.resume_from_timeout}, mode={request.mode}, games_collection={games_collection is not None}")
     if not request.resume_from_timeout:
+        logging.warning(f"⚠️ restore_timeout_resume_state: resume_from_timeout is False, returning None")
         return None
     
     saved = None
@@ -709,13 +711,15 @@ def get_game_state(game_id: str, quarter: int | None = None):
 def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = False):
     game_id = request.game_id
     logging.info(
-        "simulate_quarter_endpoint payload: game_id=%s, home_team=%s, away_team=%s, quarter=%s, home_lineup_keys=%s, away_lineup_keys=%s",
+        "simulate_quarter_endpoint payload: game_id=%s, home_team=%s, away_team=%s, quarter=%s, home_lineup_keys=%s, away_lineup_keys=%s, resume_from_timeout=%s, mode=%s",
         game_id,
         request.home_team,
         request.away_team,
         request.quarter,
         list((request.home_lineup or {}).keys()),
         list((request.away_lineup or {}).keys()),
+        request.resume_from_timeout,
+        request.mode,
     )
     if debug:
         logging.debug(
@@ -789,14 +793,23 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
         # Always load timeout state from DB first (single source of truth)
         # This ensures timeout_next_play_type is correct regardless of memory state
         timeout_saved_state = None
+        logging.info(f"🔍 TIMEOUT RESUME CHECK: resume_from_timeout={request.resume_from_timeout}, game_id={game_id}, mode={request.mode}")
         if request.resume_from_timeout:
+            logging.info(f"🔍 TIMEOUT RESUME: Calling restore_timeout_resume_state() for game_id={game_id}")
             timeout_saved_state = restore_timeout_resume_state(game_id, request, games_collection)
             if not timeout_saved_state:
                 logging.error(f"❌ TIMEOUT RESUME: Failed to load state from DB for game_id={game_id}")
                 # Continue anyway - simulate_quarter() will handle missing timeout_next_play_type
-            elif gm is not None:
-                # Game is in memory - apply timeout state now (before simulate_quarter)
-                apply_timeout_resume_state_to_gm(gm, timeout_saved_state)
+            else:
+                logging.info(f"✅ TIMEOUT RESUME: Successfully loaded state from DB, timeout_next_play_type={timeout_saved_state.get('timeout_next_play_type')}")
+                if gm is not None:
+                    # Game is in memory - apply timeout state now (before simulate_quarter)
+                    logging.info(f"🔍 TIMEOUT RESUME: Applying state to in-memory game")
+                    apply_timeout_resume_state_to_gm(gm, timeout_saved_state)
+                else:
+                    logging.info(f"🔍 TIMEOUT RESUME: Game not in memory, will apply after DB load")
+        else:
+            logging.info(f"🔍 TIMEOUT RESUME: resume_from_timeout is False, skipping timeout resume logic")
         
         if gm is None:
             logging.warning(
