@@ -296,17 +296,20 @@ def save_game_to_nested_structure(mode: str, doc_id: str, game_id: str, game_dat
 def restore_timeout_resume_state(game_id: str, request: QuarterSimulationRequest, games_collection) -> dict | None:
     """
     Unified function to restore timeout resume state from DB.
-    Always loads from DB (single source of truth) regardless of memory state.
+    Always loads from DB (single source of truth) regardless of memory state or URL parameter.
     Handles all three game modes with correct document locations:
     - Single Game: games_collection doc
     - Tournament Game: nested in tournament collection doc (with fallback to games_collection)
     - Franchise Game: nested in franchise collection doc (with fallback to games_collection)
     Returns saved document with timeout state, or None if not found.
+    
+    NOTE: This function now ALWAYS checks the database for timeout state, regardless of
+    the resume_from_timeout URL parameter. The database state is the source of truth.
     """
-    logging.info(f"🔍 restore_timeout_resume_state: Called with game_id={game_id}, resume_from_timeout={request.resume_from_timeout}, mode={request.mode}, games_collection={games_collection is not None}")
-    if not request.resume_from_timeout:
-        logging.warning(f"⚠️ restore_timeout_resume_state: resume_from_timeout is False, returning None")
-        return None
+    logging.info(f"🔍 restore_timeout_resume_state: Checking DB for timeout state (game_id={game_id}, mode={request.mode}, games_collection={games_collection is not None})")
+    
+    # Always check database - don't rely on URL parameter
+    # If timeout_next_play_type exists in DB, we're resuming from a timeout
     
     saved = None
     
@@ -790,26 +793,32 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                 logging.error(f"❌ [STRATEGY SETTINGS] Error updating strategy_settings: {e}", exc_info=True)
         
         # ✅ TIMEOUT RESUME: Unified state restoration (works for all modes and all paths)
-        # Always load timeout state from DB first (single source of truth)
-        # This ensures timeout_next_play_type is correct regardless of memory state
+        # ALWAYS check database for timeout state - don't rely on URL parameter
+        # Database state is the single source of truth (timeout_next_play_type persists in DB)
+        # URL parameter is just for navigation convenience, but DB check is what matters
         timeout_saved_state = None
-        logging.info(f"🔍 TIMEOUT RESUME CHECK: resume_from_timeout={request.resume_from_timeout}, game_id={game_id}, mode={request.mode}")
-        if request.resume_from_timeout:
-            logging.info(f"🔍 TIMEOUT RESUME: Calling restore_timeout_resume_state() for game_id={game_id}")
-            timeout_saved_state = restore_timeout_resume_state(game_id, request, games_collection)
-            if not timeout_saved_state:
-                logging.error(f"❌ TIMEOUT RESUME: Failed to load state from DB for game_id={game_id}")
-                # Continue anyway - simulate_quarter() will handle missing timeout_next_play_type
+        logging.info(f"🔍 TIMEOUT RESUME CHECK: Checking DB for timeout state (game_id={game_id}, mode={request.mode}, URL resume_from_timeout={request.resume_from_timeout})")
+        
+        # Always check database for timeout state (regardless of URL parameter)
+        # This makes the system robust - even if URL parameter is lost, we still detect timeout resume
+        timeout_saved_state = restore_timeout_resume_state(game_id, request, games_collection)
+        
+        if timeout_saved_state:
+            logging.info(f"✅ TIMEOUT RESUME: Found timeout state in DB, timeout_next_play_type={timeout_saved_state.get('timeout_next_play_type')}")
+            # Override request.resume_from_timeout to ensure simulate_quarter() handles timeout resume
+            request.resume_from_timeout = True
+            logging.info(f"✅ TIMEOUT RESUME: Detected timeout state in DB, setting resume_from_timeout=True for simulate_quarter()")
+            if gm is not None:
+                # Game is in memory - apply timeout state now (before simulate_quarter)
+                logging.info(f"🔍 TIMEOUT RESUME: Applying state to in-memory game")
+                apply_timeout_resume_state_to_gm(gm, timeout_saved_state)
             else:
-                logging.info(f"✅ TIMEOUT RESUME: Successfully loaded state from DB, timeout_next_play_type={timeout_saved_state.get('timeout_next_play_type')}")
-                if gm is not None:
-                    # Game is in memory - apply timeout state now (before simulate_quarter)
-                    logging.info(f"🔍 TIMEOUT RESUME: Applying state to in-memory game")
-                    apply_timeout_resume_state_to_gm(gm, timeout_saved_state)
-                else:
-                    logging.info(f"🔍 TIMEOUT RESUME: Game not in memory, will apply after DB load")
+                logging.info(f"🔍 TIMEOUT RESUME: Game not in memory, will apply after DB load")
         else:
-            logging.info(f"🔍 TIMEOUT RESUME: resume_from_timeout is False, skipping timeout resume logic")
+            if request.resume_from_timeout:
+                logging.warning(f"⚠️ TIMEOUT RESUME: URL has resume_from_timeout=true but no timeout state found in DB for game_id={game_id}")
+            else:
+                logging.info(f"🔍 TIMEOUT RESUME: No timeout state in DB (normal game start/resume)")
         
         if gm is None:
             logging.warning(
@@ -1088,8 +1097,12 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                         
                         # ✅ TIMEOUT RESUME: Apply unified timeout state restoration (if resuming from timeout)
                         # This uses the state we loaded earlier from DB (single source of truth)
+                        # If timeout state exists in DB, we're resuming from timeout (regardless of URL parameter)
                         if timeout_saved_state:
                             apply_timeout_resume_state_to_gm(gm, timeout_saved_state)
+                            # Override request.resume_from_timeout to ensure simulate_quarter() handles timeout resume
+                            request.resume_from_timeout = True
+                            logging.info(f"✅ TIMEOUT RESUME: Detected timeout state in DB, setting resume_from_timeout=True for simulate_quarter()")
                         else:
                             # Not resuming from timeout - restore clock/time_remaining normally
                             if "clock" in saved:
