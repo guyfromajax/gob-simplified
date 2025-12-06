@@ -27,6 +27,15 @@ import {
   transitionWithDebug,
 } from "../state/gameStateMachine.js";
 import {
+  ENABLE_TIMEOUT_BUTTON,
+  initTimeoutButton,
+  startTimeoutPause,
+  markPlayersPositioned,
+  markInboundPassStarted,
+  resetTimeoutButton,
+  checkTimeoutEligibility,
+} from "../utils/timeoutButtonManager.js";
+import {
   getPendingOwner,
   clearPendingOwner,
   setPendingOwner,
@@ -316,6 +325,16 @@ async function runSideInboundSetup({ scene, ballSprite, playerSprites, turnData 
   }
 
   await Promise.all(promises);
+  
+  // ✅ TIMEOUT: Mark players positioned and start 2-second pause
+  if (ENABLE_TIMEOUT_BUTTON) {
+    scene.currentTurnData = turnData; // Store for timeout button manager
+    const isTimeoutEligible = checkTimeoutEligibility(scene, turnData);
+    if (isTimeoutEligible) {
+      markPlayersPositioned();
+      await startTimeoutPause(scene); // 2-second pause
+    }
+  }
 
   // ✅ REFACTOR: Use passDetection.js for dynamic passes, fallback to hardcoded SF→PG
   const { detectPassAtStep, handlePassAnimation } = await import('./passDetection.js');
@@ -350,6 +369,11 @@ async function runSideInboundSetup({ scene, ballSprite, playerSprites, turnData 
     scene.events?.once('passEnd', () => animationDebugLog('passEnd'));
 
     animationDebugLog(`[sideInbound][passStart] sf:${sfId} pg:${pgId}`);
+    
+    // ✅ TIMEOUT: Mark inbound pass started (button becomes dead)
+    if (ENABLE_TIMEOUT_BUTTON) {
+      markInboundPassStarted();
+    }
     
     if (!scene.stateMachine?.is(States.FastBreak)) {
       if (passInfo) {
@@ -1425,12 +1449,27 @@ async function runInboundSetup({
     pfTween,
     cTween
   ]);
+  
+  // ✅ TIMEOUT: Mark players positioned and start 2-second pause
+  if (ENABLE_TIMEOUT_BUTTON) {
+    scene.currentTurnData = turnData; // Store for timeout button manager
+    const isTimeoutEligible = checkTimeoutEligibility(scene, turnData);
+    if (isTimeoutEligible) {
+      markPlayersPositioned();
+      await startTimeoutPause(scene); // 2-second pause
+    }
+  }
 
   animationDebugLog(`[inbound][ballAttach][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
   attachBallToPlayer(scene, ballSprite, sfSprite);
 
   animationDebugLog(`[inbound][holdStart][${newOffenseSide}] sf:${sfId} pg:${pgId}`);
   // Removed 1000ms pause for smoother transitions
+  
+  // ✅ TIMEOUT: Mark inbound pass started (button becomes dead)
+  if (ENABLE_TIMEOUT_BUTTON) {
+    markInboundPassStarted();
+  }
 
   if (scene.tweens) {
     scene.tweens.killTweensOf(ballSprite);

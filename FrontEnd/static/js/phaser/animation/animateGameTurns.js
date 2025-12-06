@@ -703,6 +703,14 @@ export async function animateGameTurns({ //hasBallAtStep
       continue;
     }
 
+    // ✅ TIMEOUT: Handle TIMEOUT turns - route through AnimationRouter
+    if (turn.result_type === "TIMEOUT") {
+      turn.index = i;
+      await animationRouter.processTurn(turn);
+      console.log('⏸️ TIMEOUT: Stopping animation loop - user will navigate to lineup screen');
+      break; // Exit the loop - don't process any more turns
+    }
+
     // ✅ PHASE 2.6: Handle OREB turns (putback attempts and kickouts) - route through AnimationRouter
     // ✅ DEBUG: Track putback/OREB path to identify skipped turns
     if (turn.result_type === "PUTBACK_MAKE" || turn.result_type === "PUTBACK_MISS" || turn.result_type === "OREB_KICKOUT") {

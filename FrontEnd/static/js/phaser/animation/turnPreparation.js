@@ -12,6 +12,7 @@ import { updatePlaycallDisplay } from "../utils/playcallDisplay.js";
 import { updateStrategyBars } from "../utils/strategyBars.js";
 import { updatePlaycallCenter, parseLeanScoreFromText } from "../ui/playcallCenter.js";
 import { announceFromTurnData } from "../utils/announcements.js";
+import { ENABLE_TIMEOUT_BUTTON, resetTimeoutButton } from "../utils/timeoutButtonManager.js";
 
 /**
  * Prepare a turn for animation by setting up all required state and UI updates.
@@ -33,6 +34,11 @@ import { announceFromTurnData } from "../utils/announcements.js";
  * @returns {Object} Prepared turn object with calculated properties
  */
 export async function prepareTurnForAnimation({ turn, scene, turnIndex, homeTeamId }) {
+  // ✅ TIMEOUT: Reset button at start of every turn
+  if (ENABLE_TIMEOUT_BUTTON) {
+    resetTimeoutButton();
+  }
+  
   // Set scene.currentTurn (required by playTurnAnimation)
   scene.currentTurn = turnIndex;
   

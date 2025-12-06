@@ -93,6 +93,8 @@ class QuarterSimulationRequest(BaseModel):
     # When True, fully simulates the quarter instantly and increments quarter number
     # When False (default), uses turn-by-turn mode (for playing with animation)
     full_sim: bool = False  # If True, turn_by_turn_mode=False (fully simulate instantly)
+    # ✅ TIMEOUT: Resume from timeout flag (reuse quarter break pattern)
+    resume_from_timeout: bool = False
 
 
 ongoing_games: dict[str, GameManager] = {}
@@ -101,6 +103,11 @@ ongoing_games: dict[str, GameManager] = {}
 class TurnSimulationRequest(BaseModel):
     game_id: str
     # Optional user overrides for this specific turn
+
+
+class CallTimeoutRequest(BaseModel):
+    game_id: str
+    calling_team: str  # "home" or "away"
     offense_override: str | None = None  # e.g., "Inside", "Attack", "Outside"
     defense_override: str | None = None  # e.g., "Zone", "Man"
     # Mode context
@@ -790,8 +797,9 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                         logging.info(f"📂 Loaded game from DB: game_id={game_id}, saved_quarter={saved_quarter}, requested_quarter={request.quarter}")
                         
                         # Simple check: If requesting Q1 but saved game is at a later quarter, start fresh (new game)
-                        is_new_game = (request.quarter == 1 and saved_quarter > 1)
-                        should_restore_stats = not is_new_game
+                        # ✅ TIMEOUT: If resuming from timeout, always restore stats (we're continuing an existing game)
+                        is_new_game = (request.quarter == 1 and saved_quarter > 1) and not request.resume_from_timeout
+                        should_restore_stats = not is_new_game or request.resume_from_timeout
                         
                         # CRITICAL: Build lineups BEFORE restoring player stats
                         # Player stat restoration (below) looks up players in team.lineup, so lineups must exist
@@ -930,6 +938,19 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                             gm.away_team.team_fouls = 0
                             gm.home_team.timeouts = 5  # New game starts with 5 timeouts
                             gm.away_team.timeouts = 5  # New game starts with 5 timeouts
+                        
+                        # ✅ TIMEOUT: Restore clock and time_remaining from saved document
+                        if "clock" in saved:
+                            gm.game_state["clock"] = saved["clock"]
+                            logging.info(f"🔄 Clock restored: {saved['clock']}")
+                        if "time_remaining" in saved:
+                            gm.game_state["time_remaining"] = saved["time_remaining"]
+                            logging.info(f"🔄 Time remaining restored: {saved['time_remaining']} seconds")
+                        
+                        # ✅ TIMEOUT: Restore timeout_next_play_type
+                        if "timeout_next_play_type" in saved:
+                            gm.game_state["timeout_next_play_type"] = saved["timeout_next_play_type"]
+                            logging.info(f"🔄 timeout_next_play_type restored: {saved['timeout_next_play_type']}")
                         
                         # Restore opening_tip_winner for Q2-Q4 possession logic
                         # Only restore if this is NOT a new Q1 game (opening tip hasn't happened yet for new games)
@@ -1203,7 +1224,7 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
         # When full_sim=True (simming), fully simulate the quarter instantly (no animation)
         # When full_sim=False (playing), use turn-by-turn mode (for animation)
         turn_by_turn_mode = not request.full_sim
-        logging.info(f"🎮 simulate_quarter_endpoint: full_sim={request.full_sim}, turn_by_turn_mode={turn_by_turn_mode}, quarter={request.quarter}")
+        logging.info(f"🎮 simulate_quarter_endpoint: full_sim={request.full_sim}, turn_by_turn_mode={turn_by_turn_mode}, quarter={request.quarter}, resume_from_timeout={request.resume_from_timeout}")
         
         simulate_quarter(
             gm,
@@ -1213,6 +1234,7 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
             request.start_with_inbound,
             request.starting_possession,
             turn_by_turn_mode=turn_by_turn_mode,
+            resume_from_timeout=request.resume_from_timeout,
         )
         
     except ValueError as e:
@@ -1272,6 +1294,14 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
     
     # Return frontend summary WITH animations for real-time play
     turns = frontend_summary.get("turns", [])
+    
+    # ✅ TIMEOUT: If resuming from timeout, return empty turns array (don't animate existing turns)
+    # The next /api/simulate-turn call will create the SIP turn
+    if request.resume_from_timeout:
+        turns = []  # Empty - don't return existing turns as "initial turns"
+        logging.info(f"✅ TIMEOUT RESUME: Returning empty turns array (will create SIP via /api/simulate-turn)")
+        frontend_summary["turns"] = turns  # Update turns in summary
+    
     logger.debug(
         "simulate_quarter_endpoint turns len=%s first=%s",
         len(turns),
@@ -1325,6 +1355,57 @@ def simulate_turn_endpoint(request: TurnSimulationRequest):
             "away_score": gm.score.get(gm.away_team.name, 0),
             "turn": None
         }
+    
+    # ✅ TIMEOUT: Check if last turn is a TIMEOUT turn (user-initiated or foul out)
+    # If so, return it immediately without simulating a new turn
+    if gm.turns and gm.turns[-1].get("result_type") == "TIMEOUT":
+        timeout_turn = gm.turns[-1]
+        logging.info(f"⏸️ TIMEOUT: Returning existing TIMEOUT turn (reason: {timeout_turn.get('timeout_reason')})")
+        # Remove the TIMEOUT turn from turns so next API call can simulate the actual next turn
+        gm.turns.pop()
+        return {
+            "turn": timeout_turn,
+            "next_offensive_state": gm.game_state.get("offensive_state", "HCO"),
+            "time_remaining": gm.game_state["time_remaining"],
+            "clock": gm.game_state.get("clock", "8:00"),
+            "quarter_complete": False,
+            "quarter": gm.quarter,
+            "is_final": False,
+            "home_score": gm.score.get(gm.home_team.name, 0),
+            "away_score": gm.score.get(gm.away_team.name, 0),
+            "home_team_fouls": gm.home_team.team_fouls,
+            "away_team_fouls": gm.away_team.team_fouls,
+            "home_team_timeouts": getattr(gm.home_team, 'timeouts', 5),
+            "away_team_timeouts": getattr(gm.away_team, 'timeouts', 5),
+            "offense_team": gm.offense_team.name,
+            "defense_team": gm.defense_team.name,
+            "game_id": game_id,
+            "ineligible_players": gm.game_state.get("ineligible_players", []),
+            "box_score": gm.get_box_score(),
+            "team_totals": {
+                gm.home_team.name: gm.home_team.get_team_game_stats(),
+                gm.away_team.name: gm.away_team.get_team_game_stats()
+            }
+        }
+    
+    # ✅ TIMEOUT: If resuming from timeout and no turns exist, create the initial turn
+    # This handles the case where simulate_quarter skipped initialization
+    if not gm.turns and gm.game_state.get("timeout_next_play_type"):
+        timeout_next_play_type = gm.game_state.get("timeout_next_play_type")
+        logging.info(f"✅ TIMEOUT RESUME: Creating initial turn based on timeout_next_play_type: {timeout_next_play_type}")
+        if timeout_next_play_type == "SIDE_INBOUND":
+            # Create SIP turn
+            gm.turn_manager.set_strategy_calls()
+            sip_turn = gm.turn_manager.setup_side_inbound()
+            gm.turns.append(sip_turn)
+            gm.text_log.append(sip_turn["text"])
+            # Update clock (SIP takes 4 seconds)
+            gm.game_state["time_remaining"] -= 4
+            minutes = gm.game_state["time_remaining"] // 60
+            seconds = gm.game_state["time_remaining"] % 60
+            gm.game_state["clock"] = f"{minutes}:{seconds:02d}"
+        # For FREE_THROW and BASELINE_INBOUND, simulate_macro_turn will create them
+        gm.game_state.pop("timeout_next_play_type", None)  # Clear flag
     
     # Simulate ONE turn
     try:
@@ -1424,6 +1505,66 @@ def simulate_turn_endpoint(request: TurnSimulationRequest):
     except Exception as e:
         logging.exception(f"Failed to simulate turn for game {game_id}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/call-timeout")
+async def call_timeout_endpoint(request: CallTimeoutRequest):
+    """
+    User-initiated timeout endpoint.
+    Creates a TIMEOUT turn and saves game state before navigating to lineup screen.
+    """
+    game_id = request.game_id
+    calling_team_side = request.calling_team  # 'home' or 'away'
+    
+    gm = ongoing_games.get(game_id)
+    if gm is None:
+        raise HTTPException(status_code=404, detail=f"Game {game_id} not found.")
+    
+    calling_team = gm.home_team if calling_team_side == 'home' else gm.away_team
+    
+    # Check if team has timeouts remaining
+    if not gm.turn_manager.can_call_timeout(calling_team):
+        raise HTTPException(
+            status_code=400,
+            detail=f"{calling_team.name} has no timeouts remaining."
+        )
+    
+    # Create a TIMEOUT turn
+    timeout_turn = gm.turn_manager.setup_timeout_turn(
+        timeout_reason="USER",
+        calling_team=calling_team
+    )
+    
+    # Store next_play_type in game_state for resume
+    gm.game_state["timeout_next_play_type"] = timeout_turn.get("next_play_type", "SIDE_INBOUND")
+    logging.info(f"✅ TIMEOUT: Stored next_play_type '{gm.game_state['timeout_next_play_type']}' to game_state for resume")
+    
+    # Append the TIMEOUT turn to the game manager's turns list
+    gm.turns.append(timeout_turn)
+    gm.text_log.append(timeout_turn["text"])
+    
+    # ✅ TIMEOUT: Save game state to database (reuse existing persistence pattern)
+    # This ensures scores, clock, fouls, etc. are preserved when user returns from lineup screen
+    try:
+        db_summary = summarize_game_state(gm, exclude_animations=True)
+        games_collection.update_one({"_id": game_id}, {"$set": db_summary}, upsert=True)
+        logging.info(
+            f"💾 TIMEOUT: Saved game state before navigating to lineup screen: "
+            f"game_id={game_id}, quarter={db_summary.get('quarter')}, "
+            f"clock={db_summary.get('clock')}, next_play_type={timeout_turn.get('next_play_type')}"
+        )
+    except Exception as e:
+        logging.error(f"🚨 TIMEOUT: Failed to save game state: {e}")
+        # Don't fail the timeout call if save fails - game is still in memory
+    
+    # Return current timeout counts for frontend display
+    return {
+        "message": f"Timeout called by {calling_team.name}",
+        "calling_team": calling_team.name,
+        "timeouts_remaining": getattr(calling_team, 'timeouts', 5),
+        "home_team_timeouts": getattr(gm.home_team, 'timeouts', 5),
+        "away_team_timeouts": getattr(gm.away_team, 'timeouts', 5),
+    }
 
 
 @app.get("/roster/{team_name}")

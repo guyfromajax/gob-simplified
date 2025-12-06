@@ -856,6 +856,10 @@ async function init() {
       if (startWithInbound) params.set('start_with_inbound', startWithInbound);
       if (startingPossession) params.set('starting_possession', startingPossession);
       
+      // ✅ TIMEOUT: Carry forward resume_from_timeout flag
+      const resumeFromTimeout = urlParams.get('resume_from_timeout');
+      if (resumeFromTimeout) params.set('resume_from_timeout', resumeFromTimeout);
+      
       if (DEBUG) {
         params.set('debug', '1');
         // optional: params.set('debug_flow', '1');

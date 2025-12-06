@@ -661,6 +661,9 @@ def summarize_game_state(game, exclude_animations=True):
         "is_final": game.quarter > 4 and game.score.get(game.home_team.name, 0) != game.score.get(game.away_team.name, 0),
         "opening_tip_winner": game.game_state.get("opening_tip_winner"),
         "game_stats_initialized": game.game_state.get("game_stats_initialized", False),  # Preserve stats initialization flag
+        "timeout_next_play_type": game.game_state.get("timeout_next_play_type"),  # ✅ TIMEOUT: Save next_play_type for resume
+        "clock": game.game_state.get("clock", "8:00"),  # ✅ TIMEOUT: Save clock for resume (same as quarter breaks)
+        "time_remaining": game.game_state.get("time_remaining", 480),  # ✅ TIMEOUT: Save time_remaining for resume (same as quarter breaks)
         
         # Top-level score map for backward compatibility (some code expects summary["score"])
         "score": {

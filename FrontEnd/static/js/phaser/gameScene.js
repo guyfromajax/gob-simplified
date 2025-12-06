@@ -9,6 +9,7 @@ import { createGameStateMachine, States } from './state/gameStateMachine.js';
 import { initializePossessionManager } from './utils/possessionManager.js';
 import gameStore from '../state/gameStore.js';
 import { animateCountdownTransition } from './animation/countdownAnimation.js';
+import { ENABLE_TIMEOUT_BUTTON, initTimeoutButton } from './utils/timeoutButtonManager.js';
 
 const DEBUG_SIM_PAYLOAD =
   (typeof window !== 'undefined' && window.DEBUG_SIM_PAYLOAD) ||
@@ -203,6 +204,13 @@ export function createGameScene(Phaser) {
 
       const payload = { home_team: homeTeam, away_team: awayTeam, quarter: this.quarter };
       if (this.gameId) payload.game_id = this.gameId;
+      
+      // ✅ TIMEOUT: Add resume_from_timeout flag if present in URL
+      const timeoutUrlParams = new URLSearchParams(window.location.search);
+      const resumeFromTimeout = timeoutUrlParams.get('resume_from_timeout') === 'true';
+      if (resumeFromTimeout) {
+        payload.resume_from_timeout = true;
+      }
       if (DEBUG_FLOW) {
         console.log('[gameScene] request payload', {
           mode: this.mode,
@@ -273,6 +281,8 @@ export function createGameScene(Phaser) {
       }
 
       const simData = await res.json();
+      // ✅ TIMEOUT: Store simData in scene for timeout button manager access
+      this.simData = simData;
       DEBUG && console.log('[gameScene] simData.turns', simData.turns.length, simData.turns[0]);
       if (DEBUG_FLOW) {
         console.log("📦 simData received:", simData);
@@ -292,6 +302,10 @@ export function createGameScene(Phaser) {
       // Extract team IDs
       const homeId = homeTeamObj?.team_id || simData.home_team_id || simData.homeTeam?.team_id;
       const awayId = awayTeamObj?.team_id || simData.away_team_id || simData.awayTeam?.team_id;
+      
+      // ✅ TIMEOUT: Store team names in scene for timeout button manager
+      this.homeTeam = logHome;
+      this.awayTeam = logAway;
       
       // Extract team colors
       const homeColors = homeTeamObj?.colors || simData.home_team_colors;
