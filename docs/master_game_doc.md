@@ -1791,6 +1791,43 @@ All frontend navigation now uses a unified helper (`FrontEnd/static/js/shared/ti
 - Helper ensures `game_id` and `resume_from_timeout` are always current when navigating
 - Prevents params from being lost during navigation chain: lineup → game-plan → court
 
+**Playcall Center Player Image Assignment (SS&S - January 2025):**
+
+Player images in the Playcall Center are assigned once when returning to `court.html` from lineup/game plan screens (all timeout navigation entry points). This ensures stable, predictable behavior.
+
+**When Images Are Set:**
+- On `court.html` page load (all game entry/re-entry instances)
+- Works for all timeout navigation entry points:
+  - Game start / Opening Tip
+  - Quarter breaks (Q2-Q4)
+  - Timeout breaks (any quarter)
+  - Player foul out breaks (any quarter)
+  - Overtime breaks
+
+**How Images Are Assigned:**
+1. **Read Lineup from URL Params:** Lineup data is preserved by `TimeoutNavigationHelper` in URL params (`home_pg`, `home_sg`, etc. or `away_pg`, `away_sg`, etc.)
+2. **Get User Team Side:** From `my_team` URL param ("home" or "away")
+3. **Map Play Focus to Position:** For each of the 6 offense plays:
+   - Inside plays → C or PF (first available)
+   - Attack plays → PG or SG (first available)
+   - Outside plays → SG or SF (first available)
+4. **Get Player ID:** From lineup for that position
+5. **Set Image Once:** Image path is `/static/images/players/{playerId}.png`
+6. **Images Remain Static:** No mid-game changes during gameplay
+
+**Why This Is SS&S:**
+- **Single Point of Assignment:** Images set once at timeout navigation return
+- **Stable During Gameplay:** Images don't change mid-game (no confusion)
+- **Correct Timing:** Lineups are locked at timeout navigation points
+- **Clear Data Flow:** Lineup → play focus → position → player ID → image
+- **Works for All Entry Points:** All use `TimeoutNavigationHelper` which preserves lineup params
+
+**Implementation:**
+- Location: `FrontEnd/static/court.html` `populatePlayHeadshots()` function (lines 2481-2561)
+- Uses existing `data-focus` attributes on play options (inside/attack/outside)
+- Runs on page load via `DOMContentLoaded` or immediate execution
+- Falls back to default image if player image fails to load
+
 #### LocalStorage (Frontend State Only)
 
 **Purpose:** LocalStorage is used for frontend convenience, not business logic.
