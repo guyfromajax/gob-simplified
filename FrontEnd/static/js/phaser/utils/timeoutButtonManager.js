@@ -256,8 +256,12 @@ async function handleTimeoutButtonClick() {
  */
 async function showTimeoutPopup(timeoutResult, gameId, scene) {
     // ✅ SS&S: Use unified Timeout Navigation Helper for consistent parameter building
-    // Import helper (ES6 module)
-    const { buildGameNavigationParams } = await import('/static/js/shared/timeoutNavigationHelper.js');
+    // Use global helper (works in both regular scripts and modules)
+    const helper = window.TimeoutNavigationHelper;
+    if (!helper) {
+        console.error('❌ [TIMEOUT-BUTTON] TimeoutNavigationHelper not loaded!');
+        return;
+    }
     
     // Get team info from scene - try multiple sources
     const homeTeam = scene.simData?.home_team?.name || 

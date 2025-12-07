@@ -14,8 +14,6 @@
  * @param {string} [options.myTeamSide] - User's team side ('home' or 'away')
  * @param {string} [options.userTeamId] - User's team ID
  */
-import { buildGameNavigationParams } from '/static/js/shared/timeoutNavigationHelper.js';
-
 export function showFoulOutPopup({ player, gameId, mode, quarter, clock, tournamentId, franchiseId, homeTeam, awayTeam, homeId, awayId, myTeamSide, userTeamId }) {
   // Remove any existing popup
   const existingPopup = document.querySelector('.foul-out-popup');
@@ -34,7 +32,14 @@ export function showFoulOutPopup({ player, gameId, mode, quarter, clock, tournam
   if (!userTeamId) userTeamId = urlParams.get('user_team_id');
   
   // Build params using unified helper
-  const params = buildGameNavigationParams({
+  // ✅ SS&S: Use global helper (works in both regular scripts and modules)
+  const helper = window.TimeoutNavigationHelper;
+  if (!helper) {
+    console.error('❌ [FOUL-OUT] TimeoutNavigationHelper not loaded!');
+    return;
+  }
+  
+  const params = helper.buildGameNavigationParams({
     sourceParams: urlParams,
     targetQuarter: quarter,
     gameId: gameId,

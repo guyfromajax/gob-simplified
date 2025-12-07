@@ -1516,12 +1516,16 @@ export function createGameScene(Phaser) {
           const nextQ = this.quarter + 1;
           const urlParams = new URLSearchParams(window.location.search);
           
-          // Import helper (ES6 module)
-          const { buildGameNavigationParams } = await import('/static/js/shared/timeoutNavigationHelper.js');
+          // ✅ SS&S: Use global helper (works in both regular scripts and modules)
+          const helper = window.TimeoutNavigationHelper;
+          if (!helper) {
+            console.error('❌ [GAMESCENE] TimeoutNavigationHelper not loaded!');
+            return;
+          }
           
           // ✅ QUARTER BREAK: Quarter breaks should NOT have resume_from_timeout
           // Helper will automatically exclude it for quarter breaks (resumeFromTimeout=false)
-          const params = buildGameNavigationParams({
+          const params = helper.buildGameNavigationParams({
             sourceParams: urlParams,
             targetQuarter: nextQ,
             gameId: this.gameId,
