@@ -2478,48 +2478,95 @@
     
     // ==================== PLAYCALL CENTER OVERRIDE LOGIC ====================
     
-    // Populate shooter headshots for the 6-play list
-    async function populatePlayHeadshots() {
+    // ✅ SS&S: Populate shooter headshots for the 6-play list using lineup from URL params
+    // This runs on all game entry/re-entry instances (game start, quarter breaks, timeouts, foul outs, overtime)
+    // Lineups are locked at timeout navigation points, so we can safely assign images here
+    function populatePlayHeadshots() {
       const playOptions = document.querySelectorAll('.play-option');
+      const urlParams = new URLSearchParams(window.location.search);
       
-      // For each play, fetch the play document and get the shooter from successful variant
-      for (const option of playOptions) {
-        const playName = option.dataset.play;
+      // Get user team side and lineup from URL params
+      const userTeamSide = urlParams.get('my_team'); // "home" or "away"
+      if (!userTeamSide) {
+        console.warn('⚠️ [PLAYCALL HEADSHOTS] No my_team in URL params, cannot populate headshots');
+        return;
+      }
+      
+      // Build lineup object from URL params
+      const lineup = {};
+      const positions = ['pg', 'sg', 'sf', 'pf', 'c'];
+      positions.forEach(pos => {
+        const paramKey = `${userTeamSide}_${pos}`;
+        const playerId = urlParams.get(paramKey);
+        if (playerId) {
+          lineup[pos.toUpperCase()] = playerId;
+        }
+      });
+      
+      if (Object.keys(lineup).length === 0) {
+        console.warn('⚠️ [PLAYCALL HEADSHOTS] No lineup data in URL params, cannot populate headshots');
+        return;
+      }
+      
+      // Map play focus to position(s) - use first available position
+      const focusToPosition = {
+        'inside': ['C', 'PF'],       // Inside plays → C or PF
+        'attack': ['PG', 'SG'],      // Attack plays → PG or SG
+        'outside': ['SG', 'SF']       // Outside plays → SG or SF
+      };
+      
+      // For each play, set headshot based on focus
+      playOptions.forEach((playOption) => {
+        const playName = playOption.getAttribute('data-play');
+        const playFocus = playOption.getAttribute('data-focus')?.toLowerCase();
         
-        try {
-          // Fetch play document from backend
-          const response = await fetch(`/api/play/${encodeURIComponent(playName)}`);
-          if (!response.ok) continue;
-          
-          const playDoc = await response.json();
-          
-          // Get successful skeleton
-          const successfulSkeleton = playDoc.skeletons?.successful;
-          if (!successfulSkeleton || !successfulSkeleton.steps) continue;
-          
-          // Find shooter in final step
-          const finalStep = successfulSkeleton.steps[successfulSkeleton.steps.length - 1];
-          let shooterPos = null;
-          
-          for (const [pos, actionInfo] of Object.entries(finalStep.pos_actions || {})) {
-            if (actionInfo.action?.toLowerCase() === 'shoot') {
-              shooterPos = pos;
+        if (!playFocus) {
+          console.warn(`⚠️ [PLAYCALL HEADSHOTS] No data-focus attribute for play: ${playName}`);
+          return;
+        }
+        
+        // Get positions for this focus
+        const positions = focusToPosition[playFocus];
+        let shooterId = null;
+        
+        if (positions) {
+          // Use first available position
+          for (const pos of positions) {
+            if (lineup[pos]) {
+              shooterId = lineup[pos];
               break;
             }
           }
-          
-          if (shooterPos) {
-            // For now, use a placeholder - we'll need roster data to get actual player ID
-            // This will be populated properly when the game starts and roster is loaded
-            option.dataset.shooterPos = shooterPos;
-          }
-        } catch (error) {
-          console.warn(`⚠️ Failed to fetch headshot for ${playName}:`, error);
         }
-      }
+        
+        if (shooterId) {
+          const headshotImg = playOption.querySelector('.play-headshot');
+          if (headshotImg) {
+            const imgPath = `/static/images/players/${shooterId}.png`;
+            headshotImg.src = imgPath;
+            headshotImg.setAttribute('data-player-id', shooterId);
+            headshotImg.onerror = () => {
+              console.warn(`⚠️ [PLAYCALL HEADSHOTS] Headshot failed to load: ${imgPath}, using default`);
+              headshotImg.src = '/static/images/players/default.png';
+            };
+            
+            // Add tooltip event listeners (if tooltip functions exist)
+            if (typeof showPlaycallHeadshotTooltip === 'function') {
+              headshotImg.addEventListener('mouseover', (e) => showPlaycallHeadshotTooltip(e, shooterId));
+              headshotImg.addEventListener('mousemove', updatePlaycallTooltipPosition);
+              headshotImg.addEventListener('mouseout', hidePlaycallHeadshotTooltip);
+            }
+          }
+        } else {
+          console.warn(`⚠️ [PLAYCALL HEADSHOTS] No shooter found for ${playName} (focus: ${playFocus})`);
+        }
+      });
+      
+      console.log('✅ [PLAYCALL HEADSHOTS] Populated headshots from lineup for user team:', userTeamSide);
     }
     
-    // Call on page load
+    // ✅ SS&S: Call on page load (runs on all game entry/re-entry instances)
+    // This ensures images are set whenever we return to court.html from lineup/game plan screens
     populatePlayHeadshots();
     
     (function initPlaycallCenter() {
