@@ -786,14 +786,32 @@ class TurnManager:
         
         # If user provided an offense call, use the specific play name
         if user_offense:
+            # User now provides specific play name (e.g., "3-2 Motion", "Base Post Play")
+            chosen_playcall = user_offense
+            
+            # ✅ LOUD DEBUG: Compare selected vs used playcall (BEFORE clearing)
+            stored_call = None
+            if self.game.offense_team.is_user_team:
+                stored_call = self.game.offense_team.strategy_calls.get("offense_call")
+            
+            if stored_call == chosen_playcall:
+                logging.info("🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢")
+                logging.info("🟢 [PLAYCALL MATCH] TRUE - Selected playcall matches used playcall!")
+                logging.info(f"🟢 Selected: '{stored_call}' | Used: '{chosen_playcall}'")
+                logging.info("🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢")
+            else:
+                logging.warning("🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴")
+                logging.warning("🔴 [PLAYCALL MATCH] FALSE - Selected playcall does NOT match used playcall!")
+                logging.warning(f"🔴 Selected: '{stored_call}' | Used: '{chosen_playcall}'")
+                logging.warning("🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴")
+            
+            logging.info(f"🎮 [PLAYCALL USED] User offense call being used in HCO turn: '{chosen_playcall}' for {self.game.offense_team.name}")
+            logging.info(f"🎮 [PLAYCALL] Using user offense call: {chosen_playcall} (clearing offense_call after use)")
+            
             # ✅ SS&S: Clear offense_call from strategy_calls after use (prevents carryover to next turn)
             if self.game.offense_team.is_user_team:
                 self.game.offense_team.strategy_calls["offense_call"] = None
             self.game.game_state["user_offense_override"] = None  # Legacy clear
-            
-            # User now provides specific play name (e.g., "3-2 Motion", "Base Post Play")
-            chosen_playcall = user_offense
-            logging.info(f"🎮 [PLAYCALL] Using user offense call: {chosen_playcall} (clearing offense_call after use)")
             
             # Lookup play details from database to get play_type and play_focus
             play_doc = plays_collection.find_one({"name": chosen_playcall})
