@@ -3081,65 +3081,9 @@
       showPlay(newIndex);
     });
 
-    // ==================== POPULATE PLAY HEADSHOTS ====================
-    // Get lineup player IDs from URL params
-    const headshotUrlParams = new URLSearchParams(window.location.search);
-    const lineup = {
-      pg: headshotUrlParams.get('home_pg'),
-      sg: headshotUrlParams.get('home_sg'),
-      sf: headshotUrlParams.get('home_sf'),
-      pf: headshotUrlParams.get('home_pf'),
-      c: headshotUrlParams.get('home_c')
-    };
-    
-    // Map play focus to position
-    const focusToPosition = {
-      'inside': ['c', 'pf'],       // Inside plays → C or PF
-      'attack': ['pg', 'sg'],      // Attack plays → PG or SG
-      'outside': ['sg', 'sf']      // Outside plays → SG or SF
-    };
-    
-    // For each play, set headshot based on focus
-    playOptions.forEach((playOption, idx) => {
-      const playName = playOption.getAttribute('data-play');
-      const playFocus = playOption.getAttribute('data-focus');
-      
-      // Get positions for this focus
-      const positions = focusToPosition[playFocus];
-      let shooterId = null;
-      
-      if (positions) {
-        // Use first available position
-        for (const pos of positions) {
-          if (lineup[pos]) {
-            shooterId = lineup[pos];
-            break;
-          }
-        }
-      }
-      
-      if (shooterId) {
-        const headshotImg = playOption.querySelector('.play-headshot');
-        if (headshotImg) {
-          const imgPath = `/static/images/players/${shooterId}.png`;
-          headshotImg.src = imgPath;
-          headshotImg.onerror = () => {
-            console.warn(`⚠️ Headshot failed to load: ${imgPath}, using default`);
-            headshotImg.src = '/static/images/players/default.png';
-          };
-          
-          // Add tooltip event listeners
-          headshotImg.setAttribute('data-player-id', shooterId);
-          headshotImg.addEventListener('mouseover', (e) => showPlaycallHeadshotTooltip(e, shooterId));
-          headshotImg.addEventListener('mousemove', updatePlaycallTooltipPosition);
-          headshotImg.addEventListener('mouseout', hidePlaycallHeadshotTooltip);
-        }
-      } else {
-        console.warn(`⚠️ No shooter found for ${playName} (focus: ${playFocus})`);
-      }
-    });
-    
-    console.log('✅ Play headshots populated from lineup');
+    // ✅ SS&S: Headshots are populated by populatePlayHeadshots() function (lines 2484-2566)
+    // which correctly checks my_team to determine user team side and uses appropriate lineup
+    // This old hardcoded code was removed to prevent overwriting correct images
 
     // ==================== PLAYCALL CENTER HEADSHOT TOOLTIP ====================
     function showPlaycallHeadshotTooltip(event, playerId) {
