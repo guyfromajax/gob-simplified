@@ -1512,15 +1512,24 @@ export function createGameScene(Phaser) {
             return; // Block navigation
           }
           
+          // ✅ SS&S: Use unified Timeout Navigation Helper for consistent parameter building
           const nextQ = this.quarter + 1;
-          const params = new URLSearchParams(window.location.search);
-          params.set('game_id', this.gameId);
-          params.set('quarter', nextQ);
-          params.set('period', `Q${nextQ}`);
-          // ✅ QUARTER BREAK: Clear resume_from_timeout when navigating to new quarter
-          // Quarter breaks (Q2, Q3, Q4) should NEVER have resume_from_timeout=true
-          // Only timeout resumes within the SAME quarter should have this flag
-          params.delete('resume_from_timeout');
+          const urlParams = new URLSearchParams(window.location.search);
+          
+          // Import helper (ES6 module)
+          const { buildGameNavigationParams } = await import('/static/js/shared/timeoutNavigationHelper.js');
+          
+          // ✅ QUARTER BREAK: Quarter breaks should NOT have resume_from_timeout
+          // Helper will automatically exclude it for quarter breaks (resumeFromTimeout=false)
+          const params = buildGameNavigationParams({
+            sourceParams: urlParams,
+            targetQuarter: nextQ,
+            gameId: this.gameId,
+            resumeFromTimeout: false, // ✅ QUARTER BREAK: Not a timeout resume
+            lineup: {}, // Lineup will be set on lineup screen
+            myTeamSide: urlParams.get('my_team')
+          });
+          
           if (this.gameId && typeof localStorage !== 'undefined') {
             localStorage.setItem('game_id', this.gameId);
           }

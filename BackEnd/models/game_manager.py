@@ -248,6 +248,12 @@ class GameManager:
                     if foul_out_player:
                         break
             
+            # ✅ FOUL OUT: Capture possession team BEFORE creating timeout turn (SS&S consistency)
+            # This matches the pattern used in call_timeout_endpoint for regular timeouts
+            # Ensures correct possession team on resume (same team that had ball when foul out occurred)
+            self.game_state["timeout_offense_team_id"] = self.offense_team.team_id
+            logging.info(f"✅ FOUL OUT: Captured possession team '{self.offense_team.name}' (team_id: {self.offense_team.team_id}) for resume")
+            
             # Create timeout turn
             timeout_turn = self.turn_manager.setup_timeout_turn(
                 timeout_reason="FOUL_OUT",

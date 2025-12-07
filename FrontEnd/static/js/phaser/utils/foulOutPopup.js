@@ -14,6 +14,8 @@
  * @param {string} [options.myTeamSide] - User's team side ('home' or 'away')
  * @param {string} [options.userTeamId] - User's team ID
  */
+import { buildGameNavigationParams } from '/static/js/shared/timeoutNavigationHelper.js';
+
 export function showFoulOutPopup({ player, gameId, mode, quarter, clock, tournamentId, franchiseId, homeTeam, awayTeam, homeId, awayId, myTeamSide, userTeamId }) {
   // Remove any existing popup
   const existingPopup = document.querySelector('.foul-out-popup');
@@ -21,43 +23,37 @@ export function showFoulOutPopup({ player, gameId, mode, quarter, clock, tournam
     existingPopup.remove();
   }
 
-  // Build lineup selection URL with game context
-  const params = new URLSearchParams();
-  
-  // Team information (required for set-lineup to work)
-  if (homeTeam) params.set('home', homeTeam);
-  if (awayTeam) params.set('away', awayTeam);
-  if (homeId) params.set('home_id', homeId);
-  if (awayId) params.set('away_id', awayId);
-  if (myTeamSide) params.set('my_team', myTeamSide);
-  if (userTeamId) params.set('user_team_id', userTeamId);
-  
-  // Game context
-  if (gameId) params.set('game_id', gameId);
-  if (quarter) params.set('quarter', quarter);
-  params.set('period', `Q${quarter}`);
-  if (clock) params.set('clock', clock); // ✅ Preserve clock time when navigating to lineup
-  if (tournamentId) params.set('tournament_id', tournamentId);
-  if (franchiseId) params.set('franchise_id', franchiseId);
-  if (mode) params.set('mode', mode);
-  
+  // ✅ SS&S: Use unified navigation helper for consistent parameter building
   // Fallback: try to get team info from current URL if not provided
-  if (!homeTeam || !awayTeam) {
   const urlParams = new URLSearchParams(window.location.search);
-    if (!homeTeam) homeTeam = urlParams.get('home');
-    if (!awayTeam) awayTeam = urlParams.get('away');
-    if (!homeId) homeId = urlParams.get('home_id');
-    if (!awayId) awayId = urlParams.get('away_id');
-    if (!myTeamSide) myTeamSide = urlParams.get('my_team');
-    if (!userTeamId) userTeamId = urlParams.get('user_team_id');
-    
-    if (homeTeam) params.set('home', homeTeam);
-    if (awayTeam) params.set('away', awayTeam);
-    if (homeId) params.set('home_id', homeId);
-    if (awayId) params.set('away_id', awayId);
-    if (myTeamSide) params.set('my_team', myTeamSide);
-    if (userTeamId) params.set('user_team_id', userTeamId);
-  }
+  if (!homeTeam) homeTeam = urlParams.get('home');
+  if (!awayTeam) awayTeam = urlParams.get('away');
+  if (!homeId) homeId = urlParams.get('home_id');
+  if (!awayId) awayId = urlParams.get('away_id');
+  if (!myTeamSide) myTeamSide = urlParams.get('my_team');
+  if (!userTeamId) userTeamId = urlParams.get('user_team_id');
+  
+  // Build params using unified helper
+  const params = buildGameNavigationParams({
+    sourceParams: urlParams,
+    targetQuarter: quarter,
+    gameId: gameId,
+    resumeFromTimeout: true, // ✅ FOUL OUT: Always resuming from timeout (any quarter)
+    lineup: {}, // Lineup will be set on lineup screen
+    myTeamSide: myTeamSide,
+    clock: clock,
+    overrides: {
+      home: homeTeam,
+      away: awayTeam,
+      home_id: homeId,
+      away_id: awayId,
+      my_team: myTeamSide,
+      user_team_id: userTeamId,
+      mode: mode,
+      tournament_id: tournamentId,
+      franchise_id: franchiseId
+    }
+  });
   
   const lineupUrl = `/static/set-lineup.html?${params.toString()}`;
 
