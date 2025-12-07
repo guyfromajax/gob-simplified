@@ -776,18 +776,20 @@ class TurnManager:
         else:
             logging.info(f"🎮 [PLAYCALL DEBUG] Offense team {self.game.offense_team.name} is NOT user team, skipping offense_call check")
         
-        # Check if defense team is user team and has defense_call set
+        # Check if user team has defense_call set (regardless of current offense/defense)
+        # Defense override can be set when user is on offense (for next time they're on defense)
         defense_call = None
-        logging.info(f"🎮 [PLAYCALL DEBUG] Checking defense team: {self.game.defense_team.name}, is_user_team={self.game.defense_team.is_user_team}")
-        if self.game.defense_team.is_user_team:
-            defense_call = self.game.defense_team.strategy_calls.get("defense_call")
-            logging.info(f"🎮 [PLAYCALL DEBUG] defense_call value: {defense_call}, type: {type(defense_call)}")
+        user_team = self.game.home_team if self.game.home_team.is_user_team else (self.game.away_team if self.game.away_team.is_user_team else None)
+        
+        if user_team:
+            defense_call = user_team.strategy_calls.get("defense_call")
+            logging.info(f"🎮 [PLAYCALL DEBUG] Checking user team ({user_team.name}) for defense_call: {defense_call}")
             if defense_call:
-                logging.info(f"🎮 [PLAYCALL] Found user defense call for {self.game.defense_team.name}: {defense_call}")
+                logging.info(f"🎮 [PLAYCALL] Found user defense call for {user_team.name}: {defense_call}")
             else:
-                logging.info(f"🎮 [PLAYCALL] No user defense call for {self.game.defense_team.name} (defense_call is None), using normal selection")
+                logging.info(f"🎮 [PLAYCALL] No user defense call for {user_team.name} (defense_call is None), using normal selection")
         else:
-            logging.info(f"🎮 [PLAYCALL DEBUG] Defense team {self.game.defense_team.name} is NOT user team, skipping defense_call check")
+            logging.info(f"🎮 [PLAYCALL DEBUG] No user team found, skipping defense_call check")
         
         # Legacy support: Also check game_state for backward compatibility (will be removed)
         user_offense = self.game.game_state.get("user_offense_override") or offense_call
