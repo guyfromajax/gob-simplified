@@ -760,8 +760,9 @@ class TurnManager:
         if self.game.offense_team.is_user_team:
             offense_call = self.game.offense_team.strategy_calls.get("offense_call")
             logging.info(f"🎮 [PLAYCALL DEBUG] offense_call value: {offense_call}, type: {type(offense_call)}")
+            logging.info(f"🎮 [PLAYCALL DEBUG] Full strategy_calls: {self.game.offense_team.strategy_calls}")
             if offense_call:
-                logging.info(f"🎮 [PLAYCALL] Found user offense call for {self.game.offense_team.name}: {offense_call}")
+                logging.info(f"🎮 [PLAYCALL] Found user offense call for {self.game.offense_team.name}: '{offense_call}' (length: {len(offense_call) if offense_call else 0})")
             else:
                 logging.info(f"🎮 [PLAYCALL] No user offense call for {self.game.offense_team.name} (offense_call is None), using normal selection")
         else:
