@@ -279,15 +279,6 @@ export function updatePlaycallCenter(turnData, homeTeamId) {
     // Get intended shooter info (from turnData if available)
     const intendedShooterId = turnData.intended_shooter_id || null;
     
-    // ✅ DEBUG: Log popup call with playcall and shooter info
-    console.log(`🎬 [PLAYCALL POPUP] Calling showPlaycallReveal:`, {
-      playcall: offensivePlaycall,
-      intendedShooterId: intendedShooterId,
-      playType: playType,
-      playFocus: playFocus,
-      defenseType: defenseType
-    });
-    
     window.showPlaycallReveal({
       offense: {
         type: playType,
@@ -301,14 +292,6 @@ export function updatePlaycallCenter(turnData, homeTeamId) {
       intendedShooterId: intendedShooterId,  // For headshot display
       // hotPlayer can be added later if available in turnData
       hotPlayer: null
-    });
-  } else {
-    console.log(`⚠️ [PLAYCALL POPUP] Not calling showPlaycallReveal:`, {
-      hasFunction: typeof window.showPlaycallReveal === 'function',
-      playType: playType,
-      playFocus: playFocus,
-      defenseType: defenseType,
-      offensivePlaycall: offensivePlaycall
     });
   }
 }
