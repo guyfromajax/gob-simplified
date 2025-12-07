@@ -2528,17 +2528,28 @@
       const clearOffenseBtn = document.getElementById('clear-offense-override');
       const clearDefenseBtn = document.getElementById('clear-defense-override');
       
-      // ✅ SS&S: Get game context from URL params
-      const urlParams = new URLSearchParams(window.location.search);
-      const gameId = urlParams.get('game_id');
-      const userTeamSide = urlParams.get('my_team'); // "home" or "away"
+      // ✅ SS&S: Helper function to get game context from URL params (read dynamically each time)
+      function getGameContext() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const gameId = urlParams.get('game_id');
+        const userTeamSide = urlParams.get('my_team'); // "home" or "away"
+        return { gameId, userTeamSide };
+      }
       
       // ✅ SS&S: Helper function to set playcall override via API
       async function setPlaycallOverride(type, value) {
+        const { gameId, userTeamSide } = getGameContext();
+        
         if (!gameId || !userTeamSide) {
-          console.warn('⚠️ [PLAYCALL OVERRIDE] Missing game_id or user_team_side, cannot set override');
+          console.warn('⚠️ [PLAYCALL OVERRIDE] Missing game_id or user_team_side, cannot set override', {
+            gameId,
+            userTeamSide,
+            url: window.location.search
+          });
           return;
         }
+        
+        console.log(`🎮 [PLAYCALL OVERRIDE] Setting ${type} override: ${value}`, { gameId, userTeamSide });
         
         try {
           const payload = {
@@ -2604,6 +2615,7 @@
             
             const normalizedAggression = aggression.toLowerCase();
             // Set both in one API call
+            const { gameId, userTeamSide } = getGameContext();
             const payload = {
               game_id: gameId,
               user_team_side: userTeamSide,

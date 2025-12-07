@@ -760,6 +760,8 @@ class TurnManager:
             offense_call = self.game.offense_team.strategy_calls.get("offense_call")
             if offense_call:
                 logging.info(f"🎮 [PLAYCALL] Found user offense call for {self.game.offense_team.name}: {offense_call}")
+            else:
+                logging.info(f"🎮 [PLAYCALL] No user offense call for {self.game.offense_team.name} (offense_call is None), using normal selection")
         
         # Check if defense team is user team and has defense_call set
         defense_call = None
@@ -767,6 +769,8 @@ class TurnManager:
             defense_call = self.game.defense_team.strategy_calls.get("defense_call")
             if defense_call:
                 logging.info(f"🎮 [PLAYCALL] Found user defense call for {self.game.defense_team.name}: {defense_call}")
+            else:
+                logging.info(f"🎮 [PLAYCALL] No user defense call for {self.game.defense_team.name} (defense_call is None), using normal selection")
         
         # Legacy support: Also check game_state for backward compatibility (will be removed)
         user_offense = self.game.game_state.get("user_offense_override") or offense_call
@@ -781,7 +785,7 @@ class TurnManager:
             
             # User now provides specific play name (e.g., "3-2 Motion", "Base Post Play")
             chosen_playcall = user_offense
-            logging.info(f"🎮 [PLAYCALL OVERRIDE] Using offense override: {chosen_playcall}")
+            logging.info(f"🎮 [PLAYCALL] Using user offense call: {chosen_playcall} (clearing offense_call after use)")
             
             # Lookup play details from database to get play_type and play_focus
             play_doc = plays_collection.find_one({"name": chosen_playcall})

@@ -1724,11 +1724,19 @@ def set_playcall_override_endpoint(request: PlaycallOverrideRequest):
     # offense_call and defense_call persist until used, then are cleared automatically
     if request.offense_override is not None:
         user_team.strategy_calls["offense_call"] = request.offense_override
-        logging.info(f"🎮 [PLAYCALL] Set offense call for {user_team.name}: {request.offense_override}")
+        logging.info(f"🎮 [PLAYCALL] API: Set offense_call for {user_team.name}: {request.offense_override}")
+    elif request.offense_override is None and "offense_override" in request.__dict__:
+        # Explicitly clearing (None was passed)
+        user_team.strategy_calls["offense_call"] = None
+        logging.info(f"🎮 [PLAYCALL] API: Cleared offense_call for {user_team.name}")
     
     if request.defense_override is not None:
         user_team.strategy_calls["defense_call"] = request.defense_override
-        logging.info(f"🎮 [PLAYCALL] Set defense call for {user_team.name}: {request.defense_override}")
+        logging.info(f"🎮 [PLAYCALL] API: Set defense_call for {user_team.name}: {request.defense_override}")
+    elif request.defense_override is None and "defense_override" in request.__dict__:
+        # Explicitly clearing (None was passed)
+        user_team.strategy_calls["defense_call"] = None
+        logging.info(f"🎮 [PLAYCALL] API: Cleared defense_call for {user_team.name}")
     
     if request.aggression_override is not None:
         user_team.strategy_calls["aggression_override"] = request.aggression_override
