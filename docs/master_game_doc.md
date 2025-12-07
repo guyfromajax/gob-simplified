@@ -1807,26 +1807,32 @@ Player images in the Playcall Center are assigned once when returning to `court.
 **How Images Are Assigned:**
 1. **Read Lineup from URL Params:** Lineup data is preserved by `TimeoutNavigationHelper` in URL params (`home_pg`, `home_sg`, etc. or `away_pg`, `away_sg`, etc.)
 2. **Get User Team Side:** From `my_team` URL param ("home" or "away")
-3. **Map Play Focus to Position:** For each of the 6 offense plays:
-   - Inside plays → C or PF (first available)
-   - Attack plays → PG or SG (first available)
-   - Outside plays → SG or SF (first available)
-4. **Get Player ID:** From lineup for that position
-5. **Set Image Once:** Image path is `/static/images/players/{playerId}.png`
-6. **Images Remain Static:** No mid-game changes during gameplay
+3. **Fetch Play Documents:** For each of the 6 offense plays, fetches play document from `/api/play/{play_name}`
+4. **Extract Intended Shooter from Skeleton:**
+   - Gets successful skeleton from `play.skeletons.successful`
+   - Extracts intended shooter position from final step's `pos_actions` where `action == "shoot"`
+   - Uses same logic as backend `phase_resolution.py` (lines 1011-1017)
+5. **Map Position to Player ID:** Maps intended shooter position to player ID from user's lineup
+6. **Set Image Once:** Image path is `/static/images/players/{playerId}.png`
+7. **Images Remain Static:** No mid-game changes during gameplay
 
 **Why This Is SS&S:**
 - **Single Point of Assignment:** Images set once at timeout navigation return
 - **Stable During Gameplay:** Images don't change mid-game (no confusion)
 - **Correct Timing:** Lineups are locked at timeout navigation points
-- **Clear Data Flow:** Lineup → play focus → position → player ID → image
+- **Clear Data Flow:** Lineup → play skeleton → intended shooter position → player ID → image
 - **Works for All Entry Points:** All use `TimeoutNavigationHelper` which preserves lineup params
+- **Matches Backend Logic:** Uses same skeleton extraction logic as backend and playcall popup
+- **Single Source of Truth:** Uses actual intended shooter from play skeletons, not hardcoded mapping
 
 **Implementation:**
-- Location: `FrontEnd/static/court.html` `populatePlayHeadshots()` function (lines 2481-2561)
-- Uses existing `data-focus` attributes on play options (inside/attack/outside)
-- Runs on page load via `DOMContentLoaded` or immediate execution
+- Location: `FrontEnd/static/court.html` `populatePlayHeadshots()` function (lines 2484-2570)
+- Fetches play documents from `/api/play/{play_name}` for each of the 6 offensive plays
+- Extracts intended shooter from successful skeleton's final step (same logic as backend)
+- Function is async to handle API calls
+- Runs on page load (immediate execution)
 - Falls back to default image if player image fails to load
+- Matches backend logic in `BackEnd/engine/phase_resolution.py` (lines 1004-1020)
 
 #### LocalStorage (Frontend State Only)
 
@@ -2574,14 +2580,40 @@ The Playcall Center allows users to override playcalls for their team. Overrides
 
 ### Player Image Assignment System
 
-Player headshots in the Playcall Center are assigned once when returning to `court.html` from lineup/game plan screens. See "Playcall Center Player Image Assignment (SS&S - January 2025)" section in "Game Start and Resume Transitions" for full details.
+Player headshots in the Playcall Center are assigned once when returning to `court.html` from lineup/game plan screens. The system uses the same logic as the backend to extract the intended shooter from each play's successful skeleton.
+
+**Process (SS&S - January 2025):**
+
+1. **Page Load:** `populatePlayHeadshots()` runs on `court.html` page load (all timeout navigation entry points)
+
+2. **Fetch Play Documents:** For each of the 6 offensive plays, fetches the play document from `/api/play/{play_name}`
+
+3. **Extract Intended Shooter from Skeleton:**
+   - Gets the successful skeleton from `play.skeletons.successful` (same as backend: `get_hco_skeleton(None, game, lean_score=1.0)`)
+   - Extracts intended shooter position from the final step's `pos_actions` where `action == "shoot"`
+   - Uses the same logic as backend `phase_resolution.py` (lines 1011-1017)
+
+4. **Map Position to Player ID:**
+   - Reads user's lineup from URL parameters (preserved by `TimeoutNavigationHelper`)
+   - Maps the intended shooter position (C, PG, SG, SF, PF) to the corresponding player ID from the lineup
+   - Uses `my_team` parameter to determine which lineup to use (home or away)
+
+5. **Set Image:** Sets the headshot image using the player ID: `/static/images/players/{playerId}.png`
 
 **Key Points:**
 - Images assigned on page load for all timeout navigation entry points
+- Uses actual intended shooter from play skeletons (not hardcoded focus-to-position mapping)
+- Matches backend logic and playcall popup behavior
 - Uses lineup data from URL parameters (preserved by `TimeoutNavigationHelper`)
-- Maps play focus (inside/attack/outside) to player positions (C/PF, PG/SG, SG/SF)
 - Images remain static during gameplay (no mid-game changes)
-- Location: `FrontEnd/static/court.html` `populatePlayHeadshots()` function (lines 2481-2561)
+- Function is async to handle API calls to fetch play documents
+- Location: `FrontEnd/static/court.html` `populatePlayHeadshots()` function (lines 2484-2570)
+
+**Why This Is SS&S:**
+- **Single Source of Truth:** Uses the same skeleton data and extraction logic as the backend
+- **Consistency:** Playcall Center images match the playcall popup (both use intended shooter from skeleton)
+- **Accuracy:** Shows the actual intended shooter for each play, not a heuristic based on play focus
+- **Maintainability:** If skeleton data changes, both backend and frontend automatically reflect the change
 
 ### Key Files
 
