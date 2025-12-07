@@ -824,63 +824,29 @@ async function init() {
   if (btn) {
     btn.addEventListener('click', () => {
       if (btn.classList.contains('disabled')) return;
-      const currentGameId = urlParams.get('game_id') ||
-        (typeof localStorage !== 'undefined' ? localStorage.getItem('game_id') : null);
-      const params = new URLSearchParams();
-      params.set('home', homeTeam);
-      params.set('away', awayTeam);
-      if (homeId) params.set('home_id', homeId);
-      if (awayId) params.set('away_id', awayId);
-      if (myTeamSide) params.set('my_team', myTeamSide);
-      if (userTeamIdParam) params.set('user_team_id', userTeamIdParam);
-      if (franchiseId) params.set('franchise_id', franchiseId);
-      if (weekParam) params.set('week', weekParam);
-      if (tournamentId) params.set('tournament_id', tournamentId);
-      if (modeParam) params.set('mode', modeParam);
-      params.set('quarter', String(quarter));
-      params.set('period', periodLabel);
       
-      // ✅ TIMEOUT: Check for resume_from_timeout BEFORE game_id check (needed for Q1 timeouts)
-      const resumeFromTimeout = urlParams.get('resume_from_timeout');
-      
-      // ✅ QUARTER BREAK: Only preserve resume_from_timeout if we're in Q1 (timeout resumes only happen in Q1)
-      // Quarter breaks (Q2, Q3, Q4) should NEVER have resume_from_timeout=true
-      // This prevents stale timeout flags from being carried across quarter boundaries
-      const shouldPreserveTimeoutFlag = resumeFromTimeout && quarter === 1;
-      
-      // ✅ CRITICAL FIX: Pass game_id for quarter breaks (Q2+) OR timeout resumes (Q1)
-      // Quarter breaks: quarter > 1 → passes game_id
-      // Timeout in Q1: shouldPreserveTimeoutFlag → passes game_id (this was missing!)
-      // New Q1 game: neither condition → doesn't pass game_id
-      if (currentGameId && (quarter > 1 || shouldPreserveTimeoutFlag)) params.set('game_id', currentGameId);
-      
-      // ✅ Preserve clock time if present (from foul out navigation)
-      const clock = urlParams.get('clock');
-      if (clock) params.set('clock', clock);
-      
-      ['PG','SG','SF','PF','C'].forEach(pos => {
-        const id = lineup[pos];
-        if (id) params.set(`${myTeamSide}_${pos.toLowerCase()}`, id);
-      });
-      
-      // Carry forward start_with_inbound and starting_possession if present (from Sim to 4th Quarter)
-      const startWithInbound = urlParams.get('start_with_inbound');
-      const startingPossession = urlParams.get('starting_possession');
-      if (startWithInbound) params.set('start_with_inbound', startWithInbound);
-      if (startingPossession) params.set('starting_possession', startingPossession);
-      
-      // ✅ TIMEOUT: Only carry forward resume_from_timeout flag if we're in Q1 (timeout resumes only happen in Q1)
-      // Quarter breaks (Q2, Q3, Q4) should NEVER have this flag
-      if (shouldPreserveTimeoutFlag) {
-        params.set('resume_from_timeout', resumeFromTimeout);
-        console.log('✅ [SET-LINEUP] Preserving resume_from_timeout for Q1 timeout resume');
-      } else if (resumeFromTimeout && quarter > 1) {
-        console.warn('⚠️ [SET-LINEUP] Clearing stale resume_from_timeout flag for quarter break (Q' + quarter + ')');
+      // ✅ SS&S: Use unified Timeout Navigation Helper for consistent parameter building
+      const helper = window.TimeoutNavigationHelper;
+      if (!helper) {
+        console.error('❌ [SET-LINEUP] TimeoutNavigationHelper not loaded!');
+        return;
       }
+      
+      const currentGameId = helper.getGameId(urlParams);
+      const resumeFromTimeout = helper.getResumeFromTimeout(urlParams);
+      
+      const params = helper.buildGameNavigationParams({
+        sourceParams: urlParams,
+        targetQuarter: quarter,
+        gameId: currentGameId,
+        resumeFromTimeout: resumeFromTimeout, // ✅ SS&S: Supports any quarter (backend supports this)
+        lineup: lineup,
+        myTeamSide: myTeamSide,
+        clock: urlParams.get('clock')
+      });
       
       if (DEBUG) {
         params.set('debug', '1');
-        // optional: params.set('debug_flow', '1');
       }
       if (DEBUG) {
         console.debug('🔀 Redirecting to court.html (bypassing game plan)', { home: homeTeam, away: awayTeam, gameId: currentGameId });
@@ -896,55 +862,25 @@ async function init() {
   if (gameplanBtn) {
     gameplanBtn.addEventListener('click', () => {
       console.log('🎮 GAME PLAN BUTTON CLICKED! Redirecting to game-plan.html');
-      const currentGameId = urlParams.get('game_id') ||
-        (typeof localStorage !== 'undefined' ? localStorage.getItem('game_id') : null);
-      const params = new URLSearchParams();
-      params.set('home', homeTeam);
-      params.set('away', awayTeam);
-      if (homeId) params.set('home_id', homeId);
-      if (awayId) params.set('away_id', awayId);
-      if (myTeamSide) params.set('my_team', myTeamSide);
-      if (userTeamIdParam) params.set('user_team_id', userTeamIdParam);
-      if (franchiseId) params.set('franchise_id', franchiseId);
-      if (weekParam) params.set('week', weekParam);
-      if (tournamentId) params.set('tournament_id', tournamentId);
-      if (modeParam) params.set('mode', modeParam);
-      params.set('quarter', String(quarter));
-      params.set('period', periodLabel);
       
-      // ✅ TIMEOUT: Check for resume_from_timeout BEFORE game_id check (needed for Q1 timeouts)
-      const resumeFromTimeout = urlParams.get('resume_from_timeout');
-      
-      // ✅ QUARTER BREAK: Only preserve resume_from_timeout if we're in Q1 (timeout resumes only happen in Q1)
-      // Quarter breaks (Q2, Q3, Q4) should NEVER have resume_from_timeout=true
-      // This prevents stale timeout flags from being carried across quarter boundaries
-      const shouldPreserveTimeoutFlag = resumeFromTimeout && quarter === 1;
-      
-      // ✅ CRITICAL FIX: Pass game_id for quarter breaks (Q2+) OR timeout resumes (Q1)
-      // Quarter breaks: quarter > 1 → passes game_id
-      // Timeout in Q1: shouldPreserveTimeoutFlag → passes game_id (this was missing!)
-      // New Q1 game: neither condition → doesn't pass game_id
-      if (currentGameId && (quarter > 1 || shouldPreserveTimeoutFlag)) params.set('game_id', currentGameId);
-      
-      ['PG','SG','SF','PF','C'].forEach(pos => {
-        const id = lineup[pos];
-        if (id) params.set(`${myTeamSide}_${pos.toLowerCase()}`, id);
-      });
-      
-      // Carry forward start_with_inbound and starting_possession if present
-      const startWithInbound = urlParams.get('start_with_inbound');
-      const startingPossession = urlParams.get('starting_possession');
-      if (startWithInbound) params.set('start_with_inbound', startWithInbound);
-      if (startingPossession) params.set('starting_possession', startingPossession);
-      
-      // ✅ TIMEOUT: Only carry forward resume_from_timeout flag if we're in Q1 (timeout resumes only happen in Q1)
-      // Quarter breaks (Q2, Q3, Q4) should NEVER have this flag
-      if (shouldPreserveTimeoutFlag) {
-        params.set('resume_from_timeout', resumeFromTimeout);
-        console.log('✅ [SET-LINEUP] Preserving resume_from_timeout for Q1 timeout resume');
-      } else if (resumeFromTimeout && quarter > 1) {
-        console.warn('⚠️ [SET-LINEUP] Clearing stale resume_from_timeout flag for quarter break (Q' + quarter + ')');
+      // ✅ SS&S: Use unified Timeout Navigation Helper for consistent parameter building
+      const helper = window.TimeoutNavigationHelper;
+      if (!helper) {
+        console.error('❌ [SET-LINEUP] TimeoutNavigationHelper not loaded!');
+        return;
       }
+      
+      const currentGameId = helper.getGameId(urlParams);
+      const resumeFromTimeout = helper.getResumeFromTimeout(urlParams);
+      
+      const params = helper.buildGameNavigationParams({
+        sourceParams: urlParams,
+        targetQuarter: quarter,
+        gameId: currentGameId,
+        resumeFromTimeout: resumeFromTimeout, // ✅ SS&S: Supports any quarter (backend supports this)
+        lineup: lineup,
+        myTeamSide: myTeamSide
+      });
 
       if (DEBUG) {
         params.set('debug', '1');

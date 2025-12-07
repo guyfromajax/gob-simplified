@@ -255,6 +255,10 @@ async function handleTimeoutButtonClick() {
  * Show timeout popup and navigate to lineup screen
  */
 async function showTimeoutPopup(timeoutResult, gameId, scene) {
+    // ✅ SS&S: Use unified Timeout Navigation Helper for consistent parameter building
+    // Import helper (ES6 module)
+    const { buildGameNavigationParams } = await import('/static/js/shared/timeoutNavigationHelper.js');
+    
     // Get team info from scene - try multiple sources
     const homeTeam = scene.simData?.home_team?.name || 
                      scene.simData?.home_team_id || 
@@ -281,35 +285,47 @@ async function showTimeoutPopup(timeoutResult, gameId, scene) {
     const tournamentId = urlParams.get('tournament_id');
     const modeParam = urlParams.get('mode') || 'single';
     
-    // Build URL for lineup screen
-    const params = new URLSearchParams();
-    params.set('game_id', gameId);
-    params.set('home', homeTeam || homeTeamFallback || '');
-    params.set('away', awayTeam || awayTeamFallback || '');
-    if (homeId) params.set('home_id', homeId);
-    if (awayId) params.set('away_id', awayId);
-    params.set('my_team', myTeamSide || myTeamSideFallback || 'home');
-    if (userTeamIdParam) params.set('user_team_id', userTeamIdParam);
-    if (franchiseId) params.set('franchise_id', franchiseId);
-    if (weekParam) params.set('week', weekParam);
-    if (tournamentId) params.set('tournament_id', tournamentId);
-    if (modeParam) params.set('mode', modeParam);
-    params.set('resume_from_timeout', 'true');
-    params.set('quarter', scene.simData?.quarter || scene.quarter || 1);
-    params.set('period', scene.simData?.period_label || scene.periodLabel || 'Q1');
+    const currentQuarter = scene.simData?.quarter || scene.quarter || 1;
+    
+    // Build lineup object from scene
+    const homeLineup = scene.homeLineup || {};
+    const awayLineup = scene.awayLineup || {};
+    const lineup = myTeamSide === 'home' ? homeLineup : awayLineup;
+    
+    // ✅ SS&S: Use unified helper to build params
+    const params = buildGameNavigationParams({
+        sourceParams: urlParams,
+        targetQuarter: currentQuarter,
+        gameId: gameId,
+        resumeFromTimeout: true, // ✅ TIMEOUT: Always resuming from timeout (any quarter)
+        lineup: lineup,
+        myTeamSide: myTeamSide || myTeamSideFallback || 'home',
+        overrides: {
+            home: homeTeam || homeTeamFallback || '',
+            away: awayTeam || awayTeamFallback || '',
+            home_id: homeId,
+            away_id: awayId,
+            my_team: myTeamSide || myTeamSideFallback || 'home',
+            user_team_id: userTeamIdParam,
+            franchise_id: franchiseId,
+            week: weekParam,
+            tournament_id: tournamentId,
+            mode: modeParam
+        }
+    });
     
     try {
-        // ✅ TIMEOUT: Get current lineup from scene (same as quarter breaks)
-        // The scene stores the current lineup in homeLineup and awayLineup
+        // ✅ TIMEOUT: Lineup is already included in params via helper
+        // But we need to add the OTHER team's lineup (helper only adds user's team)
         const homeLineup = scene.homeLineup || {};
         const awayLineup = scene.awayLineup || {};
         
-        // Pass lineup params to preserve current lineup (same pattern as quarter breaks)
+        // Add the other team's lineup params (helper only adds user's team)
+        const otherTeamSide = myTeamSide === 'home' ? 'away' : 'home';
+        const otherLineup = myTeamSide === 'home' ? awayLineup : homeLineup;
         ['PG', 'SG', 'SF', 'PF', 'C'].forEach(pos => {
-            const homePlayerId = homeLineup[pos];
-            const awayPlayerId = awayLineup[pos];
-            if (homePlayerId) params.set(`home_${pos.toLowerCase()}`, homePlayerId);
-            if (awayPlayerId) params.set(`away_${pos.toLowerCase()}`, awayPlayerId);
+            const playerId = otherLineup[pos];
+            if (playerId) params.set(`${otherTeamSide}_${pos.toLowerCase()}`, playerId);
         });
         
         // ✅ TIMEOUT: Fetch current game plan settings (same as quarter breaks)
