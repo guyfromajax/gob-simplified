@@ -1629,9 +1629,10 @@ def simulate_turn_endpoint(request: TurnSimulationRequest):
             logging.info(f"✅ Advanced to quarter {gm.quarter}")
         
         # Check if game is final (Q4+ complete and not tied)
+        # Q4 ends game if not tied, OT ends game if not tied
         is_final = (
             quarter_complete 
-            and gm.quarter > 4 
+            and gm.quarter >= 4  # ✅ FIX: Include Q4, not just OT (gm.quarter > 4)
             and gm.score.get(gm.home_team.name, 0) != gm.score.get(gm.away_team.name, 0)
         )
         
