@@ -1814,9 +1814,12 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
     if (scene._leanScoreToAnimate !== null && 
         scene._leanAnimationStep === stepIndex && 
         !scene._leanAnimationTriggered) {
+      console.log(`📊 [LEAN] Triggering animation at step ${stepIndex} with score ${scene._leanScoreToAnimate}`);
       const { animateLeanMeter } = await import('../ui/playcallCenter.js');
       animateLeanMeter(scene._leanScoreToAnimate);
       scene._leanAnimationTriggered = true;
+    } else if (scene._leanScoreToAnimate !== null && stepIndex === scene._leanAnimationStep) {
+      console.log(`⚠️ [LEAN] Animation already triggered or step mismatch: stepIndex=${stepIndex}, targetStep=${scene._leanAnimationStep}, triggered=${scene._leanAnimationTriggered}`);
     }
 
     // ✅ FIX: Skip updateBallOwnership if a pass is happening at this step OR

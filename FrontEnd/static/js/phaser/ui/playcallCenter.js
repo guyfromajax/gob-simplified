@@ -101,6 +101,7 @@ export function resetLeanMeter() {
  * @param {number} leanScore - Score from -1.0 to 1.0
  */
 export function animateLeanMeter(leanScore) {
+  console.log(`📊 [LEAN METER] animateLeanMeter called with score: ${leanScore}`);
 
   if (leanScore == null || isNaN(leanScore)) {
     console.warn('⚠️ Invalid lean score, keeping meter neutral');
@@ -146,16 +147,21 @@ export function animateLeanMeter(leanScore) {
  * @returns {number|null} - Lean score or null if not found
  */
 export function parseLeanScoreFromText(turnData) {
-  if (!turnData || !turnData.text) return null;
+  if (!turnData || !turnData.text) {
+    console.log('🔍 [LEAN] No turnData or text field');
+    return null;
+  }
 
   const text = turnData.text;
   const leanMatch = text.match(/lean:([-+]?\d+\.?\d*)/);
   
   if (leanMatch && leanMatch[1]) {
     const leanScore = parseFloat(leanMatch[1]);
+    console.log(`✅ [LEAN] Parsed lean score: ${leanScore} from text: "${text.substring(0, 100)}"`);
     return leanScore;
   }
 
+  console.log(`⚠️ [LEAN] No lean score found in text: "${text.substring(0, 100)}"`);
   return null;
 }
 
