@@ -1587,7 +1587,9 @@ The timeout system allows game pauses for strategic adjustments, lineup changes,
    - Player fouls out during shot resolution
    - `result["fouled_out"] = True` set in `shot_manager.py`
    - `game_manager.simulate_macro_turn()` detects `fouled_out` flag
+   - **Captures `timeout_offense_team_id`** before creating timeout turn (`BackEnd/models/game_manager.py` line 260)
    - Creates `TIMEOUT` turn with `timeout_reason="FOUL_OUT"`
+   - Frontend navigates with `resume_from_timeout=true` flag (`FrontEnd/static/js/phaser/utils/foulOutPopup.js`)
 
 **Timeout Turn Payload:**
 
@@ -1653,32 +1655,42 @@ if (turn.result_type === "TIMEOUT") {
 
 ### Game Start and Resume Transitions
 
-The system handles different transition types based on game state:
+The system handles different transition types based on game state. All navigation uses the unified Timeout Navigation Helper for consistent parameter building.
 
 #### 1. **Game Start (Q1) and Overtime**
 - **Initial Turn:** Opening Tip
 - **Location:** `BackEnd/main.py` `simulate_quarter()` (lines 392-401)
 - **Logic:** Q1 or any OT period → creates opening tip turn
 - **Data:** No special state needed (new game)
+- **Navigation:** Helper does NOT pass `game_id` for new Q1 game start
+- **Frontend:** `set-lineup.js` "Play Now" button, `game-plan.js` "Play Game" button
 
 #### 2. **Quarter Break Returns (Q2, Q3, Q4)**
 - **Initial Turn:** BASELINE_INBOUND (BIP)
 - **Location:** `BackEnd/main.py` `simulate_quarter()` (lines 402-443, 444-468, 469-493)
 - **Logic:** Quarter break → creates BIP turn with correct possession team
 - **Data:** Uses `opening_tip_winner` from game_state to determine possession
+- **Navigation:** Helper passes `game_id` (quarter > 1), does NOT set `resume_from_timeout`
+- **Frontend:** `gameScene.js` quarter end navigation, `set-lineup.js` "Play Now" button
 - **Note:** Not part of timeout system - handled separately
 
-#### 3. **Timeout Returns**
+#### 3. **Timeout Returns (Any Quarter)**
 - **Initial Turn:** SIDE_INBOUND (SIP)
 - **Location:** `BackEnd/main.py` `simulate_quarter()` (lines 281-332)
 - **Logic:** Timeout resume → creates SIP turn with team that had possession
 - **Data:** Restores `timeout_next_play_type` and `timeout_offense_team_id` from database
+- **Navigation:** Helper passes `game_id` AND sets `resume_from_timeout=true` (any quarter)
+- **Frontend:** `timeoutButtonManager.js` timeout button, `set-lineup.js` "Play Now" button, `game-plan.js` "Play Game" button
+- **Note:** Supports Q1-Q4 and OT (removed Q1-only restriction)
 
-#### 4. **Player Foul Out Returns**
+#### 4. **Player Foul Out Returns (Any Quarter)**
 - **Initial Turn:** SIDE_INBOUND (SIP)
 - **Location:** Same as timeout returns (uses timeout system)
 - **Logic:** Foul out resume → creates SIP turn (same pattern as timeout)
-- **Data:** Uses same timeout resume system
+- **Data:** Uses same timeout resume system, captures `timeout_offense_team_id` in `game_manager.py`
+- **Navigation:** Helper passes `game_id` AND sets `resume_from_timeout=true` (any quarter)
+- **Frontend:** `foulOutPopup.js` navigation to lineup
+- **Note:** Supports Q1-Q4 and OT (uses same system as timeout)
 
 ### Data Management: Database, LocalStorage, and URL
 
@@ -1719,28 +1731,64 @@ games_collection.update_one(
 
 **Purpose:** URL parameters are used for navigation/routing, not business logic. Database is the source of truth.
 
-**Timeout Flow:**
-1. **Timeout Called:** Frontend navigates to lineup screen with `resume_from_timeout=true` in URL
-2. **Lineup Screen:** Carries forward `resume_from_timeout=true` in URL
-3. **Game Plan Screen:** Carries forward `resume_from_timeout=true` in URL
-4. **Court Return:** Carries forward `resume_from_timeout=true` in URL
+**Unified Navigation Helper System (SS&S - December 2025):**
+
+All frontend navigation now uses a unified helper (`FrontEnd/static/js/shared/timeoutNavigationHelper.js`) for consistent parameter building across all entry points.
+
+**Helper Functions:**
+- `buildGameNavigationParams()`: Builds URL parameters with consistent SS&S logic
+- `getResumeFromTimeout()`: Extracts `resume_from_timeout` from URL params
+- `getGameId()`: Gets game ID from URL or localStorage
+
+**Navigation Entry Points Using Helper:**
+- `set-lineup.js`: "Play Now" button, "Game Plan" button
+- `game-plan.js`: `navigateToCourt()`, `navigateBack()`
+- `timeoutButtonManager.js`: `showTimeoutPopup()` (timeout button navigation)
+- `foulOutPopup.js`: Foul out navigation to lineup
+- `gameScene.js`: Quarter end navigation
+
+**Helper Logic (SS&S Rules):**
+
+1. **Game ID Logic:**
+   - Pass `game_id` if: `quarter > 1` OR `resumeFromTimeout === true`
+   - NOT for new Q1 game start
+
+2. **Resume From Timeout Logic:**
+   - Set `resume_from_timeout=true` if: `resumeFromTimeout === true` AND `gameId` exists
+   - NOT for quarter breaks (Q2-Q4 without timeout)
+   - NOT for new game start
+   - **Supports any quarter** (Q1-Q4, OT) - removed Q1-only restriction
+
+3. **Quarter/Period Logic:**
+   - Always sets `quarter` and `period` (Q1-Q4 or OT1+)
+   - Automatically calculates period label
+
+4. **Parameter Preservation:**
+   - Preserves all team info, mode, tournament/franchise IDs
+   - Preserves lineup, clock, special params
+   - Preserves debug flags
 
 **URL Parameters Used:**
 - `resume_from_timeout=true`: Navigation flag (convenience, not source of truth)
 - `game_id`: Game identifier
 - `quarter`: Quarter number
+- `period`: Period label (Q1-Q4 or OT1+)
 - `mode`: Game mode (single/tournament/franchise)
+- `tournament_id`: Tournament identifier (if applicable)
+- `franchise_id`: Franchise identifier (if applicable)
+- `week`: Week number (franchise mode)
 - Lineup parameters: `home_pg`, `home_sg`, etc.
+- `clock`: Clock time (preserved for foul out/timeout)
 
 **Frontend Resilience:**
 - Frontend checks database as fallback if URL parameter is missing (`bootGame.js` lines 825-841)
 - This provides resilience if URL parameter is lost during navigation
+- Helper ensures consistent parameter building even if some params are missing
 
-**Critical Frontend Pattern (game-plan.js):**
-- `navigateToCourt()` reads ALL URL params directly from `window.location.search` when called
+**Critical Frontend Pattern:**
+- All navigation functions read URL params directly from `window.location.search` when called
 - Does NOT rely on module-level variables that might be stale (especially after async delays)
-- This ensures `game_id` and `resume_from_timeout` are always current when navigating to court
-- Same pattern as working lineup path (`set-lineup.js`) - direct reads from URL
+- Helper ensures `game_id` and `resume_from_timeout` are always current when navigating
 - Prevents params from being lost during navigation chain: lineup → game-plan → court
 
 #### LocalStorage (Frontend State Only)
