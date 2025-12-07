@@ -2590,22 +2590,60 @@
           const defenseType = btn.dataset.defense; // 'Man' or 'Zone'
           const aggression = btn.dataset.aggression; // 'Passive', 'Normal', or 'Aggressive'
           
-          if (defenseType) {
-            // Defense type clicked - deselect other types
+          // ✅ SS&S: Set both defense type and aggression in a single API call if both are present
+          // This prevents race conditions and ensures both are set together
+          if (defenseType && aggression) {
+            // Button has both - set both at once
+            document.querySelectorAll('.defense-override-btn[data-defense]').forEach(b => {
+              b.classList.remove('selected');
+            });
+            document.querySelectorAll('.defense-override-btn[data-aggression]').forEach(b => {
+              b.classList.remove('selected');
+            });
+            btn.classList.add('selected');
+            
+            const normalizedAggression = aggression.toLowerCase();
+            // Set both in one API call
+            const payload = {
+              game_id: gameId,
+              user_team_side: userTeamSide,
+              offense_override: null,
+              defense_override: defenseType,
+              aggression_override: normalizedAggression,
+              tempo_override: null
+            };
+            
+            try {
+              const response = await fetch('/api/set-playcall-override', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+              });
+              
+              if (!response.ok) {
+                const errorData = await response.json();
+                console.error('❌ [PLAYCALL OVERRIDE] Failed to set defense/aggression override:', errorData);
+                return;
+              }
+              
+              const result = await response.json();
+              console.log(`✅ [PLAYCALL OVERRIDE] Set defense override: ${defenseType}, aggression: ${normalizedAggression}`, result);
+            } catch (error) {
+              console.error('❌ [PLAYCALL OVERRIDE] Error setting defense/aggression override:', error);
+            }
+          } else if (defenseType) {
+            // Defense type only
             document.querySelectorAll('.defense-override-btn[data-defense]').forEach(b => {
               b.classList.remove('selected');
             });
             btn.classList.add('selected');
             await setPlaycallOverride('defense', defenseType);
-          }
-          
-          if (aggression) {
-            // Aggression clicked - deselect other aggression levels
+          } else if (aggression) {
+            // Aggression only
             document.querySelectorAll('.defense-override-btn[data-aggression]').forEach(b => {
               b.classList.remove('selected');
             });
             btn.classList.add('selected');
-            // Normalize aggression value (Passive -> passive, etc.)
             const normalizedAggression = aggression.toLowerCase();
             await setPlaycallOverride('aggression', normalizedAggression);
           }

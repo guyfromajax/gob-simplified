@@ -1720,14 +1720,15 @@ def set_playcall_override_endpoint(request: PlaycallOverrideRequest):
     # Determine user team
     user_team = gm.home_team if request.user_team_side == "home" else gm.away_team
     
-    # Update overrides (None clears the override)
+    # ✅ SS&S: Update calls (None clears the call)
+    # offense_call and defense_call persist until used, then are cleared automatically
     if request.offense_override is not None:
-        user_team.strategy_calls["offense_override"] = request.offense_override
-        logging.info(f"🎮 [PLAYCALL OVERRIDE] Set offense override for {user_team.name}: {request.offense_override}")
+        user_team.strategy_calls["offense_call"] = request.offense_override
+        logging.info(f"🎮 [PLAYCALL] Set offense call for {user_team.name}: {request.offense_override}")
     
     if request.defense_override is not None:
-        user_team.strategy_calls["defense_override"] = request.defense_override
-        logging.info(f"🎮 [PLAYCALL OVERRIDE] Set defense override for {user_team.name}: {request.defense_override}")
+        user_team.strategy_calls["defense_call"] = request.defense_override
+        logging.info(f"🎮 [PLAYCALL] Set defense call for {user_team.name}: {request.defense_override}")
     
     if request.aggression_override is not None:
         user_team.strategy_calls["aggression_override"] = request.aggression_override
@@ -1740,8 +1741,8 @@ def set_playcall_override_endpoint(request: PlaycallOverrideRequest):
     return {
         "status": "success",
         "overrides": {
-            "offense": user_team.strategy_calls.get("offense_override"),
-            "defense": user_team.strategy_calls.get("defense_override"),
+            "offense": user_team.strategy_calls.get("offense_call"),
+            "defense": user_team.strategy_calls.get("defense_call"),
             "aggression": user_team.strategy_calls.get("aggression_override"),
             "tempo": user_team.strategy_calls.get("tempo_override")
         }

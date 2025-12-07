@@ -752,28 +752,36 @@ class TurnManager:
         User overrides take precedence for turn-by-turn gameplay.
         """
         
-        # ✅ SS&S: Check for persistent overrides in team.strategy_calls (replaces game_state overrides)
-        # Check if offense team is user team and has override
-        offense_override = None
+        # ✅ SS&S: Check for user-set calls in team.strategy_calls
+        # If offense_call is not None, use it and clear after use
+        # If None, use normal selection process
+        offense_call = None
         if self.game.offense_team.is_user_team:
-            offense_override = self.game.offense_team.strategy_calls.get("offense_override")
+            offense_call = self.game.offense_team.strategy_calls.get("offense_call")
+            if offense_call:
+                logging.info(f"🎮 [PLAYCALL] Found user offense call for {self.game.offense_team.name}: {offense_call}")
         
-        # Check if defense team is user team and has override
-        defense_override = None
+        # Check if defense team is user team and has defense_call set
+        defense_call = None
         if self.game.defense_team.is_user_team:
-            defense_override = self.game.defense_team.strategy_calls.get("defense_override")
+            defense_call = self.game.defense_team.strategy_calls.get("defense_call")
+            if defense_call:
+                logging.info(f"🎮 [PLAYCALL] Found user defense call for {self.game.defense_team.name}: {defense_call}")
         
         # Legacy support: Also check game_state for backward compatibility (will be removed)
-        user_offense = self.game.game_state.get("user_offense_override") or offense_override
-        user_defense = self.game.game_state.get("user_defense_override") or defense_override
+        user_offense = self.game.game_state.get("user_offense_override") or offense_call
+        user_defense = self.game.game_state.get("user_defense_override") or defense_call
         
-        # If user provided an offense override, use the specific play name
+        # If user provided an offense call, use the specific play name
         if user_offense:
-            self.game.game_state["user_offense_override"] = None  # Clear after use
+            # ✅ SS&S: Clear offense_call from strategy_calls after use (prevents carryover to next turn)
+            if self.game.offense_team.is_user_team:
+                self.game.offense_team.strategy_calls["offense_call"] = None
+            self.game.game_state["user_offense_override"] = None  # Legacy clear
             
             # User now provides specific play name (e.g., "3-2 Motion", "Base Post Play")
             chosen_playcall = user_offense
-            logging.info(f"🎮 User offense override (play): {chosen_playcall}")
+            logging.info(f"🎮 [PLAYCALL OVERRIDE] Using offense override: {chosen_playcall}")
             
             # Lookup play details from database to get play_type and play_focus
             play_doc = plays_collection.find_one({"name": chosen_playcall})
@@ -781,25 +789,32 @@ class TurnManager:
             if play_doc:
                 chosen_play_type = play_doc.get("play_type", "motion")
                 user_focus = play_doc.get("play_focus", "inside")
-                # ✅ COMMENTED OUT: User override logs (cluttering transition debugging)
-            # logging.info(f"🎯 User override play details: {chosen_playcall} (type={chosen_play_type}, focus={user_focus})")
             else:
                 # Fallback if play not found
-                # logging.warning(f"⚠️ Play '{chosen_playcall}' not found in database, using fallback")
+                logging.warning(f"⚠️ [PLAYCALL OVERRIDE] Play '{chosen_playcall}' not found in database, using fallback")
                 chosen_play_type = "motion"
                 user_focus = "inside"
             
             # Still need to choose defense normally
             if user_defense:
                 chosen_defense = user_defense
-                self.game.game_state["user_defense_override"] = None  # Clear after use
-                # ✅ COMMENTED OUT: User defense override logs (cluttering transition debugging)
-                # logging.info(f"🎮 Using user defense override: {chosen_defense}")
+                # ✅ SS&S: Clear defense_call from strategy_calls after use (prevents carryover to next turn)
+                if self.game.defense_team.is_user_team:
+                    self.game.defense_team.strategy_calls["defense_call"] = None
+                self.game.game_state["user_defense_override"] = None  # Legacy clear
+                logging.info(f"🎮 [PLAYCALL] Using user defense call: {chosen_defense}")
+                
+                # ✅ FIX: If user selected "Zone", convert to a random specific zone type
+                # (Backend expects specific zone types: "2-3 Zone", "3-2 Zone", "1-3-1 Zone")
+                if chosen_defense == "Zone":
+                    chosen_defense = random.choice(["2-3 Zone", "3-2 Zone", "1-3-1 Zone"])
+                    logging.info(f"🎮 [PLAYCALL OVERRIDE] Converted 'Zone' to specific zone type: {chosen_defense}")
             else:
+                # No user defense override - choose defense normally
                 defense_setting = self.game.defense_team.strategy_settings.get("defense", 2)
                 chosen_defense = random.choice(STRATEGY_CALL_DICTS["defense"][defense_setting])
                 
-                # If "Zone" is selected, randomly choose between 2-3 Zone, 3-2 Zone, and 1-3-1 Zone (1/3 each)
+                # Convert "Zone" to specific zone types for normal selection
                 if chosen_defense == "Zone":
                     chosen_defense = random.choice(["2-3 Zone", "3-2 Zone", "1-3-1 Zone"])
             
@@ -814,14 +829,14 @@ class TurnManager:
                 "defense_focus": None
             }
         
-        # If only defense override (user on offense, setting defense for next possession)
+        # If only defense call (user on offense, setting defense for next possession)
         if user_defense:
             chosen_defense = user_defense
-            # Clear override after use
+            # ✅ SS&S: Clear defense_call after use (prevents carryover to next turn)
             if self.game.defense_team.is_user_team:
-                self.game.defense_team.strategy_calls["defense_override"] = None
+                self.game.defense_team.strategy_calls["defense_call"] = None
             self.game.game_state["user_defense_override"] = None  # Legacy
-            logging.info(f"🎮 [PLAYCALL OVERRIDE] Using defense override: {chosen_defense}")
+            logging.info(f"🎮 [PLAYCALL] Using user defense call: {chosen_defense}")
         else:
             # No override, choose defense normally (will be set below)
             chosen_defense = None
@@ -881,21 +896,27 @@ class TurnManager:
         # Defense setting - use override if set, otherwise choose normally
         # NOTE: This must happen BEFORE offense attempt tracking so we know the correct defense
         if chosen_defense is None:  # Not set by user override above
-            # ✅ SS&S: Check for defense override in team.strategy_calls
+            # ✅ SS&S: Check for defense_call in team.strategy_calls
             if self.game.defense_team.is_user_team:
-                defense_override = self.game.defense_team.strategy_calls.get("defense_override")
-                if defense_override:
-                    chosen_defense = defense_override
-                    # Clear override after use
-                    self.game.defense_team.strategy_calls["defense_override"] = None
-                    logging.info(f"🎮 [PLAYCALL OVERRIDE] Using defense override: {chosen_defense}")
+                defense_call = self.game.defense_team.strategy_calls.get("defense_call")
+                if defense_call:
+                    chosen_defense = defense_call
+                    # ✅ SS&S: Clear defense_call after use (prevents carryover to next turn)
+                    self.game.defense_team.strategy_calls["defense_call"] = None
+                    logging.info(f"🎮 [PLAYCALL] Using user defense call: {chosen_defense}")
+                    
+                    # ✅ FIX: If user selected "Zone", convert to a random specific zone type
+                    # (Backend expects specific zone types: "2-3 Zone", "3-2 Zone", "1-3-1 Zone")
+                    if chosen_defense == "Zone":
+                        chosen_defense = random.choice(["2-3 Zone", "3-2 Zone", "1-3-1 Zone"])
+                        logging.info(f"🎮 [PLAYCALL] Converted 'Zone' to specific zone type: {chosen_defense}")
             
             # If still no override, use normal process
             if chosen_defense is None:
                 defense_setting = self.game.defense_team.strategy_settings.get("defense", 2)
                 chosen_defense = random.choice(STRATEGY_CALL_DICTS["defense"][defense_setting])
                 
-                # If "Zone" is selected, randomly choose between 2-3 Zone, 3-2 Zone, and 1-3-1 Zone (1/3 each)
+                # Convert "Zone" to specific zone types for normal selection
                 if chosen_defense == "Zone":
                     chosen_defense = random.choice(["2-3 Zone", "3-2 Zone", "1-3-1 Zone"])
         
@@ -998,8 +1019,8 @@ class TurnManager:
         # Only initialize if completely missing (shouldn't happen, but defensive check)
         if not hasattr(self.game.offense_team, 'strategy_calls') or self.game.offense_team.strategy_calls is None:
             self.game.offense_team.strategy_calls = {
-                "offense_override": None,
-                "defense_override": None,
+                "offense_call": None,
+                "defense_call": None,
                 "aggression_override": None,
                 "tempo_override": None,
                 "press_override": None,
@@ -1007,8 +1028,8 @@ class TurnManager:
             }
         if not hasattr(self.game.defense_team, 'strategy_calls') or self.game.defense_team.strategy_calls is None:
             self.game.defense_team.strategy_calls = {
-                "offense_override": None,
-                "defense_override": None,
+                "offense_call": None,
+                "defense_call": None,
                 "aggression_override": None,
                 "tempo_override": None,
                 "press_override": None,

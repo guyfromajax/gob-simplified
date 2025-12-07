@@ -6,6 +6,20 @@
  */
 
 /**
+ * Clear playcall center highlights (selected buttons)
+ * Called when a play is used or override is cleared
+ */
+export function clearPlaycallHighlights() {
+  // Clear offense play highlights
+  const playOptions = document.querySelectorAll('.play-option');
+  playOptions.forEach(opt => opt.classList.remove('selected'));
+  
+  // Clear defense highlights
+  const defenseButtons = document.querySelectorAll('.defense-override-btn');
+  defenseButtons.forEach(btn => btn.classList.remove('selected'));
+}
+
+/**
  * Update playcall center at the start of each turn
  * @param {Object} turnData - Turn data from backend containing playcalls
  * @param {string} homeTeamId - Home team ID for determining sides
@@ -21,6 +35,41 @@ export function updatePlaycallCenter(turnData, homeTeamId) {
   if (!playcallCenter) {
     console.warn('⚠️ Playcall Center not found');
     return;
+  }
+
+  // ✅ SS&S: Clear highlights if this turn used a user override
+  // Check if the turn's playcall matches a selected playcall button
+  const offensivePlaycall = turnData.offensive_playcall || turnData.current_playcall;
+  const defensivePlaycall = turnData.defensive_playcall || turnData.defense_playcall;
+  
+  // Get user team side from URL params
+  const urlParams = new URLSearchParams(window.location.search);
+  const userTeamSide = urlParams.get('my_team'); // "home" or "away"
+  const isUserTeamOnOffense = (userTeamSide === 'home' && isHomeOffense) || 
+                               (userTeamSide === 'away' && !isHomeOffense);
+  const isUserTeamOnDefense = (userTeamSide === 'home' && !isHomeOffense) || 
+                               (userTeamSide === 'away' && isHomeOffense);
+  
+  // Check if offense playcall matches a selected button
+  if (isUserTeamOnOffense && offensivePlaycall) {
+    const selectedOffenseBtn = document.querySelector(`.play-option.selected[data-play="${offensivePlaycall}"]`);
+    if (selectedOffenseBtn) {
+      // This play was selected and is now being used - clear the highlight
+      selectedOffenseBtn.classList.remove('selected');
+      console.log(`✅ [PLAYCALL OVERRIDE] Cleared offense highlight for used play: ${offensivePlaycall}`);
+    }
+  }
+  
+  // Check if defense playcall matches a selected button
+  if (isUserTeamOnDefense && defensivePlaycall) {
+    // Check for specific zone types (2-3 Zone, 3-2 Zone, 1-3-1 Zone) or generic "Zone"
+    const defenseType = defensivePlaycall.includes('Zone') ? 'Zone' : defensivePlaycall;
+    const selectedDefenseBtn = document.querySelector(`.defense-override-btn.selected[data-defense="${defenseType}"]`);
+    if (selectedDefenseBtn) {
+      // This defense was selected and is now being used - clear the highlight
+      selectedDefenseBtn.classList.remove('selected');
+      console.log(`✅ [PLAYCALL OVERRIDE] Cleared defense highlight for used defense: ${defensivePlaycall}`);
+    }
   }
 
   // Panel flipping removed - offense always left, defense always right

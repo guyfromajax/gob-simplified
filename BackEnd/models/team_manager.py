@@ -47,12 +47,12 @@ class TeamManager:
                 logging.warning(f"⚠️ [STRATEGY SETTINGS] {self.name} - strategy_settings provided but invalid (type={type(strategy_settings)}, len={len(strategy_settings) if isinstance(strategy_settings, dict) else 'N/A'}), using defaults")
             self.strategy_settings = self._init_strategy_settings()
         
-        # ✅ SS&S: Initialize strategy_calls with override fields (None = not set, value = override active)
+        # ✅ SS&S: Initialize strategy_calls with call fields (None = use normal selection, value = use this call and clear after)
         self.strategy_calls = {
-            "offense_override": None,      # Play name string or None
-            "defense_override": None,      # "Man", "Zone", or None
-            "aggression_override": None,   # "normal", "aggressive", "passive", or None
-            "tempo_override": None,        # "slow", "normal", "fast", or None
+            "offense_call": None,          # Play name string or None (user override persists until used)
+            "defense_call": None,          # "Man", "Zone", or None (user override persists until used)
+            "aggression_override": None,   # "normal", "aggressive", "passive", or None (temporary override)
+            "tempo_override": None,        # "slow", "normal", "fast", or None (temporary override)
             "press_override": None,        # Future: FCP override
             "trap_override": None,         # Future: HCT override
         }
