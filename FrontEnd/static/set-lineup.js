@@ -900,36 +900,24 @@ async function init() {
   const boxBtn = document.getElementById('box-score-button');
   if (boxBtn) {
     boxBtn.addEventListener('click', () => {
-      const currentGameId =
-        urlParams.get('game_id') ||
-        (typeof localStorage !== 'undefined' ? localStorage.getItem('game_id') : null);
-
-      const params = new URLSearchParams();
-
-      // Always pass game context so Box Score can route back to lineup if needed
-      if (homeTeam) params.set('home', homeTeam);
-      if (awayTeam) params.set('away', awayTeam);
-      if (homeId) params.set('home_id', homeId);
-      if (awayId) params.set('away_id', awayId);
-      if (myTeamSide) params.set('my_team', myTeamSide);
-      if (userTeamIdParam) params.set('user_team_id', userTeamIdParam);
-      if (franchiseId) params.set('franchise_id', franchiseId);
-      if (weekParam) params.set('week', weekParam);
-      if (tournamentId) params.set('tournament_id', tournamentId);
-      if (modeParam) params.set('mode', modeParam);
-      params.set('quarter', String(quarter));
-      params.set('period', periodLabel);
-
-      // Carry forward inbound/possession flags if present
-      const startWithInbound = urlParams.get('start_with_inbound');
-      const startingPossession = urlParams.get('starting_possession');
-      if (startWithInbound) params.set('start_with_inbound', startWithInbound);
-      if (startingPossession) params.set('starting_possession', startingPossession);
+      // ✅ SS&S: Use unified Timeout Navigation Helper for consistent parameter building
+      const helper = window.TimeoutNavigationHelper;
+      if (!helper) {
+        console.error('❌ [SET-LINEUP] TimeoutNavigationHelper not loaded!');
+        return;
+      }
       
-      // Pass lineup params to preserve lineup when navigating back
-      ['PG','SG','SF','PF','C'].forEach(pos => {
-        const id = lineup[pos];
-        if (id) params.set(`${myTeamSide}_${pos.toLowerCase()}`, id);
+      const currentGameId = helper.getGameId(urlParams);
+      const resumeFromTimeout = helper.getResumeFromTimeout(urlParams);
+      
+      // Build params using helper (preserves resume_from_timeout and all timeout state)
+      const params = helper.buildGameNavigationParams({
+        sourceParams: urlParams,
+        targetQuarter: quarter,
+        gameId: currentGameId,
+        resumeFromTimeout: resumeFromTimeout, // ✅ SS&S: Preserves timeout state
+        lineup: lineup,
+        myTeamSide: myTeamSide
       });
 
       // If we have an active game, include it so Box Score shows live stats
@@ -940,7 +928,7 @@ async function init() {
         params.set('pregame', '1');
       }
 
-      // Mark that navigation originated from lineup so Box Score can \"Back\" here
+      // Mark that navigation originated from lineup so Box Score can "Back" here
       params.set('from', 'lineup');
 
       window.location.href = `/static/box-score.html?${params.toString()}`;

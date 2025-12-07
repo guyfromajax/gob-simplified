@@ -1020,8 +1020,9 @@ function setupLockerRoomButton() {
   const startWithInbound = urlParams.get('start_with_inbound');
   const startingPossession = urlParams.get('starting_possession');
   
-  // If we came from the lineup screen, show a Back button that returns to lineup
-  if (from === 'lineup') {
+  // ✅ SS&S: Handle back navigation from lineup or game-plan screens
+  // Both use TimeoutNavigationHelper to preserve timeout state
+  if (from === 'lineup' || from === 'game-plan') {
     button.textContent = 'Back';
     
     // Remove any existing event listeners by cloning the button
@@ -1029,30 +1030,18 @@ function setupLockerRoomButton() {
     button.parentNode.replaceChild(newButton, button);
     const backButton = newButton;
     
-    const params = new URLSearchParams();
-    if (home) params.set('home', home);
-    if (away) params.set('away', away);
-    if (homeId) params.set('home_id', homeId);
-    if (awayId) params.set('away_id', awayId);
-    if (myTeam) params.set('my_team', myTeam);
-    if (userTeamId) params.set('user_team_id', userTeamId);
-    if (franchiseId) params.set('franchise_id', franchiseId);
-    if (week) params.set('week', week);
-    if (tournamentId) params.set('tournament_id', tournamentId);
-    if (mode) params.set('mode', mode);
-    if (quarter) params.set('quarter', quarter);
-    if (period) params.set('period', period);
-    if (startWithInbound) params.set('start_with_inbound', startWithInbound);
-    if (startingPossession) params.set('starting_possession', startingPossession);
-    
-    // Include game_id if available (from URL or localStorage) to preserve in-game state
-    const gameId = urlParams.get('game_id') || 
-                   (typeof localStorage !== 'undefined' ? localStorage.getItem('game_id') : null);
-    if (gameId) {
-      params.set('game_id', gameId);
+    // ✅ SS&S: Use unified Timeout Navigation Helper for consistent parameter building
+    const helper = window.TimeoutNavigationHelper;
+    if (!helper) {
+      console.error('❌ [BOX-SCORE] TimeoutNavigationHelper not loaded!');
+      return;
     }
     
-    // Preserve lineup params if present in URL (from set-lineup screen)
+    const currentGameId = helper.getGameId(urlParams);
+    const resumeFromTimeout = helper.getResumeFromTimeout(urlParams);
+    
+    // Build lineup object from URL params
+    const lineup = {};
     const myTeamParam = urlParams.get('my_team');
     if (myTeamParam) {
       const positions = ['pg', 'sg', 'sf', 'pf', 'c'];
@@ -1060,15 +1049,37 @@ function setupLockerRoomButton() {
         const paramKey = `${myTeamParam}_${pos}`;
         const playerId = urlParams.get(paramKey);
         if (playerId) {
-          params.set(paramKey, playerId);
+          // Convert lowercase pos to uppercase for lineup object
+          lineup[pos.toUpperCase()] = playerId;
         }
       });
+    }
+    
+    // Build params using helper (preserves resume_from_timeout and all timeout state)
+    const params = helper.buildGameNavigationParams({
+      sourceParams: urlParams,
+      targetQuarter: parseInt(quarter, 10) || 1,
+      gameId: currentGameId,
+      resumeFromTimeout: resumeFromTimeout, // ✅ SS&S: Preserves timeout state
+      lineup: lineup,
+      myTeamSide: myTeam
+    });
+
+    // Determine back navigation target based on "from" parameter
+    let backUrl;
+    if (from === 'lineup') {
+      backUrl = `/static/set-lineup.html?${params.toString()}`;
+    } else if (from === 'game-plan') {
+      backUrl = `/game-plan.html?${params.toString()}`;
+    } else {
+      // Fallback to lineup
+      backUrl = `/static/set-lineup.html?${params.toString()}`;
     }
 
     backButton.addEventListener('click', (e) => {
       e.preventDefault();
       e.stopPropagation();
-      window.location.href = `/static/set-lineup.html?${params.toString()}`;
+      window.location.href = backUrl;
     });
     return;
   }
