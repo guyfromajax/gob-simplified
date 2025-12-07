@@ -1811,17 +1811,44 @@ All frontend navigation now uses a unified helper (`FrontEnd/static/js/shared/ti
 ### Resume Flow
 
 1. **User navigates to lineup screen** (with `resume_from_timeout=true` URL parameter)
+   - Navigation uses unified helper (`timeoutNavigationHelper.js`)
+   - Helper ensures `game_id` and `resume_from_timeout` are passed correctly
+   - Works from any entry point (timeout button, foul out popup)
+
 2. **User makes lineup/game plan changes** (or keeps current settings)
+   - Can navigate between Lineup and Game Plan screens
+   - Helper preserves all parameters during back navigation
+   - All parameters maintained correctly
+
 3. **User navigates back to court** (with `resume_from_timeout=true` flag in URL)
+   - Navigation uses unified helper for consistency
+   - Helper ensures all parameters are passed correctly
+
 4. **Backend checks database for timeout state** (single source of truth, regardless of URL parameter)
+   - Always checks database if `game_id` exists
+   - Validates quarter match to prevent stale data
+   - Defensively clears `resume_from_timeout` flag if no valid timeout state found
+
 5. **Backend restores timeout state from database:**
    - `timeout_next_play_type` → Always `"SIDE_INBOUND"` (or `"FREE_THROW"`)
    - `timeout_offense_team_id` → Restores possession team
    - `clock` and `time_remaining` → Restores game clock
+
 6. **Backend applies state to GameManager** (whether in memory or newly loaded)
+   - Uses `apply_timeout_resume_state_to_gm()` helper
+   - Works for both in-memory and newly-loaded games
+
 7. **Backend creates SIP turn** with correct possession team
+   - Uses `timeout_offense_team_id` to ensure correct team has possession
+   - SIP transitions to HCO (defense calls play)
+
 8. **Backend clears timeout state from database** (defensive cleanup)
+   - Uses `$unset` to remove `timeout_next_play_type` and `timeout_offense_team_id`
+   - Prevents stale timeout state from affecting future games
+
 9. **Frontend auto-starts game** (bypasses pre-game buttons)
+   - Game continues seamlessly
+
 10. **Game continues** with SIP → HCO transition
 
 ### Unified Timeout Resume Architecture (Structural Fix - January 2025)
