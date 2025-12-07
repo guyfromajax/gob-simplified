@@ -120,14 +120,18 @@ export function animateLeanMeter(leanScore) {
 
   if (clampedScore > 0) {
     // Positive score: fill upward (green)
-    const percentage = (clampedScore / 1) * 100; // 0-100%
-    posFill.style.height = `${percentage}%`;
+    // Fill percentage of the space from center (50%) to top (100%)
+    // So 0.47 fills 47% of the 50% space = 23.5% of container height
+    const fillPercentage = Math.abs(clampedScore) * 50; // 0-50% of container
+    posFill.style.height = `${fillPercentage}%`;
     negFill.style.height = '0%';
   } else if (clampedScore < 0) {
     // Negative score: fill downward (red)
-    const percentage = (Math.abs(clampedScore) / 1) * 100; // 0-100%
+    // Fill percentage of the space from center (50%) to bottom (0%)
+    // So -0.88 fills 88% of the 50% space = 44% of container height
+    const fillPercentage = Math.abs(clampedScore) * 50; // 0-50% of container
     posFill.style.height = '0%';
-    negFill.style.height = `${percentage}%`;
+    negFill.style.height = `${fillPercentage}%`;
   } else {
     // Exactly 0: neutral (just yellow line)
     posFill.style.height = '0%';
