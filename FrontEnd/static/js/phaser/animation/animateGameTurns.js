@@ -1047,9 +1047,9 @@ export async function animateGameTurns({ //hasBallAtStep
       // This includes FCP/HCT → HCO transitions (press break) and regular HCO setup turns
       if (turn.animations && turn.animations.length > 0) {
         // HCO with animations - route through AnimationRouter
-        turn.index = i;
-        await animationRouter.processTurn(turn);
-        continue;
+      turn.index = i;
+      await animationRouter.processTurn(turn);
+      continue;
       } else {
         // HCO without animations - just do announcements and updates
         announceFromTurnData(turn, 'end', scene.simData?.home_team_id, scene);
@@ -1154,28 +1154,28 @@ export async function animateGameTurns({ //hasBallAtStep
       // ✅ PHASE 2.5: Route standard HCO turns through AnimationRouter
       // ✅ FIX (Bug 3 REAL FIX): Only route if isHCO (was executing for ALL turns!)
       if (isHCO) {
-        // Ensure turn.index is set (AnimationRouter will use it for context)
-        turn.index = i;
-        
-        // Removed verbose before/after process turn logs
-        
-        // AnimationRouter handles pre/post setup (prepareTurnForAnimation, finalizeTurnAfterAnimation)
-        // Note: prepareTurnForAnimation was already called at line 479, but AnimationRouter will call it again
-        // This is safe (idempotent) but we could optimize later by skipping the first call for HCO turns
-        await animationRouter.processTurn(turn);
+      // Ensure turn.index is set (AnimationRouter will use it for context)
+      turn.index = i;
+      
+      // Removed verbose before/after process turn logs
+      
+      // AnimationRouter handles pre/post setup (prepareTurnForAnimation, finalizeTurnAfterAnimation)
+      // Note: prepareTurnForAnimation was already called at line 479, but AnimationRouter will call it again
+      // This is safe (idempotent) but we could optimize later by skipping the first call for HCO turns
+      await animationRouter.processTurn(turn);
 
-        // Removed verbose after process turn log
+      // Removed verbose after process turn log
 
         if (shouldDebugHCO) {
-          console.log('🔍 HCO_ROUTER_END', {
-            turn_index: i,
-            result_type: turn.result_type,
-            fast_break: turn.fast_break,
-            currentBallOwner: scene.ballController?.currentOwner?.playerId ?? null,
-            previousTurnWasShot: scene._previousTurnWasShot === true,
-            state: scene.stateMachine?.state
-          });
-        }
+        console.log('🔍 HCO_ROUTER_END', {
+          turn_index: i,
+          result_type: turn.result_type,
+          fast_break: turn.fast_break,
+          currentBallOwner: scene.ballController?.currentOwner?.playerId ?? null,
+          previousTurnWasShot: scene._previousTurnWasShot === true,
+          state: scene.stateMachine?.state
+        });
+      }
         
         continue;  // ✅ Skip rest of loop after processing HCO
       }
@@ -1198,40 +1198,40 @@ export async function animateGameTurns({ //hasBallAtStep
       // This includes FCP/HCT steals and regular HCO steals (when we add them)
       if (turn.animations && turn.animations.length > 0) {
         // Steal with animations - route through AnimationRouter
-        turn.index = i;
-        await animationRouter.processTurn(turn);
-        continue;
+      turn.index = i;
+      await animationRouter.processTurn(turn);
+      continue;
       } else {
         // Steal without animations - check if it's a steal event within another turn
         const stealEvent = turn.events?.find(e => e.event_type === "STEAL");
         if (!scene.stateMachine?.is(States.FastBreak) && stealEvent) {
-          // STEAL event within another turn - handle inline (not a standalone turn)
-          const ballHandlerId = playerMap[turn.ball_handler] ?? turn.ball_handler;
-          const stealerRaw =
-            turn.stealerId ||
-            turn.stealer_id ||
-            stealEvent?.stealerId ||
-            stealEvent?.stealer_id;
-          const stealerId = stealerRaw ?? playerMap[turn.stealer_name];
-          if (ballHandlerId != null && stealerId != null) {
-            const cfg = animationConfig.steal || {};
-            if (scene.__activePass) {
-              animationDebugWarn('Active pass tween detected before steal; cancelling previous tween');
-            }
-            await runPass(scene, {
-              fromId: ballHandlerId,
-              toId: stealerId,
-              duration: cfg.duration,
-              easing: cfg.easing
-            });
-            
-            // Visual effects handled by announcement system
-            const defenderSprite = playerSprites[stealerId];
-            // runPass reattaches the ball after the tween resolves, so only emit
-            // possession change once that handoff has finished.
-            if (!scene.stateMachine?.is(States.FastBreak) && defenderSprite) {
-              scene.events?.emit?.('possessionChange', { offenseTeamId: defenderSprite.team_id });
-            }
+      // STEAL event within another turn - handle inline (not a standalone turn)
+      const ballHandlerId = playerMap[turn.ball_handler] ?? turn.ball_handler;
+      const stealerRaw =
+        turn.stealerId ||
+        turn.stealer_id ||
+        stealEvent?.stealerId ||
+        stealEvent?.stealer_id;
+      const stealerId = stealerRaw ?? playerMap[turn.stealer_name];
+      if (ballHandlerId != null && stealerId != null) {
+        const cfg = animationConfig.steal || {};
+        if (scene.__activePass) {
+          animationDebugWarn('Active pass tween detected before steal; cancelling previous tween');
+        }
+        await runPass(scene, {
+          fromId: ballHandlerId,
+          toId: stealerId,
+          duration: cfg.duration,
+          easing: cfg.easing
+        });
+        
+        // Visual effects handled by announcement system
+        const defenderSprite = playerSprites[stealerId];
+        // runPass reattaches the ball after the tween resolves, so only emit
+        // possession change once that handoff has finished.
+        if (!scene.stateMachine?.is(States.FastBreak) && defenderSprite) {
+          scene.events?.emit?.('possessionChange', { offenseTeamId: defenderSprite.team_id });
+        }
           }
         }
         // Steal event handled inline - continue to next turn
