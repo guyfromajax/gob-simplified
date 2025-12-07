@@ -246,6 +246,7 @@ export class ShotAnimationSystem {
   async runSetupTween(turnData, ballSprite, currentBallOwnerRef) {
     if (this.scene.skipToEnd) return;
     
+    // getPlayerDuration is already imported at top of file
     const stepIndex = 0;
     const promises = [];
     
@@ -262,12 +263,16 @@ export class ShotAnimationSystem {
         this.scene.game.config.height
       );
       
+      // ✅ FIX: Use distance-based duration for consistent speed (matches step animations)
+      // This ensures smooth transitions between turns and consistent speeds
+      const duration = getPlayerDuration(sprite, x, y);
+      
       promises.push(new Promise((resolve) => {
         const tween = this.scene.tweens.add({
           targets: [sprite],
           x,
           y,
-          duration: 1000,
+          duration,
           ease: "Linear",
           // ✅ FIX: Removed manual ball positioning - BallController handles ball following automatically
           // When ball is attached via attachToPlayer(), it automatically follows the player
@@ -583,6 +588,11 @@ export class ShotAnimationSystem {
       }
 
       // ==================== ANIMATE PLAYERS DURING SHOT ====================
+      // getPlayerDuration is already imported at top of file
+      
+      // Store get-back player tweens so we can stop them early if needed
+      this._getBackTweens = [];
+      
       // Defenders releasing for fast break
       if (turnData.defense_release && turnData.defense_release.length > 0) {
         turnData.defense_release.forEach(playerId => {
@@ -592,12 +602,15 @@ export class ShotAnimationSystem {
             const targetX = Phaser.Math.Between(45, 55);
             const targetPixel = gridToPixels(targetX, targetY, this.scene.game.config.width, this.scene.game.config.height);
             
+            // ✅ FIX: Use distance-based duration for consistent speed
+            const duration = getPlayerDuration(sprite, targetPixel.x, targetPixel.y);
+            
             this.scene.tweens.add({
               targets: sprite,
               x: targetPixel.x,
               y: targetPixel.y,
-              duration: this.shotConfig.flightDuration,
-              ease: 'Power1'
+              duration,
+              ease: 'Linear' // Match other player movements
             });
           }
         });
@@ -615,13 +628,19 @@ export class ShotAnimationSystem {
             const targetX = isHomeTeamShooting ? Phaser.Math.Between(40, 50) : Phaser.Math.Between(50, 60);
             const targetPixel = gridToPixels(targetX, targetY, this.scene.game.config.width, this.scene.game.config.height);
             
-            this.scene.tweens.add({
+            // ✅ FIX: Use distance-based duration for consistent speed
+            const duration = getPlayerDuration(sprite, targetPixel.x, targetPixel.y);
+            
+            const tween = this.scene.tweens.add({
               targets: sprite,
               x: targetPixel.x,
               y: targetPixel.y,
-              duration: this.shotConfig.flightDuration,
-              ease: 'Power1'
+              duration,
+              ease: 'Linear' // Match other player movements
             });
+            
+            // Store tween reference for early termination
+            this._getBackTweens.push(tween);
           }
         });
       }
@@ -673,18 +692,34 @@ export class ShotAnimationSystem {
     // ✅ FIX: Ball is already at rim from animateBallFlight() - just hold it there
     // Match the behavior of putback makes and free throws (no repositioning)
     const ballSprite = this.ballController.ballSprite;
+    
+    // Determine rim hold duration: 1 second for HCO, 2 seconds for fast break
+    const isFastBreak = turnData.fast_break === true;
+    const rimHoldDuration = isFastBreak ? 2000 : 1000;
+    
     if (ballSprite) {
-      // Keep ball visible and hold at rim for 1 second (like putbacks/free throws)
+      // Keep ball visible and hold at rim
       ballSprite.setVisible(true);
       
-      // Hold ball at rim for 1 second (allows announcement to display)
+      // Hold ball at rim (allows announcement to display)
       await new Promise(resolve => {
         if (this.scene.time?.delayedCall) {
-          this.scene.time.delayedCall(1000, resolve);
+          this.scene.time.delayedCall(rimHoldDuration, resolve);
         } else {
-          setTimeout(resolve, 1000);
+          setTimeout(resolve, rimHoldDuration);
         }
       });
+      
+      // ✅ FIX: Stop get-back player animations after rim hold completes
+      // Players may not have reached their destination, which is fine
+      if (this._getBackTweens) {
+        this._getBackTweens.forEach(tween => {
+          if (tween && tween.isPlaying && this.scene.tweens) {
+            this.scene.tweens.killTweensOf(tween.targets);
+          }
+        });
+        this._getBackTweens = [];
+      }
       
       // Hide ball after hold
       ballSprite.setVisible(false);
@@ -798,6 +833,10 @@ export class ShotAnimationSystem {
     // This matches the pattern in ballManager.js (line 626)
     // The ball is no longer in flight, so clear the state to allow attachment to rebounder
     this.ballController.onShotEnd();
+    
+    // ✅ FIX: Stop get-back player animations when rebound is secured
+    // Players may not have reached their destination, which is fine
+    // This happens when rebounder secures the ball (in handleEmbeddedRebound)
 
     // ✅ PRIORITY 2 FIX: Add validation to ensure rebound_type is set
     // Check if this shot turn includes rebound data
@@ -863,18 +902,34 @@ export class ShotAnimationSystem {
 
     // ✅ FIX: Animate rebounder and non-rebounders simultaneously
     // Start both animations at the same time, then wait for both to complete
+    // getPlayerDuration is already imported at top of file
+    
+    // ✅ FIX: Use distance-based duration for consistent speed
+    const rebounderDuration = getPlayerDuration(rebounderSprite, ballBounceX, ballBounceY);
+    
     const rebounderPromise = new Promise((resolve) => {
       this.scene.tweens.add({
         targets: rebounderSprite,
         x: ballBounceX,
         y: ballBounceY,
-        duration: 400,
-        ease: 'Power2',
+        duration: rebounderDuration,
+        ease: 'Linear', // Match other player movements
         onComplete: () => {
           // Attach ball to rebounder once they reach the bounce spot
           this.ballController.attachToPlayer(rebounderSprite, {
             offset: { x: 0, y: -10 }
           });
+          
+          // ✅ FIX: Stop get-back player animations when rebound is secured
+          if (this._getBackTweens) {
+            this._getBackTweens.forEach(tween => {
+              if (tween && tween.isPlaying && this.scene.tweens) {
+                this.scene.tweens.killTweensOf(tween.targets);
+              }
+            });
+            this._getBackTweens = [];
+          }
+          
           resolve();
         }
       });
@@ -934,6 +989,8 @@ export class ShotAnimationSystem {
    * NEW: Only animate players who were rebounders (not those who released/got back)
    */
   async animatePlayerCollapse(rebounderSprite, ballBounceCoords, turnData) {
+    // getPlayerDuration is already imported at top of file
+    
     return new Promise((resolve) => {
       const collapsePromises = [];
       
@@ -978,13 +1035,16 @@ export class ShotAnimationSystem {
         
         const targetPixel = gridToPixels(targetGridX, targetGridY, this.scene.game.config.width, this.scene.game.config.height);
         
+        // ✅ FIX: Use distance-based duration for consistent speed
+        const collapseDuration = getPlayerDuration(playerSprite, targetPixel.x, targetPixel.y);
+        
         const collapsePromise = new Promise((playerResolve) => {
           this.scene.tweens.add({
             targets: playerSprite,
             x: targetPixel.x,
             y: targetPixel.y,
-            duration: 400,
-            ease: 'Power2',
+            duration: collapseDuration,
+            ease: 'Linear', // Match other player movements
             onComplete: () => playerResolve()
           });
         });
@@ -1003,6 +1063,8 @@ export class ShotAnimationSystem {
    * Animate individual player to rebound spot (within 10 grid spots of ball)
    */
   async animatePlayerToReboundSpot(playerSprite, ballBounceCoords, bounceGridX, bounceGridY) {
+    // getPlayerDuration is already imported at top of file
+    
     return new Promise((resolve) => {
       // Generate random position within 10 grid spots of the ball bounce
       const maxDistance = 10;
@@ -1029,13 +1091,16 @@ export class ShotAnimationSystem {
         ballSpot: { x: ballBounceCoords.x, y: ballBounceCoords.y }
       });
       
+      // ✅ FIX: Use distance-based duration for consistent speed
+      const duration = getPlayerDuration(playerSprite, clampedX, clampedY);
+      
       // Animate player movement
       const tween = this.scene.tweens.add({
         targets: playerSprite,
         x: clampedX,
         y: clampedY,
-        duration: 500,
-        ease: 'Power2',
+        duration,
+        ease: 'Linear', // Match other player movements
         onComplete: () => {
           resolve();
         }
