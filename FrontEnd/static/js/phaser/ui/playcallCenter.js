@@ -27,7 +27,7 @@ export function clearPlaycallHighlights() {
 export function updatePlaycallCenter(turnData, homeTeamId) {
   if (!turnData) return;
 
-  const offenseTeamId = turnData.possession_team_id;
+  const offenseTeamId = turnData.offense_team_id || turnData.possession_team_id;
   const isHomeOffense = homeTeamId && String(offenseTeamId) === String(homeTeamId);
 
   // Get playcall center
@@ -49,6 +49,20 @@ export function updatePlaycallCenter(turnData, homeTeamId) {
                                (userTeamSide === 'away' && !isHomeOffense);
   const isUserTeamOnDefense = (userTeamSide === 'home' && !isHomeOffense) || 
                                (userTeamSide === 'away' && isHomeOffense);
+  
+  // ✅ DEBUG: Always log turn data check (outside condition to see why it might fail)
+  console.log(`🔍 [PLAYCALL CENTER] Turn data check:`, {
+    offensivePlaycall,
+    isUserTeamOnOffense,
+    userTeamSide,
+    isHomeOffense,
+    offenseTeamId,
+    homeTeamId,
+    hasIntendedShooter: !!turnData.intended_shooter_id,
+    resultType: turnData.result_type,
+    currentTurn: turnData.current_turn,
+    willCheckOffense: isUserTeamOnOffense && !!offensivePlaycall
+  });
   
   // Check if offense playcall matches a selected button
   if (isUserTeamOnOffense && offensivePlaycall) {
@@ -158,8 +172,25 @@ export function updatePlaycallCenter(turnData, homeTeamId) {
   resetLeanMeter();
 
   // ✅ Update playcall center headshot for the play being used (use intended_shooter_id)
+  // Update headshot even if playcall doesn't match exactly (for image consistency with popup)
   if (isUserTeamOnOffense && offensivePlaycall && turnData.intended_shooter_id) {
-    const playOption = document.querySelector(`.play-option[data-play="${offensivePlaycall}"]`);
+    // Try exact match first
+    let playOption = document.querySelector(`.play-option[data-play="${offensivePlaycall}"]`);
+    
+    // If no exact match, try case-insensitive match (robust matching)
+    if (!playOption) {
+      const allPlayOptions = document.querySelectorAll('.play-option');
+      const turnPlayName = offensivePlaycall?.trim();
+      for (const option of allPlayOptions) {
+        const optionPlayName = option.dataset.play?.trim();
+        if (optionPlayName && turnPlayName && optionPlayName.toLowerCase() === turnPlayName.toLowerCase()) {
+          playOption = option;
+          console.log(`✅ [PLAYCALL CENTER] Found play option (case-insensitive): '${optionPlayName}' matches '${turnPlayName}'`);
+          break;
+        }
+      }
+    }
+    
     if (playOption) {
       const headshotImg = playOption.querySelector('.play-headshot');
       if (headshotImg) {
@@ -171,8 +202,15 @@ export function updatePlaycallCenter(turnData, homeTeamId) {
           headshotImg.src = '/static/images/players/default.png';
         };
         console.log(`✅ [PLAYCALL CENTER] Updated headshot for '${offensivePlaycall}' using intended_shooter_id: ${turnData.intended_shooter_id}`);
+      } else {
+        console.warn(`⚠️ [PLAYCALL CENTER] Found play option but no headshot img element for: ${offensivePlaycall}`);
       }
+    } else {
+      console.warn(`⚠️ [PLAYCALL CENTER] Could not find play option for: ${offensivePlaycall}`);
+      console.warn(`⚠️ [PLAYCALL CENTER] Available play options:`, Array.from(document.querySelectorAll('.play-option')).map(opt => opt.dataset.play));
     }
+  } else if (isUserTeamOnOffense && offensivePlaycall && !turnData.intended_shooter_id) {
+    console.warn(`⚠️ [PLAYCALL CENTER] Has offensivePlaycall '${offensivePlaycall}' but no intended_shooter_id in turnData`);
   }
 
   // ==================== TRIGGER PLAYCALL REVEAL HUD ====================
