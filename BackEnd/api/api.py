@@ -116,6 +116,16 @@ class CallTimeoutRequest(BaseModel):
     mode: str | None = None  # "single", "tournament", or "franchise"
 
 
+class PlaycallOverrideRequest(BaseModel):
+    """✅ SS&S: Request model for setting persistent playcall overrides"""
+    game_id: str
+    user_team_side: str  # "home" or "away"
+    offense_override: str | None = None  # Play name (e.g., "3-2 Motion")
+    defense_override: str | None = None  # "Man" or "Zone"
+    aggression_override: str | None = None  # "normal", "aggressive", "passive"
+    tempo_override: str | None = None  # "slow", "normal", "fast"
+
+
 # Helper functions for tournament/franchise mode
 def load_player_attributes_from_doc(mode: str, doc_id: str, player_id: str):
     """Load player attributes (EM, CH, MO) from tournament/franchise doc."""
@@ -961,7 +971,8 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                             away_scouting_data=away_scouting,
                             home_plays_data=home_plays,
                             away_plays_data=away_plays,
-                            mode="single"  # Loaded games are always single mode from games_collection
+                            mode="single",  # Loaded games are always single mode from games_collection
+                            user_team_side=request.user_team_side  # ✅ SS&S: Set is_user_team flags
                         )
                         
                         # Debug logging removed - was cluttering logs
@@ -1212,7 +1223,8 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                         request.away_team,
                         home_strategy_settings=home_strategy,
                         away_strategy_settings=away_strategy,
-                        mode=mode  # Pass mode so teams can initialize plays with correct stats structure
+                        mode=mode,  # Pass mode so teams can initialize plays with correct stats structure
+                        user_team_side=request.user_team_side  # ✅ SS&S: Set is_user_team flags
                     )
                     
                     logging.warning(f"🔧 [STRATEGY SETTINGS] AFTER GAMEMANAGER (NEW)")
@@ -1293,7 +1305,8 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
             request.away_team,
             home_strategy_settings=home_strategy,
             away_strategy_settings=away_strategy,
-            mode=mode  # Pass mode so teams can initialize plays with correct stats structure
+            mode=mode,  # Pass mode so teams can initialize plays with correct stats structure
+            user_team_side=request.user_team_side  # ✅ SS&S: Pass user_team_side to set is_user_team flags
         )
         # Use the game_id from the request if provided, otherwise generate a new one
         from BackEnd.utils.game_id_utils import generate_game_id, normalize_game_id
@@ -1685,6 +1698,54 @@ def simulate_turn_endpoint(request: TurnSimulationRequest):
         logging.exception(f"Failed to simulate turn for game {game_id}")
         logging.error(f"Full traceback:\n{error_trace}")
         raise HTTPException(status_code=500, detail=f"{str(e)}\n\nFull traceback:\n{error_trace}")
+
+
+@app.post("/api/set-playcall-override")
+def set_playcall_override_endpoint(request: PlaycallOverrideRequest):
+    """
+    ✅ SS&S: Set persistent playcall overrides for user's team.
+    
+    Overrides are stored in team.strategy_calls and persist until used.
+    This replaces the old single-turn override system.
+    """
+    game_id = request.game_id
+    gm = ongoing_games.get(game_id)
+    
+    if gm is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Game {game_id} not found. Start a quarter first with /api/simulate-quarter"
+        )
+    
+    # Determine user team
+    user_team = gm.home_team if request.user_team_side == "home" else gm.away_team
+    
+    # Update overrides (None clears the override)
+    if request.offense_override is not None:
+        user_team.strategy_calls["offense_override"] = request.offense_override
+        logging.info(f"🎮 [PLAYCALL OVERRIDE] Set offense override for {user_team.name}: {request.offense_override}")
+    
+    if request.defense_override is not None:
+        user_team.strategy_calls["defense_override"] = request.defense_override
+        logging.info(f"🎮 [PLAYCALL OVERRIDE] Set defense override for {user_team.name}: {request.defense_override}")
+    
+    if request.aggression_override is not None:
+        user_team.strategy_calls["aggression_override"] = request.aggression_override
+        logging.info(f"🎮 [PLAYCALL OVERRIDE] Set aggression override for {user_team.name}: {request.aggression_override}")
+    
+    if request.tempo_override is not None:
+        user_team.strategy_calls["tempo_override"] = request.tempo_override
+        logging.info(f"🎮 [PLAYCALL OVERRIDE] Set tempo override for {user_team.name}: {request.tempo_override}")
+    
+    return {
+        "status": "success",
+        "overrides": {
+            "offense": user_team.strategy_calls.get("offense_override"),
+            "defense": user_team.strategy_calls.get("defense_override"),
+            "aggression": user_team.strategy_calls.get("aggression_override"),
+            "tempo": user_team.strategy_calls.get("tempo_override")
+        }
+    }
 
 
 @app.post("/api/call-timeout")

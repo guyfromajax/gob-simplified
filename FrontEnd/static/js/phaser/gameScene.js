@@ -1615,19 +1615,22 @@ export function createGameScene(Phaser) {
       // Main turn-by-turn loop
       while (!quarterComplete) {
         try {
-          // Call /api/simulate-turn to get the next turn
-          // Check for user overrides from quick adjust window
+          // ✅ SS&S: Overrides are now stored in team.strategy_calls via /api/set-playcall-override
+          // No need to pass overrides here - backend checks team.strategy_calls automatically
+          // Legacy support: Still check window globals for backward compatibility (will be removed)
           const offenseOverride = window.nextOffenseOverride || null;
           const defenseOverride = window.nextDefenseOverride || null;
           
-          // Clear overrides after reading (single-use)
+          // Clear legacy window globals after reading (single-use)
           window.nextOffenseOverride = null;
           window.nextDefenseOverride = null;
           window.nextDefenseTypeOverride = null;
           window.nextDefenseAggressionOverride = null;
           
-          // Clear visual selections in Playcall Center
-          if (window.clearPlaycallOverrides) {
+          // Clear visual selections in Playcall Center (only if override was used)
+          // Note: Highlighting will be managed by tracking which turn used the override
+          // For now, clear on every turn (will be refined to only clear after override is used)
+          if (window.clearPlaycallOverrides && (offenseOverride || defenseOverride)) {
             window.clearPlaycallOverrides();
           }
           
@@ -1636,8 +1639,8 @@ export function createGameScene(Phaser) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               game_id: gameId,
-              offense_override: offenseOverride,
-              defense_override: defenseOverride,
+              offense_override: offenseOverride,  // Legacy support - will be removed
+              defense_override: defenseOverride,   // Legacy support - will be removed
               mode: this.mode || 'single'
             })
           });
