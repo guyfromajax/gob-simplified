@@ -82,8 +82,10 @@ export async function prepareTurnForAnimation({ turn, scene, turnIndex, homeTeam
     scene._leanScoreToAnimate = leanScore;
     scene._leanAnimationStep = middleStep;
     scene._leanAnimationTriggered = false;
+    console.log(`📊 [LEAN] Setup: score=${leanScore}, maxSteps=${maxSteps}, middleStep=${middleStep}`);
   } else {
     scene._leanScoreToAnimate = null;
+    console.log(`⚠️ [LEAN] No lean score or animations: leanScore=${leanScore}, animations.length=${animations.length}`);
   }
   
   // ✅ SS&S: Use central announcement dispatcher
