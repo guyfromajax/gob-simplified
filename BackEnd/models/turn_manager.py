@@ -851,6 +851,7 @@ class TurnManager:
                     chosen_defense = random.choice(["2-3 Zone", "3-2 Zone", "1-3-1 Zone"])
             
             # Return early with user's choices
+            logging.info(f"🎮 [PLAYCALL RETURN] Returning user playcall: offense='{chosen_playcall}', defense='{chosen_defense}'")
             return {
                 "offense": chosen_playcall,
                 "defense": chosen_defense,
