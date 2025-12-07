@@ -2340,10 +2340,10 @@ All three flows use the same core systems:
 
 ### Overview
 
-The Playcall Center is a unified tactical hub displayed at the bottom of the court screen (`court.html`). It provides real-time visualization of offensive and defensive play calls, along with a dynamic lean meter that visualizes the effectiveness of the offensive play against the defensive setup.
+The Playcall Center is a unified tactical hub displayed at the bottom of the court screen (`court.html`). It provides real-time visualization of offensive and defensive play calls, user override controls, and a dynamic lean meter that visualizes the effectiveness of the offensive play against the defensive setup.
 
 **Location:** Fixed position at bottom of court screen, between left and right side panels  
-**Purpose:** Display tactical information and provide visual feedback on play effectiveness
+**Purpose:** Display tactical information, enable user playcall overrides, and provide visual feedback on play effectiveness
 
 ### Structure
 
@@ -2355,18 +2355,29 @@ The Playcall Center consists of three main components:
 - Format: `"Motion → Inside"` or `"Set → Attack"`
 - Shows offensive play type (Motion/Set) and focus (Inside/Attack/Outside)
 - Updated from `turnData.offensive_play_type` and `turnData.offensive_play_focus`
+- Displays the actual playcall being executed in the current turn
 
 **Defense Status:**
 - Format: `"Man Normal"` or `"2-3 Zone Normal"`
 - Shows defensive playcall (Man, 2-3 Zone, 3-2 Zone, 1-3-1 Zone) and aggression level
 - Updated from `turnData.defensive_playcall` (or `defensive_play_type`) and `turnData.aggression`
+- Displays the actual defensive setup being used in the current turn
 
 #### 2. Main Row: Three-Column Layout
 
 **Left Panel: Offense Tactical Panel**
-- Displays offensive play options and settings
-- Shows play scroller with available plays
-- Includes override buttons for play selection
+- **Title:** "OFFENSE OVERRIDE"
+- **Play Scroller:** Displays 6 offensive play options:
+  - 4-1 Motion (Inside focus)
+  - 3-2 Motion (Attack focus)
+  - 5-0 Motion (Outside focus)
+  - Base Post Play (Inside focus)
+  - Pick & Roll (Lower Wing) (Attack focus)
+  - Double Screen For SG (Outside focus)
+- **Player Headshots:** Each play displays a player headshot image assigned based on play focus and user's lineup
+- **Navigation Buttons:** Up/down arrows to scroll through plays
+- **Clear Override Button:** Removes any selected offense override
+- **Selection State:** Selected plays are highlighted with `selected` class
 
 **Center: Lean Meter**
 - Visual indicator of play effectiveness
@@ -2374,11 +2385,19 @@ The Playcall Center consists of three main components:
 - Green fill (positive) fills upward from center line
 - Red fill (negative) fills downward from center line
 - Animated during turn execution at the middle step
+- See "Lean Meter Animation System" below for detailed mechanics
 
 **Right Panel: Defense Tactical Panel**
-- Displays defensive play options and settings
-- Shows defensive playcall scroller
-- Includes override buttons for defense selection
+- **Title:** "DEFENSE OVERRIDE"
+- **Defense Type Buttons:**
+  - MAN button (Man-to-Man defense)
+  - ZONE button (Zone defense - backend converts to specific zone types)
+- **Aggression Buttons:**
+  - PASSIVE button
+  - NORMAL button
+  - AGGRESSIVE button
+- **Clear Override Button:** Removes any selected defense override
+- **Selection State:** Selected buttons are highlighted with `selected` class
 
 ### Lean Meter Animation System
 
@@ -2453,12 +2472,128 @@ fillPercentage = Math.abs(leanScore) * 50; // 0-50% of container
    - Updates CSS `height` property of fill elements
    - Smooth transition via CSS: `transition: height 0.8s ease-out`
 
+### User Override System (SS&S - January 2025)
+
+The Playcall Center allows users to override playcalls for their team. Overrides persist until used, then are automatically cleared.
+
+#### Override Types
+
+**Offense Override:**
+- User selects one of 6 offensive plays from the play scroller
+- Stored in `team.strategy_calls["offense_call"]` as play name string (e.g., "3-2 Motion")
+- Applied when user's team is on offense during next HCO turn
+- Cleared automatically after use (set to `None`)
+
+**Defense Override:**
+- User selects defense type (Man or Zone) and aggression level (Passive/Normal/Aggressive)
+- Stored in `team.strategy_calls["defense_call"]` as "Man" or "Zone"
+- Backend converts generic "Zone" to specific zone types (2-3 Zone, 3-2 Zone, 1-3-1 Zone) based on team preferences
+- Applied when user's team is on defense during next HCO turn
+- Cleared automatically after use (set to `None`)
+
+**Aggression Override:**
+- User selects aggression level (Passive/Normal/Aggressive)
+- Stored in `team.strategy_calls["aggression_override"]`
+- Applied to defensive playcalls when user's team is on defense
+
+**Tempo Override:**
+- User selects tempo level (Slow/Normal/Fast)
+- Stored in `team.strategy_calls["tempo_override"]`
+- Applied to offensive playcalls when user's team is on offense
+
+#### Data Structure
+
+**Backend Storage (`team.strategy_calls`):**
+```python
+{
+    "offense_call": None | str,          # Play name or None (persists until used)
+    "defense_call": None | str,          # "Man", "Zone", or None (persists until used)
+    "aggression_override": None | str,   # "normal", "aggressive", "passive", or None
+    "tempo_override": None | str,        # "slow", "normal", "fast", or None
+    "press_override": None,               # Future: FCP override
+    "trap_override": None                 # Future: HCT override
+}
+```
+
+**Initialization:**
+- `TeamManager.__init__()` initializes `strategy_calls` with all fields set to `None`
+- Default state: No overrides active (normal play selection logic used)
+
+#### Override Application Flow
+
+1. **User Selection (Frontend):**
+   - User clicks play option or defense button in Playcall Center
+   - Frontend calls `setPlaycallOverride()` function in `court.html`
+   - Function sends POST request to `/api/set-playcall-override`
+
+2. **API Endpoint (`/api/set-playcall-override`):**
+   - Receives `PlaycallOverrideRequest` with `game_id`, `user_team_side`, and override values
+   - Identifies user team from `user_team_side` ("home" or "away")
+   - Updates `team.strategy_calls` with override values
+   - Returns success status and current override state
+
+3. **Backend Playcall Selection (`set_playcalls()` in `turn_manager.py`):**
+   - Called during HCO turn setup
+   - Checks if user team is on offense/defense using `is_user_team` flag
+   - If `team.strategy_calls["offense_call"] != None` and user team is on offense:
+     - Uses override playcall instead of normal selection
+     - Clears override after use: `team.strategy_calls["offense_call"] = None`
+   - If `team.strategy_calls["defense_call"] != None` and user team is on defense:
+     - Uses override defense (converts "Zone" to specific zone type if needed)
+     - Clears override after use: `team.strategy_calls["defense_call"] = None`
+
+4. **Frontend Highlight Management:**
+   - Selected buttons receive `selected` class (visual highlight)
+   - `updatePlaycallCenter()` checks if turn's playcall matches selected button
+   - If match found, removes `selected` class (unhighlights after use)
+   - `clearPlaycallHighlights()` can manually clear all highlights
+
+#### Override Persistence
+
+**Current State:**
+- Overrides stored in `team.strategy_calls` (in-memory only)
+- Lost on server restart or game reload
+- **Note:** Database persistence was attempted but reverted due to breaking changes
+
+**Future Enhancement:**
+- Persist `strategy_calls` to database in `summarize_game_state()`
+- Restore `strategy_calls` when loading games from database
+- Ensure overrides survive server restarts and game reloads
+
+#### Override Timing
+
+**When Overrides Are Applied:**
+- Only during HCO (Half Court Offense) turns
+- Not applied during: FREE_THROW, BASELINE_INBOUND, FCP, HCT, or SIDE_INBOUND turns
+- Override persists until next HCO turn where user team is on offense/defense
+
+**User Team Detection:**
+- Backend uses `is_user_team` flag on `TeamManager` objects
+- Flag set during `GameManager` initialization from `user_team_side` parameter
+- Ensures overrides only apply to user's team, not computer team
+
+### Player Image Assignment System
+
+Player headshots in the Playcall Center are assigned once when returning to `court.html` from lineup/game plan screens. See "Playcall Center Player Image Assignment (SS&S - January 2025)" section in "Game Start and Resume Transitions" for full details.
+
+**Key Points:**
+- Images assigned on page load for all timeout navigation entry points
+- Uses lineup data from URL parameters (preserved by `TimeoutNavigationHelper`)
+- Maps play focus (inside/attack/outside) to player positions (C/PF, PG/SG, SG/SF)
+- Images remain static during gameplay (no mid-game changes)
+- Location: `FrontEnd/static/court.html` `populatePlayHeadshots()` function (lines 2481-2561)
+
 ### Key Files
 
 **Frontend:**
-- `FrontEnd/static/court.html`: Playcall Center HTML structure and CSS (lines 785-1109)
+- `FrontEnd/static/court.html`: 
+  - Playcall Center HTML structure and CSS (lines 785-1109, 2241-2342)
+  - Override button event handlers (lines 2572-2600)
+  - `populatePlayHeadshots()` function (lines 2481-2561)
+  - `setPlaycallOverride()` function (lines 2544-2600)
 - `FrontEnd/static/js/phaser/ui/playcallCenter.js`: Core Playcall Center logic
-  - `updatePlaycallCenter()`: Updates status displays and triggers playcall reveal HUD
+  - `updatePlaycallCenter()`: Updates status displays, manages highlights, triggers playcall reveal HUD
+  - `clearPlaycallHighlights()`: Removes `selected` class from all override buttons
   - `resetLeanMeter()`: Resets meter to neutral
   - `animateLeanMeter()`: Animates meter based on lean score
   - `parseLeanScoreFromText()`: Extracts lean score from turn text
@@ -2467,16 +2602,27 @@ fillPercentage = Math.abs(leanScore) * 50; // 0-50% of container
 - `FrontEnd/static/js/phaser/animation/ShotAnimationSystem.js`: Triggers animation for shot turns (lines 324-340)
 
 **Backend:**
+- `BackEnd/api/api.py`:
+  - `/api/set-playcall-override` endpoint (lines 1703-1764): Receives and stores user overrides
+  - `PlaycallOverrideRequest` model (lines 119-127): Request structure for overrides
+- `BackEnd/models/turn_manager.py`:
+  - `set_playcalls()` (lines 858-1033): Checks and applies user overrides during playcall selection
+  - `set_strategy_calls()` (lines 310-370): Generates strategy calls for turn
+- `BackEnd/models/team_manager.py`:
+  - `TeamManager.__init__()` (lines 50-58): Initializes `strategy_calls` structure
 - `BackEnd/engine/phase_resolution.py`: 
   - `generate_logic()`: Calculates lean score (line 794-870)
   - Embeds lean score in turn text (line 1061): `f"lean:{lean_score:.2f}"`
 
 ### Future Enhancements
 
+- **Database Persistence:** Restore `strategy_calls` persistence to database (reverted due to breaking changes)
 - **Real Lean Score Logic:** Replace placeholder random calculation with actual tactical evaluation
 - **Skeleton Variant Selection:** Use lean score to select appropriate skeleton variant (successful, mid_play_change, contested, broken)
+- **Specific Zone Selection:** Allow users to select specific zone types (2-3 Zone, 3-2 Zone, 1-3-1 Zone) instead of generic "Zone"
 - **Visual Refinements:** Additional styling, animations, or indicators
 - **Historical Tracking:** Display lean score trends over time
+- **Press/Trap Overrides:** Implement FCP and HCT override functionality
 
 ---
 
