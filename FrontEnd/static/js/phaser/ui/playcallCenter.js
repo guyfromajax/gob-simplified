@@ -52,18 +52,61 @@ export function updatePlaycallCenter(turnData, homeTeamId) {
   
   // Check if offense playcall matches a selected button
   if (isUserTeamOnOffense && offensivePlaycall) {
+    // ✅ LOUD DEBUG: Check all selected buttons and compare
+    const allSelectedButtons = document.querySelectorAll('.play-option.selected');
+    const selectedPlayNames = Array.from(allSelectedButtons).map(btn => btn.dataset.play);
+    
+    // ✅ LOUD DEBUG: Frontend comparison
+    const hasMatch = selectedPlayNames.some(name => {
+      const btnName = name?.trim();
+      const turnName = offensivePlaycall?.trim();
+      return btnName && turnName && btnName.toLowerCase() === turnName.toLowerCase();
+    });
+    
+    if (hasMatch) {
+      console.log("🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢");
+      console.log("🟢 [PLAYCALL MATCH] TRUE - Frontend found matching selected button!");
+      console.log(`🟢 Turn playcall: '${offensivePlaycall}' | Selected:`, selectedPlayNames);
+      console.log("🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢");
+    } else {
+      console.warn("🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴");
+      console.warn("🔴 [PLAYCALL MATCH] FALSE - Frontend did NOT find matching selected button!");
+      console.warn(`🔴 Turn playcall: '${offensivePlaycall}' | Selected:`, selectedPlayNames);
+      console.warn("🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴");
+    }
+    
     console.log(`🎮 [PLAYCALL] Checking if offense playcall matches selected: ${offensivePlaycall}`, {
       isUserTeamOnOffense,
       offensivePlaycall,
-      userTeamSide
+      userTeamSide,
+      selectedPlayNames
     });
-    const selectedOffenseBtn = document.querySelector(`.play-option.selected[data-play="${offensivePlaycall}"]`);
+    
+    // Try exact match first
+    let selectedOffenseBtn = document.querySelector(`.play-option.selected[data-play="${offensivePlaycall}"]`);
+    
+    // If no exact match, try to find by checking all selected buttons
+    if (!selectedOffenseBtn && selectedPlayNames.length > 0) {
+      console.log(`🔍 [PLAYCALL] No exact match, checking all selected buttons:`, selectedPlayNames);
+      // Check if any selected button matches (case-insensitive, trim whitespace)
+      for (const btn of allSelectedButtons) {
+        const btnPlayName = btn.dataset.play?.trim();
+        const turnPlayName = offensivePlaycall?.trim();
+        if (btnPlayName && turnPlayName && btnPlayName.toLowerCase() === turnPlayName.toLowerCase()) {
+          selectedOffenseBtn = btn;
+          console.log(`✅ [PLAYCALL] Found match (case-insensitive): '${btnPlayName}' === '${turnPlayName}'`);
+          break;
+        }
+      }
+    }
+    
     if (selectedOffenseBtn) {
       // This play was selected and is now being used - clear the highlight
       selectedOffenseBtn.classList.remove('selected');
       console.log(`✅ [PLAYCALL] Cleared offense highlight for used play: ${offensivePlaycall}`);
     } else {
       console.log(`🔍 [PLAYCALL] No matching selected button found for: ${offensivePlaycall}`);
+      console.log(`🔍 [PLAYCALL] Available selected plays:`, selectedPlayNames);
     }
   }
   
@@ -113,6 +156,24 @@ export function updatePlaycallCenter(turnData, homeTeamId) {
 
   // Reset lean meter to neutral
   resetLeanMeter();
+
+  // ✅ Update playcall center headshot for the play being used (use intended_shooter_id)
+  if (isUserTeamOnOffense && offensivePlaycall && turnData.intended_shooter_id) {
+    const playOption = document.querySelector(`.play-option[data-play="${offensivePlaycall}"]`);
+    if (playOption) {
+      const headshotImg = playOption.querySelector('.play-headshot');
+      if (headshotImg) {
+        const imgPath = `/static/images/players/${turnData.intended_shooter_id}.png`;
+        headshotImg.src = imgPath;
+        headshotImg.setAttribute('data-player-id', turnData.intended_shooter_id);
+        headshotImg.onerror = () => {
+          console.warn(`⚠️ Headshot failed to load: ${imgPath}, using default`);
+          headshotImg.src = '/static/images/players/default.png';
+        };
+        console.log(`✅ [PLAYCALL CENTER] Updated headshot for '${offensivePlaycall}' using intended_shooter_id: ${turnData.intended_shooter_id}`);
+      }
+    }
+  }
 
   // ==================== TRIGGER PLAYCALL REVEAL HUD ====================
   // Show transient HUD overlay with playcall info
