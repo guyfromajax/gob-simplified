@@ -2528,11 +2528,21 @@
       const clearOffenseBtn = document.getElementById('clear-offense-override');
       const clearDefenseBtn = document.getElementById('clear-defense-override');
       
-      // ✅ SS&S: Helper function to get game context from URL params (read dynamically each time)
+      // ✅ SS&S: Helper function to get game context from multiple sources (read dynamically each time)
       function getGameContext() {
         const urlParams = new URLSearchParams(window.location.search);
-        const gameId = urlParams.get('game_id');
+        
+        // Try multiple sources for game_id (in order of preference)
+        // 1. URL params (most reliable during active gameplay)
+        let gameId = urlParams.get('game_id');
+        
+        // 2. localStorage (fallback if URL doesn't have it yet)
+        if (!gameId && typeof localStorage !== 'undefined') {
+          gameId = localStorage.getItem('game_id');
+        }
+        
         const userTeamSide = urlParams.get('my_team'); // "home" or "away"
+        
         return { gameId, userTeamSide };
       }
       
@@ -2540,13 +2550,26 @@
       async function setPlaycallOverride(type, value) {
         const { gameId, userTeamSide } = getGameContext();
         
+        // Debug: Log all sources
+        const debugInfo = {
+          gameId,
+          userTeamSide,
+          url_gameId: new URLSearchParams(window.location.search).get('game_id'),
+          localStorage_gameId: typeof localStorage !== 'undefined' ? localStorage.getItem('game_id') : 'N/A',
+          url: window.location.search
+        };
+        console.log('🔍 [PLAYCALL OVERRIDE] Debug context:', debugInfo);
+        
         if (!gameId || !userTeamSide) {
-          console.warn('⚠️ [PLAYCALL OVERRIDE] Missing game_id or user_team_side, cannot set override', {
-            gameId,
-            userTeamSide,
-            url: window.location.search
-          });
-          return;
+          console.warn('⚠️ [PLAYCALL OVERRIDE] Missing game_id or user_team_side, cannot set override', debugInfo);
+          if (!userTeamSide) {
+            console.error('❌ [PLAYCALL OVERRIDE] Cannot proceed without user_team_side');
+            return;
+          }
+          if (!gameId) {
+            console.error('❌ [PLAYCALL OVERRIDE] Cannot proceed without game_id - game may not have started yet');
+            return;
+          }
         }
         
         console.log(`🎮 [PLAYCALL OVERRIDE] Setting ${type} override: ${value}`, { gameId, userTeamSide });
