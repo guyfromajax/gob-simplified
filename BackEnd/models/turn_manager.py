@@ -833,13 +833,15 @@ class TurnManager:
                 if self.game.defense_team.is_user_team:
                     self.game.defense_team.strategy_calls["defense_call"] = None
                 self.game.game_state["user_defense_override"] = None  # Legacy clear
-                logging.info(f"🎮 [PLAYCALL] Using user defense call: {chosen_defense}")
+                logging.info(f"🎮 [PLAYCALL] Using user defense call: {chosen_defense} (defense_team={self.game.defense_team.name}, is_user_team={self.game.defense_team.is_user_team})")
                 
                 # ✅ FIX: If user selected "Zone", convert to a random specific zone type
                 # (Backend expects specific zone types: "2-3 Zone", "3-2 Zone", "1-3-1 Zone")
                 if chosen_defense == "Zone":
                     chosen_defense = random.choice(["2-3 Zone", "3-2 Zone", "1-3-1 Zone"])
                     logging.info(f"🎮 [PLAYCALL OVERRIDE] Converted 'Zone' to specific zone type: {chosen_defense}")
+            else:
+                logging.info(f"🎮 [PLAYCALL DEBUG] No user_defense override found (user_defense={user_defense}), will use normal selection or check strategy_calls")
             else:
                 # No user defense override - choose defense normally
                 defense_setting = self.game.defense_team.strategy_settings.get("defense", 2)
@@ -928,8 +930,12 @@ class TurnManager:
         # NOTE: This must happen BEFORE offense attempt tracking so we know the correct defense
         if chosen_defense is None:  # Not set by user override above
             # ✅ SS&S: Check for defense_call in team.strategy_calls
+            logging.info(f"🎮 [PLAYCALL DEBUG] chosen_defense is None, checking defense_call in strategy_calls")
+            logging.info(f"🎮 [PLAYCALL DEBUG] Defense team: {self.game.defense_team.name}, is_user_team={self.game.defense_team.is_user_team}")
             if self.game.defense_team.is_user_team:
                 defense_call = self.game.defense_team.strategy_calls.get("defense_call")
+                logging.info(f"🎮 [PLAYCALL DEBUG] defense_call from strategy_calls: {defense_call}")
+                logging.info(f"🎮 [PLAYCALL DEBUG] Full strategy_calls: {self.game.defense_team.strategy_calls}")
                 if defense_call:
                     chosen_defense = defense_call
                     # ✅ SS&S: Clear defense_call after use (prevents carryover to next turn)
@@ -941,15 +947,22 @@ class TurnManager:
                     if chosen_defense == "Zone":
                         chosen_defense = random.choice(["2-3 Zone", "3-2 Zone", "1-3-1 Zone"])
                         logging.info(f"🎮 [PLAYCALL] Converted 'Zone' to specific zone type: {chosen_defense}")
+                else:
+                    logging.info(f"🎮 [PLAYCALL DEBUG] defense_call is None or empty, will use normal selection")
+            else:
+                logging.info(f"🎮 [PLAYCALL DEBUG] Defense team is NOT user team, skipping defense_call check")
             
             # If still no override, use normal process
             if chosen_defense is None:
                 defense_setting = self.game.defense_team.strategy_settings.get("defense", 2)
+                logging.info(f"🎮 [PLAYCALL DEBUG] Using normal defense selection (defense_setting={defense_setting})")
                 chosen_defense = random.choice(STRATEGY_CALL_DICTS["defense"][defense_setting])
+                logging.info(f"🎮 [PLAYCALL DEBUG] Normal selection chose: {chosen_defense}")
                 
                 # Convert "Zone" to specific zone types for normal selection
                 if chosen_defense == "Zone":
                     chosen_defense = random.choice(["2-3 Zone", "3-2 Zone", "1-3-1 Zone"])
+                    logging.info(f"🎮 [PLAYCALL DEBUG] Converted normal 'Zone' to specific zone type: {chosen_defense}")
         
         # Record playcall attempt under new buckets
         try:
