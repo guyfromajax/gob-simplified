@@ -147,19 +147,45 @@ export function updatePlaycallCenter(turnData, homeTeamId) {
   if (isUserTeamOnDefense && defensivePlaycall) {
     // Check for specific zone types (2-3 Zone, 3-2 Zone, 1-3-1 Zone) or generic "Zone"
     const defenseType = defensivePlaycall.includes('Zone') ? 'Zone' : defensivePlaycall;
+    
+    // ✅ Get all selected defense buttons for detailed logging
+    const allSelectedDefenseButtons = document.querySelectorAll('.defense-override-btn.selected');
+    const selectedDefenseNames = Array.from(allSelectedDefenseButtons).map(btn => btn.dataset.defense);
+    
     console.log(`🎮 [PLAYCALL] Checking if defense playcall matches selected: ${defensivePlaycall} (type: ${defenseType})`, {
       isUserTeamOnDefense,
       defensivePlaycall,
       defenseType,
-      userTeamSide
+      userTeamSide,
+      selectedDefenseNames
     });
-    const selectedDefenseBtn = document.querySelector(`.defense-override-btn.selected[data-defense="${defenseType}"]`);
+    
+    // Try exact match first
+    let selectedDefenseBtn = document.querySelector(`.defense-override-btn.selected[data-defense="${defenseType}"]`);
+    
+    // ✅ FIX: If no exact match and turn used a specific zone type, check if user selected generic "Zone"
+    // Backend converts "Zone" to specific types (2-3 Zone, 3-2 Zone, 1-3-1 Zone)
+    // So if turn uses "2-3 Zone" but user selected "Zone", we should still match
+    if (!selectedDefenseBtn && defenseType === 'Zone' && defensivePlaycall !== 'Zone') {
+      // Turn used a specific zone type, check if user selected generic "Zone"
+      selectedDefenseBtn = document.querySelector(`.defense-override-btn.selected[data-defense="Zone"]`);
+      if (selectedDefenseBtn) {
+        console.log(`✅ [PLAYCALL] Matched generic Zone button for specific zone type: ${defensivePlaycall}`);
+      }
+    }
+    
+    // ✅ FIX: Also check reverse - if turn used "Man" but user selected "Zone", log mismatch
+    if (!selectedDefenseBtn && defenseType === 'Man' && selectedDefenseNames.includes('Zone')) {
+      console.warn(`⚠️ [PLAYCALL] Defense mismatch: Turn used 'Man' but user selected 'Zone' - defense override may not have been applied`);
+    }
+    
     if (selectedDefenseBtn) {
       // This defense was selected and is now being used - clear the highlight
       selectedDefenseBtn.classList.remove('selected');
       console.log(`✅ [PLAYCALL] Cleared defense highlight for used defense: ${defensivePlaycall}`);
     } else {
       console.log(`🔍 [PLAYCALL] No matching selected button found for: ${defensivePlaycall} (type: ${defenseType})`);
+      console.log(`🔍 [PLAYCALL] Selected defense buttons:`, selectedDefenseNames);
     }
   }
 
