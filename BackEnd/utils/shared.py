@@ -567,15 +567,13 @@ def summarize_game_state(game, exclude_animations=True):
             "strategy_settings": getattr(game.home_team, 'strategy_settings', {}),
             "plays": populated_plays.copy(),
             "attributes": getattr(game.home_team, 'team_attributes', {}),
-            "scouting": getattr(game.home_team, 'scouting_data', {}),
-            "strategy_calls": getattr(game.home_team, 'strategy_calls', {})
+            "scouting": getattr(game.home_team, 'scouting_data', {})
         },
         game.away_team.team_id: {
             "strategy_settings": getattr(game.away_team, 'strategy_settings', {}),
             "plays": populated_plays.copy(),
             "attributes": getattr(game.away_team, 'team_attributes', {}),
-            "scouting": getattr(game.away_team, 'scouting_data', {}),
-            "strategy_calls": getattr(game.away_team, 'strategy_calls', {})
+            "scouting": getattr(game.away_team, 'scouting_data', {})
         }
     }
     
