@@ -297,7 +297,7 @@ async function showTimeoutPopup(timeoutResult, gameId, scene) {
     const lineup = myTeamSide === 'home' ? homeLineup : awayLineup;
     
     // ✅ SS&S: Use unified helper to build params
-    const params = buildGameNavigationParams({
+    const params = helper.buildGameNavigationParams({
         sourceParams: urlParams,
         targetQuarter: currentQuarter,
         gameId: gameId,
