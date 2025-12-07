@@ -2299,6 +2299,150 @@ All three flows use the same core systems:
 
 ---
 
+## Playcall Center ✅ **ACTIVE** (January 2025)
+
+### Overview
+
+The Playcall Center is a unified tactical hub displayed at the bottom of the court screen (`court.html`). It provides real-time visualization of offensive and defensive play calls, along with a dynamic lean meter that visualizes the effectiveness of the offensive play against the defensive setup.
+
+**Location:** Fixed position at bottom of court screen, between left and right side panels  
+**Purpose:** Display tactical information and provide visual feedback on play effectiveness
+
+### Structure
+
+The Playcall Center consists of three main components:
+
+#### 1. Top Row: Status Displays
+
+**Offense Status:**
+- Format: `"Motion → Inside"` or `"Set → Attack"`
+- Shows offensive play type (Motion/Set) and focus (Inside/Attack/Outside)
+- Updated from `turnData.offensive_play_type` and `turnData.offensive_play_focus`
+
+**Defense Status:**
+- Format: `"Man Normal"` or `"2-3 Zone Normal"`
+- Shows defensive playcall (Man, 2-3 Zone, 3-2 Zone, 1-3-1 Zone) and aggression level
+- Updated from `turnData.defensive_playcall` (or `defensive_play_type`) and `turnData.aggression`
+
+#### 2. Main Row: Three-Column Layout
+
+**Left Panel: Offense Tactical Panel**
+- Displays offensive play options and settings
+- Shows play scroller with available plays
+- Includes override buttons for play selection
+
+**Center: Lean Meter**
+- Visual indicator of play effectiveness
+- Yellow center line at 50% (neutral position)
+- Green fill (positive) fills upward from center line
+- Red fill (negative) fills downward from center line
+- Animated during turn execution at the middle step
+
+**Right Panel: Defense Tactical Panel**
+- Displays defensive play options and settings
+- Shows defensive playcall scroller
+- Includes override buttons for defense selection
+
+### Lean Meter Animation System
+
+The lean meter provides real-time visual feedback on how well the offensive play is executing against the defensive setup.
+
+#### Lean Score Range
+
+**Range:** -1.0 to +1.0
+- **+1.0**: Maximum positive (offense executing perfectly) → Full green fill upward (50% of container)
+- **+0.5 to +0.99**: Positive (play working well) → Partial green fill
+- **0.0**: Neutral (balanced) → No fill, just yellow center line
+- **-0.5 to -0.01**: Negative (defense engaged) → Partial red fill downward
+- **-1.0**: Maximum negative (defense disrupting) → Full red fill downward (50% of container)
+
+#### Animation Timing
+
+**Trigger Point:** Middle step of turn animation
+- Lean score is parsed from turn `text` field (pattern: `"lean:X.XX"`)
+- Middle step is calculated as `Math.ceil(maxSteps / 2)`
+- Animation triggers during step loop execution
+
+**Animation Systems:**
+- **Shot Turns:** Triggered in `ShotAnimationSystem.js` step loop (line 324-340)
+- **Other Turns:** Triggered in `turnAnimation.js` step loop (line 1813-1823)
+
+#### Fill Calculation
+
+The lean meter fills proportionally based on the lean score value:
+
+**Positive Scores (Green Fill Upward):**
+```javascript
+fillPercentage = Math.abs(leanScore) * 50; // 0-50% of container
+// Example: 0.47 → 23.5% fill (47% of the space from center to top)
+```
+
+**Negative Scores (Red Fill Downward):**
+```javascript
+fillPercentage = Math.abs(leanScore) * 50; // 0-50% of container
+// Example: -0.88 → 44% fill (88% of the space from center to bottom)
+```
+
+**CSS Positioning:**
+- Green fill: `bottom: 50%` (anchored at center, grows upward)
+- Red fill: `top: 50%` (anchored at center, grows downward)
+- Both fills start at the yellow center line (50% vertical position)
+
+#### Data Flow
+
+1. **Backend Calculation:**
+   - `generate_logic()` in `BackEnd/engine/phase_resolution.py` calculates lean score
+   - Currently returns random value (-1 to 1) as placeholder
+   - Lean score is embedded in turn `text` field: `"lean:0.96"`
+
+2. **Frontend Parsing:**
+   - `parseLeanScoreFromText()` in `playcallCenter.js` extracts lean score from text
+   - Pattern: `/lean:([-+]?\d+\.?\d*)/`
+   - Returns `null` if not found
+
+3. **Preparation (Turn Start):**
+   - `prepareTurnForAnimation()` in `turnPreparation.js` parses lean score
+   - Calculates middle step: `Math.ceil(maxSteps / 2)`
+   - Stores in `scene._leanScoreToAnimate` and `scene._leanAnimationStep`
+   - Resets lean meter to neutral (yellow line only)
+
+4. **Animation Trigger (Middle Step):**
+   - During step loop, checks if `stepIndex === scene._leanAnimationStep`
+   - Calls `animateLeanMeter(leanScore)` from `playcallCenter.js`
+   - Sets `scene._leanAnimationTriggered = true` to prevent duplicate triggers
+
+5. **Visual Update:**
+   - `animateLeanMeter()` calculates fill percentage
+   - Updates CSS `height` property of fill elements
+   - Smooth transition via CSS: `transition: height 0.8s ease-out`
+
+### Key Files
+
+**Frontend:**
+- `FrontEnd/static/court.html`: Playcall Center HTML structure and CSS (lines 785-1109)
+- `FrontEnd/static/js/phaser/ui/playcallCenter.js`: Core Playcall Center logic
+  - `updatePlaycallCenter()`: Updates status displays and triggers playcall reveal HUD
+  - `resetLeanMeter()`: Resets meter to neutral
+  - `animateLeanMeter()`: Animates meter based on lean score
+  - `parseLeanScoreFromText()`: Extracts lean score from turn text
+- `FrontEnd/static/js/phaser/animation/turnPreparation.js`: Prepares lean meter animation (lines 66-87)
+- `FrontEnd/static/js/phaser/animation/turnAnimation.js`: Triggers animation for non-shot turns (lines 1813-1823)
+- `FrontEnd/static/js/phaser/animation/ShotAnimationSystem.js`: Triggers animation for shot turns (lines 324-340)
+
+**Backend:**
+- `BackEnd/engine/phase_resolution.py`: 
+  - `generate_logic()`: Calculates lean score (line 794-870)
+  - Embeds lean score in turn text (line 1061): `f"lean:{lean_score:.2f}"`
+
+### Future Enhancements
+
+- **Real Lean Score Logic:** Replace placeholder random calculation with actual tactical evaluation
+- **Skeleton Variant Selection:** Use lean score to select appropriate skeleton variant (successful, mid_play_change, contested, broken)
+- **Visual Refinements:** Additional styling, animations, or indicators
+- **Historical Tracking:** Display lean score trends over time
+
+---
+
 ### 4. `handleTurnover()`
 **Registered for:** `TURNOVER`  
 **Location:** `AnimationEngine.js` line 369  
