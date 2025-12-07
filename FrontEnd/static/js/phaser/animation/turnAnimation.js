@@ -191,12 +191,16 @@ async function runSetupTween({ scene, ballSprite, animations, playerSprites, cur
       scene.game.config.height
     );
 
+    // ✅ FIX: Use distance-based duration for consistent speed (matches step animations)
+    // This ensures smooth transitions between turns and consistent speeds
+    const duration = getPlayerDuration(sprite, x, y);
+
     promises.push(new Promise((resolve) => {
       const tween = scene.tweens.add({
         targets: [sprite],
         x,
         y,
-        duration: 1000,
+        duration,
         ease: "Linear",
         onUpdate: () => {
           if (currentBallOwnerRef?.value === sprite && ballSprite?.setPosition) {
