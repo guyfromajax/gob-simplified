@@ -82,7 +82,10 @@ export function updatePlaycallCenter(turnData, homeTeamId) {
       };
     });
     
+    // ✅ EXPAND: Show actual play names in array (not just Array(1))
+    const actualPlayNames = selectedPlayNames.filter(n => n != null).map(n => `'${n}'`).join(', ');
     console.log(`🔍 [PLAYCALL] Selected buttons detail:`, selectedPlayNamesExpanded);
+    console.log(`🔍 [PLAYCALL] Selected play names (actual values): [${actualPlayNames}]`);
     console.log(`🔍 [PLAYCALL] Turn playcall: '${offensivePlaycall}' (type: ${typeof offensivePlaycall}, length: ${offensivePlaycall?.length})`);
     
     const hasMatch = selectedPlayNames.some(name => {
