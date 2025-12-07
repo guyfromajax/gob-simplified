@@ -52,11 +52,18 @@ export function updatePlaycallCenter(turnData, homeTeamId) {
   
   // Check if offense playcall matches a selected button
   if (isUserTeamOnOffense && offensivePlaycall) {
+    console.log(`🎮 [PLAYCALL] Checking if offense playcall matches selected: ${offensivePlaycall}`, {
+      isUserTeamOnOffense,
+      offensivePlaycall,
+      userTeamSide
+    });
     const selectedOffenseBtn = document.querySelector(`.play-option.selected[data-play="${offensivePlaycall}"]`);
     if (selectedOffenseBtn) {
       // This play was selected and is now being used - clear the highlight
       selectedOffenseBtn.classList.remove('selected');
-      console.log(`✅ [PLAYCALL OVERRIDE] Cleared offense highlight for used play: ${offensivePlaycall}`);
+      console.log(`✅ [PLAYCALL] Cleared offense highlight for used play: ${offensivePlaycall}`);
+    } else {
+      console.log(`🔍 [PLAYCALL] No matching selected button found for: ${offensivePlaycall}`);
     }
   }
   
@@ -64,11 +71,19 @@ export function updatePlaycallCenter(turnData, homeTeamId) {
   if (isUserTeamOnDefense && defensivePlaycall) {
     // Check for specific zone types (2-3 Zone, 3-2 Zone, 1-3-1 Zone) or generic "Zone"
     const defenseType = defensivePlaycall.includes('Zone') ? 'Zone' : defensivePlaycall;
+    console.log(`🎮 [PLAYCALL] Checking if defense playcall matches selected: ${defensivePlaycall} (type: ${defenseType})`, {
+      isUserTeamOnDefense,
+      defensivePlaycall,
+      defenseType,
+      userTeamSide
+    });
     const selectedDefenseBtn = document.querySelector(`.defense-override-btn.selected[data-defense="${defenseType}"]`);
     if (selectedDefenseBtn) {
       // This defense was selected and is now being used - clear the highlight
       selectedDefenseBtn.classList.remove('selected');
-      console.log(`✅ [PLAYCALL OVERRIDE] Cleared defense highlight for used defense: ${defensivePlaycall}`);
+      console.log(`✅ [PLAYCALL] Cleared defense highlight for used defense: ${defensivePlaycall}`);
+    } else {
+      console.log(`🔍 [PLAYCALL] No matching selected button found for: ${defensivePlaycall} (type: ${defenseType})`);
     }
   }
 
