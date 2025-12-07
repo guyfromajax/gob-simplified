@@ -817,53 +817,12 @@ class TurnManager:
                 self.game.offense_team.strategy_calls["offense_call"] = None
             self.game.game_state["user_offense_override"] = None  # Legacy clear
             
-            # ✅ FIX: Lookup play using team-specific play_id (same method as get_hco_skeleton)
-            # This ensures we get the same play that will be used for skeleton lookup
-            play_doc = None
-            play_id = None
-            
-            # First try to get play_id from team's plays (in-memory)
-            if hasattr(self.game.offense_team, 'plays') and self.game.offense_team.plays:
-                if chosen_playcall in self.game.offense_team.plays:
-                    play_obj = self.game.offense_team.plays[chosen_playcall]
-                    play_id = play_obj.get("play_id")
-                    logging.info(f"🎮 [PLAYCALL MATCH] Found play_id from team plays: '{chosen_playcall}' -> play_id={play_id}")
-            
-            # If not found in memory, check database
-            if not play_id:
-                game_id = getattr(self.game, 'game_id', None)
-                if game_id:
-                    from BackEnd.db import games_collection
-                    from bson import ObjectId
-                    game_doc = games_collection.find_one({"_id": game_id})
-                    if game_doc and "teams" in game_doc:
-                        team_obj = game_doc["teams"].get(self.game.offense_team.team_id, {})
-                        plays = team_obj.get("plays", {})
-                        if chosen_playcall in plays:
-                            play_obj = plays[chosen_playcall]
-                            play_id = play_obj.get("play_id")
-                            logging.info(f"🎮 [PLAYCALL MATCH] Found play_id from DB: '{chosen_playcall}' -> play_id={play_id}")
-            
-            # Fetch play document using play_id if we have it
-            if play_id:
-                from bson import ObjectId
-                try:
-                    play_doc = plays_collection.find_one({"_id": ObjectId(play_id)})
-                    if play_doc:
-                        logging.info(f"🎮 [PLAYCALL MATCH] Loaded play document by play_id: '{chosen_playcall}' (play_id={play_id})")
-                except Exception as e:
-                    logging.warning(f"⚠️ [PLAYCALL MATCH] Error loading play by play_id {play_id}: {e}")
-            
-            # Fallback to name lookup if play_id method failed
-            if not play_doc:
-                play_doc = plays_collection.find_one({"name": chosen_playcall})
-                if play_doc:
-                    logging.warning(f"⚠️ [PLAYCALL MATCH] Fallback: Found play by name (not by play_id): '{chosen_playcall}'")
+            # Lookup play details from database to get play_type and play_focus
+            play_doc = plays_collection.find_one({"name": chosen_playcall})
             
             if play_doc:
                 chosen_play_type = play_doc.get("play_type", "motion")
                 user_focus = play_doc.get("play_focus", "inside")
-                logging.info(f"🎮 [PLAYCALL MATCH] Play details: type={chosen_play_type}, focus={user_focus}")
             else:
                 # Fallback if play not found
                 logging.warning(f"⚠️ [PLAYCALL OVERRIDE] Play '{chosen_playcall}' not found in database, using fallback")

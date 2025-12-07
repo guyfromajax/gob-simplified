@@ -3036,20 +3036,14 @@
 
     // ==================== POPULATE PLAY HEADSHOTS ====================
     // Get lineup player IDs from URL params
-    // ✅ FIX: Use user team's lineup (home or away based on my_team param)
     const headshotUrlParams = new URLSearchParams(window.location.search);
-    const userTeamSide = headshotUrlParams.get('my_team'); // "home" or "away"
-    const isUserHome = userTeamSide === 'home';
-    
     const lineup = {
-      pg: headshotUrlParams.get(isUserHome ? 'home_pg' : 'away_pg'),
-      sg: headshotUrlParams.get(isUserHome ? 'home_sg' : 'away_sg'),
-      sf: headshotUrlParams.get(isUserHome ? 'home_sf' : 'away_sf'),
-      pf: headshotUrlParams.get(isUserHome ? 'home_pf' : 'away_pf'),
-      c: headshotUrlParams.get(isUserHome ? 'home_c' : 'away_c')
+      pg: headshotUrlParams.get('home_pg'),
+      sg: headshotUrlParams.get('home_sg'),
+      sf: headshotUrlParams.get('home_sf'),
+      pf: headshotUrlParams.get('home_pf'),
+      c: headshotUrlParams.get('home_c')
     };
-    
-    console.log(`✅ [PLAYCALL CENTER] Using ${userTeamSide} team lineup for headshots:`, lineup);
     
     // Map play focus to position
     const focusToPosition = {

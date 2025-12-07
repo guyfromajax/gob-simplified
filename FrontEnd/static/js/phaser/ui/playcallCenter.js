@@ -219,10 +219,47 @@ export function updatePlaycallCenter(turnData, homeTeamId) {
   // Reset lean meter to neutral
   resetLeanMeter();
 
-  // ✅ REMOVED: Dynamic headshot updates from intended_shooter_id
-  // Playcall Center images are hardcoded by position (based on play focus) in court.html
-  // They only change when lineup changes (subs), not on each turn
-  // Popup images remain dynamic using intended_shooter_id (as they should)
+  // ✅ Update playcall center headshot for the play being used (use intended_shooter_id)
+  // Update headshot even if playcall doesn't match exactly (for image consistency with popup)
+  if (isUserTeamOnOffense && offensivePlaycall && turnData.intended_shooter_id) {
+    // Try exact match first
+    let playOption = document.querySelector(`.play-option[data-play="${offensivePlaycall}"]`);
+    
+    // If no exact match, try case-insensitive match (robust matching)
+    if (!playOption) {
+      const allPlayOptions = document.querySelectorAll('.play-option');
+      const turnPlayName = offensivePlaycall?.trim();
+      for (const option of allPlayOptions) {
+        const optionPlayName = option.dataset.play?.trim();
+        if (optionPlayName && turnPlayName && optionPlayName.toLowerCase() === turnPlayName.toLowerCase()) {
+          playOption = option;
+          console.log(`✅ [PLAYCALL CENTER] Found play option (case-insensitive): '${optionPlayName}' matches '${turnPlayName}'`);
+          break;
+        }
+      }
+    }
+    
+    if (playOption) {
+      const headshotImg = playOption.querySelector('.play-headshot');
+      if (headshotImg) {
+        const imgPath = `/static/images/players/${turnData.intended_shooter_id}.png`;
+        headshotImg.src = imgPath;
+        headshotImg.setAttribute('data-player-id', turnData.intended_shooter_id);
+        headshotImg.onerror = () => {
+          console.warn(`⚠️ Headshot failed to load: ${imgPath}, using default`);
+          headshotImg.src = '/static/images/players/default.png';
+        };
+        console.log(`✅ [PLAYCALL CENTER] Updated headshot for '${offensivePlaycall}' using intended_shooter_id: ${turnData.intended_shooter_id}`);
+      } else {
+        console.warn(`⚠️ [PLAYCALL CENTER] Found play option but no headshot img element for: ${offensivePlaycall}`);
+      }
+    } else {
+      console.warn(`⚠️ [PLAYCALL CENTER] Could not find play option for: ${offensivePlaycall}`);
+      console.warn(`⚠️ [PLAYCALL CENTER] Available play options:`, Array.from(document.querySelectorAll('.play-option')).map(opt => opt.dataset.play));
+    }
+  } else if (isUserTeamOnOffense && offensivePlaycall && !turnData.intended_shooter_id) {
+    console.warn(`⚠️ [PLAYCALL CENTER] Has offensivePlaycall '${offensivePlaycall}' but no intended_shooter_id in turnData`);
+  }
 
   // ==================== TRIGGER PLAYCALL REVEAL HUD ====================
   // Show transient HUD overlay with playcall info
