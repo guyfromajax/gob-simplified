@@ -70,11 +70,29 @@ export function updatePlaycallCenter(turnData, homeTeamId) {
     const allSelectedButtons = document.querySelectorAll('.play-option.selected');
     const selectedPlayNames = Array.from(allSelectedButtons).map(btn => btn.dataset.play);
     
-    // ✅ LOUD DEBUG: Frontend comparison
+    // ✅ LOUD DEBUG: Frontend comparison - EXPAND ARRAY TO SHOW ACTUAL VALUES
+    const selectedPlayNamesExpanded = selectedPlayNames.map((name, idx) => {
+      const btn = allSelectedButtons[idx];
+      return {
+        index: idx,
+        name: name,
+        dataPlay: btn?.dataset.play,
+        textContent: btn?.textContent?.trim(),
+        fullButton: btn
+      };
+    });
+    
+    console.log(`🔍 [PLAYCALL] Selected buttons detail:`, selectedPlayNamesExpanded);
+    console.log(`🔍 [PLAYCALL] Turn playcall: '${offensivePlaycall}' (type: ${typeof offensivePlaycall}, length: ${offensivePlaycall?.length})`);
+    
     const hasMatch = selectedPlayNames.some(name => {
       const btnName = name?.trim();
       const turnName = offensivePlaycall?.trim();
-      return btnName && turnName && btnName.toLowerCase() === turnName.toLowerCase();
+      const match = btnName && turnName && btnName.toLowerCase() === turnName.toLowerCase();
+      if (match) {
+        console.log(`✅ [PLAYCALL] Match found: '${btnName}' === '${turnName}'`);
+      }
+      return match;
     });
     
     if (hasMatch) {
@@ -85,7 +103,8 @@ export function updatePlaycallCenter(turnData, homeTeamId) {
     } else {
       console.warn("🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴");
       console.warn("🔴 [PLAYCALL MATCH] FALSE - Frontend did NOT find matching selected button!");
-      console.warn(`🔴 Turn playcall: '${offensivePlaycall}' | Selected:`, selectedPlayNames);
+      console.warn(`🔴 Turn playcall: '${offensivePlaycall}' | Selected play names:`, selectedPlayNames);
+      console.warn(`🔴 Selected buttons detail:`, selectedPlayNamesExpanded);
       console.warn("🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴");
     }
     
