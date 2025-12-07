@@ -842,7 +842,6 @@ class TurnManager:
                     logging.info(f"🎮 [PLAYCALL OVERRIDE] Converted 'Zone' to specific zone type: {chosen_defense}")
             else:
                 logging.info(f"🎮 [PLAYCALL DEBUG] No user_defense override found (user_defense={user_defense}), will use normal selection or check strategy_calls")
-            else:
                 # No user defense override - choose defense normally
                 defense_setting = self.game.defense_team.strategy_settings.get("defense", 2)
                 chosen_defense = random.choice(STRATEGY_CALL_DICTS["defense"][defense_setting])
