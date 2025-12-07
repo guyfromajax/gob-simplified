@@ -324,6 +324,18 @@ export class ShotAnimationSystem {
     for (let stepIndex = 1; stepIndex < maxSteps; stepIndex++) {
       if (this.scene.skipToEnd) break;
       
+      // Trigger lean meter animation at middle step
+      if (this.scene._leanScoreToAnimate !== null && 
+          this.scene._leanAnimationStep === stepIndex && 
+          !this.scene._leanAnimationTriggered) {
+        console.log(`📊 [LEAN] Triggering animation at step ${stepIndex} with score ${this.scene._leanScoreToAnimate}`);
+        const { animateLeanMeter } = await import('../ui/playcallCenter.js');
+        animateLeanMeter(this.scene._leanScoreToAnimate);
+        this.scene._leanAnimationTriggered = true;
+      } else if (this.scene._leanScoreToAnimate !== null && stepIndex === this.scene._leanAnimationStep) {
+        console.log(`⚠️ [LEAN] Animation already triggered or step mismatch: stepIndex=${stepIndex}, targetStep=${this.scene._leanAnimationStep}, triggered=${this.scene._leanAnimationTriggered}`);
+      }
+      
       // ✅ FIX: Match playTurnAnimation - detect pass BEFORE updateBallOwnership
       // This prevents updateBallOwnership from teleporting ball during pass animations
       const { detectPassAtStep, handlePassAnimation } = await import('./passDetection.js');
