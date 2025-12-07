@@ -752,9 +752,20 @@ class TurnManager:
         User overrides take precedence for turn-by-turn gameplay.
         """
         
-        # Check for user overrides FIRST (for turn-by-turn gameplay)
-        user_offense = self.game.game_state.get("user_offense_override")
-        user_defense = self.game.game_state.get("user_defense_override")
+        # ✅ SS&S: Check for persistent overrides in team.strategy_calls (replaces game_state overrides)
+        # Check if offense team is user team and has override
+        offense_override = None
+        if self.game.offense_team.is_user_team:
+            offense_override = self.game.offense_team.strategy_calls.get("offense_override")
+        
+        # Check if defense team is user team and has override
+        defense_override = None
+        if self.game.defense_team.is_user_team:
+            defense_override = self.game.defense_team.strategy_calls.get("defense_override")
+        
+        # Legacy support: Also check game_state for backward compatibility (will be removed)
+        user_offense = self.game.game_state.get("user_offense_override") or offense_override
+        user_defense = self.game.game_state.get("user_defense_override") or defense_override
         
         # If user provided an offense override, use the specific play name
         if user_offense:
@@ -806,9 +817,11 @@ class TurnManager:
         # If only defense override (user on offense, setting defense for next possession)
         if user_defense:
             chosen_defense = user_defense
-            self.game.game_state["user_defense_override"] = None  # Clear after use
-            # ✅ COMMENTED OUT: User defense override logs (cluttering transition debugging)
-            # logging.info(f"🎮 Using user defense override: {chosen_defense}")
+            # Clear override after use
+            if self.game.defense_team.is_user_team:
+                self.game.defense_team.strategy_calls["defense_override"] = None
+            self.game.game_state["user_defense_override"] = None  # Legacy
+            logging.info(f"🎮 [PLAYCALL OVERRIDE] Using defense override: {chosen_defense}")
         else:
             # No override, choose defense normally (will be set below)
             chosen_defense = None
@@ -867,13 +880,24 @@ class TurnManager:
         
         # Defense setting - use override if set, otherwise choose normally
         # NOTE: This must happen BEFORE offense attempt tracking so we know the correct defense
-        if chosen_defense is None:  # Not set by user override
-            defense_setting = self.game.defense_team.strategy_settings.get("defense", 2)
-            chosen_defense = random.choice(STRATEGY_CALL_DICTS["defense"][defense_setting])
+        if chosen_defense is None:  # Not set by user override above
+            # ✅ SS&S: Check for defense override in team.strategy_calls
+            if self.game.defense_team.is_user_team:
+                defense_override = self.game.defense_team.strategy_calls.get("defense_override")
+                if defense_override:
+                    chosen_defense = defense_override
+                    # Clear override after use
+                    self.game.defense_team.strategy_calls["defense_override"] = None
+                    logging.info(f"🎮 [PLAYCALL OVERRIDE] Using defense override: {chosen_defense}")
             
-            # If "Zone" is selected, randomly choose between 2-3 Zone, 3-2 Zone, and 1-3-1 Zone (1/3 each)
-            if chosen_defense == "Zone":
-                chosen_defense = random.choice(["2-3 Zone", "3-2 Zone", "1-3-1 Zone"])
+            # If still no override, use normal process
+            if chosen_defense is None:
+                defense_setting = self.game.defense_team.strategy_settings.get("defense", 2)
+                chosen_defense = random.choice(STRATEGY_CALL_DICTS["defense"][defense_setting])
+                
+                # If "Zone" is selected, randomly choose between 2-3 Zone, 3-2 Zone, and 1-3-1 Zone (1/3 each)
+                if chosen_defense == "Zone":
+                    chosen_defense = random.choice(["2-3 Zone", "3-2 Zone", "1-3-1 Zone"])
         
         # Record playcall attempt under new buckets
         try:
@@ -969,18 +993,57 @@ class TurnManager:
         # logging.warning(f"   - Offense strategy_settings: {self.game.offense_team.strategy_settings}")
         # logging.warning(f"   - Defense strategy_settings: {self.game.defense_team.strategy_settings}")
         
-        # Ensure strategy_calls dictionaries exist
-        if not hasattr(self.game.offense_team, 'strategy_calls') or not self.game.offense_team.strategy_calls:
-            self.game.offense_team.strategy_calls = {}
-        if not hasattr(self.game.defense_team, 'strategy_calls') or not self.game.defense_team.strategy_calls:
-            self.game.defense_team.strategy_calls = {}
+        # ✅ SS&S: Ensure strategy_calls dictionaries exist (but don't overwrite if already initialized)
+        # strategy_calls is initialized in TeamManager.__init__ with override fields
+        # Only initialize if completely missing (shouldn't happen, but defensive check)
+        if not hasattr(self.game.offense_team, 'strategy_calls') or self.game.offense_team.strategy_calls is None:
+            self.game.offense_team.strategy_calls = {
+                "offense_override": None,
+                "defense_override": None,
+                "aggression_override": None,
+                "tempo_override": None,
+                "press_override": None,
+                "trap_override": None,
+            }
+        if not hasattr(self.game.defense_team, 'strategy_calls') or self.game.defense_team.strategy_calls is None:
+            self.game.defense_team.strategy_calls = {
+                "offense_override": None,
+                "defense_override": None,
+                "aggression_override": None,
+                "tempo_override": None,
+                "press_override": None,
+                "trap_override": None,
+            }
 
         # Set tempo/aggression calls (string values for time elapsed and foul calculations)
-        tempo_setting = self.game.offense_team.strategy_settings.get("tempo", 2)
-        aggression_setting = self.game.defense_team.strategy_settings.get("aggression", 2)
+        # ✅ SS&S: Check for overrides in team.strategy_calls first
+        if self.game.offense_team.is_user_team:
+            tempo_override = self.game.offense_team.strategy_calls.get("tempo_override")
+            if tempo_override:
+                self.game.offense_team.strategy_calls["tempo_call"] = tempo_override
+                # Clear override after use
+                self.game.offense_team.strategy_calls["tempo_override"] = None
+                logging.info(f"🎮 [PLAYCALL OVERRIDE] Using tempo override: {tempo_override}")
+            else:
+                tempo_setting = self.game.offense_team.strategy_settings.get("tempo", 2)
+                self.game.offense_team.strategy_calls["tempo_call"] = random.choice(STRATEGY_CALL_DICTS["tempo"][tempo_setting])
+        else:
+            tempo_setting = self.game.offense_team.strategy_settings.get("tempo", 2)
+            self.game.offense_team.strategy_calls["tempo_call"] = random.choice(STRATEGY_CALL_DICTS["tempo"][tempo_setting])
         
-        self.game.offense_team.strategy_calls["tempo_call"] = random.choice(STRATEGY_CALL_DICTS["tempo"][tempo_setting])
-        self.game.defense_team.strategy_calls["aggression_call"] = random.choice(STRATEGY_CALL_DICTS["aggression"][aggression_setting])
+        if self.game.defense_team.is_user_team:
+            aggression_override = self.game.defense_team.strategy_calls.get("aggression_override")
+            if aggression_override:
+                self.game.defense_team.strategy_calls["aggression_call"] = aggression_override
+                # Clear override after use
+                self.game.defense_team.strategy_calls["aggression_override"] = None
+                logging.info(f"🎮 [PLAYCALL OVERRIDE] Using aggression override: {aggression_override}")
+            else:
+                aggression_setting = self.game.defense_team.strategy_settings.get("aggression", 2)
+                self.game.defense_team.strategy_calls["aggression_call"] = random.choice(STRATEGY_CALL_DICTS["aggression"][aggression_setting])
+        else:
+            aggression_setting = self.game.defense_team.strategy_settings.get("aggression", 2)
+            self.game.defense_team.strategy_calls["aggression_call"] = random.choice(STRATEGY_CALL_DICTS["aggression"][aggression_setting])
         
         # NOTE: rebounding and defense tempo for fast break release are now read directly 
         # from strategy_settings (numeric 0-4) in shot_manager.py - no string conversion needed

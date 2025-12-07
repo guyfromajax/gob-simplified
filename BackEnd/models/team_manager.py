@@ -6,9 +6,10 @@ from BackEnd.models.player import Player
 from BackEnd.constants import PLAYCALLS
 
 class TeamManager:
-    def __init__(self, name: str, is_home_team=False, strategy_settings=None, team_attributes=None, scouting_data=None, plays_data=None, mode="single"):
+    def __init__(self, name: str, is_home_team=False, strategy_settings=None, team_attributes=None, scouting_data=None, plays_data=None, mode="single", is_user_team=False):
         self.name = name
         self.is_home_team = is_home_team
+        self.is_user_team = is_user_team  # ✅ SS&S: Track if this is the user's team for override logic
         self.players = self._load_roster()
         self.lineup = self._load_lineup()
         
@@ -46,7 +47,15 @@ class TeamManager:
                 logging.warning(f"⚠️ [STRATEGY SETTINGS] {self.name} - strategy_settings provided but invalid (type={type(strategy_settings)}, len={len(strategy_settings) if isinstance(strategy_settings, dict) else 'N/A'}), using defaults")
             self.strategy_settings = self._init_strategy_settings()
         
-        self.strategy_calls = {}
+        # ✅ SS&S: Initialize strategy_calls with override fields (None = not set, value = override active)
+        self.strategy_calls = {
+            "offense_override": None,      # Play name string or None
+            "defense_override": None,      # "Man", "Zone", or None
+            "aggression_override": None,   # "normal", "aggressive", "passive", or None
+            "tempo_override": None,        # "slow", "normal", "fast", or None
+            "press_override": None,        # Future: FCP override
+            "trap_override": None,         # Future: HCT override
+        }
         self.playcall_tracker = {pc: 0 for pc in PLAYCALLS}
         self.defense_playcall_tracker = {"Man": 0, "Zone": 0}
         
