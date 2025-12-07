@@ -20,10 +20,10 @@ Each play in MongoDB now has 4 skeleton variants:
   "play_type": "motion",
   "play_focus": "inside",
   "skeletons": {
-    "successful": {...},      // Lean >= 1: Play executes perfectly
-    "mid_play_change": {...}, // Lean 0-0.99: Play adjusts mid-execution  
-    "contested": {...},       // Lean -0.01 to -1: Defense engaged
-    "broken": {...}           // Lean < -1: Defense disrupts
+    "successful": {...},      // Lean >= 0.5: Play executes perfectly
+    "mid_play_change": {...}, // Lean 0 to 0.49: Play adjusts mid-execution  
+    "contested": {...},       // Lean -0.01 to -0.5: Defense engaged
+    "broken": {...}           // Lean < -0.5: Defense disrupts
   }
 }
 ```
@@ -39,7 +39,7 @@ Each play in MongoDB now has 4 skeleton variants:
 
 **Location:** Line 565-601
 
-**Current Implementation:** Placeholder returning random lean score (-2 to 2)
+**Current Implementation:** Placeholder returning random lean score (-1 to 1)
 
 **TODO:** Implement real logic based on:
 - Offensive play type/focus vs defensive setup
@@ -74,7 +74,7 @@ def generate_logic(off_call, def_call, off_team, def_team, off_lineup, def_lineu
     # 3. Apply modifiers based on game situation
     # (e.g., trailing teams might force plays = lower score)
     
-    return max(-2, min(2, score))  # Clamp to -2 to 2 range
+    return max(-1, min(1, score))  # Clamp to -1 to 1 range
 ```
 
 ### 3. Skeleton Selection
@@ -85,10 +85,10 @@ def generate_logic(off_call, def_call, off_team, def_team, off_lineup, def_lineu
 
 **Mapping:**
 ```python
-if lean_score >= 1:      → "successful"
-elif lean_score >= 0:     → "mid_play_change"
-elif lean_score >= -1:    → "contested"
-else:                     → "broken"
+if lean_score >= 0.5:      → "successful"
+elif lean_score >= 0:       → "mid_play_change"
+elif lean_score >= -0.5:    → "contested"
+else:                       → "broken"
 ```
 
 **Fallback:** If selected variant is empty/missing, falls back to "successful"
@@ -206,8 +206,8 @@ playcall: Motion - Inside Focus, lean_score: 1.23
 ```
 
 ### Verify Skeleton Selection
-- Lean >= 1 should use "successful" skeleton
-- Lean 0-0.99 should fall back to "successful" (until mid_play_change is populated)
+- Lean >= 0.5 should use "successful" skeleton
+- Lean 0-0.49 should use "mid_play_change" skeleton (or fall back to "successful" if not populated)
 - Once variants populated, should see different animations
 
 ---
