@@ -410,7 +410,9 @@ class TurnManager:
             # Add playcalls to result for frontend display
             result["offensive_playcall"] = calls["offense"]
             result["defensive_playcall"] = calls["defense"]
-            logging.info(f"🎮 [PLAYCALL RESULT] Added to result: offensive_playcall='{calls[\"offense\"]}', defensive_playcall='{calls[\"defense\"]}'")
+            offense_name = calls["offense"]
+            defense_name = calls["defense"]
+            logging.info(f"🎮 [PLAYCALL RESULT] Added to result: offensive_playcall='{offense_name}', defensive_playcall='{defense_name}'")
             
             # Add play type and focus for frontend display
             result["offensive_play_type"] = calls.get("offense_type", "-")
