@@ -6,7 +6,7 @@ from BackEnd.models.player import Player
 from BackEnd.constants import PLAYCALLS
 
 class TeamManager:
-    def __init__(self, name: str, is_home_team=False, strategy_settings=None, team_attributes=None, scouting_data=None, plays_data=None, mode="single", is_user_team=False, strategy_calls=None):
+    def __init__(self, name: str, is_home_team=False, strategy_settings=None, team_attributes=None, scouting_data=None, plays_data=None, mode="single", is_user_team=False):
         self.name = name
         self.is_home_team = is_home_team
         self.is_user_team = is_user_team  # ✅ SS&S: Track if this is the user's team for override logic
@@ -48,27 +48,14 @@ class TeamManager:
             self.strategy_settings = self._init_strategy_settings()
         
         # ✅ SS&S: Initialize strategy_calls with call fields (None = use normal selection, value = use this call and clear after)
-        # Use provided strategy_calls (from saved game) or initialize fresh with defaults
-        if strategy_calls and isinstance(strategy_calls, dict):
-            # Ensure all required keys exist (merge with defaults if missing keys)
-            default_calls = {
-                "offense_call": None,
-                "defense_call": None,
-                "aggression_override": None,
-                "tempo_override": None,
-                "press_override": None,
-                "trap_override": None,
-            }
-            self.strategy_calls = {**default_calls, **strategy_calls}  # Saved calls override defaults
-        else:
-            self.strategy_calls = {
-                "offense_call": None,          # Play name string or None (user override persists until used)
-                "defense_call": None,          # "Man", "Zone", or None (user override persists until used)
-                "aggression_override": None,   # "normal", "aggressive", "passive", or None (temporary override)
-                "tempo_override": None,        # "slow", "normal", "fast", or None (temporary override)
-                "press_override": None,        # Future: FCP override
-                "trap_override": None,         # Future: HCT override
-            }
+        self.strategy_calls = {
+            "offense_call": None,          # Play name string or None (user override persists until used)
+            "defense_call": None,          # "Man", "Zone", or None (user override persists until used)
+            "aggression_override": None,   # "normal", "aggressive", "passive", or None (temporary override)
+            "tempo_override": None,        # "slow", "normal", "fast", or None (temporary override)
+            "press_override": None,        # Future: FCP override
+            "trap_override": None,         # Future: HCT override
+        }
         self.playcall_tracker = {pc: 0 for pc in PLAYCALLS}
         self.defense_playcall_tracker = {"Man": 0, "Zone": 0}
         
