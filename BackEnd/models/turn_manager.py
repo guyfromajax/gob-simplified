@@ -367,7 +367,9 @@ class TurnManager:
             tracking_name = defense_playcall  # Use specific name directly
             if tracking_name in def_team.scouting_data["defense"]:
                 # Get offensive play type and focus for granular tracking
-                offense_play_type = calls.get("offense_type", "").lower()  # "motion" or "set_play"
+                # ✅ SS&S: Use offense_play_type as single source of truth (works for both user overrides and normal selection)
+                offense_play_type_raw = calls.get("offense_play_type", "")
+                offense_play_type = offense_play_type_raw.lower() if offense_play_type_raw else ""
                 offense_focus = calls.get("offense_focus", "")  # "inside", "attack", "outside"
                 
                 # Normalize play type (set_play -> set) to match phase_resolution.py
@@ -415,7 +417,10 @@ class TurnManager:
             logging.info(f"🎮 [PLAYCALL RESULT] Added to result: offensive_playcall='{offense_name}', defensive_playcall='{defense_name}'")
             
             # Add play type and focus for frontend display
-            result["offensive_play_type"] = calls.get("offense_type", "-")
+            # ✅ SS&S: Use offense_play_type as single source of truth (works for both user overrides and normal selection)
+            offense_play_type = calls.get("offense_play_type", None)
+            # Capitalize for display (Motion/Set) if we have a value, otherwise use "-"
+            result["offensive_play_type"] = offense_play_type.title() if offense_play_type else "-"
             result["offensive_play_focus"] = calls.get("offense_focus", None)
             result["defensive_play_type"] = calls.get("defense_type", "-")
             result["defensive_play_focus"] = calls.get("defense_focus", None)
@@ -858,8 +863,7 @@ class TurnManager:
             return {
                 "offense": chosen_playcall,
                 "defense": chosen_defense,
-                "offense_type": "User",  # Mark as user-selected
-                "offense_play_type": chosen_play_type,  # Include play type for Playcall Center highlighting
+                "offense_play_type": chosen_play_type,  # ✅ SS&S: Single source of truth for play type ("motion" or "set_play")
                 "offense_focus": user_focus,
                 "defense_type": chosen_defense.title() if chosen_defense else "-",
                 "defense_focus": None
@@ -1026,7 +1030,7 @@ class TurnManager:
         return {
             "offense": chosen_playcall,
             "defense": chosen_defense,
-            "offense_type": chosen_play_type.title() if chosen_play_type else "-",
+            "offense_play_type": chosen_play_type if chosen_play_type else None,  # ✅ SS&S: Single source of truth for play type ("motion" or "set_play")
             "offense_focus": chosen_focus if chosen_focus else None,
             "defense_type": chosen_defense.title() if chosen_defense else "-",  # Man or Zone
             "defense_focus": None
