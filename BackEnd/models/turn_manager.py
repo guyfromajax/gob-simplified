@@ -858,6 +858,58 @@ class TurnManager:
                 if chosen_defense == "Zone":
                     chosen_defense = random.choice(["2-3 Zone", "3-2 Zone", "1-3-1 Zone"])
             
+            # ✅ FIX: Record offensive playcall attempt tracking (same as normal path)
+            # This was being skipped due to early return, causing override stats not to be tracked
+            try:
+                # Normalize type/focus labels
+                play_type_label = "Motion" if chosen_play_type == "motion" else ("Set" if chosen_play_type == "set_play" else None)
+                focus_label = user_focus if user_focus in ["inside", "attack", "outside"] else None
+                if play_type_label and focus_label:
+                    pc = self.game.offense_team.scouting_data["offense"]["Playcalls"]
+                    # Use chosen_defense for granular tracking
+                    defense_playcall = chosen_defense  # Use the defense we just determined
+                    from BackEnd.utils.defense_utils import is_zone_defense
+                    
+                    # Determine defense tracking key based on specific defense name
+                    if defense_playcall == "Man":
+                        vs_key = "vs_man"
+                    elif defense_playcall == "2-3 Zone":
+                        vs_key = "vs_2-3_zone"
+                    elif defense_playcall == "3-2 Zone":
+                        vs_key = "vs_3-2_zone"
+                    elif defense_playcall == "1-3-1 Zone":
+                        vs_key = "vs_1-3-1_zone"
+                    else:
+                        vs_key = None
+                    
+                    # Motion/Set overall + focus
+                    pc[play_type_label]["overall"]["attempts"] += 1
+                    pc[play_type_label][focus_label]["attempts"] += 1
+                    
+                    # Track granular attempts against defensive playcall
+                    if vs_key:
+                        # Overall attempts vs defense
+                        if vs_key in pc[play_type_label]["overall"]:
+                            pc[play_type_label]["overall"][vs_key]["attempts"] += 1
+                        # Focus attempts vs defense
+                        if vs_key in pc[play_type_label][focus_label]:
+                            pc[play_type_label][focus_label][vs_key]["attempts"] += 1
+                        
+                        # Track aggregate vs_zone for any zone type
+                        if is_zone_defense(defense_playcall) and "vs_zone" in pc[play_type_label]["overall"]:
+                            pc[play_type_label]["overall"]["vs_zone"]["attempts"] += 1
+                            pc[play_type_label][focus_label]["vs_zone"]["attempts"] += 1
+                    
+                    # Cumulative by focus
+                    pc["Cumulative"][focus_label]["attempts"] += 1
+                    
+                    # Track last play run for this category (for tooltips)
+                    category_key = f"{play_type_label.lower()}_{focus_label}"
+                    self.game.offense_team.scouting_data["offense"]["last_play_by_category"][category_key] = chosen_playcall
+            except Exception as e:
+                # Silently handle errors to avoid disrupting gameplay
+                logging.warning(f"⚠️ [PLAYCALL TRACKING] Error tracking override offense stats: {e}")
+            
             # Return early with user's choices
             logging.info(f"🎮 [PLAYCALL RETURN] Returning user playcall: offense='{chosen_playcall}', defense='{chosen_defense}'")
             return {
@@ -877,6 +929,12 @@ class TurnManager:
                 self.game.defense_team.strategy_calls["defense_call"] = None
             self.game.game_state["user_defense_override"] = None  # Legacy
             logging.info(f"🎮 [PLAYCALL] Using user defense call: {chosen_defense}")
+            
+            # ✅ FIX: If user selected "Zone", convert to a random specific zone type
+            # (Backend expects specific zone types: "2-3 Zone", "3-2 Zone", "1-3-1 Zone")
+            if chosen_defense == "Zone":
+                chosen_defense = random.choice(["2-3 Zone", "3-2 Zone", "1-3-1 Zone"])
+                logging.info(f"🎮 [PLAYCALL] Converted 'Zone' to specific zone type: {chosen_defense}")
         else:
             # No override, choose defense normally (will be set below)
             chosen_defense = None
