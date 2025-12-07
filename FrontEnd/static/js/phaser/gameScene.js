@@ -1858,7 +1858,9 @@ export function createGameScene(Phaser) {
       // Check if game should end or go to overtime
       // nextQuarterNumber is the quarter number the backend is ready for next
       // So the quarter we just finished is nextQuarterNumber - 1
-      const quarterThatJustFinished = nextQuarterNumber - 1;
+      // ✅ FIX: Use this.quarter (the quarter we just finished) instead of nextQuarterNumber - 1
+      // This is more reliable since this.quarter is set by the backend
+      const quarterThatJustFinished = this.quarter;
       
       // Use scores from lastTurnData if available (most recent/accurate), otherwise fall back to tracked scores
       const finalHomeScore = (lastTurnData && lastTurnData.home_score !== undefined) 
@@ -1960,6 +1962,10 @@ export function createGameScene(Phaser) {
       } else if (isFinalFromBackend || (quarterThatJustFinished >= 4 && !finalIsTied)) {
         // Game is over - finalize
         console.log('🏆 Game complete! Finalizing...');
+        
+        // ✅ FIX: Update this.isFinal so the "no animation" path also knows game is final
+        this.isFinal = true;
+        
         const finalize = async () => {
           const { finalizeGame } = await import('./finalizeGame.js');
           
