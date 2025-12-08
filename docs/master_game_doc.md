@@ -2979,7 +2979,8 @@ The animation system uses a unified distance-based duration calculation that ens
   - Calculates player movement duration based on distance from current sprite position to target
   - Uses `getPlayerSpeed()` which checks `window.__GAME_SPEED` for dynamic speed settings
   - Formula: `duration = (distance / speed) * 1000` (converts to milliseconds)
-  - Supports transition flag for longer movements (uses `MAX_TRANSITION_DURATION` = 3000ms cap)
+  - **Note**: The `isTransition` parameter is accepted but currently unused (distance fully determines time, no upper cap)
+  - Minimum duration: 50ms (to avoid zero-length tweens)
   - Default speed: 350 pixels/second (Normal preset)
 
 - **`getBallDuration(ballSprite, targetX, targetY)`** (`ballTween.js`)
@@ -3011,6 +3012,14 @@ The animation system uses a unified distance-based duration calculation that ens
 - ✅ Opening tip player movements
 - ✅ Free throw player movements
 - ✅ Fast break player movements
+- ✅ **Setup tweens** (`runSetupTween()` in `turnAnimation.js` and `ShotAnimationSystem.js`) - Fixed January 2025
+- ✅ **Get-back players** during shot attempts - Fixed January 2025
+  - Stop on MISS when rebound is secured
+  - Stop on MAKE after rim hold (1s HCO, 2s fast break)
+- ✅ **Rebound positioning animations** - Fixed January 2025
+  - Rebounder to ball bounce
+  - Non-rebounders collapse (stop when rebounder secures ball)
+  - Player to rebound spot
 
 **Ball Animations**:
 - ✅ Pass animations (`passDetection.js`)
@@ -3037,10 +3046,16 @@ The animation system uses a unified distance-based duration calculation that ens
 - All animations use `getPlayerDuration()` or `getBallDuration()`
 - Game speed settings respected everywhere
 - Consistent speeds across all animation types
+- **Recent Fixes (January 2025)**:
+  - `runSetupTween()` now uses distance-based timing (was hardcoded 1000ms)
+  - Get-back players use distance-based timing with early termination
+  - Rebound animations use distance-based timing and stop when rebounder secures ball
+  - BIP → HCO transitions are smooth and consistent
 
 **See:**
 - `docs/PHASE_2.5_BUG_LIST.md` - Bug 3 fix details
-- `docs/To Do/animation_speed_edge_cases.md` - Remaining edge cases
+- `docs/To Do/distance_based_animation_audit.md` - Comprehensive audit and implementation details
+- `docs/To Do/animation_speed_edge_cases.md` - Previous edge cases (now resolved)
 
 ---
 
