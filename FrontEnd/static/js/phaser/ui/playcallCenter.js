@@ -33,7 +33,6 @@ export function updatePlaycallCenter(turnData, homeTeamId) {
   // Get playcall center
   const playcallCenter = document.getElementById('playcall-center');
   if (!playcallCenter) {
-    console.warn('⚠️ Playcall Center not found');
     return;
   }
 
@@ -50,87 +49,22 @@ export function updatePlaycallCenter(turnData, homeTeamId) {
   const isUserTeamOnDefense = (userTeamSide === 'home' && !isHomeOffense) || 
                                (userTeamSide === 'away' && isHomeOffense);
   
-  // ✅ DEBUG: Always log turn data check (outside condition to see why it might fail)
-  console.log(`🔍 [PLAYCALL CENTER] Turn data check:`, {
-    offensivePlaycall,
-    isUserTeamOnOffense,
-    userTeamSide,
-    isHomeOffense,
-    offenseTeamId,
-    homeTeamId,
-    hasIntendedShooter: !!turnData.intended_shooter_id,
-    resultType: turnData.result_type,
-    currentTurn: turnData.current_turn,
-    willCheckOffense: isUserTeamOnOffense && !!offensivePlaycall
-  });
-  
   // Check if offense playcall matches a selected button
   if (isUserTeamOnOffense && offensivePlaycall) {
-    // ✅ LOUD DEBUG: Check all selected buttons and compare
     const allSelectedButtons = document.querySelectorAll('.play-option.selected');
     const selectedPlayNames = Array.from(allSelectedButtons).map(btn => btn.dataset.play);
-    
-    // ✅ LOUD DEBUG: Frontend comparison - EXPAND ARRAY TO SHOW ACTUAL VALUES
-    const selectedPlayNamesExpanded = selectedPlayNames.map((name, idx) => {
-      const btn = allSelectedButtons[idx];
-      return {
-        index: idx,
-        name: name,
-        dataPlay: btn?.dataset.play,
-        textContent: btn?.textContent?.trim(),
-        fullButton: btn
-      };
-    });
-    
-    // ✅ EXPAND: Show actual play names in array (not just Array(1))
-    const actualPlayNames = selectedPlayNames.filter(n => n != null).map(n => `'${n}'`).join(', ');
-    console.log(`🔍 [PLAYCALL] Selected buttons detail:`, selectedPlayNamesExpanded);
-    console.log(`🔍 [PLAYCALL] Selected play names (actual values): [${actualPlayNames}]`);
-    console.log(`🔍 [PLAYCALL] Turn playcall: '${offensivePlaycall}' (type: ${typeof offensivePlaycall}, length: ${offensivePlaycall?.length})`);
-    
-    const hasMatch = selectedPlayNames.some(name => {
-      const btnName = name?.trim();
-      const turnName = offensivePlaycall?.trim();
-      const match = btnName && turnName && btnName.toLowerCase() === turnName.toLowerCase();
-      if (match) {
-        console.log(`✅ [PLAYCALL] Match found: '${btnName}' === '${turnName}'`);
-      }
-      return match;
-    });
-    
-    if (hasMatch) {
-      console.log("🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢");
-      console.log("🟢 [PLAYCALL MATCH] TRUE - Frontend found matching selected button!");
-      console.log(`🟢 Turn playcall: '${offensivePlaycall}' | Selected:`, selectedPlayNames);
-      console.log("🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢");
-    } else {
-      console.warn("🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴");
-      console.warn("🔴 [PLAYCALL MATCH] FALSE - Frontend did NOT find matching selected button!");
-      console.warn(`🔴 Turn playcall: '${offensivePlaycall}' | Selected play names:`, selectedPlayNames);
-      console.warn(`🔴 Selected buttons detail:`, selectedPlayNamesExpanded);
-      console.warn("🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴");
-    }
-    
-    console.log(`🎮 [PLAYCALL] Checking if offense playcall matches selected: ${offensivePlaycall}`, {
-      isUserTeamOnOffense,
-      offensivePlaycall,
-      userTeamSide,
-      selectedPlayNames
-    });
     
     // Try exact match first
     let selectedOffenseBtn = document.querySelector(`.play-option.selected[data-play="${offensivePlaycall}"]`);
     
     // If no exact match, try to find by checking all selected buttons
     if (!selectedOffenseBtn && selectedPlayNames.length > 0) {
-      console.log(`🔍 [PLAYCALL] No exact match, checking all selected buttons:`, selectedPlayNames);
       // Check if any selected button matches (case-insensitive, trim whitespace)
       for (const btn of allSelectedButtons) {
         const btnPlayName = btn.dataset.play?.trim();
         const turnPlayName = offensivePlaycall?.trim();
         if (btnPlayName && turnPlayName && btnPlayName.toLowerCase() === turnPlayName.toLowerCase()) {
           selectedOffenseBtn = btn;
-          console.log(`✅ [PLAYCALL] Found match (case-insensitive): '${btnPlayName}' === '${turnPlayName}'`);
           break;
         }
       }
@@ -139,10 +73,6 @@ export function updatePlaycallCenter(turnData, homeTeamId) {
     if (selectedOffenseBtn) {
       // This play was selected and is now being used - clear the highlight
       selectedOffenseBtn.classList.remove('selected');
-      console.log(`✅ [PLAYCALL] Cleared offense highlight for used play: ${offensivePlaycall}`);
-    } else {
-      console.log(`🔍 [PLAYCALL] No matching selected button found for: ${offensivePlaycall}`);
-      console.log(`🔍 [PLAYCALL] Available selected plays:`, selectedPlayNames);
     }
   }
   
@@ -151,44 +81,20 @@ export function updatePlaycallCenter(turnData, homeTeamId) {
     // Check for specific zone types (2-3 Zone, 3-2 Zone, 1-3-1 Zone) or generic "Zone"
     const defenseType = defensivePlaycall.includes('Zone') ? 'Zone' : defensivePlaycall;
     
-    // ✅ Get all selected defense buttons for detailed logging
-    const allSelectedDefenseButtons = document.querySelectorAll('.defense-override-btn.selected');
-    const selectedDefenseNames = Array.from(allSelectedDefenseButtons).map(btn => btn.dataset.defense);
-    
-    console.log(`🎮 [PLAYCALL] Checking if defense playcall matches selected: ${defensivePlaycall} (type: ${defenseType})`, {
-      isUserTeamOnDefense,
-      defensivePlaycall,
-      defenseType,
-      userTeamSide,
-      selectedDefenseNames
-    });
-    
     // Try exact match first
     let selectedDefenseBtn = document.querySelector(`.defense-override-btn.selected[data-defense="${defenseType}"]`);
     
-    // ✅ FIX: If no exact match and turn used a specific zone type, check if user selected generic "Zone"
+    // If no exact match and turn used a specific zone type, check if user selected generic "Zone"
     // Backend converts "Zone" to specific types (2-3 Zone, 3-2 Zone, 1-3-1 Zone)
     // So if turn uses "2-3 Zone" but user selected "Zone", we should still match
     if (!selectedDefenseBtn && defenseType === 'Zone' && defensivePlaycall !== 'Zone') {
       // Turn used a specific zone type, check if user selected generic "Zone"
       selectedDefenseBtn = document.querySelector(`.defense-override-btn.selected[data-defense="Zone"]`);
-      if (selectedDefenseBtn) {
-        console.log(`✅ [PLAYCALL] Matched generic Zone button for specific zone type: ${defensivePlaycall}`);
-      }
-    }
-    
-    // ✅ FIX: Also check reverse - if turn used "Man" but user selected "Zone", log mismatch
-    if (!selectedDefenseBtn && defenseType === 'Man' && selectedDefenseNames.includes('Zone')) {
-      console.warn(`⚠️ [PLAYCALL] Defense mismatch: Turn used 'Man' but user selected 'Zone' - defense override may not have been applied`);
     }
     
     if (selectedDefenseBtn) {
       // This defense was selected and is now being used - clear the highlight
       selectedDefenseBtn.classList.remove('selected');
-      console.log(`✅ [PLAYCALL] Cleared defense highlight for used defense: ${defensivePlaycall}`);
-    } else {
-      console.log(`🔍 [PLAYCALL] No matching selected button found for: ${defensivePlaycall} (type: ${defenseType})`);
-      console.log(`🔍 [PLAYCALL] Selected defense buttons:`, selectedDefenseNames);
     }
   }
 
@@ -274,10 +180,7 @@ export function resetLeanMeter() {
  * @param {number} leanScore - Score from -1.0 to 1.0
  */
 export function animateLeanMeter(leanScore) {
-  console.log(`📊 [LEAN METER] animateLeanMeter called with score: ${leanScore}`);
-
   if (leanScore == null || isNaN(leanScore)) {
-    console.warn('⚠️ Invalid lean score, keeping meter neutral');
     return;
   }
 
@@ -288,7 +191,6 @@ export function animateLeanMeter(leanScore) {
   const negFill = document.getElementById('lean-fill-negative');
 
   if (!posFill || !negFill) {
-    console.warn('⚠️ Lean meter elements not found');
     return;
   }
 
@@ -321,7 +223,6 @@ export function animateLeanMeter(leanScore) {
  */
 export function parseLeanScoreFromText(turnData) {
   if (!turnData || !turnData.text) {
-    console.log('🔍 [LEAN] No turnData or text field');
     return null;
   }
 
@@ -330,11 +231,9 @@ export function parseLeanScoreFromText(turnData) {
   
   if (leanMatch && leanMatch[1]) {
     const leanScore = parseFloat(leanMatch[1]);
-    console.log(`✅ [LEAN] Parsed lean score: ${leanScore} from text: "${text.substring(0, 100)}"`);
     return leanScore;
   }
 
-  console.log(`⚠️ [LEAN] No lean score found in text: "${text.substring(0, 100)}"`);
   return null;
 }
 
