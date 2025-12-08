@@ -1097,21 +1097,15 @@ def _apply_multi_defender_offsets(
         defender_list_sorted = sorted(defender_list)
         
         # Determine offset based on spot category
+        # ✅ FIX: Use consistent offset patterns for all spots (no zone-area-based logic)
+        # This prevents defenders from converging when spots change between steps
         if spot in ["key", "topLane", "upper highPost", "lower highPost", "midLane"]:
-            # Each defender goes 2 y coords toward their zone area
-            # Upper half: +=2, Lower half: -=2
-            for i, defender_pos in enumerate(defender_list_sorted):
-                # Determine if defender's zone is in upper or lower half
-                zone_coords = zone_boundaries.get(defender_pos, [])
-                if zone_coords:
-                    # Calculate average y of zone to determine upper/lower
-                    avg_zone_y = sum(c[1] for c in zone_coords) / len(zone_coords)
-                    # Upper half: y < 25 (closer to top), Lower half: y >= 25 (closer to bottom)
-                    # In grid coords, smaller y = upper, larger y = lower
-                    if avg_zone_y < 25:  # Upper half
-                        assignments[defender_pos]["y"] += 2
-                    else:  # Lower half
-                        assignments[defender_pos]["y"] -= 2
+            # Use consistent y-axis offset (same as wings) - no zone area logic
+            # Defender 1: y += 2, Defender 2: y -= 2
+            if len(defender_list_sorted) >= 1:
+                assignments[defender_list_sorted[0]]["y"] += 2
+            if len(defender_list_sorted) >= 2:
+                assignments[defender_list_sorted[1]]["y"] -= 2
         
         elif spot in ["upper wing", "upper midWing", "lower wing", "lower midWing", 
                       "upper apex", "upper bird", "lower apex", "lower bird"]:
