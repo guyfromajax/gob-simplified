@@ -463,6 +463,17 @@ def resolve_fast_break_logic(game: "GameManager"):
     ball_handler_outlet_x = max(4, min(97, ball_handler_start_x + direction * ball_handler_move_x))
     ball_handler_outlet_y = max(1, min(49, ball_handler_start_y + ball_handler_move_y))
     
+    # ✅ DEBUG: Log outlet position calculation
+    logging.warning(f"🏀 [FAST BREAK PHASE DEBUG] Outlet position calculation:")
+    logging.warning(f"  ball_handler_start_x: {ball_handler_start_x}")
+    logging.warning(f"  ball_handler_start_y: {ball_handler_start_y}")
+    logging.warning(f"  direction: {direction}")
+    logging.warning(f"  ball_handler_move_x: {ball_handler_move_x}")
+    logging.warning(f"  ball_handler_move_y: {ball_handler_move_y}")
+    logging.warning(f"  ball_handler_outlet_x: {ball_handler_outlet_x}")
+    logging.warning(f"  ball_handler_outlet_y: {ball_handler_outlet_y}")
+    logging.warning(f"  calculation: {ball_handler_start_x} + {direction} * {ball_handler_move_x} = {ball_handler_outlet_x}")
+    
     # Store ball handler outlet position for animation
     fb_roles["ball_handler_outlet_x"] = ball_handler_outlet_x
     fb_roles["ball_handler_outlet_y"] = ball_handler_outlet_y

@@ -153,19 +153,23 @@ class Animator:
         # Calculate additional movement from outlet position
         # For defensive stops and shot attempts: 5-10 x spots, ±6 y
         # Home offense: +5 to +10 (move right toward basket at x=90)
-        # Away offense: -5 to -10 (move left toward basket at x=10 in HOME orientation)
-        # Note: build_movement will flip coordinates for away offense, so we calculate in HOME orientation
+        # Away offense: +5 to +10 (move right in HOME orientation, which becomes left in away orientation after flip)
+        # Note: build_movement will flip coordinates for away offense, which inverts the direction
+        # So for away offense, we use POSITIVE values in HOME orientation, which become NEGATIVE after flip
+        move_distance = random.randint(5, 10)
         if is_away_offense:
-            # Away offense: X -5 to -10 (negative values in HOME orientation)
-            # After flipping: this becomes moving toward away basket (x=10)
-            additional_move_x = -random.randint(5, 10)
+            # Away offense: Use POSITIVE move_distance in HOME orientation
+            # After flipping: 100 - (outlet_x + move_distance) = 100 - outlet_x - move_distance
+            # This moves LEFT in away orientation (toward basket at x=90 in away orientation = x=10 in HOME)
+            additional_move_x = move_distance
         else:
             # Home offense: X +5 to +10 (positive values in HOME orientation)
             # This moves toward home basket (x=90)
-            additional_move_x = random.randint(5, 10)
+            additional_move_x = move_distance
         additional_move_y = random.randint(-6, 6)
         
         # ✅ DEBUG: Log movement values
+        logging.warning(f"  move_distance: {move_distance}")
         logging.warning(f"  additional_move_x: {additional_move_x}")
         logging.warning(f"  additional_move_y: {additional_move_y}")
         
@@ -173,6 +177,8 @@ class Animator:
         # build_movement will flip for away offense if needed
         if ball_handler_outlet_x is not None and ball_handler_outlet_y is not None:
             # Use outlet position as starting point (in HOME orientation)
+            # For away offense: adding positive value moves RIGHT in HOME, which becomes LEFT after flip
+            # For home offense: adding positive value moves RIGHT toward basket
             bh_end_x = max(4, min(97, ball_handler_outlet_x + additional_move_x))
             bh_end_y = max(1, min(49, ball_handler_outlet_y + additional_move_y))
             bh_end = {"x": bh_end_x, "y": bh_end_y}
