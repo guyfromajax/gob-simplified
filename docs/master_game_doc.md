@@ -449,9 +449,48 @@ The system prioritizes zone coverage while ensuring ball handler is always guard
 - Converted to coordinate polygons via `_get_zone_coordinates()`
 - Used for overlap detection via `_point_in_zone()` checks
 
+#### Coordinate Orientation Handling ✅ **CRITICAL** (January 2025)
+
+**Purpose:** Ensures consistent coordinate orientation throughout the zone defense assignment process to prevent double-flipping bugs.
+
+**Coordinate Flow:**
+1. **Input:** `assign_all_zone_defenders()` receives offensive player coordinates in their current orientation (away orientation if away team on offense)
+2. **Processing:** All zone defense calculations work internally, but `get_defender_coords()` returns coordinates in the same orientation as input (away if away offense)
+3. **Output:** `assign_all_zone_defenders()` converts all defender coordinates to **HOME orientation** before returning
+4. **Animation:** `animator.py` (line 1442) flips defender coordinates to away orientation to match offensive coordinates
+
+**Critical Fix - Fallback Path Coordinate Conversion:**
+
+**Bug:** The fallback path (lines 1046-1076) that assigns the closest defender to guard the ball handler was missing the HOME orientation conversion, causing a double-flip:
+- `get_defender_coords()` returned coords in away orientation
+- Fallback path assigned directly (still in away orientation)
+- `animator.py` flipped again → defender appeared on wrong end of court
+
+**Fix:** Added HOME orientation conversion in fallback path (lines 1072-1075):
+```python
+# get_defender_coords returns in same orientation as input (away if away offense)
+# Zone defense expects HOME orientation, so convert if away offense
+if is_away_offense:
+    coords = get_away_player_coords(coords)
+assignments[closest_defender] = coords
+```
+
+**Edge Case Fixed:**
+- **Scenario:** 1-3-1 zone defense, ball handler in lower corner, away team on offense
+- **Symptom:** Defender would animate to correct position initially, then flip to wrong end of court
+- **Root Cause:** Fallback path (used when ball handler check fails) didn't convert to HOME orientation
+- **Validation:** Test `test_zone_defense_lower_corner_away_offense.py` verifies defender x coordinate is closer to 6 (away side) than 88 (home side)
+
+**Key Principle:**
+- **All paths** in `assign_all_zone_defenders()` must return coordinates in HOME orientation
+- This ensures `animator.py` can consistently flip once to match offensive coordinate orientation
+- Both normal path (lines 881-882) and fallback path (lines 1072-1075) now follow this pattern
+
 **Key Files:**
 - `BackEnd/utils/shared_defense.py` - Core zone defense logic
 - `BackEnd/constants.py` - Zone definitions (`ZONE_23_NORMAL`, `ZONE_32_NORMAL`, etc.)
+- `BackEnd/models/animator.py` - Coordinate flipping for animation (line 1442)
+- `tests/test_zone_defense_lower_corner_away_offense.py` - Validation test
 
 ---
 
