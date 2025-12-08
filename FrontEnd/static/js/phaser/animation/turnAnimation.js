@@ -892,8 +892,9 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
  * @param {Object} params.playerSprites - Player sprites dict
  * @param {string} params.rebounderId - Rebounder player ID
  * @param {string} params.pgId - Point guard player ID
+ * @param {Object} [params.turnData] - Turn data (optional, for determining offense team)
  */
-async function runOffensiveReboundKickoutSetup({ scene, ballSprite, playerSprites, rebounderId, pgId }) {
+async function runOffensiveReboundKickoutSetup({ scene, ballSprite, playerSprites, rebounderId, pgId, turnData }) {
   animationDebugLog('runOffensiveReboundKickoutSetup called with:', { rebounderId, pgId });
   if (!scene || !playerSprites || rebounderId == null || pgId == null) return;
 
@@ -914,6 +915,16 @@ async function runOffensiveReboundKickoutSetup({ scene, ballSprite, playerSprite
     attachBallToPlayer(scene, ballSprite, rebounderSprite);
   }
 
+  // ✅ Determine if away team is on offense
+  const offenseTeamId = turnData?.offense_team_id || turnData?.possession_team_id || scene.offenseTeamId;
+  const homeTeamId = scene.simData?.home_team_id;
+  const isAwayOffense = offenseTeamId && homeTeamId && offenseTeamId !== homeTeamId;
+
+  // ✅ Helper function to flip coordinates for away team offense
+  const flipCoords = (coords) => {
+    return { x: 101 - coords.x, y: coords.y };
+  };
+
   const width = scene.game.config.width;
   const height = scene.game.config.height;
   const { HCO_STRING_SPOTS } = await import('../../utils/courtPositions.js');
@@ -928,14 +939,19 @@ async function runOffensiveReboundKickoutSetup({ scene, ballSprite, playerSprite
     "deep lower wing"
   ];
   const selectedPGSpot = pgSpotOptions[Math.floor(Math.random() * pgSpotOptions.length)];
-  const pgSpot = HCO_STRING_SPOTS[selectedPGSpot];
+  let pgSpot = HCO_STRING_SPOTS[selectedPGSpot];
   
   if (!pgSpot) {
     animationDebugWarn('runOffensiveReboundKickoutSetup: Invalid PG spot selected', { selectedPGSpot });
     return;
   }
 
-  // Determine PG's vertical half for rebounder constraint
+  // ✅ Apply coordinate flipping for away team offense
+  if (isAwayOffense) {
+    pgSpot = flipCoords(pgSpot);
+  }
+
+  // Determine PG's vertical half for rebounder constraint (based on original spot name, not flipped coords)
   const isPGUpperHalf = selectedPGSpot.includes("upper");
   const isPGLowerHalf = selectedPGSpot.includes("lower");
   const isPGCentral = selectedPGSpot === "key" || selectedPGSpot === "deep key";
@@ -963,18 +979,26 @@ async function runOffensiveReboundKickoutSetup({ scene, ballSprite, playerSprite
 
   // Select random rebounder spot from valid options
   const selectedRebounderSpot = rebounderSpotOptions[Math.floor(Math.random() * rebounderSpotOptions.length)];
-  const rebounderSpot = HCO_STRING_SPOTS[selectedRebounderSpot];
+  let rebounderSpot = HCO_STRING_SPOTS[selectedRebounderSpot];
   
   if (!rebounderSpot) {
     animationDebugWarn('runOffensiveReboundKickoutSetup: Invalid rebounder spot selected', { selectedRebounderSpot });
     return;
   }
 
+  // ✅ Apply coordinate flipping for away team offense
+  if (isAwayOffense) {
+    rebounderSpot = flipCoords(rebounderSpot);
+  }
+
   animationDebugLog('runOffensiveReboundKickoutSetup: Selected spots', {
     pgSpot: selectedPGSpot,
     pgCoords: pgSpot,
     rebounderSpot: selectedRebounderSpot,
-    rebounderCoords: rebounderSpot
+    rebounderCoords: rebounderSpot,
+    isAwayOffense,
+    offenseTeamId,
+    homeTeamId
   });
 
   // Animate both players to their spots

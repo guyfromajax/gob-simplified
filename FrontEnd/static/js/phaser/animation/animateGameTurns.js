@@ -344,7 +344,8 @@ async function handleOrebKickout(scene, { playerSprites, ballSprite, rebounderId
     ballSprite,
     playerSprites,
     rebounderId,
-    pgId
+    pgId,
+    turnData  // ✅ Pass turnData to determine offense team for coordinate flipping
   });
 
   // Step 2: Execute kickout pass to PG
