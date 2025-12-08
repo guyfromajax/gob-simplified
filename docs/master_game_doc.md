@@ -347,6 +347,114 @@ The defender coordinate system uses a unified architecture with **`get_defender_
 
 ---
 
+### Zone Defender Placement System ✅ **COMPLETE** (January 2025)
+
+**Status:** Fully implemented with overlap resolution and multi-defender offset logic
+
+The zone defender placement system assigns defensive coordinates for all zone defenders, handling zone overlaps, multi-defender situations, and prioritizing zone coverage when the ball handler is double-teamed.
+
+**Architecture:**
+
+#### Core Function: `assign_all_zone_defenders()`
+
+**Location:** `BackEnd/utils/shared_defense.py` (lines 794-1086)
+
+**Purpose:** Assigns defensive coordinates for all zone defenders, handling overlaps and applying offsets.
+
+**Process:**
+
+1. **Overlap Detection** (`_detect_overlapping_zones()`)
+   - Scans all offensive players to find which players are in multiple defensive zones
+   - Returns `overlap_map`: `{offensive_player_id: [defender_positions]}`
+   - Uses `_point_in_zone()` to check if player coordinates fall within zone boundaries
+
+2. **Overlap Resolution** (`_resolve_overlap_assignments()`)
+   - Determines which defender should guard each overlap player
+   - **Key Logic:** When ball handler is double-teamed:
+     - If one defender has other players in their zone → that defender guards zone player, other stays on BH
+     - If both have other players → randomly choose one to guard zone player, other stays on BH
+     - If neither has other players → both double-team ball handler (offsets applied later)
+   - **Always ensures:** At least one defender stays on ball handler when BH is double-teamed
+   - Returns assignments: `{defender_pos: offensive_player_id}` or `None` (guards zone player via priority)
+
+3. **Coordinate Assignment**
+   - For overlap-assigned defenders: Guard specific offensive player using `get_defender_coords()`
+   - For non-overlap defenders: Use standard priority logic (`assign_zone_defender_coords()`)
+   - Filters players to consider based on overlap assignments (excludes already-assigned overlap players)
+
+4. **Multi-Defender Offset Application** (`_apply_multi_defender_offsets()`)
+   - Detects when multiple defenders guard the same offensive player
+   - Applies coordinate offsets to prevent perfect stacking
+   - Offset pattern depends on offensive player's spot location
+
+#### Multi-Defender Offset Logic
+
+**Location:** `BackEnd/utils/shared_defense.py` (lines 1089-1165)
+
+**Purpose:** Prevents defenders from stacking perfectly when multiple defenders guard the same offensive player.
+
+**Offset Patterns by Spot Category:**
+
+1. **Center/Key Spots** (`key`, `topLane`, `upper highPost`, `lower highPost`, `midLane`):
+   - Defender 1: `y += 2`
+   - Defender 2: `y -= 2`
+   - **Note:** Uses consistent pattern regardless of zone area (prevents convergence when spots change)
+
+2. **Wing Spots** (`upper wing`, `upper midWing`, `lower wing`, `lower midWing`, `upper apex`, `upper bird`, `lower apex`, `lower bird`):
+   - Defender 1: `y += 2`
+   - Defender 2: `y -= 2`
+
+3. **Corner/Baseline/Post Spots** (`upper midCorner`, `upper corner`, `lower midCorner`, `lower corner`, `upper midBaseline`, `lower midBaseline`, `upper midPost`, `upper lowPost`, `lower midPost`, `lower lowPost`):
+   - Defender 1: `x += x_direction * 2`
+   - Defender 2: `x -= x_direction * 2`
+   - **x_direction:** `1` if home team on offense, `-1` if away team on offense
+
+**Key Design Decision:**
+- Offsets are **always applied** for multi-defender situations (not conditional on zone area)
+- This ensures defenders remain offset even when offensive player moves between steps
+- Prevents convergence/stacking that occurred with zone-area-based offset logic
+
+#### Zone Coverage Prioritization
+
+**When Ball Handler is Double-Teamed:**
+
+The system prioritizes zone coverage while ensuring ball handler is always guarded:
+
+1. **One Defender Has Other Players in Zone:**
+   - That defender guards the closest other player in their zone (by distance to basket)
+   - Other defender stays on ball handler
+
+2. **Both Defenders Have Other Players in Zone:**
+   - Randomly choose one defender to guard their closest zone player
+   - Other defender stays on ball handler
+   - **Ensures:** At least one defender always guards ball handler
+
+3. **Neither Defender Has Other Players in Zone:**
+   - Both defenders guard ball handler (double-team)
+   - Offsets applied via `_apply_multi_defender_offsets()`
+
+**Implementation Details:**
+- Uses `_manhattan_distance_to_basket()` to find closest zone player
+- Random selection via `random.choice()` when both have zone players
+- Assignment stored in `overlap_player_to_guard` dict for coordinate calculation
+
+#### Zone Types Supported
+
+- **2-3 Zone:** Normal, Lower Shift, Upper Shift
+- **3-2 Zone:** Normal, Lower Corner Shift, Upper Corner Shift
+- **1-3-1 Zone:** Normal, Lower Shift, Lower Corner Shift, Upper Shift, Upper Corner Shift
+
+**Zone Boundaries:**
+- Defined as lists of spot names from `HCO_STRING_SPOTS`
+- Converted to coordinate polygons via `_get_zone_coordinates()`
+- Used for overlap detection via `_point_in_zone()` checks
+
+**Key Files:**
+- `BackEnd/utils/shared_defense.py` - Core zone defense logic
+- `BackEnd/constants.py` - Zone definitions (`ZONE_23_NORMAL`, `ZONE_32_NORMAL`, etc.)
+
+---
+
 ### Unified Pass System ✅ **COMPLETE** (January 2025)
 
 **Status:** Fully unified and operational
