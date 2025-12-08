@@ -546,9 +546,10 @@ def resolve_fast_break_logic(game: "GameManager"):
         defender.outlet_coords["y"] = defender_actual_y
         
         # Check if defender is ahead of ball handler (using actual positions)
-        # ✅ FIX: For away offense, convert to away orientation for comparison
-        # Coordinates are stored in HOME orientation, but we should compare in the offense team's orientation
-        from BackEnd.utils.shared import get_away_player_coords
+        # ✅ FIX: Compare in HOME orientation for both home and away offense
+        # Coordinates are stored in HOME orientation, so we compare directly in HOME orientation
+        # For away offense: basket is at x=10, smaller x is closer → defender ahead if x <= ball handler x
+        # For home offense: basket is at x=90, larger x is closer → defender ahead if x >= ball handler x
         
         logging.warning(f"🏀 [FAST BREAK PHASE DEBUG] Defender comparison for {defender_id}:")
         logging.warning(f"  defender_actual_x (HOME): {defender_actual_x}")
@@ -556,22 +557,14 @@ def resolve_fast_break_logic(game: "GameManager"):
         logging.warning(f"  is_away_offense: {is_away_offense}")
         
         if is_away_offense:
-            # Convert to away orientation for comparison
-            defender_away = get_away_player_coords({"x": defender_actual_x, "y": defender_actual_y})
-            ball_handler_away = get_away_player_coords({"x": ball_handler_outlet_x, "y": ball_handler_outlet_y})
-            defender_x_away = defender_away["x"]
-            ball_handler_x_away = ball_handler_away["x"]
-            
-            logging.warning(f"  defender_x (AWAY): {defender_x_away}")
-            logging.warning(f"  ball_handler_x (AWAY): {ball_handler_x_away}")
-            
-            # Away offense: smaller x is closer to basket, so defender ahead if x <= ball handler x
-            is_ahead = defender_x_away <= ball_handler_x_away
-            logging.warning(f"  Comparison (AWAY orientation): {defender_x_away} <= {ball_handler_x_away} = {is_ahead}")
+            # Away offense: basket at x=10 in HOME orientation, smaller x is closer to basket
+            # Defender ahead if defender_x <= ball_handler_x (defender is closer to x=10)
+            is_ahead = defender_actual_x <= ball_handler_outlet_x
+            logging.warning(f"  Comparison (HOME orientation, away offense): {defender_actual_x} <= {ball_handler_outlet_x} = {is_ahead}")
             if is_ahead:
                 defender_ahead = True
-                # Find closest defender to ball handler (use away orientation distance)
-                distance = abs(defender_x_away - ball_handler_x_away)
+                # Find closest defender to ball handler (use HOME orientation distance)
+                distance = abs(defender_actual_x - ball_handler_outlet_x)
                 logging.warning(f"  ✅ Defender is AHEAD! Distance: {distance}")
                 if distance < closest_distance:
                     closest_distance = distance
@@ -579,10 +572,10 @@ def resolve_fast_break_logic(game: "GameManager"):
             else:
                 logging.warning(f"  ❌ Defender is NOT ahead")
         else:
-            # Home offense: larger x is closer to basket, so defender ahead if x >= ball handler x
-            # Use HOME orientation directly
+            # Home offense: basket at x=90 in HOME orientation, larger x is closer to basket
+            # Defender ahead if defender_x >= ball_handler_x (defender is closer to x=90)
             is_ahead = defender_actual_x >= ball_handler_outlet_x
-            logging.warning(f"  Comparison (HOME orientation): {defender_actual_x} >= {ball_handler_outlet_x} = {is_ahead}")
+            logging.warning(f"  Comparison (HOME orientation, home offense): {defender_actual_x} >= {ball_handler_outlet_x} = {is_ahead}")
             if is_ahead:
                 defender_ahead = True
                 # Find closest defender to ball handler
