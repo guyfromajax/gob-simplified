@@ -407,9 +407,86 @@ def resolve_fast_break_logic(game: "GameManager"):
         hold_up = True
         stopper_id = best_defender.player_id
 
-    # Determine event type based on defender count
-    # Note: o_count is always 1 (ball handler only) for rebounds
-    o_count = len(fb_roles["offense"]) + 1  # include ball handler
+    # ✅ NEW LOGIC: Determine event type based on defender positions relative to ball handler
+    # Note: This will override hold_up/stopper_id if a defender is ahead after outlet pass
+    # after outlet pass simulation (matching frontend outlet pass animation)
+    import random
+    
+    # Determine if away team is on offense (for x coordinate logic)
+    is_away_offense = off_team.team_id == game.away_team.team_id
+    
+    # Simulate ball handler position after outlet pass
+    # Frontend logic: ball handler moves 5-10 spots toward basket, ±6 Y
+    ball_handler_start_x = getattr(ball_handler, "coords", {}).get("x", 50)
+    ball_handler_start_y = getattr(ball_handler, "coords", {}).get("y", 25)
+    
+    # Determine direction toward basket
+    # Home offense: basket at x=90, so direction = +1 (right)
+    # Away offense: basket at x=10, so direction = -1 (left)
+    if is_away_offense:
+        # Away offense: smaller x is closer to basket
+        direction = -1
+        basket_x = 10
+    else:
+        # Home offense: larger x is closer to basket
+        direction = 1
+        basket_x = 90
+    
+    # Simulate ball handler position after outlet pass (5-10 x spots, ±6 y)
+    ball_handler_move_x = random.randint(5, 10)
+    ball_handler_move_y = random.randint(-6, 6)
+    ball_handler_outlet_x = max(4, min(97, ball_handler_start_x + direction * ball_handler_move_x))
+    ball_handler_outlet_y = max(1, min(49, ball_handler_start_y + ball_handler_move_y))
+    
+    # Store ball handler outlet position for animation
+    fb_roles["ball_handler_outlet_x"] = ball_handler_outlet_x
+    fb_roles["ball_handler_outlet_y"] = ball_handler_outlet_y
+    fb_roles["ball_handler_move_x"] = ball_handler_move_x
+    fb_roles["ball_handler_move_y"] = ball_handler_move_y
+    
+    # Simulate defender positions after outlet pass
+    # Frontend logic: defenders move to X 50-65 (home) or 35-50 (away), Y 15-35
+    defender_ahead = False
+    closest_defender = None
+    closest_distance = float('inf')
+    
+    for defender in fb_roles["defense"]:
+        # Simulate defender position after outlet pass
+        if is_away_offense:
+            # Away offense: defenders at X 35-50
+            defender_outlet_x = random.randint(35, 50)
+        else:
+            # Home offense: defenders at X 50-65
+            defender_outlet_x = random.randint(50, 65)
+        defender_outlet_y = random.randint(15, 35)
+        
+        # Store defender outlet position for animation
+        if not hasattr(defender, "outlet_coords"):
+            defender.outlet_coords = {}
+        defender.outlet_coords["x"] = defender_outlet_x
+        defender.outlet_coords["y"] = defender_outlet_y
+        
+        # Check if defender is ahead of ball handler
+        if is_away_offense:
+            # Away offense: smaller x is closer to basket, so defender ahead if x <= ball handler x
+            if defender_outlet_x <= ball_handler_outlet_x:
+                defender_ahead = True
+                # Find closest defender to ball handler
+                distance = abs(defender_outlet_x - ball_handler_outlet_x)
+                if distance < closest_distance:
+                    closest_distance = distance
+                    closest_defender = defender
+        else:
+            # Home offense: larger x is closer to basket, so defender ahead if x >= ball handler x
+            if defender_outlet_x >= ball_handler_outlet_x:
+                defender_ahead = True
+                # Find closest defender to ball handler
+                distance = abs(defender_outlet_x - ball_handler_outlet_x)
+                if distance < closest_distance:
+                    closest_distance = distance
+                    closest_defender = defender
+    
+    # Determine event type based on defender positions
     d_count = len(fb_roles["defense"])
     
     # Store defender count for shot resolution logic
@@ -428,15 +505,22 @@ def resolve_fast_break_logic(game: "GameManager"):
         off_team.team_stats['two_defenders_back'] = off_team.team_stats.get('two_defenders_back', 0) + 1
     # ==================== END STAT TRACKING ====================
 
+    # ✅ NEW LOGIC: If any defender is ahead of ball handler → defensive stop
+    # Otherwise → shot attempt
     if d_count == 0:
-        # 0 defenders: Always shot (99% make chance)
+        # 0 defenders: Always shot
         event_type = "SHOT"
-    elif d_count == 1:
-        # 1 defender: 75% shot, 25% defensive stop
-        event_type = random.choices(["SHOT", "DEFENSIVE_STOP"], weights=[0.75, 0.25])[0]
-    else:  # d_count >= 2
-        # 2+ defenders: 10% shot, 90% defensive stop
-        event_type = random.choices(["SHOT", "DEFENSIVE_STOP"], weights=[0.10, 0.90])[0]
+    elif defender_ahead:
+        # Defender ahead: defensive stop
+        event_type = "DEFENSIVE_STOP"
+        # Store closest defender as stopper (override previous stopper logic)
+        if closest_defender:
+            stopper_id = closest_defender.player_id
+            best_defender = closest_defender
+            hold_up = True  # Set hold_up since we're stopping the break
+    else:
+        # No defender ahead: shot attempt
+        event_type = "SHOT"
 
     # If defensive stop triggered, defense stopped the fast break
     # NOTE: This should NOT happen if has_outlet_pass is True (handled above)
