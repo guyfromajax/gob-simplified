@@ -425,32 +425,42 @@ def resolve_fast_break_logic(game: "GameManager"):
     
     # Simulate ball handler position after outlet pass
     # Frontend logic: ball handler moves 5-10 spots toward basket, ±6 Y
-    # ✅ SS&S: PRIORITIZE get-back coordinates if ball handler is a get-back player
-    # The outlet receiver is typically a get-back player, so we MUST use their get-back spot
+    # ✅ SS&S: PRIORITIZE release/get-back coordinates for ball handler
+    # The outlet receiver is typically a release player (defensive team), so check release coords first
+    # Then check get-back coordinates (for offensive players who might be ball handler)
     ball_handler_start_x = None
     ball_handler_start_y = None
     
-    # FIRST: Check if ball handler is a get-back player from previous MISS turn
-    # This is the PRIMARY source of truth for get-back players
+    ball_handler_id = getattr(ball_handler, "player_id", None)
+    logging.warning(f"🏀 [FAST BREAK PHASE DEBUG] Looking for coordinates for ball_handler_id: {ball_handler_id}")
     if game.turns and len(game.turns) > 0:
-        # Look for the most recent MISS turn with offense_getback_coords
+        # Look for the most recent MISS or MAKE turn with release/get-back coordinates
         for turn in reversed(game.turns[-10:]):  # Check last 10 turns (should be enough)
-            if turn.get("result_type") == "MISS" and turn.get("offense_getback_coords"):
+            if turn.get("result_type") in ["MISS", "MAKE"]:
+                # FIRST: Check if ball handler is a release player (outlet receiver is typically a release player)
+                release_coords = turn.get("defense_release_coords", {})
+                if release_coords and ball_handler_id and ball_handler_id in release_coords:
+                    stored_coords = release_coords[ball_handler_id]
+                    ball_handler_start_x = stored_coords.get("x")
+                    ball_handler_start_y = stored_coords.get("y")
+                    logging.warning(f"🏀 [FAST BREAK PHASE DEBUG] ✅ Using release coords for ball handler: {ball_handler_start_x}, {ball_handler_start_y}")
+                    break
+                
+                # SECOND: Check if ball handler is a get-back player
                 getback_coords = turn.get("offense_getback_coords", {})
-                ball_handler_id = getattr(ball_handler, "player_id", None)
-                if ball_handler_id and ball_handler_id in getback_coords:
-                    # Use stored get-back coordinates (their "get back spot")
+                if getback_coords and ball_handler_id and ball_handler_id in getback_coords:
                     stored_coords = getback_coords[ball_handler_id]
                     ball_handler_start_x = stored_coords.get("x")
                     ball_handler_start_y = stored_coords.get("y")
-                    logging.warning(f"🏀 [FAST BREAK PHASE DEBUG] Using get-back coords for ball handler: {ball_handler_start_x}, {ball_handler_start_y}")
+                    logging.warning(f"🏀 [FAST BREAK PHASE DEBUG] ✅ Using get-back coords for ball handler: {ball_handler_start_x}, {ball_handler_start_y}")
                     break
     
-    # FALLBACK: Use player.coords if not a get-back player or coords not found
+    # FALLBACK: Use player.coords if not a release/get-back player or coords not found
     if ball_handler_start_x is None or ball_handler_start_y is None:
         ball_handler_start_x = getattr(ball_handler, "coords", {}).get("x", 50)
         ball_handler_start_y = getattr(ball_handler, "coords", {}).get("y", 25)
-        logging.warning(f"🏀 [FAST BREAK PHASE DEBUG] Using player.coords (fallback): {ball_handler_start_x}, {ball_handler_start_y}")
+        logging.warning(f"🏀 [FAST BREAK PHASE DEBUG] ⚠️ Using player.coords (fallback): {ball_handler_start_x}, {ball_handler_start_y}")
+        logging.warning(f"🏀 [FAST BREAK PHASE DEBUG] ⚠️ This suggests ball handler is NOT a release/get-back player or coords not found in previous turn")
     
     # Determine direction toward basket
     # Home offense: basket at x=90, so direction = +1 (right)
@@ -488,44 +498,62 @@ def resolve_fast_break_logic(game: "GameManager"):
     fb_roles["ball_handler_move_y"] = ball_handler_move_y
     fb_roles["is_away_offense"] = is_away_offense  # ✅ Store for animator to use
     
-    # Simulate defender positions after outlet pass
-    # Frontend logic: defenders move to X 50-65 (home) or 35-50 (away), Y 15-35
+    # ✅ FIX: Use actual defender coordinates instead of simulating random positions
+    # Defenders are already positioned on the court after the shot attempt
+    # They don't move during the outlet pass - only the ball handler moves
+    # So we compare ball handler's outlet position to defender's actual current position
     defender_ahead = False
     closest_defender = None
     closest_distance = float('inf')
     
     for defender in fb_roles["defense"]:
-        # Simulate defender position after outlet pass
-        if is_away_offense:
-            # Away offense: defenders at X 35-50
-            defender_outlet_x = random.randint(35, 50)
-        else:
-            # Home offense: defenders at X 50-65
-            defender_outlet_x = random.randint(50, 65)
-        defender_outlet_y = random.randint(15, 35)
+        # Use defender's actual coordinates (where they are on the court)
+        # These defenders are the team that was on offense during the shot attempt
+        # They might have get-back coordinates stored, so check those first
+        defender_actual_x = None
+        defender_actual_y = None
+        defender_id = getattr(defender, "player_id", None)
         
-        # Store defender outlet position for animation
+        # Check if defender has get-back coordinates from the previous shot attempt
+        if game.turns and len(game.turns) > 0 and defender_id:
+            for turn in reversed(game.turns[-10:]):  # Check last 10 turns
+                if turn.get("result_type") in ["MISS", "MAKE"]:
+                    getback_coords = turn.get("offense_getback_coords", {})
+                    if getback_coords and defender_id in getback_coords:
+                        stored_coords = getback_coords[defender_id]
+                        defender_actual_x = stored_coords.get("x")
+                        defender_actual_y = stored_coords.get("y")
+                        logging.warning(f"🏀 [FAST BREAK PHASE DEBUG] ✅ Using get-back coords for defender {defender_id}: {defender_actual_x}, {defender_actual_y}")
+                        break
+        
+        # Fallback to defender's current coords if no get-back coords found
+        if defender_actual_x is None or defender_actual_y is None:
+            defender_actual_x = getattr(defender, "coords", {}).get("x", 50)
+            defender_actual_y = getattr(defender, "coords", {}).get("y", 25)
+            logging.warning(f"🏀 [FAST BREAK PHASE DEBUG] ⚠️ Using defender.coords (fallback) for defender {defender_id}: {defender_actual_x}, {defender_actual_y}")
+        
+        # Store defender position for animation (using actual position, not simulated)
         if not hasattr(defender, "outlet_coords"):
             defender.outlet_coords = {}
-        defender.outlet_coords["x"] = defender_outlet_x
-        defender.outlet_coords["y"] = defender_outlet_y
+        defender.outlet_coords["x"] = defender_actual_x
+        defender.outlet_coords["y"] = defender_actual_y
         
-        # Check if defender is ahead of ball handler
+        # Check if defender is ahead of ball handler (using actual positions)
         if is_away_offense:
             # Away offense: smaller x is closer to basket, so defender ahead if x <= ball handler x
-            if defender_outlet_x <= ball_handler_outlet_x:
+            if defender_actual_x <= ball_handler_outlet_x:
                 defender_ahead = True
                 # Find closest defender to ball handler
-                distance = abs(defender_outlet_x - ball_handler_outlet_x)
+                distance = abs(defender_actual_x - ball_handler_outlet_x)
                 if distance < closest_distance:
                     closest_distance = distance
                     closest_defender = defender
         else:
             # Home offense: larger x is closer to basket, so defender ahead if x >= ball handler x
-            if defender_outlet_x >= ball_handler_outlet_x:
+            if defender_actual_x >= ball_handler_outlet_x:
                 defender_ahead = True
                 # Find closest defender to ball handler
-                distance = abs(defender_outlet_x - ball_handler_outlet_x)
+                distance = abs(defender_actual_x - ball_handler_outlet_x)
                 if distance < closest_distance:
                     closest_distance = distance
                     closest_defender = defender
