@@ -247,6 +247,10 @@ async function animateOutletPhase(scene, turnData, playerSprites, ballSprite, wi
     }
   }
   
+  // ✅ TEMPORARILY COMMENTED OUT: Advance other players during outlet step
+  // For now, only animate the outlet pass - other players stay where they are
+  // TODO: May want to re-enable this in the future for more organic fast break feel
+  /*
   // ✅ SIMULTANEOUSLY advance all other players (except get-back, outlet passer, and outlet receiver)
   // This moves players up the court at the same time as the outlet pass
   let playersAdvanced = 0;
@@ -294,8 +298,9 @@ async function animateOutletPhase(scene, turnData, playerSprites, ballSprite, wi
     );
     playersAdvanced++;
   }
+  */
   
-  // Wait for ALL movements (receiver + defenders + advancing players) to complete simultaneously
+  // Wait for receiver and defenders to complete (outlet pass happens after)
   await Promise.all(promises);
   
   // THEN outlet pass (happens after all players are in position, but visually flows with the movement)

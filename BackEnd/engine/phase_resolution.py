@@ -425,13 +425,13 @@ def resolve_fast_break_logic(game: "GameManager"):
     
     # Simulate ball handler position after outlet pass
     # Frontend logic: ball handler moves 5-10 spots toward basket, ±6 Y
-    # ✅ SS&S: Use get-back coordinates if ball handler is a get-back player
-    # (player.coords should already be updated in shot_manager.py, but check previous turn as fallback)
-    ball_handler_start_x = getattr(ball_handler, "coords", {}).get("x", 50)
-    ball_handler_start_y = getattr(ball_handler, "coords", {}).get("y", 25)
+    # ✅ SS&S: PRIORITIZE get-back coordinates if ball handler is a get-back player
+    # The outlet receiver is typically a get-back player, so we MUST use their get-back spot
+    ball_handler_start_x = None
+    ball_handler_start_y = None
     
-    # Fallback: Check if ball handler is a get-back player from previous MISS turn
-    # This ensures we use the correct starting position even if player.coords wasn't updated
+    # FIRST: Check if ball handler is a get-back player from previous MISS turn
+    # This is the PRIMARY source of truth for get-back players
     if game.turns and len(game.turns) > 0:
         # Look for the most recent MISS turn with offense_getback_coords
         for turn in reversed(game.turns[-10:]):  # Check last 10 turns (should be enough)
@@ -439,11 +439,18 @@ def resolve_fast_break_logic(game: "GameManager"):
                 getback_coords = turn.get("offense_getback_coords", {})
                 ball_handler_id = getattr(ball_handler, "player_id", None)
                 if ball_handler_id and ball_handler_id in getback_coords:
-                    # Use stored get-back coordinates
+                    # Use stored get-back coordinates (their "get back spot")
                     stored_coords = getback_coords[ball_handler_id]
-                    ball_handler_start_x = stored_coords.get("x", ball_handler_start_x)
-                    ball_handler_start_y = stored_coords.get("y", ball_handler_start_y)
+                    ball_handler_start_x = stored_coords.get("x")
+                    ball_handler_start_y = stored_coords.get("y")
+                    logging.warning(f"🏀 [FAST BREAK PHASE DEBUG] Using get-back coords for ball handler: {ball_handler_start_x}, {ball_handler_start_y}")
                     break
+    
+    # FALLBACK: Use player.coords if not a get-back player or coords not found
+    if ball_handler_start_x is None or ball_handler_start_y is None:
+        ball_handler_start_x = getattr(ball_handler, "coords", {}).get("x", 50)
+        ball_handler_start_y = getattr(ball_handler, "coords", {}).get("y", 25)
+        logging.warning(f"🏀 [FAST BREAK PHASE DEBUG] Using player.coords (fallback): {ball_handler_start_x}, {ball_handler_start_y}")
     
     # Determine direction toward basket
     # Home offense: basket at x=90, so direction = +1 (right)
