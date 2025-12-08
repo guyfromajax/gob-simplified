@@ -185,6 +185,9 @@ class Animator:
             logging.warning(f"  Calculation: {ball_handler_outlet_x} + {additional_move_x} = {bh_end_x}")
             logging.warning(f"  bh_end_x (HOME orientation): {bh_end_x}")
             logging.warning(f"  bh_end_y (HOME orientation): {bh_end_y}")
+            if hold_up:
+                logging.warning(f"🛑 [DEFENSIVE STOP] Ball handler stopped at: x={bh_end_x}, y={bh_end_y} (HOME orientation)")
+                logging.warning(f"🛑 [DEFENSIVE STOP] Movement from outlet: +{additional_move_x} x, {additional_move_y:+d} y")
         else:
             # Fallback: use old logic
             if hold_up:
