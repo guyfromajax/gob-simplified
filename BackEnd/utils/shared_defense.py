@@ -741,12 +741,48 @@ def _resolve_overlap_assignments(
             )
             assignments[other_defender] = closest_to_bh.get("player_id")
         elif ball_handler_is_overlap:
-            # Ball handler IS the overlap player - both defenders should guard them
-            # But check priority: one defender might have other players that are closer to basket
-            # For now, let both defenders guard the overlap player (ball handler)
-            # This matches case 2 (neither has other players)
-            for def_pos in overlap_defenders:
-                assignments[def_pos] = overlap_player_id
+            # Ball handler IS the overlap player
+            # ✅ NEW LOGIC: Check if defenders have other players in their zones
+            # Priority: Ensure at least one defender stays on ball handler
+            # If one defender has other players → that defender guards other player, other stays on BH
+            # If both have other players → randomly choose one to guard other player, other stays on BH
+            # If neither has other players → both guard ball handler (double-team with offsets)
+            
+            if len(defenders_with_other_players) == 1:
+                # One defender has other players → that defender guards other player
+                def_with_others = list(defenders_with_other_players.keys())[0]
+                other_players = defenders_with_other_players[def_with_others]
+                # Guard the closest other player to basket (or first one if multiple)
+                closest_other = min(
+                    other_players,
+                    key=lambda p: _manhattan_distance_to_basket(p["coords"], is_away_offense)
+                )
+                assignments[def_with_others] = closest_other.get("player_id")
+                # Other defender stays on ball handler
+                def_without_others = defenders_without_other_players[0]
+                assignments[def_without_others] = overlap_player_id
+                
+            elif len(defenders_with_other_players) == 2:
+                # Both defenders have other players → randomly choose one to guard other player
+                # The other stays on ball handler (ensuring at least one guards BH)
+                def_list = list(defenders_with_other_players.keys())
+                chosen_defender = random.choice(def_list)
+                other_defender = def_list[0] if def_list[1] == chosen_defender else def_list[1]
+                
+                # Chosen defender guards closest other player in their zone
+                other_players = defenders_with_other_players[chosen_defender]
+                closest_other = min(
+                    other_players,
+                    key=lambda p: _manhattan_distance_to_basket(p["coords"], is_away_offense)
+                )
+                assignments[chosen_defender] = closest_other.get("player_id")
+                # Other defender stays on ball handler
+                assignments[other_defender] = overlap_player_id
+                
+            else:
+                # Neither has other players → both guard ball handler (double-team with offsets)
+                for def_pos in overlap_defenders:
+                    assignments[def_pos] = overlap_player_id
         else:
             # Neither has ball handler - both guard their zone players
             for def_pos in overlap_defenders:
