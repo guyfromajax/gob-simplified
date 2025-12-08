@@ -10,7 +10,6 @@ export function updatePlaycallDisplay(turnData, homeTeamId) {
   const defensiveFocusDotsEl = document.getElementById('defensive-playcall-focus-dots');
   
   if (!offensivePlaycallEl || !defensivePlaycallEl) {
-    console.warn('⚠️ Playcall elements not found in DOM');
     return;
   }
   
