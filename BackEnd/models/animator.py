@@ -93,24 +93,47 @@ class Animator:
         animated_player_ids = set()
 
         # Ball handler path
-        if ball_handler:
+        # ✅ NEW LOGIC: Calculate ball handler's final position (used for both defensive stop and shot)
+        import random
+        ball_handler_outlet_x = fb_roles.get("ball_handler_outlet_x")
+        ball_handler_outlet_y = fb_roles.get("ball_handler_outlet_y")
+        ball_handler_move_x = fb_roles.get("ball_handler_move_x", 7)  # Default 7 if not set
+        
+        # Calculate additional movement from outlet position
+        # For defensive stops and shot attempts: 5-10 x spots, ±6 y
+        # Home offense: +5 to +10 (move right toward basket)
+        # Away offense: -5 to -10 (move left toward basket)
+        if is_away_offense:
+            # Away offense: X -5 to -10 (negative values)
+            additional_move_x = -random.randint(5, 10)
+        else:
+            # Home offense: X +5 to +10 (positive values)
+            additional_move_x = random.randint(5, 10)
+        additional_move_y = random.randint(-6, 6)
+        
+        # Calculate ball handler's final position
+        if ball_handler_outlet_x is not None and ball_handler_outlet_y is not None:
+            # Use outlet position as starting point
+            bh_end_x = max(4, min(97, ball_handler_outlet_x + additional_move_x))
+            bh_end_y = max(1, min(49, ball_handler_outlet_y + additional_move_y))
+            bh_end = {"x": bh_end_x, "y": bh_end_y}
+        else:
+            # Fallback: use old logic
             if hold_up:
-                # Stopped at top of key
-                # ✅ Always use HOME_TOP_KEY in home orientation - build_movement will flip it for away team
-                # get_away_player_coords flips x around center (x=50), so:
-                # HOME_TOP_KEY (x=64) -> flipped to x=36 (away orientation) when is_away_offense=True
                 bh_end = HOME_TOP_KEY.copy()
             else:
-                # Shot attempt - position 4-6 grid spots from rim
-                # ✅ Always use HOME_RIM_COORDS in home orientation - build_movement will flip it for away team
-                rim_x = HOME_RIM_COORDS["x"]  # Always use home rim, get_away_player_coords will flip if needed
+                rim_x = HOME_RIM_COORDS["x"]
                 shot_distance = random.randint(4, 6)
-                
-                # In home orientation: home rim at x=90, shooter at x=90-4 to x=90-6 (toward center)
                 shooter_x = rim_x - shot_distance
-                shooter_y = random.randint(20, 30)  # Random Y near center
+                shooter_y = random.randint(20, 30)
                 bh_end = {"x": shooter_x, "y": shooter_y}
-            
+        
+        # Store final position for defender calculations
+        fb_roles["_bh_final_x"] = bh_end["x"]
+        fb_roles["_bh_final_y"] = bh_end["y"]
+        fb_roles["_bh_additional_move_x"] = abs(additional_move_x)  # Store absolute value for calculations
+        
+        if ball_handler:
             build_movement(ball_handler, bh_end, has_ball=True)
             animated_player_ids.add(getattr(ball_handler, "player_id", None))
 
@@ -123,17 +146,24 @@ class Animator:
                     break
         
         if hold_up:
-            # Stopping defender when break is stopped at top of key
-            # ✅ Position stopper DIRECTLY in front of ball handler (between ball handler and basket they're defending)
-            # Always use HOME_TOP_KEY in home orientation - build_movement will flip it for away team
-            # In home orientation: stopper x GREATER than ball handler (toward basket at x=90)
-            # After flipping for away team: stopper x LESS than ball handler (toward basket at x=10)
+            # ✅ NEW LOGIC: Stopping defender positioned 1-3 x coords ahead of ball handler, same y
             if stopper:
-                # In home orientation, stopper is 2 spots to the right (toward home basket)
-                # After get_away_player_coords flips: x=66 -> x=34, which is 2 spots LEFT of x=36 (away top key)
+                # Get ball handler's final position (calculated above)
+                bh_stop_x = fb_roles.get("_bh_final_x", HOME_TOP_KEY["x"])
+                bh_stop_y = fb_roles.get("_bh_final_y", HOME_TOP_KEY["y"])
+                
+                # Stopper positioned 1-3 x coords ahead of ball handler, same y
+                stopper_offset = random.randint(1, 3)
+                if is_away_offense:
+                    # Away offense: ahead means smaller x (toward basket)
+                    stopper_x = max(4, bh_stop_x - stopper_offset)
+                else:
+                    # Home offense: ahead means larger x (toward basket)
+                    stopper_x = min(97, bh_stop_x + stopper_offset)
+                
                 end = {
-                    "x": HOME_TOP_KEY["x"] + 2,  # 2 spots toward home basket (x=64+2=66)
-                    "y": HOME_TOP_KEY["y"],  # Same Y as ball handler (directly in front)
+                    "x": stopper_x,
+                    "y": bh_stop_y,  # Same Y as ball handler
                 }
                 build_movement(stopper, end, action=ACTIONS["GUARD_BALL"])
                 animated_player_ids.add(getattr(stopper, "player_id", None))
@@ -145,15 +175,36 @@ class Animator:
                 build_movement(d, between_key_and_rim(), action=ACTIONS["GUARD_OFFBALL"])
                 animated_player_ids.add(getattr(d, "player_id", None))
         else:
-            # Shot attempt - position shot defender between shooter and rim
+            # ✅ NEW LOGIC: Shot attempt - defender positioned based on ball handler movement
             shot_defender = fb_roles.get("defender")
             if shot_defender:
-                # Defender positioned 2 grid spots closer to basket than shooter
-                # ✅ Always use home orientation - build_movement will flip it for away team
-                # In home orientation: defender 2 spots closer to home rim (to the right, x+2)
-                # After flipping for away team: defender 2 spots closer to away rim (to the left)
-                defender_x = bh_end["x"] + 2  # 2 spots toward home basket in home orientation
-                defender_end = {"x": defender_x, "y": bh_end["y"]}  # Same Y as shooter
+                # Get ball handler's final position and movement distance
+                bh_shot_x = fb_roles.get("_bh_final_x", bh_end["x"])
+                additional_move_x = fb_roles.get("_bh_additional_move_x", 7)
+                
+                # Defender X: 6 less than ball handler's additional move distance (home) or 6 more (away)
+                # The defender is positioned relative to the ball handler's final position
+                defender_x_offset = 6
+                
+                if is_away_offense:
+                    # Away offense: defender at x = ball handler x + 6 (further from basket)
+                    defender_x = min(97, bh_shot_x + defender_x_offset)
+                else:
+                    # Home offense: defender at x = ball handler x - 6 (further from basket)
+                    defender_x = max(4, bh_shot_x - defender_x_offset)
+                
+                # Defender Y: based on starting y position (from outlet pass)
+                defender_start_y = getattr(shot_defender, "outlet_coords", {}).get("y", 25)
+                if defender_start_y > 25:
+                    # Starting y > 25: reduce by 1-6
+                    defender_y_adjust = -random.randint(1, 6)
+                else:
+                    # Starting y <= 25: increase by 1-6
+                    defender_y_adjust = random.randint(1, 6)
+                
+                defender_y = max(1, min(49, defender_start_y + defender_y_adjust))
+                
+                defender_end = {"x": defender_x, "y": defender_y}
                 build_movement(shot_defender, defender_end, action=ACTIONS["GUARD_BALL"])
                 animated_player_ids.add(getattr(shot_defender, "player_id", None))
             
