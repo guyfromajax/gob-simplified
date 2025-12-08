@@ -506,6 +506,9 @@ def resolve_fast_break_logic(game: "GameManager"):
     closest_defender = None
     closest_distance = float('inf')
     
+    logging.warning(f"🏀 [FAST BREAK PHASE DEBUG] Checking {len(fb_roles['defense'])} defenders for defensive stop")
+    logging.warning(f"  Ball handler outlet position: x={ball_handler_outlet_x}, y={ball_handler_outlet_y}")
+    
     for defender in fb_roles["defense"]:
         # Use defender's actual coordinates (where they are on the court)
         # These defenders are the team that was on offense during the shot attempt
@@ -516,15 +519,19 @@ def resolve_fast_break_logic(game: "GameManager"):
         
         # Check if defender has get-back coordinates from the previous shot attempt
         if game.turns and len(game.turns) > 0 and defender_id:
+            logging.warning(f"🏀 [FAST BREAK PHASE DEBUG] Looking for get-back coords for defender {defender_id}")
             for turn in reversed(game.turns[-10:]):  # Check last 10 turns
                 if turn.get("result_type") in ["MISS", "MAKE"]:
                     getback_coords = turn.get("offense_getback_coords", {})
+                    logging.warning(f"  Found {turn.get('result_type')} turn, getback_coords keys: {list(getback_coords.keys()) if getback_coords else 'None'}")
                     if getback_coords and defender_id in getback_coords:
                         stored_coords = getback_coords[defender_id]
                         defender_actual_x = stored_coords.get("x")
                         defender_actual_y = stored_coords.get("y")
                         logging.warning(f"🏀 [FAST BREAK PHASE DEBUG] ✅ Using get-back coords for defender {defender_id}: {defender_actual_x}, {defender_actual_y}")
                         break
+                    elif getback_coords:
+                        logging.warning(f"  ⚠️ Defender {defender_id} not found in getback_coords")
         
         # Fallback to defender's current coords if no get-back coords found
         if defender_actual_x is None or defender_actual_y is None:
@@ -539,24 +546,39 @@ def resolve_fast_break_logic(game: "GameManager"):
         defender.outlet_coords["y"] = defender_actual_y
         
         # Check if defender is ahead of ball handler (using actual positions)
+        logging.warning(f"🏀 [FAST BREAK PHASE DEBUG] Defender comparison for {defender_id}:")
+        logging.warning(f"  defender_actual_x: {defender_actual_x}")
+        logging.warning(f"  ball_handler_outlet_x: {ball_handler_outlet_x}")
+        logging.warning(f"  is_away_offense: {is_away_offense}")
+        
         if is_away_offense:
             # Away offense: smaller x is closer to basket, so defender ahead if x <= ball handler x
-            if defender_actual_x <= ball_handler_outlet_x:
+            is_ahead = defender_actual_x <= ball_handler_outlet_x
+            logging.warning(f"  Comparison: {defender_actual_x} <= {ball_handler_outlet_x} = {is_ahead}")
+            if is_ahead:
                 defender_ahead = True
                 # Find closest defender to ball handler
                 distance = abs(defender_actual_x - ball_handler_outlet_x)
+                logging.warning(f"  ✅ Defender is AHEAD! Distance: {distance}")
                 if distance < closest_distance:
                     closest_distance = distance
                     closest_defender = defender
+            else:
+                logging.warning(f"  ❌ Defender is NOT ahead")
         else:
             # Home offense: larger x is closer to basket, so defender ahead if x >= ball handler x
-            if defender_actual_x >= ball_handler_outlet_x:
+            is_ahead = defender_actual_x >= ball_handler_outlet_x
+            logging.warning(f"  Comparison: {defender_actual_x} >= {ball_handler_outlet_x} = {is_ahead}")
+            if is_ahead:
                 defender_ahead = True
                 # Find closest defender to ball handler
                 distance = abs(defender_actual_x - ball_handler_outlet_x)
+                logging.warning(f"  ✅ Defender is AHEAD! Distance: {distance}")
                 if distance < closest_distance:
                     closest_distance = distance
                     closest_defender = defender
+            else:
+                logging.warning(f"  ❌ Defender is NOT ahead")
     
     # Determine event type based on defender positions
     d_count = len(fb_roles["defense"])
@@ -579,12 +601,22 @@ def resolve_fast_break_logic(game: "GameManager"):
 
     # ✅ NEW LOGIC: If any defender is ahead of ball handler → defensive stop
     # Otherwise → shot attempt
+    logging.warning(f"🏀 [FAST BREAK PHASE DEBUG] Final determination:")
+    logging.warning(f"  d_count: {d_count}")
+    logging.warning(f"  defender_ahead: {defender_ahead}")
+    logging.warning(f"  ball_handler_outlet_x: {ball_handler_outlet_x}")
+    logging.warning(f"  is_away_offense: {is_away_offense}")
+    
     if d_count == 0:
         # 0 defenders: Always shot
         event_type = "SHOT"
+        logging.warning(f"  ✅ Decision: SHOT (0 defenders)")
     elif defender_ahead:
         # Defender ahead: defensive stop
         event_type = "DEFENSIVE_STOP"
+        logging.warning(f"  ✅ Decision: DEFENSIVE_STOP (defender ahead)")
+        logging.warning(f"  closest_defender: {get_name_safe(closest_defender) if closest_defender else None}")
+        logging.warning(f"  closest_distance: {closest_distance}")
         # Store closest defender as stopper (override previous stopper logic)
         if closest_defender:
             stopper_id = closest_defender.player_id
@@ -593,6 +625,7 @@ def resolve_fast_break_logic(game: "GameManager"):
     else:
         # No defender ahead: shot attempt
         event_type = "SHOT"
+        logging.warning(f"  ✅ Decision: SHOT (no defender ahead)")
 
     # If defensive stop triggered, defense stopped the fast break
     # NOTE: This should NOT happen if has_outlet_pass is True (handled above)
