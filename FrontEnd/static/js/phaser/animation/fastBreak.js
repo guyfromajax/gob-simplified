@@ -195,12 +195,12 @@ async function animateOutletPhase(scene, turnData, playerSprites, ballSprite, wi
     y: 50 - (receiverSprite.y / height) * 50
   };
   
-  // Outlet spot: move toward basket direction but not too far (5-10 spots, not 15-20)
+  // Outlet spot: move toward basket direction but not too far (2-4 spots)
   // This keeps them in position to receive pass without committing to basket
   const direction = targetBasket.x > receiverCurrentGrid.x ? 1 : -1;
   const outletTarget = {
     x: Phaser.Math.Clamp(
-      receiverCurrentGrid.x + direction * Phaser.Math.Between(5, 10),  // Reduced from 15-20
+      receiverCurrentGrid.x + direction * Phaser.Math.Between(2, 4),  // Reduced from 5-10 to 2-4
       4,
       97
     ),
@@ -222,7 +222,8 @@ async function animateOutletPhase(scene, turnData, playerSprites, ballSprite, wi
     })
   );
   
-  // SIMULTANEOUSLY animate defenders chasing
+  // SIMULTANEOUSLY animate defenders chasing (get-back defenders)
+  // Move them 2-4 x spots toward basket (same as outlet receiver) so they don't lose ground
   const defendersList = turnData.roles?.defense || [];
   const defendersSet = new Set(defendersList.map(d => d.player_id || d));
   
@@ -230,12 +231,24 @@ async function animateOutletPhase(scene, turnData, playerSprites, ballSprite, wi
   for (const [id, sprite] of Object.entries(playerSprites)) {
     if (defendersSet.has(id)) {
       defenderCount++;
-      // Defenders chase: random Y (15-35), X toward basket (50 to basket-15)
+      // Get defender's current position
+      const defenderCurrentGrid = {
+        x: (sprite.x / width) * 100,
+        y: 50 - (sprite.y / height) * 50
+      };
+      
+      // Move defender 2-4 x spots toward basket (same as outlet receiver)
       const defenderTarget = {
-        x: isHomeOffense 
-          ? Phaser.Math.Between(50, 65)  // Home offense: X 50-65
-          : Phaser.Math.Between(35, 50), // Away offense: X 35-50
-        y: Phaser.Math.Between(15, 35)
+        x: Phaser.Math.Clamp(
+          defenderCurrentGrid.x + direction * Phaser.Math.Between(2, 4),  // Same 2-4 spots as outlet receiver
+          4,
+          97
+        ),
+        y: Phaser.Math.Clamp(
+          defenderCurrentGrid.y + Phaser.Math.Between(-6, 6),
+          1,
+          49
+        )
       };
       const defenderPx = gridToPixels(defenderTarget.x, defenderTarget.y, width, height);
       promises.push(
