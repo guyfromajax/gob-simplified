@@ -1038,7 +1038,99 @@ def assign_all_zone_defenders(
             if ball_handler_id:
                 defender_to_offensive_player[closest_defender] = ball_handler_id
     
+    # ✅ Apply offsets when multiple defenders guard the same offensive player
+    assignments = _apply_multi_defender_offsets(
+        assignments,
+        defender_to_offensive_player,
+        offensive_players,
+        zone_boundaries,
+        is_away_offense
+    )
+    
     return assignments, defender_to_offensive_player
+
+
+def _apply_multi_defender_offsets(
+    assignments,
+    defender_to_offensive_player,
+    offensive_players,
+    zone_boundaries,
+    is_away_offense
+):
+    """
+    Apply offsets to defenders when multiple defenders guard the same offensive player.
+    Prevents perfect stacking by offsetting defenders based on the spot of the player they're guarding.
+    
+    Args:
+        assignments: Dict mapping defender_pos → {"x": int, "y": int} coordinates
+        defender_to_offensive_player: Dict mapping defender_pos → offensive_player_id
+        offensive_players: List of offensive player dicts with "player_id", "coords", "spot" keys
+        zone_boundaries: Dict mapping defender_pos → list of (x, y) tuples for that zone
+        is_away_offense: Whether away team is on offense
+    
+    Returns:
+        Updated assignments dict with offsets applied
+    """
+    # Determine x direction: 1 if home team is on offense, -1 if away team is on offense
+    x_direction = -1 if is_away_offense else 1
+    
+    # Group defenders by the offensive player they're guarding
+    offensive_player_to_defenders = {}
+    for defender_pos, offensive_player_id in defender_to_offensive_player.items():
+        if offensive_player_id not in offensive_player_to_defenders:
+            offensive_player_to_defenders[offensive_player_id] = []
+        offensive_player_to_defenders[offensive_player_id].append(defender_pos)
+    
+    # Apply offsets for each group with multiple defenders
+    for offensive_player_id, defender_list in offensive_player_to_defenders.items():
+        if len(defender_list) < 2:
+            continue  # Only one defender, no offset needed
+        
+        # Get the offensive player's spot
+        offensive_player = next((p for p in offensive_players if p.get("player_id") == offensive_player_id), None)
+        if not offensive_player:
+            continue
+        
+        spot = offensive_player.get("spot", "key")
+        
+        # Sort defenders for consistent ordering (defender 1 vs defender 2)
+        defender_list_sorted = sorted(defender_list)
+        
+        # Determine offset based on spot category
+        if spot in ["key", "topLane", "upper highPost", "lower highPost", "midLane"]:
+            # Each defender goes 2 y coords toward their zone area
+            # Upper half: +=2, Lower half: -=2
+            for i, defender_pos in enumerate(defender_list_sorted):
+                # Determine if defender's zone is in upper or lower half
+                zone_coords = zone_boundaries.get(defender_pos, [])
+                if zone_coords:
+                    # Calculate average y of zone to determine upper/lower
+                    avg_zone_y = sum(c[1] for c in zone_coords) / len(zone_coords)
+                    # Upper half: y < 25 (closer to top), Lower half: y >= 25 (closer to bottom)
+                    # In grid coords, smaller y = upper, larger y = lower
+                    if avg_zone_y < 25:  # Upper half
+                        assignments[defender_pos]["y"] += 2
+                    else:  # Lower half
+                        assignments[defender_pos]["y"] -= 2
+        
+        elif spot in ["upper wing", "upper midWing", "lower wing", "lower midWing", 
+                      "upper apex", "upper bird", "lower apex", "lower bird"]:
+            # Defender 1: y += 2, Defender 2: y -= 2
+            if len(defender_list_sorted) >= 1:
+                assignments[defender_list_sorted[0]]["y"] += 2
+            if len(defender_list_sorted) >= 2:
+                assignments[defender_list_sorted[1]]["y"] -= 2
+        
+        elif spot in ["upper midCorner", "upper corner", "lower midCorner", "lower corner",
+                      "upper midBaseline", "lower midBaseline", "upper midPost", "upper lowPost",
+                      "lower midPost", "lower lowPost"]:
+            # Defender 1: x += x_direction * 2, Defender 2: x -= x_direction * 2
+            if len(defender_list_sorted) >= 1:
+                assignments[defender_list_sorted[0]]["x"] += x_direction * 2
+            if len(defender_list_sorted) >= 2:
+                assignments[defender_list_sorted[1]]["x"] -= x_direction * 2
+    
+    return assignments
 
 
 # ============================================================================
