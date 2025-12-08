@@ -901,11 +901,14 @@ export class ShotAnimationSystem {
     }
 
     // ✅ FIX: Animate rebounder and non-rebounders simultaneously
-    // Start both animations at the same time, then wait for both to complete
+    // Start both animations at the same time, but stop all when rebounder reaches ball
     // getPlayerDuration is already imported at top of file
     
     // ✅ FIX: Use distance-based duration for consistent speed
     const rebounderDuration = getPlayerDuration(rebounderSprite, ballBounceX, ballBounceY);
+    
+    // Start non-rebounder animations first and store tween references
+    const collapseTweens = await this.animatePlayerCollapse(rebounderSprite, { x: ballBounceX, y: ballBounceY }, turnData);
     
     const rebounderPromise = new Promise((resolve) => {
       this.scene.tweens.add({
@@ -915,6 +918,15 @@ export class ShotAnimationSystem {
         duration: rebounderDuration,
         ease: 'Linear', // Match other player movements
         onComplete: () => {
+          // ✅ FIX: Stop all collapse animations when rebounder reaches ball
+          if (collapseTweens && collapseTweens.length > 0) {
+            collapseTweens.forEach(tween => {
+              if (tween && this.scene.tweens) {
+                this.scene.tweens.killTweensOf(tween.targets);
+              }
+            });
+          }
+          
           // Attach ball to rebounder once they reach the bounce spot
           this.ballController.attachToPlayer(rebounderSprite, {
             offset: { x: 0, y: -10 }
@@ -935,11 +947,8 @@ export class ShotAnimationSystem {
       });
     });
 
-    // Start non-rebounder animation at the same time
-    const nonRebounderPromise = this.animatePlayerCollapse(rebounderSprite, { x: ballBounceX, y: ballBounceY }, turnData);
-
-    // Wait for both animations to complete simultaneously
-    await Promise.all([rebounderPromise, nonRebounderPromise]);
+    // Wait only for rebounder to complete (collapse animations will be stopped)
+    await rebounderPromise;
 
     // Determine next action based on rebound type
     // ✅ COMMENTED OUT: Verbose rebound logs (cluttering console)
@@ -987,76 +996,75 @@ export class ShotAnimationSystem {
   /**
    * Animate players collapsing toward rebound spot
    * NEW: Only animate players who were rebounders (not those who released/got back)
+   * Returns array of tween references so they can be stopped early
    */
   async animatePlayerCollapse(rebounderSprite, ballBounceCoords, turnData) {
     // getPlayerDuration is already imported at top of file
     
-    return new Promise((resolve) => {
-      const collapsePromises = [];
+    // Store tween references so they can be stopped when rebounder reaches ball
+    const collapseTweens = [];
+    
+    // Get lists of players involved in rebounding
+    const offense_rebounders = turnData.offense_rebounders || [];
+    const defense_rebounders = turnData.defense_rebounders || [];
+    const all_rebounders = [...offense_rebounders, ...defense_rebounders];
+    
+    // ✅ FIX: Convert ball bounce coords (pixels) to grid coordinates correctly
+    // gridToPixels uses: pixelY = ((50 - gridY) / 50) * height
+    // So reverse: gridY = 50 - (pixelY / height) * 50
+    const bounceGridX = Math.round((ballBounceCoords.x / this.scene.game.config.width) * 100);
+    const bounceGridY = 50 - Math.round((ballBounceCoords.y / this.scene.game.config.height) * 50);
+    
+    // ✅ COMMENTED OUT: Verbose rebound logs (cluttering console)
+    // console.log('🎬 ShotAnimationSystem: Animating non-rebounders to ball bounce', {
+    //   ballBounceCoordsPixels: { x: ballBounceCoords.x, y: ballBounceCoords.y },
+    //   bounceGrid: { x: bounceGridX, y: bounceGridY },
+    //   totalRebounders: all_rebounders.length,
+    //   rebounderId: turnData.rebounderId,
+    //   sceneDimensions: { width: this.scene.game.config.width, height: this.scene.game.config.height }
+    // });
+    
+    // Animate each player who was attempting the rebound (but didn't get it)
+    all_rebounders.forEach(playerId => {
+      if (playerId === turnData.rebounderId) return; // Skip actual rebounder (handled separately)
       
-      // Get lists of players involved in rebounding
-      const offense_rebounders = turnData.offense_rebounders || [];
-      const defense_rebounders = turnData.defense_rebounders || [];
-      const all_rebounders = [...offense_rebounders, ...defense_rebounders];
+      const playerSprite = this.playerSprites[playerId];
+      if (!playerSprite) return;
       
-      // ✅ FIX: Convert ball bounce coords (pixels) to grid coordinates correctly
-      // gridToPixels uses: pixelY = ((50 - gridY) / 50) * height
-      // So reverse: gridY = 50 - (pixelY / height) * 50
-      const bounceGridX = Math.round((ballBounceCoords.x / this.scene.game.config.width) * 100);
-      const bounceGridY = 50 - Math.round((ballBounceCoords.y / this.scene.game.config.height) * 50);
+      // Position near ball bounce: ±6y, ±4x (can stack)
+      const offsetY = Phaser.Math.Between(-6, 6);
+      const offsetX = Phaser.Math.Between(-4, 4);
       
-      // ✅ COMMENTED OUT: Verbose rebound logs (cluttering console)
-      // console.log('🎬 ShotAnimationSystem: Animating non-rebounders to ball bounce', {
-      //   ballBounceCoordsPixels: { x: ballBounceCoords.x, y: ballBounceCoords.y },
-      //   bounceGrid: { x: bounceGridX, y: bounceGridY },
-      //   totalRebounders: all_rebounders.length,
-      //   rebounderId: turnData.rebounderId,
-      //   sceneDimensions: { width: this.scene.game.config.width, height: this.scene.game.config.height }
-      // });
+      // Apply offsets and clamp to bounds
+      let targetGridX = bounceGridX + offsetX;
+      let targetGridY = bounceGridY + offsetY;
       
-      // Animate each player who was attempting the rebound (but didn't get it)
-      all_rebounders.forEach(playerId => {
-        if (playerId === turnData.rebounderId) return; // Skip actual rebounder (handled separately)
-        
-        const playerSprite = this.playerSprites[playerId];
-        if (!playerSprite) return;
-        
-        // Position near ball bounce: ±6y, ±4x (can stack)
-        const offsetY = Phaser.Math.Between(-6, 6);
-        const offsetX = Phaser.Math.Between(-4, 4);
-        
-        // Apply offsets and clamp to bounds
-        let targetGridX = bounceGridX + offsetX;
-        let targetGridY = bounceGridY + offsetY;
-        
-        // Clamp to court bounds (0-100 x, 0-50 y)
-        targetGridX = Math.max(0, Math.min(100, targetGridX));
-        targetGridY = Math.max(0, Math.min(50, targetGridY));
-        
-        const targetPixel = gridToPixels(targetGridX, targetGridY, this.scene.game.config.width, this.scene.game.config.height);
-        
-        // ✅ FIX: Use distance-based duration for consistent speed
-        const collapseDuration = getPlayerDuration(playerSprite, targetPixel.x, targetPixel.y);
-        
-        const collapsePromise = new Promise((playerResolve) => {
-          this.scene.tweens.add({
-            targets: playerSprite,
-            x: targetPixel.x,
-            y: targetPixel.y,
-            duration: collapseDuration,
-            ease: 'Linear', // Match other player movements
-            onComplete: () => playerResolve()
-          });
-        });
-        
-        collapsePromises.push(collapsePromise);
+      // Clamp to court bounds (0-100 x, 0-50 y)
+      targetGridX = Math.max(0, Math.min(100, targetGridX));
+      targetGridY = Math.max(0, Math.min(50, targetGridY));
+      
+      const targetPixel = gridToPixels(targetGridX, targetGridY, this.scene.game.config.width, this.scene.game.config.height);
+      
+      // ✅ FIX: Use distance-based duration for consistent speed
+      const collapseDuration = getPlayerDuration(playerSprite, targetPixel.x, targetPixel.y);
+      
+      // Create tween and store reference
+      const tween = this.scene.tweens.add({
+        targets: playerSprite,
+        x: targetPixel.x,
+        y: targetPixel.y,
+        duration: collapseDuration,
+        ease: 'Linear', // Match other player movements
+        onComplete: () => {
+          // Animation completed (though it may be stopped early)
+        }
       });
       
-      // Wait for all collapse animations to complete
-      Promise.all(collapsePromises).then(() => {
-        resolve();
-      });
+      collapseTweens.push(tween);
     });
+    
+    // Return tween references so they can be stopped when rebounder reaches ball
+    return collapseTweens;
   }
 
   /**
