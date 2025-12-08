@@ -151,7 +151,7 @@ class Animator:
         logging.warning(f"  ball_handler_outlet_y: {ball_handler_outlet_y}")
         
         # Calculate additional movement from outlet position
-        # For defensive stops and shot attempts: 5-10 x spots, ±6 y
+        # For defensive stops and shot attempts: 5-10 x spots (IN ADDITION to 2-4 outlet pass), ±3 y
         # Home offense: +5 to +10 (move right toward basket at x=90 in HOME orientation)
         # Away offense: We calculate as if moving RIGHT in HOME orientation (toward x=90),
         #               then build_movement flips it, making us move LEFT in AWAY orientation (toward x=10)
@@ -163,7 +163,7 @@ class Animator:
         else:
             # Home offense: Move RIGHT in HOME orientation (add to increase x toward 90)
             additional_move_x = move_distance
-        additional_move_y = random.randint(-6, 6)
+        additional_move_y = random.randint(-3, 3)  # Reduced from ±6 to ±3
         
         # ✅ DEBUG: Log movement values
         logging.warning(f"  move_distance: {move_distance}")
