@@ -491,6 +491,7 @@ def resolve_fast_break_logic(game: "GameManager"):
     logging.warning(f"  ball_handler_outlet_x: {ball_handler_outlet_x}")
     logging.warning(f"  ball_handler_outlet_y: {ball_handler_outlet_y}")
     logging.warning(f"  calculation: {ball_handler_start_x} + {direction} * {ball_handler_move_x} = {ball_handler_outlet_x}")
+    logging.warning(f"📍 [OUTLET RECEIVER] Receives pass at: x={ball_handler_outlet_x}, y={ball_handler_outlet_y} (HOME orientation)")
     
     # Store ball handler outlet position for animation
     fb_roles["ball_handler_outlet_x"] = ball_handler_outlet_x
