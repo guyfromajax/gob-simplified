@@ -52,11 +52,32 @@ export function createGameScene(Phaser) {
         this.homeLineup = data.homeLineup || {};
         this.awayLineup = data.awayLineup || {};
         this.periodLabel = data.periodLabel;
-        this.gameId = gameStore.getGameId();
+        this.quarter = data.quarter || 1;
+        
+        // ✅ DEBUG: Log gameId state when scene initializes
+        const gameStoreGameId = gameStore.getGameId();
+        const localStorageGameId = typeof localStorage !== 'undefined' ? localStorage.getItem('game_id') : null;
+        console.log('🔍 [Q1→Q2 DEBUG] gameScene.init - gameId state:', {
+          quarter: this.quarter,
+          gameStore_gameId: gameStoreGameId,
+          localStorage_gameId: localStorageGameId,
+          urlParams_gameId: new URLSearchParams(window.location.search).get('game_id')
+        });
+        
+        this.gameId = gameStoreGameId;
+        // ✅ DEBUG: Commented out fix - adding debug logs instead
+        // if (!this.gameId && this.quarter > 1 && typeof localStorage !== 'undefined') {
+        //   const storedGameId = localStorage.getItem('game_id');
+        //   if (storedGameId) {
+        //     console.warn('⚠️ [GAMESCENE] gameId not in gameStore for Q' + this.quarter + ', using localStorage:', storedGameId);
+        //     this.gameId = storedGameId;
+        //     gameStore.setGameId(storedGameId);
+        //   }
+        // }
+        
         if (!this.gameId && typeof localStorage !== 'undefined') {
           localStorage.removeItem('game_id');
         }
-        this.quarter = data.quarter || 1;
         this.gamePlanSettings = data.gamePlanSettings;
         this.userTeamSide = data.userTeamSide;
         
@@ -348,10 +369,21 @@ export function createGameScene(Phaser) {
       this.gameId = simData.game_id || this.gameId;
       const isNewGame = this.quarter === 1 && (!previousGameId || (simData.game_id && simData.game_id !== previousGameId));
       
+      // ✅ DEBUG: Log gameId after receiving simData
+      console.log('🔍 [Q1→Q2 DEBUG] gameScene - After simulate-quarter response:', {
+        quarter: this.quarter,
+        previousGameId: previousGameId,
+        simData_game_id: simData.game_id,
+        scene_gameId_after: this.gameId,
+        isNewGame: isNewGame
+      });
+      
       if (this.gameId && typeof localStorage !== 'undefined') {
         localStorage.setItem('game_id', this.gameId);
+        console.log('🔍 [Q1→Q2 DEBUG] gameScene - Saved gameId to localStorage:', this.gameId);
       }
       gameStore.setGameId(this.gameId);
+      console.log('🔍 [Q1→Q2 DEBUG] gameScene - Set gameId in gameStore:', this.gameId);
       
       // Set team IDs on scene for animation systems
       this.homeTeamId = homeId;
@@ -1516,12 +1548,33 @@ export function createGameScene(Phaser) {
           const nextQ = this.quarter + 1;
           const urlParams = new URLSearchParams(window.location.search);
           
+          // ✅ DEBUG: Log gameId state when navigating to next quarter
+          const localStorageGameId = typeof localStorage !== 'undefined' ? localStorage.getItem('game_id') : null;
+          console.log('🔍 [Q1→Q2 DEBUG] gameScene - Navigating to Q' + nextQ + ':', {
+            currentQuarter: this.quarter,
+            nextQuarter: nextQ,
+            scene_gameId: this.gameId,
+            gameStore_gameId: gameStore.getGameId(),
+            localStorage_gameId: localStorageGameId,
+            urlParams_gameId: urlParams.get('game_id')
+          });
+          
           // ✅ SS&S: Use global helper (works in both regular scripts and modules)
           const helper = window.TimeoutNavigationHelper;
           if (!helper) {
             console.error('❌ [GAMESCENE] TimeoutNavigationHelper not loaded!');
             return;
           }
+          
+          // ✅ DEBUG: Commented out fix - adding debug logs instead
+          // let gameIdForNavigation = this.gameId;
+          // if (!gameIdForNavigation && typeof localStorage !== 'undefined') {
+          //   gameIdForNavigation = localStorage.getItem('game_id');
+          //   if (gameIdForNavigation) {
+          //     console.warn('⚠️ [GAMESCENE] gameId was null, using localStorage fallback:', gameIdForNavigation);
+          //     this.gameId = gameIdForNavigation;
+          //   }
+          // }
           
           // ✅ QUARTER BREAK: Quarter breaks should NOT have resume_from_timeout
           // Helper will automatically exclude it for quarter breaks (resumeFromTimeout=false)
@@ -1532,6 +1585,13 @@ export function createGameScene(Phaser) {
             resumeFromTimeout: false, // ✅ QUARTER BREAK: Not a timeout resume
             lineup: {}, // Lineup will be set on lineup screen
             myTeamSide: urlParams.get('my_team')
+          });
+          
+          // ✅ DEBUG: Log what params are being built
+          console.log('🔍 [Q1→Q2 DEBUG] gameScene - Navigation params built:', {
+            nextQuarter: nextQ,
+            gameId_in_params: params.get('game_id'),
+            all_params: Object.fromEntries(params.entries())
           });
           
           if (this.gameId && typeof localStorage !== 'undefined') {
