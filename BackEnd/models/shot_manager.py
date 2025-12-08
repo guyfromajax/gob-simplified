@@ -585,9 +585,14 @@ class ShotManager:
                     rebound_team = off_team
                     rebounder = o_rebounder
                 else:
-                    # Step 4: Pick best rebounders from each side
-                    o_best_pos = max(o_scores, key=o_scores.get)
-                    d_best_pos = max(d_scores, key=d_scores.get)
+                # Step 4: Pick best rebounders from each side
+                o_best_pos = max(o_scores, key=o_scores.get)
+                d_best_pos = max(d_scores, key=d_scores.get)
+                
+                # ✅ TEMPORARY HARDCODE: Force all rebounds to be DREB for debugging
+                # Override rebound selection to always be defensive
+                o_best_pos = None
+                d_best_pos = max(d_scores, key=d_scores.get) if d_scores else None
                     
                     o_rebounder = off_team.lineup[o_best_pos]
                     d_rebounder = def_team.lineup[d_best_pos]
@@ -617,9 +622,10 @@ class ShotManager:
                         d_weight *= 0.9
                     
                     # Step 8: Determine winner
-                    rebound_team = def_team if random.random() < d_weight else off_team
-                    rebounder = d_rebounder if rebound_team == def_team else o_rebounder
-                    stat = "DREB" if rebound_team == def_team else "OREB"
+                    # ✅ TEMPORARY HARDCODE: Force all rebounds to be DREB for debugging
+                    rebound_team = def_team  # if random.random() < d_weight else off_team
+                    rebounder = d_rebounder  # if rebound_team == def_team else o_rebounder
+                    stat = "DREB"  # if rebound_team == def_team else "OREB"
                 
                 # Record rebound stat and update game state
                 self.game_state["last_rebound"] = stat
@@ -713,8 +719,10 @@ class ShotManager:
                     # Fast Break is determined DURING the shot (by defense tempo), not after DREB
                     # If a defender released for fast break during shot → auto-trigger fast break
                     # If no defender released → regular HCO
+                    # ✅ TEMPORARY HARDCODE: Force all DREB next steps to be Fast Break for debugging
+                    next_play_type = "FAST_BREAK"  # if defense_release_list else "HCO"
                     if defense_release_list:
-                        next_play_type = "FAST_BREAK"
+                        # next_play_type = "FAST_BREAK"
                         # Log fast break determination with release player info
                         release_player_ids = [def_team.lineup[pos].player_id for pos in defense_release_list]
                         # ✅ Store release player in game_state for use in resolve_fast_break_logic
