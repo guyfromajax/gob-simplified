@@ -231,6 +231,152 @@ Every turn result from the backend contains data organized into **three distinct
 
 ---
 
+## FCP/HCT System ✅ **COMPLETE** (January 2025)
+
+### Overview
+
+The **Full Court Press (FCP)** and **Half Court Trap (HCT)** system handles defensive pressure situations that occur after made shots. Both systems use skeleton-based animations to simulate press break sequences and can result in various outcomes: turnovers, fouls, press breaks, or shot attempts.
+
+**Key Functions:**
+- `resolve_full_court_press_logic()` - Handles FCP outcomes in `BackEnd/engine/phase_resolution.py`
+- `resolve_half_court_trap_logic()` - Handles HCT outcomes in `BackEnd/engine/phase_resolution.py`
+- `get_ball_handler_from_skeleton()` - Determines ball handler dynamically from skeleton steps
+
+### When FCP/HCT Activates
+
+**Trigger Conditions:**
+- After made shots when defense applies full court press or half court trap
+- Set via `offensive_state = "FCP"` or `offensive_state = "HCT"` in `game_state`
+- Determined by `turn_manager.determine_defensive_pressure_type()` in `shot_manager.py`
+
+**State Flow:**
+1. Made shot → Sets `offensive_state` based on defensive pressure type
+2. BASELINE_INBOUND turn generated (if applicable)
+3. Next API call routes to FCP/HCT handler based on `offensive_state`
+4. Handler generates outcome turn (FOUL/TURNOVER/HCO/SHOT)
+
+### Possible Outcomes
+
+Both FCP and HCT can result in:
+
+1. **Offensive Foul (O_FOUL)**
+   - Possession change
+   - Routes to: Side Inbound Pass → HCO
+   - Foul player: Determined dynamically from ball handler (60% ball handler, 10% each other player)
+
+2. **Defensive Foul (D_FOUL)**
+   - **In Bonus (5-9 fouls)**: Routes to FREE_THROW (1 & 1)
+   - **In Double Bonus (10+ fouls)**: Routes to FREE_THROW (2 shots)
+   - **Not in Bonus (<5 fouls)**: Routes to Side Inbound Pass → HCO
+   - Foul player: Determined dynamically from defender guarding ball handler
+
+3. **Steal (STEAL)**
+   - Possession change
+   - Routes to: HCO or FAST_BREAK (based on fast break chance)
+   - Stealer: Defender guarding ball handler (position-matched)
+   - Victim: Ball handler (determined from skeleton)
+
+4. **Dead Ball Turnover (DEAD_BALL_TURNOVER)**
+   - Possession change
+   - Routes to: Side Inbound Pass → HCO
+   - Turnover player: Ball handler (determined from skeleton)
+
+5. **Press/Trap Break (HCO)**
+   - Successful press break
+   - Routes to: HCO (half court offense)
+   - No possession change
+
+6. **Press/Trap Break Shot (SHOT)**
+   - Shot attempt during press break
+   - Routes to: Standard shot resolution flow
+   - Uses FCP/HCT-specific skeleton for animation
+
+### Dynamic Player Assignment System ✅ **NEW** (January 2025)
+
+**Previous Behavior:**
+- Ball handler was hardcoded to PG (or first player in lineup)
+- Defender was hardcoded to defensive PG
+- All events (fouls, steals, turnovers) assigned to these hardcoded players
+
+**Current Behavior:**
+- **Ball Handler**: Determined dynamically from skeleton steps
+  - Checks skeleton steps for actions: `"handle_ball"`, `"receive"`, `"shoot"`
+  - Defaults to last step (where event occurs)
+  - Falls back to PG if no ball handler found in skeleton
+- **Defender**: Position-matched to ball handler
+  - Uses same position as ball handler (e.g., if ball handler is SG, defender is defensive SG)
+  - Falls back to defensive PG if position not found
+- **All Events**: Use dynamic players
+  - Offensive foul: Uses dynamic ball handler
+  - Defensive foul: Uses dynamic ball handler and defender
+  - Steal: Uses dynamic ball handler (victim) and defender (stealer)
+  - Dead ball turnover: Uses dynamic ball handler
+
+**Implementation:**
+
+```python
+def get_ball_handler_from_skeleton(skeleton, off_lineup, step_index=None):
+    """
+    Determine the ball handler from skeleton steps.
+    
+    Args:
+        skeleton: Skeleton dict with "steps" key
+        off_lineup: Dictionary of offensive players by position
+        step_index: Optional step index to check (defaults to last step if None)
+    
+    Returns:
+        Player object who has the ball, or PG (or first player) as fallback
+    """
+    # Check skeleton steps for ball possession actions
+    # Actions that indicate ball possession: "handle_ball", "receive", "shoot"
+    # Defaults to last step (where event likely occurs)
+    # Falls back to PG if no ball handler found
+```
+
+**Benefits:**
+- ✅ More accurate player assignments based on actual game flow
+- ✅ Removes hardcoded PG assumption
+- ✅ Better stat tracking (correct players get credited)
+- ✅ More realistic game simulation
+
+### Skeleton System
+
+**Skeleton Sources:**
+- FCP skeletons: `BackEnd/playcall_skeletons/fcp_skeletons.py`
+- HCT skeletons: `BackEnd/playcall_skeletons/hct_skeletons.py`
+- Skeleton variants: Different skeletons for different outcomes (FOUL, STEAL, HCO, SHOT)
+
+**Skeleton Structure:**
+- Each skeleton contains `steps` array
+- Each step has `pos_actions` dict mapping positions to actions
+- Actions include: `"handle_ball"`, `"receive"`, `"pass"`, `"shoot"`, `"screen"`, etc.
+- Ball handler determined by checking for ball possession actions in steps
+
+**Animation Generation:**
+- Skeletons converted to animations via `animator.skeleton_to_animations()`
+- Animations include player movements, ball movements, and defender positioning
+- Frontend uses skeleton data to animate press break sequences
+
+### Key Files
+
+- `BackEnd/engine/phase_resolution.py`
+  - `resolve_full_court_press_logic()` - FCP outcome resolution
+  - `resolve_half_court_trap_logic()` - HCT outcome resolution
+  - `get_ball_handler_from_skeleton()` - Dynamic ball handler determination
+  - `select_foul_player()` - Probabilistic foul player selection
+- `BackEnd/playcall_skeletons/fcp_skeletons.py` - FCP skeleton definitions
+- `BackEnd/playcall_skeletons/hct_skeletons.py` - HCT skeleton definitions
+- `BackEnd/models/animator.py` - Skeleton to animation conversion
+- `FrontEnd/static/js/phaser/animation/animateGameTurns.js` - FCP/HCT detection and state tracking
+
+### Future Enhancements
+
+- **More Nuanced Defender Assignment**: Currently uses position matching. Future: Determine defender based on actual defensive assignments (zone/man coverage)
+- **Enhanced Ball Handler Detection**: Improve detection logic for edge cases where ball handler isn't clear from skeleton
+- **Skeleton Variants**: Add more skeleton variants for different press break scenarios
+
+---
+
 ## Production Animation System
 
 ### Ball Animation System ✅ **COMPLETE**
