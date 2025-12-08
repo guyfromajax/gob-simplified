@@ -28,6 +28,9 @@ class MockPlayer:
             s = self.stats["game"]
             s["REB"] = s.get("OREB", 0) + s.get("DREB", 0)
 
+    def get_stat(self, stat, level="game"):
+        """Get a stat value, matching Player.get_stat interface."""
+        return self.stats.get(level, {}).get(stat, 0)
 
     def get_name(self):
         return self.name
