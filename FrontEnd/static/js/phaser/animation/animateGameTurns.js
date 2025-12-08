@@ -312,17 +312,50 @@ export async function handleOrebTurn(scene, { playerSprites, ballSprite, turnDat
       // If another OREB, it will be handled by the next OREB turn
     }
   } else if (turnData.result_type === "OREB_KICKOUT") {
-    // Animate kickout pass to PG
-    const pgId = turnData.pgId;
-    await animateKickoutReset(
-      scene,
+    // Handle kickout with outlet animation step
+    await handleOrebKickout(scene, {
+      playerSprites,
       ballSprite,
       rebounderId,
-      pgId,
-      turnData.pass || {},
-      500
-    );
+      turnData
+    });
   }
+}
+
+/**
+ * Handle OREB kickout with outlet animation step
+ * Similar to DREB outlet setup, but for offensive rebounds
+ * 
+ * Flow: Rebound animation → Outlet positioning → Pass to PG → HCO
+ */
+async function handleOrebKickout(scene, { playerSprites, ballSprite, rebounderId, turnData }) {
+  const { animateKickoutReset } = await import('./ballManager.js');
+  const { runOffensiveReboundKickoutSetup } = await import('./turnAnimation.js');
+  
+  const pgId = turnData.pgId;
+  if (!pgId) {
+    console.warn('handleOrebKickout: No PG ID provided', turnData);
+    return;
+  }
+
+  // Step 1: Run outlet positioning animation (PG and rebounder move to outlet spots)
+  await runOffensiveReboundKickoutSetup({
+    scene,
+    ballSprite,
+    playerSprites,
+    rebounderId,
+    pgId
+  });
+
+  // Step 2: Execute kickout pass to PG
+  await animateKickoutReset(
+    scene,
+    ballSprite,
+    rebounderId,
+    pgId,
+    turnData.pass || {},
+    500
+  );
 }
 
 function getResultType(turn = {}) {
