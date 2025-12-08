@@ -96,14 +96,14 @@ class ShotManager:
         # Calculate X range based on fast break offense team and IQ
         if will_be_home_offense_on_fast_break:
             # Home team will be offense on fast break (away team is shooting)
-            # Defense release: 40-60 if home will be offense, 50-60 if IQ > 50
-            target_x_min = 50 if has_high_iq else 40
+            # Defense release: 45-60 if home will be offense, 50-60 if IQ > 50
+            target_x_min = 50 if has_high_iq else 45
             target_x_max = 60
         else:
             # Away team will be offense on fast break (home team is shooting)
-            # Defense release: 40-60 if away will be offense, 40-50 if IQ > 50
+            # Defense release: 40-55 if away will be offense, 40-50 if IQ > 50
             target_x_min = 40
-            target_x_max = 50 if has_high_iq else 60
+            target_x_max = 50 if has_high_iq else 55
         
         # Calculate Y range based on IQ
         if has_high_iq:
