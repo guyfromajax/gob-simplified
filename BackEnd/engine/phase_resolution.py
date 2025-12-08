@@ -442,6 +442,7 @@ def resolve_fast_break_logic(game: "GameManager"):
     fb_roles["ball_handler_outlet_y"] = ball_handler_outlet_y
     fb_roles["ball_handler_move_x"] = ball_handler_move_x
     fb_roles["ball_handler_move_y"] = ball_handler_move_y
+    fb_roles["is_away_offense"] = is_away_offense  # ✅ Store for animator to use
     
     # Simulate defender positions after outlet pass
     # Frontend logic: defenders move to X 50-65 (home) or 35-50 (away), Y 15-35
