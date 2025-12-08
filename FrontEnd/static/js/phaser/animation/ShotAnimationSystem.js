@@ -605,29 +605,41 @@ export class ShotAnimationSystem {
         turnData.defense_release.forEach(playerId => {
           const sprite = this.playerSprites[playerId];
           if (sprite) {
-            // ✅ Get player IQ attribute from simData
-            const player = this.scene.simData?.players?.find(p => (p.playerId || p.player_id) === playerId);
-            const playerIQ = player?.attributes?.IQ || player?.IQ || 0;
-            const hasHighIQ = playerIQ > 50;
+            let targetX, targetY;
             
-            // ✅ Determine X range based on fast break offense team and IQ
-            let targetXMin, targetXMax;
-            if (willBeHomeOffenseOnFastBreak) {
-              // Home team will be offense on fast break (away team is shooting)
-              targetXMin = hasHighIQ ? 50 : 40;
-              targetXMax = 60;
+            // ✅ Backend calculates and stores release coordinates in defense_release_coords
+            // Use backend coordinates if available (SS&S: backend is source of truth)
+            if (turnData.defense_release_coords && turnData.defense_release_coords[playerId]) {
+              const storedCoords = turnData.defense_release_coords[playerId];
+              targetX = storedCoords.x;
+              targetY = storedCoords.y;
             } else {
-              // Away team will be offense on fast break (home team is shooting)
-              targetXMin = 40;
-              targetXMax = hasHighIQ ? 50 : 60;
+              // Fallback: Calculate on frontend (for backwards compatibility)
+              // ✅ Get player IQ attribute from simData
+              const player = this.scene.simData?.players?.find(p => (p.playerId || p.player_id) === playerId);
+              const playerIQ = player?.attributes?.IQ || player?.IQ || 0;
+              const hasHighIQ = playerIQ > 50;
+              
+              // ✅ Determine X range based on fast break offense team and IQ
+              let targetXMin, targetXMax;
+              if (willBeHomeOffenseOnFastBreak) {
+                // Home team will be offense on fast break (away team is shooting)
+                targetXMin = hasHighIQ ? 50 : 40;
+                targetXMax = 60;
+              } else {
+                // Away team will be offense on fast break (home team is shooting)
+                targetXMin = 40;
+                targetXMax = hasHighIQ ? 50 : 60;
+              }
+              
+              // ✅ Determine Y range based on IQ
+              const targetYMin = hasHighIQ ? 20 : 14;
+              const targetYMax = hasHighIQ ? 30 : 36;
+              
+              targetY = Phaser.Math.Between(targetYMin, targetYMax);
+              targetX = Phaser.Math.Between(targetXMin, targetXMax);
             }
             
-            // ✅ Determine Y range based on IQ
-            const targetYMin = hasHighIQ ? 20 : 14;
-            const targetYMax = hasHighIQ ? 30 : 36;
-            
-            const targetY = Phaser.Math.Between(targetYMin, targetYMax);
-            const targetX = Phaser.Math.Between(targetXMin, targetXMax);
             const targetPixel = gridToPixels(targetX, targetY, this.scene.game.config.width, this.scene.game.config.height);
             
             // ✅ FIX: Use distance-based duration for consistent speed

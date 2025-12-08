@@ -73,6 +73,52 @@ class ShotManager:
         
         return {"x": target_x, "y": target_y}
     
+    def _calculate_release_coordinates(self, release_player, off_team, def_team):
+        """
+        Calculate defensive release player coordinates matching frontend logic.
+        
+        Args:
+            release_player: Player object releasing for fast break
+            off_team: Offensive team (shooting team)
+            def_team: Defensive team (will be offense on fast break)
+        
+        Returns:
+            dict with "x" and "y" coordinates
+        """
+        # Determine which team will be on offense for the fast break
+        # The defensive team (def_team) will be offense on fast break
+        will_be_home_offense_on_fast_break = def_team.team_id == self.game.home_team.team_id
+        
+        # Get player IQ attribute
+        player_iq = getattr(release_player, "attributes", {}).get("IQ", 0)
+        has_high_iq = player_iq > 50
+        
+        # Calculate X range based on fast break offense team and IQ
+        if will_be_home_offense_on_fast_break:
+            # Home team will be offense on fast break (away team is shooting)
+            # Defense release: 40-60 if home will be offense, 50-60 if IQ > 50
+            target_x_min = 50 if has_high_iq else 40
+            target_x_max = 60
+        else:
+            # Away team will be offense on fast break (home team is shooting)
+            # Defense release: 40-60 if away will be offense, 40-50 if IQ > 50
+            target_x_min = 40
+            target_x_max = 50 if has_high_iq else 60
+        
+        # Calculate Y range based on IQ
+        if has_high_iq:
+            target_y_min = 20
+            target_y_max = 30
+        else:
+            target_y_min = 14
+            target_y_max = 36
+        
+        # Randomize within ranges
+        target_x = random.randint(target_x_min, target_x_max)
+        target_y = random.randint(target_y_min, target_y_max)
+        
+        return {"x": target_x, "y": target_y}
+    
     def _get_shooter_position_and_spot(self, shooter, roles):
         """
         Helper method to extract shooter's position and spot from roles.
@@ -480,6 +526,17 @@ class ShotManager:
                     # Update player.coords so fast break logic uses correct starting position
                     getback_player.coords = coords.copy()
             result["offense_getback_coords"] = offense_getback_coords
+            
+            # ✅ SS&S: Calculate and store release player coordinates (backend as source of truth)
+            defense_release_coords = {}
+            for pos in defense_release_list:
+                release_player = def_team.lineup.get(pos)
+                if release_player:
+                    coords = self._calculate_release_coordinates(release_player, off_team, def_team)
+                    defense_release_coords[release_player.player_id] = coords
+                    # Update player.coords so fast break logic uses correct starting position
+                    release_player.coords = coords.copy()
+            result["defense_release_coords"] = defense_release_coords
 
         # ------------------------
         # ❌ Shot is Missed
@@ -534,6 +591,17 @@ class ShotManager:
                         # Update player.coords so fast break logic uses correct starting position
                         getback_player.coords = coords.copy()
                 result["offense_getback_coords"] = offense_getback_coords
+                
+                # ✅ SS&S: Calculate and store release player coordinates (backend as source of truth)
+                defense_release_coords = {}
+                for pos in defense_release_list:
+                    release_player = def_team.lineup.get(pos)
+                    if release_player:
+                        coords = self._calculate_release_coordinates(release_player, off_team, def_team)
+                        defense_release_coords[release_player.player_id] = coords
+                        # Update player.coords so fast break logic uses correct starting position
+                        release_player.coords = coords.copy()
+                result["defense_release_coords"] = defense_release_coords
             else:
                 # Regular miss → rebound logic
                 defense_attrs = defender.attributes if defender else {"ID": 0}
@@ -627,6 +695,17 @@ class ShotManager:
                         # Update player.coords so fast break logic uses correct starting position
                         getback_player.coords = coords.copy()
                 result["offense_getback_coords"] = offense_getback_coords
+                
+                # ✅ SS&S: Calculate and store release player coordinates (backend as source of truth)
+                defense_release_coords = {}
+                for pos in defense_release_list:
+                    release_player = def_team.lineup.get(pos)
+                    if release_player:
+                        coords = self._calculate_release_coordinates(release_player, off_team, def_team)
+                        defense_release_coords[release_player.player_id] = coords
+                        # Update player.coords so fast break logic uses correct starting position
+                        release_player.coords = coords.copy()
+                result["defense_release_coords"] = defense_release_coords
                 
                 # Debug log to verify offense_getback is populated
                 print(f"🔍 [BACKEND GET BACK DEBUG] MISS shot - offense_getback populated:", {

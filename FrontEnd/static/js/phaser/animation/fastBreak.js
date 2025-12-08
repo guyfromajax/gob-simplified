@@ -671,10 +671,23 @@ async function animateDefensiveStop(scene, turnData, playerSprites, ballSprite, 
         const distanceToBasket = Math.abs(endStep.coords.x - basket.x);
         const distanceToTopKey = Math.abs(endStep.coords.x - topKey.x);
         
+        // For away offense, coordinates in animation data are in HOME orientation
+        // Flip them for display to match what the user sees
+        let displayStartCoords = startStep.coords;
+        let displayEndCoords = endStep.coords;
+        if (!isHomeOffense) {
+          // Away offense: flip coordinates for display
+          displayStartCoords = { x: 100 - startStep.coords.x, y: startStep.coords.y };
+          displayEndCoords = { x: 100 - endStep.coords.x, y: endStep.coords.y };
+        }
+        
         console.log("🛑 Defensive Stop - Animation Check:", {
           ballHandlerId,
-          startCoords: startStep.coords,
-          endCoords: endStep.coords,
+          isHomeOffense,
+          startCoords: startStep.coords, // Raw from backend (HOME orientation)
+          endCoords: endStep.coords, // Raw from backend (HOME orientation)
+          displayStartCoords, // Flipped for away offense (what user sees)
+          displayEndCoords, // Flipped for away offense (what user sees)
           basketCoords: basket,
           distanceToBasket,
           distanceToTopKey,
