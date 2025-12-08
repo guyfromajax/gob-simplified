@@ -70,13 +70,26 @@ class Animator:
         duration = 800
 
         def build_movement(player, end_coords, has_ball=False, action=ACTIONS["DRIFT"]):
-            start = getattr(player, "coords", {"x": 25, "y": 50})
+            # ✅ FIX: For ball handler, use outlet position from fb_roles as start (guaranteed HOME orientation)
+            # This ensures we're starting from the correct position after the outlet pass
+            if has_ball:
+                # Use outlet position as start (already in HOME orientation)
+                ball_handler_outlet_x = fb_roles.get("ball_handler_outlet_x")
+                ball_handler_outlet_y = fb_roles.get("ball_handler_outlet_y")
+                if ball_handler_outlet_x is not None and ball_handler_outlet_y is not None:
+                    start = {"x": ball_handler_outlet_x, "y": ball_handler_outlet_y}
+                else:
+                    # Fallback to player.coords if outlet position not available
+                    start = getattr(player, "coords", {"x": 25, "y": 50})
+            else:
+                # For non-ball handlers, use player.coords as normal
+                start = getattr(player, "coords", {"x": 25, "y": 50})
             
             # ✅ DEBUG: Log build_movement inputs
             if has_ball:  # Only log for ball handler to avoid spam
                 logging.warning(f"🏀 [FAST BREAK ANIMATION DEBUG] build_movement for ball handler:")
                 logging.warning(f"  is_away_offense: {is_away_offense}")
-                logging.warning(f"  start (player.coords): {start}")
+                logging.warning(f"  start (from outlet or player.coords): {start}")
                 logging.warning(f"  end_coords (input, HOME orientation): {end_coords}")
             
             if is_away_offense:
