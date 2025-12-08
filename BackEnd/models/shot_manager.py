@@ -392,6 +392,11 @@ class ShotManager:
         else:
             num_getback = 2
         
+        # ✅ FIX: If defense is releasing for fast break, ensure at least 1 get-back player
+        # This ensures we have defenders to stop the fast break
+        if defense_releases and num_getback == 0:
+            num_getback = 1
+        
         offense_getback_list = []
         if num_getback >= 1:
             if shooter_pos != "PG":
@@ -742,6 +747,24 @@ class ShotManager:
                         # Update player.coords so fast break logic uses correct starting position
                         release_player.coords = coords.copy()
                 result["defense_release_coords"] = defense_release_coords
+                
+                # ✅ FIX: Update coordinates for non-get-back players (rebounders) to prevent stale coordinates
+                # These players should be near the basket they were attacking (where the shot was taken)
+                # off_team was on offense during shot, so they were attacking their target basket
+                # For home team shooting: attacking away basket (x=10)
+                # For away team shooting: attacking home basket (x=90)
+                is_home_team_shooting = off_team.team_id == self.game.home_team.team_id
+                for pos in offense_rebounders:
+                    rebounder_player = off_team.lineup.get(pos)
+                    if rebounder_player:
+                        # Non-get-back players are near the basket after shot attempt
+                        if is_home_team_shooting:
+                            # Home team was shooting, so rebounders near away basket (x=10)
+                            rebounder_coords = {"x": random.randint(8, 15), "y": random.randint(20, 30)}
+                        else:
+                            # Away team was shooting, so rebounders near home basket (x=90)
+                            rebounder_coords = {"x": random.randint(85, 92), "y": random.randint(20, 30)}
+                        rebounder_player.coords = rebounder_coords.copy()
                 
                 # Debug log to verify offense_getback is populated
                 print(f"🔍 [BACKEND GET BACK DEBUG] MISS shot - offense_getback populated:", {
