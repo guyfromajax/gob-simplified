@@ -509,6 +509,17 @@ def resolve_fast_break_logic(game: "GameManager"):
     logging.warning(f"🏀 [FAST BREAK PHASE DEBUG] Checking {len(fb_roles['defense'])} defenders for defensive stop")
     logging.warning(f"  Ball handler outlet position: x={ball_handler_outlet_x}, y={ball_handler_outlet_y}")
     
+    # ✅ Log all get-back players and their coordinates from the previous shot attempt
+    if game.turns and len(game.turns) > 0:
+        for turn in reversed(game.turns[-10:]):  # Check last 10 turns
+            if turn.get("result_type") in ["MISS", "MAKE"]:
+                getback_coords = turn.get("offense_getback_coords", {})
+                if getback_coords:
+                    logging.warning(f"🏀 [FAST BREAK PHASE DEBUG] Get-back players from {turn.get('result_type')} turn:")
+                    for player_id, coords in getback_coords.items():
+                        logging.warning(f"  Get-back player {player_id}: x={coords.get('x')}, y={coords.get('y')}")
+                break
+    
     for defender in fb_roles["defense"]:
         # Use defender's actual coordinates (where they are on the court)
         # These defenders are the team that was on offense during the shot attempt
