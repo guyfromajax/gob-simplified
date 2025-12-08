@@ -145,7 +145,8 @@ async function loadSettings() {
         for (const [key, sliderId] of Object.entries(strategySliders)) {
           const slider = document.getElementById(sliderId);
           const valueDisplay = document.getElementById(`value-${sliderId.replace('slider-', '')}`);
-          const value = currentSettings.strategy_settings[key] || 2;
+          // ✅ FIX: Use nullish coalescing to preserve 0 values (|| treats 0 as falsy)
+          const value = currentSettings.strategy_settings[key] ?? 2;
           if (slider) slider.value = value;
           if (valueDisplay) valueDisplay.textContent = value;
         }
@@ -203,7 +204,8 @@ async function loadSettings() {
     for (const [key, sliderId] of Object.entries(strategySliders)) {
       const slider = document.getElementById(sliderId);
       const valueDisplay = document.getElementById(`value-${sliderId.replace('slider-', '')}`);
-      const value = currentSettings.strategy_settings[key] || 2;
+      // ✅ FIX: Use nullish coalescing to preserve 0 values (|| treats 0 as falsy)
+      const value = currentSettings.strategy_settings[key] ?? 2;
       
       // Ensure value is in currentSettings (in case it wasn't loaded)
       currentSettings.strategy_settings[key] = value;
