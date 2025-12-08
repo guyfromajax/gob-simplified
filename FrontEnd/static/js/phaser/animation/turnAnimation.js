@@ -291,7 +291,28 @@ async function runSideInboundSetup({ scene, ballSprite, playerSprites, turnData 
     if (scene.tweens) scene.tweens.killTweensOf(sprite);
   }
 
+  // ✅ Move ball to inbound spot immediately (matching BIP behavior)
+  if (ball_spot && ballSprite?.setPosition) {
+    const spotPx = gridToPixels(ball_spot.x, ball_spot.y, width, height);
+    ballSprite.setPosition(spotPx.x, spotPx.y);
+    ballSprite.setVisible(true);
+    // Kill any existing ball tweens to ensure it stays at the spot
+    if (scene.tweens) scene.tweens.killTweensOf(ballSprite);
+  }
+
+  // ✅ Move ball to inbound spot immediately (matching BIP behavior)
+  if (ball_spot && ballSprite?.setPosition) {
+    const spotPx = gridToPixels(ball_spot.x, ball_spot.y, width, height);
+    ballSprite.setPosition(spotPx.x, spotPx.y);
+    ballSprite.setVisible(true);
+    // Kill any existing ball tweens to ensure it stays at the spot
+    if (scene.tweens) scene.tweens.killTweensOf(ballSprite);
+  }
+
   const promises = [];
+  const sfSprite = offenseSprites["SF"];
+  const sfId = offenseIds["SF"];
+  
   const addTween = (sprite, coords, pos) => {
     if (!sprite || !coords) return;
     const { x, y } = gridToPixels(coords.x, coords.y, width, height);
@@ -308,10 +329,20 @@ async function runSideInboundSetup({ scene, ballSprite, playerSprites, turnData 
           onStart: () => animationDebugLog(`tweenStart:${pos}`),
           onComplete: () => {
             animationDebugLog(`tweenEnd:${pos}`);
+            // ✅ Attach ball to SF when SF reaches the inbound spot (matching BIP behavior)
+            if (pos === "SF" && sfSprite && ballSprite && ball_spot) {
+              attachBallToPlayer(scene, ballSprite, sfSprite);
+              animationDebugLog(`[sideInbound][ballAttach][SF] sf:${sfId}`);
+            }
             resolve();
           },
           onStop: () => {
             animationDebugLog(`tweenEnd:${pos}`);
+            // ✅ Also attach on stop (in case tween is interrupted)
+            if (pos === "SF" && sfSprite && ballSprite && ball_spot) {
+              attachBallToPlayer(scene, ballSprite, sfSprite);
+              animationDebugLog(`[sideInbound][ballAttach][SF] sf:${sfId}`);
+            }
             resolve();
           }
         });
@@ -321,12 +352,6 @@ async function runSideInboundSetup({ scene, ballSprite, playerSprites, turnData 
 
   Object.entries(oDestinations).forEach(([pos, coords]) => addTween(offenseSprites[pos], coords, pos));
   Object.entries(dDestinations).forEach(([pos, coords]) => addTween(defenseSprites[pos], coords, pos));
-
-  if (ball_spot && ballSprite?.setPosition) {
-    const spotPx = gridToPixels(ball_spot.x, ball_spot.y, width, height);
-    ballSprite.setPosition(spotPx.x, spotPx.y);
-    ballSprite.setVisible(true);
-  }
 
   await Promise.all(promises);
   
@@ -355,14 +380,18 @@ async function runSideInboundSetup({ scene, ballSprite, playerSprites, turnData 
   }
   
   // Fallback to hardcoded SF→PG if no pass detected in animation data
-  const sfSprite = offenseSprites["SF"];
+  // ✅ Note: Ball is already attached to SF when SF reached the inbound spot (above)
   const pgSprite = offenseSprites["PG"];
-  const sfId = offenseIds["SF"];
   const pgId = offenseIds["PG"];
   
   if (sfSprite) {
-    attachBallToPlayer(scene, ballSprite, sfSprite);
-    animationDebugLog("ballAttach(SF)");
+    // ✅ Ball attachment already happened when SF reached the spot (in tween onComplete)
+    // Only attach here as a safety fallback if attachment didn't happen
+    const ballController = scene.ballController || (scene.ballSprite?.ballController);
+    if (!ballController?.isAttached || ballController?.currentOwner !== sfSprite) {
+      attachBallToPlayer(scene, ballSprite, sfSprite);
+      animationDebugLog("ballAttach(SF) - fallback");
+    }
 
     animationDebugLog(`[sideInbound][holdStart] sf:${sfId} pg:${pgId}`);
     // Removed 1000ms pause for smoother transitions
