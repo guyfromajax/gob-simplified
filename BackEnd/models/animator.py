@@ -63,11 +63,28 @@ class Animator:
 
         def build_movement(player, end_coords, has_ball=False, action=ACTIONS["DRIFT"]):
             start = getattr(player, "coords", {"x": 25, "y": 50})
+            
+            # ✅ DEBUG: Log build_movement inputs
+            if has_ball:  # Only log for ball handler to avoid spam
+                logging.warning(f"🏀 [FAST BREAK ANIMATION DEBUG] build_movement for ball handler:")
+                logging.warning(f"  is_away_offense: {is_away_offense}")
+                logging.warning(f"  start (player.coords): {start}")
+                logging.warning(f"  end_coords (input, HOME orientation): {end_coords}")
+            
             if is_away_offense:
                 start = get_away_player_coords(start)
                 end = get_away_player_coords(end_coords)
+                
+                # ✅ DEBUG: Log after flipping
+                if has_ball:
+                    logging.warning(f"  start (after flip): {start}")
+                    logging.warning(f"  end (after flip): {end}")
             else:
                 end = end_coords
+                
+                # ✅ DEBUG: Log for home offense
+                if has_ball:
+                    logging.warning(f"  end (no flip, HOME orientation): {end}")
 
             movement = [
                 {"timestamp": 0, "coords": start, "action": action if not has_ball else ACTIONS["HANDLE"]},
@@ -104,24 +121,44 @@ class Animator:
         ball_handler_outlet_y = fb_roles.get("ball_handler_outlet_y")
         ball_handler_move_x = fb_roles.get("ball_handler_move_x", 7)  # Default 7 if not set
         
+        # ✅ DEBUG: Log initial state
+        logging.warning(f"🏀 [FAST BREAK ANIMATION DEBUG] Ball handler movement calculation:")
+        logging.warning(f"  is_away_offense: {is_away_offense}")
+        logging.warning(f"  offense_team.team_id: {offense_team.team_id}")
+        logging.warning(f"  game.away_team.team_id: {self.game.away_team.team_id}")
+        logging.warning(f"  ball_handler_outlet_x: {ball_handler_outlet_x}")
+        logging.warning(f"  ball_handler_outlet_y: {ball_handler_outlet_y}")
+        
         # Calculate additional movement from outlet position
         # For defensive stops and shot attempts: 5-10 x spots, ±6 y
-        # Home offense: +5 to +10 (move right toward basket)
-        # Away offense: -5 to -10 (move left toward basket)
+        # Home offense: +5 to +10 (move right toward basket at x=90)
+        # Away offense: -5 to -10 (move left toward basket at x=10 in HOME orientation)
+        # Note: build_movement will flip coordinates for away offense, so we calculate in HOME orientation
         if is_away_offense:
-            # Away offense: X -5 to -10 (negative values)
+            # Away offense: X -5 to -10 (negative values in HOME orientation)
+            # After flipping: this becomes moving toward away basket (x=10)
             additional_move_x = -random.randint(5, 10)
         else:
-            # Home offense: X +5 to +10 (positive values)
+            # Home offense: X +5 to +10 (positive values in HOME orientation)
+            # This moves toward home basket (x=90)
             additional_move_x = random.randint(5, 10)
         additional_move_y = random.randint(-6, 6)
         
-        # Calculate ball handler's final position
+        # ✅ DEBUG: Log movement values
+        logging.warning(f"  additional_move_x: {additional_move_x}")
+        logging.warning(f"  additional_move_y: {additional_move_y}")
+        
+        # Calculate ball handler's final position in HOME orientation
+        # build_movement will flip for away offense if needed
         if ball_handler_outlet_x is not None and ball_handler_outlet_y is not None:
-            # Use outlet position as starting point
+            # Use outlet position as starting point (in HOME orientation)
             bh_end_x = max(4, min(97, ball_handler_outlet_x + additional_move_x))
             bh_end_y = max(1, min(49, ball_handler_outlet_y + additional_move_y))
             bh_end = {"x": bh_end_x, "y": bh_end_y}
+            
+            # ✅ DEBUG: Log calculated position
+            logging.warning(f"  bh_end_x (HOME orientation): {bh_end_x}")
+            logging.warning(f"  bh_end_y (HOME orientation): {bh_end_y}")
         else:
             # Fallback: use old logic
             if hold_up:
@@ -133,7 +170,10 @@ class Animator:
                 shooter_y = random.randint(20, 30)
                 bh_end = {"x": shooter_x, "y": shooter_y}
         
-        # Store final position for defender calculations
+        # ✅ DEBUG: Log final position before build_movement
+        logging.warning(f"  bh_end before build_movement: {bh_end}")
+        
+        # Store final position for defender calculations (in HOME orientation)
         fb_roles["_bh_final_x"] = bh_end["x"]
         fb_roles["_bh_final_y"] = bh_end["y"]
         fb_roles["_bh_additional_move_x"] = abs(additional_move_x)  # Store absolute value for calculations

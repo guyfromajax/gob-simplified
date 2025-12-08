@@ -411,8 +411,17 @@ def resolve_fast_break_logic(game: "GameManager"):
     # Note: This will override hold_up/stopper_id if a defender is ahead after outlet pass
     # after outlet pass simulation (matching frontend outlet pass animation)
     
-    # Determine if away team is on offense (for x coordinate logic)
+    # ✅ SS&S: Determine if away team is on offense using offense_team_id
+    # Using team_id is more explicit and traceable than a derived boolean
     is_away_offense = off_team.team_id == game.away_team.team_id
+    
+    # ✅ DEBUG: Log offense team determination
+    import logging
+    logging.warning(f"🏀 [FAST BREAK PHASE DEBUG] Offense team determination:")
+    logging.warning(f"  off_team.team_id: {off_team.team_id}")
+    logging.warning(f"  game.away_team.team_id: {game.away_team.team_id}")
+    logging.warning(f"  game.home_team.team_id: {game.home_team.team_id}")
+    logging.warning(f"  is_away_offense: {is_away_offense}")
     
     # Simulate ball handler position after outlet pass
     # Frontend logic: ball handler moves 5-10 spots toward basket, ±6 Y
