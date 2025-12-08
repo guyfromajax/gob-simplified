@@ -649,28 +649,45 @@ export class ShotAnimationSystem {
         turnData.offense_getback.forEach(playerId => {
           const sprite = this.playerSprites[playerId];
           if (sprite) {
-            // ✅ Get player IQ attribute from simData
-            const player = this.scene.simData?.players?.find(p => (p.playerId || p.player_id) === playerId);
-            const playerIQ = player?.attributes?.IQ || player?.IQ || 0;
-            const hasHighIQ = playerIQ > 50;
-            
-            // ✅ Determine X range based on fast break offense team and IQ
-            let targetXMin, targetXMax;
-            if (willBeHomeOffenseOnFastBreak) {
-              // Home team will be offense on fast break (away team is shooting)
-              // Offense get-back: 40-55 if home will be offense, 45-55 if IQ > 50
-              targetXMin = hasHighIQ ? 45 : 40;
-              targetXMax = 55;
+            // ✅ SS&S: Use stored coordinates from backend (single source of truth)
+            // Backend calculates and stores get-back coordinates in offense_getback_coords
+            let targetX, targetY;
+            if (turnData.offense_getback_coords && turnData.offense_getback_coords[playerId]) {
+              // Use stored coordinates from backend
+              const storedCoords = turnData.offense_getback_coords[playerId];
+              targetX = storedCoords.x;
+              targetY = storedCoords.y;
             } else {
-              // Away team will be offense on fast break (home team is shooting)
-              // Offense get-back: 45-60 if away will be offense, 45-55 if IQ > 50
-              targetXMin = 45;
-              targetXMax = hasHighIQ ? 55 : 60;
+              // Fallback: Calculate coordinates (shouldn't happen if backend is working correctly)
+              console.warn('⚠️ [GET BACK] No stored coordinates found, falling back to calculation', {
+                playerId,
+                hasOffenseGetbackCoords: !!turnData.offense_getback_coords
+              });
+              
+              // ✅ Get player IQ attribute from simData
+              const player = this.scene.simData?.players?.find(p => (p.playerId || p.player_id) === playerId);
+              const playerIQ = player?.attributes?.IQ || player?.IQ || 0;
+              const hasHighIQ = playerIQ > 50;
+              
+              // ✅ Determine X range based on fast break offense team and IQ
+              let targetXMin, targetXMax;
+              if (willBeHomeOffenseOnFastBreak) {
+                // Home team will be offense on fast break (away team is shooting)
+                // Offense get-back: 40-55 if home will be offense, 45-55 if IQ > 50
+                targetXMin = hasHighIQ ? 45 : 40;
+                targetXMax = 55;
+              } else {
+                // Away team will be offense on fast break (home team is shooting)
+                // Offense get-back: 45-60 if away will be offense, 45-55 if IQ > 50
+                targetXMin = 45;
+                targetXMax = hasHighIQ ? 55 : 60;
+              }
+              
+              // ✅ Y range is always 14-36
+              targetY = Phaser.Math.Between(14, 36);
+              targetX = Phaser.Math.Between(targetXMin, targetXMax);
             }
             
-            // ✅ Y range is always 14-36
-            const targetY = Phaser.Math.Between(14, 36);
-            const targetX = Phaser.Math.Between(targetXMin, targetXMax);
             const targetPixel = gridToPixels(targetX, targetY, this.scene.game.config.width, this.scene.game.config.height);
             
             // ✅ FIX: Use distance-based duration for consistent speed

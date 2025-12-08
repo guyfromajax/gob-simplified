@@ -416,9 +416,24 @@ export async function shootBall({
         turnData.offense_getback.forEach(playerId => {
           const sprite = scene.playerSprites[playerId];
           if (sprite) {
-            const targetY = Phaser.Math.Between(14, 36);
-            // Away team shooting → x: 50-60, Home team shooting → x: 40-50
-            const targetX = isHomeTeam ? Phaser.Math.Between(40, 50) : Phaser.Math.Between(50, 60);
+            // ✅ SS&S: Use stored coordinates from backend (single source of truth)
+            let targetX, targetY;
+            if (turnData.offense_getback_coords && turnData.offense_getback_coords[playerId]) {
+              // Use stored coordinates from backend
+              const storedCoords = turnData.offense_getback_coords[playerId];
+              targetX = storedCoords.x;
+              targetY = storedCoords.y;
+            } else {
+              // Fallback: Calculate coordinates (shouldn't happen if backend is working correctly)
+              console.warn('⚠️ [GET BACK] No stored coordinates found in ballManager, falling back to calculation', {
+                playerId,
+                hasOffenseGetbackCoords: !!turnData.offense_getback_coords
+              });
+              targetY = Phaser.Math.Between(14, 36);
+              // Away team shooting → x: 50-60, Home team shooting → x: 40-50
+              targetX = isHomeTeam ? Phaser.Math.Between(40, 50) : Phaser.Math.Between(50, 60);
+            }
+            
             const targetPixel = gridToPixels(targetX, targetY, scene.game.config.width, scene.game.config.height);
             
             scene.tweens.add({

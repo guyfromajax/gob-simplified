@@ -425,8 +425,25 @@ def resolve_fast_break_logic(game: "GameManager"):
     
     # Simulate ball handler position after outlet pass
     # Frontend logic: ball handler moves 5-10 spots toward basket, ±6 Y
+    # ✅ SS&S: Use get-back coordinates if ball handler is a get-back player
+    # (player.coords should already be updated in shot_manager.py, but check previous turn as fallback)
     ball_handler_start_x = getattr(ball_handler, "coords", {}).get("x", 50)
     ball_handler_start_y = getattr(ball_handler, "coords", {}).get("y", 25)
+    
+    # Fallback: Check if ball handler is a get-back player from previous MISS turn
+    # This ensures we use the correct starting position even if player.coords wasn't updated
+    if game.turns and len(game.turns) > 0:
+        # Look for the most recent MISS turn with offense_getback_coords
+        for turn in reversed(game.turns[-10:]):  # Check last 10 turns (should be enough)
+            if turn.get("result_type") == "MISS" and turn.get("offense_getback_coords"):
+                getback_coords = turn.get("offense_getback_coords", {})
+                ball_handler_id = getattr(ball_handler, "player_id", None)
+                if ball_handler_id and ball_handler_id in getback_coords:
+                    # Use stored get-back coordinates
+                    stored_coords = getback_coords[ball_handler_id]
+                    ball_handler_start_x = stored_coords.get("x", ball_handler_start_x)
+                    ball_handler_start_y = stored_coords.get("y", ball_handler_start_y)
+                    break
     
     # Determine direction toward basket
     # Home offense: basket at x=90, so direction = +1 (right)
