@@ -1069,6 +1069,10 @@ def assign_all_zone_defenders(
                     None,
                     is_ball_handler=True
                 )
+            # get_defender_coords returns in same orientation as input (away if away offense)
+            # Zone defense expects HOME orientation, so convert if away offense
+            if is_away_offense:
+                coords = get_away_player_coords(coords)
             assignments[closest_defender] = coords
             # Track that this defender is guarding the ball handler
             if ball_handler_id:
