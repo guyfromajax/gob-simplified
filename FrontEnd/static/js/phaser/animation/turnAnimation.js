@@ -882,6 +882,130 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
   }
 }
 
+/**
+ * Run offensive rebound kickout outlet setup animation
+ * Similar to runDefensiveReboundSetup but for OREB kickout scenarios
+ * 
+ * @param {Object} params
+ * @param {Object} params.scene - Phaser scene
+ * @param {Object} params.ballSprite - Ball sprite
+ * @param {Object} params.playerSprites - Player sprites dict
+ * @param {string} params.rebounderId - Rebounder player ID
+ * @param {string} params.pgId - Point guard player ID
+ */
+async function runOffensiveReboundKickoutSetup({ scene, ballSprite, playerSprites, rebounderId, pgId }) {
+  animationDebugLog('runOffensiveReboundKickoutSetup called with:', { rebounderId, pgId });
+  if (!scene || !playerSprites || rebounderId == null || pgId == null) return;
+
+  const rebounderSprite = playerSprites[rebounderId];
+  const pgSprite = playerSprites[pgId];
+  if (!rebounderSprite || !pgSprite) {
+    animationDebugWarn('runOffensiveReboundKickoutSetup: Missing sprites', {
+      rebounderId,
+      pgId,
+      hasRebounder: !!rebounderSprite,
+      hasPG: !!pgSprite
+    });
+    return;
+  }
+
+  // Attach ball to rebounder
+  if (ballSprite) {
+    attachBallToPlayer(scene, ballSprite, rebounderSprite);
+  }
+
+  const width = scene.game.config.width;
+  const height = scene.game.config.height;
+  const { HCO_STRING_SPOTS } = await import('../utils/courtPositions.js');
+
+  // PG moves to one of: key, deep key, upper wing, deep upper wing, lower wing, deep lower wing (randomized)
+  const pgSpotOptions = [
+    "key",
+    "deep key",
+    "upper wing",
+    "deep upper wing",
+    "lower wing",
+    "deep lower wing"
+  ];
+  const selectedPGSpot = pgSpotOptions[Math.floor(Math.random() * pgSpotOptions.length)];
+  const pgSpot = HCO_STRING_SPOTS[selectedPGSpot];
+  
+  if (!pgSpot) {
+    animationDebugWarn('runOffensiveReboundKickoutSetup: Invalid PG spot selected', { selectedPGSpot });
+    return;
+  }
+
+  // Determine PG's vertical half for rebounder constraint
+  const isPGUpperHalf = selectedPGSpot.includes("upper");
+  const isPGLowerHalf = selectedPGSpot.includes("lower");
+  const isPGCentral = selectedPGSpot === "key" || selectedPGSpot === "deep key";
+
+  // Rebounder moves to: topLane, upper apex, lower apex, or key (if PG not at key)
+  // Constraint: Rebounder must be on same vertical half as PG (or central)
+  let rebounderSpotOptions = [];
+  
+  // Always allow topLane and key (vertically central)
+  rebounderSpotOptions.push("topLane");
+  if (selectedPGSpot !== "key") {
+    rebounderSpotOptions.push("key");
+  }
+
+  // Add vertical half options based on PG position
+  // If PG is central (key/deep key), rebounder can go to any vertical spot
+  // If PG is upper half, rebounder can't go to lower apex
+  // If PG is lower half, rebounder can't go to upper apex
+  if (isPGCentral || isPGUpperHalf) {
+    rebounderSpotOptions.push("upper apex");
+  }
+  if (isPGCentral || isPGLowerHalf) {
+    rebounderSpotOptions.push("lower apex");
+  }
+
+  // Select random rebounder spot from valid options
+  const selectedRebounderSpot = rebounderSpotOptions[Math.floor(Math.random() * rebounderSpotOptions.length)];
+  const rebounderSpot = HCO_STRING_SPOTS[selectedRebounderSpot];
+  
+  if (!rebounderSpot) {
+    animationDebugWarn('runOffensiveReboundKickoutSetup: Invalid rebounder spot selected', { selectedRebounderSpot });
+    return;
+  }
+
+  animationDebugLog('runOffensiveReboundKickoutSetup: Selected spots', {
+    pgSpot: selectedPGSpot,
+    pgCoords: pgSpot,
+    rebounderSpot: selectedRebounderSpot,
+    rebounderCoords: rebounderSpot
+  });
+
+  // Animate both players to their spots
+  const promises = [];
+  
+  // Animate PG to outlet position
+  const pgPx = gridToPixels(pgSpot.x, pgSpot.y, width, height);
+  const pgDuration = getPlayerDuration(pgSprite, pgPx.x, pgPx.y, true);
+  promises.push(
+    tweenPlayerTo(scene, pgSprite, pgPx, {
+      duration: pgDuration,
+      easing: 'Linear',
+    })
+  );
+
+  // Animate rebounder to outlet position
+  const rebounderPx = gridToPixels(rebounderSpot.x, rebounderSpot.y, width, height);
+  const rebounderDuration = getPlayerDuration(rebounderSprite, rebounderPx.x, rebounderPx.y, true);
+  promises.push(
+    tweenPlayerTo(scene, rebounderSprite, rebounderPx, {
+      duration: rebounderDuration,
+      easing: 'Linear',
+    })
+  );
+
+  // Wait for both animations to complete
+  await Promise.all(promises);
+
+  animationDebugLog('runOffensiveReboundKickoutSetup: Outlet positioning complete');
+}
+
 // Setup baseline inbound play after a made basket
 async function runInboundSetup({
   scene,
@@ -2417,7 +2541,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   }
 }
 
-export { runInboundSetup, runSideInboundSetup, runDefensiveReboundSetup, getPlayerDuration };
+export { runInboundSetup, runSideInboundSetup, runDefensiveReboundSetup, runOffensiveReboundKickoutSetup, getPlayerDuration };
 // Provide an uncapped duration helper for long transitions (e.g., inbound -> HCO)
 export function getPlayerDurationUncapped(sprite, targetX, targetY) {
   const currentX = sprite.x;
