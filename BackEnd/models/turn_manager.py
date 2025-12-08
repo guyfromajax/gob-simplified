@@ -1654,6 +1654,10 @@ class TurnManager:
         # Resolve what happens with the offensive rebound
         oreb_event = resolve_offensive_rebound(self.game, rebounder)
         
+        # ✅ TEMPORARY HARDCODE: Force all OREBs to be kickouts for testing
+        # TODO: Remove this after testing kickout outlet animation
+        oreb_event["event_type"] = "KICKOUT"
+        
         if oreb_event["event_type"] == "PUTBACK_ATTEMPT":
             self.logger.log("putbackStart")
             self.logger.log(oreb_event["result"].lower())
