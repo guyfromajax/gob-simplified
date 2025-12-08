@@ -410,7 +410,6 @@ def resolve_fast_break_logic(game: "GameManager"):
     # ✅ NEW LOGIC: Determine event type based on defender positions relative to ball handler
     # Note: This will override hold_up/stopper_id if a defender is ahead after outlet pass
     # after outlet pass simulation (matching frontend outlet pass animation)
-    import random
     
     # Determine if away team is on offense (for x coordinate logic)
     is_away_offense = off_team.team_id == game.away_team.team_id
