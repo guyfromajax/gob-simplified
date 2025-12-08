@@ -90,6 +90,54 @@ def check_and_handle_foul_out(foul_player, game_state, foul_team):
         "foul_player_team": foul_team.name if fouled_out else None
     }
 
+def get_ball_handler_from_skeleton(skeleton, off_lineup, step_index=None):
+    """
+    Determine the ball handler from skeleton steps.
+    
+    Args:
+        skeleton: Skeleton dict with "steps" key
+        off_lineup: Dictionary of offensive players by position
+        step_index: Optional step index to check (defaults to last step if None)
+    
+    Returns:
+        Player object who has the ball, or PG (or first player) as fallback
+    """
+    if not skeleton or not skeleton.get("steps"):
+        # Fallback: use PG or first player
+        return off_lineup.get("PG", list(off_lineup.values())[0])
+    
+    steps = skeleton.get("steps", [])
+    if not steps:
+        return off_lineup.get("PG", list(off_lineup.values())[0])
+    
+    # Determine which step to check
+    if step_index is None:
+        # Default to last step (where event likely occurs)
+        step_index = len(steps) - 1
+    
+    # Clamp step_index to valid range
+    step_index = max(0, min(step_index, len(steps) - 1))
+    
+    # Check steps from step_index backwards to find ball handler
+    # (ball handler might be determined earlier in the sequence)
+    for i in range(step_index, -1, -1):
+        step = steps[i]
+        pos_actions = step.get("pos_actions", {})
+        
+        # Find who has ball at this step
+        for pos, action_info in pos_actions.items():
+            action = action_info.get("action", "")
+            # Actions that indicate ball possession
+            if action in ["handle_ball", "receive", "shoot"]:
+                # Found ball handler position
+                ball_handler_player = off_lineup.get(pos)
+                if ball_handler_player:
+                    return ball_handler_player
+    
+    # Fallback: use PG or first player
+    return off_lineup.get("PG", list(off_lineup.values())[0])
+
+
 def select_foul_player(foul_team_type, ball_handler, off_lineup, def_lineup):
     """
     Select which player committed the foul based on probabilistic logic.
@@ -1415,11 +1463,18 @@ def resolve_full_court_press_logic(game: "GameManager"):
         
         return shot_result
     
+    # ✅ Determine ball handler from skeleton (who actually has the ball)
+    ball_handler = get_ball_handler_from_skeleton(skeleton, off_lineup)
+    ball_handler_pos = getattr(ball_handler, 'position', None) or "PG"
+    
+    # ✅ Determine defender based on ball handler position (position matching for now)
+    defender = def_lineup.get(ball_handler_pos, def_lineup.get("PG", list(def_lineup.values())[0]))
+    
     # Build roles dict for animation generation
     roles = {
-        "ball_handler": off_lineup.get("PG", list(off_lineup.values())[0]),
-        "defender": def_lineup.get("PG", list(def_lineup.values())[0]),
-        "shooter": off_lineup.get("PG", list(off_lineup.values())[0]),
+        "ball_handler": ball_handler,
+        "defender": defender,
+        "shooter": ball_handler,
         "passer": None,
         "screener": None,
     }
@@ -1434,12 +1489,19 @@ def resolve_full_court_press_logic(game: "GameManager"):
     
     if not skeleton or not skeleton.get('steps'):
         skeleton = get_skeleton_for_turn(result_type, "FCP", game) or {}
+        # Re-determine ball handler if skeleton was just retrieved
+        ball_handler = get_ball_handler_from_skeleton(skeleton, off_lineup)
+        ball_handler_pos = getattr(ball_handler, 'position', None) or "PG"
+        defender = def_lineup.get(ball_handler_pos, def_lineup.get("PG", list(def_lineup.values())[0]))
+        roles["ball_handler"] = ball_handler
+        roles["defender"] = defender
     
     # Handle foul results - use standard foul types for frontend
     if result_type == "D_FOUL":
         game_state["foul_team"] = "DEFENSE"
+        # ✅ Use dynamically determined ball handler and defender
         # Select the foul player and increment their fouls
-        foul_player = select_foul_player("DEFENSE", roles["ball_handler"], off_lineup, def_lineup)
+        foul_player = select_foul_player("DEFENSE", ball_handler, off_lineup, def_lineup)
         foul_player.record_stat("F")
         def_team.team_fouls += 1  # Increment team fouls
         roles["foul_player"] = foul_player
@@ -1454,16 +1516,16 @@ def resolve_full_court_press_logic(game: "GameManager"):
             game_state["free_throws"] = 2
             game_state["free_throws_remaining"] = 2
             game_state["one_and_one"] = False
-            game_state["last_ball_handler"] = roles["ball_handler"]
-            game_state["shooter"] = roles["ball_handler"]
+            game_state["last_ball_handler"] = ball_handler
+            game_state["shooter"] = ball_handler
         elif def_team.team_fouls >= 5:
             # Bonus (5-9 fouls): 1 & 1 free throws
             game_state["offensive_state"] = "FREE_THROW"
             game_state["free_throws"] = 2  # Maximum possible (if front end is made)
             game_state["free_throws_remaining"] = 1  # Start with 1 (front end)
             game_state["one_and_one"] = True
-            game_state["last_ball_handler"] = roles["ball_handler"]
-            game_state["shooter"] = roles["ball_handler"]
+            game_state["last_ball_handler"] = ball_handler
+            game_state["shooter"] = ball_handler
         else:
             # Less than 5 fouls: possession change, side inbound
             game_state["offensive_state"] = "HCO"
@@ -1472,8 +1534,9 @@ def resolve_full_court_press_logic(game: "GameManager"):
         # text = "PRESS! Defensive foul"
     elif result_type == "O_FOUL":
         game_state["foul_team"] = "OFFENSE"
+        # ✅ Use dynamically determined ball handler
         # Select the foul player and increment their fouls
-        foul_player = select_foul_player("OFFENSE", roles["ball_handler"], off_lineup, def_lineup)
+        foul_player = select_foul_player("OFFENSE", ball_handler, off_lineup, def_lineup)
         foul_player.record_stat("F")
         off_team.team_fouls += 1  # Increment team fouls
         roles["foul_player"] = foul_player
@@ -1486,16 +1549,18 @@ def resolve_full_court_press_logic(game: "GameManager"):
     elif result_type == "DEAD_BALL_TURNOVER":
         result_type = "DEAD BALL"
         # text = "PRESS! Turnover"
+        # ✅ Use dynamically determined ball handler
         # Record TO stat for the ball handler
-        roles["ball_handler"].record_stat("TO")
+        ball_handler.record_stat("TO")
         # Track FCP success: turnover = defensive success
         def_scouting["defense"]["FCP"]["success"] += 1
     elif result_type == "STEAL":
+        # ✅ Use dynamically determined ball handler and defender
         # Record TO stat for the ball handler (victim of steal)
-        roles["ball_handler"].record_stat("TO")
-        # Record STL stat for the defender
-        if roles["defender"]:
-            roles["defender"].record_stat("STL")
+        ball_handler.record_stat("TO")
+        # Record STL stat for the defender (guarding ball handler)
+        if defender:
+            defender.record_stat("STL")
         # Track FCP success: steal = defensive success
         def_scouting["defense"]["FCP"]["success"] += 1
     
@@ -2228,11 +2293,18 @@ def resolve_half_court_trap_logic(game: "GameManager"):
         
         return shot_result
     
+    # ✅ Determine ball handler from skeleton (who actually has the ball)
+    ball_handler = get_ball_handler_from_skeleton(skeleton, off_lineup)
+    ball_handler_pos = getattr(ball_handler, 'position', None) or "PG"
+    
+    # ✅ Determine defender based on ball handler position (position matching for now)
+    defender = def_lineup.get(ball_handler_pos, def_lineup.get("PG", list(def_lineup.values())[0]))
+    
     # Build roles dict for animation generation
     roles = {
-        "ball_handler": off_lineup.get("PG", list(off_lineup.values())[0]),
-        "defender": def_lineup.get("PG", list(def_lineup.values())[0]),
-        "shooter": off_lineup.get("PG", list(off_lineup.values())[0]),
+        "ball_handler": ball_handler,
+        "defender": defender,
+        "shooter": ball_handler,
         "passer": None,
         "screener": None,
     }
@@ -2248,11 +2320,19 @@ def resolve_half_court_trap_logic(game: "GameManager"):
     
     if not skeleton or not skeleton.get('steps'):
         skeleton = get_skeleton_for_turn(result_type, "HCT", game) or {}
+        # Re-determine ball handler if skeleton was just retrieved
+        ball_handler = get_ball_handler_from_skeleton(skeleton, off_lineup)
+        ball_handler_pos = getattr(ball_handler, 'position', None) or "PG"
+        defender = def_lineup.get(ball_handler_pos, def_lineup.get("PG", list(def_lineup.values())[0]))
+        roles["ball_handler"] = ball_handler
+        roles["defender"] = defender
+    
     # Handle foul results - use standard foul types for frontend (same as FCP)
     if result_type == "D_FOUL":
         game_state["foul_team"] = "DEFENSE"
+        # ✅ Use dynamically determined ball handler and defender
         # Select the foul player and increment their fouls
-        foul_player = select_foul_player("DEFENSE", roles["ball_handler"], off_lineup, def_lineup)
+        foul_player = select_foul_player("DEFENSE", ball_handler, off_lineup, def_lineup)
         foul_player.record_stat("F")
         def_team.team_fouls += 1  # Increment team fouls
         roles["foul_player"] = foul_player
@@ -2267,16 +2347,16 @@ def resolve_half_court_trap_logic(game: "GameManager"):
             game_state["free_throws"] = 2
             game_state["free_throws_remaining"] = 2
             game_state["one_and_one"] = False
-            game_state["last_ball_handler"] = roles["ball_handler"]
-            game_state["shooter"] = roles["ball_handler"]
+            game_state["last_ball_handler"] = ball_handler
+            game_state["shooter"] = ball_handler
         elif def_team.team_fouls >= 5:
             # Bonus (5-9 fouls): 1 & 1 free throws
             game_state["offensive_state"] = "FREE_THROW"
             game_state["free_throws"] = 2  # Maximum possible (if front end is made)
             game_state["free_throws_remaining"] = 1  # Start with 1 (front end)
             game_state["one_and_one"] = True
-            game_state["last_ball_handler"] = roles["ball_handler"]
-            game_state["shooter"] = roles["ball_handler"]
+            game_state["last_ball_handler"] = ball_handler
+            game_state["shooter"] = ball_handler
         else:
             # Less than 5 fouls: possession change, side inbound
             game_state["offensive_state"] = "HCO"
@@ -2284,8 +2364,9 @@ def resolve_half_court_trap_logic(game: "GameManager"):
             game_state["free_throws_remaining"] = 0
     elif result_type == "O_FOUL":
         game_state["foul_team"] = "OFFENSE"
+        # ✅ Use dynamically determined ball handler
         # Select the foul player and increment their fouls
-        foul_player = select_foul_player("OFFENSE", roles["ball_handler"], off_lineup, def_lineup)
+        foul_player = select_foul_player("OFFENSE", ball_handler, off_lineup, def_lineup)
         foul_player.record_stat("F")
         off_team.team_fouls += 1  # Increment team fouls
         roles["foul_player"] = foul_player
@@ -2296,16 +2377,18 @@ def resolve_half_court_trap_logic(game: "GameManager"):
         def_scouting["defense"]["HCT"]["success"] += 1
     elif result_type == "DEAD_BALL_TURNOVER":
         result_type = "DEAD BALL"
+        # ✅ Use dynamically determined ball handler
         # Record TO stat for the ball handler
-        roles["ball_handler"].record_stat("TO")
+        ball_handler.record_stat("TO")
         # Track HCT success: turnover = defensive success
         def_scouting["defense"]["HCT"]["success"] += 1
     elif result_type == "STEAL":
+        # ✅ Use dynamically determined ball handler and defender
         # Record TO stat for the ball handler (victim of steal)
-        roles["ball_handler"].record_stat("TO")
-        # Record STL stat for the defender
-        if roles["defender"]:
-            roles["defender"].record_stat("STL")
+        ball_handler.record_stat("TO")
+        # Record STL stat for the defender (guarding ball handler)
+        if defender:
+            defender.record_stat("STL")
         # Track HCT success: steal = defensive success
         def_scouting["defense"]["HCT"]["success"] += 1
     
