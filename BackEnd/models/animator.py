@@ -48,7 +48,12 @@ class Animator:
 
         offense_team = self.game.offense_team
         defense_team = self.game.defense_team
-        is_away_offense = offense_team.team_id == self.game.away_team.team_id
+        # ✅ Use is_away_offense from fb_roles if available (more reliable than self.game.offense_team)
+        # This ensures consistency with phase_resolution.py calculations
+        is_away_offense = fb_roles.get("is_away_offense")
+        if is_away_offense is None:
+            # Fallback to calculating from game state
+            is_away_offense = offense_team.team_id == self.game.away_team.team_id
 
         ball_handler = fb_roles.get("ball_handler")
         defenders = fb_roles.get("defense", [])
