@@ -1707,6 +1707,93 @@ After a made shot (HCO MAKE, PUTBACK_MAKE, Fast Break MAKE, Free Throw MAKE), th
 
 ---
 
+## SIDE_INBOUND (SIP) and Player Setup After Fouls/Dead Balls
+
+Side inbound passes (`SIDE_INBOUND`) occur after dead ball situations such as fouls (non-shooting), turnovers (dead ball), or other stoppages. Unlike BASELINE_INBOUND, SIP is simpler and doesn't involve defensive pressure setup or retreat animations.
+
+### Process Overview
+
+**Location:** `AnimationEngine.handleSideInbound()` → `PassAnimationSystem.executeInboundSequence()` → `runSideInboundSetup()`
+
+**Flow:**
+1. Dead ball situation occurs (foul, turnover, etc.)
+2. `SIDE_INBOUND` turn is created by backend
+3. Frontend routes to `AnimationEngine.handleSideInbound()`
+4. Ball is immediately moved to inbound spot
+5. Players are positioned based on `oDestinations` and `dDestinations`
+6. Ball attaches to SF when SF reaches the inbound spot
+7. Inbound pass is executed (SF → PG)
+8. Next turn (typically HCO) begins
+
+### Ball Handling
+
+**Ball Positioning:**
+- Ball is immediately moved to `ball_spot` coordinates at the start of the SIP turn
+- Ball remains at the inbound spot while players animate to their positions
+- This matches BASELINE_INBOUND behavior for consistency
+
+**Ball Attachment:**
+- Ball attaches to SF when SF reaches the inbound spot (in SF's tween `onComplete` callback)
+- This ensures the ball is attached as soon as the SF arrives, not after all players finish
+- Safety fallback attachment exists if SF tween completes without attachment
+
+**Key Code:**
+- `turnAnimation.js` lines 294-301: Ball immediately positioned at inbound spot
+- `turnAnimation.js` lines 321-327: Ball attaches to SF when SF reaches spot
+- `turnAnimation.js` lines 378-384: Safety fallback attachment check
+
+### Player Positioning
+
+**Offensive Players:**
+- Positions come from `turnData.oDestinations` (backend-provided)
+- All offensive players animate to their destinations using distance-based timing
+- SF is the inbounder (receives ball at inbound spot)
+
+**Defensive Players:**
+- Positions come from `turnData.dDestinations` (backend-provided)
+- All defensive players animate to their destinations using distance-based timing
+- No special retreat or pressure positioning (unlike BIP)
+
+### Inbound Pass Execution
+
+**Pass Detection:**
+- Frontend checks `turnData.animations` for dynamic pass actions
+- If pass detected in animation data, uses `handlePassAnimation()` with pass info
+- Falls back to hardcoded SF → PG pass if no pass detected
+
+**Pass Animation:**
+- Pass executes after all players reach their positions
+- Ball transfers from SF to PG
+- PG receives ball and next turn begins
+
+**Key Code:**
+- `turnAnimation.js` lines 359-415: Pass detection and execution
+- `passDetection.js`: Dynamic pass detection from animation data
+- `ballManager.js`: Pass animation execution
+
+### Key Differences from BASELINE_INBOUND
+
+| Aspect | SIDE_INBOUND (SIP) | BASELINE_INBOUND (BIP) |
+|--------|-------------------|------------------------|
+| **Use Case** | After fouls, dead ball turnovers | After made shots, quarter starts |
+| **Defensive Setup** | Simple positioning from `dDestinations` | Complex: retreat animation or FCP/HCT press positions |
+| **Pressure Logic** | None | Handles FCP/HCT setup with skeleton positions |
+| **Ball Attachment** | Attaches when SF reaches spot | Attaches after all players positioned |
+| **Complexity** | Simple, straightforward | Complex with multiple scenarios |
+| **Code Function** | `runSideInboundSetup()` | `runInboundSetup()` |
+
+### Key Functions
+
+**Backend:**
+- `turn_manager.py`: Creates SIDE_INBOUND turn data with `oDestinations`, `dDestinations`, `ball_spot`
+
+**Frontend:**
+- `AnimationEngine.handleSideInbound()`: Routes SIDE_INBOUND turns
+- `PassAnimationSystem.executeInboundSequence()`: Handles inbound pass execution
+- `turnAnimation.js` `runSideInboundSetup()`: Positions players, handles ball attachment, executes inbound pass
+
+---
+
 ## Quarter Start Possession Logic and BASELINE_INBOUND Turns ✅ **COMPLETE** (January 2025)
 
 **Status:** Fully implemented and tested
