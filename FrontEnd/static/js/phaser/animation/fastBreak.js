@@ -673,8 +673,8 @@ async function animateDefensiveStop(scene, turnData, playerSprites, ballSprite, 
         
         console.log("🛑 Defensive Stop - Animation Check:", {
           ballHandlerId,
+          startCoords: startStep.coords,
           endCoords: endStep.coords,
-          topKeyCoords: topKey,
           basketCoords: basket,
           distanceToBasket,
           distanceToTopKey,
