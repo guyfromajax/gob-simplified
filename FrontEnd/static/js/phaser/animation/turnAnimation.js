@@ -929,13 +929,13 @@ async function runOffensiveReboundKickoutSetup({ scene, ballSprite, playerSprite
   const height = scene.game.config.height;
   const { HCO_STRING_SPOTS } = await import('../../utils/courtPositions.js');
 
-  // PG moves to one of: key, deep key, upper wing, deep upper wing, lower wing, deep lower wing (randomized)
+  // PG moves to one of: key, deep key, upper midWing, deep upper wing, lower midWing, deep lower wing (randomized)
   const pgSpotOptions = [
     "key",
     "deep key",
-    "upper wing",
+    "upper midWing",
     "deep upper wing",
-    "lower wing",
+    "lower midWing",
     "deep lower wing"
   ];
   const selectedPGSpot = pgSpotOptions[Math.floor(Math.random() * pgSpotOptions.length)];
