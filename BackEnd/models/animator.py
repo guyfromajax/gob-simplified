@@ -48,12 +48,20 @@ class Animator:
 
         offense_team = self.game.offense_team
         defense_team = self.game.defense_team
-        # ✅ Use is_away_offense from fb_roles if available (more reliable than self.game.offense_team)
+        # ✅ SS&S: Use is_away_offense from fb_roles (calculated from offense_team_id in phase_resolution)
         # This ensures consistency with phase_resolution.py calculations
         is_away_offense = fb_roles.get("is_away_offense")
         if is_away_offense is None:
-            # Fallback to calculating from game state
+            # Fallback to calculating from game state (shouldn't happen, but safety check)
             is_away_offense = offense_team.team_id == self.game.away_team.team_id
+            logging.warning(f"⚠️ [FAST BREAK ANIMATION] is_away_offense not in fb_roles, calculated from game state: {is_away_offense}")
+        
+        # ✅ DEBUG: Verify is_away_offense is correct
+        calculated_is_away = offense_team.team_id == self.game.away_team.team_id
+        if is_away_offense != calculated_is_away:
+            logging.warning(f"⚠️ [FAST BREAK ANIMATION] is_away_offense mismatch! fb_roles: {is_away_offense}, calculated: {calculated_is_away}")
+            # Use the calculated value as it's more reliable
+            is_away_offense = calculated_is_away
 
         ball_handler = fb_roles.get("ball_handler")
         defenders = fb_roles.get("defense", [])
@@ -198,12 +206,16 @@ class Animator:
                 bh_stop_y = fb_roles.get("_bh_final_y", HOME_TOP_KEY["y"])
                 
                 # Stopper positioned 1-3 x coords ahead of ball handler, same y
+                # Note: bh_stop_x is in HOME orientation, build_movement will flip for away offense
                 stopper_offset = random.randint(1, 3)
                 if is_away_offense:
-                    # Away offense: ahead means smaller x (toward basket)
-                    stopper_x = max(4, bh_stop_x - stopper_offset)
+                    # Away offense: ahead means smaller x in AWAY orientation (toward basket at x=10)
+                    # In HOME orientation: smaller x in away = larger x in home
+                    # Example: ball handler at x=45 (HOME) = x=55 (away), stopper should be x=53 (away) = x=47 (HOME)
+                    # So we ADD offset in HOME orientation
+                    stopper_x = min(97, bh_stop_x + stopper_offset)
                 else:
-                    # Home offense: ahead means larger x (toward basket)
+                    # Home offense: ahead means larger x (toward basket at x=90)
                     stopper_x = min(97, bh_stop_x + stopper_offset)
                 
                 end = {
