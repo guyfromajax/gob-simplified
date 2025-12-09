@@ -437,9 +437,11 @@ Fast breaks can result in:
 
 **Example from Logs:**
 ```
-Outlet Receiver: x=50, y=26 (from defense_release_coords)
-Get-Back Defender: x=51, y=23 (from offense_getback_coords)
-Result: DEFENSIVE_STOP (defender at x=51 is ahead of ball handler at x=50)
+Outlet Receiver: x=55, y=23 (from defense_release_coords)
+Get-Back Defender: x=57, y=34 (from offense_getback_coords)
+Result: DEFENSIVE_STOP (defender at x=57 is ahead of ball handler at x=55, distance: 2)
+Note: This get-back defender was correctly detected even though they weren't initially in 
+fb_roles["defense"] due to stale ball_handler.coords in get_in_play_defenders()
 ```
 
 ### Defensive Stop vs. Shot Attempt Determination
@@ -458,17 +460,40 @@ Result: DEFENSIVE_STOP (defender at x=51 is ahead of ball handler at x=50)
 - If defender ahead → DEFENSIVE_STOP
 - Otherwise → SHOT
 
+**Critical Implementation Detail:**
+- **All defenders checked**: The system checks **all defenders in `def_lineup`**, not just those initially in `fb_roles["defense"]`
+- **Why**: `get_in_play_defenders()` (called earlier) uses stale `ball_handler.coords` to filter defenders, which might exclude get-back players who are actually ahead of the outlet receiver position
+- **Fix**: Loop through all defenders when comparing against outlet receiver position (`ball_handler_outlet_x/y`)
+- **Result**: Get-back players who are ahead are correctly detected, even if they weren't initially included in `fb_roles["defense"]`
+- **Animation**: If an ahead defender wasn't in the initial list, they're added to `fb_roles["defense"]` for animation purposes
+
 **Implementation:**
 ```python
-# Compare in HOME orientation for both home and away offense
-if is_away_offense:
-    # Away offense: smaller x is closer to basket
-    is_ahead = defender_outlet_x <= ball_handler_outlet_x
-else:
-    # Home offense: larger x is closer to basket
-    is_ahead = defender_outlet_x >= ball_handler_outlet_x
+# ✅ Check ALL defenders in def_lineup, not just fb_roles["defense"]
+# This ensures get-back players are checked even if they weren't initially included
+for defender in def_lineup.values():
+    # Get defender coordinates (get-back coords if available, else defender.coords)
+    defender_outlet_x = get_defender_coords(defender, most_recent_shot_turn)
+    
+    # Compare in HOME orientation for both home and away offense
+    if is_away_offense:
+        # Away offense: smaller x is closer to basket
+        is_ahead = defender_outlet_x <= ball_handler_outlet_x
+    else:
+        # Home offense: larger x is closer to basket
+        is_ahead = defender_outlet_x >= ball_handler_outlet_x
+    
+    if is_ahead:
+        defender_ahead = True
+        # Track closest defender ahead
+        if distance < closest_distance:
+            closest_defender = defender
 
-if is_ahead:
+# If closest defender wasn't in fb_roles["defense"], add them for animation
+if closest_defender and closest_defender not in fb_roles["defense"]:
+    fb_roles["defense"].append(closest_defender)
+
+if defender_ahead:
     event_type = "DEFENSIVE_STOP"
     stopper_id = closest_defender.player_id
 else:
