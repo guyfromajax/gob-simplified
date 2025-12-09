@@ -504,9 +504,14 @@ def resolve_fast_break_logic(game: "GameManager"):
     # Defenders are already positioned on the court after the shot attempt
     # They don't move during the outlet pass - only the ball handler moves
     # So we compare ball handler's outlet position to defender's actual current position
+    # ✅ NEW: Defender must be ahead AND within ±6 y-coords to force defensive stop
+    # If multiple get-back players meet both conditions, the closest one forces the stop
+    # If no defender meets both conditions, it's a shot attempt and closest defender overall becomes shot defender
     defender_ahead = False
-    closest_defender = None
-    closest_distance = float('inf')
+    closest_stopping_defender = None  # Defender who is ahead AND within ±6 y-coords
+    closest_stopping_distance = float('inf')
+    closest_defender_overall = None  # Closest defender overall (for shot attempts, uses Euclidean distance)
+    closest_distance_overall = float('inf')
     
     # ✅ Find the most recent MISS/MAKE turn (the one that triggered this fast break)
     # Only use get-back coords from THIS turn, not from previous turns
@@ -600,49 +605,68 @@ def resolve_fast_break_logic(game: "GameManager"):
         # Coordinates are stored in HOME orientation, so we compare directly in HOME orientation
         # For away offense: basket is at x=10, smaller x is closer → defender ahead if x <= ball handler x
         # For home offense: basket is at x=90, larger x is closer → defender ahead if x >= ball handler x
+        # ✅ NEW: Defender must also be within ±6 y-coords to force defensive stop
         
         logging.warning(f"🏀 [FAST BREAK PHASE DEBUG] Defender comparison for {defender_id}:")
         logging.warning(f"  defender_actual_x (start, HOME): {defender_actual_x}")
+        logging.warning(f"  defender_actual_y (start, HOME): {defender_actual_y}")
         logging.warning(f"  defender_move_x: {defender_move_x}")
         logging.warning(f"  defender_outlet_x (after outlet step, HOME): {defender_outlet_x}")
+        logging.warning(f"  defender_outlet_y (after outlet step, HOME): {defender_outlet_y}")
         logging.warning(f"  ball_handler_outlet_x (after outlet step, HOME): {ball_handler_outlet_x}")
+        logging.warning(f"  ball_handler_outlet_y (after outlet step, HOME): {ball_handler_outlet_y}")
         logging.warning(f"  is_away_offense: {is_away_offense}")
         
+        # Calculate distance for closest defender tracking (for shot attempts)
+        x_distance = abs(defender_outlet_x - ball_handler_outlet_x)
+        y_distance = abs(defender_outlet_y - ball_handler_outlet_y)
+        total_distance = (x_distance ** 2 + y_distance ** 2) ** 0.5  # Euclidean distance
+        
+        # Track closest defender overall (for shot attempts)
+        if total_distance < closest_distance_overall:
+            closest_distance_overall = total_distance
+            closest_defender_overall = defender
+        
+        # Check if defender is ahead (x-coordinate check)
         if is_away_offense:
             # Away offense: basket at x=10 in HOME orientation, smaller x is closer to basket
             # Defender ahead if defender_x <= ball_handler_x (defender is closer to x=10)
             is_ahead = defender_outlet_x <= ball_handler_outlet_x
-            logging.warning(f"  Comparison (HOME orientation, away offense): {defender_outlet_x} <= {ball_handler_outlet_x} = {is_ahead}")
-            if is_ahead:
-                defender_ahead = True
-                # Find closest defender to ball handler (use HOME orientation distance)
-                distance = abs(defender_outlet_x - ball_handler_outlet_x)
-                logging.warning(f"  ✅ Defender is AHEAD! Distance: {distance}")
-                if distance < closest_distance:
-                    closest_distance = distance
-                    closest_defender = defender
-            else:
-                logging.warning(f"  ❌ Defender is NOT ahead")
+            logging.warning(f"  X Comparison (HOME orientation, away offense): {defender_outlet_x} <= {ball_handler_outlet_x} = {is_ahead}")
         else:
             # Home offense: basket at x=90 in HOME orientation, larger x is closer to basket
             # Defender ahead if defender_x >= ball_handler_x (defender is closer to x=90)
             is_ahead = defender_outlet_x >= ball_handler_outlet_x
-            logging.warning(f"  Comparison (HOME orientation, home offense): {defender_outlet_x} >= {ball_handler_outlet_x} = {is_ahead}")
-            if is_ahead:
-                defender_ahead = True
-                # Find closest defender to ball handler
-                distance = abs(defender_outlet_x - ball_handler_outlet_x)
-                logging.warning(f"  ✅ Defender is AHEAD! Distance: {distance}")
-                if distance < closest_distance:
-                    closest_distance = distance
-                    closest_defender = defender
-            else:
-                logging.warning(f"  ❌ Defender is NOT ahead")
+            logging.warning(f"  X Comparison (HOME orientation, home offense): {defender_outlet_x} >= {ball_handler_outlet_x} = {is_ahead}")
+        
+        # ✅ NEW: Check if defender is within ±6 y-coords of outlet receiver
+        y_diff = abs(defender_outlet_y - ball_handler_outlet_y)
+        is_within_y_range = y_diff <= 6
+        logging.warning(f"  Y Comparison: |{defender_outlet_y} - {ball_handler_outlet_y}| = {y_diff} <= 6 = {is_within_y_range}")
+        
+        # Defender can force defensive stop if: ahead AND within y-range
+        if is_ahead and is_within_y_range:
+            defender_ahead = True
+            logging.warning(f"  ✅ Defender can force DEFENSIVE_STOP! (ahead AND within y-range)")
+            # Find closest stopping defender (x-distance only, as per original logic)
+            x_distance_only = abs(defender_outlet_x - ball_handler_outlet_x)
+            if x_distance_only < closest_stopping_distance:
+                closest_stopping_distance = x_distance_only
+                closest_stopping_defender = defender
+        elif is_ahead:
+            logging.warning(f"  ⚠️ Defender is ahead but NOT within y-range (y_diff={y_diff}), cannot force defensive stop")
+        else:
+            logging.warning(f"  ❌ Defender is NOT ahead")
     
-    # ✅ If we found a defender ahead who wasn't in fb_roles["defense"], add them for animation
-    if closest_defender and closest_defender not in fb_roles["defense"]:
-        fb_roles["defense"].append(closest_defender)
-        logging.warning(f"🏀 [FAST BREAK PHASE DEBUG] Added ahead defender to fb_roles['defense']: {get_name_safe(closest_defender)} (was not in initial list)")
+    # ✅ If we found a stopping defender who wasn't in fb_roles["defense"], add them for animation
+    if closest_stopping_defender and closest_stopping_defender not in fb_roles["defense"]:
+        fb_roles["defense"].append(closest_stopping_defender)
+        logging.warning(f"🏀 [FAST BREAK PHASE DEBUG] Added stopping defender to fb_roles['defense']: {get_name_safe(closest_stopping_defender)} (was not in initial list)")
+    
+    # ✅ For shot attempts, store closest defender overall as shot defender
+    if closest_defender_overall:
+        fb_roles["shot_defender"] = closest_defender_overall
+        logging.warning(f"🏀 [FAST BREAK PHASE DEBUG] Closest defender overall (for shot attempts): {get_name_safe(closest_defender_overall)}, distance: {closest_distance_overall:.2f}")
     
     # Determine event type based on defender positions
     d_count = len(fb_roles["defense"])
@@ -675,21 +699,33 @@ def resolve_fast_break_logic(game: "GameManager"):
         # 0 defenders: Always shot
         event_type = "SHOT"
         logging.warning(f"  ✅ Decision: SHOT (0 defenders)")
-    elif defender_ahead:
-        # Defender ahead: defensive stop
+    elif defender_ahead and closest_stopping_defender:
+        # Defender ahead AND within ±6 y-coords: defensive stop
         event_type = "DEFENSIVE_STOP"
-        logging.warning(f"  ✅ Decision: DEFENSIVE_STOP (defender ahead)")
-        logging.warning(f"  closest_defender: {get_name_safe(closest_defender) if closest_defender else None}")
-        logging.warning(f"  closest_distance: {closest_distance}")
-        # Store closest defender as stopper (override previous stopper logic)
-        if closest_defender:
-            stopper_id = closest_defender.player_id
-            best_defender = closest_defender
+        logging.warning(f"  ✅ Decision: DEFENSIVE_STOP (defender ahead AND within ±6 y-coords)")
+        logging.warning(f"  closest_stopping_defender: {get_name_safe(closest_stopping_defender)}")
+        logging.warning(f"  closest_stopping_distance: {closest_stopping_distance}")
+        # Store closest stopping defender as stopper (override previous stopper logic)
+        if closest_stopping_defender:
+            stopper_id = closest_stopping_defender.player_id
+            best_defender = closest_stopping_defender
             hold_up = True  # Set hold_up since we're stopping the break
+            closest_defender = closest_stopping_defender  # For compatibility with existing code
     else:
-        # No defender ahead: shot attempt
+        # No defender ahead AND within y-range: shot attempt
+        # Use closest defender overall as shot defender
         event_type = "SHOT"
-        logging.warning(f"  ✅ Decision: SHOT (no defender ahead)")
+        if closest_defender_overall:
+            logging.warning(f"  ✅ Decision: SHOT (no defender ahead within y-range)")
+            logging.warning(f"  closest_defender_overall (shot defender): {get_name_safe(closest_defender_overall)}")
+            logging.warning(f"  closest_distance_overall: {closest_distance_overall:.2f}")
+            # Store closest defender overall as shot defender for animation
+            fb_roles["defender"] = closest_defender_overall
+        else:
+            logging.warning(f"  ✅ Decision: SHOT (no defender ahead)")
+            # Fallback: use first defender in list if available
+            if fb_roles["defense"] and len(fb_roles["defense"]) > 0:
+                fb_roles["defender"] = fb_roles["defense"][0]
 
     # If defensive stop triggered, defense stopped the fast break
     # NOTE: This should NOT happen if has_outlet_pass is True (handled above)
