@@ -805,6 +805,16 @@ def resolve_fast_break_logic(game: "GameManager"):
             if fb_roles["defense"] and len(fb_roles["defense"]) > 0:
                 fb_roles["defender"] = fb_roles["defense"][0]
 
+    # ==================== OUTLET PASS STAT TRACKING ====================
+    # Record outlet pass stats if outlet pass occurred
+    outlet_passer_id = fb_roles.get("outlet_passer")
+    outlet_score = fb_roles.get("outlet_score")
+    if outlet_passer_id and outlet_score is not None:
+        # Outlet pass is successful if it leads to a shot attempt (not defensive stop)
+        is_successful = (event_type == "SHOT")
+        _record_outlet_pass_stats(outlet_passer_id, outlet_score, is_successful, game)
+    # ==================== END OUTLET PASS STAT TRACKING ====================
+
     # If defensive stop triggered, defense stopped the fast break
     # NOTE: This should NOT happen if has_outlet_pass is True (handled above)
     if event_type == "DEFENSIVE_STOP":
