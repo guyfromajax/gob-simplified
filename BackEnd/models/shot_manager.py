@@ -341,10 +341,6 @@ class ShotManager:
         )
 
         made = shot_score >= shot_threshold
-        
-        # ✅ TEMPORARY HARDCODE: Force all HCO shots to be misses for Fast Break testing
-        if self.game_state.get("offensive_state") == "HCO":
-            made = False
 
         # Stat tracking (attempts)
         shooter.record_stat("FGA")
@@ -697,21 +693,45 @@ class ShotManager:
                     rebound_team = off_team
                     rebounder = o_rebounder
                 else:
-                    # ✅ TEMPORARY HARDCODE: Force all rebounds to be DREB for debugging
-                    # Skip normal rebound selection logic and force defensive rebound
+                    # Normal rebound selection: pick best rebounder from each side, then use weighted random
+                    o_best_pos = max(o_scores, key=o_scores.get) if o_scores else None
                     d_best_pos = max(d_scores, key=d_scores.get) if d_scores else None
                     
-                    if d_best_pos is None:
-                        raise ValueError("No defensive rebounder available")
+                    if o_best_pos is None or d_best_pos is None:
+                        raise ValueError("Missing rebounders: o_best_pos={}, d_best_pos={}".format(o_best_pos, d_best_pos))
+                    
+                    o_rebounder = off_team.lineup[o_best_pos]
                     d_rebounder = def_team.lineup[d_best_pos]
                     
-                    if d_rebounder is None:
-                        raise ValueError(f"Defensive rebounder at position {d_best_pos} is None")
+                    if o_rebounder is None or d_rebounder is None:
+                        raise ValueError("Rebounder is None: o_rebounder={}, d_rebounder={}".format(o_rebounder, d_rebounder))
                     
-                    # Force DREB
-                    rebound_team = def_team
-                    rebounder = d_rebounder
-                    stat = "DREB"
+                    # Get rebound scores for best rebounders
+                    o_rebounder_score = o_scores[o_best_pos]
+                    d_rebounder_score = d_scores[d_best_pos]
+                    
+                    # Apply team bias
+                    off_mod = off_team.team_attributes["rebound_modifier"]
+                    def_mod = def_team.team_attributes["rebound_modifier"]
+                    bias = def_mod - off_mod
+                    new_prob = min(0.95, max(0.35, def_prob + bias))
+                    
+                    # Calculate final weights
+                    total_score = d_rebounder_score + o_rebounder_score
+                    d_weight = (d_rebounder_score / total_score) if total_score > 0 else 0.5
+                    d_weight += (new_prob - 0.5)
+                    d_weight = min(0.95, max(0.05, d_weight))
+                    
+                    # Zone defense penalty
+                    defense_call = game_state.get("defense_call", "Man")
+                    if defense_call == "Zone":
+                        d_weight *= 0.9
+                    
+                    # Weighted random selection
+                    o_weight = 1 - d_weight
+                    rebound_team = def_team if random.random() < d_weight else off_team
+                    rebounder = d_rebounder if rebound_team == def_team else o_rebounder
+                    stat = "DREB" if rebound_team == def_team else "OREB"
                 
                 # Record rebound stat and update game state
                 self.game_state["last_rebound"] = stat
@@ -834,8 +854,7 @@ class ShotManager:
                     # Fast Break is determined DURING the shot (by defense tempo), not after DREB
                     # If a defender released for fast break during shot → auto-trigger fast break
                     # If no defender released → regular HCO
-                    # ✅ TEMPORARY HARDCODE: Force all DREB next steps to be Fast Break for debugging
-                    next_play_type = "FAST_BREAK"  # if defense_release_list else "HCO"
+                    next_play_type = "FAST_BREAK" if defense_release_list else "HCO"
                     if defense_release_list:
                         # next_play_type = "FAST_BREAK"
                         # Log fast break determination with release player info
