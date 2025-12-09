@@ -1698,11 +1698,15 @@ class TurnManager:
                 for team in (self.game.home_team, self.game.away_team):
                     for player in team.get_all_players():
                         prev = pre_stats.get(player.player_id, {})
-                        diff = {
-                            stat: player.stats["game"].get(stat, 0) - prev.get(stat, 0)
-                            for stat in player.stats["game"]
-                            if player.stats["game"].get(stat, 0) - prev.get(stat, 0)
-                        }
+                        diff = {}
+                        for stat in player.stats["game"]:
+                            if stat == "REB" or stat == "Outlet_Score_List":
+                                continue  # Skip REB (calculated) and Outlet_Score_List (list, not numeric)
+                            current_val = player.stats["game"].get(stat, 0)
+                            prev_val = prev.get(stat, 0)
+                            delta = current_val - prev_val
+                            if delta != 0:
+                                diff[stat] = delta
                         if diff:
                             deltas[player.player_id] = {"team": team.name, "stats": diff}
                 
