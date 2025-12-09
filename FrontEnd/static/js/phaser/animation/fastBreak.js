@@ -438,7 +438,8 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
   }
   
   // Move all other players to standard positions (same as defensive stop)
-  await moveOtherPlayersToStandardPositions(
+  // ✅ Capture rebounder tween references for early termination
+  const rebounderTweens = await moveOtherPlayersToStandardPositions(
     scene,
     playerSprites,
     shooterId,
@@ -449,7 +450,11 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
     promises
   );
   
-  await Promise.all(promises);
+  // ✅ Don't wait for rebounder animations - let them run in parallel with shot
+  // They will be stopped early when shot is made or rebounder grabs ball
+  // Only wait for shooter and defender promises
+  const shooterDefenderPromises = promises.slice(0, promises.length - rebounderTweens.length);
+  await Promise.all(shooterDefenderPromises);
   
   // Shoot the ball
   safeTransition(scene.stateMachine, States.ShotAttempt);
@@ -471,6 +476,15 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
     easing: "Sine.easeInOut",
     arc: { height: 50 }
   });
+  
+  // ✅ Stop rebounder animations when ball hits rim (made shot)
+  if (turnData.result_type === "MAKE") {
+    rebounderTweens.forEach(tween => {
+      if (tween && tween.isPlaying && scene.tweens) {
+        scene.tweens.killTweensOf(tween.targets);
+      }
+    });
+  }
   
   // Handle outcome
   if (turnData.result_type === "MAKE") {
@@ -556,6 +570,45 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
       missTurn = currentTurn;
     }
     
+    // ✅ Stop rebounder animations when rebounder grabs ball (missed shot)
+    // Monitor rebounder position and stop tweens when rebounder gets close to ball bounce spot
+    const rebounderId = turnData.rebounderId || turnData.rebounder_player_id;
+    const rebounderSprite = rebounderId ? playerSprites[rebounderId] : null;
+    
+    if (rebounderSprite && rebounderTweens.length > 0) {
+      let monitoringActive = true;
+      const ballBouncePx = gridToPixels(miss.grid.x, miss.grid.y, width, height);
+      
+      const checkRebounderReached = () => {
+        if (!monitoringActive) return;
+        
+        const distanceToBall = Math.hypot(
+          rebounderSprite.x - ballBouncePx.x,
+          rebounderSprite.y - ballBouncePx.y
+        );
+        
+        // If rebounder is within 30 pixels of ball bounce spot, stop all rebounder animations
+        if (distanceToBall < 30) {
+          monitoringActive = false;
+          rebounderTweens.forEach(tween => {
+            if (tween && tween.isPlaying && scene.tweens) {
+              scene.tweens.killTweensOf(tween.targets);
+            }
+          });
+          return;
+        }
+        
+        // Continue checking until rebounder reaches ball or all tweens are stopped
+        if (monitoringActive && rebounderTweens.some(t => t && t.isPlaying)) {
+          scene.time.delayedCall(50, checkRebounderReached);
+        } else {
+          monitoringActive = false;
+        }
+      };
+      
+      // Start monitoring after a short delay to let rebounder start moving
+      scene.time.delayedCall(100, checkRebounderReached);
+    }
     
     await animateRebound({
       scene,
@@ -711,7 +764,8 @@ async function animateDefensiveStop(scene, turnData, playerSprites, ballSprite, 
           }
           
           // Move other players to standard positions
-          await moveOtherPlayersToStandardPositions(
+          // ✅ Capture rebounder tween references for early termination
+          const rebounderTweens = await moveOtherPlayersToStandardPositions(
             scene,
             playerSprites,
             ballHandlerId,
@@ -722,7 +776,46 @@ async function animateDefensiveStop(scene, turnData, playerSprites, ballSprite, 
             promises
           );
           
-          // Wait for all animations to complete
+          // ✅ Track ball handler and stopper promises for early termination
+          const ballHandlerPromise = promises[promises.length - rebounderTweens.length - (stopperSprite ? 2 : 1)];
+          const stopperPromise = stopperSprite ? promises[promises.length - rebounderTweens.length - 1] : null;
+          
+          // ✅ Stop rebounder animations when both ball handler and stopper reach their spots
+          let handlerComplete = false;
+          let stopperComplete = !stopperSprite; // If no stopper, consider it "complete"
+          
+          const checkAndStopRebounders = () => {
+            if (handlerComplete && stopperComplete) {
+              rebounderTweens.forEach(tween => {
+                if (tween && tween.isPlaying && scene.tweens) {
+                  scene.tweens.killTweensOf(tween.targets);
+                }
+              });
+            }
+          };
+          
+          // Set up completion handlers
+          if (ballHandlerPromise && typeof ballHandlerPromise.then === 'function') {
+            ballHandlerPromise.then(() => {
+              handlerComplete = true;
+              checkAndStopRebounders();
+            });
+          } else {
+            handlerComplete = true;
+            checkAndStopRebounders();
+          }
+          
+          if (stopperPromise && typeof stopperPromise.then === 'function') {
+            stopperPromise.then(() => {
+              stopperComplete = true;
+              checkAndStopRebounders();
+            });
+          } else if (stopperSprite) {
+            stopperComplete = true;
+            checkAndStopRebounders();
+          }
+          
+          // Wait for all animations to complete (rebounders will stop early)
           await Promise.all(promises);
           // Skip to announcement/state transition (avoid fallback logic)
           gotoStateTransition = true;
@@ -814,16 +907,16 @@ async function animateDefensiveStop(scene, turnData, playerSprites, ballSprite, 
     attachBallToPlayer(scene, ballSprite, ballHandlerSprite);
     const topKeyPx = gridToPixels(topKey.x, topKey.y, width, height);
     const handlerDuration = getPlayerDuration(ballHandlerSprite, topKeyPx.x, topKeyPx.y);
-    promises.push(
-      tweenPlayerTo(scene, ballHandlerSprite, topKeyPx, {
-        duration: handlerDuration,
-        easing: "Linear"
-      })
-    );
+    const ballHandlerPromise = tweenPlayerTo(scene, ballHandlerSprite, topKeyPx, {
+      duration: handlerDuration,
+      easing: "Linear"
+    });
+    promises.push(ballHandlerPromise);
     
     // Move stopper (if exists)
     const stopperId = turnData.stopper_id;
     const stopperSprite = stopperId ? playerSprites[stopperId] : null;
+    let stopperPromise = null;
     
     if (stopperSprite) {
       // ✅ Position stopper DIRECTLY in front of ball handler (between ball handler and basket they're defending)
@@ -837,16 +930,16 @@ async function animateDefensiveStop(scene, turnData, playerSprites, ballSprite, 
       
       const stopperPx = gridToPixels(stopperSpot.x, stopperSpot.y, width, height);
       const stopperDuration = getPlayerDuration(stopperSprite, stopperPx.x, stopperPx.y);
-      promises.push(
-        tweenPlayerTo(scene, stopperSprite, stopperPx, {
-          duration: stopperDuration,
-          easing: "Linear"
-        })
-      );
+      stopperPromise = tweenPlayerTo(scene, stopperSprite, stopperPx, {
+        duration: stopperDuration,
+        easing: "Linear"
+      });
+      promises.push(stopperPromise);
     }
     
     // Move other defenders and non-involved players
-    await moveOtherPlayersToStandardPositions(
+    // ✅ Capture rebounder tween references for early termination
+    const rebounderTweens = await moveOtherPlayersToStandardPositions(
       scene,
       playerSprites,
       ballHandlerId,
@@ -856,6 +949,41 @@ async function animateDefensiveStop(scene, turnData, playerSprites, ballSprite, 
       height,
       promises
     );
+    
+    // ✅ Stop rebounder animations when both ball handler and stopper reach their spots
+    let handlerComplete = false;
+    let stopperComplete = !stopperSprite; // If no stopper, consider it "complete"
+    
+    const checkAndStopRebounders = () => {
+      if (handlerComplete && stopperComplete) {
+        rebounderTweens.forEach(tween => {
+          if (tween && tween.isPlaying && scene.tweens) {
+            scene.tweens.killTweensOf(tween.targets);
+          }
+        });
+      }
+    };
+    
+    // Set up completion handlers
+    if (ballHandlerPromise && typeof ballHandlerPromise.then === 'function') {
+      ballHandlerPromise.then(() => {
+        handlerComplete = true;
+        checkAndStopRebounders();
+      });
+    } else {
+      handlerComplete = true;
+      checkAndStopRebounders();
+    }
+    
+    if (stopperPromise && typeof stopperPromise.then === 'function') {
+      stopperPromise.then(() => {
+        stopperComplete = true;
+        checkAndStopRebounders();
+      });
+    } else if (stopperSprite) {
+      stopperComplete = true;
+      checkAndStopRebounders();
+    }
   }
   
   // Only wait for promises if we haven't already awaited them (manual positioning case)
@@ -950,6 +1078,8 @@ async function animateDefensiveStop(scene, turnData, playerSprites, ballSprite, 
  * - Rebounders (defensive stop): x=40-60, y=starting_y ± 6 (clamped 1-49)
  * - Rebounders (shot attempt): x=rim_x, y=rim_y ± 10 (clamped 1-49)
  * - Distance-based animation - stops when ball hits rim (made) or rebounder grabs ball (missed)
+ * 
+ * @returns {Array} Array of tween references for rebounder animations (for early termination)
  */
 async function moveOtherPlayersToStandardPositions(
   scene,
@@ -961,6 +1091,7 @@ async function moveOtherPlayersToStandardPositions(
   height,
   promises
 ) {
+  const rebounderTweens = []; // Store tween references for early termination
   // ✅ Find the most recent MISS/MAKE turn to get get-back and release player lists
   let getbackPlayerIds = [];
   let releasePlayerIds = [];
@@ -1049,13 +1180,40 @@ async function moveOtherPlayersToStandardPositions(
     // Players will stop at their current position if shot happens before they reach their spot
     // (Made shot: stops when ball hits rim; Missed shot: stops when rebounder grabs ball)
     const playerDuration = getPlayerDuration(sprite, targetPx.x, targetPx.y);
-    promises.push(
-      tweenPlayerTo(scene, sprite, targetPx, {
+    
+    // ✅ Create tween directly (not using tweenPlayerTo) so we can store reference for early termination
+    // Only store references for rebounder animations (not get-back players)
+    const isRebounder = !getbackPlayerIdsSet.has(id);
+    if (isRebounder) {
+      const tween = scene.tweens.add({
+        targets: sprite,
+        x: targetPx.x,
+        y: targetPx.y,
         duration: playerDuration,
-        easing: "Linear" // Match HCO step movements
-      })
-    );
+        ease: "Linear",
+        onComplete: () => {
+          // Tween completed naturally (player reached destination)
+        }
+      });
+      rebounderTweens.push(tween);
+      promises.push(
+        new Promise((resolve) => {
+          tween.once('complete', resolve);
+          tween.once('stop', resolve);
+        })
+      );
+    } else {
+      // Get-back players use standard tweenPlayerTo (no early termination needed)
+      promises.push(
+        tweenPlayerTo(scene, sprite, targetPx, {
+          duration: playerDuration,
+          easing: "Linear"
+        })
+      );
+    }
   }
+  
+  return rebounderTweens; // Return tween references for early termination
 }
 
 // Export for backwards compatibility
