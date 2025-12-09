@@ -10,6 +10,13 @@ import { getCurrentOwner } from "./BallControllerAdapter.js";
 import { runInboundSetup, getPlayerDuration } from "./turnAnimation.js";
 import { animationDebugLog, isAnimationDebugEnabled } from "../utils/debugFlags.js";
 import { appendToTextScroll } from "../utils/textScroll.js";
+import {
+  REBOUNDER_X_MIN,
+  REBOUNDER_X_MAX,
+  REBOUNDER_Y_RANGE,
+  SHOT_ATTEMPT_REBOUNDER_Y_RANGE,
+  OUTLET_PASSER_MOVE_X,
+} from "../constants/fastBreakConstants.js";
 
 /**
  * Simplified Fast Break Animation System
@@ -1072,11 +1079,12 @@ async function animateDefensiveStop(scene, turnData, playerSprites, ballSprite, 
 
 /**
  * Helper: Move all non-involved players to their positions
- * - Outlet passer: NO MOVEMENT (stays at outlet pass spot)
+ * - Outlet passer: moves forward 7 x-coords toward basket (+7 for home offense, -7 for away offense)
  * - Get-back players: chase toward basket (X: 50 to basket-15, Y: 15-35)
  * - Rebounders (defensive stop): x=40-60, y=starting_y ± 6 (clamped 1-49)
  * - Rebounders (shot attempt): x=rim_x, y=rim_y ± 10 (clamped 1-49)
  * - Distance-based animation - stops when ball hits rim (made) or rebounder grabs ball (missed)
+ * - Rebounders stop early when defensive stop is made (ball handler and stopper reach their spots)
  * 
  * @returns {Array} Array of tween references for rebounder animations (for early termination)
  */
@@ -1109,7 +1117,7 @@ async function moveOtherPlayersToStandardPositions(
   const getbackPlayerIdsSet = new Set(getbackPlayerIds);
   const releasePlayerIdsSet = new Set(releasePlayerIds);
   
-  // ✅ Get outlet passer ID - they should NOT move at all
+  // ✅ Get outlet passer ID - they move forward 7 x-coords toward basket
   const outletPasserId = turnData.roles?.outlet_passer;
   
   // Determine which basket is being attacked and if this is a defensive stop or shot attempt
@@ -1131,8 +1139,27 @@ async function moveOtherPlayersToStandardPositions(
       continue;
     }
     
-    // ✅ Skip outlet passer - they stay at outlet pass spot (no movement)
+    // ✅ Outlet passer moves forward 7 x-coords toward basket
     if (id === outletPasserId) {
+      const passerCurrentGrid = pixelsToGrid(sprite.x, sprite.y);
+      const passerTargetX = isHomeOffense 
+        ? Phaser.Math.Clamp(passerCurrentGrid.x + OUTLET_PASSER_MOVE_X, 4, 97)  // Home: +7 (toward x=90)
+        : Phaser.Math.Clamp(passerCurrentGrid.x - OUTLET_PASSER_MOVE_X, 4, 97); // Away: -7 (toward x=10)
+      
+      const targetSpot = {
+        x: passerTargetX,
+        y: passerCurrentGrid.y  // Keep same y-coord
+      };
+      
+      const targetPx = gridToPixels(targetSpot.x, targetSpot.y, width, height);
+      const playerDuration = getPlayerDuration(sprite, targetPx.x, targetPx.y);
+      
+      promises.push(
+        tweenPlayerTo(scene, sprite, targetPx, {
+          duration: playerDuration,
+          easing: "Linear"
+        })
+      );
       continue;
     }
     
@@ -1162,8 +1189,8 @@ async function moveOtherPlayersToStandardPositions(
       if (isDefensiveStop) {
         // ✅ Defensive Stop: x=40-60, y=starting_y ± 6 (clamped 1-49)
         targetSpot = {
-          x: Phaser.Math.Between(40, 60),
-          y: Phaser.Math.Clamp(startingY + Phaser.Math.Between(-6, 6), 1, 49)
+          x: Phaser.Math.Between(REBOUNDER_X_MIN, REBOUNDER_X_MAX),
+          y: Phaser.Math.Clamp(startingY + Phaser.Math.Between(-REBOUNDER_Y_RANGE, REBOUNDER_Y_RANGE), 1, 49)
         };
       } else {
         // ✅ Shot Attempt: x=random 5-20 spots out from basket, y=rim_y ± 10 (clamped 1-49)
@@ -1176,7 +1203,7 @@ async function moveOtherPlayersToStandardPositions(
         
         targetSpot = {
           x: Phaser.Math.Clamp(targetX, 4, 97), // Clamp to court bounds
-          y: Phaser.Math.Clamp(basket.y + Phaser.Math.Between(-10, 10), 1, 49)
+          y: Phaser.Math.Clamp(basket.y + Phaser.Math.Between(-SHOT_ATTEMPT_REBOUNDER_Y_RANGE, SHOT_ATTEMPT_REBOUNDER_Y_RANGE), 1, 49)
         };
       }
     }

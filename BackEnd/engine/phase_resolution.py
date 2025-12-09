@@ -271,6 +271,13 @@ def resolve_non_shooting_foul(roles, game):
     return result
 
 # #FAST BREAK
+from BackEnd.constants.fast_break_constants import (
+    BALL_HANDLER_MOVE_X_MIN,
+    BALL_HANDLER_MOVE_X_MAX,
+    BALL_HANDLER_MOVE_Y_RANGE,
+    DEFENSIVE_STOP_Y_RANGE,
+)
+
 def resolve_fast_break_logic(game: "GameManager"):
     from BackEnd.models.game_manager import GameManager
     # print("Entering resolve_fast_break()")
@@ -641,7 +648,7 @@ def resolve_fast_break_logic(game: "GameManager"):
         
         # ✅ NEW: Check if defender is within ±6 y-coords of outlet receiver
         y_diff = abs(defender_outlet_y - ball_handler_outlet_y)
-        is_within_y_range = y_diff <= 6
+        is_within_y_range = y_diff <= DEFENSIVE_STOP_Y_RANGE
         logging.warning(f"  Y Comparison: |{defender_outlet_y} - {ball_handler_outlet_y}| = {y_diff} <= 6 = {is_within_y_range}")
         
         # Defender can force defensive stop if: ahead AND within y-range
