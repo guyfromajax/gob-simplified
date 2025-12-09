@@ -10,6 +10,19 @@ from collections import defaultdict
 from BackEnd.constants import HCO_STRING_SPOTS, ACTIONS, RIM_COORDS, TOP_KEY_COORDS, HOME_RIM_COORDS, AWAY_RIM_COORDS, HOME_TOP_KEY, AWAY_TOP_KEY
 import random
 import logging
+from BackEnd.constants.fast_break_constants import (
+    BALL_HANDLER_MOVE_X_MIN,
+    BALL_HANDLER_MOVE_X_MAX,
+    BALL_HANDLER_MOVE_Y_RANGE,
+    STOPPER_OFFSET_MIN,
+    STOPPER_OFFSET_MAX,
+    DEFENDER_X_OFFSET,
+    REBOUNDER_X_MIN,
+    REBOUNDER_X_MAX,
+    REBOUNDER_Y_RANGE,
+    SHOT_ATTEMPT_REBOUNDER_Y_RANGE,
+    OUTLET_PASSER_MOVE_X,
+)
 
 class Animator:
     def __init__(self, game):
@@ -159,7 +172,7 @@ class Animator:
         # Home offense: +5 to +10 (move right toward basket at x=90 in HOME orientation)
         # Away offense: We calculate as if moving RIGHT in HOME orientation (toward x=90),
         #               then build_movement flips it, making us move LEFT in AWAY orientation (toward x=10)
-        move_distance = random.randint(5, 10)
+        move_distance = random.randint(BALL_HANDLER_MOVE_X_MIN, BALL_HANDLER_MOVE_X_MAX)
         if is_away_offense:
             # Away offense: Calculate as moving RIGHT in HOME orientation
             # After flipping in build_movement, this becomes moving LEFT in AWAY orientation (toward x=10)
@@ -167,7 +180,7 @@ class Animator:
         else:
             # Home offense: Move RIGHT in HOME orientation (add to increase x toward 90)
             additional_move_x = move_distance
-        additional_move_y = random.randint(-3, 3)  # Reduced from ±6 to ±3
+        additional_move_y = random.randint(-BALL_HANDLER_MOVE_Y_RANGE, BALL_HANDLER_MOVE_Y_RANGE)
         
         # ✅ DEBUG: Log movement values
         logging.warning(f"  move_distance: {move_distance}")
@@ -232,7 +245,7 @@ class Animator:
                 
                 # Stopper positioned 1-3 x coords ahead of ball handler, same y
                 # Note: bh_stop_x is in HOME orientation, build_movement will flip for away offense
-                stopper_offset = random.randint(1, 3)
+                stopper_offset = random.randint(STOPPER_OFFSET_MIN, STOPPER_OFFSET_MAX)
                 if is_away_offense:
                     # Away offense: ahead means smaller x in AWAY orientation (toward basket at x=10)
                     # In HOME orientation: smaller x in away = larger x in home
@@ -272,7 +285,7 @@ class Animator:
                 
                 # Defender X: 6 less than ball handler's additional move distance (home) or 6 more (away)
                 # The defender is positioned relative to the ball handler's final position
-                defender_x_offset = 6
+                defender_x_offset = DEFENDER_X_OFFSET
                 
                 if is_away_offense:
                     # Away offense: defender at x = ball handler x + 6 (further from basket)
@@ -309,8 +322,8 @@ class Animator:
                     build_movement(d, between_key_and_rim(), action=ACTIONS["GUARD_OFFBALL"])
                     animated_player_ids.add(player_id)
         
-        # ✅ Animate rebounders (players who stayed near rim, not get-back, not release, not outlet passer)
-        # Get outlet passer ID - they should NOT move at all
+        # ✅ Animate rebounders (players who stayed near rim, not get-back, not release)
+        # Get outlet passer ID - they move forward 7 x-coords toward basket
         outlet_passer_id = fb_roles.get("outlet_passer")
         outlet_passer_id_set = {outlet_passer_id} if outlet_passer_id else set()
         
@@ -328,12 +341,35 @@ class Animator:
                         release_player_ids = set(release_coords.keys())
                     break
         
+        # ✅ Animate outlet passer: move forward 7 x-coords toward basket
+        if outlet_passer_id:
+            outlet_passer = None
+            for player in all_offensive_players + all_defensive_players:
+                if getattr(player, "player_id", None) == outlet_passer_id:
+                    outlet_passer = player
+                    break
+            
+            if outlet_passer:
+                passer_coords = getattr(outlet_passer, "coords", {})
+                passer_current_x = passer_coords.get("x", 50)
+                passer_current_y = passer_coords.get("y", 25)
+                
+                # Home offense: +7 (toward x=90), Away offense: -7 (toward x=10)
+                passer_target_x = max(4, min(97, passer_current_x + (OUTLET_PASSER_MOVE_X if not is_away_offense else -OUTLET_PASSER_MOVE_X)))
+                outlet_passer_spot = {
+                    "x": passer_target_x,
+                    "y": passer_current_y  # Keep same y-coord
+                }
+                
+                build_movement(outlet_passer, outlet_passer_spot, has_ball=False, action=ACTIONS["DRIFT"])
+                animated_player_ids.add(outlet_passer_id)
+        
         for player in all_offensive_players + all_defensive_players:
             player_id = getattr(player, "player_id", None)
             if not player_id or player_id in animated_player_ids:
                 continue
             
-            # Skip outlet passer - they stay at outlet pass spot (no movement)
+            # Skip outlet passer - already animated above
             if player_id in outlet_passer_id_set:
                 continue
             
@@ -350,15 +386,15 @@ class Animator:
             
             if hold_up:
                 # ✅ Defensive Stop: x=40-60, y=starting_y ± 6 (clamped 1-49)
-                target_y = max(1, min(49, player_start_y + random.randint(-6, 6)))
+                target_y = max(1, min(49, player_start_y + random.randint(-REBOUNDER_Y_RANGE, REBOUNDER_Y_RANGE)))
                 target_spot = {
-                    "x": random.randint(40, 60),
+                    "x": random.randint(REBOUNDER_X_MIN, REBOUNDER_X_MAX),
                     "y": target_y
                 }
             else:
                 # ✅ Shot Attempt: x=rim_x, y=rim_y ± 10 (clamped 1-49)
                 rim_coords = AWAY_RIM_COORDS if is_away_offense else HOME_RIM_COORDS
-                target_y = max(1, min(49, rim_coords["y"] + random.randint(-10, 10)))
+                target_y = max(1, min(49, rim_coords["y"] + random.randint(-SHOT_ATTEMPT_REBOUNDER_Y_RANGE, SHOT_ATTEMPT_REBOUNDER_Y_RANGE)))
                 target_spot = {
                     "x": rim_coords["x"],
                     "y": target_y
