@@ -572,6 +572,53 @@ else:
   - Made shot: Rebounder animations stop when ball hits rim
   - Missed shot: Rebounder animations stop when rebounder grabs ball
 
+### Fast Break MISS → DREB Transition
+
+**Flow:**
+1. Fast Break shot attempt results in MISS
+2. Defensive rebound occurs (DREB)
+3. Transition to HCO (half court offense) via `runDefensiveReboundSetup()`
+
+**Critical Implementation Detail - turnData Handling:**
+- **Current Fast Break MISS turn** must be passed as `turnData` to `runDefensiveReboundSetup()`
+- **Why**: `runDefensiveReboundSetup()` uses `turnData.animations` to detect pass actions for the outlet pass animation
+- **offense_getback lookup**: If current turn doesn't have `offense_getback`, `runDefensiveReboundSetup()` automatically looks up the previous HCO MISS turn (the one that triggered the Fast Break)
+- **Why this matters**: The previous HCO MISS turn has the `offense_getback` list needed for get-back player positioning, but the current Fast Break MISS turn has the correct animation data
+
+**Implementation:**
+```javascript
+// In fastBreak.js - animateFastBreakShot()
+// Pass current Fast Break MISS turnData (has animations)
+await runDefensiveReboundSetup({
+  scene,
+  ballSprite,
+  playerSprites,
+  rebounderId,
+  nextPlayType: turnData.next_play_type || "HCO",
+  turnData: turnData // ✅ Current Fast Break MISS turn (for animations)
+  // runDefensiveReboundSetup will find offense_getback from previous turn if needed
+});
+```
+
+```javascript
+// In turnAnimation.js - runDefensiveReboundSetup()
+// Lookup offense_getback from previous turn if current turn doesn't have it
+let missTurnForGetback = turnData;
+if (!missTurnForGetback || !missTurnForGetback.offense_getback) {
+  // Try previous turn if current turn doesn't have offense_getback (Fast Break case)
+  const previousTurn = scene.simData?.turns?.[currentIndex - 1];
+  if (previousTurn?.result_type === "MISS" && previousTurn.offense_getback) {
+    missTurnForGetback = previousTurn;
+  }
+}
+const getBackList = missTurnForGetback?.offense_getback || [];
+```
+
+**Why This Fix Was Critical:**
+- **Previous Bug**: Passing the previous HCO MISS turn caused `runDefensiveReboundSetup()` to look for pass animations in the wrong turn data
+- **Result**: Animation freeze when trying to execute outlet pass after Fast Break MISS → DREB
+- **Fix**: Pass current Fast Break MISS turn (correct animations) while still allowing lookup of `offense_getback` from previous turn
+
 ### Key Files
 
 - `BackEnd/engine/phase_resolution.py`
@@ -590,9 +637,12 @@ else:
   - `runFastBreakSequence()` - Orchestrates fast break animation
   - `animateOutletPhase()` - Handles outlet pass (no player movement)
   - `animateDefensiveStop()` - Handles defensive stop animation
-  - `animateFastBreakShot()` - Handles shot attempt animation
+  - `animateFastBreakShot()` - Handles shot attempt animation and MISS → DREB transition
   - `moveOtherPlayersToStandardPositions()` - Positions rebounders and get-back defenders
   - Early termination logic for rebounder animations
+- `FrontEnd/static/js/phaser/animation/turnAnimation.js`
+  - `runDefensiveReboundSetup()` - Handles DREB → HCO transition, including Fast Break MISS → DREB cases
+  - Automatically looks up `offense_getback` from previous turn if current turn doesn't have it (Fast Break case)
 
 ### Future Enhancements
 
