@@ -511,34 +511,37 @@ def resolve_fast_break_logic(game: "GameManager"):
     logging.warning(f"🏀 [FAST BREAK PHASE DEBUG] Checking {len(fb_roles['defense'])} defenders for defensive stop")
     logging.warning(f"  Ball handler outlet position: x={ball_handler_outlet_x}, y={ball_handler_outlet_y}")
     
-    # ✅ Log all get-back players and their coordinates from the previous shot attempt
-    logging.warning(f"🏀 [FAST BREAK PHASE DEBUG] Searching for get-back players in previous turns...")
+    # ✅ Find the most recent MISS/MAKE turn (the one that triggered this fast break)
+    # Only use get-back coords from THIS turn, not from previous turns
+    most_recent_shot_turn = None
     if game.turns and len(game.turns) > 0:
-        found_getback_turn = False
         for turn in reversed(game.turns[-10:]):  # Check last 10 turns
             if turn.get("result_type") in ["MISS", "MAKE"]:
-                found_getback_turn = True
-                turn_result_type = turn.get("result_type")
-                getback_coords = turn.get("offense_getback_coords", {})
-                getback_player_ids = turn.get("offense_getback", [])
-                
-                logging.warning(f"🏀 [FAST BREAK PHASE DEBUG] Found {turn_result_type} turn:")
-                logging.warning(f"  offense_getback (player IDs): {getback_player_ids}")
-                logging.warning(f"  offense_getback_coords keys: {list(getback_coords.keys()) if getback_coords else 'None'}")
-                
-                if getback_coords:
-                    logging.warning(f"  Get-back players with coordinates:")
-                    for player_id, coords in getback_coords.items():
-                        logging.warning(f"    Get-back player {player_id}: x={coords.get('x')}, y={coords.get('y')}")
-                elif getback_player_ids:
-                    logging.warning(f"  ⚠️ WARNING: Get-back player IDs exist but no coordinates stored!")
-                    logging.warning(f"    Player IDs: {getback_player_ids}")
-                else:
-                    logging.warning(f"  No get-back players in this turn")
+                most_recent_shot_turn = turn
                 break
+    
+    # ✅ Log all get-back players and their coordinates from the most recent shot attempt
+    logging.warning(f"🏀 [FAST BREAK PHASE DEBUG] Most recent shot turn:")
+    if most_recent_shot_turn:
+        turn_result_type = most_recent_shot_turn.get("result_type")
+        getback_coords = most_recent_shot_turn.get("offense_getback_coords", {})
+        getback_player_ids = most_recent_shot_turn.get("offense_getback", [])
         
-        if not found_getback_turn:
-            logging.warning(f"  ⚠️ No MISS or MAKE turn found in last 10 turns")
+        logging.warning(f"  Found {turn_result_type} turn:")
+        logging.warning(f"  offense_getback (player IDs): {getback_player_ids}")
+        logging.warning(f"  offense_getback_coords keys: {list(getback_coords.keys()) if getback_coords else 'None'}")
+        
+        if getback_coords:
+            logging.warning(f"  Get-back players with coordinates:")
+            for player_id, coords in getback_coords.items():
+                logging.warning(f"    Get-back player {player_id}: x={coords.get('x')}, y={coords.get('y')}")
+        elif getback_player_ids:
+            logging.warning(f"  ⚠️ WARNING: Get-back player IDs exist but no coordinates stored!")
+            logging.warning(f"    Player IDs: {getback_player_ids}")
+        else:
+            logging.warning(f"  No get-back players in this turn")
+    else:
+        logging.warning(f"  ⚠️ No MISS or MAKE turn found in last 10 turns")
     
     for defender in fb_roles["defense"]:
         # Use defender's actual coordinates (where they are on the court)
@@ -548,21 +551,21 @@ def resolve_fast_break_logic(game: "GameManager"):
         defender_actual_y = None
         defender_id = getattr(defender, "player_id", None)
         
-        # Check if defender has get-back coordinates from the previous shot attempt
-        if game.turns and len(game.turns) > 0 and defender_id:
+        # ✅ Check if defender has get-back coordinates from the MOST RECENT shot attempt only
+        # Only use get-back coords if this defender was actually a get-back player in the turn that triggered this fast break
+        if most_recent_shot_turn and defender_id:
             logging.warning(f"🏀 [FAST BREAK PHASE DEBUG] Looking for get-back coords for defender {defender_id}")
-            for turn in reversed(game.turns[-10:]):  # Check last 10 turns
-                if turn.get("result_type") in ["MISS", "MAKE"]:
-                    getback_coords = turn.get("offense_getback_coords", {})
-                    logging.warning(f"  Found {turn.get('result_type')} turn, getback_coords keys: {list(getback_coords.keys()) if getback_coords else 'None'}")
-                    if getback_coords and defender_id in getback_coords:
-                        stored_coords = getback_coords[defender_id]
-                        defender_actual_x = stored_coords.get("x")
-                        defender_actual_y = stored_coords.get("y")
-                        logging.warning(f"🏀 [FAST BREAK PHASE DEBUG] ✅ Using get-back coords for defender {defender_id}: {defender_actual_x}, {defender_actual_y}")
-                        break
-                    elif getback_coords:
-                        logging.warning(f"  ⚠️ Defender {defender_id} not found in getback_coords")
+            getback_coords = most_recent_shot_turn.get("offense_getback_coords", {})
+            logging.warning(f"  Most recent {most_recent_shot_turn.get('result_type')} turn, getback_coords keys: {list(getback_coords.keys()) if getback_coords else 'None'}")
+            if getback_coords and defender_id in getback_coords:
+                stored_coords = getback_coords[defender_id]
+                defender_actual_x = stored_coords.get("x")
+                defender_actual_y = stored_coords.get("y")
+                logging.warning(f"🏀 [FAST BREAK PHASE DEBUG] ✅ Using get-back coords for defender {defender_id}: {defender_actual_x}, {defender_actual_y}")
+            elif getback_coords:
+                logging.warning(f"  ⚠️ Defender {defender_id} not found in getback_coords (not a get-back player in most recent shot)")
+            else:
+                logging.warning(f"  ⚠️ No getback_coords in most recent shot turn")
         
         # Fallback to defender's current coords if no get-back coords found
         if defender_actual_x is None or defender_actual_y is None:
