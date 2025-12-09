@@ -476,7 +476,9 @@ class TurnManager:
                     "outlet_receiver": result.get("roles", {}).get("outlet_receiver") if result.get("roles") else None,
                     "ball_handler_id": getattr(result.get("ball_handler"), "player_id", None) if result.get("ball_handler") else None,
                     "has_animations": len(result.get("animations", [])) > 0,
-                    "animation_count": len(result.get("animations", []))
+                    "animation_count": len(result.get("animations", [])),
+                    "rebounderId": result.get("rebounderId"),  # ✅ Add rebounderId to debug output
+                    "rebound_type": result.get("rebound_type")  # ✅ Add rebound_type to debug output
                 }
                 logging.warning(f"🏀 [FAST BREAK DEBUG] Turn #{turn_num} result before return: {json.dumps(debug_data, default=str)}")
             
