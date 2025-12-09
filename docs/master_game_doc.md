@@ -384,6 +384,7 @@ def get_ball_handler_from_skeleton(skeleton, off_lineup, step_index=None):
 The **Fast Break** system handles transition offense situations that occur after defensive rebounds or steals. The system determines whether a fast break results in a defensive stop or a shot attempt based on defender positioning relative to the ball handler after the outlet pass.
 
 **Key Functions:**
+- `FastBreakTrigger.can_trigger_from_dreb()` - Determines if fast break should trigger from DREB in `BackEnd/engine/fast_break_trigger.py`
 - `resolve_fast_break_logic()` - Handles fast break outcome determination in `BackEnd/engine/phase_resolution.py`
 - `capture_fast_break_animation()` - Builds animation packet in `BackEnd/models/animator.py`
 - `runFastBreakSequence()` - Orchestrates fast break animation in `FrontEnd/static/js/phaser/animation/fastBreak.js`
@@ -621,6 +622,10 @@ const getBackList = missTurnForGetback?.offense_getback || [];
 
 ### Key Files
 
+- `BackEnd/engine/fast_break_trigger.py`
+  - `FastBreakTrigger` - Class for determining fast break triggers
+  - `can_trigger_from_dreb()` - Determines if fast break should trigger from defensive rebound
+  - `can_trigger_from_steal()` - Determines if fast break should trigger from steal (for future use)
 - `BackEnd/engine/phase_resolution.py`
   - `resolve_fast_break_logic()` - Determines defensive stop vs. shot attempt
   - Uses coordinate comparison in HOME orientation
