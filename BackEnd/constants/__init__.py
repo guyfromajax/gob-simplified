@@ -17,7 +17,7 @@ BOX_SCORE_KEYS = [
     # Fast Break stats
     "Outlet_A", "Outlet_S", "Outlet_Score", "Outlet_Score_List", "Outlet_Score_Cum",
     "FB_A", "FB_S", "FB_F", "FB_N",
-    "FB_A_D", "FB_S_D", "FB_F_D", "FB_S_N"
+    "FB_A_D", "FB_S_D", "FB_F_D"
 ]
 
 
