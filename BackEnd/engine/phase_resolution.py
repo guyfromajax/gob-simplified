@@ -514,11 +514,16 @@ def resolve_fast_break_logic(game: "GameManager"):
     # ✅ Find the most recent MISS/MAKE turn (the one that triggered this fast break)
     # Only use get-back coords from THIS turn, not from previous turns
     most_recent_shot_turn = None
+    getback_player_ids = []
     if game.turns and len(game.turns) > 0:
         for turn in reversed(game.turns[-10:]):  # Check last 10 turns
             if turn.get("result_type") in ["MISS", "MAKE"]:
                 most_recent_shot_turn = turn
+                getback_player_ids = turn.get("offense_getback", [])
                 break
+    
+    # ✅ Store get-back player IDs in fb_roles for animator to use
+    fb_roles["getback_player_ids"] = getback_player_ids
     
     # ✅ Log all get-back players and their coordinates from the most recent shot attempt
     logging.warning(f"🏀 [FAST BREAK PHASE DEBUG] Most recent shot turn:")

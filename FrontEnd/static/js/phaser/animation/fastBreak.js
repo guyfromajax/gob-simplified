@@ -945,8 +945,9 @@ async function animateDefensiveStop(scene, turnData, playerSprites, ballSprite, 
 
 /**
  * Helper: Move all non-involved players to their positions
- * - Defenders in list: chase toward basket (X: 50 to basket-15, Y: 15-35)
- * - Other players: move to half court (X: 45-55, Y: 15-35)
+ * - Get-back players only: chase toward basket (X: 50 to basket-15, Y: 15-35)
+ * - Other players: move to random x between 40-60 (horizontally symmetrical), Y: 15-35
+ * - Only shooter needs to reach their destination; others stop if shot happens before they arrive
  */
 async function moveOtherPlayersToStandardPositions(
   scene,
@@ -958,8 +959,20 @@ async function moveOtherPlayersToStandardPositions(
   height,
   promises
 ) {
-  const defendersList = turnData.roles?.defense || [];
-  const defendersSet = new Set(defendersList.map(d => d.player_id || d));
+  // ✅ Find the most recent MISS/MAKE turn to get get-back player list
+  // Only animate get-back players as defenders, not all players in defense list
+  let getbackPlayerIds = [];
+  const currentIndex = scene.currentTurn || 0;
+  const previousTurn = scene.simData?.turns?.[currentIndex - 1];
+  const currentTurn = scene.simData?.turns?.[currentIndex];
+  
+  if (previousTurn?.result_type === "MISS" || previousTurn?.result_type === "MAKE") {
+    getbackPlayerIds = previousTurn?.offense_getback || [];
+  } else if (currentTurn?.result_type === "MISS" || currentTurn?.result_type === "MAKE") {
+    getbackPlayerIds = currentTurn?.offense_getback || [];
+  }
+  
+  const getbackPlayerIdsSet = new Set(getbackPlayerIds);
   
   // Determine which basket is being attacked
   const shooterSprite = playerSprites[ballHandlerId];
@@ -974,9 +987,9 @@ async function moveOtherPlayersToStandardPositions(
     
     let targetSpot;
     
-    // Animate defenders in the list to chase positions
-    if (defendersSet.has(id)) {
-      // Defenders chase: X between 50 and 15 spots closer to basket
+    // ✅ Only animate get-back players as defenders (not all players in defense list)
+    if (getbackPlayerIdsSet.has(id)) {
+      // Get-back defenders chase: X between 50 and 15 spots closer to basket
       const minX = isHomeOffense ? 50 : basket.x + 2;
       const maxX = isHomeOffense ? basket.x - 2 : 50;
       
@@ -985,15 +998,16 @@ async function moveOtherPlayersToStandardPositions(
         y: Phaser.Math.Between(15, 35)
       };
     } else {
-      // All other players: move to half court
+      // ✅ Other players: move to random x between 40-60 (horizontally symmetrical)
       targetSpot = {
-        x: Phaser.Math.Between(45, 55),
+        x: Phaser.Math.Between(40, 60),
         y: Phaser.Math.Between(15, 35)
       };
     }
     
     const targetPx = gridToPixels(targetSpot.x, targetSpot.y, width, height);
-    // Use distance-based duration for consistent speed
+    // ✅ Use distance-based duration for consistent speed
+    // Players will stop at their current position if shot happens before they reach their spot
     const playerDuration = getPlayerDuration(sprite, targetPx.x, targetPx.y);
     promises.push(
       tweenPlayerTo(scene, sprite, targetPx, {
