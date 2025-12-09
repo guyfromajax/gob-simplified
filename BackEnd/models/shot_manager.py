@@ -362,12 +362,13 @@ class ShotManager:
         shooter_name = get_name_safe(shooter)
         
         # Determine defensive players releasing for fast break
-        defense_release_chances = {0: 0.0, 1: 0.25, 2: 0.5, 3: 0.75, 4: 1.0}
-        defense_releases = random.random() < defense_release_chances[defense_tempo_value]
-        release_pos = "PG" if shooter_pos != "PG" else "SG"
+        from BackEnd.engine.fast_break_trigger import FastBreakTrigger
         
-        defense_rebounders = [pos for pos, p in def_team.lineup.items() if pos != release_pos] if defense_releases else list(def_team.lineup.keys())
-        defense_release_list = [release_pos] if defense_releases else []
+        defense_releases, defense_release_list, defense_rebounders = FastBreakTrigger.can_trigger_from_dreb(
+            defense_tempo_value=defense_tempo_value,
+            shooter_pos=shooter_pos,
+            def_team_lineup=def_team.lineup
+        )
         
         # Get names for debug logging
         release_player = def_team.lineup.get(release_pos) if defense_releases else None
