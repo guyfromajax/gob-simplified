@@ -638,7 +638,11 @@ const getBackList = missTurnForGetback?.offense_getback || [];
   - `animateOutletPhase()` - Handles outlet pass (no player movement)
   - `animateDefensiveStop()` - Handles defensive stop animation
   - `animateFastBreakShot()` - Handles shot attempt animation and MISS → DREB transition
-  - `moveOtherPlayersToStandardPositions()` - Positions rebounders and get-back defenders
+  - `moveOtherPlayersToStandardPositions()` - Positions outlet passer and get-back defenders
+  - `animateRebounders()` - Handles rebounder animation (extracted for maintainability)
+    - Defensive Stop: x=40-60, y=starting_y ± 6 (clamped 1-49)
+    - Shot Attempt: x=random 5-20 spots out from basket, y=rim_y ± 10 (clamped 1-49)
+    - Returns tween references for early termination
   - Early termination logic for rebounder animations
 - `FrontEnd/static/js/phaser/animation/turnAnimation.js`
   - `runDefensiveReboundSetup()` - Handles DREB → HCO transition, including Fast Break MISS → DREB cases
