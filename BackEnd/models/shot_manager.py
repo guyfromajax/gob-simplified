@@ -392,10 +392,9 @@ class ShotManager:
         else:
             num_getback = 2
         
-        # ✅ FIX: If defense is releasing for fast break, ensure at least 1 get-back player
-        # This ensures we have defenders to stop the fast break
-        if defense_releases and num_getback == 0:
-            num_getback = 1
+        # Note: 0 get-back defenders with a release player is still a valid Fast Break
+        # It's just an easy layup opportunity for the outlet receiver
+        # No minimum enforcement needed
         
         offense_getback_list = []
         if num_getback >= 1:
