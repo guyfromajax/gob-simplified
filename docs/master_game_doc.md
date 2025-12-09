@@ -1,6 +1,6 @@
 # Master Game Documentation
 
-> **Last Updated:** January 2025  
+> **Last Updated:** January 2025
 > **Previously:** `animation_system.md`
 
 This document provides comprehensive documentation of the **GOB** game system, including animation, transitions, game flows, and system architecture.
@@ -439,9 +439,16 @@ Fast breaks can result in:
 ```
 Outlet Receiver: x=55, y=23 (from defense_release_coords)
 Get-Back Defender: x=57, y=34 (from offense_getback_coords)
-Result: DEFENSIVE_STOP (defender at x=57 is ahead of ball handler at x=55, distance: 2)
-Note: This get-back defender was correctly detected even though they weren't initially in 
-fb_roles["defense"] due to stale ball_handler.coords in get_in_play_defenders()
+Y Difference: |34 - 23| = 11 (exceeds ±6 range)
+Result: SHOT (defender is ahead in x but NOT within y-range)
+Note: Even though defender at x=57 is ahead of ball handler at x=55, they are 11 y-coords 
+away, which exceeds the ±6 requirement, so it becomes a shot attempt instead of defensive stop.
+
+Another Example:
+Outlet Receiver: x=55, y=23 (from defense_release_coords)
+Get-Back Defender: x=57, y=25 (from offense_getback_coords)
+Y Difference: |25 - 23| = 2 (within ±6 range)
+Result: DEFENSIVE_STOP (defender at x=57 is ahead AND within y-range, distance: 2)
 ```
 
 ### Defensive Stop vs. Shot Attempt Determination
@@ -451,14 +458,25 @@ fb_roles["defense"] due to stale ball_handler.coords in get_in_play_defenders()
 **Home Offense:**
 - Basket at x=90 (larger x is closer to basket)
 - Defender ahead if: `defender_x >= ball_handler_x`
-- If defender ahead → DEFENSIVE_STOP
+- **Defender must also be within ±6 y-coords of outlet receiver**
+- If defender ahead AND within y-range → DEFENSIVE_STOP
 - Otherwise → SHOT
 
 **Away Offense:**
 - Basket at x=10 (smaller x is closer to basket)
 - Defender ahead if: `defender_x <= ball_handler_x`
-- If defender ahead → DEFENSIVE_STOP
+- **Defender must also be within ±6 y-coords of outlet receiver**
+- If defender ahead AND within y-range → DEFENSIVE_STOP
 - Otherwise → SHOT
+
+**Multiple Get-Back Players:**
+- If multiple get-back players meet both conditions (ahead AND within y-range), the closest one (by x-distance) forces the defensive stop
+- If neither get-back player meets both conditions, the closest defender overall (by Euclidean distance) becomes the shot defender
+
+**Shot Defender Selection:**
+- If no defender meets both conditions (ahead AND within y-range), it's a shot attempt
+- The closest defender overall (by Euclidean distance from outlet receiver) becomes the shot defender
+- This ensures there's always a defender to animate during shot attempts
 
 **Critical Implementation Detail:**
 - **All defenders checked**: The system checks **all defenders in `def_lineup`**, not just those initially in `fb_roles["defense"]`
@@ -471,33 +489,55 @@ fb_roles["defense"] due to stale ball_handler.coords in get_in_play_defenders()
 ```python
 # ✅ Check ALL defenders in def_lineup, not just fb_roles["defense"]
 # This ensures get-back players are checked even if they weren't initially included
+closest_stopping_defender = None  # Defender who is ahead AND within ±6 y-coords
+closest_defender_overall = None   # Closest defender overall (for shot attempts)
+
 for defender in def_lineup.values():
     # Get defender coordinates (get-back coords if available, else defender.coords)
-    defender_outlet_x = get_defender_coords(defender, most_recent_shot_turn)
+    defender_outlet_x = get_defender_coords_x(defender, most_recent_shot_turn)
+    defender_outlet_y = get_defender_coords_y(defender, most_recent_shot_turn)
     
-    # Compare in HOME orientation for both home and away offense
+    # Calculate Euclidean distance for closest defender overall
+    x_distance = abs(defender_outlet_x - ball_handler_outlet_x)
+    y_distance = abs(defender_outlet_y - ball_handler_outlet_y)
+    total_distance = (x_distance ** 2 + y_distance ** 2) ** 0.5
+    
+    # Track closest defender overall (for shot attempts)
+    if total_distance < closest_distance_overall:
+        closest_distance_overall = total_distance
+        closest_defender_overall = defender
+    
+    # Check if defender is ahead (x-coordinate check)
     if is_away_offense:
-        # Away offense: smaller x is closer to basket
         is_ahead = defender_outlet_x <= ball_handler_outlet_x
     else:
-        # Home offense: larger x is closer to basket
         is_ahead = defender_outlet_x >= ball_handler_outlet_x
     
-    if is_ahead:
+    # ✅ NEW: Check if defender is within ±6 y-coords of outlet receiver
+    y_diff = abs(defender_outlet_y - ball_handler_outlet_y)
+    is_within_y_range = y_diff <= 6
+    
+    # Defender can force defensive stop if: ahead AND within y-range
+    if is_ahead and is_within_y_range:
         defender_ahead = True
-        # Track closest defender ahead
-        if distance < closest_distance:
-            closest_defender = defender
+        # Track closest stopping defender (x-distance only)
+        x_distance_only = abs(defender_outlet_x - ball_handler_outlet_x)
+        if x_distance_only < closest_stopping_distance:
+            closest_stopping_distance = x_distance_only
+            closest_stopping_defender = defender
 
-# If closest defender wasn't in fb_roles["defense"], add them for animation
-if closest_defender and closest_defender not in fb_roles["defense"]:
-    fb_roles["defense"].append(closest_defender)
+# If closest stopping defender wasn't in fb_roles["defense"], add them for animation
+if closest_stopping_defender and closest_stopping_defender not in fb_roles["defense"]:
+    fb_roles["defense"].append(closest_stopping_defender)
 
-if defender_ahead:
+if defender_ahead and closest_stopping_defender:
     event_type = "DEFENSIVE_STOP"
-    stopper_id = closest_defender.player_id
+    stopper_id = closest_stopping_defender.player_id
 else:
     event_type = "SHOT"
+    # Use closest defender overall as shot defender
+    if closest_defender_overall:
+        fb_roles["defender"] = closest_defender_overall
 ```
 
 ### Animation Sequence
@@ -2500,7 +2540,7 @@ if timeout_saved_state:
         request.resume_from_timeout = True
         if gm is not None:
             # Step 4a: Apply to in-memory game (if exists)
-            apply_timeout_resume_state_to_gm(gm, timeout_saved_state)
+    apply_timeout_resume_state_to_gm(gm, timeout_saved_state)
         # Step 4b: If game not in memory, will apply after DB load (see Step 6)
     else:
         # Stale timeout data (quarter mismatch) - ignore it
