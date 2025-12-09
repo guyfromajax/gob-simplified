@@ -299,6 +299,50 @@ from BackEnd.constants.fast_break_constants import (
     DEFENSIVE_STOP_Y_RANGE,
 )
 
+def _record_outlet_pass_stats(outlet_passer_id, outlet_score, is_successful, game):
+    """
+    Record outlet pass statistics for the outlet passer.
+    
+    Args:
+        outlet_passer_id: Player ID of the outlet passer
+        outlet_score: Scaled outlet pass score (1-100)
+        is_successful: True if outlet pass led to shot attempt, False if defensive stop
+        game: GameManager instance
+    """
+    if not outlet_passer_id or outlet_score is None:
+        return
+    
+    # Find outlet passer player object
+    outlet_passer = None
+    for team in (game.home_team, game.away_team):
+        for player in team.get_all_players():
+            if getattr(player, "player_id", None) == outlet_passer_id:
+                outlet_passer = player
+                break
+        if outlet_passer:
+            break
+    
+    if not outlet_passer:
+        return
+    
+    # Record Outlet_A (always increment on outlet pass)
+    outlet_passer.record_stat("Outlet_A", 1)
+    
+    # Record Outlet_S if successful (led to shot attempt)
+    if is_successful:
+        outlet_passer.record_stat("Outlet_S", 1)
+    
+    # Update Outlet_Score_List (append score to array)
+    outlet_passer.stats["game"]["Outlet_Score_List"].append(outlet_score)
+    
+    # Calculate and update Outlet_Score (average of list)
+    score_list = outlet_passer.stats["game"]["Outlet_Score_List"]
+    if score_list:
+        outlet_passer.stats["game"]["Outlet_Score"] = int(round(sum(score_list) / len(score_list)))
+    
+    # Update Outlet_Score_Cum (cumulative sum)
+    outlet_passer.stats["game"]["Outlet_Score_Cum"] += outlet_score
+
 def resolve_fast_break_logic(game: "GameManager"):
     from BackEnd.models.game_manager import GameManager
     # print("Entering resolve_fast_break()")
