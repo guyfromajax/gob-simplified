@@ -574,30 +574,24 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
     const miss = await bounceFromRim(scene, ballSprite, basket, isHomeOffense, 300);
     console.log('🏀 [FAST BREAK MISS] bounceFromRim completed', { miss: miss?.grid });
     
-    // Find the original MISS turn that led to this Fast Break
-    // The current turnData is the FAST_BREAK turn, but we need the original MISS turn
-    // to get the offense_getback list
-    let missTurn = null;
+    // Find the original MISS turn that led to this Fast Break (for offense_getback list)
+    // Also need the current Fast Break MISS turn (for animations)
     const currentIndex = scene.currentTurn || 0;
     const previousTurn = scene.simData?.turns?.[currentIndex - 1];
     const currentTurn = scene.simData?.turns?.[currentIndex];
     
-    console.log('🏀 [FAST BREAK MISS] Looking for original MISS turn', {
+    console.log('🏀 [FAST BREAK MISS] Looking for MISS turns', {
       currentIndex,
       previousTurnType: previousTurn?.result_type,
-      currentTurnType: currentTurn?.result_type
+      currentTurnType: currentTurn?.result_type,
+      turnDataType: turnData?.result_type
     });
     
-    // Check previous turn first (the MISS that led to this Fast Break)
-    if (previousTurn?.result_type === "MISS") {
-      missTurn = previousTurn;
-      console.log('🏀 [FAST BREAK MISS] Found MISS turn in previousTurn');
-    } else if (currentTurn?.result_type === "MISS") {
-      missTurn = currentTurn;
-      console.log('🏀 [FAST BREAK MISS] Found MISS turn in currentTurn');
-    } else {
-      console.warn('🏀 [FAST BREAK MISS] ⚠️ No MISS turn found in previous or current turn');
-    }
+    // The current turnData is the Fast Break MISS turn - use it for animations
+    // The previous HCO MISS turn is needed for offense_getback list
+    // runDefensiveReboundSetup will use turnData for animations, and can find offense_getback
+    // from the previous turn if needed
+    const missTurnForGetback = previousTurn?.result_type === "MISS" ? previousTurn : null;
     
     // ✅ Get rebounderId - must be present for rebound animation
     const rebounderId = turnData.rebounderId || turnData.rebounder_player_id;
@@ -714,7 +708,8 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
         playerSprites,
         rebounderId,
         nextPlayType: turnData.next_play_type || "HCO", // Use turnData.next_play_type instead of hardcoded "HCO"
-        turnData: missTurn // Pass the original MISS turn so we can get offense_getback list
+        turnData: turnData // ✅ FIX: Pass current Fast Break MISS turn (has animations), not previous HCO MISS turn
+        // runDefensiveReboundSetup will find offense_getback from previous turn if needed
       });
       console.log('🏀 [FAST BREAK MISS] runDefensiveReboundSetup completed');
     } else {

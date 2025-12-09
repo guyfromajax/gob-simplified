@@ -448,20 +448,28 @@ async function runSideInboundSetup({ scene, ballSprite, playerSprites, turnData 
 // Setup positions after a defensive rebound before new half-court offense or fast break
 async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebounderId, nextPlayType = "HCO", turnData = null }) {
   // Get the offense_getback list from the MISS turn that led to this DREB
-  // The turnData parameter should be the MISS turn, but if not provided, try to find it
-  let missTurn = turnData;
-  if (!missTurn) {
-    // Try current turn first (most likely)
-    const currentTurn = scene.simData?.turns?.[scene.currentTurn || 0];
-    if (currentTurn?.result_type === "MISS") {
-      missTurn = currentTurn;
-    } else {
-      // Fallback to previous turn
-      missTurn = scene.simData?.turns?.[(scene.currentTurn || 0) - 1];
+  // For Fast Break MISS → DREB, the offense_getback is from the previous HCO MISS turn
+  // For regular HCO MISS → DREB, the offense_getback is from the current MISS turn
+  // The turnData parameter is the current turn (for animations), but we may need to look
+  // at the previous turn for offense_getback if this is a Fast Break MISS
+  let missTurnForGetback = turnData;
+  if (!missTurnForGetback || !missTurnForGetback.offense_getback) {
+    // Try previous turn if current turn doesn't have offense_getback (Fast Break case)
+    const currentIndex = scene.currentTurn || 0;
+    const previousTurn = scene.simData?.turns?.[currentIndex - 1];
+    if (previousTurn?.result_type === "MISS" && previousTurn.offense_getback) {
+      missTurnForGetback = previousTurn;
+      console.log('🏀 [DREB SETUP] Using previous MISS turn for offense_getback (Fast Break case)');
+    } else if (!missTurnForGetback) {
+      // Fallback: try current turn
+      const currentTurn = scene.simData?.turns?.[currentIndex];
+      if (currentTurn?.result_type === "MISS") {
+        missTurnForGetback = currentTurn;
+      }
     }
   }
   
-  const getBackList = missTurn?.offense_getback || [];
+  const getBackList = missTurnForGetback?.offense_getback || [];
   
   // runDefensiveReboundSetup called
   
