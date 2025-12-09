@@ -19,6 +19,7 @@ from BackEnd.utils.shared import (
     get_time_elapsed,
     get_fast_break_chance,
     calculate_rebound_score,
+    calculate_outlet_pass_score,
     choose_rebounder,
     default_rebounder_dict,
     resolve_offensive_rebound,
@@ -342,12 +343,17 @@ def resolve_fast_break_logic(game: "GameManager"):
                 fb_roles["outlet_passer"] = getattr(rebounder, "player_id", None)
                 fb_roles["outlet_receiver"] = getattr(ball_handler, "player_id", None)
                 
+                # Calculate outlet pass score for stat tracking
+                outlet_score = calculate_outlet_pass_score(rebounder)
+                fb_roles["outlet_score"] = outlet_score
+                
                 import logging
                 # ✅ COMMENTED OUT: Fast break outlet pass logs (cluttering transition debugging)
                 # logging.warning(f"🏀 Fast Break outlet pass: outlet_passer={get_name_safe(rebounder)} (rebounder), outlet_receiver={get_name_safe(ball_handler)} (release player)")
             else:
                 fb_roles["outlet_passer"] = None
                 fb_roles["outlet_receiver"] = None
+                fb_roles["outlet_score"] = None
         else:
             # Fallback: Random ball handler if no release player (shouldn't happen, but safety check)
             bh_pos = random.choices(["PG", "SG", "SF"], weights=[75, 15, 10])[0]
@@ -360,12 +366,17 @@ def resolve_fast_break_logic(game: "GameManager"):
                 fb_roles["outlet_passer"] = getattr(rebounder, "player_id", None)
                 fb_roles["outlet_receiver"] = getattr(ball_handler, "player_id", None)
                 
+                # Calculate outlet pass score for stat tracking
+                outlet_score = calculate_outlet_pass_score(rebounder)
+                fb_roles["outlet_score"] = outlet_score
+                
                 import logging
                 # ✅ COMMENTED OUT: Fast break outlet pass logs (cluttering transition debugging)
                 # logging.warning(f"⚠️ Fast Break outlet pass (FALLBACK - no release player): outlet_passer={get_name_safe(rebounder)} (rebounder), outlet_receiver={get_name_safe(ball_handler)} (random)")
             else:
                 fb_roles["outlet_passer"] = None
                 fb_roles["outlet_receiver"] = None
+                fb_roles["outlet_score"] = None
 
         # No additional offensive players when starting from a rebound
         fb_roles["offense"] = []
@@ -378,6 +389,7 @@ def resolve_fast_break_logic(game: "GameManager"):
         fb_roles["ball_handler"] = ball_handler
         fb_roles["outlet_passer"] = None
         fb_roles["outlet_receiver"] = None
+        fb_roles["outlet_score"] = None  # No outlet pass on steals
 
         # Previous logic added additional offensive players to the fast break,
         # potentially scheduling runners beyond the ball handler. The current
