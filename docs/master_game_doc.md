@@ -377,6 +377,161 @@ def get_ball_handler_from_skeleton(skeleton, off_lineup, step_index=None):
 
 ---
 
+## Fast Break System ✅ **COMPLETE** (January 2025)
+
+### Overview
+
+The **Fast Break** system handles transition offense situations that occur after defensive rebounds or steals. The system determines whether a fast break results in a defensive stop or a shot attempt based on defender positioning relative to the ball handler after the outlet pass.
+
+**Key Functions:**
+- `resolve_fast_break_logic()` - Handles fast break outcome determination in `BackEnd/engine/phase_resolution.py`
+- `capture_fast_break_animation()` - Builds animation packet in `BackEnd/models/animator.py`
+- `runFastBreakSequence()` - Orchestrates fast break animation in `FrontEnd/static/js/phaser/animation/fastBreak.js`
+
+### When Fast Break Activates
+
+**Trigger Conditions:**
+- After defensive rebounds when `defense_releases = True` (defensive players release for fast break)
+- After steals with fast break chance
+- Set via `next_play_type = "FAST_BREAK"` in turn result
+- Determined by `shot_manager.resolve_shot()` for DREB or `phase_resolution.py` for steals
+
+**State Flow:**
+1. DREB or STEAL → Fast break chance determined
+2. FAST_BREAK turn generated with `fast_break = true` flag
+3. Backend determines outcome (DEFENSIVE_STOP or SHOT) based on defender positioning
+4. Frontend animates outlet pass, then defensive stop or shot attempt
+
+### Possible Outcomes
+
+Fast breaks can result in:
+
+1. **Defensive Stop (DEFENSIVE_STOP)**
+   - Defender is ahead of ball handler after outlet pass
+   - Ball handler moves 5-10 spots toward basket, ±3 Y (clamped)
+   - Closest defender ahead becomes "stopper" and is placed 1-3 spots in front of ball handler
+   - Routes to: HCO (half court offense)
+
+2. **Shot Attempt (SHOT)**
+   - No defender ahead of ball handler after outlet pass
+   - Ball handler moves 5-10 spots toward basket, ±3 Y (clamped)
+   - Defender follows and is positioned 1-6 spots behind ball handler
+   - Routes to: Standard shot resolution flow (MAKE/MISS)
+
+### Coordinate System and Player Positioning
+
+**Coordinate Orientation:**
+- All coordinates stored in **HOME orientation** (basket at x=90 for home, x=10 for away)
+- Frontend flips coordinates for away team display
+- Backend calculations always use HOME orientation for consistency
+
+**Outlet Receiver (Ball Handler) Starting Coordinates:**
+- **Priority 1**: `defense_release_coords` from most recent MISS/MAKE turn (outlet receiver is typically a release player)
+- **Priority 2**: `offense_getback_coords` from most recent MISS/MAKE turn (if ball handler was a get-back player)
+- **Fallback**: `player.coords` (current position on court)
+
+**Get-Back Defender Coordinates:**
+- **Priority**: `offense_getback_coords` from **most recent** MISS/MAKE turn only
+- Only defenders who were actually get-back players in the turn that triggered the fast break
+- **Fallback**: `defender.coords` (current position on court)
+
+**Example from Logs:**
+```
+Outlet Receiver: x=50, y=26 (from defense_release_coords)
+Get-Back Defender: x=51, y=23 (from offense_getback_coords)
+Result: DEFENSIVE_STOP (defender at x=51 is ahead of ball handler at x=50)
+```
+
+### Defensive Stop vs. Shot Attempt Determination
+
+**Logic (HOME Orientation):**
+
+**Home Offense:**
+- Basket at x=90 (larger x is closer to basket)
+- Defender ahead if: `defender_x >= ball_handler_x`
+- If defender ahead → DEFENSIVE_STOP
+- Otherwise → SHOT
+
+**Away Offense:**
+- Basket at x=10 (smaller x is closer to basket)
+- Defender ahead if: `defender_x <= ball_handler_x`
+- If defender ahead → DEFENSIVE_STOP
+- Otherwise → SHOT
+
+**Implementation:**
+```python
+# Compare in HOME orientation for both home and away offense
+if is_away_offense:
+    # Away offense: smaller x is closer to basket
+    is_ahead = defender_outlet_x <= ball_handler_outlet_x
+else:
+    # Home offense: larger x is closer to basket
+    is_ahead = defender_outlet_x >= ball_handler_outlet_x
+
+if is_ahead:
+    event_type = "DEFENSIVE_STOP"
+    stopper_id = closest_defender.player_id
+else:
+    event_type = "SHOT"
+```
+
+### Animation Sequence
+
+**Phase 1: Outlet Pass**
+- Outlet passer (rebounder) stays at rebound spot
+- Outlet receiver (ball handler) receives pass at current position (no movement)
+- Defenders stay at current position (no movement)
+- Rebounders (non-get-back, non-release) stay at current position (no movement)
+
+**Phase 2: Defensive Stop or Shot Attempt**
+
+**Defensive Stop:**
+- Ball handler moves 5-10 spots toward basket, ±3 Y (clamped)
+- Stopper (closest defender ahead) moves to position 1-3 spots in front of ball handler
+- Get-back defenders chase toward basket
+- Rebounders move to random x=40-60, y=starting_y ± 6 (clamped)
+- **Early Termination**: Rebounder animations stop when ball handler and stopper both reach their spots
+
+**Shot Attempt:**
+- Ball handler (shooter) moves to spot near rim (basket ± 2-6, ±6 Y)
+- Defender follows to position 1-6 spots behind shooter
+- Get-back defenders chase toward basket
+- Rebounders move to random x=5-20 spots from basket, y=rim_y ± 10 (clamped)
+- **Early Termination**: 
+  - Made shot: Rebounder animations stop when ball hits rim
+  - Missed shot: Rebounder animations stop when rebounder grabs ball
+
+### Key Files
+
+- `BackEnd/engine/phase_resolution.py`
+  - `resolve_fast_break_logic()` - Determines defensive stop vs. shot attempt
+  - Uses coordinate comparison in HOME orientation
+  - Stores `ball_handler_outlet_x/y`, `is_away_offense`, `getback_player_ids` in `fb_roles`
+- `BackEnd/models/shot_manager.py`
+  - `_calculate_getback_coordinates()` - Calculates get-back player coordinates
+  - `_calculate_release_coordinates()` - Calculates release player coordinates
+  - Stores `offense_getback_coords` and `defense_release_coords` in turn results
+- `BackEnd/models/animator.py`
+  - `capture_fast_break_animation()` - Builds animation packet
+  - Uses `fb_roles` for ball handler outlet position and `is_away_offense`
+  - Handles coordinate flipping for away team display
+- `FrontEnd/static/js/phaser/animation/fastBreak.js`
+  - `runFastBreakSequence()` - Orchestrates fast break animation
+  - `animateOutletPhase()` - Handles outlet pass (no player movement)
+  - `animateDefensiveStop()` - Handles defensive stop animation
+  - `animateFastBreakShot()` - Handles shot attempt animation
+  - `moveOtherPlayersToStandardPositions()` - Positions rebounders and get-back defenders
+  - Early termination logic for rebounder animations
+
+### Future Enhancements
+
+- **Steal → Fast Break**: Currently focuses on DREB → Fast Break. Enhance steal → fast break flow
+- **More Nuanced Get-Back Logic**: Consider player attributes (speed, IQ) for get-back player selection
+- **Fast Break Fouls**: Add foul handling during fast break sequences
+- **Fast Break Turnovers**: Add turnover handling during fast break sequences
+
+---
+
 ## Production Animation System
 
 ### Ball Animation System ✅ **COMPLETE**
