@@ -1111,21 +1111,27 @@ class ShotManager:
         shot_score = (attrs["SC"] * 0.6 + attrs["AG"] * 0.2 + attrs["IQ"] * 0.2) * random.randint(1, 6)
         text = f"fast break shot_score: {shot_score}"
         
-        # Defender assignment based on defender count
-        if defender_count == 0:
-            # 0 defenders: No defender assigned
-            defender = None
-            fb_roles["defender"] = None
-        elif defender_count == 1:
-            # 1 defender: Assign the single defender
-            defender = fb_roles["defense"][0] if fb_roles["defense"] else None
-            fb_roles["defender"] = defender
-        else:  # defender_count >= 2
-            # 2+ defenders: Randomly select one as primary shot defender
-            defender = random.choice(fb_roles["defense"])
-            fb_roles["defender"] = defender
-            # Store all defenders for animation (other defenders position around basket)
-            fb_roles["all_defenders"] = fb_roles["defense"]
+        # ✅ Defender assignment: Respect already-set defender (e.g., from phase_resolution.py)
+        # If defender already set (e.g., closest_defender_overall for shot attempts), use it
+        if fb_roles.get("defender"):
+            defender = fb_roles["defender"]
+            # Defender already set, no need to reassign
+        else:
+            # Defender not set: assign based on defender count (fallback logic)
+            if defender_count == 0:
+                # 0 defenders: No defender assigned
+                defender = None
+                fb_roles["defender"] = None
+            elif defender_count == 1:
+                # 1 defender: Assign the single defender
+                defender = fb_roles["defense"][0] if fb_roles["defense"] else None
+                fb_roles["defender"] = defender
+            else:  # defender_count >= 2
+                # 2+ defenders: Randomly select one as primary shot defender
+                defender = random.choice(fb_roles["defense"])
+                fb_roles["defender"] = defender
+                # Store all defenders for animation (other defenders position around basket)
+                fb_roles["all_defenders"] = fb_roles["defense"]
         
         # Calculate defense score and apply to shot
         if defender:
