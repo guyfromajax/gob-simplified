@@ -395,7 +395,7 @@ The **Fast Break** system handles transition offense situations that occur after
 - After defensive rebounds when `defense_releases = True` (defensive players release for fast break)
 - After steals with fast break chance
 - Set via `next_play_type = "FAST_BREAK"` in turn result
-- Determined by `shot_manager.resolve_shot()` for DREB or `phase_resolution.py` for steals
+- Determined by `FastBreakTrigger.can_trigger_from_dreb()` for DREB or `FastBreakTrigger.can_trigger_from_steal()` for steals (in `BackEnd/engine/fast_break_trigger.py`)
 
 **State Flow:**
 1. DREB or STEAL → Fast break chance determined
