@@ -114,6 +114,7 @@ class FranchiseManager:
         self.reset_stats()
 
         zero_stats = {k: 0 for k in BOX_SCORE_KEYS}
+        zero_stats["Outlet_Score"] = []  # Outlet_Score is an array, not an integer
         existing = {}
         if self.franchise_id:
             existing = (

@@ -36,6 +36,7 @@ class TournamentManager:
         round1 = self._generate_first_round(seeds)
 
         zero_stats = {key: 0 for key in BOX_SCORE_KEYS}
+        zero_stats["Outlet_Score"] = []  # Outlet_Score is an array, not an integer
         player_stats: dict[str, dict] = {}
         players = players_collection.find(
             {"team": {"$in": teams}},

@@ -70,11 +70,15 @@ class Player:
         return attributes
 
     def _init_stats(self):
-        return {
+        stats = {
             "game": {stat: 0 for stat in BOX_SCORE_KEYS},
             "season": {stat: 0 for stat in BOX_SCORE_KEYS},
             "career": {stat: 0 for stat in BOX_SCORE_KEYS},
         }
+        # Outlet_Score is an array (game-specific), initialize as empty array
+        for level in ["game", "season", "career"]:
+            stats[level]["Outlet_Score"] = []
+        return stats
 
     def record_stat(self, stat, amount=1):
         self.stats["game"][stat] += amount
@@ -141,6 +145,7 @@ class Player:
     
     def reset_stats(self):
         self.stats["game"] = {stat: 0 for stat in BOX_SCORE_KEYS}
+        self.stats["game"]["Outlet_Score"] = []  # Outlet_Score is an array, not an integer
 
     def get_stat(self, stat, level="game"):
         return self.stats.get(level, {}).get(stat, 0)

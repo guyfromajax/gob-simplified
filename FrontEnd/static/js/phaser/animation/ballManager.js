@@ -840,13 +840,13 @@ export function animateRebound({
       });
     }
     rebounderPromise = new Promise((resolve) => {
-      scene.tweens.add({
-        targets: rebounderSprite,
-        x: spotPx.x,
-        y: spotPx.y,
-        duration: rebCfg.playerMoveMs,
-        ease: "Linear",
-        onComplete: async () => {
+        scene.tweens.add({
+          targets: rebounderSprite,
+          x: spotPx.x,
+          y: spotPx.y,
+          duration: rebCfg.playerMoveMs,
+          ease: "Linear",
+          onComplete: async () => {
             if (debugEnabled && REBOUND_DEBUG) {
               animationDebugLog("reb:moveEnd", {
                 playerId: rebounderId,
@@ -1044,23 +1044,23 @@ export function animateRebound({
   // Other players' rebound animations continue in background but don't block resolution
   if (rebounderPromise) {
     return rebounderPromise.then(
-      () =>
-        new Promise((resolve) => {
-          const logPayload = {
-            rebounderId,
-            ballSpot,
-            positions: finalPositions
-          };
-          if (debugEnabled && REBOUND_DEBUG) {
-            animationDebugLog("[rebound]", logPayload);
-          }
-          if (scene.time?.delayedCall) {
-            scene.time.delayedCall(rebCfg.attachDelayMs, resolve);
-          } else {
-            setTimeout(resolve, rebCfg.attachDelayMs);
-          }
-        })
-    );
+    () =>
+      new Promise((resolve) => {
+        const logPayload = {
+          rebounderId,
+          ballSpot,
+          positions: finalPositions
+        };
+        if (debugEnabled && REBOUND_DEBUG) {
+          animationDebugLog("[rebound]", logPayload);
+        }
+        if (scene.time?.delayedCall) {
+          scene.time.delayedCall(rebCfg.attachDelayMs, resolve);
+        } else {
+          setTimeout(resolve, rebCfg.attachDelayMs);
+        }
+      })
+  );
   } else {
     // Fallback: If no rebounder sprite, resolve immediately
     return Promise.resolve();
