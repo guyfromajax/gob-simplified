@@ -1254,9 +1254,6 @@ async function runInboundSetup({
           width,
           height
         ).x;
-        
-        // 🔍 DEBUG: Log randomization for each defensive player
-        animationDebugLog(`[BIP DEFENSIVE RETREAT] Player ${info.pos} (${id}): baseX=${baseX}, xOffset=${xOffset}, targetXGrid=${targetXGrid}, clampedXGrid=${clampedXGrid}, targetX=${targetX.toFixed(0)}`);
         // Use distance-based duration for consistent speed (same as HCO step movements)
         // Use regular speed (not transition) for retreat - should match inbound setup speed
         const retreatDuration = getPlayerDuration(sprite, targetX, sprite.y, false);
