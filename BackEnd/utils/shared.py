@@ -374,15 +374,34 @@ def calculate_rebound_score(player):
 def calculate_outlet_pass_score(outlet_passer):
     """
     Calculate outlet pass score based on outlet passer's attributes.
+    Score is scaled to 1-100 range where midpoint (average attributes + average die) = 50.
+    
+    Raw formula: (PS * 0.6 + ST * 0.2 + IQ * 0.2) * random(1-6)
+    - Attributes range: 1-100 (midpoint = 50)
+    - Die roll: 1-6 (midpoint = 3.5)
+    - Raw midpoint: (50 * 0.6 + 50 * 0.2 + 50 * 0.2) * 3.5 = 175
+    - Raw range: 1 (min) to 600 (max)
+    
+    Scaling formula: ((raw - 175) / 425) * 50 + 50
+    - Maps raw 175 → scaled 50
+    - Maps raw 1 → scaled ~29.5
+    - Maps raw 600 → scaled 100
     
     Args:
         outlet_passer: Player object making the outlet pass
     
     Returns:
-        int: Outlet pass score (PS * 0.6 + ST * 0.2 + IQ * 0.2) * random(1-6)
+        int: Scaled outlet pass score (1-100, with midpoint = 50)
     """
     attr = outlet_passer.attributes
-    return int((attr["PS"] * 0.6 + attr["ST"] * 0.2 + attr["IQ"] * 0.2) * random.randint(1, 6))
+    # Calculate raw score
+    raw_score = (attr["PS"] * 0.6 + attr["ST"] * 0.2 + attr["IQ"] * 0.2) * random.randint(1, 6)
+    
+    # Scale to 1-100 where midpoint (175) = 50
+    # Formula: ((raw - 175) / (600 - 175)) * 50 + 50
+    scaled_score = ((raw_score - 175) / 425) * 50 + 50
+    
+    return int(round(scaled_score))
 
 def apply_scoring(game, team, player, points, stats):
     """Record player scoring stats and update team points.
