@@ -945,9 +945,11 @@ async function animateDefensiveStop(scene, turnData, playerSprites, ballSprite, 
 
 /**
  * Helper: Move all non-involved players to their positions
- * - Get-back players only: chase toward basket (X: 50 to basket-15, Y: 15-35)
- * - Other players: move to random x between 40-60 (horizontally symmetrical), Y: 15-35
- * - Only shooter needs to reach their destination; others stop if shot happens before they arrive
+ * - Outlet passer: NO MOVEMENT (stays at outlet pass spot)
+ * - Get-back players: chase toward basket (X: 50 to basket-15, Y: 15-35)
+ * - Rebounders (defensive stop): x=40-60, y=starting_y ± 6 (clamped 1-49)
+ * - Rebounders (shot attempt): x=rim_x, y=rim_y ± 10 (clamped 1-49)
+ * - Distance-based animation - stops when ball hits rim (made) or rebounder grabs ball (missed)
  */
 async function moveOtherPlayersToStandardPositions(
   scene,
@@ -959,29 +961,53 @@ async function moveOtherPlayersToStandardPositions(
   height,
   promises
 ) {
-  // ✅ Find the most recent MISS/MAKE turn to get get-back player list
-  // Only animate get-back players as defenders, not all players in defense list
+  // ✅ Find the most recent MISS/MAKE turn to get get-back and release player lists
   let getbackPlayerIds = [];
+  let releasePlayerIds = [];
   const currentIndex = scene.currentTurn || 0;
   const previousTurn = scene.simData?.turns?.[currentIndex - 1];
   const currentTurn = scene.simData?.turns?.[currentIndex];
   
   if (previousTurn?.result_type === "MISS" || previousTurn?.result_type === "MAKE") {
     getbackPlayerIds = previousTurn?.offense_getback || [];
+    releasePlayerIds = previousTurn?.defense_release || [];
   } else if (currentTurn?.result_type === "MISS" || currentTurn?.result_type === "MAKE") {
     getbackPlayerIds = currentTurn?.offense_getback || [];
+    releasePlayerIds = currentTurn?.defense_release || [];
   }
   
   const getbackPlayerIdsSet = new Set(getbackPlayerIds);
+  const releasePlayerIdsSet = new Set(releasePlayerIds);
   
-  // Determine which basket is being attacked
+  // ✅ Get outlet passer ID - they should NOT move at all
+  const outletPasserId = turnData.roles?.outlet_passer;
+  
+  // Determine which basket is being attacked and if this is a defensive stop or shot attempt
   const shooterSprite = playerSprites[ballHandlerId];
   const isHomeOffense = shooterSprite?.team === "home";
   const basket = isHomeOffense ? HOME_RIM_COORDS : AWAY_RIM_COORDS;
+  const isDefensiveStop = turnData.result_type === "DEFENSIVE_STOP";
+  
+  // Convert sprite positions to grid for starting y calculation
+  const pixelsToGrid = (pixelX, pixelY) => {
+    const gridX = (pixelX / width) * 100;
+    const gridY = 50 - (pixelY / height) * 50;
+    return { x: gridX, y: gridY };
+  };
   
   for (const [id, sprite] of Object.entries(playerSprites)) {
     // Skip shooter and primary defender (already animated)
     if (id === ballHandlerId || id === primaryDefenderId) {
+      continue;
+    }
+    
+    // ✅ Skip outlet passer - they stay at outlet pass spot (no movement)
+    if (id === outletPasserId) {
+      continue;
+    }
+    
+    // ✅ Skip release players (they're the ball handler, already animated)
+    if (releasePlayerIdsSet.has(id)) {
       continue;
     }
     
@@ -998,16 +1024,30 @@ async function moveOtherPlayersToStandardPositions(
         y: Phaser.Math.Between(15, 35)
       };
     } else {
-      // ✅ Other players: move to random x between 40-60 (horizontally symmetrical)
-      targetSpot = {
-        x: Phaser.Math.Between(40, 60),
-        y: Phaser.Math.Between(15, 35)
-      };
+      // ✅ This is a rebounder (stayed near rim for shot attempt)
+      // Get starting y coordinate from current sprite position
+      const startingGrid = pixelsToGrid(sprite.x, sprite.y);
+      const startingY = startingGrid.y;
+      
+      if (isDefensiveStop) {
+        // ✅ Defensive Stop: x=40-60, y=starting_y ± 6 (clamped 1-49)
+        targetSpot = {
+          x: Phaser.Math.Between(40, 60),
+          y: Phaser.Math.Clamp(startingY + Phaser.Math.Between(-6, 6), 1, 49)
+        };
+      } else {
+        // ✅ Shot Attempt: x=rim_x, y=rim_y ± 10 (clamped 1-49)
+        targetSpot = {
+          x: basket.x,
+          y: Phaser.Math.Clamp(basket.y + Phaser.Math.Between(-10, 10), 1, 49)
+        };
+      }
     }
     
     const targetPx = gridToPixels(targetSpot.x, targetSpot.y, width, height);
     // ✅ Use distance-based duration for consistent speed
     // Players will stop at their current position if shot happens before they reach their spot
+    // (Made shot: stops when ball hits rim; Missed shot: stops when rebounder grabs ball)
     const playerDuration = getPlayerDuration(sprite, targetPx.x, targetPx.y);
     promises.push(
       tweenPlayerTo(scene, sprite, targetPx, {
