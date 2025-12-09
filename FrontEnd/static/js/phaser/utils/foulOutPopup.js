@@ -24,13 +24,13 @@ export function showFoulOutPopup({ player, gameId, mode, quarter, clock, tournam
   // ✅ SS&S: Use unified navigation helper for consistent parameter building
   // Fallback: try to get team info from current URL if not provided
   const urlParams = new URLSearchParams(window.location.search);
-  if (!homeTeam) homeTeam = urlParams.get('home');
-  if (!awayTeam) awayTeam = urlParams.get('away');
-  if (!homeId) homeId = urlParams.get('home_id');
-  if (!awayId) awayId = urlParams.get('away_id');
-  if (!myTeamSide) myTeamSide = urlParams.get('my_team');
-  if (!userTeamId) userTeamId = urlParams.get('user_team_id');
-  
+    if (!homeTeam) homeTeam = urlParams.get('home');
+    if (!awayTeam) awayTeam = urlParams.get('away');
+    if (!homeId) homeId = urlParams.get('home_id');
+    if (!awayId) awayId = urlParams.get('away_id');
+    if (!myTeamSide) myTeamSide = urlParams.get('my_team');
+    if (!userTeamId) userTeamId = urlParams.get('user_team_id');
+    
   // Build params using unified helper
   // ✅ SS&S: Use global helper (works in both regular scripts and modules)
   const helper = window.TimeoutNavigationHelper;

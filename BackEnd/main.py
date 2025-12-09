@@ -35,6 +35,13 @@ from BackEnd.utils.shared import (
 from BackEnd.utils.energy_system import recharge_lineups
 
 
+def _init_game_stats_dict():
+    """Initialize game stats dict with all stats set to 0, except Outlet_Score which is an empty array."""
+    stats = {k: 0 for k in BOX_SCORE_KEYS}
+    stats["Outlet_Score"] = []  # Outlet_Score is an array, not an integer
+    return stats
+
+
 def _initialize_game_stats(gm: GameManager, game_id: str | None = None) -> None:
     """Reset per-game stats for all players and persist initial state.
 
@@ -102,7 +109,7 @@ def _initialize_game_stats(gm: GameManager, game_id: str | None = None) -> None:
                         "team": label,
                         "team_id": team.team_id,
                         "pos": pos,
-                        "stats": {k: 0 for k in BOX_SCORE_KEYS},
+                        "stats": self._init_game_stats_dict(),
                         "attributes": {
                             "EM": player.attributes.get("EM", 0),
                             "CH": player.attributes.get("CH", 0),

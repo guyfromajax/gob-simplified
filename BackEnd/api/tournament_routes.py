@@ -66,6 +66,7 @@ def start_tournament(request: StartTournamentRequest):
 
     # Reset all player stats for teams in this tournament
     zero_stats = {key: 0 for key in BOX_SCORE_KEYS}
+    zero_stats["Outlet_Score"] = []  # Outlet_Score is an array, not an integer
     for tid in team_ids:
         players_collection.update_many(
             {"team": tid},

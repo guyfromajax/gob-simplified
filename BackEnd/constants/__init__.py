@@ -13,7 +13,11 @@ ALL_ATTRS = [
 BOX_SCORE_KEYS = [
     "FGA", "FGM", "3PTA", "3PTM", "FTA", "FTM",
     "OREB", "DREB", "REB", "AST", "STL", "BLK", "TO", "F", "MIN", "PTS", "PIP", "FB_PTS",
-    "DEF_A", "DEF_S", "HELP_D", "SCR_A", "SCR_S"
+    "DEF_A", "DEF_S", "HELP_D", "SCR_A", "SCR_S",
+    # Fast Break stats
+    "Outlet_A", "Outlet_S", "Outlet_Score_Cum",
+    "FB_A", "FB_S", "FB_F", "FB_N",
+    "FB_A_D", "FB_S_D", "FB_F_D", "FB_S_N"
 ]
 
 
