@@ -8,9 +8,15 @@
 
 ## Executive Summary
 
-The Fast Break system is **well-structured** with clear separation of concerns between backend logic and frontend animation. The coordinate system is consistent (HOME orientation), and the defensive stop vs. shot determination logic is sound. However, there are opportunities to reduce duplication and improve maintainability.
+The Fast Break system is **well-structured** with clear separation of concerns between backend logic and frontend animation. The coordinate system is consistent (HOME orientation), and the defensive stop vs. shot determination logic is sound. A critical bug was recently fixed where get-back defenders weren't being checked for defensive stops. However, there are still opportunities to reduce duplication and improve maintainability.
 
 **Overall Grade:** **B+** (Good, with room for improvement)
+
+**Recent Fix (January 2025):**
+- ✅ Fixed critical bug where get-back defenders weren't checked for defensive stops
+- Issue: `get_in_play_defenders()` used stale `ball_handler.coords`, excluding get-back players
+- Fix: Now checks all defenders in `def_lineup` when determining defensive stops
+- Result: Get-back players who are ahead are now correctly detected
 
 ---
 
@@ -39,6 +45,7 @@ The Fast Break system is **well-structured** with clear separation of concerns b
    - Simple comparison: Is any defender ahead of ball handler?
    - Clear logic for both home and away offense
    - Well-commented with examples
+   - ✅ **Fixed (Jan 2025)**: Now checks all defenders, not just those in `fb_roles["defense"]`
 
 ### Areas for Improvement
 
@@ -73,6 +80,13 @@ The Fast Break system is **well-structured** with clear separation of concerns b
    - Coordinate lookup has clear fallback chain
    - Prevents crashes if coordinates are missing
    - Logs warnings when fallback is used
+
+4. **✅ Fixed Critical Bug: Defender Checking**
+   - **Previous Issue**: Only checked defenders in `fb_roles["defense"]` (filtered by stale `ball_handler.coords`)
+   - **Problem**: Get-back players who were ahead weren't detected
+   - **Fix**: Now checks all defenders in `def_lineup` when determining defensive stops
+   - **Result**: Get-back players correctly trigger defensive stops
+   - **Status**: ✅ Resolved (January 2025)
 
 ### Areas for Improvement
 
@@ -222,12 +236,15 @@ The Fast Break system is **well-structured** with clear separation of concerns b
 
 ## Conclusion
 
-The Fast Break system is **well-designed** with clear separation of concerns and consistent coordinate handling. The main sustainability issue is **duplicate coordinate calculation logic** between frontend and backend. Removing the frontend calculation and always using backend coordinates would significantly improve maintainability.
+The Fast Break system is **well-designed** with clear separation of concerns and consistent coordinate handling. A critical bug was recently fixed where get-back defenders weren't being checked for defensive stops. The main remaining sustainability issue is **duplicate coordinate calculation logic** between frontend and backend. Removing the frontend calculation and always using backend coordinates would significantly improve maintainability.
+
+**Recent Fixes:**
+- ✅ Fixed defender checking bug (all defenders now checked, not just `fb_roles["defense"]`)
 
 **Priority Actions:**
 1. Remove frontend coordinate calculation (always use backend)
 2. Extract movement ranges to constants
 3. Extract turn history lookup to helper function
 
-**Overall Assessment:** **B+** - Good foundation, minor improvements needed for long-term sustainability.
+**Overall Assessment:** **B+** - Good foundation, critical bug fixed, minor improvements needed for long-term sustainability.
 
