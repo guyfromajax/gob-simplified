@@ -474,12 +474,12 @@ def resolve_fast_break_logic(game: "GameManager"):
         direction = 1
         basket_x = 90
     
-    # Simulate ball handler position after outlet pass (2-4 x spots, ±6 y)
-    # Reduced from 5-10 to 2-4 to match frontend and prevent outlet receiver from gaining too much advantage
-    ball_handler_move_x = random.randint(2, 4)
-    ball_handler_move_y = random.randint(-6, 6)
-    ball_handler_outlet_x = max(4, min(97, ball_handler_start_x + direction * ball_handler_move_x))
-    ball_handler_outlet_y = max(1, min(49, ball_handler_start_y + ball_handler_move_y))
+    # Simulate ball handler position after outlet pass (NO MOVEMENT - receives pass at starting position)
+    # Ball handler will only move during defensive stop/shot attempt step
+    ball_handler_move_x = 0
+    ball_handler_move_y = 0
+    ball_handler_outlet_x = ball_handler_start_x  # No movement during outlet pass
+    ball_handler_outlet_y = ball_handler_start_y  # No movement during outlet pass
     
     # ✅ DEBUG: Log outlet position calculation
     logging.warning(f"🏀 [FAST BREAK PHASE DEBUG] Outlet position calculation:")
@@ -570,12 +570,12 @@ def resolve_fast_break_logic(game: "GameManager"):
             defender_actual_y = getattr(defender, "coords", {}).get("y", 25)
             logging.warning(f"🏀 [FAST BREAK PHASE DEBUG] ⚠️ Using defender.coords (fallback) for defender {defender_id}: {defender_actual_x}, {defender_actual_y}")
         
-        # ✅ Simulate defender movement during outlet step (2-4 x spots toward basket, same as outlet receiver)
-        # This matches frontend behavior where defenders move 2-4 spots during outlet pass
-        defender_move_x = random.randint(2, 4)
-        defender_move_y = random.randint(-6, 6)
-        defender_outlet_x = max(4, min(97, defender_actual_x + direction * defender_move_x))
-        defender_outlet_y = max(1, min(49, defender_actual_y + defender_move_y))
+        # ✅ Defender position after outlet step (NO MOVEMENT - same as ball handler)
+        # Defenders stay at their starting position during outlet pass, only move during defensive stop/shot attempt
+        defender_move_x = 0
+        defender_move_y = 0
+        defender_outlet_x = defender_actual_x  # No movement during outlet pass
+        defender_outlet_y = defender_actual_y  # No movement during outlet pass
         
         # Store defender outlet position for animation
         if not hasattr(defender, "outlet_coords"):
