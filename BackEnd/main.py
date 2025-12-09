@@ -109,7 +109,7 @@ def _initialize_game_stats(gm: GameManager, game_id: str | None = None) -> None:
                         "team": label,
                         "team_id": team.team_id,
                         "pos": pos,
-                        "stats": self._init_game_stats_dict(),
+                        "stats": _init_game_stats_dict(),
                         "attributes": {
                             "EM": player.attributes.get("EM", 0),
                             "CH": player.attributes.get("CH", 0),
