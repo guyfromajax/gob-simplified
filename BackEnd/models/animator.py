@@ -286,14 +286,22 @@ class Animator:
                 build_movement(shot_defender, defender_end, action=ACTIONS["GUARD_BALL"])
                 animated_player_ids.add(getattr(shot_defender, "player_id", None))
             
-            # Other in-play defenders position between key and rim
+            # ✅ Only animate get-back players as defenders (not all players in defense list)
+            getback_player_ids = fb_roles.get("getback_player_ids", [])
+            getback_player_ids_set = set(getback_player_ids) if getback_player_ids else set()
+            
+            # Other get-back defenders position between key and rim
             for d in defenders:
                 if d is shot_defender:
                     continue
-                build_movement(d, between_key_and_rim(), action=ACTIONS["GUARD_OFFBALL"])
-                animated_player_ids.add(getattr(d, "player_id", None))
+                player_id = getattr(d, "player_id", None)
+                # Only animate if this defender was a get-back player in the most recent shot attempt
+                if player_id and player_id in getback_player_ids_set:
+                    build_movement(d, between_key_and_rim(), action=ACTIONS["GUARD_OFFBALL"])
+                    animated_player_ids.add(player_id)
         
-        # Animate non-involved players to half court
+        # ✅ Animate non-involved players to random x between 40-60 (horizontally symmetrical)
+        # Use distance-based animation so they stop if shot happens before they reach their spot
         # Get all players from both teams
         all_offensive_players = list(offense_team.lineup.values())
         all_defensive_players = list(defense_team.lineup.values())
@@ -301,8 +309,12 @@ class Animator:
         for player in all_offensive_players + all_defensive_players:
             player_id = getattr(player, "player_id", None)
             if player_id and player_id not in animated_player_ids:
-                # Move to random half court spot
-                build_movement(player, half_court_spot(), has_ball=False, action=ACTIONS["DRIFT"])
+                # Move to random x between 40-60, random y between 15-35
+                random_spot = {
+                    "x": random.randint(40, 60),
+                    "y": random.randint(15, 35)
+                }
+                build_movement(player, random_spot, has_ball=False, action=ACTIONS["DRIFT"])
         self._log_step_timestamps(animations)
         self.latest_packet = animations
         logging.debug(
