@@ -312,7 +312,9 @@ function combinePlayersAndBoxScore(rosterPlayers, boxScore, teamName) {
         // Filter out non-stat properties (name, jersey, etc.)
         const statKeys = ['FGM', 'FGA', '3PTM', '3PTA', 'FTM', 'FTA', 'OREB', 'DREB', 'REB', 
                          'AST', 'STL', 'BLK', 'TO', 'F', 'MIN', 'PTS', 'PIP', 'FB_PTS',
-                         'DEF_A', 'DEF_S', 'HELP_D', 'SCR_A', 'SCR_S'];
+                         'DEF_A', 'DEF_S', 'HELP_D', 'SCR_A', 'SCR_S',
+                         'FB_A', 'FB_S', 'FB_F', 'FB_N', 'FB_A_D', 'FB_S_D', 'FB_F_D',
+                         'Outlet_A', 'Outlet_S', 'Outlet_Score', 'Outlet_Score_List', 'Outlet_Score_Cum'];
         const boxStats = {};
         statKeys.forEach(key => {
           if (playerData[key] !== undefined) {
@@ -328,7 +330,9 @@ function combinePlayersAndBoxScore(rosterPlayers, boxScore, teamName) {
         // New player from box_score (bench player)
         const statKeys = ['FGM', 'FGA', '3PTM', '3PTA', 'FTM', 'FTA', 'OREB', 'DREB', 'REB', 
                          'AST', 'STL', 'BLK', 'TO', 'F', 'MIN', 'PTS', 'PIP', 'FB_PTS',
-                         'DEF_A', 'DEF_S', 'HELP_D', 'SCR_A', 'SCR_S'];
+                         'DEF_A', 'DEF_S', 'HELP_D', 'SCR_A', 'SCR_S',
+                         'FB_A', 'FB_S', 'FB_F', 'FB_N', 'FB_A_D', 'FB_S_D', 'FB_F_D',
+                         'Outlet_A', 'Outlet_S', 'Outlet_Score', 'Outlet_Score_List', 'Outlet_Score_Cum'];
         const boxStats = {};
         statKeys.forEach(key => {
           if (playerData[key] !== undefined) {
@@ -419,26 +423,35 @@ function renderPlayerStatsTable(team, players) {
       // Convert to string and display if we have a valid jersey (including 0)
       const jerseyDisplay = (jerseyNum !== null && jerseyNum !== undefined) ? ` (#${String(jerseyNum)})` : '';
 
-      row.innerHTML = `
-        <td>${name}${jerseyDisplay}</td>
-        <td>${stats.PTS || 0}</td>
-        <td>${stats.FGM || 0}/${stats.FGA || 0}</td>
-        <td>${stats['3PTM'] || 0}/${stats['3PTA'] || 0}</td>
-        <td>${stats.FTM || 0}/${stats.FTA || 0}</td>
-        <td>${stats.DREB || 0}</td>
-        <td>${stats.OREB || 0}</td>
-        <td>${treb}</td>
-        <td>${stats.AST || 0}</td>
-        <td>${stats.STL || 0}</td>
-        <td>${stats.BLK || 0}</td>
-        <td>${stats.F || 0}</td>
-        <td>${stats.TO || 0}</td>
-        <td>${defa}</td>
-        <td>${defPct}%</td>
-        <td>${scra}</td>
-        <td>${scrPct}%</td>
-        <td>${min}</td>
-      `;
+      // Build row with clickable player name
+      const nameCell = document.createElement('td');
+      const nameLink = document.createElement('span');
+      nameLink.className = 'player-name-link';
+      nameLink.textContent = `${name}${jerseyDisplay}`;
+      nameLink.style.cursor = 'pointer';
+      nameLink.style.color = '#0066cc';
+      nameLink.style.textDecoration = 'underline';
+      nameLink.addEventListener('click', () => showFastBreakPopup(player));
+      nameCell.appendChild(nameLink);
+      
+      row.appendChild(nameCell);
+      row.appendChild(createTableCell(stats.PTS || 0));
+      row.appendChild(createTableCell(`${stats.FGM || 0}/${stats.FGA || 0}`));
+      row.appendChild(createTableCell(`${stats['3PTM'] || 0}/${stats['3PTA'] || 0}`));
+      row.appendChild(createTableCell(`${stats.FTM || 0}/${stats.FTA || 0}`));
+      row.appendChild(createTableCell(stats.DREB || 0));
+      row.appendChild(createTableCell(stats.OREB || 0));
+      row.appendChild(createTableCell(treb));
+      row.appendChild(createTableCell(stats.AST || 0));
+      row.appendChild(createTableCell(stats.STL || 0));
+      row.appendChild(createTableCell(stats.BLK || 0));
+      row.appendChild(createTableCell(stats.F || 0));
+      row.appendChild(createTableCell(stats.TO || 0));
+      row.appendChild(createTableCell(defa));
+      row.appendChild(createTableCell(`${defPct}%`));
+      row.appendChild(createTableCell(scra));
+      row.appendChild(createTableCell(`${scrPct}%`));
+      row.appendChild(createTableCell(min));
     } else {
       // Empty row
       row.innerHTML = `
@@ -474,6 +487,13 @@ function formatMinutes(seconds) {
   const secs = seconds % 60;
   if (secs === 0) return mins.toString();
   return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
+// Helper function to create table cell
+function createTableCell(text) {
+  const td = document.createElement('td');
+  td.textContent = text;
+  return td;
 }
 
 // Render team stats
@@ -1109,5 +1129,88 @@ function setupLockerRoomButton() {
   button.addEventListener('click', () => {
     window.location.href = lockerRoomUrl;
   });
+}
+
+// Show Fast Break stats popup
+function showFastBreakPopup(player) {
+  const stats = player.stats || {};
+  const playerName = player.name || 'Unknown';
+  
+  // Calculate Fast Break stats
+  const fbA = stats.FB_A || 0;
+  const fbS = stats.FB_S || 0;
+  const fbF = stats.FB_F || 0;
+  const fbN = fbA - (fbS + fbF); // Calculated
+  
+  const fbAD = stats.FB_A_D || 0;
+  const fbSD = stats.FB_S_D || 0;
+  const fbFD = stats.FB_F_D || 0;
+  
+  // Calculate success rates
+  const offenseSuccessRate = fbA > 0 ? ((fbS / fbA) * 100).toFixed(0) : '0';
+  const defenseSuccessRate = fbAD > 0 ? ((fbSD / fbAD) * 100).toFixed(0) : '0';
+  
+  // Calculate outlet pass stats
+  const outletA = stats.Outlet_A || 0;
+  const outletScoreList = stats.Outlet_Score_List || [];
+  const outletScore = outletA > 0 && outletScoreList.length > 0
+    ? (outletScoreList.reduce((a, b) => a + b, 0) / outletScoreList.length).toFixed(0)
+    : '0';
+  
+  // Create popup HTML
+  const popup = document.createElement('div');
+  popup.id = 'fast-break-popup';
+  popup.className = 'fast-break-popup';
+  popup.innerHTML = `
+    <div class="fast-break-popup-content">
+      <div class="fast-break-popup-header">
+        <h2>${playerName} - Fast Break Stats</h2>
+        <button class="fast-break-popup-close" onclick="closeFastBreakPopup()">&times;</button>
+      </div>
+      <div class="fast-break-popup-body">
+        <div class="fast-break-column">
+          <div class="fast-break-row">
+            <h3>Fast Breaks</h3>
+          </div>
+          <div class="fast-break-row">
+            <span class="fast-break-label">Offense:</span>
+            <span class="fast-break-value">${fbA} / ${offenseSuccessRate}%</span>
+          </div>
+          <div class="fast-break-row">
+            <span class="fast-break-label">Defense:</span>
+            <span class="fast-break-value">${fbAD} / ${defenseSuccessRate}%</span>
+          </div>
+          <div class="fast-break-row empty-row"></div>
+          <div class="fast-break-row">
+            <h3>Outlet Passes</h3>
+          </div>
+          <div class="fast-break-row">
+            <span class="fast-break-label">Att / Score:</span>
+            <span class="fast-break-value">${outletA} / ${outletScore}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="fast-break-popup-overlay" onclick="closeFastBreakPopup()"></div>
+  `;
+  
+  document.body.appendChild(popup);
+  
+  // Close on Escape key
+  const escapeHandler = (e) => {
+    if (e.key === 'Escape') {
+      closeFastBreakPopup();
+      document.removeEventListener('keydown', escapeHandler);
+    }
+  };
+  document.addEventListener('keydown', escapeHandler);
+}
+
+// Close Fast Break popup
+function closeFastBreakPopup() {
+  const popup = document.getElementById('fast-break-popup');
+  if (popup) {
+    popup.remove();
+  }
 }
 
