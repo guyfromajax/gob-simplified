@@ -90,6 +90,26 @@ def check_and_handle_foul_out(foul_player, game_state, foul_team):
         "foul_player_team": foul_team.name if fouled_out else None
     }
 
+def _find_most_recent_shot_turn(game, max_turns=10):
+    """
+    Find the most recent MISS or MAKE turn.
+    
+    Args:
+        game: Game object with turns list
+        max_turns: Maximum number of turns to check (default: 10)
+    
+    Returns:
+        dict: Most recent MISS/MAKE turn, or None if not found
+    """
+    if not game.turns or len(game.turns) == 0:
+        return None
+    
+    for turn in reversed(game.turns[-max_turns:]):
+        if turn.get("result_type") in ["MISS", "MAKE"]:
+            return turn
+    
+    return None
+
 def get_ball_handler_from_skeleton(skeleton, off_lineup, step_index=None):
     """
     Determine the ball handler from skeleton steps.
@@ -440,27 +460,25 @@ def resolve_fast_break_logic(game: "GameManager"):
     
     ball_handler_id = getattr(ball_handler, "player_id", None)
     logging.warning(f"🏀 [FAST BREAK PHASE DEBUG] Looking for coordinates for ball_handler_id: {ball_handler_id}")
-    if game.turns and len(game.turns) > 0:
-        # Look for the most recent MISS or MAKE turn with release/get-back coordinates
-        for turn in reversed(game.turns[-10:]):  # Check last 10 turns (should be enough)
-            if turn.get("result_type") in ["MISS", "MAKE"]:
-                # FIRST: Check if ball handler is a release player (outlet receiver is typically a release player)
-                release_coords = turn.get("defense_release_coords", {})
-                if release_coords and ball_handler_id and ball_handler_id in release_coords:
-                    stored_coords = release_coords[ball_handler_id]
-                    ball_handler_start_x = stored_coords.get("x")
-                    ball_handler_start_y = stored_coords.get("y")
-                    logging.warning(f"🏀 [FAST BREAK PHASE DEBUG] ✅ Using release coords for ball handler: {ball_handler_start_x}, {ball_handler_start_y}")
-                    break
-                
-                # SECOND: Check if ball handler is a get-back player
-                getback_coords = turn.get("offense_getback_coords", {})
-                if getback_coords and ball_handler_id and ball_handler_id in getback_coords:
-                    stored_coords = getback_coords[ball_handler_id]
-                    ball_handler_start_x = stored_coords.get("x")
-                    ball_handler_start_y = stored_coords.get("y")
-                    logging.warning(f"🏀 [FAST BREAK PHASE DEBUG] ✅ Using get-back coords for ball handler: {ball_handler_start_x}, {ball_handler_start_y}")
-                    break
+    
+    # ✅ SS&S: Use helper function to find most recent shot turn
+    most_recent_shot_turn = _find_most_recent_shot_turn(game, max_turns=10)
+    if most_recent_shot_turn:
+        # FIRST: Check if ball handler is a release player (outlet receiver is typically a release player)
+        release_coords = most_recent_shot_turn.get("defense_release_coords", {})
+        if release_coords and ball_handler_id and ball_handler_id in release_coords:
+            stored_coords = release_coords[ball_handler_id]
+            ball_handler_start_x = stored_coords.get("x")
+            ball_handler_start_y = stored_coords.get("y")
+            logging.warning(f"🏀 [FAST BREAK PHASE DEBUG] ✅ Using release coords for ball handler: {ball_handler_start_x}, {ball_handler_start_y}")
+        else:
+            # SECOND: Check if ball handler is a get-back player
+            getback_coords = most_recent_shot_turn.get("offense_getback_coords", {})
+            if getback_coords and ball_handler_id and ball_handler_id in getback_coords:
+                stored_coords = getback_coords[ball_handler_id]
+                ball_handler_start_x = stored_coords.get("x")
+                ball_handler_start_y = stored_coords.get("y")
+                logging.warning(f"🏀 [FAST BREAK PHASE DEBUG] ✅ Using get-back coords for ball handler: {ball_handler_start_x}, {ball_handler_start_y}")
     
     # FALLBACK: Use player.coords if not a release/get-back player or coords not found
     if ball_handler_start_x is None or ball_handler_start_y is None:
@@ -522,14 +540,11 @@ def resolve_fast_break_logic(game: "GameManager"):
     
     # ✅ Find the most recent MISS/MAKE turn (the one that triggered this fast break)
     # Only use get-back coords from THIS turn, not from previous turns
-    most_recent_shot_turn = None
+    # ✅ SS&S: Use helper function to find most recent shot turn
+    most_recent_shot_turn = _find_most_recent_shot_turn(game, max_turns=10)
     getback_player_ids = []
-    if game.turns and len(game.turns) > 0:
-        for turn in reversed(game.turns[-10:]):  # Check last 10 turns
-            if turn.get("result_type") in ["MISS", "MAKE"]:
-                most_recent_shot_turn = turn
-                getback_player_ids = turn.get("offense_getback", [])
-                break
+    if most_recent_shot_turn:
+        getback_player_ids = most_recent_shot_turn.get("offense_getback", [])
     
     # ✅ Store get-back player IDs in fb_roles for animator to use
     fb_roles["getback_player_ids"] = getback_player_ids
