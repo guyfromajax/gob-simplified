@@ -1351,20 +1351,18 @@ async function moveOtherPlayersToStandardPositions(
       continue;
     }
     
-    let targetSpot;
-    
     // ✅ Only animate get-back players as defenders (not all players in defense list)
+    // Rebounders are handled separately by animateRebounders() function
     if (getbackPlayerIdsSet.has(id)) {
       // Get-back defenders chase: X between 50 and 15 spots closer to basket
       const minX = isHomeOffense ? 50 : basket.x + 2;
       const maxX = isHomeOffense ? basket.x - 2 : 50;
       
-      targetSpot = {
+      const targetSpot = {
         x: Phaser.Math.Between(Math.min(minX, maxX), Math.max(minX, maxX)),
         y: Phaser.Math.Between(15, 35)
       };
-    } else {
-      // Get-back players use standard tweenPlayerTo (no early termination needed)
+      
       const targetPx = gridToPixels(targetSpot.x, targetSpot.y, width, height);
       const playerDuration = getPlayerDuration(sprite, targetPx.x, targetPx.y);
       
@@ -1375,6 +1373,7 @@ async function moveOtherPlayersToStandardPositions(
         })
       );
     }
+    // Note: Rebounders are handled by animateRebounders() function (called after this loop)
   }
   
   // ✅ Animate rebounders using extracted function
