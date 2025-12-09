@@ -478,6 +478,12 @@ Result: DEFENSIVE_STOP (defender at x=57 is ahead AND within y-range, distance: 
 - The closest defender overall (by Euclidean distance from outlet receiver) becomes the shot defender
 - This ensures there's always a defender to animate during shot attempts
 
+**Critical Implementation Detail - Defender Assignment Consistency:**
+- **Backend Calculation**: In `phase_resolution.py`, `fb_roles["defender"]` is set to `closest_defender_overall` for shot attempts (line 730)
+- **Shot Resolution**: `resolve_fast_break_shot()` in `shot_manager.py` now **respects** the already-set `fb_roles["defender"]` instead of randomly reassigning it
+- **Why This Matters**: The defender used in shot resolution must match the defender used in animation to prevent animation freezes or mismatches
+- **Implementation**: `resolve_fast_break_shot()` checks if `fb_roles["defender"]` is already set; if so, uses it. Only falls back to random assignment if not set (for edge cases)
+
 **Critical Implementation Detail:**
 - **All defenders checked**: The system checks **all defenders in `def_lineup`**, not just those initially in `fb_roles["defense"]`
 - **Why**: `get_in_play_defenders()` (called earlier) uses stale `ball_handler.coords` to filter defenders, which might exclude get-back players who are actually ahead of the outlet receiver position

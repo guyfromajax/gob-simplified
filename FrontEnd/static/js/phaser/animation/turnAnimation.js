@@ -1241,8 +1241,15 @@ async function runInboundSetup({
         sprite.team_id === scoringTeamId ||
         (!scoringTeamId && sprite.team === scoringTeamKey)
       ) {
+        // Base x-coord for midcourt retreat (uniform for all defensive players)
+        const baseX = isAwayOffense ? 45 : 55;
+        // Randomize x-coord by ±10 from base for more organic feel
+        const xOffset = Phaser.Math.Between(-10, 10);
+        const targetXGrid = baseX + xOffset;
+        // Clamp to valid court bounds (1-99)
+        const clampedXGrid = Phaser.Math.Clamp(targetXGrid, 1, 99);
         const targetX = gridToPixels(
-          isAwayOffense ? 45 : 55,
+          clampedXGrid,
           25,
           width,
           height
