@@ -1167,9 +1167,16 @@ async function moveOtherPlayersToStandardPositions(
           y: Phaser.Math.Clamp(startingY + Phaser.Math.Between(-6, 6), 1, 49)
         };
       } else {
-        // ✅ Shot Attempt: x=rim_x, y=rim_y ± 10 (clamped 1-49)
+        // ✅ Shot Attempt: x=random 5-20 spots out from basket, y=rim_y ± 10 (clamped 1-49)
+        // Home basket (x=91): 5-20 spots less = 71-86
+        // Away basket (x=9): 5-20 spots more = 14-29
+        const distanceFromBasket = Phaser.Math.Between(5, 20);
+        const targetX = isHomeOffense 
+          ? basket.x - distanceFromBasket  // Home: move left (toward center court)
+          : basket.x + distanceFromBasket;  // Away: move right (toward center court)
+        
         targetSpot = {
-          x: basket.x,
+          x: Phaser.Math.Clamp(targetX, 4, 97), // Clamp to court bounds
           y: Phaser.Math.Clamp(basket.y + Phaser.Math.Between(-10, 10), 1, 49)
         };
       }
