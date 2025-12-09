@@ -1138,12 +1138,19 @@ function showFastBreakPopup(player) {
   const stats = player.stats || {};
   const playerName = player.name || 'Unknown';
   
-  // Get jersey number (check multiple possible fields)
+  // Get jersey number (use same logic as table rendering)
+  const jersey = player.jersey || '';
+  
+  // Format jersey number - check multiple possible fields and handle 0 as valid jersey number
+  // Jersey can be a number (including 0) or string
   let jerseyNum = null;
-  if (typeof player.jersey === 'number') {
-    jerseyNum = player.jersey;
-  } else if (player.jersey !== undefined && player.jersey !== null && player.jersey !== '') {
-    jerseyNum = player.jersey;
+  // Check in order: jersey, jerseyNumber, jersey_number
+  // Allow 0 as a valid jersey number, only exclude undefined/null/empty string
+  if (typeof jersey === 'number') {
+    // Handle jersey as number (including 0)
+    jerseyNum = jersey;
+  } else if (jersey !== undefined && jersey !== null && jersey !== '') {
+    jerseyNum = jersey;
   } else if (typeof player.jerseyNumber === 'number') {
     jerseyNum = player.jerseyNumber;
   } else if (player.jerseyNumber !== undefined && player.jerseyNumber !== null && player.jerseyNumber !== '') {
@@ -1154,6 +1161,7 @@ function showFastBreakPopup(player) {
     jerseyNum = player.jersey_number;
   }
   
+  // Convert to string and display if we have a valid jersey (including 0)
   const jerseyDisplay = (jerseyNum !== null && jerseyNum !== undefined) ? ` | #${String(jerseyNum)}` : '';
   
   // Calculate Fast Break stats
