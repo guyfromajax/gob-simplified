@@ -371,7 +371,8 @@ class ShotManager:
         )
         
         # Get names for debug logging
-        release_player = def_team.lineup.get(release_pos) if defense_releases else None
+        release_pos = defense_release_list[0] if defense_release_list else None
+        release_player = def_team.lineup.get(release_pos) if release_pos else None
         release_player_name = get_name_safe(release_player) if release_player else "NONE"
         
         # Determine offensive players getting back on defense
