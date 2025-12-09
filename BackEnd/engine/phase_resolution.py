@@ -942,6 +942,11 @@ def resolve_fast_break_logic(game: "GameManager"):
             result["hold_up"] = True
             result["stopper_id"] = stopper_id
         
+        # ==================== FAST BREAK STAT TRACKING ====================
+        # Record Fast Break stats for release player (offensive) and get-back players (defensive)
+        _record_fast_break_stats(fb_roles, result, game)
+        # ==================== END FAST BREAK STAT TRACKING ====================
+        
         return result
 
     #get shooter and passer (if applicable)
