@@ -555,11 +555,24 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
     });
   } else {
     // Miss - handle rebound
+    console.log('🏀 [FAST BREAK MISS] Starting rebound sequence', {
+      turnDataKeys: Object.keys(turnData),
+      hasRebounderId: !!turnData.rebounderId,
+      hasRebounderPlayerId: !!turnData.rebounder_player_id,
+      rebounderId: turnData.rebounderId,
+      rebounder_player_id: turnData.rebounder_player_id,
+      rebound_type: turnData.rebound_type,
+      result_type: turnData.result_type
+    });
+    
     appendToTextScroll("Missed!");
     safeTransition(scene.stateMachine, States.Rebound);
+    console.log('🏀 [FAST BREAK MISS] State transitioned to Rebound');
     
     const { bounceFromRim, animateRebound } = await import('./ballManager.js');
+    console.log('🏀 [FAST BREAK MISS] About to call bounceFromRim');
     const miss = await bounceFromRim(scene, ballSprite, basket, isHomeOffense, 300);
+    console.log('🏀 [FAST BREAK MISS] bounceFromRim completed', { miss: miss?.grid });
     
     // Find the original MISS turn that led to this Fast Break
     // The current turnData is the FAST_BREAK turn, but we need the original MISS turn
@@ -569,27 +582,51 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
     const previousTurn = scene.simData?.turns?.[currentIndex - 1];
     const currentTurn = scene.simData?.turns?.[currentIndex];
     
+    console.log('🏀 [FAST BREAK MISS] Looking for original MISS turn', {
+      currentIndex,
+      previousTurnType: previousTurn?.result_type,
+      currentTurnType: currentTurn?.result_type
+    });
+    
     // Check previous turn first (the MISS that led to this Fast Break)
     if (previousTurn?.result_type === "MISS") {
       missTurn = previousTurn;
+      console.log('🏀 [FAST BREAK MISS] Found MISS turn in previousTurn');
     } else if (currentTurn?.result_type === "MISS") {
       missTurn = currentTurn;
+      console.log('🏀 [FAST BREAK MISS] Found MISS turn in currentTurn');
+    } else {
+      console.warn('🏀 [FAST BREAK MISS] ⚠️ No MISS turn found in previous or current turn');
     }
     
     // ✅ Get rebounderId - must be present for rebound animation
     const rebounderId = turnData.rebounderId || turnData.rebounder_player_id;
     
+    console.log('🏀 [FAST BREAK MISS] Checking rebounderId', {
+      rebounderId,
+      fromRebounderId: turnData.rebounderId,
+      fromRebounderPlayerId: turnData.rebounder_player_id,
+      exists: !!rebounderId
+    });
+    
     if (!rebounderId) {
       console.error('⚠️ [FAST BREAK MISS] Missing rebounderId in turnData, cannot animate rebound', {
         turnDataKeys: Object.keys(turnData),
         hasRebounderId: !!turnData.rebounderId,
-        hasRebounderPlayerId: !!turnData.rebounder_player_id
+        hasRebounderPlayerId: !!turnData.rebounder_player_id,
+        fullTurnData: turnData
       });
       // Return early - rebound will be handled by next turn
       return;
     }
     
     const rebounderSprite = playerSprites[rebounderId];
+    
+    console.log('🏀 [FAST BREAK MISS] Checking rebounder sprite', {
+      rebounderId,
+      spriteExists: !!rebounderSprite,
+      availableSprites: Object.keys(playerSprites)
+    });
     
     if (!rebounderSprite) {
       console.error('⚠️ [FAST BREAK MISS] Rebounder sprite not found', {
@@ -602,6 +639,10 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
     
     // ✅ Stop rebounder animations when rebounder grabs ball (missed shot)
     // Monitor rebounder position and stop tweens when rebounder gets close to ball bounce spot
+    console.log('🏀 [FAST BREAK MISS] Setting up rebounder animation monitoring', {
+      rebounderTweensCount: rebounderTweens.length
+    });
+    
     if (rebounderTweens.length > 0) {
       let monitoringActive = true;
       const ballBouncePx = gridToPixels(miss.grid.x, miss.grid.y, width, height);
@@ -617,6 +658,7 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
         // If rebounder is within 30 pixels of ball bounce spot, stop all rebounder animations
         if (distanceToBall < 30) {
           monitoringActive = false;
+          console.log('🏀 [FAST BREAK MISS] Rebounder reached ball, stopping rebounder tweens');
           rebounderTweens.forEach(tween => {
             if (tween && tween.isPlaying && scene.tweens) {
               scene.tweens.killTweensOf(tween.targets);
@@ -637,6 +679,13 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
       scene.time.delayedCall(100, checkRebounderReached);
     }
     
+    console.log('🏀 [FAST BREAK MISS] About to call animateRebound', {
+      rebounderId,
+      ballSpot: miss.grid,
+      shooterId,
+      hasMissTurn: !!missTurn
+    });
+    
     await animateRebound({
       scene,
       ballSprite,
@@ -648,8 +697,16 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
       turnData: missTurn // Pass the original MISS turn so get-back players can be excluded
     });
     
+    console.log('🏀 [FAST BREAK MISS] animateRebound completed');
+    
     // Defensive rebound setup if needed
+    console.log('🏀 [FAST BREAK MISS] Checking rebound_type', {
+      rebound_type: turnData.rebound_type,
+      next_play_type: turnData.next_play_type
+    });
+    
     if (turnData.rebound_type === "DREB") {
+      console.log('🏀 [FAST BREAK MISS] About to call runDefensiveReboundSetup');
       const { runDefensiveReboundSetup } = await import('./turnAnimation.js');
       await runDefensiveReboundSetup({
         scene,
@@ -659,7 +716,12 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
         nextPlayType: turnData.next_play_type || "HCO", // Use turnData.next_play_type instead of hardcoded "HCO"
         turnData: missTurn // Pass the original MISS turn so we can get offense_getback list
       });
+      console.log('🏀 [FAST BREAK MISS] runDefensiveReboundSetup completed');
+    } else {
+      console.log('🏀 [FAST BREAK MISS] Not a DREB, skipping runDefensiveReboundSetup');
     }
+    
+    console.log('🏀 [FAST BREAK MISS] Rebound sequence completed');
   }
 }
 
