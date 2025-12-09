@@ -367,6 +367,30 @@ def get_player_by_pos(pos, offense_lineup, defense_lineup):
 def get_quarter_index_from_game(game):
     return game.game_state["quarter"] - 1
 
+def scale_score_to_100(raw_score):
+    """
+    Universal helper function to scale raw scores to 1-100 range where midpoint = 50.
+    
+    Assumes consistent pattern:
+    - Attributes range: 1-100 (midpoint = 50)
+    - Die roll: 1-6 (midpoint = 3.5)
+    - Attribute weights sum to 1.0
+    - Raw midpoint: 50 * 3.5 = 175
+    - Raw range: 1 (min) to 600 (max)
+    
+    Scaling formula: ((raw - 175) / 425) * 50 + 50
+    - Maps raw 175 → scaled 50 (midpoint)
+    - Maps raw 1 → scaled ~29.5 (minimum)
+    - Maps raw 600 → scaled 100 (maximum)
+    
+    Args:
+        raw_score: Raw score value (typically 1-600)
+    
+    Returns:
+        int: Scaled score (1-100, with midpoint = 50)
+    """
+    return int(round(((raw_score - 175) / 425) * 50 + 50))
+
 def calculate_rebound_score(player):
     attr = player.attributes
     return (attr["RB"] * 0.5 + attr["ST"] * 0.3 + attr["IQ"] * 0.2) * random.randint(1, 6)
@@ -397,11 +421,8 @@ def calculate_outlet_pass_score(outlet_passer):
     # Calculate raw score
     raw_score = (attr["PS"] * 0.6 + attr["ST"] * 0.2 + attr["IQ"] * 0.2) * random.randint(1, 6)
     
-    # Scale to 1-100 where midpoint (175) = 50
-    # Formula: ((raw - 175) / (600 - 175)) * 50 + 50
-    scaled_score = ((raw_score - 175) / 425) * 50 + 50
-    
-    return int(round(scaled_score))
+    # Scale to 1-100 using universal scaling function
+    return scale_score_to_100(raw_score)
 
 def apply_scoring(game, team, player, points, stats):
     """Record player scoring stats and update team points.
