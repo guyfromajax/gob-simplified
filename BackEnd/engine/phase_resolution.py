@@ -1015,6 +1015,11 @@ def resolve_fast_break_logic(game: "GameManager"):
     turn_result["roles"] = fb_roles
     turn_result["fast_break"] = True  # ✅ Add fast_break flag for frontend routing
     
+    # ==================== FAST BREAK STAT TRACKING ====================
+    # Record Fast Break stats for release player (offensive) and get-back players (defensive)
+    _record_fast_break_stats(fb_roles, turn_result, game)
+    # ==================== END FAST BREAK STAT TRACKING ====================
+    
     # ✅ DEBUG: Log fast break result (MAKE/MISS/TURNOVER/FOUL) to verify data is being set correctly
     import logging
     import json
