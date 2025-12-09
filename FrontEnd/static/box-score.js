@@ -1138,6 +1138,24 @@ function showFastBreakPopup(player) {
   const stats = player.stats || {};
   const playerName = player.name || 'Unknown';
   
+  // Get jersey number (check multiple possible fields)
+  let jerseyNum = null;
+  if (typeof player.jersey === 'number') {
+    jerseyNum = player.jersey;
+  } else if (player.jersey !== undefined && player.jersey !== null && player.jersey !== '') {
+    jerseyNum = player.jersey;
+  } else if (typeof player.jerseyNumber === 'number') {
+    jerseyNum = player.jerseyNumber;
+  } else if (player.jerseyNumber !== undefined && player.jerseyNumber !== null && player.jerseyNumber !== '') {
+    jerseyNum = player.jerseyNumber;
+  } else if (typeof player.jersey_number === 'number') {
+    jerseyNum = player.jersey_number;
+  } else if (player.jersey_number !== undefined && player.jersey_number !== null && player.jersey_number !== '') {
+    jerseyNum = player.jersey_number;
+  }
+  
+  const jerseyDisplay = (jerseyNum !== null && jerseyNum !== undefined) ? ` | #${String(jerseyNum)}` : '';
+  
   // Calculate Fast Break stats
   const fbA = stats.FB_A || 0;
   const fbS = stats.FB_S || 0;
@@ -1166,7 +1184,7 @@ function showFastBreakPopup(player) {
   popup.innerHTML = `
     <div class="fast-break-popup-content">
       <div class="fast-break-popup-header">
-        <h2>${playerName} - Fast Break Stats</h2>
+        <h2 class="fast-break-popup-title">${playerName}${jerseyDisplay}</h2>
         <button class="fast-break-popup-close" onclick="closeFastBreakPopup()">&times;</button>
       </div>
       <div class="fast-break-popup-body">
