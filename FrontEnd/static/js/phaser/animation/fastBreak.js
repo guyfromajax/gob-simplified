@@ -367,12 +367,12 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
   attachBallToPlayer(scene, ballSprite, shooterSprite);
   // Use distance-based duration for consistent speed
   const shooterDuration = getPlayerDuration(shooterSprite, shotPx.x, shotPx.y);
-  promises.push(
-    tweenPlayerTo(scene, shooterSprite, shotPx, {
-      duration: shooterDuration,
-      easing: "Linear" // Match HCO step movements
-    })
-  );
+  // ✅ Store shooter promise separately - we'll wait only for this before shooting
+  const shooterPromise = tweenPlayerTo(scene, shooterSprite, shotPx, {
+    duration: shooterDuration,
+    easing: "Linear" // Match HCO step movements
+  });
+  promises.push(shooterPromise);
   
   // Move primary defender
   // Check top-level defender field first (from shot_manager), then roles.defense array
@@ -422,6 +422,7 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
     const defenderPx = gridToPixels(defenderSpot.x, defenderSpot.y, width, height);
     // Use distance-based duration for consistent speed
     const defenderDuration = getPlayerDuration(defenderSprite, defenderPx.x, defenderPx.y);
+    // ✅ Defender animates in parallel - we don't wait for it before shooting
     promises.push(
       tweenPlayerTo(scene, defenderSprite, defenderPx, {
         duration: defenderDuration,
@@ -450,11 +451,9 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
     promises
   );
   
-  // ✅ Don't wait for rebounder animations - let them run in parallel with shot
-  // They will be stopped early when shot is made or rebounder grabs ball
-  // Only wait for shooter and defender promises
-  const shooterDefenderPromises = promises.slice(0, promises.length - rebounderTweens.length);
-  await Promise.all(shooterDefenderPromises);
+  // ✅ Wait only for shooter to reach basket - shoot immediately when he arrives
+  // Defender and rebounders continue animating in parallel
+  await shooterPromise;
   
   // Shoot the ball
   safeTransition(scene.stateMachine, States.ShotAttempt);
