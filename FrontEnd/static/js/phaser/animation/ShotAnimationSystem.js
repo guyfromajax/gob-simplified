@@ -608,36 +608,19 @@ export class ShotAnimationSystem {
             let targetX, targetY;
             
             // ✅ Backend calculates and stores release coordinates in defense_release_coords
-            // Use backend coordinates if available (SS&S: backend is source of truth)
+            // Use backend coordinates (SS&S: backend is single source of truth)
             if (turnData.defense_release_coords && turnData.defense_release_coords[playerId]) {
               const storedCoords = turnData.defense_release_coords[playerId];
               targetX = storedCoords.x;
               targetY = storedCoords.y;
             } else {
-              // Fallback: Calculate on frontend (for backwards compatibility)
-              // ✅ Get player IQ attribute from simData
-              const player = this.scene.simData?.players?.find(p => (p.playerId || p.player_id) === playerId);
-              const playerIQ = player?.attributes?.IQ || player?.IQ || 0;
-              const hasHighIQ = playerIQ > 50;
-              
-              // ✅ Determine X range based on fast break offense team and IQ
-              let targetXMin, targetXMax;
-              if (willBeHomeOffenseOnFastBreak) {
-                // Home team will be offense on fast break (away team is shooting)
-                targetXMin = hasHighIQ ? 50 : 40;
-                targetXMax = 60;
-              } else {
-                // Away team will be offense on fast break (home team is shooting)
-                targetXMin = 40;
-                targetXMax = hasHighIQ ? 50 : 60;
-              }
-              
-              // ✅ Determine Y range based on IQ
-              const targetYMin = hasHighIQ ? 20 : 14;
-              const targetYMax = hasHighIQ ? 30 : 36;
-              
-              targetY = Phaser.Math.Between(targetYMin, targetYMax);
-              targetX = Phaser.Math.Between(targetXMin, targetXMax);
+              // Fallback: Use safe defaults if backend coordinates missing (shouldn't happen)
+              console.error('⚠️ [DEFENSE RELEASE] Missing backend coordinates, using safe defaults', {
+                playerId,
+                hasDefenseReleaseCoords: !!turnData.defense_release_coords
+              });
+              targetX = 50; // Safe default: center court
+              targetY = 25; // Safe default: mid-court
             }
             
             const targetPixel = gridToPixels(targetX, targetY, this.scene.game.config.width, this.scene.game.config.height);

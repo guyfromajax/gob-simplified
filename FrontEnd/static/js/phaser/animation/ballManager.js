@@ -424,14 +424,13 @@ export async function shootBall({
               targetX = storedCoords.x;
               targetY = storedCoords.y;
             } else {
-              // Fallback: Calculate coordinates (shouldn't happen if backend is working correctly)
-              console.warn('⚠️ [GET BACK] No stored coordinates found in ballManager, falling back to calculation', {
+              // Fallback: Use safe defaults if backend coordinates missing (shouldn't happen)
+              console.error('⚠️ [OFFENSE GET BACK] Missing backend coordinates in ballManager, using safe defaults', {
                 playerId,
                 hasOffenseGetbackCoords: !!turnData.offense_getback_coords
               });
-              targetY = Phaser.Math.Between(14, 36);
-              // Away team shooting → x: 50-60, Home team shooting → x: 40-50
-              targetX = isHomeTeam ? Phaser.Math.Between(40, 50) : Phaser.Math.Between(50, 60);
+              targetX = 50; // Safe default: center court
+              targetY = 25; // Safe default: mid-court
             }
             
             const targetPixel = gridToPixels(targetX, targetY, scene.game.config.width, scene.game.config.height);
