@@ -187,78 +187,25 @@ async function animateOutletPhase(scene, turnData, playerSprites, ballSprite, wi
   
   const getBackList = missTurn?.offense_getback || [];
   
-  // ✅ Move outlet receiver to NEUTRAL outlet spot (not toward basket yet)
-  // We'll move toward basket AFTER we know if it's a shot or defensive stop
-  // Outlet spot is just where they receive the pass (mid-court area)
+  // ✅ Outlet receiver receives pass at current position (NO MOVEMENT during outlet pass)
+  // Ball handler will only move during defensive stop/shot attempt step
   const receiverCurrentGrid = {
     x: (receiverSprite.x / width) * 100,
     y: 50 - (receiverSprite.y / height) * 50
   };
   
-  // Outlet spot: move toward basket direction but not too far (2-4 spots)
-  // This keeps them in position to receive pass without committing to basket
-  const direction = targetBasket.x > receiverCurrentGrid.x ? 1 : -1;
-  const outletTarget = {
-    x: Phaser.Math.Clamp(
-      receiverCurrentGrid.x + direction * Phaser.Math.Between(2, 4),  // Reduced from 5-10 to 2-4
-      4,
-      97
-    ),
-    y: Phaser.Math.Clamp(
-      receiverCurrentGrid.y + Phaser.Math.Between(-6, 6),
-      1,
-      49
-    )
-  };
+  // Outlet receiver stays at current position (no movement)
+  const outletTarget = receiverCurrentGrid;
   const outletPx = gridToPixels(outletTarget.x, outletTarget.y, width, height);
   
   const promises = [];
   
-  // Move outlet receiver to neutral outlet spot (will move toward basket later if shot)
-  promises.push(
-    tweenPlayerTo(scene, receiverSprite, outletPx, {
-      duration: 500,
-      easing: "Sine.easeInOut"
-    })
-  );
+  // Outlet receiver receives pass at current position (no movement animation needed)
+  // Note: Ball will still animate from passer to receiver, but receiver doesn't move
   
-  // SIMULTANEOUSLY animate defenders chasing (get-back defenders)
-  // Move them 2-4 x spots toward basket (same as outlet receiver) so they don't lose ground
-  const defendersList = turnData.roles?.defense || [];
-  const defendersSet = new Set(defendersList.map(d => d.player_id || d));
-  
-  let defenderCount = 0;
-  for (const [id, sprite] of Object.entries(playerSprites)) {
-    if (defendersSet.has(id)) {
-      defenderCount++;
-      // Get defender's current position
-      const defenderCurrentGrid = {
-        x: (sprite.x / width) * 100,
-        y: 50 - (sprite.y / height) * 50
-      };
-      
-      // Move defender 2-4 x spots toward basket (same as outlet receiver)
-      const defenderTarget = {
-        x: Phaser.Math.Clamp(
-          defenderCurrentGrid.x + direction * Phaser.Math.Between(2, 4),  // Same 2-4 spots as outlet receiver
-          4,
-          97
-        ),
-        y: Phaser.Math.Clamp(
-          defenderCurrentGrid.y + Phaser.Math.Between(-6, 6),
-          1,
-          49
-        )
-      };
-      const defenderPx = gridToPixels(defenderTarget.x, defenderTarget.y, width, height);
-      promises.push(
-        tweenPlayerTo(scene, sprite, defenderPx, {
-          duration: 500,
-          easing: "Sine.easeInOut"
-        })
-      );
-    }
-  }
+  // ✅ Defenders stay at current position during outlet pass (NO MOVEMENT)
+  // Defenders will only move during defensive stop/shot attempt step
+  // Note: No animation needed for defenders during outlet pass
   
   // ✅ TEMPORARILY COMMENTED OUT: Advance other players during outlet step
   // For now, only animate the outlet pass - other players stay where they are
