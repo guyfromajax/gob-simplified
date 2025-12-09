@@ -677,7 +677,7 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
       rebounderId,
       ballSpot: miss.grid,
       shooterId,
-      hasMissTurn: !!missTurn
+      hasMissTurnForGetback: !!missTurnForGetback
     });
     
     await animateRebound({
@@ -688,7 +688,7 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
       rebounderId,
       ballSpot: miss.grid,
       shooterId,
-      turnData: missTurn // Pass the original MISS turn so get-back players can be excluded
+      turnData: missTurnForGetback // ✅ FIX: Pass previous HCO MISS turn (has offense_getback) so get-back players can be excluded
     });
     
     console.log('🏀 [FAST BREAK MISS] animateRebound completed');
