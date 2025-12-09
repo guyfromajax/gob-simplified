@@ -391,7 +391,15 @@ class TeamManager:
         totals = {}
         for player in self.players.values():
             for stat, val in player.stats["game"].items():
-                totals[stat] = totals.get(stat, 0) + val
+                if stat == "Outlet_Score_List":
+                    # Outlet_Score_List is an array - concatenate lists from all players
+                    if stat not in totals:
+                        totals[stat] = []
+                    if isinstance(val, list):
+                        totals[stat].extend(val)
+                else:
+                    # Regular stat - sum numeric values
+                    totals[stat] = totals.get(stat, 0) + val
         self.stats = totals
 
     def reset_for_new_game(self):
