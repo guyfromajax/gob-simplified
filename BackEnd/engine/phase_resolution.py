@@ -508,9 +508,6 @@ def resolve_fast_break_logic(game: "GameManager"):
     closest_defender = None
     closest_distance = float('inf')
     
-    logging.warning(f"🏀 [FAST BREAK PHASE DEBUG] Checking {len(fb_roles['defense'])} defenders for defensive stop")
-    logging.warning(f"  Ball handler outlet position: x={ball_handler_outlet_x}, y={ball_handler_outlet_y}")
-    
     # ✅ Find the most recent MISS/MAKE turn (the one that triggered this fast break)
     # Only use get-back coords from THIS turn, not from previous turns
     most_recent_shot_turn = None
@@ -548,7 +545,14 @@ def resolve_fast_break_logic(game: "GameManager"):
     else:
         logging.warning(f"  ⚠️ No MISS or MAKE turn found in last 10 turns")
     
-    for defender in fb_roles["defense"]:
+    # ✅ FIX: Check ALL defenders in def_lineup, not just those in fb_roles["defense"]
+    # The get_in_play_defenders() function uses stale ball_handler.coords, which might exclude
+    # get-back players who are actually ahead of the outlet receiver position
+    # We need to check all defenders against the outlet receiver position (ball_handler_outlet_x)
+    logging.warning(f"🏀 [FAST BREAK PHASE DEBUG] Checking {len(def_lineup)} defenders for defensive stop")
+    logging.warning(f"  Ball handler outlet position: x={ball_handler_outlet_x}, y={ball_handler_outlet_y}")
+    
+    for defender in def_lineup.values():
         # Use defender's actual coordinates (where they are on the court)
         # These defenders are the team that was on offense during the shot attempt
         # They might have get-back coordinates stored, so check those first
@@ -634,6 +638,11 @@ def resolve_fast_break_logic(game: "GameManager"):
                     closest_defender = defender
             else:
                 logging.warning(f"  ❌ Defender is NOT ahead")
+    
+    # ✅ If we found a defender ahead who wasn't in fb_roles["defense"], add them for animation
+    if closest_defender and closest_defender not in fb_roles["defense"]:
+        fb_roles["defense"].append(closest_defender)
+        logging.warning(f"🏀 [FAST BREAK PHASE DEBUG] Added ahead defender to fb_roles['defense']: {get_name_safe(closest_defender)} (was not in initial list)")
     
     # Determine event type based on defender positions
     d_count = len(fb_roles["defense"])
