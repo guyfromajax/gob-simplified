@@ -341,6 +341,10 @@ class ShotManager:
         )
 
         made = shot_score >= shot_threshold
+        
+        # ✅ TEMPORARY HARDCODE: Force all HCO shots to be misses for Fast Break testing
+        if self.game_state.get("offensive_state") == "HCO":
+            made = False
 
         # Stat tracking (attempts)
         shooter.record_stat("FGA")
