@@ -576,12 +576,33 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
       missTurn = currentTurn;
     }
     
+    // ✅ Get rebounderId - must be present for rebound animation
+    const rebounderId = turnData.rebounderId || turnData.rebounder_player_id;
+    
+    if (!rebounderId) {
+      console.error('⚠️ [FAST BREAK MISS] Missing rebounderId in turnData, cannot animate rebound', {
+        turnDataKeys: Object.keys(turnData),
+        hasRebounderId: !!turnData.rebounderId,
+        hasRebounderPlayerId: !!turnData.rebounder_player_id
+      });
+      // Return early - rebound will be handled by next turn
+      return;
+    }
+    
+    const rebounderSprite = playerSprites[rebounderId];
+    
+    if (!rebounderSprite) {
+      console.error('⚠️ [FAST BREAK MISS] Rebounder sprite not found', {
+        rebounderId,
+        availableSprites: Object.keys(playerSprites)
+      });
+      // Return early - rebound will be handled by next turn
+      return;
+    }
+    
     // ✅ Stop rebounder animations when rebounder grabs ball (missed shot)
     // Monitor rebounder position and stop tweens when rebounder gets close to ball bounce spot
-    const rebounderId = turnData.rebounderId || turnData.rebounder_player_id;
-    const rebounderSprite = rebounderId ? playerSprites[rebounderId] : null;
-    
-    if (rebounderSprite && rebounderTweens.length > 0) {
+    if (rebounderTweens.length > 0) {
       let monitoringActive = true;
       const ballBouncePx = gridToPixels(miss.grid.x, miss.grid.y, width, height);
       
@@ -621,7 +642,7 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
       ballSprite,
       playerSprites,
       animations: [],
-      rebounderId: turnData.rebounderId || turnData.rebounder_player_id,
+      rebounderId,
       ballSpot: miss.grid,
       shooterId,
       turnData: missTurn // Pass the original MISS turn so get-back players can be excluded
@@ -634,7 +655,7 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
         scene,
         ballSprite,
         playerSprites,
-        rebounderId: turnData.rebounderId || turnData.rebounder_player_id,
+        rebounderId,
         nextPlayType: turnData.next_play_type || "HCO", // Use turnData.next_play_type instead of hardcoded "HCO"
         turnData: missTurn // Pass the original MISS turn so we can get offense_getback list
       });
