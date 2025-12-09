@@ -620,6 +620,78 @@ const getBackList = missTurnForGetback?.offense_getback || [];
 - **Result**: Animation freeze when trying to execute outlet pass after Fast Break MISS → DREB
 - **Fix**: Pass current Fast Break MISS turn (correct animations) while still allowing lookup of `offense_getback` from previous turn
 
+### Fast Break Stat Tracking
+
+The Fast Break system tracks comprehensive statistics for both offensive and defensive players involved in fast break situations.
+
+**Stat Tracking Function:**
+- `_record_fast_break_stats()` in `BackEnd/engine/phase_resolution.py` - Records stats after Fast Break turn completes
+
+**Offensive Stats (Release Player / Outlet Receiver):**
+
+The release player (outlet receiver) tracks:
+- **`FB_A`** (Fast Break Attempts): Always incremented when player is the outlet receiver on a Fast Break
+- **`FB_S`** (Fast Break Success): Incremented when Fast Break results in:
+  - Shot Make
+  - Shot Make + Foul
+  - Shot Miss + Foul
+  - Defensive Foul (non-shooting)
+- **`FB_F`** (Fast Break Failure): Incremented when Fast Break results in:
+  - Steal
+  - Dead Ball Turnover
+  - Offensive Foul
+- **`FB_N`** (Fast Break Neutral): Calculated as `FB_A - (FB_S + FB_F)`
+
+**Defensive Stats (Get-Back Players):**
+
+All get-back players (defenders who got back on defense) track:
+- **`FB_A_D`** (Fast Break Attempts Defense): Always incremented when player is a get-back defender on a Fast Break
+- **`FB_S_D`** (Fast Break Success Defense): Incremented when Fast Break results in:
+  - DEFENSIVE_STOP
+- **`FB_F_D`** (Fast Break Failure Defense): Incremented when Fast Break results in:
+  - Shot Make
+  - Shot Make + Foul
+  - Shot Miss + Foul
+  - Defensive Foul (non-shooting)
+
+**Outlet Pass Stats (Outlet Passer):**
+
+The outlet passer tracks:
+- **`Outlet_A`** (Outlet Pass Attempts): Always incremented when player makes an outlet pass
+- **`Outlet_S`** (Outlet Pass Successes): Incremented when outlet pass leads to a shot attempt (not a defensive stop)
+- **`Outlet_Score`** (Average Outlet Pass Score): Average of all outlet pass scores (1-100 scale)
+- **`Outlet_Score_List`** (Outlet Pass Score List): Array of individual outlet pass scores
+- **`Outlet_Score_Cum`** (Cumulative Outlet Pass Score): Sum of all outlet pass scores
+
+**Outlet Pass Score Calculation:**
+- **Formula**: `(PS * 0.6 + ST * 0.2 + IQ * 0.2) * random.randint(1, 6)`
+- **Scaling**: Raw score (1-600 range, midpoint 175) is scaled to 1-100 range (midpoint 50)
+- **Function**: `calculate_outlet_pass_score()` in `BackEnd/utils/shared.py`
+- **Scaling Function**: `scale_score_to_100()` in `BackEnd/utils/shared.py` (universal helper for all attribute-based scores)
+
+**Stat Initialization:**
+- All Fast Break stats initialized to `0` (except `Outlet_Score_List` which is initialized as empty array `[]`)
+- Initialized in:
+  - `Player._init_stats()` - For all stat levels (game, season, career)
+  - `_init_game_stats_dict()` in `BackEnd/main.py` - For single game mode
+  - Tournament and Franchise mode initialization functions
+
+**Stat Tracking Timing:**
+- **Outlet Pass Stats**: Tracked immediately after outlet pass score is calculated (in `resolve_fast_break_logic()`)
+- **Fast Break Stats**: Tracked after Fast Break turn result is finalized (both DEFENSIVE_STOP and SHOT paths)
+- Stats are recorded in both `run_micro_turn()` and `resolve_offensive_rebound_turn()` paths
+
+**Special Handling:**
+- **`Outlet_Score_List`**: Excluded from stat delta calculations (it's a list, not numeric)
+- **Team Stats Aggregation**: `Outlet_Score_List` is concatenated (not summed) when aggregating team stats
+- **Stat Deltas**: `Outlet_Score_List` and `REB` are excluded from delta calculations in `turn_manager.py`
+
+**Box Score Display:**
+- Fast Break stats are available in the Box Score page
+- Clicking a player's name opens a popup showing:
+  - Fast Breaks: Offense (Attempts / Success Rate), Defense (Attempts / Success Rate)
+  - Outlet Passes: Att / Score (average of `Outlet_Score_List`)
+
 ### Key Files
 
 - `BackEnd/engine/fast_break_trigger.py`
