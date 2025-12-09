@@ -1149,7 +1149,8 @@ function showFastBreakPopup(player) {
   });
   
   // Get jersey number (use same logic as table rendering)
-  const jersey = player.jersey || '';
+  // Handle 0 as valid jersey number - use nullish coalescing to preserve 0
+  const jersey = player.jersey ?? player.jerseyNumber ?? player.jersey_number ?? '';
   
   // Format jersey number - check multiple possible fields and handle 0 as valid jersey number
   // Jersey can be a number (including 0) or string
