@@ -781,8 +781,8 @@ def _resolve_overlap_assignments(
                 
             else:
                 # Neither has other players → both guard ball handler (double-team with offsets)
-            for def_pos in overlap_defenders:
-                assignments[def_pos] = overlap_player_id
+                for def_pos in overlap_defenders:
+                    assignments[def_pos] = overlap_player_id
         else:
             # Neither has ball handler - both guard their zone players
             for def_pos in overlap_defenders:
