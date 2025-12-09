@@ -1156,11 +1156,117 @@ async function animateDefensiveStop(scene, turnData, playerSprites, ballSprite, 
 }
 
 /**
+ * Animate rebounders (players who stayed near rim for shot attempt) to their target positions
+ * - Defensive Stop: x=40-60, y=starting_y ± 6 (clamped 1-49)
+ * - Shot Attempt: x=random 5-20 spots out from basket, y=rim_y ± 10 (clamped 1-49)
+ * 
+ * @param {Phaser.Scene} scene - Phaser scene
+ * @param {Object} playerSprites - Dictionary of player sprites
+ * @param {string} ballHandlerId - ID of ball handler (to skip)
+ * @param {string} primaryDefenderId - ID of primary defender (to skip)
+ * @param {Object} turnData - Turn data with result_type and roles
+ * @param {number} width - Scene width
+ * @param {number} height - Scene height
+ * @param {Set} getbackPlayerIdsSet - Set of get-back player IDs (to skip)
+ * @param {Set} releasePlayerIdsSet - Set of release player IDs (to skip)
+ * @param {string} outletPasserId - ID of outlet passer (to skip)
+ * @returns {Array} Array of tween references for rebounder animations (for early termination)
+ */
+function animateRebounders(
+  scene,
+  playerSprites,
+  ballHandlerId,
+  primaryDefenderId,
+  turnData,
+  width,
+  height,
+  getbackPlayerIdsSet,
+  releasePlayerIdsSet,
+  outletPasserId
+) {
+  const rebounderTweens = [];
+  const isDefensiveStop = turnData.result_type === "DEFENSIVE_STOP";
+  
+  // Determine which basket is being attacked
+  const shooterSprite = playerSprites[ballHandlerId];
+  const isHomeOffense = shooterSprite?.team === "home";
+  const basket = isHomeOffense ? HOME_RIM_COORDS : AWAY_RIM_COORDS;
+  
+  // Convert sprite positions to grid for starting y calculation
+  const pixelsToGrid = (pixelX, pixelY) => {
+    const gridX = (pixelX / width) * 100;
+    const gridY = 50 - (pixelY / height) * 50;
+    return { x: gridX, y: gridY };
+  };
+  
+  for (const [id, sprite] of Object.entries(playerSprites)) {
+    // Skip shooter, primary defender, outlet passer, get-back players, and release players
+    if (
+      id === ballHandlerId ||
+      id === primaryDefenderId ||
+      id === outletPasserId ||
+      getbackPlayerIdsSet.has(id) ||
+      releasePlayerIdsSet.has(id)
+    ) {
+      continue;
+    }
+    
+    // ✅ This is a rebounder (stayed near rim for shot attempt)
+    // Get starting y coordinate from current sprite position
+    const startingGrid = pixelsToGrid(sprite.x, sprite.y);
+    const startingY = startingGrid.y;
+    
+    let targetSpot;
+    
+    if (isDefensiveStop) {
+      // ✅ Defensive Stop: x=40-60, y=starting_y ± 6 (clamped 1-49)
+      targetSpot = {
+        x: Phaser.Math.Between(REBOUNDER_X_MIN, REBOUNDER_X_MAX),
+        y: Phaser.Math.Clamp(startingY + Phaser.Math.Between(-REBOUNDER_Y_RANGE, REBOUNDER_Y_RANGE), 1, 49)
+      };
+    } else {
+      // ✅ Shot Attempt: x=random 5-20 spots out from basket, y=rim_y ± 10 (clamped 1-49)
+      // Home basket (x=91): 5-20 spots less = 71-86
+      // Away basket (x=9): 5-20 spots more = 14-29
+      const distanceFromBasket = Phaser.Math.Between(5, 20);
+      const targetX = isHomeOffense 
+        ? basket.x - distanceFromBasket  // Home: move left (toward center court)
+        : basket.x + distanceFromBasket;  // Away: move right (toward center court)
+      
+      targetSpot = {
+        x: Phaser.Math.Clamp(targetX, 4, 97), // Clamp to court bounds
+        y: Phaser.Math.Clamp(basket.y + Phaser.Math.Between(-SHOT_ATTEMPT_REBOUNDER_Y_RANGE, SHOT_ATTEMPT_REBOUNDER_Y_RANGE), 1, 49)
+      };
+    }
+    
+    const targetPx = gridToPixels(targetSpot.x, targetSpot.y, width, height);
+    // ✅ Use distance-based duration for consistent speed
+    // Players will stop at their current position if shot happens before they reach their spot
+    // (Made shot: stops when ball hits rim; Missed shot: stops when rebounder grabs ball)
+    const playerDuration = getPlayerDuration(sprite, targetPx.x, targetPx.y);
+    
+    // ✅ Create tween directly (not using tweenPlayerTo) so we can store reference for early termination
+    const tween = scene.tweens.add({
+      targets: sprite,
+      x: targetPx.x,
+      y: targetPx.y,
+      duration: playerDuration,
+      ease: "Linear",
+      onComplete: () => {
+        // Tween completed naturally (player reached destination)
+      }
+    });
+    rebounderTweens.push(tween);
+  }
+  
+  return rebounderTweens;
+}
+
+/**
  * Helper: Move all non-involved players to their positions
  * - Outlet passer: moves forward 7 x-coords toward basket (+7 for home offense, -7 for away offense)
  * - Get-back players: chase toward basket (X: 50 to basket-15, Y: 15-35)
- * - Rebounders (defensive stop): x=40-60, y=starting_y ± 6 (clamped 1-49)
- * - Rebounders (shot attempt): x=rim_x, y=rim_y ± 10 (clamped 1-49)
+ * - Rebounders: handled by animateRebounders() function
  * - Distance-based animation - stops when ball hits rim (made) or rebounder grabs ball (missed)
  * - Rebounders stop early when defensive stop is made (ball handler and stopper reach their spots)
  * 
@@ -1176,7 +1282,6 @@ async function moveOtherPlayersToStandardPositions(
   height,
   promises
 ) {
-  const rebounderTweens = []; // Store tween references for early termination
   // ✅ Find the most recent MISS/MAKE turn to get get-back and release player lists
   let getbackPlayerIds = [];
   let releasePlayerIds = [];
@@ -1259,62 +1364,10 @@ async function moveOtherPlayersToStandardPositions(
         y: Phaser.Math.Between(15, 35)
       };
     } else {
-      // ✅ This is a rebounder (stayed near rim for shot attempt)
-      // Get starting y coordinate from current sprite position
-      const startingGrid = pixelsToGrid(sprite.x, sprite.y);
-      const startingY = startingGrid.y;
-      
-      if (isDefensiveStop) {
-        // ✅ Defensive Stop: x=40-60, y=starting_y ± 6 (clamped 1-49)
-        targetSpot = {
-          x: Phaser.Math.Between(REBOUNDER_X_MIN, REBOUNDER_X_MAX),
-          y: Phaser.Math.Clamp(startingY + Phaser.Math.Between(-REBOUNDER_Y_RANGE, REBOUNDER_Y_RANGE), 1, 49)
-        };
-      } else {
-        // ✅ Shot Attempt: x=random 5-20 spots out from basket, y=rim_y ± 10 (clamped 1-49)
-        // Home basket (x=91): 5-20 spots less = 71-86
-        // Away basket (x=9): 5-20 spots more = 14-29
-        const distanceFromBasket = Phaser.Math.Between(5, 20);
-        const targetX = isHomeOffense 
-          ? basket.x - distanceFromBasket  // Home: move left (toward center court)
-          : basket.x + distanceFromBasket;  // Away: move right (toward center court)
-        
-        targetSpot = {
-          x: Phaser.Math.Clamp(targetX, 4, 97), // Clamp to court bounds
-          y: Phaser.Math.Clamp(basket.y + Phaser.Math.Between(-SHOT_ATTEMPT_REBOUNDER_Y_RANGE, SHOT_ATTEMPT_REBOUNDER_Y_RANGE), 1, 49)
-        };
-      }
-    }
-    
-    const targetPx = gridToPixels(targetSpot.x, targetSpot.y, width, height);
-    // ✅ Use distance-based duration for consistent speed
-    // Players will stop at their current position if shot happens before they reach their spot
-    // (Made shot: stops when ball hits rim; Missed shot: stops when rebounder grabs ball)
-    const playerDuration = getPlayerDuration(sprite, targetPx.x, targetPx.y);
-    
-    // ✅ Create tween directly (not using tweenPlayerTo) so we can store reference for early termination
-    // Only store references for rebounder animations (not get-back players)
-    const isRebounder = !getbackPlayerIdsSet.has(id);
-    if (isRebounder) {
-      const tween = scene.tweens.add({
-        targets: sprite,
-        x: targetPx.x,
-        y: targetPx.y,
-        duration: playerDuration,
-        ease: "Linear",
-        onComplete: () => {
-          // Tween completed naturally (player reached destination)
-        }
-      });
-      rebounderTweens.push(tween);
-      promises.push(
-        new Promise((resolve) => {
-          tween.once('complete', resolve);
-          tween.once('stop', resolve);
-        })
-      );
-    } else {
       // Get-back players use standard tweenPlayerTo (no early termination needed)
+      const targetPx = gridToPixels(targetSpot.x, targetSpot.y, width, height);
+      const playerDuration = getPlayerDuration(sprite, targetPx.x, targetPx.y);
+      
       promises.push(
         tweenPlayerTo(scene, sprite, targetPx, {
           duration: playerDuration,
@@ -1323,6 +1376,30 @@ async function moveOtherPlayersToStandardPositions(
       );
     }
   }
+  
+  // ✅ Animate rebounders using extracted function
+  const rebounderTweens = animateRebounders(
+    scene,
+    playerSprites,
+    ballHandlerId,
+    primaryDefenderId,
+    turnData,
+    width,
+    height,
+    getbackPlayerIdsSet,
+    releasePlayerIdsSet,
+    outletPasserId
+  );
+  
+  // Add rebounder tween promises for awaiting
+  rebounderTweens.forEach(tween => {
+    promises.push(
+      new Promise((resolve) => {
+        tween.once('complete', resolve);
+        tween.once('stop', resolve);
+      })
+    );
+  });
   
   return rebounderTweens; // Return tween references for early termination
 }
