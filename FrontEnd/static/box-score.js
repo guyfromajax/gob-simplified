@@ -1138,6 +1138,16 @@ function showFastBreakPopup(player) {
   const stats = player.stats || {};
   const playerName = player.name || 'Unknown';
   
+  // Debug: Log player object structure to verify jersey field
+  console.log('[Fast Break Popup] Player object:', {
+    name: player.name,
+    jersey: player.jersey,
+    jerseyNumber: player.jerseyNumber,
+    jersey_number: player.jersey_number,
+    playerId: player.playerId,
+    allKeys: Object.keys(player)
+  });
+  
   // Get jersey number (use same logic as table rendering)
   const jersey = player.jersey || '';
   
