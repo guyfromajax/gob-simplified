@@ -794,7 +794,7 @@ export function animateRebound({
   
   scene.rebounderId = rebounderId;
   const rebCfg = animationConfig.rebound;
-  const promises = [];
+  const promises = []; // For other players' rebound animations (non-blocking)
   const finalPositions = [];
   const MIN_X_SEP = 3;
   const MIN_Y_SEP = 2;
@@ -824,6 +824,10 @@ export function animateRebound({
       team
     });
   }
+  
+  // ✅ Store rebounder promise separately - this is what we'll wait for
+  let rebounderPromise = null;
+  
   if (rebounderSprite) {
     const teamId = rebounderSprite.team_id;
     finalPositions.push({ playerId: rebounderId, grid: { ...ballSpot } });
@@ -835,15 +839,14 @@ export function animateRebound({
         duration: rebCfg.playerMoveMs
       });
     }
-    promises.push(
-      new Promise((resolve) => {
-        scene.tweens.add({
-          targets: rebounderSprite,
-          x: spotPx.x,
-          y: spotPx.y,
-          duration: rebCfg.playerMoveMs,
-          ease: "Linear",
-          onComplete: async () => {
+    rebounderPromise = new Promise((resolve) => {
+      scene.tweens.add({
+        targets: rebounderSprite,
+        x: spotPx.x,
+        y: spotPx.y,
+        duration: rebCfg.playerMoveMs,
+        ease: "Linear",
+        onComplete: async () => {
             if (debugEnabled && REBOUND_DEBUG) {
               animationDebugLog("reb:moveEnd", {
                 playerId: rebounderId,
@@ -934,8 +937,9 @@ export function animateRebound({
           },
           onStop: resolve
         });
-      })
-    );
+      });
+    // Add rebounder promise to promises array for other players' animations (non-blocking)
+    promises.push(rebounderPromise);
   }
 
   // Determine shooting team to apply proximity criteria
@@ -1036,24 +1040,31 @@ export function animateRebound({
     );
   }
 
-  return Promise.all(promises).then(
-    () =>
-      new Promise((resolve) => {
-        const logPayload = {
-          rebounderId,
-          ballSpot,
-          positions: finalPositions
-        };
-        if (debugEnabled && REBOUND_DEBUG) {
-          animationDebugLog("[rebound]", logPayload);
-        }
-        if (scene.time?.delayedCall) {
-          scene.time.delayedCall(rebCfg.attachDelayMs, resolve);
-        } else {
-          setTimeout(resolve, rebCfg.attachDelayMs);
-        }
-      })
-  );
+  // ✅ FIX: Resolve when rebounder secures the ball, not when all animations complete
+  // Other players' rebound animations continue in background but don't block resolution
+  if (rebounderPromise) {
+    return rebounderPromise.then(
+      () =>
+        new Promise((resolve) => {
+          const logPayload = {
+            rebounderId,
+            ballSpot,
+            positions: finalPositions
+          };
+          if (debugEnabled && REBOUND_DEBUG) {
+            animationDebugLog("[rebound]", logPayload);
+          }
+          if (scene.time?.delayedCall) {
+            scene.time.delayedCall(rebCfg.attachDelayMs, resolve);
+          } else {
+            setTimeout(resolve, rebCfg.attachDelayMs);
+          }
+        })
+    );
+  } else {
+    // Fallback: If no rebounder sprite, resolve immediately
+    return Promise.resolve();
+  }
 }
 
 /**
