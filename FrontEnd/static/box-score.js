@@ -434,6 +434,8 @@ function renderPlayerStatsTable(team, players) {
       nameLink.addEventListener('click', () => showFastBreakPopup(player));
       nameCell.appendChild(nameLink);
       
+      // Clear row and build it properly
+      row.innerHTML = '';
       row.appendChild(nameCell);
       row.appendChild(createTableCell(stats.PTS || 0));
       row.appendChild(createTableCell(`${stats.FGM || 0}/${stats.FGA || 0}`));
