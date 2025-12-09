@@ -371,6 +371,19 @@ def calculate_rebound_score(player):
     attr = player.attributes
     return (attr["RB"] * 0.5 + attr["ST"] * 0.3 + attr["IQ"] * 0.2) * random.randint(1, 6)
 
+def calculate_outlet_pass_score(outlet_passer):
+    """
+    Calculate outlet pass score based on outlet passer's attributes.
+    
+    Args:
+        outlet_passer: Player object making the outlet pass
+    
+    Returns:
+        int: Outlet pass score (PS * 0.6 + ST * 0.2 + IQ * 0.2) * random(1-6)
+    """
+    attr = outlet_passer.attributes
+    return int((attr["PS"] * 0.6 + attr["ST"] * 0.2 + attr["IQ"] * 0.2) * random.randint(1, 6))
+
 def apply_scoring(game, team, player, points, stats):
     """Record player scoring stats and update team points.
 
