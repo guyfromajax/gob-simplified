@@ -177,12 +177,7 @@ export class AnimationRouter {
     } finally {
       // ✅ PHASE 2.3: Call finalizeTurnAfterAnimation in finally block (always runs)
       try {
-        // ✅ DEBUG: Log before finalizing turn
-        console.log('🔍 [BEFORE FINALIZE]', {
-          turnIndex: turnData.index,
-          result_type: turnData.result_type,
-          willFinalize: true
-        });
+        // ✅ REMOVED: Finalize logging (cluttering console)
         
         await finalizeTurnAfterAnimation({
           turn: turnData,

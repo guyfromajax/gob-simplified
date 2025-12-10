@@ -139,14 +139,7 @@ export async function prepareTurnForAnimation({ turn, scene, turnIndex, homeTeam
  * @param {Object} turnData - Turn data from backend
  */
 function handleTurnTransition(scene, turnData) {
-  // ✅ DEBUG: Always log transition handler entry
-  console.log('🔍 [UNIVERSAL TRANSITION]', {
-    result_type: turnData.result_type,
-    offense_team_id: turnData.offense_team_id,
-    possession_flips: turnData.possession_flips,
-    current_scene_offenseTeamId: scene.offenseTeamId,
-    text_preview: turnData.text?.substring(0, 30)
-  });
+  // ✅ REMOVED: Transition logging (cluttering console)
   
   // ✅ SS&S: Backend provides offense_team_id for each turn (single source of truth)
   // Frontend just sets scene.offenseTeamId to that value (no flip logic, just assignment)
