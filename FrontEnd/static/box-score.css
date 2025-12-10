@@ -481,13 +481,13 @@ h2 {
   flex-direction: column;
 }
 
-.fast-break-column {
+.special-stats-column {
   width: 50%;
   display: flex;
   flex-direction: column;
 }
 
-.fast-break-row {
+.special-stats-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -495,12 +495,12 @@ h2 {
   border-bottom: 1px solid #f0f0f0;
 }
 
-.fast-break-row.empty-row {
+.special-stats-row.empty-row {
   border-bottom: none;
   min-height: 20px;
 }
 
-.fast-break-row h3 {
+.special-stats-row h3 {
   font-family: 'Bebas Neue', sans-serif;
   font-size: 22px;
   color: #333;
@@ -508,13 +508,13 @@ h2 {
   width: 100%;
 }
 
-.fast-break-label {
+.special-stats-label {
   font-weight: 600;
   color: #555;
   font-size: 16px;
 }
 
-.fast-break-value {
+.special-stats-value {
   color: #333;
   font-size: 16px;
   font-weight: 500;
