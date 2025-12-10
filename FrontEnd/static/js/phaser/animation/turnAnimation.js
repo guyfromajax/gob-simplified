@@ -1986,6 +1986,47 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   // ✅ REMOVED: Special FCP/HCT tween cleanup - FCP/HCT now uses exact same path as HCO
   // ShotAnimationSystem handles all skeleton animations identically
 
+  // ✅ SS&S FIX: Resolve offenseTeamId once at turn start and classify all players
+  // This ensures consistent player classification throughout the turn
+  const { resolveOffenseTeamId } = await import('../utils/offenseTeamIdResolver.js');
+  const offenseTeamId = resolveOffenseTeamId({
+    scene,
+    turnData,
+    playerSprites,
+    passInfo: null // No passInfo at turn start, will be detected per step
+  });
+  
+  // ✅ SS&S: Classify all players once at turn start
+  const playerClassifications = {}; // Map: playerId -> 'offense' | 'defense'
+  let offensiveCount = 0;
+  let defensiveCount = 0;
+  
+  for (const anim of turnData.animations) {
+    const sprite = playerSprites[anim.playerId];
+    if (!sprite) continue;
+    
+    const isOffensivePlayer = offenseTeamId ? String(sprite.team_id) === String(offenseTeamId) : false;
+    playerClassifications[anim.playerId] = isOffensivePlayer ? 'offense' : 'defense';
+    
+    if (isOffensivePlayer) {
+      offensiveCount++;
+    } else {
+      defensiveCount++;
+    }
+  }
+  
+  // ✅ VALIDATION: Ensure we have exactly 5 offensive and 5 defensive players
+  if (offensiveCount !== 5 || defensiveCount !== 5) {
+    console.warn('⚠️ [PLAYER CLASSIFICATION] Expected 5 offensive and 5 defensive players, but got:', {
+      offensiveCount,
+      defensiveCount,
+      offenseTeamId,
+      turnDataId: turnData?.id,
+      resultType: turnData?.result_type,
+      totalAnimations: turnData.animations?.length
+    });
+  }
+
   for (let stepIndex = 1; stepIndex < maxSteps; stepIndex++) {
     // ✅ REMOVED: Special FCP/HCT FastBreak check - FCP/HCT now routes through AnimationRouter (same as HCO)
     const willEarlyExit = scene.skipToEnd || scene.stateMachine?.is(States.FastBreak);
@@ -2064,39 +2105,14 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
       }
     }
 
-    // Get offense team ID to separate offensive and defensive players
-    // ✅ ROBUST: Use comprehensive resolver to ensure offenseTeamId is always defined
-    const { resolveOffenseTeamId } = await import('../utils/offenseTeamIdResolver.js');
-    const offenseTeamId = resolveOffenseTeamId({
-      scene,
-      turnData,
-      playerSprites,
-      passInfo
-    });
-    
-    // ✅ DEBUG: Log team ID comparison to diagnose sync issues
-    if (passInfo && stepIndex === passInfo.stepIndex) {
-      if (false) console.log('🔍 [PASS SYNC DEBUG] Team ID comparison:', {
-        stepIndex,
-        offenseTeamId,
-        sceneOffenseTeamId: scene.offenseTeamId,
-        turnDataPossessionTeamId: turnData.possession_team_id,
-        homeTeamId: scene.simData?.home_team_id,
-        awayTeamId: scene.simData?.away_team_id,
-        passInfo: {
-          passerId: passInfo.passerId,
-          receiverId: passInfo.receiverId,
-          stepIndex: passInfo.stepIndex
-        }
-      });
-    }
-    
+    // ✅ SS&S: Use pre-classified player roles (determined at turn start)
+    // No need to re-resolve offenseTeamId or re-classify players per step
     const offensivePromises = [];
     const defensivePromises = [];
     let passerPromise = null;
     let shotInfo = null;
 
-    // Separate offensive and defensive players
+    // Separate offensive and defensive players using pre-classified roles
     for (const anim of turnData.animations) {
       if (scene.skipToEnd) break;
       const sprite = playerSprites[anim.playerId];
@@ -2154,23 +2170,10 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
         stepIndex  // Pass stepIndex to identify first step
       });
 
-      // ✅ FIX: Separate offensive and defensive players for synchronized pass animation
-      // Determine if player is on offense or defense
-      // ✅ ROBUST: offenseTeamId should always be defined (resolved by resolveOffenseTeamId)
-      // If it's still null (pre-opening tip or data corruption), default to false (defensive)
-      const isOffensivePlayer = offenseTeamId ? String(sprite.team_id) === String(offenseTeamId) : false;
-
-      // ✅ DEBUG: Log player classification for pass steps
-      if (passInfo && stepIndex === passInfo.stepIndex && (anim.playerId === passInfo.passerId || anim.playerId === passInfo.receiverId)) {
-        if (false) console.log('🔍 [PASS SYNC DEBUG] Player classification:', {
-          playerId: anim.playerId,
-          spriteTeamId: sprite.team_id,
-          offenseTeamId,
-          isOffensivePlayer,
-          isPasser: anim.playerId === passInfo.passerId,
-          isReceiver: anim.playerId === passInfo.receiverId
-        });
-      }
+      // ✅ SS&S: Use pre-classified player role (determined at turn start)
+      // This ensures consistent classification throughout the turn
+      const playerRole = playerClassifications[anim.playerId] || 'defense'; // Default to defense if not found
+      const isOffensivePlayer = playerRole === 'offense';
       
       if (isOffensivePlayer) {
         offensivePromises.push(promise);
