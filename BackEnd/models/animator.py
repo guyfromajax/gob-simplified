@@ -341,28 +341,28 @@ class Animator:
                         release_player_ids = set(release_coords.keys())
                     break
         
-        # ✅ Animate outlet passer: move forward 7 x-coords toward basket
-        if outlet_passer_id:
-            outlet_passer = None
-            for player in all_offensive_players + all_defensive_players:
-                if getattr(player, "player_id", None) == outlet_passer_id:
-                    outlet_passer = player
-                    break
-            
-            if outlet_passer:
-                passer_coords = getattr(outlet_passer, "coords", {})
-                passer_current_x = passer_coords.get("x", 50)
-                passer_current_y = passer_coords.get("y", 25)
-                
-                # Home offense: +7 (toward x=90), Away offense: -7 (toward x=10)
-                passer_target_x = max(4, min(97, passer_current_x + (OUTLET_PASSER_MOVE_X if not is_away_offense else -OUTLET_PASSER_MOVE_X)))
-                outlet_passer_spot = {
-                    "x": passer_target_x,
-                    "y": passer_current_y  # Keep same y-coord
-                }
-                
-                build_movement(outlet_passer, outlet_passer_spot, has_ball=False, action=ACTIONS["DRIFT"])
-                animated_player_ids.add(outlet_passer_id)
+        # ✅ TEMP: Do not animate outlet passer during Fast Break turn to avoid side-flip bug
+        # if outlet_passer_id:
+        #     outlet_passer = None
+        #     for player in all_offensive_players + all_defensive_players:
+        #         if getattr(player, "player_id", None) == outlet_passer_id:
+        #             outlet_passer = player
+        #             break
+        #     
+        #     if outlet_passer:
+        #         passer_coords = getattr(outlet_passer, "coords", {})
+        #         passer_current_x = passer_coords.get("x", 50)
+        #         passer_current_y = passer_coords.get("y", 25)
+        #         
+        #         # Home offense: +7 (toward x=90), Away offense: -7 (toward x=10)
+        #         passer_target_x = max(4, min(97, passer_current_x + (OUTLET_PASSER_MOVE_X if not is_away_offense else -OUTLET_PASSER_MOVE_X)))
+        #         outlet_passer_spot = {
+        #             "x": passer_target_x,
+        #             "y": passer_current_y  # Keep same y-coord
+        #         }
+        #         
+        #         build_movement(outlet_passer, outlet_passer_spot, has_ball=False, action=ACTIONS["DRIFT"])
+        #         animated_player_ids.add(outlet_passer_id)
         
         for player in all_offensive_players + all_defensive_players:
             player_id = getattr(player, "player_id", None)
