@@ -3058,6 +3058,74 @@ Player images in the Playcall Center are assigned once when returning to `court.
 
 10. **Game continues** with SIP → HCO transition
 
+### Computer Team Lineup Management (January 2025)
+
+The computer team automatically adjusts its lineup during timeouts and at quarter breaks based on player energy levels and foul counts. This ensures the computer team makes strategic lineup decisions without user intervention.
+
+**When Lineups Are Rebuilt:**
+
+1. **During Timeouts:**
+   - When the user calls a timeout, the computer team's lineup is automatically rebuilt
+   - Location: `BackEnd/api/api.py` `call_timeout_endpoint()` (lines 195-210)
+   - Only the computer team's lineup is adjusted (user team lineup remains unchanged)
+   - Uses current game state to apply energy and foul filtering rules
+
+2. **At Quarter Breaks:**
+   - At the start of each new quarter (Q2, Q3, Q4, OT), the computer team's lineup is automatically rebuilt
+   - Location: `BackEnd/main.py` `simulate_quarter()` (lines 402-443, 444-468, 469-493)
+   - Ensures the computer team starts each quarter with an optimal lineup based on current player conditions
+
+**Player Eligibility Filtering:**
+
+The system uses `is_player_eligible_for_lineup()` (`BackEnd/utils/db_utils.py`) to filter players based on:
+
+1. **Energy (NG) Filtering:**
+   - **Default:** Exclude players with NG < 80% (0.8)
+   - **Q4 < 4min or OT:** Exclude players with NG < 69% (0.69)
+   - Allows computer team to rest fatigued players during normal play, but be more aggressive in late-game situations
+
+2. **Foul-Based Filtering (by Quarter):**
+   - **Q1:** Exclude if player fouls > 1
+   - **Q2:** Exclude if player fouls > 2
+   - **Q3:** Exclude if player fouls > 3
+   - **Q4:** Exclude if player fouls > 3 AND > 4 minutes remaining (no exclusion if ≤ 4 minutes remaining)
+   - **Overtime:** No foul exclusion for active players
+   - Prevents computer team from playing players in foul trouble early, but allows them to play through foul trouble in critical moments
+
+3. **Fouled Out Players:**
+   - Players with 5 or more fouls are always excluded (not considered active)
+   - Applied regardless of quarter or time remaining
+
+**Implementation Details:**
+
+- **Function:** `build_lineup_from_mongo(team, game_state=None)` (`BackEnd/utils/db_utils.py`)
+  - Accepts `game_state` parameter to access current quarter, time remaining, and player stats
+  - Filters `available_players` using `is_player_eligible_for_lineup(player, game_state)`
+  - Only applies filtering to computer teams (user team lineups are not modified)
+
+- **Lineup Completion:** `ensure_complete_lineup(team, game_state)` (`BackEnd/utils/db_utils.py`)
+  - Ensures lineup has exactly 5 players
+  - Uses same eligibility filtering if additional players are needed
+  - Falls back to any available players if filtered list is insufficient
+
+- **Game State Access:**
+  - `game_state["quarter"]` - Current quarter number
+  - `game_state["time_remaining"]` - Time remaining in seconds
+  - `player.fouls` - Player's current foul count
+  - `player.NG` - Player's current energy level (Nerve/Game)
+
+**Key Features:**
+- Only affects computer team (user team lineups are never auto-adjusted)
+- Respects explicit lineup choices (doesn't overwrite if lineup is explicitly provided)
+- Uses current game state for accurate filtering (quarter, time remaining, player stats)
+- Includes error handling and logging for debugging
+- Works consistently across all game modes (single, tournament, franchise)
+
+**Backend Locations:**
+- `BackEnd/utils/db_utils.py`: `is_player_eligible_for_lineup()`, `build_lineup_from_mongo()`, `ensure_complete_lineup()`
+- `BackEnd/api/api.py`: Timeout lineup rebuild logic (`call_timeout_endpoint()`)
+- `BackEnd/main.py`: Quarter break lineup rebuild logic (`simulate_quarter()`)
+
 ### Unified Timeout Resume Architecture (Structural Fix - January 2025)
 
 The timeout resume system uses a unified architecture that works consistently across all game modes and memory states.
