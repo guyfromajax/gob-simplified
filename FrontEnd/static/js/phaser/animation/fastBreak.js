@@ -787,7 +787,7 @@ async function animateDefensiveStop(scene, turnData, playerSprites, ballSprite, 
           gotoStateTransition = true;
         } else {
           // Backend animation looks correct (top of key or neutral) - use it
-          console.log("✅ Defensive Stop - Using backend animations (ball handler correctly positioned)");
+          // ✅ REMOVED: Defensive stop backend animations logging (cluttering console)
           
           for (const anim of animations) {
             const sprite = playerSprites[anim.playerId];
@@ -822,7 +822,7 @@ async function animateDefensiveStop(scene, turnData, playerSprites, ballSprite, 
     }
   } else if (animations.length > 0 && !isDefensiveStop) {
     // Not a defensive stop - use backend animations as normal
-    console.log("✅ Using backend animations (not a defensive stop)");
+    // ✅ REMOVED: Using backend animations logging (cluttering console)
     for (const anim of animations) {
       const sprite = playerSprites[anim.playerId];
       if (!sprite || !anim.movement || anim.movement.length < 2) continue;

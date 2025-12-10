@@ -267,23 +267,9 @@ async function startGame({ homeRoster, awayRoster, animate = true }) {
   // Load game plan settings before starting the game
   await loadGamePlanSettings();
   
-  // ✅ DEBUG: Log gameId state before reset
-  console.log('🔍 [Q1→Q2 DEBUG] bootGame.startGame - BEFORE reset:', {
-    quarter,
-    gameId_from_url: urlParams.get('game_id'),
-    gameId_from_localStorage: typeof localStorage !== 'undefined' ? localStorage.getItem('game_id') : null,
-    gameId_variable: gameId,
-    gameStore_gameId: gameStore.getGameId()
-  });
+  // ✅ REMOVED: Quarter transition debug logging (cluttering console)
   
   gameStore.reset();
-  
-  // ✅ DEBUG: Log gameId state after reset
-  console.log('🔍 [Q1→Q2 DEBUG] bootGame.startGame - AFTER reset:', {
-    quarter,
-    gameId_variable: gameId,
-    gameStore_gameId: gameStore.getGameId()
-  });
   
   gameStore.setTeams({ home: homeTeam, away: awayTeam });
   gameStore.setRosters({ home: homeRoster, away: awayRoster });
@@ -298,13 +284,6 @@ async function startGame({ homeRoster, awayRoster, animate = true }) {
     },
   });
   gameStore.setGameId(gameId);
-  
-  // ✅ DEBUG: Log gameId state after setGameId
-  console.log('🔍 [Q1→Q2 DEBUG] bootGame.startGame - AFTER setGameId:', {
-    quarter,
-    gameId_variable: gameId,
-    gameStore_gameId: gameStore.getGameId()
-  });
   if (!game) {
     game = new Phaser.Game({
       type: Phaser.AUTO,
