@@ -314,7 +314,9 @@ function combinePlayersAndBoxScore(rosterPlayers, boxScore, teamName) {
                          'AST', 'STL', 'BLK', 'TO', 'F', 'MIN', 'PTS', 'PIP', 'FB_PTS',
                          'DEF_A', 'DEF_S', 'HELP_D', 'SCR_A', 'SCR_S',
                          'FB_A', 'FB_S', 'FB_F', 'FB_N', 'FB_A_D', 'FB_S_D', 'FB_F_D',
-                         'Outlet_A', 'Outlet_S', 'Outlet_Score', 'Outlet_Score_List', 'Outlet_Score_Cum'];
+                         'Outlet_A', 'Outlet_S', 'Outlet_Score', 'Outlet_Score_List', 'Outlet_Score_Cum',
+                         'HCT_A', 'HCT_S', 'HCT_A_D', 'HCT_S_D',
+                         'FCP_A', 'FCP_S', 'FCP_A_D', 'FCP_S_D'];
         const boxStats = {};
         statKeys.forEach(key => {
           if (playerData[key] !== undefined) {
@@ -332,7 +334,9 @@ function combinePlayersAndBoxScore(rosterPlayers, boxScore, teamName) {
                          'AST', 'STL', 'BLK', 'TO', 'F', 'MIN', 'PTS', 'PIP', 'FB_PTS',
                          'DEF_A', 'DEF_S', 'HELP_D', 'SCR_A', 'SCR_S',
                          'FB_A', 'FB_S', 'FB_F', 'FB_N', 'FB_A_D', 'FB_S_D', 'FB_F_D',
-                         'Outlet_A', 'Outlet_S', 'Outlet_Score', 'Outlet_Score_List', 'Outlet_Score_Cum'];
+                         'Outlet_A', 'Outlet_S', 'Outlet_Score', 'Outlet_Score_List', 'Outlet_Score_Cum',
+                         'HCT_A', 'HCT_S', 'HCT_A_D', 'HCT_S_D',
+                         'FCP_A', 'FCP_S', 'FCP_A_D', 'FCP_S_D'];
         const boxStats = {};
         statKeys.forEach(key => {
           if (playerData[key] !== undefined) {
@@ -1196,6 +1200,22 @@ function showSpecialStatsPopup(player) {
     ? (outletScoreList.reduce((a, b) => a + b, 0) / outletScoreList.length).toFixed(0)
     : '0';
   
+  // Calculate HCT stats
+  const hctA = stats.HCT_A || 0;
+  const hctS = stats.HCT_S || 0;
+  const hctAD = stats.HCT_A_D || 0;
+  const hctSD = stats.HCT_S_D || 0;
+  const hctOffenseSuccessRate = hctA > 0 ? ((hctS / hctA) * 100).toFixed(0) : '0';
+  const hctDefenseSuccessRate = hctAD > 0 ? ((hctSD / hctAD) * 100).toFixed(0) : '0';
+  
+  // Calculate FCP stats
+  const fcpA = stats.FCP_A || 0;
+  const fcpS = stats.FCP_S || 0;
+  const fcpAD = stats.FCP_A_D || 0;
+  const fcpSD = stats.FCP_S_D || 0;
+  const fcpOffenseSuccessRate = fcpA > 0 ? ((fcpS / fcpA) * 100).toFixed(0) : '0';
+  const fcpDefenseSuccessRate = fcpAD > 0 ? ((fcpSD / fcpAD) * 100).toFixed(0) : '0';
+  
   // Create popup HTML
   const popup = document.createElement('div');
   popup.id = 'special-stats-popup';
@@ -1207,25 +1227,53 @@ function showSpecialStatsPopup(player) {
         <button class="special-stats-popup-close" onclick="closeSpecialStatsPopup()">&times;</button>
       </div>
       <div class="special-stats-popup-body">
-        <div class="special-stats-column">
-          <div class="special-stats-row">
-            <h3>Fast Breaks</h3>
+        <div class="special-stats-columns-container">
+          <div class="special-stats-column">
+            <div class="special-stats-row">
+              <h3>Fast Breaks</h3>
+            </div>
+            <div class="special-stats-row">
+              <span class="special-stats-label">Offense:</span>
+              <span class="special-stats-value">${fbA} / ${offenseSuccessRate}%</span>
+            </div>
+            <div class="special-stats-row">
+              <span class="special-stats-label">Defense:</span>
+              <span class="special-stats-value">${fbAD} / ${defenseSuccessRate}%</span>
+            </div>
+            <div class="special-stats-row empty-row"></div>
+            <div class="special-stats-row">
+              <h3>Outlet Passes</h3>
+            </div>
+            <div class="special-stats-row">
+              <span class="special-stats-label">Att / Score:</span>
+              <span class="special-stats-value">${outletA} / ${outletScore}</span>
+            </div>
           </div>
-          <div class="special-stats-row">
-            <span class="special-stats-label">Offense:</span>
-            <span class="special-stats-value">${fbA} / ${offenseSuccessRate}%</span>
+          <div class="special-stats-column">
+            <div class="special-stats-row">
+              <h3>Traps</h3>
+            </div>
+            <div class="special-stats-row">
+              <span class="special-stats-label">Offense:</span>
+              <span class="special-stats-value">${hctA} / ${hctOffenseSuccessRate}%</span>
+            </div>
+            <div class="special-stats-row">
+              <span class="special-stats-label">Defense:</span>
+              <span class="special-stats-value">${hctAD} / ${hctDefenseSuccessRate}%</span>
+            </div>
           </div>
-          <div class="special-stats-row">
-            <span class="special-stats-label">Defense:</span>
-            <span class="special-stats-value">${fbAD} / ${defenseSuccessRate}%</span>
-          </div>
-          <div class="special-stats-row empty-row"></div>
-          <div class="special-stats-row">
-            <h3>Outlet Passes</h3>
-          </div>
-          <div class="special-stats-row">
-            <span class="special-stats-label">Att / Score:</span>
-            <span class="special-stats-value">${outletA} / ${outletScore}</span>
+          <div class="special-stats-column">
+            <div class="special-stats-row">
+              <h3>Presses</h3>
+            </div>
+            <div class="special-stats-row">
+              <span class="special-stats-label">Offense:</span>
+              <span class="special-stats-value">${fcpA} / ${fcpOffenseSuccessRate}%</span>
+            </div>
+            <div class="special-stats-row">
+              <span class="special-stats-label">Defense:</span>
+              <span class="special-stats-value">${fcpAD} / ${fcpDefenseSuccessRate}%</span>
+            </div>
           </div>
         </div>
       </div>
