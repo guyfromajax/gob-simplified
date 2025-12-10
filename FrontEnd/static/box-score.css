@@ -401,8 +401,8 @@ h2 {
   }
 }
 
-/* Fast Break Popup */
-.fast-break-popup {
+/* Special Stats Popup */
+.special-stats-popup {
   position: fixed;
   top: 0;
   left: 0;
@@ -414,7 +414,7 @@ h2 {
   justify-content: center;
 }
 
-.fast-break-popup-overlay {
+.special-stats-popup-overlay {
   position: absolute;
   top: 0;
   left: 0;
@@ -424,7 +424,7 @@ h2 {
   z-index: 2001;
 }
 
-.fast-break-popup-content {
+.special-stats-popup-content {
   position: relative;
   background: white;
   border-radius: 8px;
@@ -437,7 +437,7 @@ h2 {
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
 }
 
-.fast-break-popup-header {
+.special-stats-popup-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -447,7 +447,7 @@ h2 {
   position: relative;
 }
 
-.fast-break-popup-title {
+.special-stats-popup-title {
   font-family: 'Bebas Neue', sans-serif;
   font-size: 28px;
   color: #333;
@@ -456,7 +456,7 @@ h2 {
   flex: 1;
 }
 
-.fast-break-popup-close {
+.special-stats-popup-close {
   background: none;
   border: none;
   font-size: 32px;
@@ -472,11 +472,11 @@ h2 {
   transition: color 0.2s;
 }
 
-.fast-break-popup-close:hover {
+.special-stats-popup-close:hover {
   color: #000;
 }
 
-.fast-break-popup-body {
+.special-stats-popup-body {
   display: flex;
   flex-direction: column;
 }
