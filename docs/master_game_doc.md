@@ -441,6 +441,164 @@ def get_ball_handler_from_skeleton(skeleton, off_lineup, step_index=None):
 
 ---
 
+## HCO System ✅ **COMPLETE** (January 2025)
+
+### Overview
+
+The **Half Court Offense (HCO)** system handles standard half-court offensive possessions. HCO turns use skeleton-based animations to simulate offensive plays, including ball movement, player cuts, screens, and shot attempts.
+
+**Key Functions:**
+- `resolve_hco_logic()` - Handles HCO outcomes in `BackEnd/engine/phase_resolution.py`
+- `skeleton_to_animations()` - Converts skeleton steps to animation data in `BackEnd/models/animator.py`
+- `ShotAnimationSystem` - Handles HCO shot attempt animations in frontend
+
+### When HCO Activates
+
+**Trigger Conditions:**
+- Default offensive state after opening tip, side inbound passes, and defensive rebounds
+- Set via `offensive_state = "HCO"` in `game_state`
+- Can transition from: Opening Tip, Side Inbound Pass, Defensive Rebound, Press/Trap Break, Fast Break (defensive stop)
+
+**State Flow:**
+1. Turn starts with `offensive_state = "HCO"`
+2. Offensive playcall selected based on team strategy
+3. Skeleton retrieved from play database
+4. Skeleton converted to animation data
+5. Outcome determined (MAKE, MISS, FOUL, TURNOVER)
+
+### Possible Outcomes
+
+HCO turns can result in:
+
+1. **Made Shot (MAKE)**
+   - Points scored
+   - Routes to: BASELINE_INBOUND (with optional FCP/HCT pressure)
+   - Shooter: Determined from skeleton (intended shooter or hot read)
+
+2. **Missed Shot (MISS)**
+   - Shot attempt failed
+   - Routes to: OREB (offensive rebound) or DREB (defensive rebound)
+   - Rebounder: Determined by rebound calculation
+
+3. **Shooting Foul (D_FOUL)**
+   - Defensive foul during shot attempt
+   - Routes to: FREE_THROW
+   - Foul player: Defender guarding shooter
+
+4. **Non-Shooting Foul (D_FOUL)**
+   - Defensive foul before shot attempt
+   - **In Bonus**: Routes to FREE_THROW
+   - **Not in Bonus**: Routes to Side Inbound Pass → HCO
+
+5. **Offensive Foul (O_FOUL)**
+   - Offensive foul (e.g., charge, illegal screen)
+   - Possession change
+   - Routes to: Side Inbound Pass → HCO
+
+6. **Turnover (TURNOVER)**
+   - Ball lost (travel, out of bounds, etc.)
+   - Possession change
+   - Routes to: Side Inbound Pass → HCO or FAST_BREAK
+
+### Skeleton Animation System
+
+**Skeleton Sources:**
+- HCO skeletons: Stored in MongoDB `plays` collection
+- Skeleton variants: Different skeletons for different play types (INSIDE, OUTSIDE, MOTION, etc.)
+- Play selection: Based on offensive playcall from team strategy
+
+**Skeleton Structure:**
+- Each skeleton contains `steps` array
+- Each step has `pos_actions` dict mapping positions (PG, SG, SF, PF, C) to actions
+- Actions include: `"handle_ball"`, `"receive"`, `"pass"`, `"shoot"`, `"screen"`, `"cut"`, `"drift"`, etc.
+- Each action includes `location` (court position) and optional `opp` field (opposite side of court)
+
+**Animation Generation:**
+- Skeletons converted to animations via `animator.skeleton_to_animations()` in `BackEnd/models/animator.py`
+- Location strings converted to grid coordinates using `HCO_STRING_SPOTS`
+- For screen actions, uses `OFFSET_SPOTS` instead to avoid visual overlap
+- Animations include player movements, ball movements, and defender positioning
+- Frontend uses animation data to render turn animations
+
+### Screener Offset Coordinate System ✅ **NEW** (January 2025)
+
+**Purpose:**
+Screeners automatically animate to offset positions to prevent visual overlap when multiple players are at the same location.
+
+**Implementation:**
+- **Location:** `BackEnd/models/animator.py` - `skeleton_to_animations()` method (lines 1087-1094)
+- **Detection:** Checks if `action == "screen"` before converting location to coordinates
+- **Coordinate Selection:**
+  - If `action == "screen"`: Uses `OFFSET_SPOTS[location]` if available
+  - Falls back to `HCO_STRING_SPOTS[location]` if offset not defined for that location
+  - Otherwise: Uses `HCO_STRING_SPOTS[location]` for all non-screen actions
+
+**Offset Coordinate Mapping:**
+- `OFFSET_SPOTS` defines slightly shifted positions (typically ±3 units in x/y) from standard positions
+- Offset patterns vary by location type:
+  - Center spots: x + 3, y same
+  - Upper wing/apex: x + 3, y - 3
+  - Lower wing/apex: x + 3, y + 3
+  - Upper corner/baseline: x same, y - 3
+  - Lower corner/baseline: x same, y + 3
+  - Upper post: x - 3, y + 3
+  - Lower post: x + 3, y - 3
+
+**Away Team Handling:**
+- Offset coordinates are determined first (using `OFFSET_SPOTS`)
+- Then away team mirroring is applied (x: 100 - x)
+- This ensures screeners on away team animate to correctly mirrored offset positions
+
+**Benefits:**
+- Prevents visual overlap when screeners and other players share locations
+- Automatic detection (no manual flags needed in play builder)
+- Consistent with play builder offset system
+- Works for all screen actions across all HCO skeletons
+
+**Key Files:**
+- `BackEnd/models/animator.py` - Offset coordinate logic (lines 1087-1094)
+- `BackEnd/constants/__init__.py` - `OFFSET_SPOTS` definition (lines 191-231)
+- `FrontEnd/static/play-builder.html` - Play builder offset visualization
+
+### Stat Tracking
+
+**Player-Level Stats:**
+- **FGA, FGM**: Shot attempts and makes
+- **3PTM, PTS**: Three-pointers and points scored
+- **AST**: Assists (on made shots)
+- **TO**: Turnovers
+- **F**: Fouls (offensive or defensive)
+- **SCR_A, SCR_S**: Screen attempts and successes
+
+**Team-Level Stats:**
+- **Offensive efficiency**: Points per possession
+- **Turnover rate**: Turnovers per possession
+- **Shot selection**: Distribution of shot types
+
+**Stat Tracking Location:**
+- `BackEnd/models/shot_manager.py` - Shot resolution and stat recording
+- `BackEnd/engine/phase_resolution.py` - Screen stat tracking
+- `BackEnd/models/turn_manager.py` - Turnover and foul stat recording
+
+### Key Files
+
+- `BackEnd/engine/phase_resolution.py`
+  - `resolve_hco_logic()` - HCO outcome resolution
+  - `generate_logic()` - Play selection and skeleton retrieval
+- `BackEnd/models/animator.py`
+  - `skeleton_to_animations()` - Skeleton to animation conversion
+  - Screener offset coordinate logic
+- `BackEnd/models/shot_manager.py`
+  - `resolve_shot()` - Shot attempt resolution
+  - `is_three_point_shot()` - Three-point detection
+  - `is_paint_shot()` - Paint shot detection
+- `FrontEnd/static/js/phaser/animation/ShotAnimationSystem.js`
+  - `animatePlayerMovement()` - HCO shot attempt animations
+- `FrontEnd/static/js/phaser/animation/turnAnimation.js`
+  - `playTurnAnimation()` - HCO skeleton animation orchestration
+
+---
+
 ## Fast Break System ✅ **COMPLETE** (January 2025)
 
 ### Overview
