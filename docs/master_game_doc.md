@@ -811,6 +811,356 @@ The outlet passer tracks:
 
 ---
 
+## Statistics System ✅ **COMPLETE** (January 2025)
+
+### Overview
+
+The Statistics System tracks comprehensive player-level and team-level statistics across all game situations. Stats are tracked in real-time during gameplay and aggregated at game, season, and career levels.
+
+**Stat Categories:**
+- **Standard Basketball Stats**: FGM, FGA, 3PTM, 3PTA, FTM, FTA, PTS, REB, OREB, DREB, AST, STL, BLK, TO, F, PIP, MIN
+- **Special Situational Stats**: Fast Break, FCP/HCT, Outlet Pass, Defensive Attempts/Success, Screen Attempts/Success, Help Defense
+- **Team-Level Stats**: Scouting data (offense/defense success rates), team totals, team-level situational stats
+
+**Stat Initialization:**
+- All stats initialized to `0` at game start (except `Outlet_Score_List` which is initialized as empty array `[]`)
+- Initialized in:
+  - `Player._init_stats()` - For all stat levels (game, season, career)
+  - `_init_game_stats_dict()` in `BackEnd/main.py` - For single game mode
+  - Tournament and Franchise mode initialization functions
+
+**Stat Calculation:**
+- **PTS**: Automatically calculated as `(2 * FGM) + 3PTM + FTM` when FGM, 3PTM, or FTM are recorded
+- **REB**: Automatically calculated as `OREB + DREB` when OREB or DREB are recorded
+- **Outlet_Score**: Automatically calculated as average of `Outlet_Score_List` when new scores are added
+
+---
+
+### HCO (Half Court Offense) Stat Tracking
+
+**Player-Level Stats:**
+
+**Standard Stats Tracked:**
+- **FGA** (Field Goal Attempts): Incremented for shooter on all shot attempts
+- **3PTA** (Three-Point Attempts): Incremented for shooter if shot is a three-pointer
+- **FGM** (Field Goals Made): Incremented for shooter when shot is made (via `apply_scoring()`)
+- **3PTM** (Three-Pointers Made): Incremented for shooter when three-pointer is made (via `apply_scoring()`)
+- **PTS** (Points): Automatically calculated from FGM, 3PTM, FTM
+- **AST** (Assists): Incremented for passer when shot is made (if passer exists)
+- **PIP** (Points in Paint): Incremented for shooter when shot is made from paint (amount = points scored)
+- **TO** (Turnovers): Incremented for ball handler on dead ball turnovers
+- **F** (Fouls): Incremented for foul player (offensive or defensive)
+- **BLK** (Blocks): Incremented for defender when shot is blocked
+- **DEF_A** (Defensive Attempts): Incremented for defender on shot attempts
+- **DEF_S** (Defensive Success): Incremented for defender when shot is missed (without defensive foul)
+- **SCR_A** (Screen Attempts): Incremented for screener on screen attempts
+- **SCR_S** (Screen Success): Incremented for screener when screen leads to made shot (50% chance per attempt)
+- **HELP_D** (Help Defense): Tracked for help defenders in zone defense
+
+**Team-Level Stats (Scouting Data):**
+
+**Offensive Success Tracking:**
+- **`off_scouting["offense"]["Playcalls"][type_label]["overall"]["success"]`**: Incremented when:
+  - Shot is made (`MAKE`), or
+  - Defensive foul occurs (`FOUL` where `foul_team == "DEFENSE"`)
+- **`off_scouting["offense"]["Playcalls"][type_label][focus]["success"]`**: Same criteria, tracked by play focus (inside/attack/outside)
+- **`off_scouting["offense"]["Playcalls"]["Cumulative"][focus]["success"]`**: Cumulative success across all play types
+
+**Defensive Success Tracking:**
+- **`def_scouting["defense"][tracking_name]["used"]`**: Incremented each time defense is used (by defensive playcall: Man, 2-3 Zone, 3-2 Zone, 1-3-1 Zone)
+- **`def_scouting["defense"][tracking_name]["success"]`**: Incremented when:
+  - Shot is missed (`MISS` without defensive foul), or
+  - Turnover occurs (`TURNOVER`), or
+  - Offensive foul occurs (`O_FOUL`)
+- **Granular Tracking**: Success tracked by:
+  - Play type (vs_motion, vs_set)
+  - Focus type (vs_inside, vs_attack, vs_outside)
+  - Defense type (vs_man, vs_2-3_zone, vs_3-2_zone, vs_1-3-1_zone, vs_zone aggregate)
+  - Combinations (vs_motion_inside, vs_set_attack, etc.)
+
+**Stat Tracking Location:**
+- `BackEnd/models/shot_manager.py` - `resolve_shot()` method
+- `BackEnd/engine/phase_resolution.py` - `resolve_half_court_offense_logic()` method
+
+---
+
+### OREB (Offensive Rebound) Stat Tracking
+
+**Player-Level Stats:**
+
+**Standard Stats Tracked:**
+- **OREB** (Offensive Rebounds): Incremented for rebounder when offensive rebound is secured
+- **DREB** (Defensive Rebounds): Incremented for rebounder when defensive rebound is secured
+- **REB** (Total Rebounds): Automatically calculated as `OREB + DREB`
+- **FGA** (Field Goal Attempts): Incremented for rebounder on putback attempts
+- **FGM** (Field Goals Made): Incremented for rebounder when putback is made (via `apply_scoring()`)
+- **PTS** (Points): Automatically calculated from FGM, 3PTM, FTM
+- **PIP** (Points in Paint): Incremented for rebounder when putback is made (always 2 points, putbacks are from paint)
+- **DEF_A** (Defensive Attempts): Incremented for defender on putback attempts
+- **DEF_S** (Defensive Success): Incremented for defender when putback is missed
+
+**Putback vs Kickout:**
+- **Putback (90% chance)**: Rebounder attempts shot immediately
+  - Tracks FGA, FGM, PTS, PIP for rebounder
+  - Tracks DEF_A, DEF_S for defender
+- **Kickout (10% chance)**: Rebounder passes out, transitions to HCO
+  - Only tracks OREB for rebounder
+  - No shot attempt stats tracked
+
+**Stat Tracking Location:**
+- `BackEnd/utils/shared.py` - `resolve_offensive_rebound()` function
+- `BackEnd/models/rebound_manager.py` - `handle_rebound()` method
+
+---
+
+### Free Throw Stat Tracking
+
+**Player-Level Stats:**
+
+**Standard Stats Tracked:**
+- **FTA** (Free Throw Attempts): Incremented for shooter on each free throw attempt
+- **FTM** (Free Throws Made): Incremented for shooter when free throw is made (via `apply_scoring()`)
+- **PTS** (Points): Automatically calculated from FGM, 3PTM, FTM
+- **OREB** (Offensive Rebounds): Incremented for rebounder if free throw is missed and offensive rebound secured
+- **DREB** (Defensive Rebounds): Incremented for rebounder if free throw is missed and defensive rebound secured
+
+**Free Throw Scenarios:**
+- **Regular Free Throws**: 1-3 attempts based on foul situation
+- **1-and-1 Free Throws**: Front end must be made to unlock second attempt
+- **Bonus/Double Bonus**: Automatic free throws based on team foul count
+
+**Stat Tracking Location:**
+- `BackEnd/engine/phase_resolution.py` - `resolve_free_throw_logic()` function
+
+**Team-Level Stats:**
+- No specific team-level tracking for free throws (standard scoring stat)
+
+---
+
+### Fast Break Stat Tracking
+
+**Player-Level Stats:**
+
+**Offensive Stats (Release Player / Outlet Receiver):**
+- **`FB_A`** (Fast Break Attempts): Always incremented when player is the outlet receiver on a Fast Break
+- **`FB_S`** (Fast Break Success): Incremented when Fast Break results in:
+  - Shot Make (`MAKE`), or
+  - Defensive Foul (non-shooting) (`FOUL` where `foul_team == "DEFENSE"`)
+- **`FB_F`** (Fast Break Failure): Incremented when Fast Break results in:
+  - Steal (`STEAL`), or
+  - Dead Ball Turnover (`DEAD BALL`), or
+  - Offensive Foul (`FOUL` where `foul_team == "OFFENSE"`)
+- **`FB_N`** (Fast Break Neutral): Calculated as `FB_A - (FB_S + FB_F)`
+- **Standard Stats**: FGA, FGM, 3PTM, PTS, FB_PTS (fast break points), AST (if assist on made shot)
+
+**Defensive Stats (Get-Back Players):**
+- **`FB_A_D`** (Fast Break Attempts Defense): Always incremented when player is a get-back defender on a Fast Break
+- **`FB_S_D`** (Fast Break Success Defense): Incremented when Fast Break results in:
+  - `DEFENSIVE_STOP`
+- **`FB_F_D`** (Fast Break Failure Defense): Incremented when Fast Break results in:
+  - Shot Make (`MAKE`), or
+  - Shot Make + Foul, or
+  - Shot Miss + Foul, or
+  - Defensive Foul (non-shooting)
+
+**Outlet Pass Stats (Outlet Passer):**
+- **`Outlet_A`** (Outlet Pass Attempts): Always incremented when player makes an outlet pass
+- **`Outlet_S`** (Outlet Pass Successes): Incremented when outlet pass leads to a shot attempt (not a defensive stop)
+- **`Outlet_Score`** (Average Outlet Pass Score): Average of all outlet pass scores (1-100 scale)
+- **`Outlet_Score_List`** (Outlet Pass Score List): Array of individual outlet pass scores
+- **`Outlet_Score_Cum`** (Cumulative Outlet Pass Score): Sum of all outlet pass scores
+
+**Outlet Pass Score Calculation:**
+- **Formula**: `(PS * 0.6 + ST * 0.2 + IQ * 0.2) * random.randint(1, 6)`
+- **Scaling**: Raw score (1-600 range, midpoint 175) is scaled to 1-100 range (midpoint 50)
+- **Function**: `calculate_outlet_pass_score()` in `BackEnd/utils/shared.py`
+- **Scaling Function**: `scale_score_to_100()` in `BackEnd/utils/shared.py` (universal helper for all attribute-based scores)
+
+**Team-Level Stats (Scouting Data):**
+- **`Fast_Break_Entries`** (Offense): Incremented each time a team runs a Fast Break
+- **`Fast_Break_Success`** (Offense): Incremented only when Fast Break result_type is:
+  - `MAKE`, or
+  - `FOUL` where `foul_team == "DEFENSE"` (defensive foul on the break)
+  - **Note**: `MISS` or `TURNOVER` do NOT count as team success (they count as defensive success)
+- **`vs_Fast_Break.used`** (Defense): Incremented each time defending a Fast Break
+- **`vs_Fast_Break.success`** (Defense): Incremented when Fast Break result_type is:
+  - `DEFENSIVE_STOP`, or
+  - `MISS`, or
+  - `TURNOVER`, or
+  - `FOUL` where `foul_team == "OFFENSE"`
+
+**Stat Tracking Location:**
+- `BackEnd/engine/phase_resolution.py` - `resolve_fast_break_logic()` function
+- `BackEnd/engine/phase_resolution.py` - `_record_fast_break_stats()` helper function
+- `BackEnd/engine/phase_resolution.py` - `_record_outlet_pass_stats()` helper function
+
+**Special Handling:**
+- **`Outlet_Score_List`**: Excluded from stat delta calculations (it's a list, not numeric)
+- **Team Stats Aggregation**: `Outlet_Score_List` is concatenated (not summed) when aggregating team stats
+- **Stat Deltas**: `Outlet_Score_List` and `REB` are excluded from delta calculations in `turn_manager.py`
+
+---
+
+### FCP (Full Court Press) Stat Tracking
+
+**Player-Level Stats:**
+
+**Offensive Stats (All 5 Players in Active Lineup):**
+- **`FCP_A`** (FCP Attempts): Always incremented for all offensive players in active lineup
+- **`FCP_S`** (FCP Success): Incremented for all offensive players when FCP result_type is:
+  - `MAKE` (made shot), or
+  - `HCO` (press break - successfully broke through), or
+  - `FOUL` where `foul_team == "DEFENSE"` (defensive foul)
+
+**Defensive Stats (All 5 Players in Active Lineup):**
+- **`FCP_A_D`** (FCP Attempts Defense): Always incremented for all defensive players in active lineup
+- **`FCP_S_D`** (FCP Success Defense): Incremented for all defensive players when FCP result_type is:
+  - `MISS` (missed shot), or
+  - `TURNOVER`, `STEAL`, `DEAD BALL`, or
+  - `FOUL` where `foul_team == "OFFENSE"` (offensive foul)
+
+**Standard Stats (When Applicable):**
+- **FGA, FGM, 3PTM, PTS**: Tracked for shooter on shot attempts
+- **AST**: Tracked for passer on made shots
+- **TO**: Tracked for ball handler on turnovers/steals
+- **STL**: Tracked for defender on steals
+- **F**: Tracked for foul player
+
+**Team-Level Stats (Scouting Data):**
+
+**Defensive Success Tracking:**
+- **`def_scouting["defense"]["FCP"]["used"]`**: Incremented each time defense applies Full Court Press
+- **`def_scouting["defense"]["FCP"]["success"]`**: Incremented when FCP result_type is:
+  - `MISS` (missed shot during press break)
+  - `O_FOUL` (offensive foul)
+  - `DEAD_BALL_TURNOVER` (dead ball turnover)
+  - `STEAL` (steal)
+
+**Offensive Success (Derived):**
+- `offensive_successes = total_attempts - defensive_successes`
+- `offensive_failures = defensive_successes`
+- `defensive_failures = total_attempts - defensive_successes`
+
+**Stat Tracking Location:**
+- `BackEnd/engine/phase_resolution.py` - `resolve_full_court_press_logic()` function
+- `BackEnd/engine/phase_resolution.py` - `_record_fcp_stats()` helper function
+
+**Stat Tracking Timing:**
+- **SHOT Results**: Tracked after shot resolution (MAKE/MISS) in `resolve_full_court_press_logic()`
+- **Non-SHOT Results**: Tracked after result type determination (O_FOUL, D_FOUL, STEAL, DEAD_BALL_TURNOVER, HCO)
+
+---
+
+### HCT (Half Court Trap) Stat Tracking
+
+**Player-Level Stats:**
+
+**Offensive Stats (All 5 Players in Active Lineup):**
+- **`HCT_A`** (HCT Attempts): Always incremented for all offensive players in active lineup
+- **`HCT_S`** (HCT Success): Incremented for all offensive players when HCT result_type is:
+  - `MAKE` (made shot), or
+  - `HCO` (trap break - successfully broke through), or
+  - `FOUL` where `foul_team == "DEFENSE"` (defensive foul)
+
+**Defensive Stats (All 5 Players in Active Lineup):**
+- **`HCT_A_D`** (HCT Attempts Defense): Always incremented for all defensive players in active lineup
+- **`HCT_S_D`** (HCT Success Defense): Incremented for all defensive players when HCT result_type is:
+  - `MISS` (missed shot), or
+  - `TURNOVER`, `STEAL`, `DEAD BALL`, or
+  - `FOUL` where `foul_team == "OFFENSE"` (offensive foul)
+
+**Standard Stats (When Applicable):**
+- **FGA, FGM, 3PTM, PTS**: Tracked for shooter on shot attempts
+- **AST**: Tracked for passer on made shots
+- **TO**: Tracked for ball handler on turnovers/steals
+- **STL**: Tracked for defender on steals
+- **F**: Tracked for foul player
+
+**Team-Level Stats (Scouting Data):**
+
+**Defensive Success Tracking:**
+- **`def_scouting["defense"]["HCT"]["used"]`**: Incremented each time defense applies Half Court Trap
+- **`def_scouting["defense"]["HCT"]["success"]`**: Incremented when HCT result_type is:
+  - `MISS` (missed shot during trap break)
+  - `O_FOUL` (offensive foul)
+  - `DEAD_BALL_TURNOVER` (dead ball turnover)
+  - `STEAL` (steal)
+
+**Offensive Success (Derived):**
+- `offensive_successes = total_attempts - defensive_successes`
+- `offensive_failures = defensive_successes`
+- `defensive_failures = total_attempts - defensive_successes`
+
+**Stat Tracking Location:**
+- `BackEnd/engine/phase_resolution.py` - `resolve_half_court_trap_logic()` function
+- `BackEnd/engine/phase_resolution.py` - `_record_hct_stats()` helper function
+
+**Stat Tracking Timing:**
+- **SHOT Results**: Tracked after shot resolution (MAKE/MISS) in `resolve_half_court_trap_logic()`
+- **Non-SHOT Results**: Tracked after result type determination (O_FOUL, D_FOUL, STEAL, DEAD_BALL_TURNOVER, HCO)
+
+---
+
+### Other Turn Types with Stat Tracking
+
+**Steals:**
+- **STL** (Steals): Incremented for defender who steals the ball
+- **TO** (Turnovers): Incremented for ball handler (victim of steal)
+- **Fast Break Stats**: May trigger fast break opportunity, tracking `FB_A`, `FB_S`, `FB_F` for release player and `FB_A_D`, `FB_S_D`, `FB_F_D` for get-back players
+
+**Turnovers (Dead Ball):**
+- **TO** (Turnovers): Incremented for ball handler
+- **Fast Break Stats**: May trigger fast break opportunity (same as steals)
+
+**Fouls:**
+- **F** (Fouls): Incremented for foul player (offensive or defensive)
+- **Team Fouls**: Incremented for foul team
+- **Free Throws**: May trigger free throw sequence (tracks FTA, FTM)
+
+**Rebounds:**
+- **OREB** (Offensive Rebounds): Incremented for rebounder on offensive rebounds
+- **DREB** (Defensive Rebounds): Incremented for rebounder on defensive rebounds
+- **REB** (Total Rebounds): Automatically calculated as `OREB + DREB`
+- **Fast Break Stats**: DREB may trigger fast break opportunity
+
+---
+
+### Stat Aggregation and Team Totals
+
+**Player Stat Aggregation:**
+- Team totals calculated by summing all player stats from roster (not just active lineup)
+- Includes bench players who may have played earlier in the game
+- Aggregated in `TeamManager.get_team_game_stats()` method
+
+**Team-Level Stats:**
+- **Team Stats**: Aggregated from player stats (PTS, FGM, FGA, etc.)
+- **Scouting Data**: Tracked separately at team level (offense/defense success rates)
+- **Team Stats Dictionary**: Tracks team-level metrics (release_instances, get_back_instances, actual_releases, fast break defender counts)
+
+**Stat Deltas:**
+- Calculated between turns to show stat changes
+- Excludes calculated stats (REB, PTS) and list stats (Outlet_Score_List)
+- Used for frontend stat updates without full roster refresh
+
+**Stat Persistence:**
+- Game stats: Stored in game document
+- Season stats: Aggregated across games in tournament/franchise mode
+- Career stats: Aggregated across all seasons for franchise mode
+
+---
+
+### Key Files
+
+- `BackEnd/models/player.py` - Player stat initialization and recording
+- `BackEnd/models/shot_manager.py` - Shot stat tracking (FGA, FGM, AST, BLK, DEF_A, DEF_S)
+- `BackEnd/engine/phase_resolution.py` - Fast Break, FCP, HCT, Free Throw stat tracking
+- `BackEnd/utils/shared.py` - OREB stat tracking, outlet pass score calculation
+- `BackEnd/models/rebound_manager.py` - Rebound stat tracking
+- `BackEnd/models/team_manager.py` - Team stat aggregation
+- `BackEnd/constants/__init__.py` - `BOX_SCORE_KEYS` definition (all trackable stats)
+
+---
+
 ## Production Animation System
 
 ### Ball Animation System ✅ **COMPLETE**
