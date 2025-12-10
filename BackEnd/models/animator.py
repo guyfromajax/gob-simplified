@@ -7,7 +7,7 @@ from BackEnd.utils.shared_defense import (
     get_defender_coords
 )
 from collections import defaultdict
-from BackEnd.constants import HCO_STRING_SPOTS, ACTIONS, RIM_COORDS, TOP_KEY_COORDS, HOME_RIM_COORDS, AWAY_RIM_COORDS, HOME_TOP_KEY, AWAY_TOP_KEY
+from BackEnd.constants import HCO_STRING_SPOTS, OFFSET_SPOTS, ACTIONS, RIM_COORDS, TOP_KEY_COORDS, HOME_RIM_COORDS, AWAY_RIM_COORDS, HOME_TOP_KEY, AWAY_TOP_KEY
 import random
 import logging
 from BackEnd.constants.fast_break_constants import (
@@ -1067,6 +1067,9 @@ class Animator:
                 
                 timestamp = step.get("timestamp", 0)
                 
+                # Get action early to check if we should use offset coords for screeners
+                action = pos_action.get("action", "drift")
+                
                 # Handle both coords and location formats
                 has_opp = pos_action.get("opp", False)
                 coords_from_location = False
@@ -1078,9 +1081,19 @@ class Animator:
                     # Coords already exist - these should have been set by apply_opposite_side_logic()
                     coords_already_flipped = True
                 elif "location" in pos_action:
-                    # Convert location string to coordinates using HCO_STRING_SPOTS
+                    # Convert location string to coordinates
                     location = pos_action.get("location", "key")
-                    coords = HCO_STRING_SPOTS.get(location, {"x": 50, "y": 25})
+                    
+                    # ✅ SCREEN OFFSET: Use OFFSET_SPOTS for screen actions, otherwise use HCO_STRING_SPOTS
+                    # This ensures screeners animate to offset positions to avoid visual overlap
+                    # Check both ACTIONS["SCREEN"] (which is "screen") and literal "screen" for safety
+                    if action == ACTIONS["SCREEN"] or action == "screen":
+                        # Try to use offset coords for screeners, fallback to standard if not available
+                        coords = OFFSET_SPOTS.get(location) or HCO_STRING_SPOTS.get(location, {"x": 50, "y": 25})
+                    else:
+                        # Use standard coordinates for non-screen actions
+                        coords = HCO_STRING_SPOTS.get(location, {"x": 50, "y": 25})
+                    
                     coords_from_location = True
                     coords_already_flipped = False
                 else:
@@ -1117,10 +1130,9 @@ class Animator:
                 # Away team needs to flip to attack away basket (x=10)
                 # is_away_offense calculated once at function start (line 809) for consistency
                 # Only flip if not already flipped by opp logic above
+                # ✅ SCREEN OFFSET: Flip offset coords for away team (determine offset first, then flip)
                 if is_away_offense and not coords_already_flipped:
                     coords = get_away_player_coords(coords)
-                
-                action = pos_action.get("action", "drift")
                 
                 if start_coords is None:
                     start_coords = coords
