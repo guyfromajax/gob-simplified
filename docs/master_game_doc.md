@@ -339,6 +339,70 @@ def get_ball_handler_from_skeleton(skeleton, off_lineup, step_index=None):
 - ✅ Better stat tracking (correct players get credited)
 - ✅ More realistic game simulation
 
+### FCP/HCT Stat Tracking ✅ **NEW** (January 2025)
+
+**Player-Level Stats:**
+
+**Offensive Stats (FCP_A, FCP_S, FCP_F / HCT_A, HCT_S, HCT_F):**
+- **FCP_A / HCT_A**: Attempts - Incremented for ball handler (and shooter if shot was taken)
+- **FCP_S / HCT_S**: Success - Incremented when:
+  - `MAKE` (made shot)
+  - `HCO` (press/trap break - successfully broke through)
+  - `FOUL` where `foul_team == "DEFENSE"` (defensive foul)
+- **FCP_F / HCT_F**: Failure - Incremented when:
+  - `MISS` (missed shot)
+  - `TURNOVER`, `STEAL`, `DEAD BALL`
+  - `FOUL` where `foul_team == "OFFENSE"` (offensive foul)
+
+**Defensive Stats (FCP_A_D, FCP_S_D, FCP_F_D / HCT_A_D, HCT_S_D, HCT_F_D):**
+- **FCP_A_D / HCT_A_D**: Defensive Attempts - Incremented for defender
+- **FCP_S_D / HCT_S_D**: Defensive Success - Incremented when:
+  - `MISS` (missed shot)
+  - `TURNOVER`, `STEAL`, `DEAD BALL`
+  - `FOUL` where `foul_team == "OFFENSE"` (offensive foul)
+- **FCP_F_D / HCT_F_D**: Defensive Failure - Incremented when:
+  - `MAKE` (made shot)
+  - `HCO` (press/trap break - defense failed to stop)
+  - `FOUL` where `foul_team == "DEFENSE"` (defensive foul)
+
+**Stat Initialization:**
+- All FCP/HCT stats initialized to `0` at game start
+- Initialized in:
+  - `Player._init_stats()` - For all stat levels (game, season, career)
+  - `_init_game_stats_dict()` in `BackEnd/main.py` - For single game mode
+  - Tournament and Franchise mode initialization functions
+
+**Stat Tracking Timing:**
+- **SHOT Results**: Tracked after shot resolution (MAKE/MISS) in `resolve_full_court_press_logic()` and `resolve_half_court_trap_logic()`
+- **Non-SHOT Results**: Tracked after result type determination (O_FOUL, D_FOUL, STEAL, DEAD_BALL_TURNOVER, HCO)
+- Stats are recorded via `_record_fcp_stats()` and `_record_hct_stats()` helper functions
+
+**Team-Level Stats (Scouting Data):**
+
+**Defensive Success Tracking:**
+- **`def_scouting["defense"]["FCP"]["used"]`**: Incremented each time defense applies Full Court Press
+- **`def_scouting["defense"]["FCP"]["success"]`**: Incremented when FCP result_type is:
+  - `MISS` (missed shot during press break)
+  - `O_FOUL` (offensive foul)
+  - `DEAD_BALL_TURNOVER` (dead ball turnover)
+  - `STEAL` (steal)
+- **`def_scouting["defense"]["HCT"]["used"]`**: Incremented each time defense applies Half Court Trap
+- **`def_scouting["defense"]["HCT"]["success"]`**: Incremented when HCT result_type is:
+  - `MISS` (missed shot during trap break)
+  - `O_FOUL` (offensive foul)
+  - `DEAD_BALL_TURNOVER` (dead ball turnover)
+  - `STEAL` (steal)
+
+**Note:** Team-level offensive success/failure can be derived from defensive tracking:
+- `offensive_successes = total_attempts - defensive_successes`
+- `offensive_failures = defensive_successes`
+- `defensive_failures = total_attempts - defensive_successes`
+
+**Special Handling:**
+- **HCO (Press/Trap Break)**: Counts as offensive success at player level (FCP_S/HCT_S) and defensive failure at player level (FCP_F_D/HCT_F_D), but is NOT tracked as defensive success at team level (correct - defense failed to stop the break)
+- **MAKE**: Counts as offensive success at player level but NOT as defensive success at team level (correct - offense scored)
+- **D_FOUL**: Counts as defensive failure at player level but NOT as defensive success at team level (correct - defense fouled)
+
 ### Skeleton System
 
 **Skeleton Sources:**
