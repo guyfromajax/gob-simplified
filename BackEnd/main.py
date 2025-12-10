@@ -161,11 +161,13 @@ def _ensure_complete_lineup(team, game_state=None) -> None:
         if player and hasattr(player, "player_id"):
             current_player_ids.add(player.player_id)
 
-    # Filter available players: exclude ineligible and already-assigned players
+    # Filter available players: exclude ineligible, already-assigned, and players failing energy/foul restrictions
+    from BackEnd.utils.db_utils import is_player_eligible_for_lineup
     available_players = [
         p for p in team.get_all_players()
         if p.player_id not in ineligible_player_ids 
         and p.player_id not in current_player_ids
+        and is_player_eligible_for_lineup(p, game_state, ineligible_player_ids)
     ]
     
     if len(available_players) < len(missing):
@@ -245,14 +247,14 @@ def simulate_quarter(
         logging.info(f"✅ simulate_quarter: Set home lineup from home_lineup_ids: {list(gm.home_team.lineup.keys())}")
     elif not gm.home_team.lineup:
         # Reuse existing player objects so per-game stats persist mid-game.
-        gm.home_team.lineup = build_lineup_from_mongo(gm.home_team)
+        gm.home_team.lineup = build_lineup_from_mongo(gm.home_team, gm.game_state)
         logging.info(f"✅ simulate_quarter: Built home lineup from MongoDB: {list(gm.home_team.lineup.keys())}")
 
     if away_lineup_ids:
         gm.away_team.lineup = assign_lineup_from_ids(gm.away_team, away_lineup_ids)
         logging.info(f"✅ simulate_quarter: Set away lineup from away_lineup_ids: {list(gm.away_team.lineup.keys())}")
     elif not gm.away_team.lineup:
-        gm.away_team.lineup = build_lineup_from_mongo(gm.away_team)
+        gm.away_team.lineup = build_lineup_from_mongo(gm.away_team, gm.game_state)
         logging.info(f"✅ simulate_quarter: Built away lineup from MongoDB: {list(gm.away_team.lineup.keys())}")
     
     # Final check - log final lineup state

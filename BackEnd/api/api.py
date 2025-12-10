@@ -1000,7 +1000,7 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                             logging.info(f"✅ Loaded from DB: Set home lineup from request: {list(gm.home_team.lineup.keys())}")
                         elif not gm.home_team.lineup:
                             from BackEnd.utils.db_utils import build_lineup_from_mongo
-                            gm.home_team.lineup = build_lineup_from_mongo(gm.home_team)
+                            gm.home_team.lineup = build_lineup_from_mongo(gm.home_team, gm.game_state)
                             logging.info(f"✅ Loaded from DB: Built home lineup from MongoDB: {list(gm.home_team.lineup.keys())}")
                         
                         if request.away_lineup:
@@ -1009,7 +1009,7 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                             logging.info(f"✅ Loaded from DB: Set away lineup from request: {list(gm.away_team.lineup.keys())}")
                         elif not gm.away_team.lineup:
                             from BackEnd.utils.db_utils import build_lineup_from_mongo
-                            gm.away_team.lineup = build_lineup_from_mongo(gm.away_team)
+                            gm.away_team.lineup = build_lineup_from_mongo(gm.away_team, gm.game_state)
                             logging.info(f"✅ Loaded from DB: Built away lineup from MongoDB: {list(gm.away_team.lineup.keys())}")
                         
                         # Validate lineups are set
