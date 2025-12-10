@@ -257,9 +257,21 @@ def simulate_quarter(
         gm.away_team.lineup = build_lineup_from_mongo(gm.away_team, gm.game_state)
         logging.info(f"✅ simulate_quarter: Built away lineup from MongoDB: {list(gm.away_team.lineup.keys())}")
     
+    # ✅ QUARTER BREAK: Rebuild computer team's lineup at start of each new quarter
+    # This allows computer team to adjust based on energy/foul restrictions
+    computer_team = gm.away_team if not gm.away_team.is_user_team else gm.home_team
+    if not computer_team.is_user_team and not (away_lineup_ids if computer_team == gm.away_team else home_lineup_ids):
+        # Only rebuild if no explicit lineup was provided and this is the computer team
+        try:
+            computer_team.lineup = build_lineup_from_mongo(computer_team, gm.game_state)
+            logging.info(f"✅ QUARTER BREAK: Rebuilt computer team ({computer_team.name}) lineup for Q{gm.quarter} with energy/foul filtering")
+        except Exception as e:
+            logging.error(f"⚠️ QUARTER BREAK: Failed to rebuild computer team lineup: {e}")
+            # Don't fail quarter start if lineup rebuild fails - use existing lineup
+    
     # Final check - log final lineup state
     logging.info(f"🏀 simulate_quarter: FINAL home_lineup_keys={list(gm.home_team.lineup.keys()) if gm.home_team.lineup else 'EMPTY'}, away_lineup_keys={list(gm.away_team.lineup.keys()) if gm.away_team.lineup else 'EMPTY'}")
-
+    
     # Validate that both lineups contain all required positions
     # Pass game_state to filter out ineligible (fouled-out) players
     _ensure_complete_lineup(gm.home_team, gm.game_state)
