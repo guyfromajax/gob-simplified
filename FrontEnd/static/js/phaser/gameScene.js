@@ -1557,7 +1557,6 @@ export function createGameScene(Phaser) {
           });
           
           // ✅ REMOVED: Navigation params debug logging (cluttering console)
-          });
           
           if (this.gameId && typeof localStorage !== 'undefined') {
             localStorage.setItem('game_id', this.gameId);
