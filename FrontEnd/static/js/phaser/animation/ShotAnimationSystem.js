@@ -397,7 +397,7 @@ export class ShotAnimationSystem {
       // ✅ SS&S: Use pre-classified player roles (determined at turn start)
       // No need to re-resolve offenseTeamId or re-classify players per step
       const offensivePromises = [];
-      const defensivePromises = [];
+      const defensiveAnimationParams = []; // Store params instead of starting animations immediately
       let passerPromise = null;
       
       for (const anim of turnData.animations) {
@@ -426,43 +426,43 @@ export class ShotAnimationSystem {
           shotInfo = { step: nextStep, playerId: anim.playerId, stepIndex };
         }
         
-        // ✅ FIX: Match playTurnAnimation's animateStep call signature exactly
-        // Pass step (prev) and nextStep (curr) separately, plus stepIndex
-        // This ensures animateStep can properly calculate positions and handle actions
-        const promise = animateStep({
-          scene: this.scene,
-          sprite,
-          step: prev,  // Previous step (for position calculation)
-          nextStep: curr,  // Current step (for action checking)
-          duration,
-          ballSprite,
-          currentBallOwnerRef,
-          onAction: null, // We'll handle actions separately
-          stepIndex  // Pass stepIndex to identify first step
-        });
-        
         // ✅ SS&S: Use pre-classified player role (determined at turn start)
         // This ensures consistent classification throughout the turn
         const playerRole = playerClassifications[anim.playerId] || 'defense'; // Default to defense if not found
         const isOffensivePlayer = playerRole === 'offense';
         
         if (isOffensivePlayer) {
+          // ✅ FIX: Start offensive animations immediately (Phase 1)
+          // ✅ FIX: Match playTurnAnimation's animateStep call signature exactly
+          // Pass step (prev) and nextStep (curr) separately, plus stepIndex
+          // This ensures animateStep can properly calculate positions and handle actions
+          const promise = animateStep({
+            scene: this.scene,
+            sprite,
+            step: prev,  // Previous step (for position calculation)
+            nextStep: curr,  // Current step (for action checking)
+            duration,
+            ballSprite,
+            currentBallOwnerRef,
+            onAction: null, // We'll handle actions separately
+            stepIndex  // Pass stepIndex to identify first step
+          });
+          
           offensivePromises.push(promise);
           // Track passer's promise separately so we can wait for it before starting pass
           if (passInfo && anim.playerId === passInfo.passerId) {
             passerPromise = promise;
           }
         } else {
-          // ✅ DEBUG: Track when defensive promises are created (they start animating immediately)
-          const defensiveStartTime = performance.now();
-          defensivePromises.push({
-            promise,
-            startTime: defensiveStartTime,
+          // ✅ FIX: Store defensive animation parameters instead of starting immediately
+          // We'll start these in Phase 2, synchronized with the pass animation
+          defensiveAnimationParams.push({
+            sprite,
+            step: prev,
+            nextStep: curr,
+            duration,
             playerId: anim.playerId
           });
-          if (passInfo) {
-            console.log(`🔵 [PASS SYNC] Defensive player ${anim.playerId} animation started at ${defensiveStartTime.toFixed(2)}ms`);
-          }
         }
       }
       
@@ -488,6 +488,33 @@ export class ShotAnimationSystem {
       // Other offensive players (non-passer) continue animating from Phase 1
       const passAndDefensePromises = [];
       const phase2StartTime = performance.now();
+      
+      // ✅ FIX: Start defensive animations now (Phase 2), synchronized with pass
+      const defensivePromises = [];
+      for (const params of defensiveAnimationParams) {
+        const defensiveStartTime = performance.now();
+        const promise = animateStep({
+          scene: this.scene,
+          sprite: params.sprite,
+          step: params.step,
+          nextStep: params.nextStep,
+          duration: params.duration,
+          ballSprite,
+          currentBallOwnerRef,
+          onAction: null,
+          stepIndex
+        });
+        
+        defensivePromises.push({
+          promise,
+          startTime: defensiveStartTime,
+          playerId: params.playerId
+        });
+        
+        if (passInfo) {
+          console.log(`🔵 [PASS SYNC] Defensive player ${params.playerId} animation started at ${defensiveStartTime.toFixed(2)}ms`);
+        }
+      }
       
       if (passInfo) {
         // ✅ DEBUG: Track when pass animation is created
