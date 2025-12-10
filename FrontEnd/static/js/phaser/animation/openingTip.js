@@ -109,7 +109,7 @@ function animateJumpBall(scene, playerSprites, animations, ballSprite, onComplet
             ease: 'Quad.easeOut',
             onComplete: () => {
                 // Stay at peak position
-                console.log(`🏀 Center ${anim.playerId} stays at peak`);
+                // ✅ REMOVED: Opening tip logging (cluttering console)
             }
         });
         
@@ -135,7 +135,7 @@ function animateJumpBall(scene, playerSprites, animations, ballSprite, onComplet
         ease: 'Quad.easeOut',
         onComplete: () => {
             // Stay at peak position
-            console.log("🏀 Ball stays at peak");
+            // ✅ REMOVED: Opening tip logging (cluttering console)
             
             // Wait a moment, then continue
             scene.time.delayedCall(100, () => {
@@ -184,10 +184,7 @@ function animateConvergence(scene, playerSprites, animations, ballSprite, ballLa
     // Ball tweens to landing spot
     const ballPixelCoords = gridToPixels(ballLandingCoords.x, ballLandingCoords.y, canvasWidth, canvasHeight);
     
-    console.log("🏀 Ball converging to:", {
-        gridCoords: ballLandingCoords,
-        pixelCoords: ballPixelCoords
-    });
+    // ✅ REMOVED: Opening tip ball converging logging (cluttering console)
     
     // ✅ FIX: Use getBallDuration() to respect game speed settings
     // This ensures ball animations respect Slow/Normal/Fast speed buttons
@@ -200,14 +197,14 @@ function animateConvergence(scene, playerSprites, animations, ballSprite, ballLa
         duration: ballConvergeDuration,
         ease: 'Quad.easeOut',
         onComplete: () => {
-            console.log("🏀 Ball landed at grid:", ballLandingCoords, "pixel:", { x: ballSprite.x, y: ballSprite.y });
+            // ✅ REMOVED: Opening tip ball landing logging (cluttering console)
             
             // ✅ FIX: Attach ball to the tip winner (player whose end coords match ballLandingCoords)
             // This matches the pattern used in inbound passes (IP → HCO transition)
             // The player who converges to the ball landing spot is the tip winner
             const tipWinnerSprite = findTipWinner(playerSprites, animations, ballLandingCoords, canvasWidth, canvasHeight);
             if (tipWinnerSprite) {
-                console.log("🏀 Attaching ball to tip winner:", tipWinnerSprite.playerId);
+                // ✅ REMOVED: Opening tip ball attachment logging (cluttering console)
                 attachBallToPlayer(scene, ballSprite, tipWinnerSprite);
                 // Set flag so first HCO turn knows ball is already attached (like _previousTurnWasInbound)
                 scene._previousTurnWasOpeningTip = true;

@@ -363,12 +363,12 @@ export class ShotAnimationSystem {
       if (this.scene._leanScoreToAnimate !== null && 
           this.scene._leanAnimationStep === stepIndex && 
           !this.scene._leanAnimationTriggered) {
-        console.log(`📊 [LEAN] Triggering animation at step ${stepIndex} with score ${this.scene._leanScoreToAnimate}`);
+        // ✅ REMOVED: LEAN animation logging (cluttering console)
         const { animateLeanMeter } = await import('../ui/playcallCenter.js');
         animateLeanMeter(this.scene._leanScoreToAnimate);
         this.scene._leanAnimationTriggered = true;
       } else if (this.scene._leanScoreToAnimate !== null && stepIndex === this.scene._leanAnimationStep) {
-        console.log(`⚠️ [LEAN] Animation already triggered or step mismatch: stepIndex=${stepIndex}, targetStep=${this.scene._leanAnimationStep}, triggered=${this.scene._leanAnimationTriggered}`);
+        // ✅ REMOVED: LEAN animation mismatch logging (cluttering console)
       }
       
       // ✅ FIX: Match playTurnAnimation - detect pass BEFORE updateBallOwnership

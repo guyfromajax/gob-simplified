@@ -845,7 +845,7 @@ async function initGame() {
       if (response.ok) {
         const gameData = await response.json();
         if (gameData.timeout_next_play_type) {
-          console.log('✅ TIMEOUT RESUME: Detected timeout state in DB (URL param was missing)');
+          // ✅ REMOVED: Timeout resume logging (cluttering console)
           resumeFromTimeout = true;
         }
       }
