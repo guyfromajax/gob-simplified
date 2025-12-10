@@ -1800,6 +1800,17 @@ async def call_timeout_endpoint(request: CallTimeoutRequest):
     gm.game_state["timeout_offense_team_id"] = gm.offense_team.team_id
     logging.info(f"✅ TIMEOUT: Captured possession team '{gm.offense_team.name}' (team_id: {gm.offense_team.team_id}) for resume")
     
+    # ✅ TIMEOUT: Rebuild computer team's lineup with energy/foul filtering
+    computer_team = gm.away_team if not gm.away_team.is_user_team else gm.home_team
+    if not computer_team.is_user_team:
+        from BackEnd.utils.db_utils import build_lineup_from_mongo
+        try:
+            computer_team.lineup = build_lineup_from_mongo(computer_team, gm.game_state)
+            logging.info(f"✅ TIMEOUT: Rebuilt computer team ({computer_team.name}) lineup with energy/foul filtering")
+        except Exception as e:
+            logging.error(f"⚠️ TIMEOUT: Failed to rebuild computer team lineup: {e}")
+            # Don't fail the timeout if lineup rebuild fails - use existing lineup
+    
     # Append the TIMEOUT turn to the game manager's turns list
     gm.turns.append(timeout_turn)
     gm.text_log.append(timeout_turn["text"])
