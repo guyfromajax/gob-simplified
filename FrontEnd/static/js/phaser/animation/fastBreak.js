@@ -669,9 +669,6 @@ async function animateDefensiveStop(scene, turnData, playerSprites, ballSprite, 
         }
         
         // ✅ REMOVED: Defensive stop animation check logging (cluttering console)
-          distanceToTopKey,
-          wouldMoveTowardBasket: distanceToBasket < distanceToTopKey
-        });
         
         if (distanceToBasket < distanceToTopKey) {
           // Backend animation incorrectly moves ball handler toward basket - use manual positioning instead
