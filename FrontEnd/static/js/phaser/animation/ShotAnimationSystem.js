@@ -202,10 +202,6 @@ export class ShotAnimationSystem {
     } else {
       // Coming from inbound/tip or previous was shot - ball is already attached, don't re-attach
       // ✅ REMOVED: Step 0 ball attachment logging (cluttering console)
-        reason: previousTurnWasShot ? 'previous turn was shot' : 
-                fromInbound ? 'coming from inbound' : 
-                'coming from opening tip'
-      });
     }
     
     // ✅ MATCH playTurnAnimation EXACTLY: Clear inbound and opening tip flags after applying pre-step setup
