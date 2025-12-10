@@ -680,6 +680,20 @@ The outlet passer tracks:
 - **Fast Break Stats**: Tracked after Fast Break turn result is finalized (both DEFENSIVE_STOP and SHOT paths)
 - Stats are recorded in both `run_micro_turn()` and `resolve_offensive_rebound_turn()` paths
 
+**Team Stats (Scouting Data):**
+- **`Fast_Break_Entries`** (Offense): Incremented each time a team runs a Fast Break
+- **`Fast_Break_Success`** (Offense): Incremented only when Fast Break result_type is:
+  - `MAKE`, or
+  - `FOUL` where `foul_team == "DEFENSE"` (defensive foul on the break)
+  - **Note**: `MISS` or `TURNOVER` do NOT count as team success (they count as defensive success)
+- **`vs_Fast_Break.used`** (Defense): Incremented each time defending a Fast Break
+- **`vs_Fast_Break.success`** (Defense): Incremented when Fast Break result_type is:
+  - `DEFENSIVE_STOP`, or
+  - `MISS`, or
+  - `TURNOVER`, or
+  - `FOUL` where `foul_team == "OFFENSE"`
+- **Alignment with player stats:** Player `FB_S` now matches team `Fast_Break_Success` (only `MAKE` or defensive foul). A `MISS` without defensive foul is neutral (`FB_N`) for players and not a success for the team.
+
 **Special Handling:**
 - **`Outlet_Score_List`**: Excluded from stat delta calculations (it's a list, not numeric)
 - **Team Stats Aggregation**: `Outlet_Score_List` is concatenated (not summed) when aggregating team stats
