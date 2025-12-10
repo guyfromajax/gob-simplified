@@ -633,9 +633,8 @@ The release player (outlet receiver) tracks:
 - **`FB_A`** (Fast Break Attempts): Always incremented when player is the outlet receiver on a Fast Break
 - **`FB_S`** (Fast Break Success): Incremented when Fast Break results in:
   - Shot Make
-  - Shot Make + Foul
-  - Shot Miss + Foul
   - Defensive Foul (non-shooting)
+  - **Note**: Shot Miss (without defensive foul) does NOT count as success (matches team-level criteria)
 - **`FB_F`** (Fast Break Failure): Incremented when Fast Break results in:
   - Steal
   - Dead Ball Turnover

@@ -312,13 +312,14 @@ def _record_fast_break_stats(fb_roles, turn_result, game):
     if not result_type:
         return
     
-    # Determine success/failure criteria
-    # FB_S (offense): Shot Make, Shot Make + Foul, Shot Miss + Foul, Defensive Foul (non-shooting)
+    # Determine success/failure criteria (aligned with team-level Fast_Break_Success)
+    # FB_S (offense): Shot Make, Defensive Foul (non-shooting)
+    # Note: MISS does NOT count as success (matches team-level criteria)
     # FB_F (offense): Steal, Dead Ball Turnover, Offensive Foul
     # FB_S_D (defense): DEFENSIVE_STOP
-    # FB_F_D (defense): Same as FB_S (Shot Make, Shot Make + Foul, Shot Miss + Foul, Defensive Foul)
+    # FB_F_D (defense): Shot Make, Shot Miss, Defensive Foul (any shot attempt or defensive foul)
     
-    is_fb_s_offense = result_type in ["MAKE", "MISS"] or (
+    is_fb_s_offense = result_type == "MAKE" or (
         result_type == "FOUL" and game.game_state.get("foul_team") == "DEFENSE"
     )
     is_fb_f_offense = result_type in ["TURNOVER", "STEAL", "DEAD BALL"] or (
