@@ -431,7 +431,7 @@ function renderPlayerStatsTable(team, players) {
       nameLink.style.cursor = 'pointer';
       nameLink.style.color = '#0066cc';
       nameLink.style.textDecoration = 'underline';
-      nameLink.addEventListener('click', () => showFastBreakPopup(player));
+      nameLink.addEventListener('click', () => showSpecialStatsPopup(player));
       nameCell.appendChild(nameLink);
       
       // Clear row and build it properly
@@ -1133,13 +1133,13 @@ function setupLockerRoomButton() {
   });
 }
 
-// Show Fast Break stats popup
-function showFastBreakPopup(player) {
+// Show special stats popup (Fast Break stats and future stat categories)
+function showSpecialStatsPopup(player) {
   const stats = player.stats || {};
   const playerName = player.name || 'Unknown';
   
   // Debug: Log player object structure to verify jersey field
-  console.log('[Fast Break Popup] Player object:', {
+  console.log('[Special Stats Popup] Player object:', {
     name: player.name,
     jersey: player.jersey,
     jerseyNumber: player.jerseyNumber,
@@ -1198,15 +1198,15 @@ function showFastBreakPopup(player) {
   
   // Create popup HTML
   const popup = document.createElement('div');
-  popup.id = 'fast-break-popup';
-  popup.className = 'fast-break-popup';
+  popup.id = 'special-stats-popup';
+  popup.className = 'special-stats-popup';
   popup.innerHTML = `
-    <div class="fast-break-popup-content">
-      <div class="fast-break-popup-header">
-        <h2 class="fast-break-popup-title">${playerName}${jerseyDisplay}</h2>
-        <button class="fast-break-popup-close" onclick="closeFastBreakPopup()">&times;</button>
+    <div class="special-stats-popup-content">
+      <div class="special-stats-popup-header">
+        <h2 class="special-stats-popup-title">${playerName}${jerseyDisplay}</h2>
+        <button class="special-stats-popup-close" onclick="closeSpecialStatsPopup()">&times;</button>
       </div>
-      <div class="fast-break-popup-body">
+      <div class="special-stats-popup-body">
         <div class="fast-break-column">
           <div class="fast-break-row">
             <h3>Fast Breaks</h3>
@@ -1230,7 +1230,7 @@ function showFastBreakPopup(player) {
         </div>
       </div>
     </div>
-    <div class="fast-break-popup-overlay" onclick="closeFastBreakPopup()"></div>
+    <div class="special-stats-popup-overlay" onclick="closeSpecialStatsPopup()"></div>
   `;
   
   document.body.appendChild(popup);
@@ -1238,16 +1238,16 @@ function showFastBreakPopup(player) {
   // Close on Escape key
   const escapeHandler = (e) => {
     if (e.key === 'Escape') {
-      closeFastBreakPopup();
+      closeSpecialStatsPopup();
       document.removeEventListener('keydown', escapeHandler);
     }
   };
   document.addEventListener('keydown', escapeHandler);
 }
 
-// Close Fast Break popup
-function closeFastBreakPopup() {
-  const popup = document.getElementById('fast-break-popup');
+// Close special stats popup
+function closeSpecialStatsPopup() {
+  const popup = document.getElementById('special-stats-popup');
   if (popup) {
     popup.remove();
   }
