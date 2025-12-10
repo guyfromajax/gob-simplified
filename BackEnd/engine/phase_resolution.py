@@ -420,14 +420,16 @@ def _record_outlet_pass_stats(outlet_passer_id, outlet_score, is_successful, gam
     # Update Outlet_Score_Cum (cumulative sum)
     outlet_passer.stats["game"]["Outlet_Score_Cum"] += outlet_score
 
-def _record_fcp_stats(fcp_roles, turn_result, game):
+def _record_fcp_stats(fcp_roles, turn_result, game, off_lineup, def_lineup):
     """
-    Record FCP (Full Court Press) statistics for offensive and defensive players.
+    Record FCP (Full Court Press) statistics for all players in active lineups.
     
     Args:
         fcp_roles: FCP roles dict with ball_handler, shooter, defender, etc.
         turn_result: Final turn result dict with result_type
         game: GameManager instance
+        off_lineup: Dictionary of offensive players by position
+        def_lineup: Dictionary of defensive players by position
     """
     result_type = turn_result.get("result_type")
     if not result_type:
@@ -444,37 +446,30 @@ def _record_fcp_stats(fcp_roles, turn_result, game):
         result_type == "FOUL" and game.game_state.get("foul_team") == "OFFENSE"
     )
     
-    # Track stats for offensive players (ball handler and shooter if shot was taken)
-    ball_handler = fcp_roles.get("ball_handler")
-    shooter = fcp_roles.get("shooter")
+    # Track stats for ALL offensive players in active lineup
+    for player in off_lineup.values():
+        if player:
+            player.record_stat("FCP_A", 1)
+            if is_fcp_s_offense:
+                player.record_stat("FCP_S", 1)
     
-    # Track ball handler stats
-    if ball_handler:
-        ball_handler.record_stat("FCP_A", 1)
-        if is_fcp_s_offense:
-            ball_handler.record_stat("FCP_S", 1)
-    
-    # Track shooter stats (if different from ball handler and shot was taken)
-    if shooter and shooter != ball_handler and result_type in ["MAKE", "MISS"]:
-        shooter.record_stat("FCP_A", 1)
-        if is_fcp_s_offense:
-            shooter.record_stat("FCP_S", 1)
-    
-    # Track stats for defensive players (defender)
-    defender = fcp_roles.get("defender")
-    if defender:
-        defender.record_stat("FCP_A_D", 1)
-        if is_fcp_s_defense:
-            defender.record_stat("FCP_S_D", 1)
+    # Track stats for ALL defensive players in active lineup
+    for player in def_lineup.values():
+        if player:
+            player.record_stat("FCP_A_D", 1)
+            if is_fcp_s_defense:
+                player.record_stat("FCP_S_D", 1)
 
-def _record_hct_stats(hct_roles, turn_result, game):
+def _record_hct_stats(hct_roles, turn_result, game, off_lineup, def_lineup):
     """
-    Record HCT (Half Court Trap) statistics for offensive and defensive players.
+    Record HCT (Half Court Trap) statistics for all players in active lineups.
     
     Args:
         hct_roles: HCT roles dict with ball_handler, shooter, defender, etc.
         turn_result: Final turn result dict with result_type
         game: GameManager instance
+        off_lineup: Dictionary of offensive players by position
+        def_lineup: Dictionary of defensive players by position
     """
     result_type = turn_result.get("result_type")
     if not result_type:
@@ -491,28 +486,19 @@ def _record_hct_stats(hct_roles, turn_result, game):
         result_type == "FOUL" and game.game_state.get("foul_team") == "OFFENSE"
     )
     
-    # Track stats for offensive players (ball handler and shooter if shot was taken)
-    ball_handler = hct_roles.get("ball_handler")
-    shooter = hct_roles.get("shooter")
+    # Track stats for ALL offensive players in active lineup
+    for player in off_lineup.values():
+        if player:
+            player.record_stat("HCT_A", 1)
+            if is_hct_s_offense:
+                player.record_stat("HCT_S", 1)
     
-    # Track ball handler stats
-    if ball_handler:
-        ball_handler.record_stat("HCT_A", 1)
-        if is_hct_s_offense:
-            ball_handler.record_stat("HCT_S", 1)
-    
-    # Track shooter stats (if different from ball handler and shot was taken)
-    if shooter and shooter != ball_handler and result_type in ["MAKE", "MISS"]:
-        shooter.record_stat("HCT_A", 1)
-        if is_hct_s_offense:
-            shooter.record_stat("HCT_S", 1)
-    
-    # Track stats for defensive players (defender)
-    defender = hct_roles.get("defender")
-    if defender:
-        defender.record_stat("HCT_A_D", 1)
-        if is_hct_s_defense:
-            defender.record_stat("HCT_S_D", 1)
+    # Track stats for ALL defensive players in active lineup
+    for player in def_lineup.values():
+        if player:
+            player.record_stat("HCT_A_D", 1)
+            if is_hct_s_defense:
+                player.record_stat("HCT_S_D", 1)
 
 def resolve_fast_break_logic(game: "GameManager"):
     from BackEnd.models.game_manager import GameManager
@@ -1997,7 +1983,7 @@ def resolve_full_court_press_logic(game: "GameManager"):
             "shooter": shooter,
             "defender": defender,
         }
-        _record_fcp_stats(fcp_roles, shot_result, game)
+        _record_fcp_stats(fcp_roles, shot_result, game, off_lineup, def_lineup)
         
         # Add FCP-specific data
         shot_result["fcp_shot"] = True
@@ -2188,7 +2174,7 @@ def resolve_full_court_press_logic(game: "GameManager"):
         "defender": defender,
     }
     turn_result = {"result_type": result_type}
-    _record_fcp_stats(fcp_roles, turn_result, game)
+    _record_fcp_stats(fcp_roles, turn_result, game, off_lineup, def_lineup)
     
     # ✅ SS&S: Set offense_team_id (team on offense DURING this turn)
     # Backend calls switch_possession() after turn if needed, so next turn has correct offense_team
@@ -2841,7 +2827,7 @@ def resolve_half_court_trap_logic(game: "GameManager"):
             "shooter": shooter,
             "defender": defender,
         }
-        _record_hct_stats(hct_roles, shot_result, game)
+        _record_hct_stats(hct_roles, shot_result, game, off_lineup, def_lineup)
         
         # Add HCT-specific data
         shot_result["hct_shot"] = True
@@ -3036,7 +3022,7 @@ def resolve_half_court_trap_logic(game: "GameManager"):
         "defender": defender,
     }
     turn_result = {"result_type": result_type}
-    _record_hct_stats(hct_roles, turn_result, game)
+    _record_hct_stats(hct_roles, turn_result, game, off_lineup, def_lineup)
     
     # ✅ SS&S: Set offense_team_id (team on offense DURING this turn)
     # Backend calls switch_possession() after turn if needed, so next turn has correct offense_team
