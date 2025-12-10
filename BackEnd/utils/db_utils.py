@@ -21,7 +21,69 @@ def get_player_rating(player, traits: List[str]) -> float:
         total += player.attributes.get(trait, 0)
     return total / len(traits)
 
-def build_lineup_from_mongo(team: Union[str, TeamManager]) -> Dict[str, Player]:
+def is_player_eligible_for_lineup(player, game_state=None, ineligible_player_ids=None) -> bool:
+    """
+    Check if a player is eligible for lineup based on energy and foul restrictions.
+    
+    Args:
+        player: Player object to check
+        game_state: Optional game state dict with quarter, time_remaining, ineligible_players
+        ineligible_player_ids: Optional set of ineligible player IDs (fouled out)
+    
+    Returns:
+        True if player is eligible, False otherwise
+    """
+    # Always exclude fouled-out players (5+ fouls)
+    if ineligible_player_ids and player.player_id in ineligible_player_ids:
+        return False
+    
+    foul_count = player.get_stat("F", "game")
+    if foul_count >= 5:
+        return False
+    
+    # If no game_state provided, only check for fouled-out players
+    if not game_state:
+        return True
+    
+    quarter = game_state.get("quarter", 1)
+    time_remaining = game_state.get("time_remaining", 480)  # Default to 8:00 (480 seconds)
+    ineligible_players = game_state.get("ineligible_players", [])
+    
+    # Check if player is in ineligible list (fouled out)
+    if player.player_id in ineligible_players:
+        return False
+    
+    # Energy (NG) filtering
+    ng = player.attributes.get("NG", 1.0)
+    
+    # Determine energy threshold based on quarter and time
+    is_late_q4_or_ot = (quarter == 4 and time_remaining < 240) or quarter > 4
+    energy_threshold = 0.69 if is_late_q4_or_ot else 0.8
+    
+    if ng < energy_threshold:
+        return False
+    
+    # Foul filtering by quarter
+    if quarter == 1:
+        if foul_count > 1:
+            return False
+    elif quarter == 2:
+        if foul_count > 2:
+            return False
+    elif quarter == 3:
+        if foul_count > 3:
+            return False
+    elif quarter == 4:
+        # Q4: exclude if fouls > 3 AND more than 4 minutes remaining
+        if foul_count > 3 and time_remaining > 240:
+            return False
+    elif quarter > 4:  # Overtime
+        # OT: no foul exclusion for active players (already checked for 5+ fouls above)
+        pass
+    
+    return True
+
+def build_lineup_from_mongo(team: Union[str, TeamManager], game_state=None) -> Dict[str, Player]:
     """Build a starting lineup using existing player objects when available.
 
     ``team`` may be either a team name or an actual :class:`TeamManager`
@@ -29,6 +91,11 @@ def build_lineup_from_mongo(team: Union[str, TeamManager]) -> Dict[str, Player]:
     are reused so their in-memory ``stats['game']`` containers are preserved.
     Passing a string falls back to the original behaviour of constructing new
     :class:`Player` objects from the database.
+    
+    Args:
+        team: Team name or TeamManager instance
+        game_state: Optional game state dict with quarter, time_remaining, ineligible_players
+                   Used to filter players based on energy and foul restrictions
     """
 
     if isinstance(team, TeamManager):
@@ -39,13 +106,27 @@ def build_lineup_from_mongo(team: Union[str, TeamManager]) -> Dict[str, Player]:
         players_cursor = players_collection.find({"team": team_name})
         players = [Player(p) for p in players_cursor]
 
-    if len(players) < 5:
-        raise ValueError(f"Team '{team_name}' has fewer than 5 players.")
+    # Get ineligible player IDs (fouled out)
+    ineligible_player_ids = set()
+    if game_state:
+        ineligible_player_ids = set(game_state.get("ineligible_players", []))
+    
+    # Filter players based on energy and foul restrictions
+    eligible_players = [
+        p for p in players
+        if is_player_eligible_for_lineup(p, game_state, ineligible_player_ids)
+    ]
+    
+    if len(eligible_players) < 5:
+        raise ValueError(
+            f"Team '{team_name}' has fewer than 5 eligible players. "
+            f"Total players: {len(players)}, Eligible: {len(eligible_players)}"
+        )
 
     position_order = ["PG", "SG", "SF", "PF", "C"]
     random.shuffle(position_order)
 
-    available_players = players.copy()
+    available_players = eligible_players.copy()
     lineup: Dict[str, Player] = {}
 
     for pos in position_order:
