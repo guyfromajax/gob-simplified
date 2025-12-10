@@ -1207,25 +1207,25 @@ function showSpecialStatsPopup(player) {
         <button class="special-stats-popup-close" onclick="closeSpecialStatsPopup()">&times;</button>
       </div>
       <div class="special-stats-popup-body">
-        <div class="fast-break-column">
-          <div class="fast-break-row">
+        <div class="special-stats-column">
+          <div class="special-stats-row">
             <h3>Fast Breaks</h3>
           </div>
-          <div class="fast-break-row">
-            <span class="fast-break-label">Offense:</span>
-            <span class="fast-break-value">${fbA} / ${offenseSuccessRate}%</span>
+          <div class="special-stats-row">
+            <span class="special-stats-label">Offense:</span>
+            <span class="special-stats-value">${fbA} / ${offenseSuccessRate}%</span>
           </div>
-          <div class="fast-break-row">
-            <span class="fast-break-label">Defense:</span>
-            <span class="fast-break-value">${fbAD} / ${defenseSuccessRate}%</span>
+          <div class="special-stats-row">
+            <span class="special-stats-label">Defense:</span>
+            <span class="special-stats-value">${fbAD} / ${defenseSuccessRate}%</span>
           </div>
-          <div class="fast-break-row empty-row"></div>
-          <div class="fast-break-row">
+          <div class="special-stats-row empty-row"></div>
+          <div class="special-stats-row">
             <h3>Outlet Passes</h3>
           </div>
-          <div class="fast-break-row">
-            <span class="fast-break-label">Att / Score:</span>
-            <span class="fast-break-value">${outletA} / ${outletScore}</span>
+          <div class="special-stats-row">
+            <span class="special-stats-label">Att / Score:</span>
+            <span class="special-stats-value">${outletA} / ${outletScore}</span>
           </div>
         </div>
       </div>
