@@ -124,13 +124,6 @@ export class AnimationEngine {
                         turnData.result_type === "FAST_BREAK";
     
     if (isFastBreak) {
-      // ✅ REMOVED: Fast break detected logging (cluttering console)
-        outlet_passer: turnData.roles?.outlet_passer,
-        outlet_receiver: turnData.roles?.outlet_receiver,
-        reason: turnData.fast_break === true || turnData.fast_break === "true" ? 'fast_break flag' :
-                turnData.result_type === "FAST_BREAK" ? 'result_type' :
-                'unknown'
-      });
       return this.animationHandlers.get('FAST_BREAK');
     }
 
