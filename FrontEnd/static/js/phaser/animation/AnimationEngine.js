@@ -124,14 +124,7 @@ export class AnimationEngine {
                         turnData.result_type === "FAST_BREAK";
     
     if (isFastBreak) {
-      console.log('⚡ [FAST BREAK DETECTED]', {
-        fast_break: turnData.fast_break,
-        fast_break_type: typeof turnData.fast_break,
-        result_type: turnData.result_type,
-        next_play_type: turnData.next_play_type,
-        has_roles: !!turnData.roles,
-        has_outlet_passer: !!turnData.roles?.outlet_passer,
-        has_outlet_receiver: !!turnData.roles?.outlet_receiver,
+      // ✅ REMOVED: Fast break detected logging (cluttering console)
         outlet_passer: turnData.roles?.outlet_passer,
         outlet_receiver: turnData.roles?.outlet_receiver,
         reason: turnData.fast_break === true || turnData.fast_break === "true" ? 'fast_break flag' :
@@ -391,15 +384,7 @@ export class AnimationEngine {
   }
 
   async handleFastBreak(turnData, context) {
-    console.log('⚡ AnimationEngine: Handling fast break', {
-      result_type: turnData.result_type,
-      fast_break: turnData.fast_break,
-      has_roles: !!turnData.roles,
-      outlet_passer: turnData.roles?.outlet_passer,
-      outlet_receiver: turnData.roles?.outlet_receiver,
-      has_animations: !!turnData.animations,
-      animation_count: turnData.animations?.length || 0
-    });
+    // ✅ REMOVED: Fast break handling logging (cluttering console)
     
     // ✅ PHASE 2.6: Update active player display (moved from animateGameTurns.js)
     const { getBallHandlerIdFromTurn, getDefenderIdFromTurn, updateActivePlayers } = await import('../utils/activePlayerDisplay.js');
@@ -410,7 +395,6 @@ export class AnimationEngine {
     }
     
     // Import and use existing fast break handler for now
-    console.log('⚡ About to call runFastBreakSequence');
     const { runFastBreakSequence } = await import('./fastBreak.js');
     await runFastBreakSequence({
       scene: this.scene,
@@ -419,7 +403,6 @@ export class AnimationEngine {
       ballSprite: context.ballSprite,
       turnIndex: context.turnIndex // ✅ PHASE 2.6: Pass turnIndex from context
     });
-    console.log('⚡ runFastBreakSequence completed');
     
     // ✅ PHASE 2.6: Set flag if this was a shot turn (moved from animateGameTurns.js)
     if (turnData.result_type === "MAKE" || turnData.result_type === "MISS") {

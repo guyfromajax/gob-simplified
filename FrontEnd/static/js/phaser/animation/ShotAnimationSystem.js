@@ -71,8 +71,7 @@ export class ShotAnimationSystem {
     });
     
     const isHCO = turnData.play_type === 'HCO' || turnData.playcall === 'HCO';
-    const shooterName = this.playerSprites[turnData.shooter_id]?.name || 'unknown';
-    console.log(`🏀 SHOT ATTEMPT: ${shooterName} (${turnData.shooter_id}) - Result: ${turnData.result_type} - HCO: ${isHCO}`);
+    // ✅ REMOVED: Shot attempt logging (cluttering console)
     
     if (this.activeShot) {
       console.warn('ShotAnimationSystem: Already processing a shot, queuing...');
@@ -176,7 +175,6 @@ export class ShotAnimationSystem {
     // After a shot, the ball should remain at the rim/bounce spot until the next turn's animation moves it
     const previousTurnWasShot = this.scene._previousTurnWasShot === true;
     if (previousTurnWasShot) {
-      console.log('🏀 ShotAnimationSystem: Skipping step 0 ball attachment - previous turn was a shot');
       this.scene._previousTurnWasShot = false; // Clear the flag
     }
     
@@ -203,10 +201,7 @@ export class ShotAnimationSystem {
       }
     } else {
       // Coming from inbound/tip or previous was shot - ball is already attached, don't re-attach
-      console.log('🏀 ShotAnimationSystem: Skipping step 0 ball attachment', {
-        previousTurnWasShot,
-        fromInbound,
-        fromOpeningTip,
+      // ✅ REMOVED: Step 0 ball attachment logging (cluttering console)
         reason: previousTurnWasShot ? 'previous turn was shot' : 
                 fromInbound ? 'coming from inbound' : 
                 'coming from opening tip'
@@ -228,9 +223,7 @@ export class ShotAnimationSystem {
     const isMake = turnData.result_type === 'MAKE';
     const rimCoords = this.getRimCoordinates(turnData);
     
-    // ✅ DEBUG: Log the result immediately when determined
-    const shooterName = this.playerSprites[turnData.shooter_id]?.name || 'unknown';
-    console.log(`🏀 SHOT RESULT: ${shooterName} - ${turnData.result_type}`);
+    // ✅ REMOVED: Shot result logging (cluttering console)
     
     // Execute make or miss handling
     if (isMake) {
@@ -521,7 +514,7 @@ export class ShotAnimationSystem {
       }
     }
     
-    console.log('✅ ShotAnimationSystem: Player movement animation completed');
+    // ✅ REMOVED: Player movement completed logging (cluttering console)
   }
   
   /**
@@ -719,10 +712,8 @@ export class ShotAnimationSystem {
    * Handle made shot
    */
   async handleMadeShot(rimCoords, turnData) {
-    // ✅ DEBUG: Log made shot with shooter details
-    const shooterName = this.playerSprites[turnData.shooter_id]?.name || 'unknown';
+    // ✅ REMOVED: Made shot logging (cluttering console)
     const isPutbackMake = turnData.result_type === 'PUTBACK_MAKE';
-    console.log(`🏀 MADE SHOT: ${shooterName} - Putback: ${isPutbackMake} - next_play_type: ${turnData.next_play_type || 'UNDEFINED'}`);
     
     if (DebugFlags.SHOT_ANIMATION) {
       console.log('ShotAnimationSystem: Shot made', {
@@ -854,19 +845,14 @@ export class ShotAnimationSystem {
       }
     }
     
-    // ✅ DEBUG: Log completion of made shot
-    console.log(`🔍 MADE SHOT COMPLETE - next_play_type: ${turnData.next_play_type || 'UNDEFINED'}`);
+    // ✅ REMOVED: Made shot complete logging (cluttering console)
   }
 
   /**
    * Handle missed shot
    */
   async handleMissedShot(rimCoords, turnData) {
-    // ✅ DEBUG: Log missed shot with shooter details
-    const shooterName = this.playerSprites[turnData.shooter_id]?.name || 'unknown';
-    const rebounderName = turnData.rebounderId ? (this.playerSprites[turnData.rebounderId]?.name || 'unknown') : null;
-    const isOwnRebound = turnData.rebounderId === turnData.shooter_id;
-    console.log(`🏀 MISSED SHOT: ${shooterName} - Rebounder: ${rebounderName || 'none'} - Own Rebound: ${isOwnRebound}`);
+    // ✅ REMOVED: Missed shot logging (cluttering console)
 
     // Animate ball bounce from rim
     await this.animateBallBounce(rimCoords, turnData);
@@ -1002,7 +988,7 @@ export class ShotAnimationSystem {
     // });
     
     if (turnData.rebound_type === 'DREB') {
-      console.log('🎬 ShotAnimationSystem: Calling handleDefensiveRebound');
+      // ✅ REMOVED: Calling handleDefensiveRebound logging (cluttering console)
       await this.handleDefensiveRebound(rebounderSprite, turnData);
     } else if (turnData.rebound_type === 'OREB') {
       // ✅ DEBUG: Track OREB handling to see if putback is coming
@@ -1017,12 +1003,10 @@ export class ShotAnimationSystem {
         willSeePutbackAfterOREB: (nextTurn?.result_type === 'OREB' || nextTurn?.result_type === 'OREB_KICKOUT') && 
                                   (nextNextTurn?.result_type === 'PUTBACK_MAKE' || nextNextTurn?.result_type === 'PUTBACK_MISS')
       });
-      console.log('🎬 ShotAnimationSystem: Calling handleOffensiveRebound');
+      // ✅ REMOVED: Calling handleOffensiveRebound logging (cluttering console)
       await this.handleOffensiveRebound(rebounderSprite, turnData);
     } else {
-      console.log('🎬 ShotAnimationSystem: Unknown rebound type, skipping', {
-        rebound_type: turnData.rebound_type
-      });
+      // ✅ REMOVED: Unknown rebound type logging (cluttering console)
     }
 
     // Transition to POSSESSION state
@@ -1134,12 +1118,7 @@ export class ShotAnimationSystem {
       const clampedX = Math.max(20, Math.min(courtWidth - 20, targetX));
       const clampedY = Math.max(20, Math.min(courtHeight - 20, targetY));
       
-      console.log('🎬 ShotAnimationSystem: Player moving to rebound spot', {
-        playerId: playerSprite.playerId,
-        from: { x: playerSprite.x, y: playerSprite.y },
-        to: { x: clampedX, y: clampedY },
-        ballSpot: { x: ballBounceCoords.x, y: ballBounceCoords.y }
-      });
+      // ✅ REMOVED: Player moving to rebound spot logging (cluttering console)
       
       // ✅ FIX: Use distance-based duration for consistent speed
       const duration = getPlayerDuration(playerSprite, clampedX, clampedY);
@@ -1202,13 +1181,7 @@ export class ShotAnimationSystem {
     // Use the same defensive rebound setup for HCO, HCT, and FCP
     // Fast breaks handle outlet in their own turn
     if (nextPlayType === 'HCO' || nextPlayType === 'HCT' || nextPlayType === 'FCP') {
-      console.log(`🎬 ShotAnimationSystem: Defensive rebound leads to ${nextPlayType} - using runDefensiveReboundSetup`, {
-        nextPlayType,
-        rebounderId: turnData.rebounderId,
-        fcp_shot: turnData.fcp_shot,
-        hct_shot: turnData.hct_shot,
-        note: 'Should execute outlet step (PG to rebounder, others down court)'
-      });
+      // ✅ REMOVED: Defensive rebound logging (cluttering console)
       
       // ✅ FIX: Announce rebound before outlet animation
       // ballManager only announces rebounds for its own rebound positioning code
@@ -1237,7 +1210,7 @@ export class ShotAnimationSystem {
           nextPlayType: nextPlayType,
           turnData: turnData // ✅ FIX: Pass turnData to enable outlet pass detection from animation data
         });
-        console.log('✅ ShotAnimationSystem: runDefensiveReboundSetup completed successfully');
+        // ✅ REMOVED: runDefensiveReboundSetup completed logging (cluttering console)
       } catch (error) {
         console.error('❌ ShotAnimationSystem: runDefensiveReboundSetup failed', error);
         throw error; // Re-throw to trigger fallback
@@ -1245,18 +1218,10 @@ export class ShotAnimationSystem {
     } else if (nextPlayType === 'FAST_BREAK') {
       // ✅ FIX: Fast Break outlet passes are handled in the Fast Break sequence itself
       // But we should still log that we're skipping outlet pass here
-      console.log('🎬 ShotAnimationSystem: Defensive rebound leads to FAST_BREAK - outlet pass handled in Fast Break sequence', {
-        rebounderId: turnData.rebounderId,
-        note: 'Fast Break sequence (fastBreak.js) will handle outlet pass in animateOutletPhase()'
-      });
+      // ✅ REMOVED: Fast break outlet pass logging (cluttering console)
     } else {
       // ✅ PRIORITY 2 FIX: Add defensive logging for skipped outlet pass
-      console.warn('🎬 ShotAnimationSystem: Defensive rebound outlet pass skipped', {
-        nextPlayType: nextPlayType,
-        rebounderId: turnData.rebounderId,
-        reason: 'next_play_type is not HCO, HCT, FCP, or FAST_BREAK',
-        note: 'Unknown next play type - outlet pass may be skipped'
-      });
+      // ✅ REMOVED: Defensive rebound outlet pass skipped logging (cluttering console)
       // Handle other cases if needed
     }
   }
@@ -1270,30 +1235,11 @@ export class ShotAnimationSystem {
     const nextTurn = this.scene.simData?.turns?.[currentTurnIndex + 1];
     const nextNextTurn = this.scene.simData?.turns?.[currentTurnIndex + 2];
     
-    console.log('🎬 ShotAnimationSystem: Handling offensive rebound', {
-      rebounderId: turnData.rebounderId,
-      putback_attempt: turnData.putback_attempt,
-      events: turnData.events,
-      currentTurnIndex,
-      nextTurnResult: nextTurn?.result_type || null,
-      nextNextTurnResult: nextNextTurn?.result_type || null,
-      willSeePutbackTurn: nextTurn?.result_type === 'PUTBACK_MAKE' || nextTurn?.result_type === 'PUTBACK_MISS',
-      willSeeOREBTurn: nextTurn?.result_type === 'OREB' || nextTurn?.result_type === 'OREB_KICKOUT'
-    });
+    // ✅ REMOVED: Offensive rebound logging (cluttering console)
     
     try {
       // TEMPORARY: Force all offensive rebounds to be putback attempts for testing
-      console.log('🎬 ShotAnimationSystem: TEMPORARY - Forcing all offensive rebounds to be putback attempts');
       await this.executePutbackAttempt(rebounderSprite, turnData);
-      console.log('🎬 ShotAnimationSystem: executePutbackAttempt completed successfully');
-      
-      // ✅ DEBUG: After putback attempt, check if we should expect a PUTBACK_MAKE turn
-      const afterPutbackNextTurn = this.scene.simData?.turns?.[currentTurnIndex + 1];
-      console.log('🔍 [AFTER PUTBACK ATTEMPT]', {
-        currentTurnIndex,
-        nextTurnResult: afterPutbackNextTurn?.result_type || null,
-        expectingPutbackTurn: afterPutbackNextTurn?.result_type === 'PUTBACK_MAKE' || afterPutbackNextTurn?.result_type === 'PUTBACK_MISS'
-      });
     } catch (error) {
       console.error('🎬 ShotAnimationSystem: executePutbackAttempt failed', error);
       throw error;
@@ -1331,7 +1277,7 @@ export class ShotAnimationSystem {
    * Execute putback attempt using standard shot animation
    */
   async executePutbackAttempt(rebounderSprite, turnData) {
-    console.log('🎬 ShotAnimationSystem: Executing putback attempt using OLD SYSTEM');
+    // ✅ REMOVED: Putback attempt logging (cluttering console)
     
     // SIMPLE APPROACH: Use the old system that already works for regular shots
     const { playTurnAnimation } = await import('./turnAnimation.js');
@@ -1350,8 +1296,6 @@ export class ShotAnimationSystem {
       }]
     };
     
-    console.log('🎬 ShotAnimationSystem: Using old system for putback', putbackTurnData);
-    
     // Use the old system - it already works perfectly for regular shots
     await playTurnAnimation({
       scene: this.scene,
@@ -1361,8 +1305,6 @@ export class ShotAnimationSystem {
       ballSprite: this.ballController.ballSprite,
       onAction: () => {} // No callback needed
     });
-    
-    console.log('🎬 ShotAnimationSystem: Putback completed using old system');
     return { success: true };
   }
 
@@ -1370,7 +1312,7 @@ export class ShotAnimationSystem {
    * Execute kickout pass
    */
   async executeKickoutPass(rebounderSprite, turnData) {
-    console.log('🎬 ShotAnimationSystem: Executing kickout pass');
+    // ✅ REMOVED: Kickout pass logging (cluttering console)
     
     // Find the kickout event data
     const kickoutEvent = turnData.events?.find(event => event.event_type === 'KICKOUT_RESET');
@@ -1390,8 +1332,6 @@ export class ShotAnimationSystem {
       kickoutEvent.pgId,
       kickoutEvent.pass
     );
-    
-    console.log('🎬 ShotAnimationSystem: Kickout pass completed');
     
     // The animateKickoutReset function already handles:
     // - Pass from rebounder to PG

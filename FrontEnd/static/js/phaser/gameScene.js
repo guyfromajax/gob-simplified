@@ -54,15 +54,7 @@ export function createGameScene(Phaser) {
         this.periodLabel = data.periodLabel;
         this.quarter = data.quarter || 1;
         
-        // ✅ DEBUG: Log gameId state when scene initializes
-        const gameStoreGameId = gameStore.getGameId();
-        const localStorageGameId = typeof localStorage !== 'undefined' ? localStorage.getItem('game_id') : null;
-        console.log('🔍 [Q1→Q2 DEBUG] gameScene.init - gameId state:', {
-          quarter: this.quarter,
-          gameStore_gameId: gameStoreGameId,
-          localStorage_gameId: localStorageGameId,
-          urlParams_gameId: new URLSearchParams(window.location.search).get('game_id')
-        });
+        // ✅ REMOVED: Quarter transition debug logging (cluttering console)
         
         this.gameId = gameStoreGameId;
         // ✅ DEBUG: Commented out fix - adding debug logs instead
@@ -233,7 +225,7 @@ export function createGameScene(Phaser) {
       
       if (isNewGameStart) {
         // Clear stale game_id for new game
-        console.log('🆕 NEW GAME: Clearing stale game_id for new game start');
+        // ✅ REMOVED: New game logging (cluttering console)
         this.gameId = null;
         if (typeof localStorage !== 'undefined') {
           localStorage.removeItem('game_id');
@@ -249,12 +241,7 @@ export function createGameScene(Phaser) {
       // ✅ TIMEOUT: Add resume_from_timeout flag if present in URL
       if (resumeFromTimeout) {
         payload.resume_from_timeout = true;
-        console.log('🔍 TIMEOUT RESUME: Setting resume_from_timeout=true in payload', payload);
-      } else {
-        console.log('🔍 TIMEOUT RESUME: resume_from_timeout not in URL or not true', {
-          url: window.location.search,
-          resumeFromTimeout: resumeFromTimeout
-        });
+        // ✅ REMOVED: Timeout resume logging (cluttering console)
       }
       if (DEBUG_FLOW) {
         console.log('[gameScene] request payload', {
@@ -369,21 +356,12 @@ export function createGameScene(Phaser) {
       this.gameId = simData.game_id || this.gameId;
       const isNewGame = this.quarter === 1 && (!previousGameId || (simData.game_id && simData.game_id !== previousGameId));
       
-      // ✅ DEBUG: Log gameId after receiving simData
-      console.log('🔍 [Q1→Q2 DEBUG] gameScene - After simulate-quarter response:', {
-        quarter: this.quarter,
-        previousGameId: previousGameId,
-        simData_game_id: simData.game_id,
-        scene_gameId_after: this.gameId,
-        isNewGame: isNewGame
-      });
+      // ✅ REMOVED: Quarter transition debug logging (cluttering console)
       
       if (this.gameId && typeof localStorage !== 'undefined') {
         localStorage.setItem('game_id', this.gameId);
-        console.log('🔍 [Q1→Q2 DEBUG] gameScene - Saved gameId to localStorage:', this.gameId);
       }
       gameStore.setGameId(this.gameId);
-      console.log('🔍 [Q1→Q2 DEBUG] gameScene - Set gameId in gameStore:', this.gameId);
       
       // Set team IDs on scene for animation systems
       this.homeTeamId = homeId;
@@ -1455,7 +1433,7 @@ export function createGameScene(Phaser) {
           // Turn-by-turn simulation loop
           // Initial turns (opening tip for Q1, empty for Q2+) are passed in
           // Turns are generated on-demand via /api/simulate-turn calls
-          console.log(`🎮 Starting quarter ${this.quarter} (initial turns: ${simData.turns?.length || 0})`);
+          // ✅ REMOVED: Starting quarter logging (cluttering console)
           await this.simulateTurnByTurn(simData, updateScoreboard);
           
           console.log('🎬 GameScene: Turn-by-turn simulation completed');
@@ -1638,7 +1616,7 @@ export function createGameScene(Phaser) {
      * Replaces the old batch simulation approach
      */
     async simulateTurnByTurn(initialSimData, updateScoreboard) {
-      console.log('🔄 Starting turn-by-turn simulation for quarter', this.quarter);
+      // ✅ REMOVED: Starting turn-by-turn simulation logging (cluttering console)
       
       const gameId = initialSimData.game_id;
       const { home: homeTeam, away: awayTeam } = gameStore.getTeams();
@@ -1655,7 +1633,7 @@ export function createGameScene(Phaser) {
       
       // Animate initial turns first (opening tip, quarter start inbound, etc.)
       if (initialTurns.length > 0) {
-        console.log(`🎬 Animating ${initialTurns.length} initial turns (opening tip/inbound)`);
+        // ✅ REMOVED: Animating initial turns logging (cluttering console)
         
         // Add indices to initial turns for text scroll
         initialTurns.forEach((turn, idx) => {
@@ -1756,7 +1734,7 @@ export function createGameScene(Phaser) {
           
           // Handle BATCH turns (e.g., HCO miss → OREB)
           if (turn.result_type === 'BATCH' && turn.batch_turns) {
-            console.log(`🎬 Batch turn with ${turn.batch_turns.length} sub-turns`);
+            // ✅ REMOVED: Batch turn logging (cluttering console)
             
             // Animate each turn in the batch
             for (const subTurn of turn.batch_turns) {
