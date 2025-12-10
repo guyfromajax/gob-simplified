@@ -56,7 +56,7 @@ export function createGameScene(Phaser) {
         
         // ✅ REMOVED: Quarter transition debug logging (cluttering console)
         
-        this.gameId = gameStoreGameId;
+        this.gameId = gameStore.getGameId();
         // ✅ DEBUG: Commented out fix - adding debug logs instead
         // if (!this.gameId && this.quarter > 1 && typeof localStorage !== 'undefined') {
         //   const storedGameId = localStorage.getItem('game_id');
