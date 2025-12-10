@@ -48,9 +48,7 @@ export class FreeThrowAnimationSystem {
     this.currentAttempt = 0;
     this.totalAttempts = 0;
     
-    if (DebugFlags.FREE_THROW_ANIMATION) {
-      console.log('FreeThrowAnimationSystem: Initialized');
-    }
+    // ✅ REMOVED: Free throw initialization logging (cluttering console)
   }
 
   /**
@@ -66,27 +64,12 @@ export class FreeThrowAnimationSystem {
     this.activeSequence = turnData;
     
     try {
-      if (DebugFlags.FREE_THROW_ANIMATION) {
-        console.log('FreeThrowAnimationSystem: Processing free throw', {
-          shooter_id: turnData.shooter_id,
-          ft_context: turnData.ftContext,
-          result_type: turnData.result_type
-        });
-      }
+      // ✅ REMOVED: Free throw processing logging (cluttering console)
 
       // Adapt backend data structure to new system format
       const adaptedTurnData = this.adaptBackendData(turnData);
       
       // Validate free throw data
-      console.log('🔍 FreeThrowAnimationSystem: Validating free throw data', {
-        result_type: adaptedTurnData.result_type,
-        shooter_id: adaptedTurnData.shooter_id,
-        player_id: adaptedTurnData.player_id,
-        ftContext: adaptedTurnData.ftContext,
-        allKeys: Object.keys(adaptedTurnData),
-        fullTurnData: adaptedTurnData
-      });
-      
       if (!this.validateFreeThrowData(adaptedTurnData)) {
         console.error('❌ FreeThrowAnimationSystem: Free throw data validation failed', {
           result_type: adaptedTurnData.result_type,
@@ -98,8 +81,6 @@ export class FreeThrowAnimationSystem {
         });
         throw new Error('Invalid free throw data');
       }
-      
-      console.log('✅ FreeThrowAnimationSystem: Free throw data validation passed');
 
       // Get shooter sprite
       const shooterSprite = this.getShooterSprite(adaptedTurnData);
@@ -151,14 +132,7 @@ export class FreeThrowAnimationSystem {
     const width = this.scene.game.config.width;
     const height = this.scene.game.config.height;
 
-    if (DebugFlags.FREE_THROW_ANIMATION) {
-      console.log('FreeThrowAnimationSystem: Setting up free throw positioning', {
-        shooter_id: turnData.shooter_id,
-        animations_count: animations.length,
-        player_anims_count: playerAnims.length,
-        no_lane: turnData.no_lane
-      });
-    }
+    // ✅ REMOVED: Free throw positioning logging (cluttering console)
 
     if (!turnData.no_lane) {
       // Move all players to their free throw positions
@@ -212,9 +186,7 @@ export class FreeThrowAnimationSystem {
       this.ballController.attachToPlayer(shooterSprite);
     }
 
-    if (DebugFlags.FREE_THROW_ANIMATION) {
-      console.log('FreeThrowAnimationSystem: Free throw positioning complete');
-    }
+    // ✅ REMOVED: Free throw positioning complete logging (cluttering console)
   }
 
   /**
@@ -238,14 +210,7 @@ export class FreeThrowAnimationSystem {
     const rimCoords = this.getRimCoordinatesFromAnimation(turnData);
     await this.animateBallToRim(shooterSprite, rimCoords, turnData);
 
-    if (DebugFlags.FREE_THROW_ANIMATION) {
-      console.log('FreeThrowAnimationSystem: Free throw shot executed', {
-        shooter_id: turnData.shooter_id,
-        attempt: ftContext.attempt,
-        total: ftContext.total,
-        rimCoords: rimCoords
-      });
-    }
+    // ✅ REMOVED: Free throw shot executed logging (cluttering console)
   }
 
   /**
@@ -293,13 +258,7 @@ export class FreeThrowAnimationSystem {
         }
       });
 
-      if (DebugFlags.FREE_THROW_ANIMATION) {
-        console.log('FreeThrowAnimationSystem: Ball animation to rim', {
-          from: { x: shooterSprite.x, y: shooterSprite.y - 10 },
-          to: rimCoords,
-          duration: shotDuration
-        });
-      }
+      // ✅ REMOVED: Free throw ball animation logging (cluttering console)
     });
   }
 
@@ -307,24 +266,9 @@ export class FreeThrowAnimationSystem {
    * Handle made free throw
    */
   async handleMadeFreeThrow(turnData, ftContext) {
-    // ✅ DEBUG: Log free throw context to diagnose inbound pass issue
-    console.log('🏀 [FREE THROW DEBUG] handleMadeFreeThrow', {
-      shooter_id: turnData.shooter_id,
-      attempt: ftContext.attempt,
-      total: ftContext.total,
-      isFinal: ftContext.isFinal,
-      free_throws_remaining: turnData.free_throws_remaining,
-      ftContext_keys: Object.keys(turnData.ftContext || {}),
-      ftContext_full: turnData.ftContext
-    });
+    // ✅ REMOVED: Free throw debug logging (cluttering console)
     
-    if (DebugFlags.FREE_THROW_ANIMATION) {
-      console.log('FreeThrowAnimationSystem: Free throw made', {
-        shooter_id: turnData.shooter_id,
-        attempt: ftContext.attempt,
-        total: ftContext.total
-      });
-    }
+    // ✅ REMOVED: Free throw made logging (cluttering console)
 
     // ✅ SS&S: Announce FT make using central dispatcher
     const { announceGameEvent } = await import('../utils/gameAnnouncements.js');
@@ -384,13 +328,7 @@ export class FreeThrowAnimationSystem {
    * Handle missed free throw
    */
   async handleMissedFreeThrow(turnData, ftContext) {
-    if (DebugFlags.FREE_THROW_ANIMATION) {
-      console.log('FreeThrowAnimationSystem: Free throw missed', {
-        shooter_id: turnData.shooter_id,
-        attempt: ftContext.attempt,
-        total: ftContext.total
-      });
-    }
+    // ✅ REMOVED: Free throw missed logging (cluttering console)
 
     // Use existing bounce system for authentic basketball feel
     const rimGridCoords = this.getRimGridCoordinates(turnData);
@@ -442,13 +380,7 @@ export class FreeThrowAnimationSystem {
       this.ftConfig.bounceDuration
     );
 
-    if (DebugFlags.FREE_THROW_ANIMATION) {
-      console.log('FreeThrowAnimationSystem: Ball bounced from rim', {
-        rimGridCoords,
-        bounceSpot: miss.grid,
-        isHomeTeam
-      });
-    }
+    // ✅ REMOVED: Free throw bounce logging (cluttering console)
 
     return miss;
   }
@@ -457,13 +389,7 @@ export class FreeThrowAnimationSystem {
    * Handle final made free throw - execute inbound pass
    */
   async handleFinalMadeFreeThrow(turnData) {
-    if (DebugFlags.FREE_THROW_ANIMATION) {
-      console.log('FreeThrowAnimationSystem: Final free throw made - executing inbound pass', {
-        shooter_id: turnData.shooter_id,
-        possession_team_id: turnData.possession_team_id,
-        possession_flips: turnData.possession_flips
-      });
-    }
+    // ✅ REMOVED: Free throw inbound pass logging (cluttering console)
 
     // Transition to IDLE state
     if (this.stateMachine) {
@@ -482,14 +408,6 @@ export class FreeThrowAnimationSystem {
     // After made shot/FT, possession flips to opposite team
     const newOffenseSide = isHomeOffense ? 'away' : 'home';
     
-    console.log('🔄 [FREE THROW INBOUND] Calculated newOffenseSide from shooter sprite', {
-      shooter_id: turnData.shooter_id,
-      shooterTeamId,
-      isHomeOffense,
-      newOffenseSide,
-      home_team_id: this.scene.simData?.home_team_id
-    });
-    
     // Execute inbound pass using the existing system
     const { runInboundSetup } = await import('./turnAnimation.js');
     
@@ -497,18 +415,6 @@ export class FreeThrowAnimationSystem {
     // This ensures pressureSequenceActive is set so subsequent STEAL turns are recognized as FCP/HCT
     const skipRetreat = turnData.next_defensive_setup === "FCP" || turnData.next_defensive_setup === "HCT";
     const pressureType = skipRetreat ? turnData.next_defensive_setup : null;
-    if (skipRetreat) {
-      console.log(`🎯 [FCP/HCT DETECTED] ${turnData.next_defensive_setup} detected after FT - setting pressure state`);
-    }
-    
-    console.log('FreeThrowAnimationSystem: Executing inbound pass after final made free throw', {
-      possession_team_id: turnData.possession_team_id,
-      newOffenseSide,
-      home_team_id: this.scene.simData?.home_team_id,
-      next_defensive_setup: turnData.next_defensive_setup,
-      pressureType,
-      skipRetreat
-    });
     
     // ✅ FIX: Don't call runInboundSetup() here if next_play_type === "BASELINE_INBOUND"
     // The BASELINE_INBOUND turn will handle the inbound setup via AnimationEngine.handleBaselineInbound()
@@ -531,9 +437,7 @@ export class FreeThrowAnimationSystem {
       turnData: turnData
     });
 
-    if (DebugFlags.FREE_THROW_ANIMATION) {
-      console.log('FreeThrowAnimationSystem: Inbound pass completed after final made free throw');
-    }
+    // ✅ REMOVED: Free throw inbound pass completed logging (cluttering console)
   }
 
   /**
@@ -542,14 +446,7 @@ export class FreeThrowAnimationSystem {
    * @param {Object} miss - Bounce result from animateBallBounceFromRim (contains grid coordinates)
    */
   async handleFinalMissedFreeThrow(turnData, miss) {
-    if (DebugFlags.FREE_THROW_ANIMATION) {
-      console.log('FreeThrowAnimationSystem: Final free throw missed - executing rebound system', {
-        shooter_id: turnData.shooter_id,
-        rebounderId: turnData.rebounderId,
-        rebound_type: turnData.rebound_type,
-        bounceSpot: miss?.grid
-      });
-    }
+    // ✅ REMOVED: Free throw rebound logging (cluttering console)
 
     // Transition to REBOUNDING state
     if (this.stateMachine) {
@@ -594,9 +491,7 @@ export class FreeThrowAnimationSystem {
       });
     }
 
-    if (DebugFlags.FREE_THROW_ANIMATION) {
-      console.log('FreeThrowAnimationSystem: Rebound system completed after final missed free throw');
-    }
+    // ✅ REMOVED: Free throw rebound completed logging (cluttering console)
   }
 
   /**
@@ -849,9 +744,7 @@ export class FreeThrowAnimationSystem {
       ballSprite.setVisible(false);
     }
     
-    if (DebugFlags.FREE_THROW_ANIMATION) {
-      console.log('FreeThrowAnimationSystem: Reset');
-    }
+    // ✅ REMOVED: Free throw reset logging (cluttering console)
   }
 }
 

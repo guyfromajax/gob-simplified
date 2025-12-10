@@ -1768,23 +1768,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
     isFCPHCT
   });
   
-  // 🔍 DEBUG: Log full animation structure for FCP/HCT turns
-  if (isFCPHCT && turnData.animations) {
-    console.log("=".repeat(80));
-    console.log(`🔍 [${turnData.play_type} FULL ANIMATIONS] result_type=${turnData.result_type}`);
-    
-    for (const anim of turnData.animations) {
-      const info = scene.playerInfo?.[anim.playerId];
-      const pos = info?.pos || 'UNKNOWN';
-      console.log(`  🏃 Player: ${pos} (${anim.playerId?.substring(0, 8)})`);
-      
-      for (let stepIdx = 0; stepIdx < (anim.movement?.length || 0); stepIdx++) {
-        const step = anim.movement[stepIdx];
-        console.log(`    📍 STEP ${stepIdx}: coords=${JSON.stringify(step.coords)}, action=${step.action}, has_ball=${step.has_ball || false}, timestamp=${step.timestamp}`);
-      }
-    }
-    console.log("=".repeat(80));
-  }
+  // ✅ REMOVED: Step-by-step animation logging (cluttering console)
   
   // Guard: Skip if this is an opening tip, putback, or if animations is missing
   // Putback turns are handled by handleOrebTurn in animateGameTurns.js

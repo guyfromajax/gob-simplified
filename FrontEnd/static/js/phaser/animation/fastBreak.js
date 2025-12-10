@@ -34,25 +34,7 @@ export async function runFastBreakSequence({
   ballSprite,
   turnIndex = null,
 }) {
-  console.log('⚡ [runFastBreakSequence] ENTERING', {
-    has_scene: !!scene,
-    has_turnData: !!turnData,
-    skipToEnd: scene?.skipToEnd,
-    result_type: turnData?.result_type,
-    has_roles: !!turnData?.roles,
-    outlet_passer: turnData?.roles?.outlet_passer,
-    outlet_receiver: turnData?.roles?.outlet_receiver
-  });
-  
   if (!scene || !turnData || scene.skipToEnd) {
-    console.log('⚡ [runFastBreakSequence] EARLY RETURN - missing scene/turnData or skipToEnd', {
-      scene_is_falsy: !scene,
-      turnData_is_falsy: !turnData,
-      skipToEnd_is_true: scene?.skipToEnd === true,
-      scene_value: scene ? 'present' : 'missing',
-      turnData_value: turnData ? 'present' : 'missing',
-      skipToEnd_value: scene?.skipToEnd
-    });
     return;
   }
   if (!scene.ballSprite) scene.ballSprite = ballSprite;
@@ -68,7 +50,6 @@ export async function runFastBreakSequence({
   }
   
   const currentState = scene.stateMachine?.state;
-  console.log('⚡ [runFastBreakSequence] Current state:', currentState);
   
   // ✅ Check current state before transitioning - avoid invalid transitions
   // For defensive stops after HCO, we're already in HalfCourt, so transition to FastBreak directly
@@ -77,16 +58,13 @@ export async function runFastBreakSequence({
     // Only transition to FastBreakOutlet if we have outlet pass and we're not already in Fast Break state
     // Check if we can transition (must be coming from Rebound or OutletSetup)
     if (currentState === States.Rebound || currentState === States.OutletSetup) {
-      console.log('⚡ [runFastBreakSequence] Transitioning to FastBreakOutlet');
       safeTransition(scene.stateMachine, States.FastBreakOutlet);
     } else {
       // Coming from HalfCourt (defensive stop scenario) - go directly to FastBreak
-      console.log('⚡ [runFastBreakSequence] Transitioning to FastBreak (from HalfCourt)');
       safeTransition(scene.stateMachine, States.FastBreak);
     }
   } else if (currentState !== States.FastBreak && currentState !== States.FastBreakOutlet) {
     // No outlet pass or already in Fast Break state - just ensure we're in FastBreak
-    console.log('⚡ [runFastBreakSequence] Transitioning to FastBreak (no outlet pass)');
     safeTransition(scene.stateMachine, States.FastBreak);
   }
   
@@ -96,23 +74,15 @@ export async function runFastBreakSequence({
   // PHASE 1: OUTLET PASS (if applicable) - WITHOUT moving receiver toward basket
   // ============================================================================
   if (turnData.roles?.outlet_passer && turnData.roles?.outlet_receiver) {
-    console.log('⚡ [runFastBreakSequence] Starting outlet pass phase');
     await animateOutletPhase(scene, turnData, playerSprites, ballSprite, width, height);
-    console.log('⚡ [runFastBreakSequence] Outlet pass phase completed');
     
     // Transition to FastBreak state after outlet (only if not already there)
     if (scene.stateMachine?.state !== States.FastBreak) {
       safeTransition(scene.stateMachine, States.FastBreak);
     }
-  } else {
-    console.log('⚡ [runFastBreakSequence] Skipping outlet pass - missing outlet_passer or outlet_receiver', {
-      outlet_passer: turnData.roles?.outlet_passer,
-      outlet_receiver: turnData.roles?.outlet_receiver
-    });
   }
   
   if (scene.skipToEnd) {
-    console.log('⚡ [runFastBreakSequence] EARLY RETURN - skipToEnd after outlet pass');
     return;
   }
   
@@ -121,33 +91,15 @@ export async function runFastBreakSequence({
   // ============================================================================
   const result = turnData.result_type;
   
-  console.log("🏀 Fast Break - Phase 2 Decision:", {
-    result_type: result,
-    current_state: scene.stateMachine?.state,
-    next_play_type: turnData.next_play_type,
-    has_animations: !!turnData.animations?.length,
-    animation_count: turnData.animations?.length || 0,
-    fast_break: turnData.fast_break,
-    will_shoot: result === "MAKE" || result === "MISS",
-    will_stop: result === "DEFENSIVE_STOP" || result === "FOUL" || result === "TURNOVER" || result === "STEAL",
-    ball_handler_id: turnData.roles?.ball_handler?.player_id || turnData.roles?.ball_handler || getCurrentOwner(scene),
-    outlet_receiver_id: turnData.roles?.outlet_receiver
-  });
-  
   if (result === "MAKE" || result === "MISS") {
     // Shot attempt scenario - move shooter toward basket now
-    console.log("🏀 Fast Break - Routing to SHOT animation");
     await animateFastBreakShot(scene, turnData, playerSprites, ballSprite, width, height);
-    console.log("🏀 Fast Break - SHOT animation completed");
   } else {
     // Defensive stop, foul, turnover, or steal - position for defensive stop (outlet receiver hasn't moved too far)
-    console.log("🏀 Fast Break - Routing to DEFENSIVE_STOP animation");
     await animateDefensiveStop(scene, turnData, playerSprites, ballSprite, width, height);
-    console.log("🏀 Fast Break - DEFENSIVE_STOP animation completed");
   }
   
   if (scene.skipToEnd) {
-    console.log('⚡ [runFastBreakSequence] EARLY RETURN - skipToEnd after Phase 2');
     return;
   }
   
@@ -155,7 +107,6 @@ export async function runFastBreakSequence({
   // PHASE 3: CLEANUP & STATE TRANSITIONS
   // ============================================================================
   scene.events?.emit("fb:end");
-  console.log('⚡ [runFastBreakSequence] COMPLETED - all phases finished');
 }
 
 /**
@@ -555,37 +506,17 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
     });
   } else {
     // Miss - handle rebound
-    console.log('🏀 [FAST BREAK MISS] Starting rebound sequence', {
-      turnDataKeys: Object.keys(turnData),
-      hasRebounderId: !!turnData.rebounderId,
-      hasRebounderPlayerId: !!turnData.rebounder_player_id,
-      rebounderId: turnData.rebounderId,
-      rebounder_player_id: turnData.rebounder_player_id,
-      rebound_type: turnData.rebound_type,
-      result_type: turnData.result_type
-    });
-    
     appendToTextScroll("Missed!");
     safeTransition(scene.stateMachine, States.Rebound);
-    console.log('🏀 [FAST BREAK MISS] State transitioned to Rebound');
     
     const { bounceFromRim, animateRebound } = await import('./ballManager.js');
-    console.log('🏀 [FAST BREAK MISS] About to call bounceFromRim');
     const miss = await bounceFromRim(scene, ballSprite, basket, isHomeOffense, 300);
-    console.log('🏀 [FAST BREAK MISS] bounceFromRim completed', { miss: miss?.grid });
     
     // Find the original MISS turn that led to this Fast Break (for offense_getback list)
     // Also need the current Fast Break MISS turn (for animations)
     const currentIndex = scene.currentTurn || 0;
     const previousTurn = scene.simData?.turns?.[currentIndex - 1];
     const currentTurn = scene.simData?.turns?.[currentIndex];
-    
-    console.log('🏀 [FAST BREAK MISS] Looking for MISS turns', {
-      currentIndex,
-      previousTurnType: previousTurn?.result_type,
-      currentTurnType: currentTurn?.result_type,
-      turnDataType: turnData?.result_type
-    });
     
     // The current turnData is the Fast Break MISS turn - use it for animations
     // The previous HCO MISS turn is needed for offense_getback list
@@ -596,7 +527,7 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
     // ✅ Get rebounderId - must be present for rebound animation
     const rebounderId = turnData.rebounderId || turnData.rebounder_player_id;
     
-    console.log('🏀 [FAST BREAK MISS] Checking rebounderId', {
+    if (false) console.log('🏀 [FAST BREAK MISS] Checking rebounderId', {
       rebounderId,
       fromRebounderId: turnData.rebounderId,
       fromRebounderPlayerId: turnData.rebounder_player_id,
@@ -616,12 +547,6 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
     
     const rebounderSprite = playerSprites[rebounderId];
     
-    console.log('🏀 [FAST BREAK MISS] Checking rebounder sprite', {
-      rebounderId,
-      spriteExists: !!rebounderSprite,
-      availableSprites: Object.keys(playerSprites)
-    });
-    
     if (!rebounderSprite) {
       console.error('⚠️ [FAST BREAK MISS] Rebounder sprite not found', {
         rebounderId,
@@ -633,10 +558,6 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
     
     // ✅ Stop rebounder animations when rebounder grabs ball (missed shot)
     // Monitor rebounder position and stop tweens when rebounder gets close to ball bounce spot
-    console.log('🏀 [FAST BREAK MISS] Setting up rebounder animation monitoring', {
-      rebounderTweensCount: rebounderTweens.length
-    });
-    
     if (rebounderTweens.length > 0) {
       let monitoringActive = true;
       const ballBouncePx = gridToPixels(miss.grid.x, miss.grid.y, width, height);
@@ -652,7 +573,6 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
         // If rebounder is within 30 pixels of ball bounce spot, stop all rebounder animations
         if (distanceToBall < 30) {
           monitoringActive = false;
-          console.log('🏀 [FAST BREAK MISS] Rebounder reached ball, stopping rebounder tweens');
           rebounderTweens.forEach(tween => {
             if (tween && tween.isPlaying && scene.tweens) {
               scene.tweens.killTweensOf(tween.targets);
@@ -673,13 +593,6 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
       scene.time.delayedCall(100, checkRebounderReached);
     }
     
-    console.log('🏀 [FAST BREAK MISS] About to call animateRebound', {
-      rebounderId,
-      ballSpot: miss.grid,
-      shooterId,
-      hasMissTurnForGetback: !!missTurnForGetback
-    });
-    
     await animateRebound({
       scene,
       ballSprite,
@@ -691,16 +604,8 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
       turnData: missTurnForGetback // ✅ FIX: Pass previous HCO MISS turn (has offense_getback) so get-back players can be excluded
     });
     
-    console.log('🏀 [FAST BREAK MISS] animateRebound completed');
-    
     // Defensive rebound setup if needed
-    console.log('🏀 [FAST BREAK MISS] Checking rebound_type', {
-      rebound_type: turnData.rebound_type,
-      next_play_type: turnData.next_play_type
-    });
-    
     if (turnData.rebound_type === "DREB") {
-      console.log('🏀 [FAST BREAK MISS] About to call runDefensiveReboundSetup');
       const { runDefensiveReboundSetup } = await import('./turnAnimation.js');
       await runDefensiveReboundSetup({
         scene,
@@ -711,12 +616,7 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
         turnData: turnData // ✅ FIX: Pass current Fast Break MISS turn (has animations), not previous HCO MISS turn
         // runDefensiveReboundSetup will find offense_getback from previous turn if needed
       });
-      console.log('🏀 [FAST BREAK MISS] runDefensiveReboundSetup completed');
-    } else {
-      console.log('🏀 [FAST BREAK MISS] Not a DREB, skipping runDefensiveReboundSetup');
     }
-    
-    console.log('🏀 [FAST BREAK MISS] Rebound sequence completed');
   }
 }
 
@@ -728,16 +628,6 @@ async function animateFastBreakShot(scene, turnData, playerSprites, ballSprite, 
  * - All other players scatter to half court
  */
 async function animateDefensiveStop(scene, turnData, playerSprites, ballSprite, width, height) {
-  console.log("🛑 Fast Break Defensive Stop START:", {
-    current_state: scene.stateMachine?.state,
-    next_play_type: turnData.next_play_type,
-    has_animations: !!turnData.animations?.length,
-    animation_count: turnData.animations?.length || 0,
-    stopper_id: turnData.stopper_id,
-    ball_handler_id: turnData.roles?.ball_handler?.player_id || turnData.roles?.ball_handler,
-    outlet_receiver_id: turnData.roles?.outlet_receiver,
-    result_type: turnData.result_type
-  });
   
   // ✅ Use backend animation end coords for positioning (matches other transitions like DREB -> HCO)
   // This ensures frontend sprite positions match backend player.coords for accurate distance calculations
@@ -778,15 +668,7 @@ async function animateDefensiveStop(scene, turnData, playerSprites, ballSprite, 
           displayEndCoords = { x: 100 - endStep.coords.x, y: endStep.coords.y };
         }
         
-        console.log("🛑 Defensive Stop - Animation Check:", {
-          ballHandlerId,
-          isHomeOffense,
-          startCoords: startStep.coords, // Raw from backend (HOME orientation)
-          endCoords: endStep.coords, // Raw from backend (HOME orientation)
-          displayStartCoords, // Flipped for away offense (what user sees)
-          displayEndCoords, // Flipped for away offense (what user sees)
-          basketCoords: basket,
-          distanceToBasket,
+        // ✅ REMOVED: Defensive stop animation check logging (cluttering console)
           distanceToTopKey,
           wouldMoveTowardBasket: distanceToBasket < distanceToTopKey
         });
@@ -968,7 +850,6 @@ async function animateDefensiveStop(scene, turnData, playerSprites, ballSprite, 
   // Manual positioning fallback (if animations are missing or incorrect)
   if (!gotoStateTransition && promises.length === 0 && (animations.length === 0 || isDefensiveStop)) {
     // Fallback to manual positioning if animations are missing or incorrect (backwards compatibility)
-    console.log("🛑 Defensive Stop - Using manual positioning (fallback)");
     
     const ballHandlerData = turnData.roles?.ball_handler;
     const ballHandlerId = ballHandlerData?.player_id || ballHandlerData || getCurrentOwner(scene);
@@ -1122,11 +1003,6 @@ async function animateDefensiveStop(scene, turnData, playerSprites, ballSprite, 
   // because it checks if state is FastBreak and skips animation
   const currentState = scene.stateMachine?.state;
   if (currentState !== States.HalfCourt) {
-    console.log("🛑 Fast Break Defensive Stop - Transitioning state:", {
-      from_state: currentState,
-      to_state: States.HalfCourt,
-      transition_allowed: scene.stateMachine?.canTransition?.(States.HalfCourt)
-    });
     safeTransition(scene.stateMachine, States.HalfCourt);
     
     // Verify transition succeeded
@@ -1143,12 +1019,6 @@ async function animateDefensiveStop(scene, turnData, playerSprites, ballSprite, 
   // ✅ Ensure HCO setup is triggered after defensive stop transitions to HCO
   // This ensures players are properly positioned for the next HCO turn
   if (turnData.next_play_type === "HCO") {
-    console.log("🛑 Fast Break Defensive Stop -> HCO transition:", {
-      next_play_type: turnData.next_play_type,
-      has_startNextHalfCourtOffense: typeof scene.startNextHalfCourtOffense === "function",
-      current_state: scene.stateMachine?.state
-    });
-    
     if (typeof scene.startNextHalfCourtOffense === "function") {
       scene.startNextHalfCourtOffense();
     }
