@@ -167,10 +167,7 @@ function handleTurnTransition(scene, turnData) {
     }
   } else {
     // No offense_team_id provided - keep current (shouldn't happen in normal flow)
-    console.warn('⚠️ [UNIVERSAL TRANSITION] No offense_team_id provided, keeping current', {
-      current_offenseTeamId: scene.offenseTeamId,
-      result_type: turnData.result_type
-    });
+    // ✅ REMOVED: Universal transition warning logging (cluttering console)
   }
   
   // Note: next_play_type transitions are handled by the turn-by-turn loop

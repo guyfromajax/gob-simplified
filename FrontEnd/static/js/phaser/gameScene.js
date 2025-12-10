@@ -1526,16 +1526,7 @@ export function createGameScene(Phaser) {
           const nextQ = this.quarter + 1;
           const urlParams = new URLSearchParams(window.location.search);
           
-          // ✅ DEBUG: Log gameId state when navigating to next quarter
-          const localStorageGameId = typeof localStorage !== 'undefined' ? localStorage.getItem('game_id') : null;
-          console.log('🔍 [Q1→Q2 DEBUG] gameScene - Navigating to Q' + nextQ + ':', {
-            currentQuarter: this.quarter,
-            nextQuarter: nextQ,
-            scene_gameId: this.gameId,
-            gameStore_gameId: gameStore.getGameId(),
-            localStorage_gameId: localStorageGameId,
-            urlParams_gameId: urlParams.get('game_id')
-          });
+          // ✅ REMOVED: Quarter navigation debug logging (cluttering console)
           
           // ✅ SS&S: Use global helper (works in both regular scripts and modules)
           const helper = window.TimeoutNavigationHelper;
@@ -1565,11 +1556,7 @@ export function createGameScene(Phaser) {
             myTeamSide: urlParams.get('my_team')
           });
           
-          // ✅ DEBUG: Log what params are being built
-          console.log('🔍 [Q1→Q2 DEBUG] gameScene - Navigation params built:', {
-            nextQuarter: nextQ,
-            gameId_in_params: params.get('game_id'),
-            all_params: Object.fromEntries(params.entries())
+          // ✅ REMOVED: Navigation params debug logging (cluttering console)
           });
           
           if (this.gameId && typeof localStorage !== 'undefined') {
