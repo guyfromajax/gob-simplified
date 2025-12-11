@@ -1191,6 +1191,11 @@ class ShotManager:
             if passer:
                 passer.record_stat("AST")
             points = 2
+            # If this fast break was triggered by a steal (no outlet pass), track Points Off Turnovers (POT)
+            # and allow for 3-point makes if the shot was from deep (if the flag is present).
+            if fb_roles.get("is_steal_entry"):
+                pot_points = 3 if fb_roles.get("is_three_point_shot") else points
+                shooter.record_stat("POT", amount=pot_points)
             apply_scoring(self.game, off_team, shooter, points, ["FGM"])  # Record FGM
             shooter.record_stat("FB_PTS", amount=points)  # Track fast break points - increment by points scored (2 or 3)
             text += f"{shooter} converts the fast break shot!"
