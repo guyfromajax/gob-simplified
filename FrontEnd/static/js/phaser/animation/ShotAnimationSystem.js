@@ -1228,8 +1228,10 @@ export class ShotAnimationSystem {
     // });
     
     if (turnData.rebound_type === 'DREB') {
-      // ✅ REMOVED: Calling handleDefensiveRebound logging (cluttering console)
-      await this.handleDefensiveRebound(rebounderSprite, turnData);
+      // ✅ FIX: Skip embedded DREB handling - let the next turn handle it (same pattern as OREB Putback Miss → DREB)
+      // This prevents handleDefensiveRebound() from interfering with defensive tweens still running from skeleton steps
+      // The next HCO turn will detect the previous MISS → DREB and call runDefensiveReboundSetup() in its setup phase
+      console.log('🔍 [EMBEDDED REBOUND] Skipping handleDefensiveRebound() for DREB - will be handled by next turn setup');
     } else if (turnData.rebound_type === 'OREB') {
       // ✅ DEBUG: Track OREB handling to see if putback is coming
       const nextTurn = this.scene.simData?.turns?.[(this.scene.currentTurn || 0) + 1];
