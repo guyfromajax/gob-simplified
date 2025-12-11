@@ -432,12 +432,12 @@ export class ShotAnimationSystem {
       const promises = [];
       let shotInfo = null;
       
-      // 🔍 DEBUG: Log before pass detection
-      console.log(`🔍 [SHOT ANIM] Step ${stepIndex}: Starting pass detection`, {
-        turnId: turnData?.id?.substring(0, 8),
-        totalAnimations: turnData.animations?.length,
-        maxSteps: maxSteps
-      });
+      // ✅ COMMENTED OUT: Starting pass detection log (cluttering console)
+      // console.log(`🔍 [SHOT ANIM] Step ${stepIndex}: Starting pass detection`, {
+      //   turnId: turnData?.id?.substring(0, 8),
+      //   totalAnimations: turnData.animations?.length,
+      //   maxSteps: maxSteps
+      // });
       
       // ✅ COMMENTED OUT: Movement array structure log (cluttering console)
       // const movementArrayInfo = turnData.animations.map(anim => ({
