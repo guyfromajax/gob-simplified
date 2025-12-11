@@ -456,6 +456,9 @@ export class ShotAnimationSystem {
         // ✅ FIX: Match playTurnAnimation's animateStep call signature exactly
         // Pass step (prev) and nextStep (curr) separately, plus stepIndex
         // This ensures animateStep can properly calculate positions and handle actions
+        
+        // 🔍 TIMING: Track when animateStep() is called (tween starts immediately when called)
+        const beforeAnimateStep = performance.now();
         const promise = animateStep({
           scene: this.scene,
           sprite,
@@ -467,6 +470,7 @@ export class ShotAnimationSystem {
           onAction: null, // We'll handle actions separately
           stepIndex  // Pass stepIndex to identify first step
         });
+        const afterAnimateStep = performance.now();
         
         // ✅ SS&S: Use pre-classified player role (determined at turn start)
         // This ensures consistent classification throughout the turn
@@ -480,11 +484,17 @@ export class ShotAnimationSystem {
             passerPromise = promise;
           }
         } else {
-          // ✅ DEBUG: Track when defensive promises are created (they start animating immediately)
-          const defensiveStartTime = performance.now();
+          // 🔍 TIMING: Track when defensive animateStep() is called (tween starts NOW, not in Phase 2)
+          const defensiveTweenStartTime = performance.now();
+          console.log(`⏱️ [TIMING] Step ${stepIndex}: Defensive tween CREATED and STARTED for ${anim.playerId?.substring(0, 8)}`, {
+            playerId: anim.playerId?.substring(0, 8),
+            animateStepCallDuration: afterAnimateStep - beforeAnimateStep,
+            tweenStartTime: defensiveTweenStartTime,
+            note: 'Tween starts immediately when animateStep() is called, not when Phase 2 begins'
+          });
           defensivePromises.push({
             promise,
-            startTime: defensiveStartTime,
+            startTime: defensiveTweenStartTime,
             playerId: anim.playerId
           });
         }
@@ -543,10 +553,36 @@ export class ShotAnimationSystem {
       passAndDefensePromises.push(...defensivePromiseArray);
       console.log(`✅ [SHOT ANIM] Step ${stepIndex}: Added ${defensivePromiseArray.length} defensive animations to Phase 2`);
       
+      // 🔍 TIMING: Calculate time difference between defensive tween start and Phase 2 start
+      if (defensivePromises.length > 0) {
+        const earliestDefensiveStart = Math.min(...defensivePromises.map(dp => dp.startTime));
+        const timeDiff = phase2StartTime - earliestDefensiveStart;
+        console.log(`⏱️ [TIMING] Step ${stepIndex}: Time between defensive tween start and Phase 2 start`, {
+          earliestDefensiveStart,
+          phase2StartTime,
+          timeDifferenceMs: timeDiff,
+          note: timeDiff > 0 ? 'Defensive tweens started BEFORE Phase 2' : 'Defensive tweens started AFTER Phase 2 (unexpected)'
+        });
+      }
+      
+      // 🔍 TIMING: Log when Promise.all() actually begins waiting
+      const beforePromiseAll = performance.now();
+      console.log(`⏱️ [TIMING] Step ${stepIndex}: Promise.all() about to start waiting for pass + defensive animations`, {
+        passAndDefensePromisesCount: passAndDefensePromises.length,
+        hasPass: !!passInfo,
+        defensiveCount: defensivePromiseArray.length
+      });
+      
       // Animate pass and defensive players simultaneously
       if (passAndDefensePromises.length > 0) {
         await Promise.all(passAndDefensePromises);
       }
+      
+      // 🔍 TIMING: Log when Promise.all() completes
+      const afterPromiseAll = performance.now();
+      console.log(`⏱️ [TIMING] Step ${stepIndex}: Promise.all() completed`, {
+        waitDuration: afterPromiseAll - beforePromiseAll
+      });
       
       // ✅ FIX: Wait for any remaining offensive players (non-passer) to complete
       // This ensures all offensive players finish their movements
