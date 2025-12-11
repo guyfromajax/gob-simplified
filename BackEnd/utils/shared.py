@@ -97,12 +97,12 @@ def apply_help_defense_if_triggered(game, playcall, is_three, defender, shot_sco
 
 def get_fast_break_chance(game):
     """
-    Determine fast break probability based on the OFFENSIVE team's tempo setting.
-    Called after defensive rebounds when the rebounding team is now on offense.
+    Determine fast break probability based on the OFFENSIVE team's aggression setting.
+    Called after defensive rebounds or steals when the team is now on offense.
     """
     game_state = game.game_state
-    off_team = game.offense_team  # Team that just got the rebound (now on offense)
-    level = off_team.strategy_settings.get("tempo", 2)
+    off_team = game.offense_team  # Team that just got the rebound/steal (now on offense)
+    level = off_team.strategy_settings.get("aggression", 2)
     return [0.0, 0.25, 0.5, 0.75, 1.0][level]
 
 def get_time_elapsed(tempo_call):
