@@ -40,3 +40,10 @@ export const STEAL_ENTRY_MOVE_Y_RANGE = 4; // ±4 y-coords
 export const STEAL_ENTRY_Y_MIN = 3; // Minimum y-coord (clamped)
 export const STEAL_ENTRY_Y_MAX = 47; // Maximum y-coord (clamped)
 
+// Steal HCO Setup Movement (Steal → HCO)
+export const STEAL_HCO_SETUP_MOVE_X_MIN = 3; // Minimum x movement away from basket
+export const STEAL_HCO_SETUP_MOVE_X_MAX = 7; // Maximum x movement away from basket
+export const STEAL_HCO_SETUP_MOVE_Y_RANGE = 3; // ±3 y-coords
+export const STEAL_HCO_SETUP_Y_MIN = 3; // Minimum y-coord (clamped)
+export const STEAL_HCO_SETUP_Y_MAX = 47; // Maximum y-coord (clamped)
+

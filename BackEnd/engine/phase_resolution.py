@@ -302,6 +302,11 @@ from BackEnd.constants.fast_break_constants import (
     STEAL_ENTRY_MOVE_Y_RANGE,
     STEAL_ENTRY_Y_MIN,
     STEAL_ENTRY_Y_MAX,
+    STEAL_HCO_SETUP_MOVE_X_MIN,
+    STEAL_HCO_SETUP_MOVE_X_MAX,
+    STEAL_HCO_SETUP_MOVE_Y_RANGE,
+    STEAL_HCO_SETUP_Y_MIN,
+    STEAL_HCO_SETUP_Y_MAX,
 )
 
 def _record_fast_break_stats(fb_roles, turn_result, game):
@@ -1657,6 +1662,61 @@ def resolve_half_court_offense_logic(game):
     # Store intended shooter in roles for later comparison
     roles["intended_shooter_pos"] = intended_shooter_pos
     
+    # ============================================================================
+    # STEAL HCO SETUP: Check if this HCO turn comes from a steal
+    # ============================================================================
+    last_stealer = game_state.get("last_stealer")
+    is_steal_hco_setup = False
+    hco_setup_move_x = 0
+    hco_setup_move_y = 0
+    hco_setup_final_x = None
+    hco_setup_final_y = None
+    
+    if last_stealer:
+        # Check if the previous turn was a steal that transitioned to HCO
+        # This happens when last_stealer is set and offensive_state is HCO (not FAST_BREAK)
+        if game_state.get("offensive_state") == "HCO":
+            is_steal_hco_setup = True
+            ball_handler = last_stealer
+            
+            # Get stealer's current position
+            ball_handler_start_x = getattr(ball_handler, "coords", {}).get("x", 50)
+            ball_handler_start_y = getattr(ball_handler, "coords", {}).get("y", 25)
+            
+            # Determine direction away from basket (opposite of steal entry)
+            # Home offense: basket at x=90, so away = -1 (left, toward x=10)
+            # Away offense: basket at x=10, so away = +1 (right, toward x=90)
+            is_away_offense = off_team.team_id == game.away_team.team_id
+            if is_away_offense:
+                direction = 1  # Away from x=10 (toward x=90)
+            else:
+                direction = -1  # Away from x=90 (toward x=10)
+            
+            # Calculate steal HCO setup movement (away from basket)
+            hco_setup_move_x = random.randint(STEAL_HCO_SETUP_MOVE_X_MIN, STEAL_HCO_SETUP_MOVE_X_MAX)
+            hco_setup_move_y = random.randint(-STEAL_HCO_SETUP_MOVE_Y_RANGE, STEAL_HCO_SETUP_MOVE_Y_RANGE)
+            
+            # Apply movement away from basket
+            hco_setup_final_x = ball_handler_start_x + (direction * hco_setup_move_x)
+            hco_setup_final_y = max(STEAL_HCO_SETUP_Y_MIN, min(STEAL_HCO_SETUP_Y_MAX, ball_handler_start_y + hco_setup_move_y))
+            
+            # Store in roles for frontend
+            roles["is_steal_hco_setup"] = True
+            roles["ball_handler_hco_setup_x"] = hco_setup_final_x
+            roles["ball_handler_hco_setup_y"] = hco_setup_final_y
+            roles["ball_handler_hco_setup_move_x"] = hco_setup_move_x
+            roles["ball_handler_hco_setup_move_y"] = hco_setup_move_y
+            roles["ball_handler_id"] = getattr(ball_handler, "player_id", None)
+            
+            # Clear last_stealer after using it (so it doesn't persist to subsequent turns)
+            game_state["last_stealer"] = None
+            
+            import logging
+            logging.debug(f"🏀 [STEAL HCO SETUP] Stealer {get_name_safe(ball_handler)} moves away from basket:")
+            logging.debug(f"  Start: x={ball_handler_start_x}, y={ball_handler_start_y}")
+            logging.debug(f"  Movement: x={hco_setup_move_x} (direction={direction}), y={hco_setup_move_y}")
+            logging.debug(f"  Final: x={hco_setup_final_x}, y={hco_setup_final_y}")
+    
     # print("inside resolve_half_court_offense_logic")
     # print("[DEBUG] roles:", roles.keys())
     # print("[DEBUG] event_step:", roles.get("event_step"))
@@ -1709,6 +1769,9 @@ def resolve_half_court_offense_logic(game):
     
     # Add skeleton data for unified animation system (reuse skeleton from line 556)
     shot_result["skeleton"] = skeleton or {}
+    
+    # ✅ Add roles to result (includes steal HCO setup data if applicable)
+    shot_result["roles"] = roles
     
     # Convert skeleton to animations if skeleton exists
     if skeleton and "steps" in skeleton:
