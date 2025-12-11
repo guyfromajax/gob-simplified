@@ -536,9 +536,11 @@ def get_game_state(game_id: str, quarter: int | None = None):
         logging.info(f"📊 Active games in memory: {list(ongoing_games.keys())}")
         if gm:
             # Get players with current energy levels, stats, and attributes
+            # Include ALL players (not just lineup) so roster merge works correctly
             players = []
             for team in [gm.home_team, gm.away_team]:
-                for pos, player in team.lineup.items():
+                # Get all players (lineup + bench) so all roster players can be matched
+                for player in team.get_all_players():
                     players.append({
                         "_id": player.player_id,
                         "name": player.name,
