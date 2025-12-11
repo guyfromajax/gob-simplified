@@ -751,7 +751,6 @@ def resolve_fast_break_logic(game: "GameManager"):
         ball_handler_start_y = getattr(ball_handler, "coords", {}).get("y", 25)
         
         # Calculate steal entry movement
-        import random
         steal_entry_move_x = random.randint(STEAL_ENTRY_MOVE_X_MIN, STEAL_ENTRY_MOVE_X_MAX)
         steal_entry_move_y = random.randint(-STEAL_ENTRY_MOVE_Y_RANGE, STEAL_ENTRY_MOVE_Y_RANGE)
         

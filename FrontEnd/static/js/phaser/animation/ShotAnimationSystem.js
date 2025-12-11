@@ -460,9 +460,6 @@ export class ShotAnimationSystem {
             startTime: defensiveStartTime,
             playerId: anim.playerId
           });
-          if (passInfo) {
-            console.log(`🔵 [PASS SYNC] Defensive player ${anim.playerId} animation started at ${defensiveStartTime.toFixed(2)}ms`);
-          }
         }
       }
       
@@ -474,10 +471,6 @@ export class ShotAnimationSystem {
         // Wait for passer to complete before starting pass animation
         // Other offensive players continue animating in the background
         await passerPromise;
-        const phase1EndTime = performance.now();
-        if (passInfo) {
-          console.log(`🔵 [PASS SYNC] Phase 1 complete (passer finished) - Duration: ${(phase1EndTime - phase1StartTime).toFixed(2)}ms`);
-        }
       } else if (offensivePromises.length > 0) {
         // No pass, wait for all offensive players to complete
         await Promise.all(offensivePromises);
@@ -490,26 +483,6 @@ export class ShotAnimationSystem {
       const phase2StartTime = performance.now();
       
       if (passInfo) {
-        // ✅ DEBUG: Track when pass animation is created
-        const passStartTime = performance.now();
-        console.log(`🔵 [PASS SYNC] Pass animation created at ${passStartTime.toFixed(2)}ms`);
-        
-        // Check if any defensive promises started before pass
-        if (defensivePromises.length > 0) {
-          const defendersStartedBeforePass = defensivePromises.some(dp => dp.startTime < passStartTime);
-          if (defendersStartedBeforePass) {
-            const earliestDefenderStart = Math.min(...defensivePromises.map(dp => dp.startTime));
-            const timeDiff = passStartTime - earliestDefenderStart;
-            console.log(`❌ [PASS SYNC] ⭕ DEFENDERS STARTED BEFORE PASS! Time difference: ${timeDiff.toFixed(2)}ms`);
-            console.log(`❌ [PASS SYNC] ⭕ Defenders started at ${earliestDefenderStart.toFixed(2)}ms, Pass started at ${passStartTime.toFixed(2)}ms`);
-          } else {
-            console.log(`✅ [PASS SYNC] ⭕ PASS AND DEFENDERS STARTING IN UNISON!`);
-            console.log(`✅ [PASS SYNC] ⭕ Pass started at ${passStartTime.toFixed(2)}ms, Defenders started after`);
-          }
-        } else {
-          console.log(`🔵 [PASS SYNC] No defensive players to animate`);
-        }
-        
         // Add pass animation to the parallel batch
         const passPromise = handlePassAnimation({
           scene: this.scene,
@@ -517,36 +490,17 @@ export class ShotAnimationSystem {
           playerSprites: this.playerSprites
         });
         
-        // Track pass promise completion
-        passPromise.then(() => {
-          const passEndTime = performance.now();
-          console.log(`🔵 [PASS SYNC] Pass animation completed at ${passEndTime.toFixed(2)}ms (Duration: ${(passEndTime - passStartTime).toFixed(2)}ms)`);
-        });
-        
         passAndDefensePromises.push(passPromise);
       }
       
       // Add all defensive player movements to the parallel batch
       // Extract promises from defensivePromises array (which now contains objects with {promise, startTime, playerId})
-      const defensivePromiseArray = defensivePromises.map(dp => {
-        const defensivePromise = dp.promise;
-        // Track defensive promise completion
-        defensivePromise.then(() => {
-          const defensiveEndTime = performance.now();
-          console.log(`🔵 [PASS SYNC] Defensive player ${dp.playerId} animation completed at ${defensiveEndTime.toFixed(2)}ms (Duration: ${(defensiveEndTime - dp.startTime).toFixed(2)}ms)`);
-        });
-        return defensivePromise;
-      });
+      const defensivePromiseArray = defensivePromises.map(dp => dp.promise);
       passAndDefensePromises.push(...defensivePromiseArray);
       
       // Animate pass and defensive players simultaneously
       if (passAndDefensePromises.length > 0) {
-        console.log(`🔵 [PASS SYNC] Phase 2 starting Promise.all() at ${phase2StartTime.toFixed(2)}ms with ${passAndDefensePromises.length} promises (${passInfo ? '1 pass' : '0 pass'} + ${defensivePromiseArray.length} defenders)`);
         await Promise.all(passAndDefensePromises);
-        const phase2EndTime = performance.now();
-        if (passInfo) {
-          console.log(`🔵 [PASS SYNC] Phase 2 complete - Duration: ${(phase2EndTime - phase2StartTime).toFixed(2)}ms`);
-        }
       }
       
       // ✅ FIX: Wait for any remaining offensive players (non-passer) to complete
