@@ -962,10 +962,211 @@ The outlet passer tracks:
 
 ### Future Enhancements
 
-- **Steal → Fast Break**: Currently focuses on DREB → Fast Break. Enhance steal → fast break flow
 - **More Nuanced Get-Back Logic**: Consider player attributes (speed, IQ) for get-back player selection
 - **Fast Break Fouls**: Add foul handling during fast break sequences
 - **Fast Break Turnovers**: Add turnover handling during fast break sequences
+
+---
+
+## Steal System ✅ **COMPLETE** (January 2025)
+
+### Overview
+
+The **Steal System** handles steal-initiated transitions, currently implemented for Fast Breaks but designed to apply to multiple turn types (FCP, HCT, HCO, and Fast Breaks). The system includes a bespoke "Steal Entry" step that moves the stealer toward the basket before determining the outcome (defensive stop or shot attempt).
+
+**Key Functions:**
+- `resolve_fast_break_logic()` - Handles steal entry movement and outcome determination in `BackEnd/engine/phase_resolution.py`
+- `animateStealEntry()` - Animates stealer movement in `FrontEnd/static/js/phaser/animation/fastBreak.js`
+
+**Current Implementation:**
+- ✅ **Fast Break**: Steal → Steal Entry → Fast Break resolution
+- 🔜 **HCO**: Steal → Steal Entry → HCO (future)
+- 🔜 **FCP/HCT**: Steal → Steal Entry → Fast Break or HCO (future)
+
+### When Steal Entry Activates
+
+**Trigger Conditions:**
+- After a steal occurs in FCP, HCT, or HCO turns
+- When the next turn is determined to be a Fast Break (based on team aggression setting)
+- Ball is already attached to the stealer from the steal turn
+- No outlet pass occurs (steal-initiated Fast Breaks bypass outlet phase)
+
+**State Flow:**
+1. Steal occurs → Ball attached to stealer
+2. Fast break chance determined by `get_fast_break_chance()` using team **aggression** setting
+3. If Fast Break → Steal Entry step executes
+4. Stealer moves 5-10 x spots toward basket, ±4 y spots (clamped to 3-47)
+5. After movement, defensive stop vs shot determination occurs
+6. Fast Break resolution proceeds (shot attempt or defensive stop)
+
+### Steal Entry Movement
+
+**Movement Parameters:**
+- **X Movement**: Random 5-10 grid spots toward offense basket
+  - Home team: +5 to +10 (toward x=90)
+  - Away team: -10 to -5 (toward x=10)
+- **Y Movement**: Random -4 to +4 grid spots
+  - Clamped to y min = 3, y max = 47 (stays in bounds)
+
+**Constants:**
+- `STEAL_ENTRY_MOVE_X_MIN = 5`
+- `STEAL_ENTRY_MOVE_X_MAX = 10`
+- `STEAL_ENTRY_MOVE_Y_RANGE = 4` (±4 y-coords)
+- `STEAL_ENTRY_Y_MIN = 3`
+- `STEAL_ENTRY_Y_MAX = 47`
+
+**Implementation:**
+```python
+# Backend: BackEnd/engine/phase_resolution.py
+ball_handler_start_x = getattr(ball_handler, "coords", {}).get("x", 50)
+ball_handler_start_y = getattr(ball_handler, "coords", {}).get("y", 25)
+
+steal_entry_move_x = random.randint(STEAL_ENTRY_MOVE_X_MIN, STEAL_ENTRY_MOVE_X_MAX)
+steal_entry_move_y = random.randint(-STEAL_ENTRY_MOVE_Y_RANGE, STEAL_ENTRY_MOVE_Y_RANGE)
+
+ball_handler_after_entry_x = ball_handler_start_x + (direction * steal_entry_move_x)
+ball_handler_after_entry_y = max(STEAL_ENTRY_Y_MIN, min(STEAL_ENTRY_Y_MAX, ball_handler_start_y + steal_entry_move_y))
+```
+
+**Frontend Animation:**
+```javascript
+// Frontend: FrontEnd/static/js/phaser/animation/fastBreak.js
+const moveX = turnData.roles?.ball_handler_move_x || 
+              Phaser.Math.Between(STEAL_ENTRY_MOVE_X_MIN, STEAL_ENTRY_MOVE_X_MAX);
+const moveY = turnData.roles?.ball_handler_move_y || 
+              Phaser.Math.Between(-STEAL_ENTRY_MOVE_Y_RANGE, STEAL_ENTRY_MOVE_Y_RANGE);
+
+const targetGrid = {
+  x: currentGrid.x + (direction * moveX),
+  y: Phaser.Math.Clamp(
+    currentGrid.y + moveY,
+    STEAL_ENTRY_Y_MIN,
+    STEAL_ENTRY_Y_MAX
+  )
+};
+```
+
+### Defensive Stop vs Shot Determination
+
+After the stealer completes the steal entry movement, the system uses the **same logic as DREB Fast Breaks** to determine if it's a defensive stop or shot attempt:
+
+**Logic (HOME Orientation):**
+
+**Home Offense:**
+- Basket at x=90 (larger x is closer to basket)
+- Defender ahead if: `defender_x >= stealer_x` (after steal entry movement)
+- **Defender must also be within ±6 y-coords of stealer**
+- If defender ahead AND within y-range → DEFENSIVE_STOP
+- Otherwise → SHOT
+
+**Away Offense:**
+- Basket at x=10 (smaller x is closer to basket)
+- Defender ahead if: `defender_x <= stealer_x` (after steal entry movement)
+- **Defender must also be within ±6 y-coords of stealer**
+- If defender ahead AND within y-range → DEFENSIVE_STOP
+- Otherwise → SHOT
+
+**Y-Coord Range Barrier:**
+- Uses `DEFENSIVE_STOP_Y_RANGE = 6` (same as DREB Fast Breaks)
+- Defender must be within ±6 y-coords of stealer to force defensive stop
+- If defender is ahead but outside y-range, it becomes a shot attempt
+
+**Multiple Defenders:**
+- If multiple defenders meet both conditions (ahead AND within y-range), the closest one (by x-distance) forces the defensive stop
+- If no defender meets both conditions, the closest defender overall (by Euclidean distance) becomes the shot defender
+
+### Integration with Fast Break System
+
+**Steal-Initiated Fast Break Flow:**
+
+1. **Steal Entry Phase** (Bespoke Step)
+   - Stealer moves 5-10 x spots toward basket, ±4 y spots (clamped)
+   - Ball remains attached to stealer throughout movement
+   - No outlet pass occurs (steal-initiated Fast Breaks bypass outlet phase)
+
+2. **Defensive Stop vs Shot Check**
+   - Uses stealer's position **after** steal entry movement
+   - Applies same logic as DREB Fast Breaks (defender ahead AND within ±6 y-coords)
+
+3. **Fast Break Resolution**
+   - If SHOT → Animate shot attempt (same as DREB Fast Breaks)
+   - If DEFENSIVE_STOP → Animate defensive stop (same as DREB Fast Breaks)
+
+**Key Differences from DREB Fast Breaks:**
+- **No Outlet Pass**: Steal-initiated Fast Breaks skip the outlet pass phase
+- **Steal Entry Step**: Stealer moves before defensive stop/shot determination
+- **Ball Attachment**: Ball is already attached to stealer from steal turn, remains attached during steal entry
+
+**Backend Data Flow:**
+```python
+# Backend stores steal entry movement in fb_roles
+fb_roles["ball_handler_move_x"] = steal_entry_move_x
+fb_roles["ball_handler_move_y"] = steal_entry_move_y
+fb_roles["ball_handler_outlet_x"] = ball_handler_after_entry_x  # Position after steal entry
+fb_roles["ball_handler_outlet_y"] = ball_handler_after_entry_y
+fb_roles["is_steal_entry"] = True  # Flag to indicate steal entry vs outlet pass
+```
+
+**Frontend Animation Flow:**
+```javascript
+// Frontend: FrontEnd/static/js/phaser/animation/fastBreak.js
+if (turnData.roles?.is_steal_entry || (!turnData.roles?.outlet_passer && !turnData.roles?.outlet_receiver)) {
+  // Steal Entry Phase
+  await animateStealEntry(scene, turnData, playerSprites, ballSprite, width, height);
+}
+
+// Then proceed with Fast Break resolution (shot or defensive stop)
+if (result === "MAKE" || result === "MISS") {
+  await animateFastBreakShot(scene, turnData, playerSprites, ballSprite, width, height);
+} else {
+  await animateDefensiveStop(scene, turnData, playerSprites, ballSprite, width, height);
+}
+```
+
+### Fast Break Chance Determination
+
+**Team Aggression Setting:**
+- Fast break chance after steals is determined by the **offensive team's aggression setting** (not tempo)
+- Function: `get_fast_break_chance()` in `BackEnd/utils/shared.py`
+- Aggression levels: 0-4 (0 = 0%, 1 = 25%, 2 = 50%, 3 = 75%, 4 = 100%)
+
+**Implementation:**
+```python
+def get_fast_break_chance(game):
+    """
+    Determine fast break probability based on the OFFENSIVE team's aggression setting.
+    Called after defensive rebounds or steals when the team is now on offense.
+    """
+    off_team = game.offense_team
+    level = off_team.strategy_settings.get("aggression", 2)
+    return [0.0, 0.25, 0.5, 0.75, 1.0][level]
+```
+
+### Key Files
+
+**Backend:**
+- `BackEnd/engine/phase_resolution.py` - `resolve_fast_break_logic()` (steal entry movement calculation)
+- `BackEnd/constants/fast_break_constants.py` - Steal entry constants
+- `BackEnd/utils/shared.py` - `get_fast_break_chance()` (aggression-based fast break chance)
+
+**Frontend:**
+- `FrontEnd/static/js/phaser/animation/fastBreak.js` - `animateStealEntry()` and `runFastBreakSequence()`
+- `FrontEnd/static/js/phaser/constants/fastBreakConstants.js` - Steal entry constants
+
+### Future Enhancements
+
+**HCO Steals:**
+- Apply steal entry step to HCO steals that transition to Fast Break
+- Same movement logic, same defensive stop/shot determination
+
+**FCP/HCT Steals:**
+- Currently, FCP/HCT steals can transition to Fast Break or HCO
+- When transitioning to Fast Break, steal entry step already applies
+- When transitioning to HCO, may need bespoke steal entry logic for HCO context
+
+**Steal Entry for Non-Fast Break Transitions:**
+- Consider steal entry step for steals that transition directly to HCO (without Fast Break)
+- May require different movement parameters or logic based on context
 
 ---
 
