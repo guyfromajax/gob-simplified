@@ -1883,8 +1883,20 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
                                       previousTurn?.rebound_type === "DREB" &&
                                       previousTurn?.next_play_type !== "FAST_BREAK";
   
+  // 🔍 DEBUG: Log detection attempt
+  console.log('🔍 [HCO SETUP] Checking for previous MISS → DREB', {
+    currentIndex,
+    currentTurnResultType: turnData.result_type,
+    hasPreviousTurn: !!previousTurn,
+    previousTurnResultType: previousTurn?.result_type,
+    previousTurnReboundType: previousTurn?.rebound_type,
+    previousTurnNextPlayType: previousTurn?.next_play_type,
+    isPreviousTurnMissWithDreb,
+    willCallRunDefensiveReboundSetup: isPreviousTurnMissWithDreb
+  });
+  
   if (isPreviousTurnMissWithDreb) {
-    console.log('🔍 [HCO SETUP] Previous turn was MISS with DREB - calling runDefensiveReboundSetup()', {
+    console.log('✅ [HCO SETUP] Previous turn was MISS with DREB - calling runDefensiveReboundSetup()', {
       previousTurnResult: previousTurn.result_type,
       previousTurnReboundType: previousTurn.rebound_type,
       previousTurnRebounderId: previousTurn.rebounderId,
