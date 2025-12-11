@@ -16,6 +16,11 @@ import {
   REBOUNDER_Y_RANGE,
   SHOT_ATTEMPT_REBOUNDER_Y_RANGE,
   OUTLET_PASSER_MOVE_X,
+  STEAL_ENTRY_MOVE_X_MIN,
+  STEAL_ENTRY_MOVE_X_MAX,
+  STEAL_ENTRY_MOVE_Y_RANGE,
+  STEAL_ENTRY_Y_MIN,
+  STEAL_ENTRY_Y_MAX,
 } from "../constants/fastBreakConstants.js";
 
 /**
@@ -77,6 +82,17 @@ export async function runFastBreakSequence({
     await animateOutletPhase(scene, turnData, playerSprites, ballSprite, width, height);
     
     // Transition to FastBreak state after outlet (only if not already there)
+    if (scene.stateMachine?.state !== States.FastBreak) {
+      safeTransition(scene.stateMachine, States.FastBreak);
+    }
+  } else if (turnData.roles?.is_steal_entry || (!turnData.roles?.outlet_passer && !turnData.roles?.outlet_receiver)) {
+    // ============================================================================
+    // PHASE 1b: STEAL ENTRY (for steal-initiated Fast Breaks)
+    // ============================================================================
+    // Check is_steal_entry flag OR if there's no outlet pass (steal-initiated)
+    await animateStealEntry(scene, turnData, playerSprites, ballSprite, width, height);
+    
+    // Transition to FastBreak state after steal entry
     if (scene.stateMachine?.state !== States.FastBreak) {
       safeTransition(scene.stateMachine, States.FastBreak);
     }
@@ -287,6 +303,92 @@ async function animateOutletPhase(scene, turnData, playerSprites, ballSprite, wi
         debugInfo: { reason: 'fast_break_outlet_retry' }
       });
     }
+  }
+}
+
+/**
+ * Phase 1b: Steal Entry Animation (for steal-initiated Fast Breaks)
+ * - Stealer (ball handler) moves 5-10 x spots toward basket
+ * - Stealer moves ±4 y spots (clamped to 3-47)
+ * - Ball is already attached to stealer from the steal turn
+ */
+async function animateStealEntry(scene, turnData, playerSprites, ballSprite, width, height) {
+  // Get ball handler ID from roles (backend stores player object, frontend gets ID)
+  const ballHandlerId = turnData.roles?.ball_handler_id ||
+                        turnData.roles?.ball_handler?.player_id || 
+                        turnData.ball_handler_id ||
+                        turnData.stealer_id; // Fallback to stealer_id for steals
+  const ballHandlerSprite = ballHandlerId ? playerSprites[ballHandlerId] : null;
+  
+  if (!ballHandlerSprite) {
+    console.warn("Steal Entry: Ball handler sprite not found", { 
+      ballHandlerId, 
+      roles: turnData.roles,
+      stealer_id: turnData.stealer_id 
+    });
+    return;
+  }
+  
+  // Ball should already be attached to stealer from the steal turn
+  // Verify attachment
+  const { getBallController } = await import('./BallControllerAdapter.js');
+  const ballController = getBallController();
+  
+  if (!ballController?.isAttached || ballController.currentOwner !== ballHandlerSprite) {
+    // Attach ball to stealer if not already attached
+    attachBallToPlayer(scene, ballSprite, ballHandlerSprite, {
+      reason: 'steal_entry_verify'
+    });
+  }
+  
+  // Get stealer's current position
+  const currentGrid = {
+    x: ballHandlerSprite.gridX || 50,
+    y: ballHandlerSprite.gridY || 25
+  };
+  
+  // Determine offense team and direction
+  const isHomeOffense = ballHandlerSprite.team === "home";
+  const direction = isHomeOffense ? 1 : -1; // +1 for home (toward x=90), -1 for away (toward x=10)
+  
+  // Calculate steal entry movement (matches backend calculation)
+  // Backend sends ball_handler_move_x and ball_handler_move_y in turnData.roles
+  const moveX = turnData.roles?.ball_handler_move_x || 
+                Phaser.Math.Between(STEAL_ENTRY_MOVE_X_MIN, STEAL_ENTRY_MOVE_X_MAX);
+  const moveY = turnData.roles?.ball_handler_move_y || 
+                Phaser.Math.Between(-STEAL_ENTRY_MOVE_Y_RANGE, STEAL_ENTRY_MOVE_Y_RANGE);
+  
+  // Calculate target position
+  const targetGrid = {
+    x: currentGrid.x + (direction * moveX),
+    y: Phaser.Math.Clamp(
+      currentGrid.y + moveY,
+      STEAL_ENTRY_Y_MIN,
+      STEAL_ENTRY_Y_MAX
+    )
+  };
+  
+  // Convert to pixel coordinates
+  const targetPx = gridToPixels(targetGrid.x, targetGrid.y, width, height);
+  
+  // Get animation duration
+  const playerDuration = getPlayerDuration(ballHandlerSprite, targetPx.x, targetPx.y, true);
+  
+  // Animate stealer movement
+  await tweenPlayerTo(scene, ballHandlerSprite, targetPx, {
+    duration: playerDuration,
+    easing: "Linear"
+  });
+  
+  // Update sprite grid coordinates
+  ballHandlerSprite.gridX = targetGrid.x;
+  ballHandlerSprite.gridY = targetGrid.y;
+  
+  // Verify ball remains attached after movement
+  if (ballController && (!ballController.isAttached || ballController.currentOwner !== ballHandlerSprite)) {
+    attachBallToPlayer(scene, ballSprite, ballHandlerSprite, {
+      reason: 'steal_entry_post_movement'
+    });
   }
 }
 

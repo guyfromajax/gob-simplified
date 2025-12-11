@@ -33,3 +33,10 @@ OUTLET_PASSER_MOVE_X = 7  # Moves forward 7 x-coords toward basket (+7 for home,
 # Defensive Stop Determination
 DEFENSIVE_STOP_Y_RANGE = 6  # Defender must be within ±6 y-coords of outlet receiver to force stop
 
+# Steal Entry Movement (Steal → Fast Break)
+STEAL_ENTRY_MOVE_X_MIN = 5  # Minimum x movement toward basket
+STEAL_ENTRY_MOVE_X_MAX = 10  # Maximum x movement toward basket
+STEAL_ENTRY_MOVE_Y_RANGE = 4  # ±4 y-coords
+STEAL_ENTRY_Y_MIN = 3  # Minimum y-coord (clamped)
+STEAL_ENTRY_Y_MAX = 47  # Maximum y-coord (clamped)
+
