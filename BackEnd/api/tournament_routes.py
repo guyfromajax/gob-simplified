@@ -397,6 +397,95 @@ def tournament_state(tournament_id: str):
     return jsonable_encoder(doc, custom_encoder={ObjectId: str})
 
 
+@router.get("/tournament/roster")
+def get_tournament_roster(tournament_id: str, team_name: str = None):
+    """
+    Get roster with tournament-specific player attributes.
+    
+    Similar to /franchise/roster, this endpoint merges tournament-specific attributes
+    (EM, CH, MO) with base attributes from the universal collection. Future training
+    support will allow tournament documents to store evolved attributes like franchise mode.
+    """
+    try:
+        tid = ObjectId(tournament_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid tournament ID")
+    
+    # Get tournament document
+    tournament_doc = tournaments_collection.find_one({"_id": tid})
+    if not tournament_doc:
+        raise HTTPException(status_code=404, detail="Tournament not found")
+    
+    # Get team name from tournament if not provided
+    if not team_name:
+        team_name = tournament_doc.get("user_team_id")
+    
+    if not team_name:
+        raise HTTPException(status_code=404, detail="Team not found")
+    
+    # Get team document
+    team_doc = teams_collection.find_one({"name": team_name})
+    if not team_doc:
+        raise HTTPException(status_code=404, detail="Team not found")
+    
+    tournament_players = tournament_doc.get("player_stats", {})
+    team_player_ids = team_doc.get("player_ids", [])
+    
+    # Build player list with tournament-specific attributes
+    players = []
+    for pid in team_player_ids:
+        pid_str = str(pid)
+        tournament_player_data = tournament_players.get(pid_str, {})
+        if not tournament_player_data:
+            continue
+        
+        # Get tournament-specific attributes (currently EM, CH, MO only)
+        # Future: will include all evolved attributes when training is added
+        tournament_attributes = tournament_player_data.get("attributes", {})
+        
+        # Get additional data from core collection
+        core_player = players_collection.find_one({"_id": pid}, {
+            "position_ratings": 1, "height": 1, "weight": 1, "jersey": 1, "year": 1, "attributes": 1,
+            "first_name": 1, "last_name": 1
+        })
+        
+        if not core_player:
+            continue
+        
+        # Get position ratings from core (tournament doesn't store position ratings yet)
+        position_ratings = core_player.get("position_ratings", {})
+        
+        # Merge core attributes with tournament attributes (tournament overrides core)
+        core_attributes = core_player.get("attributes", {}) if core_player else {}
+        merged_attributes = {**core_attributes, **tournament_attributes}
+        
+        # Create anchor_ prefixed attributes (like Player class does)
+        for attr_key in ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "AG", "ST", "ND", "IQ", "FT"]:
+            if attr_key in merged_attributes:
+                merged_attributes[f"anchor_{attr_key}"] = merged_attributes[attr_key]
+        
+        # Use tournament player data for name, fallback to core
+        first = tournament_player_data.get("first_name") or core_player.get("first_name", "")
+        last = tournament_player_data.get("last_name") or core_player.get("last_name", "")
+        
+        player = {
+            "_id": pid_str,
+            "first_name": first,
+            "last_name": last,
+            "name": f"{first} {last}".strip(),
+            "team": team_name,
+            "attributes": merged_attributes,
+            "position_ratings": position_ratings,
+            "height": core_player.get("height"),
+            "weight": core_player.get("weight"),
+            "jersey": core_player.get("jersey", 0),
+            "year": core_player.get("year")
+        }
+        players.append(player)
+    
+    return {"players": players}
+
+
 @router.post("/tournament/sim-remaining")
 def sim_remaining(request: SimulateRequest):
     """Simulate all remaining games until the bracket is complete.
