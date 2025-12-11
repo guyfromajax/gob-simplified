@@ -1877,7 +1877,8 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   // ✅ FIX: Check if previous turn was MISS with DREB (HCO Shot Miss → DREB)
   // If so, handle DREB setup here (same pattern as OREB Putback Miss → DREB)
   // This prevents embedded DREB handling from interfering with skeleton animation defensive tweens
-  const currentIndex = scene.currentTurn || 0;
+  // Use turnIndex parameter if available, otherwise fall back to scene.currentTurn
+  const currentIndex = turnIndex !== undefined ? turnIndex : (scene.currentTurn || 0);
   const previousTurn = scene.simData?.turns?.[currentIndex - 1];
   const isPreviousTurnMissWithDreb = previousTurn?.result_type === "MISS" && 
                                       previousTurn?.rebound_type === "DREB" &&
@@ -1885,14 +1886,19 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   
   // 🔍 DEBUG: Log detection attempt
   console.log('🔍 [HCO SETUP] Checking for previous MISS → DREB', {
-    currentIndex,
+    turnIndexParam: turnIndex,
+    sceneCurrentTurn: scene.currentTurn,
+    currentIndexUsed: currentIndex,
     currentTurnResultType: turnData.result_type,
     hasPreviousTurn: !!previousTurn,
     previousTurnResultType: previousTurn?.result_type,
     previousTurnReboundType: previousTurn?.rebound_type,
     previousTurnNextPlayType: previousTurn?.next_play_type,
+    previousTurnRebounderId: previousTurn?.rebounderId,
     isPreviousTurnMissWithDreb,
-    willCallRunDefensiveReboundSetup: isPreviousTurnMissWithDreb
+    willCallRunDefensiveReboundSetup: isPreviousTurnMissWithDreb,
+    totalTurns: scene.simData?.turns?.length || 0,
+    turnsArray: scene.simData?.turns?.map((t, idx) => ({ idx, result_type: t.result_type, rebound_type: t.rebound_type })) || []
   });
   
   if (isPreviousTurnMissWithDreb) {
