@@ -528,6 +528,27 @@ HCO turns can result in:
 - Animations include player movements, ball movements, and defender positioning
 - Frontend uses animation data to render turn animations
 
+### DREB → HCO Transition and Outlet Pass Execution ✅ **NEW** (January 2025)
+
+**Design Pattern:**
+When a defensive rebound (DREB) transitions to an HCO turn, the outlet pass executes in the **DREB turn** (via `runDefensiveReboundSetup`), not in the HCO turn itself. This differs from Fast Break outlet passes, which execute in the Fast Break turn.
+
+**Why This Design:**
+- **HCO is skeleton-based**: The HCO turn simply plays the skeleton animation. The outlet pass is a **transition step** that happens before the HCO turn begins, positioning players and transferring the ball from rebounder to outlet receiver.
+- **Fast Break is self-contained**: Fast Break is a complete sequence (outlet pass → resolution), so it owns its setup and executes the outlet pass as Phase 1 of the Fast Break turn.
+- **Separation of concerns**: HCO outlet pass is a transition animation, while HCO turn is the skeleton execution. Keeping them separate maintains clarity and avoids complicating the skeleton-based turn logic.
+
+**Implementation:**
+- **Location:** `FrontEnd/static/js/phaser/animation/turnAnimation.js` - `runDefensiveReboundSetup()` function
+- **Trigger:** Called from `handleOrebTurn()` when `rebound_type === "DREB"` and `next_play_type !== "FAST_BREAK"`
+- **Execution:** Outlet pass happens before HCO turn begins, ensuring players are positioned and ball is transferred to the outlet receiver
+- **Note:** These two outlet steps are mutually exclusive - never run together. Fast Break outlet is handled separately in `fastBreak.js` (`animateOutletPhase`).
+
+**Key Files:**
+- `FrontEnd/static/js/phaser/animation/turnAnimation.js` - `runDefensiveReboundSetup()` (HCO outlet pass)
+- `FrontEnd/static/js/phaser/animation/fastBreak.js` - `animateOutletPhase()` (Fast Break outlet pass)
+- `FrontEnd/static/js/phaser/animation/animateGameTurns.js` - `handleOrebTurn()` (calls outlet setup for HCO)
+
 ### Screener Offset Coordinate System ✅ **NEW** (January 2025)
 
 **Purpose:**
