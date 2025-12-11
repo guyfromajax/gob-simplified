@@ -514,6 +514,7 @@ class GameManager:
                     team_box[pos] = {
                     "name": player.get_name(),
                         "playerId": player.player_id,
+                        "jersey": player.jersey,
                     **player.stats["game"]
                 }
             # Then add bench players (players not in current lineup)
@@ -528,6 +529,7 @@ class GameManager:
                     team_box[pos] = {
                         "name": player.get_name(),
                         "playerId": player.player_id,
+                        "jersey": player.jersey,
                         **player.stats["game"]
         }
             box_score[team.name] = team_box

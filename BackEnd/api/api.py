@@ -1893,6 +1893,7 @@ def get_team_roster(team_name: str, tournament_id: str | None = None, response: 
             "year": p.get("year"),
             "height": p.get("height"),
             "weight": p.get("weight"),
+            "jersey": p.get("jersey", 0),
             "position_ratings": p.get("position_ratings", {}),
             "attributes": attributes,  # Return full attributes object (not filtered)
         })
