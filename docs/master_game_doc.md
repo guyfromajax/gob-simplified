@@ -972,32 +972,49 @@ The outlet passer tracks:
 
 ### Overview
 
-The **Steal System** handles steal-initiated transitions, currently implemented for Fast Breaks but designed to apply to multiple turn types (FCP, HCT, HCO, and Fast Breaks). The system includes a bespoke "Steal Entry" step that moves the stealer toward the basket before determining the outcome (defensive stop or shot attempt).
+The **Steal System** handles steal-initiated transitions for Fast Breaks and HCO turns. The system includes two bespoke steps:
+- **Steal Entry**: Moves the stealer toward the basket before Fast Break resolution (defensive stop or shot attempt)
+- **Steal HCO Setup**: Moves the stealer away from the basket before HCO skeleton animation begins
 
 **Key Functions:**
 - `resolve_fast_break_logic()` - Handles steal entry movement and outcome determination in `BackEnd/engine/phase_resolution.py`
-- `animateStealEntry()` - Animates stealer movement in `FrontEnd/static/js/phaser/animation/fastBreak.js`
+- `resolve_half_court_offense_logic()` - Handles steal HCO setup movement in `BackEnd/engine/phase_resolution.py`
+- `animateStealEntry()` - Animates stealer movement for Fast Breaks in `FrontEnd/static/js/phaser/animation/fastBreak.js`
+- `animateStealHCOSetup()` - Animates stealer movement for HCO in `FrontEnd/static/js/phaser/animation/turnAnimation.js`
 
 **Current Implementation:**
 - ✅ **Fast Break**: Steal → Steal Entry → Fast Break resolution
-- 🔜 **HCO**: Steal → Steal Entry → HCO (future)
-- 🔜 **FCP/HCT**: Steal → Steal Entry → Fast Break or HCO (future)
+- ✅ **HCO**: Steal → Steal HCO Setup → HCO skeleton animation
+- 🔜 **FCP/HCT**: Steal → Steal Entry/Setup → Fast Break or HCO (future)
 
-### When Steal Entry Activates
+### When Steal Steps Activate
 
-**Trigger Conditions:**
+**Steal Entry (Fast Break):**
 - After a steal occurs in FCP, HCT, or HCO turns
 - When the next turn is determined to be a Fast Break (based on team aggression setting)
 - Ball is already attached to the stealer from the steal turn
 - No outlet pass occurs (steal-initiated Fast Breaks bypass outlet phase)
 
-**State Flow:**
+**Steal HCO Setup (HCO):**
+- After a steal occurs in FCP, HCT, or HCO turns
+- When the next turn is determined to be HCO (fast break chance fails)
+- Ball is already attached to the stealer from the steal turn
+- Runs as the first step of the HCO turn, before skeleton animation
+
+**State Flow (Fast Break):**
 1. Steal occurs → Ball attached to stealer
 2. Fast break chance determined by `get_fast_break_chance()` using team **aggression** setting
 3. If Fast Break → Steal Entry step executes
 4. Stealer moves 5-10 x spots toward basket, ±4 y spots (clamped to 3-47)
 5. After movement, defensive stop vs shot determination occurs
 6. Fast Break resolution proceeds (shot attempt or defensive stop)
+
+**State Flow (HCO):**
+1. Steal occurs → Ball attached to stealer
+2. Fast break chance determined by `get_fast_break_chance()` using team **aggression** setting
+3. If HCO (fast break chance fails) → Steal HCO Setup step executes
+4. Stealer moves 3-7 x spots away from basket, ±3 y spots (clamped to 3-47)
+5. After movement, HCO skeleton animation proceeds normally
 
 ### Steal Entry Movement
 
@@ -1123,6 +1140,100 @@ if (result === "MAKE" || result === "MISS") {
 }
 ```
 
+### Steal HCO Setup Movement
+
+**Movement Parameters:**
+- **X Movement**: Random 3-7 grid spots away from offense basket
+  - Home team: -7 to -3 (away from x=90, toward x=10)
+  - Away team: +3 to +7 (away from x=10, toward x=90)
+- **Y Movement**: Random -3 to +3 grid spots
+  - Clamped to y min = 3, y max = 47 (stays in bounds)
+
+**Constants:**
+- `STEAL_HCO_SETUP_MOVE_X_MIN = 3`
+- `STEAL_HCO_SETUP_MOVE_X_MAX = 7`
+- `STEAL_HCO_SETUP_MOVE_Y_RANGE = 3` (±3 y-coords)
+- `STEAL_HCO_SETUP_Y_MIN = 3`
+- `STEAL_HCO_SETUP_Y_MAX = 47`
+
+**Implementation:**
+```python
+# Backend: BackEnd/engine/phase_resolution.py
+ball_handler_start_x = getattr(ball_handler, "coords", {}).get("x", 50)
+ball_handler_start_y = getattr(ball_handler, "coords", {}).get("y", 25)
+
+hco_setup_move_x = random.randint(STEAL_HCO_SETUP_MOVE_X_MIN, STEAL_HCO_SETUP_MOVE_X_MAX)
+hco_setup_move_y = random.randint(-STEAL_HCO_SETUP_MOVE_Y_RANGE, STEAL_HCO_SETUP_MOVE_Y_RANGE)
+
+# Direction away from basket (opposite of steal entry)
+hco_setup_final_x = ball_handler_start_x + (direction * hco_setup_move_x)
+hco_setup_final_y = max(STEAL_HCO_SETUP_Y_MIN, min(STEAL_HCO_SETUP_Y_MAX, ball_handler_start_y + hco_setup_move_y))
+```
+
+**Frontend Animation:**
+```javascript
+// Frontend: FrontEnd/static/js/phaser/animation/turnAnimation.js
+const moveX = turnData.roles?.ball_handler_hco_setup_move_x || 
+              Phaser.Math.Between(STEAL_HCO_SETUP_MOVE_X_MIN, STEAL_HCO_SETUP_MOVE_X_MAX);
+const moveY = turnData.roles?.ball_handler_hco_setup_move_y || 
+              Phaser.Math.Between(-STEAL_HCO_SETUP_MOVE_Y_RANGE, STEAL_HCO_SETUP_MOVE_Y_RANGE);
+
+const targetGrid = {
+  x: currentGrid.x + (direction * moveX),
+  y: Phaser.Math.Clamp(
+    currentGrid.y + moveY,
+    STEAL_HCO_SETUP_Y_MIN,
+    STEAL_HCO_SETUP_Y_MAX
+  )
+};
+```
+
+### Integration with HCO System
+
+**Steal-Initiated HCO Flow:**
+
+1. **Steal HCO Setup Phase** (Bespoke Step)
+   - Stealer moves 3-7 x spots away from basket, ±3 y spots (clamped)
+   - Ball remains attached to stealer throughout movement
+   - Runs before HCO skeleton animation begins
+
+2. **HCO Skeleton Animation**
+   - Proceeds normally after steal HCO setup completes
+   - Stealer's position after setup becomes the starting point for skeleton animation
+
+**Key Characteristics:**
+- **Movement Direction**: Away from basket (opposite of Steal Entry for Fast Breaks)
+- **Timing**: Runs as first step of HCO turn, before skeleton animation
+- **Ball Attachment**: Ball is already attached to stealer from steal turn, remains attached during setup
+
+**Backend Data Flow:**
+```python
+# Backend stores steal HCO setup movement in roles
+roles["is_steal_hco_setup"] = True
+roles["ball_handler_hco_setup_x"] = hco_setup_final_x
+roles["ball_handler_hco_setup_y"] = hco_setup_final_y
+roles["ball_handler_hco_setup_move_x"] = hco_setup_move_x
+roles["ball_handler_hco_setup_move_y"] = hco_setup_move_y
+roles["ball_handler_id"] = getattr(ball_handler, "player_id", None)
+
+# Clear last_stealer after use to prevent persistence
+game_state["last_stealer"] = None
+```
+
+**Frontend Animation Flow:**
+```javascript
+// Frontend: FrontEnd/static/js/phaser/animation/turnAnimation.js
+// In playTurnAnimation(), before step loop starts:
+if (turnData.roles?.is_steal_hco_setup) {
+  await animateStealHCOSetup(scene, turnData, playerSprites, ballSprite);
+}
+
+// Then proceed with normal HCO skeleton animation
+for (let stepIndex = 1; stepIndex < maxSteps; stepIndex++) {
+  // ... skeleton animation steps
+}
+```
+
 ### Fast Break Chance Determination
 
 **Team Aggression Setting:**
@@ -1145,28 +1256,26 @@ def get_fast_break_chance(game):
 ### Key Files
 
 **Backend:**
-- `BackEnd/engine/phase_resolution.py` - `resolve_fast_break_logic()` (steal entry movement calculation)
-- `BackEnd/constants/fast_break_constants.py` - Steal entry constants
+- `BackEnd/engine/phase_resolution.py` - `resolve_fast_break_logic()` (steal entry movement calculation) and `resolve_half_court_offense_logic()` (steal HCO setup movement calculation)
+- `BackEnd/constants/fast_break_constants.py` - Steal entry and steal HCO setup constants
 - `BackEnd/utils/shared.py` - `get_fast_break_chance()` (aggression-based fast break chance)
 
 **Frontend:**
 - `FrontEnd/static/js/phaser/animation/fastBreak.js` - `animateStealEntry()` and `runFastBreakSequence()`
-- `FrontEnd/static/js/phaser/constants/fastBreakConstants.js` - Steal entry constants
+- `FrontEnd/static/js/phaser/animation/turnAnimation.js` - `animateStealHCOSetup()` and `playTurnAnimation()`
+- `FrontEnd/static/js/phaser/constants/fastBreakConstants.js` - Steal entry and steal HCO setup constants
 
 ### Future Enhancements
 
-**HCO Steals:**
-- Apply steal entry step to HCO steals that transition to Fast Break
-- Same movement logic, same defensive stop/shot determination
-
 **FCP/HCT Steals:**
 - Currently, FCP/HCT steals can transition to Fast Break or HCO
-- When transitioning to Fast Break, steal entry step already applies
-- When transitioning to HCO, may need bespoke steal entry logic for HCO context
+- When transitioning to Fast Break, Steal Entry step already applies
+- When transitioning to HCO, Steal HCO Setup step already applies
+- Both paths are now fully implemented
 
-**Steal Entry for Non-Fast Break Transitions:**
-- Consider steal entry step for steals that transition directly to HCO (without Fast Break)
-- May require different movement parameters or logic based on context
+**Additional Steal Contexts:**
+- Consider if steals in other contexts (e.g., during Fast Break) need bespoke setup steps
+- May require different movement parameters or logic based on specific context
 
 ---
 
