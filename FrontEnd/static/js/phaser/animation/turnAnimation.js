@@ -2143,8 +2143,36 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
     // ✅ REFACTOR: Use unified passDetection.js for consistency
     // ✅ FIX: Detect pass early to determine animation sequence (reused below)
     const { detectPassAtStep } = await import('./passDetection.js');
+    
+    // 🔍 DEBUG: Log before pass detection
+    console.log(`🔍 [TURN ANIM] Step ${stepIndex}: Starting pass detection`, {
+      turnId: turnData?.id?.substring(0, 8),
+      totalAnimations: turnData.animations?.length,
+      maxSteps: maxSteps
+    });
+    
+    // 🔍 DEBUG: Log movement array structure for all players at this step
+    const movementArrayInfo = turnData.animations.map(anim => ({
+      playerId: anim.playerId?.substring(0, 8) || 'unknown',
+      movementLength: anim.movement?.length || 0,
+      hasStep: stepIndex < (anim.movement?.length || 0),
+      stepAction: stepIndex < (anim.movement?.length || 0) ? anim.movement[stepIndex]?.action : 'N/A',
+      stepTimestamp: stepIndex < (anim.movement?.length || 0) ? anim.movement[stepIndex]?.timestamp : 'N/A'
+    }));
+    console.log(`🔍 [TURN ANIM] Step ${stepIndex}: Movement array structure`, movementArrayInfo);
+    
     const passInfo = detectPassAtStep(turnData.animations, stepIndex);
     const passHappeningAtThisStep = !!passInfo;
+    
+    // 🔍 DEBUG: Log pass detection result
+    console.log(`🔍 [TURN ANIM] Step ${stepIndex}: Pass detection result`, {
+      passInfo: passInfo ? {
+        passer: passInfo.passerId?.substring(0, 8),
+        receiver: passInfo.receiverId?.substring(0, 8),
+        stepIndex: passInfo.stepIndex
+      } : null,
+      passHappeningAtThisStep
+    });
     
     // ✅ OLD CODE (commented out - replaced with unified passDetection.js):
     // const passHappeningAtThisStep = turnData.animations.some(
@@ -2278,8 +2306,20 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
     // Start defensive tweens immediately only when there is no pass; when there is a pass,
     // we'll start them alongside the pass to keep them in sync.
     let defensivePromiseArray = [];
+    
+    // 🔍 DEBUG: Log defensive animation decision
+    console.log(`🔍 [TURN ANIM] Step ${stepIndex}: Defensive animation decision`, {
+      hasPassInfo: !!passInfo,
+      defensiveStartersCount: defensiveStarters.length,
+      willStartImmediately: !passInfo && defensiveStarters.length > 0,
+      willStartInPhase2: !!passInfo && defensiveStarters.length > 0
+    });
+    
     if (!passInfo && defensiveStarters.length > 0) {
+      console.log(`⚠️ [TURN ANIM] Step ${stepIndex}: Starting defensive animations IMMEDIATELY (no pass detected)`);
       defensivePromiseArray = defensiveStarters.map(start => start());
+    } else if (passInfo && defensiveStarters.length > 0) {
+      console.log(`✅ [TURN ANIM] Step ${stepIndex}: Deferring defensive animations to Phase 2 (pass detected)`);
     }
 
     // ✅ FIX: Phase 1 - Start all offensive players animating, wait for passer if there's a pass
@@ -2301,6 +2341,13 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
     const passAndDefensePromises = [];
     const phase2StartTime = performance.now();
     
+    // 🔍 DEBUG: Log Phase 2 start
+    console.log(`🔍 [TURN ANIM] Step ${stepIndex}: Starting Phase 2`, {
+      hasPassInfo: !!passInfo,
+      defensiveStartersCount: defensiveStarters.length,
+      phase1Duration: phase2StartTime - phase1StartTime
+    });
+    
     if (passInfo) {
       // Add pass animation to the parallel batch
       const { handlePassAnimation } = await import('./passDetection.js');
@@ -2311,15 +2358,18 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
       });
       
       passAndDefensePromises.push(passPromise);
+      console.log(`✅ [TURN ANIM] Step ${stepIndex}: Starting pass animation + defensive animations in parallel`);
 
       // Start defensive tweens now (in sync with pass start)
       if (defensiveStarters.length > 0) {
         defensivePromiseArray = defensiveStarters.map(start => start());
         passAndDefensePromises.push(...defensivePromiseArray);
+        console.log(`✅ [TURN ANIM] Step ${stepIndex}: Added ${defensivePromiseArray.length} defensive animations to Phase 2`);
       }
     } else {
       // No pass: defensive tweens (if any) already started above
       passAndDefensePromises.push(...defensivePromiseArray);
+      console.log(`⚠️ [TURN ANIM] Step ${stepIndex}: No pass - using defensive animations from Phase 1`);
     }
     
     // Animate pass and defensive players simultaneously

@@ -13,32 +13,82 @@ import * as Phaser from "https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.
  * @returns {Object|null} Pass info with passerId, receiverId, stepIndex, or null if no pass
  */
 export function detectPassAtStep(animations, stepIndex) {
+  // 🔍 DEBUG: Log pass detection attempt
+  const debugInfo = {
+    stepIndex,
+    totalAnimations: animations.length,
+    movementLengths: {},
+    passersFound: [],
+    receiversFound: []
+  };
+  
   for (const anim of animations) {
     const movement = anim.movement;
-    if (!movement || stepIndex >= movement.length) continue;
+    if (!movement) {
+      debugInfo.movementLengths[anim.playerId?.substring(0, 8) || 'unknown'] = 'NO_MOVEMENT';
+      continue;
+    }
+    
+    debugInfo.movementLengths[anim.playerId?.substring(0, 8) || 'unknown'] = movement.length;
+    
+    if (stepIndex >= movement.length) continue;
     
     const step = movement[stepIndex];
-    if (step?.action === "pass") {
+    const action = step?.action;
+    
+    if (action === "pass") {
+      debugInfo.passersFound.push({
+        playerId: anim.playerId?.substring(0, 8) || 'unknown',
+        action,
+        timestamp: step?.timestamp
+      });
+      
       // Find receiver (player with action === "receive" at same step)
       const receiverAnim = animations.find(otherAnim => {
         if (otherAnim.playerId === anim.playerId) return false; // Skip passer
         const otherMovement = otherAnim.movement;
         if (!otherMovement || stepIndex >= otherMovement.length) return false;
         const otherStep = otherMovement[stepIndex];
-        return otherStep?.action === "receive";
+        const otherAction = otherStep?.action;
+        
+        if (otherAction === "receive") {
+          debugInfo.receiversFound.push({
+            playerId: otherAnim.playerId?.substring(0, 8) || 'unknown',
+            action: otherAction,
+            timestamp: otherStep?.timestamp
+          });
+          return true;
+        }
+        return false;
       });
       
       if (receiverAnim) {
-        return {
+        const result = {
           passerId: anim.playerId,
           receiverId: receiverAnim.playerId,
           stepIndex,
           timestamp: step.timestamp
         };
+        
+        console.log(`✅ [PASS DETECT] Step ${stepIndex}: Found pass`, {
+          passer: anim.playerId?.substring(0, 8),
+          receiver: receiverAnim.playerId?.substring(0, 8),
+          timestamp: step.timestamp,
+          debugInfo
+        });
+        
+        return result;
+      } else {
+        console.warn(`⚠️ [PASS DETECT] Step ${stepIndex}: Passer found but NO receiver`, {
+          passer: anim.playerId?.substring(0, 8),
+          debugInfo
+        });
       }
     }
   }
   
+  // No pass found
+  console.log(`❌ [PASS DETECT] Step ${stepIndex}: No pass found`, debugInfo);
   return null;
 }
 
