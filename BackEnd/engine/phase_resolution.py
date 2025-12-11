@@ -1769,6 +1769,9 @@ def resolve_half_court_offense_logic(game):
     
     # Add skeleton data for unified animation system (reuse skeleton from line 556)
     shot_result["skeleton"] = skeleton or {}
+    # Add skeleton variant for debugging (temporary - will be removed after debugging)
+    if skeleton and "_variant" in skeleton:
+        shot_result["skeleton_variant"] = skeleton["_variant"]
     
     # ✅ Add serializable roles data to result (includes steal HCO setup data if applicable)
     # Only include serializable fields, not player objects

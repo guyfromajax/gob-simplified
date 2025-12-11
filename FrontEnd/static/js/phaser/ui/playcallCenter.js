@@ -107,7 +107,10 @@ export function updatePlaycallCenter(turnData, homeTeamId) {
   if (offenseStatusText && turnData.offensive_play_type && turnData.offensive_play_focus) {
     const type = turnData.offensive_play_type === 'motion' ? 'Motion' : 'Set';
     const focus = turnData.offensive_play_focus.charAt(0).toUpperCase() + turnData.offensive_play_focus.slice(1);
-    offenseStatusText.textContent = `${type} → ${focus}`;
+    // ✅ TEMPORARY DEBUG: Add skeleton variant in parentheses (for debugging HCO animation sync issue)
+    const variant = turnData.skeleton_variant || turnData.skeleton?._variant;
+    const variantDisplay = variant ? ` (${variant})` : '';
+    offenseStatusText.textContent = `${type} → ${focus}${variantDisplay}`;
   }
   
   if (defenseStatusText) {
