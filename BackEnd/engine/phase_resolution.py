@@ -1770,8 +1770,24 @@ def resolve_half_court_offense_logic(game):
     # Add skeleton data for unified animation system (reuse skeleton from line 556)
     shot_result["skeleton"] = skeleton or {}
     
-    # ✅ Add roles to result (includes steal HCO setup data if applicable)
-    shot_result["roles"] = roles
+    # ✅ Add serializable roles data to result (includes steal HCO setup data if applicable)
+    # Only include serializable fields, not player objects
+    # Note: turn_manager.convert_players() will handle player objects in other result fields,
+    # but we only store the specific fields we need here to avoid serialization issues
+    serializable_roles = {}
+    if roles.get("is_steal_hco_setup"):
+        serializable_roles["is_steal_hco_setup"] = True
+        serializable_roles["ball_handler_hco_setup_x"] = roles.get("ball_handler_hco_setup_x")
+        serializable_roles["ball_handler_hco_setup_y"] = roles.get("ball_handler_hco_setup_y")
+        serializable_roles["ball_handler_hco_setup_move_x"] = roles.get("ball_handler_hco_setup_move_x")
+        serializable_roles["ball_handler_hco_setup_move_y"] = roles.get("ball_handler_hco_setup_move_y")
+        serializable_roles["ball_handler_id"] = roles.get("ball_handler_id")
+    if roles.get("next_defensive_setup"):
+        serializable_roles["next_defensive_setup"] = roles.get("next_defensive_setup")
+    if roles.get("intended_shooter_pos"):
+        serializable_roles["intended_shooter_pos"] = roles.get("intended_shooter_pos")
+    if serializable_roles:  # Only add roles if we have something to add
+        shot_result["roles"] = serializable_roles
     
     # Convert skeleton to animations if skeleton exists
     if skeleton and "steps" in skeleton:
