@@ -297,6 +297,11 @@ from BackEnd.constants.fast_break_constants import (
     BALL_HANDLER_MOVE_X_MAX,
     BALL_HANDLER_MOVE_Y_RANGE,
     DEFENSIVE_STOP_Y_RANGE,
+    STEAL_ENTRY_MOVE_X_MIN,
+    STEAL_ENTRY_MOVE_X_MAX,
+    STEAL_ENTRY_MOVE_Y_RANGE,
+    STEAL_ENTRY_Y_MIN,
+    STEAL_ENTRY_Y_MAX,
 )
 
 def _record_fast_break_stats(fb_roles, turn_result, game):
@@ -535,6 +540,7 @@ def resolve_fast_break_logic(game: "GameManager"):
             # Use release player as ball handler and outlet receiver
             ball_handler = release_player
             fb_roles["ball_handler"] = ball_handler
+            fb_roles["ball_handler_id"] = getattr(ball_handler, "player_id", None)  # ✅ Store ID for frontend
             
             # Clear release player after use to avoid carry-over bugs
             game_state["last_release_player"] = None
@@ -561,6 +567,7 @@ def resolve_fast_break_logic(game: "GameManager"):
             ball_handler = off_lineup[bh_pos]
 
             fb_roles["ball_handler"] = ball_handler
+            fb_roles["ball_handler_id"] = getattr(ball_handler, "player_id", None)  # ✅ Store ID for frontend
 
             # Ensure outlet passer and receiver are set to IDs and only if different
             if rebounder and rebounder != ball_handler:
@@ -588,6 +595,7 @@ def resolve_fast_break_logic(game: "GameManager"):
         if ball_handler is None:
             ball_handler = off_lineup["PG"]
         fb_roles["ball_handler"] = ball_handler
+        fb_roles["ball_handler_id"] = getattr(ball_handler, "player_id", None)  # ✅ Store ID for frontend
         fb_roles["outlet_passer"] = None
         fb_roles["outlet_receiver"] = None
         fb_roles["outlet_score"] = None  # No outlet pass on steals
@@ -663,43 +671,6 @@ def resolve_fast_break_logic(game: "GameManager"):
     logging.debug(f"  game.home_team.team_id: {game.home_team.team_id}")
     logging.debug(f"  is_away_offense: {is_away_offense}")
     
-    # Simulate ball handler position after outlet pass
-    # Frontend logic: ball handler moves 5-10 spots toward basket, ±6 Y
-    # ✅ SS&S: PRIORITIZE release/get-back coordinates for ball handler
-    # The outlet receiver is typically a release player (defensive team), so check release coords first
-    # Then check get-back coordinates (for offensive players who might be ball handler)
-    ball_handler_start_x = None
-    ball_handler_start_y = None
-    
-    ball_handler_id = getattr(ball_handler, "player_id", None)
-    logging.debug(f"🏀 [FAST BREAK PHASE DEBUG] Looking for coordinates for ball_handler_id: {ball_handler_id}")
-    
-    # ✅ SS&S: Use helper function to find most recent shot turn
-    most_recent_shot_turn = _find_most_recent_shot_turn(game, max_turns=10)
-    if most_recent_shot_turn:
-        # FIRST: Check if ball handler is a release player (outlet receiver is typically a release player)
-        release_coords = most_recent_shot_turn.get("defense_release_coords", {})
-        if release_coords and ball_handler_id and ball_handler_id in release_coords:
-            stored_coords = release_coords[ball_handler_id]
-            ball_handler_start_x = stored_coords.get("x")
-            ball_handler_start_y = stored_coords.get("y")
-            logging.debug(f"🏀 [FAST BREAK PHASE DEBUG] ✅ Using release coords for ball handler: {ball_handler_start_x}, {ball_handler_start_y}")
-        else:
-            # SECOND: Check if ball handler is a get-back player
-            getback_coords = most_recent_shot_turn.get("offense_getback_coords", {})
-            if getback_coords and ball_handler_id and ball_handler_id in getback_coords:
-                stored_coords = getback_coords[ball_handler_id]
-                ball_handler_start_x = stored_coords.get("x")
-                ball_handler_start_y = stored_coords.get("y")
-                logging.debug(f"🏀 [FAST BREAK PHASE DEBUG] ✅ Using get-back coords for ball handler: {ball_handler_start_x}, {ball_handler_start_y}")
-    
-    # FALLBACK: Use player.coords if not a release/get-back player or coords not found
-    if ball_handler_start_x is None or ball_handler_start_y is None:
-        ball_handler_start_x = getattr(ball_handler, "coords", {}).get("x", 50)
-        ball_handler_start_y = getattr(ball_handler, "coords", {}).get("y", 25)
-        logging.warning(f"🏀 [FAST BREAK PHASE DEBUG] ⚠️ Using player.coords (fallback): {ball_handler_start_x}, {ball_handler_start_y}")
-        logging.warning(f"🏀 [FAST BREAK PHASE DEBUG] ⚠️ This suggests ball handler is NOT a release/get-back player or coords not found in previous turn")
-    
     # Determine direction toward basket
     # Home offense: basket at x=90, so direction = +1 (right)
     # Away offense: basket at x=10, so direction = -1 (left)
@@ -712,31 +683,107 @@ def resolve_fast_break_logic(game: "GameManager"):
         direction = 1
         basket_x = 90
     
-    # Simulate ball handler position after outlet pass (NO MOVEMENT - receives pass at starting position)
-    # Ball handler will only move during defensive stop/shot attempt step
-    ball_handler_move_x = 0
-    ball_handler_move_y = 0
-    ball_handler_outlet_x = ball_handler_start_x  # No movement during outlet pass
-    ball_handler_outlet_y = ball_handler_start_y  # No movement during outlet pass
+    # ============================================================================
+    # STEAL ENTRY vs OUTLET PASS: Different logic for steals vs rebounds
+    # ============================================================================
+    if rebound:
+        # ==================== DREB → FAST BREAK: OUTLET PASS LOGIC ====================
+        # Simulate ball handler position after outlet pass
+        # Frontend logic: ball handler moves 5-10 spots toward basket, ±6 Y
+        # ✅ SS&S: PRIORITIZE release/get-back coordinates for ball handler
+        # The outlet receiver is typically a release player (defensive team), so check release coords first
+        # Then check get-back coordinates (for offensive players who might be ball handler)
+        ball_handler_start_x = None
+        ball_handler_start_y = None
+        
+        ball_handler_id = getattr(ball_handler, "player_id", None)
+        logging.debug(f"🏀 [FAST BREAK PHASE DEBUG] Looking for coordinates for ball_handler_id: {ball_handler_id}")
+        
+        # ✅ SS&S: Use helper function to find most recent shot turn
+        most_recent_shot_turn = _find_most_recent_shot_turn(game, max_turns=10)
+        if most_recent_shot_turn:
+            # FIRST: Check if ball handler is a release player (outlet receiver is typically a release player)
+            release_coords = most_recent_shot_turn.get("defense_release_coords", {})
+            if release_coords and ball_handler_id and ball_handler_id in release_coords:
+                stored_coords = release_coords[ball_handler_id]
+                ball_handler_start_x = stored_coords.get("x")
+                ball_handler_start_y = stored_coords.get("y")
+                logging.debug(f"🏀 [FAST BREAK PHASE DEBUG] ✅ Using release coords for ball handler: {ball_handler_start_x}, {ball_handler_start_y}")
+            else:
+                # SECOND: Check if ball handler is a get-back player
+                getback_coords = most_recent_shot_turn.get("offense_getback_coords", {})
+                if getback_coords and ball_handler_id and ball_handler_id in getback_coords:
+                    stored_coords = getback_coords[ball_handler_id]
+                    ball_handler_start_x = stored_coords.get("x")
+                    ball_handler_start_y = stored_coords.get("y")
+                    logging.debug(f"🏀 [FAST BREAK PHASE DEBUG] ✅ Using get-back coords for ball handler: {ball_handler_start_x}, {ball_handler_start_y}")
+        
+        # FALLBACK: Use player.coords if not a release/get-back player or coords not found
+        if ball_handler_start_x is None or ball_handler_start_y is None:
+            ball_handler_start_x = getattr(ball_handler, "coords", {}).get("x", 50)
+            ball_handler_start_y = getattr(ball_handler, "coords", {}).get("y", 25)
+            logging.warning(f"🏀 [FAST BREAK PHASE DEBUG] ⚠️ Using player.coords (fallback): {ball_handler_start_x}, {ball_handler_start_y}")
+            logging.warning(f"🏀 [FAST BREAK PHASE DEBUG] ⚠️ This suggests ball handler is NOT a release/get-back player or coords not found in previous turn")
+        
+        # Simulate ball handler position after outlet pass (NO MOVEMENT - receives pass at starting position)
+        # Ball handler will only move during defensive stop/shot attempt step
+        ball_handler_move_x = 0
+        ball_handler_move_y = 0
+        ball_handler_outlet_x = ball_handler_start_x  # No movement during outlet pass
+        ball_handler_outlet_y = ball_handler_start_y  # No movement during outlet pass
+        
+        # ✅ DEBUG: Log outlet position calculation
+        logging.debug(f"🏀 [FAST BREAK PHASE DEBUG] Outlet position calculation:")
+        logging.debug(f"  ball_handler_start_x: {ball_handler_start_x}")
+        logging.debug(f"  ball_handler_start_y: {ball_handler_start_y}")
+        logging.debug(f"  direction: {direction}")
+        logging.debug(f"  ball_handler_move_x: {ball_handler_move_x}")
+        logging.debug(f"  ball_handler_move_y: {ball_handler_move_y}")
+        logging.debug(f"  ball_handler_outlet_x: {ball_handler_outlet_x}")
+        logging.debug(f"  ball_handler_outlet_y: {ball_handler_outlet_y}")
+        logging.debug(f"  calculation: {ball_handler_start_x} + {direction} * {ball_handler_move_x} = {ball_handler_outlet_x}")
+        logging.debug(f"📍 [OUTLET RECEIVER] Receives pass at: x={ball_handler_outlet_x}, y={ball_handler_outlet_y} (HOME orientation)")
+    else:
+        # ==================== STEAL → FAST BREAK: STEAL ENTRY LOGIC ====================
+        # Stealer (ball handler) moves 5-10 x spots toward basket, ±4 y spots (clamped to 3-47)
+        # This movement happens BEFORE checking for defensive stop vs shot
+        ball_handler_start_x = getattr(ball_handler, "coords", {}).get("x", 50)
+        ball_handler_start_y = getattr(ball_handler, "coords", {}).get("y", 25)
+        
+        # Calculate steal entry movement
+        import random
+        steal_entry_move_x = random.randint(STEAL_ENTRY_MOVE_X_MIN, STEAL_ENTRY_MOVE_X_MAX)
+        steal_entry_move_y = random.randint(-STEAL_ENTRY_MOVE_Y_RANGE, STEAL_ENTRY_MOVE_Y_RANGE)
+        
+        # Apply movement toward basket
+        ball_handler_after_entry_x = ball_handler_start_x + (direction * steal_entry_move_x)
+        ball_handler_after_entry_y = max(STEAL_ENTRY_Y_MIN, min(STEAL_ENTRY_Y_MAX, ball_handler_start_y + steal_entry_move_y))
+        
+        # Store steal entry movement for animation
+        ball_handler_move_x = steal_entry_move_x
+        ball_handler_move_y = steal_entry_move_y
+        ball_handler_outlet_x = ball_handler_after_entry_x  # Position after steal entry movement
+        ball_handler_outlet_y = ball_handler_after_entry_y  # Position after steal entry movement
+        
+        # ✅ DEBUG: Log steal entry calculation
+        logging.debug(f"🏀 [FAST BREAK PHASE DEBUG] Steal Entry calculation:")
+        logging.debug(f"  ball_handler_start_x: {ball_handler_start_x}")
+        logging.debug(f"  ball_handler_start_y: {ball_handler_start_y}")
+        logging.debug(f"  direction: {direction}")
+        logging.debug(f"  steal_entry_move_x: {steal_entry_move_x}")
+        logging.debug(f"  steal_entry_move_y: {steal_entry_move_y}")
+        logging.debug(f"  ball_handler_after_entry_x: {ball_handler_outlet_x}")
+        logging.debug(f"  ball_handler_after_entry_y: {ball_handler_outlet_y}")
+        logging.debug(f"  calculation: {ball_handler_start_x} + {direction} * {steal_entry_move_x} = {ball_handler_outlet_x}")
+        logging.debug(f"📍 [STEAL ENTRY] Stealer moves to: x={ball_handler_outlet_x}, y={ball_handler_outlet_y} (HOME orientation)")
     
-    # ✅ DEBUG: Log outlet position calculation
-    logging.debug(f"🏀 [FAST BREAK PHASE DEBUG] Outlet position calculation:")
-    logging.debug(f"  ball_handler_start_x: {ball_handler_start_x}")
-    logging.debug(f"  ball_handler_start_y: {ball_handler_start_y}")
-    logging.debug(f"  direction: {direction}")
-    logging.debug(f"  ball_handler_move_x: {ball_handler_move_x}")
-    logging.debug(f"  ball_handler_move_y: {ball_handler_move_y}")
-    logging.debug(f"  ball_handler_outlet_x: {ball_handler_outlet_x}")
-    logging.debug(f"  ball_handler_outlet_y: {ball_handler_outlet_y}")
-    logging.debug(f"  calculation: {ball_handler_start_x} + {direction} * {ball_handler_move_x} = {ball_handler_outlet_x}")
-    logging.debug(f"📍 [OUTLET RECEIVER] Receives pass at: x={ball_handler_outlet_x}, y={ball_handler_outlet_y} (HOME orientation)")
-    
-    # Store ball handler outlet position for animation
+    # Store ball handler position for animation (after outlet pass for DREB, after steal entry for steals)
     fb_roles["ball_handler_outlet_x"] = ball_handler_outlet_x
     fb_roles["ball_handler_outlet_y"] = ball_handler_outlet_y
     fb_roles["ball_handler_move_x"] = ball_handler_move_x
     fb_roles["ball_handler_move_y"] = ball_handler_move_y
     fb_roles["is_away_offense"] = is_away_offense  # ✅ Store for animator to use
+    fb_roles["is_steal_entry"] = not rebound  # ✅ Flag to indicate steal entry vs outlet pass
     
     # ✅ FIX: Use actual defender coordinates instead of simulating random positions
     # Defenders are already positioned on the court after the shot attempt
