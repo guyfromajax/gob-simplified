@@ -2,6 +2,13 @@ import * as Phaser from "https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.
 import { animateStep } from "./animateStep.js";
 import { gridToPixels } from "../utils/gridToPixels.js";
 import {
+  STEAL_HCO_SETUP_MOVE_X_MIN,
+  STEAL_HCO_SETUP_MOVE_X_MAX,
+  STEAL_HCO_SETUP_MOVE_Y_RANGE,
+  STEAL_HCO_SETUP_Y_MIN,
+  STEAL_HCO_SETUP_Y_MAX,
+} from "../constants/fastBreakConstants.js";
+import {
   shootBall,
   SHOT_DEBUG,
   animateRebound,
@@ -114,6 +121,86 @@ function getDurationFromDistance(currentX, currentY, targetX, targetY, speed, ma
  * @param {boolean} isTransition - If true, use MAX_TRANSITION_DURATION instead of MAX_STEP_DURATION
  * @returns {number} Duration in milliseconds
  */
+/**
+ * Steal HCO Setup Animation
+ * Moves the stealer (ball handler) back away from basket before HCO skeleton starts
+ */
+async function animateStealHCOSetup(scene, turnData, playerSprites, ballSprite) {
+  const ballHandlerId = turnData.roles?.ball_handler_id;
+  const ballHandlerSprite = ballHandlerId ? playerSprites[ballHandlerId] : null;
+  
+  if (!ballHandlerSprite) {
+    console.warn("Steal HCO Setup: Ball handler sprite not found", { 
+      ballHandlerId,
+      roles: turnData.roles
+    });
+    return;
+  }
+  
+  // Ball should already be attached to stealer from the steal turn
+  // Verify attachment
+  const { getBallController } = await import('./BallControllerAdapter.js');
+  const ballController = getBallController();
+  
+  if (!ballController?.isAttached || ballController.currentOwner !== ballHandlerSprite) {
+    // Attach ball to stealer if not already attached
+    attachBallToPlayer(scene, ballSprite, ballHandlerSprite, {
+      reason: 'steal_hco_setup_verify'
+    });
+  }
+  
+  // Get stealer's current position
+  const currentGrid = {
+    x: ballHandlerSprite.gridX || 50,
+    y: ballHandlerSprite.gridY || 25
+  };
+  
+  // Determine offense team and direction (away from basket)
+  const isHomeOffense = ballHandlerSprite.team === "home";
+  const direction = isHomeOffense ? -1 : 1; // -1 for home (away from x=90), +1 for away (away from x=10)
+  
+  // Calculate steal HCO setup movement (matches backend calculation)
+  const moveX = turnData.roles?.ball_handler_hco_setup_move_x || 
+                Phaser.Math.Between(STEAL_HCO_SETUP_MOVE_X_MIN, STEAL_HCO_SETUP_MOVE_X_MAX);
+  const moveY = turnData.roles?.ball_handler_hco_setup_move_y || 
+                Phaser.Math.Between(-STEAL_HCO_SETUP_MOVE_Y_RANGE, STEAL_HCO_SETUP_MOVE_Y_RANGE);
+  
+  // Calculate target position
+  const targetGrid = {
+    x: currentGrid.x + (direction * moveX),
+    y: Phaser.Math.Clamp(
+      currentGrid.y + moveY,
+      STEAL_HCO_SETUP_Y_MIN,
+      STEAL_HCO_SETUP_Y_MAX
+    )
+  };
+  
+  // Convert to pixel coordinates
+  const width = scene.game.config.width;
+  const height = scene.game.config.height;
+  const targetPx = gridToPixels(targetGrid.x, targetGrid.y, width, height);
+  
+  // Get animation duration
+  const playerDuration = getPlayerDuration(ballHandlerSprite, targetPx.x, targetPx.y, true);
+  
+  // Animate stealer movement
+  await tweenPlayerTo(scene, ballHandlerSprite, targetPx, {
+    duration: playerDuration,
+    easing: "Linear"
+  });
+  
+  // Update sprite grid coordinates
+  ballHandlerSprite.gridX = targetGrid.x;
+  ballHandlerSprite.gridY = targetGrid.y;
+  
+  // Verify ball remains attached after movement
+  if (ballController && (!ballController.isAttached || ballController.currentOwner !== ballHandlerSprite)) {
+    attachBallToPlayer(scene, ballSprite, ballHandlerSprite, {
+      reason: 'steal_hco_setup_post_movement'
+    });
+  }
+}
+
 function getPlayerDuration(sprite, targetX, targetY, isTransition = false) {
   const currentX = sprite.x;
   const currentY = sprite.y;
@@ -2009,6 +2096,13 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
       resultType: turnData?.result_type,
       totalAnimations: turnData.animations?.length
     });
+  }
+
+  // ============================================================================
+  // STEAL HCO SETUP: Animate stealer moving back before HCO skeleton starts
+  // ============================================================================
+  if (turnData.roles?.is_steal_hco_setup) {
+    await animateStealHCOSetup(scene, turnData, playerSprites, ballSprite);
   }
 
   for (let stepIndex = 1; stepIndex < maxSteps; stepIndex++) {
