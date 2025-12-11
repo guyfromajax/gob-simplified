@@ -1263,6 +1263,13 @@ function showSpecialStatsPopup(player) {
               <span class="special-stats-label">Defense:</span>
               <span class="special-stats-value">${hctAD} / ${hctDefenseSuccessRate}%</span>
             </div>
+            <div class="special-stats-row empty-row"></div>
+            <div class="special-stats-row">
+              <h3>Points off TOs</h3>
+            </div>
+            <div class="special-stats-row">
+              <span class="special-stats-value" style="text-align: left;">${pot}</span>
+            </div>
           </div>
           <div class="special-stats-column">
             <div class="special-stats-row">
