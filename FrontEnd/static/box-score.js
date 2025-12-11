@@ -1284,10 +1284,6 @@ function showSpecialStatsPopup(player) {
               <span class="special-stats-value">${fcpAD} / ${fcpDefenseSuccessRate}%</span>
             </div>
             <div class="special-stats-row empty-row"></div>
-            <div class="special-stats-row">
-              <span class="special-stats-label">Points Off TOs:</span>
-              <span class="special-stats-value">${pot}</span>
-            </div>
           </div>
         </div>
       </div>
