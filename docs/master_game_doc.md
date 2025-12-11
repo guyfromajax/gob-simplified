@@ -1740,6 +1740,131 @@ Jersey numbers were not appearing in the box score display or special stats popu
 
 ---
 
+## Lineup Selection Screen ✅ **COMPLETE** (January 2025)
+
+### Overview
+
+The Lineup Selection Screen allows users to set their starting lineup before each game and during timeouts. It displays comprehensive player information including current game stats, attributes, and eligibility status for all roster players.
+
+**Key Features:**
+- Drag-and-drop lineup selection (5 positions: PG, SG, SF, PF, C)
+- Real-time display of player stats and attributes for lineup players
+- Player eligibility filtering (energy, fouls, fouled out)
+- Auto-set lineup functionality
+- Grid view and player card view modes
+- Pre-game and in-game (timeout) lineup management
+
+### Data Sources
+
+**Backend Data:**
+- **Roster API**: Mode-specific endpoints return player baseline data
+  - **Single Game**: `/roster/{team_name}` - Base attributes from universal collection
+  - **Franchise Mode**: `/franchise/roster` - Evolved attributes + game-specific attributes (EM, CH, MO)
+  - **Tournament Mode**: `/tournament/roster` - Base attributes + tournament-specific attributes (EM, CH, MO)
+- **Game API** (`/api/game/{gameId}`): Returns current game state including:
+  - Player stats (`stats.game`)
+  - Player attributes (`attributes.EM`, `attributes.MO`, `attributes.CH`, `attributes.NG`)
+  - Ineligible players (fouled out)
+
+**Frontend Processing:**
+- `loadRoster()`: Loads roster from mode-specific endpoint
+- `loadRoster()`: If `gameId` exists, fetches game data and merges stats/attributes
+- `updateSlotDisplay()`: Displays stats and attributes for each lineup player
+
+### Player Stats and Attributes Display ✅ **NEW** (January 2025)
+
+**Displayed Information for Lineup Players:**
+- **Points** (PTS): Current game points
+- **Rebounds** (REB): Sum of OREB + DREB + REB
+- **Assists** (AST): Current game assists
+- **Def %**: Defensive success rate (DEF_S / DEF_A * 100)
+- **Emotion** (EM): Emoji display based on value (😎 80+, 😊 60+, 😐 40+, 😕 20+, 😞 <20)
+- **Momentum** (MO): Visual bar display (-10 to +10 range)
+- **Fouls** (F): Current game foul count
+- **Energy** (NG): Percentage with color coding (Green >89%, Yellow 80-89%, Orange 70-79%, Red <70%)
+
+**Data Flow:**
+1. **Pre-Game (Q1, no gameId)**: 
+   - Roster loads from mode-specific endpoint
+   - Game initialized via `/api/init-game` (randomizes EM, CH, MO)
+   - Game data fetched and merged into roster
+   - All players (lineup + bench) get EM/MO attributes from initialized game
+
+2. **In-Game (timeout, gameId exists)**:
+   - Roster loads from mode-specific endpoint
+   - Game data fetched from `/api/game/{gameId}`
+   - Stats and attributes merged into roster
+   - Lineup players display current game stats and updated attributes
+
+**Mode-Specific Attribute Handling:**
+
+- **Single Game Mode**:
+  - Roster provides base attributes (SC, SH, ID, OD, etc.)
+  - Game API provides: stats + attributes (EM, MO, CH, NG)
+  - Frontend merges: roster base + game stats/attributes
+
+- **Franchise Mode**:
+  - Roster (`/franchise/roster`) provides evolved + game-specific attributes
+  - Game API provides: stats + NG (current energy)
+  - Frontend merges: franchise attributes + game stats/NG
+
+- **Tournament Mode**:
+  - Roster (`/tournament/roster`) provides base + tournament-specific attributes
+  - Game API provides: stats + NG (current energy)
+  - Frontend merges: tournament attributes + game stats/NG
+
+### Pre-Game EM/MO Display Fix ✅ **NEW** (January 2025)
+
+**Issue:**
+Emotion and momentum values were not displaying on the pre-game (pre-Q1) lineup screen, even though they were initialized when the game was created via `/api/init-game`.
+
+**Root Cause:**
+The `/api/game/{gameId}` endpoint was only returning players from the starting lineup (`team.lineup.items()`), which meant only 5 players were returned. The roster has all players (typically 12), so most roster players couldn't be matched with game data to get EM/MO attributes.
+
+**Fix:**
+Changed `/api/game/{gameId}` to return ALL players using `team.get_all_players()` instead of just lineup players. This ensures:
+- All roster players can be matched with game data
+- All players get EM/MO attributes initialized by `init-game`
+- Pre-game lineup screen displays emotion/momentum immediately after game initialization
+- Works for both lineup players and bench players
+
+**Implementation:**
+```python
+# Before: Only lineup players
+for pos, player in team.lineup.items():  # Only 5 players
+
+# After: All players
+for player in team.get_all_players():  # All players (lineup + bench)
+```
+
+### Player Eligibility Filtering
+
+**Energy (NG) Restrictions:**
+- Default: Exclude players with NG < 80%
+- Late Q4/OT: Exclude players with NG < 69% (less than 4 minutes remaining in Q4 or overtime)
+
+**Foul Restrictions (by quarter):**
+- Q1: Exclude if player fouls > 1
+- Q2: Exclude if player fouls > 2
+- Q3: Exclude if player fouls > 3
+- Q4: Exclude if player fouls > 3 AND more than 4 minutes remaining
+- Overtime: No foul exclusion for active players (5+ fouls still excluded)
+
+**Fouled Out:**
+- Players with 5+ fouls are always excluded (marked as ineligible)
+- Visual indicators: Reduced opacity, "FOULED OUT" label, disabled interactions
+
+### Key Files
+
+- `FrontEnd/static/set-lineup.html` - Lineup selection page structure
+- `FrontEnd/static/set-lineup.js` - Lineup selection logic and data processing
+- `BackEnd/api/api.py` - Game state endpoint (`/api/game/{gameId}`), init game endpoint (`/api/init-game`)
+- `BackEnd/api/franchise_routes.py` - Franchise roster endpoint (`/franchise/roster`)
+- `BackEnd/api/tournament_routes.py` - Tournament roster endpoint (`/tournament/roster`)
+- `BackEnd/utils/db_utils.py` - Player eligibility filtering (`is_player_eligible_for_lineup()`)
+
+---
+
 ## Production Animation System
 
 ### Ball Animation System ✅ **COMPLETE**
