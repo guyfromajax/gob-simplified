@@ -572,6 +572,42 @@ export class AnimationEngine {
       });
       console.log('✅ [STEAL HANDLER] Skeleton animation completed - steal action included in skeleton');
       
+      // ✅ FIX: Attach ball to stealer after skeleton animation completes
+      // This ensures ball is attached before next turn (HCO or Fast Break) starts
+      const stealerRaw =
+        turnData.stealerId ||
+        turnData.stealer_id ||
+        turnData.roles?.ball_handler_id ||
+        turnData.events?.find(e => e.event_type === "STEAL")?.stealerId ||
+        turnData.events?.find(e => e.event_type === "STEAL")?.stealer_id;
+      
+      if (stealerRaw) {
+        const stealerSprite = context.playerSprites[stealerRaw];
+        if (stealerSprite) {
+          const { attachBallToPlayer } = await import('./BallControllerAdapter.js');
+          attachBallToPlayer(this.scene, context.ballSprite, stealerSprite, {
+            reason: 'steal_handler_post_skeleton'
+          });
+          console.log('✅ [STEAL HANDLER] Ball attached to stealer after skeleton animation', {
+            stealerId: stealerRaw
+          });
+        } else {
+          console.warn('⚠️ [STEAL HANDLER] Stealer sprite not found for ball attachment', {
+            stealerId: stealerRaw,
+            availableSprites: Object.keys(context.playerSprites)
+          });
+        }
+      } else {
+        console.warn('⚠️ [STEAL HANDLER] Could not determine stealer ID for ball attachment', {
+          turnData: {
+            stealerId: turnData.stealerId,
+            stealer_id: turnData.stealer_id,
+            ball_handler_id: turnData.roles?.ball_handler_id,
+            events: turnData.events
+          }
+        });
+      }
+      
       // ✅ FIX (Bug 3): Skeleton animation includes steal action in final step
       // Skip Step 2 to avoid double animation and double announcement
       return;
@@ -620,6 +656,22 @@ export class AnimationEngine {
         duration: cfg.duration,
         easing: cfg.easing
       });
+      
+      // ✅ FIX: Ensure ball is attached to stealer after pass completes
+      // runPass should handle attachment, but verify to ensure consistency
+      const stealerSprite = context.playerSprites[stealerId];
+      if (stealerSprite) {
+        const { attachBallToPlayer, getBallController } = await import('./BallControllerAdapter.js');
+        const ballController = getBallController();
+        if (!ballController?.isAttached || ballController.currentOwner !== stealerSprite) {
+          attachBallToPlayer(this.scene, context.ballSprite, stealerSprite, {
+            reason: 'steal_handler_post_pass'
+          });
+          console.log('✅ [STEAL HANDLER] Ball attached to stealer after pass (no skeleton path)', {
+            stealerId: stealerId
+          });
+        }
+      }
       
       console.log('✅ [STEAL HANDLER] Steal action completed');
     }
