@@ -312,6 +312,14 @@ Both FCP and HCT can result in:
   - Steal: Uses dynamic ball handler (victim) and defender (stealer)
   - Dead ball turnover: Uses dynamic ball handler
 
+### Per-Step Ball Handler Tracking for Defender Positioning ✅ **NEW (March 2025)**
+
+- **FCP**: Defenders still match their assigned offensive player, but at each step, if their assignment is the current ball handler, they switch to `guard_ball`; ball handler is determined **per timestamp** (not just step 0).
+- **HCT**: Per-step ball handler detection drives trap logic:
+  - Defensive PG tracks the **current** ball handler each step (not the initial handler).
+  - Other defenders track their assignments with tighter offsets and respect half-court boundaries.
+- **Why it matters**: Prevents PG/SF “swap” behavior when the ball changes hands mid-sequence; defenders always respond to the live ball handler.
+
 **Implementation:**
 
 ```python

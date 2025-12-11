@@ -1216,6 +1216,7 @@ class Animator:
         - Each defender guards the offensive player at their position
         - Defender maintains same Y coordinate as their assignment
         - Defender is positioned 3 grid units closer to the offensive basket
+        - Ball handler is determined per step (dynamic) for consistent guard logic
         
         Args:
             offensive_animations: Dict mapping position → offensive player animation
@@ -1233,6 +1234,21 @@ class Animator:
         # For away team offense: offensive basket is on the LEFT (lower x)
         # For home team offense: offensive basket is on the RIGHT (higher x)
         x_offset = -3 if is_away_offense else 3
+
+        # Precompute ball handler per timestamp (dynamic by step)
+        ball_handler_by_timestamp = {}
+        initial_ball_handler_pos = None
+        for pos, off_anim in offensive_animations.items():
+            has_ball_list = off_anim.get("hasBallAtStep", [])
+            for idx, off_step in enumerate(off_anim.get("movement", [])):
+                if idx < len(has_ball_list) and has_ball_list[idx]:
+                    ts = off_step.get("timestamp")
+                    if ts is not None:
+                        ball_handler_by_timestamp[ts] = pos
+                        if initial_ball_handler_pos is None:
+                            initial_ball_handler_pos = pos
+        if initial_ball_handler_pos is None:
+            initial_ball_handler_pos = "PG"
         
         # Match each defensive position to offensive position
         for position, off_anim in offensive_animations.items():
@@ -1253,6 +1269,10 @@ class Animator:
             for off_step in off_anim["movement"]:
                 timestamp = off_step["timestamp"]
                 off_coords = off_step["coords"]
+
+                # Determine current ball handler at this timestamp
+                current_ball_handler_pos = ball_handler_by_timestamp.get(timestamp, initial_ball_handler_pos)
+                is_guarding_ball_handler = position == current_ball_handler_pos
                 
                 # Defender position: same Y, X offset toward offensive basket
                 def_coords = {
@@ -1264,7 +1284,7 @@ class Animator:
                 def_coords["x"] = max(0, min(100, def_coords["x"]))
                 
                 # Determine defensive action based on offensive action
-                if off_step.get("action") in ["handle_ball", "receive", "shoot", "pass"]:
+                if is_guarding_ball_handler:
                     def_action = "guard_ball"  # Guarding ball handler
                 else:
                     def_action = "guard_offball"  # Guarding off-ball player
@@ -1349,10 +1369,16 @@ class Animator:
         
         # Find ball handler position for trap focus
         ball_handler_pos = None
+        ball_handler_by_timestamp = {}
         for pos, off_anim in offensive_animations.items():
-            if off_anim.get("hasBallAtStep", [False])[0]:  # Has ball at first step
-                ball_handler_pos = pos
-                break
+            has_ball_list = off_anim.get("hasBallAtStep", [])
+            for idx, off_step in enumerate(off_anim.get("movement", [])):
+                if idx < len(has_ball_list) and has_ball_list[idx]:
+                    ts = off_step.get("timestamp")
+                    if ts is not None:
+                        ball_handler_by_timestamp[ts] = pos
+                        if ball_handler_pos is None:
+                            ball_handler_pos = pos
         if not ball_handler_pos:
             ball_handler_pos = "PG"  # Fallback
         
@@ -1390,9 +1416,12 @@ class Animator:
                 if timestamp == 0:
                     continue
                 
+                # Determine current ball handler at this timestamp
+                current_ball_handler_pos = ball_handler_by_timestamp.get(timestamp, ball_handler_pos)
+                
                 # Calculate defensive position based on offensive position
                 # For HCT: defenders are positioned closer with trap focus
-                if position == "PG" and position == ball_handler_pos:
+                if position == "PG" and position == current_ball_handler_pos:
                     # Primary trap defender tracking ball handler - follow closely
                     def_coords = {
                         "x": off_coords["x"] + x_offset_toward_basket,
@@ -1400,7 +1429,7 @@ class Animator:
                     }
                 elif position == "PG":
                     # PG tracks ball handler even if not guarding him
-                    ball_handler_anim = offensive_animations.get(ball_handler_pos)
+                    ball_handler_anim = offensive_animations.get(current_ball_handler_pos)
                     if ball_handler_anim and ball_handler_anim["movement"]:
                         # Find ball handler's position at this timestamp
                         bh_coords = off_coords  # Default to current offensive position
