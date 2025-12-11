@@ -535,7 +535,7 @@ def get_game_state(game_id: str, quarter: int | None = None):
         logging.info(f"📊 /api/game/{game_id} - GameManager in memory: {gm is not None}, quarter param: {quarter}")
         logging.info(f"📊 Active games in memory: {list(ongoing_games.keys())}")
         if gm:
-            # Get players with current energy levels
+            # Get players with current energy levels, stats, and attributes
             players = []
             for team in [gm.home_team, gm.away_team]:
                 for pos, player in team.lineup.items():
@@ -543,7 +543,14 @@ def get_game_state(game_id: str, quarter: int | None = None):
                         "_id": player.player_id,
                         "name": player.name,
                         "NG": player.attributes.get("NG", 1.0),
-                        "team": team.name
+                        "team": team.name,
+                        "stats": player.stats.get("game", {}),  # ✅ Add game stats
+                        "attributes": {  # ✅ Add attributes (EM, MO, CH, NG)
+                            "EM": player.attributes.get("EM", 50),
+                            "MO": player.attributes.get("MO", 0),
+                            "CH": player.attributes.get("CH", 50),
+                            "NG": player.attributes.get("NG", 1.0)
+                        }
                     })
             
             # Build team_stats structure (for S2 tab - playcall stats)
@@ -609,7 +616,8 @@ def get_game_state(game_id: str, quarter: int | None = None):
                             "name": p.get("name"),
                             "NG": p.get("NG", 1.0),
                             "team": p.get("team"),
-                            "stats": {}  # Empty stats for new game
+                            "stats": {},  # Empty stats for new game
+                            "attributes": p.get("attributes", {})  # ✅ Add attributes (EM, MO, CH, NG) from saved doc
                         }
                         players_with_energy.append(player_data)
                     
@@ -645,16 +653,18 @@ def get_game_state(game_id: str, quarter: int | None = None):
                         }
                     }
                 
-                # Extract player energy from saved game doc
+                # Extract player energy, stats, and attributes from saved game doc
                 players = saved.get("players", [])
-                # Map to include NG if available
+                # Map to include NG, stats, and attributes if available
                 players_with_energy = []
                 for p in players:
                     player_data = {
                         "_id": p.get("playerId") or p.get("player_id"),
                         "name": p.get("name"),
                         "NG": p.get("NG", 1.0),  # May be saved in game doc
-                        "team": p.get("team")
+                        "team": p.get("team"),
+                        "stats": p.get("stats", {}),  # ✅ Add stats from saved doc
+                        "attributes": p.get("attributes", {})  # ✅ Add attributes (EM, MO, CH, NG) from saved doc
                     }
                     players_with_energy.append(player_data)
                 
