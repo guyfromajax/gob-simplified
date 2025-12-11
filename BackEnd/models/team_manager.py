@@ -441,6 +441,7 @@ class TeamManager:
             "F": 0,
             "PIP": 0,  # Points in Paint
             "FB_PTS": 0,  # Fast Break Points
+            "POT": 0,  # Points Off Turnovers (from steal-initiated fast breaks)
             "DEF_A": 0,  # Defensive Attempts
             "DEF_S": 0,  # Defensive Stops
         }
