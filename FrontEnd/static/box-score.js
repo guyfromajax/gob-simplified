@@ -555,9 +555,10 @@ function renderTeamStatsTable(team, totals) {
 // Render special stats (Fast Break Points, PIP)
 function renderSpecialStats(team, totals, teamName) {
   // Fast Breaks ratio is shown in Special Situations section, not here
-  // Only show Fast Break Points and Points In The Paint
+  // Show Fast Break Points, Points In The Paint, and Points Off Turnovers
   document.getElementById(`${team}-fb-points`).textContent = totals.FB_PTS || 0;
   document.getElementById(`${team}-pip`).textContent = totals.PIP || 0;
+  document.getElementById(`${team}-pot`).textContent = totals.POT || 0;
 }
 
 // Render scouting notes
@@ -1199,6 +1200,7 @@ function showSpecialStatsPopup(player) {
   const outletScore = outletA > 0 && outletScoreList.length > 0
     ? (outletScoreList.reduce((a, b) => a + b, 0) / outletScoreList.length).toFixed(0)
     : '0';
+  const pot = stats.POT || 0;
   
   // Calculate HCT stats
   const hctA = stats.HCT_A || 0;
@@ -1273,6 +1275,11 @@ function showSpecialStatsPopup(player) {
             <div class="special-stats-row">
               <span class="special-stats-label">Defense:</span>
               <span class="special-stats-value">${fcpAD} / ${fcpDefenseSuccessRate}%</span>
+            </div>
+            <div class="special-stats-row empty-row"></div>
+            <div class="special-stats-row">
+              <span class="special-stats-label">Points Off TOs:</span>
+              <span class="special-stats-value">${pot}</span>
             </div>
           </div>
         </div>
