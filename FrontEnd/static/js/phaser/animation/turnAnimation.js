@@ -2186,7 +2186,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
     // ✅ SS&S: Use pre-classified player roles (determined at turn start)
     // No need to re-resolve offenseTeamId or re-classify players per step
     const offensivePromises = [];
-    const defensivePromises = [];
+    const defensiveStarters = []; // defer starting defensive tweens when a pass exists
     let passerPromise = null;
     let shotInfo = null;
 
@@ -2260,14 +2260,26 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
           passerPromise = promise;
         }
       } else {
-        // ✅ DEBUG: Track when defensive promises are created (they start animating immediately)
-        const defensiveStartTime = performance.now();
-        defensivePromises.push({
-          promise,
-          startTime: defensiveStartTime,
-          playerId: anim.playerId
-        });
+        // Defer starting defensive tweens when a pass exists so we can sync them with the pass
+        defensiveStarters.push(() => animateStep({
+          scene,
+          sprite,
+          step: prev,
+          nextStep: curr,
+          duration,
+          ballSprite,
+          currentBallOwnerRef,
+          onAction,
+          stepIndex
+        }));
       }
+    }
+
+    // Start defensive tweens immediately only when there is no pass; when there is a pass,
+    // we'll start them alongside the pass to keep them in sync.
+    let defensivePromiseArray = [];
+    if (!passInfo && defensiveStarters.length > 0) {
+      defensivePromiseArray = defensiveStarters.map(start => start());
     }
 
     // ✅ FIX: Phase 1 - Start all offensive players animating, wait for passer if there's a pass
@@ -2299,12 +2311,16 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
       });
       
       passAndDefensePromises.push(passPromise);
+
+      // Start defensive tweens now (in sync with pass start)
+      if (defensiveStarters.length > 0) {
+        defensivePromiseArray = defensiveStarters.map(start => start());
+        passAndDefensePromises.push(...defensivePromiseArray);
+      }
+    } else {
+      // No pass: defensive tweens (if any) already started above
+      passAndDefensePromises.push(...defensivePromiseArray);
     }
-    
-    // Add all defensive player movements to the parallel batch
-    // Extract promises from defensivePromises array (which now contains objects with {promise, startTime, playerId})
-    const defensivePromiseArray = defensivePromises.map(dp => dp.promise);
-    passAndDefensePromises.push(...defensivePromiseArray);
     
     // Animate pass and defensive players simultaneously
     if (passAndDefensePromises.length > 0) {
