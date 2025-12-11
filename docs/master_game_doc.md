@@ -1658,6 +1658,88 @@ The Statistics System tracks comprehensive player-level and team-level statistic
 
 ---
 
+## Box Score System ✅ **COMPLETE** (January 2025)
+
+### Overview
+
+The Box Score System displays comprehensive game statistics for both teams and individual players. It aggregates data from the Statistics System and presents it in a user-friendly format accessible from the post-game screen.
+
+**Key Features:**
+- Team-level statistics (totals, fast break points, points in paint, points off turnovers)
+- Player-level statistics (all tracked stats per player)
+- Special stats popup (Fast Break, Outlet Passes, Traps, Presses, Points Off TOs)
+- Real-time updates during game play
+
+### Data Sources
+
+**Backend Data:**
+- **Roster API** (`/roster/{team_name}`): Returns player baseline data including `jersey`, `year`, `height`, `weight`, `attributes`
+- **Box Score API** (`get_box_score()`): Returns player stats for all players (lineup + bench) with `name`, `playerId`, `jersey`, and all stat values
+- **Game Summary**: Includes team totals, box score, and player energy levels
+
+**Frontend Processing:**
+- `combinePlayersAndBoxScore()`: Merges roster data with box score stats
+- Handles both lineup players (by position) and bench players
+- Preserves jersey numbers from multiple possible sources (`jersey`, `jerseyNumber`, `jersey_number`)
+
+### Player Jersey Number Display ✅ **NEW** (January 2025)
+
+**Issue:**
+Jersey numbers were not appearing in the box score display or special stats popup because the backend APIs were not including jersey data.
+
+**Root Cause:**
+- Roster API (`/roster/{team_name}`) was missing `jersey` field in response
+- Box Score API (`get_box_score()`) was missing `jersey` field for both lineup and bench players
+
+**Fix:**
+- **Roster API**: Added `"jersey": p.get("jersey", 0)` to player objects in `/roster/{team_name}` endpoint
+- **Box Score API**: Added `"jersey": player.jersey` to both lineup and bench player entries in `get_box_score()` method
+
+**Display:**
+- Jersey numbers appear next to player names in the box score table: `Player Name (#44)`
+- Jersey numbers appear in special stats popup header: `Player Name | #44`
+- Handles jersey number 0 as valid (some players may have jersey 0)
+
+**Key Files:**
+- `BackEnd/api/api.py` - Roster API endpoint (line 1896)
+- `BackEnd/models/game_manager.py` - `get_box_score()` method (lines 516, 530)
+- `FrontEnd/static/box-score.js` - Jersey number display logic (lines 397-428, 1156-1181)
+
+### Team Statistics Display
+
+**Team Totals:**
+- Points, Field Goals, 3-Pointers, Free Throws
+- Rebounds (Defensive, Offensive, Total)
+- Assists, Steals, Blocks, Fouls, Turnovers
+- Defensive Attempts and Success Rate
+
+**Special Team Stats:**
+- **Fast Break Points**: Aggregated from player `FB_PTS` stats
+- **Points In The Paint**: Aggregated from player `PIP` stats
+- **Points Off Turnovers**: Aggregated from player `POT` stats
+
+### Player Statistics Display
+
+**Standard Stats Table:**
+- All tracked stats per player (FGM/FGA, 3PTM/3PTA, FTM/FTA, etc.)
+- Minutes played (formatted as MM:SS)
+- Defensive and Screen success rates (percentages)
+
+**Special Stats Popup:**
+- **Column 1**: Fast Break stats (Offense/Defense attempts and success rates), Outlet Passes (Attempts/Score)
+- **Column 2**: Traps (HCT) stats (Offense/Defense attempts and success rates), Points Off TOs (integer value)
+- **Column 3**: Presses (FCP) stats (Offense/Defense attempts and success rates)
+
+### Key Files
+
+- `FrontEnd/static/box-score.html` - Box score page structure
+- `FrontEnd/static/box-score.js` - Box score rendering and data processing
+- `BackEnd/api/api.py` - Roster API endpoint (`/roster/{team_name}`)
+- `BackEnd/models/game_manager.py` - Box score generation (`get_box_score()`)
+- `BackEnd/models/team_manager.py` - Team stat aggregation (`get_team_game_stats()`)
+
+---
+
 ## Production Animation System
 
 ### Ball Animation System ✅ **COMPLETE**
