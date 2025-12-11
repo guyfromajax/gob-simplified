@@ -1996,18 +1996,47 @@ def get_player(player_id: str):
 
 
 @app.get("/teams/{team_id}/players")
-def get_team_players(team_id: str):
-    """Return roster data for a given team."""
+def get_team_players(team_id: str, tournament_id: Optional[str] = None):
+    """Return roster data for a given team.
+    
+    If tournament_id is provided, merges tournament-specific attributes (EM, CH, MO)
+    from the tournament document with base attributes from the universal collection.
+    """
     team_doc, players = load_roster(team_id)
     if not players:
         raise HTTPException(status_code=404, detail=f"No players found for team '{team_id}'")
 
+    # Load tournament document if tournament_id provided
+    tournament_players = {}
+    if tournament_id:
+        try:
+            tid = ObjectId(tournament_id)
+            tournament_doc = tournaments_collection.find_one({"_id": tid})
+            if tournament_doc:
+                tournament_players = tournament_doc.get("player_stats", {})
+        except Exception as e:
+            logging.warning(f"Could not load tournament document {tournament_id}: {e}")
+
     display_attributes = ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "AG", "ST", "ND", "IQ", "FT", "NG"]
     players_data = []
     for p in players:
-        attributes = p.get("attributes", {})
+        pid_str = str(p.get("_id"))
+        base_attributes = p.get("attributes", {}).copy()
+        
+        # Merge tournament-specific attributes if available
+        if tournament_id and pid_str in tournament_players:
+            tournament_player = tournament_players[pid_str]
+            tournament_attrs = tournament_player.get("attributes", {})
+            # Merge tournament attributes (EM, CH, MO) into base attributes
+            base_attributes.update(tournament_attrs)
+        
+        # Create anchor_ prefixed attributes (like Player class does)
+        for attr_key in ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "AG", "ST", "ND", "IQ", "FT"]:
+            if attr_key in base_attributes:
+                base_attributes[f"anchor_{attr_key}"] = base_attributes[attr_key]
+        
         players_data.append({
-            "_id": str(p.get("_id")),
+            "_id": pid_str,
             "first_name": p.get("first_name", ""),
             "last_name": p.get("last_name", ""),
             "name": f"{p.get('first_name', '')} {p.get('last_name', '')}".strip(),
@@ -2015,7 +2044,7 @@ def get_team_players(team_id: str):
             "height": p.get("height"),
             "weight": p.get("weight"),
             "position_ratings": p.get("position_ratings", {}),
-            "attributes": {attr: attributes.get(attr, "--") for attr in display_attributes},
+            "attributes": {attr: base_attributes.get(attr, "--") for attr in display_attributes},
             "stats": p.get("stats", {}).get("season", {}),
         })
 

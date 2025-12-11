@@ -516,7 +516,12 @@ async function loadRoster() {
       console.error('No userTeamId found - cannot load roster');
       return;
     }
-    const res = await fetch(`/teams/${encodeURIComponent(formatTeamName(userTeamId))}/players`);
+    // Include tournament_id if available to load tournament-specific attributes
+    const tournamentId = tournament?._id;
+    const url = tournamentId 
+      ? `/teams/${encodeURIComponent(formatTeamName(userTeamId))}/players?tournament_id=${encodeURIComponent(tournamentId)}`
+      : `/teams/${encodeURIComponent(formatTeamName(userTeamId))}/players`;
+    const res = await fetch(url);
     const data = await res.json();
     console.log("Tournament team player data:", data);
     roster = (data.players || []).map(p => {
