@@ -390,9 +390,36 @@ export class ShotAnimationSystem {
       const promises = [];
       let shotInfo = null;
       
+      // 🔍 DEBUG: Log before pass detection
+      console.log(`🔍 [SHOT ANIM] Step ${stepIndex}: Starting pass detection`, {
+        turnId: turnData?.id?.substring(0, 8),
+        totalAnimations: turnData.animations?.length,
+        maxSteps: maxSteps
+      });
+      
+      // 🔍 DEBUG: Log movement array structure for all players at this step
+      const movementArrayInfo = turnData.animations.map(anim => ({
+        playerId: anim.playerId?.substring(0, 8) || 'unknown',
+        movementLength: anim.movement?.length || 0,
+        hasStep: stepIndex < (anim.movement?.length || 0),
+        stepAction: stepIndex < (anim.movement?.length || 0) ? anim.movement[stepIndex]?.action : 'N/A',
+        stepTimestamp: stepIndex < (anim.movement?.length || 0) ? anim.movement[stepIndex]?.timestamp : 'N/A'
+      }));
+      console.log(`🔍 [SHOT ANIM] Step ${stepIndex}: Movement array structure`, movementArrayInfo);
+      
       // ✅ SCALABLE FIX: Use shared pass detection utility
       // This ensures passes work for HCO shots, fouls, turnovers, etc.
       const passInfo = detectPassAtStep(turnData.animations, stepIndex);
+      
+      // 🔍 DEBUG: Log pass detection result
+      console.log(`🔍 [SHOT ANIM] Step ${stepIndex}: Pass detection result`, {
+        passInfo: passInfo ? {
+          passer: passInfo.passerId?.substring(0, 8),
+          receiver: passInfo.receiverId?.substring(0, 8),
+          stepIndex: passInfo.stepIndex
+        } : null,
+        passHappeningAtThisStep: !!passInfo
+      });
       
       // ✅ SS&S: Use pre-classified player roles (determined at turn start)
       // No need to re-resolve offenseTeamId or re-classify players per step
@@ -463,6 +490,13 @@ export class ShotAnimationSystem {
         }
       }
       
+      // 🔍 DEBUG: Log defensive animation decision
+      console.log(`🔍 [SHOT ANIM] Step ${stepIndex}: Defensive animation decision`, {
+        hasPassInfo: !!passInfo,
+        defensivePromisesCount: defensivePromises.length,
+        willStartInPhase2: true // ShotAnimationSystem always starts defenders in Phase 2
+      });
+      
       // ✅ FIX: Phase 1 - Start all offensive players animating, wait for passer if there's a pass
       // This maintains the existing behavior where pass doesn't start until passer reaches their spot
       // All offensive players start animating simultaneously, but we only wait for the passer
@@ -482,6 +516,13 @@ export class ShotAnimationSystem {
       const passAndDefensePromises = [];
       const phase2StartTime = performance.now();
       
+      // 🔍 DEBUG: Log Phase 2 start
+      console.log(`🔍 [SHOT ANIM] Step ${stepIndex}: Starting Phase 2`, {
+        hasPassInfo: !!passInfo,
+        defensivePromisesCount: defensivePromises.length,
+        phase1Duration: phase2StartTime - phase1StartTime
+      });
+      
       if (passInfo) {
         // Add pass animation to the parallel batch
         const passPromise = handlePassAnimation({
@@ -491,12 +532,16 @@ export class ShotAnimationSystem {
         });
         
         passAndDefensePromises.push(passPromise);
+        console.log(`✅ [SHOT ANIM] Step ${stepIndex}: Starting pass animation + defensive animations in parallel`);
+      } else {
+        console.log(`⚠️ [SHOT ANIM] Step ${stepIndex}: No pass - starting defensive animations in Phase 2`);
       }
       
       // Add all defensive player movements to the parallel batch
       // Extract promises from defensivePromises array (which now contains objects with {promise, startTime, playerId})
       const defensivePromiseArray = defensivePromises.map(dp => dp.promise);
       passAndDefensePromises.push(...defensivePromiseArray);
+      console.log(`✅ [SHOT ANIM] Step ${stepIndex}: Added ${defensivePromiseArray.length} defensive animations to Phase 2`);
       
       // Animate pass and defensive players simultaneously
       if (passAndDefensePromises.length > 0) {
