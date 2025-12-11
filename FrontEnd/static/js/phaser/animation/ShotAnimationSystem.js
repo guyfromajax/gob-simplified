@@ -219,7 +219,49 @@ export class ShotAnimationSystem {
     const isMake = turnData.result_type === 'MAKE';
     const rimCoords = this.getRimCoordinates(turnData);
     
-    // ✅ REMOVED: Shot result logging (cluttering console)
+    // 🔍 STATE COMPARISON: Log tween manager and scene state before MAKE vs MISS handling
+    const getTweenManagerState = () => {
+      if (!this.scene.tweens) return null;
+      try {
+        const total = typeof this.scene.tweens.getAll === 'function' 
+          ? this.scene.tweens.getAll().length 
+          : 'N/A';
+        const paused = typeof this.scene.tweens.isPaused === 'function'
+          ? this.scene.tweens.isPaused()
+          : 'N/A';
+        const timeScale = this.scene.tweens.timeScale || 'N/A';
+        return { total, paused, timeScale };
+      } catch (error) {
+        return { error: error.message };
+      }
+    };
+    
+    const getBallControllerState = () => {
+      if (!this.ballController) return null;
+      return {
+        isAttached: this.ballController.isAttached,
+        isInFlight: this.ballController.isInFlight,
+        currentOwner: this.ballController.currentOwner?.playerId || null
+      };
+    };
+    
+    const getSceneFlags = () => {
+      return {
+        skipToEnd: this.scene.skipToEnd,
+        _getBackTweens: this._getBackTweens ? this._getBackTweens.length : 0,
+        _previousTurnWasInbound: this.scene._previousTurnWasInbound,
+        _previousTurnWasOpeningTip: this.scene._previousTurnWasOpeningTip
+      };
+    };
+    
+    console.log(`🔍 [STATE COMPARISON] Before ${isMake ? 'MAKE' : 'MISS'} handling`, {
+      resultType: turnData.result_type,
+      tweenManager: getTweenManagerState(),
+      ballController: getBallControllerState(),
+      sceneFlags: getSceneFlags(),
+      hasRebounderId: !!turnData.rebounderId,
+      hasReboundType: !!turnData.rebound_type
+    });
     
     // Execute make or miss handling
     if (isMake) {
@@ -397,29 +439,29 @@ export class ShotAnimationSystem {
         maxSteps: maxSteps
       });
       
-      // 🔍 DEBUG: Log movement array structure for all players at this step
-      const movementArrayInfo = turnData.animations.map(anim => ({
-        playerId: anim.playerId?.substring(0, 8) || 'unknown',
-        movementLength: anim.movement?.length || 0,
-        hasStep: stepIndex < (anim.movement?.length || 0),
-        stepAction: stepIndex < (anim.movement?.length || 0) ? anim.movement[stepIndex]?.action : 'N/A',
-        stepTimestamp: stepIndex < (anim.movement?.length || 0) ? anim.movement[stepIndex]?.timestamp : 'N/A'
-      }));
-      console.log(`🔍 [SHOT ANIM] Step ${stepIndex}: Movement array structure`, movementArrayInfo);
+      // ✅ COMMENTED OUT: Movement array structure log (cluttering console)
+      // const movementArrayInfo = turnData.animations.map(anim => ({
+      //   playerId: anim.playerId?.substring(0, 8) || 'unknown',
+      //   movementLength: anim.movement?.length || 0,
+      //   hasStep: stepIndex < (anim.movement?.length || 0),
+      //   stepAction: stepIndex < (anim.movement?.length || 0) ? anim.movement[stepIndex]?.action : 'N/A',
+      //   stepTimestamp: stepIndex < (anim.movement?.length || 0) ? anim.movement[stepIndex]?.timestamp : 'N/A'
+      // }));
+      // console.log(`🔍 [SHOT ANIM] Step ${stepIndex}: Movement array structure`, movementArrayInfo);
       
       // ✅ SCALABLE FIX: Use shared pass detection utility
       // This ensures passes work for HCO shots, fouls, turnovers, etc.
       const passInfo = detectPassAtStep(turnData.animations, stepIndex);
       
-      // 🔍 DEBUG: Log pass detection result
-      console.log(`🔍 [SHOT ANIM] Step ${stepIndex}: Pass detection result`, {
-        passInfo: passInfo ? {
-          passer: passInfo.passerId?.substring(0, 8),
-          receiver: passInfo.receiverId?.substring(0, 8),
-          stepIndex: passInfo.stepIndex
-        } : null,
-        passHappeningAtThisStep: !!passInfo
-      });
+      // ✅ COMMENTED OUT: Pass detection result log (cluttering console)
+      // console.log(`🔍 [SHOT ANIM] Step ${stepIndex}: Pass detection result`, {
+      //   passInfo: passInfo ? {
+      //     passer: passInfo.passerId?.substring(0, 8),
+      //     receiver: passInfo.receiverId?.substring(0, 8),
+      //     stepIndex: passInfo.stepIndex
+      //   } : null,
+      //   passHappeningAtThisStep: !!passInfo
+      // });
       
       // ✅ SS&S: Use pre-classified player roles (determined at turn start)
       // No need to re-resolve offenseTeamId or re-classify players per step
@@ -484,28 +526,28 @@ export class ShotAnimationSystem {
             passerPromise = promise;
           }
         } else {
-          // 🔍 TIMING: Track when defensive animateStep() is called (tween starts NOW, not in Phase 2)
-          const defensiveTweenStartTime = performance.now();
-          console.log(`⏱️ [TIMING] Step ${stepIndex}: Defensive tween CREATED and STARTED for ${anim.playerId?.substring(0, 8)}`, {
-            playerId: anim.playerId?.substring(0, 8),
-            animateStepCallDuration: afterAnimateStep - beforeAnimateStep,
-            tweenStartTime: defensiveTweenStartTime,
-            note: 'Tween starts immediately when animateStep() is called, not when Phase 2 begins'
-          });
+          // ✅ COMMENTED OUT: Timing logs (didn't solve the issue)
+          // const defensiveTweenStartTime = performance.now();
+          // console.log(`⏱️ [TIMING] Step ${stepIndex}: Defensive tween CREATED and STARTED for ${anim.playerId?.substring(0, 8)}`, {
+          //   playerId: anim.playerId?.substring(0, 8),
+          //   animateStepCallDuration: afterAnimateStep - beforeAnimateStep,
+          //   tweenStartTime: defensiveTweenStartTime,
+          //   note: 'Tween starts immediately when animateStep() is called, not when Phase 2 begins'
+          // });
           defensivePromises.push({
             promise,
-            startTime: defensiveTweenStartTime,
+            // startTime: defensiveTweenStartTime,
             playerId: anim.playerId
           });
         }
       }
       
-      // 🔍 DEBUG: Log defensive animation decision
-      console.log(`🔍 [SHOT ANIM] Step ${stepIndex}: Defensive animation decision`, {
-        hasPassInfo: !!passInfo,
-        defensivePromisesCount: defensivePromises.length,
-        willStartInPhase2: true // ShotAnimationSystem always starts defenders in Phase 2
-      });
+      // ✅ COMMENTED OUT: Defensive animation decision log (cluttering console)
+      // console.log(`🔍 [SHOT ANIM] Step ${stepIndex}: Defensive animation decision`, {
+      //   hasPassInfo: !!passInfo,
+      //   defensivePromisesCount: defensivePromises.length,
+      //   willStartInPhase2: true // ShotAnimationSystem always starts defenders in Phase 2
+      // });
       
       // ✅ FIX: Phase 1 - Start all offensive players animating, wait for passer if there's a pass
       // This maintains the existing behavior where pass doesn't start until passer reaches their spot
@@ -526,12 +568,12 @@ export class ShotAnimationSystem {
       const passAndDefensePromises = [];
       const phase2StartTime = performance.now();
       
-      // 🔍 DEBUG: Log Phase 2 start
-      console.log(`🔍 [SHOT ANIM] Step ${stepIndex}: Starting Phase 2`, {
-        hasPassInfo: !!passInfo,
-        defensivePromisesCount: defensivePromises.length,
-        phase1Duration: phase2StartTime - phase1StartTime
-      });
+      // ✅ COMMENTED OUT: Phase 2 start log (cluttering console)
+      // console.log(`🔍 [SHOT ANIM] Step ${stepIndex}: Starting Phase 2`, {
+      //   hasPassInfo: !!passInfo,
+      //   defensivePromisesCount: defensivePromises.length,
+      //   phase1Duration: phase2StartTime - phase1StartTime
+      // });
       
       if (passInfo) {
         // Add pass animation to the parallel batch
@@ -542,47 +584,49 @@ export class ShotAnimationSystem {
         });
         
         passAndDefensePromises.push(passPromise);
-        console.log(`✅ [SHOT ANIM] Step ${stepIndex}: Starting pass animation + defensive animations in parallel`);
+        // ✅ COMMENTED OUT: Pass animation start log (cluttering console)
+        // console.log(`✅ [SHOT ANIM] Step ${stepIndex}: Starting pass animation + defensive animations in parallel`);
       } else {
-        console.log(`⚠️ [SHOT ANIM] Step ${stepIndex}: No pass - starting defensive animations in Phase 2`);
+        // ✅ COMMENTED OUT: No pass log (cluttering console)
+        // console.log(`⚠️ [SHOT ANIM] Step ${stepIndex}: No pass - starting defensive animations in Phase 2`);
       }
       
       // Add all defensive player movements to the parallel batch
-      // Extract promises from defensivePromises array (which now contains objects with {promise, startTime, playerId})
+      // Extract promises from defensivePromises array (which now contains objects with {promise, playerId})
       const defensivePromiseArray = defensivePromises.map(dp => dp.promise);
       passAndDefensePromises.push(...defensivePromiseArray);
-      console.log(`✅ [SHOT ANIM] Step ${stepIndex}: Added ${defensivePromiseArray.length} defensive animations to Phase 2`);
+      // ✅ COMMENTED OUT: Defensive animations added log (cluttering console)
+      // console.log(`✅ [SHOT ANIM] Step ${stepIndex}: Added ${defensivePromiseArray.length} defensive animations to Phase 2`);
       
-      // 🔍 TIMING: Calculate time difference between defensive tween start and Phase 2 start
-      if (defensivePromises.length > 0) {
-        const earliestDefensiveStart = Math.min(...defensivePromises.map(dp => dp.startTime));
-        const timeDiff = phase2StartTime - earliestDefensiveStart;
-        console.log(`⏱️ [TIMING] Step ${stepIndex}: Time between defensive tween start and Phase 2 start`, {
-          earliestDefensiveStart,
-          phase2StartTime,
-          timeDifferenceMs: timeDiff,
-          note: timeDiff > 0 ? 'Defensive tweens started BEFORE Phase 2' : 'Defensive tweens started AFTER Phase 2 (unexpected)'
-        });
-      }
-      
-      // 🔍 TIMING: Log when Promise.all() actually begins waiting
-      const beforePromiseAll = performance.now();
-      console.log(`⏱️ [TIMING] Step ${stepIndex}: Promise.all() about to start waiting for pass + defensive animations`, {
-        passAndDefensePromisesCount: passAndDefensePromises.length,
-        hasPass: !!passInfo,
-        defensiveCount: defensivePromiseArray.length
-      });
+      // ✅ COMMENTED OUT: Timing logs (didn't solve the issue)
+      // if (defensivePromises.length > 0) {
+      //   const earliestDefensiveStart = Math.min(...defensivePromises.map(dp => dp.startTime));
+      //   const timeDiff = phase2StartTime - earliestDefensiveStart;
+      //   console.log(`⏱️ [TIMING] Step ${stepIndex}: Time between defensive tween start and Phase 2 start`, {
+      //     earliestDefensiveStart,
+      //     phase2StartTime,
+      //     timeDifferenceMs: timeDiff,
+      //     note: timeDiff > 0 ? 'Defensive tweens started BEFORE Phase 2' : 'Defensive tweens started AFTER Phase 2 (unexpected)'
+      //   });
+      // }
+      // 
+      // const beforePromiseAll = performance.now();
+      // console.log(`⏱️ [TIMING] Step ${stepIndex}: Promise.all() about to start waiting for pass + defensive animations`, {
+      //   passAndDefensePromisesCount: passAndDefensePromises.length,
+      //   hasPass: !!passInfo,
+      //   defensiveCount: defensivePromiseArray.length
+      // });
       
       // Animate pass and defensive players simultaneously
       if (passAndDefensePromises.length > 0) {
         await Promise.all(passAndDefensePromises);
       }
       
-      // 🔍 TIMING: Log when Promise.all() completes
-      const afterPromiseAll = performance.now();
-      console.log(`⏱️ [TIMING] Step ${stepIndex}: Promise.all() completed`, {
-        waitDuration: afterPromiseAll - beforePromiseAll
-      });
+      // ✅ COMMENTED OUT: Timing logs (didn't solve the issue)
+      // const afterPromiseAll = performance.now();
+      // console.log(`⏱️ [TIMING] Step ${stepIndex}: Promise.all() completed`, {
+      //   waitDuration: afterPromiseAll - beforePromiseAll
+      // });
       
       // ✅ FIX: Wait for any remaining offensive players (non-passer) to complete
       // This ensures all offensive players finish their movements
@@ -802,6 +846,27 @@ export class ShotAnimationSystem {
     // ✅ REMOVED: Made shot logging (cluttering console)
     const isPutbackMake = turnData.result_type === 'PUTBACK_MAKE';
     
+    // 🔍 STATE COMPARISON: Log state at start of handleMadeShot
+    const getTweenManagerState = () => {
+      if (!this.scene.tweens) return null;
+      try {
+        const total = typeof this.scene.tweens.getAll === 'function' 
+          ? this.scene.tweens.getAll().length 
+          : 'N/A';
+        return { total };
+      } catch (error) {
+        return { error: error.message };
+      }
+    };
+    console.log(`🔍 [MAKE HANDLER] Start`, {
+      _getBackTweensCount: this._getBackTweens ? this._getBackTweens.length : 0,
+      tweenManager: getTweenManagerState(),
+      ballControllerState: this.ballController ? {
+        isAttached: this.ballController.isAttached,
+        isInFlight: this.ballController.isInFlight
+      } : null
+    });
+    
     if (DebugFlags.SHOT_ANIMATION) {
       console.log('ShotAnimationSystem: Shot made', {
         shooter_id: turnData.shooter_id,
@@ -833,12 +898,19 @@ export class ShotAnimationSystem {
       // ✅ FIX: Stop get-back player animations after rim hold completes
       // Players may not have reached their destination, which is fine
       if (this._getBackTweens) {
+        const beforeKill = getTweenManagerState();
         this._getBackTweens.forEach(tween => {
           if (tween && tween.isPlaying && this.scene.tweens) {
             this.scene.tweens.killTweensOf(tween.targets);
           }
         });
         this._getBackTweens = [];
+        const afterKill = getTweenManagerState();
+        console.log(`🔍 [MAKE HANDLER] After killing _getBackTweens`, {
+          beforeKill,
+          afterKill,
+          killedCount: this._getBackTweens ? 0 : 'N/A'
+        });
       }
       
       // Hide ball after hold
@@ -851,6 +923,9 @@ export class ShotAnimationSystem {
         reason: 'shot_made',
         shooter_id: turnData.shooter_id
       });
+      console.log(`🔍 [MAKE HANDLER] After state transition to IDLE`, {
+        currentState: this.stateMachine.state
+      });
     }
 
     // Ball hold already handled above (1 second), no additional delay needed
@@ -858,6 +933,12 @@ export class ShotAnimationSystem {
     // ✅ PRIORITY 1 FIX: Call onShotEnd() to clear in-flight state
     // This matches the pattern in ballManager.js (line 626)
     this.ballController.onShotEnd();
+    console.log(`🔍 [MAKE HANDLER] After onShotEnd()`, {
+      ballControllerState: {
+        isAttached: this.ballController.isAttached,
+        isInFlight: this.ballController.isInFlight
+      }
+    });
     
     // ✅ FIX: Show announcement for ALL made shots (like Fast Break does)
     // This includes both regular makes and AND-1 situations
@@ -941,13 +1022,44 @@ export class ShotAnimationSystem {
   async handleMissedShot(rimCoords, turnData) {
     // ✅ REMOVED: Missed shot logging (cluttering console)
 
+    // 🔍 STATE COMPARISON: Log state at start of handleMissedShot
+    const getTweenManagerState = () => {
+      if (!this.scene.tweens) return null;
+      try {
+        const total = typeof this.scene.tweens.getAll === 'function' 
+          ? this.scene.tweens.getAll().length 
+          : 'N/A';
+        return { total };
+      } catch (error) {
+        return { error: error.message };
+      }
+    };
+    console.log(`🔍 [MISS HANDLER] Start`, {
+      _getBackTweensCount: this._getBackTweens ? this._getBackTweens.length : 0,
+      tweenManager: getTweenManagerState(),
+      ballControllerState: this.ballController ? {
+        isAttached: this.ballController.isAttached,
+        isInFlight: this.ballController.isInFlight
+      } : null
+    });
+
     // Animate ball bounce from rim
     await this.animateBallBounce(rimCoords, turnData);
+    console.log(`🔍 [MISS HANDLER] After animateBallBounce()`, {
+      tweenManager: getTweenManagerState()
+    });
     
     // ✅ PRIORITY 1 FIX: Call onShotEnd() to clear in-flight state before rebound
     // This matches the pattern in ballManager.js (line 626)
     // The ball is no longer in flight, so clear the state to allow attachment to rebounder
     this.ballController.onShotEnd();
+    console.log(`🔍 [MISS HANDLER] After onShotEnd()`, {
+      ballControllerState: {
+        isAttached: this.ballController.isAttached,
+        isInFlight: this.ballController.isInFlight
+      },
+      tweenManager: getTweenManagerState()
+    });
     
     // ✅ FIX: Stop get-back player animations when rebound is secured
     // Players may not have reached their destination, which is fine
@@ -956,6 +1068,12 @@ export class ShotAnimationSystem {
     // ✅ PRIORITY 2 FIX: Add validation to ensure rebound_type is set
     // Check if this shot turn includes rebound data
     if (turnData.rebounderId && turnData.rebound_type) {
+      console.log(`🔍 [MISS HANDLER] Before handleEmbeddedRebound()`, {
+        rebounderId: turnData.rebounderId,
+        reboundType: turnData.rebound_type,
+        tweenManager: getTweenManagerState(),
+        _getBackTweensCount: this._getBackTweens ? this._getBackTweens.length : 0
+      });
       // ✅ COMMENTED OUT: Verbose rebound logs (cluttering console)
       // console.log('🎬 ShotAnimationSystem: Handling embedded rebound', {
       //   rebounderId: turnData.rebounderId,
@@ -1022,8 +1140,29 @@ export class ShotAnimationSystem {
     // ✅ FIX: Use distance-based duration for consistent speed
     const rebounderDuration = getPlayerDuration(rebounderSprite, ballBounceX, ballBounceY);
     
+    // 🔍 STATE COMPARISON: Log before animatePlayerCollapse
+    const getTweenManagerState = () => {
+      if (!this.scene.tweens) return null;
+      try {
+        const total = typeof this.scene.tweens.getAll === 'function' 
+          ? this.scene.tweens.getAll().length 
+          : 'N/A';
+        return { total };
+      } catch (error) {
+        return { error: error.message };
+      }
+    };
+    console.log(`🔍 [EMBEDDED REBOUND] Before animatePlayerCollapse()`, {
+      _getBackTweensCount: this._getBackTweens ? this._getBackTweens.length : 0,
+      tweenManager: getTweenManagerState()
+    });
+    
     // Start non-rebounder animations first and store tween references
     const collapseTweens = await this.animatePlayerCollapse(rebounderSprite, { x: ballBounceX, y: ballBounceY }, turnData);
+    console.log(`🔍 [EMBEDDED REBOUND] After animatePlayerCollapse()`, {
+      collapseTweensCount: collapseTweens ? collapseTweens.length : 0,
+      tweenManager: getTweenManagerState()
+    });
     
     const rebounderPromise = new Promise((resolve) => {
       this.scene.tweens.add({
@@ -1034,6 +1173,7 @@ export class ShotAnimationSystem {
         ease: 'Linear', // Match other player movements
         onComplete: () => {
           // ✅ FIX: Stop all collapse animations when rebounder reaches ball
+          const beforeKillCollapse = getTweenManagerState();
           if (collapseTweens && collapseTweens.length > 0) {
             collapseTweens.forEach(tween => {
               if (tween && this.scene.tweens) {
@@ -1041,6 +1181,12 @@ export class ShotAnimationSystem {
               }
             });
           }
+          const afterKillCollapse = getTweenManagerState();
+          console.log(`🔍 [EMBEDDED REBOUND] After killing collapseTweens`, {
+            beforeKillCollapse,
+            afterKillCollapse,
+            killedCollapseCount: collapseTweens ? collapseTweens.length : 0
+          });
           
           // Attach ball to rebounder once they reach the bounce spot
           this.ballController.attachToPlayer(rebounderSprite, {
@@ -1048,6 +1194,7 @@ export class ShotAnimationSystem {
           });
           
           // ✅ FIX: Stop get-back player animations when rebound is secured
+          const beforeKillGetBack = getTweenManagerState();
           if (this._getBackTweens) {
             this._getBackTweens.forEach(tween => {
               if (tween && tween.isPlaying && this.scene.tweens) {
@@ -1056,6 +1203,12 @@ export class ShotAnimationSystem {
             });
             this._getBackTweens = [];
           }
+          const afterKillGetBack = getTweenManagerState();
+          console.log(`🔍 [EMBEDDED REBOUND] After killing _getBackTweens`, {
+            beforeKillGetBack,
+            afterKillGetBack,
+            killedGetBackCount: this._getBackTweens ? 0 : 'N/A'
+          });
           
           resolve();
         }
