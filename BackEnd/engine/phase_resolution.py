@@ -1468,7 +1468,7 @@ def generate_logic(off_call, def_call, off_team, def_team, off_lineup, def_lineu
     from BackEnd.constants import ACTIONS
     
     result = random.choices(
-        ["HCO", "O_FOUL", "D_FOUL", "DEAD_BALL_TURNOVER", "STEAL"],
+        ["SHOT", "O_FOUL", "D_FOUL", "DEAD_BALL_TURNOVER", "STEAL"],
         weights=[6, 1, 1, 1, 1],
         k=1
     )[0]
@@ -1668,9 +1668,9 @@ def resolve_half_court_offense_logic(game):
         skeleton = copy.deepcopy(skeleton)
         logging.warning(f"📋 [HCO RESOLVE] Created deep copy of skeleton ({len(skeleton.get('steps', []))} steps)")
     
-    # ✅ STOPER SYSTEM: Truncate skeleton and add stopper step if result is not HCO
-    if result != "HCO" and skeleton:
-        logging.warning(f"🛑 [STOPPER] Non-HCO result detected: {result}")
+    # ✅ STOPER SYSTEM: Truncate skeleton and add stopper step if result is not SHOT
+    if result != "SHOT" and skeleton:
+        logging.warning(f"🛑 [STOPPER] Non-SHOT result detected: {result}")
         if skeleton and "steps" in skeleton:
             steps = skeleton.get("steps", [])
             if len(steps) > 1:
@@ -1756,7 +1756,7 @@ def resolve_half_court_offense_logic(game):
         else:
             logging.warning(f"⚠️ [STOPPER] Cannot apply stopper - skeleton or steps missing (result: {result})")
     else:
-        logging.warning(f"✅ [STOPPER] HCO result - no stopper needed")
+        logging.warning(f"✅ [STOPPER] SHOT result - no stopper needed")
     
     # Get the successful variant to determine intended shooter
     successful_skeleton = get_hco_skeleton(None, game, lean_score=1.0)  # Force successful variant
@@ -1837,16 +1837,34 @@ def resolve_half_court_offense_logic(game):
     # print("[DEBUG] shooter:", roles.get("shooter"))
 
     # 2. Event Determination
-    event_type = game.turn_manager.determine_event_type(roles)
-
-    # print(f"event_type 0: {event_type}")
-    event_type = "SHOT"
-    # print(f"event_type 1: {event_type}")
+    # Use result from generate_logic() for stopper results, otherwise determine from skeleton
+    if result != "SHOT":
+        # Map stopper result to event_type
+        if result == "O_FOUL":
+            event_type = "O_FOUL"
+        elif result == "D_FOUL":
+            event_type = "D_FOUL"
+        elif result == "DEAD_BALL_TURNOVER":
+            event_type = "TURNOVER"
+        elif result == "STEAL":
+            event_type = "TURNOVER"
+        else:
+            # Fallback: determine from skeleton analysis
+            event_type = game.turn_manager.determine_event_type(roles)
+    else:
+        # Normal flow: determine event type from skeleton
+        event_type = game.turn_manager.determine_event_type(roles)
+        # If determine_event_type returns something other than SHOT, use that
+        # Otherwise default to SHOT for normal HCO flow
+        if event_type == "SHOT" or event_type is None:
+            event_type = "SHOT"
 
     if event_type != "SHOT":
         #need to add animations to each of these
         if event_type == "TURNOVER":
-            return resolve_turnover_logic(roles, game, turnover_type="DEAD BALL")
+            # Use result to determine turnover type (STEAL vs DEAD BALL)
+            turnover_type = "STEAL" if result == "STEAL" else "DEAD BALL"
+            return resolve_turnover_logic(roles, game, turnover_type=turnover_type)
 
         elif event_type == "O_FOUL":
             game_state["foul_team"] = "OFFENSE"
