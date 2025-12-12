@@ -1515,6 +1515,9 @@ def generate_logic(off_call, def_call, off_team, def_team, off_lineup, def_lineu
     # This allows the system to work while full logic is implemented
     lean_score = random.uniform(-1, 1)
     
+    # Log result for debugging
+    logging.info(f"🎲 [GENERATE_LOGIC] Result: {result}, Lean Score: {lean_score:.2f}")
+    
     return result, lean_score
 
 
@@ -1642,6 +1645,9 @@ def resolve_half_court_offense_logic(game):
     # Generate logic to determine result and lean score
     result, lean_score = generate_logic(off_call, def_call, off_team, def_team, off_lineup, def_lineup, game=game)
     
+    # Log result received for debugging
+    logging.info(f"🎯 [HCO RESOLVE] Received result: {result}, lean_score: {lean_score:.2f}")
+    
     # Store lean_score in scouting data
     _store_lean_score(lean_score, game, off_team, def_team)
     
@@ -1649,8 +1655,16 @@ def resolve_half_court_offense_logic(game):
     # Pass lean_score to select the appropriate skeleton variant
     skeleton = get_hco_skeleton(None, game, lean_score=lean_score)
     
+    # Log skeleton retrieval
+    if skeleton and "steps" in skeleton:
+        logging.info(f"📋 [HCO RESOLVE] Skeleton retrieved: {len(skeleton['steps'])} steps, variant: {skeleton.get('_variant', 'unknown')}")
+    else:
+        logging.warning(f"⚠️ [HCO RESOLVE] No skeleton or steps found")
+    
     # ✅ STOPER SYSTEM: Truncate skeleton and add stopper step if result is not HCO
-    if result != "HCO" and skeleton and "steps" in skeleton:
+    if result != "HCO":
+        logging.info(f"🛑 [STOPPER] Non-HCO result detected: {result}")
+        if skeleton and "steps" in skeleton:
         steps = skeleton.get("steps", [])
         if len(steps) > 1:
             # Determine which step to stop at based on result type
@@ -1731,7 +1745,11 @@ def resolve_half_court_offense_logic(game):
             skeleton["steps"] = truncated_steps + [stopper_step]
             
             # Log truncation for debugging
-            logging.debug(f"🛑 [STOPPER] Truncated skeleton to step {stop_step_index}, added {result} stopper at step {len(skeleton['steps']) - 1}")
+            logging.info(f"🛑 [STOPPER] Truncated skeleton to step {stop_step_index}, added {result} stopper at step {len(skeleton['steps']) - 1}")
+        else:
+            logging.warning(f"⚠️ [STOPPER] Cannot apply stopper - skeleton or steps missing (result: {result})")
+    else:
+        logging.info(f"✅ [STOPPER] HCO result - no stopper needed")
     
     # Get the successful variant to determine intended shooter
     successful_skeleton = get_hco_skeleton(None, game, lean_score=1.0)  # Force successful variant
