@@ -1860,19 +1860,67 @@ def resolve_half_court_offense_logic(game):
             event_type = "SHOT"
 
     if event_type != "SHOT":
+        # ✅ STOPER SYSTEM: Populate roles for stopper results
+        # When bypassing determine_event_type(), we need to set up roles manually
+        ball_handler = roles.get("ball_handler")
+        if not ball_handler:
+            # Fallback: use PG if ball_handler not set
+            ball_handler = off_lineup.get("PG", list(off_lineup.values())[0] if off_lineup else None)
+            roles["ball_handler"] = ball_handler
+        
+        # Determine defender based on ball handler position
+        ball_handler_pos = get_player_position(off_lineup, ball_handler) if ball_handler else "PG"
+        defender = def_lineup.get(ball_handler_pos, def_lineup.get("PG", list(def_lineup.values())[0] if def_lineup else None))
+        roles["defender"] = defender
+        
+        # Set foul_player for foul results
+        if event_type in ["O_FOUL", "D_FOUL"]:
+            if event_type == "O_FOUL":
+                # Offensive foul: foul_player is the ball handler
+                roles["foul_player"] = ball_handler
+            else:
+                # Defensive foul: foul_player is the defender
+                roles["foul_player"] = defender
+            # Ensure shooter is set (needed by resolve_non_shooting_foul)
+            if "shooter" not in roles or not roles["shooter"]:
+                roles["shooter"] = ball_handler
+        
+        # Convert truncated skeleton to animations
+        animator = Animator(game)
+        animations = []
+        if skeleton and "steps" in skeleton:
+            animations = animator.skeleton_to_animations(
+                skeleton,
+                off_lineup,
+                def_lineup,
+                add_defenders=True
+            )
+        
         #need to add animations to each of these
         if event_type == "TURNOVER":
             # Use result to determine turnover type (STEAL vs DEAD BALL)
             turnover_type = "STEAL" if result == "STEAL" else "DEAD BALL"
-            return resolve_turnover_logic(roles, game, turnover_type=turnover_type)
+            turn_result = resolve_turnover_logic(roles, game, turnover_type=turnover_type)
+            # Add skeleton and animations to result
+            turn_result["skeleton"] = skeleton or {}
+            turn_result["animations"] = animations
+            return turn_result
 
         elif event_type == "O_FOUL":
             game_state["foul_team"] = "OFFENSE"
-            return resolve_non_shooting_foul(roles, game)
+            foul_result = resolve_non_shooting_foul(roles, game)
+            # Add skeleton and animations to result
+            foul_result["skeleton"] = skeleton or {}
+            foul_result["animations"] = animations
+            return foul_result
 
         elif event_type == "D_FOUL":
             game_state["foul_team"] = "DEFENSE"
-            return resolve_non_shooting_foul(roles, game)
+            foul_result = resolve_non_shooting_foul(roles, game)
+            # Add skeleton and animations to result
+            foul_result["skeleton"] = skeleton or {}
+            foul_result["animations"] = animations
+            return foul_result
 
     # 3. Shot Result
     shot_result = game.shot_manager.resolve_shot(roles)
