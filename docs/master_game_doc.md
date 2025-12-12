@@ -628,6 +628,208 @@ Screeners automatically animate to offset positions to prevent visual overlap wh
 
 ---
 
+## Stopper System ✅ **COMPLETE** (January 2025)
+
+### Overview
+
+The **Stopper System** is an SS&S (Single Source & Scalable) system that interrupts HCO skeleton animations at strategic points to execute non-shot outcomes (fouls, turnovers, steals). Instead of using result-specific skeletons (like FCP/HCT), the stopper system uses standard HCO playcall skeletons and truncates them at a determined "stopper step," then appends a final stopper action step.
+
+**Key Design Principles:**
+- **SS&S Architecture**: Uses shared helper functions (`get_ball_handler_from_skeleton()`, `select_foul_player()`, `resolve_non_shooting_foul()`, `resolve_turnover_logic()`) for consistency across turn types
+- **Skeleton Reuse**: Uses existing HCO skeleton variants (successful, mid_play_change, contested, broken) instead of creating result-specific skeletons
+- **Dynamic Interruption**: Determines stop step based on result type (random for fouls, strategic for turnovers/steals)
+- **Deep Copy Protection**: Always creates a deep copy of the skeleton before modification to prevent cache mutation
+
+### When Stopper System Activates
+
+The stopper system activates in **HCO turns** when `generate_logic()` determines a non-SHOT result:
+
+**Possible Results:**
+- `SHOT` - Normal flow, proceeds to shot resolution (no stopper)
+- `O_FOUL` - Offensive foul (stopper activates)
+- `D_FOUL` - Defensive foul (stopper activates)
+- `DEAD_BALL_TURNOVER` - Dead ball turnover (stopper activates)
+- `STEAL` - Steal (stopper activates)
+
+**Result Determination:**
+- `generate_logic()` in `phase_resolution.py` (line 1469-1474) uses weighted random choice:
+  - `SHOT`: 60% weight (default successful outcome)
+  - `O_FOUL`: 10% weight
+  - `D_FOUL`: 10% weight
+  - `DEAD_BALL_TURNOVER`: 10% weight
+  - `STEAL`: 10% weight
+
+### Stopper Step Selection
+
+The system determines which step to stop at based on result type:
+
+**Fouls (O_FOUL, D_FOUL):**
+- Random step between step 1 and second-to-last step
+- Example: For a 7-step skeleton (steps 0-6), chooses randomly from steps 1-5
+- Rationale: Fouls can organically happen at any point during the play
+
+**Turnovers/Steals (DEAD_BALL_TURNOVER, STEAL):**
+- Strategic step: Currently uses middle step (`len(steps) // 2`)
+- TODO: Enhance with player attribute analysis (ball handler's BH, defender's ST, IQ) and positioning
+- Rationale: Turnovers are more likely during high-pressure situations (passes, drives)
+
+### Skeleton Truncation Process
+
+1. **Deep Copy Creation** (line 1704):
+   - Immediately creates a deep copy of the skeleton after retrieval
+   - Prevents in-place modification from mutating the cached skeleton
+   - Critical for preventing truncated skeletons in future turns
+
+2. **Stop Step Determination** (lines 1716-1727):
+   - Calculates `stop_step_index` based on result type
+   - Truncates skeleton to `steps[:stop_step_index + 1]` (includes the stop step)
+
+3. **Ball Handler Identification** (lines 1732-1755):
+   - Finds ball handler at the stop step (checks for "handle_ball", "receive", "pass" actions)
+   - Falls back to previous step if not found in stop step
+   - Determines ball handler position and location for stopper step
+
+4. **Stopper Step Creation** (lines 1757-1781):
+   - Creates final stopper step with timestamp = stop_step.timestamp + 300ms
+   - Maps result to stopper action: `O_FOUL` → "o_foul", `D_FOUL` → "d_foul", `DEAD_BALL_TURNOVER` → "dead_ball_turnover", `STEAL` → "steal"
+   - Adds ball handler to stopper step's `pos_actions` (ball remains with them until stopper)
+   - Adds stopper event to `events` array
+
+5. **Skeleton Assembly** (line 1790):
+   - Replaces `skeleton["steps"]` with `truncated_steps + [stopper_step]`
+   - Frontend animates this truncated skeleton normally (no special handling needed)
+
+### Player Role Population
+
+The stopper system uses SS&S helper functions to populate player roles, ensuring consistency with FCP/HCT:
+
+**Ball Handler Determination** (line 1909):
+- Uses `get_ball_handler_from_skeleton(skeleton, off_lineup)` - same as FCP/HCT
+- Determines ball handler from skeleton steps (from stopper step or last step)
+
+**Defender Determination** (line 1914):
+- Uses position matching based on ball handler position - same as FCP/HCT
+- Falls back to PG if position not found
+
+**Foul Player Selection** (lines 1918-1921):
+- Uses `select_foul_player(foul_team_type, ball_handler, off_lineup, def_lineup)` - same as FCP/HCT
+- Probabilistic selection: 60% chance it's the ball handler, 40% distributed among other players
+
+### Event Routing and Handlers
+
+**Event Type Mapping** (lines 1881-1892):
+- Maps `result` from `generate_logic()` to `event_type`:
+  - `O_FOUL` → `O_FOUL`
+  - `D_FOUL` → `D_FOUL`
+  - `DEAD_BALL_TURNOVER` → `TURNOVER`
+  - `STEAL` → `TURNOVER`
+
+**Handler Routing** (lines 1930-1950):
+- **Turnovers**: Calls `resolve_turnover_logic(roles, game, turnover_type)` - shared function
+- **Fouls**: Calls `resolve_non_shooting_foul(roles, game)` - shared function
+- Both handlers return result with skeleton and animations included
+
+**Animation Generation** (lines 1924-1930):
+- Converts truncated skeleton to animations using `animator.skeleton_to_animations()`
+- Adds `skeleton` and `animations` to result before returning
+- Frontend animates the truncated skeleton normally
+
+### Possession Flip and Transition Handling
+
+**Possession Flips:**
+- Handled by shared functions (`resolve_non_shooting_foul()`, `resolve_turnover_logic()`)
+- `resolve_non_shooting_foul()` sets `possession_flips: True` for offensive fouls, `False` for defensive fouls
+- `resolve_turnover_logic()` sets `possession_flips: True` for all turnovers
+
+**Transition Handling:**
+- Handled by shared functions (sets `offensive_state`, `next_play_type`)
+- For steals with Fast Break: Sets `next_play_type = "FAST_BREAK"` to trigger possession flip in `game_manager.py`
+- For steals with HCO: Sets `next_play_type = "HCO"` for direct HCO transition
+- For dead ball turnovers: Routes to Side Inbound Pass (SIP) → HCO
+
+### Stat Tracking
+
+**Player Stats:**
+- Handled by shared functions:
+  - `resolve_non_shooting_foul()`: Records `F` (fouls) for foul player
+  - `resolve_turnover_logic()`: Records `TO` (turnovers) for ball handler, `STL` (steals) for defender
+
+**Team Stats:**
+- Handled by shared functions (team fouls, scouting data)
+
+### Announcement System
+
+**Announcement Data:**
+- Result structure includes all necessary IDs:
+  - `foul_player_id` - For foul announcements
+  - `victim_id`, `victim_name` - For turnover announcements
+  - `stealer_id`, `stealer_name` - For steal announcements
+  - `foul_team` - For foul type determination
+
+**Announcement Timing:**
+- Announcements occur after animation completes (frontend handles timing)
+
+### Key Implementation Details
+
+**Deep Copy Protection** (line 1704):
+```python
+# CRITICAL: Always create a deep copy to avoid mutating cached skeleton
+if skeleton:
+    skeleton = copy.deepcopy(skeleton)
+```
+- Prevents truncated skeletons from affecting future turns
+- Must be done immediately after skeleton retrieval, before any modifications
+
+**Skeleton Variants:**
+- Stopper system works consistently across all skeleton variants (successful, mid_play_change, contested, broken)
+- Simply truncates the skeleton at the determined step, regardless of variant
+
+**Ball Handling for Steals:**
+- If stopper step has a pass: Ball attaches to receiver, then defender steals it
+- If no pass: Ball remains with previous ball handler, then defender steals it
+- TODO: Implement pass interception logic for future enhancement
+
+### Future Enhancements
+
+**Strategic Step Selection for Turnovers/Steals:**
+- Currently uses middle step as placeholder
+- TODO: Implement logic to dynamically determine `stop_step_index` based on:
+  - Ball handler's BH (Ball Handling) attribute
+  - Defender's ST (Steal) attribute
+  - Defender's IQ (Intelligence) attribute
+  - Player positions and actions in the skeleton
+  - This would make turnovers feel more organic and less random
+
+**Defensive Player Selection for Steals:**
+- Currently uses placeholder (pass statement)
+- TODO: When `result == "STEAL"`, determine which defensive player makes the steal:
+  - Analyze defensive player positions at `stop_step_index`
+  - Consider defensive player's `ST` (Steal) attribute
+  - Consider proximity to ball handler
+  - Add selected `defender_id` to `stopper_step`'s `pos_actions` or `events`
+
+**Pass Interception Logic:**
+- Currently treats all steals as steals from the ball handler
+- TODO: For steps with passes, implement pass interception logic:
+  - Ball attaches to receiver
+  - Defender intercepts the pass (different animation than steal from handler)
+
+### Key Files
+
+- `BackEnd/engine/phase_resolution.py`
+  - `generate_logic()` - Result determination (lines 1469-1474)
+  - `resolve_half_court_offense_logic()` - Stopper system implementation (lines 1704-1950)
+  - `resolve_turnover_logic()` - Shared turnover handler (lines 1383-1474)
+  - `resolve_non_shooting_foul()` - Shared foul handler (lines 207-293)
+  - `get_ball_handler_from_skeleton()` - SS&S helper (lines 115-161)
+  - `select_foul_player()` - SS&S helper (lines 163-204)
+- `BackEnd/models/animator.py`
+  - `skeleton_to_animations()` - Converts truncated skeleton to animations
+- `docs/To Do/stopper_system.md`
+  - Future enhancement tracking
+
+---
+
 ## Fast Break System ✅ **COMPLETE** (January 2025)
 
 ### Overview
