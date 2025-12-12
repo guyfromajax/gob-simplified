@@ -1912,61 +1912,6 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   // ✅ NEW (Step 1): Initialize simple ball holder state (WIP_GOB approach)
   initializeBallHolderState(scene);
 
-  // ✅ FIX: Check if previous turn was MISS with DREB (HCO Shot Miss → DREB)
-  // If so, handle DREB setup here (same pattern as OREB Putback Miss → DREB)
-  // This prevents embedded DREB handling from interfering with skeleton animation defensive tweens
-  // Use turnIndex parameter if available, otherwise fall back to scene.currentTurn
-  const currentIndex = turnIndex !== undefined ? turnIndex : (scene.currentTurn || 0);
-  const previousTurn = scene.simData?.turns?.[currentIndex - 1];
-  const isPreviousTurnMissWithDreb = previousTurn?.result_type === "MISS" && 
-                                      previousTurn?.rebound_type === "DREB" &&
-                                      previousTurn?.next_play_type !== "FAST_BREAK";
-  
-  // 🔍 DEBUG: Log detection attempt (ALWAYS log, not just when condition is met)
-  console.log('🔍 [HCO SETUP] Checking for previous MISS → DREB', {
-    turnIndexParam: turnIndex,
-    sceneCurrentTurn: scene.currentTurn,
-    currentIndexUsed: currentIndex,
-    currentTurnResultType: turnData.result_type,
-    currentTurnId: turnData.id,
-    hasPreviousTurn: !!previousTurn,
-    previousTurnIndex: currentIndex - 1,
-    previousTurnResultType: previousTurn?.result_type,
-    previousTurnReboundType: previousTurn?.rebound_type,
-    previousTurnNextPlayType: previousTurn?.next_play_type,
-    previousTurnRebounderId: previousTurn?.rebounderId,
-    previousTurnId: previousTurn?.id,
-    isPreviousTurnMissWithDreb,
-    willCallRunDefensiveReboundSetup: isPreviousTurnMissWithDreb,
-    totalTurns: scene.simData?.turns?.length || 0,
-    turnsArray: scene.simData?.turns?.map((t, idx) => ({ 
-      idx, 
-      result_type: t.result_type, 
-      rebound_type: t.rebound_type,
-      next_play_type: t.next_play_type,
-      id: t.id?.substring(0, 8) || 'no-id'
-    })) || []
-  });
-  
-  if (isPreviousTurnMissWithDreb) {
-    console.log('✅ [HCO SETUP] Previous turn was MISS with DREB - calling runDefensiveReboundSetup()', {
-      previousTurnResult: previousTurn.result_type,
-      previousTurnReboundType: previousTurn.rebound_type,
-      previousTurnRebounderId: previousTurn.rebounderId,
-      nextPlayType: previousTurn.next_play_type
-    });
-    
-    const { runDefensiveReboundSetup } = await import('./turnAnimation.js');
-    await runDefensiveReboundSetup({
-      scene,
-      ballSprite,
-      playerSprites,
-      rebounderId: previousTurn.rebounderId,
-      nextPlayType: previousTurn.next_play_type || "HCO",
-      turnData: previousTurn // Pass the MISS turn with offense_getback
-    });
-  }
-
   const fromInbound = scene._previousTurnWasInbound === true;
   const fromOpeningTip = scene._previousTurnWasOpeningTip === true;
 
