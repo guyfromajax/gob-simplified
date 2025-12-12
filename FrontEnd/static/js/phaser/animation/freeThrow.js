@@ -410,30 +410,23 @@ export async function runFreeThrowSequence(
         });
         
         // Check if this is a defensive rebound and handle accordingly
+        // Only call runDefensiveReboundSetup for HCO/HCT/FCP, not for FAST_BREAK
+        // Fast Break handles its own outlet pass in fastBreak.js (animateOutletPhase)
         const isDreb = reboundData.rebound_type === "DREB";
         if (isDreb) {
-          if (turnData.fast_break) {
-            // Handle fast break after defensive rebound on free throw
-            const { runFastBreakSequence } = await import('./fastBreak.js');
-            await runFastBreakSequence({
-              scene,
-              playerSprites,
-              ballSprite,
-              turnData: {
-                ...turnData,
-                result_type: "FAST_BREAK",
-                roles: turnData.roles || {}
-              }
-            });
-          } else {
-            // Handle HCO after defensive rebound on free throw
+          const nextPlayType = reboundData.next_play_type || "HCO";
+          if (nextPlayType === 'FAST_BREAK') {
+            // Fast Break outlet passes are handled in the Fast Break sequence itself
+            // No need to call runDefensiveReboundSetup here
+          } else if (nextPlayType === 'HCO' || nextPlayType === 'HCT' || nextPlayType === 'FCP') {
+            // Handle HCO/HCT/FCP after defensive rebound on free throw
             const { runDefensiveReboundSetup } = await import('./turnAnimation.js');
             await runDefensiveReboundSetup({
               scene,
               ballSprite,
               playerSprites,
               rebounderId: reboundData.rebounderId,
-              nextPlayType: reboundData.next_play_type || "HCO"
+              nextPlayType: nextPlayType
             });
           }
         }
