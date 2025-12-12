@@ -29,6 +29,10 @@ export class ShotAnimationSystem {
     this.stateMachine = stateMachine;
     this.playerSprites = playerSprites;
     this.gameStore = gameStore;
+    this._getBackTweens = null; // Store get-back tween references
+    // ✅ TEMP FIX: Track defensive player IDs from skeleton animation for tween cleanup
+    // TODO: Remove if this fix doesn't resolve the animation sync issue
+    this._skeletonDefensivePlayerIds = [];
     
     // Debug logging removed for cleaner console
     
@@ -372,6 +376,10 @@ export class ShotAnimationSystem {
     let offensiveCount = 0;
     let defensiveCount = 0;
     
+    // ✅ TEMP FIX: Track defensive player IDs for tween cleanup before animatePlayerCollapse()
+    // TODO: Remove if this fix doesn't resolve the animation sync issue
+    this._skeletonDefensivePlayerIds = [];
+    
     for (const anim of turnData.animations) {
       const sprite = this.playerSprites[anim.playerId];
       if (!sprite) continue;
@@ -383,6 +391,8 @@ export class ShotAnimationSystem {
         offensiveCount++;
       } else {
         defensiveCount++;
+        // ✅ TEMP FIX: Store defensive player IDs for later tween cleanup
+        this._skeletonDefensivePlayerIds.push(anim.playerId);
       }
     }
     
@@ -1157,6 +1167,30 @@ export class ShotAnimationSystem {
       tweenManager: getTweenManagerState()
     });
     
+    // ✅ TEMP FIX: Kill skeleton defensive tweens before animatePlayerCollapse() to prevent conflict
+    // This addresses the animation sync issue where defenders move before passes in HCO MISS => DREB
+    // TODO: Remove if this fix doesn't resolve the animation sync issue
+    if (this._skeletonDefensivePlayerIds && this._skeletonDefensivePlayerIds.length > 0 && this.scene.tweens) {
+      const beforeKillSkeleton = getTweenManagerState();
+      let killedCount = 0;
+      for (const defensivePlayerId of this._skeletonDefensivePlayerIds) {
+        const defensiveSprite = this.playerSprites[defensivePlayerId];
+        if (defensiveSprite) {
+          this.scene.tweens.killTweensOf(defensiveSprite);
+          killedCount++;
+        }
+      }
+      const afterKillSkeleton = getTweenManagerState();
+      console.log(`🔧 [TEMP FIX] Killed skeleton defensive tweens before animatePlayerCollapse()`, {
+        defensivePlayerIds: this._skeletonDefensivePlayerIds.length,
+        killedCount,
+        beforeKillSkeleton,
+        afterKillSkeleton
+      });
+      // Clear the list after cleanup
+      this._skeletonDefensivePlayerIds = [];
+    }
+    
     // Start non-rebounder animations first and store tween references
     const collapseTweens = await this.animatePlayerCollapse(rebounderSprite, { x: ballBounceX, y: ballBounceY }, turnData);
     console.log(`🔍 [EMBEDDED REBOUND] After animatePlayerCollapse()`, {
@@ -1228,6 +1262,24 @@ export class ShotAnimationSystem {
     // });
     
     if (turnData.rebound_type === 'DREB') {
+      // ✅ TEMP FIX: Ensure collapseTweens are fully killed before outlet pass starts
+      // This prevents collapse animations from interfering with outlet pass timing
+      // TODO: Remove if this fix doesn't resolve the animation sync issue
+      if (collapseTweens && collapseTweens.length > 0 && this.scene.tweens) {
+        const beforeKillCollapse = getTweenManagerState();
+        collapseTweens.forEach(tween => {
+          if (tween && this.scene.tweens) {
+            this.scene.tweens.killTweensOf(tween.targets);
+          }
+        });
+        const afterKillCollapse = getTweenManagerState();
+        console.log(`🔧 [TEMP FIX] Killed collapseTweens before handleDefensiveRebound() / outlet pass`, {
+          collapseTweensCount: collapseTweens.length,
+          beforeKillCollapse,
+          afterKillCollapse
+        });
+      }
+      
       // ✅ REVERTED: Back to embedded DREB handling (standalone step approach didn't fix animation sync issue)
       await this.handleDefensiveRebound(rebounderSprite, turnData);
     } else if (turnData.rebound_type === 'OREB') {
