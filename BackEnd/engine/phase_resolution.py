@@ -1860,27 +1860,23 @@ def resolve_half_court_offense_logic(game):
             event_type = "SHOT"
 
     if event_type != "SHOT":
-        # ✅ STOPER SYSTEM: Populate roles for stopper results
-        # When bypassing determine_event_type(), we need to set up roles manually
-        ball_handler = roles.get("ball_handler")
-        if not ball_handler:
-            # Fallback: use PG if ball_handler not set
-            ball_handler = off_lineup.get("PG", list(off_lineup.values())[0] if off_lineup else None)
-            roles["ball_handler"] = ball_handler
+        # ✅ STOPER SYSTEM: Populate roles for stopper results using SS&S helper functions
+        # Use same player determination logic as FCP/HCT for consistency
         
-        # Determine defender based on ball handler position
-        ball_handler_pos = get_player_position(off_lineup, ball_handler) if ball_handler else "PG"
+        # Determine ball handler from skeleton (from stopper step or last step)
+        ball_handler = get_ball_handler_from_skeleton(skeleton, off_lineup)
+        ball_handler_pos = getattr(ball_handler, 'position', None) or "PG"
+        roles["ball_handler"] = ball_handler
+        
+        # Determine defender based on ball handler position (same as FCP/HCT)
         defender = def_lineup.get(ball_handler_pos, def_lineup.get("PG", list(def_lineup.values())[0] if def_lineup else None))
         roles["defender"] = defender
         
-        # Set foul_player for foul results
+        # Set foul_player using SS&S helper function (same as FCP/HCT)
         if event_type in ["O_FOUL", "D_FOUL"]:
-            if event_type == "O_FOUL":
-                # Offensive foul: foul_player is the ball handler
-                roles["foul_player"] = ball_handler
-            else:
-                # Defensive foul: foul_player is the defender
-                roles["foul_player"] = defender
+            foul_team_type = "OFFENSE" if event_type == "O_FOUL" else "DEFENSE"
+            foul_player = select_foul_player(foul_team_type, ball_handler, off_lineup, def_lineup)
+            roles["foul_player"] = foul_player
             # Ensure shooter is set (needed by resolve_non_shooting_foul)
             if "shooter" not in roles or not roles["shooter"]:
                 roles["shooter"] = ball_handler
