@@ -1662,11 +1662,15 @@ def resolve_half_court_offense_logic(game):
     else:
         logging.warning(f"⚠️ [HCO RESOLVE] No skeleton or steps found")
     
+    # CRITICAL: Always create a deep copy to avoid mutating cached skeleton
+    # This prevents any modifications (from stopper system or elsewhere) from affecting future turns
+    if skeleton:
+        skeleton = copy.deepcopy(skeleton)
+        logging.warning(f"📋 [HCO RESOLVE] Created deep copy of skeleton ({len(skeleton.get('steps', []))} steps)")
+    
     # ✅ STOPER SYSTEM: Truncate skeleton and add stopper step if result is not HCO
-    # CRITICAL: Create a deep copy before modifying to avoid mutating cached skeleton
     if result != "HCO" and skeleton:
-        skeleton = copy.deepcopy(skeleton)  # Create deep copy to avoid mutating cache
-        logging.warning(f"🛑 [STOPPER] Non-HCO result detected: {result}, created deep copy of skeleton")
+        logging.warning(f"🛑 [STOPPER] Non-HCO result detected: {result}")
         if skeleton and "steps" in skeleton:
             steps = skeleton.get("steps", [])
             if len(steps) > 1:
