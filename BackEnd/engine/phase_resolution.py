@@ -1439,6 +1439,15 @@ def resolve_turnover_logic(roles, game, turnover_type="DEAD BALL"):
 
     bh_pos = get_player_position(off_lineup, ball_handler)
 
+    # ✅ SS&S FIX: Set next_play_type when offensive_state is FAST_BREAK
+    # This allows game_manager.py to flip possession before the Fast Break turn
+    # Matches the pattern used in FCP/HCT steals (lines 2482, 3330)
+    next_play_type = None
+    if game_state.get("offensive_state") == "FAST_BREAK":
+        next_play_type = "FAST_BREAK"
+    elif game_state.get("offensive_state") == "HCO":
+        next_play_type = "HCO"
+
     result = {
         "result_type": turnover_type,
         "ball_handler": ball_handler,
@@ -1450,6 +1459,11 @@ def resolve_turnover_logic(roles, game, turnover_type="DEAD BALL"):
         "victim_id": victim_id,
         "victim_name": victim_name,
     }
+    
+    # ✅ SS&S FIX: Add next_play_type to result (only if set)
+    if next_play_type:
+        result["next_play_type"] = next_play_type
+        result["next_turn"] = next_play_type  # ✅ SS&S: Explicit next turn
 
     if stealer_id:
         result["stealer_id"] = stealer_id
