@@ -1922,21 +1922,30 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
                                       previousTurn?.rebound_type === "DREB" &&
                                       previousTurn?.next_play_type !== "FAST_BREAK";
   
-  // 🔍 DEBUG: Log detection attempt
+  // 🔍 DEBUG: Log detection attempt (ALWAYS log, not just when condition is met)
   console.log('🔍 [HCO SETUP] Checking for previous MISS → DREB', {
     turnIndexParam: turnIndex,
     sceneCurrentTurn: scene.currentTurn,
     currentIndexUsed: currentIndex,
     currentTurnResultType: turnData.result_type,
+    currentTurnId: turnData.id,
     hasPreviousTurn: !!previousTurn,
+    previousTurnIndex: currentIndex - 1,
     previousTurnResultType: previousTurn?.result_type,
     previousTurnReboundType: previousTurn?.rebound_type,
     previousTurnNextPlayType: previousTurn?.next_play_type,
     previousTurnRebounderId: previousTurn?.rebounderId,
+    previousTurnId: previousTurn?.id,
     isPreviousTurnMissWithDreb,
     willCallRunDefensiveReboundSetup: isPreviousTurnMissWithDreb,
     totalTurns: scene.simData?.turns?.length || 0,
-    turnsArray: scene.simData?.turns?.map((t, idx) => ({ idx, result_type: t.result_type, rebound_type: t.rebound_type })) || []
+    turnsArray: scene.simData?.turns?.map((t, idx) => ({ 
+      idx, 
+      result_type: t.result_type, 
+      rebound_type: t.rebound_type,
+      next_play_type: t.next_play_type,
+      id: t.id?.substring(0, 8) || 'no-id'
+    })) || []
   });
   
   if (isPreviousTurnMissWithDreb) {
