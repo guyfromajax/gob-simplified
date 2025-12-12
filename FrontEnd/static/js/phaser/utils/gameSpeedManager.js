@@ -4,9 +4,9 @@
  */
 
 const SPEED_PRESETS = {
-  SLOW: 250,
-  NORMAL: 350,
-  FAST: 450
+  SLOW: 350,
+  NORMAL: 450,
+  FAST: 550
 };
 
 const STORAGE_KEY = 'gameSpeed';
