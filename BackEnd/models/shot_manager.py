@@ -341,10 +341,6 @@ class ShotManager:
         )
 
         made = shot_score >= shot_threshold
-        
-        # ✅ TEMP DEBUG: Hard code all HCO shots to miss
-        made = False
-        logging.warning("🔧 [TEMP DEBUG] Hard coded shot to MISS for debugging")
 
         # Stat tracking (attempts)
         shooter.record_stat("FGA")
@@ -373,10 +369,6 @@ class ShotManager:
             shooter_pos=shooter_pos,
             def_team_lineup=def_team.lineup
         )
-        
-        # ✅ TEMP DEBUG: Hard code no release player (force HCO, not Fast Break)
-        defense_release_list = []
-        logging.warning("🔧 [TEMP DEBUG] Hard coded defense_release_list to [] to force HCO")
         
         # Get names for debug logging
         release_pos = defense_release_list[0] if defense_release_list else None
@@ -864,10 +856,8 @@ class ShotManager:
                     # Fast Break is determined DURING the shot (by defense tempo), not after DREB
                     # If a defender released for fast break during shot → auto-trigger fast break
                     # If no defender released → regular HCO
-                    # ✅ TEMP DEBUG: Hard code next_play_type to HCO for DREB
-                    next_play_type = "HCO"
-                    logging.warning("🔧 [TEMP DEBUG] Hard coded next_play_type to HCO for DREB")
-                    if False:  # Changed from `if defense_release_list:` to prevent Fast Break
+                    next_play_type = "FAST_BREAK" if defense_release_list else "HCO"
+                    if defense_release_list:
                         # next_play_type = "FAST_BREAK"
                         # Log fast break determination with release player info
                         release_player_ids = [def_team.lineup[pos].player_id for pos in defense_release_list]
@@ -887,11 +877,6 @@ class ShotManager:
                         # Clear release player if not doing fast break
                         self.game_state["last_release_player"] = None
                         # logging.info(f"🏀 HCO determined during shot: no defense_release_list, shooter={get_name_safe(shooter)}")
-                    
-                    # ✅ TEMP DEBUG: Ensure release player is None and next_play_type is HCO
-                    self.game_state["last_release_player"] = None
-                    next_play_type = "HCO"
-                    logging.warning("🔧 [TEMP DEBUG] Hard coded release_player=None and next_play_type=HCO")
                     
                     self.game_state["offensive_state"] = next_play_type
                     result["next_play_type"] = next_play_type
