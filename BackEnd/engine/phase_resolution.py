@@ -264,6 +264,10 @@ def resolve_non_shooting_foul(roles, game):
 
     bh_pos = get_player_position(off_team.lineup, ball_handler)
     
+    # ✅ SS&S FIX: Set possession_flips based on foul_team (matches FCP/HCT logic)
+    # Offensive fouls always flip possession, defensive fouls don't (handled by bonus logic)
+    possession_flips = (foul_team == off_team)  # True for offensive fouls, False for defensive
+    
     result = {
         "result_type": "FOUL",
         "ball_handler": ball_handler,
@@ -271,7 +275,7 @@ def resolve_non_shooting_foul(roles, game):
         "passer": passer,
         "defender": defender,
         "text": text,
-        "possession_flips": False,
+        "possession_flips": possession_flips,
         "time_elapsed": time_elapsed,
         "offense_team_id": game.offense_team.team_id,  # ✅ SS&S: Add offense_team_id to all results
         "current_turn": "HCO",  # ✅ SS&S: Standalone fouls occur in HCO context
@@ -1852,12 +1856,15 @@ def resolve_half_court_offense_logic(game):
             # Fallback: determine from skeleton analysis
             event_type = game.turn_manager.determine_event_type(roles)
     else:
-        # Normal flow: determine event type from skeleton
-        event_type = game.turn_manager.determine_event_type(roles)
-        # If determine_event_type returns something other than SHOT, use that
-        # Otherwise default to SHOT for normal HCO flow
-        if event_type == "SHOT" or event_type is None:
-            event_type = "SHOT"
+        # Normal flow: result == "SHOT", proceed to shot resolution
+        # ✅ SS&S FIX: Commented out determine_event_type() call to avoid conflicts
+        # When result == "SHOT" from generate_logic(), we should proceed directly to shot resolution
+        # determine_event_type() can return non-SHOT values (e.g., "D_FOUL") which conflicts with stopper system
+        # TODO: Revisit determine_event_type() usage if needed for future enhancements
+        # event_type = game.turn_manager.determine_event_type(roles)
+        # if event_type == "SHOT" or event_type is None:
+        #     event_type = "SHOT"
+        event_type = "SHOT"
 
     if event_type != "SHOT":
         # ✅ STOPER SYSTEM: Populate roles for stopper results using SS&S helper functions
