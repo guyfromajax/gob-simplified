@@ -70,25 +70,28 @@ export function detectPassAtStep(animations, stepIndex) {
           timestamp: step.timestamp
         };
         
-        console.log(`✅ [PASS DETECT] Step ${stepIndex}: Found pass`, {
-          passer: anim.playerId?.substring(0, 8),
-          receiver: receiverAnim.playerId?.substring(0, 8),
-          timestamp: step.timestamp,
-          debugInfo
-        });
+        // ✅ COMMENTED OUT: Pass detection logs (cluttering console)
+        // console.log(`✅ [PASS DETECT] Step ${stepIndex}: Found pass`, {
+        //   passer: anim.playerId?.substring(0, 8),
+        //   receiver: receiverAnim.playerId?.substring(0, 8),
+        //   timestamp: step.timestamp,
+        //   debugInfo
+        // });
         
         return result;
       } else {
-        console.warn(`⚠️ [PASS DETECT] Step ${stepIndex}: Passer found but NO receiver`, {
-          passer: anim.playerId?.substring(0, 8),
-          debugInfo
-        });
+        // ✅ COMMENTED OUT: Pass detection warning (cluttering console)
+        // console.warn(`⚠️ [PASS DETECT] Step ${stepIndex}: Passer found but NO receiver`, {
+        //   passer: anim.playerId?.substring(0, 8),
+        //   debugInfo
+        // });
       }
     }
   }
   
   // No pass found
-  console.log(`❌ [PASS DETECT] Step ${stepIndex}: No pass found`, debugInfo);
+  // ✅ COMMENTED OUT: Pass detection logs (cluttering console)
+  // console.log(`❌ [PASS DETECT] Step ${stepIndex}: No pass found`, debugInfo);
   return null;
 }
 
