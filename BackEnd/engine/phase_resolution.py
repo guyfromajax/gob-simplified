@@ -1,5 +1,6 @@
 import random
 import logging
+import copy
 from typing import TYPE_CHECKING
 from fastapi import HTTPException
 from BackEnd.utils.shared import (
@@ -1662,8 +1663,10 @@ def resolve_half_court_offense_logic(game):
         logging.warning(f"⚠️ [HCO RESOLVE] No skeleton or steps found")
     
     # ✅ STOPER SYSTEM: Truncate skeleton and add stopper step if result is not HCO
-    if result != "HCO":
-        logging.warning(f"🛑 [STOPPER] Non-HCO result detected: {result}")
+    # CRITICAL: Create a deep copy before modifying to avoid mutating cached skeleton
+    if result != "HCO" and skeleton:
+        skeleton = copy.deepcopy(skeleton)  # Create deep copy to avoid mutating cache
+        logging.warning(f"🛑 [STOPPER] Non-HCO result detected: {result}, created deep copy of skeleton")
         if skeleton and "steps" in skeleton:
             steps = skeleton.get("steps", [])
             if len(steps) > 1:
