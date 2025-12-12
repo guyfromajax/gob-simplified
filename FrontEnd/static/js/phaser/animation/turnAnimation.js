@@ -611,11 +611,49 @@ async function runDefensiveReboundSetup({ scene, ballSprite, playerSprites, rebo
   
   // For HCO, always find the PG
   // CRITICAL: This must find the PG for the outlet pass to execute
+  // First try scene.playerInfo (preferred, has position data)
   for (const [id, info] of Object.entries(scene.playerInfo || {})) {
     if (info.pos === "PG" && info.team === rebounderSprite.team) {
       outletReceiverId = id;
       outletReceiverSprite = playerSprites[id];
       break;
+    }
+  }
+  
+  // ✅ FALLBACK: If scene.playerInfo lookup failed, try finding PG from playerSprites
+  // This can happen when runDefensiveReboundSetup() is called before scene.playerInfo is fully populated
+  if (!outletReceiverId) {
+    console.warn('🏀 [DREB OUTLET] PG not found in scene.playerInfo, trying fallback lookup from playerSprites', {
+      rebounderTeam: rebounderSprite.team,
+      playerInfoCount: Object.keys(scene.playerInfo || {}).length,
+      playerSpritesCount: Object.keys(playerSprites).length
+    });
+    
+    // Try to find PG by checking sprite properties or by position
+    // Look for a sprite on the rebounder's team that might be the PG
+    // We'll use the first player on the rebounder's team as a fallback
+    for (const [id, sprite] of Object.entries(playerSprites)) {
+      if (sprite.team === rebounderSprite.team && id !== rebounderId) {
+        // Check if sprite has position info
+        if (sprite.pos === "PG" || sprite.position === "PG") {
+          outletReceiverId = id;
+          outletReceiverSprite = sprite;
+          console.log('🏀 [DREB OUTLET] Found PG via fallback lookup', { outletReceiverId: id });
+          break;
+        }
+      }
+    }
+    
+    // If still not found, use the first non-rebounder player on the rebounder's team as a last resort
+    if (!outletReceiverId) {
+      for (const [id, sprite] of Object.entries(playerSprites)) {
+        if (sprite.team === rebounderSprite.team && id !== rebounderId) {
+          outletReceiverId = id;
+          outletReceiverSprite = sprite;
+          console.warn('🏀 [DREB OUTLET] Using fallback: first non-rebounder player as outlet receiver', { outletReceiverId: id });
+          break;
+        }
+      }
     }
   }
   
