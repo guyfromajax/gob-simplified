@@ -1466,6 +1466,11 @@ def generate_logic(off_call, def_call, off_team, def_team, off_lineup, def_lineu
     import random
     from BackEnd.constants import ACTIONS
     
+    result = random.choices(
+        ["HCO", "O_FOUL", "D_FOUL", "DEAD_BALL_TURNOVER", "STEAL"],
+        weights=[6, 1, 1, 1, 1],
+        k=1
+    )[0]
     # Analyze skeleton to count screen attempts
     screen_attempts_by_pos = {}
     if game:
@@ -1510,7 +1515,7 @@ def generate_logic(off_call, def_call, off_team, def_team, off_lineup, def_lineu
     # This allows the system to work while full logic is implemented
     lean_score = random.uniform(-1, 1)
     
-    return lean_score
+    return result, lean_score
 
 
 def _store_lean_score(lean_score, game, offense_team, defense_team):
@@ -1634,8 +1639,8 @@ def resolve_half_court_offense_logic(game):
     off_call = game_state["current_playcall"]
     def_call = game_state["defense_playcall"]
 
-    # Generate logic to determine lean score
-    lean_score = generate_logic(off_call, def_call, off_team, def_team, off_lineup, def_lineup, game=game)
+    # Generate logic to determine result and lean score
+    result, lean_score = generate_logic(off_call, def_call, off_team, def_team, off_lineup, def_lineup, game=game)
     
     # Store lean_score in scouting data
     _store_lean_score(lean_score, game, off_team, def_team)
@@ -1643,6 +1648,90 @@ def resolve_half_court_offense_logic(game):
     # Get skeleton from MongoDB BEFORE assigning roles, so assign_roles can use the correct skeleton
     # Pass lean_score to select the appropriate skeleton variant
     skeleton = get_hco_skeleton(None, game, lean_score=lean_score)
+    
+    # ✅ STOPER SYSTEM: Truncate skeleton and add stopper step if result is not HCO
+    if result != "HCO" and skeleton and "steps" in skeleton:
+        steps = skeleton.get("steps", [])
+        if len(steps) > 1:
+            # Determine which step to stop at based on result type
+            if result in ["O_FOUL", "D_FOUL"]:
+                # Random step before final (exclude step 0 and final step)
+                # If skeleton has 7 steps (0-6), choose from steps 1-5
+                stop_step_index = random.randint(1, len(steps) - 2) if len(steps) > 2 else 1
+            elif result in ["DEAD_BALL_TURNOVER", "STEAL"]:
+                # Strategic step - for now, use middle step or based on ball handler dynamics
+                # TODO: Enhance this with player attribute analysis
+                stop_step_index = len(steps) // 2  # Middle step as placeholder
+            else:
+                # Default: stop at step before final
+                stop_step_index = len(steps) - 2
+            
+            # Truncate skeleton to stop_step_index
+            truncated_steps = steps[:stop_step_index + 1]  # Include the stop step
+            
+            # Get the ball handler at the stop step for the stopper action
+            stop_step = truncated_steps[-1]
+            ball_handler_pos = None
+            ball_handler_location = "key"  # Default location
+            
+            # Find ball handler in the stop step
+            pos_actions = stop_step.get("pos_actions", {})
+            for pos, action_info in pos_actions.items():
+                action = action_info.get("action", "").lower()
+                if action in ["handle_ball", "receive", "pass"]:
+                    ball_handler_pos = pos
+                    ball_handler_location = action_info.get("location", "key")
+                    break
+            
+            # If no ball handler found in stop step, check previous step
+            if not ball_handler_pos and len(truncated_steps) > 1:
+                prev_step = truncated_steps[-2]
+                prev_pos_actions = prev_step.get("pos_actions", {})
+                for pos, action_info in prev_pos_actions.items():
+                    action = action_info.get("action", "").lower()
+                    if action in ["handle_ball", "receive"]:
+                        ball_handler_pos = pos
+                        ball_handler_location = action_info.get("location", "key")
+                        break
+            
+            # Create stopper step as final step
+            stopper_timestamp = stop_step.get("timestamp", 0) + 300  # 300ms after stop step
+            
+            # Map result to stopper action
+            stopper_action_map = {
+                "O_FOUL": "o_foul",
+                "D_FOUL": "d_foul",
+                "DEAD_BALL_TURNOVER": "dead_ball_turnover",
+                "STEAL": "steal"
+            }
+            stopper_action = stopper_action_map.get(result, "turnover")
+            
+            # Create stopper step
+            stopper_step = {
+                "timestamp": stopper_timestamp,
+                "pos_actions": {},
+                "events": [{"type": stopper_action}]
+            }
+            
+            # Add ball handler position (if found) - ball remains with them until stopper
+            if ball_handler_pos:
+                stopper_step["pos_actions"][ball_handler_pos] = {
+                    "location": ball_handler_location,
+                    "action": "handle_ball"  # Ball still with them
+                }
+            
+            # For steals, add defensive player who steals
+            if result == "STEAL":
+                # TODO: Determine which defensive player makes the steal based on matchup
+                # For now, use a placeholder - this should be determined by player attributes
+                # and defensive positioning
+                pass
+            
+            # Replace skeleton steps with truncated steps + stopper step
+            skeleton["steps"] = truncated_steps + [stopper_step]
+            
+            # Log truncation for debugging
+            logging.debug(f"🛑 [STOPPER] Truncated skeleton to step {stop_step_index}, added {result} stopper at step {len(skeleton['steps']) - 1}")
     
     # Get the successful variant to determine intended shooter
     successful_skeleton = get_hco_skeleton(None, game, lean_score=1.0)  # Force successful variant
