@@ -207,8 +207,10 @@ class GameManager:
 
         # ✅ FIX 3: Backend flip for DREB → HCO (Pattern B)
         # Handle possession flips for DREB transitions that go directly to HCO (not through inbound)
-        # This includes: MISS with DREB → HCO, STEAL → HCO
-        if result.get("next_play_type") == "HCO" and result.get("possession_flips"):
+        # This includes: MISS with DREB → HCO, STEAL → HCO (direct, not via Fast Break)
+        # ✅ SS&S FIX: Only flip if possession_flips is True (prevents double flip for Fast Break → HCO)
+        # Fast Break defensive stop sets possession_flips: False, so it won't trigger this flip
+        if result.get("next_play_type") == "HCO" and result.get("possession_flips") is True:
             old_offense = self.offense_team.name
             self.switch_possession()
             result["possession_flips"] = False
