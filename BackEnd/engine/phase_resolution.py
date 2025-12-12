@@ -1800,7 +1800,6 @@ def resolve_half_court_offense_logic(game):
             # Clear last_stealer after using it (so it doesn't persist to subsequent turns)
             game_state["last_stealer"] = None
             
-            import logging
             logging.debug(f"🏀 [STEAL HCO SETUP] Stealer {get_name_safe(ball_handler)} moves away from basket:")
             logging.debug(f"  Start: x={ball_handler_start_x}, y={ball_handler_start_y}")
             logging.debug(f"  Movement: x={hco_setup_move_x} (direction={direction}), y={hco_setup_move_y}")
