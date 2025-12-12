@@ -56,6 +56,26 @@ def get_in_play_defenders(ball_handler, defense_lineup, target_is_away):
     return in_play
 
 
+def apply_energy_decay(off_lineup, def_lineup):
+    """
+    Apply energy decay to all players in both lineups.
+    
+    This is extracted from determine_event_type() to ensure energy decay
+    happens for all HCO turns, regardless of whether determine_event_type()
+    is called (e.g., when stopper system bypasses it for SHOT results).
+    
+    Args:
+        off_lineup: Dictionary of offensive players by position
+        def_lineup: Dictionary of defensive players by position
+    """
+    for player in off_lineup.values():
+        if player and hasattr(player, "decay_energy") and hasattr(player, "get_fatigue_decay_amount"):
+            player.decay_energy(player.get_fatigue_decay_amount())
+    for player in def_lineup.values():
+        if player and hasattr(player, "decay_energy") and hasattr(player, "get_fatigue_decay_amount"):
+            player.decay_energy(player.get_fatigue_decay_amount())
+
+
 def check_and_handle_foul_out(foul_player, game_state, foul_team):
     """
     Check if player fouled out (5+ fouls) and handle accordingly.
@@ -1874,6 +1894,12 @@ def resolve_half_court_offense_logic(game):
     # print("[DEBUG] event_step:", roles.get("event_step"))
     # print("[DEBUG] steps:", roles.get("steps"))
     # print("[DEBUG] shooter:", roles.get("shooter"))
+
+    # ✅ SS&S FIX: Apply energy decay for ALL HCO turns (both SHOT and non-SHOT)
+    # Energy decay was previously inside determine_event_type(), but we bypass that
+    # for SHOT results in the stopper system. Extract energy decay to ensure it
+    # always runs regardless of event type.
+    apply_energy_decay(off_lineup, def_lineup)
 
     # 2. Event Determination
     # Use result from generate_logic() for stopper results, otherwise determine from skeleton

@@ -589,6 +589,38 @@ Screeners automatically animate to offset positions to prevent visual overlap wh
 - `BackEnd/constants/__init__.py` - `OFFSET_SPOTS` definition (lines 191-231)
 - `FrontEnd/static/play-builder.html` - Play builder offset visualization
 
+### Energy Decay System ✅ **SS&S** (January 2025)
+
+**Energy Decay Application:**
+- Energy decay is applied to all players (both offensive and defensive) for **every HCO turn**
+- Decay happens **before** event determination, ensuring it runs regardless of turn outcome (SHOT, foul, turnover, steal)
+- Uses `apply_energy_decay()` function in `phase_resolution.py` (extracted from `determine_event_type()`)
+
+**Decay Logic:**
+- Each player's energy (NG) decays based on their ND (Nerve/Defense) attribute
+- Higher ND = less decay (better stamina)
+- Decay amount determined by `player.get_fatigue_decay_amount()`:
+  - ND ≥ 89: 0-0.01 (minimal decay)
+  - ND ≥ 79: 0-0.01 (low decay)
+  - ND ≥ 69: 0-0.02 (moderate decay)
+  - ND < 69: 0-0.03 (higher decay)
+- Energy is clamped to minimum 0.1 (10%) and maximum 1.0 (100%)
+
+**Why Extracted:**
+- Previously, energy decay was inside `determine_event_type()` in `turn_manager.py`
+- With the stopper system, `determine_event_type()` is bypassed for SHOT results
+- Extracting energy decay ensures it always runs, maintaining SS&S consistency
+
+**Energy Display:**
+- Frontend displays energy via `turn.player_energy` (set in `turn_manager.py` line 708-717)
+- Energy levels included in `/api/game/{gameId}` response for lineup screen
+- Color-coded display: Green (>89%), Yellow (80-89%), Orange (70-79%), Red (<70%)
+
+**Key Files:**
+- `BackEnd/engine/phase_resolution.py` - `apply_energy_decay()` function (lines 58-75)
+- `BackEnd/models/player.py` - `decay_energy()` and `get_fatigue_decay_amount()` methods
+- `BackEnd/models/turn_manager.py` - `player_energy` population (lines 708-717)
+
 ### Stat Tracking
 
 **Player-Level Stats:**
