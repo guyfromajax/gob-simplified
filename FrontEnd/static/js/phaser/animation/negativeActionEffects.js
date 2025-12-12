@@ -2,8 +2,8 @@
  * Negative Action Effects - Visual feedback for fouls and turnovers
  * 
  * Provides tiered visual feedback:
- * - FOUL: Red tint (0.3) + pulse + "F" icon (1.0s)
- * - TURNOVER: Red tint (0.5) + shake + "TO" icon (1.0s)
+ * - FOUL: Red tint + screen flash + "F" icon
+ * - TURNOVER: Red tint + screen flash + "TO" icon
  */
 
 export function triggerNegativeAction(scene, playerId, actionType = 'foul', skipScreenFlash = false) {
@@ -20,16 +20,14 @@ export function triggerNegativeAction(scene, playerId, actionType = 'foul', skip
     duration: 3000,      // 3.0s
     iconText: 'F',
     iconDuration: 3000,  // 3.0s
-    iconSize: '48px',    // Much larger text
-    animation: 'pulse'   // Pulse effect
+    iconSize: '48px'     // Much larger text
   } : {
     tint: 0xff0000,      // BRIGHT RED tint (same as foul)
     tintAlpha: 0.7,      // Even more visible for turnovers
     duration: 3000,      // 3.0s
     iconText: 'TO',
     iconDuration: 3000,  // 3.0s
-    iconSize: '48px',    // Much larger text
-    animation: 'shake'   // Shake effect
+    iconSize: '48px'     // Much larger text
   };
   
   // Helper function to apply tint (handles both single sprites and containers)
