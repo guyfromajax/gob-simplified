@@ -345,50 +345,71 @@ def _record_fast_break_stats(fb_roles, turn_result, game):
         result_type == "FOUL" and game.game_state.get("foul_team") == "DEFENSE"
     )
     
-    # Track stats for release player (outlet receiver) - OFFENSIVE stats
+    # Track stats for offensive player - OFFENSIVE stats
+    # ✅ SS&S FIX: For DREB-initiated Fast Breaks, use outlet_receiver
+    # For STEAL-initiated Fast Breaks, use ball_handler (stealer)
     outlet_receiver_id = fb_roles.get("outlet_receiver")
+    ball_handler = fb_roles.get("ball_handler")
+    
+    offensive_player = None
     if outlet_receiver_id:
-        release_player = None
+        # DREB-initiated: Use outlet receiver
         for team in (game.home_team, game.away_team):
             for player in team.get_all_players():
                 if getattr(player, "player_id", None) == outlet_receiver_id:
-                    release_player = player
+                    offensive_player = player
                     break
-            if release_player:
+            if offensive_player:
                 break
+    elif ball_handler:
+        # STEAL-initiated: Use ball handler (stealer)
+        offensive_player = ball_handler
+    
+    if offensive_player:
+        # Always increment FB_A (Fast Break Attempt)
+        offensive_player.record_stat("FB_A", 1)
         
-        if release_player:
-            # Always increment FB_A (Fast Break Attempt)
-            release_player.record_stat("FB_A", 1)
-            
-            # Increment FB_S or FB_F based on result
-            if is_fb_s_offense:
-                release_player.record_stat("FB_S", 1)
-            elif is_fb_f_offense:
-                release_player.record_stat("FB_F", 1)
-            # FB_N is calculated: FB_A - (FB_S + FB_F)
+        # Increment FB_S or FB_F based on result
+        if is_fb_s_offense:
+            offensive_player.record_stat("FB_S", 1)
+        elif is_fb_f_offense:
+            offensive_player.record_stat("FB_F", 1)
+        # FB_N is calculated: FB_A - (FB_S + FB_F)
     
     # Track stats for get-back players - DEFENSIVE stats
+    # ✅ SS&S FIX: For DREB-initiated Fast Breaks, use getback_player_ids
+    # For STEAL-initiated Fast Breaks, use fb_roles["defense"] (defensive players)
     getback_player_ids = fb_roles.get("getback_player_ids", [])
-    for getback_id in getback_player_ids:
-        getback_player = None
-        for team in (game.home_team, game.away_team):
-            for player in team.get_all_players():
-                if getattr(player, "player_id", None) == getback_id:
-                    getback_player = player
+    defensive_players = []
+    
+    if getback_player_ids:
+        # DREB-initiated: Use get-back players
+        for getback_id in getback_player_ids:
+            getback_player = None
+            for team in (game.home_team, game.away_team):
+                for player in team.get_all_players():
+                    if getattr(player, "player_id", None) == getback_id:
+                        getback_player = player
+                        break
+                if getback_player:
                     break
             if getback_player:
-                break
-        
-        if getback_player:
+                defensive_players.append(getback_player)
+    else:
+        # STEAL-initiated: Use defensive players from fb_roles["defense"]
+        defensive_players = fb_roles.get("defense", [])
+    
+    # Record defensive stats for all defensive players
+    for defensive_player in defensive_players:
+        if defensive_player:
             # Always increment FB_A_D (Fast Break Attempt Defense)
-            getback_player.record_stat("FB_A_D", 1)
+            defensive_player.record_stat("FB_A_D", 1)
             
             # Increment FB_S_D or FB_F_D based on result
             if is_fb_s_defense:
-                getback_player.record_stat("FB_S_D", 1)
+                defensive_player.record_stat("FB_S_D", 1)
             elif is_fb_f_defense:
-                getback_player.record_stat("FB_F_D", 1)
+                defensive_player.record_stat("FB_F_D", 1)
             # FB_S_N removed (no instances)
 
 def _record_outlet_pass_stats(outlet_passer_id, outlet_score, is_successful, game):
