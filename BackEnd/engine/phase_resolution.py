@@ -2105,29 +2105,19 @@ def resolve_half_court_offense_logic(game):
                 logging.warning(f"  PG final position: x={pg_final_x}, y={pg_final_y}")
             
             # Now handle all other players from both teams (excluding ball handler and offensive PG)
-            # Combine offensive and defensive lineups
-            all_players = {}
-            all_players.update(off_lineup)
-            all_players.update(def_lineup)
-            
             # Get offensive PG ID to exclude it
             offensive_pg_id = None
             if "PG" in off_lineup:
                 offensive_pg_id = getattr(off_lineup["PG"], "player_id", None)
             
-            for pos, player in all_players.items():
-                player_id = getattr(player, "player_id", None)
-                if player_id == ball_handler_id:
-                    continue  # Skip ball handler
-                if player_id == offensive_pg_id:
-                    continue  # Skip offensive PG (handled separately above)
-                
+            # Helper function to calculate and add player movement
+            def add_player_movement(player, player_id):
                 # Get player's current position
                 player_coords = getattr(player, "coords", {})
                 player_start_x = player_coords.get("x", 50)
                 player_start_y = player_coords.get("y", 25)
                 
-                # Calculate movement toward new offense basket (opposite direction of ball handler)
+                # Calculate movement toward new offense basket
                 other_move_x = random.randint(
                     STEAL_HCO_SETUP_OTHER_PLAYERS_MOVE_X_MIN,
                     STEAL_HCO_SETUP_OTHER_PLAYERS_MOVE_X_MAX
@@ -2156,6 +2146,21 @@ def resolve_half_court_offense_logic(game):
                     "move_x": other_move_x,
                     "move_y": other_move_y
                 })
+            
+            # Iterate through offensive players (excluding ball handler and PG)
+            for pos, player in off_lineup.items():
+                player_id = getattr(player, "player_id", None)
+                if player_id == ball_handler_id:
+                    continue  # Skip ball handler
+                if player_id == offensive_pg_id:
+                    continue  # Skip offensive PG (handled separately above)
+                
+                add_player_movement(player, player_id)
+            
+            # Iterate through defensive players (all defensive players move, none can be ball handler or offensive PG)
+            for pos, player in def_lineup.items():
+                player_id = getattr(player, "player_id", None)
+                add_player_movement(player, player_id)
             
             # Add PG movement to the list if it exists
             if pg_movement:
