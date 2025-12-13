@@ -2252,28 +2252,64 @@ def resolve_half_court_offense_logic(game):
             # Use result to determine turnover type (STEAL vs DEAD BALL)
             turnover_type = "STEAL" if result == "STEAL" else "DEAD BALL"
             turn_result = resolve_turnover_logic(roles, game, turnover_type=turnover_type)
-            # Add skeleton, animations, and roles to result
+            # Add skeleton and animations to result
             turn_result["skeleton"] = skeleton or {}
             turn_result["animations"] = animations
-            turn_result["roles"] = roles  # ✅ FIX: Include roles so frontend can access is_steal_hco_setup
+            # ✅ FIX: Add serializable roles data (only include fields needed for frontend, not Player objects)
+            serializable_roles = {}
+            if roles.get("is_steal_hco_setup"):
+                serializable_roles["is_steal_hco_setup"] = True
+                serializable_roles["ball_handler_hco_setup_x"] = roles.get("ball_handler_hco_setup_x")
+                serializable_roles["ball_handler_hco_setup_y"] = roles.get("ball_handler_hco_setup_y")
+                serializable_roles["ball_handler_hco_setup_move_x"] = roles.get("ball_handler_hco_setup_move_x")
+                serializable_roles["ball_handler_hco_setup_move_y"] = roles.get("ball_handler_hco_setup_move_y")
+                serializable_roles["ball_handler_id"] = roles.get("ball_handler_id")
+                serializable_roles["other_players_hco_setup_movements"] = roles.get("other_players_hco_setup_movements", [])
+                serializable_roles["hco_setup_x_direction"] = roles.get("hco_setup_x_direction")
+            if serializable_roles:
+                turn_result["roles"] = serializable_roles
             return turn_result
 
         elif event_type == "O_FOUL":
             game_state["foul_team"] = "OFFENSE"
             foul_result = resolve_non_shooting_foul(roles, game)
-            # Add skeleton, animations, and roles to result
+            # Add skeleton and animations to result
             foul_result["skeleton"] = skeleton or {}
             foul_result["animations"] = animations
-            foul_result["roles"] = roles  # ✅ FIX: Include roles so frontend can access is_steal_hco_setup
+            # ✅ FIX: Add serializable roles data (only include fields needed for frontend, not Player objects)
+            serializable_roles = {}
+            if roles.get("is_steal_hco_setup"):
+                serializable_roles["is_steal_hco_setup"] = True
+                serializable_roles["ball_handler_hco_setup_x"] = roles.get("ball_handler_hco_setup_x")
+                serializable_roles["ball_handler_hco_setup_y"] = roles.get("ball_handler_hco_setup_y")
+                serializable_roles["ball_handler_hco_setup_move_x"] = roles.get("ball_handler_hco_setup_move_x")
+                serializable_roles["ball_handler_hco_setup_move_y"] = roles.get("ball_handler_hco_setup_move_y")
+                serializable_roles["ball_handler_id"] = roles.get("ball_handler_id")
+                serializable_roles["other_players_hco_setup_movements"] = roles.get("other_players_hco_setup_movements", [])
+                serializable_roles["hco_setup_x_direction"] = roles.get("hco_setup_x_direction")
+            if serializable_roles:
+                foul_result["roles"] = serializable_roles
             return foul_result
 
         elif event_type == "D_FOUL":
             game_state["foul_team"] = "DEFENSE"
             foul_result = resolve_non_shooting_foul(roles, game)
-            # Add skeleton, animations, and roles to result
+            # Add skeleton and animations to result
             foul_result["skeleton"] = skeleton or {}
             foul_result["animations"] = animations
-            foul_result["roles"] = roles  # ✅ FIX: Include roles so frontend can access is_steal_hco_setup
+            # ✅ FIX: Add serializable roles data (only include fields needed for frontend, not Player objects)
+            serializable_roles = {}
+            if roles.get("is_steal_hco_setup"):
+                serializable_roles["is_steal_hco_setup"] = True
+                serializable_roles["ball_handler_hco_setup_x"] = roles.get("ball_handler_hco_setup_x")
+                serializable_roles["ball_handler_hco_setup_y"] = roles.get("ball_handler_hco_setup_y")
+                serializable_roles["ball_handler_hco_setup_move_x"] = roles.get("ball_handler_hco_setup_move_x")
+                serializable_roles["ball_handler_hco_setup_move_y"] = roles.get("ball_handler_hco_setup_move_y")
+                serializable_roles["ball_handler_id"] = roles.get("ball_handler_id")
+                serializable_roles["other_players_hco_setup_movements"] = roles.get("other_players_hco_setup_movements", [])
+                serializable_roles["hco_setup_x_direction"] = roles.get("hco_setup_x_direction")
+            if serializable_roles:
+                foul_result["roles"] = serializable_roles
             return foul_result
 
     # 3. Shot Result
