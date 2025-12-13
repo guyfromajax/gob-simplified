@@ -1582,6 +1582,10 @@ def generate_logic(off_call, def_call, off_team, def_team, off_lineup, def_lineu
         weights=[6, 1, 1, 1, 1],
         k=1
     )[0]
+    
+    # ✅ TEMPORARY TEST CODE: Force all HCO turns to result in STEAL
+    result = "STEAL"
+    logging.warning(f"🧪 [TEST MODE] Forcing HCO result to STEAL")
     # Analyze skeleton to count screen attempts
     screen_attempts_by_pos = {}
     if game:
@@ -1889,6 +1893,10 @@ def resolve_half_court_offense_logic(game):
     # ============================================================================
     # STEAL HCO SETUP: Check if this HCO turn comes from a steal
     # ============================================================================
+    # ✅ FIX: Only check for Steal HCO Setup if this is NOT a steal turn itself
+    # For HCO steals, this function is called during the steal turn, but last_stealer
+    # isn't set until resolve_turnover_logic() runs later. We should only run this
+    # check in the NEXT HCO turn (after last_stealer has been set).
     last_stealer = game_state.get("last_stealer")
     is_steal_hco_setup = False
     hco_setup_move_x = 0
@@ -1898,11 +1906,16 @@ def resolve_half_court_offense_logic(game):
     
     # ✅ DEBUG: Log Steal HCO Setup check
     logging.warning(f"🏀 [STEAL HCO SETUP CHECK] Entry:")
+    logging.warning(f"  result from generate_logic: {result}")
     logging.warning(f"  last_stealer: {get_name_safe(last_stealer) if last_stealer else 'None'}")
     logging.warning(f"  offensive_state: {game_state.get('offensive_state')}")
     logging.warning(f"  current_turn: HCO")
     
-    if last_stealer:
+    # ✅ FIX: Skip Steal HCO Setup if this is a steal turn itself (result == "STEAL")
+    # The setup should only run in the NEXT HCO turn, after last_stealer has been set
+    if result == "STEAL":
+        logging.warning(f"  ⚠️ This is a steal turn (result='STEAL') - Steal HCO Setup will run in NEXT turn")
+    elif last_stealer:
         # Check if the previous turn was a steal that transitioned to HCO
         # This happens when last_stealer is set and offensive_state is HCO (not FAST_BREAK)
         offensive_state = game_state.get("offensive_state")
@@ -2367,6 +2380,10 @@ def resolve_full_court_press_logic(game: "GameManager"):
     else:
         result_type = random.choices(["O_FOUL", "DEAD_BALL_TURNOVER", "STEAL"], weights=[0.2, 0.5, 0.3])[0]
     
+    # ✅ TEMPORARY TEST CODE: Force all FCP turns to result in STEAL
+    result_type = "STEAL"
+    logging.warning(f"🧪 [TEST MODE] Forcing FCP result to STEAL")
+    
     result_text_dict = {
         "HCO": "they break the press & establish their half court offense",
         "D_FOUL": "defensive foul!",
@@ -2555,6 +2572,10 @@ def resolve_full_court_press_logic(game: "GameManager"):
             defender.record_stat("STL")
         # Track FCP success: steal = defensive success
         def_scouting["defense"]["FCP"]["success"] += 1
+        
+        # ✅ FIX: Set last_stealer for FCP steals (so Steal HCO Setup runs in next turn)
+        game_state["last_stealer"] = defender
+        game_state["last_rebound"] = ""
     
     if skeleton and "steps" in skeleton:
         logging.warning(f"🔍 [FCP] Converting skeleton to animations (result_type={result_type})...")
@@ -3223,6 +3244,10 @@ def resolve_half_court_trap_logic(game: "GameManager"):
     else:
         result_type = random.choices(["O_FOUL", "DEAD_BALL_TURNOVER", "STEAL"], weights=[0.2, 0.5, 0.3])[0]
     
+    # ✅ TEMPORARY TEST CODE: Force all HCT turns to result in STEAL
+    result_type = "STEAL"
+    logging.warning(f"🧪 [TEST MODE] Forcing HCT result to STEAL")
+    
     result_text_dict = {
         "HCO": "they break the trap & establish their half court offense",
         "D_FOUL": "defensive foul!",
@@ -3402,6 +3427,10 @@ def resolve_half_court_trap_logic(game: "GameManager"):
             defender.record_stat("STL")
         # Track HCT success: steal = defensive success
         def_scouting["defense"]["HCT"]["success"] += 1
+        
+        # ✅ FIX: Set last_stealer for HCT steals (so Steal HCO Setup runs in next turn)
+        game_state["last_stealer"] = defender
+        game_state["last_rebound"] = ""
     
     if skeleton and "steps" in skeleton:
         logging.warning(f"🔍 [HCT] Converting skeleton to animations (result_type={result_type})...")
