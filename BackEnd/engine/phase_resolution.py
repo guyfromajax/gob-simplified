@@ -1967,6 +1967,139 @@ def resolve_half_court_offense_logic(game):
     
     roles = game.turn_manager.assign_roles(off_call, def_call, skeleton=skeleton)
     
+    # ✅ FIX: For non-shot outcomes (steals, turnovers, fouls), override defender
+    # to be based on ball handler's position, not shooter's position
+    # assign_roles() assigns defender based on shooter, but for steals we need
+    # whoever is guarding the ball handler at the time of the steal
+    if result in ["STEAL", "DEAD_BALL_TURNOVER", "O_FOUL", "D_FOUL"]:
+        ball_handler = roles.get("ball_handler")
+        if ball_handler:
+            ball_handler_pos = get_player_position(off_lineup, ball_handler)
+            
+            from BackEnd.utils.defense_utils import is_zone_defense
+            if is_zone_defense(def_call):
+                # Zone defense: use actual zone assignment logic to find which defender(s) are guarding the ball handler
+                from BackEnd.utils.shared_defense import (
+                    _get_23_zone_boundaries, _get_32_zone_boundaries, _get_131_zone_boundaries,
+                    assign_all_zone_defenders
+                )
+                from BackEnd.constants import HCO_STRING_SPOTS
+                from BackEnd.utils.shared import get_away_player_coords
+                
+                # Get ball handler's location from the skeleton step where steal occurs
+                ball_handler_spot = "key"  # Default fallback
+                if skeleton and "steps" in skeleton:
+                    # For steals, use the stop step (where steal occurs)
+                    # For other outcomes, use the last step before stopper
+                    steps = skeleton.get("steps", [])
+                    if steps:
+                        # Find the step where the ball handler has the ball
+                        for step in reversed(steps):
+                            pos_actions = step.get("pos_actions", {})
+                            for pos, action_info in pos_actions.items():
+                                action = action_info.get("action", "").lower()
+                                if action in ["handle_ball", "receive", "pass"] and pos == ball_handler_pos:
+                                    ball_handler_spot = action_info.get("location") or action_info.get("spot") or "key"
+                                    break
+                            if ball_handler_spot != "key":
+                                break
+                
+                # Get ball handler's coordinates
+                ball_handler_coords = HCO_STRING_SPOTS.get(ball_handler_spot, {"x": 50, "y": 25})
+                
+                # Determine court orientation
+                is_away_offense = off_team.team_id == game.away_team.team_id
+                if is_away_offense:
+                    ball_handler_coords = get_away_player_coords(ball_handler_coords)
+                
+                # Get zone boundaries based on ball location (applies shifts)
+                if def_call == "3-2 Zone":
+                    zone_boundaries = _get_32_zone_boundaries(ball_handler_spot, is_away_offense)
+                elif def_call == "1-3-1 Zone":
+                    zone_boundaries = _get_131_zone_boundaries(ball_handler_spot, is_away_offense)
+                else:
+                    zone_boundaries = _get_23_zone_boundaries(ball_handler_spot, is_away_offense)
+                
+                # Build offensive players list for zone assignment
+                ball_handler_id = getattr(ball_handler, "player_id", None)
+                offensive_players = []
+                for pos, player in off_lineup.items():
+                    player_id = getattr(player, "player_id", None)
+                    player_coords = getattr(player, "coords", {})
+                    # Get player's spot from skeleton if available
+                    player_spot = "key"
+                    if skeleton and "steps" in skeleton:
+                        steps = skeleton.get("steps", [])
+                        if steps:
+                            for step in reversed(steps):
+                                pos_actions = step.get("pos_actions", {})
+                                if pos in pos_actions:
+                                    action_info = pos_actions[pos]
+                                    player_spot = action_info.get("location") or action_info.get("spot") or "key"
+                                    break
+                    
+                    # Convert spot to coordinates
+                    spot_coords = HCO_STRING_SPOTS.get(player_spot, {"x": 50, "y": 25})
+                    if is_away_offense:
+                        spot_coords = get_away_player_coords(spot_coords)
+                    
+                    # Use player's coords if available, otherwise use spot coords
+                    final_coords = player_coords if player_coords.get("x") and player_coords.get("y") else spot_coords
+                    
+                    offensive_players.append({
+                        "player_id": player_id,
+                        "coords": final_coords,
+                        "spot": player_spot,
+                        "is_ball_handler": (player_id == ball_handler_id)
+                    })
+                
+                # Get aggression level
+                aggression_level = def_team.strategy_settings.get("aggression", "normal")
+                aggression_map = {0: "passive", 1: "passive", 2: "normal", 3: "aggressive", 4: "aggressive"}
+                aggression = aggression_map.get(aggression_level, "normal")
+                
+                # Call zone assignment logic to get actual defender assignments
+                _, defender_to_offensive_player = assign_all_zone_defenders(
+                    zone_boundaries,
+                    offensive_players,
+                    ball_handler_coords,
+                    ball_handler_spot,
+                    aggression,
+                    is_away_offense
+                )
+                
+                # Find which defender(s) are actually guarding the ball handler
+                defenders_guarding_ball_handler = []
+                for def_pos, guarded_player_id in defender_to_offensive_player.items():
+                    if guarded_player_id == ball_handler_id:
+                        defenders_guarding_ball_handler.append(def_pos)
+                
+                # Handle overlapping zones per user requirements:
+                # 1. If only one defender is guarding the ball handler, use that one
+                # 2. If two defenders are guarding the ball handler, randomly pick one
+                if len(defenders_guarding_ball_handler) == 1:
+                    defender_pos = defenders_guarding_ball_handler[0]
+                elif len(defenders_guarding_ball_handler) >= 2:
+                    # Two or more defenders guarding ball handler - randomly pick one
+                    defender_pos = random.choice(defenders_guarding_ball_handler)
+                else:
+                    # No defender assigned to guard ball handler (shouldn't happen, but fallback)
+                    # Fallback: use position match
+                    defender_pos = ball_handler_pos
+                
+                defender = def_lineup.get(defender_pos) if defender_pos else def_lineup.get("PG")
+            else:
+                # Man-to-man: defender matches ball handler position
+                defender = def_lineup.get(ball_handler_pos) if ball_handler_pos else def_lineup.get("PG")
+            
+            if defender:
+                roles["defender"] = defender
+                logging.warning(f"🏀 [DEFENDER OVERRIDE] Non-shot outcome ({result}): Overriding defender")
+                logging.warning(f"  Ball handler: {get_name_safe(ball_handler)} (position: {ball_handler_pos})")
+                logging.warning(f"  Defender: {get_name_safe(defender)} (position: {get_player_position(def_lineup, defender)})")
+                if is_zone_defense(def_call):
+                    logging.warning(f"  Zone defense: Found defender in zone containing ball handler")
+    
     # Extract intended shooter from successful variant
     intended_shooter_pos = None
     if successful_skeleton and "steps" in successful_skeleton and successful_skeleton["steps"]:
