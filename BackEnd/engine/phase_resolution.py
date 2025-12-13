@@ -916,17 +916,16 @@ def resolve_fast_break_logic(game: "GameManager"):
         ball_handler_outlet_x = ball_handler_after_entry_x  # Position after steal entry movement
         ball_handler_outlet_y = ball_handler_after_entry_y  # Position after steal entry movement
         
-        # ✅ DEBUG: Log steal entry calculation
-        logging.debug(f"🏀 [FAST BREAK PHASE DEBUG] Steal Entry calculation:")
-        logging.debug(f"  ball_handler_start_x: {ball_handler_start_x}")
-        logging.debug(f"  ball_handler_start_y: {ball_handler_start_y}")
-        logging.debug(f"  direction: {direction}")
-        logging.debug(f"  steal_entry_move_x: {steal_entry_move_x}")
-        logging.debug(f"  steal_entry_move_y: {steal_entry_move_y}")
-        logging.debug(f"  ball_handler_after_entry_x: {ball_handler_outlet_x}")
-        logging.debug(f"  ball_handler_after_entry_y: {ball_handler_outlet_y}")
-        logging.debug(f"  calculation: {ball_handler_start_x} + {direction} * {steal_entry_move_x} = {ball_handler_outlet_x}")
-        logging.debug(f"📍 [STEAL ENTRY] Stealer moves to: x={ball_handler_outlet_x}, y={ball_handler_outlet_y} (HOME orientation)")
+        # ✅ DETAILED LOGGING: Track Steal Entry calculation
+        is_away_offense = off_team.team_id == game.away_team.team_id
+        logging.warning(f"🏀 [STEAL ENTRY] ✅ ACTIVATED - Detailed Calculation:")
+        logging.warning(f"  Starting Position: x={ball_handler_start_x}, y={ball_handler_start_y}")
+        logging.warning(f"  Offense Team: {off_team.name} (is_away_offense={is_away_offense})")
+        logging.warning(f"  Direction: {direction} ({'toward x=10 (away basket)' if is_away_offense else 'toward x=90 (home basket)'})")
+        logging.warning(f"  Movement: x={steal_entry_move_x} (direction={direction}), y={steal_entry_move_y}")
+        logging.warning(f"  Calculation: {ball_handler_start_x} + ({direction} * {steal_entry_move_x}) = {ball_handler_after_entry_x}")
+        logging.warning(f"  Final Target Position: x={ball_handler_after_entry_x}, y={ball_handler_after_entry_y}")
+        logging.warning(f"  Stealer: {get_name_safe(ball_handler)} (ID: {getattr(ball_handler, 'player_id', 'N/A')})")
     
     # Store ball handler position for animation (after outlet pass for DREB, after steal entry for steals)
     fb_roles["ball_handler_outlet_x"] = ball_handler_outlet_x
@@ -2025,6 +2024,16 @@ def resolve_half_court_offense_logic(game):
             # Apply movement away from basket
             hco_setup_final_x = ball_handler_start_x + (direction * hco_setup_move_x)
             hco_setup_final_y = max(STEAL_HCO_SETUP_Y_MIN, min(STEAL_HCO_SETUP_Y_MAX, ball_handler_start_y + hco_setup_move_y))
+            
+            # ✅ DETAILED LOGGING: Track HCO Setup Step calculation
+            logging.warning(f"🏀 [STEAL HCO SETUP] ✅ ACTIVATED - Detailed Calculation:")
+            logging.warning(f"  Starting Position: x={ball_handler_start_x}, y={ball_handler_start_y}")
+            logging.warning(f"  Offense Team: {off_team.name} (is_away_offense={is_away_offense})")
+            logging.warning(f"  Direction: {direction} ({'away from x=10 (toward x=90)' if is_away_offense else 'away from x=90 (toward x=10)'})")
+            logging.warning(f"  Movement: x={hco_setup_move_x} (direction={direction}), y={hco_setup_move_y}")
+            logging.warning(f"  Calculation: {ball_handler_start_x} + ({direction} * {hco_setup_move_x}) = {hco_setup_final_x}")
+            logging.warning(f"  Final Target Position: x={hco_setup_final_x}, y={hco_setup_final_y}")
+            logging.warning(f"  Stealer: {get_name_safe(ball_handler)} (ID: {getattr(ball_handler, 'player_id', 'N/A')})")
             
             # Store in roles for frontend
             roles["is_steal_hco_setup"] = True

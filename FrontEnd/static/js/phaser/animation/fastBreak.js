@@ -347,6 +347,17 @@ async function animateStealEntry(scene, turnData, playerSprites, ballSprite, wid
     y: ballHandlerSprite.gridY || 25
   };
   
+  // ✅ DETAILED LOGGING: Track frontend Steal Entry calculation
+  console.warn("🏀 [FRONTEND STEAL ENTRY] Entry:", {
+    ballHandlerId,
+    currentSpritePosition: { x: ballHandlerSprite.gridX, y: ballHandlerSprite.gridY },
+    roles: turnData.roles,
+    backendOutletX: turnData.roles?.ball_handler_outlet_x,
+    backendOutletY: turnData.roles?.ball_handler_outlet_y,
+    backendMoveX: turnData.roles?.ball_handler_move_x,
+    backendMoveY: turnData.roles?.ball_handler_move_y
+  });
+  
   // Determine offense team and direction
   const isHomeOffense = ballHandlerSprite.team === "home";
   const direction = isHomeOffense ? 1 : -1; // +1 for home (toward x=90), -1 for away (toward x=10)
@@ -358,15 +369,37 @@ async function animateStealEntry(scene, turnData, playerSprites, ballSprite, wid
   const moveY = turnData.roles?.ball_handler_move_y || 
                 Phaser.Math.Between(-STEAL_ENTRY_MOVE_Y_RANGE, STEAL_ENTRY_MOVE_Y_RANGE);
   
-  // Calculate target position
-  const targetGrid = {
-    x: currentGrid.x + (direction * moveX),
-    y: Phaser.Math.Clamp(
-      currentGrid.y + moveY,
-      STEAL_ENTRY_Y_MIN,
-      STEAL_ENTRY_Y_MAX
-    )
-  };
+  // ✅ FIX: Use backend-provided final coordinates if available (more accurate)
+  // Otherwise, calculate from current position
+  let targetGrid;
+  if (turnData.roles?.ball_handler_outlet_x !== undefined && turnData.roles?.ball_handler_outlet_y !== undefined) {
+    // Use backend-calculated final position (for steals, outlet_x/y is the position after steal entry)
+    targetGrid = {
+      x: turnData.roles.ball_handler_outlet_x,
+      y: turnData.roles.ball_handler_outlet_y
+    };
+    console.warn("🏀 [FRONTEND STEAL ENTRY] Using backend final coordinates:", targetGrid);
+  } else {
+    // Fallback: Calculate from current position (shouldn't happen if backend is correct)
+    targetGrid = {
+      x: currentGrid.x + (direction * moveX),
+      y: Phaser.Math.Clamp(
+        currentGrid.y + moveY,
+        STEAL_ENTRY_Y_MIN,
+        STEAL_ENTRY_Y_MAX
+      )
+    };
+    console.warn("⚠️ [FRONTEND STEAL ENTRY] Calculated target (backend coords missing):", targetGrid);
+  }
+  
+  console.warn("🏀 [FRONTEND STEAL ENTRY] Movement Details:", {
+    startingPosition: currentGrid,
+    direction,
+    moveX,
+    moveY,
+    targetPosition: targetGrid,
+    calculation: `${currentGrid.x} + (${direction} * ${moveX}) = ${targetGrid.x}`
+  });
   
   // Convert to pixel coordinates
   const targetPx = gridToPixels(targetGrid.x, targetGrid.y, width, height);
