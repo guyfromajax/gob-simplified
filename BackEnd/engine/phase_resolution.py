@@ -1934,6 +1934,14 @@ def resolve_half_court_offense_logic(game):
                     # and defensive positioning
                     pass
                 
+                # ✅ FIX: Store stop_step_index for later use in extracting stealer position
+                # This ensures we extract from the actual step where the steal occurred, not the stopper step
+                if result == "STEAL":
+                    game_state["steal_stop_step_index"] = stop_step_index
+                    # Also store a reference to the original skeleton steps before truncation
+                    # (we'll use this to extract position from the correct step)
+                    game_state["steal_original_skeleton_steps"] = steps.copy()
+                
                 # Replace skeleton steps with truncated steps + stopper step
                 skeleton["steps"] = truncated_steps + [stopper_step]
                 
@@ -2043,8 +2051,11 @@ def resolve_half_court_offense_logic(game):
             roles["ball_handler_hco_setup_move_y"] = hco_setup_move_y
             roles["ball_handler_id"] = getattr(ball_handler, "player_id", None)
             
-            # Clear last_stealer after using it (so it doesn't persist to subsequent turns)
+            # Clear last_stealer and stored skeleton data after using it (so it doesn't persist to subsequent turns)
             game_state["last_stealer"] = None
+            game_state.pop("steal_stop_step_index", None)
+            game_state.pop("steal_original_skeleton_steps", None)
+            game_state.pop("last_stealer_coords", None)
             
             logging.warning(f"🏀 [STEAL HCO SETUP] ✅ ACTIVATED - Stealer {get_name_safe(ball_handler)} moves away from basket:")
             logging.warning(f"  Start: x={ball_handler_start_x}, y={ball_handler_start_y}")
@@ -2110,22 +2121,41 @@ def resolve_half_court_offense_logic(game):
         defender = def_lineup.get(ball_handler_pos, def_lineup.get("PG", list(def_lineup.values())[0] if def_lineup else None))
         roles["defender"] = defender
         
-        # ✅ FIX: Extract stealer position from skeleton step where steal occurs
-        # For HCO steals, the stopper step is the last step in the truncated skeleton
-        if event_type == "TURNOVER" and result == "STEAL" and skeleton and skeleton.get("steps"):
-            steps = skeleton.get("steps", [])
-            if steps:
-                # The stopper step is the last step (where steal occurs)
-                stopper_step_index = len(steps) - 1
+        # ✅ FIX: Extract stealer position from skeleton step where steal actually occurs
+        # For HCO steals, we need to extract from the stop_step_index (where steal occurred), not the stopper step we added
+        if event_type == "TURNOVER" and result == "STEAL":
+            # Use the original skeleton steps and stop_step_index stored during truncation
+            original_steps = game_state.get("steal_original_skeleton_steps")
+            stop_step_index = game_state.get("steal_stop_step_index")
+            
+            if original_steps and stop_step_index is not None and stop_step_index < len(original_steps):
+                # Extract from the actual step where the steal occurred (before stopper step was added)
                 stealer_coords = get_stealer_position_from_skeleton_step(
-                    skeleton, stopper_step_index, ball_handler_pos, defender, off_team, def_team, game
+                    {"steps": original_steps}, stop_step_index, ball_handler_pos, defender, off_team, def_team, game
                 )
                 if stealer_coords:
                     # Store stealer position for use in intermediate steps
                     game_state["last_stealer_coords"] = stealer_coords
-                    logging.warning(f"🏀 [STEAL POSITION] Extracted stealer position from skeleton step {stopper_step_index}: x={stealer_coords['x']}, y={stealer_coords['y']}")
+                    logging.warning(f"🏀 [STEAL POSITION] Extracted stealer position from ORIGINAL skeleton step {stop_step_index} (where steal occurred): x={stealer_coords['x']}, y={stealer_coords['y']}")
                 else:
-                    logging.warning(f"⚠️ [STEAL POSITION] Could not extract stealer position from skeleton")
+                    logging.warning(f"⚠️ [STEAL POSITION] Could not extract stealer position from original skeleton step {stop_step_index}")
+            else:
+                # Fallback: Try to extract from current skeleton (less accurate)
+                if skeleton and skeleton.get("steps"):
+                    steps = skeleton.get("steps", [])
+                    if len(steps) > 1:
+                        # Use second-to-last step (the stop step, before stopper step)
+                        fallback_step_index = len(steps) - 2
+                        stealer_coords = get_stealer_position_from_skeleton_step(
+                            skeleton, fallback_step_index, ball_handler_pos, defender, off_team, def_team, game
+                        )
+                        if stealer_coords:
+                            game_state["last_stealer_coords"] = stealer_coords
+                            logging.warning(f"⚠️ [STEAL POSITION] Fallback: Extracted from skeleton step {fallback_step_index}: x={stealer_coords['x']}, y={stealer_coords['y']}")
+                        else:
+                            logging.warning(f"⚠️ [STEAL POSITION] Could not extract stealer position (fallback also failed)")
+                else:
+                    logging.warning(f"⚠️ [STEAL POSITION] No original skeleton steps or stop_step_index stored")
         
         # Set foul_player using SS&S helper function (same as FCP/HCT)
         if event_type in ["O_FOUL", "D_FOUL"]:
