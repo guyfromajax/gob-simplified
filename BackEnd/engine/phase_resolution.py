@@ -2252,25 +2252,28 @@ def resolve_half_court_offense_logic(game):
             # Use result to determine turnover type (STEAL vs DEAD BALL)
             turnover_type = "STEAL" if result == "STEAL" else "DEAD BALL"
             turn_result = resolve_turnover_logic(roles, game, turnover_type=turnover_type)
-            # Add skeleton and animations to result
+            # Add skeleton, animations, and roles to result
             turn_result["skeleton"] = skeleton or {}
             turn_result["animations"] = animations
+            turn_result["roles"] = roles  # ✅ FIX: Include roles so frontend can access is_steal_hco_setup
             return turn_result
 
         elif event_type == "O_FOUL":
             game_state["foul_team"] = "OFFENSE"
             foul_result = resolve_non_shooting_foul(roles, game)
-            # Add skeleton and animations to result
+            # Add skeleton, animations, and roles to result
             foul_result["skeleton"] = skeleton or {}
             foul_result["animations"] = animations
+            foul_result["roles"] = roles  # ✅ FIX: Include roles so frontend can access is_steal_hco_setup
             return foul_result
 
         elif event_type == "D_FOUL":
             game_state["foul_team"] = "DEFENSE"
             foul_result = resolve_non_shooting_foul(roles, game)
-            # Add skeleton and animations to result
+            # Add skeleton, animations, and roles to result
             foul_result["skeleton"] = skeleton or {}
             foul_result["animations"] = animations
+            foul_result["roles"] = roles  # ✅ FIX: Include roles so frontend can access is_steal_hco_setup
             return foul_result
 
     # 3. Shot Result
