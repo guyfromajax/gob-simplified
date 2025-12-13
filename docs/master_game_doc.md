@@ -1604,6 +1604,18 @@ The Statistics System tracks comprehensive player-level and team-level statistic
 - **`off_scouting["offense"]["Playcalls"][type_label][focus]["success"]`**: Same criteria, tracked by play focus (inside/attack/outside)
 - **`off_scouting["offense"]["Playcalls"]["Cumulative"][focus]["success"]`**: Cumulative success across all play types
 
+**Expected Value (EV) and Average Execution Tracking:**
+- **EV Scores** (`ev_scores`): Expected Value percentage (-99.0 to +99.0) calculated for each playcall matchup
+  - Stored in `off_scouting["offense"]["Playcalls"][type_label]["overall"]["ev_scores"]` and focus-specific buckets
+  - Also stored in `def_scouting["defense"][tracking_name]["game_stats"]["ev_scores"]` and vs_* buckets
+  - Calculated via `calculate_ev()` in `turn_manager.py` and stored via `_store_ev_score()`
+  - **Key Fix (January 2025)**: Uses `calls.get("offense_play_type")` (not `"offense_type"`) to match the key used in `set_playcalls()`
+- **Average Execution** (`lean_scores`): Lean score (-1.0 to +1.0) representing execution quality
+  - Stored in `off_scouting["offense"]["Playcalls"][type_label]["overall"]["lean_scores"]` and focus-specific buckets
+  - Also stored in `def_scouting["defense"][tracking_name]["game_stats"]["lean_scores"]` and vs_* buckets
+  - Calculated via `generate_logic()` in `phase_resolution.py` and stored via `_store_lean_score()`
+  - Uses `game_state["offense_play_type"]` (set correctly in `turn_manager.py`)
+
 **Defensive Success Tracking:**
 - **`def_scouting["defense"][tracking_name]["used"]`**: Incremented each time defense is used (by defensive playcall: Man, 2-3 Zone, 3-2 Zone, 1-3-1 Zone)
 - **`def_scouting["defense"][tracking_name]["success"]`**: Incremented when:
