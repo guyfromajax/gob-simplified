@@ -632,7 +632,6 @@ def resolve_fast_break_logic(game: "GameManager"):
                 outlet_score = calculate_outlet_pass_score(rebounder)
                 fb_roles["outlet_score"] = outlet_score
                 
-                import logging
                 # ✅ COMMENTED OUT: Fast break outlet pass logs (cluttering transition debugging)
                 # logging.warning(f"🏀 Fast Break outlet pass: outlet_passer={get_name_safe(rebounder)} (rebounder), outlet_receiver={get_name_safe(ball_handler)} (release player)")
             else:
@@ -656,7 +655,6 @@ def resolve_fast_break_logic(game: "GameManager"):
                 outlet_score = calculate_outlet_pass_score(rebounder)
                 fb_roles["outlet_score"] = outlet_score
                 
-                import logging
                 # ✅ COMMENTED OUT: Fast break outlet pass logs (cluttering transition debugging)
                 # logging.warning(f"⚠️ Fast Break outlet pass (FALLBACK - no release player): outlet_passer={get_name_safe(rebounder)} (rebounder), outlet_receiver={get_name_safe(ball_handler)} (random)")
             else:
@@ -753,7 +751,6 @@ def resolve_fast_break_logic(game: "GameManager"):
     is_away_offense = off_team.team_id == game.away_team.team_id
     
     # ✅ DEBUG: Log offense team determination
-    import logging
     logging.debug(f"🏀 [FAST BREAK PHASE DEBUG] Offense team determination:")
     logging.debug(f"  off_team.team_id: {off_team.team_id}")
     logging.debug(f"  game.away_team.team_id: {game.away_team.team_id}")
