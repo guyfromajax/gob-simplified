@@ -2543,7 +2543,6 @@ def resolve_full_court_press_logic(game: "GameManager"):
     
     # Initialize animator and skeleton for all cases
     from BackEnd.models.animator import Animator
-    import logging
     animator = Animator(game)
     logging.warning(f"🔍 [FCP] Getting skeleton for result_type={result_type}")
     skeleton = get_skeleton_for_turn(result_type, "FCP", game) or {}
@@ -2862,7 +2861,6 @@ def get_fcp_skeleton(result_type, game_context=None):
         dict: Skeleton with steps, or fallback to old hardcoded system
     """
     import random
-    import logging
     from BackEnd.db import fcp_skeletons_collection
     
     # Map result_type to variant name
@@ -2954,7 +2952,6 @@ def get_hct_skeleton(result_type, game_context=None):
         dict: Skeleton with steps, or fallback to old hardcoded system
     """
     import random
-    import logging
     from BackEnd.db import hct_skeletons_collection
     
     # Map result_type to variant name
@@ -3468,7 +3465,6 @@ def resolve_half_court_trap_logic(game: "GameManager"):
         
         # Generate animations from skeleton
         from BackEnd.models.animator import Animator
-        import logging
         animator = Animator(game)
         logging.warning(f"🔍 [HCT SHOT] Getting skeleton for SHOT variant")
         skeleton = get_skeleton_for_turn("SHOT", "HCT", game) or {}
@@ -3520,7 +3516,6 @@ def resolve_half_court_trap_logic(game: "GameManager"):
     # Only SHOT result retrieves a different skeleton (SHOT variant)
     # Skip duplicate retrieval to avoid double animations
     from BackEnd.models.animator import Animator
-    import logging
     if animator is None:
         animator = Animator(game)
     
