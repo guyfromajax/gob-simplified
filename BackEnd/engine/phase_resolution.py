@@ -2058,19 +2058,59 @@ def resolve_half_court_offense_logic(game):
             # x_direction: +1 for home offense (toward x=90), -1 for away offense (toward x=10)
             x_direction = 1 if not is_away_offense else -1
             
-            # Get all players from both lineups
-            all_players = {}
-            all_players.update(off_lineup)
-            all_players.update(def_lineup)
-            
-            # Calculate target positions for all 9 other players (excluding ball handler)
-            other_players_movements = []
+            # Get ball handler position to check if they're the PG
+            ball_handler_pos = get_player_position(off_lineup, ball_handler)
             ball_handler_id = getattr(ball_handler, "player_id", None)
+            is_ball_handler_pg = (ball_handler_pos == "PG")
             
-            for pos, player in all_players.items():
+            # Calculate target positions for offensive players (excluding ball handler and PG)
+            other_players_movements = []
+            pg_movement = None
+            
+            # First, handle PG positioning if ball handler is not the PG
+            if not is_ball_handler_pg and "PG" in off_lineup:
+                pg_player = off_lineup["PG"]
+                pg_id = getattr(pg_player, "player_id", None)
+                pg_coords = getattr(pg_player, "coords", {})
+                pg_start_x = pg_coords.get("x", 50)
+                pg_start_y = pg_coords.get("y", 25)
+                
+                # PG moves to a spot relative to ball handler
+                # Y: ±6 coords from ball handler
+                pg_move_y = random.randint(-6, 6)
+                pg_final_y = max(4, min(46, ball_handler_start_y + pg_move_y))
+                
+                # X: 3-9 coords from ball handler in direction of offense basket
+                # Away team: -9 to -3 (toward x=10), Home team: 3 to 9 (toward x=90)
+                pg_move_x_distance = random.randint(3, 9)
+                pg_move_x = x_direction * pg_move_x_distance  # x_direction: -1 for away, +1 for home
+                pg_final_x = ball_handler_start_x + pg_move_x
+                # Clamp x to court bounds (4-97)
+                pg_final_x = max(4, min(97, pg_final_x))
+                
+                pg_movement = {
+                    "player_id": pg_id,
+                    "start_x": pg_start_x,
+                    "start_y": pg_start_y,
+                    "final_x": pg_final_x,
+                    "final_y": pg_final_y,
+                    "move_x": pg_move_x,  # Already signed (x_direction * distance)
+                    "move_y": pg_move_y
+                }
+                
+                logging.warning(f"🏀 [STEAL HCO SETUP] PG positioning (ball handler is not PG):")
+                logging.warning(f"  PG: {get_name_safe(pg_player)} (ID: {pg_id})")
+                logging.warning(f"  Ball handler position: x={ball_handler_start_x}, y={ball_handler_start_y}")
+                logging.warning(f"  PG movement: x={pg_move_x} (distance={pg_move_x_distance}, direction={x_direction}), y={pg_move_y}")
+                logging.warning(f"  PG final position: x={pg_final_x}, y={pg_final_y}")
+            
+            # Now handle all other offensive players (excluding ball handler and PG)
+            for pos, player in off_lineup.items():
                 player_id = getattr(player, "player_id", None)
                 if player_id == ball_handler_id:
                     continue  # Skip ball handler
+                if pos == "PG":
+                    continue  # Skip PG (handled separately above)
                 
                 # Get player's current position
                 player_coords = getattr(player, "coords", {})
@@ -2106,6 +2146,10 @@ def resolve_half_court_offense_logic(game):
                     "move_x": other_move_x,
                     "move_y": other_move_y
                 })
+            
+            # Add PG movement to the list if it exists
+            if pg_movement:
+                other_players_movements.append(pg_movement)
             
             logging.warning(f"🏀 [STEAL HCO SETUP] Calculated movement for {len(other_players_movements)} other players:")
             for movement in other_players_movements:
