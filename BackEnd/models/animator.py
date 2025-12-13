@@ -105,20 +105,24 @@ class Animator:
                 logging.warning(f"  start (from outlet or player.coords): {start}")
                 logging.warning(f"  end_coords (input, HOME orientation): {end_coords}")
             
-            if is_away_offense:
-                start = get_away_player_coords(start)
-                end = get_away_player_coords(end_coords)
-                
-                # ✅ DEBUG: Log after flipping
-                if has_ball:
-                    logging.warning(f"  start (after flip): {start}")
-                    logging.warning(f"  end (after flip): {end}")
-            else:
-                end = end_coords
-                
-                # ✅ DEBUG: Log for home offense
-                if has_ball:
-                    logging.warning(f"  end (no flip, HOME orientation): {end}")
+            # ✅ COMMENTED OUT: Coordinate flipping removed - using coordinates as-is
+            # if is_away_offense:
+            #     start = get_away_player_coords(start)
+            #     end = get_away_player_coords(end_coords)
+            #     
+            #     # ✅ DEBUG: Log after flipping
+            #     if has_ball:
+            #         logging.warning(f"  start (after flip): {start}")
+            #         logging.warning(f"  end (after flip): {end}")
+            # else:
+            #     end = end_coords
+            #     
+            #     # ✅ DEBUG: Log for home offense
+            #     if has_ball:
+            #         logging.warning(f"  end (no flip, HOME orientation): {end}")
+            
+            # Use end_coords as-is (no coordinate flipping)
+            end = end_coords
 
             movement = [
                 {"timestamp": 0, "coords": start, "action": action if not has_ball else ACTIONS["HANDLE"]},
