@@ -155,6 +155,17 @@ async function animateStealHCOSetup(scene, turnData, playerSprites, ballSprite) 
     y: ballHandlerSprite.gridY || 25
   };
   
+  // ✅ DETAILED LOGGING: Track frontend HCO Setup calculation
+  console.warn("🏀 [FRONTEND STEAL HCO SETUP] Entry:", {
+    ballHandlerId,
+    currentSpritePosition: { x: ballHandlerSprite.gridX, y: ballHandlerSprite.gridY },
+    roles: turnData.roles,
+    backendFinalX: turnData.roles?.ball_handler_hco_setup_x,
+    backendFinalY: turnData.roles?.ball_handler_hco_setup_y,
+    backendMoveX: turnData.roles?.ball_handler_hco_setup_move_x,
+    backendMoveY: turnData.roles?.ball_handler_hco_setup_move_y
+  });
+  
   // Determine offense team and direction (away from basket)
   const isHomeOffense = ballHandlerSprite.team === "home";
   const direction = isHomeOffense ? -1 : 1; // -1 for home (away from x=90), +1 for away (away from x=10)
@@ -165,15 +176,37 @@ async function animateStealHCOSetup(scene, turnData, playerSprites, ballSprite) 
   const moveY = turnData.roles?.ball_handler_hco_setup_move_y || 
                 Phaser.Math.Between(-STEAL_HCO_SETUP_MOVE_Y_RANGE, STEAL_HCO_SETUP_MOVE_Y_RANGE);
   
-  // Calculate target position
-  const targetGrid = {
-    x: currentGrid.x + (direction * moveX),
-    y: Phaser.Math.Clamp(
-      currentGrid.y + moveY,
-      STEAL_HCO_SETUP_Y_MIN,
-      STEAL_HCO_SETUP_Y_MAX
-    )
-  };
+  // ✅ FIX: Use backend-provided final coordinates if available (more accurate)
+  // Otherwise, calculate from current position
+  let targetGrid;
+  if (turnData.roles?.ball_handler_hco_setup_x !== undefined && turnData.roles?.ball_handler_hco_setup_y !== undefined) {
+    // Use backend-calculated final position
+    targetGrid = {
+      x: turnData.roles.ball_handler_hco_setup_x,
+      y: turnData.roles.ball_handler_hco_setup_y
+    };
+    console.warn("🏀 [FRONTEND STEAL HCO SETUP] Using backend final coordinates:", targetGrid);
+  } else {
+    // Fallback: Calculate from current position (shouldn't happen if backend is correct)
+    targetGrid = {
+      x: currentGrid.x + (direction * moveX),
+      y: Phaser.Math.Clamp(
+        currentGrid.y + moveY,
+        STEAL_HCO_SETUP_Y_MIN,
+        STEAL_HCO_SETUP_Y_MAX
+      )
+    };
+    console.warn("⚠️ [FRONTEND STEAL HCO SETUP] Calculated target (backend coords missing):", targetGrid);
+  }
+  
+  console.warn("🏀 [FRONTEND STEAL HCO SETUP] Movement Details:", {
+    startingPosition: currentGrid,
+    direction,
+    moveX,
+    moveY,
+    targetPosition: targetGrid,
+    calculation: `${currentGrid.x} + (${direction} * ${moveX}) = ${targetGrid.x}`
+  });
   
   // Convert to pixel coordinates
   const width = scene.game.config.width;
