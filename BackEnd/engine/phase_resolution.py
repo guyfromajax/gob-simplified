@@ -942,7 +942,8 @@ def resolve_fast_break_logic(game: "GameManager"):
         logging.warning(f"  ✅ Steal Entry target position: x={ball_handler_outlet_x}, y={ball_handler_outlet_y}")
         # ✅ SS&S: Clear steal-related data after using it (so it doesn't persist to subsequent turns)
         game_state.pop("last_stealer_coords", None)
-        logging.warning(f"  ✅ Cleared last_stealer_coords after Steal Entry")
+        game_state["last_stealer"] = None
+        logging.warning(f"  ✅ Cleared last_stealer and last_stealer_coords after Steal Entry")
     
     # ✅ FIX: Use actual defender coordinates instead of simulating random positions
     # Defenders are already positioned on the court after the shot attempt
@@ -2153,6 +2154,10 @@ def resolve_half_court_offense_logic(game):
         # For stopper results (steal, foul, turnover), the stopper step is always the final step,
         # so we can simply use animation["end"] to get the final coordinates
         if event_type == "TURNOVER" and result == "STEAL" and animations and defender:
+            # ✅ SS&S: Clear old steal data before setting new steal data (prevents stale data from previous steals)
+            game_state.pop("last_stealer_coords", None)
+            game_state["last_stealer"] = None
+            
             stealer_id = getattr(defender, "player_id", None)
             
             if stealer_id:
