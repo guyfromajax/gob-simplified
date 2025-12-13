@@ -1870,13 +1870,6 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   
   // ✅ SS&S: Use current_turn to detect FCP/HCT (replaces fragmented flags)
   const isFCPHCT = turnData?.current_turn === 'FCP' || turnData?.current_turn === 'HCT';
-    fcp_shot: turnData.fcp_shot,
-    hct_shot: turnData.hct_shot,
-    fcp_foul: turnData.fcp_foul,
-    hct_foul: turnData.hct_foul,
-    pressureSequenceActive: scene.pressureSequenceActive,
-    isFCPHCT
-  });
   
   // ✅ REMOVED: Step-by-step animation logging (cluttering console)
   
