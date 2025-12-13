@@ -418,6 +418,11 @@ from BackEnd.constants.fast_break_constants import (
     STEAL_HCO_SETUP_MOVE_Y_RANGE,
     STEAL_HCO_SETUP_Y_MIN,
     STEAL_HCO_SETUP_Y_MAX,
+    STEAL_HCO_SETUP_OTHER_PLAYERS_MOVE_X_MIN,
+    STEAL_HCO_SETUP_OTHER_PLAYERS_MOVE_X_MAX,
+    STEAL_HCO_SETUP_OTHER_PLAYERS_MOVE_Y_RANGE,
+    STEAL_HCO_SETUP_OTHER_PLAYERS_Y_MIN,
+    STEAL_HCO_SETUP_OTHER_PLAYERS_Y_MAX,
 )
 
 def _record_fast_break_stats(fb_roles, turn_result, game):
@@ -2049,13 +2054,72 @@ def resolve_half_court_offense_logic(game):
             logging.warning(f"  Final Target Position: x={hco_setup_final_x}, y={hco_setup_final_y}")
             logging.warning(f"  Stealer: {get_name_safe(ball_handler)} (ID: {getattr(ball_handler, 'player_id', 'N/A')})")
             
+            # Calculate movement for all 9 other players (toward the new offense basket)
+            # x_direction: +1 for home offense (toward x=90), -1 for away offense (toward x=10)
+            x_direction = 1 if not is_away_offense else -1
+            
+            # Get all players from both lineups
+            all_players = {}
+            all_players.update(off_lineup)
+            all_players.update(def_lineup)
+            
+            # Calculate target positions for all 9 other players (excluding ball handler)
+            other_players_movements = []
+            ball_handler_id = getattr(ball_handler, "player_id", None)
+            
+            for pos, player in all_players.items():
+                player_id = getattr(player, "player_id", None)
+                if player_id == ball_handler_id:
+                    continue  # Skip ball handler
+                
+                # Get player's current position
+                player_coords = getattr(player, "coords", {})
+                player_start_x = player_coords.get("x", 50)
+                player_start_y = player_coords.get("y", 25)
+                
+                # Calculate movement toward new offense basket (opposite direction of ball handler)
+                other_move_x = random.randint(
+                    STEAL_HCO_SETUP_OTHER_PLAYERS_MOVE_X_MIN,
+                    STEAL_HCO_SETUP_OTHER_PLAYERS_MOVE_X_MAX
+                )
+                other_move_y = random.randint(
+                    -STEAL_HCO_SETUP_OTHER_PLAYERS_MOVE_Y_RANGE,
+                    STEAL_HCO_SETUP_OTHER_PLAYERS_MOVE_Y_RANGE
+                )
+                
+                # Apply movement toward basket
+                other_final_x = player_start_x + (x_direction * other_move_x)
+                # Clamp x to court bounds (4-97)
+                other_final_x = max(4, min(97, other_final_x))
+                # Apply y movement and clamp
+                other_final_y = max(
+                    STEAL_HCO_SETUP_OTHER_PLAYERS_Y_MIN,
+                    min(STEAL_HCO_SETUP_OTHER_PLAYERS_Y_MAX, player_start_y + other_move_y)
+                )
+                
+                other_players_movements.append({
+                    "player_id": player_id,
+                    "start_x": player_start_x,
+                    "start_y": player_start_y,
+                    "final_x": other_final_x,
+                    "final_y": other_final_y,
+                    "move_x": other_move_x,
+                    "move_y": other_move_y
+                })
+            
+            logging.warning(f"🏀 [STEAL HCO SETUP] Calculated movement for {len(other_players_movements)} other players:")
+            for movement in other_players_movements:
+                logging.warning(f"  Player {movement['player_id']}: ({movement['start_x']}, {movement['start_y']}) → ({movement['final_x']}, {movement['final_y']}) (move_x={movement['move_x']}, move_y={movement['move_y']}, x_direction={x_direction})")
+            
             # Store in roles for frontend
             roles["is_steal_hco_setup"] = True
             roles["ball_handler_hco_setup_x"] = hco_setup_final_x
             roles["ball_handler_hco_setup_y"] = hco_setup_final_y
             roles["ball_handler_hco_setup_move_x"] = hco_setup_move_x
             roles["ball_handler_hco_setup_move_y"] = hco_setup_move_y
-            roles["ball_handler_id"] = getattr(ball_handler, "player_id", None)
+            roles["ball_handler_id"] = ball_handler_id
+            roles["other_players_hco_setup_movements"] = other_players_movements
+            roles["hco_setup_x_direction"] = x_direction
             
             # Clear last_stealer and stored skeleton data after using it (so it doesn't persist to subsequent turns)
             game_state["last_stealer"] = None

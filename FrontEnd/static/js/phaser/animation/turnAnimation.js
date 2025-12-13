@@ -232,6 +232,55 @@ async function animateStealHCOSetup(scene, turnData, playerSprites, ballSprite) 
       reason: 'steal_hco_setup_post_movement'
     });
   }
+  
+  // Animate all 9 other players (toward the new offense basket)
+  const otherPlayersMovements = turnData.roles?.other_players_hco_setup_movements || [];
+  if (otherPlayersMovements.length > 0) {
+    console.warn(`🏀 [FRONTEND STEAL HCO SETUP] Animating ${otherPlayersMovements.length} other players toward new offense basket`);
+    
+    const promises = [];
+    for (const movement of otherPlayersMovements) {
+      const playerSprite = playerSprites[movement.player_id];
+      if (!playerSprite) {
+        console.warn(`⚠️ [FRONTEND STEAL HCO SETUP] Player sprite not found: ${movement.player_id}`);
+        continue;
+      }
+      
+      // Get current position
+      const currentGrid = {
+        x: playerSprite.gridX || movement.start_x,
+        y: playerSprite.gridY || movement.start_y
+      };
+      
+      // Use backend-calculated final position
+      const targetGrid = {
+        x: movement.final_x,
+        y: movement.final_y
+      };
+      
+      // Convert to pixel coordinates
+      const targetPx = gridToPixels(targetGrid.x, targetGrid.y, width, height);
+      
+      // Get animation duration
+      const duration = getPlayerDuration(playerSprite, targetPx.x, targetPx.y, true);
+      
+      // Animate player movement
+      promises.push(
+        tweenPlayerTo(scene, playerSprite, targetPx, {
+          duration: duration,
+          easing: "Linear"
+        }).then(() => {
+          // Update sprite grid coordinates
+          playerSprite.gridX = targetGrid.x;
+          playerSprite.gridY = targetGrid.y;
+        })
+      );
+    }
+    
+    // Wait for all other players to finish animating
+    await Promise.all(promises);
+    console.warn(`🏀 [FRONTEND STEAL HCO SETUP] All ${otherPlayersMovements.length} other players finished animating`);
+  }
 }
 
 function getPlayerDuration(sprite, targetX, targetY, isTransition = false) {

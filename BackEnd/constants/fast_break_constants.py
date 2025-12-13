@@ -41,9 +41,16 @@ STEAL_ENTRY_Y_MIN = 3  # Minimum y-coord (clamped)
 STEAL_ENTRY_Y_MAX = 47  # Maximum y-coord (clamped)
 
 # Steal HCO Setup Movement (Steal → HCO)
-STEAL_HCO_SETUP_MOVE_X_MIN = 3  # Minimum x movement away from basket
-STEAL_HCO_SETUP_MOVE_X_MAX = 7  # Maximum x movement away from basket
-STEAL_HCO_SETUP_MOVE_Y_RANGE = 3  # ±3 y-coords
+STEAL_HCO_SETUP_MOVE_X_MIN = 3  # Minimum x movement away from basket (ball handler)
+STEAL_HCO_SETUP_MOVE_X_MAX = 7  # Maximum x movement away from basket (ball handler)
+STEAL_HCO_SETUP_MOVE_Y_RANGE = 3  # ±3 y-coords (ball handler)
 STEAL_HCO_SETUP_Y_MIN = 3  # Minimum y-coord (clamped)
 STEAL_HCO_SETUP_Y_MAX = 47  # Maximum y-coord (clamped)
+
+# Other Players Movement (Steal HCO Setup - all 9 other players)
+STEAL_HCO_SETUP_OTHER_PLAYERS_MOVE_X_MIN = 15  # Minimum x movement toward new offense basket
+STEAL_HCO_SETUP_OTHER_PLAYERS_MOVE_X_MAX = 30  # Maximum x movement toward new offense basket
+STEAL_HCO_SETUP_OTHER_PLAYERS_MOVE_Y_RANGE = 6  # ±6 y-coords
+STEAL_HCO_SETUP_OTHER_PLAYERS_Y_MIN = 4  # Minimum y-coord (clamped)
+STEAL_HCO_SETUP_OTHER_PLAYERS_Y_MAX = 46  # Maximum y-coord (clamped)
 
