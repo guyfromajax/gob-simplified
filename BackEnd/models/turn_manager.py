@@ -312,7 +312,8 @@ class TurnManager:
         # ✅ DEBUG: Log offensive_state transition (previous turn → current turn)
         # This is the critical transition point where offensive_state determines routing
         state = self.game.game_state.get("offensive_state", "HCO")
-        turn_num = self.game.micro_turn_count
+        # Use len(turns) + 1 to match frontend turnCount (1-based, accounts for current turn being added)
+        turn_num = len(self.game.turns) + 1
         from BackEnd.constants import DEBUG
         time_remaining = self.game.game_state.get("clock", "N/A")
         
@@ -568,12 +569,14 @@ class TurnManager:
                 else:
                     result[key] = str(val)  # final fallback (safe for non-class data)
 
-        result["turn_count"] = self.game.micro_turn_count
+        # Use len(turns) + 1 to match frontend turnCount (1-based, accounts for current turn being added)
+        result["turn_count"] = len(self.game.turns) + 1
         # result["possession_team_id"] = self.game.offense_team.team_id
         update_player_coords_from_animations(self.game, result["animations"])
         
         # Print turn result summary for debugging
-        turn_num = self.game.micro_turn_count
+        # Use len(turns) + 1 to match frontend turnCount (1-based, accounts for current turn being added)
+        turn_num = len(self.game.turns) + 1
         result_type = result.get("result_type", "N/A")
         next_play_type = result.get("next_play_type", "None")
         next_defensive_setup = result.get("next_defensive_setup", "None")
