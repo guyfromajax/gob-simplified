@@ -611,14 +611,21 @@ Screeners automatically animate to offset positions to prevent visual overlap wh
 - With the stopper system, `determine_event_type()` is bypassed for SHOT results
 - Extracting energy decay ensures it always runs, maintaining SS&S consistency
 
+**Bench Player Energy Recharge:**
+- Players not in the active lineup recharge energy during each turn
+- 50% chance per turn to recharge 0.01 energy (0.0-1.0 scale)
+- Implemented in `apply_bench_energy_recharge()` function
+- Called alongside energy decay for HCO turns
+- Ensures bench players gradually regain energy when not playing
+
 **Energy Display:**
 - Frontend displays energy via `turn.player_energy` (set in `turn_manager.py` line 708-717)
 - Energy levels included in `/api/game/{gameId}` response for lineup screen
 - Color-coded display: Green (>89%), Yellow (80-89%), Orange (70-79%), Red (<70%)
 
 **Key Files:**
-- `BackEnd/engine/phase_resolution.py` - `apply_energy_decay()` function (lines 58-75)
-- `BackEnd/models/player.py` - `decay_energy()` and `get_fatigue_decay_amount()` methods
+- `BackEnd/engine/phase_resolution.py` - `apply_energy_decay()` function (lines 59-76) and `apply_bench_energy_recharge()` function (lines 79-100)
+- `BackEnd/models/player.py` - `decay_energy()`, `recharge_energy()`, and `get_fatigue_decay_amount()` methods
 - `BackEnd/models/turn_manager.py` - `player_energy` population (lines 708-717)
 
 ### Stat Tracking
