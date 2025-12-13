@@ -207,6 +207,64 @@ def get_ball_handler_from_skeleton(skeleton, off_lineup, step_index=None):
     return off_lineup.get("PG", list(off_lineup.values())[0])
 
 
+def get_stealer_position_from_skeleton_step(skeleton, step_index, ball_handler_pos, defender, off_team, def_team, game):
+    """
+    Extract the stealer's (defender's) position from a specific skeleton step.
+    
+    Args:
+        skeleton: Skeleton dict with "steps" key
+        step_index: Index of the step where steal occurs
+        ball_handler_pos: Position of the ball handler (e.g., "PG", "SG")
+        defender: Defender (stealer) player object
+        off_team: Offensive team object
+        def_team: Defensive team object
+        game: GameManager instance
+    
+    Returns:
+        dict: Stealer's coordinates {"x": int, "y": int} or None if cannot determine
+    """
+    if not skeleton or not skeleton.get("steps"):
+        return None
+    
+    steps = skeleton.get("steps", [])
+    if step_index < 0 or step_index >= len(steps):
+        return None
+    
+    step = steps[step_index]
+    pos_actions = step.get("pos_actions", {})
+    
+    # Get ball handler's position from this step
+    ball_handler_action = pos_actions.get(ball_handler_pos, {})
+    ball_handler_location = ball_handler_action.get("location") or ball_handler_action.get("spot") or "key"
+    
+    # Convert location string to coordinates
+    from BackEnd.constants import HCO_STRING_SPOTS
+    ball_handler_coords = HCO_STRING_SPOTS.get(ball_handler_location, {"x": 50, "y": 25})
+    
+    # Calculate defender's position based on ball handler's position
+    from BackEnd.utils.shared_defense import get_defender_coords
+    
+    # Determine if away team is on offense
+    is_away_offense = off_team.team_id == game.away_team.team_id
+    
+    # Get defense aggression level
+    aggression_level = def_team.strategy_settings.get("aggression", "normal")
+    aggression_map = {0: "passive", 1: "passive", 2: "normal", 3: "aggressive", 4: "aggressive"}
+    aggression = aggression_map.get(aggression_level, "normal")
+    
+    # Calculate defender coordinates (stealer is the ball handler's defender)
+    stealer_coords = get_defender_coords(
+        ball_handler_coords,
+        is_away_offense,
+        aggression,
+        ball_handler_location,
+        None,
+        is_ball_handler=True
+    )
+    
+    return stealer_coords
+
+
 def select_foul_player(foul_team_type, ball_handler, off_lineup, def_lineup):
     """
     Select which player committed the foul based on probabilistic logic.
@@ -833,8 +891,16 @@ def resolve_fast_break_logic(game: "GameManager"):
         # ==================== STEAL → FAST BREAK: STEAL ENTRY LOGIC ====================
         # Stealer (ball handler) moves 5-10 x spots toward basket, ±4 y spots (clamped to 3-47)
         # This movement happens BEFORE checking for defensive stop vs shot
-        ball_handler_start_x = getattr(ball_handler, "coords", {}).get("x", 50)
-        ball_handler_start_y = getattr(ball_handler, "coords", {}).get("y", 25)
+        # ✅ FIX: Use stored stealer position from skeleton step (if available)
+        if "last_stealer_coords" in game_state and game_state["last_stealer_coords"]:
+            stealer_coords = game_state["last_stealer_coords"]
+            ball_handler_start_x = stealer_coords.get("x", 50)
+            ball_handler_start_y = stealer_coords.get("y", 25)
+            logging.warning(f"🏀 [STEAL ENTRY] Using stored stealer position: x={ball_handler_start_x}, y={ball_handler_start_y}")
+        else:
+            ball_handler_start_x = getattr(ball_handler, "coords", {}).get("x", 50)
+            ball_handler_start_y = getattr(ball_handler, "coords", {}).get("y", 25)
+            logging.warning(f"⚠️ [STEAL ENTRY] No stored position, using ball_handler.coords: x={ball_handler_start_x}, y={ball_handler_start_y}")
         
         # Calculate steal entry movement
         steal_entry_move_x = random.randint(STEAL_ENTRY_MOVE_X_MIN, STEAL_ENTRY_MOVE_X_MAX)
@@ -1478,6 +1544,15 @@ def resolve_turnover_logic(roles, game, turnover_type="DEAD BALL"):
         game_state["last_stealer"] = defender
         game_state["last_rebound"] = ""
         
+        # ✅ FIX: Use stored stealer position from skeleton step (if available)
+        # This ensures intermediate steps use the position at the exact moment of the steal
+        if "last_stealer_coords" in game_state and game_state["last_stealer_coords"]:
+            stealer_coords = game_state["last_stealer_coords"]
+            defender.coords = stealer_coords.copy()
+            logging.warning(f"🏀 [STEAL POSITION] Using stored stealer position: x={stealer_coords['x']}, y={stealer_coords['y']}")
+        else:
+            logging.warning(f"⚠️ [STEAL POSITION] No stored stealer position, using defender.coords: x={getattr(defender, 'coords', {}).get('x', 'N/A')}, y={getattr(defender, 'coords', {}).get('y', 'N/A')}")
+        
         # ✅ DEBUG: Log steal flow for HCO steals
         logging.warning(f"🏀 [STEAL FLOW] HCO Steal detected:")
         logging.warning(f"  Stealer: {get_name_safe(defender)} (ID: {stealer_id})")
@@ -1922,9 +1997,17 @@ def resolve_half_court_offense_logic(game):
             is_steal_hco_setup = True
             ball_handler = last_stealer
             
-            # Get stealer's current position
-            ball_handler_start_x = getattr(ball_handler, "coords", {}).get("x", 50)
-            ball_handler_start_y = getattr(ball_handler, "coords", {}).get("y", 25)
+            # ✅ FIX: Use stored stealer position from skeleton step (if available)
+            # This ensures we use the position at the exact moment of the steal, not stale coords
+            if "last_stealer_coords" in game_state and game_state["last_stealer_coords"]:
+                stealer_coords = game_state["last_stealer_coords"]
+                ball_handler_start_x = stealer_coords.get("x", 50)
+                ball_handler_start_y = stealer_coords.get("y", 25)
+                logging.warning(f"🏀 [STEAL HCO SETUP] Using stored stealer position: x={ball_handler_start_x}, y={ball_handler_start_y}")
+            else:
+                ball_handler_start_x = getattr(ball_handler, "coords", {}).get("x", 50)
+                ball_handler_start_y = getattr(ball_handler, "coords", {}).get("y", 25)
+                logging.warning(f"⚠️ [STEAL HCO SETUP] No stored position, using ball_handler.coords: x={ball_handler_start_x}, y={ball_handler_start_y}")
             
             # Determine direction away from basket (opposite of steal entry)
             # Home offense: basket at x=90, so away = -1 (left, toward x=10)
@@ -2017,6 +2100,23 @@ def resolve_half_court_offense_logic(game):
         # Determine defender based on ball handler position (same as FCP/HCT)
         defender = def_lineup.get(ball_handler_pos, def_lineup.get("PG", list(def_lineup.values())[0] if def_lineup else None))
         roles["defender"] = defender
+        
+        # ✅ FIX: Extract stealer position from skeleton step where steal occurs
+        # For HCO steals, the stopper step is the last step in the truncated skeleton
+        if event_type == "TURNOVER" and result == "STEAL" and skeleton and skeleton.get("steps"):
+            steps = skeleton.get("steps", [])
+            if steps:
+                # The stopper step is the last step (where steal occurs)
+                stopper_step_index = len(steps) - 1
+                stealer_coords = get_stealer_position_from_skeleton_step(
+                    skeleton, stopper_step_index, ball_handler_pos, defender, off_team, def_team, game
+                )
+                if stealer_coords:
+                    # Store stealer position for use in intermediate steps
+                    game_state["last_stealer_coords"] = stealer_coords
+                    logging.warning(f"🏀 [STEAL POSITION] Extracted stealer position from skeleton step {stopper_step_index}: x={stealer_coords['x']}, y={stealer_coords['y']}")
+                else:
+                    logging.warning(f"⚠️ [STEAL POSITION] Could not extract stealer position from skeleton")
         
         # Set foul_player using SS&S helper function (same as FCP/HCT)
         if event_type in ["O_FOUL", "D_FOUL"]:
@@ -2574,6 +2674,22 @@ def resolve_full_court_press_logic(game: "GameManager"):
         # ✅ FIX: Set last_stealer for FCP steals (so Steal HCO Setup runs in next turn)
         game_state["last_stealer"] = defender
         game_state["last_rebound"] = ""
+        
+        # ✅ FIX: Extract stealer position from skeleton step where steal occurs
+        # For FCP steals, use the last step of the skeleton (where steal logically occurs)
+        if skeleton and skeleton.get("steps"):
+            steps = skeleton.get("steps", [])
+            if steps:
+                last_step_index = len(steps) - 1
+                stealer_coords = get_stealer_position_from_skeleton_step(
+                    skeleton, last_step_index, ball_handler_pos, defender, off_team, def_team, game
+                )
+                if stealer_coords:
+                    game_state["last_stealer_coords"] = stealer_coords
+                    defender.coords = stealer_coords.copy()
+                    logging.warning(f"🏀 [STEAL POSITION] FCP: Extracted stealer position from skeleton step {last_step_index}: x={stealer_coords['x']}, y={stealer_coords['y']}")
+                else:
+                    logging.warning(f"⚠️ [STEAL POSITION] FCP: Could not extract stealer position from skeleton")
     
     if skeleton and "steps" in skeleton:
         logging.warning(f"🔍 [FCP] Converting skeleton to animations (result_type={result_type})...")
@@ -3429,6 +3545,22 @@ def resolve_half_court_trap_logic(game: "GameManager"):
         # ✅ FIX: Set last_stealer for HCT steals (so Steal HCO Setup runs in next turn)
         game_state["last_stealer"] = defender
         game_state["last_rebound"] = ""
+        
+        # ✅ FIX: Extract stealer position from skeleton step where steal occurs
+        # For HCT steals, use the last step of the skeleton (where steal logically occurs)
+        if skeleton and skeleton.get("steps"):
+            steps = skeleton.get("steps", [])
+            if steps:
+                last_step_index = len(steps) - 1
+                stealer_coords = get_stealer_position_from_skeleton_step(
+                    skeleton, last_step_index, ball_handler_pos, defender, off_team, def_team, game
+                )
+                if stealer_coords:
+                    game_state["last_stealer_coords"] = stealer_coords
+                    defender.coords = stealer_coords.copy()
+                    logging.warning(f"🏀 [STEAL POSITION] HCT: Extracted stealer position from skeleton step {last_step_index}: x={stealer_coords['x']}, y={stealer_coords['y']}")
+                else:
+                    logging.warning(f"⚠️ [STEAL POSITION] HCT: Could not extract stealer position from skeleton")
     
     if skeleton and "steps" in skeleton:
         logging.warning(f"🔍 [HCT] Converting skeleton to animations (result_type={result_type})...")
