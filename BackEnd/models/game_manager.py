@@ -357,10 +357,12 @@ class GameManager:
             )
             
             if not is_valid and error_msg:
+                # Use len(turns) to match frontend turnCount (turn has already been added at this point)
+                turn_num = len(self.turns)
                 logging.warning(
-                    f"⚠️ [TRANSITION VALIDATION] Invalid transition detected in turn #{self.macro_turn_count}: {error_msg}",
+                    f"⚠️ [TRANSITION VALIDATION] Invalid transition detected in turn #{turn_num}: {error_msg}",
                     extra={
-                        "turn_number": self.macro_turn_count,
+                        "turn_number": turn_num,
                         "from_result_type": from_result.get("result_type"),
                         "from_result_text": from_result.get("text", "")[:50],
                         "to_offensive_state": to_offensive_state,
@@ -404,7 +406,7 @@ class GameManager:
                         logging.warning(
                             f"⚠️ [EVENT VALIDATION] {event_error}",
                             extra={
-                                "turn_number": self.macro_turn_count,
+                                "turn_number": len(self.turns),
                                 "detected_event": detected_event,
                                 "from_turn_type": from_turn_type.value,
                                 "to_turn_type": to_turn_type.value,
@@ -413,10 +415,12 @@ class GameManager:
                         )
                     elif detected_event:
                         # Log successful event detection (info level, not warning)
+                        # Use len(turns) to match frontend turnCount (turn has already been added at this point)
+                        turn_num = len(self.turns)
                         logging.debug(
-                            f"✅ [EVENT DETECTION] Turn #{self.macro_turn_count}: {detected_event} → {from_turn_type.value} -> {to_turn_type.value}",
+                            f"✅ [EVENT DETECTION] Turn #{turn_num}: {detected_event} → {from_turn_type.value} -> {to_turn_type.value}",
                             extra={
-                                "turn_number": self.macro_turn_count,
+                                "turn_number": turn_num,
                                 "detected_event": detected_event,
                                 "transition": f"{from_turn_type.value} -> {to_turn_type.value}",
                             }
