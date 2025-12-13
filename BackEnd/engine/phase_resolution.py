@@ -670,8 +670,19 @@ def resolve_fast_break_logic(game: "GameManager"):
 
     else:  # STEAL
         ball_handler = game_state.get("last_stealer")
+        
+        # ✅ DEBUG: Log Fast Break steal entry check
+        logging.warning(f"🏀 [FAST BREAK STEAL ENTRY CHECK] Entry:")
+        logging.warning(f"  last_stealer: {get_name_safe(ball_handler) if ball_handler else 'None'}")
+        logging.warning(f"  offensive_state: {game_state.get('offensive_state')}")
+        logging.warning(f"  current_turn: FAST_BREAK")
+        
         if ball_handler is None:
             ball_handler = off_lineup["PG"]
+            logging.warning(f"  ⚠️ last_stealer was None, using PG fallback: {get_name_safe(ball_handler)}")
+        else:
+            logging.warning(f"  ✅ last_stealer found: {get_name_safe(ball_handler)} (ID: {getattr(ball_handler, 'player_id', None)})")
+        
         fb_roles["ball_handler"] = ball_handler
         fb_roles["ball_handler_id"] = getattr(ball_handler, "player_id", None)  # ✅ Store ID for frontend
         fb_roles["outlet_passer"] = None
@@ -861,6 +872,12 @@ def resolve_fast_break_logic(game: "GameManager"):
     fb_roles["ball_handler_move_y"] = ball_handler_move_y
     fb_roles["is_away_offense"] = is_away_offense  # ✅ Store for animator to use
     fb_roles["is_steal_entry"] = not rebound  # ✅ Flag to indicate steal entry vs outlet pass
+    
+    # ✅ DEBUG: Log steal entry flag
+    if not rebound:
+        logging.warning(f"  ✅ Steal Entry flag set: is_steal_entry=True")
+        logging.warning(f"  ✅ Steal Entry movement calculated: x={ball_handler_move_x}, y={ball_handler_move_y}")
+        logging.warning(f"  ✅ Steal Entry target position: x={ball_handler_outlet_x}, y={ball_handler_outlet_y}")
     
     # ✅ FIX: Use actual defender coordinates instead of simulating random positions
     # Defenders are already positioned on the court after the shot attempt
@@ -1455,7 +1472,9 @@ def resolve_turnover_logic(roles, game, turnover_type="DEAD BALL"):
     if turnover_type == "STEAL" and defender:
         defender.record_stat("STL")
         text = f"{stealer_name} jumps the pass"
-        if random.random() < get_fast_break_chance(game):
+        fast_break_chance = get_fast_break_chance(game)
+        fast_break_roll = random.random()
+        if fast_break_roll < fast_break_chance:
             game_state["offensive_state"] = "FAST_BREAK"
             text += " and takes it the other way!"
         else:
@@ -1463,6 +1482,14 @@ def resolve_turnover_logic(roles, game, turnover_type="DEAD BALL"):
             text += " and waits to set up the half-court offense."
         game_state["last_stealer"] = defender
         game_state["last_rebound"] = ""
+        
+        # ✅ DEBUG: Log steal flow for HCO steals
+        logging.warning(f"🏀 [STEAL FLOW] HCO Steal detected:")
+        logging.warning(f"  Stealer: {get_name_safe(defender)} (ID: {stealer_id})")
+        logging.warning(f"  Victim: {get_name_safe(ball_handler)} (ID: {victim_id})")
+        logging.warning(f"  Fast break chance: {fast_break_chance:.2%}, Roll: {fast_break_roll:.3f}")
+        logging.warning(f"  Next offensive_state: {game_state['offensive_state']}")
+        logging.warning(f"  last_stealer SET: {get_name_safe(defender)} (ID: {stealer_id})")
 
         events.append({
             "event_type": "STEAL",
@@ -1872,10 +1899,18 @@ def resolve_half_court_offense_logic(game):
     hco_setup_final_x = None
     hco_setup_final_y = None
     
+    # ✅ DEBUG: Log Steal HCO Setup check
+    logging.warning(f"🏀 [STEAL HCO SETUP CHECK] Entry:")
+    logging.warning(f"  last_stealer: {get_name_safe(last_stealer) if last_stealer else 'None'}")
+    logging.warning(f"  offensive_state: {game_state.get('offensive_state')}")
+    logging.warning(f"  current_turn: HCO")
+    
     if last_stealer:
         # Check if the previous turn was a steal that transitioned to HCO
         # This happens when last_stealer is set and offensive_state is HCO (not FAST_BREAK)
-        if game_state.get("offensive_state") == "HCO":
+        offensive_state = game_state.get("offensive_state")
+        logging.warning(f"  ✅ last_stealer found, checking offensive_state: {offensive_state}")
+        if offensive_state == "HCO":
             is_steal_hco_setup = True
             ball_handler = last_stealer
             
@@ -1911,10 +1946,15 @@ def resolve_half_court_offense_logic(game):
             # Clear last_stealer after using it (so it doesn't persist to subsequent turns)
             game_state["last_stealer"] = None
             
-            logging.debug(f"🏀 [STEAL HCO SETUP] Stealer {get_name_safe(ball_handler)} moves away from basket:")
-            logging.debug(f"  Start: x={ball_handler_start_x}, y={ball_handler_start_y}")
-            logging.debug(f"  Movement: x={hco_setup_move_x} (direction={direction}), y={hco_setup_move_y}")
-            logging.debug(f"  Final: x={hco_setup_final_x}, y={hco_setup_final_y}")
+            logging.warning(f"🏀 [STEAL HCO SETUP] ✅ ACTIVATED - Stealer {get_name_safe(ball_handler)} moves away from basket:")
+            logging.warning(f"  Start: x={ball_handler_start_x}, y={ball_handler_start_y}")
+            logging.warning(f"  Movement: x={hco_setup_move_x} (direction={direction}), y={hco_setup_move_y}")
+            logging.warning(f"  Final: x={hco_setup_final_x}, y={hco_setup_final_y}")
+            logging.warning(f"  Roles set: is_steal_hco_setup=True, ball_handler_id={roles.get('ball_handler_id')}")
+        else:
+            logging.warning(f"  ⚠️ last_stealer found but offensive_state != 'HCO' (is '{offensive_state}') - Steal HCO Setup SKIPPED")
+    else:
+        logging.warning(f"  ⚠️ last_stealer is None - Steal HCO Setup SKIPPED")
     
     # print("inside resolve_half_court_offense_logic")
     # print("[DEBUG] roles:", roles.keys())
