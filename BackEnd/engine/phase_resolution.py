@@ -2104,13 +2104,23 @@ def resolve_half_court_offense_logic(game):
                 logging.warning(f"  PG movement: x={pg_move_x} (distance={pg_move_x_distance}, direction={x_direction}), y={pg_move_y}")
                 logging.warning(f"  PG final position: x={pg_final_x}, y={pg_final_y}")
             
-            # Now handle all other offensive players (excluding ball handler and PG)
-            for pos, player in off_lineup.items():
+            # Now handle all other players from both teams (excluding ball handler and offensive PG)
+            # Combine offensive and defensive lineups
+            all_players = {}
+            all_players.update(off_lineup)
+            all_players.update(def_lineup)
+            
+            # Get offensive PG ID to exclude it
+            offensive_pg_id = None
+            if "PG" in off_lineup:
+                offensive_pg_id = getattr(off_lineup["PG"], "player_id", None)
+            
+            for pos, player in all_players.items():
                 player_id = getattr(player, "player_id", None)
                 if player_id == ball_handler_id:
                     continue  # Skip ball handler
-                if pos == "PG":
-                    continue  # Skip PG (handled separately above)
+                if player_id == offensive_pg_id:
+                    continue  # Skip offensive PG (handled separately above)
                 
                 # Get player's current position
                 player_coords = getattr(player, "coords", {})
