@@ -158,6 +158,17 @@ export class ShotAnimationSystem {
         )
       : 0;
     
+    // ============================================================================
+    // STEAL HCO SETUP: Animate stealer and all other players before HCO skeleton starts
+    // ============================================================================
+    // This runs BEFORE the setup tween, similar to Fast Break Entry in runFastBreakSequence()
+    // Note: This is for the HCO transition (steal → HCO), not the shot attempt itself
+    // The HCO Setup Step happens regardless of whether this HCO turn results in a shot
+    if (turnData.roles?.is_steal_hco_setup) {
+      const { animateStealHCOSetup } = await import('./turnAnimation.js');
+      await animateStealHCOSetup(this.scene, turnData, this.playerSprites, ballSprite);
+    }
+    
     // 1. Setup: Move players to step 0 positions
     await this.runSetupTween(turnData, ballSprite, currentBallOwnerRef);
     
