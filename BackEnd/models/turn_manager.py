@@ -1428,7 +1428,8 @@ class TurnManager:
         """
         try:
             # Get play type and focus
-            offense_play_type = calls.get("offense_type", "").lower()
+            # ✅ FIX: Use "offense_play_type" to match the key used in set_playcalls() and elsewhere
+            offense_play_type = calls.get("offense_play_type", "").lower()
             offense_focus = calls.get("offense_focus", "")
             defense_playcall = calls.get("defense", "")
             
