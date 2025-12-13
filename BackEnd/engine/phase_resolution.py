@@ -1143,7 +1143,6 @@ def resolve_fast_break_logic(game: "GameManager"):
         }
         
         # ✅ DEBUG: Log fast break defensive stop result to verify data is being set correctly
-        import logging
         import json
         debug_data = {
             "result_type": result.get("result_type"),
@@ -1245,7 +1244,6 @@ def resolve_fast_break_logic(game: "GameManager"):
     # ==================== END FAST BREAK STAT TRACKING ====================
     
     # ✅ DEBUG: Log fast break result (MAKE/MISS/TURNOVER/FOUL) to verify data is being set correctly
-    import logging
     import json
     debug_data = {
         "result_type": turn_result.get("result_type"),
