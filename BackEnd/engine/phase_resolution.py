@@ -1997,11 +1997,10 @@ def resolve_half_court_offense_logic(game):
     logging.warning(f"  current_turn: HCO")
     logging.warning(f"  Condition check: result != 'STEAL'? {result != 'STEAL'}, last_stealer exists? {last_stealer is not None}")
     
-    # ✅ FIX: Skip Steal HCO Setup if this is a steal turn itself (result == "STEAL")
-    # The setup should only run in the NEXT HCO turn, after last_stealer has been set
-    if result == "STEAL":
-        logging.warning(f"  ⚠️ This is a steal turn (result='STEAL') - Steal HCO Setup will run in NEXT turn")
-    elif last_stealer:
+    # ✅ FIX: Run HCO Setup if last_stealer exists and next turn is HCO
+    # This runs regardless of the current turn's result (even if it's another steal)
+    # Once a steal happens and transitions to HCO, the HCO Setup Step should always run in the next HCO turn
+    if last_stealer:
         # Check if the previous turn was a steal that transitioned to HCO
         # This happens when last_stealer is set and offensive_state is HCO (not FAST_BREAK)
         offensive_state = game_state.get("offensive_state")
