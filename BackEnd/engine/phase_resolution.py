@@ -1988,8 +1988,10 @@ def resolve_half_court_offense_logic(game):
     logging.warning(f"🏀 [STEAL HCO SETUP CHECK] Entry:")
     logging.warning(f"  result from generate_logic: {result}")
     logging.warning(f"  last_stealer: {get_name_safe(last_stealer) if last_stealer else 'None'}")
+    logging.warning(f"  last_stealer_coords: {game_state.get('last_stealer_coords', 'None')}")
     logging.warning(f"  offensive_state: {game_state.get('offensive_state')}")
     logging.warning(f"  current_turn: HCO")
+    logging.warning(f"  Condition check: result != 'STEAL'? {result != 'STEAL'}, last_stealer exists? {last_stealer is not None}")
     
     # ✅ FIX: Skip Steal HCO Setup if this is a steal turn itself (result == "STEAL")
     # The setup should only run in the NEXT HCO turn, after last_stealer has been set
