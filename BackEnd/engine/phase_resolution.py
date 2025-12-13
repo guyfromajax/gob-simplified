@@ -1,6 +1,7 @@
 import random
 import logging
 import copy
+import time
 from typing import TYPE_CHECKING
 from fastapi import HTTPException
 from BackEnd.utils.shared import (
@@ -2067,6 +2068,11 @@ def resolve_half_court_offense_logic(game):
             logging.warning(f"  Movement: x={hco_setup_move_x} (direction={direction}), y={hco_setup_move_y}")
             logging.warning(f"  Final: x={hco_setup_final_x}, y={hco_setup_final_y}")
             logging.warning(f"  Roles set: is_steal_hco_setup=True, ball_handler_id={roles.get('ball_handler_id')}")
+            
+            # ✅ TEMPORARY: 5 second pause after HCO Setup Step completes (for testing animation visibility)
+            logging.warning(f"⏸️ [TEMPORARY] Pausing 5 seconds after HCO Setup Step...")
+            time.sleep(5)
+            logging.warning(f"▶️ [TEMPORARY] Resuming after HCO Setup Step pause")
         else:
             logging.warning(f"  ⚠️ last_stealer found but offensive_state != 'HCO' (is '{offensive_state}') - Steal HCO Setup SKIPPED")
     else:
