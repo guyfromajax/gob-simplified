@@ -76,6 +76,33 @@ def apply_energy_decay(off_lineup, def_lineup):
             player.decay_energy(player.get_fatigue_decay_amount())
 
 
+def apply_bench_energy_recharge(game):
+    """
+    Recharge energy for players not in the active lineup.
+    
+    For each bench player (not in active lineup), there's a 50% chance
+    to recharge 0.01 energy per turn.
+    
+    Args:
+        game: GameManager instance containing home and away teams
+    """
+    # Get all lineup player IDs from both teams
+    lineup_player_ids = set()
+    for team in [game.home_team, game.away_team]:
+        for player in team.lineup.values():
+            if player and hasattr(player, "player_id"):
+                lineup_player_ids.add(player.player_id)
+    
+    # Recharge bench players (not in lineup)
+    for team in [game.home_team, game.away_team]:
+        for player in team.get_all_players():
+            if player and hasattr(player, "player_id") and player.player_id not in lineup_player_ids:
+                # 50% chance to recharge 0.01 energy
+                if random.random() < 0.5:
+                    if hasattr(player, "recharge_energy"):
+                        player.recharge_energy(0.01)
+
+
 def check_and_handle_foul_out(foul_player, game_state, foul_team):
     """
     Check if player fouled out (5+ fouls) and handle accordingly.
@@ -1900,6 +1927,9 @@ def resolve_half_court_offense_logic(game):
     # for SHOT results in the stopper system. Extract energy decay to ensure it
     # always runs regardless of event type.
     apply_energy_decay(off_lineup, def_lineup)
+    
+    # ✅ SS&S: Recharge energy for bench players (50% chance to add 0.01 per turn)
+    apply_bench_energy_recharge(game)
 
     # 2. Event Determination
     # Use result from generate_logic() for stopper results, otherwise determine from skeleton
