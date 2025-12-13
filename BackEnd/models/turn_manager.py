@@ -1422,7 +1422,7 @@ class TurnManager:
         
         Args:
             ev (float): EV percentage from -99.0 to 99.0
-            calls (dict): Playcall information with offense_type, offense_focus, defense_playcall
+            calls (dict): Playcall information with offense_play_type, offense_focus, defense_playcall
             offense_team: Offensive team object
             defense_team: Defensive team object
         """
