@@ -2150,16 +2150,12 @@ def resolve_half_court_offense_logic(game):
         # This uses the actual calculated defensive position from the animation system,
         # avoiding coordinate orientation issues and reusing existing calculations
         # Always extract for new steals - coordinates will be cleared after use in followup turn
+        # For stopper results (steal, foul, turnover), the stopper step is always the final step,
+        # so we can simply use animation["end"] to get the final coordinates
         if event_type == "TURNOVER" and result == "STEAL" and animations and defender:
             stealer_id = getattr(defender, "player_id", None)
-            stop_step_index = game_state.get("steal_stop_step_index")
-            original_steps = game_state.get("steal_original_skeleton_steps")
             
-            if stealer_id and stop_step_index is not None and original_steps and stop_step_index < len(original_steps):
-                # Get the timestamp from the skeleton step where steal occurred
-                steal_step = original_steps[stop_step_index]
-                steal_timestamp = steal_step.get("timestamp", 0)
-                
+            if stealer_id:
                 # Find the defensive animation for the stealer
                 stealer_animation = None
                 for anim in animations:
@@ -2167,33 +2163,15 @@ def resolve_half_court_offense_logic(game):
                         stealer_animation = anim
                         break
                 
-                if stealer_animation and "movement" in stealer_animation:
-                    # Find the movement step that matches the steal timestamp
-                    stealer_coords = None
-                    for movement_step in stealer_animation["movement"]:
-                        if movement_step.get("timestamp") == steal_timestamp:
-                            stealer_coords = movement_step.get("coords")
-                            break
-                    
-                    # Fallback: Use the closest timestamp if exact match not found
-                    if not stealer_coords and stealer_animation["movement"]:
-                        # Find closest timestamp
-                        closest_step = min(
-                            stealer_animation["movement"],
-                            key=lambda s: abs(s.get("timestamp", 0) - steal_timestamp)
-                        )
-                        stealer_coords = closest_step.get("coords")
-                    
-                    if stealer_coords:
-                        # Store stealer position for use in intermediate steps (will be cleared after use in followup turn)
-                        game_state["last_stealer_coords"] = stealer_coords.copy()
-                        logging.warning(f"🏀 [STEAL POSITION] Extracted from animations at step {stop_step_index} (timestamp={steal_timestamp}): x={stealer_coords['x']}, y={stealer_coords['y']}")
-                    else:
-                        logging.warning(f"⚠️ [STEAL POSITION] Could not find movement step with timestamp {steal_timestamp} in stealer animation")
+                if stealer_animation and "end" in stealer_animation:
+                    # Use the final coordinates from the animation (stopper step is always final)
+                    stealer_coords = stealer_animation["end"]
+                    game_state["last_stealer_coords"] = stealer_coords.copy()
+                    logging.warning(f"🏀 [STEAL POSITION] Extracted final coords from animation end: x={stealer_coords['x']}, y={stealer_coords['y']}")
                 else:
-                    logging.warning(f"⚠️ [STEAL POSITION] Could not find stealer animation (stealer_id={stealer_id}, has_movement={stealer_animation and 'movement' in stealer_animation if stealer_animation else False})")
+                    logging.warning(f"⚠️ [STEAL POSITION] Could not find stealer animation or 'end' field (stealer_id={stealer_id}, has_animation={stealer_animation is not None}, has_end={stealer_animation and 'end' in stealer_animation if stealer_animation else False})")
             else:
-                logging.warning(f"⚠️ [STEAL POSITION] Missing required data: stealer_id={stealer_id}, stop_step_index={stop_step_index}, has_original_steps={original_steps is not None}")
+                logging.warning(f"⚠️ [STEAL POSITION] Missing stealer_id")
         
         #need to add animations to each of these
         if event_type == "TURNOVER":
@@ -2745,15 +2723,12 @@ def resolve_full_court_press_logic(game: "GameManager"):
         
         # ✅ FIX: Extract stealer position from generated animations (SS&S approach)
         # This uses the actual calculated defensive position from the animation system
+        # For stopper results (steal, foul, turnover), the stopper step is always the final step,
+        # so we can simply use animation["end"] to get the final coordinates
         if result_type == "STEAL" and animations and defender:
             stealer_id = getattr(defender, "player_id", None)
-            steps = skeleton.get("steps", [])
             
-            if stealer_id and steps:
-                # Get the timestamp from the last skeleton step (where steal logically occurs)
-                last_step = steps[-1]
-                steal_timestamp = last_step.get("timestamp", 0)
-                
+            if stealer_id:
                 # Find the defensive animation for the stealer
                 stealer_animation = None
                 for anim in animations:
@@ -2761,27 +2736,16 @@ def resolve_full_court_press_logic(game: "GameManager"):
                         stealer_animation = anim
                         break
                 
-                if stealer_animation and "movement" in stealer_animation:
-                    # Find the movement step that matches the steal timestamp
-                    stealer_coords = None
-                    for movement_step in stealer_animation["movement"]:
-                        if movement_step.get("timestamp") == steal_timestamp:
-                            stealer_coords = movement_step.get("coords")
-                            break
-                    
-                    # Fallback: Use the last movement step if exact match not found
-                    if not stealer_coords and stealer_animation["movement"]:
-                        last_movement = stealer_animation["movement"][-1]
-                        stealer_coords = last_movement.get("coords")
-                    
-                    if stealer_coords:
-                        game_state["last_stealer_coords"] = stealer_coords.copy()
-                        defender.coords = stealer_coords.copy()
-                        logging.warning(f"🏀 [STEAL POSITION] FCP: Extracted from animations (timestamp={steal_timestamp}): x={stealer_coords['x']}, y={stealer_coords['y']}")
-                    else:
-                        logging.warning(f"⚠️ [STEAL POSITION] FCP: Could not find movement step with timestamp {steal_timestamp} in stealer animation")
+                if stealer_animation and "end" in stealer_animation:
+                    # Use the final coordinates from the animation (stopper step is always final)
+                    stealer_coords = stealer_animation["end"]
+                    game_state["last_stealer_coords"] = stealer_coords.copy()
+                    defender.coords = stealer_coords.copy()
+                    logging.warning(f"🏀 [STEAL POSITION] FCP: Extracted final coords from animation end: x={stealer_coords['x']}, y={stealer_coords['y']}")
                 else:
-                    logging.warning(f"⚠️ [STEAL POSITION] FCP: Could not find stealer animation (stealer_id={stealer_id})")
+                    logging.warning(f"⚠️ [STEAL POSITION] FCP: Could not find stealer animation or 'end' field (stealer_id={stealer_id}, has_animation={stealer_animation is not None}, has_end={stealer_animation and 'end' in stealer_animation if stealer_animation else False})")
+            else:
+                logging.warning(f"⚠️ [STEAL POSITION] FCP: Missing stealer_id")
         
         if animations:
             shot_result["animations"] = animations
@@ -3642,15 +3606,12 @@ def resolve_half_court_trap_logic(game: "GameManager"):
         
         # ✅ FIX: Extract stealer position from generated animations (SS&S approach)
         # This uses the actual calculated defensive position from the animation system
+        # For stopper results (steal, foul, turnover), the stopper step is always the final step,
+        # so we can simply use animation["end"] to get the final coordinates
         if result_type == "STEAL" and animations and defender:
             stealer_id = getattr(defender, "player_id", None)
-            steps = skeleton.get("steps", [])
             
-            if stealer_id and steps:
-                # Get the timestamp from the last skeleton step (where steal logically occurs)
-                last_step = steps[-1]
-                steal_timestamp = last_step.get("timestamp", 0)
-                
+            if stealer_id:
                 # Find the defensive animation for the stealer
                 stealer_animation = None
                 for anim in animations:
@@ -3658,27 +3619,16 @@ def resolve_half_court_trap_logic(game: "GameManager"):
                         stealer_animation = anim
                         break
                 
-                if stealer_animation and "movement" in stealer_animation:
-                    # Find the movement step that matches the steal timestamp
-                    stealer_coords = None
-                    for movement_step in stealer_animation["movement"]:
-                        if movement_step.get("timestamp") == steal_timestamp:
-                            stealer_coords = movement_step.get("coords")
-                            break
-                    
-                    # Fallback: Use the last movement step if exact match not found
-                    if not stealer_coords and stealer_animation["movement"]:
-                        last_movement = stealer_animation["movement"][-1]
-                        stealer_coords = last_movement.get("coords")
-                    
-                    if stealer_coords:
-                        game_state["last_stealer_coords"] = stealer_coords.copy()
-                        defender.coords = stealer_coords.copy()
-                        logging.warning(f"🏀 [STEAL POSITION] HCT: Extracted from animations (timestamp={steal_timestamp}): x={stealer_coords['x']}, y={stealer_coords['y']}")
-                    else:
-                        logging.warning(f"⚠️ [STEAL POSITION] HCT: Could not find movement step with timestamp {steal_timestamp} in stealer animation")
+                if stealer_animation and "end" in stealer_animation:
+                    # Use the final coordinates from the animation (stopper step is always final)
+                    stealer_coords = stealer_animation["end"]
+                    game_state["last_stealer_coords"] = stealer_coords.copy()
+                    defender.coords = stealer_coords.copy()
+                    logging.warning(f"🏀 [STEAL POSITION] HCT: Extracted final coords from animation end: x={stealer_coords['x']}, y={stealer_coords['y']}")
                 else:
-                    logging.warning(f"⚠️ [STEAL POSITION] HCT: Could not find stealer animation (stealer_id={stealer_id})")
+                    logging.warning(f"⚠️ [STEAL POSITION] HCT: Could not find stealer animation or 'end' field (stealer_id={stealer_id}, has_animation={stealer_animation is not None}, has_end={stealer_animation and 'end' in stealer_animation if stealer_animation else False})")
+            else:
+                logging.warning(f"⚠️ [STEAL POSITION] HCT: Missing stealer_id")
         
         if animations:
             shot_result["animations"] = animations
