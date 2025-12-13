@@ -733,17 +733,8 @@ def resolve_fast_break_logic(game: "GameManager"):
     else:  # STEAL
         ball_handler = game_state.get("last_stealer")
         
-        # ✅ DEBUG: Log Fast Break steal entry check
-        logging.warning(f"🏀 [FAST BREAK STEAL ENTRY CHECK] Entry:")
-        logging.warning(f"  last_stealer: {get_name_safe(ball_handler) if ball_handler else 'None'}")
-        logging.warning(f"  offensive_state: {game_state.get('offensive_state')}")
-        logging.warning(f"  current_turn: FAST_BREAK")
-        
         if ball_handler is None:
             ball_handler = off_lineup["PG"]
-            logging.warning(f"  ⚠️ last_stealer was None, using PG fallback: {get_name_safe(ball_handler)}")
-        else:
-            logging.warning(f"  ✅ last_stealer found: {get_name_safe(ball_handler)} (ID: {getattr(ball_handler, 'player_id', None)})")
         
         fb_roles["ball_handler"] = ball_handler
         fb_roles["ball_handler_id"] = getattr(ball_handler, "player_id", None)  # ✅ Store ID for frontend
@@ -902,11 +893,9 @@ def resolve_fast_break_logic(game: "GameManager"):
             stealer_coords = game_state["last_stealer_coords"]
             ball_handler_start_x = stealer_coords.get("x", 50)
             ball_handler_start_y = stealer_coords.get("y", 25)
-            logging.warning(f"🏀 [STEAL ENTRY] Using stored stealer position: x={ball_handler_start_x}, y={ball_handler_start_y}")
         else:
             ball_handler_start_x = getattr(ball_handler, "coords", {}).get("x", 50)
             ball_handler_start_y = getattr(ball_handler, "coords", {}).get("y", 25)
-            logging.warning(f"⚠️ [STEAL ENTRY] No stored position, using ball_handler.coords: x={ball_handler_start_x}, y={ball_handler_start_y}")
         
         # Calculate steal entry movement
         steal_entry_move_x = random.randint(STEAL_ENTRY_MOVE_X_MIN, STEAL_ENTRY_MOVE_X_MAX)
@@ -921,17 +910,6 @@ def resolve_fast_break_logic(game: "GameManager"):
         ball_handler_move_y = steal_entry_move_y
         ball_handler_outlet_x = ball_handler_after_entry_x  # Position after steal entry movement
         ball_handler_outlet_y = ball_handler_after_entry_y  # Position after steal entry movement
-        
-        # ✅ DETAILED LOGGING: Track Steal Entry calculation
-        is_away_offense = off_team.team_id == game.away_team.team_id
-        logging.warning(f"🏀 [STEAL ENTRY] ✅ ACTIVATED - Detailed Calculation:")
-        logging.warning(f"  Starting Position: x={ball_handler_start_x}, y={ball_handler_start_y}")
-        logging.warning(f"  Offense Team: {off_team.name} (is_away_offense={is_away_offense})")
-        logging.warning(f"  Direction: {direction} ({'toward x=10 (away basket)' if is_away_offense else 'toward x=90 (home basket)'})")
-        logging.warning(f"  Movement: x={steal_entry_move_x} (direction={direction}), y={steal_entry_move_y}")
-        logging.warning(f"  Calculation: {ball_handler_start_x} + ({direction} * {steal_entry_move_x}) = {ball_handler_after_entry_x}")
-        logging.warning(f"  Final Target Position: x={ball_handler_after_entry_x}, y={ball_handler_after_entry_y}")
-        logging.warning(f"  Stealer: {get_name_safe(ball_handler)} (ID: {getattr(ball_handler, 'player_id', 'N/A')})")
     
     # Store ball handler position for animation (after outlet pass for DREB, after steal entry for steals)
     fb_roles["ball_handler_outlet_x"] = ball_handler_outlet_x
@@ -941,15 +919,10 @@ def resolve_fast_break_logic(game: "GameManager"):
     fb_roles["is_away_offense"] = is_away_offense  # ✅ Store for animator to use
     fb_roles["is_steal_entry"] = not rebound  # ✅ Flag to indicate steal entry vs outlet pass
     
-    # ✅ DEBUG: Log steal entry flag
+    # ✅ SS&S: Clear steal-related data after using it (so it doesn't persist to subsequent turns)
     if not rebound:
-        logging.warning(f"  ✅ Steal Entry flag set: is_steal_entry=True")
-        logging.warning(f"  ✅ Steal Entry movement calculated: x={ball_handler_move_x}, y={ball_handler_move_y}")
-        logging.warning(f"  ✅ Steal Entry target position: x={ball_handler_outlet_x}, y={ball_handler_outlet_y}")
-        # ✅ SS&S: Clear steal-related data after using it (so it doesn't persist to subsequent turns)
         game_state.pop("last_stealer_coords", None)
         game_state["last_stealer"] = None
-        logging.warning(f"  ✅ Cleared last_stealer and last_stealer_coords after Steal Entry")
     
     # ✅ FIX: Use actual defender coordinates instead of simulating random positions
     # Defenders are already positioned on the court after the shot attempt
@@ -1971,14 +1944,22 @@ def resolve_half_court_offense_logic(game):
     # to be based on ball handler's position, not shooter's position
     # assign_roles() assigns defender based on shooter, but for steals we need
     # whoever is guarding the ball handler at the time of the steal
+    logging.warning(f"🔍 [DEFENDER OVERRIDE] Checking if override needed. result={result}, result in list? {result in ['STEAL', 'DEAD_BALL_TURNOVER', 'O_FOUL', 'D_FOUL']}")
     if result in ["STEAL", "DEAD_BALL_TURNOVER", "O_FOUL", "D_FOUL"]:
+        logging.warning(f"🔍 [DEFENDER OVERRIDE] ✅ Condition met! Overriding defender for result: {result}")
         ball_handler = roles.get("ball_handler")
+        logging.warning(f"🔍 [DEFENDER OVERRIDE] ball_handler from roles: {get_name_safe(ball_handler) if ball_handler else 'None'}")
         if ball_handler:
             ball_handler_pos = get_player_position(off_lineup, ball_handler)
+            logging.warning(f"🔍 [DEFENDER OVERRIDE] ball_handler_pos: {ball_handler_pos}")
+            logging.warning(f"🔍 [DEFENDER OVERRIDE] Current defender from roles: {get_name_safe(roles.get('defender')) if roles.get('defender') else 'None'}")
             
             from BackEnd.utils.defense_utils import is_zone_defense
-            if is_zone_defense(def_call):
+            is_zone = is_zone_defense(def_call)
+            logging.warning(f"🔍 [DEFENDER OVERRIDE] Defense type: {def_call}, is_zone_defense: {is_zone}")
+            if is_zone:
                 # Zone defense: use actual zone assignment logic to find which defender(s) are guarding the ball handler
+                logging.warning(f"🔍 [DEFENDER OVERRIDE] Entering zone defense logic")
                 from BackEnd.utils.shared_defense import (
                     _get_23_zone_boundaries, _get_32_zone_boundaries, _get_131_zone_boundaries,
                     assign_all_zone_defenders
@@ -2070,35 +2051,54 @@ def resolve_half_court_offense_logic(game):
                 
                 # Find which defender(s) are actually guarding the ball handler
                 defenders_guarding_ball_handler = []
+                logging.warning(f"🔍 [DEFENDER OVERRIDE] defender_to_offensive_player: {defender_to_offensive_player}")
+                logging.warning(f"🔍 [DEFENDER OVERRIDE] ball_handler_id: {ball_handler_id}")
                 for def_pos, guarded_player_id in defender_to_offensive_player.items():
                     if guarded_player_id == ball_handler_id:
                         defenders_guarding_ball_handler.append(def_pos)
+                        logging.warning(f"🔍 [DEFENDER OVERRIDE] Found defender {def_pos} guarding ball handler")
+                
+                logging.warning(f"🔍 [DEFENDER OVERRIDE] defenders_guarding_ball_handler: {defenders_guarding_ball_handler} (count: {len(defenders_guarding_ball_handler)})")
                 
                 # Handle overlapping zones per user requirements:
                 # 1. If only one defender is guarding the ball handler, use that one
                 # 2. If two defenders are guarding the ball handler, randomly pick one
                 if len(defenders_guarding_ball_handler) == 1:
                     defender_pos = defenders_guarding_ball_handler[0]
+                    logging.warning(f"🔍 [DEFENDER OVERRIDE] Single defender found: {defender_pos}")
                 elif len(defenders_guarding_ball_handler) >= 2:
                     # Two or more defenders guarding ball handler - randomly pick one
                     defender_pos = random.choice(defenders_guarding_ball_handler)
+                    logging.warning(f"🔍 [DEFENDER OVERRIDE] Multiple defenders found, randomly selected: {defender_pos} from {defenders_guarding_ball_handler}")
                 else:
                     # No defender assigned to guard ball handler (shouldn't happen, but fallback)
                     # Fallback: use position match
                     defender_pos = ball_handler_pos
+                    logging.warning(f"🔍 [DEFENDER OVERRIDE] ⚠️ No defender found guarding ball handler, using fallback position match: {defender_pos}")
                 
                 defender = def_lineup.get(defender_pos) if defender_pos else def_lineup.get("PG")
+                logging.warning(f"🔍 [DEFENDER OVERRIDE] Zone defense - Selected defender: {get_name_safe(defender)} (position: {defender_pos})")
             else:
                 # Man-to-man: defender matches ball handler position
+                logging.warning(f"🔍 [DEFENDER OVERRIDE] Entering man-to-man logic")
                 defender = def_lineup.get(ball_handler_pos) if ball_handler_pos else def_lineup.get("PG")
+                logging.warning(f"🔍 [DEFENDER OVERRIDE] Man-to-man - Selected defender: {get_name_safe(defender)} (position: {ball_handler_pos})")
             
             if defender:
+                old_defender = roles.get("defender")
                 roles["defender"] = defender
-                logging.warning(f"🏀 [DEFENDER OVERRIDE] Non-shot outcome ({result}): Overriding defender")
+                logging.warning(f"🏀 [DEFENDER OVERRIDE] ✅ SUCCESS - Overriding defender for non-shot outcome ({result})")
+                logging.warning(f"  Old defender: {get_name_safe(old_defender) if old_defender else 'None'} (position: {get_player_position(def_lineup, old_defender) if old_defender else 'N/A'})")
+                logging.warning(f"  New defender: {get_name_safe(defender)} (position: {get_player_position(def_lineup, defender)})")
                 logging.warning(f"  Ball handler: {get_name_safe(ball_handler)} (position: {ball_handler_pos})")
-                logging.warning(f"  Defender: {get_name_safe(defender)} (position: {get_player_position(def_lineup, defender)})")
-                if is_zone_defense(def_call):
+                if is_zone:
                     logging.warning(f"  Zone defense: Found defender in zone containing ball handler")
+            else:
+                logging.warning(f"🔍 [DEFENDER OVERRIDE] ⚠️ WARNING - No defender found, override skipped")
+        else:
+            logging.warning(f"🔍 [DEFENDER OVERRIDE] ⚠️ WARNING - ball_handler is None, cannot override")
+    else:
+        logging.warning(f"🔍 [DEFENDER OVERRIDE] Condition not met (result={result}), skipping override")
     
     # Extract intended shooter from successful variant
     intended_shooter_pos = None
@@ -2127,15 +2127,6 @@ def resolve_half_court_offense_logic(game):
     hco_setup_final_x = None
     hco_setup_final_y = None
     
-    # ✅ DEBUG: Log Steal HCO Setup check
-    logging.warning(f"🏀 [STEAL HCO SETUP CHECK] Entry:")
-    logging.warning(f"  result from generate_logic: {result}")
-    logging.warning(f"  last_stealer: {get_name_safe(last_stealer) if last_stealer else 'None'}")
-    logging.warning(f"  last_stealer_coords: {game_state.get('last_stealer_coords', 'None')}")
-    logging.warning(f"  offensive_state: {game_state.get('offensive_state')}")
-    logging.warning(f"  current_turn: HCO")
-    logging.warning(f"  Condition check: result != 'STEAL'? {result != 'STEAL'}, last_stealer exists? {last_stealer is not None}")
-    
     # ✅ FIX: Run HCO Setup if last_stealer exists and next turn is HCO
     # This runs regardless of the current turn's result (even if it's another steal)
     # Once a steal happens and transitions to HCO, the HCO Setup Step should always run in the next HCO turn
@@ -2143,7 +2134,6 @@ def resolve_half_court_offense_logic(game):
         # Check if the previous turn was a steal that transitioned to HCO
         # This happens when last_stealer is set and offensive_state is HCO (not FAST_BREAK)
         offensive_state = game_state.get("offensive_state")
-        logging.warning(f"  ✅ last_stealer found, checking offensive_state: {offensive_state}")
         if offensive_state == "HCO":
             is_steal_hco_setup = True
             ball_handler = last_stealer
@@ -2154,11 +2144,9 @@ def resolve_half_court_offense_logic(game):
                 stealer_coords = game_state["last_stealer_coords"]
                 ball_handler_start_x = stealer_coords.get("x", 50)
                 ball_handler_start_y = stealer_coords.get("y", 25)
-                logging.warning(f"🏀 [STEAL HCO SETUP] Using stored stealer position: x={ball_handler_start_x}, y={ball_handler_start_y}")
             else:
                 ball_handler_start_x = getattr(ball_handler, "coords", {}).get("x", 50)
                 ball_handler_start_y = getattr(ball_handler, "coords", {}).get("y", 25)
-                logging.warning(f"⚠️ [STEAL HCO SETUP] No stored position, using ball_handler.coords: x={ball_handler_start_x}, y={ball_handler_start_y}")
             
             # Determine direction away from basket (opposite of steal entry)
             # Home offense: basket at x=90, so away = -1 (left, toward x=10)
@@ -2176,16 +2164,6 @@ def resolve_half_court_offense_logic(game):
             # Apply movement away from basket
             hco_setup_final_x = ball_handler_start_x + (direction * hco_setup_move_x)
             hco_setup_final_y = max(STEAL_HCO_SETUP_Y_MIN, min(STEAL_HCO_SETUP_Y_MAX, ball_handler_start_y + hco_setup_move_y))
-            
-            # ✅ DETAILED LOGGING: Track HCO Setup Step calculation
-            logging.warning(f"🏀 [STEAL HCO SETUP] ✅ ACTIVATED - Detailed Calculation:")
-            logging.warning(f"  Starting Position: x={ball_handler_start_x}, y={ball_handler_start_y}")
-            logging.warning(f"  Offense Team: {off_team.name} (is_away_offense={is_away_offense})")
-            logging.warning(f"  Direction: {direction} ({'away from x=10 (toward x=90)' if is_away_offense else 'away from x=90 (toward x=10)'})")
-            logging.warning(f"  Movement: x={hco_setup_move_x} (direction={direction}), y={hco_setup_move_y}")
-            logging.warning(f"  Calculation: {ball_handler_start_x} + ({direction} * {hco_setup_move_x}) = {hco_setup_final_x}")
-            logging.warning(f"  Final Target Position: x={hco_setup_final_x}, y={hco_setup_final_y}")
-            logging.warning(f"  Stealer: {get_name_safe(ball_handler)} (ID: {getattr(ball_handler, 'player_id', 'N/A')})")
             
             # Calculate movement for all 9 other players (toward the new offense basket)
             # x_direction: +1 for home offense (toward x=90), -1 for away offense (toward x=10)
@@ -2230,12 +2208,6 @@ def resolve_half_court_offense_logic(game):
                     "move_x": pg_move_x,  # Already signed (x_direction * distance)
                     "move_y": pg_move_y
                 }
-                
-                logging.warning(f"🏀 [STEAL HCO SETUP] PG positioning (ball handler is not PG):")
-                logging.warning(f"  PG: {get_name_safe(pg_player)} (ID: {pg_id})")
-                logging.warning(f"  Ball handler position: x={ball_handler_start_x}, y={ball_handler_start_y}")
-                logging.warning(f"  PG movement: x={pg_move_x} (distance={pg_move_x_distance}, direction={x_direction}), y={pg_move_y}")
-                logging.warning(f"  PG final position: x={pg_final_x}, y={pg_final_y}")
             
             # Now handle all other players from both teams (excluding ball handler and offensive PG)
             # Get offensive PG ID to exclude it
@@ -2299,10 +2271,6 @@ def resolve_half_court_offense_logic(game):
             if pg_movement:
                 other_players_movements.append(pg_movement)
             
-            logging.warning(f"🏀 [STEAL HCO SETUP] Calculated movement for {len(other_players_movements)} other players:")
-            for movement in other_players_movements:
-                logging.warning(f"  Player {movement['player_id']}: ({movement['start_x']}, {movement['start_y']}) → ({movement['final_x']}, {movement['final_y']}) (move_x={movement['move_x']}, move_y={movement['move_y']}, x_direction={x_direction})")
-            
             # Store in roles for frontend
             roles["is_steal_hco_setup"] = True
             roles["ball_handler_hco_setup_x"] = hco_setup_final_x
@@ -2319,20 +2287,8 @@ def resolve_half_court_offense_logic(game):
             game_state.pop("steal_original_skeleton_steps", None)
             game_state.pop("last_stealer_coords", None)
             
-            logging.warning(f"🏀 [STEAL HCO SETUP] ✅ ACTIVATED - Stealer {get_name_safe(ball_handler)} moves away from basket:")
-            logging.warning(f"  Start: x={ball_handler_start_x}, y={ball_handler_start_y}")
-            logging.warning(f"  Movement: x={hco_setup_move_x} (direction={direction}), y={hco_setup_move_y}")
-            logging.warning(f"  Final: x={hco_setup_final_x}, y={hco_setup_final_y}")
-            logging.warning(f"  Roles set: is_steal_hco_setup=True, ball_handler_id={roles.get('ball_handler_id')}")
-            
             # ✅ TEMPORARY: 5 second pause after HCO Setup Step completes (for testing animation visibility)
-            logging.warning(f"⏸️ [TEMPORARY] Pausing 5 seconds after HCO Setup Step...")
             time.sleep(5)
-            logging.warning(f"▶️ [TEMPORARY] Resuming after HCO Setup Step pause")
-        else:
-            logging.warning(f"  ⚠️ last_stealer found but offensive_state != 'HCO' (is '{offensive_state}') - Steal HCO Setup SKIPPED")
-    else:
-        logging.warning(f"  ⚠️ last_stealer is None - Steal HCO Setup SKIPPED")
     
     # print("inside resolve_half_court_offense_logic")
     # print("[DEBUG] roles:", roles.keys())
