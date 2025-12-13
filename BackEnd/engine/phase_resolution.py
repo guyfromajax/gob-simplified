@@ -2336,13 +2336,28 @@ def resolve_half_court_offense_logic(game):
         # Use same player determination logic as FCP/HCT for consistency
         
         # Determine ball handler from skeleton (from stopper step or last step)
-        ball_handler = get_ball_handler_from_skeleton(skeleton, off_lineup)
-        ball_handler_pos = getattr(ball_handler, 'position', None) or "PG"
-        roles["ball_handler"] = ball_handler
+        # ✅ FIX: Use ball_handler from roles if already set (from defender override logic)
+        # Otherwise, determine from skeleton (for cases where override didn't run)
+        if "ball_handler" in roles and roles["ball_handler"]:
+            ball_handler = roles["ball_handler"]
+        else:
+            ball_handler = get_ball_handler_from_skeleton(skeleton, off_lineup)
+            roles["ball_handler"] = ball_handler
         
-        # Determine defender based on ball handler position (same as FCP/HCT)
-        defender = def_lineup.get(ball_handler_pos, def_lineup.get("PG", list(def_lineup.values())[0] if def_lineup else None))
-        roles["defender"] = defender
+        ball_handler_pos = getattr(ball_handler, 'position', None) or "PG"
+        
+        # ✅ FIX: Only set defender if not already set by override logic
+        # The defender override logic (for steals/turnovers/fouls) should have already set
+        # the correct defender based on ball handler position and zone/man defense
+        if "defender" not in roles or not roles["defender"]:
+            # Determine defender based on ball handler position (same as FCP/HCT)
+            defender = def_lineup.get(ball_handler_pos, def_lineup.get("PG", list(def_lineup.values())[0] if def_lineup else None))
+            roles["defender"] = defender
+            logging.warning(f"🔍 [STOPPER SYSTEM] Set defender from ball_handler_pos: {get_name_safe(defender)} (position: {ball_handler_pos})")
+        else:
+            # Use the defender that was already set by override logic
+            defender = roles["defender"]
+            logging.warning(f"🔍 [STOPPER SYSTEM] Using defender from override logic: {get_name_safe(defender)} (position: {get_player_position(def_lineup, defender)})")
         
         # Set foul_player using SS&S helper function (same as FCP/HCT)
         if event_type in ["O_FOUL", "D_FOUL"]:
