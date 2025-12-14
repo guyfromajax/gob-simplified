@@ -458,7 +458,9 @@ class TurnManager:
         # ✅ REMOVED: possession_team_id (fully migrated to offense_team_id in SS&S refactor)
         
         # ✅ SS&S: Initialize offense_override_cleared flag (starts False, set to True if user override was used and cleared)
-        result["offense_override_cleared"] = False
+        # Only initialize if not already set (HCO turns set it from calls, other turn types default to False)
+        if "offense_override_cleared" not in result:
+            result["offense_override_cleared"] = False
         
         # ✅ SS&S: Set current_turn based on offensive_state
         # This explicitly identifies what type of turn this is
