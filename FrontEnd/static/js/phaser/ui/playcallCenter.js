@@ -104,7 +104,9 @@ export function updatePlaycallCenter(turnData, homeTeamId) {
     const defType = defPlaycall || turnData.defensive_play_type;
     if (defType) {
       const formattedDefType = defType.charAt(0).toUpperCase() + defType.slice(1);
-    const aggr = turnData.aggression || 'Normal';
+      // ✅ SS&S: Use defense_aggression_call from backend (set by set_strategy_calls)
+      const aggrRaw = turnData.defense_aggression_call || turnData.aggression || 'normal';
+      const aggr = aggrRaw.charAt(0).toUpperCase() + aggrRaw.slice(1); // Capitalize first letter
       defenseStatusText.textContent = `${formattedDefType} ${aggr}`;
     }
   }
@@ -124,7 +126,8 @@ export function updatePlaycallCenter(turnData, homeTeamId) {
   // Otherwise fall back to defensive_play_type (just "Man" or "Zone")
   const defensePlaycall = turnData.defensive_playcall || turnData.defense_playcall;
   const defenseType = defensePlaycall || turnData.defensive_play_type;
-  const aggression = turnData.aggression || 'normal';
+  // ✅ SS&S: Use defense_aggression_call from backend (set by set_strategy_calls)
+  const aggression = turnData.defense_aggression_call || turnData.aggression || 'normal';
   
   if (typeof window.showPlaycallReveal === 'function' && playType && playFocus && defenseType) {
     // Get EV from backend calculation (if available), otherwise fallback to random
