@@ -1753,17 +1753,21 @@ def set_playcall_override_endpoint(request: PlaycallOverrideRequest):
     # Determine user team
     user_team = gm.home_team if request.user_team_side == "home" else gm.away_team
     
-    # ✅ DEBUG: Log team info
-    logging.info(f"🎮 [PLAYCALL DEBUG] API: user_team_side={request.user_team_side}, user_team={user_team.name}, is_user_team={user_team.is_user_team}")
-    logging.info(f"🎮 [PLAYCALL DEBUG] API: Current strategy_calls: {user_team.strategy_calls}")
+    # ✅ DEBUG: Log team info with object IDs for tracking
+    user_team_id = id(user_team)  # Python object ID to verify same object
+    logging.warning(f"🎮 [PLAYCALL SET] API: Setting override on team object")
+    logging.warning(f"   - user_team_side={request.user_team_side}, user_team={user_team.name}")
+    logging.warning(f"   - team_id={user_team.team_id}, object_id={user_team_id}")
+    logging.warning(f"   - Current strategy_calls: {user_team.strategy_calls}")
+    logging.warning(f"   - game_id={game_id}, game_object_id={id(gm)}")
     
     # ✅ SS&S: Update calls (None clears the call)
     # offense_call and defense_call persist until used, then are cleared automatically
     if request.offense_override is not None:
         user_team.strategy_calls["offense_call"] = request.offense_override
-        logging.info(f"🎮 [PLAYCALL SELECTED] User selected offense playcall: '{request.offense_override}' for {user_team.name}")
-        logging.info(f"🎮 [PLAYCALL] API: Set offense_call for {user_team.name}: {request.offense_override}")
-        logging.info(f"🎮 [PLAYCALL DEBUG] API: After setting, strategy_calls['offense_call'] = {user_team.strategy_calls.get('offense_call')}")
+        logging.warning(f"🎮 [PLAYCALL SET] ✅ Offense override SET: '{request.offense_override}'")
+        logging.warning(f"   - Team: {user_team.name} (team_id: {user_team.team_id}, object_id: {id(user_team)})")
+        logging.warning(f"   - After setting, strategy_calls['offense_call'] = {user_team.strategy_calls.get('offense_call')}")
     elif request.offense_override is None and "offense_override" in request.__dict__:
         # Explicitly clearing (None was passed)
         old_override = user_team.strategy_calls.get("offense_call")
@@ -1776,8 +1780,9 @@ def set_playcall_override_endpoint(request: PlaycallOverrideRequest):
     
     if request.defense_override is not None:
         user_team.strategy_calls["defense_call"] = request.defense_override
-        logging.info(f"🎮 [PLAYCALL] API: Set defense_call for {user_team.name}: {request.defense_override}")
-        logging.info(f"🎮 [PLAYCALL DEBUG] API: After setting, strategy_calls['defense_call'] = {user_team.strategy_calls.get('defense_call')}")
+        logging.warning(f"🎮 [PLAYCALL SET] ✅ Defense override SET: '{request.defense_override}'")
+        logging.warning(f"   - Team: {user_team.name} (team_id: {user_team.team_id}, object_id: {id(user_team)})")
+        logging.warning(f"   - After setting, strategy_calls['defense_call'] = {user_team.strategy_calls.get('defense_call')}")
     elif request.defense_override is None and "defense_override" in request.__dict__:
         # Explicitly clearing (None was passed)
         old_override = user_team.strategy_calls.get("defense_call")
@@ -1790,7 +1795,8 @@ def set_playcall_override_endpoint(request: PlaycallOverrideRequest):
     
     if request.aggression_override is not None:
         user_team.strategy_calls["aggression_override"] = request.aggression_override
-        logging.info(f"🎮 [PLAYCALL OVERRIDE] Set aggression override for {user_team.name}: {request.aggression_override}")
+        logging.warning(f"🎮 [PLAYCALL SET] ✅ Aggression override SET: '{request.aggression_override}'")
+        logging.warning(f"   - Team: {user_team.name} (team_id: {user_team.team_id}, object_id: {id(user_team)})")
     elif request.aggression_override is None and "aggression_override" in request.__dict__:
         # Explicitly clearing (None was passed)
         old_override = user_team.strategy_calls.get("aggression_override")
