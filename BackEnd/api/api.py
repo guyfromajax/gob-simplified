@@ -1766,8 +1766,13 @@ def set_playcall_override_endpoint(request: PlaycallOverrideRequest):
         logging.info(f"🎮 [PLAYCALL DEBUG] API: After setting, strategy_calls['offense_call'] = {user_team.strategy_calls.get('offense_call')}")
     elif request.offense_override is None and "offense_override" in request.__dict__:
         # Explicitly clearing (None was passed)
+        old_override = user_team.strategy_calls.get("offense_call")
         user_team.strategy_calls["offense_call"] = None
-        logging.info(f"🎮 [PLAYCALL] API: Cleared offense_call for {user_team.name}")
+        logging.warning(f"🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴")
+        logging.warning(f"🔴 [OVERRIDE CLEARED] API: Offense override CLEARED by user (red X button)")
+        logging.warning(f"🔴   Team: {user_team.name} (team_id: {user_team.team_id})")
+        logging.warning(f"🔴   Override that was cleared: '{old_override}'")
+        logging.warning(f"🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴")
     
     if request.defense_override is not None:
         user_team.strategy_calls["defense_call"] = request.defense_override
@@ -1775,12 +1780,26 @@ def set_playcall_override_endpoint(request: PlaycallOverrideRequest):
         logging.info(f"🎮 [PLAYCALL DEBUG] API: After setting, strategy_calls['defense_call'] = {user_team.strategy_calls.get('defense_call')}")
     elif request.defense_override is None and "defense_override" in request.__dict__:
         # Explicitly clearing (None was passed)
+        old_override = user_team.strategy_calls.get("defense_call")
         user_team.strategy_calls["defense_call"] = None
-        logging.info(f"🎮 [PLAYCALL] API: Cleared defense_call for {user_team.name}")
+        logging.warning(f"🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴")
+        logging.warning(f"🔴 [OVERRIDE CLEARED] API: Defense override CLEARED by user (red X button)")
+        logging.warning(f"🔴   Team: {user_team.name} (team_id: {user_team.team_id})")
+        logging.warning(f"🔴   Override that was cleared: '{old_override}'")
+        logging.warning(f"🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴")
     
     if request.aggression_override is not None:
         user_team.strategy_calls["aggression_override"] = request.aggression_override
         logging.info(f"🎮 [PLAYCALL OVERRIDE] Set aggression override for {user_team.name}: {request.aggression_override}")
+    elif request.aggression_override is None and "aggression_override" in request.__dict__:
+        # Explicitly clearing (None was passed)
+        old_override = user_team.strategy_calls.get("aggression_override")
+        user_team.strategy_calls["aggression_override"] = None
+        logging.warning(f"🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴")
+        logging.warning(f"🔴 [OVERRIDE CLEARED] API: Aggression override CLEARED by user (red X button)")
+        logging.warning(f"🔴   Team: {user_team.name} (team_id: {user_team.team_id})")
+        logging.warning(f"🔴   Override that was cleared: '{old_override}'")
+        logging.warning(f"🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴")
     
     if request.tempo_override is not None:
         user_team.strategy_calls["tempo_override"] = request.tempo_override

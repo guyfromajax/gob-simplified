@@ -862,7 +862,14 @@ class TurnManager:
             
             # ✅ SS&S: Clear offense_call from strategy_calls after use (prevents carryover to next turn)
             if is_offense_user:
+                old_override = self.game.offense_team.strategy_calls.get("offense_call")
                 self.game.offense_team.strategy_calls["offense_call"] = None
+                logging.warning(f"🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴")
+                logging.warning(f"🔴 [OVERRIDE CLEARED] Offense override CLEARED after use!")
+                logging.warning(f"🔴   Team: {self.game.offense_team.name} (team_id: {self.game.offense_team.team_id})")
+                logging.warning(f"🔴   Override that was cleared: '{old_override}'")
+                logging.warning(f"🔴   Playcall that was used: '{chosen_playcall}'")
+                logging.warning(f"🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴")
             self.game.game_state["user_offense_override"] = None  # Legacy clear
             
             # Lookup play details from database to get play_type and play_focus
@@ -1189,7 +1196,9 @@ class TurnManager:
             if tempo_override:
                 self.game.offense_team.strategy_calls["tempo_call"] = tempo_override
                 # Clear override after use
+                old_tempo_override = self.game.offense_team.strategy_calls.get("tempo_override")
                 self.game.offense_team.strategy_calls["tempo_override"] = None
+                logging.warning(f"🔴 [OVERRIDE CLEARED] Tempo override CLEARED after use: '{old_tempo_override}' for {self.game.offense_team.name}")
                 logging.info(f"🎮 [PLAYCALL OVERRIDE] Using tempo override: {tempo_override}")
             else:
                 tempo_setting = self.game.offense_team.strategy_settings.get("tempo", 2)
