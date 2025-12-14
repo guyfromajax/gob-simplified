@@ -1638,9 +1638,6 @@ def generate_logic(off_call, def_call, off_team, def_team, off_lineup, def_lineu
         k=1
     )[0]
     
-    # ✅ TEMPORARY TEST CODE: Force all HCO turns to result in STEAL
-    result = "STEAL"
-    logging.warning(f"🧪 [TEST MODE] Forcing HCO result to STEAL")
     # Analyze skeleton to count screen attempts
     screen_attempts_by_pos = {}
     if game:
@@ -1814,6 +1811,8 @@ def resolve_half_court_offense_logic(game):
 
     # Generate logic to determine result and lean score
     result, lean_score = generate_logic(off_call, def_call, off_team, def_team, off_lineup, def_lineup, game=game)
+    
+    # ✅ REMOVED: Test code that forced all HCO turns to be steals
     
     # Log result received for debugging
     logging.warning(f"🎯 [HCO RESOLVE] Received result: {result}, lean_score: {lean_score:.2f}")
@@ -2786,10 +2785,6 @@ def resolve_full_court_press_logic(game: "GameManager"):
     else:
         result_type = random.choices(["O_FOUL", "DEAD_BALL_TURNOVER", "STEAL"], weights=[0.2, 0.5, 0.3])[0]
     
-    # ✅ TEMPORARY TEST CODE: Force all FCP turns to result in STEAL
-    result_type = "STEAL"
-    logging.warning(f"🧪 [TEST MODE] Forcing FCP result to STEAL")
-    
     result_text_dict = {
         "HCO": "they break the press & establish their half court offense",
         "D_FOUL": "defensive foul!",
@@ -3674,9 +3669,7 @@ def resolve_half_court_trap_logic(game: "GameManager"):
     else:
         result_type = random.choices(["O_FOUL", "DEAD_BALL_TURNOVER", "STEAL"], weights=[0.2, 0.5, 0.3])[0]
     
-    # ✅ TEMPORARY TEST CODE: Force all HCT turns to result in STEAL
-    result_type = "STEAL"
-    logging.warning(f"🧪 [TEST MODE] Forcing HCT result to STEAL")
+    # ✅ REMOVED: Test code that forced all HCT turns to be steals
     
     result_text_dict = {
         "HCO": "they break the trap & establish their half court offense",
