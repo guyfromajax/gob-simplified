@@ -799,6 +799,9 @@ class TurnManager:
         is_offense_user = (user_team_side == "home" and self.game.offense_team.is_home_team) or (user_team_side == "away" and not self.game.offense_team.is_home_team)
         
         logging.warning(f"🎮 [PLAYCALL DEBUG] Checking offense team: {self.game.offense_team.name}, user_team_side={user_team_side}, is_offense_user={is_offense_user}")
+        logging.warning(f"   - Home team: {self.game.home_team.name} (team_id: {self.game.home_team.team_id}, is_home_team: {self.game.home_team.is_home_team})")
+        logging.warning(f"   - Away team: {self.game.away_team.name} (team_id: {self.game.away_team.team_id}, is_home_team: {self.game.away_team.is_home_team})")
+        logging.warning(f"   - Offense team: {self.game.offense_team.name} (team_id: {self.game.offense_team.team_id}, is_home_team: {self.game.offense_team.is_home_team})")
         if is_offense_user:
             offense_call = self.game.offense_team.strategy_calls.get("offense_call")
             logging.info(f"🎮 [PLAYCALL DEBUG] offense_call value: {offense_call}, type: {type(offense_call)}")
