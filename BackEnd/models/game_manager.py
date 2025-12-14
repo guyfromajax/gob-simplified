@@ -35,6 +35,11 @@ class GameManager:
         self.defense_team = self.away_team
 
         self.game_state = self._init_game_state()
+        
+        # ✅ SS&S: Store user_team_side in game_state for persistent override checking
+        # This is more reliable than is_user_team flag which isn't persisted to DB
+        if user_team_side:
+            self.game_state["user_team_side"] = user_team_side
 
         self.turn_manager = TurnManager(self)
         self.shot_manager = ShotManager(self)

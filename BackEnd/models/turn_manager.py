@@ -309,7 +309,14 @@ class TurnManager:
         self.set_strategy_calls()
         
         # ✅ LOG: Check for Playcall Center overrides at start of turn
-        user_team = self.game.home_team if self.game.home_team.is_user_team else (self.game.away_team if self.game.away_team.is_user_team else None)
+        # ✅ SS&S: Use game_state["user_team_side"] instead of is_user_team flag (more reliable, persists to DB)
+        user_team_side = self.game.game_state.get("user_team_side")
+        user_team = None
+        if user_team_side == "home":
+            user_team = self.game.home_team
+        elif user_team_side == "away":
+            user_team = self.game.away_team
+        
         if user_team:
             offense_override = user_team.strategy_calls.get("offense_call")
             defense_override = user_team.strategy_calls.get("defense_call")
@@ -321,7 +328,7 @@ class TurnManager:
             
             logging.info(f"🎮 [TURN START] Playcall sources - Offense: {offense_source} ({offense_override or 'N/A'}), Defense: {defense_source} ({defense_override or 'N/A'}), Aggression: {aggression_source} ({aggression_override or 'N/A'})")
         else:
-            logging.info(f"🎮 [TURN START] No user team found - all playcalls using STANDARD LOGIC")
+            logging.info(f"🎮 [TURN START] No user team found (user_team_side={user_team_side}) - all playcalls using STANDARD LOGIC")
 
         # ✅ DEBUG: Log offensive_state transition (previous turn → current turn)
         # This is the critical transition point where offensive_state determines routing
@@ -785,9 +792,13 @@ class TurnManager:
         # ✅ SS&S: Check for user-set calls in team.strategy_calls
         # If offense_call is not None, use it and clear after use
         # If None, use normal selection process
+        # ✅ SS&S: Use game_state["user_team_side"] instead of is_user_team flag (more reliable, persists to DB)
         offense_call = None
-        logging.info(f"🎮 [PLAYCALL DEBUG] Checking offense team: {self.game.offense_team.name}, is_user_team={self.game.offense_team.is_user_team}")
-        if self.game.offense_team.is_user_team:
+        user_team_side = self.game.game_state.get("user_team_side")
+        is_offense_user = (user_team_side == "home" and self.game.offense_team.is_home_team) or (user_team_side == "away" and not self.game.offense_team.is_home_team)
+        
+        logging.info(f"🎮 [PLAYCALL DEBUG] Checking offense team: {self.game.offense_team.name}, user_team_side={user_team_side}, is_offense_user={is_offense_user}")
+        if is_offense_user:
             offense_call = self.game.offense_team.strategy_calls.get("offense_call")
             logging.info(f"🎮 [PLAYCALL DEBUG] offense_call value: {offense_call}, type: {type(offense_call)}")
             logging.info(f"🎮 [PLAYCALL DEBUG] Full strategy_calls: {self.game.offense_team.strategy_calls}")
@@ -796,12 +807,16 @@ class TurnManager:
             else:
                 logging.info(f"🎮 [PLAYCALL] No user offense call for {self.game.offense_team.name} (offense_call is None), using normal selection")
         else:
-            logging.info(f"🎮 [PLAYCALL DEBUG] Offense team {self.game.offense_team.name} is NOT user team, skipping offense_call check")
+            logging.info(f"🎮 [PLAYCALL DEBUG] Offense team {self.game.offense_team.name} is NOT user team (user_team_side={user_team_side}), skipping offense_call check")
         
         # Check if user team has defense_call set (regardless of current offense/defense)
         # Defense override can be set when user is on offense (for next time they're on defense)
         defense_call = None
-        user_team = self.game.home_team if self.game.home_team.is_user_team else (self.game.away_team if self.game.away_team.is_user_team else None)
+        user_team = None
+        if user_team_side == "home":
+            user_team = self.game.home_team
+        elif user_team_side == "away":
+            user_team = self.game.away_team
         
         if user_team:
             defense_call = user_team.strategy_calls.get("defense_call")
@@ -811,7 +826,7 @@ class TurnManager:
             else:
                 logging.info(f"🎮 [PLAYCALL] No user defense call for {user_team.name} (defense_call is None), using normal selection")
         else:
-            logging.info(f"🎮 [PLAYCALL DEBUG] No user team found, skipping defense_call check")
+            logging.info(f"🎮 [PLAYCALL DEBUG] No user team found (user_team_side={user_team_side}), skipping defense_call check")
         
         # Legacy support: Also check game_state for backward compatibility (will be removed)
         user_offense = self.game.game_state.get("user_offense_override") or offense_call
@@ -824,7 +839,7 @@ class TurnManager:
             
             # ✅ LOUD DEBUG: Compare selected vs used playcall (BEFORE clearing)
             stored_call = None
-            if self.game.offense_team.is_user_team:
+            if is_offense_user:
                 stored_call = self.game.offense_team.strategy_calls.get("offense_call")
             
             if stored_call == chosen_playcall:
@@ -842,7 +857,7 @@ class TurnManager:
             logging.info(f"🎮 [PLAYCALL] Using user offense call: {chosen_playcall} (clearing offense_call after use)")
             
             # ✅ SS&S: Clear offense_call from strategy_calls after use (prevents carryover to next turn)
-            if self.game.offense_team.is_user_team:
+            if is_offense_user:
                 self.game.offense_team.strategy_calls["offense_call"] = None
             self.game.game_state["user_offense_override"] = None  # Legacy clear
             
@@ -1161,7 +1176,11 @@ class TurnManager:
 
         # Set tempo/aggression calls (string values for time elapsed and foul calculations)
         # ✅ SS&S: Check for overrides in team.strategy_calls first
-        if self.game.offense_team.is_user_team:
+        # ✅ SS&S: Use game_state["user_team_side"] instead of is_user_team flag (more reliable, persists to DB)
+        user_team_side = self.game.game_state.get("user_team_side")
+        is_offense_user = (user_team_side == "home" and self.game.offense_team.is_home_team) or (user_team_side == "away" and not self.game.offense_team.is_home_team)
+        
+        if is_offense_user:
             tempo_override = self.game.offense_team.strategy_calls.get("tempo_override")
             if tempo_override:
                 self.game.offense_team.strategy_calls["tempo_call"] = tempo_override
@@ -1177,7 +1196,13 @@ class TurnManager:
         
         # ✅ SS&S: Check for aggression_override in user_team.strategy_calls (regardless of current offense/defense)
         # Aggression override can be set when user is on offense (for next time they're on defense)
-        user_team = self.game.home_team if self.game.home_team.is_user_team else (self.game.away_team if self.game.away_team.is_user_team else None)
+        # ✅ SS&S: Use game_state["user_team_side"] instead of is_user_team flag (more reliable, persists to DB)
+        user_team = None
+        if user_team_side == "home":
+            user_team = self.game.home_team
+        elif user_team_side == "away":
+            user_team = self.game.away_team
+        
         if user_team:
             aggression_override = user_team.strategy_calls.get("aggression_override")
             if aggression_override:
