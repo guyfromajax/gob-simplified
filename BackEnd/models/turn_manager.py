@@ -308,6 +308,21 @@ class TurnManager:
 
         # STEP 1: Set strategy calls (tempo + aggression)
         self.set_strategy_calls()
+        
+        # ✅ LOG: Check for Playcall Center overrides at start of turn
+        user_team = self.game.home_team if self.game.home_team.is_user_team else (self.game.away_team if self.game.away_team.is_user_team else None)
+        if user_team:
+            offense_override = user_team.strategy_calls.get("offense_call")
+            defense_override = user_team.strategy_calls.get("defense_call")
+            aggression_override = user_team.strategy_calls.get("aggression_override")
+            
+            offense_source = "PLAYCALL CENTER" if offense_override else "STANDARD LOGIC"
+            defense_source = "PLAYCALL CENTER" if defense_override else "STANDARD LOGIC"
+            aggression_source = "PLAYCALL CENTER" if aggression_override else "STANDARD LOGIC"
+            
+            logging.info(f"🎮 [TURN START] Playcall sources - Offense: {offense_source} ({offense_override or 'N/A'}), Defense: {defense_source} ({defense_override or 'N/A'}), Aggression: {aggression_source} ({aggression_override or 'N/A'})")
+        else:
+            logging.info(f"🎮 [TURN START] No user team found - all playcalls using STANDARD LOGIC")
 
         # ✅ DEBUG: Log offensive_state transition (previous turn → current turn)
         # This is the critical transition point where offensive_state determines routing
