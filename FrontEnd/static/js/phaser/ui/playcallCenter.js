@@ -76,52 +76,9 @@ export function updatePlaycallCenter(turnData, homeTeamId) {
     }
   }
   
-  // Check if defense playcall matches a selected button
-  if (isUserTeamOnDefense && defensivePlaycall) {
-    // Check for specific zone types (2-3 Zone, 3-2 Zone, 1-3-1 Zone) or generic "Zone"
-    const defenseType = defensivePlaycall.includes('Zone') ? 'Zone' : defensivePlaycall;
-    
-    // Try exact match first
-    let selectedDefenseBtn = document.querySelector(`.defense-override-btn.selected[data-defense="${defenseType}"]`);
-    
-    // If no exact match and turn used a specific zone type, check if user selected generic "Zone"
-    // Backend converts "Zone" to specific types (2-3 Zone, 3-2 Zone, 1-3-1 Zone)
-    // So if turn uses "2-3 Zone" but user selected "Zone", we should still match
-    if (!selectedDefenseBtn && defenseType === 'Zone' && defensivePlaycall !== 'Zone') {
-      // Turn used a specific zone type, check if user selected generic "Zone"
-      selectedDefenseBtn = document.querySelector(`.defense-override-btn.selected[data-defense="Zone"]`);
-    }
-    
-    if (selectedDefenseBtn) {
-      // This defense was selected and is now being used - clear the highlight
-      selectedDefenseBtn.classList.remove('selected');
-    }
-  }
-  
-  // Check if aggression matches a selected button
-  // Backend returns defense_aggression_call in turn result (from turn_manager.py)
-  const aggressionValue = turnData.defense_aggression_call || turnData.aggression;
-  if (isUserTeamOnDefense && aggressionValue) {
-    // Normalize aggression value from backend (could be "normal", "Normal", "passive", "Passive", etc.)
-    const normalizedAggression = aggressionValue.toLowerCase();
-    
-    // Map backend values to button data-aggression values (which are capitalized)
-    const aggressionMap = {
-      'passive': 'Passive',
-      'normal': 'Normal',
-      'aggressive': 'Aggressive'
-    };
-    
-    const buttonAggression = aggressionMap[normalizedAggression] || aggressionValue.charAt(0).toUpperCase() + aggressionValue.slice(1).toLowerCase();
-    
-    // Try to find matching selected aggression button
-    const selectedAggressionBtn = document.querySelector(`.defense-override-btn.selected[data-aggression="${buttonAggression}"]`);
-    
-    if (selectedAggressionBtn) {
-      // This aggression was selected and is now being used - clear the highlight
-      selectedAggressionBtn.classList.remove('selected');
-    }
-  }
+  // ✅ Defense and aggression buttons remain highlighted until manually cleared by user
+  // (via red X buttons or clicking different buttons)
+  // Only offense playcall buttons clear automatically after use
 
   // Panel flipping removed - offense always left, defense always right
 
