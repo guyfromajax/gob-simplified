@@ -281,7 +281,6 @@ class TurnManager:
                 step_0 = skeleton["steps"][0]
                 if "pos_actions" in step_0 and step_0["pos_actions"]:
                     payload["offense_setup_positions"] = step_0["pos_actions"]
-                    import logging
                     logging.warning(f"✅ [BASELINE_INBOUND] Including {len(step_0['pos_actions'])} skeleton step 0 positions for {next_defensive_setup} setup")
 
         return payload
@@ -467,7 +466,6 @@ class TurnManager:
             final_state = self.game.game_state.get("offensive_state", "HCO")
             next_play_type = result.get("next_play_type", "None")
             result_type = result.get("result_type", "N/A")
-            import logging
             logging.info(f"🔄 [OFFENSIVE_STATE TRANSITION] Turn #{turn_num} - AFTER HANDLER", {
                 "turn_number": turn_num,
                 "result_type": result_type,
@@ -1604,7 +1602,6 @@ class TurnManager:
             if timeout_reason in ["USER", "COMPUTER"]:
                 if calling_team.timeouts > 0:
                     calling_team.timeouts -= 1
-                    import logging
                     logging.info(f"⏸️ TIMEOUT: {calling_team.name} called timeout. Remaining: {calling_team.timeouts}")
         
         # Add foul out player info
@@ -2024,7 +2021,6 @@ class TurnManager:
 
     def assign_roles(self, off_call="INSIDE", def_call="MAN", skeleton=None):
         from BackEnd.utils.shared import get_name_safe
-        import logging
         
         game = self.game
         game_state = game.game_state
@@ -2524,11 +2520,9 @@ class TurnManager:
         # Ensure strategy_settings is initialized (but don't overwrite existing settings)
         # Only initialize if it's completely missing (None), not if it's an empty dict
         if not hasattr(def_team, 'strategy_settings') or def_team.strategy_settings is None:
-            import logging
             logging.warning(f"⚠️ [STRATEGY SETTINGS] {def_team.name} missing strategy_settings, initializing with defaults")
             def_team.strategy_settings = def_team._init_strategy_settings()
         elif isinstance(def_team.strategy_settings, dict) and len(def_team.strategy_settings) == 0:
-            import logging
             logging.warning(f"⚠️ [STRATEGY SETTINGS] {def_team.name} has empty strategy_settings dict, initializing with defaults")
             def_team.strategy_settings = def_team._init_strategy_settings()
         
@@ -2537,7 +2531,6 @@ class TurnManager:
         fcp_value = def_team.strategy_settings.get("fc_press", 0)
         
         # 🐛 DEBUG: Log strategy settings being used
-        import logging
         # ✅ COMMENTED OUT: Defensive pressure logs (cluttering transition debugging)
         # logging.warning(f"🛡️ [DEFENSIVE PRESSURE] {def_team.name} - HCT={hct_value}, FCP={fcp_value}")
         # logging.warning(f"   - Full strategy_settings: {def_team.strategy_settings}")
