@@ -1030,22 +1030,50 @@
       display: flex;
       gap: 8px;
       justify-content: center;
+      align-items: center;
+    }
+
+    /* Red X Clear Override Button for Defense Rows */
+    .defense-clear-x-btn {
+      width: 28px;
+      height: 38px;  /* Match defense button min-height exactly */
+      border-radius: 4px;
+      background: rgba(244, 67, 54, 0.2);
+      border: 2px solid rgba(244, 67, 54, 0.6);
+      color: #F44336;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+      flex-shrink: 0;  /* Don't shrink */
+    }
+
+    .defense-clear-x-btn:hover {
+      background: rgba(244, 67, 54, 0.4);
+      border-color: #F44336;
+      color: #fff;
+      box-shadow: 0 0 10px rgba(244, 67, 54, 0.6);
     }
 
     .defense-override-btn {
       flex: 1;
-      padding: 10px 12px;  /* CHANGE: reduced padding */
+      max-width: 70px;  /* Compress horizontal size to make room for red X */
+      padding: 10px 8px;  /* Reduced horizontal padding */
       background: rgba(255, 255, 255, 0.05);
       border: 2px solid rgba(255, 255, 255, 0.15);
       border-radius: 6px;
       color: rgba(255, 255, 255, 0.6);
-      font-size: 10px;  /* CHANGE: smaller font */
+      font-size: 9px;  /* Reduced font size to fit "Aggressive" when compressed */
       font-weight: 700;
-      letter-spacing: 1px;
+      letter-spacing: 0.5px;  /* Reduced letter spacing */
       cursor: pointer;
       transition: all 0.2s ease;
       text-transform: uppercase;
-      min-height: 38px;  /* CHANGE: reduced min-height */
+      min-height: 38px;  /* Keep vertical height exactly as is */
     }
 
     .defense-override-btn:hover {
@@ -2359,11 +2387,13 @@
           <div class="defense-row">
             <button class="defense-override-btn" data-defense="Man">MAN</button>
             <button class="defense-override-btn" data-defense="Zone">ZONE</button>
+            <button id="clear-defense-override-x" class="defense-clear-x-btn">✕</button>
         </div>
           <div class="defense-row">
             <button class="defense-override-btn" data-aggression="Passive">PASSIVE</button>
             <button class="defense-override-btn" data-aggression="Normal">NORMAL</button>
             <button class="defense-override-btn" data-aggression="Aggressive">AGGRESSIVE</button>
+            <button id="clear-aggression-override-x" class="defense-clear-x-btn">✕</button>
       </div>
         </div>
         <button id="clear-defense-override" class="clear-override-btn">Clear Override</button>
@@ -2811,11 +2841,35 @@
         });
       }
       
-      // Clear defense override
+      // Clear defense override (legacy button at bottom - clears both)
       if (clearDefenseBtn) {
         clearDefenseBtn.addEventListener('click', async () => {
           defenseButtons.forEach(btn => btn.classList.remove('selected'));
           await setPlaycallOverride('defense', null);
+          await setPlaycallOverride('aggression', null);
+        });
+      }
+      
+      // Clear defense override only (red X in defense row)
+      const clearDefenseXBtn = document.getElementById('clear-defense-override-x');
+      if (clearDefenseXBtn) {
+        clearDefenseXBtn.addEventListener('click', async () => {
+          // Only clear defense buttons (Man/Zone)
+          document.querySelectorAll('.defense-override-btn[data-defense]').forEach(btn => {
+            btn.classList.remove('selected');
+          });
+          await setPlaycallOverride('defense', null);
+        });
+      }
+      
+      // Clear aggression override only (red X in aggression row)
+      const clearAggressionXBtn = document.getElementById('clear-aggression-override-x');
+      if (clearAggressionXBtn) {
+        clearAggressionXBtn.addEventListener('click', async () => {
+          // Only clear aggression buttons (Passive/Normal/Aggressive)
+          document.querySelectorAll('.defense-override-btn[data-aggression]').forEach(btn => {
+            btn.classList.remove('selected');
+          });
           await setPlaycallOverride('aggression', null);
         });
       }
