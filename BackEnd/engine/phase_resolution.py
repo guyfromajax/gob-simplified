@@ -2286,9 +2286,6 @@ def resolve_half_court_offense_logic(game):
             game_state.pop("steal_stop_step_index", None)
             game_state.pop("steal_original_skeleton_steps", None)
             game_state.pop("last_stealer_coords", None)
-            
-            # ✅ TEMPORARY: 5 second pause after HCO Setup Step completes (for testing animation visibility)
-            time.sleep(5)
     
     # print("inside resolve_half_court_offense_logic")
     # print("[DEBUG] roles:", roles.keys())

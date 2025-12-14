@@ -746,9 +746,22 @@ The stopper system uses SS&S helper functions to populate player roles, ensuring
 - Uses `get_ball_handler_from_skeleton(skeleton, off_lineup)` - same as FCP/HCT
 - Determines ball handler from skeleton steps (from stopper step or last step)
 
-**Defender Determination** (line 1914):
-- Uses position matching based on ball handler position - same as FCP/HCT
-- Falls back to PG if position not found
+**Defender Determination** (lines 1970-2095):
+- **For Non-Shot Outcomes (Steals, Turnovers, Fouls)**: Overrides defender assignment to be based on ball handler's position, not shooter's position
+  - `assign_roles()` assigns defender based on shooter position (for shot attempts)
+  - For steals/turnovers/fouls, we need whoever is guarding the ball handler at the time of the steal
+  - **Man-to-Man Defense**: Defender matches ball handler position (e.g., if ball handler is SF, defender is defensive SF)
+  - **Zone Defense**: Uses actual zone assignment logic (`assign_all_zone_defenders()`) to determine which defender(s) are actually guarding the ball handler
+    - Checks `defender_to_offensive_player` mapping to find which defender(s) are assigned to guard the ball handler
+    - **Overlapping Zones**: If ball handler is in overlapping zones:
+      - If only one defender is guarding the ball handler → uses that defender
+      - If two or more defenders are guarding the ball handler → randomly picks one
+      - This respects the zone overlap resolution logic (if one defender is assigned to guard a different player in their zone, they won't be considered)
+    - Falls back to position match if no defender is assigned (shouldn't happen, but safety fallback)
+- **Stopper System Protection**: The stopper system preserves the defender if already set by override logic (prevents overwriting the correct defender)
+  - Checks if `roles["defender"]` is already set before recalculating
+  - Only recalculates if defender wasn't set by override logic
+- **Implementation**: Located in `resolve_half_court_offense_logic()` after `assign_roles()` is called
 
 **Foul Player Selection** (lines 1918-1921):
 - Uses `select_foul_player(foul_team_type, ball_handler, off_lineup, def_lineup)` - same as FCP/HCT
@@ -840,12 +853,13 @@ if skeleton:
   - This would make turnovers feel more organic and less random
 
 **Defensive Player Selection for Steals:**
-- Currently uses placeholder (pass statement)
-- TODO: When `result == "STEAL"`, determine which defensive player makes the steal:
-  - Analyze defensive player positions at `stop_step_index`
-  - Consider defensive player's `ST` (Steal) attribute
-  - Consider proximity to ball handler
-  - Add selected `defender_id` to `stopper_step`'s `pos_actions` or `events`
+- ✅ **COMPLETE** (January 2025): Defender assignment for steals is now implemented
+  - For non-shot outcomes (steals, turnovers, fouls), defender is determined based on ball handler's position, not shooter's position
+  - **Man-to-Man**: Defender matches ball handler position
+  - **Zone Defense**: Uses actual zone assignment logic to find which defender(s) are guarding the ball handler
+  - Handles overlapping zones correctly (uses defender actually assigned to guard ball handler)
+  - Stopper system preserves the correctly set defender (prevents overwriting)
+  - See "Defender Determination" section above for full implementation details
 
 **Pass Interception Logic:**
 - Currently treats all steals as steals from the ball handler
