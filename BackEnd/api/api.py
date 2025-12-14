@@ -998,6 +998,15 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                         # ✅ FIX: Log loaded quarter to debug save/load issues
                         logging.info(f"📂 Loaded game from DB: game_id={game_id}, saved_quarter={saved_quarter}, requested_quarter={request.quarter}")
                         
+                        # ✅ SS&S: Restore user_team_side to game_state (persists override checking across game loads)
+                        # If saved game has it, use that; otherwise use request.user_team_side
+                        if "user_team_side" in saved:
+                            gm.game_state["user_team_side"] = saved["user_team_side"]
+                            logging.info(f"✅ Restored user_team_side from DB: {saved['user_team_side']}")
+                        elif request.user_team_side:
+                            gm.game_state["user_team_side"] = request.user_team_side
+                            logging.info(f"✅ Set user_team_side from request: {request.user_team_side}")
+                        
                         # Simple check: If requesting Q1 but saved game is at a later quarter, start fresh (new game)
                         # ✅ TIMEOUT: If resuming from timeout, always restore stats (we're continuing an existing game)
                         is_new_game = (request.quarter == 1 and saved_quarter > 1) and not request.resume_from_timeout
