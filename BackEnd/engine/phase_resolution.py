@@ -1682,9 +1682,6 @@ def generate_logic(off_call, def_call, off_team, def_team, off_lineup, def_lineu
     # This allows the system to work while full logic is implemented
     lean_score = random.uniform(-1, 1)
     
-    # Log result for debugging
-    logging.warning(f"🎲 [GENERATE_LOGIC] Result: {result}, Lean Score: {lean_score:.2f}")
-    
     return result, lean_score
 
 
@@ -1814,9 +1811,6 @@ def resolve_half_court_offense_logic(game):
     
     # ✅ REMOVED: Test code that forced all HCO turns to be steals
     
-    # Log result received for debugging
-    logging.warning(f"🎯 [HCO RESOLVE] Received result: {result}, lean_score: {lean_score:.2f}")
-    
     # Store lean_score in scouting data
     _store_lean_score(lean_score, game, off_team, def_team)
     
@@ -1824,21 +1818,13 @@ def resolve_half_court_offense_logic(game):
     # Pass lean_score to select the appropriate skeleton variant
     skeleton = get_hco_skeleton(None, game, lean_score=lean_score)
     
-    # Log skeleton retrieval
-    if skeleton and "steps" in skeleton:
-        logging.warning(f"📋 [HCO RESOLVE] Skeleton retrieved: {len(skeleton['steps'])} steps, variant: {skeleton.get('_variant', 'unknown')}")
-    else:
-        logging.warning(f"⚠️ [HCO RESOLVE] No skeleton or steps found")
-    
     # CRITICAL: Always create a deep copy to avoid mutating cached skeleton
     # This prevents any modifications (from stopper system or elsewhere) from affecting future turns
     if skeleton:
         skeleton = copy.deepcopy(skeleton)
-        logging.warning(f"📋 [HCO RESOLVE] Created deep copy of skeleton ({len(skeleton.get('steps', []))} steps)")
     
     # ✅ STOPER SYSTEM: Truncate skeleton and add stopper step if result is not SHOT
     if result != "SHOT" and skeleton:
-        logging.warning(f"🛑 [STOPPER] Non-SHOT result detected: {result}")
         if skeleton and "steps" in skeleton:
             steps = skeleton.get("steps", [])
             if len(steps) > 1:
@@ -1927,12 +1913,8 @@ def resolve_half_court_offense_logic(game):
                 # Replace skeleton steps with truncated steps + stopper step
                 skeleton["steps"] = truncated_steps + [stopper_step]
                 
-                # Log truncation for debugging
-                logging.warning(f"🛑 [STOPPER] Truncated skeleton to step {stop_step_index}, added {result} stopper at step {len(skeleton['steps']) - 1}")
         else:
             logging.warning(f"⚠️ [STOPPER] Cannot apply stopper - skeleton or steps missing (result: {result})")
-    else:
-        logging.warning(f"✅ [STOPPER] SHOT result - no stopper needed")
     
     # Get the successful variant to determine intended shooter
     successful_skeleton = get_hco_skeleton(None, game, lean_score=1.0)  # Force successful variant
@@ -1943,22 +1925,15 @@ def resolve_half_court_offense_logic(game):
     # to be based on ball handler's position, not shooter's position
     # assign_roles() assigns defender based on shooter, but for steals we need
     # whoever is guarding the ball handler at the time of the steal
-    logging.warning(f"🔍 [DEFENDER OVERRIDE] Checking if override needed. result={result}, result in list? {result in ['STEAL', 'DEAD_BALL_TURNOVER', 'O_FOUL', 'D_FOUL']}")
     if result in ["STEAL", "DEAD_BALL_TURNOVER", "O_FOUL", "D_FOUL"]:
-        logging.warning(f"🔍 [DEFENDER OVERRIDE] ✅ Condition met! Overriding defender for result: {result}")
         ball_handler = roles.get("ball_handler")
-        logging.warning(f"🔍 [DEFENDER OVERRIDE] ball_handler from roles: {get_name_safe(ball_handler) if ball_handler else 'None'}")
         if ball_handler:
             ball_handler_pos = get_player_position(off_lineup, ball_handler)
-            logging.warning(f"🔍 [DEFENDER OVERRIDE] ball_handler_pos: {ball_handler_pos}")
-            logging.warning(f"🔍 [DEFENDER OVERRIDE] Current defender from roles: {get_name_safe(roles.get('defender')) if roles.get('defender') else 'None'}")
             
             from BackEnd.utils.defense_utils import is_zone_defense
             is_zone = is_zone_defense(def_call)
-            logging.warning(f"🔍 [DEFENDER OVERRIDE] Defense type: {def_call}, is_zone_defense: {is_zone}")
             if is_zone:
                 # Zone defense: use actual zone assignment logic to find which defender(s) are guarding the ball handler
-                logging.warning(f"🔍 [DEFENDER OVERRIDE] Entering zone defense logic")
                 from BackEnd.utils.shared_defense import (
                     _get_23_zone_boundaries, _get_32_zone_boundaries, _get_131_zone_boundaries,
                     assign_all_zone_defenders
@@ -2050,54 +2025,30 @@ def resolve_half_court_offense_logic(game):
                 
                 # Find which defender(s) are actually guarding the ball handler
                 defenders_guarding_ball_handler = []
-                logging.warning(f"🔍 [DEFENDER OVERRIDE] defender_to_offensive_player: {defender_to_offensive_player}")
-                logging.warning(f"🔍 [DEFENDER OVERRIDE] ball_handler_id: {ball_handler_id}")
                 for def_pos, guarded_player_id in defender_to_offensive_player.items():
                     if guarded_player_id == ball_handler_id:
                         defenders_guarding_ball_handler.append(def_pos)
-                        logging.warning(f"🔍 [DEFENDER OVERRIDE] Found defender {def_pos} guarding ball handler")
-                
-                logging.warning(f"🔍 [DEFENDER OVERRIDE] defenders_guarding_ball_handler: {defenders_guarding_ball_handler} (count: {len(defenders_guarding_ball_handler)})")
                 
                 # Handle overlapping zones per user requirements:
                 # 1. If only one defender is guarding the ball handler, use that one
                 # 2. If two defenders are guarding the ball handler, randomly pick one
                 if len(defenders_guarding_ball_handler) == 1:
                     defender_pos = defenders_guarding_ball_handler[0]
-                    logging.warning(f"🔍 [DEFENDER OVERRIDE] Single defender found: {defender_pos}")
                 elif len(defenders_guarding_ball_handler) >= 2:
                     # Two or more defenders guarding ball handler - randomly pick one
                     defender_pos = random.choice(defenders_guarding_ball_handler)
-                    logging.warning(f"🔍 [DEFENDER OVERRIDE] Multiple defenders found, randomly selected: {defender_pos} from {defenders_guarding_ball_handler}")
                 else:
                     # No defender assigned to guard ball handler (shouldn't happen, but fallback)
                     # Fallback: use position match
                     defender_pos = ball_handler_pos
-                    logging.warning(f"🔍 [DEFENDER OVERRIDE] ⚠️ No defender found guarding ball handler, using fallback position match: {defender_pos}")
                 
                 defender = def_lineup.get(defender_pos) if defender_pos else def_lineup.get("PG")
-                logging.warning(f"🔍 [DEFENDER OVERRIDE] Zone defense - Selected defender: {get_name_safe(defender)} (position: {defender_pos})")
             else:
                 # Man-to-man: defender matches ball handler position
-                logging.warning(f"🔍 [DEFENDER OVERRIDE] Entering man-to-man logic")
                 defender = def_lineup.get(ball_handler_pos) if ball_handler_pos else def_lineup.get("PG")
-                logging.warning(f"🔍 [DEFENDER OVERRIDE] Man-to-man - Selected defender: {get_name_safe(defender)} (position: {ball_handler_pos})")
             
             if defender:
-                old_defender = roles.get("defender")
                 roles["defender"] = defender
-                logging.warning(f"🏀 [DEFENDER OVERRIDE] ✅ SUCCESS - Overriding defender for non-shot outcome ({result})")
-                logging.warning(f"  Old defender: {get_name_safe(old_defender) if old_defender else 'None'} (position: {get_player_position(def_lineup, old_defender) if old_defender else 'N/A'})")
-                logging.warning(f"  New defender: {get_name_safe(defender)} (position: {get_player_position(def_lineup, defender)})")
-                logging.warning(f"  Ball handler: {get_name_safe(ball_handler)} (position: {ball_handler_pos})")
-                if is_zone:
-                    logging.warning(f"  Zone defense: Found defender in zone containing ball handler")
-            else:
-                logging.warning(f"🔍 [DEFENDER OVERRIDE] ⚠️ WARNING - No defender found, override skipped")
-        else:
-            logging.warning(f"🔍 [DEFENDER OVERRIDE] ⚠️ WARNING - ball_handler is None, cannot override")
-    else:
-        logging.warning(f"🔍 [DEFENDER OVERRIDE] Condition not met (result={result}), skipping override")
     
     # Extract intended shooter from successful variant
     intended_shooter_pos = None
