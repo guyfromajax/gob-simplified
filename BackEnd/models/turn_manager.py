@@ -849,11 +849,9 @@ class TurnManager:
             # Still need to choose defense normally
             if user_defense:
                 chosen_defense = user_defense
-                # ✅ SS&S: Clear defense_call from strategy_calls after use (prevents carryover to next turn)
-                if self.game.defense_team.is_user_team:
-                    self.game.defense_team.strategy_calls["defense_call"] = None
+                # ✅ PERSISTENT: Don't clear defense_call - keep it until user manually clears
                 self.game.game_state["user_defense_override"] = None  # Legacy clear
-                logging.info(f"🎮 [PLAYCALL] Using user defense call: {chosen_defense} (defense_team={self.game.defense_team.name}, is_user_team={self.game.defense_team.is_user_team})")
+                logging.info(f"🎮 [PLAYCALL] Using user defense call: {chosen_defense} (defense_team={self.game.defense_team.name}, persistent until manually cleared)")
                 
                 # ✅ FIX: If user selected "Zone", convert to a random specific zone type
                 # (Backend expects specific zone types: "2-3 Zone", "3-2 Zone", "1-3-1 Zone")
@@ -936,11 +934,9 @@ class TurnManager:
         # If only defense call (user on offense, setting defense for next possession)
         if user_defense:
             chosen_defense = user_defense
-            # ✅ SS&S: Clear defense_call after use (prevents carryover to next turn)
-            if self.game.defense_team.is_user_team:
-                self.game.defense_team.strategy_calls["defense_call"] = None
+            # ✅ PERSISTENT: Don't clear defense_call - keep it until user manually clears
             self.game.game_state["user_defense_override"] = None  # Legacy
-            logging.info(f"🎮 [PLAYCALL] Using user defense call: {chosen_defense}")
+            logging.info(f"🎮 [PLAYCALL] Using user defense call: {chosen_defense} (persistent until manually cleared)")
             
             # ✅ FIX: If user selected "Zone", convert to a random specific zone type
             # (Backend expects specific zone types: "2-3 Zone", "3-2 Zone", "1-3-1 Zone")
@@ -1006,18 +1002,17 @@ class TurnManager:
         # Defense setting - use override if set, otherwise choose normally
         # NOTE: This must happen BEFORE offense attempt tracking so we know the correct defense
         if chosen_defense is None:  # Not set by user override above
-            # ✅ SS&S: Check for defense_call in team.strategy_calls
-            logging.info(f"🎮 [PLAYCALL DEBUG] chosen_defense is None, checking defense_call in strategy_calls")
-            logging.info(f"🎮 [PLAYCALL DEBUG] Defense team: {self.game.defense_team.name}, is_user_team={self.game.defense_team.is_user_team}")
-            if self.game.defense_team.is_user_team:
-                defense_call = self.game.defense_team.strategy_calls.get("defense_call")
-                logging.info(f"🎮 [PLAYCALL DEBUG] defense_call from strategy_calls: {defense_call}")
-                logging.info(f"🎮 [PLAYCALL DEBUG] Full strategy_calls: {self.game.defense_team.strategy_calls}")
+            # ✅ SS&S: Check for defense_call in user_team.strategy_calls (regardless of current offense/defense)
+            # Defense override can be set when user is on offense (for next time they're on defense)
+            logging.info(f"🎮 [PLAYCALL DEBUG] chosen_defense is None, checking defense_call in user_team.strategy_calls")
+            user_team = self.game.home_team if self.game.home_team.is_user_team else (self.game.away_team if self.game.away_team.is_user_team else None)
+            if user_team:
+                defense_call = user_team.strategy_calls.get("defense_call")
+                logging.info(f"🎮 [PLAYCALL DEBUG] defense_call from user_team ({user_team.name}) strategy_calls: {defense_call}")
                 if defense_call:
                     chosen_defense = defense_call
-                    # ✅ SS&S: Clear defense_call after use (prevents carryover to next turn)
-                    self.game.defense_team.strategy_calls["defense_call"] = None
-                    logging.info(f"🎮 [PLAYCALL] Using user defense call: {chosen_defense}")
+                    # ✅ PERSISTENT: Don't clear defense_call - keep it until user manually clears
+                    logging.info(f"🎮 [PLAYCALL] Using user defense call: {chosen_defense} (persistent until manually cleared)")
                     
                     # ✅ FIX: If user selected "Zone", convert to a random specific zone type
                     # (Backend expects specific zone types: "2-3 Zone", "3-2 Zone", "1-3-1 Zone")
@@ -1027,7 +1022,7 @@ class TurnManager:
                 else:
                     logging.info(f"🎮 [PLAYCALL DEBUG] defense_call is None or empty, will use normal selection")
             else:
-                logging.info(f"🎮 [PLAYCALL DEBUG] Defense team is NOT user team, skipping defense_call check")
+                logging.info(f"🎮 [PLAYCALL DEBUG] No user team found, skipping defense_call check")
             
             # If still no override, use normal process
             if chosen_defense is None:
@@ -1173,13 +1168,15 @@ class TurnManager:
             tempo_setting = self.game.offense_team.strategy_settings.get("tempo", 2)
             self.game.offense_team.strategy_calls["tempo_call"] = random.choice(STRATEGY_CALL_DICTS["tempo"][tempo_setting])
         
-        if self.game.defense_team.is_user_team:
-            aggression_override = self.game.defense_team.strategy_calls.get("aggression_override")
+        # ✅ SS&S: Check for aggression_override in user_team.strategy_calls (regardless of current offense/defense)
+        # Aggression override can be set when user is on offense (for next time they're on defense)
+        user_team = self.game.home_team if self.game.home_team.is_user_team else (self.game.away_team if self.game.away_team.is_user_team else None)
+        if user_team:
+            aggression_override = user_team.strategy_calls.get("aggression_override")
             if aggression_override:
                 self.game.defense_team.strategy_calls["aggression_call"] = aggression_override
-                # Clear override after use
-                self.game.defense_team.strategy_calls["aggression_override"] = None
-                logging.info(f"🎮 [PLAYCALL OVERRIDE] Using aggression override: {aggression_override}")
+                # ✅ PERSISTENT: Don't clear aggression_override - keep it until user manually clears
+                logging.info(f"🎮 [PLAYCALL OVERRIDE] Using aggression override: {aggression_override} (persistent until manually cleared)")
             else:
                 aggression_setting = self.game.defense_team.strategy_settings.get("aggression", 2)
                 self.game.defense_team.strategy_calls["aggression_call"] = random.choice(STRATEGY_CALL_DICTS["aggression"][aggression_setting])
