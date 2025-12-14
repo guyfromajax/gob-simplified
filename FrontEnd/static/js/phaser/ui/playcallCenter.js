@@ -97,6 +97,31 @@ export function updatePlaycallCenter(turnData, homeTeamId) {
       selectedDefenseBtn.classList.remove('selected');
     }
   }
+  
+  // Check if aggression matches a selected button
+  // Backend returns defense_aggression_call in turn result (from turn_manager.py)
+  const aggressionValue = turnData.defense_aggression_call || turnData.aggression;
+  if (isUserTeamOnDefense && aggressionValue) {
+    // Normalize aggression value from backend (could be "normal", "Normal", "passive", "Passive", etc.)
+    const normalizedAggression = aggressionValue.toLowerCase();
+    
+    // Map backend values to button data-aggression values (which are capitalized)
+    const aggressionMap = {
+      'passive': 'Passive',
+      'normal': 'Normal',
+      'aggressive': 'Aggressive'
+    };
+    
+    const buttonAggression = aggressionMap[normalizedAggression] || aggressionValue.charAt(0).toUpperCase() + aggressionValue.slice(1).toLowerCase();
+    
+    // Try to find matching selected aggression button
+    const selectedAggressionBtn = document.querySelector(`.defense-override-btn.selected[data-aggression="${buttonAggression}"]`);
+    
+    if (selectedAggressionBtn) {
+      // This aggression was selected and is now being used - clear the highlight
+      selectedAggressionBtn.classList.remove('selected');
+    }
+  }
 
   // Panel flipping removed - offense always left, defense always right
 
