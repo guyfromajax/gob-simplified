@@ -2300,11 +2300,9 @@ def resolve_half_court_offense_logic(game):
             # Determine defender based on ball handler position (same as FCP/HCT)
             defender = def_lineup.get(ball_handler_pos, def_lineup.get("PG", list(def_lineup.values())[0] if def_lineup else None))
             roles["defender"] = defender
-            logging.warning(f"🔍 [STOPPER SYSTEM] Set defender from ball_handler_pos: {get_name_safe(defender)} (position: {ball_handler_pos})")
         else:
             # Use the defender that was already set by override logic
             defender = roles["defender"]
-            logging.warning(f"🔍 [STOPPER SYSTEM] Using defender from override logic: {get_name_safe(defender)} (position: {get_player_position(def_lineup, defender)})")
         
         # Set foul_player using SS&S helper function (same as FCP/HCT)
         if event_type in ["O_FOUL", "D_FOUL"]:
