@@ -798,18 +798,22 @@ class TurnManager:
         user_team_side = self.game.game_state.get("user_team_side")
         is_offense_user = (user_team_side == "home" and self.game.offense_team.is_home_team) or (user_team_side == "away" and not self.game.offense_team.is_home_team)
         
-        logging.warning(f"🎮 [PLAYCALL DEBUG] Checking offense team: {self.game.offense_team.name}, user_team_side={user_team_side}, is_offense_user={is_offense_user}")
-        logging.warning(f"   - Home team: {self.game.home_team.name} (team_id: {self.game.home_team.team_id}, is_home_team: {self.game.home_team.is_home_team})")
-        logging.warning(f"   - Away team: {self.game.away_team.name} (team_id: {self.game.away_team.team_id}, is_home_team: {self.game.away_team.is_home_team})")
-        logging.warning(f"   - Offense team: {self.game.offense_team.name} (team_id: {self.game.offense_team.team_id}, is_home_team: {self.game.offense_team.is_home_team})")
+        logging.warning(f"🎮 [PLAYCALL CHECK] Checking for overrides in set_playcalls()")
+        logging.warning(f"   - Offense team: {self.game.offense_team.name} (team_id: {self.game.offense_team.team_id}, object_id: {id(self.game.offense_team)}, is_home_team: {self.game.offense_team.is_home_team})")
+        logging.warning(f"   - Home team: {self.game.home_team.name} (team_id: {self.game.home_team.team_id}, object_id: {id(self.game.home_team)})")
+        logging.warning(f"   - Away team: {self.game.away_team.name} (team_id: {self.game.away_team.team_id}, object_id: {id(self.game.away_team)})")
+        logging.warning(f"   - user_team_side={user_team_side}, is_offense_user={is_offense_user}")
+        logging.warning(f"   - game_object_id: {id(self.game)}")
         if is_offense_user:
             offense_call = self.game.offense_team.strategy_calls.get("offense_call")
-            logging.info(f"🎮 [PLAYCALL DEBUG] offense_call value: {offense_call}, type: {type(offense_call)}")
-            logging.info(f"🎮 [PLAYCALL DEBUG] Full strategy_calls: {self.game.offense_team.strategy_calls}")
+            logging.warning(f"🎮 [PLAYCALL CHECK] Checking offense_team.strategy_calls for offense_call")
+            logging.warning(f"   - offense_call value: {offense_call}, type: {type(offense_call)}")
+            logging.warning(f"   - Full strategy_calls: {self.game.offense_team.strategy_calls}")
+            logging.warning(f"   - Team object_id: {id(self.game.offense_team)}")
             if offense_call:
-                logging.info(f"🎮 [PLAYCALL] Found user offense call for {self.game.offense_team.name}: '{offense_call}' (length: {len(offense_call) if offense_call else 0})")
+                logging.warning(f"🎮 [PLAYCALL CHECK] ✅ Found user offense call: '{offense_call}'")
             else:
-                logging.info(f"🎮 [PLAYCALL] No user offense call for {self.game.offense_team.name} (offense_call is None), using normal selection")
+                logging.warning(f"🎮 [PLAYCALL CHECK] ❌ No user offense call found (offense_call is None)")
         else:
             logging.info(f"🎮 [PLAYCALL DEBUG] Offense team {self.game.offense_team.name} is NOT user team (user_team_side={user_team_side}), skipping offense_call check")
         
@@ -824,13 +828,16 @@ class TurnManager:
         
         if user_team:
             defense_call = user_team.strategy_calls.get("defense_call")
-            logging.info(f"🎮 [PLAYCALL DEBUG] Checking user team ({user_team.name}) for defense_call: {defense_call}")
+            logging.warning(f"🎮 [PLAYCALL CHECK] Checking user_team.strategy_calls for defense_call")
+            logging.warning(f"   - User team: {user_team.name} (team_id: {user_team.team_id}, object_id: {id(user_team)})")
+            logging.warning(f"   - defense_call value: {defense_call}, type: {type(defense_call)}")
+            logging.warning(f"   - Full strategy_calls: {user_team.strategy_calls}")
             if defense_call:
-                logging.info(f"🎮 [PLAYCALL] Found user defense call for {user_team.name}: {defense_call}")
+                logging.warning(f"🎮 [PLAYCALL CHECK] ✅ Found user defense call: '{defense_call}'")
             else:
-                logging.info(f"🎮 [PLAYCALL] No user defense call for {user_team.name} (defense_call is None), using normal selection")
+                logging.warning(f"🎮 [PLAYCALL CHECK] ❌ No user defense call found (defense_call is None)")
         else:
-            logging.info(f"🎮 [PLAYCALL DEBUG] No user team found (user_team_side={user_team_side}), skipping defense_call check")
+            logging.warning(f"🎮 [PLAYCALL CHECK] ❌ No user team found (user_team_side={user_team_side}), skipping defense_call check")
         
         # Legacy support: Also check game_state for backward compatibility (will be removed)
         user_offense = self.game.game_state.get("user_offense_override") or offense_call
