@@ -4698,12 +4698,15 @@ The Playcall Center allows users to override playcalls for their team. Overrides
 - Stored in `team.strategy_calls["defense_call"]` as "Man" or "Zone"
 - Backend converts generic "Zone" to specific zone types (2-3 Zone, 3-2 Zone, 1-3-1 Zone) based on team preferences
 - Applied when user's team is on defense during next HCO turn
-- Cleared automatically after use (set to `None`)
+- **PERSISTENT:** Defense override is NOT cleared after use - remains until user manually clears via red X button
 
 **Aggression Override:**
 - User selects aggression level (Passive/Normal/Aggressive)
 - Stored in `team.strategy_calls["aggression_override"]`
 - Applied to defensive playcalls when user's team is on defense
+- **PERSISTENT:** Aggression override is NOT cleared after use - remains until user manually clears via red X button
+- Applied in `set_strategy_calls()` (not `set_playcalls()`)
+- Sets `defense_team.strategy_calls["aggression_call"] = aggression_override`
 
 **Tempo Override:**
 - User selects tempo level (Slow/Normal/Fast)
@@ -4715,14 +4718,21 @@ The Playcall Center allows users to override playcalls for their team. Overrides
 **Backend Storage (`team.strategy_calls`):**
 ```python
 {
-    "offense_call": None | str,          # Play name or None (persists until used)
-    "defense_call": None | str,          # "Man", "Zone", or None (persists until used)
-    "aggression_override": None | str,   # "normal", "aggressive", "passive", or None
+    "offense_call": None | str,          # Play name or None (cleared after one use)
+    "defense_call": None | str,          # "Man", "Zone", or None (persists until manually cleared)
+    "aggression_override": None | str,   # "normal", "aggressive", "passive", or None (persists until manually cleared)
     "tempo_override": None | str,        # "slow", "normal", "fast", or None
     "press_override": None,               # Future: FCP override
     "trap_override": None                 # Future: HCT override
 }
 ```
+
+**Turn Result Flag (`result["offense_override_cleared"]`):**
+- Boolean flag sent to frontend in turn result
+- Initialized to `False` at start of each turn
+- Set to `True` when user team's offense override is used and cleared
+- Frontend uses this flag to un-highlight the selected offense playcall button
+- Prevents false un-highlighting when computer team uses same play name
 
 **Initialization:**
 - `TeamManager.__init__()` initializes `strategy_calls` with all fields set to `None`
@@ -4734,28 +4744,45 @@ The Playcall Center allows users to override playcalls for their team. Overrides
    - User clicks play option or defense button in Playcall Center
    - Frontend calls `setPlaycallOverride()` function in `court.html`
    - Function sends POST request to `/api/set-playcall-override`
+   - **Key Behavior:** Only sends the field being changed (not all fields with nulls)
+   - Example: Setting offense sends only `{offense_override: "4-1 Motion"}`, not all three override fields
 
 2. **API Endpoint (`/api/set-playcall-override`):**
    - Receives `PlaycallOverrideRequest` with `game_id`, `user_team_side`, and override values
+   - **SS&S Design:** Only processes fields that are explicitly provided in the request body
+   - This prevents accidentally clearing other overrides when setting one field
    - Identifies user team from `user_team_side` ("home" or "away")
    - Updates `team.strategy_calls` with override values
    - Returns success status and current override state
+   - **Implementation:** Uses `provided_fields = set(body.keys())` to track which fields were sent
+   - Only processes fields in `provided_fields`, ignoring fields not in the request
 
 3. **Backend Playcall Selection (`set_playcalls()` in `turn_manager.py`):**
    - Called during HCO turn setup
-   - Checks if user team is on offense/defense using `is_user_team` flag
-   - If `team.strategy_calls["offense_call"] != None` and user team is on offense:
-     - Uses override playcall instead of normal selection
-     - Clears override after use: `team.strategy_calls["offense_call"] = None`
-   - If `team.strategy_calls["defense_call"] != None` and user team is on defense:
-     - Uses override defense (converts "Zone" to specific zone type if needed)
-     - Clears override after use: `team.strategy_calls["defense_call"] = None`
+   - **User Team Detection:** Uses `game_state["user_team_side"]` instead of `is_user_team` flag (more reliable, persists to DB)
+   - Determines if user team is on offense: `is_offense_user = (user_team_side == "home" and offense_team.is_home_team) or (user_team_side == "away" and not offense_team.is_home_team)`
+   - **Offense Override:**
+     - If `team.strategy_calls["offense_call"] != None` and user team is on offense:
+       - Uses override playcall instead of normal selection
+       - Clears override after use: `team.strategy_calls["offense_call"] = None`
+       - Sets `offense_override_cleared = True` in return dictionary
+   - **Defense Override:**
+     - If `team.strategy_calls["defense_call"] != None` and user team is on defense:
+       - Uses override defense (converts "Zone" to specific zone type if needed)
+       - **PERSISTENT:** Defense override is NOT cleared after use - remains until user manually clears via red X button
+   - **Aggression Override:**
+     - Checked in `set_strategy_calls()` (not `set_playcalls()`)
+     - If `team.strategy_calls["aggression_override"] != None`:
+       - Applied to `defense_team.strategy_calls["aggression_call"]`
+       - **PERSISTENT:** Aggression override is NOT cleared after use - remains until user manually clears via red X button
 
-4. **Frontend Highlight Management:**
-   - Selected buttons receive `selected` class (visual highlight)
-   - `updatePlaycallCenter()` checks if turn's playcall matches selected button
-   - If match found, removes `selected` class (unhighlights after use)
-   - `clearPlaycallHighlights()` can manually clear all highlights
+4. **Frontend Button Un-Highlighting:**
+   - **Offense Playcalls:** Un-highlighted automatically when backend clears the override
+   - Backend sends `offense_override_cleared: true` flag in turn result when override is used
+   - Frontend checks `turnData.offense_override_cleared === true` in `updatePlaycallCenter()`
+   - If flag is `true`, finds selected button and removes `selected` class
+   - **SS&S Design:** No need to match playcall names or check team sides - backend flag is single source of truth
+   - **Defense/Aggression Buttons:** Remain highlighted until user manually clears via red X buttons (persistent overrides)
 
 #### Override Persistence
 
@@ -4777,8 +4804,10 @@ The Playcall Center allows users to override playcalls for their team. Overrides
 - Override persists until next HCO turn where user team is on offense/defense
 
 **User Team Detection:**
-- Backend uses `is_user_team` flag on `TeamManager` objects
-- Flag set during `GameManager` initialization from `user_team_side` parameter
+- Backend uses `game_state["user_team_side"]` stored during `GameManager` initialization
+- More reliable than `is_user_team` flag - persists to database and survives game reloads
+- Value is "home" or "away" indicating which team is the user's team
+- Stored in `game_state` and included in `summarize_game_state()` for database persistence
 - Ensures overrides only apply to user's team, not computer team
 
 ### Player Image Assignment System
@@ -4828,23 +4857,43 @@ Player headshots in the Playcall Center are assigned once when returning to `cou
   - `setPlaycallOverride()` function (lines 2544-2600)
 - `FrontEnd/static/js/phaser/ui/playcallCenter.js`: Core Playcall Center logic
   - `updatePlaycallCenter()`: Updates status displays, manages highlights, triggers playcall reveal HUD
+    - Checks `turnData.offense_override_cleared === true` to un-highlight offense button
+    - Reads `turnData.defense_aggression_call` (not `turnData.aggression`) for defense status display
   - `clearPlaycallHighlights()`: Removes `selected` class from all override buttons
   - `resetLeanMeter()`: Resets meter to neutral
   - `animateLeanMeter()`: Animates meter based on lean score
   - `parseLeanScoreFromText()`: Extracts lean score from turn text
+- `FrontEnd/static/court.html`:
+  - `setPlaycallOverride()` function (lines 2697-2752): Sends override requests to backend
+    - Only sends the field being changed (not all fields with nulls)
+    - Example: `{offense_override: "4-1 Motion"}` instead of all three override fields
 - `FrontEnd/static/js/phaser/animation/turnPreparation.js`: Prepares lean meter animation (lines 66-87)
 - `FrontEnd/static/js/phaser/animation/turnAnimation.js`: Triggers animation for non-shot turns (lines 1813-1823)
 - `FrontEnd/static/js/phaser/animation/ShotAnimationSystem.js`: Triggers animation for shot turns (lines 324-340)
 
 **Backend:**
 - `BackEnd/api/api.py`:
-  - `/api/set-playcall-override` endpoint (lines 1703-1764): Receives and stores user overrides
+  - `/api/set-playcall-override` endpoint (lines 1736-1840): Receives and stores user overrides
+    - Only processes fields explicitly provided in request body (prevents accidental clearing)
+    - Uses `provided_fields = set(body.keys())` to track which fields were sent
+    - Sets `offense_call`, `defense_call`, or `aggression_override` in `team.strategy_calls`
   - `PlaycallOverrideRequest` model (lines 119-127): Request structure for overrides
 - `BackEnd/models/turn_manager.py`:
-  - `set_playcalls()` (lines 858-1033): Checks and applies user overrides during playcall selection
-  - `set_strategy_calls()` (lines 310-370): Generates strategy calls for turn
+  - `set_playcalls()` (lines 787-1155): Checks and applies user overrides during playcall selection
+    - Uses `game_state["user_team_side"]` to determine user team (not `is_user_team` flag)
+    - Returns `offense_override_cleared: True` when override is used and cleared
+    - Clears `offense_call` after use, but NOT `defense_call` (persistent)
+  - `set_strategy_calls()` (lines 1150-1237): Generates strategy calls for turn
+    - Applies `aggression_override` to `defense_team.strategy_calls["aggression_call"]`
+    - Does NOT clear `aggression_override` after use (persistent)
+  - `run_micro_turn()` (line 288+): Initializes `result["offense_override_cleared"] = False` at turn start
+    - Sets flag from `calls.get("offense_override_cleared", False)` for HCO turns
 - `BackEnd/models/team_manager.py`:
   - `TeamManager.__init__()` (lines 50-58): Initializes `strategy_calls` structure
+- `BackEnd/models/game_manager.py`:
+  - `GameManager.__init__()`: Stores `user_team_side` in `game_state["user_team_side"]`
+- `BackEnd/utils/shared.py`:
+  - `summarize_game_state()`: Includes `user_team_side` in saved game state for database persistence
 - `BackEnd/engine/phase_resolution.py`: 
   - `generate_logic()`: Calculates lean score (line 794-870)
   - Embeds lean score in turn text (line 1061): `f"lean:{lean_score:.2f}"`
