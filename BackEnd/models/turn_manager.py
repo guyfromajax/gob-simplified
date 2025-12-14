@@ -334,7 +334,6 @@ class TurnManager:
         
         # Get previous turn's offensive_state (stored in game_state for tracking)
         previous_state = self.game.game_state.get("_previous_offensive_state", "N/A (first turn)")
-        import logging
         logging.info(f"🔄 [OFFENSIVE_STATE TRANSITION] Turn #{turn_num} - BEFORE ROUTING", {
             "turn_number": turn_num,
             "previous_offensive_state": previous_state,
