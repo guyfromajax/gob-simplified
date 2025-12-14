@@ -1002,10 +1002,12 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                         # If saved game has it, use that; otherwise use request.user_team_side
                         if "user_team_side" in saved:
                             gm.game_state["user_team_side"] = saved["user_team_side"]
-                            logging.info(f"✅ Restored user_team_side from DB: {saved['user_team_side']}")
+                            logging.warning(f"✅ Restored user_team_side from DB: {saved['user_team_side']}")
                         elif request.user_team_side:
                             gm.game_state["user_team_side"] = request.user_team_side
-                            logging.info(f"✅ Set user_team_side from request: {request.user_team_side}")
+                            logging.warning(f"✅ Set user_team_side from request: {request.user_team_side}")
+                        else:
+                            logging.warning(f"⚠️ No user_team_side found in DB or request - override checking will not work!")
                         
                         # Simple check: If requesting Q1 but saved game is at a later quarter, start fresh (new game)
                         # ✅ TIMEOUT: If resuming from timeout, always restore stats (we're continuing an existing game)
@@ -1247,6 +1249,15 @@ def simulate_quarter_endpoint(request: QuarterSimulationRequest, debug: bool = F
                         mode=mode,  # Pass mode so teams can initialize plays with correct stats structure
                         user_team_side=request.user_team_side  # ✅ SS&S: Set is_user_team flags
                     )
+                    
+                    # ✅ SS&S: Ensure user_team_side is set in game_state (GameManager should set it, but double-check)
+                    if request.user_team_side and not gm.game_state.get("user_team_side"):
+                        gm.game_state["user_team_side"] = request.user_team_side
+                        logging.warning(f"✅ [NEW GAME] Set user_team_side in game_state: {request.user_team_side}")
+                    elif gm.game_state.get("user_team_side"):
+                        logging.warning(f"✅ [NEW GAME] user_team_side already set in game_state: {gm.game_state.get('user_team_side')}")
+                    else:
+                        logging.warning(f"⚠️ [NEW GAME] No user_team_side set! request.user_team_side={request.user_team_side}")
                     
                     logging.warning(f"🔧 [STRATEGY SETTINGS] AFTER GAMEMANAGER (NEW)")
                     logging.warning(f"   - Home: HCT={gm.home_team.strategy_settings.get('hc_trap', 'MISSING')}, FCP={gm.home_team.strategy_settings.get('fc_press', 'MISSING')}")

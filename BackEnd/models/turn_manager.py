@@ -311,6 +311,7 @@ class TurnManager:
         # ✅ LOG: Check for Playcall Center overrides at start of turn
         # ✅ SS&S: Use game_state["user_team_side"] instead of is_user_team flag (more reliable, persists to DB)
         user_team_side = self.game.game_state.get("user_team_side")
+        logging.warning(f"🔍 [TURN START DEBUG] user_team_side from game_state: {user_team_side}")
         user_team = None
         if user_team_side == "home":
             user_team = self.game.home_team
@@ -326,9 +327,9 @@ class TurnManager:
             defense_source = "PLAYCALL CENTER" if defense_override else "STANDARD LOGIC"
             aggression_source = "PLAYCALL CENTER" if aggression_override else "STANDARD LOGIC"
             
-            logging.info(f"🎮 [TURN START] Playcall sources - Offense: {offense_source} ({offense_override or 'N/A'}), Defense: {defense_source} ({defense_override or 'N/A'}), Aggression: {aggression_source} ({aggression_override or 'N/A'})")
+            logging.warning(f"🎮 [TURN START] Playcall sources - Offense: {offense_source} ({offense_override or 'N/A'}), Defense: {defense_source} ({defense_override or 'N/A'}), Aggression: {aggression_source} ({aggression_override or 'N/A'})")
         else:
-            logging.info(f"🎮 [TURN START] No user team found (user_team_side={user_team_side}) - all playcalls using STANDARD LOGIC")
+            logging.warning(f"🎮 [TURN START] No user team found (user_team_side={user_team_side}) - all playcalls using STANDARD LOGIC")
 
         # ✅ DEBUG: Log offensive_state transition (previous turn → current turn)
         # This is the critical transition point where offensive_state determines routing
@@ -797,7 +798,7 @@ class TurnManager:
         user_team_side = self.game.game_state.get("user_team_side")
         is_offense_user = (user_team_side == "home" and self.game.offense_team.is_home_team) or (user_team_side == "away" and not self.game.offense_team.is_home_team)
         
-        logging.info(f"🎮 [PLAYCALL DEBUG] Checking offense team: {self.game.offense_team.name}, user_team_side={user_team_side}, is_offense_user={is_offense_user}")
+        logging.warning(f"🎮 [PLAYCALL DEBUG] Checking offense team: {self.game.offense_team.name}, user_team_side={user_team_side}, is_offense_user={is_offense_user}")
         if is_offense_user:
             offense_call = self.game.offense_team.strategy_calls.get("offense_call")
             logging.info(f"🎮 [PLAYCALL DEBUG] offense_call value: {offense_call}, type: {type(offense_call)}")
