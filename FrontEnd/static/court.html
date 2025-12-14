@@ -878,6 +878,7 @@
       align-items: center;
       gap: 8px;
       flex: 1;
+      min-height: 0; /* Allow flex shrinking */
     }
 
     /* Offense Play Scroller - Show only 1 play at a time */
@@ -917,19 +918,49 @@
       display: flex;
       flex-direction: column;
       gap: 4px;
+      align-items: center;
+    }
+
+    /* Red X Clear Override Button */
+    .clear-override-x-btn {
+      width: 32px;
+      height: 60px;  /* Default height, will be set dynamically to 50% of container */
+      min-height: 50px;  /* Minimum height for visibility */
+      max-height: 120px;  /* Maximum height to prevent it from being too large */
+      border-radius: 4px;
+      background: rgba(244, 67, 54, 0.2);
+      border: 2px solid rgba(244, 67, 54, 0.6);
+      color: #F44336;
+      font-size: 20px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+      align-self: center;  /* Vertically center relative to container */
+      margin-left: 8px;  /* Space between nav buttons and X button */
+    }
+
+    .clear-override-x-btn:hover {
+      background: rgba(244, 67, 54, 0.4);
+      border-color: #F44336;
+      color: #fff;
+      box-shadow: 0 0 10px rgba(244, 67, 54, 0.6);
     }
 
     .play-option {
       display: flex;
       align-items: center;
       gap: 10px;
-      padding: 6px 12px;  /* CHANGE: reduced padding */
+      padding: 10px 12px;  /* Increased padding for larger container */
       background: rgba(255, 255, 255, 0.05);
       border: 2px solid rgba(255, 255, 255, 0.15);
       border-radius: 6px;
       cursor: pointer;
       transition: all 0.2s ease;
-      min-height: 44px;  /* CHANGE: reduced min-height */
+      min-height: 70px;  /* Increased min-height for larger container */
     }
 
     .play-option:hover {
@@ -944,10 +975,10 @@
     }
 
     .play-headshot {
-      width: auto;  /* CHANGE: proportional to height */
-      height: 100%;  /* CHANGE: fill container height */
-      max-height: 44px;  /* Match play-option min-height */
-      border-radius: 4px;  /* CHANGE: rectangular with slight rounding */
+      width: auto;  /* Proportional to height */
+      height: 100%;  /* Fill container height */
+      max-height: 70px;  /* Match play-option min-height (increased) */
+      border-radius: 4px;  /* Rectangular with slight rounding */
       border: 2px solid rgba(255, 255, 255, 0.3);
       object-fit: cover;
       background: rgba(0, 0, 0, 0.5);
@@ -966,7 +997,7 @@
     }
 
     .play-name {
-      font-size: 11px;  /* CHANGE: smaller font */
+      font-size: 16px;  /* Increased font size for larger container */
       font-weight: 700;
       color: rgba(255, 255, 255, 0.8);
       letter-spacing: 0.5px;
@@ -977,7 +1008,7 @@
     }
 
     .play-focus {
-      font-size: 9px;  /* CHANGE: smaller font */
+      font-size: 12px;  /* Increased font size for larger container */
       font-weight: 600;
       color: rgba(255, 255, 255, 0.4);
       text-transform: uppercase;
@@ -2308,8 +2339,8 @@
             <button class="play-nav-btn" id="play-nav-up">▲</button>
             <button class="play-nav-btn" id="play-nav-down">▼</button>
           </div>
+          <button id="clear-offense-override-x" class="clear-override-x-btn">✕</button>
         </div>  <!-- Close .play-scroller-container -->
-        <button id="clear-offense-override" class="clear-override-btn">Clear Override</button>
     </div>
 
       <!-- Lean Meter (Center - Absolute Focal Point) -->
@@ -2597,8 +2628,23 @@
     (function initPlaycallCenter() {
       const playOptions = document.querySelectorAll('.play-option');
       const defenseButtons = document.querySelectorAll('.defense-override-btn');
-      const clearOffenseBtn = document.getElementById('clear-offense-override');
+      const clearOffenseBtn = document.getElementById('clear-offense-override-x');
       const clearDefenseBtn = document.getElementById('clear-defense-override');
+      
+      // Set red X button height to 50% of play-scroller-container height
+      function setClearXButtonHeight() {
+        const playScrollerContainer = document.querySelector('.play-scroller-container');
+        const clearXBtn = document.getElementById('clear-offense-override-x');
+        if (playScrollerContainer && clearXBtn) {
+          const containerHeight = playScrollerContainer.offsetHeight;
+          const buttonHeight = containerHeight * 0.5; // 50% of container height
+          clearXBtn.style.height = `${buttonHeight}px`;
+        }
+      }
+      
+      // Set height on load and resize
+      setClearXButtonHeight();
+      window.addEventListener('resize', setClearXButtonHeight);
       
       // ✅ SS&S: Helper function to get game context from multiple sources (read dynamically each time)
       function getGameContext() {
