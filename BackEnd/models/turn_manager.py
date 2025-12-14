@@ -455,6 +455,9 @@ class TurnManager:
         result["offense_team_id"] = self.game.offense_team.team_id
         # ✅ REMOVED: possession_team_id (fully migrated to offense_team_id in SS&S refactor)
         
+        # ✅ SS&S: Initialize offense_override_cleared flag (starts False, set to True if user override was used and cleared)
+        result["offense_override_cleared"] = False
+        
         # ✅ SS&S: Set current_turn based on offensive_state
         # This explicitly identifies what type of turn this is
         state = self.game.game_state.get("offensive_state", "HCO")
@@ -877,6 +880,8 @@ class TurnManager:
                 logging.warning(f"🔴   Override that was cleared: '{old_override}'")
                 logging.warning(f"🔴   Playcall that was used: '{chosen_playcall}'")
                 logging.warning(f"🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴")
+                # ✅ SS&S: Set flag to notify frontend that override was cleared (for button un-highlighting)
+                result["offense_override_cleared"] = True
             self.game.game_state["user_offense_override"] = None  # Legacy clear
             
             # Lookup play details from database to get play_type and play_focus

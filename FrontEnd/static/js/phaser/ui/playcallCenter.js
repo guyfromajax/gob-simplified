@@ -36,48 +36,17 @@ export function updatePlaycallCenter(turnData, homeTeamId) {
     return;
   }
 
-  // ✅ SS&S: Clear highlights if this turn used a user override
-  // Check if the turn's playcall matches a selected playcall button
-  const offensivePlaycall = turnData.offensive_playcall || turnData.current_playcall;
-  const defensivePlaycall = turnData.defensive_playcall || turnData.defense_playcall;
-  
-  // Get user team side from URL params
-  const urlParams = new URLSearchParams(window.location.search);
-  const userTeamSide = urlParams.get('my_team'); // "home" or "away"
-  const isUserTeamOnOffense = (userTeamSide === 'home' && isHomeOffense) || 
-                               (userTeamSide === 'away' && !isHomeOffense);
-  const isUserTeamOnDefense = (userTeamSide === 'home' && !isHomeOffense) || 
-                               (userTeamSide === 'away' && isHomeOffense);
-  
-  // Check if offense playcall matches a selected button
-  if (isUserTeamOnOffense && offensivePlaycall) {
+  // ✅ SS&S: Clear highlights if backend cleared the offense override
+  // Backend sets offense_override_cleared: true when user team's override was used and cleared
+  // This is simpler and more reliable than matching playcall names or checking team sides
+  if (turnData.offense_override_cleared === true) {
     const allSelectedButtons = document.querySelectorAll('.play-option.selected');
-    const selectedPlayNames = Array.from(allSelectedButtons).map(btn => btn.dataset.play);
-    
-    // Try exact match first
-    let selectedOffenseBtn = document.querySelector(`.play-option.selected[data-play="${offensivePlaycall}"]`);
-    
-    // If no exact match, try to find by checking all selected buttons
-    if (!selectedOffenseBtn && selectedPlayNames.length > 0) {
-      // Check if any selected button matches (case-insensitive, trim whitespace)
-      for (const btn of allSelectedButtons) {
-        const btnPlayName = btn.dataset.play?.trim();
-        const turnPlayName = offensivePlaycall?.trim();
-        if (btnPlayName && turnPlayName && btnPlayName.toLowerCase() === turnPlayName.toLowerCase()) {
-          selectedOffenseBtn = btn;
-          break;
-        }
-      }
-    }
-    
-    if (selectedOffenseBtn) {
-      // This play was selected and is now being used - clear the highlight
-      const playName = selectedOffenseBtn.dataset.play;
-      console.log(`🎮 [PLAYCALL CENTER CLEAR] Offense playcall cleared after use: "${playName}" (matched turn playcall: "${offensivePlaycall}")`);
-      selectedOffenseBtn.classList.remove('selected');
-    } else if (isUserTeamOnOffense && offensivePlaycall && allSelectedButtons.length > 0) {
-      // Log when a playcall was selected but didn't match
-      console.log(`🎮 [PLAYCALL CENTER CLEAR] Offense playcall selected but no match found. Turn playcall: "${offensivePlaycall}", Selected: ${selectedPlayNames.join(', ')}`);
+    if (allSelectedButtons.length > 0) {
+      // Un-highlight the selected button (there should only be one selected at a time)
+      const selectedButton = allSelectedButtons[0];
+      const playName = selectedButton.dataset.play;
+      console.log(`🎮 [PLAYCALL CENTER CLEAR] Offense playcall cleared after use: "${playName}" (backend flag: offense_override_cleared=true)`);
+      selectedButton.classList.remove('selected');
     }
   }
   
