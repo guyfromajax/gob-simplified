@@ -2762,6 +2762,7 @@
           
           // ✅ SS&S: Store override via API (use full play name from data-play attribute)
           const playName = option.dataset.play;
+          console.log(`🎮 [PLAYCALL CENTER] Offense play registered: "${playName}"`);
           await setPlaycallOverride('offense', playName);
         });
       });
@@ -2785,6 +2786,7 @@
             btn.classList.add('selected');
             
             const normalizedAggression = aggression.toLowerCase();
+            console.log(`🎮 [PLAYCALL CENTER] Defense playcall registered: "${defenseType}", Aggression registered: "${normalizedAggression}"`);
             // Set both in one API call
             const { gameId, userTeamSide } = getGameContext();
             const payload = {
@@ -2820,6 +2822,7 @@
               b.classList.remove('selected');
             });
             btn.classList.add('selected');
+            console.log(`🎮 [PLAYCALL CENTER] Defense playcall registered: "${defenseType}"`);
             await setPlaycallOverride('defense', defenseType);
           } else if (aggression) {
             // Aggression only
@@ -2828,6 +2831,7 @@
             });
             btn.classList.add('selected');
             const normalizedAggression = aggression.toLowerCase();
+            console.log(`🎮 [PLAYCALL CENTER] Aggression registered: "${normalizedAggression}"`);
             await setPlaycallOverride('aggression', normalizedAggression);
           }
         });

@@ -72,7 +72,12 @@ export function updatePlaycallCenter(turnData, homeTeamId) {
     
     if (selectedOffenseBtn) {
       // This play was selected and is now being used - clear the highlight
+      const playName = selectedOffenseBtn.dataset.play;
+      console.log(`🎮 [PLAYCALL CENTER CLEAR] Offense playcall cleared after use: "${playName}" (matched turn playcall: "${offensivePlaycall}")`);
       selectedOffenseBtn.classList.remove('selected');
+    } else if (isUserTeamOnOffense && offensivePlaycall && allSelectedButtons.length > 0) {
+      // Log when a playcall was selected but didn't match
+      console.log(`🎮 [PLAYCALL CENTER CLEAR] Offense playcall selected but no match found. Turn playcall: "${offensivePlaycall}", Selected: ${selectedPlayNames.join(', ')}`);
     }
   }
   
