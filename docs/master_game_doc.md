@@ -612,8 +612,11 @@ Screeners automatically animate to offset positions to prevent visual overlap wh
 - Extracting energy decay ensures it always runs, maintaining SS&S consistency
 
 **Bench Player Energy Recharge:**
-- Players not in the active lineup recharge energy during each turn
-- 50% chance per turn to recharge 0.01 energy (0.0-1.0 scale)
+- Players not in the active lineup recharge energy during each HCO turn
+- Per turn recharge probabilities:
+  - 20% chance: no recharge (0)
+  - 70% chance: recharge +0.01 energy
+  - 10% chance: recharge +0.02 energy
 - Implemented in `apply_bench_energy_recharge()` function
 - Called alongside energy decay for HCO turns
 - Ensures bench players gradually regain energy when not playing
