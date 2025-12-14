@@ -1120,25 +1120,20 @@ class TurnManager:
         # Ensure strategy_settings are initialized for both teams (but don't overwrite existing settings)
         # Only initialize if it's completely missing (None), not if it's an empty dict
         if not hasattr(self.game.offense_team, 'strategy_settings') or self.game.offense_team.strategy_settings is None:
-            import logging
             logging.warning(f"⚠️ [STRATEGY SETTINGS] {self.game.offense_team.name} missing strategy_settings in set_strategy_calls, initializing with defaults")
             self.game.offense_team.strategy_settings = self.game.offense_team._init_strategy_settings()
         elif isinstance(self.game.offense_team.strategy_settings, dict) and len(self.game.offense_team.strategy_settings) == 0:
-            import logging
             logging.warning(f"⚠️ [STRATEGY SETTINGS] {self.game.offense_team.name} has empty strategy_settings dict in set_strategy_calls, initializing with defaults")
             self.game.offense_team.strategy_settings = self.game.offense_team._init_strategy_settings()
         
         if not hasattr(self.game.defense_team, 'strategy_settings') or self.game.defense_team.strategy_settings is None:
-            import logging
             logging.warning(f"⚠️ [STRATEGY SETTINGS] {self.game.defense_team.name} missing strategy_settings in set_strategy_calls, initializing with defaults")
             self.game.defense_team.strategy_settings = self.game.defense_team._init_strategy_settings()
         elif isinstance(self.game.defense_team.strategy_settings, dict) and len(self.game.defense_team.strategy_settings) == 0:
-            import logging
             logging.warning(f"⚠️ [STRATEGY SETTINGS] {self.game.defense_team.name} has empty strategy_settings dict in set_strategy_calls, initializing with defaults")
             self.game.defense_team.strategy_settings = self.game.defense_team._init_strategy_settings()
         
         # 🐛 DEBUG: Log strategy settings being used
-        import logging
         # ✅ COMMENTED OUT: Strategy settings logs (cluttering transition debugging)
         # logging.warning(f"🔧 [SET STRATEGY CALLS] Offense: {self.game.offense_team.name}, Defense: {self.game.defense_team.name}")
         # logging.warning(f"   - Offense strategy_settings: {self.game.offense_team.strategy_settings}")
