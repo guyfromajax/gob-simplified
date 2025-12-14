@@ -81,8 +81,10 @@ def apply_bench_energy_recharge(game):
     """
     Recharge energy for players not in the active lineup.
     
-    For each bench player (not in active lineup), there's a 50% chance
-    to recharge 0.01 energy per turn.
+    For each bench player (not in active lineup), per turn:
+    - 20% chance: no recharge (0)
+    - 70% chance: recharge +0.01 energy
+    - 10% chance: recharge +0.02 energy
     
     Args:
         game: GameManager instance containing home and away teams
@@ -98,10 +100,17 @@ def apply_bench_energy_recharge(game):
     for team in [game.home_team, game.away_team]:
         for player in team.get_all_players():
             if player and hasattr(player, "player_id") and player.player_id not in lineup_player_ids:
-                # 50% chance to recharge 0.01 energy
-                if random.random() < 0.5:
-                    if hasattr(player, "recharge_energy"):
+                if hasattr(player, "recharge_energy"):
+                    roll = random.random()
+                    if roll < 0.2:
+                        # 20% chance: no recharge
+                        pass
+                    elif roll < 0.9:
+                        # 70% chance: recharge +0.01
                         player.recharge_energy(0.01)
+                    else:
+                        # 10% chance: recharge +0.02
+                        player.recharge_energy(0.02)
 
 
 def check_and_handle_foul_out(foul_player, game_state, foul_team):
