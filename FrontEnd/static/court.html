@@ -2723,14 +2723,21 @@
         console.log(`🎮 [PLAYCALL OVERRIDE] Setting ${type} override: ${value}`, { gameId, userTeamSide });
         
         try {
+          // ✅ SS&S: Only send the field being changed, not all fields
+          // This allows the backend to distinguish between "set this" and "clear that"
           const payload = {
             game_id: gameId,
-            user_team_side: userTeamSide,
-            offense_override: type === 'offense' ? value : null,
-            defense_override: type === 'defense' ? value : null,
-            aggression_override: type === 'aggression' ? value : null,
-            tempo_override: null // Future
+            user_team_side: userTeamSide
           };
+          
+          // Only include the field being set/cleared
+          if (type === 'offense') {
+            payload.offense_override = value;
+          } else if (type === 'defense') {
+            payload.defense_override = value;
+          } else if (type === 'aggression') {
+            payload.aggression_override = value;
+          }
           
           const response = await fetch('/api/set-playcall-override', {
             method: 'POST',
