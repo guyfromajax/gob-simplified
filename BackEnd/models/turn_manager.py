@@ -437,6 +437,8 @@ class TurnManager:
             offense_name = calls["offense"]
             defense_name = calls["defense"]
             logging.info(f"🎮 [PLAYCALL RESULT] Added to result: offensive_playcall='{offense_name}', defensive_playcall='{defense_name}'")
+            # ✅ SS&S: Set offense_override_cleared flag from calls (overrides default False)
+            result["offense_override_cleared"] = calls.get("offense_override_cleared", False)
             
             # Add play type and focus for frontend display
             # ✅ SS&S: Use offense_play_type as single source of truth (works for both user overrides and normal selection)
@@ -871,6 +873,7 @@ class TurnManager:
             logging.info(f"🎮 [PLAYCALL] Using user offense call: {chosen_playcall} (clearing offense_call after use)")
             
             # ✅ SS&S: Clear offense_call from strategy_calls after use (prevents carryover to next turn)
+            offense_override_cleared = False
             if is_offense_user:
                 old_override = self.game.offense_team.strategy_calls.get("offense_call")
                 self.game.offense_team.strategy_calls["offense_call"] = None
@@ -881,7 +884,7 @@ class TurnManager:
                 logging.warning(f"🔴   Playcall that was used: '{chosen_playcall}'")
                 logging.warning(f"🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴")
                 # ✅ SS&S: Set flag to notify frontend that override was cleared (for button un-highlighting)
-                result["offense_override_cleared"] = True
+                offense_override_cleared = True
             self.game.game_state["user_offense_override"] = None  # Legacy clear
             
             # Lookup play details from database to get play_type and play_focus
@@ -978,7 +981,8 @@ class TurnManager:
                 "offense_play_type": chosen_play_type,  # ✅ SS&S: Single source of truth for play type ("motion" or "set_play")
                 "offense_focus": user_focus,
                 "defense_type": chosen_defense.title() if chosen_defense else "-",
-                "defense_focus": None
+                "defense_focus": None,
+                "offense_override_cleared": offense_override_cleared  # ✅ SS&S: Flag for frontend button un-highlighting
             }
         
         # If only defense call (user on offense, setting defense for next possession)
@@ -1148,7 +1152,8 @@ class TurnManager:
             "offense_play_type": chosen_play_type if chosen_play_type else None,  # ✅ SS&S: Single source of truth for play type ("motion" or "set_play")
             "offense_focus": chosen_focus if chosen_focus else None,
             "defense_type": chosen_defense.title() if chosen_defense else "-",  # Man or Zone
-            "defense_focus": None
+            "defense_focus": None,
+            "offense_override_cleared": False  # ✅ SS&S: Normal path - no override cleared
         }
 
 
