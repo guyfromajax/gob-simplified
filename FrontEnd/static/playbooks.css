@@ -152,10 +152,24 @@ body {
 /* Row */
 .playbook-row {
   display: grid;
-  grid-template-columns: 1fr auto auto;
-  gap: var(--spacing-sm);
+  grid-template-columns: 1fr auto;
+  gap: var(--spacing-md);
   align-items: center;
   padding: var(--spacing-xs) 0;
+}
+
+.row-column-1 {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--spacing-sm);
+  align-items: center;
+}
+
+.row-column-2 {
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: var(--spacing-sm);
+  align-items: center;
 }
 
 .row-label-group {

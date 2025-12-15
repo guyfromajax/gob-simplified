@@ -177,9 +177,22 @@ class PlaybooksState {
     const play = PLAY_DATA[assignment.section]?.find(p => p.id === assignment.playId);
     if (!play) return null;
     
+    // For motion, include dropdown (focus)
     if (assignment.section === 'motion') {
       return `${play.name} (${assignment.dropdown})`;
     }
+    
+    // For set plays, determine focus from section
+    if (assignment.section === 'set-play-inside') {
+      return `${play.name} (Inside)`;
+    }
+    if (assignment.section === 'set-play-attack') {
+      return `${play.name} (Attack)`;
+    }
+    if (assignment.section === 'set-play-outside') {
+      return `${play.name} (Outside)`;
+    }
+    
     return play.name;
   }
   
@@ -302,30 +315,13 @@ class PlaybooksUI {
     row.dataset.section = sectionKey;
     row.dataset.playId = play.id;
     
-    const labelGroup = document.createElement('div');
-    labelGroup.className = 'row-label-group';
-    
-    // Motion dropdown
-    if (sectionKey === 'motion') {
-      const dropdown = document.createElement('select');
-      dropdown.className = 'motion-dropdown';
-      dropdown.value = this.state.motionDropdowns[play.id] || 'Inside';
-      ['Inside', 'Attack', 'Outside'].forEach(opt => {
-        const option = document.createElement('option');
-        option.value = opt;
-        option.textContent = opt;
-        dropdown.appendChild(option);
-      });
-      dropdown.addEventListener('change', (e) => {
-        this.handleMotionDropdownChange(play.id, e.target.value);
-      });
-      labelGroup.appendChild(dropdown);
-    }
+    // Column 1: Play Name | Percentage Input
+    const column1 = document.createElement('div');
+    column1.className = 'row-column-1';
     
     const label = document.createElement('span');
     label.className = 'row-label';
     label.textContent = play.name;
-    labelGroup.appendChild(label);
     
     const input = document.createElement('input');
     input.type = 'number';
@@ -340,6 +336,35 @@ class PlaybooksUI {
       this.validateAndUpdate();
     });
     
+    column1.appendChild(label);
+    column1.appendChild(input);
+    
+    // Column 2: Dropdown (Motion only) | Slot Controls (Motion + Set Plays)
+    const column2 = document.createElement('div');
+    column2.className = 'row-column-2';
+    
+    // Motion dropdown (only for motion section)
+    if (sectionKey === 'motion') {
+      const dropdown = document.createElement('select');
+      dropdown.className = 'motion-dropdown';
+      dropdown.value = this.state.motionDropdowns[play.id] || 'Inside';
+      ['Inside', 'Attack', 'Outside'].forEach(opt => {
+        const option = document.createElement('option');
+        option.value = opt;
+        option.textContent = opt;
+        dropdown.appendChild(option);
+      });
+      dropdown.addEventListener('change', (e) => {
+        this.handleMotionDropdownChange(play.id, e.target.value);
+      });
+      column2.appendChild(dropdown);
+    } else {
+      // Empty spacer for set plays to align slot controls
+      const spacer = document.createElement('div');
+      spacer.style.width = '80px'; // Match dropdown width
+      column2.appendChild(spacer);
+    }
+    
     // Slot controls (offense only)
     const slotControls = document.createElement('div');
     slotControls.className = 'slot-controls';
@@ -351,16 +376,19 @@ class PlaybooksUI {
         pill.textContent = i;
         pill.dataset.slot = i;
         
-        // Check if this slot is assigned to this play
-        const isAssigned = this.isSlotAssignedToPlay(i, sectionKey, play.id, playData);
+        // Check if this slot is assigned to this play (check all dropdown variants for motion)
+        const isAssigned = this.isSlotAssignedToPlay(i, sectionKey, play.id);
         if (isAssigned) {
           pill.classList.add('assigned');
+          // Show badge with the dropdown value that this slot is assigned to
           if (sectionKey === 'motion') {
-            const badge = document.createElement('span');
-            badge.className = 'slot-badge';
-            const dropdown = this.state.motionDropdowns[play.id] || 'Inside';
-            badge.textContent = dropdown[0]; // I, A, or O
-            pill.appendChild(badge);
+            const assignment = this.state.slotAssignments[i];
+            if (assignment && assignment.playId === play.id) {
+              const badge = document.createElement('span');
+              badge.className = 'slot-badge';
+              badge.textContent = assignment.dropdown[0]; // I, A, or O
+              pill.appendChild(badge);
+            }
           }
         }
         
@@ -372,41 +400,36 @@ class PlaybooksUI {
       }
     }
     
-    row.appendChild(labelGroup);
-    row.appendChild(input);
-    row.appendChild(slotControls);
+    column2.appendChild(slotControls);
+    
+    row.appendChild(column1);
+    row.appendChild(column2);
     
     return row;
   }
   
-  isSlotAssignedToPlay(slotNumber, sectionKey, playId, playData) {
+  isSlotAssignedToPlay(slotNumber, sectionKey, playId) {
     const assignment = this.state.slotAssignments[slotNumber];
     if (!assignment) return false;
     
+    // For motion, check if slot is assigned to this play (regardless of current dropdown)
+    // The badge will show which dropdown variant it's assigned to
     if (sectionKey === 'motion') {
-      const currentDropdown = this.state.motionDropdowns[playId] || 'Inside';
-      return assignment.section === 'motion' &&
-             assignment.playId === playId &&
-             assignment.dropdown === currentDropdown;
+      return assignment.section === 'motion' && assignment.playId === playId;
     }
     
     return assignment.section === sectionKey && assignment.playId === playId;
   }
   
   handleMotionDropdownChange(playId, dropdownValue) {
-    const oldDropdown = this.state.motionDropdowns[playId] || 'Inside';
+    // Update dropdown value (persists the selection)
     this.state.motionDropdowns[playId] = dropdownValue;
     
-    // If this play had a slot assigned, we need to update the assignment
-    const playData = this.state.sections.motion[playId];
-    if (playData && playData.slot) {
-      const slotNumber = playData.slot;
-      this.state.assignSlot(slotNumber, 'motion', playId, dropdownValue);
-    }
+    // Don't change existing slot assignments - they stay with their original dropdown variant
+    // Just re-render to update the UI (badges will show correct variant)
     
     this.renderSection('motion');
     this.renderAssignedPlays();
-    this.updateAllTotals();
     this.debouncedSave();
   }
   
