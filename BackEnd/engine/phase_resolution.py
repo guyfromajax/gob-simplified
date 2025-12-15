@@ -1828,6 +1828,121 @@ def _store_lean_score(lean_score, game, offense_team, defense_team):
         pass
 
 
+def apply_stopper_system_to_skeleton(skeleton, result, game_state):
+    """
+    Apply stopper system to skeleton: truncate and add stopper step for non-shot results.
+    
+    Args:
+        skeleton: Skeleton dict with "steps" array
+        result: Result type ("O_FOUL", "D_FOUL", "DEAD_BALL_TURNOVER", "STEAL", or "HCO")
+        game_state: Game state dict (for storing steal position data)
+    
+    Returns:
+        Modified skeleton (truncated + stopper step, or full skeleton if result == "HCO")
+    """
+    import copy
+    
+    # If result is HCO, return full skeleton (no truncation)
+    if result == "HCO":
+        return skeleton
+    
+    # If result is SHOT, return full skeleton (no truncation)
+    if result == "SHOT":
+        return skeleton
+    
+    # Deep copy skeleton to avoid mutating original
+    skeleton = copy.deepcopy(skeleton)
+    
+    if not skeleton or "steps" not in skeleton:
+        logging.warning(f"⚠️ [STOPPER] Cannot apply stopper - skeleton or steps missing (result: {result})")
+        return skeleton
+    
+    steps = skeleton.get("steps", [])
+    if len(steps) <= 1:
+        logging.warning(f"⚠️ [STOPPER] Cannot apply stopper - skeleton has {len(steps)} steps (need at least 2)")
+        return skeleton
+    
+    # Determine which step to stop at based on result type
+    if result in ["O_FOUL", "D_FOUL"]:
+        # Random step before final (exclude step 0 and final step)
+        # If skeleton has 7 steps (0-6), choose from steps 1-5
+        stop_step_index = random.randint(1, len(steps) - 2) if len(steps) > 2 else 1
+    elif result in ["DEAD_BALL_TURNOVER", "STEAL"]:
+        # Strategic step - for now, use middle step or based on ball handler dynamics
+        # TODO: Enhance this with player attribute analysis
+        stop_step_index = len(steps) // 2  # Middle step as placeholder
+    else:
+        # Default: stop at step before final
+        stop_step_index = len(steps) - 2
+    
+    # Truncate skeleton to stop_step_index
+    truncated_steps = steps[:stop_step_index + 1]  # Include the stop step
+    
+    # Get the ball handler at the stop step for the stopper action
+    stop_step = truncated_steps[-1]
+    ball_handler_pos = None
+    ball_handler_location = "key"  # Default location
+    
+    # Find ball handler in the stop step
+    pos_actions = stop_step.get("pos_actions", {})
+    for pos, action_info in pos_actions.items():
+        action = action_info.get("action", "").lower()
+        if action in ["handle_ball", "receive", "pass"]:
+            ball_handler_pos = pos
+            ball_handler_location = action_info.get("location", "key")
+            break
+    
+    # If no ball handler found in stop step, check previous step
+    if not ball_handler_pos and len(truncated_steps) > 1:
+        prev_step = truncated_steps[-2]
+        prev_pos_actions = prev_step.get("pos_actions", {})
+        for pos, action_info in prev_pos_actions.items():
+            action = action_info.get("action", "").lower()
+            if action in ["handle_ball", "receive"]:
+                ball_handler_pos = pos
+                ball_handler_location = action_info.get("location", "key")
+                break
+    
+    # Create stopper step as final step
+    stopper_timestamp = stop_step.get("timestamp", 0) + 300  # 300ms after stop step
+    
+    # Map result to stopper action
+    stopper_action_map = {
+        "O_FOUL": "o_foul",
+        "D_FOUL": "d_foul",
+        "DEAD_BALL_TURNOVER": "dead_ball_turnover",
+        "STEAL": "steal"
+    }
+    stopper_action = stopper_action_map.get(result, "turnover")
+    
+    # Create stopper step
+    stopper_step = {
+        "timestamp": stopper_timestamp,
+        "pos_actions": {},
+        "events": [{"type": stopper_action}]
+    }
+    
+    # Add ball handler position (if found) - ball remains with them until stopper
+    if ball_handler_pos:
+        stopper_step["pos_actions"][ball_handler_pos] = {
+            "location": ball_handler_location,
+            "action": "handle_ball"  # Ball still with them
+        }
+    
+    # ✅ FIX: Store stop_step_index for later use in extracting stealer position
+    # This ensures we extract from the actual step where the steal occurred, not the stopper step
+    if result == "STEAL":
+        game_state["steal_stop_step_index"] = stop_step_index
+        # Also store a reference to the original skeleton steps before truncation
+        # (we'll use this to extract position from the correct step)
+        game_state["steal_original_skeleton_steps"] = steps.copy()
+    
+    # Replace skeleton steps with truncated steps + stopper step
+    skeleton["steps"] = truncated_steps + [stopper_step]
+    
+    return skeleton
+
+
 def resolve_half_court_offense_logic(game):
     game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
 
@@ -1852,98 +1967,8 @@ def resolve_half_court_offense_logic(game):
     if skeleton:
         skeleton = copy.deepcopy(skeleton)
     
-    # ✅ STOPER SYSTEM: Truncate skeleton and add stopper step if result is not SHOT
-    if result != "SHOT" and skeleton:
-        if skeleton and "steps" in skeleton:
-            steps = skeleton.get("steps", [])
-            if len(steps) > 1:
-                # Determine which step to stop at based on result type
-                if result in ["O_FOUL", "D_FOUL"]:
-                    # Random step before final (exclude step 0 and final step)
-                    # If skeleton has 7 steps (0-6), choose from steps 1-5
-                    stop_step_index = random.randint(1, len(steps) - 2) if len(steps) > 2 else 1
-                elif result in ["DEAD_BALL_TURNOVER", "STEAL"]:
-                    # Strategic step - for now, use middle step or based on ball handler dynamics
-                    # TODO: Enhance this with player attribute analysis
-                    stop_step_index = len(steps) // 2  # Middle step as placeholder
-                else:
-                    # Default: stop at step before final
-                    stop_step_index = len(steps) - 2
-                
-                # Truncate skeleton to stop_step_index
-                truncated_steps = steps[:stop_step_index + 1]  # Include the stop step
-                
-                # Get the ball handler at the stop step for the stopper action
-                stop_step = truncated_steps[-1]
-                ball_handler_pos = None
-                ball_handler_location = "key"  # Default location
-                
-                # Find ball handler in the stop step
-                pos_actions = stop_step.get("pos_actions", {})
-                for pos, action_info in pos_actions.items():
-                    action = action_info.get("action", "").lower()
-                    if action in ["handle_ball", "receive", "pass"]:
-                        ball_handler_pos = pos
-                        ball_handler_location = action_info.get("location", "key")
-                        break
-                
-                # If no ball handler found in stop step, check previous step
-                if not ball_handler_pos and len(truncated_steps) > 1:
-                    prev_step = truncated_steps[-2]
-                    prev_pos_actions = prev_step.get("pos_actions", {})
-                    for pos, action_info in prev_pos_actions.items():
-                        action = action_info.get("action", "").lower()
-                        if action in ["handle_ball", "receive"]:
-                            ball_handler_pos = pos
-                            ball_handler_location = action_info.get("location", "key")
-                            break
-                
-                # Create stopper step as final step
-                stopper_timestamp = stop_step.get("timestamp", 0) + 300  # 300ms after stop step
-                
-                # Map result to stopper action
-                stopper_action_map = {
-                    "O_FOUL": "o_foul",
-                    "D_FOUL": "d_foul",
-                    "DEAD_BALL_TURNOVER": "dead_ball_turnover",
-                    "STEAL": "steal"
-                }
-                stopper_action = stopper_action_map.get(result, "turnover")
-                
-                # Create stopper step
-                stopper_step = {
-                    "timestamp": stopper_timestamp,
-                    "pos_actions": {},
-                    "events": [{"type": stopper_action}]
-                }
-                
-                # Add ball handler position (if found) - ball remains with them until stopper
-                if ball_handler_pos:
-                    stopper_step["pos_actions"][ball_handler_pos] = {
-                        "location": ball_handler_location,
-                        "action": "handle_ball"  # Ball still with them
-                    }
-                
-                # For steals, add defensive player who steals
-                if result == "STEAL":
-                    # TODO: Determine which defensive player makes the steal based on matchup
-                    # For now, use a placeholder - this should be determined by player attributes
-                    # and defensive positioning
-                    pass
-                
-                # ✅ FIX: Store stop_step_index for later use in extracting stealer position
-                # This ensures we extract from the actual step where the steal occurred, not the stopper step
-                if result == "STEAL":
-                    game_state["steal_stop_step_index"] = stop_step_index
-                    # Also store a reference to the original skeleton steps before truncation
-                    # (we'll use this to extract position from the correct step)
-                    game_state["steal_original_skeleton_steps"] = steps.copy()
-                
-                # Replace skeleton steps with truncated steps + stopper step
-                skeleton["steps"] = truncated_steps + [stopper_step]
-                
-        else:
-            logging.warning(f"⚠️ [STOPPER] Cannot apply stopper - skeleton or steps missing (result: {result})")
+    # ✅ STOPER SYSTEM: Apply stopper system to skeleton (truncate and add stopper step if needed)
+    skeleton = apply_stopper_system_to_skeleton(skeleton, result, game_state)
     
     # Get the successful variant to determine intended shooter
     successful_skeleton = get_hco_skeleton(None, game, lean_score=1.0)  # Force successful variant
@@ -2777,12 +2802,9 @@ def resolve_full_court_press_logic(game: "GameManager"):
     # Initialize shot_result for all cases
     shot_result = {}
     
-    # Initialize animator and skeleton for all cases
+    # Initialize animator for all cases
     from BackEnd.models.animator import Animator
     animator = Animator(game)
-    logging.warning(f"🔍 [FCP] Getting skeleton for result_type={result_type}")
-    skeleton = get_skeleton_for_turn(result_type, "FCP", game) or {}
-    logging.warning(f"🔍 [FCP] Retrieved skeleton: has_steps={bool(skeleton.get('steps'))}, step_count={len(skeleton.get('steps', []))}")
     animations = []
     
     # Handle SHOT result - execute actual shot resolution
@@ -2823,8 +2845,9 @@ def resolve_full_court_press_logic(game: "GameManager"):
         shot_result["text"] = "PRESS! " + shot_result.get("text", "")
         
         # Generate animations from skeleton for the pass, then rely on standard shot animation
+        # ✅ FCP/HCT SHOT: Use FCP shot skeleton with version selection (filters non-empty versions)
         logging.warning(f"🔍 [FCP SHOT] Getting skeleton for SHOT variant")
-        skeleton = get_skeleton_for_turn("SHOT", "FCP", game) or {}
+        skeleton = get_fcp_skeleton("SHOT", game) or {}
         logging.warning(f"🔍 [FCP SHOT] Retrieved skeleton: has_steps={bool(skeleton.get('steps'))}, step_count={len(skeleton.get('steps', []))}")
         
         if skeleton and "steps" in skeleton:
@@ -2850,6 +2873,20 @@ def resolve_full_court_press_logic(game: "GameManager"):
         
         return shot_result
     
+    # ✅ FCP NON-SHOT: Get standard HCO skeleton and apply stopper system
+    # For non-shot results (O_FOUL, D_FOUL, STEAL, DEAD_BALL_TURNOVER, HCO), use HCO skeleton
+    # Apply stopper system if result is not HCO (truncate and add stopper step)
+    logging.warning(f"🔍 [FCP NON-SHOT] Getting HCO skeleton for result_type={result_type}")
+    skeleton = get_hco_skeleton(None, game, lean_score=None)  # Standard HCO skeleton (successful variant)
+    
+    # Deep copy skeleton to avoid mutating cached skeleton
+    if skeleton:
+        skeleton = copy.deepcopy(skeleton)
+    
+    # Apply stopper system (truncates if needed, or returns full skeleton if result == "HCO")
+    skeleton = apply_stopper_system_to_skeleton(skeleton, result_type, game_state)
+    logging.warning(f"🔍 [FCP NON-SHOT] Retrieved skeleton: has_steps={bool(skeleton.get('steps'))}, step_count={len(skeleton.get('steps', []))}")
+    
     # ✅ Determine ball handler from skeleton (who actually has the ball)
     ball_handler = get_ball_handler_from_skeleton(skeleton, off_lineup)
     ball_handler_pos = getattr(ball_handler, 'position', None) or "PG"
@@ -2865,23 +2902,6 @@ def resolve_full_court_press_logic(game: "GameManager"):
         "passer": None,
         "screener": None,
     }
-    
-    # Generate animations from skeleton BEFORE changing result_type
-    # (skeleton keys use D_FOUL/O_FOUL, not FOUL)
-    # ✅ FIX: Skeleton already retrieved at line 1354 for STEAL/FOUL/DEAD_BALL
-    # Only SHOT result retrieves a different skeleton (SHOT variant)
-    # Skip duplicate retrieval to avoid double animations
-    from BackEnd.models.animator import Animator
-    animator = Animator(game)
-    
-    if not skeleton or not skeleton.get('steps'):
-        skeleton = get_skeleton_for_turn(result_type, "FCP", game) or {}
-        # Re-determine ball handler if skeleton was just retrieved
-        ball_handler = get_ball_handler_from_skeleton(skeleton, off_lineup)
-        ball_handler_pos = getattr(ball_handler, 'position', None) or "PG"
-        defender = def_lineup.get(ball_handler_pos, def_lineup.get("PG", list(def_lineup.values())[0]))
-        roles["ball_handler"] = ball_handler
-        roles["defender"] = defender
     
     # Handle foul results - use standard foul types for frontend
     if result_type == "D_FOUL":
@@ -3700,8 +3720,9 @@ def resolve_half_court_trap_logic(game: "GameManager"):
         # Generate animations from skeleton
         from BackEnd.models.animator import Animator
         animator = Animator(game)
+        # ✅ FCP/HCT SHOT: Use HCT shot skeleton with version selection (filters non-empty versions)
         logging.warning(f"🔍 [HCT SHOT] Getting skeleton for SHOT variant")
-        skeleton = get_skeleton_for_turn("SHOT", "HCT", game) or {}
+        skeleton = get_hct_skeleton("SHOT", game) or {}
         logging.warning(f"🔍 [HCT SHOT] Retrieved skeleton: has_steps={bool(skeleton.get('steps'))}, step_count={len(skeleton.get('steps', []))}")
         
         if skeleton and "steps" in skeleton:
@@ -3729,6 +3750,20 @@ def resolve_half_court_trap_logic(game: "GameManager"):
         
         return shot_result
     
+    # ✅ HCT NON-SHOT: Get standard HCO skeleton and apply stopper system
+    # For non-shot results (O_FOUL, D_FOUL, STEAL, DEAD_BALL_TURNOVER, HCO), use HCO skeleton
+    # Apply stopper system if result is not HCO (truncate and add stopper step)
+    logging.warning(f"🔍 [HCT NON-SHOT] Getting HCO skeleton for result_type={result_type}")
+    skeleton = get_hco_skeleton(None, game, lean_score=None)  # Standard HCO skeleton (successful variant)
+    
+    # Deep copy skeleton to avoid mutating cached skeleton
+    if skeleton:
+        skeleton = copy.deepcopy(skeleton)
+    
+    # Apply stopper system (truncates if needed, or returns full skeleton if result == "HCO")
+    skeleton = apply_stopper_system_to_skeleton(skeleton, result_type, game_state)
+    logging.warning(f"🔍 [HCT NON-SHOT] Retrieved skeleton: has_steps={bool(skeleton.get('steps'))}, step_count={len(skeleton.get('steps', []))}")
+    
     # ✅ Determine ball handler from skeleton (who actually has the ball)
     ball_handler = get_ball_handler_from_skeleton(skeleton, off_lineup)
     ball_handler_pos = getattr(ball_handler, 'position', None) or "PG"
@@ -3745,22 +3780,10 @@ def resolve_half_court_trap_logic(game: "GameManager"):
         "screener": None,
     }
     
-    # Generate animations from skeleton BEFORE changing result_type
-    # ✅ FIX: Skeleton already retrieved earlier for STEAL/FOUL/DEAD_BALL
-    # Only SHOT result retrieves a different skeleton (SHOT variant)
-    # Skip duplicate retrieval to avoid double animations
+    # Initialize animator if not already initialized
     from BackEnd.models.animator import Animator
     if animator is None:
         animator = Animator(game)
-    
-    if not skeleton or not skeleton.get('steps'):
-        skeleton = get_skeleton_for_turn(result_type, "HCT", game) or {}
-        # Re-determine ball handler if skeleton was just retrieved
-        ball_handler = get_ball_handler_from_skeleton(skeleton, off_lineup)
-        ball_handler_pos = getattr(ball_handler, 'position', None) or "PG"
-        defender = def_lineup.get(ball_handler_pos, def_lineup.get("PG", list(def_lineup.values())[0]))
-        roles["ball_handler"] = ball_handler
-        roles["defender"] = defender
     
     # Handle foul results - use standard foul types for frontend (same as FCP)
     if result_type == "D_FOUL":
