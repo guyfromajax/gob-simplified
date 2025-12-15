@@ -411,12 +411,19 @@ def get_ball_handler_from_skeleton(skeleton, off_lineup, step_index=None):
 - **MAKE**: Counts as offensive success at player level but NOT as defensive success at team level (correct - offense scored)
 - **D_FOUL**: Counts as defensive failure at player level but NOT as defensive success at team level (correct - defense fouled)
 
-### Skeleton System
+### Skeleton System ✅ **UPDATED** (January 2025)
 
 **Skeleton Sources:**
-- FCP skeletons: `BackEnd/playcall_skeletons/fcp_skeletons.py`
-- HCT skeletons: `BackEnd/playcall_skeletons/hct_skeletons.py`
-- Skeleton variants: Different skeletons for different outcomes (FOUL, STEAL, HCO, SHOT)
+- FCP skeletons: MongoDB `fcp_skeletons` collection
+- HCT skeletons: MongoDB `hct_skeletons` collection
+- **Variant Structure**: Two variants per skeleton type:
+  - `"base"` - Standard press/trap break skeleton (used for all non-shot results: O_FOUL, D_FOUL, STEAL, DEAD_BALL_TURNOVER, HCO)
+  - `"shot"` - Shot attempt skeleton (used for SHOT results)
+- **Critical**: FCP/HCT "base" variants have step 0 with press/trap break positions (unlike HCO skeletons which don't have step 0)
+- **Skeleton Selection**: `get_fcp_skeleton(result_type, game)` or `get_hct_skeleton(result_type, game)` maps result types to variants
+  - All non-shot result types map to `"base"` variant
+  - SHOT results map to `"shot"` variant
+- **Stopper System Integration**: FCP/HCT non-shot results use "base" variant skeletons with stopper system applied (truncation + stopper step)
 
 **Skeleton Structure:**
 - Each skeleton contains `steps` array
