@@ -384,9 +384,10 @@ class PlaybooksUI {
     if (!assignment) return false;
     
     if (sectionKey === 'motion') {
+      const currentDropdown = this.state.motionDropdowns[playId] || 'Inside';
       return assignment.section === 'motion' &&
              assignment.playId === playId &&
-             assignment.dropdown === (this.state.motionDropdowns[playId] || 'Inside');
+             assignment.dropdown === currentDropdown;
     }
     
     return assignment.section === sectionKey && assignment.playId === playId;
