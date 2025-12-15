@@ -14,7 +14,7 @@
  * @param {string} [options.myTeamSide] - User's team side ('home' or 'away')
  * @param {string} [options.userTeamId] - User's team ID
  */
-export function showFoulOutPopup({ player, gameId, mode, quarter, clock, tournamentId, franchiseId, homeTeam, awayTeam, homeId, awayId, myTeamSide, userTeamId }) {
+export async function showFoulOutPopup({ player, gameId, mode, quarter, clock, tournamentId, franchiseId, homeTeam, awayTeam, homeId, awayId, myTeamSide, userTeamId }) {
   // Remove any existing popup
   const existingPopup = document.querySelector('.foul-out-popup');
   if (existingPopup) {
@@ -22,15 +22,61 @@ export function showFoulOutPopup({ player, gameId, mode, quarter, clock, tournam
   }
 
   // ✅ SS&S: Use unified navigation helper for consistent parameter building
-  // Fallback: try to get team info from current URL if not provided
+  // Fallback: try to get team info and CURRENT LINEUP from current URL if not provided
   const urlParams = new URLSearchParams(window.location.search);
-    if (!homeTeam) homeTeam = urlParams.get('home');
-    if (!awayTeam) awayTeam = urlParams.get('away');
-    if (!homeId) homeId = urlParams.get('home_id');
-    if (!awayId) awayId = urlParams.get('away_id');
-    if (!myTeamSide) myTeamSide = urlParams.get('my_team');
-    if (!userTeamId) userTeamId = urlParams.get('user_team_id');
-    
+  if (!homeTeam) homeTeam = urlParams.get('home');
+  if (!awayTeam) awayTeam = urlParams.get('away');
+  if (!homeId) homeId = urlParams.get('home_id');
+  if (!awayId) awayId = urlParams.get('away_id');
+  if (!myTeamSide) myTeamSide = urlParams.get('my_team');
+  if (!userTeamId) userTeamId = urlParams.get('user_team_id');
+  
+  // ✅ FOUL OUT: Build current lineup for user's team from URL (same pattern as timeout/quarter flows)
+  const effectiveMyTeamSide = myTeamSide || urlParams.get('my_team');
+  const lineup = {};
+  if (effectiveMyTeamSide === 'home' || effectiveMyTeamSide === 'away') {
+    const positions = ['PG', 'SG', 'SF', 'PF', 'C'];
+    positions.forEach(pos => {
+      const key = `${effectiveMyTeamSide}_${pos.toLowerCase()}`;
+      const playerId = urlParams.get(key);
+      if (playerId) {
+        lineup[pos] = playerId;
+      }
+    });
+  }
+
+  // ✅ FOUL OUT: Remove fouled-out player from user's lineup (user must replace this slot)
+  try {
+    const foulOutPlayerId = player?.player_id || player?.playerId || player?.id;
+    const foulOutPlayerTeam = player?.team;
+    const userTeamName = effectiveMyTeamSide === 'home' ? homeTeam : awayTeam;
+
+    if (foulOutPlayerId && foulOutPlayerTeam && userTeamName && foulOutPlayerTeam === userTeamName) {
+      Object.entries(lineup).forEach(([pos, playerId]) => {
+        if (playerId === foulOutPlayerId) {
+          delete lineup[pos];
+          console.log(`✅ [FOUL-OUT] Cleared ${pos} slot for fouled-out player ${player.name} (${foulOutPlayerId})`);
+        }
+      });
+    }
+  } catch (err) {
+    console.warn('⚠️ [FOUL-OUT] Failed to clear fouled-out player from lineup', err);
+  }
+
+  // ✅ FOUL OUT: Also preserve the other team's lineup from URL so both sides stay consistent
+  const otherLineupParams = {};
+  if (effectiveMyTeamSide === 'home' || effectiveMyTeamSide === 'away') {
+    const otherTeamSide = effectiveMyTeamSide === 'home' ? 'away' : 'home';
+    const positions = ['PG', 'SG', 'SF', 'PF', 'C'];
+    positions.forEach(pos => {
+      const key = `${otherTeamSide}_${pos.toLowerCase()}`;
+      const playerId = urlParams.get(key);
+      if (playerId) {
+        otherLineupParams[`${otherTeamSide}_${pos.toLowerCase()}`] = playerId;
+      }
+    });
+  }
+  
   // Build params using unified helper
   // ✅ SS&S: Use global helper (works in both regular scripts and modules)
   const helper = window.TimeoutNavigationHelper;
@@ -44,8 +90,8 @@ export function showFoulOutPopup({ player, gameId, mode, quarter, clock, tournam
     targetQuarter: quarter,
     gameId: gameId,
     resumeFromTimeout: true, // ✅ FOUL OUT: Always resuming from timeout (any quarter)
-    lineup: {}, // Lineup will be set on lineup screen
-    myTeamSide: myTeamSide,
+    lineup: lineup, // ✅ Pre-populated with current lineup (user's team), minus fouled-out player
+    myTeamSide: effectiveMyTeamSide,
     clock: clock,
     overrides: {
       home: homeTeam,
@@ -58,6 +104,11 @@ export function showFoulOutPopup({ player, gameId, mode, quarter, clock, tournam
       tournament_id: tournamentId,
       franchise_id: franchiseId
     }
+  });
+
+  // ✅ FOUL OUT: Manually add other team's lineup params (helper only adds user's team)
+  Object.entries(otherLineupParams).forEach(([key, value]) => {
+    params.set(key, value);
   });
   
   const lineupUrl = `/static/set-lineup.html?${params.toString()}`;

@@ -383,6 +383,12 @@ def resolve_non_shooting_foul(roles, game):
     # Offensive fouls always flip possession, defensive fouls don't (handled by bonus logic)
     possession_flips = (foul_team == off_team)  # True for offensive fouls, False for defensive
     
+    # ✅ FOUL OUT: Flip possession immediately for offensive fouls (SS&S)
+    # This ensures game.offense_team is correct BEFORE foul-out timeout is created
+    if possession_flips and foul_team == off_team:
+        game.switch_possession()
+        logging.info(f"🔄 [FOUL OUT] Flipped possession for offensive foul: {off_team.name} → {game.offense_team.name}")
+    
     result = {
         "result_type": "FOUL",
         "ball_handler": ball_handler,
@@ -408,6 +414,20 @@ def resolve_non_shooting_foul(roles, game):
             "photo": foul_out_info["foul_player_photo"],
             "team": foul_out_info["foul_player_team"]
         }
+        
+        # ✅ FOUL OUT: Store foul context for timeout creation
+        # This allows setup_timeout_turn() to determine next_play_type correctly
+        is_bonus = def_team.team_fouls >= 5 if foul_team == def_team else False
+        next_play_type = "FREE_THROW" if game_state.get("offensive_state") == "FREE_THROW" else "SIDE_INBOUND"
+        
+        game_state["foul_out_context"] = {
+            "foul_type": "OFFENSIVE" if foul_team == off_team else "DEFENSIVE",
+            "is_shooting_foul": False,
+            "is_bonus": is_bonus,
+            "next_play_type": next_play_type,
+            "shooter": ball_handler if game_state.get("offensive_state") == "FREE_THROW" else None
+        }
+        logging.info(f"✅ FOUL OUT: Stored foul context - type={game_state['foul_out_context']['foul_type']}, next={next_play_type}")
     
     return result
 

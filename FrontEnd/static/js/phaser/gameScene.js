@@ -391,6 +391,15 @@ export function createGameScene(Phaser) {
       const awayTolEl = document.getElementById('away-tol');
       const clockEl = document.getElementById('game-clock');
       const quarterEl = document.getElementById('quarter');
+      
+      // ✅ FOUL OUT RESUME: Set clock immediately on page load (before turn processing)
+      // This ensures correct clock display when returning from lineup/game plan screens
+      if (clockEl && liveClock) {
+        clockEl.textContent = liveClock;
+      }
+      if (quarterEl && livePeriodLabel) {
+        quarterEl.textContent = livePeriodLabel;
+      }
 
       const positions = ["PG","SG","SF","PF","C"];
       // Filter out the ball and inactive players (those without a position)
@@ -1076,11 +1085,23 @@ export function createGameScene(Phaser) {
       const awayTimeoutsFromData = awayTeamObj?.timeouts ?? simData.timeouts?.away ?? simData.away_team_timeouts;
       let liveHomeTimeouts = typeof homeTimeoutsFromData === 'number' ? homeTimeoutsFromData : (isNewGame ? 5 : 5);
       let liveAwayTimeouts = typeof awayTimeoutsFromData === 'number' ? awayTimeoutsFromData : (isNewGame ? 5 : 5);
-      // ✅ FIX: Check URL params for clock (from foul out navigation) before using simData.clock
-      // This preserves the clock time when returning from lineup screen after a foul out
+      // ✅ FOUL OUT RESUME: Use first turn's clock as source of truth (SS&S)
+      // When resuming from timeout/foul out, the first turn has the correct clock from backend
       const urlParams = new URLSearchParams(window.location.search);
-      const urlClock = urlParams.get('clock');
-      let liveClock = urlClock || simData.clock || '8:00';
+      const resumeFromTimeout = urlParams.get('resume_from_timeout') === 'true';
+      
+      // For timeout resumes, use first turn's clock if available (backend source of truth)
+      let liveClock = '8:00'; // Default
+      if (resumeFromTimeout && simData.turns && simData.turns.length > 0) {
+        const firstTurn = simData.turns[0];
+        liveClock = firstTurn.clock || firstTurn.game_clock || simData.clock || '8:00';
+        console.log(`✅ TIMEOUT RESUME: Using first turn clock: ${liveClock}`);
+      } else {
+        // For new games or non-timeout resumes, use URL param or simData
+        const urlClock = urlParams.get('clock');
+        liveClock = urlClock || simData.clock || '8:00';
+      }
+      
       let liveQuarter = this.quarter;
       let livePeriodLabel = simData.period_label || `Q${this.quarter}`;
 

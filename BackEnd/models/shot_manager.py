@@ -597,6 +597,16 @@ class ShotManager:
                         "team": foul_out_info["foul_player_team"]
                     }
                     result["foul_count"] = foul_out_info["foul_count"]
+                    
+                    # ✅ FOUL OUT: Store foul context for timeout creation
+                    self.game_state["foul_out_context"] = {
+                        "foul_type": "DEFENSIVE",
+                        "is_shooting_foul": True,
+                        "is_bonus": False,  # Shooting fouls are always free throws regardless of bonus
+                        "next_play_type": "FREE_THROW",
+                        "shooter": shooter  # Store shooter for free throw resume
+                    }
+                    logging.info(f"✅ FOUL OUT: Stored shooting foul context (miss) - shooter={get_name_safe(shooter)}")
                 
                 # ✅ Add player positioning data for frontend animation (defensive foul on miss)
                 # Players still released/got back when shot was taken, so include this data
