@@ -754,10 +754,18 @@ The system determines which step to stop at based on result type:
 - **Location**: `FrontEnd/static/js/phaser/animation/turnAnimation.js` - `runSetupTween()` function (lines 345-390)
 - **Execution**: `runSetupTween()` moves all players to their step 0 positions using distance-based duration, then the step loop begins at step 1
 
+**Exception: BIP → FCP/HCT Transitions** ✅ **NEW** (January 2025)
+- **Skip `runSetupTween()`** when coming from BASELINE_INBOUND (`fromInbound === true`) AND the turn is FCP/HCT (`isFCPHCT === true`)
+- **Reason**: BIP already positions players at skeleton step 0 positions (from `offense_setup_positions`), so `runSetupTween()` is redundant
+- **Prevents Timing Conflicts**: The inbound pass animation may still be completing when HCT/FCP starts, and redundant positioning can cause conflicts
+- **Location**: `FrontEnd/static/js/phaser/animation/turnAnimation.js` - `playTurnAnimation()` function (lines 2211-2217)
+- **Code**: `if (!fromInbound || !isFCPHCT) { await runSetupTween({...}); }`
+
 **Why This Matters:**
 - Truncated skeletons (o foul, d foul, dead ball turnover, steal) use `playTurnAnimation()` which was missing the `runSetupTween()` call
 - Shot attempts use `ShotAnimationSystem` which correctly calls `runSetupTween()` before animation
 - The fix ensures both paths position players at step 0 before step 1 starts, preventing animation hitches
+- **Exception handling** prevents redundant positioning when BIP already handled it, ensuring smooth BIP → FCP/HCT transitions
 
 **Key Files:**
 - `FrontEnd/static/js/phaser/animation/turnAnimation.js` - `playTurnAnimation()` and `runSetupTween()` functions
