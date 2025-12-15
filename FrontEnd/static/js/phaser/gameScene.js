@@ -394,8 +394,7 @@ export function createGameScene(Phaser) {
       
       // ✅ FOUL OUT RESUME: Initialize clock early (before DOM usage)
       // When resuming from timeout/foul out, the first turn has the correct clock from backend
-      const urlParams = new URLSearchParams(window.location.search);
-      const resumeFromTimeout = urlParams.get('resume_from_timeout') === 'true';
+      // Note: resumeFromTimeout is already declared earlier in this function (line 222)
       
       // For timeout resumes, use first turn's clock if available (backend source of truth)
       let liveClock = '8:00'; // Default
@@ -405,7 +404,7 @@ export function createGameScene(Phaser) {
         console.log(`✅ TIMEOUT RESUME: Using first turn clock: ${liveClock}`);
       } else {
         // For new games or non-timeout resumes, use URL param or simData
-        const urlClock = urlParams.get('clock');
+        const urlClock = timeoutUrlParams.get('clock');
         liveClock = urlClock || simData.clock || '8:00';
       }
       
