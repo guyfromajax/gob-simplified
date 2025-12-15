@@ -5011,6 +5011,240 @@ Player headshots in the Playcall Center are assigned once when returning to `cou
 
 ---
 
+## Playbooks Page ✅ **UI COMPLETE** (January 2025)
+
+### Overview
+
+The Playbooks page allows users to configure their team's offensive and defensive playcall distributions and priority assignments. Users set percentage distributions for each play type and assign priority slots 1-6 to specific plays.
+
+**Location:** `FrontEnd/static/playbooks.html`  
+**Purpose:** Configure playcall percentages and priority assignments for offense and defense  
+**Status:** UI/UX complete, backend integration pending
+
+### Layout Structure
+
+**Desktop Grid Layout:**
+- **2-column grid** (4 equal columns total, each section spans 2 columns)
+- **Column 1-2:** Offense Play Calls (spans 2 columns, 50% width)
+- **Column 3-4:** Defense Play Calls (spans 2 columns, 50% width)
+
+**Header Row:**
+- **Left:** Page title "Playbooks"
+- **Right:** Submit button with helper text
+
+### Six Percentage Sections
+
+Each section contains multiple rows with numeric percentage inputs (0-100) and must total exactly 100%:
+
+**Offense Sections:**
+1. **Motion Offense** - 4 plays (4-1 Motion, 3-2 Motion, 5-0 Motion, Motion Option 4)
+2. **Set Play Inside Offense** - 2 plays (Base Post Play, Low Post Isolation)
+3. **Set Play Attack Offense** - 2 plays (Pick & Roll Lower Wing, Pick & Roll Top)
+4. **Set Play Outside Offense** - 2 plays (Double Screen For SG, Flare Screen)
+
+**Defense Sections:**
+5. **Man Defense** - 3 plays (Man Defense, Man Defense Variant 2, Man Defense Variant 3)
+6. **Zone Defense** - 5 plays (2-3 Zone, 3-2 Zone, 1-3-1 Zone, Zone Variant 4, Zone Variant 5)
+
+**Validation Rules:**
+- Each section displays live total (e.g., "Total: 100%")
+- If user edit would push section over 100%, change is prevented/reverted
+- Inline error message: "This section must total 100%. You're over by X%."
+- Warning state (subtle color + helper text) when section total ≠ 100%
+- Submit button disabled unless ALL six sections total exactly 100%
+
+### Default Values (First-Time User)
+
+**If no saved settings exist:**
+- Top row in each section = 100%
+- All other rows = 0%
+- Motion dropdowns default to "Inside"
+
+### Submit Button
+
+**Location:** Top-right of page header  
+**Styling:** Orange button (`#ff7a00`)  
+**Behavior:**
+- **Enabled:** Only when ALL six section totals == 100%
+- **Disabled:** When any section total != 100%
+  - Reduced opacity (0.5)
+  - Disabled pointer events
+  - Helper text displayed: "All sections must total 100% to submit."
+- **On Click (when enabled):**
+  - Runs final validation
+  - Persists settings (currently localStorage, API interface ready)
+  - Shows success toast notification ("Saved")
+
+### Persistence Layer
+
+**Current Implementation:**
+- **Primary:** localStorage (`gob_playbooks` key)
+- **API Interface:** Ready for backend integration (`/api/playbooks` endpoint stubbed)
+
+**Persistence Interface (`PlaybooksPersistence` class):**
+- `load()` - Attempts API first, falls back to localStorage
+- `save(data)` - Attempts API first, falls back to localStorage
+- Single interface allows easy swap to real API endpoints
+
+**Data Serialization:**
+```javascript
+{
+  sections: {
+    motion: { [playId]: { percentage: number, slot: number | null } },
+    'set-play-inside': { [playId]: { percentage: number, slot: number | null } },
+    // ... other sections
+  },
+  slotAssignments: {
+    [slotNumber]: { section: string, playId: string, dropdown?: string }
+  },
+  motionDropdowns: { [playId]: 'Inside' | 'Attack' | 'Outside' }
+}
+```
+
+### Motion Offense Dropdowns
+
+**Behavior:**
+- Each Motion row includes dropdown with options: **Inside / Attack / Outside**
+- Dropdown default: **Inside**
+- **Persistence:** Selection persists when changed (stored in `motionDropdowns` state)
+- **Display:** Dropdown shows current selection until user changes it or leaves page
+
+**Integration with Slot Assignment:**
+- Motion slot assignments are keyed by dropdown variant
+- Example: "5-0 Motion (Inside)" and "5-0 Motion (Attack)" are separate assignable targets
+- Slot assignment key format: `motion:${playId}:${dropdown}`
+
+### Priority Slots 1-6 (Offense Only)
+
+**Location:** Right column of every Motion and Set Play row  
+**Alignment:** Single vertical column of 6 slot controls (aligned across all rows)
+
+**Rules:**
+- Each slot number (1-6) can be assigned only **once** across ALL offense play call rows
+- If Slot 1 is assigned to one row and user assigns Slot 1 to another row, it auto-unassigns from first and assigns to second
+- **Motion Complication:** Slot assignments must support dropdown variants
+  - Users can assign Slot 1 to "Motion (Inside)", Slot 2 to "Motion (Attack)", Slot 3 to "Motion (Outside)"
+  - Motion slot assignments tracked as distinct targets: `(motionRowId + selectedDropdownFocus)`
+
+**Slot UI/UX:**
+- Each slot rendered as small toggle "pill/chip" control
+- **When assigned:**
+  - **Set Plays:** Normal selected styling (gold background)
+  - **Motion:** Selected styling + small badge indicating I/A/O (derived from assigned dropdown variant)
+- **Badge Colors:**
+  - **Inside (I):** Blue (`#4a90e2`)
+  - **Attack (A):** Orange (`#ff7a00`)
+  - **Outside (O):** Green (`#4caf50`)
+- All slot controls aligned vertically for consistent column reading
+
+**Slot Persistence:**
+- Slots remain assigned when dropdown changes
+- Example: If Slot 1 is assigned to "5-0 Motion (Inside)" and user changes dropdown to "Attack", checkbox stays highlighted with "I" badge (showing it's still assigned to Inside variant)
+- Badge shows the **assigned** dropdown variant, not the current dropdown selection
+
+### Assigned Plays 1-6 List
+
+**Location:** Bottom of Offense column  
+**Structure:** Simple 6-row list (rows labeled 1-6)
+
+**Display Format:**
+- Each row shows: `"Slot Number: Play Name (Focus)"`
+- **Motion examples:**
+  - `"1: 5-0 Motion (Inside)"`
+  - `"2: 4-1 Motion (Outside)"`
+- **Set Play examples:**
+  - `"3: Base Post Play (Inside)"`
+  - `"4: Pick & Roll (Lower Wing) (Attack)"`
+- **Unassigned:** Shows `"Unassigned"` in muted/italic text
+
+**Behavior:**
+- Updates live as slot assignments change
+- Reflects current state of all 6 slot assignments
+- Format: `"Play Name (Focus)"` where Focus is:
+  - For Motion: The dropdown variant (Inside/Attack/Outside)
+  - For Set Plays: The section focus (Inside/Attack/Outside)
+
+### State Model
+
+**Clean state shape supporting:**
+- Six independent section totals + validation state
+- Slot uniqueness across offense (enforced via `slotAssignments` object)
+- Motion slot assignment keyed by dropdown focus
+- Easy serialization/deserialization to save payload
+
+**State Structure (`PlaybooksState` class):**
+```javascript
+{
+  sections: {
+    [sectionKey]: {
+      [playId]: {
+        percentage: number,
+        slot: number | null  // For set plays only
+      }
+    }
+  },
+  slotAssignments: {
+    [slotNumber]: {
+      section: string,
+      playId: string,
+      dropdown?: string  // For motion plays
+    }
+  },
+  motionDropdowns: {
+    [playId]: 'Inside' | 'Attack' | 'Outside'
+  }
+}
+```
+
+### Visual and Interaction Quality
+
+**Typography Hierarchy:**
+- Page title: 2.5rem, gold color (`#FFD700`)
+- Section titles: 1.125rem, white
+- Row labels: 0.9375rem, white
+- Helper text: 0.875rem, muted white
+
+**Input Alignment:**
+- Labels left-aligned
+- Inputs right-aligned
+- Totals consistent positioning
+
+**Error Handling:**
+- Inline section-level error messages (avoid global error dumps)
+- Warning states with subtle color changes
+- Fast and predictable editing experience (no jank)
+
+**Accessibility:**
+- Keyboard navigation support
+- Focus states on all interactive elements
+- Readable contrast ratios
+- ARIA labels where appropriate
+
+### Key Files
+
+**Frontend:**
+- `FrontEnd/static/playbooks.html` - Main page structure
+- `FrontEnd/static/playbooks.css` - Styling and layout
+- `FrontEnd/static/playbooks.js` - State management, validation, and UI logic
+
+**Key Classes:**
+- `PlaybooksState` - State management and validation
+- `PlaybooksPersistence` - Load/save interface (localStorage + API ready)
+- `PlaybooksUI` - UI controller and rendering logic
+
+### Future Enhancements (Backend Integration)
+
+**Pending:**
+- Wire persistence to user account system
+- Integrate with game engine playcall selection logic
+- Connect percentage distributions to playcall probability calculations
+- Link priority slots to playcall selection order
+- Add API endpoints for save/load operations
+
+**Note:** Backend integration details will be added to this section once implementation begins.
+
+---
+
 ### 4. `handleTurnover()`
 **Registered for:** `TURNOVER`  
 **Location:** `AnimationEngine.js` line 369  
