@@ -3011,6 +3011,16 @@ def resolve_full_court_press_logic(game: "GameManager"):
         )
         logging.warning(f"🔍 [FCP] Generated {len(animations)} animations")
         
+        # ✅ DEBUG: Log step 0 positions from generated animations
+        for anim in animations[:5]:  # Log first 5 animations
+            player_id = anim.get("playerId", "UNKNOWN")
+            movement = anim.get("movement", [])
+            if movement and len(movement) > 0:
+                step_0_coords = movement[0].get("coords", "N/A")
+                logging.warning(f"🔍 [FCP] Animation {player_id[:8]}: step 0 coords={step_0_coords}")
+            else:
+                logging.warning(f"⚠️ [FCP] Animation {player_id[:8]}: NO MOVEMENT ARRAY or EMPTY!")
+        
         # ✅ FIX: Extract stealer position from generated animations (SS&S approach)
         # This uses the actual calculated defensive position from the animation system
         # For stopper results (steal, foul, turnover), the stopper step is always the final step,
