@@ -19,7 +19,6 @@ const PLAY_DATA = {
     { id: 'motion-2', name: '3-2 Motion' },
     { id: 'motion-3', name: '5-0 Motion' },
     { id: 'motion-4', name: 'Motion Option 4' },
-    { id: 'motion-5', name: 'Motion Option 5' },
   ],
   'set-play-inside': [
     { id: 'set-inside-1', name: 'Base Post Play' },
