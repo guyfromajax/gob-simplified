@@ -2882,11 +2882,11 @@ def resolve_full_court_press_logic(game: "GameManager"):
         
         return shot_result
     
-    # ✅ FCP NON-SHOT: Get standard HCO skeleton and apply stopper system
-    # For non-shot results (O_FOUL, D_FOUL, STEAL, DEAD_BALL_TURNOVER, HCO), use HCO skeleton
+    # ✅ FCP NON-SHOT: Get FCP "base" variant skeleton and apply stopper system
+    # For non-shot results (O_FOUL, D_FOUL, STEAL, DEAD_BALL_TURNOVER, HCO), use FCP "base" variant
     # Apply stopper system if result is not HCO (truncate and add stopper step)
-    logging.warning(f"🔍 [FCP NON-SHOT] Getting HCO skeleton for result_type={result_type}")
-    skeleton = get_hco_skeleton(None, game, lean_score=None)  # Standard HCO skeleton (successful variant)
+    logging.warning(f"🔍 [FCP NON-SHOT] Getting FCP base skeleton for result_type={result_type}")
+    skeleton = get_fcp_skeleton(result_type, game)  # Get FCP "base" variant (has step 0 with press break positions)
     
     # Deep copy skeleton to avoid mutating cached skeleton
     if skeleton:
@@ -3785,11 +3785,11 @@ def resolve_half_court_trap_logic(game: "GameManager"):
         
         return shot_result
     
-    # ✅ HCT NON-SHOT: Get standard HCO skeleton and apply stopper system
-    # For non-shot results (O_FOUL, D_FOUL, STEAL, DEAD_BALL_TURNOVER, HCO), use HCO skeleton
+    # ✅ HCT NON-SHOT: Get HCT "base" variant skeleton and apply stopper system
+    # For non-shot results (O_FOUL, D_FOUL, STEAL, DEAD_BALL_TURNOVER, HCO), use HCT "base" variant
     # Apply stopper system if result is not HCO (truncate and add stopper step)
-    logging.warning(f"🔍 [HCT NON-SHOT] Getting HCO skeleton for result_type={result_type}")
-    skeleton = get_hco_skeleton(None, game, lean_score=None)  # Standard HCO skeleton (successful variant)
+    logging.warning(f"🔍 [HCT NON-SHOT] Getting HCT base skeleton for result_type={result_type}")
+    skeleton = get_hct_skeleton(result_type, game)  # Get HCT "base" variant (has step 0 with trap break positions)
     
     # Deep copy skeleton to avoid mutating cached skeleton
     if skeleton:
