@@ -97,15 +97,19 @@ body {
   pointer-events: none;
 }
 
-/* 3-Column Grid (Offense spans 2 columns) */
+/* 4-Column Grid (Offense and Defense each span 2 columns) */
 .playbooks-grid {
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr;
+  grid-template-columns: repeat(4, 1fr);
   gap: var(--spacing-md);
   align-items: start;
 }
 
 .offense-column-wide {
+  grid-column: span 2;
+}
+
+.defense-column-wide {
   grid-column: span 2;
 }
 
