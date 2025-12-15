@@ -3155,16 +3155,17 @@ def get_fcp_skeleton(result_type, game_context=None):
     from BackEnd.db import fcp_skeletons_collection
     
     # Map result_type to variant name
+    # All non-shot results use "base" variant (has step 0 with press break positions)
     variant_map = {
-        "O_FOUL": "o_foul",
-        "D_FOUL": "d_foul",
-        "DEAD_BALL_TURNOVER": "dead_ball_turnover",
-        "STEAL": "steal",
+        "O_FOUL": "base",
+        "D_FOUL": "base",
+        "DEAD_BALL_TURNOVER": "base",
+        "STEAL": "base",
         "SHOT": "shot",
-        "HCO": "hco"
+        "HCO": "base"  # Press break → HCO transition uses base variant
     }
     
-    variant_name = variant_map.get(result_type, "hco")  # Default to hco
+    variant_name = variant_map.get(result_type, "base")  # Default to base
     
     # Try to get skeleton from MongoDB
     try:
@@ -3246,16 +3247,17 @@ def get_hct_skeleton(result_type, game_context=None):
     from BackEnd.db import hct_skeletons_collection
     
     # Map result_type to variant name
+    # All non-shot results use "base" variant (has step 0 with trap break positions)
     variant_map = {
-        "O_FOUL": "o_foul",
-        "D_FOUL": "d_foul",
-        "DEAD_BALL_TURNOVER": "dead_ball_turnover",
-        "STEAL": "steal",
+        "O_FOUL": "base",
+        "D_FOUL": "base",
+        "DEAD_BALL_TURNOVER": "base",
+        "STEAL": "base",
         "SHOT": "shot",
-        "HCO": "hco"
+        "HCO": "base"  # Trap break → HCO transition uses base variant
     }
     
-    variant_name = variant_map.get(result_type, "hco")  # Default to hco
+    variant_name = variant_map.get(result_type, "base")  # Default to base
     
     # Try to get skeleton from MongoDB
     try:
