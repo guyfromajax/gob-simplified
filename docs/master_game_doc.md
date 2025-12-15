@@ -3412,11 +3412,15 @@ After a made shot (HCO MAKE, PUTBACK_MAKE, Fast Break MAKE, Free Throw MAKE), th
     - `opp=True`: Flip coords for home offense (ball handlers go to away side)
     - `opp=False`: Flip coords for away offense (outlet players go to away side)
 - **Inbound pass:** SF → PG (from skeleton step 0 positions)
+- **HCT Turn Start:** ✅ **NEW** (January 2025) - `playTurnAnimation()` skips `runSetupTween()` when `fromInbound === true` AND `isFCPHCT === true`
+  - Players are already positioned at step 0 from BIP, so redundant positioning is skipped
+  - Prevents timing conflicts with inbound pass animation completion
 
 **Key Code:**
 - `turnAnimation.js` lines 1186-1225: Skeleton position conversion with `opp` logic
 - `turnAnimation.js` lines 1079-1128: HCT defensive positioning
 - `BackEnd/engine/phase_resolution.py` `apply_opposite_side_logic()`: Backend `opp` handling
+- `turnAnimation.js` lines 2211-2217: Skip `runSetupTween()` for BIP → HCT transitions
 
 **Important Notes:**
 - `opp` field determines which players go to opposite side (defensive side)
@@ -3445,11 +3449,15 @@ After a made shot (HCO MAKE, PUTBACK_MAKE, Fast Break MAKE, Free Throw MAKE), th
   - Falls back to `location` field if `coords` missing
   - Applies `opp` logic when using `location` (same as HCT)
 - **Inbound pass:** SF → PG (from skeleton step 0 positions)
+- **FCP Turn Start:** ✅ **NEW** (January 2025) - `playTurnAnimation()` skips `runSetupTween()` when `fromInbound === true` AND `isFCPHCT === true`
+  - Players are already positioned at step 0 from BIP, so redundant positioning is skipped
+  - Prevents timing conflicts with inbound pass animation completion
 
 **Key Code:**
 - `turnAnimation.js` lines 1186-1225: Skeleton position conversion with `opp` logic
 - `turnAnimation.js` lines 1079-1128: FCP defensive positioning
 - `BackEnd/engine/phase_resolution.py` `apply_opposite_side_logic()`: Backend `opp` handling
+- `turnAnimation.js` lines 2211-2217: Skip `runSetupTween()` for BIP → FCP transitions
 
 **Important Notes:**
 - Same `opp` logic as HCT (ball handlers vs outlet players)
