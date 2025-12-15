@@ -383,11 +383,17 @@ def resolve_non_shooting_foul(roles, game):
     # Offensive fouls always flip possession, defensive fouls don't (handled by bonus logic)
     possession_flips = (foul_team == off_team)  # True for offensive fouls, False for defensive
     
+    logging.warning(f"🔍 [RESOLVE_FOUL] foul_team={foul_team.name}, off_team={off_team.name}, possession_flips={possession_flips}")
+    logging.warning(f"🔍 [RESOLVE_FOUL] BEFORE flip - offense_team={game.offense_team.name}, defense_team={game.defense_team.name}")
+    
     # ✅ FOUL OUT: Flip possession immediately for offensive fouls (SS&S)
     # This ensures game.offense_team is correct BEFORE foul-out timeout is created
     if possession_flips and foul_team == off_team:
+        old_offense = game.offense_team.name
         game.switch_possession()
-        logging.info(f"🔄 [FOUL OUT] Flipped possession for offensive foul: {off_team.name} → {game.offense_team.name}")
+        logging.warning(f"🔄 [RESOLVE_FOUL] Flipped possession for offensive foul: {old_offense} → {game.offense_team.name}")
+    else:
+        logging.warning(f"⚠️ [RESOLVE_FOUL] NOT flipping possession - possession_flips={possession_flips}, foul_team==off_team={foul_team == off_team}")
     
     result = {
         "result_type": "FOUL",
@@ -2312,6 +2318,7 @@ def resolve_half_court_offense_logic(game):
         # Map stopper result to event_type
         if result == "O_FOUL":
             event_type = "O_FOUL"
+            logging.warning(f"🔍 [HCO] result=O_FOUL, setting event_type=O_FOUL - offense_team={game.offense_team.name}, defense_team={game.defense_team.name}")
         elif result == "D_FOUL":
             event_type = "D_FOUL"
         elif result == "DEAD_BALL_TURNOVER":
@@ -2434,7 +2441,9 @@ def resolve_half_court_offense_logic(game):
 
         elif event_type == "O_FOUL":
             game_state["foul_team"] = "OFFENSE"
+            logging.warning(f"🔍 [HCO O_FOUL] About to call resolve_non_shooting_foul() - offense_team={game.offense_team.name}, defense_team={game.defense_team.name}")
             foul_result = resolve_non_shooting_foul(roles, game)
+            logging.warning(f"🔍 [HCO O_FOUL] After resolve_non_shooting_foul() - offense_team={game.offense_team.name}, defense_team={game.defense_team.name}, possession_flips={foul_result.get('possession_flips')}")
             # Add skeleton and animations to result
             foul_result["skeleton"] = skeleton or {}
             foul_result["animations"] = animations
