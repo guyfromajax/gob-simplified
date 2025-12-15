@@ -387,6 +387,14 @@ class PlaybooksUI {
               const badge = document.createElement('span');
               badge.className = 'slot-badge';
               badge.textContent = assignment.dropdown[0]; // I, A, or O
+              // Add color class based on dropdown value
+              if (assignment.dropdown === 'Inside') {
+                badge.classList.add('inside');
+              } else if (assignment.dropdown === 'Attack') {
+                badge.classList.add('attack');
+              } else if (assignment.dropdown === 'Outside') {
+                badge.classList.add('outside');
+              }
               pill.appendChild(badge);
             }
           }

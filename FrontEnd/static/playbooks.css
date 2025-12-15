@@ -97,12 +97,16 @@ body {
   pointer-events: none;
 }
 
-/* 4-Column Grid */
+/* 3-Column Grid (Offense spans 2 columns) */
 .playbooks-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: 2fr 1fr 1fr;
   gap: var(--spacing-md);
   align-items: start;
+}
+
+.offense-column-wide {
+  grid-column: span 2;
 }
 
 .column {
@@ -279,14 +283,25 @@ body {
   width: 14px;
   height: 14px;
   border-radius: 50%;
-  background: var(--color-accent-orange);
-  color: #000;
+  color: #fff;
   font-size: 0.625rem;
   font-weight: 700;
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid #000;
+  border: 1px solid rgba(0, 0, 0, 0.3);
+}
+
+.slot-badge.inside {
+  background: #4a90e2; /* Blue */
+}
+
+.slot-badge.attack {
+  background: var(--color-accent-orange); /* Orange */
+}
+
+.slot-badge.outside {
+  background: #4caf50; /* Green */
 }
 
 /* Section Footer */
