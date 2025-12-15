@@ -2892,9 +2892,25 @@ def resolve_full_court_press_logic(game: "GameManager"):
     if skeleton:
         skeleton = copy.deepcopy(skeleton)
     
+    # ✅ DEBUG: Log step 0 positions from HCO skeleton
+    if skeleton and "steps" in skeleton and len(skeleton.get("steps", [])) > 0:
+        step_0 = skeleton["steps"][0]
+        step_0_positions = step_0.get("pos_actions", {})
+        logging.warning(f"🔍 [FCP NON-SHOT] HCO skeleton step 0 has {len(step_0_positions)} positions: {list(step_0_positions.keys())}")
+        for pos, pos_action in step_0_positions.items():
+            location = pos_action.get("location", "N/A")
+            coords = pos_action.get("coords", "N/A")
+            logging.warning(f"🔍 [FCP NON-SHOT] Step 0 {pos}: location={location}, coords={coords}")
+    
     # Apply stopper system (truncates if needed, or returns full skeleton if result == "HCO")
     skeleton = apply_stopper_system_to_skeleton(skeleton, result_type, game_state)
     logging.warning(f"🔍 [FCP NON-SHOT] Retrieved skeleton: has_steps={bool(skeleton.get('steps'))}, step_count={len(skeleton.get('steps', []))}")
+    
+    # ✅ DEBUG: Log step 0 positions AFTER stopper system (should still be there)
+    if skeleton and "steps" in skeleton and len(skeleton.get("steps", [])) > 0:
+        step_0_after = skeleton["steps"][0]
+        step_0_positions_after = step_0_after.get("pos_actions", {})
+        logging.warning(f"🔍 [FCP NON-SHOT] After stopper, step 0 has {len(step_0_positions_after)} positions: {list(step_0_positions_after.keys())}")
     
     # ✅ Determine ball handler from skeleton (who actually has the ball)
     ball_handler = get_ball_handler_from_skeleton(skeleton, off_lineup)
