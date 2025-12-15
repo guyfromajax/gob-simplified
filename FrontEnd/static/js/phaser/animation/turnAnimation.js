@@ -2208,13 +2208,20 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
   // Without this, truncated skeletons (o foul, d foul, dead ball turnover, steal) start
   // the step loop before players reach step 0 positions, causing slow/fast first pass animations
   // Shot attempts work correctly because ShotAnimationSystem calls runSetupTween() before animatePlayerMovement()
-  await runSetupTween({
-    scene,
-    ballSprite,
-    animations: turnData.animations,
-    playerSprites,
-    currentBallOwnerRef
-  });
+  // ✅ SS&S FIX: Skip setup tween if coming from BIP for FCP/HCT - players are already at step 0 positions
+  // BIP (BASELINE_INBOUND) already positioned players at skeleton step 0 positions, so this is redundant
+  // and can cause timing conflicts if the inbound pass animation is still completing
+  if (!fromInbound || !isFCPHCT) {
+    await runSetupTween({
+      scene,
+      ballSprite,
+      animations: turnData.animations,
+      playerSprites,
+      currentBallOwnerRef
+    });
+  } else {
+    console.log('⏭️ [FCP/HCT] Skipping runSetupTween() - players already positioned at step 0 from BIP');
+  }
 
   for (let stepIndex = 1; stepIndex < maxSteps; stepIndex++) {
     // ✅ REMOVED: Special FCP/HCT FastBreak check - FCP/HCT now routes through AnimationRouter (same as HCO)
