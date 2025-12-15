@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Playbooks - GOB</title>
+  <link rel="icon" type="image/x-icon" href="/static/images/favicon.ico" />
+  <link rel="stylesheet" href="playbooks.css">
+</head>
+<body>
+  <div class="playbooks-container">
+    <!-- Header Row -->
+    <header class="playbooks-header">
+      <h1 class="page-title">Playbooks</h1>
+      <div class="header-actions">
+        <p class="helper-text" id="submit-helper" style="display: none;">All sections must total 100% to submit.</p>
+        <button id="submit-btn" class="submit-button" disabled>
+          Submit Playbooks
+        </button>
+      </div>
+    </header>
+
+    <!-- Main 4-Column Grid -->
+    <div class="playbooks-grid">
+      <!-- Column 1: Offense Play Calls -->
+      <div class="column offense-column">
+        <h2 class="column-title">Offense</h2>
+        
+        <!-- Motion Offense Section -->
+        <div class="section" data-section="motion">
+          <h3 class="section-title">Motion Offense</h3>
+          <div id="motion-rows" class="rows-container"></div>
+          <div class="section-footer">
+            <span class="total-label">Total: <span class="total-value" id="motion-total">100</span>%</span>
+            <span class="error-message" id="motion-error"></span>
+          </div>
+        </div>
+
+        <!-- Set Play Inside Section -->
+        <div class="section" data-section="set-play-inside">
+          <h3 class="section-title">Set Play Inside Offense</h3>
+          <div id="set-play-inside-rows" class="rows-container"></div>
+          <div class="section-footer">
+            <span class="total-label">Total: <span class="total-value" id="set-play-inside-total">100</span>%</span>
+            <span class="error-message" id="set-play-inside-error"></span>
+          </div>
+        </div>
+
+        <!-- Set Play Attack Section -->
+        <div class="section" data-section="set-play-attack">
+          <h3 class="section-title">Set Play Attack Offense</h3>
+          <div id="set-play-attack-rows" class="rows-container"></div>
+          <div class="section-footer">
+            <span class="total-label">Total: <span class="total-value" id="set-play-attack-total">100</span>%</span>
+            <span class="error-message" id="set-play-attack-error"></span>
+          </div>
+        </div>
+
+        <!-- Set Play Outside Section -->
+        <div class="section" data-section="set-play-outside">
+          <h3 class="section-title">Set Play Outside Offense</h3>
+          <div id="set-play-outside-rows" class="rows-container"></div>
+          <div class="section-footer">
+            <span class="total-label">Total: <span class="total-value" id="set-play-outside-total">100</span>%</span>
+            <span class="error-message" id="set-play-outside-error"></span>
+          </div>
+        </div>
+
+        <!-- Assigned Plays List -->
+        <div class="assigned-plays-section">
+          <h3 class="section-title">Assigned Plays 1-6</h3>
+          <div id="assigned-plays-list" class="assigned-plays-list"></div>
+        </div>
+      </div>
+
+      <!-- Column 2: Play Call Center (Placeholder) -->
+      <div class="column playcall-center-column">
+        <h2 class="column-title">Play Call Center</h2>
+        <div class="placeholder-content">
+          <p>UI placeholder section</p>
+          <p class="placeholder-subtext">No deep functionality required</p>
+        </div>
+      </div>
+
+      <!-- Column 3: Defense Play Calls -->
+      <div class="column defense-column">
+        <h2 class="column-title">Defense</h2>
+        
+        <!-- Man Defense Section -->
+        <div class="section" data-section="man-defense">
+          <h3 class="section-title">Man Defense</h3>
+          <div id="man-defense-rows" class="rows-container"></div>
+          <div class="section-footer">
+            <span class="total-label">Total: <span class="total-value" id="man-defense-total">100</span>%</span>
+            <span class="error-message" id="man-defense-error"></span>
+          </div>
+        </div>
+
+        <!-- Zone Defense Section -->
+        <div class="section" data-section="zone-defense">
+          <h3 class="section-title">Zone Defense</h3>
+          <div id="zone-defense-rows" class="rows-container"></div>
+          <div class="section-footer">
+            <span class="total-label">Total: <span class="total-value" id="zone-defense-total">100</span>%</span>
+            <span class="error-message" id="zone-defense-error"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Column 4: Reserved -->
+      <div class="column reserved-column">
+        <h2 class="column-title">Reserved</h2>
+        <div class="placeholder-content">
+          <p class="placeholder-subtext">Future expansion</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toast" class="toast" role="alert" aria-live="polite"></div>
+
+  <script src="playbooks.js"></script>
+</body>
+</html>
+
