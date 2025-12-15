@@ -320,14 +320,24 @@ def simulate_quarter(
         
         # Create the appropriate initial turn based on timeout_next_play_type
         if resume_from_timeout and timeout_next_play_type == "SIDE_INBOUND":
-            # Create SIP turn (same pattern as quarter breaks create BIP turns)
-            logging.info(f"✅ TIMEOUT RESUME: Creating SIP turn with offense team: {gm.offense_team.name} (team_id: {gm.offense_team.team_id})")
+            # ✅ TIMEOUT RESUME: Use game.offense_team as source of truth (SS&S)
+            # Possession was already set correctly by foul resolution before timeout was created
+            current_offense_team_id = gm.offense_team.team_id
+            stored_offense_team_id = gm.game_state.get("timeout_offense_team_id")
+            
+            if stored_offense_team_id and stored_offense_team_id != current_offense_team_id:
+                logging.warning(f"⚠️ TIMEOUT RESUME: Mismatch - stored={stored_offense_team_id}, current={current_offense_team_id}. Using current.")
+            
+            logging.info(f"✅ TIMEOUT RESUME: Creating SIP turn with offense team: {gm.offense_team.name} (team_id: {current_offense_team_id})")
             # ✅ TIMEOUT: Reset offensive_state to HCO to ensure SIP transitions to HCO (not FCP/HCT)
             # This prevents defensive pressure from before timeout from carrying over
             gm.game_state["offensive_state"] = "HCO"
             logging.info(f"✅ TIMEOUT RESUME: Reset offensive_state to HCO (was: {gm.game_state.get('offensive_state', 'unknown')})")
             gm.turn_manager.set_strategy_calls()  # Ensure strategy calls are set
             sip_turn = gm.turn_manager.setup_side_inbound()
+            # ✅ TIMEOUT RESUME: Ensure clock is in turn payload for frontend
+            if "clock" not in sip_turn:
+                sip_turn["clock"] = gm.game_state.get("clock", "0:00")
             gm.turns.append(sip_turn)
             gm.text_log.append(sip_turn.get("text", "Side inbound"))
             # Update clock (SIP takes 4 seconds)

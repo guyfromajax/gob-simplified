@@ -266,17 +266,22 @@ class GameManager:
                     if foul_out_player:
                         break
             
-            # ✅ FOUL OUT: Capture possession team BEFORE creating timeout turn (SS&S consistency)
-            # This matches the pattern used in call_timeout_endpoint for regular timeouts
-            # Ensures correct possession team on resume (same team that had ball when foul out occurred)
+            # ✅ FOUL OUT: Store offense team for debugging (game.offense_team is source of truth)
+            # Possession has already been flipped by foul resolution if needed (offensive fouls)
             self.game_state["timeout_offense_team_id"] = self.offense_team.team_id
-            logging.info(f"✅ FOUL OUT: Captured possession team '{self.offense_team.name}' (team_id: {self.offense_team.team_id}) for resume")
+            logging.info(f"✅ FOUL OUT: Current offense team '{self.offense_team.name}' (team_id: {self.offense_team.team_id})")
+            
+            # Get foul context if available (set by foul resolution)
+            foul_out_context = self.game_state.get("foul_out_context", {})
+            if foul_out_context:
+                logging.info(f"✅ FOUL OUT: Using foul context - type={foul_out_context.get('foul_type')}, next={foul_out_context.get('next_play_type')}")
             
             # Create timeout turn
             timeout_turn = self.turn_manager.setup_timeout_turn(
                 timeout_reason="FOUL_OUT",
                 calling_team=None,
-                foul_out_player=foul_out_player
+                foul_out_player=foul_out_player,
+                foul_out_context=foul_out_context  # ✅ NEW: Pass foul context
             )
             self.turns.append(timeout_turn)
             self.text_log.append(timeout_turn["text"])

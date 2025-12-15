@@ -1608,7 +1608,7 @@ class TurnManager:
     def resolve_turnover(self):
         return resolve_turnover_logic(self.game)
     
-    def setup_timeout_turn(self, timeout_reason="USER", calling_team=None, foul_out_player=None):
+    def setup_timeout_turn(self, timeout_reason="USER", calling_team=None, foul_out_player=None, foul_out_context=None):
         """
         Create a TIMEOUT turn payload.
         
@@ -1616,6 +1616,7 @@ class TurnManager:
             timeout_reason: "USER", "COMPUTER", "FOUL_OUT", or "QUARTER_END"
             calling_team: Team object that called the timeout (for USER/COMPUTER)
             foul_out_player: Player object that fouled out (for FOUL_OUT)
+            foul_out_context: Dict with foul context for FOUL_OUT (foul_type, is_shooting_foul, is_bonus, next_play_type, shooter)
         
         Returns:
             dict: Timeout turn payload with next_play_type determined based on game state
@@ -1623,13 +1624,21 @@ class TurnManager:
         game = self.game
         game_state = game.game_state
         
-        # Determine next_play_type based on game state
-        # Timeouts always resume with SIP (Side Inbound Pass), except when free throws are pending
-        # Quarter breaks are handled separately in simulate_quarter() and use BIP (Baseline Inbound Pass)
-        if game_state.get("free_throws_remaining", 0) > 0:
+        # ✅ FOUL OUT: Determine next_play_type based on foul context (SS&S)
+        if timeout_reason == "FOUL_OUT" and foul_out_context:
+            # Use foul context to determine next play type
+            next_play_type = foul_out_context.get("next_play_type", "SIDE_INBOUND")
+            logging.info(f"✅ FOUL OUT: next_play_type from context: {next_play_type}")
+            
+            # Store shooter for free throw resume if applicable
+            if next_play_type == "FREE_THROW" and foul_out_context.get("shooter"):
+                game_state["shooter"] = foul_out_context["shooter"]
+                logging.info(f"✅ FOUL OUT: Stored shooter for free throw: {getattr(foul_out_context['shooter'], 'name', 'Unknown')}")
+        elif game_state.get("free_throws_remaining", 0) > 0:
+            # Regular timeout with free throws pending
             next_play_type = "FREE_THROW"
         else:
-            # Always SIP for timeout resume (quarter breaks handled separately)
+            # Regular timeout or foul out without context (fallback)
             next_play_type = "SIDE_INBOUND"
         
         # Store next_play_type in game_state for resume
