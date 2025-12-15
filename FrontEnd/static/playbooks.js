@@ -24,23 +24,14 @@ const PLAY_DATA = {
   'set-play-inside': [
     { id: 'set-inside-1', name: 'Base Post Play' },
     { id: 'set-inside-2', name: 'Low Post Isolation' },
-    { id: 'set-inside-3', name: 'High-Low Post' },
-    { id: 'set-inside-4', name: 'Inside Set 4' },
-    { id: 'set-inside-5', name: 'Inside Set 5' },
   ],
   'set-play-attack': [
     { id: 'set-attack-1', name: 'Pick & Roll (Lower Wing)' },
     { id: 'set-attack-2', name: 'Pick & Roll (Top)' },
-    { id: 'set-attack-3', name: 'Drive & Kick' },
-    { id: 'set-attack-4', name: 'Attack Set 4' },
-    { id: 'set-attack-5', name: 'Attack Set 5' },
   ],
   'set-play-outside': [
     { id: 'set-outside-1', name: 'Double Screen For SG' },
     { id: 'set-outside-2', name: 'Flare Screen' },
-    { id: 'set-outside-3', name: 'Pin Down Screen' },
-    { id: 'set-outside-4', name: 'Outside Set 4' },
-    { id: 'set-outside-5', name: 'Outside Set 5' },
   ],
   'man-defense': [
     { id: 'man-1', name: 'Man Defense' },
