@@ -2203,6 +2203,19 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
     await animateStealHCOSetup(scene, turnData, playerSprites, ballSprite);
   }
 
+  // ✅ CRITICAL FIX: Run setup tween to move players to step 0 positions before skeleton animation
+  // This ensures players are correctly positioned before step 1 (first pass) starts
+  // Without this, truncated skeletons (o foul, d foul, dead ball turnover, steal) start
+  // the step loop before players reach step 0 positions, causing slow/fast first pass animations
+  // Shot attempts work correctly because ShotAnimationSystem calls runSetupTween() before animatePlayerMovement()
+  await runSetupTween({
+    scene,
+    ballSprite,
+    animations: turnData.animations,
+    playerSprites,
+    currentBallOwnerRef
+  });
+
   for (let stepIndex = 1; stepIndex < maxSteps; stepIndex++) {
     // ✅ REMOVED: Special FCP/HCT FastBreak check - FCP/HCT now routes through AnimationRouter (same as HCO)
     const willEarlyExit = scene.skipToEnd || scene.stateMachine?.is(States.FastBreak);
