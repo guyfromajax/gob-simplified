@@ -1088,7 +1088,6 @@ export function createGameScene(Phaser) {
       // ✅ FOUL OUT RESUME: Use first turn's clock as source of truth (SS&S)
       // When resuming from timeout/foul out, the first turn has the correct clock from backend
       const urlParams = new URLSearchParams(window.location.search);
-      const resumeFromTimeout = urlParams.get('resume_from_timeout') === 'true';
       
       // For timeout resumes, use first turn's clock if available (backend source of truth)
       let liveClock = '8:00'; // Default
