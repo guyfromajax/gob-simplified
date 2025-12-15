@@ -741,6 +741,28 @@ The system determines which step to stop at based on result type:
    - Replaces `skeleton["steps"]` with `truncated_steps + [stopper_step]`
    - Frontend animates this truncated skeleton normally (no special handling needed)
 
+### Frontend Animation Handling ✅ **NEW** (January 2025)
+
+**Step 0 Positioning Requirement:**
+- Truncated skeletons still include step 0 (the truncation preserves step 0: `truncated_steps = steps[:stop_step_index + 1]`)
+- **Critical**: Frontend must position players at step 0 positions **before** starting the step loop
+- Without step 0 positioning, step 1 (first pass) can fire before players reach their step 0 positions, causing slow/fast first pass animations
+
+**Implementation:**
+- **Shot Attempts (Full Skeletons)**: Route through `ShotAnimationSystem.executeCompleteShotSequence()` which calls `runSetupTween()` at line 162 before starting the step loop
+- **Non-Shooting Results (Truncated Skeletons)**: Route through `playTurnAnimation()` which must also call `runSetupTween()` before the step loop starts
+- **Location**: `FrontEnd/static/js/phaser/animation/turnAnimation.js` - `runSetupTween()` function (lines 345-390)
+- **Execution**: `runSetupTween()` moves all players to their step 0 positions using distance-based duration, then the step loop begins at step 1
+
+**Why This Matters:**
+- Truncated skeletons (o foul, d foul, dead ball turnover, steal) use `playTurnAnimation()` which was missing the `runSetupTween()` call
+- Shot attempts use `ShotAnimationSystem` which correctly calls `runSetupTween()` before animation
+- The fix ensures both paths position players at step 0 before step 1 starts, preventing animation hitches
+
+**Key Files:**
+- `FrontEnd/static/js/phaser/animation/turnAnimation.js` - `playTurnAnimation()` and `runSetupTween()` functions
+- `FrontEnd/static/js/phaser/animation/ShotAnimationSystem.js` - `executeCompleteShotSequence()` and `runSetupTween()` functions
+
 ### Player Role Population
 
 The stopper system uses SS&S helper functions to populate player roles, ensuring consistency with FCP/HCT:
@@ -3821,14 +3843,67 @@ The system handles different transition types based on game state. All navigatio
 - **Frontend:** `timeoutButtonManager.js` timeout button, `set-lineup.js` "Play Now" button, `game-plan.js` "Play Game" button
 - **Note:** Supports Q1-Q4 and OT (removed Q1-only restriction)
 
-#### 4. **Player Foul Out Returns (Any Quarter)**
-- **Initial Turn:** SIDE_INBOUND (SIP)
+#### 4. **Player Foul Out Returns (Any Quarter)** ✅ **UPDATED** (January 2025)
+- **Initial Turn:** SIDE_INBOUND (SIP) or FREE_THROW (based on foul context)
 - **Location:** Same as timeout returns (uses timeout system)
-- **Logic:** Foul out resume → creates SIP turn (same pattern as timeout)
+- **Logic:** Foul out resume → creates SIP or FREE_THROW turn based on foul context
 - **Data:** Uses same timeout resume system, captures `timeout_offense_team_id` in `game_manager.py`
 - **Navigation:** Helper passes `game_id` AND sets `resume_from_timeout=true` (any quarter)
 - **Frontend:** `foulOutPopup.js` navigation to lineup
 - **Note:** Supports Q1-Q4 and OT (uses same system as timeout)
+
+**Foul Out Context System:**
+- **Purpose:** Stores detailed foul information to guide next play type determination
+- **Location:** `game_state["foul_out_context"]` dictionary
+- **Contents:**
+  - `foul_type`: "OFFENSIVE" or "DEFENSIVE"
+  - `is_shooting_foul`: Boolean (True for shooting fouls, False for non-shooting)
+  - `is_bonus`: Boolean (True if team is in bonus situation)
+  - `next_play_type`: "SIDE_INBOUND" or "FREE_THROW" (determined by foul context)
+  - `shooter`: Player object (for shooting fouls, stores shooter for free throw resume)
+- **Set By:** Foul resolution logic in `phase_resolution.py` (non-shooting fouls) and `shot_manager.py` (shooting fouls)
+- **Used By:** `turn_manager.py` `setup_timeout_turn()` to determine `next_play_type` for foul-out timeouts
+
+**Possession Flip Logic:**
+- **Offensive Fouls:** Possession flips **immediately** during foul resolution (before timeout creation)
+  - Location: `phase_resolution.py` `resolve_non_shooting_foul()` (line ~384)
+  - Ensures `game.offense_team` is correct BEFORE timeout is created
+  - Next step: SIDE_INBOUND (with new offense team)
+- **Defensive Fouls:** No possession flip
+  - If Shooting Foul: Next step: FREE_THROW (the shooting player shoots)
+  - If Non-Shooting Foul:
+    - If Bonus Situation: Next step: FREE_THROW (the player the fouling player was guarding shoots)
+    - If Non-Bonus Situation: Next step: SIDE_INBOUND
+
+**Next Play Type Determination:**
+- **Location:** `turn_manager.py` `setup_timeout_turn()` (lines 1611-1676)
+- **Logic:**
+  1. For foul-out timeouts: Uses `foul_out_context` to determine `next_play_type`
+  2. For regular timeouts with free throws: Uses `free_throws_remaining` to set `next_play_type = "FREE_THROW"`
+  3. For regular timeouts: Defaults to `next_play_type = "SIDE_INBOUND"`
+- **Stored In:** `game_state["timeout_next_play_type"]` for resume
+
+**Lineup Screen Population:**
+- **Location:** `FrontEnd/static/js/phaser/utils/foulOutPopup.js` `showFoulOutPopup()` function
+- **Logic:**
+  1. Fetches current lineup from URL parameters (same as timeout flow)
+  2. Removes **only** the fouled-out player from the user's team lineup
+  3. Leaves the fouled-out player's position empty (not replaced)
+  4. Passes populated lineup (minus foul out player) to `TimeoutNavigationHelper`
+- **Key Point:** Only removes the fouled-out player if they're on the user's team; other team's lineup is preserved
+
+**Clock Display:**
+- **Location:** `FrontEnd/static/js/phaser/gameScene.js` (lines 392-410)
+- **Logic:** Clock is initialized immediately on page load using first turn's clock data from backend
+- **Ensures:** Correct time remaining displays immediately when returning from lineup/game plan screens, not a stale value that updates only after the next turn
+
+**Key Files:**
+- `BackEnd/engine/phase_resolution.py` - Foul resolution and `foul_out_context` storage (non-shooting fouls)
+- `BackEnd/models/shot_manager.py` - Shooting foul resolution and `foul_out_context` storage
+- `BackEnd/models/game_manager.py` - Foul-out timeout creation (lines 244-283)
+- `BackEnd/models/turn_manager.py` - `setup_timeout_turn()` with `foul_out_context` support
+- `FrontEnd/static/js/phaser/utils/foulOutPopup.js` - Lineup population and navigation
+- `FrontEnd/static/js/phaser/gameScene.js` - Clock initialization on timeout resume
 
 ### Data Management: Database, LocalStorage, and URL
 
