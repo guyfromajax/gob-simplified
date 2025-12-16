@@ -45,7 +45,8 @@ export function updatePlaycallDisplay(turnData, homeTeamId) {
   if (isHomeOnOffense) {
     // Home on offense - show defensive playcall on home side (right), offensive on away side (left)
     offensivePlaycallEl.textContent = defensivePlayType || "-"; // Show Man/Zone for defense
-    defensivePlaycallEl.textContent = offensivePlayType;
+    // ✅ FIX: Display full playcall name (e.g., "3-2 Motion") instead of just play type ("Motion")
+    defensivePlaycallEl.textContent = offensivePlaycall || offensivePlayType || "-";
     
     // Update focus dots (only for offense - away side)
     if (offensiveFocusDotsEl) clearFocusDots(offensiveFocusDotsEl); // Clear defense dots
@@ -53,7 +54,8 @@ export function updatePlaycallDisplay(turnData, homeTeamId) {
   } else {
     // Away on offense - show defensive playcall on away side (left), offensive on home side (right)
     defensivePlaycallEl.textContent = defensivePlayType || "-"; // Show Man/Zone for defense
-    offensivePlaycallEl.textContent = offensivePlayType;
+    // ✅ FIX: Display full playcall name (e.g., "3-2 Motion") instead of just play type ("Motion")
+    offensivePlaycallEl.textContent = offensivePlaycall || offensivePlayType || "-";
     
     // Update focus dots (only for offense - home side)
     if (defensiveFocusDotsEl) clearFocusDots(defensiveFocusDotsEl); // Clear defense dots
