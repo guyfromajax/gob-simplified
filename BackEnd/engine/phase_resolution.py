@@ -384,16 +384,14 @@ def resolve_non_shooting_foul(roles, game):
     possession_flips = (foul_team == off_team)  # True for offensive fouls, False for defensive
     
     logging.warning(f"🔍 [RESOLVE_FOUL] foul_team={foul_team.name}, off_team={off_team.name}, possession_flips={possession_flips}")
-    logging.warning(f"🔍 [RESOLVE_FOUL] BEFORE flip - offense_team={game.offense_team.name}, defense_team={game.defense_team.name}")
+    logging.warning(f"🔍 [RESOLVE_FOUL] Current offense_team={game.offense_team.name}, defense_team={game.defense_team.name}")
     
-    # ✅ FOUL OUT: Flip possession immediately for offensive fouls (SS&S)
-    # This ensures game.offense_team is correct BEFORE foul-out timeout is created
-    if possession_flips and foul_team == off_team:
-        old_offense = game.offense_team.name
-        game.switch_possession()
-        logging.warning(f"🔄 [RESOLVE_FOUL] Flipped possession for offensive foul: {old_offense} → {game.offense_team.name}")
-    else:
-        logging.warning(f"⚠️ [RESOLVE_FOUL] NOT flipping possession - possession_flips={possession_flips}, foul_team==off_team={foul_team == off_team}")
+    # ✅ FIX: Do NOT flip possession here for offensive fouls - let SIP setup handle it
+    # This prevents double-flipping: resolve_non_shooting_foul() sets possession_flips=True,
+    # then game_manager.py SIP setup flips based on that flag (same pattern as dead ball turnovers)
+    # The flip happens in game_manager.py simulate_macro_turn() before setup_side_inbound()
+    # This ensures consistent behavior: all possession flips for SIP transitions happen in one place
+    logging.warning(f"⏭️ [RESOLVE_FOUL] NOT flipping possession here - SIP setup will handle it (possession_flips={possession_flips})")
     
     result = {
         "result_type": "FOUL",
