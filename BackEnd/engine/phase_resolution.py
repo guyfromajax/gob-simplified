@@ -2495,8 +2495,13 @@ def resolve_half_court_offense_logic(game):
     game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
 
     # 1. Tactical Setup
-    off_call = game_state["current_playcall"]
-    def_call = game_state["defense_playcall"]
+    off_call = game_state.get("current_playcall", "Inside")
+    def_call = game_state.get("defense_playcall", "Man")
+    
+    # 🔍 DEBUG: Log playcall being used
+    logging.warning(f"🔍 [HCO RESOLVE] Using playcall: '{off_call}' (from game_state['current_playcall'])")
+    if not off_call or off_call == "Inside":
+        logging.warning(f"⚠️ [HCO RESOLVE] WARNING: playcall is '{off_call}' - may fall back to old skeleton system")
 
     # Generate logic to determine result and lean score
     result, lean_score = generate_logic(off_call, def_call, off_team, def_team, off_lineup, def_lineup, game=game)
@@ -2509,6 +2514,12 @@ def resolve_half_court_offense_logic(game):
     # Get skeleton from MongoDB BEFORE assigning roles, so assign_roles can use the correct skeleton
     # Pass lean_score to select the appropriate skeleton variant
     skeleton = get_hco_skeleton(None, game, lean_score=lean_score)
+    
+    # 🔍 DEBUG: Log skeleton retrieval result
+    if skeleton:
+        logging.warning(f"✅ [HCO RESOLVE] Skeleton retrieved successfully: {len(skeleton.get('steps', []))} steps")
+    else:
+        logging.warning(f"⚠️ [HCO RESOLVE] WARNING: No skeleton retrieved! Will fall back to old system")
     
     # CRITICAL: Always create a deep copy to avoid mutating cached skeleton
     # This prevents any modifications (from stopper system or elsewhere) from affecting future turns
