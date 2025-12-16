@@ -2507,12 +2507,6 @@ def resolve_half_court_offense_logic(game):
     # Generate logic to determine result and lean score
     result, lean_score = generate_logic(off_call, def_call, off_team, def_team, off_lineup, def_lineup, game=game)
     
-    # ✅ DIAGNOSTIC: Log result from generate_logic for Motion plays
-    offense_play_type = game_state.get("offense_play_type", "")
-    is_motion_play = offense_play_type == "motion"
-    if is_motion_play:
-        logging.warning(f"🔍 [MOTION STOPPER DIAG] generate_logic() returned result='{result}' for Motion play '{off_call}'")
-    
     # ✅ REMOVED: Test code that forced all HCO turns to be steals
     
     # Store lean_score in scouting data
@@ -2526,26 +2520,9 @@ def resolve_half_court_offense_logic(game):
     # This prevents any modifications (from stopper system or elsewhere) from affecting future turns
     if skeleton:
         skeleton = copy.deepcopy(skeleton)
-        if is_motion_play:
-            original_step_count = len(skeleton.get("steps", []))
-            logging.warning(f"🔍 [MOTION STOPPER DIAG] Skeleton retrieved: {original_step_count} steps before stopper system")
     
     # ✅ STOPER SYSTEM: Apply stopper system to skeleton (truncate and add stopper step if needed)
     skeleton = apply_stopper_system_to_skeleton(skeleton, result, game_state)
-    
-    # ✅ DIAGNOSTIC: Log stopper system application for Motion plays
-    if is_motion_play:
-        after_step_count = len(skeleton.get("steps", [])) if skeleton else 0
-        if result != "SHOT":
-            logging.warning(f"🔍 [MOTION STOPPER DIAG] After stopper system: {after_step_count} steps (result='{result}')")
-            if result in ["O_FOUL", "D_FOUL", "DEAD_BALL_TURNOVER", "STEAL"]:
-                # Check if stopper step was added
-                if skeleton and "steps" in skeleton and skeleton["steps"]:
-                    last_step = skeleton["steps"][-1]
-                    last_step_events = last_step.get("events", [])
-                    has_stopper_event = any(event.get("type") in ["o_foul", "d_foul", "dead_ball_turnover", "steal"] 
-                                          for event in last_step_events)
-                    logging.warning(f"🔍 [MOTION STOPPER DIAG] Last step has stopper event: {has_stopper_event}, events: {last_step_events}")
     
     # Get the successful variant to determine intended shooter (only for Set Plays)
     # Motion plays don't have variants, so we'll use the base_loop skeleton
@@ -2907,10 +2884,6 @@ def resolve_half_court_offense_logic(game):
         else:
             # Fallback: determine from skeleton analysis
             event_type = game.turn_manager.determine_event_type(roles)
-        
-        # ✅ DIAGNOSTIC: Log event_type for Motion plays with non-SHOT results
-        if is_motion_play:
-            logging.warning(f"🔍 [MOTION STOPPER DIAG] Non-SHOT result detected: result='{result}', event_type='{event_type}'")
     else:
         # Normal flow: result == "SHOT", proceed to shot resolution
         # ✅ SS&S FIX: Commented out determine_event_type() call to avoid conflicts
@@ -2921,10 +2894,6 @@ def resolve_half_court_offense_logic(game):
         # if event_type == "SHOT" or event_type is None:
         #     event_type = "SHOT"
         event_type = "SHOT"
-        
-        # ✅ DIAGNOSTIC: Log SHOT result for Motion plays
-        if is_motion_play:
-            logging.warning(f"🔍 [MOTION STOPPER DIAG] SHOT result detected: proceeding to Motion shot resolution")
 
     if event_type != "SHOT":
         # ✅ STOPER SYSTEM: Populate roles for stopper results using SS&S helper functions
