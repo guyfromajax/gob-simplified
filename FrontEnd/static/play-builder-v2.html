@@ -1012,13 +1012,14 @@
         <div class="animation-preview-controls" id="animation-preview-section" style="display: none;">
           <h4>🎬 Animation Preview</h4>
           <div class="animation-controls-row">
-            <div class="form-group" style="margin: 0; flex: 1;">
+            <div class="form-group" style="margin: 0; flex: 1;" id="animate-variant-select-container">
               <label for="animate-variant-select" style="font-size: 0.85rem;">Select Variant</label>
               <select id="animate-variant-select">
                 <option value="successful">Successful</option>
                 <option value="mid_play_change">Mid-Play Change</option>
                 <option value="contested">Contested</option>
                 <option value="broken">Broken</option>
+                <option value="base_loop" style="display: none;">Base Loop</option>
               </select>
             </div>
             <button id="animate-btn" onclick="startAnimation()" class="btn-animate">▶️ Animate</button>
@@ -2089,7 +2090,30 @@
 
     function updateAnimationVariantDropdown() {
       const select = document.getElementById('animate-variant-select');
+      const container = document.getElementById('animate-variant-select-container');
       if (!select) return;
+      
+      // Show/hide variant selector based on play type
+      if (playState.type === 'Motion') {
+        // Motion: hide variant selector, always use base_loop
+        if (container) container.style.display = 'none';
+        // Ensure base_loop option exists and is visible
+        let baseLoopOption = select.querySelector('option[value="base_loop"]');
+        if (!baseLoopOption) {
+          baseLoopOption = document.createElement('option');
+          baseLoopOption.value = 'base_loop';
+          baseLoopOption.textContent = 'Base Loop';
+          select.appendChild(baseLoopOption);
+        }
+        baseLoopOption.style.display = 'block';
+        select.value = 'base_loop';
+      } else {
+        // Set Play: show variant selector
+        if (container) container.style.display = 'block';
+        // Hide base_loop option for Set Plays
+        const baseLoopOption = select.querySelector('option[value="base_loop"]');
+        if (baseLoopOption) baseLoopOption.style.display = 'none';
+      }
       
       // Determine which variants to process based on play type
       const variantsToProcess = playState.type === 'Motion' 
@@ -2129,7 +2153,12 @@
 
     function startAnimation() {
       console.log('🎬 startAnimation called');
-      const selectedVariant = document.getElementById('animate-variant-select').value;
+      
+      // For Motion plays, automatically use base_loop; for Set Plays, use selected variant
+      const selectedVariant = playState.type === 'Motion' 
+        ? 'base_loop' 
+        : document.getElementById('animate-variant-select').value;
+      
       console.log('Selected variant:', selectedVariant);
       
       const variantData = playState.variants[selectedVariant];
@@ -2178,18 +2207,42 @@
       
       const variantData = playState.variants[selectedVariant];
       
+      // Check if we've reached the end of steps
       if (animationStepIndex >= variantData.steps.length) {
-        // Animation complete
-        console.log('✅ Animation complete');
-        stopAnimation();
-        return;
+        // For Motion plays, check if we should loop back
+        if (playState.type === 'Motion') {
+          // Find the final step (marked with is_final_step: true)
+          const finalStepIndex = variantData.steps.findIndex(step => step.is_final_step === true);
+          
+          if (finalStepIndex !== -1 && animationStepIndex > finalStepIndex) {
+            // We've passed the final step, loop back to step 0
+            console.log('🔄 Motion play: Looping back to step 0');
+            animationStepIndex = 0;
+          } else {
+            // No final step marked or we're at the end, loop back to step 0
+            console.log('🔄 Motion play: Looping back to step 0 (end of steps)');
+            animationStepIndex = 0;
+          }
+        } else {
+          // Set Play: Animation complete
+          console.log('✅ Animation complete');
+          stopAnimation();
+          return;
+        }
       }
       
       const step = variantData.steps[animationStepIndex];
       console.log('Current step data:', step);
       
+      // Check if this is the final step for Motion plays
+      const isFinalStep = playState.type === 'Motion' && step.is_final_step === true;
       const statusDiv = document.getElementById('animation-status');
-      statusDiv.textContent = `Animating Step ${animationStepIndex + 1} of ${variantData.steps.length}`;
+      
+      if (isFinalStep) {
+        statusDiv.textContent = `Animating Step ${animationStepIndex + 1} of ${variantData.steps.length} (Final Step - will loop)`;
+      } else {
+        statusDiv.textContent = `Animating Step ${animationStepIndex + 1} of ${variantData.steps.length}`;
+      }
       
       // Update positions
       previousStepAssignments = {...currentStepAssignments};
