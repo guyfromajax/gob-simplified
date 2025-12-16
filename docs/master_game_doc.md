@@ -798,6 +798,10 @@ The stopper system uses SS&S helper functions to populate player roles, ensuring
 - **For Non-Shot Outcomes (Steals, Turnovers, Fouls)**: Overrides defender assignment to be based on ball handler's position, not shooter's position
   - `assign_roles()` assigns defender based on shooter position (for shot attempts)
   - For steals/turnovers/fouls, we need whoever is guarding the ball handler at the time of the steal
+  - **✅ FIX (January 2025)**: Uses `get_ball_handler_from_skeleton(skeleton, off_lineup, step_index=stop_step_index)` to get the ball handler at the **stop step** where the steal/foul/turnover occurs
+    - Critical for Motion plays where the ball handler changes throughout the motion
+    - The stop step index is stored in `game_state["steal_stop_step_index"]` by `apply_stopper_system_to_skeleton()`
+    - Falls back to `roles.get("ball_handler")` if stop step index is not available (backwards compatibility)
   - **Man-to-Man Defense**: Defender matches ball handler position (e.g., if ball handler is SF, defender is defensive SF)
   - **Zone Defense**: Uses actual zone assignment logic (`assign_all_zone_defenders()`) to determine which defender(s) are actually guarding the ball handler
     - Checks `defender_to_offensive_player` mapping to find which defender(s) are assigned to guard the ball handler
