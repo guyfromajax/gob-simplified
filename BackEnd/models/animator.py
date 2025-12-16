@@ -1066,12 +1066,16 @@ class Animator:
             end_coords = None
             total_steps = len(steps)
             
+            # 🔍 DEBUG: Track which skeleton steps map to which movement array indices
+            step_mapping = []  # Will store (skeleton_step_idx, timestamp) for each movement entry
+            
             for step_idx, step in enumerate(steps):
                 pos_action = step.get("pos_actions", {}).get(position)
                 if not pos_action:
                     continue
                 
                 timestamp = step.get("timestamp", 0)
+                step_mapping.append((step_idx, timestamp))  # Track mapping
                 
                 # Get action early to check if we should use offset coords for screeners
                 action = pos_action.get("action", "drift")
@@ -1157,6 +1161,14 @@ class Animator:
             
             if not movement:
                 continue
+            
+            # 🔍 DEBUG: Log movement array mapping for SF and PG at indices 15, 16, 17 (3-2 Motion bug)
+            if position in ["SF", "PG"] and len(movement) > 16:
+                for check_mov_idx in [15, 16, 17]:
+                    if check_mov_idx < len(step_mapping):
+                        skeleton_idx, timestamp = step_mapping[check_mov_idx]
+                        player_name = getattr(player, "name", "unknown")
+                        logging.warning(f"🔍 [MOVEMENT MAPPING] {position} ({player_name}) - movement[{check_mov_idx}] = skeleton step {skeleton_idx} (timestamp {timestamp})")
             
             # Calculate duration (last timestamp)
             duration = movement[-1]["timestamp"] if movement else 0
