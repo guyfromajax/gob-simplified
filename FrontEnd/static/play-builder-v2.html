@@ -2426,14 +2426,19 @@
       const playType = document.getElementById('play-type').value;
       const playFocusSelect = document.getElementById('play-focus');
       
-      // Enable Play Focus only for Set Play
+      // Enable Play Focus only for Set Play, disable for Motion
       if (playType === 'Set Play') {
         playFocusSelect.disabled = false;
-      } else {
+      } else if (playType === 'Motion') {
         playFocusSelect.disabled = true;
         playFocusSelect.value = ''; // Clear selection
+      } else {
+        // No play type selected - keep disabled
+        playFocusSelect.disabled = true;
+        playFocusSelect.value = '';
       }
       
+      // Re-validate after play type change
       validateStep1();
     }
 
@@ -3441,15 +3446,20 @@
     function validateStep1() {
       const name = document.getElementById('play-name').value.trim();
       const type = document.getElementById('play-type').value;
-      const focus = document.getElementById('play-focus').value;
+      const playFocusSelect = document.getElementById('play-focus');
+      const focus = playFocusSelect.disabled ? '' : playFocusSelect.value; // Only read focus if dropdown is enabled
 
       const submitBtn = document.getElementById('submit-play-btn');
       
       // For Set Play, require focus. For Motion, don't require focus
       if (type === 'Set Play') {
         submitBtn.disabled = !(name && type && focus);
-      } else {
+      } else if (type === 'Motion') {
+        // Motion plays don't require focus - only name and type
         submitBtn.disabled = !(name && type);
+      } else {
+        // No play type selected yet
+        submitBtn.disabled = true;
       }
     }
 
