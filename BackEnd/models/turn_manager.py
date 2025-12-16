@@ -432,7 +432,9 @@ class TurnManager:
             
             result = self.resolve_half_court_offense()
             # Add playcalls to result for frontend display
-            result["offensive_playcall"] = calls["offense"]
+            # ✅ FIX 2: Use current_playcall from game_state (may be overridden for Motion plays)
+            # This ensures Motion play overrides (like "3-2 Motion") are reflected in the result
+            result["offensive_playcall"] = self.game.game_state.get("current_playcall", calls["offense"])
             result["defensive_playcall"] = calls["defense"]
             offense_name = calls["offense"]
             defense_name = calls["defense"]
