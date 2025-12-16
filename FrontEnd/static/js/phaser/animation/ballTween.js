@@ -373,6 +373,20 @@ export async function runPass(scene, cfg = {}) {
         return;
       }
       endPosition = { ...end };
+      
+      // 🔍 DEBUG: Log ball routing for step 16 (3-2 Motion bug)
+      if (cfg.stepIndex === 16) {
+        console.log('🏀 [BALL ROUTING] Pass execution for step 16', {
+          fromId,
+          toId,
+          fromSprite: fromSprite ? { x: fromSprite.x, y: fromSprite.y, playerId: fromSprite.playerId } : null,
+          toSprite: toSprite ? { x: toSprite.x, y: toSprite.y, playerId: toSprite.playerId } : null,
+          startPosition,
+          endPosition,
+          stepIndex: cfg.stepIndex,
+          timestamp: Date.now()
+        });
+      }
       if (startPosition) {
         plannedDistance = Math.hypot(end.x - startPosition.x, end.y - startPosition.y);
       }
