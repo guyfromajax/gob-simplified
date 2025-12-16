@@ -1049,6 +1049,14 @@ class Animator:
             if not player_id:
                 continue
             
+            # 🔍 DEBUG: Log position to player ID mapping for step 16 (3-2 Motion bug)
+            # Check if any step has index 16 (step 16 is the problematic pass step)
+            if len(steps) > 16 and steps[16].get("pos_actions", {}).get(position):
+                step_16_action = steps[16].get("pos_actions", {}).get(position).get("action")
+                if step_16_action in ["pass", "receive"]:
+                    player_name = getattr(player, "name", "unknown")
+                    logging.warning(f"🔍 [SKELETON MAPPING] Step 16 - Position {position} → Player {player_name} (ID: {player_id[:8]}) with action: {step_16_action}")
+            
             # Build movement array from steps
             movement = []
             has_ball_steps = []
