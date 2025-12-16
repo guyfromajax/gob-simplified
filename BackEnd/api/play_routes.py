@@ -30,7 +30,7 @@ def serve_play_builder():
 class PlayCreate(BaseModel):
     name: str
     play_type: str
-    play_focus: str
+    play_focus: Optional[str] = None  # Optional: None for Motion plays, string for Set Plays
     skeletons: Dict[str, Any]
     game_stats: Optional[Dict[str, int]] = None
     season_stats: Optional[Dict[str, int]] = None
