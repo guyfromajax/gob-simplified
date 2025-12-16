@@ -332,12 +332,6 @@ class GameManager:
             self.turns.append(inbound_payload)
             self.text_log.append("Baseline inbound after made shot")
             
-            # ✅ DIAGNOSTIC: Log BIP creation and current turns state
-            logging.warning(f"🔍 [BIP DIAGNOSTIC] BIP turn created and appended to self.turns")
-            logging.warning(f"🔍 [BIP DIAGNOSTIC] Total turns in self.turns: {len(self.turns)}")
-            logging.warning(f"🔍 [BIP DIAGNOSTIC] Last 3 turns result_types: {[t.get('result_type') if isinstance(t, dict) else str(t)[:20] for t in self.turns[-3:]]}")
-            logging.warning(f"🔍 [BIP DIAGNOSTIC] BIP turn result_type: {inbound_payload.get('result_type')}, next_defensive_setup: {inbound_payload.get('next_defensive_setup')}")
-            
             # Preserve offensive_state for next API call
             if next_defensive_setup:
                 self.game_state["offensive_state"] = next_defensive_setup
@@ -352,7 +346,6 @@ class GameManager:
             # This matches the pattern used in OREB putback and Free Throw flows
             if next_defensive_setup:
                 self.game_state["offensive_state"] = next_defensive_setup
-                logging.warning(f"🔍 [BIP DIAGNOSTIC] Set offensive_state to: {next_defensive_setup}")
 
         # Update team stats after each turn
         self.update_team_stats()

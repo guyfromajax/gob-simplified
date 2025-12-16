@@ -722,17 +722,11 @@ export async function animateGameTurns({ //hasBallAtStep
     }
 
     if (turn.result_type === "BASELINE_INBOUND") {
-      // ✅ DIAGNOSTIC: Log BASELINE_INBOUND processing
-      console.log(`🔍 [ANIMATE GAME TURNS] Processing BASELINE_INBOUND turn at index ${i}`);
-      console.log(`🔍 [ANIMATE GAME TURNS] BIP turn details: next_defensive_setup=${turn.next_defensive_setup}, next_play_type=${turn.next_play_type}`);
-      
       // ✅ PHASE 2.6: Route BASELINE_INBOUND through AnimationRouter
       // FCP/HCT state tracking, player animations, and state transitions are handled by handler
       // AnimationRouter handles pre/post setup (prepareTurnForAnimation, finalizeTurnAfterAnimation)
       turn.index = i;
-      console.log(`🔍 [ANIMATE GAME TURNS] About to call animationRouter.processTurn for BASELINE_INBOUND`);
       await animationRouter.processTurn(turn);
-      console.log(`🔍 [ANIMATE GAME TURNS] Completed animationRouter.processTurn for BASELINE_INBOUND`);
       // Note: onUpdate and updateDebugScore handled by AnimationRouter
       continue;
     }
