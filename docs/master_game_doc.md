@@ -4949,8 +4949,8 @@ The Playcall Center consists of three main components:
 - Updated from `turnData.defensive_playcall` (or `defensive_play_type`) and `turnData.aggression`
 - Displays the actual defensive setup being used in the current turn
 
-**Scoreboard Playcall Display:**
-- The scoreboard (via `playcallDisplay.js`) displays the full offense playcall name from the database
+**Playcall Name Display:**
+- The Playcall Center displays the full offense playcall name from the database (via `playcallDisplay.js`)
 - Format: Full playcall name (e.g., "3-2 Motion", "4-1 Motion", "Pick & Roll (Lower Wing)")
 - Updated from `turnData.offensive_playcall` or `turnData.current_playcall`
 - For Motion plays, displays the actual play name (e.g., "3-2 Motion") instead of just the play type ("Motion")
@@ -5248,8 +5248,8 @@ Player headshots in the Playcall Center are assigned once when returning to `cou
   - `resetLeanMeter()`: Resets meter to neutral
   - `animateLeanMeter()`: Animates meter based on lean score
   - `parseLeanScoreFromText()`: Extracts lean score from turn text
-- `FrontEnd/static/js/phaser/utils/playcallDisplay.js`: Scoreboard playcall display
-  - `updatePlaycallDisplay()`: Updates playcall names in scoreboard (offensive-playcall and defensive-playcall elements)
+- `FrontEnd/static/js/phaser/utils/playcallDisplay.js`: Playcall Center playcall name display
+  - `updatePlaycallDisplay()`: Updates playcall names in Playcall Center (offensive-playcall and defensive-playcall elements)
     - Reads `turnData.offensive_playcall` or `turnData.current_playcall` for full playcall name (e.g., "3-2 Motion")
     - Displays full playcall name from database, not just play type ("Motion" or "Set")
     - Falls back to `offensivePlayType` if playcall name is not available
