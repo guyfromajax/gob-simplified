@@ -2194,6 +2194,176 @@ for player in team.get_all_players():  # All players (lineup + bench)
 
 ---
 
+## Play Builder System ✅ **COMPLETE** (January 2025)
+
+### Overview
+
+The Play Builder (`play-builder-v2.html`) is a web-based tool for creating and editing offensive plays. It supports two distinct play types: **Set Plays** and **Motion Plays**, each with different structures and requirements.
+
+### Play Types
+
+#### Set Plays
+- **Structure**: Four skeleton variants (`successful`, `mid_play_change`, `contested`, `broken`)
+- **Focus**: Required - must select Inside, Attack, Outside, or Balanced
+- **Variants**: 
+  - `successful`: Direct `steps` array (no versions)
+  - `mid_play_change`, `contested`, `broken`: `versions` dictionary (v1-v6), each with a `steps` array
+- **Final Step Requirement**: Must have a `shoot` action in the final step
+- **Shooter Validation**: Shots only allowed in final step
+
+#### Motion Plays
+- **Structure**: Single skeleton variant (`base_loop`)
+- **Focus**: Not required (null in database)
+- **Variants**: Only `base_loop` with direct `steps` array
+- **Loop Structure**: Circular motion with `is_final_step` flag marking loop end
+- **Final Step**: Marked with checkbox when building - sets `is_final_step: true` and `loop_back_to: 0`
+- **Shooter Validation**: Shots can occur at any step (no restrictions)
+
+### Building Process
+
+#### Step 1: Play Creation
+1. **Enter Play Name**: Text input for play name
+2. **Select Play Type**: Dropdown - "Motion" or "Set Play"
+3. **Select Play Focus** (Set Play only): Dropdown - "Inside", "Attack", "Outside", or "Balanced"
+   - Disabled for Motion plays
+   - Required for Set Plays to enable "Create Play" button
+4. **Create Play Button**: Enabled when name + type (+ focus for Set Plays) are provided
+
+#### Step 2: Step Building
+1. **Starting Formation Selection**: 
+   - Preset formations: "3-2", "4-1", "5-0", "Screen Entry"
+   - Custom: Manual positioning
+   - **Note**: Formation must be manually saved as Step 0 by clicking "Add Step" after selection
+2. **Step Building**:
+   - Drag-and-drop players to court locations
+   - Assign actions (handle_ball, pass, receive, shoot, drive, get_open)
+   - Add position offsets for screens
+   - **Motion Plays**: Checkbox to "Mark as Final Step (Loop End)" available when building new steps
+3. **Add Step Button**: Saves current step and increments to next step
+   - Timestamp calculation: `(currentStep - 1) * 300` (Step 0 = 0ms, Step 1 = 300ms, etc.)
+4. **Finish Variant & Save**: 
+   - Auto-submits current step if incomplete
+   - Validates variant structure
+   - Saves to database via `/api/plays` endpoint
+
+### Variant Management
+
+#### Set Play Variants
+- **Successful**: Base skeleton with direct steps array
+- **Mid-Play Change**: 6 versions (v1-v6), each with steps array
+- **Contested**: 6 versions (v1-v6), each with steps array
+- **Broken**: 6 versions (v1-v6), each with steps array
+- **Version Selector**: Shown for non-successful variants
+- **Clone Function**: Can clone from Successful variant to other variants
+
+#### Motion Play Variants
+- **Base Loop**: Single variant with steps array
+- **No Version Selector**: Hidden for Motion plays
+- **Loop Validation**: Checks for `is_final_step` flag and validates loop structure
+
+### Database Structure
+
+#### Set Play Structure
+```json
+{
+  "name": "Play Name",
+  "play_type": "set_play",
+  "play_focus": "inside|attack|outside|balanced",
+  "skeletons": {
+    "successful": {
+      "steps": [...],
+      "complete": true
+    },
+    "mid_play_change": {
+      "versions": [
+        {"steps": [...], "complete": true},
+        ...
+      ]
+    },
+    "contested": {...},
+    "broken": {...}
+  }
+}
+```
+
+#### Motion Play Structure
+```json
+{
+  "name": "Play Name",
+  "play_type": "motion",
+  "play_focus": null,
+  "skeletons": {
+    "base_loop": {
+      "steps": [
+        {...},
+        {"is_final_step": true, "loop_back_to": 0, ...}
+      ],
+      "complete": true
+    }
+  }
+}
+```
+
+### Key Functions
+
+#### `updateAnimationVariantDropdown()`
+- **Purpose**: Updates animation preview dropdown with available variants
+- **Motion Plays**: Only processes `base_loop` variant
+- **Set Plays**: Processes all four variants (`successful`, `mid_play_change`, `contested`, `broken`)
+- **Error Prevention**: Checks for variant existence before accessing `steps.length`
+
+#### `savePlayToDatabase()`
+- **Purpose**: Saves play to MongoDB via `/api/plays` endpoint
+- **Motion Plays**: Saves only `base_loop` skeleton
+- **Set Plays**: Saves all four variants with version structures
+- **Validation**: Ensures proper structure before saving
+
+#### `validateCurrentStep()`
+- **Purpose**: Validates step assignments against skeleton rules
+- **Set Plays**: Enforces shooter validation (shoot only in final step)
+- **Motion Plays**: No shooter restrictions (shoot can be at any step)
+
+#### `validateLoopStructure()`
+- **Purpose**: Validates Motion play loop structure
+- **Checks**: 
+  - At least 2 steps for cohesive cycle
+  - `is_final_step` flag is present
+  - First and final step position matching (warnings only)
+
+### UI Components
+
+#### Variant Tabs
+- **Set Plays**: Shows 4 tabs (Successful, Mid-Play Change, Contested, Broken)
+- **Motion Plays**: Shows 1 tab (Base Loop)
+- **Visibility**: Controlled by `updateVariantTabsVisibility()` based on play type
+
+#### Formation Selection
+- **Preset Formations**: Pre-populate player positions and actions
+- **Custom**: Manual positioning required
+- **Step 0**: Formation must be manually saved as first step
+
+#### Final Step Checkbox (Motion Only)
+- **Visibility**: Only shown for Motion plays when building new steps
+- **Function**: Marks step as loop end with `is_final_step: true` and `loop_back_to: 0`
+
+### Key Files
+
+**Frontend**:
+- `FrontEnd/static/play-builder-v2.html` - Main play builder interface
+- `FrontEnd/static/play-builder.html` - Legacy play builder (Set Plays only)
+
+**Backend**:
+- `BackEnd/api/play_routes.py` - API endpoints for play CRUD operations
+- `BackEnd/db.py` - MongoDB connection and `plays_collection` definition
+
+### Future Enhancements
+
+- [ ] Animation preview for Motion plays
+- [ ] Loop visualization (show loop path)
+- [ ] Version cloning between variants
+- [ ] Bulk import/export of plays
+- [ ] Play templates library
+
 ## Production Animation System
 
 ### Ball Animation System ✅ **COMPLETE**

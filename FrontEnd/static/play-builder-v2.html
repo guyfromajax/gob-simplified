@@ -2091,18 +2091,23 @@
       const select = document.getElementById('animate-variant-select');
       if (!select) return;
       
+      // Determine which variants to process based on play type
+      const variantsToProcess = playState.type === 'Motion' 
+        ? ['base_loop']  // Motion: only base_loop
+        : ['successful', 'mid_play_change', 'contested', 'broken'];  // Set Play: all variants
+      
       // Update all options based on variant data
-      ['successful', 'mid_play_change', 'contested', 'broken'].forEach(variant => {
+      variantsToProcess.forEach(variant => {
         const variantData = playState.variants[variant];
         const option = select.querySelector(`option[value="${variant}"]`);
         
-        if (option) {
-          if (variantData.steps.length === 0) {
+        if (option && variantData) {
+          if (variantData.steps && variantData.steps.length === 0) {
             // No steps - disable and grey out
             option.disabled = true;
             option.style.color = 'rgba(255, 255, 255, 0.3)';
             option.textContent = option.textContent.split(' (')[0] + ' (Empty)';
-          } else {
+          } else if (variantData.steps && variantData.steps.length > 0) {
             // Has steps - enable
             option.disabled = false;
             option.style.color = '#fff';
@@ -2113,8 +2118,10 @@
       });
       
       // Select first available variant
-      const firstAvailable = ['successful', 'mid_play_change', 'contested', 'broken']
-        .find(v => playState.variants[v].steps.length > 0);
+      const firstAvailable = variantsToProcess.find(v => {
+        const variantData = playState.variants[v];
+        return variantData && variantData.steps && variantData.steps.length > 0;
+      });
       if (firstAvailable) {
         select.value = firstAvailable;
       }
