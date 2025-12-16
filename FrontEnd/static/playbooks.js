@@ -67,15 +67,18 @@ class PlaybooksState {
     
     for (let i = 0; i < motionSlots; i++) {
       const play = i < motionPlays.length ? motionPlays[i] : TO_BE_ADDED_PLACEHOLDER;
+      // Generate unique ID for each slot (including placeholders)
       const playId = play.id || `motion-${i + 1}`;
+      // For "To Be Added" placeholders, use unique ID
+      const finalPlayId = (play.name === 'To Be Added') ? `motion-tba-${i + 1}` : playId;
       
-      this.sections.motion[playId] = {
+      this.sections.motion[finalPlayId] = {
         percentage: i === 0 ? 100 : 0,
         slot: null,
       };
       
       if (play.name !== 'To Be Added') {
-        this.motionDropdowns[playId] = 'Inside';
+        this.motionDropdowns[finalPlayId] = 'Inside';
       }
     }
     
@@ -90,8 +93,10 @@ class PlaybooksState {
       for (let i = 0; i < 2; i++) {
         const play = i < plays.length ? plays[i] : TO_BE_ADDED_PLACEHOLDER;
         const playId = play.id || `${key}-${i + 1}`;
+        // For "To Be Added" placeholders, use unique ID
+        const finalPlayId = (play.name === 'To Be Added') ? `${key}-tba-${i + 1}` : playId;
         
-        this.sections[key][playId] = {
+        this.sections[key][finalPlayId] = {
           percentage: i === 0 ? 100 : 0,
           slot: null,
         };
@@ -418,7 +423,17 @@ class PlaybooksUI {
   }
   
   renderAll() {
-    Object.keys(PLAY_DATA).forEach(sectionKey => {
+    // Render all sections (offense and defense)
+    const sections = [
+      'motion',
+      'set-play-inside',
+      'set-play-attack',
+      'set-play-outside',
+      'man-defense',
+      'zone-defense'
+    ];
+    
+    sections.forEach(sectionKey => {
       this.renderSection(sectionKey);
     });
     this.renderAssignedPlays();
@@ -465,7 +480,11 @@ class PlaybooksUI {
     
     plays.forEach((play, index) => {
       // Generate play ID if it's a placeholder
-      const playId = play.id || (sectionKey === 'motion' ? `motion-${index + 1}` : `${sectionKey}-${index + 1}`);
+      let playId = play.id || (sectionKey === 'motion' ? `motion-${index + 1}` : `${sectionKey}-${index + 1}`);
+      // For "To Be Added" placeholders, use unique ID matching state initialization
+      if (play.name === 'To Be Added') {
+        playId = sectionKey === 'motion' ? `motion-tba-${index + 1}` : `${sectionKey}-tba-${index + 1}`;
+      }
       const playData = this.state.sections[sectionKey][playId] || { percentage: 0, slot: null };
       const row = this.createPlayRow(sectionKey, { ...play, id: playId }, playData);
       container.appendChild(row);
