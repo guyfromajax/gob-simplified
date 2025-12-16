@@ -1041,16 +1041,23 @@ class TurnManager:
                 chosen_focus = "outside"
         
         # Query plays collection for matching play
-        query = {
-            "play_type": chosen_play_type,
-            "play_focus": chosen_focus
-        }
+        # ✅ FIX: Motion plays don't filter by play_focus (focus is only for tracking/influence)
+        # Set plays filter by both play_type and play_focus
+        if chosen_play_type == "motion":
+            query = {
+                "play_type": chosen_play_type
+            }
+        else:
+            query = {
+                "play_type": chosen_play_type,
+                "play_focus": chosen_focus
+            }
         
         matching_plays = list(plays_collection.find(query))
         
         if not matching_plays:
             # Fallback: if no plays match, log warning and use a default
-            print(f"⚠️ No plays found for {chosen_play_type}/{chosen_focus}, using fallback")
+            print(f"⚠️ No plays found for {chosen_play_type}{'/' + chosen_focus if chosen_play_type != 'motion' else ''}, using fallback")
             chosen_playcall = "Inside"  # Fallback to old system
         else:
             # Randomly select one play from matches
