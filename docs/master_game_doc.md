@@ -3422,12 +3422,19 @@ After a made shot (HCO MAKE, PUTBACK_MAKE, Fast Break MAKE, Free Throw MAKE), th
 - **HCT Turn Start:** ✅ **NEW** (January 2025) - `playTurnAnimation()` skips `runSetupTween()` when `fromInbound === true` AND `isFCPHCT === true`
   - Players are already positioned at step 0 from BIP, so redundant positioning is skipped
   - Prevents timing conflicts with inbound pass animation completion
+- **BIP Pass Completion Wait:** ✅ **NEW** (January 2025) - `handleBaselineInbound()` explicitly waits for inbound pass animation to fully complete before returning
+  - **Problem Fixed:** HCT/FCP turn was starting before BIP pass animation finished, causing sequencing bug where HCT setup step ran, then BIP pass executed, then HCT continued
+  - **Solution:** After `executeInboundSequence()` completes, checks `scene.passInFlight` flag and waits for it to clear
+  - **Implementation:** Listens for `passEnd` event and polls `passInFlight` as fallback, with 2-second safety timeout
+  - **Location:** `FrontEnd/static/js/phaser/animation/AnimationEngine.js` - `handleBaselineInbound()` function (lines 354-395)
+  - **Why It Matters:** Ensures BIP animation fully completes before next turn (HCT/FCP) starts, preventing visual glitches and timing conflicts
 
 **Key Code:**
 - `turnAnimation.js` lines 1186-1225: Skeleton position conversion with `opp` logic
 - `turnAnimation.js` lines 1079-1128: HCT defensive positioning
 - `BackEnd/engine/phase_resolution.py` `apply_opposite_side_logic()`: Backend `opp` handling
 - `turnAnimation.js` lines 2211-2217: Skip `runSetupTween()` for BIP → HCT transitions
+- `AnimationEngine.js` lines 354-395: BIP pass completion wait logic
 
 **Important Notes:**
 - `opp` field determines which players go to opposite side (defensive side)
