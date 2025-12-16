@@ -1872,9 +1872,13 @@ def apply_stopper_system_to_skeleton(skeleton, result, game_state):
         # If skeleton has 7 steps (0-6), choose from steps 1-5
         stop_step_index = random.randint(1, len(steps) - 2) if len(steps) > 2 else 1
     elif result in ["DEAD_BALL_TURNOVER", "STEAL"]:
-        # Strategic step - for now, use middle step or based on ball handler dynamics
-        # TODO: Enhance this with player attribute analysis
-        stop_step_index = len(steps) // 2  # Middle step as placeholder
+        # Strategic step - use middle step, excluding step 0 for consistency with fouls
+        # Calculate middle of steps 1 through len(steps)-1 (excluding step 0 and final step)
+        if len(steps) > 2:
+            # Middle of steps 1 to len(steps)-2
+            stop_step_index = 1 + (len(steps) - 2 - 1) // 2
+        else:
+            stop_step_index = 1
     else:
         # Default: stop at step before final
         stop_step_index = len(steps) - 2
@@ -1947,6 +1951,544 @@ def apply_stopper_system_to_skeleton(skeleton, result, game_state):
     return skeleton
 
 
+# ==================== MOTION OFFENSE SHOT RESOLUTION ====================
+
+def _is_inside_location(location):
+    """Check if a location is an inside shot location."""
+    inside_locations = ["lower lowPost", "lower midPost", "midLane", "basketSpot", "upper lowPost", "upper midPost"]
+    return location in inside_locations
+
+
+def _is_deep_location(location):
+    """Check if a location has 'deep' in the name."""
+    return "deep" in location.lower()
+
+
+def _is_outside_location(location):
+    """Check if a location is an outside shot location (not inside, not deep)."""
+    return not _is_inside_location(location) and not _is_deep_location(location)
+
+
+def _is_upper_location(location):
+    """Check if a location is in the upper half of the court."""
+    upper_keywords = ["upper", "top"]
+    return any(keyword in location.lower() for keyword in upper_keywords)
+
+
+def _is_lower_location(location):
+    """Check if a location is in the lower half of the court."""
+    lower_keywords = ["lower"]
+    return any(keyword in location.lower() for keyword in lower_keywords)
+
+
+def _is_central_location(location):
+    """Check if a location is central (key, topLane, deep key)."""
+    central_locations = ["key", "topLane", "deep key"]
+    return location in central_locations
+
+
+def _get_upper_inside_locations():
+    """Get list of upper half inside shot locations."""
+    return ["upper lowPost", "upper midPost", "midLane", "basketSpot"]
+
+
+def _get_lower_inside_locations():
+    """Get list of lower half inside shot locations."""
+    return ["lower lowPost", "lower midPost", "midLane", "basketSpot"]
+
+
+def _check_inside_shot_possibility(selected_step, ball_handler_location, off_lineup):
+    """
+    Check if an inside shot is possible based on conducive pass logic.
+    
+    Returns:
+        tuple: (is_possible, list of viable receivers with their positions)
+    """
+    inside_locations = ["lower lowPost", "lower midPost", "midLane", "basketSpot", "upper lowPost", "upper midPost"]
+    viable_receivers = []
+    
+    # Determine which inside locations are viable based on ball handler location
+    if _is_upper_location(ball_handler_location):
+        viable_inside_locations = _get_upper_inside_locations()
+    elif _is_lower_location(ball_handler_location):
+        viable_inside_locations = _get_lower_inside_locations()
+    elif _is_central_location(ball_handler_location):
+        # Central locations can pass to all inside spots
+        viable_inside_locations = inside_locations
+    else:
+        # Default: use all inside locations
+        viable_inside_locations = inside_locations
+    
+    # Find players at viable inside locations
+    pos_actions = selected_step.get("pos_actions", {})
+    for pos, action_info in pos_actions.items():
+        location = action_info.get("location", "")
+        if location in viable_inside_locations:
+            player = off_lineup.get(pos)
+            if player:
+                viable_receivers.append({
+                    "position": pos,
+                    "player": player,
+                    "location": location
+                })
+    
+    return len(viable_receivers) > 0, viable_receivers
+
+
+def _check_attack_shot_possibility(ball_handler_location):
+    """
+    Check if an attack shot is possible.
+    Attack shots are not possible if ball handler is at an inside location.
+    """
+    return not _is_inside_location(ball_handler_location)
+
+
+def _check_outside_shot_possibility(selected_step, off_lineup):
+    """
+    Check if an outside shot is possible (any player at outside location).
+    
+    Returns:
+        tuple: (is_possible, list of players at outside locations)
+    """
+    outside_players = []
+    pos_actions = selected_step.get("pos_actions", {})
+    
+    for pos, action_info in pos_actions.items():
+        location = action_info.get("location", "")
+        if _is_outside_location(location):
+            player = off_lineup.get(pos)
+            if player:
+                outside_players.append({
+                    "position": pos,
+                    "player": player,
+                    "location": location
+                })
+    
+    return len(outside_players) > 0, outside_players
+
+
+def _build_shot_type_weighted_list(strategy_settings, inside_possible, attack_possible, outside_possible, ball_handler_at_inside):
+    """
+    Build weighted list for shot type selection based on strategy settings and possibilities.
+    
+    Returns:
+        list: Weighted list of shot types (e.g., ["inside", "inside", "attack", "outside"])
+    """
+    inside_weight = strategy_settings.get("inside", 2)
+    attack_weight = strategy_settings.get("attack", 2)
+    outside_weight = strategy_settings.get("outside", 2)
+    
+    # Special case: ball handler at inside location
+    if ball_handler_at_inside:
+        # No attack possible, weighted: 4 inside, 2 outside
+        weighted_list = ["inside"] * 4 + ["outside"] * 2
+        if not outside_possible:
+            # Only inside possible
+            return ["inside"] * 4
+        return weighted_list
+    
+    # Build initial weighted list
+    weighted_list = []
+    if inside_possible:
+        weighted_list.extend(["inside"] * inside_weight)
+    if attack_possible:
+        weighted_list.extend(["attack"] * attack_weight)
+    if outside_possible:
+        weighted_list.extend(["outside"] * outside_weight)
+    
+    # Handle edge cases where list is empty or only one type possible
+    if not weighted_list:
+        # All three not possible (shouldn't happen, but handle gracefully)
+        if inside_possible:
+            return ["inside"]
+        elif attack_possible:
+            return ["attack"]
+        elif outside_possible:
+            return ["outside"]
+        else:
+            # Fallback: default to outside
+            return ["outside"]
+    
+    # Handle cases where chosen type has 0 weight
+    if inside_possible and attack_possible and not outside_possible:
+        if inside_weight == 0 and attack_weight == 0:
+            return ["inside", "attack"]  # Random between available
+    elif inside_possible and outside_possible and not attack_possible:
+        if inside_weight == 0 and outside_weight == 0:
+            return ["inside", "outside"]  # Random between available
+    elif attack_possible and outside_possible and not inside_possible:
+        if attack_weight == 0 and outside_weight == 0:
+            return ["attack", "outside"]  # Random between available
+    
+    return weighted_list
+
+
+def _find_closest_receiver(ball_handler_location, receivers, off_lineup):
+    """
+    Find closest receiver to ball handler (75% chance) or random other (25% chance).
+    
+    Args:
+        ball_handler_location: Location string of ball handler
+        receivers: List of receiver dicts with "position", "player", "location"
+        off_lineup: Offensive lineup dict
+    
+    Returns:
+        dict: Selected receiver
+    """
+    from BackEnd.constants import HCO_STRING_SPOTS
+    
+    if len(receivers) == 1:
+        return receivers[0]
+    
+    # Get ball handler coordinates
+    bh_coords = HCO_STRING_SPOTS.get(ball_handler_location, {"x": 50, "y": 25})
+    
+    # Calculate distances
+    receiver_distances = []
+    for receiver in receivers:
+        receiver_location = receiver["location"]
+        receiver_coords = HCO_STRING_SPOTS.get(receiver_location, {"x": 50, "y": 25})
+        
+        # Euclidean distance
+        distance = ((bh_coords["x"] - receiver_coords["x"]) ** 2 + 
+                   (bh_coords["y"] - receiver_coords["y"]) ** 2) ** 0.5
+        
+        receiver_distances.append({
+            "receiver": receiver,
+            "distance": distance
+        })
+    
+    # Sort by distance
+    receiver_distances.sort(key=lambda x: x["distance"])
+    closest = receiver_distances[0]
+    others = receiver_distances[1:]
+    
+    # 75% chance closest, 25% chance random other
+    if random.random() < 0.75 or len(others) == 0:
+        return closest["receiver"]
+    else:
+        return random.choice(others)["receiver"]
+
+
+def _determine_attack_drive_destination(ball_handler_location):
+    """
+    Determine valid drive destinations based on starting location.
+    
+    Returns:
+        list: Valid destination locations
+    """
+    if _is_upper_location(ball_handler_location):
+        return ["upper lowPost", "upper midPost", "upper bird", "midLane", "basketSpot"]
+    elif _is_lower_location(ball_handler_location):
+        return ["lower lowPost", "lower midPost", "lower bird", "midLane", "basketSpot"]
+    elif _is_central_location(ball_handler_location):
+        # Central: all destinations
+        return ["upper lowPost", "upper midPost", "upper bird", "midLane", "basketSpot",
+                "lower lowPost", "lower midPost", "lower bird"]
+    else:
+        # Default: all destinations
+        return ["upper lowPost", "upper midPost", "upper bird", "midLane", "basketSpot",
+                "lower lowPost", "lower midPost", "lower bird"]
+
+
+def _create_pass_receive_step(passer_pos, receiver_pos, passer_location, receiver_location, timestamp):
+    """
+    Create a step for pass and receive.
+    
+    Returns:
+        dict: Step with pass and receive actions
+    """
+    return {
+        "timestamp": timestamp,
+        "pos_actions": {
+            passer_pos: {
+                "location": passer_location,
+                "action": "pass"
+            },
+            receiver_pos: {
+                "location": receiver_location,
+                "action": "receive"
+            }
+        },
+        "events": []
+    }
+
+
+def _create_shoot_step(shooter_pos, shooter_location, timestamp):
+    """
+    Create a step for shooting.
+    
+    Returns:
+        dict: Step with shoot action
+    """
+    return {
+        "timestamp": timestamp,
+        "pos_actions": {
+            shooter_pos: {
+                "location": shooter_location,
+                "action": "shoot"
+            }
+        },
+        "events": [{"type": "shot"}]
+    }
+
+
+def _create_attack_drive_shoot_step(ball_handler_pos, start_location, destination_location, timestamp, is_away_offense=False):
+    """
+    Create a step for attack drive and shoot.
+    Player drives to destination and shoots immediately.
+    
+    Args:
+        is_away_offense: Whether away team is on offense (for coordinate flipping)
+    
+    Returns:
+        dict: Step with drive and shoot actions
+    """
+    from BackEnd.constants import HCO_STRING_SPOTS
+    
+    # Get destination coordinates
+    dest_coords = HCO_STRING_SPOTS.get(destination_location, {"x": 50, "y": 25})
+    
+    # TODO: Add defensive stop logic here (player may be stopped short)
+    # For now, assume player reaches destination
+    final_location = destination_location
+    
+    return {
+        "timestamp": timestamp,
+        "pos_actions": {
+            ball_handler_pos: {
+                "location": final_location,
+                "action": "shoot"  # Drive and shoot in same step
+            }
+        },
+        "events": [{"type": "shot"}],
+        "_attack_drive": {
+            "start_location": start_location,
+            "intended_destination": destination_location,
+            "final_location": final_location,
+            "stopped_short": False  # TODO: Implement defensive stop logic
+        }
+    }
+
+
+def _apply_attack_penalty(shot_location, is_away_offense):
+    """
+    Calculate attack shot penalty if player was stopped short.
+    
+    Args:
+        shot_location: Final location where shot was taken
+        is_away_offense: Whether away team is on offense
+    
+    Returns:
+        float: Penalty value (0 if no penalty)
+    """
+    from BackEnd.constants import HCO_STRING_SPOTS, HOME_RIM_COORDS, AWAY_RIM_COORDS
+    
+    # No penalty for ideal spots
+    ideal_spots = ["basketSpot", "upper lowPost", "lower lowPost"]
+    if shot_location in ideal_spots:
+        return 0.0
+    
+    # Get shot location coordinates
+    shot_coords = HCO_STRING_SPOTS.get(shot_location, {"x": 50, "y": 25})
+    
+    # Get basket spot coordinates
+    if is_away_offense:
+        basket_coords = AWAY_RIM_COORDS  # x=10
+    else:
+        basket_coords = HOME_RIM_COORDS  # x=90
+    
+    # Calculate penalty
+    penalty = abs(shot_coords["x"] - basket_coords["x"])
+    
+    return penalty
+
+
+def resolve_motion_offense_shot(skeleton, game, off_lineup, def_lineup):
+    """
+    Resolve Motion offense shot attempt.
+    
+    This function:
+    1. Selects a random step (excluding step 0) for shot attempt
+    2. Determines shot type (inside/outside/attack) based on possibilities and strategy
+    3. Truncates skeleton at selected step
+    4. Appends necessary steps (pass/receive, drive, shoot)
+    5. Returns modified skeleton and shot information
+    
+    Args:
+        skeleton: Motion play skeleton with base_loop steps
+        game: GameManager instance
+        off_lineup: Offensive lineup dict
+        def_lineup: Defensive lineup dict
+    
+    Returns:
+        dict: {
+            "skeleton": modified skeleton with shot steps appended,
+            "shooter": Player object,
+            "shooter_location": location string,
+            "shot_type": "inside" | "outside" | "attack",
+            "playcall": "Inside" | "Outside" | "Attack",
+            "attack_penalty": float (0 if not attack or no penalty)
+        }
+    """
+    import copy
+    from BackEnd.constants import HCO_STRING_SPOTS
+    from BackEnd.utils.shared import get_away_player_coords
+    
+    game_state = game.game_state
+    off_team = game.offense_team
+    is_away_offense = off_team.team_id == game.away_team.team_id
+    
+    # Deep copy skeleton to avoid mutating original
+    skeleton = copy.deepcopy(skeleton)
+    steps = skeleton.get("steps", [])
+    
+    if len(steps) < 2:
+        logging.warning(f"⚠️ [MOTION SHOT] Skeleton has insufficient steps ({len(steps)}), cannot select shot step")
+        return None
+    
+    # Phase 1: Select random step (excluding step 0)
+    shot_step_index = random.randint(1, len(steps) - 1)
+    selected_step = steps[shot_step_index]
+    
+    # Truncate skeleton at selected step
+    truncated_steps = steps[:shot_step_index + 1]
+    last_timestamp = truncated_steps[-1].get("timestamp", 0)
+    
+    # Phase 2: Identify ball handler at selected step
+    ball_handler_pos = None
+    ball_handler_location = "key"
+    pos_actions = selected_step.get("pos_actions", {})
+    
+    for pos, action_info in pos_actions.items():
+        action = action_info.get("action", "").lower()
+        if action in ["handle_ball", "receive", "pass"]:
+            ball_handler_pos = pos
+            ball_handler_location = action_info.get("location", "key")
+            break
+    
+    if not ball_handler_pos:
+        logging.warning(f"⚠️ [MOTION SHOT] No ball handler found at selected step {shot_step_index}")
+        return None
+    
+    ball_handler = off_lineup.get(ball_handler_pos)
+    if not ball_handler:
+        logging.warning(f"⚠️ [MOTION SHOT] Ball handler position {ball_handler_pos} not found in lineup")
+        return None
+    
+    # Phase 3: Check shot possibilities
+    inside_possible, inside_receivers = _check_inside_shot_possibility(selected_step, ball_handler_location, off_lineup)
+    attack_possible = _check_attack_shot_possibility(ball_handler_location)
+    outside_possible, outside_players = _check_outside_shot_possibility(selected_step, off_lineup)
+    
+    ball_handler_at_inside = _is_inside_location(ball_handler_location)
+    
+    # Phase 4: Get strategy settings and build weighted list
+    strategy_settings = off_team.strategy_settings
+    weighted_list = _build_shot_type_weighted_list(
+        strategy_settings, inside_possible, attack_possible, outside_possible, ball_handler_at_inside
+    )
+    
+    # Phase 5: Select shot type
+    selected_shot_type = random.choice(weighted_list)
+    
+    # Phase 6: Execute shot - build additional steps
+    new_steps = []
+    shooter = ball_handler
+    shooter_pos = ball_handler_pos
+    shooter_location = ball_handler_location
+    attack_penalty = 0.0
+    
+    if selected_shot_type == "inside":
+        if ball_handler_at_inside:
+            # Ball handler shoots from current location
+            shoot_step = _create_shoot_step(ball_handler_pos, ball_handler_location, last_timestamp + 300)
+            new_steps.append(shoot_step)
+        else:
+            # Pass to inside receiver
+            receiver = _find_closest_receiver(ball_handler_location, inside_receivers, off_lineup)
+            receiver_pos = receiver["position"]
+            receiver_location = receiver["location"]
+            
+            # Step 1: Pass and receive
+            pass_step = _create_pass_receive_step(
+                ball_handler_pos, receiver_pos, ball_handler_location, receiver_location, last_timestamp + 300
+            )
+            new_steps.append(pass_step)
+            
+            # Step 2: Receiver shoots
+            shoot_step = _create_shoot_step(receiver_pos, receiver_location, last_timestamp + 600)
+            new_steps.append(shoot_step)
+            
+            shooter = receiver["player"]
+            shooter_pos = receiver_pos
+            shooter_location = receiver_location
+    
+    elif selected_shot_type == "outside":
+        if _is_outside_location(ball_handler_location):
+            # Ball handler shoots from current location
+            shoot_step = _create_shoot_step(ball_handler_pos, ball_handler_location, last_timestamp + 300)
+            new_steps.append(shoot_step)
+        else:
+            # Pass to outside receiver
+            receiver = _find_closest_receiver(ball_handler_location, outside_players, off_lineup)
+            receiver_pos = receiver["position"]
+            receiver_location = receiver["location"]
+            
+            # Step 1: Pass and receive
+            pass_step = _create_pass_receive_step(
+                ball_handler_pos, receiver_pos, ball_handler_location, receiver_location, last_timestamp + 300
+            )
+            new_steps.append(pass_step)
+            
+            # Step 2: Receiver shoots
+            shoot_step = _create_shoot_step(receiver_pos, receiver_location, last_timestamp + 600)
+            new_steps.append(shoot_step)
+            
+            shooter = receiver["player"]
+            shooter_pos = receiver_pos
+            shooter_location = receiver_location
+    
+    elif selected_shot_type == "attack":
+        # Determine drive destination
+        valid_destinations = _determine_attack_drive_destination(ball_handler_location)
+        destination = random.choice(valid_destinations)
+        
+        # Create drive + shoot step
+        drive_shoot_step = _create_attack_drive_shoot_step(
+            ball_handler_pos, ball_handler_location, destination, last_timestamp + 300, is_away_offense
+        )
+        new_steps.append(drive_shoot_step)
+        
+        # Get final location (may be stopped short)
+        final_location = drive_shoot_step["_attack_drive"]["final_location"]
+        shooter_location = final_location
+        
+        # Calculate attack penalty if stopped short
+        attack_penalty = _apply_attack_penalty(final_location, is_away_offense)
+    
+    # Phase 7: Append new steps to truncated skeleton
+    skeleton["steps"] = truncated_steps + new_steps
+    
+    # Phase 8: Map shot type to playcall for shot calculation
+    playcall_map = {
+        "inside": "Inside",
+        "outside": "Outside",
+        "attack": "Attack"
+    }
+    playcall = playcall_map.get(selected_shot_type, "Inside")
+    
+    return {
+        "skeleton": skeleton,
+        "shooter": shooter,
+        "shooter_pos": shooter_pos,
+        "shooter_location": shooter_location,
+        "shot_type": selected_shot_type,
+        "playcall": playcall,
+        "attack_penalty": attack_penalty
+    }
+
+
 def resolve_half_court_offense_logic(game):
     game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
 
@@ -1974,8 +2516,16 @@ def resolve_half_court_offense_logic(game):
     # ✅ STOPER SYSTEM: Apply stopper system to skeleton (truncate and add stopper step if needed)
     skeleton = apply_stopper_system_to_skeleton(skeleton, result, game_state)
     
-    # Get the successful variant to determine intended shooter
-    successful_skeleton = get_hco_skeleton(None, game, lean_score=1.0)  # Force successful variant
+    # Get the successful variant to determine intended shooter (only for Set Plays)
+    # Motion plays don't have variants, so we'll use the base_loop skeleton
+    offense_play_type = game_state.get("offense_play_type", "")
+    is_motion_play = offense_play_type == "motion"
+    if is_motion_play:
+        # For Motion plays, use the same skeleton (base_loop)
+        successful_skeleton = skeleton
+    else:
+        # For Set Plays, get the successful variant
+        successful_skeleton = get_hco_skeleton(None, game, lean_score=1.0)  # Force successful variant
     
     roles = game.turn_manager.assign_roles(off_call, def_call, skeleton=skeleton)
     
@@ -2482,6 +3032,31 @@ def resolve_half_court_offense_logic(game):
             return foul_result
 
     # 3. Shot Result
+    # ✅ MOTION OFFENSE: Check if this is a Motion play and route to Motion shot logic
+    offense_play_type = game_state.get("offense_play_type", "")
+    is_motion_play = offense_play_type == "motion"
+    
+    if is_motion_play and event_type == "SHOT":
+        # Motion play shot resolution
+        motion_shot_info = resolve_motion_offense_shot(skeleton, game, off_lineup, def_lineup)
+        
+        if motion_shot_info:
+            # Update skeleton with Motion shot modifications
+            skeleton = motion_shot_info["skeleton"]
+            
+            # Update roles with Motion shot information
+            roles["shooter"] = motion_shot_info["shooter"]
+            roles["shooter_pos"] = motion_shot_info["shooter_pos"]
+            roles["shooter_location"] = motion_shot_info["shooter_location"]
+            roles["motion_shot_type"] = motion_shot_info["shot_type"]
+            roles["motion_playcall"] = motion_shot_info["playcall"]
+            roles["motion_attack_penalty"] = motion_shot_info["attack_penalty"]
+            
+            # Store attack penalty in game_state for shot calculation
+            if motion_shot_info["attack_penalty"] > 0:
+                game_state["motion_attack_penalty"] = motion_shot_info["attack_penalty"]
+    
+    # Resolve shot (standard logic for Set Plays, Motion-specific logic applied above)
     shot_result = game.shot_manager.resolve_shot(roles)
     
     # Add playcall and variant debug info to the text
@@ -3425,7 +4000,18 @@ def get_hco_skeleton(result_type, game_context, lean_score=None):
     play_doc = plays_collection.find_one({"name": playcall})
     
     if play_doc and "skeletons" in play_doc:
-        # Use lean score to select skeleton variant if provided
+        # Check if this is a Motion play
+        play_type = play_doc.get("play_type", "set_play")
+        
+        if play_type == "motion":
+            # Motion plays: use base_loop skeleton (no variant selection)
+            skeletons = play_doc.get("skeletons", {})
+            if "base_loop" in skeletons:
+                skeleton = skeletons["base_loop"]
+                if skeleton and skeleton.get("steps"):
+                    return skeleton
+        
+        # Set Play: Use lean score to select skeleton variant if provided
         if lean_score is not None:
             skeleton, variant = get_skeleton_by_lean(play_doc, lean_score)
             if skeleton:
@@ -3433,7 +4019,7 @@ def get_hco_skeleton(result_type, game_context, lean_score=None):
                 skeleton["_variant"] = variant
                 return skeleton
         
-        # Default to successful skeleton
+        # Default to successful skeleton (Set Play only)
         skeletons = play_doc.get("skeletons", {})
         if "successful" in skeletons:
             skeleton = skeletons["successful"]
@@ -3534,17 +4120,30 @@ def _get_skeleton_from_team_plays(playcall, team_id, game_context, lean_score=No
             print(f"🚨 Error fetching play from universal collection: {e}")
             return None
     
-    # STEP 4: Select skeleton variant based on lean score
+    # STEP 4: Select skeleton variant based on play type
     if "skeletons" not in play_doc:
         return None
     
+    # Check if this is a Motion play
+    play_type = play_doc.get("play_type", "set_play")
+    
+    if play_type == "motion":
+        # Motion plays: use base_loop skeleton (no variant selection, ignore lean_score)
+        skeletons = play_doc.get("skeletons", {})
+        if "base_loop" in skeletons:
+            skeleton = skeletons["base_loop"]
+            if skeleton and skeleton.get("steps"):
+                return skeleton
+        return None
+    
+    # Set Play: Select skeleton variant based on lean score
     if lean_score is not None:
         skeleton, variant = get_skeleton_by_lean(play_doc, lean_score)
         if skeleton and skeleton.get("steps"):
             skeleton["_variant"] = variant
             return skeleton
     
-    # Default to successful variant
+    # Default to successful variant (Set Play only)
     skeletons = play_doc.get("skeletons", {})
     if "successful" in skeletons:
         skeleton = skeletons["successful"]
