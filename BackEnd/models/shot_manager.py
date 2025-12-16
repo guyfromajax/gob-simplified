@@ -303,7 +303,8 @@ class ShotManager:
         #     print(f"🎯 SHOT DEBUG: shooter={get_name_safe(shooter)}, shooter_pos={get_player_position(off_lineup, shooter)}, shooter_id={id(shooter)}")
         #     print(f"🎯 SHOT DEBUG: shooter object: {shooter}")
 
-        playcall = self.game_state["current_playcall"]
+        # ✅ MOTION OFFENSE: Use motion_playcall if available (from Motion shot resolution)
+        playcall = roles.get("motion_playcall") or self.game_state["current_playcall"]
         defense_call = self.game_state["defense_playcall"]
         
         # Determine if shot is three-pointer based on shooter's spot
@@ -339,6 +340,13 @@ class ShotManager:
         shot_score, help_defender, d_foul, foul_player = self.calculate_shot_score(
             shooter, passer, screener, defender, playcall, defense_call, is_three, is_paint, second_defender
         )
+        
+        # ✅ MOTION OFFENSE: Apply attack penalty if applicable
+        motion_attack_penalty = roles.get("motion_attack_penalty", 0) or game_state.get("motion_attack_penalty", 0)
+        if motion_attack_penalty > 0:
+            shot_score -= motion_attack_penalty
+            # Clear penalty after use
+            game_state.pop("motion_attack_penalty", None)
 
         made = shot_score >= shot_threshold
 
