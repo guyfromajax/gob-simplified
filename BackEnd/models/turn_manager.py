@@ -1302,6 +1302,10 @@ class TurnManager:
         play_type = play_doc.get("play_type", "motion")
         play_focus = play_doc.get("play_focus", "inside")
         
+        # ✅ FIX: Normalize play_focus to ensure it's always one of the expected values
+        if play_focus not in ["inside", "attack", "outside"]:
+            play_focus = "inside"  # Default fallback
+        
         # Step 2: Get successful variant skeleton to find projected shooter and passer
         successful_skeleton = get_hco_skeleton(None, self.game, lean_score=1.0)
         if not successful_skeleton or "steps" not in successful_skeleton:
@@ -1466,12 +1470,16 @@ class TurnManager:
                 def_ag = zone_defender.attributes.get("AG", 50)
                 def_st = zone_defender.attributes.get("ST", 50)
                 
+                # ✅ FIX: Initialize player_d with a default value in case play_focus is unexpected
                 if play_focus == "inside":
                     player_d = def_id + def_st * 0.25
                 elif play_focus == "attack":
                     player_d = def_id + def_ag * 0.25
                 elif play_focus == "outside":
                     player_d = def_od * 1.25
+                else:
+                    # Default fallback if play_focus is unexpected (shouldn't happen, but safe)
+                    player_d = def_id + def_st * 0.25
             
             if defensive_playcall == "1-3-1 Zone":
                 player_d *= 1.15
