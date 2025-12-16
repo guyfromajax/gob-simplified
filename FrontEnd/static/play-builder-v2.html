@@ -1731,6 +1731,31 @@
       }
     }
 
+    function updateVariantTabsVisibility() {
+      // Show/hide variant tabs based on play type
+      const allTabs = document.querySelectorAll('.variant-tab');
+      
+      if (playState.type === 'Motion') {
+        // Motion: show only base_loop tab, hide Set Play tabs
+        allTabs.forEach(tab => {
+          if (tab.dataset.variant === 'base_loop') {
+            tab.style.display = 'block';
+          } else {
+            tab.style.display = 'none';
+          }
+        });
+      } else {
+        // Set Play: show Set Play tabs, hide Motion tab
+        allTabs.forEach(tab => {
+          if (tab.dataset.playType === 'set_play') {
+            tab.style.display = 'block';
+          } else if (tab.dataset.playType === 'motion') {
+            tab.style.display = 'none';
+          }
+        });
+      }
+    }
+
     function updateVariantTabs() {
       // Update tabs based on play type
       if (playState.type === 'Motion') {
@@ -3481,19 +3506,25 @@
       
       // Update variant tabs visibility
       updateVariantTabsVisibility();
-
+      
+      // Update variant tabs status
+      updateVariantTabs();
+      
+      // Switch to the appropriate variant
+      switchVariant(currentVariant);
+      
       // Update page title
       const pageTitle = document.getElementById('page-title');
       pageTitle.textContent = 'Building Step 1';
       pageTitle.classList.add('step2-title');
-
+      
       // Show step 2, hide step 1
       document.getElementById('step1').classList.add('hidden');
       document.getElementById('step2').classList.remove('hidden');
       
       // Show back button
       showBackButton();
-
+      
       // Update summary
       let summaryText = `${playState.name} | ${playState.type}`;
       if (playState.focus) {
