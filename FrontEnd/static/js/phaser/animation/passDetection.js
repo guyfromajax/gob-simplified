@@ -131,12 +131,25 @@ export async function handlePassAnimation({ scene, passInfo, playerSprites }) {
   
   // 🔍 DEBUG: Log pass animation for step 16 (3-2 Motion bug)
   if (passInfo.stepIndex === 16) {
+    // Map all player IDs to their positions for debugging
+    const allPlayerMappings = Object.keys(playerSprites).map(playerId => {
+      const sprite = playerSprites[playerId];
+      return {
+        playerId: playerId?.substring(0, 8),
+        fullPlayerId: playerId,
+        position: sprite.position || 'unknown',
+        x: sprite.x,
+        y: sprite.y
+      };
+    });
+    
     console.log('🏀 [PASS ANIMATION] Calling runPass for step 16', {
       fromId: passInfo.passerId,
       toId: passInfo.receiverId,
-      passerPos: { x: passerSprite.x, y: passerSprite.y },
-      receiverPos: { x: receiverSprite.x, y: receiverSprite.y },
-      stepIndex: passInfo.stepIndex
+      passerPos: { x: passerSprite.x, y: passerSprite.y, position: passerSprite.position },
+      receiverPos: { x: receiverSprite.x, y: receiverSprite.y, position: receiverSprite.position },
+      stepIndex: passInfo.stepIndex,
+      allPlayerMappings: allPlayerMappings
     });
   }
   
