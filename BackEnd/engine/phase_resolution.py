@@ -2495,6 +2495,14 @@ def resolve_half_court_offense_logic(game):
     # 1. Tactical Setup
     off_call = game_state["current_playcall"]
     def_call = game_state["defense_playcall"]
+    
+    # ✅ TEMPORARY: Force "3-2 Motion" for all Motion offense plays
+    # This is temporary until more Motion plays are added to the database
+    offense_play_type = game_state.get("offense_play_type", "")
+    if offense_play_type == "motion":
+        off_call = "3-2 Motion"
+        game_state["current_playcall"] = "3-2 Motion"  # Update game_state so other code uses correct playcall
+        logging.info(f"🎯 [MOTION TEMP] Forcing playcall to '3-2 Motion' (temporary override)")
 
     # Generate logic to determine result and lean score
     result, lean_score = generate_logic(off_call, def_call, off_team, def_team, off_lineup, def_lineup, game=game)
