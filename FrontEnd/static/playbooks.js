@@ -13,25 +13,8 @@
 // PLAY DATA DEFINITIONS
 // ============================================================================
 
-const PLAY_DATA = {
-  motion: [
-    { id: 'motion-1', name: '4-1 Motion' },
-    { id: 'motion-2', name: '3-2 Motion' },
-    { id: 'motion-3', name: '5-0 Motion' },
-    { id: 'motion-4', name: 'Motion Option 4' },
-  ],
-  'set-play-inside': [
-    { id: 'set-inside-1', name: 'Base Post Play' },
-    { id: 'set-inside-2', name: 'Low Post Isolation' },
-  ],
-  'set-play-attack': [
-    { id: 'set-attack-1', name: 'Pick & Roll (Lower Wing)' },
-    { id: 'set-attack-2', name: 'Pick & Roll (Top)' },
-  ],
-  'set-play-outside': [
-    { id: 'set-outside-1', name: 'Double Screen For SG' },
-    { id: 'set-outside-2', name: 'Flare Screen' },
-  ],
+// Play data will be loaded from API, but we keep defense plays hardcoded for now
+const DEFENSE_PLAY_DATA = {
   'man-defense': [
     { id: 'man-1', name: 'Man Defense' },
     { id: 'man-2', name: 'Man Defense Variant 2' },
@@ -46,12 +29,15 @@ const PLAY_DATA = {
   ],
 };
 
+// Placeholder for plays that don't exist yet
+const TO_BE_ADDED_PLACEHOLDER = { id: 'to-be-added', name: 'To Be Added' };
+
 // ============================================================================
 // STATE MANAGEMENT
 // ============================================================================
 
 class PlaybooksState {
-  constructor() {
+  constructor(playData = {}) {
     // Section data: { [playId]: { percentage: number, slot: number | null, dropdown?: string } }
     this.sections = {
       motion: {},
@@ -68,23 +54,58 @@ class PlaybooksState {
     // Motion dropdown defaults
     this.motionDropdowns = {}; // { [playId]: 'Inside' | 'Attack' | 'Outside' }
     
+    // Store play data for rendering (not used in state, but kept for compatibility)
+    this.playData = playData;
+    
     this.initDefaults();
   }
   
   initDefaults() {
-    // Initialize each section with first play = 100%, others = 0
-    Object.keys(PLAY_DATA).forEach(sectionKey => {
-      const plays = PLAY_DATA[sectionKey];
+    // Initialize motion plays (6 slots max)
+    const motionPlays = this.playData.motion || [];
+    const motionSlots = 6;
+    
+    for (let i = 0; i < motionSlots; i++) {
+      const play = i < motionPlays.length ? motionPlays[i] : TO_BE_ADDED_PLACEHOLDER;
+      const playId = play.id || `motion-${i + 1}`;
+      
+      this.sections.motion[playId] = {
+        percentage: i === 0 ? 100 : 0,
+        slot: null,
+      };
+      
+      if (play.name !== 'To Be Added') {
+        this.motionDropdowns[playId] = 'Inside';
+      }
+    }
+    
+    // Initialize set play sections (2 slots each)
+    const setPlaySections = [
+      { key: 'set-play-inside', plays: this.playData.set_play_inside || [] },
+      { key: 'set-play-attack', plays: this.playData.set_play_attack || [] },
+      { key: 'set-play-outside', plays: this.playData.set_play_outside || [] },
+    ];
+    
+    setPlaySections.forEach(({ key, plays }) => {
+      for (let i = 0; i < 2; i++) {
+        const play = i < plays.length ? plays[i] : TO_BE_ADDED_PLACEHOLDER;
+        const playId = play.id || `${key}-${i + 1}`;
+        
+        this.sections[key][playId] = {
+          percentage: i === 0 ? 100 : 0,
+          slot: null,
+        };
+      }
+    });
+    
+    // Initialize defense plays (hardcoded for now)
+    Object.keys(DEFENSE_PLAY_DATA).forEach(sectionKey => {
+      const plays = DEFENSE_PLAY_DATA[sectionKey];
       plays.forEach((play, index) => {
         this.sections[sectionKey][play.id] = {
           percentage: index === 0 ? 100 : 0,
           slot: null,
         };
-        
-        // Initialize motion dropdowns
-        if (sectionKey === 'motion') {
-          this.motionDropdowns[play.id] = 'Inside';
-        }
       });
     });
   }
@@ -160,11 +181,29 @@ class PlaybooksState {
   }
   
   // Get assigned play name for a slot
-  getAssignedPlayName(slotNumber) {
+  getAssignedPlayName(slotNumber, playData = null) {
     const assignment = this.slotAssignments[slotNumber];
     if (!assignment) return null;
     
-    const play = PLAY_DATA[assignment.section]?.find(p => p.id === assignment.playId);
+    // Try to find play in loaded play data
+    let play = null;
+    if (playData) {
+      if (assignment.section === 'motion') {
+        play = playData.motion?.find(p => p.id === assignment.playId);
+      } else if (assignment.section === 'set-play-inside') {
+        play = playData.set_play_inside?.find(p => p.id === assignment.playId);
+      } else if (assignment.section === 'set-play-attack') {
+        play = playData.set_play_attack?.find(p => p.id === assignment.playId);
+      } else if (assignment.section === 'set-play-outside') {
+        play = playData.set_play_outside?.find(p => p.id === assignment.playId);
+      }
+    }
+    
+    // Fallback to defense plays (hardcoded)
+    if (!play && DEFENSE_PLAY_DATA[assignment.section]) {
+      play = DEFENSE_PLAY_DATA[assignment.section].find(p => p.id === assignment.playId);
+    }
+    
     if (!play) return null;
     
     // For motion, include dropdown (focus)
@@ -254,16 +293,117 @@ class PlaybooksPersistence {
 
 class PlaybooksUI {
   constructor() {
-    this.state = new PlaybooksState();
+    this.state = null; // Will be initialized after loading plays
     this.persistence = new PlaybooksPersistence();
     this.debounceTimer = null;
+    this.playData = null;
   }
   
   async init() {
+    // Load plays from API first
+    await this.loadPlays();
+    
+    // Initialize state with loaded plays
+    this.state = new PlaybooksState(this.playData);
+    
+    // Load saved state (if any)
     await this.loadState();
+    
     this.renderAll();
     this.attachEventListeners();
     this.updateSubmitButton();
+  }
+  
+  async loadPlays() {
+    try {
+      // Get URL parameters
+      const urlParams = new URLSearchParams(window.location.search);
+      const mode = urlParams.get('mode') || 'single';
+      const teamId = urlParams.get('team_id') || urlParams.get('home_id') || urlParams.get('away_id');
+      const gameId = urlParams.get('game_id');
+      const tournamentId = urlParams.get('tournament_id');
+      const franchiseId = urlParams.get('franchise_id');
+      
+      if (!teamId) {
+        console.warn('⚠️ No team_id found in URL params, using hardcoded plays');
+        this.playData = {
+          motion: [],
+          set_play_inside: [],
+          set_play_attack: [],
+          set_play_outside: []
+        };
+        return;
+      }
+      
+      // Build API URL
+      const params = new URLSearchParams();
+      params.set('mode', mode);
+      params.set('team_id', teamId);
+      if (mode === 'single' && gameId) {
+        params.set('game_id', gameId);
+      } else if (mode === 'tournament' && tournamentId) {
+        params.set('tournament_id', tournamentId);
+      } else if (mode === 'franchise' && franchiseId) {
+        params.set('franchise_id', franchiseId);
+      }
+      
+      const response = await fetch(`/api/playbooks?${params.toString()}`);
+      if (response.ok) {
+        const data = await response.json();
+        
+        // Convert API response to play data format
+        this.playData = {
+          motion: (data.motion || []).map((play, index) => ({
+            id: `motion-${index + 1}`,
+            name: play.name,
+            play_id: play.play_id,
+            play_type: play.play_type,
+            play_focus: play.play_focus
+          })),
+          set_play_inside: (data.set_play_inside || []).map((play, index) => ({
+            id: `set-inside-${index + 1}`,
+            name: play.name,
+            play_id: play.play_id,
+            play_type: play.play_type,
+            play_focus: play.play_focus
+          })),
+          set_play_attack: (data.set_play_attack || []).map((play, index) => ({
+            id: `set-attack-${index + 1}`,
+            name: play.name,
+            play_id: play.play_id,
+            play_type: play.play_type,
+            play_focus: play.play_focus
+          })),
+          set_play_outside: (data.set_play_outside || []).map((play, index) => ({
+            id: `set-outside-${index + 1}`,
+            name: play.name,
+            play_id: play.play_id,
+            play_type: play.play_type,
+            play_focus: play.play_focus
+          }))
+        };
+        
+        console.log('✅ Loaded plays from API:', this.playData);
+      } else {
+        console.error('❌ Failed to load plays from API:', response.status);
+        // Fallback to empty plays
+        this.playData = {
+          motion: [],
+          set_play_inside: [],
+          set_play_attack: [],
+          set_play_outside: []
+        };
+      }
+    } catch (error) {
+      console.error('❌ Error loading plays:', error);
+      // Fallback to empty plays
+      this.playData = {
+        motion: [],
+        set_play_inside: [],
+        set_play_attack: [],
+        set_play_outside: []
+      };
+    }
   }
   
   async loadState() {
@@ -289,12 +429,45 @@ class PlaybooksUI {
     const container = document.getElementById(`${sectionKey}-rows`);
     if (!container) return;
     
-    const plays = PLAY_DATA[sectionKey];
+    let plays = [];
+    
+    // Get plays based on section
+    if (sectionKey === 'motion') {
+      const motionPlays = this.playData.motion || [];
+      // Fill to 6 slots
+      for (let i = 0; i < 6; i++) {
+        plays.push(i < motionPlays.length ? motionPlays[i] : TO_BE_ADDED_PLACEHOLDER);
+      }
+    } else if (sectionKey === 'set-play-inside') {
+      const setPlays = this.playData.set_play_inside || [];
+      // Fill to 2 slots
+      for (let i = 0; i < 2; i++) {
+        plays.push(i < setPlays.length ? setPlays[i] : TO_BE_ADDED_PLACEHOLDER);
+      }
+    } else if (sectionKey === 'set-play-attack') {
+      const setPlays = this.playData.set_play_attack || [];
+      // Fill to 2 slots
+      for (let i = 0; i < 2; i++) {
+        plays.push(i < setPlays.length ? setPlays[i] : TO_BE_ADDED_PLACEHOLDER);
+      }
+    } else if (sectionKey === 'set-play-outside') {
+      const setPlays = this.playData.set_play_outside || [];
+      // Fill to 2 slots
+      for (let i = 0; i < 2; i++) {
+        plays.push(i < setPlays.length ? setPlays[i] : TO_BE_ADDED_PLACEHOLDER);
+      }
+    } else {
+      // Defense plays (hardcoded)
+      plays = DEFENSE_PLAY_DATA[sectionKey] || [];
+    }
+    
     container.innerHTML = '';
     
-    plays.forEach(play => {
-      const playData = this.state.sections[sectionKey][play.id] || { percentage: 0, slot: null };
-      const row = this.createPlayRow(sectionKey, play, playData);
+    plays.forEach((play, index) => {
+      // Generate play ID if it's a placeholder
+      const playId = play.id || (sectionKey === 'motion' ? `motion-${index + 1}` : `${sectionKey}-${index + 1}`);
+      const playData = this.state.sections[sectionKey][playId] || { percentage: 0, slot: null };
+      const row = this.createPlayRow(sectionKey, { ...play, id: playId }, playData);
       container.appendChild(row);
     });
   }
@@ -313,18 +486,32 @@ class PlaybooksUI {
     label.className = 'row-label';
     label.textContent = play.name;
     
+    // Style "To Be Added" differently
+    if (play.name === 'To Be Added') {
+      label.style.fontStyle = 'italic';
+      label.style.opacity = '0.6';
+    }
+    
     const input = document.createElement('input');
     input.type = 'number';
     input.className = 'percentage-input';
     input.min = '0';
     input.max = '100';
     input.value = playData.percentage || 0;
-    input.addEventListener('input', (e) => {
-      this.handlePercentageChange(sectionKey, play.id, e.target.value);
-    });
-    input.addEventListener('blur', () => {
-      this.validateAndUpdate();
-    });
+    
+    // Disable input for "To Be Added" placeholders
+    if (play.name === 'To Be Added') {
+      input.disabled = true;
+      input.style.opacity = '0.5';
+      input.style.cursor = 'not-allowed';
+    } else {
+      input.addEventListener('input', (e) => {
+        this.handlePercentageChange(sectionKey, play.id, e.target.value);
+      });
+      input.addEventListener('blur', () => {
+        this.validateAndUpdate();
+      });
+    }
     
     column1.appendChild(label);
     column1.appendChild(input);
@@ -344,9 +531,16 @@ class PlaybooksUI {
         option.textContent = opt;
         dropdown.appendChild(option);
       });
-      dropdown.addEventListener('change', (e) => {
-        this.handleMotionDropdownChange(play.id, e.target.value);
-      });
+      // Disable dropdown for "To Be Added" placeholders
+      if (play.name === 'To Be Added') {
+        dropdown.disabled = true;
+        dropdown.style.opacity = '0.5';
+        dropdown.style.cursor = 'not-allowed';
+      } else {
+        dropdown.addEventListener('change', (e) => {
+          this.handleMotionDropdownChange(play.id, e.target.value);
+        });
+      }
       column2.appendChild(dropdown);
     } else {
       // Empty spacer for set plays to align slot controls
@@ -390,9 +584,16 @@ class PlaybooksUI {
           }
         }
         
-        pill.addEventListener('click', () => {
-          this.handleSlotClick(i, sectionKey, play.id);
-        });
+        // Disable slot assignment for "To Be Added" placeholders
+        if (play.name === 'To Be Added') {
+          pill.disabled = true;
+          pill.style.opacity = '0.5';
+          pill.style.cursor = 'not-allowed';
+        } else {
+          pill.addEventListener('click', () => {
+            this.handleSlotClick(i, sectionKey, play.id);
+          });
+        }
         
         slotControls.appendChild(pill);
       }
@@ -549,7 +750,7 @@ class PlaybooksUI {
       
       const name = document.createElement('span');
       name.className = 'assigned-play-name';
-      const playName = this.state.getAssignedPlayName(i);
+      const playName = this.state.getAssignedPlayName(i, this.playData);
       name.textContent = playName || 'Unassigned';
       if (!playName) {
         name.classList.add('unassigned');
