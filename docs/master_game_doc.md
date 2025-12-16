@@ -2346,6 +2346,69 @@ The Play Builder (`play-builder-v2.html`) is a web-based tool for creating and e
 - **Visibility**: Only shown for Motion plays when building new steps
 - **Function**: Marks step as loop end with `is_final_step: true` and `loop_back_to: 0`
 
+### Animation Preview System ✅ **NEW** (January 2025)
+
+#### Overview
+The Play Builder includes an animation preview system that allows users to visualize their plays before saving. The system behaves differently for Motion plays vs Set Plays.
+
+#### Animation Controls
+
+**Variant Selector:**
+- **Motion Plays**: Variant selector is hidden - automatically uses `base_loop` variant
+- **Set Plays**: Variant selector is shown - user must select from available variants (`successful`, `mid_play_change`, `contested`, `broken`)
+- **Dropdown Population**: `updateAnimationVariantDropdown()` populates options based on play type and available steps
+
+**Animate Button:**
+- **Motion Plays**: No variant selection required - button works immediately if `base_loop` has steps
+- **Set Plays**: Requires variant selection from dropdown before animating
+- **Validation**: Checks that selected variant has at least one step before starting animation
+
+#### Animation Behavior
+
+**Set Plays:**
+- Animates through all steps sequentially
+- Stops at the end of the animation
+- Shows step counter: "Animating Step X of Y"
+
+**Motion Plays - Infinite Loop:**
+- Animates through all steps sequentially
+- **Loop Detection**: When final step (`is_final_step: true`) is reached, automatically loops back to step 0
+- **Fallback Loop**: If no final step is marked, loops back to step 0 at the end of all steps
+- **Continuous Animation**: Animation continues indefinitely until manually stopped
+- **Status Display**: Shows "Animating Step X of Y (Final Step - will loop)" when final step is reached
+
+#### Animation Functions
+
+**`startAnimation()`:**
+- **Motion Plays**: Automatically uses `base_loop` variant (no selection needed)
+- **Set Plays**: Uses selected variant from dropdown
+- **Validation**: Checks for variant existence and step count before starting
+- **UI Updates**: Hides animate button, shows stop button, displays status
+
+**`animateNextStep(selectedVariant)`:**
+- **Step Rendering**: Updates player positions and actions for current step
+- **Loop Logic** (Motion only):
+  - Detects when `is_final_step: true` is reached
+  - Resets `animationStepIndex` to 0 to loop back
+  - If no final step marked, loops at end of steps array
+- **Set Play Logic**: Stops animation when all steps are complete
+- **Timing**: 1 second delay between steps
+- **Status Updates**: Updates status message with current step and loop indication
+
+**`stopAnimation()`:**
+- Stops the animation loop
+- Clears animation interval
+- Resets UI (shows animate button, hides stop button)
+- Works for both Motion and Set Plays
+
+#### Key Implementation Details
+
+1. **Variant Selection**: Motion plays bypass variant selection entirely, using `base_loop` automatically
+2. **Loop Detection**: Uses `step.is_final_step === true` to identify the loop end point
+3. **Index Management**: `animationStepIndex` is reset to 0 when loop condition is met
+4. **Status Messages**: Provides clear feedback about current step and loop behavior
+5. **Continuous Play**: Motion plays can run indefinitely until user stops them
+
 ### Key Files
 
 **Frontend**:
