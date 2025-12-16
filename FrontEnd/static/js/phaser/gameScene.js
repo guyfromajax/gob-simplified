@@ -1741,13 +1741,17 @@ export function createGameScene(Phaser) {
           
           // Handle BATCH turns (e.g., HCO miss → OREB)
           if (turn.result_type === 'BATCH' && turn.batch_turns) {
-            // ✅ REMOVED: Batch turn logging (cluttering console)
+            // ✅ DIAGNOSTIC: Log BATCH processing
+            console.log(`🔍 [FRONTEND BATCH] Processing BATCH with ${turn.batch_turns.length} turns`);
+            console.log(`🔍 [FRONTEND BATCH] Batch turn result_types: ${turn.batch_turns.map(t => t.result_type)}`);
             
             // Animate each turn in the batch
-            for (const subTurn of turn.batch_turns) {
+            for (let batchIdx = 0; batchIdx < turn.batch_turns.length; batchIdx++) {
+              const subTurn = turn.batch_turns[batchIdx];
               turnCount++;
               subTurn.index = turnCount;
               
+              console.log(`🔍 [FRONTEND BATCH] Processing batch turn ${batchIdx + 1}/${turn.batch_turns.length}: ${subTurn.result_type}`);
               console.log(`🎬 Turn ${turnCount}: ${subTurn.result_type} - ${subTurn.text?.substring(0, 50)}...`);
               
               // Display debug info in text scroll
@@ -1761,6 +1765,7 @@ export function createGameScene(Phaser) {
                 appendToTextScroll(subTurn.debug_turn_result);
               }
               
+              console.log(`🔍 [FRONTEND BATCH] About to call animateGameTurns for ${subTurn.result_type}`);
               await animateGameTurns({
                 scene: this,
                 simData: { 
@@ -1773,10 +1778,12 @@ export function createGameScene(Phaser) {
                 ballSprite: this.ballSprite,
                 onUpdate: updateScoreboard
               });
+              console.log(`🔍 [FRONTEND BATCH] Completed animateGameTurns for ${subTurn.result_type}`);
               
               // Update finalTurn to be the last sub-turn in the batch
               finalTurn = subTurn;
             }
+            console.log(`🔍 [FRONTEND BATCH] Finished processing all ${turn.batch_turns.length} turns in BATCH`);
           } else {
             // Normal single turn
             turnCount++;
