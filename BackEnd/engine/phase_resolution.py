@@ -1937,13 +1937,15 @@ def apply_stopper_system_to_skeleton(skeleton, result, game_state):
             "action": "handle_ball"  # Ball still with them
         }
     
-    # ✅ FIX: Store stop_step_index for later use in extracting stealer position
-    # This ensures we extract from the actual step where the steal occurred, not the stopper step
-    if result == "STEAL":
+    # ✅ FIX: Store stop_step_index for later use in determining ball handler and defender
+    # This ensures we use the actual ball handler at the step where the steal/foul/turnover occurred
+    # Store for all non-shot results (steals, fouls, turnovers) so defender determination uses correct ball handler
+    if result in ["STEAL", "DEAD_BALL_TURNOVER", "O_FOUL", "D_FOUL"]:
         game_state["steal_stop_step_index"] = stop_step_index
         # Also store a reference to the original skeleton steps before truncation
         # (we'll use this to extract position from the correct step)
-        game_state["steal_original_skeleton_steps"] = steps.copy()
+        if result == "STEAL":
+            game_state["steal_original_skeleton_steps"] = steps.copy()
     
     # Replace skeleton steps with truncated steps + stopper step
     skeleton["steps"] = truncated_steps + [stopper_step]
@@ -2542,7 +2544,17 @@ def resolve_half_court_offense_logic(game):
     # assign_roles() assigns defender based on shooter, but for steals we need
     # whoever is guarding the ball handler at the time of the steal
     if result in ["STEAL", "DEAD_BALL_TURNOVER", "O_FOUL", "D_FOUL"]:
-        ball_handler = roles.get("ball_handler")
+        # ✅ FIX: Get ball handler from the stop step where the steal/foul/turnover occurs,
+        # not from roles (which may be the shooter from a different step)
+        # This is critical for Motion plays where the ball handler changes throughout the motion
+        stop_step_index = game_state.get("steal_stop_step_index")
+        if stop_step_index is not None and skeleton and "steps" in skeleton:
+            # Use the actual ball handler at the stop step
+            ball_handler = get_ball_handler_from_skeleton(skeleton, off_lineup, step_index=stop_step_index)
+        else:
+            # Fallback: use ball handler from roles (for backwards compatibility or if stop step not available)
+            ball_handler = roles.get("ball_handler")
+        
         if ball_handler:
             ball_handler_pos = get_player_position(off_lineup, ball_handler)
             

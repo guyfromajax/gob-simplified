@@ -1,0 +1,636 @@
+{
+  "play_name": "3-2 Motion",
+  "play_type": "motion",
+  "play_focus": null,
+  "skeletons": {
+    "base_loop": {
+      "steps": [
+        {
+          "timestamp": 0,
+          "pos_actions": {
+            "PG": {
+              "location": "key",
+              "action": "handle_ball"
+            },
+            "SG": {
+              "location": "upper wing",
+              "action": "get_open"
+            },
+            "SF": {
+              "location": "lower wing",
+              "action": "get_open"
+            },
+            "PF": {
+              "location": "lower lowPost",
+              "action": "get_open"
+            },
+            "C": {
+              "location": "upper lowPost",
+              "action": "get_open"
+            }
+          },
+          "events": []
+        },
+        {
+          "timestamp": 300,
+          "pos_actions": {
+            "PG": {
+              "location": "key",
+              "action": "pass"
+            },
+            "SG": {
+              "location": "upper wing",
+              "action": "receive"
+            },
+            "SF": {
+              "location": "lower wing",
+              "action": "stationary"
+            },
+            "PF": {
+              "location": "lower lowPost",
+              "action": "post_up"
+            },
+            "C": {
+              "location": "upper lowPost",
+              "action": "post_up"
+            }
+          },
+          "events": []
+        },
+        {
+          "timestamp": 600,
+          "pos_actions": {
+            "PG": {
+              "location": "midLane",
+              "action": "cut"
+            },
+            "SG": {
+              "location": "upper wing",
+              "action": "handle_ball"
+            },
+            "SF": {
+              "location": "lower wing",
+              "action": "stationary"
+            },
+            "PF": {
+              "location": "lower lowPost",
+              "action": "post_up"
+            },
+            "C": {
+              "location": "upper lowPost",
+              "action": "post_up"
+            }
+          },
+          "events": []
+        },
+        {
+          "timestamp": 900,
+          "pos_actions": {
+            "PG": {
+              "location": "midLane",
+              "action": "stationary"
+            },
+            "SG": {
+              "location": "upper wing",
+              "action": "handle_ball"
+            },
+            "SF": {
+              "location": "key",
+              "action": "cut"
+            },
+            "PF": {
+              "location": "midLane",
+              "action": "screen"
+            },
+            "C": {
+              "location": "upper lowPost",
+              "action": "post_up"
+            }
+          },
+          "events": []
+        },
+        {
+          "timestamp": 1200,
+          "pos_actions": {
+            "PG": {
+              "location": "lower wing",
+              "action": "cut"
+            },
+            "SG": {
+              "location": "upper wing",
+              "action": "pass"
+            },
+            "SF": {
+              "location": "key",
+              "action": "receive"
+            },
+            "PF": {
+              "location": "lower lowPost",
+              "action": "cut"
+            },
+            "C": {
+              "location": "upper lowPost",
+              "action": "post_up"
+            }
+          },
+          "events": []
+        },
+        {
+          "timestamp": 1500,
+          "pos_actions": {
+            "PG": {
+              "location": "lower wing",
+              "action": "receive"
+            },
+            "SG": {
+              "location": "upper wing",
+              "action": "stationary"
+            },
+            "SF": {
+              "location": "key",
+              "action": "pass"
+            },
+            "PF": {
+              "location": "lower lowPost",
+              "action": "post_up"
+            },
+            "C": {
+              "location": "upper lowPost",
+              "action": "post_up"
+            }
+          },
+          "events": []
+        },
+        {
+          "timestamp": 1800,
+          "pos_actions": {
+            "PG": {
+              "location": "lower wing",
+              "action": "handle_ball"
+            },
+            "SG": {
+              "location": "upper wing",
+              "action": "stationary"
+            },
+            "SF": {
+              "location": "midLane",
+              "action": "cut"
+            },
+            "PF": {
+              "location": "lower lowPost",
+              "action": "post_up"
+            },
+            "C": {
+              "location": "upper lowPost",
+              "action": "post_up"
+            }
+          },
+          "events": []
+        },
+        {
+          "timestamp": 2100,
+          "pos_actions": {
+            "PG": {
+              "location": "lower wing",
+              "action": "handle_ball"
+            },
+            "SG": {
+              "location": "key",
+              "action": "cut"
+            },
+            "SF": {
+              "location": "midLane",
+              "action": "stationary"
+            },
+            "PF": {
+              "location": "lower lowPost",
+              "action": "post_up"
+            },
+            "C": {
+              "location": "midLane",
+              "action": "screen"
+            }
+          },
+          "events": []
+        },
+        {
+          "timestamp": 2400,
+          "pos_actions": {
+            "PG": {
+              "location": "lower wing",
+              "action": "pass"
+            },
+            "SG": {
+              "location": "key",
+              "action": "receive"
+            },
+            "SF": {
+              "location": "upper wing",
+              "action": "cut"
+            },
+            "PF": {
+              "location": "lower lowPost",
+              "action": "post_up"
+            },
+            "C": {
+              "location": "upper lowPost",
+              "action": "cut"
+            }
+          },
+          "events": []
+        },
+        {
+          "timestamp": 2700,
+          "pos_actions": {
+            "PG": {
+              "location": "lower wing",
+              "action": "stationary"
+            },
+            "SG": {
+              "location": "key",
+              "action": "pass"
+            },
+            "SF": {
+              "location": "upper wing",
+              "action": "receive"
+            },
+            "PF": {
+              "location": "lower lowPost",
+              "action": "post_up"
+            },
+            "C": {
+              "location": "upper lowPost",
+              "action": "post_up"
+            }
+          },
+          "events": []
+        },
+        {
+          "timestamp": 3000,
+          "pos_actions": {
+            "PG": {
+              "location": "lower wing",
+              "action": "stationary"
+            },
+            "SG": {
+              "location": "midLane",
+              "action": "cut"
+            },
+            "SF": {
+              "location": "upper wing",
+              "action": "handle_ball"
+            },
+            "PF": {
+              "location": "lower lowPost",
+              "action": "post_up"
+            },
+            "C": {
+              "location": "upper lowPost",
+              "action": "post_up"
+            }
+          },
+          "events": []
+        },
+        {
+          "timestamp": 3300,
+          "pos_actions": {
+            "PG": {
+              "location": "key",
+              "action": "cut"
+            },
+            "SG": {
+              "location": "midLane",
+              "action": "stationary"
+            },
+            "SF": {
+              "location": "upper wing",
+              "action": "handle_ball"
+            },
+            "PF": {
+              "location": "midLane",
+              "action": "screen"
+            },
+            "C": {
+              "location": "upper lowPost",
+              "action": "post_up"
+            }
+          },
+          "events": []
+        },
+        {
+          "timestamp": 3600,
+          "pos_actions": {
+            "PG": {
+              "location": "key",
+              "action": "receive"
+            },
+            "SG": {
+              "location": "lower wing",
+              "action": "cut"
+            },
+            "SF": {
+              "location": "upper wing",
+              "action": "pass"
+            },
+            "PF": {
+              "location": "lower lowPost",
+              "action": "cut"
+            },
+            "C": {
+              "location": "upper lowPost",
+              "action": "post_up"
+            }
+          },
+          "events": []
+        },
+        {
+          "timestamp": 3900,
+          "pos_actions": {
+            "PG": {
+              "location": "key",
+              "action": "pass"
+            },
+            "SG": {
+              "location": "lower wing",
+              "action": "receive"
+            },
+            "SF": {
+              "location": "upper wing",
+              "action": "stationary"
+            },
+            "PF": {
+              "location": "lower lowPost",
+              "action": "cut"
+            },
+            "C": {
+              "location": "upper lowPost",
+              "action": "post_up"
+            }
+          },
+          "events": []
+        },
+        {
+          "timestamp": 4200,
+          "pos_actions": {
+            "PG": {
+              "location": "midLane",
+              "action": "cut"
+            },
+            "SG": {
+              "location": "lower wing",
+              "action": "handle_ball"
+            },
+            "SF": {
+              "location": "upper wing",
+              "action": "stationary"
+            },
+            "PF": {
+              "location": "lower lowPost",
+              "action": "post_up"
+            },
+            "C": {
+              "location": "upper lowPost",
+              "action": "post_up"
+            }
+          },
+          "events": []
+        },
+        {
+          "timestamp": 4500,
+          "pos_actions": {
+            "PG": {
+              "location": "upper wing",
+              "action": "cut"
+            },
+            "SG": {
+              "location": "lower wing",
+              "action": "pass"
+            },
+            "SF": {
+              "location": "key",
+              "action": "receive"
+            },
+            "PF": {
+              "location": "lower lowPost",
+              "action": "post_up"
+            },
+            "C": {
+              "location": "upper lowPost",
+              "action": "cut"
+            }
+          },
+          "events": []
+        },
+        {
+          "timestamp": 4800,
+          "pos_actions": {
+            "PG": {
+              "location": "upper wing",
+              "action": "receive"
+            },
+            "SG": {
+              "location": "lower wing",
+              "action": "stationary"
+            },
+            "SF": {
+              "location": "key",
+              "action": "pass"
+            },
+            "PF": {
+              "location": "lower lowPost",
+              "action": "post_up"
+            },
+            "C": {
+              "location": "upper lowPost",
+              "action": "post_up"
+            }
+          },
+          "events": []
+        },
+        {
+          "timestamp": 5100,
+          "pos_actions": {
+            "PG": {
+              "location": "upper wing",
+              "action": "handle_ball"
+            },
+            "SG": {
+              "location": "lower wing",
+              "action": "stationary"
+            },
+            "SF": {
+              "location": "midLane",
+              "action": "cut"
+            },
+            "PF": {
+              "location": "lower lowPost",
+              "action": "post_up"
+            },
+            "C": {
+              "location": "upper lowPost",
+              "action": "post_up"
+            }
+          },
+          "events": []
+        },
+        {
+          "timestamp": 5400,
+          "pos_actions": {
+            "PG": {
+              "location": "upper wing",
+              "action": "handle_ball"
+            },
+            "SG": {
+              "location": "key",
+              "action": "cut"
+            },
+            "SF": {
+              "location": "midLane",
+              "action": "stationary"
+            },
+            "PF": {
+              "location": "midLane",
+              "action": "screen"
+            },
+            "C": {
+              "location": "upper lowPost",
+              "action": "post_up"
+            }
+          },
+          "events": []
+        },
+        {
+          "timestamp": 5700,
+          "pos_actions": {
+            "PG": {
+              "location": "upper wing",
+              "action": "pass"
+            },
+            "SG": {
+              "location": "key",
+              "action": "receive"
+            },
+            "SF": {
+              "location": "lower wing",
+              "action": "cut"
+            },
+            "PF": {
+              "location": "lower lowPost",
+              "action": "cut"
+            },
+            "C": {
+              "location": "upper lowPost",
+              "action": "post_up"
+            }
+          },
+          "events": []
+        },
+        {
+          "timestamp": 6000,
+          "pos_actions": {
+            "PG": {
+              "location": "upper wing",
+              "action": "stationary"
+            },
+            "SG": {
+              "location": "key",
+              "action": "pass"
+            },
+            "SF": {
+              "location": "lower wing",
+              "action": "receive"
+            },
+            "PF": {
+              "location": "lower lowPost",
+              "action": "post_up"
+            },
+            "C": {
+              "location": "upper lowPost",
+              "action": "post_up"
+            }
+          },
+          "events": []
+        },
+        {
+          "timestamp": 6300,
+          "pos_actions": {
+            "PG": {
+              "location": "upper wing",
+              "action": "stationary"
+            },
+            "SG": {
+              "location": "midLane",
+              "action": "cut"
+            },
+            "SF": {
+              "location": "lower wing",
+              "action": "handle_ball"
+            },
+            "PF": {
+              "location": "lower lowPost",
+              "action": "post_up"
+            },
+            "C": {
+              "location": "upper lowPost",
+              "action": "post_up"
+            }
+          },
+          "events": []
+        },
+        {
+          "timestamp": 6600,
+          "pos_actions": {
+            "PG": {
+              "location": "key",
+              "action": "receive"
+            },
+            "SG": {
+              "location": "upper wing",
+              "action": "cut"
+            },
+            "SF": {
+              "location": "lower wing",
+              "action": "pass"
+            },
+            "PF": {
+              "location": "lower lowPost",
+              "action": "post_up"
+            },
+            "C": {
+              "location": "upper lowPost",
+              "action": "cut"
+            }
+          },
+          "events": []
+        },
+        {
+          "timestamp": 6900,
+          "pos_actions": {
+            "PG": {
+              "location": "key",
+              "action": "handle_ball"
+            },
+            "SG": {
+              "location": "upper wing",
+              "action": "stationary"
+            },
+            "SF": {
+              "location": "lower wing",
+              "action": "stationary"
+            },
+            "PF": {
+              "location": "lower lowPost",
+              "action": "post_up"
+            },
+            "C": {
+              "location": "upper lowPost",
+              "action": "post_up"
+            }
+          },
+          "events": []
+        }
+      ],
+      "complete": true
+    }
+  }
+}
