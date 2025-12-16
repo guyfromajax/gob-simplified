@@ -1935,17 +1935,6 @@
         errors: errors
       };
     }
-      
-      // Multiple shooters check
-      if (shooters.length > 1) {
-        errors.push(`❌ Multiple shooters (${shooters.join(', ')})! Only one player can shoot per step.`);
-      }
-      
-      return {
-        valid: errors.length === 0,
-        errors: errors
-      };
-    }
 
     // ==================== NAVIGATION FUNCTIONS ====================
     
