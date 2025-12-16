@@ -31,9 +31,12 @@ export function detectPassAtStep(animations, stepIndex) {
     
     debugInfo.movementLengths[anim.playerId?.substring(0, 8) || 'unknown'] = movement.length;
     
-    if (stepIndex >= movement.length) continue;
+    // ✅ FIX: Check stepIndex - 1 to match animation system (prev = movement[stepIndex - 1], curr = movement[stepIndex])
+    // The animation system animates FROM prev TO curr, so we need to check prev for pass actions
+    const checkIndex = stepIndex - 1;
+    if (checkIndex < 0 || checkIndex >= movement.length) continue;
     
-    const step = movement[stepIndex];
+    const step = movement[checkIndex];
     const action = step?.action;
     
     if (action === "pass") {
@@ -47,8 +50,9 @@ export function detectPassAtStep(animations, stepIndex) {
       const receiverAnim = animations.find(otherAnim => {
         if (otherAnim.playerId === anim.playerId) return false; // Skip passer
         const otherMovement = otherAnim.movement;
-        if (!otherMovement || stepIndex >= otherMovement.length) return false;
-        const otherStep = otherMovement[stepIndex];
+        // ✅ FIX: Use checkIndex to match animation system
+        if (!otherMovement || checkIndex < 0 || checkIndex >= otherMovement.length) return false;
+        const otherStep = otherMovement[checkIndex];
         const otherAction = otherStep?.action;
         
         if (otherAction === "receive") {
