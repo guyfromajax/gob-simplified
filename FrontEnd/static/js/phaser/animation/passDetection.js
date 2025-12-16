@@ -70,28 +70,37 @@ export function detectPassAtStep(animations, stepIndex) {
           timestamp: step.timestamp
         };
         
-        // ✅ COMMENTED OUT: Pass detection logs (cluttering console)
-        // console.log(`✅ [PASS DETECT] Step ${stepIndex}: Found pass`, {
-        //   passer: anim.playerId?.substring(0, 8),
-        //   receiver: receiverAnim.playerId?.substring(0, 8),
-        //   timestamp: step.timestamp,
-        //   debugInfo
-        // });
+        // 🔍 DEBUG: Log pass detection for step 16 (3-2 Motion bug)
+        if (stepIndex === 16) {
+          console.log(`🔍 [PASS DETECTION] Step ${stepIndex}: Found pass`, {
+            passer: anim.playerId?.substring(0, 8),
+            receiver: receiverAnim.playerId?.substring(0, 8),
+            timestamp: step.timestamp,
+            debugInfo,
+            allPassersFound: debugInfo.passersFound,
+            allReceiversFound: debugInfo.receiversFound
+          });
+        }
         
         return result;
       } else {
-        // ✅ COMMENTED OUT: Pass detection warning (cluttering console)
-        // console.warn(`⚠️ [PASS DETECT] Step ${stepIndex}: Passer found but NO receiver`, {
-        //   passer: anim.playerId?.substring(0, 8),
-        //   debugInfo
-        // });
+        // 🔍 DEBUG: Log when passer found but no receiver (step 16 bug)
+        if (stepIndex === 16) {
+          console.warn(`⚠️ [PASS DETECTION] Step ${stepIndex}: Passer found but NO receiver`, {
+            passer: anim.playerId?.substring(0, 8),
+            debugInfo,
+            allReceiversFound: debugInfo.receiversFound
+          });
+        }
       }
     }
   }
   
   // No pass found
-  // ✅ COMMENTED OUT: Pass detection logs (cluttering console)
-  // console.log(`❌ [PASS DETECT] Step ${stepIndex}: No pass found`, debugInfo);
+  // 🔍 DEBUG: Log when no pass found at step 16
+  if (stepIndex === 16) {
+    console.log(`❌ [PASS DETECTION] Step ${stepIndex}: No pass found`, debugInfo);
+  }
   return null;
 }
 
@@ -120,13 +129,16 @@ export async function handlePassAnimation({ scene, passInfo, playerSprites }) {
     return;
   }
   
-  // ✅ COMMENTED OUT: Pass animation logs (cluttering console)
-  // console.log('🏀 [PASS ANIMATION] Calling runPass', {
-  //   fromId: passInfo.passerId,
-  //   toId: passInfo.receiverId,
-  //   passerPos: { x: passerSprite.x, y: passerSprite.y },
-  //   receiverPos: { x: receiverSprite.x, y: receiverSprite.y }
-  // });
+  // 🔍 DEBUG: Log pass animation for step 16 (3-2 Motion bug)
+  if (passInfo.stepIndex === 16) {
+    console.log('🏀 [PASS ANIMATION] Calling runPass for step 16', {
+      fromId: passInfo.passerId,
+      toId: passInfo.receiverId,
+      passerPos: { x: passerSprite.x, y: passerSprite.y },
+      receiverPos: { x: receiverSprite.x, y: receiverSprite.y },
+      stepIndex: passInfo.stepIndex
+    });
+  }
   
   // ✅ FIX: Use getBallDuration() to respect game speed settings
   // Import getBallDuration from ballTween.js which uses getBallSpeed() that checks window.__GAME_SPEED
@@ -156,7 +168,8 @@ export async function handlePassAnimation({ scene, passInfo, playerSprites }) {
     fromId: passInfo.passerId,
     toId: passInfo.receiverId,
     duration: passDuration,
-    easing: "Sine.easeInOut"
+    easing: "Sine.easeInOut",
+    stepIndex: passInfo.stepIndex // 🔍 DEBUG: Pass stepIndex for debugging
   });
   
   // ✅ CRITICAL FIX: Keep passInFlight true for the NEXT step to prevent

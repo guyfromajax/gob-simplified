@@ -2223,7 +2223,19 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
     console.log('⏭️ [FCP/HCT] Skipping runSetupTween() - players already positioned at step 0 from BIP');
   }
 
+  // ✅ TEMPORARY: Force stop at step 16 for 3-2 Motion to debug ball teleportation bug
+  const is32Motion = turnData.offensive_playcall === "3-2 Motion" || 
+                     turnData.offensivePlaycall === "3-2 Motion" ||
+                     (turnData.animations && turnData.animations.length > 0 && 
+                      turnData.animations[0]?.movement && turnData.animations[0].movement.length > 16);
+  
   for (let stepIndex = 1; stepIndex < maxSteps; stepIndex++) {
+    // ✅ TEMPORARY: Force stop at step 16 for 3-2 Motion debugging
+    if (is32Motion && stepIndex === 17) {
+      console.log('🛑 [TEMP DEBUG] Stopping 3-2 Motion animation at step 17 (after step 16 pass)');
+      break;
+    }
+    
     // ✅ REMOVED: Special FCP/HCT FastBreak check - FCP/HCT now routes through AnimationRouter (same as HCO)
     const willEarlyExit = scene.skipToEnd || scene.stateMachine?.is(States.FastBreak);
     
@@ -2264,6 +2276,31 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
     
     const passInfo = detectPassAtStep(turnData.animations, stepIndex);
     const passHappeningAtThisStep = !!passInfo;
+    
+    // 🔍 DEBUG: Log step processing for step 16 (3-2 Motion bug)
+    if (stepIndex === 16) {
+      const step = turnData.animations?.[0]?.movement?.[stepIndex];
+      console.log('📋 [STEP PROCESSING] Step 16', {
+        timestamp: step?.timestamp,
+        passHappening: passHappeningAtThisStep,
+        passInfo: passInfo ? {
+          passerId: passInfo.passerId?.substring(0, 8),
+          receiverId: passInfo.receiverId?.substring(0, 8)
+        } : null,
+        allPlayerPositions: Object.keys(playerSprites).map(playerId => {
+          const sprite = playerSprites[playerId];
+          const anim = turnData.animations?.find(a => a.playerId === playerId);
+          const stepData = anim?.movement?.[stepIndex];
+          return {
+            playerId: playerId?.substring(0, 8),
+            x: sprite.x,
+            y: sprite.y,
+            action: stepData?.action,
+            location: stepData?.location
+          };
+        })
+      });
+    }
     
     // ✅ OLD CODE (commented out - replaced with unified passDetection.js):
     // const passHappeningAtThisStep = turnData.animations.some(
