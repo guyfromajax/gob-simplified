@@ -2223,18 +2223,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
     console.log('⏭️ [FCP/HCT] Skipping runSetupTween() - players already positioned at step 0 from BIP');
   }
 
-  // ✅ TEMPORARY: Force stop at step 20 for 3-2 Motion to debug ball teleportation bug
-  const is32Motion = turnData.offensive_playcall === "3-2 Motion" || 
-                     turnData.offensivePlaycall === "3-2 Motion" ||
-                     (turnData.animations && turnData.animations.length > 0 && 
-                      turnData.animations[0]?.movement && turnData.animations[0].movement.length > 16);
-  
   for (let stepIndex = 1; stepIndex < maxSteps; stepIndex++) {
-    // ✅ TEMPORARY: Force stop at step 20 for 3-2 Motion debugging
-    if (is32Motion && stepIndex === 20) {
-      console.log('🛑 [TEMP DEBUG] Stopping 3-2 Motion animation at step 20');
-      break;
-    }
     
     // ✅ REMOVED: Special FCP/HCT FastBreak check - FCP/HCT now routes through AnimationRouter (same as HCO)
     const willEarlyExit = scene.skipToEnd || scene.stateMachine?.is(States.FastBreak);
