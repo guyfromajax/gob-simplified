@@ -134,20 +134,36 @@ export async function handlePassAnimation({ scene, passInfo, playerSprites }) {
     // Map all player IDs to their positions for debugging
     const allPlayerMappings = Object.keys(playerSprites).map(playerId => {
       const sprite = playerSprites[playerId];
+      const playerInfo = scene.playerInfo?.[playerId];
       return {
         playerId: playerId?.substring(0, 8),
         fullPlayerId: playerId,
-        position: sprite.position || 'unknown',
+        position: playerInfo?.pos || sprite.position || 'unknown',
+        name: playerInfo?.name || 'unknown',
         x: sprite.x,
         y: sprite.y
       };
     });
     
+    // Get passer and receiver position info
+    const passerInfo = scene.playerInfo?.[passInfo.passerId];
+    const receiverInfo = scene.playerInfo?.[passInfo.receiverId];
+    
     console.log('🏀 [PASS ANIMATION] Calling runPass for step 16', {
       fromId: passInfo.passerId,
       toId: passInfo.receiverId,
-      passerPos: { x: passerSprite.x, y: passerSprite.y, position: passerSprite.position },
-      receiverPos: { x: receiverSprite.x, y: receiverSprite.y, position: receiverSprite.position },
+      passerPos: { 
+        x: passerSprite.x, 
+        y: passerSprite.y, 
+        position: passerInfo?.pos || passerSprite.position || 'unknown',
+        name: passerInfo?.name || 'unknown'
+      },
+      receiverPos: { 
+        x: receiverSprite.x, 
+        y: receiverSprite.y, 
+        position: receiverInfo?.pos || receiverSprite.position || 'unknown',
+        name: receiverInfo?.name || 'unknown'
+      },
       stepIndex: passInfo.stepIndex,
       allPlayerMappings: allPlayerMappings
     });
