@@ -5305,7 +5305,7 @@ Player headshots in the Playcall Center are assigned once when returning to `cou
 
 ---
 
-## Playbooks Page ✅ **UI COMPLETE** (January 2025)
+## Playbooks Page ✅ **IMPLEMENTED** (January 2025)
 
 ### Overview
 
@@ -5313,7 +5313,7 @@ The Playbooks page allows users to configure their team's offensive and defensiv
 
 **Location:** `FrontEnd/static/playbooks.html`  
 **Purpose:** Configure playcall percentages and priority assignments for offense and defense  
-**Status:** UI/UX complete, backend integration pending
+**Status:** ✅ Backend integration complete - loads plays from database
 
 ### Layout Structure
 
@@ -5331,10 +5331,10 @@ The Playbooks page allows users to configure their team's offensive and defensiv
 Each section contains multiple rows with numeric percentage inputs (0-100) and must total exactly 100%:
 
 **Offense Sections:**
-1. **Motion Offense** - 4 plays (4-1 Motion, 3-2 Motion, 5-0 Motion, Motion Option 4)
-2. **Set Play Inside Offense** - 2 plays (Base Post Play, Low Post Isolation)
-3. **Set Play Attack Offense** - 2 plays (Pick & Roll Lower Wing, Pick & Roll Top)
-4. **Set Play Outside Offense** - 2 plays (Double Screen For SG, Flare Screen)
+1. **Motion Offense** - 6 slots (loads from database, fills empty slots with "To Be Added")
+2. **Set Play Inside Offense** - 2 slots (loads from database, fills empty slots with "To Be Added")
+3. **Set Play Attack Offense** - 2 slots (loads from database, fills empty slots with "To Be Added")
+4. **Set Play Outside Offense** - 2 slots (loads from database, fills empty slots with "To Be Added")
 
 **Defense Sections:**
 5. **Man Defense** - 3 plays (Man Defense, Man Defense Variant 2, Man Defense Variant 3)
@@ -5369,11 +5369,49 @@ Each section contains multiple rows with numeric percentage inputs (0-100) and m
   - Persists settings (currently localStorage, API interface ready)
   - Shows success toast notification ("Saved")
 
+### Database Integration
+
+**API Endpoint:** `GET /api/playbooks`
+
+**Query Parameters:**
+- `mode` (required): `"single"`, `"tournament"`, or `"franchise"`
+- `team_id` (required): Team ID
+- `game_id` (conditional): Required if mode is `"single"`
+- `tournament_id` (conditional): Required if mode is `"tournament"`
+- `franchise_id` (conditional): Required if mode is `"franchise"`
+
+**Response:**
+```json
+{
+  "motion": [
+    { "name": "3-2 Motion", "play_id": "...", "play_type": "motion", "play_focus": "attack" },
+    ...
+  ],
+  "set_play_inside": [
+    { "name": "Base Post Play", "play_id": "...", "play_type": "set_play", "play_focus": "inside" },
+    ...
+  ],
+  "set_play_attack": [...],
+  "set_play_outside": [...]
+}
+```
+
+**Data Source:**
+- Plays are loaded from `teams.{team_id}.plays` in the appropriate mode document:
+  - **Single Game:** `games_collection` → `game_doc.teams.{team_id}.plays`
+  - **Tournament:** `tournaments_collection` → `tournament_doc.teams.{team_id}.plays`
+  - **Franchise:** `franchises_collection` → `franchise_doc.teams.{team_id}.plays`
+
+**Play Loading:**
+- Frontend loads plays from API on page initialization
+- Plays are filtered by `play_type` (motion vs set_play) and `play_focus` (inside/attack/outside)
+- Empty slots are filled with "To Be Added" placeholders (disabled for interaction)
+
 ### Persistence Layer
 
 **Current Implementation:**
 - **Primary:** localStorage (`gob_playbooks` key)
-- **API Interface:** Ready for backend integration (`/api/playbooks` endpoint stubbed)
+- **API Interface:** ✅ Implemented - loads plays from database via `/api/playbooks`
 
 **Persistence Interface (`PlaybooksPersistence` class):**
 - `load()` - Attempts API first, falls back to localStorage
@@ -5526,16 +5564,32 @@ Each section contains multiple rows with numeric percentage inputs (0-100) and m
 - `PlaybooksPersistence` - Load/save interface (localStorage + API ready)
 - `PlaybooksUI` - UI controller and rendering logic
 
-### Future Enhancements (Backend Integration)
+### Implementation Details
+
+**Backend Files:**
+- `BackEnd/api/gameplan_routes.py` - Contains `/api/playbooks` endpoint
+- `BackEnd/api/api.py` - Router registration
+
+**Frontend Files:**
+- `FrontEnd/static/playbooks.html` - Page structure
+- `FrontEnd/static/playbooks.css` - Styling
+- `FrontEnd/static/playbooks.js` - State management and API integration
+
+**Key Features:**
+- ✅ Loads plays dynamically from database based on game mode
+- ✅ Supports 6 motion offense slots (fills with "To Be Added" if needed)
+- ✅ Supports 2 slots per Set Play focus (fills with "To Be Added" if needed)
+- ✅ "To Be Added" placeholders are disabled (no percentage input, no slot assignment)
+- ✅ Mode-aware: Works with single game, tournament, and franchise modes
+
+### Future Enhancements
 
 **Pending:**
-- Wire persistence to user account system
+- Save playbook settings (percentages, slot assignments) to database
 - Integrate with game engine playcall selection logic
 - Connect percentage distributions to playcall probability calculations
 - Link priority slots to playcall selection order
-- Add API endpoints for save/load operations
-
-**Note:** Backend integration details will be added to this section once implementation begins.
+- Support custom plays (user-created plays per team)
 
 ---
 

@@ -18,6 +18,11 @@ def serve_game_plan_html():
     """Return the game plan page so query params work in production."""
     return FileResponse(STATIC_DIR / "game-plan.html")
 
+@router.get("/playbooks.html")
+def serve_playbooks_html():
+    """Return the playbooks page so query params work in production."""
+    return FileResponse(STATIC_DIR / "playbooks.html")
+
 class GamePlanSettings(BaseModel):
     playcall_settings: dict[str, int]
     strategy_settings: dict[str, int]
@@ -413,5 +418,104 @@ def update_gameplan(request: GamePlanUpdateRequest):
         raise
     except Exception as e:
         logger.error(f"Error updating game plan: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/api/playbooks")
+def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_id: str = None, game_id: str = None):
+    """
+    Get plays for a team from the appropriate mode document.
+    Returns plays organized by type (motion, set_play) and focus (inside, attack, outside).
+    """
+    try:
+        # Determine which collection to use
+        if mode == "franchise":
+            if not franchise_id:
+                raise HTTPException(status_code=400, detail="franchise_id required for franchise mode")
+            doc_id = franchise_id
+            collection = db.franchises
+        elif mode == "tournament":
+            if not tournament_id:
+                raise HTTPException(status_code=400, detail="tournament_id required for tournament mode")
+            doc_id = tournament_id
+            collection = db.tournaments
+        elif mode == "single":
+            if not game_id:
+                raise HTTPException(status_code=400, detail="game_id required for single game mode")
+            doc_id = game_id
+            collection = db.games
+        else:
+            raise HTTPException(status_code=400, detail=f"Invalid mode: {mode}")
+        
+        # Load the document
+        doc = collection.find_one({"_id": ObjectId(doc_id)})
+        if not doc:
+            raise HTTPException(status_code=404, detail=f"{mode.capitalize()} document not found")
+        
+        # Get team plays
+        if mode == "franchise":
+            team_obj = doc.get("franchise_teams", {}).get(team_id, {})
+        else:
+            team_obj = doc.get("teams", {}).get(team_id, {})
+        
+        plays = team_obj.get("plays", {})
+        
+        # Organize plays by type and focus
+        motion_plays = []
+        set_plays_inside = []
+        set_plays_attack = []
+        set_plays_outside = []
+        
+        for play_name, play_data in plays.items():
+            play_type = play_data.get("play_type", "")
+            play_focus = play_data.get("play_focus", "")
+            
+            if play_type == "motion":
+                motion_plays.append({
+                    "name": play_name,
+                    "play_id": play_data.get("play_id"),
+                    "play_type": play_type,
+                    "play_focus": play_focus
+                })
+            elif play_type == "set_play":
+                if play_focus == "inside":
+                    set_plays_inside.append({
+                        "name": play_name,
+                        "play_id": play_data.get("play_id"),
+                        "play_type": play_type,
+                        "play_focus": play_focus
+                    })
+                elif play_focus == "attack":
+                    set_plays_attack.append({
+                        "name": play_name,
+                        "play_id": play_data.get("play_id"),
+                        "play_type": play_type,
+                        "play_focus": play_focus
+                    })
+                elif play_focus == "outside":
+                    set_plays_outside.append({
+                        "name": play_name,
+                        "play_id": play_data.get("play_id"),
+                        "play_type": play_type,
+                        "play_focus": play_focus
+                    })
+        
+        # Sort plays by name for consistency
+        motion_plays.sort(key=lambda x: x["name"])
+        set_plays_inside.sort(key=lambda x: x["name"])
+        set_plays_attack.sort(key=lambda x: x["name"])
+        set_plays_outside.sort(key=lambda x: x["name"])
+        
+        return {
+            "motion": motion_plays,
+            "set_play_inside": set_plays_inside,
+            "set_play_attack": set_plays_attack,
+            "set_play_outside": set_plays_outside
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error loading playbooks: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
