@@ -353,6 +353,50 @@ export class AnimationEngine {
     const passSystem = this.passSystem || new PassSys(this.scene, null, null, context.playerSprites);
     await passSystem.executeInboundSequence(turnData, context);
     
+    // ✅ CRITICAL FIX: Explicitly wait for pass animation to fully complete
+    // This ensures BIP animation finishes before the next turn (HCT/FCP) starts
+    // Check passInFlight flag and wait for passEnd event if needed
+    if (this.scene.passInFlight) {
+      // Wait for passInFlight to be cleared (indicates pass animation is complete)
+      await new Promise((resolve) => {
+        // If already cleared, resolve immediately
+        if (!this.scene.passInFlight) {
+          resolve();
+          return;
+        }
+        
+        // Otherwise, wait for passEnd event or check periodically
+        const checkPassComplete = () => {
+          if (!this.scene.passInFlight) {
+            this.scene.events?.off('passEnd', onPassEnd);
+            clearInterval(intervalId);
+            resolve();
+          }
+        };
+        
+        const onPassEnd = () => {
+          // Give a small delay to ensure all pass cleanup is complete
+          setTimeout(() => {
+            checkPassComplete();
+          }, 50);
+        };
+        
+        // Listen for passEnd event
+        this.scene.events?.on('passEnd', onPassEnd);
+        
+        // Also poll periodically as a fallback (in case event doesn't fire)
+        const intervalId = setInterval(checkPassComplete, 50);
+        
+        // Safety timeout - resolve after 2 seconds max
+        setTimeout(() => {
+          this.scene.events?.off('passEnd', onPassEnd);
+          clearInterval(intervalId);
+          console.warn('⚠️ [BIP] Pass completion timeout - proceeding anyway');
+          resolve();
+        }, 2000);
+      });
+    }
+    
     // ✅ PHASE 2.6: Transition to HalfCourt state (moved from animateGameTurns.js)
     const { safeTransition } = await import('../state/gameStateMachine.js');
     const { States } = await import('../state/gameStateMachine.js');
