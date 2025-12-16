@@ -182,7 +182,13 @@ Every turn result from the backend contains data organized into **three distinct
 **Backend Responsibility:**
 - Sets `result["offense_team_id"] = game.offense_team.team_id` (team on offense DURING this turn)
 - Uses `possession_flips` as INTERNAL flag (tells backend when to call `switch_possession()`)
-- After turn completes, calls `game.switch_possession()` if `possession_flips=True`
+- **Possession Flip Locations:**
+  - **SIP Transitions:** `game_manager.py` `simulate_macro_turn()` flips BEFORE `setup_side_inbound()` (line ~300)
+    - Handles offensive fouls and dead ball turnovers
+    - Checks `result.get("possession_flips")` and flips if True
+    - Clears flag after flipping to prevent frontend double flip
+  - **Other Transitions:** Various handlers flip possession as needed (OREB, made shots, etc.)
+- After turn completes, calls `game.switch_possession()` if `possession_flips=True` (location depends on transition type)
 - Next turn automatically has correct `game.offense_team` (updated state)
 
 **Frontend Responsibility:**
@@ -831,6 +837,9 @@ The stopper system uses SS&S helper functions to populate player roles, ensuring
 **Possession Flips:**
 - Handled by shared functions (`resolve_non_shooting_foul()`, `resolve_turnover_logic()`)
 - `resolve_non_shooting_foul()` sets `possession_flips: True` for offensive fouls, `False` for defensive fouls
+  - **✅ FIX (January 2025):** Does NOT flip possession itself - sets flag only
+  - The actual flip happens in `game_manager.py` `simulate_macro_turn()` before `setup_side_inbound()`
+  - This prevents double-flipping and ensures consistent behavior (same pattern as dead ball turnovers)
 - `resolve_turnover_logic()` sets `possession_flips: True` for all turnovers
 
 **Transition Handling:**
@@ -838,6 +847,9 @@ The stopper system uses SS&S helper functions to populate player roles, ensuring
 - For steals with Fast Break: Sets `next_play_type = "FAST_BREAK"` to trigger possession flip in `game_manager.py`
 - For steals with HCO: Sets `next_play_type = "HCO"` for direct HCO transition
 - For dead ball turnovers: Routes to Side Inbound Pass (SIP) → HCO
+- **SIP Setup Possession Flip:** `game_manager.py` checks `result.get("possession_flips")` and flips possession BEFORE creating the SIP turn payload (line ~300)
+  - This ensures the correct team is on offense for the inbound pass
+  - Clears `possession_flips` flag after flipping to prevent frontend double flip
 
 ### Stat Tracking
 
@@ -3902,10 +3914,12 @@ The system handles different transition types based on game state. All navigatio
 - **Used By:** `turn_manager.py` `setup_timeout_turn()` to determine `next_play_type` for foul-out timeouts
 
 **Possession Flip Logic:**
-- **Offensive Fouls:** Possession flips **immediately** during foul resolution (before timeout creation)
-  - Location: `phase_resolution.py` `resolve_non_shooting_foul()` (line ~384)
-  - Ensures `game.offense_team` is correct BEFORE timeout is created
-  - Next step: SIDE_INBOUND (with new offense team)
+- **Offensive Fouls:** Possession flips during SIP setup (not during foul resolution)
+  - Location: `phase_resolution.py` `resolve_non_shooting_foul()` sets `possession_flips: True` (line ~384)
+  - **✅ FIX (January 2025):** Does NOT call `game.switch_possession()` in `resolve_non_shooting_foul()`
+  - Actual flip happens in `game_manager.py` `simulate_macro_turn()` before `setup_side_inbound()` (line ~300)
+  - This prevents double-flipping and ensures consistent behavior (same pattern as dead ball turnovers)
+  - Next step: SIDE_INBOUND (with new offense team after flip)
 - **Defensive Fouls:** No possession flip
   - If Shooting Foul: Next step: FREE_THROW (the shooting player shoots)
   - If Non-Shooting Foul:
