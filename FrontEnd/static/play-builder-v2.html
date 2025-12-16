@@ -896,21 +896,27 @@
       <!-- Variant Tabs -->
       <div id="variant-tabs-container" class="variant-tabs-container">
         <div class="variant-tabs">
-          <div class="variant-tab active" data-variant="successful" onclick="switchVariant('successful')">
+          <!-- Set Play variants -->
+          <div class="variant-tab active" data-variant="successful" data-play-type="set_play" onclick="switchVariant('successful')">
             <span class="status-indicator complete"></span>
             Successful
           </div>
-          <div class="variant-tab" data-variant="mid_play_change" onclick="switchVariant('mid_play_change')">
+          <div class="variant-tab" data-variant="mid_play_change" data-play-type="set_play" onclick="switchVariant('mid_play_change')">
             <span class="status-indicator not-started"></span>
             Mid-Play Change
           </div>
-          <div class="variant-tab" data-variant="contested" onclick="switchVariant('contested')">
+          <div class="variant-tab" data-variant="contested" data-play-type="set_play" onclick="switchVariant('contested')">
             <span class="status-indicator not-started"></span>
             Contested
           </div>
-          <div class="variant-tab" data-variant="broken" onclick="switchVariant('broken')">
+          <div class="variant-tab" data-variant="broken" data-play-type="set_play" onclick="switchVariant('broken')">
             <span class="status-indicator not-started"></span>
             Broken
+          </div>
+          <!-- Motion variant -->
+          <div class="variant-tab active" data-variant="base_loop" data-play-type="motion" onclick="switchVariant('base_loop')" style="display: none;">
+            <span class="status-indicator complete"></span>
+            Base Loop
           </div>
         </div>
 
@@ -963,7 +969,14 @@
 
       <!-- Step 1 Custom & Step 2+: Build Buttons -->
       <div id="build-buttons" class="step2-controls-row hidden">
-        <button id="action-btn" disabled>Add Step</button>
+        <div class="control-column">
+          <button id="action-btn" disabled>Add Step</button>
+          <!-- Motion Play: Mark Final Step Checkbox -->
+          <label id="final-step-checkbox-label" style="display: none; font-size: 0.85rem; color: #FFD700; margin-top: 10px; cursor: pointer;">
+            <input type="checkbox" id="final-step-checkbox" style="margin-right: 5px; cursor: pointer;">
+            Mark as Final Step (Loop End)
+          </label>
+        </div>
         <button id="complete-variant-btn" onclick="finishVariantAndSave()">✅ Finish Variant & Save</button>
       </div>
 
@@ -1175,7 +1188,14 @@
       focus: "",
       playId: null, // For editing existing plays
       variants: {
+        // For Motion: base_loop (or successful renamed)
+        // For Set Play: successful, mid_play_change, contested, broken
         successful: {
+          steps: [],
+          complete: false,
+          currentStep: 1
+        },
+        base_loop: { // Motion plays use this
           steps: [],
           complete: false,
           currentStep: 1
@@ -1222,7 +1242,7 @@
     // Helper to get current variant data
     function getCurrentVariantData() {
       const variant = playState.variants[currentVariant];
-      if (currentVariant === 'successful') {
+      if (currentVariant === 'successful' || currentVariant === 'base_loop') {
         return variant;
       } else {
         // For multi-version variants, return the current version
@@ -1318,54 +1338,68 @@
       playState.focus = playData.play_focus ? playData.play_focus.charAt(0).toUpperCase() + playData.play_focus.slice(1) : '';
       playState.playId = playData._id;
       
-      // Load all variants
+      // Load variants based on play type
       const skeletons = playData.skeletons || {};
-      ['successful', 'mid_play_change', 'contested', 'broken'].forEach(variant => {
-        if (skeletons[variant]) {
-          if (variant === 'successful') {
-            // Successful variant: simple structure
-            playState.variants[variant] = {
-              steps: skeletons[variant].steps || [],
-              complete: skeletons[variant].complete || false,
-              currentStep: (skeletons[variant].steps || []).length + 1
-            };
-          } else {
-            // Other variants: version structure
-            const versions = skeletons[variant].versions || [];
-            
-            // Convert versions array to object format
-            const versionsObj = {};
-            if (versions.length > 0) {
-              // Has version array structure (new format)
-              versions.forEach(v => {
-                versionsObj[v.version] = {
-                  steps: v.steps || []
-                };
-              });
-            } else if (skeletons[variant].steps) {
-              // Old format: single steps array - migrate to v1
-              versionsObj.v1 = { steps: skeletons[variant].steps };
-              // Create empty v2-v6
-              for (let i = 2; i <= 6; i++) {
-                versionsObj[`v${i}`] = { steps: [] };
-              }
-            } else {
-              // No data - create empty versions
-              for (let i = 1; i <= 6; i++) {
-                versionsObj[`v${i}`] = { steps: [] };
-              }
-            }
-            
-            playState.variants[variant] = {
-              currentVersion: 'v1',
-              versions: versionsObj
-            };
-          }
-        }
-      });
       
-      // Start editing
-      currentVariant = 'successful';
+      if (playState.type === 'Motion') {
+        // Motion: load base_loop (or successful if that's what's stored)
+        const motionSkeleton = skeletons.base_loop || skeletons.successful || {};
+        playState.variants.base_loop = {
+          steps: motionSkeleton.steps || [],
+          complete: motionSkeleton.complete || false,
+          currentStep: (motionSkeleton.steps || []).length + 1
+        };
+        currentVariant = 'base_loop';
+      } else {
+        // Set Play: load all variants
+        ['successful', 'mid_play_change', 'contested', 'broken'].forEach(variant => {
+          if (skeletons[variant]) {
+            if (variant === 'successful') {
+              // Successful variant: simple structure
+              playState.variants[variant] = {
+                steps: skeletons[variant].steps || [],
+                complete: skeletons[variant].complete || false,
+                currentStep: (skeletons[variant].steps || []).length + 1
+              };
+            } else {
+              // Other variants: version structure
+              const versions = skeletons[variant].versions || [];
+              
+              // Convert versions array to object format
+              const versionsObj = {};
+              if (versions.length > 0) {
+                // Has version array structure (new format)
+                versions.forEach(v => {
+                  versionsObj[v.version] = {
+                    steps: v.steps || []
+                  };
+                });
+              } else if (skeletons[variant].steps) {
+                // Old format: single steps array - migrate to v1
+                versionsObj.v1 = { steps: skeletons[variant].steps };
+                // Create empty v2-v6
+                for (let i = 2; i <= 6; i++) {
+                  versionsObj[`v${i}`] = { steps: [] };
+                }
+              } else {
+                // No data - create empty versions
+                for (let i = 1; i <= 6; i++) {
+                  versionsObj[`v${i}`] = { steps: [] };
+                }
+              }
+              
+              playState.variants[variant] = {
+                currentVersion: 'v1',
+                versions: versionsObj
+              };
+            }
+          }
+        });
+        currentVariant = 'successful';
+      }
+      
+      // Update variant tabs visibility
+      updateVariantTabsVisibility();
       
       // Hide load section, show step 2
       document.getElementById('load-play-section').classList.add('hidden');
@@ -1389,7 +1423,9 @@
       // Update variant tabs
       updateVariantTabs();
       updateVariantInfo();
-      updateVersionDropdown(); // Update dropdown with version info after loading
+      if (playState.type === 'Set Play') {
+        updateVersionDropdown(); // Update dropdown with version info after loading (Set Play only)
+      }
       
       // Show animation preview section
       const animSection = document.getElementById('animation-preview-section');
@@ -1424,18 +1460,20 @@
       const versionSelector = document.getElementById('version-selector');
       const versionSelect = document.getElementById('version-select');
       
-      if (variant === 'successful') {
-        // Hide version selector for successful
-        versionSelector.style.display = 'none';
+      if (variant === 'successful' || variant === 'base_loop' || playState.type === 'Motion') {
+        // Hide version selector for successful, base_loop, and all Motion plays
+        if (versionSelector) versionSelector.style.display = 'none';
       } else {
-        // Show version selector for other variants
-        versionSelector.style.display = 'block';
+        // Show version selector for other variants (Set Play only)
+        if (versionSelector) versionSelector.style.display = 'block';
         
         // Set to current version for this variant
         const variantData = playState.variants[variant];
-        versionSelect.value = variantData.currentVersion;
-        updateVersionDropdown(); // Update dropdown with version info
-        updateVersionInfo();
+        if (versionSelect && variantData) {
+          versionSelect.value = variantData.currentVersion;
+          updateVersionDropdown(); // Update dropdown with version info
+          updateVersionInfo();
+        }
       }
       
       // Load new variant with reset to Step 1
@@ -1482,7 +1520,7 @@
       if (!versionSelect) return;
 
       // Only update if we're on a variant that has versions
-      if (currentVariant === 'successful') return;
+      if (currentVariant === 'successful' || currentVariant === 'base_loop' || playState.type === 'Motion') return;
 
       const variantData = playState.variants[currentVariant];
       if (!variantData || !variantData.versions) return;
@@ -1629,6 +1667,9 @@
       renderPositionDashboard();
       renderCourtVisualization();
       validateActionButton();
+      
+      // Update final step checkbox visibility
+      updateFinalStepCheckboxVisibility();
     }
 
     function cloneFromSuccessful() {
@@ -1691,49 +1732,74 @@
     }
 
     function updateVariantTabs() {
-      ['successful', 'mid_play_change', 'contested', 'broken'].forEach(variant => {
-        const tab = document.querySelector(`.variant-tab[data-variant="${variant}"]`);
-        const indicator = tab.querySelector('.status-indicator');
-        const variantData = playState.variants[variant];
-        
-        // Update status indicator
-        indicator.className = 'status-indicator';
-        if (variantData.complete) {
-          indicator.classList.add('complete');
-        } else if (variantData.steps.length > 0) {
-          indicator.classList.add('in-progress');
-        } else {
-          indicator.classList.add('not-started');
+      // Update tabs based on play type
+      if (playState.type === 'Motion') {
+        // Motion: update base_loop tab
+        const tab = document.querySelector(`.variant-tab[data-variant="base_loop"]`);
+        if (tab) {
+          const indicator = tab.querySelector('.status-indicator');
+          const variantData = playState.variants.base_loop;
+          
+          indicator.className = 'status-indicator';
+          if (variantData.complete) {
+            indicator.classList.add('complete');
+          } else if (variantData.steps.length > 0) {
+            indicator.classList.add('in-progress');
+          } else {
+            indicator.classList.add('not-started');
+          }
         }
-      });
+      } else {
+        // Set Play: update all variant tabs
+        ['successful', 'mid_play_change', 'contested', 'broken'].forEach(variant => {
+          const tab = document.querySelector(`.variant-tab[data-variant="${variant}"]`);
+          if (tab) {
+            const indicator = tab.querySelector('.status-indicator');
+            const variantData = playState.variants[variant];
+            
+            // Update status indicator
+            indicator.className = 'status-indicator';
+            if (variantData && variantData.complete) {
+              indicator.classList.add('complete');
+            } else if (variantData && variantData.steps && variantData.steps.length > 0) {
+              indicator.classList.add('in-progress');
+            } else {
+              indicator.classList.add('not-started');
+            }
+          }
+        });
+      }
     }
 
     function updateVariantInfo() {
       const variantData = getCurrentVariantData();
       const variantNames = {
         successful: 'Successful',
+        base_loop: 'Base Loop',
         mid_play_change: 'Mid-Play Change',
         contested: 'Contested',
         broken: 'Broken'
       };
       
-      document.getElementById('current-variant-name').textContent = variantNames[currentVariant];
-      document.getElementById('current-variant-steps').textContent = variantData.steps.length;
+      document.getElementById('current-variant-name').textContent = variantNames[currentVariant] || currentVariant;
+      document.getElementById('current-variant-steps').textContent = variantData.steps ? variantData.steps.length : 0;
       
       let statusText = variantData.complete ? 'Complete' : 
-                       variantData.steps.length > 0 ? 'In Progress' : 'Not Started';
+                       (variantData.steps && variantData.steps.length > 0) ? 'In Progress' : 'Not Started';
       document.getElementById('current-variant-status').textContent = statusText;
       
       // Update completion button
       const completionBtn = document.getElementById('completion-btn');
-      if (variantData.complete) {
-        completionBtn.textContent = '↩️ Mark as Incomplete';
-        completionBtn.classList.remove('btn-success');
-        completionBtn.classList.add('btn-secondary');
-      } else {
-        completionBtn.textContent = '✓ Mark as Complete';
-        completionBtn.classList.remove('btn-secondary');
-        completionBtn.classList.add('btn-success');
+      if (completionBtn) {
+        if (variantData.complete) {
+          completionBtn.textContent = '↩️ Mark as Incomplete';
+          completionBtn.classList.remove('btn-success');
+          completionBtn.classList.add('btn-secondary');
+        } else {
+          completionBtn.textContent = '✓ Mark as Complete';
+          completionBtn.classList.remove('btn-secondary');
+          completionBtn.classList.add('btn-success');
+        }
       }
     }
 
@@ -1799,15 +1865,76 @@
         errors.push(`❌ ${receivers[0]} is receiving but no one is passing!`);
       }
       
-      // Rule 4: Final step must have shoot
-      if (isFinalStep && shooters.length === 0) {
-        errors.push("❌ Final step must have a 'shoot' action!");
+      // Rule 4 & 5: Final step shooter validation (ONLY for Set Plays)
+      // Motion plays: shoot can happen at any step, no final step requirement
+      if (playState.type === 'Set Play') {
+        if (isFinalStep && shooters.length === 0) {
+          errors.push("❌ Final step must have a 'shoot' action!");
+        }
+        
+        if (!isFinalStep && shooters.length > 0) {
+          errors.push(`❌ ${shooters[0]} has 'shoot' action but this is not the final step! Shoot only allowed in final step.`);
+        }
+      }
+      // For Motion: shoot can happen at any step, no restrictions
+      
+      return {
+        valid: errors.length === 0,
+        errors: errors
+      };
+    }
+
+    function validateLoopStructure(variantData) {
+      /**
+       * Validate that Motion play loop structure is cohesive.
+       * Final step should match first step (or have loop_back_to marker).
+       * 
+       * Returns:
+       *   {valid: boolean, errors: string[]}
+       */
+      const errors = [];
+      
+      if (!variantData || !variantData.steps || variantData.steps.length === 0) {
+        errors.push("❌ Loop must have at least one step!");
+        return { valid: false, errors };
       }
       
-      // Rule 5: Shoot can only be in final step
-      if (!isFinalStep && shooters.length > 0) {
-        errors.push(`❌ ${shooters[0]} has 'shoot' action but this is not the final step! Shoot only allowed in final step.`);
+      if (variantData.steps.length < 2) {
+        errors.push("⚠️ Loop should have at least 2 steps for a cohesive cycle. Continue anyway?");
+        // Allow single-step loops but warn
       }
+      
+      // Check if a final step is marked
+      const finalStepIndex = variantData.steps.findIndex(step => step.is_final_step === true);
+      if (finalStepIndex === -1) {
+        // No final step marked - use last step as default
+        errors.push("⚠️ No step marked as final step. The last step will be used as the loop end.");
+      } else {
+        // Final step is marked - validate it makes sense
+        const finalStep = variantData.steps[finalStepIndex];
+        const firstStep = variantData.steps[0];
+        
+        // Check if positions match between first and final step (for cohesive loop)
+        const firstPositions = Object.keys(firstStep.pos_actions || {});
+        const finalPositions = Object.keys(finalStep.pos_actions || {});
+        
+        // Check if all positions are present in both steps
+        const allPositions = new Set([...firstPositions, ...finalPositions]);
+        for (const pos of allPositions) {
+          if (!firstStep.pos_actions[pos] || !finalStep.pos_actions[pos]) {
+            errors.push(`⚠️ Position ${pos} is missing in first or final step. Loop may not be cohesive.`);
+          }
+        }
+      }
+      
+      // Note: We don't require exact match, but warn if very different
+      // The engine will handle looping back to step 0
+      
+      return {
+        valid: errors.length === 0 || errors.every(e => e.startsWith('⚠️')), // Allow warnings
+        errors: errors
+      };
+    }
       
       // Multiple shooters check
       if (shooters.length > 1) {
@@ -2206,14 +2333,32 @@
           return;
         }
         
-        // Check that last existing step has shoot
-        const lastStep = variantData.steps[variantData.steps.length - 1];
-        const lastStepActions = lastStep.pos_actions || {};
-        const hasShoot = Object.values(lastStepActions).some(action => action.action === "shoot");
-        
-        if (!hasShoot) {
-          alert("Cannot finish variant - final step must have a 'shoot' action!");
-          return;
+        // For Set Plays: Check that last existing step has shoot
+        // For Motion: Validate loop structure instead
+        if (playState.type === 'Set Play') {
+          const lastStep = variantData.steps[variantData.steps.length - 1];
+          const lastStepActions = lastStep.pos_actions || {};
+          const hasShoot = Object.values(lastStepActions).some(action => action.action === "shoot");
+          
+          if (!hasShoot) {
+            alert("Cannot finish variant - final step must have a 'shoot' action!");
+            return;
+          }
+        } else if (playState.type === 'Motion') {
+          // Validate loop structure for Motion
+          const loopValidation = validateLoopStructure(variantData);
+          if (!loopValidation.valid) {
+            alert("Cannot finish loop - please fix these issues:\n\n" + loopValidation.errors.join('\n'));
+            return;
+          }
+          
+          // Check if a final step is marked
+          const hasFinalStep = variantData.steps.some(step => step.is_final_step === true);
+          if (!hasFinalStep) {
+            if (!confirm("No step is marked as the final step. The loop will end at the last step added. Continue anyway?")) {
+              return;
+            }
+          }
         }
       }
       
@@ -3314,16 +3459,29 @@
       playState.focus = document.getElementById('play-focus').value;
       playState.playId = null;
       
-      // Initialize all variants
-      ['successful', 'mid_play_change', 'contested', 'broken'].forEach(variant => {
-        playState.variants[variant] = {
+      // Initialize variants based on play type
+      if (playState.type === 'Motion') {
+        // Motion: only base_loop
+        playState.variants.base_loop = {
           steps: [],
           complete: false,
           currentStep: 1
         };
-      });
+        currentVariant = 'base_loop';
+      } else {
+        // Set Play: all variants
+        ['successful', 'mid_play_change', 'contested', 'broken'].forEach(variant => {
+          playState.variants[variant] = {
+            steps: [],
+            complete: false,
+            currentStep: 1
+          };
+        });
+        currentVariant = 'successful';
+      }
       
-      currentVariant = 'successful';
+      // Update variant tabs visibility
+      updateVariantTabsVisibility();
 
       // Update page title
       const pageTitle = document.getElementById('page-title');
@@ -3375,6 +3533,9 @@
       // Initialize dashboard and court
       renderPositionDashboard();
       renderCourtVisualization();
+      
+      // Update final step checkbox visibility
+      updateFinalStepCheckboxVisibility();
     }
 
 
@@ -3388,7 +3549,7 @@
         return;
       }
       
-      // Check if any player has shoot action (final step)
+      // Check if any player has shoot action (final step for Set Play only)
       // NOTE: "drive" is NOT a turn-ender - only "shoot" is
       let hasShoot = false;
       for (const pos of POSITIONS) {
@@ -3409,8 +3570,10 @@
         }
       }
 
-      if (hasShoot) {
-        // Shot assigned - this is the final step
+      // For Set Play: shoot = final step
+      // For Motion: shoot can be at any step, no special handling
+      if (playState.type === 'Set Play' && hasShoot) {
+        // Shot assigned - this is the final step (Set Play only)
         actionBtn.disabled = true;
         actionBtn.textContent = 'Shot = Final Step';
         completeVariantBtn.disabled = false;
@@ -3551,10 +3714,58 @@
       renderPositionDashboard();
       renderCourtVisualization();
       validateActionButton();
+      
+      // Update final step checkbox visibility
+      updateFinalStepCheckboxVisibility();
       updateStepCounter();
       updateVariantInfo(); // Update variant step count
       updateVariantTabs(); // Update status if needed
       updateAnimationVariantDropdown(); // Update animation dropdown with new step count
+      
+      // Update final step checkbox visibility for Motion plays
+      updateFinalStepCheckboxVisibility();
+    }
+    
+    function updateFinalStepCheckboxVisibility() {
+      /**
+       * Show/hide the "Mark as Final Step" checkbox based on play type.
+       * Only show for Motion plays when building new steps (not reviewing).
+       */
+      const checkboxLabel = document.getElementById('final-step-checkbox-label');
+      const checkbox = document.getElementById('final-step-checkbox');
+      
+      if (!checkboxLabel || !checkbox) return;
+      
+      const variantData = getCurrentVariantData();
+      const isBuildingNewStep = variantData.currentStep > variantData.steps.length;
+      
+      if (playState.type === 'Motion' && isBuildingNewStep) {
+        checkboxLabel.style.display = 'block';
+      } else {
+        checkboxLabel.style.display = 'none';
+        checkbox.checked = false; // Reset when hidden
+      }
+    }
+    
+    function updateFinalStepCheckboxVisibility() {
+      /**
+       * Show/hide the "Mark as Final Step" checkbox based on play type.
+       * Only show for Motion plays when building new steps (not reviewing).
+       */
+      const checkboxLabel = document.getElementById('final-step-checkbox-label');
+      const checkbox = document.getElementById('final-step-checkbox');
+      
+      if (!checkboxLabel || !checkbox) return;
+      
+      const variantData = getCurrentVariantData();
+      const isBuildingNewStep = variantData.currentStep > variantData.steps.length;
+      
+      if (playState.type === 'Motion' && isBuildingNewStep) {
+        checkboxLabel.style.display = 'block';
+      } else {
+        checkboxLabel.style.display = 'none';
+        checkbox.checked = false; // Reset when hidden
+      }
     }
 
     function prePopulateStep(previousOffsets = {}) {
@@ -3710,20 +3921,29 @@
     }
 
     async function savePlayToDatabase() {
-      // Build play data with all variants
+      // Build play data with variants based on play type
       const playData = {
         name: playState.name,
         play_type: playState.type.toLowerCase().replace(' ', '_'),
-        play_focus: playState.focus ? playState.focus.toLowerCase() : 'balanced',
-        skeletons: {
-          successful: {
-            steps: playState.variants.successful.steps,
-            complete: playState.variants.successful.complete
-          },
-          mid_play_change: buildVariantVersions('mid_play_change'),
-          contested: buildVariantVersions('contested'),
-          broken: buildVariantVersions('broken')
-        },
+        play_focus: playState.focus ? playState.focus.toLowerCase() : (playState.type === 'Motion' ? null : 'balanced'),
+        skeletons: playState.type === 'Motion' 
+          ? {
+              // Motion: only base_loop
+              base_loop: {
+                steps: playState.variants.base_loop.steps,
+                complete: playState.variants.base_loop.complete
+              }
+            }
+          : {
+              // Set Play: all variants
+              successful: {
+                steps: playState.variants.successful.steps,
+                complete: playState.variants.successful.complete
+              },
+              mid_play_change: buildVariantVersions('mid_play_change'),
+              contested: buildVariantVersions('contested'),
+              broken: buildVariantVersions('broken')
+            },
         game_stats: {
           times_run: 0,
           shot_attempts: 0,
