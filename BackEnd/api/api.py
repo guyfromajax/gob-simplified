@@ -1645,12 +1645,22 @@ def simulate_turn_endpoint(request: TurnSimulationRequest):
         # (simulate_macro_turn can create multiple turns for OREBs, side inbounds, etc.)
         new_turns = gm.turns[turns_before:] if len(gm.turns) > turns_before else []
         
+        # ✅ DIAGNOSTIC: Log what turns were created
+        logging.warning(f"🔍 [API DIAGNOSTIC] turns_before: {turns_before}, total_turns_now: {len(gm.turns)}, new_turns_count: {len(new_turns)}")
+        if new_turns:
+            logging.warning(f"🔍 [API DIAGNOSTIC] New turns result_types: {[t.get('result_type') if isinstance(t, dict) else str(t)[:20] for t in new_turns]}")
+            for i, turn in enumerate(new_turns):
+                if isinstance(turn, dict):
+                    logging.warning(f"🔍 [API DIAGNOSTIC] Turn {i}: result_type={turn.get('result_type')}, next_play_type={turn.get('next_play_type')}, next_defensive_setup={turn.get('next_defensive_setup')}")
+        
         if not new_turns:
             # No turns were created (shouldn't happen, but handle gracefully)
             latest_turn = None
+            logging.warning(f"⚠️ [API DIAGNOSTIC] No new turns created!")
         elif len(new_turns) == 1:
             # Normal case: one turn created
             latest_turn = new_turns[0]
+            logging.warning(f"🔍 [API DIAGNOSTIC] Returning single turn: {latest_turn.get('result_type') if isinstance(latest_turn, dict) else 'non-dict'}")
         else:
             # Multiple turns created (e.g., HCO miss → OREB turn)
             # Return them as a batch for the frontend to animate sequentially
@@ -1659,6 +1669,8 @@ def simulate_turn_endpoint(request: TurnSimulationRequest):
                 "batch_turns": new_turns,
                 "text": " → ".join(t.get("text", "") for t in new_turns)
             }
+            logging.warning(f"🔍 [API DIAGNOSTIC] Returning BATCH with {len(new_turns)} turns")
+            logging.warning(f"🔍 [API DIAGNOSTIC] BATCH turn result_types: {[t.get('result_type') if isinstance(t, dict) else str(t)[:20] for t in new_turns]}")
         
         # Check if quarter is now complete
         quarter_complete = gm.game_state["time_remaining"] <= 0
