@@ -4328,13 +4328,22 @@ Player images in the Playcall Center are assigned once when returning to `court.
 1. **Read Lineup from URL Params:** Lineup data is preserved by `TimeoutNavigationHelper` in URL params (`home_pg`, `home_sg`, etc. or `away_pg`, `away_sg`, etc.)
 2. **Get User Team Side:** From `my_team` URL param ("home" or "away")
 3. **Fetch Play Documents:** For each of the 6 offense plays, fetches play document from `/api/play/{play_name}`
-4. **Extract Intended Shooter from Skeleton:**
+4. **Determine Play Type:**
+   - Checks `play.play_type` to determine if it's a Motion play or Set Play
+   - Uses different logic based on play type
+5. **Set Plays - Extract Intended Shooter from Skeleton:**
    - Gets successful skeleton from `play.skeletons.successful`
    - Extracts intended shooter position from final step's `pos_actions` where `action == "shoot"`
    - Uses same logic as backend `phase_resolution.py` (lines 1011-1017)
-5. **Map Position to Player ID:** Maps intended shooter position to player ID from user's lineup
-6. **Set Image Once:** Image path is `/static/images/players/{playerId}.png`
-7. **Images Remain Static:** No mid-game changes during gameplay
+6. **Motion Plays - Analyze Steps 1-10 for Most Likely Shooter:**
+   - Gets `base_loop` skeleton from `play.skeletons.base_loop`
+   - Analyzes steps 1-10 (excluding step 0) to count shot opportunities for each player
+   - **Inside Shots:** Player with most opportunities (handles ball at inside spot OR receives pass at inside spot)
+   - **Outside/Attack Shots:** Player who handles ball at outside shot spot the most
+   - If tie, chooses randomly
+7. **Map Position to Player ID:** Maps shooter position to player ID from user's lineup
+8. **Set Image Once:** Image path is `/static/images/players/{playerId}.png`
+9. **Images Remain Static:** No mid-game changes during gameplay
 
 **Why This Is SS&S:**
 - **Single Point of Assignment:** Images set once at timeout navigation return
