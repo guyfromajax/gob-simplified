@@ -958,9 +958,33 @@ class PlaybooksUI {
     const from = urlParams.get('from');
     const mode = urlParams.get('mode') || 'single';
     
+    console.log('🔍 [PLAYBOOKS BACK] Navigation params:', {
+      from,
+      mode,
+      franchise_id: urlParams.get('franchise_id'),
+      tournament_id: urlParams.get('tournament_id'),
+      team_id: urlParams.get('team_id'),
+      allParams: Object.fromEntries(urlParams.entries())
+    });
+    
     // Determine where to navigate back based on 'from' parameter
     if (from === 'tournament-command-center') {
       // Navigate back to Tournament Command Center
+      console.log('✅ [PLAYBOOKS BACK] Navigating to Tournament Command Center');
+      const tournamentId = urlParams.get('tournament_id');
+      const userTeamId = urlParams.get('team_id') || urlParams.get('user_team_id');
+      
+      const params = new URLSearchParams();
+      if (tournamentId) params.set('tournament_id', tournamentId);
+      if (userTeamId) params.set('user_team_id', userTeamId);
+      
+      window.location.href = `/static/tournament.html?${params.toString()}`;
+      return;
+    }
+    
+    // Fallback: If mode is tournament but no 'from' parameter, assume tournament-command-center
+    if (mode === 'tournament' && !from) {
+      console.log('⚠️ [PLAYBOOKS BACK] No "from" parameter, but mode is tournament - assuming tournament-command-center');
       const tournamentId = urlParams.get('tournament_id');
       const userTeamId = urlParams.get('team_id') || urlParams.get('user_team_id');
       
@@ -977,6 +1001,22 @@ class PlaybooksUI {
       const franchiseId = urlParams.get('franchise_id');
       const userTeamName = urlParams.get('team_id') || urlParams.get('user_team_id');
       
+      console.log('✅ [PLAYBOOKS BACK] Navigating to Franchise Command Center');
+      
+      const params = new URLSearchParams();
+      if (franchiseId) params.set('franchise_id', franchiseId);
+      if (userTeamName) params.set('user_team_name', userTeamName);
+      
+      window.location.href = `/static/franchise-command-center.html?${params.toString()}`;
+      return;
+    }
+    
+    // Fallback: If mode is franchise but no 'from' parameter, assume franchise-command-center
+    if (mode === 'franchise' && !from) {
+      console.log('⚠️ [PLAYBOOKS BACK] No "from" parameter, but mode is franchise - assuming franchise-command-center');
+      const franchiseId = urlParams.get('franchise_id');
+      const userTeamName = urlParams.get('team_id') || urlParams.get('user_team_id');
+      
       const params = new URLSearchParams();
       if (franchiseId) params.set('franchise_id', franchiseId);
       if (userTeamName) params.set('user_team_name', userTeamName);
@@ -986,6 +1026,7 @@ class PlaybooksUI {
     }
     
     // Default: go back to game-plan (from === 'game-plan' or no 'from' parameter)
+    console.log('✅ [PLAYBOOKS BACK] Navigating to Game Plan (default)');
     const gameId = urlParams.get('game_id');
     const teamId = urlParams.get('team_id') || urlParams.get('user_team_id');
     const homeId = urlParams.get('home_id');
