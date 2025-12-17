@@ -448,9 +448,23 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
             raise HTTPException(status_code=400, detail=f"Invalid mode: {mode}")
         
         # Load the document
-        doc = collection.find_one({"_id": ObjectId(doc_id)})
+        # For single game mode, game_id is a UUID string, not ObjectId
+        if mode == "single":
+            doc = collection.find_one({"_id": doc_id})
+        else:
+            doc = collection.find_one({"_id": ObjectId(doc_id)})
+        
         if not doc:
             raise HTTPException(status_code=404, detail=f"{mode.capitalize()} document not found")
+        
+        # Ensure team objects exist first (this will create them if missing)
+        ensure_team_objects_exist(mode, doc_id, team_id)
+        
+        # Reload document to get updated team objects
+        if mode == "single":
+            doc = collection.find_one({"_id": doc_id})
+        else:
+            doc = collection.find_one({"_id": ObjectId(doc_id)})
         
         # Get team plays
         # ✅ Handle team name resolution (team_id might be a name, need to find actual team_id)
@@ -458,11 +472,15 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
             team_obj = doc.get("franchise_teams", {}).get(team_id, {})
         else:
             teams = doc.get("teams", {})
+            logger.info(f"🔍 [PLAYBOOKS] Looking for team_id='{team_id}' in document with {len(teams)} teams")
+            logger.info(f"🔍 [PLAYBOOKS] Available team keys: {list(teams.keys())[:5]}...")  # Log first 5 keys
+            
             # For tournament/single mode, try to resolve team name to team_id
             actual_team_id = None
             # First try direct lookup
             if team_id in teams:
                 actual_team_id = team_id
+                logger.info(f"✅ [PLAYBOOKS] Found team_id directly: {actual_team_id}")
             else:
                 # Try to find by team name - iterate through teams to find match
                 for tid in teams.keys():
@@ -474,21 +492,29 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
                         team_doc = db.teams.find_one({"team_id": tid})
                     if team_doc and (team_doc.get("name") == team_id or str(team_doc.get("_id")) == team_id or team_doc.get("team_id") == team_id):
                         actual_team_id = tid
+                        logger.info(f"✅ [PLAYBOOKS] Found team by name lookup: {actual_team_id} (team name: {team_doc.get('name')})")
                         break
                 # If still not found, try teams collection lookup by name
                 if not actual_team_id:
                     team_doc = db.teams.find_one({"name": team_id})
                     if team_doc:
                         team_id_from_doc = team_doc.get("team_id")
+                        logger.info(f"🔍 [PLAYBOOKS] Found team in teams collection: {team_doc.get('name')}, team_id={team_id_from_doc}, _id={team_doc.get('_id')}")
                         # Try to find this team_id in the document's teams
                         for tid in teams.keys():
                             if tid == team_id_from_doc or str(tid) == str(team_doc.get("_id")):
                                 actual_team_id = tid
+                                logger.info(f"✅ [PLAYBOOKS] Matched team in document: {actual_team_id}")
                                 break
+            
+            if not actual_team_id:
+                logger.warning(f"⚠️ [PLAYBOOKS] Could not resolve team_id '{team_id}' to a team in the document")
+                logger.warning(f"⚠️ [PLAYBOOKS] Available teams in document: {list(teams.keys())}")
             
             team_obj = teams.get(actual_team_id, {}) if actual_team_id else {}
         
         plays = team_obj.get("plays", {})
+        logger.info(f"🔍 [PLAYBOOKS] Found {len(plays)} plays for team")
         
         # Organize plays by type and focus
         motion_plays = []
