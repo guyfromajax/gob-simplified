@@ -2023,17 +2023,22 @@ def _check_inside_shot_possibility(selected_step, ball_handler_location, off_lin
     
     # Find players at viable inside locations
     pos_actions = selected_step.get("pos_actions", {})
+    logging.warning(f"🔍 [INSIDE CHECK] Ball handler at: {ball_handler_location}, Viable inside locations: {viable_inside_locations}")
+    logging.warning(f"🔍 [INSIDE CHECK] All players in step: {[(pos, action_info.get('location', '')) for pos, action_info in pos_actions.items()]}")
+    
     for pos, action_info in pos_actions.items():
         location = action_info.get("location", "")
         if location in viable_inside_locations:
             player = off_lineup.get(pos)
             if player:
+                logging.warning(f"🔍 [INSIDE CHECK] Found viable receiver: {pos} at {location}")
                 viable_receivers.append({
                     "position": pos,
                     "player": player,
                     "location": location
                 })
     
+    logging.warning(f"🔍 [INSIDE CHECK] Total viable receivers: {len(viable_receivers)}")
     return len(viable_receivers) > 0, viable_receivers
 
 
@@ -2385,14 +2390,25 @@ def resolve_motion_offense_shot(skeleton, game, off_lineup, def_lineup):
     
     ball_handler_at_inside = _is_inside_location(ball_handler_location)
     
+    # 🔍 DEBUG: Log shot possibilities
+    logging.warning(f"🎯 [MOTION SHOT] Step {shot_step_index}, Ball handler: {ball_handler_pos} at {ball_handler_location}")
+    logging.warning(f"🎯 [MOTION SHOT] Inside possible: {inside_possible}, Receivers: {len(inside_receivers)}")
+    if inside_receivers:
+        logging.warning(f"🎯 [MOTION SHOT] Inside receivers: {[(r['position'], r['location']) for r in inside_receivers]}")
+    logging.warning(f"🎯 [MOTION SHOT] Attack possible: {attack_possible}, Outside possible: {outside_possible}")
+    logging.warning(f"🎯 [MOTION SHOT] Ball handler at inside: {ball_handler_at_inside}")
+    
     # Phase 4: Get strategy settings and build weighted list
     strategy_settings = off_team.strategy_settings
     weighted_list = _build_shot_type_weighted_list(
         strategy_settings, inside_possible, attack_possible, outside_possible, ball_handler_at_inside
     )
     
+    logging.warning(f"🎯 [MOTION SHOT] Weighted list: {weighted_list} (inside_weight={strategy_settings.get('inside', 2)}, attack_weight={strategy_settings.get('attack', 2)}, outside_weight={strategy_settings.get('outside', 2)})")
+    
     # Phase 5: Select shot type
     selected_shot_type = random.choice(weighted_list)
+    logging.warning(f"🎯 [MOTION SHOT] Selected shot type: {selected_shot_type}")
     
     # Phase 6: Execute shot - build additional steps
     new_steps = []
