@@ -5410,13 +5410,38 @@ Each section contains multiple rows with numeric percentage inputs (0-100) and m
 ### Persistence Layer
 
 **Current Implementation:**
-- **Primary:** localStorage (`gob_playbooks` key)
-- **API Interface:** ✅ Implemented - loads plays from database via `/api/playbooks`
+- **UI State:** localStorage (`gob_playbooks` key) - for UI state persistence
+- **Playbook Settings:** ✅ Database storage via `POST /api/playbooks` - saves percentages to team documents
+
+**API Endpoints:**
+- `GET /api/playbooks` - Loads plays from database (organized by type and focus)
+- `POST /api/playbooks` - Saves playbook settings (percentages) to `teams.{team_id}.playbook_settings`
+
+**Storage Structure:**
+```javascript
+teams.{team_id}.playbook_settings = {
+  "motion": {
+    "3-2 Motion": 20,
+    "4-1 Motion": 30,
+    "5-0 Motion": 50
+  },
+  "set_play_inside": {
+    "Base Post Play": 100
+  },
+  "set_play_attack": {...},
+  "set_play_outside": {...},
+  "zone_defense": {
+    "2-3 Zone": 40,
+    "3-2 Zone": 35,
+    "1-3-1 Zone": 25
+  }
+}
+```
 
 **Persistence Interface (`PlaybooksPersistence` class):**
-- `load()` - Attempts API first, falls back to localStorage
-- `save(data)` - Attempts API first, falls back to localStorage
-- Single interface allows easy swap to real API endpoints
+- `load()` - Loads UI state from localStorage
+- `save(data)` - Saves UI state to localStorage
+- `savePlaybookSettings()` - Saves playbook percentages to database via API
 
 **Data Serialization:**
 ```javascript
@@ -5582,14 +5607,141 @@ Each section contains multiple rows with numeric percentage inputs (0-100) and m
 - ✅ "To Be Added" placeholders are disabled (no percentage input, no slot assignment)
 - ✅ Mode-aware: Works with single game, tournament, and franchise modes
 
+### Game Engine Integration
+
+**✅ Implemented:**
+- Playbook percentages are used for weighted random selection when choosing plays
+- Motion plays: Uses percentages from `playbook_settings.motion`
+- Set plays: Uses percentages from `playbook_settings.set_play_{focus}` (inside/attack/outside)
+- Zone defense: Uses percentages from `playbook_settings.zone_defense`
+- "To Be Added" plays are excluded from selection
+- CPU teams use equal weights (playbook settings only apply to user teams)
+- Falls back to equal weights if no playbook settings exist
+
+**Selection Logic:**
+- When `set_playcalls()` is called, it loads playbook settings from the team document
+- Uses `weighted_random_from_dict()` to select plays based on percentages
+- Man defense: Currently only one option ("Man"), so no weighting needed
+
 ### Future Enhancements
 
 **Pending:**
-- Save playbook settings (percentages, slot assignments) to database
-- Integrate with game engine playcall selection logic
-- Connect percentage distributions to playcall probability calculations
-- Link priority slots to playcall selection order
+- Link priority slots (1-6) to playcall selection order
 - Support custom plays (user-created plays per team)
+- Motion dropdown focus integration (currently only used for Playcall Center display)
+
+---
+
+## In-Game Play Calling System ✅ **IMPLEMENTED** (January 2025)
+
+### Overview
+
+The In-Game Play Calling System determines which offensive and defensive plays are selected during gameplay. It uses weighted random selection based on playbook settings configured by the user, with fallbacks for CPU teams and when no settings exist.
+
+**Location:** `BackEnd/models/turn_manager.py` - `set_playcalls()` method  
+**Purpose:** Select offensive and defensive playcalls for each turn  
+**Status:** ✅ Playbook integration complete
+
+### Play Selection Flow
+
+**1. Determine Play Type (Motion vs Set Play)**
+- Uses `offense_setting` from strategy settings (0-4 slider)
+- Weighted random between "motion" and "set_play" based on setting
+- Setting 0 = 100% motion, Setting 4 = 100% set play
+
+**2. Determine Play Focus (Inside/Attack/Outside)**
+- Uses `inside`, `attack`, `outside` values from strategy settings
+- Weighted random selection based on these values
+- Only applies to Set Plays (Motion plays don't filter by focus)
+
+**3. Select Specific Play**
+- **Motion Plays:** Queries all motion plays, then uses weighted selection based on playbook percentages
+- **Set Plays:** Queries plays matching play_type + play_focus, then uses weighted selection based on playbook percentages
+- **Zone Defense:** When "Zone" is selected, uses weighted selection from playbook percentages for specific zone types (2-3, 3-2, 1-3-1)
+
+### Playbook Integration
+
+**Weighted Selection:**
+- Loads playbook settings from `teams.{team_id}.playbook_settings` in the appropriate mode document
+- Uses `weighted_random_from_dict()` to select plays based on percentages
+- Only applies to user teams (CPU teams use equal weights)
+
+**Fallback Behavior:**
+- If no playbook settings exist → Equal weights for all plays
+- If CPU team → Equal weights (playbook settings ignored)
+- If "To Be Added" play → Excluded from selection (0% weight)
+
+**Example:**
+```python
+# User sets playbook:
+# - 5-0 Motion: 50%
+# - 4-1 Motion: 30%
+# - 3-2 Motion: 20%
+
+# When motion offense is selected:
+# - 50% chance: 5-0 Motion
+# - 30% chance: 4-1 Motion
+# - 20% chance: 3-2 Motion
+```
+
+### Defense Selection
+
+**Man Defense:**
+- Currently only one option ("Man")
+- No weighting needed (always selects "Man")
+- Future: Will support multiple man defense variants with playbook percentages
+
+**Zone Defense:**
+- When "Zone" is selected (from strategy settings or user override), converts to specific zone type
+- Uses playbook percentages from `playbook_settings.zone_defense`
+- Example: If user sets 2-3 Zone: 40%, 3-2 Zone: 35%, 1-3-1 Zone: 25%, selection follows these weights
+
+### Storage and Mode Support
+
+**Storage Location:**
+- **Single Game:** `games_collection` → `game_doc.teams.{team_id}.playbook_settings`
+- **Tournament:** `tournaments_collection` → `tournament_doc.teams.{team_id}.playbook_settings`
+- **Franchise:** `franchises_collection` → `franchise_doc.teams.{team_id}.playbook_settings`
+
+**Mode Isolation:**
+- Each game mode maintains its own playbook settings
+- Settings from one mode don't affect another
+- Settings persist across games within the same mode
+
+### Key Methods
+
+**`set_playcalls()`** - Main entry point for play selection
+- Determines play type (motion/set_play)
+- Determines focus (inside/attack/outside) for set plays
+- Calls `_select_play_with_playbook_weights()` for offense
+- Calls `_select_zone_defense_with_playbook_weights()` for zone defense
+
+**`_load_playbook_settings(team_id)`** - Loads playbook settings from database
+- Checks if team is user team (CPU teams return None)
+- Loads from appropriate mode document
+- Returns playbook_settings dict or None
+
+**`_select_play_with_playbook_weights(matching_plays, play_type, play_focus)`** - Weighted play selection
+- Filters out "To Be Added" plays
+- Loads playbook settings
+- Builds weights dict from percentages
+- Uses `weighted_random_from_dict()` for selection
+
+**`_select_zone_defense_with_playbook_weights()`** - Weighted zone defense selection
+- Loads playbook settings for defense team
+- Uses zone_defense percentages
+- Falls back to equal weights if no settings
+
+### Integration Points
+
+**Turn Manager:**
+- `set_playcalls()` method calls playbook selection logic
+- Results stored in `game_state["current_playcall"]` and `game_state["defense_playcall"]`
+
+**Game Engine:**
+- Selected playcall used by `resolve_half_court_offense_logic()`
+- Skeleton retrieved based on selected playcall
+- Shot resolution uses playcall for scoring calculations
 
 ---
 

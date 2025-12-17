@@ -457,7 +457,18 @@ if (setGameplanBtn) {
 const playbooksBtn = document.getElementById('playbooks-franchise');
 if (playbooksBtn) {
   playbooksBtn.addEventListener('click', () => {
-    window.location.href = '/static/play-builder-v2.html';
+    if (!franchiseId || !userTeamName) {
+      alert('Franchise or user team not loaded');
+      return;
+    }
+    
+    // Build playbooks URL with franchise parameters
+    const params = new URLSearchParams();
+    params.set('mode', 'franchise');
+    params.set('franchise_id', franchiseId);
+    params.set('team_id', userTeamName); // userTeamName is the team name, backend will resolve to team_id
+    
+    window.location.href = `/static/playbooks.html?${params.toString()}`;
   });
 }
 

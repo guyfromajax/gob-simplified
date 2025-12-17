@@ -679,7 +679,18 @@ document.addEventListener("DOMContentLoaded", async () => {
   const playbooksBtn = document.getElementById('playbooks-tournament');
   if (playbooksBtn) {
     playbooksBtn.addEventListener('click', () => {
-      window.location.href = '/static/play-builder-v2.html';
+      if (!tournament || !tournament._id || !userTeamId) {
+        alert('Tournament or user team not loaded');
+        return;
+      }
+      
+      // Build playbooks URL with tournament parameters
+      const params = new URLSearchParams();
+      params.set('mode', 'tournament');
+      params.set('tournament_id', tournament._id);
+      params.set('team_id', userTeamId); // userTeamId is the team name, backend will resolve to team_id
+      
+      window.location.href = `/static/playbooks.html?${params.toString()}`;
     });
   }
 
