@@ -2778,7 +2778,11 @@
       
       const urlParams = new URLSearchParams(window.location.search);
       const mode = urlParams.get('mode') || 'single';
-      let teamId = urlParams.get('team_id') || urlParams.get('home_id') || urlParams.get('away_id');
+      // Check multiple possible team_id parameter names (different pages use different names)
+      let teamId = urlParams.get('team_id') || 
+                   urlParams.get('user_team_id') || 
+                   urlParams.get('home_id') || 
+                   urlParams.get('away_id');
       let gameId = urlParams.get('game_id');
       if (!gameId && mode === 'single' && typeof localStorage !== 'undefined') {
         gameId = localStorage.getItem('game_id');
