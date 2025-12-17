@@ -400,23 +400,46 @@
     // Load all plays on page load
     async function loadAllPlays() {
       try {
+        console.log('🔍 Loading plays from /api/plays...');
         const response = await fetch('/api/plays');
-        if (!response.ok) throw new Error('Failed to load plays');
+        if (!response.ok) {
+          throw new Error(`Failed to load plays: ${response.status} ${response.statusText}`);
+        }
         const data = await response.json();
+        console.log('📊 API response:', data);
         allPlays = data.plays || [];
+        console.log(`✅ Loaded ${allPlays.length} plays`);
         
         const dropdown = document.getElementById('play-dropdown');
+        if (!dropdown) {
+          console.error('❌ Dropdown element not found');
+          return;
+        }
+        
         dropdown.innerHTML = '<option value="">-- Select a Play --</option>';
+        
+        if (allPlays.length === 0) {
+          console.warn('⚠️ No plays found in database');
+          const option = document.createElement('option');
+          option.value = '';
+          option.textContent = '-- No Plays Available --';
+          option.disabled = true;
+          dropdown.appendChild(option);
+          return;
+        }
         
         allPlays.forEach(play => {
           const option = document.createElement('option');
           option.value = play.name;
           option.textContent = play.name;
           dropdown.appendChild(option);
+          console.log(`  ✓ Added play: ${play.name}`);
         });
+        
+        console.log('✅ Dropdown populated successfully');
       } catch (error) {
-        console.error('Error loading plays:', error);
-        showMessage('Error loading plays. Please refresh the page.', 'error');
+        console.error('❌ Error loading plays:', error);
+        showMessage(`Error loading plays: ${error.message}. Please refresh the page.`, 'error');
       }
     }
 
@@ -705,8 +728,17 @@
 
     // Initialize on page load
     window.addEventListener('DOMContentLoaded', () => {
+      console.log('🚀 Plays Builder page loaded, initializing...');
       loadAllPlays();
     });
+    
+    // Also try loading if DOM is already ready
+    if (document.readyState === 'loading') {
+      window.addEventListener('DOMContentLoaded', loadAllPlays);
+    } else {
+      console.log('🚀 DOM already ready, loading plays immediately...');
+      loadAllPlays();
+    }
   </script>
 </body>
 </html>
