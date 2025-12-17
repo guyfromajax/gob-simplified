@@ -164,8 +164,14 @@ def ensure_team_objects_exist(mode: str, doc_id: str, team_id: str):
     
     # Handle different ID formats for different modes
     if mode == "single":
-        # For single game mode, game_id is a UUID string, not ObjectId
+        # For single game mode, try both UUID string and ObjectId formats
         doc = collection.find_one({"_id": doc_id})
+        if not doc:
+            # Try as ObjectId if UUID string lookup failed
+            try:
+                doc = collection.find_one({"_id": ObjectId(doc_id)})
+            except:
+                pass
     else:
         # For franchise/tournament modes, use ObjectId
         doc = collection.find_one({"_id": ObjectId(doc_id)})
@@ -448,9 +454,15 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
             raise HTTPException(status_code=400, detail=f"Invalid mode: {mode}")
         
         # Load the document
-        # For single game mode, game_id is a UUID string, not ObjectId
+        # For single game mode, try both UUID string and ObjectId formats
         if mode == "single":
             doc = collection.find_one({"_id": doc_id})
+            if not doc:
+                # Try as ObjectId if UUID string lookup failed
+                try:
+                    doc = collection.find_one({"_id": ObjectId(doc_id)})
+                except:
+                    pass
         else:
             doc = collection.find_one({"_id": ObjectId(doc_id)})
         
@@ -618,9 +630,15 @@ def save_playbooks(request: PlaybookSettingsRequest):
         actual_team_id = request.team_id
         if request.mode != "franchise":
             # For tournament/single mode, try to resolve team name to team_id
-            # For single game mode, use UUID string directly; for others, use ObjectId
+            # For single game mode, try both UUID string and ObjectId formats
             if request.mode == "single":
                 doc = collection.find_one({"_id": doc_id})
+                if not doc:
+                    # Try as ObjectId if UUID string lookup failed
+                    try:
+                        doc = collection.find_one({"_id": ObjectId(doc_id)})
+                    except:
+                        pass
             else:
                 doc = collection.find_one({"_id": ObjectId(doc_id)})
             if not doc:
@@ -659,12 +677,22 @@ def save_playbooks(request: PlaybookSettingsRequest):
         else:
             update_path = f"teams.{actual_team_id}.playbook_settings"
         
-        # For single game mode, use UUID string directly; for others, use ObjectId
+        # For single game mode, try both UUID string and ObjectId formats
         if request.mode == "single":
+            # Try UUID string first
             result = collection.update_one(
                 {"_id": doc_id},
                 {"$set": {update_path: request.playbook_settings}}
             )
+            # If not found, try as ObjectId
+            if result.matched_count == 0:
+                try:
+                    result = collection.update_one(
+                        {"_id": ObjectId(doc_id)},
+                        {"$set": {update_path: request.playbook_settings}}
+                    )
+                except:
+                    pass
         else:
             result = collection.update_one(
                 {"_id": ObjectId(doc_id)},
