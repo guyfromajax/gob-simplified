@@ -285,7 +285,7 @@
 
       <div class="right-column">
         <div class="court-visualization">
-          <img id="court-image" src="/static/images/courts/default-court.png" alt="Basketball Court">
+          <img id="court-image" src="/static/images/courts/bentley_truman.jpg" alt="Basketball Court">
           <div id="player-icons-container"></div>
           <div id="ball-icon" class="ball-icon" style="display: none;"></div>
         </div>
@@ -303,14 +303,8 @@
   </div>
 
   <script>
-    // Constants (reused from play-builder-v2.html)
-    const POSITIONS = {
-      PG: { x: 0, y: 0 },
-      SG: { x: 0, y: 0 },
-      SF: { x: 0, y: 0 },
-      PF: { x: 0, y: 0 },
-      C: { x: 0, y: 0 }
-    };
+    // Constants (reused from play-details.html)
+    const POSITIONS = ["PG", "SG", "SF", "PF", "C"];
 
     // Court coordinates (from HCO_STRING_SPOTS in constants.py)
     const HCO_STRING_SPOTS = {
@@ -384,7 +378,6 @@
     };
 
     const BALL_HANDLING_ACTIONS = ["handle_ball", "receive", "shoot"];
-    const POSITIONS = ["PG", "SG", "SF", "PF", "C"];
 
     let allPlays = [];
     let currentPlay = null;
