@@ -5400,7 +5400,7 @@ Each section contains multiple rows with numeric percentage inputs (0-100) and m
 **If no saved settings exist:**
 - Top row in each section = 100%
 - All other rows = 0%
-- Motion dropdowns default to "Inside"
+- Motion dropdowns default to "-" (explicit unselected state - user must select Inside/Attack/Outside)
 
 ### Submit Button
 
