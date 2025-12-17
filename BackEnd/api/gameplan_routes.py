@@ -655,10 +655,17 @@ def save_playbooks(request: PlaybookSettingsRequest):
         else:
             update_path = f"teams.{actual_team_id}.playbook_settings"
         
-        result = collection.update_one(
-            {"_id": ObjectId(doc_id)},
-            {"$set": {update_path: request.playbook_settings}}
-        )
+        # For single game mode, use UUID string directly; for others, use ObjectId
+        if request.mode == "single":
+            result = collection.update_one(
+                {"_id": doc_id},
+                {"$set": {update_path: request.playbook_settings}}
+            )
+        else:
+            result = collection.update_one(
+                {"_id": ObjectId(doc_id)},
+                {"$set": {update_path: request.playbook_settings}}
+            )
         
         if result.matched_count == 0:
             raise HTTPException(status_code=404, detail=f"{request.mode.capitalize()} document not found")
