@@ -5577,6 +5577,16 @@ teams.{team_id}.playbook_settings = {
 - Example: "5-0 Motion (Inside)" and "5-0 Motion (Attack)" are separate assignable targets
 - Slot assignment key format: `motion:${playId}:${dropdown}`
 
+**Integration with Playcall Center:**
+- Slot assignments (1-6) determine the order of plays in the Playcall Center
+- Slot 1 = First play displayed in Playcall Center
+- Slot 2 = Second play, etc.
+- Navigation buttons respect slot order:
+  - **Up button (▲)**: Navigates to previous slot (1→2→3→4→5→6, wraps to 6)
+  - **Down button (▼)**: Navigates to next slot (6→5→4→3→2→1, wraps to 1)
+- Plays are automatically reordered when slot assignments are loaded from playbooks
+- Unassigned plays appear at the end (after slots 1-6)
+
 ### Priority Slots 1-6 (Offense Only)
 
 **Location:** Right column of every Motion and Set Play row  
