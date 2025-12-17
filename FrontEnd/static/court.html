@@ -2825,6 +2825,8 @@
         const motionDropdowns = data.motion_dropdowns || {};
         
         console.log('🔍 [PLAYCALL CENTER] Slot assignments:', slotAssignments);
+        console.log('🔍 [PLAYCALL CENTER] Slot assignments keys:', Object.keys(slotAssignments));
+        console.log('🔍 [PLAYCALL CENTER] Slot assignments full structure:', JSON.stringify(slotAssignments, null, 2));
         console.log('🔍 [PLAYCALL CENTER] Motion dropdowns:', motionDropdowns);
         
         // Get all play options
