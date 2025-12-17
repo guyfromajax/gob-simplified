@@ -5430,6 +5430,14 @@ Each section contains multiple rows with numeric percentage inputs (0-100) and m
 - Plays are filtered by `play_type` (motion vs set_play) and `play_focus` (inside/attack/outside)
 - Empty slots are filled with "To Be Added" placeholders (disabled for interaction)
 
+**Team ID Resolution:**
+- The page attempts to resolve `team_id` from URL parameters using multiple fallbacks:
+  1. Primary: `team_id` parameter
+  2. Fallback 1: `user_team_id` parameter (used in tournament/franchise modes)
+  3. Fallback 2: `home_id` or `away_id` parameters
+- If no team_id is found, the page displays empty play slots with a console warning
+- Debug logging shows all parameters being used for troubleshooting
+
 ### Persistence Layer
 
 **Current Implementation:**
@@ -5640,8 +5648,19 @@ teams.{team_id}.playbook_settings = {
 
 **Navigation Entry Points:**
 - **Game Plan Screen:** Playbooks button links to playbooks.html with mode, team_id, and mode-specific ID
+  - **Team ID Resolution (Multiple Fallbacks):**
+    1. Primary: `teamId` (derived from `myTeamSide` - `homeId` or `awayId`)
+    2. Fallback 1: `userTeamIdParam` (from URL parameter)
+    3. Fallback 2: `homeId` or `awayId` (direct from URL parameters)
+  - **Additional Parameters:**
+    - Also passes `home_id` and `away_id` as fallbacks in URL for playbooks.js to use
+    - Falls back to localStorage for `game_id` if not in URL (single mode)
+    - Includes debug logging (`🔍 [GAME-PLAN] Navigating to playbooks with params:`) for troubleshooting
+  - **Location:** `FrontEnd/static/game-plan.js` - `btnPlaybooks` click handler
 - **Tournament Command Center:** Playbooks button links to playbooks.html with tournament_id and team_id
+  - **Location:** `FrontEnd/static/tournament.js` - `playbooks-tournament` button handler
 - **Franchise Command Center:** Playbooks button links to playbooks.html with franchise_id and team_id
+  - **Location:** `FrontEnd/static/franchise-command-center.js` - `playbooks-franchise` button handler
 
 ### Game Engine Integration
 
