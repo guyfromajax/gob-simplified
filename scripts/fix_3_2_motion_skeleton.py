@@ -7,9 +7,9 @@ Pattern: When a player moves to lower wing, lower lowPost (PF) sets screen.
          When a player moves to upper wing, upper lowPost (C) sets screen.
 """
 
-import requests
 import json
 import sys
+import subprocess
 
 def fix_skeleton():
     play_name = "3-2 Motion"
@@ -18,10 +18,14 @@ def fix_skeleton():
     print(f"🔍 Fetching '{play_name}' from API...")
     
     try:
-        # Get current play data
-        response = requests.get(api_url)
-        response.raise_for_status()
-        play_data = response.json()
+        # Get current play data using curl
+        result = subprocess.run(
+            ["curl", "-s", api_url],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        play_data = json.loads(result.stdout)
         
         if not play_data:
             print(f"❌ Play '{play_name}' not found in database")
@@ -35,160 +39,151 @@ def fix_skeleton():
         steps = skeleton.get("steps", [])
         print(f"📊 Current skeleton has {len(steps)} steps")
         
-        # Find the indices where we need to insert steps
-        # Step 15 (4500ms) -> Step 16 (4800ms) needs intermediate step
-        # Step 19 (5700ms) -> Step 20 (6000ms) needs intermediate step
+        # Find the steps that need fixing by their content
+        # First fix: After Step 14 (PG cuts to midLane), before Step 15 (SG passes to SF at key, PG cuts to upper wing)
+        # Second fix: After Step 18 (SF at midLane, PF sets screen), before Step 19 (PG passes to SG at key, SF cuts to lower wing)
         
-        # Create a new steps array
         new_steps = []
         inserted_count = 0
+        i = 0
         
-        for i, step in enumerate(steps):
+        while i < len(steps):
+            step = steps[i]
             timestamp = step.get("timestamp", 0)
-            updated_step = step.copy()
+            pos_actions = step.get("pos_actions", {})
             
-            # Check if we need to insert an intermediate step after this one
-            if timestamp == 4500:
-                # Step 15: SG passes to SF at key, PG cuts to upper wing
-                # Append current step as-is
-                new_steps.append(updated_step)
+            # Check if this is Step 14: PG cuts to midLane
+            if (pos_actions.get("PG", {}).get("location") == "midLane" and 
+                pos_actions.get("PG", {}).get("action") == "cut" and
+                pos_actions.get("SG", {}).get("location") == "lower wing" and
+                pos_actions.get("SG", {}).get("action") == "handle_ball"):
+                # This is Step 14 - append it
+                new_steps.append(step.copy())
+                i += 1
                 
-                # Insert intermediate step: PG cuts to key, C sets screen at midLane
-                print(f"🔧 Inserting intermediate step after step {i+1} (timestamp {timestamp})")
-                intermediate_step = {
-                    "timestamp": 4800,
-                    "pos_actions": {
-                        "PG": {
-                            "location": "key",
-                            "action": "cut"
-                        },
-                        "SG": {
-                            "location": "lower wing",
-                            "action": "stationary"
-                        },
-                        "SF": {
-                            "location": "key",
-                            "action": "handle_ball"
-                        },
-                        "PF": {
-                            "location": "lower lowPost",
-                            "action": "post_up"
-                        },
-                        "C": {
-                            "location": "midLane",
-                            "action": "screen"
+                # Check if next step is Step 15: SG passes to SF at key, PG cuts to upper wing
+                if i < len(steps):
+                    next_step = steps[i]
+                    next_pos_actions = next_step.get("pos_actions", {})
+                    if (next_pos_actions.get("SG", {}).get("action") == "pass" and
+                        next_pos_actions.get("SF", {}).get("location") == "key" and
+                        next_pos_actions.get("SF", {}).get("action") == "receive" and
+                        next_pos_actions.get("PG", {}).get("location") == "upper wing" and
+                        next_pos_actions.get("PG", {}).get("action") == "cut"):
+                        # Insert intermediate step before Step 15
+                        print(f"🔧 Inserting intermediate step after Step 14 (timestamp {timestamp})")
+                        intermediate_step = {
+                            "timestamp": timestamp + 300,
+                            "pos_actions": {
+                                "PG": {
+                                    "location": "midLane",
+                                    "action": "stationary"
+                                },
+                                "SG": {
+                                    "location": "lower wing",
+                                    "action": "handle_ball"
+                                },
+                                "SF": {
+                                    "location": "key",
+                                    "action": "cut"
+                                },
+                                "PF": {
+                                    "location": "lower lowPost",
+                                    "action": "post_up"
+                                },
+                                "C": {
+                                    "location": "midLane",
+                                    "action": "screen"
+                                }
+                            },
+                            "events": []
                         }
-                    },
-                    "events": []
-                }
-                new_steps.append(intermediate_step)
-                inserted_count += 1
+                        new_steps.append(intermediate_step)
+                        inserted_count += 1
+                        
+                        # Update Step 15: shift timestamp and keep actions (they're already correct)
+                        updated_step = next_step.copy()
+                        updated_step["timestamp"] = timestamp + 600
+                        new_steps.append(updated_step)
+                        i += 1
+                        
+                        # Shift all subsequent steps by 300ms
+                        shift_amount = 300
+                        continue
                 
-            elif timestamp == 4800:
-                # This is the old Step 16, need to update it
-                # Change PG from "upper wing" receive to "key" receive
-                # And update timestamp to 5100
-                print(f"🔧 Updating step {i+1} (old timestamp {timestamp}) to new timestamp 5100")
-                updated_step["timestamp"] = 5100
-                updated_pos_actions = step["pos_actions"].copy()
+            # Check if this is Step 18: SF stationary at midLane, PF sets screen at midLane
+            elif (pos_actions.get("SF", {}).get("location") == "midLane" and
+                  pos_actions.get("SF", {}).get("action") == "stationary" and
+                  pos_actions.get("PF", {}).get("location") == "midLane" and
+                  pos_actions.get("PF", {}).get("action") == "screen" and
+                  pos_actions.get("SG", {}).get("location") == "key" and
+                  pos_actions.get("SG", {}).get("action") == "cut"):
+                # This is Step 18 - append it
+                new_steps.append(step.copy())
+                i += 1
                 
-                # Change PG from upper wing receive to key receive
-                updated_pos_actions["PG"] = {
-                    "location": "key",
-                    "action": "receive"
-                }
-                
-                # SF passes (stays the same)
-                # SG should cut to upper wing (since PG is now at key)
-                updated_pos_actions["SG"] = {
-                    "location": "upper wing",
-                    "action": "cut"
-                }
-                
-                updated_step["pos_actions"] = updated_pos_actions
-                new_steps.append(updated_step)
-                
-            elif timestamp == 5100:
-                # This is the old Step 17, need to shift it to 5400
-                print(f"🔧 Shifting step {i+1} from timestamp {timestamp} to 5400")
-                updated_step["timestamp"] = 5400
-                new_steps.append(updated_step)
-                
-            elif timestamp == 5400:
-                # This is the old Step 18, need to shift it to 5700
-                print(f"🔧 Shifting step {i+1} from timestamp {timestamp} to 5700")
-                updated_step["timestamp"] = 5700
-                new_steps.append(updated_step)
-                
-            elif timestamp == 5700:
-                # Step 19: PG passes to SG at key, SF cuts to lower wing
-                # Append current step as-is
-                new_steps.append(updated_step)
-                
-                # Insert intermediate step: SF cuts to key, PF sets screen at midLane
-                print(f"🔧 Inserting intermediate step after step {i+1} (timestamp {timestamp})")
-                intermediate_step = {
-                    "timestamp": 6000,
-                    "pos_actions": {
-                        "PG": {
-                            "location": "upper wing",
-                            "action": "stationary"
-                        },
-                        "SG": {
-                            "location": "key",
-                            "action": "handle_ball"
-                        },
-                        "SF": {
-                            "location": "key",
-                            "action": "cut"
-                        },
-                        "PF": {
-                            "location": "midLane",
-                            "action": "screen"
-                        },
-                        "C": {
-                            "location": "upper lowPost",
-                            "action": "post_up"
+                # Check if next step is Step 19: PG passes to SG at key, SF cuts to lower wing
+                if i < len(steps):
+                    next_step = steps[i]
+                    next_pos_actions = next_step.get("pos_actions", {})
+                    if (next_pos_actions.get("PG", {}).get("action") == "pass" and
+                        next_pos_actions.get("SG", {}).get("location") == "key" and
+                        next_pos_actions.get("SG", {}).get("action") == "receive" and
+                        next_pos_actions.get("SF", {}).get("location") == "lower wing" and
+                        next_pos_actions.get("SF", {}).get("action") == "cut"):
+                        # Insert intermediate step before Step 19
+                        print(f"🔧 Inserting intermediate step after Step 18 (timestamp {timestamp})")
+                        intermediate_step = {
+                            "timestamp": timestamp + 300,
+                            "pos_actions": {
+                                "PG": {
+                                    "location": "upper wing",
+                                    "action": "handle_ball"
+                                },
+                                "SG": {
+                                    "location": "key",
+                                    "action": "cut"
+                                },
+                                "SF": {
+                                    "location": "midLane",
+                                    "action": "stationary"
+                                },
+                                "PF": {
+                                    "location": "midLane",
+                                    "action": "screen"
+                                },
+                                "C": {
+                                    "location": "upper lowPost",
+                                    "action": "post_up"
+                                }
+                            },
+                            "events": []
                         }
-                    },
-                    "events": []
-                }
-                new_steps.append(intermediate_step)
-                inserted_count += 1
-                
-            elif timestamp == 6000:
-                # This is the old Step 20, need to update it
-                # Change SF from "lower wing" receive to "key" receive
-                # And update timestamp to 6300
-                print(f"🔧 Updating step {i+1} (old timestamp {timestamp}) to new timestamp 6300")
-                updated_step["timestamp"] = 6300
-                updated_pos_actions = step["pos_actions"].copy()
-                
-                # Change SF from lower wing receive to key receive
-                updated_pos_actions["SF"] = {
-                    "location": "key",
-                    "action": "receive"
-                }
-                
-                # SG passes (stays the same)
-                # PF should cut to lower wing (since SF is now at key)
-                updated_pos_actions["PF"] = {
-                    "location": "lower lowPost",
-                    "action": "cut"
-                }
-                
-                updated_step["pos_actions"] = updated_pos_actions
-                new_steps.append(updated_step)
-                
-            elif timestamp >= 6300:
-                # Shift remaining steps by 300ms
-                new_timestamp = timestamp + 300
-                print(f"🔧 Shifting step {i+1} from timestamp {timestamp} to {new_timestamp}")
-                updated_step["timestamp"] = new_timestamp
+                        new_steps.append(intermediate_step)
+                        inserted_count += 1
+                        
+                        # Update Step 19: shift timestamp and keep actions (they're already correct)
+                        updated_step = next_step.copy()
+                        updated_step["timestamp"] = timestamp + 600
+                        new_steps.append(updated_step)
+                        i += 1
+                        
+                        # Shift all subsequent steps by 300ms
+                        shift_amount = 300
+                        continue
+            
+            # For all other steps, check if we need to shift timestamps
+            # If we've inserted steps, shift this step's timestamp
+            if inserted_count > 0 and timestamp > 4500:  # Only shift steps after first insertion
+                # Calculate how many 300ms shifts we need
+                shifts_needed = inserted_count * 300
+                updated_step = step.copy()
+                updated_step["timestamp"] = timestamp + shifts_needed
                 new_steps.append(updated_step)
             else:
-                # All other steps: append as-is
-                new_steps.append(updated_step)
+                new_steps.append(step.copy())
+            
+            i += 1
         
         # Update the skeleton
         skeleton["steps"] = new_steps
@@ -207,10 +202,20 @@ def fix_skeleton():
             del update_payload["_id"]
         
         print(f"💾 Updating play in database...")
-        update_response = requests.post(update_url, json=update_payload)
-        update_response.raise_for_status()
+        # Use curl to POST the update
+        payload_json = json.dumps(update_payload)
+        update_result = subprocess.run(
+            ["curl", "-s", "-X", "POST", "-H", "Content-Type: application/json", "-d", payload_json, update_url],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        update_response = json.loads(update_result.stdout)
         
-        print(f"✅ Successfully updated '{play_name}' skeleton in database!")
+        if update_response.get("message"):
+            print(f"✅ Successfully updated '{play_name}' skeleton in database!")
+        else:
+            print(f"⚠️ Update response: {update_response}")
         print(f"📊 Summary:")
         print(f"   - Original steps: {len(steps)}")
         print(f"   - New steps: {len(new_steps)}")
@@ -218,8 +223,9 @@ def fix_skeleton():
         
         return True
         
-    except requests.exceptions.RequestException as e:
+    except subprocess.CalledProcessError as e:
         print(f"❌ Error calling API: {e}")
+        print(f"   stderr: {e.stderr}")
         return False
     except Exception as e:
         print(f"❌ An unexpected error occurred: {e}")
@@ -230,4 +236,3 @@ def fix_skeleton():
 if __name__ == "__main__":
     success = fix_skeleton()
     sys.exit(0 if success else 1)
-

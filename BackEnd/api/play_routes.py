@@ -34,6 +34,7 @@ class PlayCreate(BaseModel):
     skeletons: Dict[str, Any]
     game_stats: Optional[Dict[str, int]] = None
     season_stats: Optional[Dict[str, int]] = None
+    copy: Optional[Dict[str, str]] = None  # Optional: copy_1, copy_2, copy_3 for play details page
 
 
 @router.post("/api/plays")

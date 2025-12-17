@@ -494,6 +494,16 @@
           return;
         }
 
+        // Load and display copy if it exists
+        if (playData.copy) {
+          const copyContainers = document.querySelectorAll('.info-container p');
+          if (copyContainers.length >= 3) {
+            copyContainers[0].textContent = playData.copy.copy_1 || 'Copy Goes Here';
+            copyContainers[1].textContent = playData.copy.copy_2 || 'Copy Goes Here';
+            copyContainers[2].textContent = playData.copy.copy_3 || 'Copy Goes Here';
+          }
+        }
+
         // Start animation
         startAnimation();
         
