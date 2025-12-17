@@ -78,7 +78,8 @@ class PlaybooksState {
       };
       
       if (play.name !== 'To Be Added') {
-        this.motionDropdowns[finalPlayId] = 'Inside';
+        // Don't set default here - let it be "-" initially, user must explicitly select "Inside"
+        // this.motionDropdowns[finalPlayId] = 'Inside';
       }
     }
     
@@ -155,7 +156,7 @@ class PlaybooksState {
     // Assign to new play
     if (sectionKey === 'motion') {
       if (!dropdown) {
-        dropdown = this.motionDropdowns[playId] || 'Inside';
+        dropdown = this.motionDropdowns[playId] || '-';
       }
       this.slotAssignments[slotNumber] = {
         section: sectionKey,
@@ -573,13 +574,31 @@ class PlaybooksUI {
     if (sectionKey === 'motion') {
       const dropdown = document.createElement('select');
       dropdown.className = 'motion-dropdown';
-      dropdown.value = this.state.motionDropdowns[play.id] || 'Inside';
+      dropdown.dataset.playId = play.id; // Store playId for later reference
+      
+      // Add "-" as default option (explicit unselected state)
+      const defaultOption = document.createElement('option');
+      defaultOption.value = '-';
+      defaultOption.textContent = '-';
+      dropdown.appendChild(defaultOption);
+      
+      // Add Inside, Attack, Outside options
       ['Inside', 'Attack', 'Outside'].forEach(opt => {
         const option = document.createElement('option');
         option.value = opt;
         option.textContent = opt;
         dropdown.appendChild(option);
       });
+      
+      // Set current value (default to "-" if not set)
+      const currentValue = this.state.motionDropdowns[play.id];
+      dropdown.value = currentValue || '-';
+      
+      // Ensure state has entry (even if "-") so it persists
+      if (!this.state.motionDropdowns[play.id]) {
+        this.state.motionDropdowns[play.id] = '-';
+      }
+      
       // Disable dropdown for "To Be Added" placeholders
       if (play.name === 'To Be Added') {
         dropdown.disabled = true;
@@ -587,7 +606,7 @@ class PlaybooksUI {
         dropdown.style.cursor = 'not-allowed';
       } else {
         dropdown.addEventListener('change', (e) => {
-          this.handleMotionDropdownChange(play.id, e.target.value);
+          this.handleMotionDropdownChange(play.id, e.target.value, dropdown);
         });
       }
       column2.appendChild(dropdown);
@@ -669,9 +688,21 @@ class PlaybooksUI {
     return assignment.section === sectionKey && assignment.playId === playId;
   }
   
-  handleMotionDropdownChange(playId, dropdownValue) {
-    // Update dropdown value (persists the selection)
+  handleMotionDropdownChange(playId, dropdownValue, dropdownElement) {
+    // Update state
     this.state.motionDropdowns[playId] = dropdownValue;
+    
+    // Update dropdown element directly to ensure UI reflects change immediately
+    if (dropdownElement) {
+      dropdownElement.value = dropdownValue;
+    } else {
+      // Fallback: find dropdown by playId and update it
+      const dropdown = document.querySelector(`.motion-dropdown[data-play-id="${playId}"]`) || 
+                       document.querySelector(`.motion-dropdown[data-playId="${playId}"]`);
+      if (dropdown) {
+        dropdown.value = dropdownValue;
+      }
+    }
     
     // Don't change existing slot assignments - they stay with their original dropdown variant
     // Just re-render to update the UI (badges will show correct variant)
