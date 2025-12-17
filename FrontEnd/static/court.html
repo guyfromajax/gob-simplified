@@ -2588,36 +2588,148 @@
           
           const playDoc = await response.json();
           
-          // Get successful skeleton (same as backend: get_hco_skeleton with lean_score=1.0)
-          const skeletons = playDoc.skeletons || {};
-          const successfulSkeleton = skeletons.successful;
+          // Check if this is a Motion play
+          const playType = playDoc.play_type || '';
+          const isMotionPlay = playType === 'motion';
           
-          if (!successfulSkeleton || !successfulSkeleton.steps || successfulSkeleton.steps.length === 0) {
-            console.warn(`⚠️ [PLAYCALL HEADSHOTS] No successful skeleton for play '${playName}'`);
-            continue;
-          }
-          
-          // Extract intended shooter position from final step (same logic as backend phase_resolution.py lines 1011-1017)
-          const finalStep = successfulSkeleton.steps[successfulSkeleton.steps.length - 1];
-          const posActions = finalStep.pos_actions || {};
-          
-          let intendedShooterPos = null;
-          for (const [pos, actionInfo] of Object.entries(posActions)) {
-            const action = (actionInfo.action || '').toLowerCase();
-            if (action === 'shoot') {
-              intendedShooterPos = pos.toUpperCase(); // Normalize to uppercase (C, PG, SG, SF, PF)
-              break;
-            }
-          }
-          
-          // Map position to player ID from lineup
           let shooterId = null;
-          if (intendedShooterPos && lineup[intendedShooterPos]) {
-            shooterId = lineup[intendedShooterPos];
-          } else if (intendedShooterPos) {
-            console.warn(`⚠️ [PLAYCALL HEADSHOTS] Intended shooter position '${intendedShooterPos}' not found in lineup for play '${playName}'`);
+          
+          if (isMotionPlay) {
+            // ✅ MOTION PLAYS: Analyze steps 1-6 to find most likely shooter for each shot type
+            const skeletons = playDoc.skeletons || {};
+            const baseLoopSkeleton = skeletons.base_loop;
+            
+            if (!baseLoopSkeleton || !baseLoopSkeleton.steps || baseLoopSkeleton.steps.length === 0) {
+              console.warn(`⚠️ [PLAYCALL HEADSHOTS] No base_loop skeleton for Motion play '${playName}'`);
+              continue;
+            }
+            
+            // Get play focus from play option (Inside, Attack, or Outside)
+            const playFocus = playOption.getAttribute('data-focus') || 'inside';
+            const focusLower = playFocus.toLowerCase();
+            
+            // Analyze steps 1-6 (excluding step 0)
+            const steps = baseLoopSkeleton.steps;
+            const stepsToAnalyze = steps.slice(1, Math.min(7, steps.length)); // Steps 1-6 (or fewer if skeleton is shorter)
+            
+            // Inside shot locations (normalized for comparison)
+            const insideLocations = ['lowerlowpost', 'lowermidpost', 'midlane', 'basketspot', 'upperlowpost', 'uppermidpost'];
+            
+            // Helper function to normalize location string
+            const normalizeLocation = (loc) => {
+              if (!loc) return '';
+              return loc.toLowerCase().replace(/\s+/g, '');
+            };
+            
+            // Helper function to check if location is inside
+            const isInsideLocation = (loc) => {
+              const normalized = normalizeLocation(loc);
+              return insideLocations.some(insideLoc => normalized.includes(insideLoc) || insideLoc.includes(normalized));
+            };
+            
+            // Track opportunities for each player
+            const playerInsideOpportunities = {};
+            const playerOutsideOpportunities = {};
+            
+            for (const step of stepsToAnalyze) {
+              const posActions = step.pos_actions || {};
+              
+              // Count opportunities for each player
+              for (const [pos, actionInfo] of Object.entries(posActions)) {
+                const posUpper = pos.toUpperCase();
+                if (!lineup[posUpper]) continue; // Skip if player not in lineup
+                
+                const action = (actionInfo.action || '').toLowerCase();
+                const location = actionInfo.location || actionInfo.spot || '';
+                
+                // Check if player handles ball (ball handler actions)
+                const isBallHandler = ['pass', 'shoot', 'drive', 'dribble', 'hold', 'handle_ball'].includes(action);
+                
+                if (isBallHandler && location) {
+                  if (isInsideLocation(location)) {
+                    // Player handles ball at inside spot - opportunity for inside shot
+                    playerInsideOpportunities[posUpper] = (playerInsideOpportunities[posUpper] || 0) + 1;
+                  } else {
+                    // Player handles ball at outside spot - opportunity for outside/attack shot
+                    playerOutsideOpportunities[posUpper] = (playerOutsideOpportunities[posUpper] || 0) + 1;
+                  }
+                }
+                
+                // Check if player receives pass at inside spot (viable pass opportunity)
+                if (action === 'receive' && location && isInsideLocation(location)) {
+                  // This player can receive pass for inside shot
+                  playerInsideOpportunities[posUpper] = (playerInsideOpportunities[posUpper] || 0) + 1;
+                }
+              }
+            }
+            
+            // Determine shooter based on focus
+            if (focusLower === 'inside') {
+              // Find player with most inside opportunities
+              const insideCounts = Object.values(playerInsideOpportunities);
+              if (insideCounts.length > 0) {
+                const maxInside = Math.max(...insideCounts);
+                const topInsidePlayers = Object.entries(playerInsideOpportunities)
+                  .filter(([_, count]) => count === maxInside)
+                  .map(([pos, _]) => pos);
+                
+                if (topInsidePlayers.length > 0) {
+                  // If tie, choose randomly
+                  const chosenPos = topInsidePlayers[Math.floor(Math.random() * topInsidePlayers.length)];
+                  shooterId = lineup[chosenPos];
+                }
+              }
+            } else {
+              // For outside/attack, find player with most outside opportunities
+              const outsideCounts = Object.values(playerOutsideOpportunities);
+              if (outsideCounts.length > 0) {
+                const maxOutside = Math.max(...outsideCounts);
+                const topOutsidePlayers = Object.entries(playerOutsideOpportunities)
+                  .filter(([_, count]) => count === maxOutside)
+                  .map(([pos, _]) => pos);
+                
+                if (topOutsidePlayers.length > 0) {
+                  // If tie, choose randomly
+                  const chosenPos = topOutsidePlayers[Math.floor(Math.random() * topOutsidePlayers.length)];
+                  shooterId = lineup[chosenPos];
+                }
+              }
+            }
+            
+            if (!shooterId) {
+              console.warn(`⚠️ [PLAYCALL HEADSHOTS] No player found for Motion play '${playName}' focus '${focusLower}'. Inside opportunities:`, playerInsideOpportunities, 'Outside opportunities:', playerOutsideOpportunities);
+            }
           } else {
-            console.warn(`⚠️ [PLAYCALL HEADSHOTS] No intended shooter found in skeleton for play '${playName}'`);
+            // ✅ SET PLAYS: Use existing logic (intended shooter from successful skeleton)
+            const skeletons = playDoc.skeletons || {};
+            const successfulSkeleton = skeletons.successful;
+            
+            if (!successfulSkeleton || !successfulSkeleton.steps || successfulSkeleton.steps.length === 0) {
+              console.warn(`⚠️ [PLAYCALL HEADSHOTS] No successful skeleton for play '${playName}'`);
+              continue;
+            }
+            
+            // Extract intended shooter position from final step (same logic as backend phase_resolution.py lines 1011-1017)
+            const finalStep = successfulSkeleton.steps[successfulSkeleton.steps.length - 1];
+            const posActions = finalStep.pos_actions || {};
+            
+            let intendedShooterPos = null;
+            for (const [pos, actionInfo] of Object.entries(posActions)) {
+              const action = (actionInfo.action || '').toLowerCase();
+              if (action === 'shoot') {
+                intendedShooterPos = pos.toUpperCase(); // Normalize to uppercase (C, PG, SG, SF, PF)
+                break;
+              }
+            }
+            
+            // Map position to player ID from lineup
+            if (intendedShooterPos && lineup[intendedShooterPos]) {
+              shooterId = lineup[intendedShooterPos];
+            } else if (intendedShooterPos) {
+              console.warn(`⚠️ [PLAYCALL HEADSHOTS] Intended shooter position '${intendedShooterPos}' not found in lineup for play '${playName}'`);
+            } else {
+              console.warn(`⚠️ [PLAYCALL HEADSHOTS] No intended shooter found in skeleton for play '${playName}'`);
+            }
           }
           
           // Set headshot image
