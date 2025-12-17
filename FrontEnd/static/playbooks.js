@@ -588,10 +588,22 @@ class PlaybooksUI {
     
     const label = document.createElement('span');
     label.className = 'row-label';
-    label.textContent = play.name;
     
-    // Style "To Be Added" differently
-    if (play.name === 'To Be Added') {
+    // Make play name clickable (except for "To Be Added")
+    if (play.name !== 'To Be Added') {
+      const playLink = document.createElement('a');
+      playLink.textContent = play.name;
+      playLink.href = '#';
+      playLink.style.color = 'inherit';
+      playLink.style.textDecoration = 'none';
+      playLink.style.cursor = 'pointer';
+      playLink.addEventListener('click', (e) => {
+        e.preventDefault();
+        this.navigateToPlayDetails(play.name);
+      });
+      label.appendChild(playLink);
+    } else {
+      label.textContent = play.name;
       label.style.fontStyle = 'italic';
       label.style.opacity = '0.6';
     }
