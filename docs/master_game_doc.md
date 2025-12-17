@@ -5448,16 +5448,24 @@ Each section contains multiple rows with numeric percentage inputs (0-100) and m
 - `GET /api/playbooks` - Loads plays from database (organized by type and focus)
   - Resolves team names to team_id automatically
   - Returns plays organized by motion, set_play_inside, set_play_attack, set_play_outside
-  - **Single Game Mode:** Uses UUID string for game_id (not ObjectId)
+  - **Single Game Mode:** Handles both string and ObjectId formats for game_id
+    - First attempts lookup with game_id as string
+    - Falls back to ObjectId conversion if string lookup fails
+    - This supports both UUID strings and MongoDB ObjectId formats
   - **Tournament/Franchise Mode:** Uses ObjectId for document lookup
-  - Ensures team objects exist before loading plays
+  - Ensures team objects exist before loading plays (creates with defaults if missing)
+  - Reloads document after ensuring team objects to get updated data
 - `POST /api/playbooks` - Saves playbook settings (percentages) to `teams.{team_id}.playbook_settings`
   - Request body: `{ mode, team_id, game_id/tournament_id/franchise_id, playbook_settings }`
   - Resolves team names to team_id automatically
   - Ensures team objects exist before saving
   - Validates required parameters based on mode
-  - **Single Game Mode:** Uses UUID string for game_id (not ObjectId)
+  - **Single Game Mode:** Handles both string and ObjectId formats for game_id
+    - First attempts update with game_id as string
+    - Falls back to ObjectId conversion if string update fails (matched_count == 0)
+    - This supports both UUID strings and MongoDB ObjectId formats
   - **Tournament/Franchise Mode:** Uses ObjectId for document lookup
+  - Includes detailed logging for team_id resolution and document operations
 
 **Storage Structure:**
 ```javascript
