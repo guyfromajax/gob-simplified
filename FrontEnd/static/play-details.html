@@ -390,25 +390,38 @@
 
     // Back navigation
     function goBack() {
-      const mode = urlParams.get('mode') || 'single';
-      const teamId = urlParams.get('team_id') || urlParams.get('user_team_id') || urlParams.get('home_id') || urlParams.get('away_id');
+      // ✅ SS&S: Preserve all game context parameters when navigating back
+      const urlParams = new URLSearchParams(window.location.search);
       
-      let backUrl = '/static/playbooks.html?';
-      backUrl += `mode=${mode}`;
-      if (teamId) backUrl += `&team_id=${teamId}`;
+      // Build params preserving all game context (except play_name)
+      const params = new URLSearchParams();
       
-      if (mode === 'single') {
-        const gameId = urlParams.get('game_id') || localStorage.getItem('game_id');
-        if (gameId) backUrl += `&game_id=${gameId}`;
-      } else if (mode === 'tournament') {
-        const tournamentId = urlParams.get('tournament_id');
-        if (tournamentId) backUrl += `&tournament_id=${tournamentId}`;
-      } else if (mode === 'franchise') {
-        const franchiseId = urlParams.get('franchise_id');
-        if (franchiseId) backUrl += `&franchise_id=${franchiseId}`;
+      // Preserve all game context parameters
+      const gameContextParams = [
+        'home', 'away', 'home_id', 'away_id', 'my_team', 'user_team_id',
+        'game_id', 'mode', 'tournament_id', 'franchise_id', 'week',
+        'quarter', 'period', 'resume_from_timeout', 'clock',
+        'home_pg', 'home_sg', 'home_sf', 'home_pf', 'home_c',
+        'away_pg', 'away_sg', 'away_sf', 'away_pf', 'away_c',
+        'team_id', 'from', 'debug'
+      ];
+      
+      gameContextParams.forEach(param => {
+        const value = urlParams.get(param);
+        if (value) {
+          params.set(param, value);
+        }
+      });
+      
+      // For single mode, also check localStorage for game_id
+      if (params.get('mode') === 'single' && !params.get('game_id')) {
+        const gameId = typeof localStorage !== 'undefined' ? localStorage.getItem('game_id') : null;
+        if (gameId) {
+          params.set('game_id', gameId);
+        }
       }
       
-      window.location.href = backUrl;
+      window.location.href = `/static/playbooks.html?${params.toString()}`;
     }
 
     // Helper function to adjust color brightness
@@ -804,6 +817,7 @@
       stopAnimation();
     });
   </script>
+  <script src="/static/js/shared/timeoutNavigationHelper.js"></script>
 </body>
 </html>
 

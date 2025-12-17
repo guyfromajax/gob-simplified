@@ -508,43 +508,33 @@ async function init() {
   
   if (btnPlaybooks) {
     btnPlaybooks.addEventListener('click', () => {
-      // Build playbooks URL with proper parameters
+      // ✅ SS&S: Preserve all game context parameters when navigating to playbooks
+      const currentUrlParams = new URLSearchParams(window.location.search);
       const params = new URLSearchParams();
-      const mode = modeParam || 'single';
-      params.set('mode', mode);
       
-      // Determine team_id - try multiple sources
-      let teamIdToUse = teamId; // From myTeamSide (homeId/awayId)
+      // Preserve all game context parameters
+      const gameContextParams = [
+        'home', 'away', 'home_id', 'away_id', 'my_team', 'user_team_id',
+        'game_id', 'mode', 'tournament_id', 'franchise_id', 'week',
+        'quarter', 'period', 'resume_from_timeout', 'clock',
+        'home_pg', 'home_sg', 'home_sf', 'home_pf', 'home_c',
+        'away_pg', 'away_sg', 'away_sf', 'away_pf', 'away_c',
+        'team_id', 'debug'
+      ];
       
-      // Fallback: use user_team_id if available
-      if (!teamIdToUse && userTeamIdParam) {
-        teamIdToUse = userTeamIdParam;
-      }
+      gameContextParams.forEach(param => {
+        const value = currentUrlParams.get(param);
+        if (value) {
+          params.set(param, value);
+        }
+      });
       
-      // Fallback: use home_id or away_id if myTeamSide not set
-      if (!teamIdToUse) {
-        teamIdToUse = homeId || awayId;
-      }
-      
-      if (teamIdToUse) {
-        params.set('team_id', teamIdToUse);
-      } else {
-        // Also pass home_id and away_id as fallbacks
-        if (homeId) params.set('home_id', homeId);
-        if (awayId) params.set('away_id', awayId);
-      }
-      
-      // Add mode-specific IDs
-      if (mode === 'single') {
-        // Try gameId from URL, fallback to localStorage
-        const gameIdToUse = gameId || (typeof localStorage !== 'undefined' ? localStorage.getItem('game_id') : null);
+      // For single mode, also check localStorage for game_id
+      if (params.get('mode') === 'single' && !params.get('game_id')) {
+        const gameIdToUse = typeof localStorage !== 'undefined' ? localStorage.getItem('game_id') : null;
         if (gameIdToUse) {
           params.set('game_id', gameIdToUse);
         }
-      } else if (mode === 'tournament' && tournamentId) {
-        params.set('tournament_id', tournamentId);
-      } else if (mode === 'franchise' && franchiseId) {
-        params.set('franchise_id', franchiseId);
       }
       
       // Add 'from' parameter to track navigation source
