@@ -124,14 +124,23 @@ async function loadRoster() {
     console.log("No gameId found - initializing new game for pre-game lineup");
     try {
       const mode = modeParam || 'single';
+      const initPayload = {
+        home_team: homeTeam,
+        away_team: awayTeam,
+        mode: mode
+      };
+      
+      // Add mode-specific IDs for playbook settings persistence
+      if (mode === 'tournament' && tournamentId) {
+        initPayload.tournament_id = tournamentId;
+      } else if (mode === 'franchise' && franchiseId) {
+        initPayload.franchise_id = franchiseId;
+      }
+      
       const initRes = await fetch('/api/init-game', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          home_team: homeTeam,
-          away_team: awayTeam,
-          mode: mode
-        })
+        body: JSON.stringify(initPayload)
       });
       if (initRes.ok) {
         const initData = await initRes.json();

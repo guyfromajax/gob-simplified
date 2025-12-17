@@ -5520,6 +5520,20 @@ Each section contains multiple rows with numeric percentage inputs (0-100) and m
 - **UI State:** localStorage (`gob_playbooks` key) - for UI state persistence
 - **Playbook Settings:** ✅ Database storage via `POST /api/playbooks` - saves percentages to team documents
 
+**Game Initialization and Playbook Settings Persistence:**
+- When a game is initialized via `/api/init-game`, the game document is created with `mode`, `tournament_id` (for tournament mode), or `franchise_id` (for franchise mode) fields
+- These fields are set on the game document at initialization time (not just at game completion) to ensure playbook settings can be loaded during active gameplay
+- **Frontend:** `set-lineup.js` passes `mode`, `tournament_id`, and `franchise_id` (when available) to `/api/init-game`
+- **Backend:** `/api/init-game` stores these fields on the game document:
+  - `mode`: "single", "tournament", or "franchise"
+  - `tournament_id`: Set if `mode === "tournament"` (string format)
+  - `franchise_id`: Set if `mode === "franchise"` (string format)
+- **During Gameplay:** `_load_playbook_settings()` in `turn_manager.py` uses these fields to:
+  1. Check the game document for `mode` and `tournament_id`/`franchise_id`
+  2. Load the appropriate tournament/franchise document
+  3. Retrieve `playbook_settings` from `teams.{team_id}.playbook_settings` (or `franchise_teams.{team_id}.playbook_settings` for franchise mode)
+- This ensures that playbook settings submitted from the Command Center (Tournament or Franchise) persist and are used when playing games in those modes
+
 **API Endpoints:**
 - `GET /api/playbooks` - Loads plays from database (organized by type and focus)
   - Resolves team names to team_id automatically
