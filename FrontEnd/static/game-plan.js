@@ -508,7 +508,25 @@ async function init() {
   
   if (btnPlaybooks) {
     btnPlaybooks.addEventListener('click', () => {
-      window.location.href = '/static/play-builder-v2.html';
+      // Build playbooks URL with proper parameters
+      const params = new URLSearchParams();
+      params.set('mode', modeParam || 'single');
+      
+      // Use team_id (from homeId/awayId based on myTeamSide)
+      if (teamId) {
+        params.set('team_id', teamId);
+      }
+      
+      // Add mode-specific IDs
+      if (modeParam === 'single' && gameId) {
+        params.set('game_id', gameId);
+      } else if (modeParam === 'tournament' && tournamentId) {
+        params.set('tournament_id', tournamentId);
+      } else if (modeParam === 'franchise' && franchiseId) {
+        params.set('franchise_id', franchiseId);
+      }
+      
+      window.location.href = `/static/playbooks.html?${params.toString()}`;
     });
   }
   

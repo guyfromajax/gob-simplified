@@ -802,13 +802,111 @@ class PlaybooksUI {
       return;
     }
     
-    // Save
-    const success = await this.saveState();
+    // Save to localStorage (for UI state)
+    await this.saveState();
+    
+    // Save playbook settings to database
+    const success = await this.savePlaybookSettings();
     
     if (success) {
-      this.showToast('Saved');
+      this.showToast('Playbooks saved successfully');
     } else {
-      this.showToast('Error saving', true);
+      this.showToast('Error saving playbooks', true);
+    }
+  }
+  
+  async savePlaybookSettings() {
+    try {
+      // Get URL parameters
+      const urlParams = new URLSearchParams(window.location.search);
+      const mode = urlParams.get('mode') || 'single';
+      const teamId = urlParams.get('team_id') || urlParams.get('home_id') || urlParams.get('away_id');
+      const gameId = urlParams.get('game_id');
+      const tournamentId = urlParams.get('tournament_id');
+      const franchiseId = urlParams.get('franchise_id');
+      
+      if (!teamId) {
+        console.error('❌ No team_id found in URL params');
+        return false;
+      }
+      
+      // Build playbook settings from state
+      const playbookSettings = {
+        motion: {},
+        set_play_inside: {},
+        set_play_attack: {},
+        set_play_outside: {},
+        zone_defense: {}
+      };
+      
+      // Extract motion play percentages (exclude "To Be Added")
+      Object.keys(this.state.sections.motion || {}).forEach(playId => {
+        const playData = this.state.sections.motion[playId];
+        // Find play name from playData
+        const play = this.playData.motion?.find(p => p.id === playId);
+        if (play && play.name !== 'To Be Added' && playData.percentage > 0) {
+          playbookSettings.motion[play.name] = playData.percentage;
+        }
+      });
+      
+      // Extract set play percentages (exclude "To Be Added")
+      ['set-play-inside', 'set-play-attack', 'set-play-outside'].forEach(sectionKey => {
+        const settingsKey = sectionKey.replace('set-play-', 'set_play_');
+        const plays = this.playData[settingsKey] || [];
+        
+        Object.keys(this.state.sections[sectionKey] || {}).forEach(playId => {
+          const playData = this.state.sections[sectionKey][playId];
+          // Find play name from playData
+          const play = plays.find(p => p.id === playId);
+          if (play && play.name !== 'To Be Added' && playData.percentage > 0) {
+            playbookSettings[settingsKey][play.name] = playData.percentage;
+          }
+        });
+      });
+      
+      // Extract zone defense percentages (exclude "To Be Added")
+      Object.keys(this.state.sections['zone-defense'] || {}).forEach(playId => {
+        const playData = this.state.sections['zone-defense'][playId];
+        // Find play name from DEFENSE_PLAY_DATA
+        const play = DEFENSE_PLAY_DATA['zone-defense']?.find(p => p.id === playId);
+        if (play && play.name !== 'To Be Added' && playData.percentage > 0) {
+          playbookSettings.zone_defense[play.name] = playData.percentage;
+        }
+      });
+      
+      // Build request body
+      const requestBody = {
+        mode: mode,
+        team_id: teamId,
+        playbook_settings: playbookSettings
+      };
+      
+      if (mode === 'single' && gameId) {
+        requestBody.game_id = gameId;
+      } else if (mode === 'tournament' && tournamentId) {
+        requestBody.tournament_id = tournamentId;
+      } else if (mode === 'franchise' && franchiseId) {
+        requestBody.franchise_id = franchiseId;
+      }
+      
+      // Save to API
+      const response = await fetch('/api/playbooks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody)
+      });
+      
+      if (response.ok) {
+        console.log('✅ Playbook settings saved successfully');
+        return true;
+      } else {
+        const error = await response.json();
+        console.error('❌ Failed to save playbook settings:', error);
+        return false;
+      }
+    } catch (error) {
+      console.error('❌ Error saving playbook settings:', error);
+      return false;
     }
   }
   

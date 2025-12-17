@@ -1060,8 +1060,10 @@ class TurnManager:
             print(f"⚠️ No plays found for {chosen_play_type}{'/' + chosen_focus if chosen_play_type != 'motion' else ''}, using fallback")
             chosen_playcall = "Inside"  # Fallback to old system
         else:
-            # Randomly select one play from matches
-            selected_play = random.choice(matching_plays)
+            # ✅ PLAYBOOK SYSTEM: Use weighted selection based on playbook settings
+            selected_play = self._select_play_with_playbook_weights(
+                matching_plays, chosen_play_type, chosen_focus
+            )
             chosen_playcall = selected_play["name"]
         
         # Defense setting - use override if set, otherwise choose normally
@@ -1082,7 +1084,8 @@ class TurnManager:
                     # ✅ FIX: If user selected "Zone", convert to a random specific zone type
                     # (Backend expects specific zone types: "2-3 Zone", "3-2 Zone", "1-3-1 Zone")
                     if chosen_defense == "Zone":
-                        chosen_defense = random.choice(["2-3 Zone", "3-2 Zone", "1-3-1 Zone"])
+                        # ✅ PLAYBOOK SYSTEM: Use weighted selection based on playbook settings
+                        chosen_defense = self._select_zone_defense_with_playbook_weights()
                         logging.info(f"🎮 [PLAYCALL] Converted 'Zone' to specific zone type: {chosen_defense}")
                 else:
                     logging.info(f"🎮 [PLAYCALL DEBUG] defense_call is None or empty, will use normal selection")
@@ -1098,7 +1101,8 @@ class TurnManager:
                 
                 # Convert "Zone" to specific zone types for normal selection
                 if chosen_defense == "Zone":
-                    chosen_defense = random.choice(["2-3 Zone", "3-2 Zone", "1-3-1 Zone"])
+                    # ✅ PLAYBOOK SYSTEM: Use weighted selection based on playbook settings
+                    chosen_defense = self._select_zone_defense_with_playbook_weights()
                     logging.info(f"🎮 [PLAYCALL DEBUG] Converted normal 'Zone' to specific zone type: {chosen_defense}")
         
         # Record playcall attempt under new buckets
@@ -1167,6 +1171,165 @@ class TurnManager:
             "offense_override_cleared": False  # ✅ SS&S: Normal path - no override cleared
         }
 
+    def _load_playbook_settings(self, team_id):
+        """
+        Load playbook settings from team document.
+        Returns dict with play percentages or None if not found/not user team.
+        """
+        from BackEnd.db import games_collection, tournaments_collection, franchises_collection
+        from bson import ObjectId
+        
+        # Only load playbook settings for user teams (CPU teams use equal weights)
+        offense_team = self.game.offense_team
+        defense_team = self.game.defense_team
+        
+        # Determine which team and mode
+        is_offense_user = offense_team.is_user_team
+        is_defense_user = defense_team.is_user_team
+        
+        if not (is_offense_user or is_defense_user):
+            # CPU vs CPU - use equal weights
+            return None
+        
+        # Get game document
+        game_id = getattr(self.game, 'game_id', None)
+        if not game_id:
+            return None
+        
+        try:
+            game_doc = games_collection.find_one({"_id": ObjectId(game_id)})
+            if not game_doc:
+                return None
+            
+            # Check if this is a tournament or franchise game
+            mode = game_doc.get("mode", "single")
+            doc_id = game_id
+            
+            if mode == "tournament":
+                tournament_id = game_doc.get("tournament_id")
+                if tournament_id:
+                    doc_id = tournament_id
+                    collection = tournaments_collection
+                else:
+                    collection = games_collection
+            elif mode == "franchise":
+                franchise_id = game_doc.get("franchise_id")
+                if franchise_id:
+                    doc_id = franchise_id
+                    collection = franchises_collection
+                else:
+                    collection = games_collection
+            else:
+                collection = games_collection
+            
+            # Load document
+            if doc_id != game_id:
+                doc = collection.find_one({"_id": ObjectId(doc_id)})
+            else:
+                doc = game_doc
+            
+            if not doc:
+                return None
+            
+            # Get playbook settings for the appropriate team
+            if is_offense_user:
+                if mode == "franchise":
+                    team_obj = doc.get("franchise_teams", {}).get(team_id, {})
+                else:
+                    team_obj = doc.get("teams", {}).get(team_id, {})
+                return team_obj.get("playbook_settings")
+            elif is_defense_user:
+                # For defense, we need the defense team's ID
+                def_team_id = defense_team.team_id
+                if mode == "franchise":
+                    team_obj = doc.get("franchise_teams", {}).get(def_team_id, {})
+                else:
+                    team_obj = doc.get("teams", {}).get(def_team_id, {})
+                return team_obj.get("playbook_settings")
+        except Exception as e:
+            logging.warning(f"⚠️ Error loading playbook settings: {e}")
+            return None
+        
+        return None
+
+    def _select_play_with_playbook_weights(self, matching_plays, play_type, play_focus=None):
+        """
+        Select a play using weighted random based on playbook settings.
+        Falls back to equal weights if no settings exist or for CPU teams.
+        Excludes "To Be Added" plays.
+        """
+        # Filter out "To Be Added" plays
+        valid_plays = [p for p in matching_plays if p.get("name") != "To Be Added"]
+        if not valid_plays:
+            # Fallback to all plays if somehow all are "To Be Added"
+            valid_plays = matching_plays
+        
+        # Load playbook settings
+        team_id = self.game.offense_team.team_id
+        playbook_settings = self._load_playbook_settings(team_id)
+        
+        # Build weights dict
+        weights = {}
+        for play in valid_plays:
+            play_name = play.get("name")
+            
+            if playbook_settings:
+                # Get percentage from playbook settings
+                if play_type == "motion":
+                    percentage = playbook_settings.get("motion", {}).get(play_name, 0)
+                elif play_type == "set_play":
+                    focus_key = f"set_play_{play_focus}" if play_focus else "set_play_inside"
+                    percentage = playbook_settings.get(focus_key, {}).get(play_name, 0)
+                else:
+                    percentage = 0
+                
+                if percentage > 0:
+                    weights[play_name] = percentage
+            else:
+                # Equal weights (fallback or CPU team)
+                weights[play_name] = 1
+        
+        if not weights:
+            # Fallback to equal weights if no valid weights found
+            weights = {p.get("name"): 1 for p in valid_plays}
+        
+        # Select using weighted random
+        selected_name = weighted_random_from_dict(weights)
+        
+        # Find and return the selected play
+        for play in valid_plays:
+            if play.get("name") == selected_name:
+                return play
+        
+        # Fallback
+        return valid_plays[0] if valid_plays else matching_plays[0]
+
+    def _select_zone_defense_with_playbook_weights(self):
+        """
+        Select a zone defense type using weighted random based on playbook settings.
+        Falls back to equal weights if no settings exist or for CPU teams.
+        """
+        zone_types = ["2-3 Zone", "3-2 Zone", "1-3-1 Zone"]
+        
+        # Load playbook settings
+        defense_team = self.game.defense_team
+        team_id = defense_team.team_id
+        playbook_settings = self._load_playbook_settings(team_id)
+        
+        if playbook_settings and defense_team.is_user_team:
+            # Get zone defense percentages
+            zone_settings = playbook_settings.get("zone_defense", {})
+            weights = {}
+            for zone_type in zone_types:
+                percentage = zone_settings.get(zone_type, 0)
+                if percentage > 0:
+                    weights[zone_type] = percentage
+            
+            if weights:
+                return weighted_random_from_dict(weights)
+        
+        # Fallback to equal weights (CPU team or no settings)
+        return random.choice(zone_types)
 
     def set_strategy_calls(self):
         # Ensure strategy_settings are initialized for both teams (but don't overwrite existing settings)

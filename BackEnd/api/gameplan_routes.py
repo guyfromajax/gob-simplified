@@ -453,10 +453,40 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
             raise HTTPException(status_code=404, detail=f"{mode.capitalize()} document not found")
         
         # Get team plays
+        # ✅ Handle team name resolution (team_id might be a name, need to find actual team_id)
         if mode == "franchise":
             team_obj = doc.get("franchise_teams", {}).get(team_id, {})
         else:
-            team_obj = doc.get("teams", {}).get(team_id, {})
+            teams = doc.get("teams", {})
+            # For tournament/single mode, try to resolve team name to team_id
+            actual_team_id = None
+            # First try direct lookup
+            if team_id in teams:
+                actual_team_id = team_id
+            else:
+                # Try to find by team name - iterate through teams to find match
+                for tid in teams.keys():
+                    # Find the team that matches our input team_id (could be name or ObjectId)
+                    try:
+                        team_doc = db.teams.find_one({"_id": ObjectId(tid)})
+                    except:
+                        # If tid is not a valid ObjectId, try as team_id string
+                        team_doc = db.teams.find_one({"team_id": tid})
+                    if team_doc and (team_doc.get("name") == team_id or str(team_doc.get("_id")) == team_id or team_doc.get("team_id") == team_id):
+                        actual_team_id = tid
+                        break
+                # If still not found, try teams collection lookup by name
+                if not actual_team_id:
+                    team_doc = db.teams.find_one({"name": team_id})
+                    if team_doc:
+                        team_id_from_doc = team_doc.get("team_id")
+                        # Try to find this team_id in the document's teams
+                        for tid in teams.keys():
+                            if tid == team_id_from_doc or str(tid) == str(team_doc.get("_id")):
+                                actual_team_id = tid
+                                break
+            
+            team_obj = teams.get(actual_team_id, {}) if actual_team_id else {}
         
         plays = team_obj.get("plays", {})
         
@@ -517,5 +547,67 @@ def get_playbooks(mode: str, team_id: str, franchise_id: str = None, tournament_
         raise
     except Exception as e:
         logger.error(f"Error loading playbooks: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class PlaybookSettingsRequest(BaseModel):
+    mode: str
+    team_id: str
+    franchise_id: Optional[str] = None
+    tournament_id: Optional[str] = None
+    game_id: Optional[str] = None
+    playbook_settings: dict  # { "motion": {...}, "set_play_inside": {...}, etc. }
+
+
+@router.post("/api/playbooks")
+def save_playbooks(request: PlaybookSettingsRequest):
+    """
+    Save playbook settings (percentages) for a team.
+    Stores in teams.{team_id}.playbook_settings in the appropriate mode document.
+    """
+    try:
+        # Determine which collection to use
+        if request.mode == "franchise":
+            if not request.franchise_id:
+                raise HTTPException(status_code=400, detail="franchise_id required for franchise mode")
+            doc_id = request.franchise_id
+            collection = db.franchises
+        elif request.mode == "tournament":
+            if not request.tournament_id:
+                raise HTTPException(status_code=400, detail="tournament_id required for tournament mode")
+            doc_id = request.tournament_id
+            collection = db.tournaments
+        elif request.mode == "single":
+            if not request.game_id:
+                raise HTTPException(status_code=400, detail="game_id required for single game mode")
+            doc_id = request.game_id
+            collection = db.games
+        else:
+            raise HTTPException(status_code=400, detail=f"Invalid mode: {request.mode}")
+        
+        # Ensure team objects exist first
+        ensure_team_objects_exist(request.mode, doc_id, request.team_id)
+        
+        # Update playbook_settings in the appropriate document
+        if request.mode == "franchise":
+            update_path = f"franchise_teams.{request.team_id}.playbook_settings"
+        else:
+            update_path = f"teams.{request.team_id}.playbook_settings"
+        
+        result = collection.update_one(
+            {"_id": ObjectId(doc_id)},
+            {"$set": {update_path: request.playbook_settings}}
+        )
+        
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail=f"{request.mode.capitalize()} document not found")
+        
+        logger.info(f"✅ Saved playbook settings for team {request.team_id} in {request.mode} mode")
+        return {"success": True, "message": "Playbook settings saved successfully"}
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error saving playbooks: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
