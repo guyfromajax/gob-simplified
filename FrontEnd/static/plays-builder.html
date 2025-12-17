@@ -468,8 +468,10 @@
         document.getElementById('animation-controls').style.display = 'block';
         document.getElementById('submit-section').style.display = 'block';
 
-        // Load team info and start animation
-        await loadTeamInfo();
+        // Set default court image (Bentley Truman)
+        document.getElementById('court-image').src = '/static/images/courts/bentley_truman.jpg';
+        
+        // Start animation
         startAnimation();
       } catch (error) {
         console.error('Error loading play:', error);
@@ -477,10 +479,10 @@
       }
     });
 
-    // Load team info (default team for now)
+    // Load team info (default to Bentley Truman for plays builder)
     async function loadTeamInfo() {
-      // Use default court image for now
-      document.getElementById('court-image').src = '/static/images/courts/default-court.png';
+      // Use Bentley Truman court image as default
+      document.getElementById('court-image').src = '/static/images/courts/bentley_truman.jpg';
     }
 
     // Render court visualization
