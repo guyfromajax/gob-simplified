@@ -510,22 +510,44 @@ async function init() {
     btnPlaybooks.addEventListener('click', () => {
       // Build playbooks URL with proper parameters
       const params = new URLSearchParams();
-      params.set('mode', modeParam || 'single');
+      const mode = modeParam || 'single';
+      params.set('mode', mode);
       
-      // Use team_id (from homeId/awayId based on myTeamSide)
-      if (teamId) {
-        params.set('team_id', teamId);
+      // Determine team_id - try multiple sources
+      let teamIdToUse = teamId; // From myTeamSide (homeId/awayId)
+      
+      // Fallback: use user_team_id if available
+      if (!teamIdToUse && userTeamIdParam) {
+        teamIdToUse = userTeamIdParam;
+      }
+      
+      // Fallback: use home_id or away_id if myTeamSide not set
+      if (!teamIdToUse) {
+        teamIdToUse = homeId || awayId;
+      }
+      
+      if (teamIdToUse) {
+        params.set('team_id', teamIdToUse);
+      } else {
+        // Also pass home_id and away_id as fallbacks
+        if (homeId) params.set('home_id', homeId);
+        if (awayId) params.set('away_id', awayId);
       }
       
       // Add mode-specific IDs
-      if (modeParam === 'single' && gameId) {
-        params.set('game_id', gameId);
-      } else if (modeParam === 'tournament' && tournamentId) {
+      if (mode === 'single') {
+        // Try gameId from URL, fallback to localStorage
+        const gameIdToUse = gameId || (typeof localStorage !== 'undefined' ? localStorage.getItem('game_id') : null);
+        if (gameIdToUse) {
+          params.set('game_id', gameIdToUse);
+        }
+      } else if (mode === 'tournament' && tournamentId) {
         params.set('tournament_id', tournamentId);
-      } else if (modeParam === 'franchise' && franchiseId) {
+      } else if (mode === 'franchise' && franchiseId) {
         params.set('franchise_id', franchiseId);
       }
       
+      console.log('🔍 [GAME-PLAN] Navigating to playbooks with params:', params.toString());
       window.location.href = `/static/playbooks.html?${params.toString()}`;
     });
   }

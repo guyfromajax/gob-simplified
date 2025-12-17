@@ -324,13 +324,39 @@ class PlaybooksUI {
       // Get URL parameters
       const urlParams = new URLSearchParams(window.location.search);
       const mode = urlParams.get('mode') || 'single';
-      const teamId = urlParams.get('team_id') || urlParams.get('home_id') || urlParams.get('away_id');
-      const gameId = urlParams.get('game_id');
+      let teamId = urlParams.get('team_id');
+      
+      // If no team_id, try multiple fallbacks
+      if (!teamId) {
+        // Try user_team_id (used in tournament/franchise modes)
+        teamId = urlParams.get('user_team_id');
+      }
+      
+      if (!teamId) {
+        // Try home_id or away_id
+        teamId = urlParams.get('home_id') || urlParams.get('away_id');
+      }
+      
+      // For single mode, try to get game_id from localStorage if not in URL
+      let gameId = urlParams.get('game_id');
+      if (!gameId && mode === 'single' && typeof localStorage !== 'undefined') {
+        gameId = localStorage.getItem('game_id');
+      }
+      
       const tournamentId = urlParams.get('tournament_id');
       const franchiseId = urlParams.get('franchise_id');
       
+      console.log('🔍 [PLAYBOOKS] Loading plays with params:', {
+        mode,
+        teamId,
+        gameId,
+        tournamentId,
+        franchiseId,
+        allParams: Object.fromEntries(urlParams.entries())
+      });
+      
       if (!teamId) {
-        console.warn('⚠️ No team_id found in URL params, using hardcoded plays');
+        console.warn('⚠️ No team_id found in URL params, using empty plays');
         this.playData = {
           motion: [],
           set_play_inside: [],
