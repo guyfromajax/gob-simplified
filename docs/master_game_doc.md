@@ -5559,13 +5559,18 @@ teams.{team_id}.playbook_settings = {
 ### Motion Offense Dropdowns
 
 **Behavior:**
-- Each Motion row includes dropdown with options: **Inside / Attack / Outside**
-- Dropdown default: **Inside**
+- Each Motion row includes dropdown with options: **- / Inside / Attack / Outside**
+- **Default State:** Dropdown defaults to **"-"** (explicit unselected state)
+  - Users must explicitly select "Inside", "Attack", or "Outside"
+  - Makes it clear when a selection has been made vs. default state
 - **Persistence:** Selection persists when changed (stored in `motionDropdowns` state)
+  - Dropdown value is updated immediately in UI when changed
+  - State is saved to localStorage and synced to database
 - **Default Preservation:** When loading persisted state, defaults are merged with saved values (not overwritten)
-  - Ensures new Motion plays always default to "Inside" even after loading persisted state
+  - Ensures new Motion plays always default to "-" even after loading persisted state
   - Saved user selections take precedence, but defaults remain for plays without saved values
-- **Display:** Dropdown shows current selection until user changes it or leaves page
+  - All motion plays are initialized with "-" if no value exists
+- **Display:** Dropdown shows current selection immediately when changed
 
 **Integration with Slot Assignment:**
 - Motion slot assignments are keyed by dropdown variant
