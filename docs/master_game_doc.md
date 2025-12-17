@@ -5205,7 +5205,7 @@ The Playcall Center allows users to override playcalls for their team. Overrides
 
 ### Player Image Assignment System
 
-Player headshots in the Playcall Center are assigned once when returning to `court.html` from lineup/game plan screens. The system uses the same logic as the backend to extract the intended shooter from each play's successful skeleton.
+Player headshots in the Playcall Center are assigned once when returning to `court.html` from lineup/game plan screens. The system uses different logic for Set Plays vs Motion Plays.
 
 **Process (SS&S - January 2025):**
 
@@ -5213,30 +5213,49 @@ Player headshots in the Playcall Center are assigned once when returning to `cou
 
 2. **Fetch Play Documents:** For each of the 6 offensive plays, fetches the play document from `/api/play/{play_name}`
 
-3. **Extract Intended Shooter from Skeleton:**
+3. **Determine Play Type:**
+   - Checks `play.play_type` to determine if it's a Motion play or Set Play
+   - Uses different logic based on play type
+
+4. **Set Plays - Extract Intended Shooter from Skeleton:**
    - Gets the successful skeleton from `play.skeletons.successful` (same as backend: `get_hco_skeleton(None, game, lean_score=1.0)`)
    - Extracts intended shooter position from the final step's `pos_actions` where `action == "shoot"`
    - Uses the same logic as backend `phase_resolution.py` (lines 1011-1017)
 
-4. **Map Position to Player ID:**
+5. **Motion Plays - Analyze Steps 1-6 for Most Likely Shooter:**
+   - Gets the `base_loop` skeleton from `play.skeletons.base_loop`
+   - Analyzes steps 1-6 (excluding step 0) to count shot opportunities for each player
+   - **Inside Shots:** Player with most opportunities to take inside shot:
+     - Counts when player handles ball at inside spot (lower lowPost, lower midPost, midLane, basketSpot, upper lowPost, upper midPost)
+     - Counts when player receives pass at inside spot (viable pass opportunity)
+   - **Outside/Attack Shots:** Player who handles ball at outside shot spot the most:
+     - Counts when player handles ball at any non-inside location
+     - Same player image used for both Outside and Attack (since outside spots are also attack-possible spots)
+   - If tie between players, chooses randomly
+   - Uses `data-focus` attribute from play option to determine which shot type to analyze
+
+6. **Map Position to Player ID:**
    - Reads user's lineup from URL parameters (preserved by `TimeoutNavigationHelper`)
-   - Maps the intended shooter position (C, PG, SG, SF, PF) to the corresponding player ID from the lineup
+   - Maps the shooter position (C, PG, SG, SF, PF) to the corresponding player ID from the lineup
    - Uses `my_team` parameter to determine which lineup to use (home or away)
 
-5. **Set Image:** Sets the headshot image using the player ID: `/static/images/players/{playerId}.png`
+7. **Set Image:** Sets the headshot image using the player ID: `/static/images/players/{playerId}.png`
 
 **Key Points:**
 - Images assigned on page load for all timeout navigation entry points
-- Uses actual intended shooter from play skeletons (not hardcoded focus-to-position mapping)
-- Matches backend logic and playcall popup behavior
+- **Set Plays:** Uses actual intended shooter from successful skeleton (not hardcoded focus-to-position mapping)
+- **Motion Plays:** Uses statistical analysis of steps 1-6 to find most likely shooter for each shot type
+- Matches backend logic for Set Plays
 - Uses lineup data from URL parameters (preserved by `TimeoutNavigationHelper`)
 - Images remain static during gameplay (no mid-game changes)
 - Function is async to handle API calls to fetch play documents
-- Location: `FrontEnd/static/court.html` `populatePlayHeadshots()` function (lines 2484-2570)
+- Location: `FrontEnd/static/court.html` `populatePlayHeadshots()` function (lines 2546-2750)
 
 **Why This Is SS&S:**
-- **Single Source of Truth:** Uses the same skeleton data and extraction logic as the backend
-- **Consistency:** Playcall Center images match the playcall popup (both use intended shooter from skeleton)
+- **Single Source of Truth:** Uses the same skeleton data as the backend
+- **Set Plays:** Uses intended shooter from successful skeleton (matches backend and playcall popup)
+- **Motion Plays:** Uses actual skeleton analysis to determine most likely shooter (reflects dynamic nature of Motion offense)
+- **Consistency:** Images set once at timeout navigation return, remain stable during gameplay
 - **Accuracy:** Shows the actual intended shooter for each play, not a heuristic based on play focus
 - **Maintainability:** If skeleton data changes, both backend and frontend automatically reflect the change
 
